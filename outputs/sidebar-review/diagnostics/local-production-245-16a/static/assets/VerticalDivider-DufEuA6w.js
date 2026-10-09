@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";function n(){return(0,r.jsx)(`div`,{className:`h-5 w-px bg-subtle`,"aria-hidden":`true`})}var r;function i(){return(i=e((()=>{r=t()})))()}export{i as n,n as t};

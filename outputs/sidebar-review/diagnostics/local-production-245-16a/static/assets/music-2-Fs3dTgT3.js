@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./createLucideIcon-DKtuYzxz.js";var r,i;function a(){return(a=e((()=>{t(),r={name:`music-2`,size:24,node:[[`circle`,{cx:`8`,cy:`18`,r:`4`,key:`1fc0mg`}],[`path`,{d:`M12 18V2l7 4`,key:`g04rme`}]]},r.node,i=n(r)})))()}export{a as n,i as t};

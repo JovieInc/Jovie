@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{t as n}from"./jsx-runtime-BbDfbRii.js";function r(){return(0,o.useContext)(s)}function i({children:e}){let t=r();return(0,a.jsx)(a.Fragment,{children:t?c:e})}var a,o,s,c;function l(){return(l=e((()=>{a=n(),o=t(),s=(0,o.createContext)(!1),c=`•••`})))()}export{l as n,i as t};

@@ -1,0 +1,12 @@
+{
+  "lastBootedAt": "2026-10-08T09:08:42Z",
+  "dataPath": "/Users/timwhite/Library/Developer/CoreSimulator/Devices/7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5/data",
+  "dataPathSize": 3690287104,
+  "logPath": "/Users/timwhite/Library/Logs/CoreSimulator/7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5",
+  "udid": "7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5",
+  "isAvailable": true,
+  "logPathSize": 765952,
+  "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max",
+  "state": "Shutdown",
+  "name": "iPhone 17 Pro Max"
+}

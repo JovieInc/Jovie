@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{a as t}from"./column-snap-ywFjibCu.js";import{i as n}from"./useLegacyTable-D0InwJu7.js";function r(){return{accessor:(e,t)=>typeof e==`function`?{...t,accessorFn:e}:{...t,accessorKey:e},columns:e=>e,display:e=>e,group:e=>e}}function i(){return r()}function a(){return(a=e((()=>{t(),n()})))()}export{a as n,i as t};

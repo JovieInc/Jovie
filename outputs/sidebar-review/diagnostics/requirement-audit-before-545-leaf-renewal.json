@@ -1,0 +1,491 @@
+{
+  "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "nativeHead": "545b383925854b8a1632fffe9b48087fe88f6e37",
+  "contract": "/Users/timwhite/Documents/Codex/2026-10-07/goal-make-the-left-rail-sidebar/outputs/sidebar-implementation-spec.md",
+  "audit": "completion unproven; requirements retain original scope",
+  "requirements": [
+    {
+      "id": "permanent-anchor-and-density",
+      "requirement": "244px rail, permanent logo/toggle,44px header,28px visible rows,16px icons,44px touch targets",
+      "source": [
+        "AppShellFrame",
+        "UnifiedSidebar",
+        "RailToggleButton"
+      ],
+      "proofPath": [
+        "shared Jovie/Ovie rail geometry",
+        "touch Jovie/Ovie controls",
+        "canonical sidebar light/dark"
+      ],
+      "currentStatus": "Current245 browser geometry/touch/light-dark cases passed"
+    },
+    {
+      "id": "floating-geometry",
+      "requirement": "toolbar+8px,zero allocation,stable anchors/main/scroll; pinned and floating body bounds",
+      "source": [
+        "AppShellFrame",
+        "AuthShell",
+        "sidebar/sidebar"
+      ],
+      "proofPath": [
+        "shared rail geometry",
+        "floating rail repeated reversals"
+      ],
+      "currentStatus": "Current245 unchanged geometry/reversal cases passed; measured main/header/scroll stable"
+    },
+    {
+      "id": "native-window-controls",
+      "requirement": "derive native clearance and preserve drag/no-drag and traffic lights",
+      "source": [
+        "globals.css: --electron-traffic-light-safe-width=env(titlebar-area-x,72px)",
+        "DesktopTitlebar"
+      ],
+      "proofPath": [
+        "DesktopTitlebar unit/structural browser cases"
+      ],
+      "currentStatus": "source derives native CSS env; actual Mac window geometry missing"
+    },
+    {
+      "id": "intent-and-persistence",
+      "requirement": "pinned/collapsed/floating/drawer; explicitpin only;mobile cannot overwrite desktop",
+      "source": [
+        "SidebarProvider",
+        "useRailPreview",
+        "useSidebarCookieState"
+      ],
+      "proofPath": [
+        "provider regression: hover promotes to explicit",
+        "mobile desktop preference reload",
+        "keyboard pinning"
+      ],
+      "currentStatus": "27 focused regressions passed; all4 current CI coverage shards and unchanged25-case matrix passed"
+    },
+    {
+      "id": "motion-and-theme",
+      "requirement": "interruptible220ms, reduced0,light/dark/contrast/transparency",
+      "source": [
+        "rail-motion",
+        "useRailMotionPhase",
+        "shell CSS"
+      ],
+      "proofPath": [
+        "reduced-motion RTL",
+        "canonical sidebar light/dark"
+      ],
+      "currentStatus": "Current245 reduced-motion RTL/light-dark browser cases passed; physical motion unproven"
+    },
+    {
+      "id": "permitted-roots-and-utilities",
+      "requirement": "JovieHome/Profiles/Work/Audience;Ovieexisting5roots;all permitted utilities/aliases;deniedexcluded",
+      "source": [
+        "DashboardNav/config/capacity",
+        "operator-navigation"
+      ],
+      "proofPath": [
+        "complete permitted operator collection",
+        "DashboardNav/config/capacity tests"
+      ],
+      "currentStatus": "Current245 local coverage and fixture browser passed; real authenticated route proof missing"
+    },
+    {
+      "id": "more-and-search",
+      "requirement": "max384px/viewport;one submenu/mobileBack;12inline retains current;full scoped permitted search",
+      "source": [
+        "SidebarMoreMenu",
+        "useSidebarPageSearch",
+        "CmdKPalette",
+        "CommandPalette"
+      ],
+      "proofPath": [
+        "120th page actual mocked router selection",
+        "phone Find a page",
+        "complete operator palette"
+      ],
+      "currentStatus": "Current245 full120-page search/navigation case passed,12inline; menuReact max9.8ms, palette3.3ms; raw CPUprofile preserved"
+    },
+    {
+      "id": "personal-pins",
+      "requirement": "fullallowedIDs,auth/workspace scope,insertionorder,no countcap,bounded140px region;revoked/corrupt/deniedsafe",
+      "source": [
+        "useSidebarPins",
+        "SidebarMoreMenu",
+        "UnifiedSidebar"
+      ],
+      "proofPath": [
+        "SidebarMoreMenu current page120 pin/unpin",
+        "useSidebarPins account/permission/storage tests"
+      ],
+      "currentStatus": "Current245 CI coverage passed; native policy previously fully exercised; authenticated pin UI proof missing"
+    },
+    {
+      "id": "recent",
+      "requirement": "320x320 clamped,5realcached Today/Earlier/status;fixedheader/footer;loading/empty/error/retry",
+      "source": [
+        "SidebarRecentMenu",
+        "SidebarThreadsSection"
+      ],
+      "proofPath": [
+        "SidebarRecentMenu state tests",
+        "long Recent labels fixture",
+        "mobile Recent Back"
+      ],
+      "currentStatus": "Web245 unchanged proof retained; native4b Today/Earlier uses real ISO dates/device Calendar and freezes IDs+group buckets; delayed first load/midnight/reopen/live updates/scopes/removal policy tests passed; populated largest-text UI/scroll anchors and recording passed"
+    },
+    {
+      "id": "private-history",
+      "requirement": "private Summer API,scopedcache;no public fallback;ordering/status/readsemantics",
+      "source": [
+        "SidebarSummerRecentMenu",
+        "SidebarThreadsSection"
+      ],
+      "proofPath": [
+        "Ovie private Summer door and resume",
+        "recent/read state unit tests"
+      ],
+      "currentStatus": "Current245 fixture private Summer read/resume case passed; native explicit web door preserved; full native parity unproven"
+    },
+    {
+      "id": "interaction-ownership",
+      "requirement": "160ms hover/180ms exit,explicitsticky,ownedportals,deepestEscape/focus/outsideclick",
+      "source": [
+        "useRailPreview",
+        "useSidebarFlyout",
+        "useRailFocusReturn"
+      ],
+      "proofPath": [
+        "27 current focused preview/provider/reversible tests",
+        "nested portal/mobile keyboard cases"
+      ],
+      "currentStatus": "27 focused regressions and unchanged current25-case matrix passed"
+    },
+    {
+      "id": "updater-and-whats-new",
+      "requirement": "fixed32px attention,updatepriority,max3highlights,retry/realprogress/draftdeferral",
+      "source": [
+        "RuntimeUpdateProvider",
+        "DesktopUpdateProvider",
+        "DesktopUpdateModal",
+        "WhatsNewBanner"
+      ],
+      "proofPath": [
+        "attention/audio/inspector coexistence",
+        "updater failure/download/work-state tests"
+      ],
+      "currentStatus": "Current245 related CI and combined-state browser cases passed"
+    },
+    {
+      "id": "audio-and-footer",
+      "requirement": "bottom account stable,64pxcompactdock,exclusivemini/full,non-navprogress/failure recovery",
+      "source": [
+        "SidebarBottomNowPlayingBridge",
+        "AppShellFrame",
+        "UnifiedSidebar"
+      ],
+      "proofPath": [
+        "1024/1440/1920 detached composer cases",
+        "audio bridge tests"
+      ],
+      "currentStatus": "Current245 related CI and 1024/1440/1920 short-height composer/audio cases passed"
+    },
+    {
+      "id": "native-adaptation",
+      "requirement": "sharedhierarchy,boundedtouchpanels,gestures/safeareas/composer/large text",
+      "source": [
+        "native3cdda15bd684 RootView/AppShellView/AppShellLeftDrawer"
+      ],
+      "proofPath": [
+        "14semantic policy/layout tests",
+        "largest accessibility text UI case"
+      ],
+      "currentStatus": "Native4b: full CI unit686/686 and selected19semantic+10UI pass,0skip; recording1/1; drawer1704/1868. Native Ovie five operator roots/authorized overflow remain incomplete; concrete current-source route/auth/AASA audit ongoing; no hitch/physical120Hz/VoiceOver proof"
+    },
+    {
+      "id": "recovery-and-scope",
+      "requirement": "offline/storagedenial/corruption/hydration/accountswitch/updater/playback failure",
+      "source": [
+        "relevant state owners and scoped preference helpers"
+      ],
+      "proofPath": [
+        "Sidebar hydration",
+        "storage/read/pin policy tests",
+        "update/media failures"
+      ],
+      "currentStatus": "Current245 related CI passed; native3cdda Recent failure/cache/pins policy fully exercised; older offline/reduced-motion receipts remain distinct"
+    },
+    {
+      "id": "responsive-matrix",
+      "requirement": "320/375/390/768/1024/1440/1920,short,200%zoom,RTL/longtext,combinedupdate/audio/inspector",
+      "source": [
+        "existing two Storybook specs"
+      ],
+      "proofPath": [
+        "25-case current browser matrix"
+      ],
+      "currentStatus": "Current24525/25passed0skip0flaky; successful1440Jovie/390Ovie recordings saved outside perf sampling"
+    },
+    {
+      "id": "performance",
+      "requirement": "16.7ms60Hz/8.3ms120Hz,no sidebar task>50ms; numericRAF/React/LongTasks separate",
+      "source": [
+        "existing large-page test CPUprofile attachment",
+        "rail RAF sampler"
+      ],
+      "proofPath": [
+        "full25-case run with CPUprofile and retained traces"
+      ],
+      "currentStatus": "Current245 no longtasks; rail max9.5ms; complete flow p9526.7/max33.6ms exceeds frame budgets; historical95/99ms retained; physical120Hz unproven; synchronized dev capture-off max33.4ms/capture-on40.7ms preserved; production comparison awaits qualified compiler16a dependency composition; native4b expanded empty-panel roundtrip Clock mean4.28928s, no exportedhitch, populated fixture covered outside metric windows"
+    },
+    {
+      "id": "delivery-and-proof",
+      "requirement": "realCI selector/meaningful changed coverage,exact-build browser/Mac/iOS recordings,sourcehooks and caps",
+      "source": [
+        "existing CI/coverage runner",
+        "branch metadata/provenance"
+      ],
+      "proofPath": [
+        "18-task typecheck",
+        "fourCI coverage shards",
+        "25 browser cases",
+        "native14+1"
+      ],
+      "currentStatus": "Current24518typechecks/4CIcoverage/25browser passed; publication authority held; Mac/deployed/physical proof missing"
+    }
+  ],
+  "currentNativeCiAudit": {
+    "head": "545b383925854b8a1632fffe9b48087fe88f6e37",
+    "tree": "105ef3d9a6c586b5380628d180f5f11830eff8eb",
+    "sourceFiles": {
+      "apps/ios/Jovie/App/AppRouteManifest.swift": "593bd5c228e8c09d8ead8247df20a9de5bd07d8b",
+      "apps/ios/Jovie/App/RootView.swift": "3d0ec909678e4d7f50a2e55645de97e2c82effb6",
+      "apps/ios/Jovie/Core/ChatRepository.swift": "a9d07528ad007eb92bc5e1256159957fef99c38a",
+      "apps/ios/Jovie/DesignSystem/JovieTheme.swift": "750bb6a2d724c148e56bfba5be5831fcef111a0e",
+      "apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift": "34052c7f9c63aaaeee791725b76828e8ef92365d",
+      "apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift": "aa85dce5b681580b646fed0118c34cd4613412e9",
+      "apps/ios/Jovie/Features/AppShell/AppShellView.swift": "09472facec00f20920809d14a199817bd04daa03",
+      "apps/ios/JovieTests/AppRouteManifestTests.swift": "ef5caa725d5a4319a8b6cce3cc3a43da08720515",
+      "apps/ios/JovieTests/AppShellDrawerThreadsFilterTests.swift": "0dad5c7765f8d8796453a1104ba3d464e9ea30c8",
+      "apps/ios/JovieTests/AppShellIntentNavigationTests.swift": "c3abfd34496ae6611056472ba0e9a6e9626152a8",
+      "apps/ios/JovieTests/AppShellTabBarTests.swift": "5ec7ed59b73b755d63086a37ef257bf5401ff922",
+      "apps/ios/JovieTests/ChatRepositoryTests.swift": "8bf20b5c7f1b3d3805e84d92d3fa3883f1d71839",
+      "apps/ios/JovieUITests/JovieUITests.swift": "ccd994747b8dcf2a29aeae9acd88292fe856b9c2",
+      "apps/web/lib/ios/apple-app-site-association.ts": "857ffcaec672f5e5867157105bfaf14356689d57",
+      "apps/web/tests/unit/ios/apple-app-site-association.test.ts": "27ad5f238d4c75f7ac3aa1fb55ae7880367a3c1f"
+    },
+    "baseline": "95c4afede3605e63a3dd9d2519ff843aae81f26e",
+    "filesChanged": 15,
+    "changedLines": 1213,
+    "fullCIUnit": {
+      "passed": 690,
+      "failed": 0,
+      "skipped": 0,
+      "selector": "unchanged run-unit-tests.sh;JovieUnitTests;only-testing:JovieTests;coverage YES;unchanged check_coverage.sh",
+      "appCoverage": {
+        "covered": 10709,
+        "executable": 31030,
+        "percent": 34.5117628101837
+      },
+      "intentNavigationCoverage": {
+        "covered": 219,
+        "executable": 223,
+        "percent": 98.20627802690582
+      },
+      "floor": 18,
+      "gatePassed": true,
+      "ratchetEnforced": false,
+      "baselineWarning": "No coverage_baseline.txt at this source"
+    },
+    "selectedQualification": {
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0,
+      "semantic": 23,
+      "UI": 12,
+      "text": "accessibility-extra-extra-extra-large",
+      "drawerCoverage": {
+        "covered": 2123,
+        "executable": 2293,
+        "percent": 92.58613170518971
+      }
+    },
+    "webAASA": {
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "coverageLines": "7/7",
+      "selector": "CI vitest.config.mts, forks,maxWorkers2;tests/unit/ios/apple-app-site-association.test.ts;actual canonical registry and native prefix parity"
+    },
+    "recording": {
+      "passed": 1,
+      "failed": 0,
+      "sameBuildAsSelectedQualification": true,
+      "media": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 1320,
+            "height": 2868
+          }
+        ],
+        "format": {
+          "duration": "33.708333"
+        }
+      },
+      "outsidePerformanceWindow": true,
+      "flow": "existing admin fixture;Ovie five roots/More12/full search/retained scoped pin toggle/Jovie restoration;no external page/session proof"
+    },
+    "metrics": [
+      {
+        "name": "CPU Cycles (Jovie)",
+        "unit": "kC",
+        "values": [
+          5025661.49,
+          5018318.144,
+          4920958.4,
+          5132433.609,
+          5377161.14
+        ],
+        "mean": 5094906.5566
+      },
+      {
+        "name": "Clock Monotonic Time",
+        "unit": "s",
+        "values": [
+          4.1987083610000004,
+          4.235913483,
+          4.24658812,
+          4.249670459,
+          4.329873593
+        ],
+        "mean": 4.2521508032
+      },
+      {
+        "name": "CPU Time (Jovie)",
+        "unit": "s",
+        "values": [
+          1.266964862,
+          1.3142093670000001,
+          1.309050091,
+          1.30181396,
+          1.323973271
+        ],
+        "mean": 1.3032023102
+      },
+      {
+        "name": "CPU Instructions Retired (Jovie)",
+        "unit": "kI",
+        "values": [
+          13881867.963,
+          13851778.33,
+          13856729.634,
+          13874608.39,
+          13858280.448
+        ],
+        "mean": 13864652.953
+      },
+      {
+        "name": "Memory Peak Physical (Jovie)",
+        "unit": "kB",
+        "values": [
+          88361.264,
+          88312.112,
+          88262.96,
+          94062.896,
+          94505.264
+        ],
+        "mean": 90700.89920000001
+      },
+      {
+        "name": "Memory Physical (Jovie)",
+        "unit": "kB",
+        "values": [
+          2621.44,
+          1605.632,
+          1605.632,
+          8142.848,
+          1458.176
+        ],
+        "mean": 3086.7455999999997
+      },
+      {
+        "name": "Absolute Memory Physical (Jovie)",
+        "unit": "kB",
+        "values": [
+          87492.912,
+          87443.76,
+          87394.608,
+          93882.672,
+          93653.296
+        ],
+        "mean": 89973.4496
+      }
+    ],
+    "performanceScope": "existing creator empty-Recent/More/Back/Profile/Chat flow;Ovie hierarchy has separate UI/recording only;Clock includes automation waits",
+    "namedHitchExported": false,
+    "existingHitchCollectorAlreadyPresent": true,
+    "allOperatorDestinations": "20 canonical registry entries,explicit webOnly kinds;no false native selected Safari route",
+    "privateHistoryProof": "explicit existing web door only;no private native history acceptance",
+    "unproven": [
+      "protected in-app operator composition/same-account web session/back/active/drafts/media acceptance",
+      "production245+16a renderer/frame diagnostic execution",
+      "physical120Hz and human VoiceOver",
+      "hosted CI/native queue/deployment/authenticated runtime",
+      "complete goal"
+    ],
+    "publicationActionActive": false,
+    "publishNow": false,
+    "sourceClean": true,
+    "ownedSimulatorRestored": true,
+    "artifactSHA256": {
+      "ci-unit-coverage.json": "66d8d6658d65a48df4a927ffe1aa703dcc9321babb88ec6ba12d52a583192f51",
+      "ci-unit-restored-state.json": "8ba573a8620a3213b43b456ca82727b212907f675a64108a36cc33262627f0b8",
+      "ci-unit-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+      "ci-unit-summary.json": "5c4c12170703620f4cdfb8f9171a08a500e6532e7d721a9462bfa711998bd08a",
+      "ci-unit.log": "8a3c7a45955ed84f71c0824c9b5526ec4ed3cb9d06127985c69e839b368c4691",
+      "ci-unit.sh": "50f20cde406171e83e4f79cce8e3af33e8d2798423783e1a74d7ab7bd8b79c67",
+      "media.json": "95ce8569f75a1ed55f32b81a5b2659e78cecff8fe2079db5bb8011419e303567",
+      "publication.log": "6df7603f2c4afc1b8e10fc2349ecc7cc697bc87241bebb0c4de79980222d5754",
+      "qualified-coverage.json": "1a10d4bf9e4d27784e1500bf18198394731ae9d32619e481d93e3946ec441d33",
+      "qualified-metrics.json": "f8398542f28432032ff0e5704b3245247354b216ed9057076666fa43406644bc",
+      "qualified-summary.json": "81935f41e20d25e3ea056972f4b941460f8ec27e4d6d3977ea77a7b2143b5d0f",
+      "qualified.log": "f95eae60c1e05e4165d1c477ecb8a2cdee61455f85d24f602fec3079f02596c8",
+      "qualified.sh": "7e457602e743204f41afd53e56e3cb1089739dc2f620ea2c39527e82a31b5875",
+      "record-frame32.png": "daa54d03421f20d4d1759c8afe9c90ad27c1fb203d4d9a78a80dcf12d246abb4",
+      "record-restored-state.json": "a26f736f893511e8ecdcae51199443da2c5ac150189a3e73ba5322e0dc62e9d4",
+      "record-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+      "record-screenshots/ios-shared-sidebar-ovie-operator-roots.png": "a9554ca49e657a1db8a77840512d8d4212a88c106cf47f5e7863e059ed87edd7",
+      "record-summary.json": "f04a43313fc206decef759fdd4bd7321f98b5ac2adb3518216f57fcc80e3cbca",
+      "record-video.log": "fab94b5551b4c1f352268b83fc7b56e2c2c796c64118be538b2a93dee26baff5",
+      "record.log": "c2281f238070c04eff5caa4a7d2797ce4d5ca692d42506d4e567a3e786e1bede",
+      "record.sh": "7f4f2162dd4cfb4e4d5dcae58ff01936038ae9bae08a76da79031d10a37b6cc6",
+      "restored-state.json": "2c483e256567d04ca486d7e2170c59beecfb8349e588c318b49ef055a9a7b305",
+      "restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+      "screenshots/drawer-base-plane-occluded-closed.png": "25875777c6b83f41c57e9671827d30470b2a0fb059fb52377aad920fb80225b4",
+      "screenshots/ios-canonical-information-architecture.png": "f502306424795f5851db60e53f4c5b81e1a70e89ee25d34cfbc9d8d8002bee6a",
+      "screenshots/ios-offline-stable-toolbar.png": "d79cf4ea307d4c551cd71da8161bfa618f43cfbf06ca7d7e962864ceb0c77be3",
+      "screenshots/ios-shared-sidebar-footer-probe.png": "b62a94de77749a201b285fdf78ba9e82e9f14cac85063cfe0fcc834079ebd7ae",
+      "screenshots/ios-shared-sidebar-grouped-recent.png": "4475ea43cbda5c20f1b93d1abd36457093ae383d0f5aba7fa7f24419bf67e723",
+      "screenshots/ios-shared-sidebar-more.png": "86f03ae760bec3574d88645717b2f75b7f12aa1c7b5032ebe1b3f39a92942493",
+      "screenshots/ios-shared-sidebar-ovie-operator-roots.png": "e1d81ef1724785637f46cf0c8b2394f95b6996e01ddd2d792d0661e1b9363263",
+      "screenshots/ios-shared-sidebar-recent.png": "18a89d7ecb4d8c5de47ac7f195c017e69bd51159b419a3192c8dcd9eb7faef75",
+      "sidebar-native-ovie-commit.log": "63c6d92e6807ec8344a4c79cfba516dbe7c35aca63d79ea59559681ab8bf5570",
+      "sidebar-native-ovie-panel-commit.log": "181ca0629fb187d0807cf49657064c105f8aab0e79492dc59ad2c8cdb88b214f",
+      "sidebar-native-ovie-pin-commit.log": "6dfec70da08dd69a508a140d53f5b5e3e717e2e1e8226e970c6abb36aa9b8434",
+      "sidebar-ovie-final-aasa-tests.log": "095f08a2a011ecea4d41f111f8bb9cfc52f3757ccd36fe7d09ee87f52f46bfbf",
+      "success.mov": "d40412a0ccc4d49961175d34c47eaf442cc043d3d5e1f93510a264f94e5abec5",
+      "success.mp4": "9226cb9c038722abacc182f104334f3efe1e8e80ecc2bf638753394172fa3bae",
+      "web-aasa-coverage-final.json": "12cd36249283dad2ed18d1fe064195bfb44b958049e2a47f76dd44d45d9f0a74"
+    },
+    "gbrainReceipt": {
+      "slug": "receipts/shared-sidebar-native-ovie-adapter-545b3839-2026-10-08",
+      "contentHash": "ddb2e5276aa2023530e20532373d8b5a47ea17015991f157bfd9080b39c5ed21",
+      "fullBodyMatch": true,
+      "verifiedAt": "2026-10-08T08:50:18.669Z"
+    }
+  },
+  "publicationPolicy": "publication-policy.json",
+  "nativeOvieBoundedAdapter": "20 canonical typed webOnly destinations;5roots/More12+full15search/scoped pins;complete URL paired native/AASA fallback locally qualified",
+  "nativeOvieFullParity": "unresolved protected in-app/session/private history/back/current URL/draft-media acceptance",
+  "publicationActionActive": false
+}

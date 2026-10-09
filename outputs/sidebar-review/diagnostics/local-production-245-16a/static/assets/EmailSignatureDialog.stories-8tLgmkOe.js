@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./EmailSignatureDialog-CsYWXGIO.js";var r,i,a,o;function s(){return(s=e((()=>{t(),r={title:`Dashboard/Molecules/EmailSignatureDialog`,component:n,parameters:{layout:`centered`},args:{open:!0,onClose:()=>{},input:{name:`Sasha Waves`,handle:`sashawaves`,tagline:`Independent artist`,avatarUrl:null,socials:[{label:`Instagram`,url:`https://instagram.com/sashawaves`},{label:`Spotify`,url:`https://open.spotify.com/artist/sashawaves`}],latestRelease:{title:`Skyline Dreams`,url:`https://jov.ie/sashawaves/skyline-dreams`,artworkUrl:null}}}},i={},a={args:{input:null}},o=[`Open`,`NoInput`],i.parameters={...i.parameters,docs:{...i.parameters?.docs,source:{originalSource:`{}`,...i.parameters?.docs?.source}}},a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{
+  args: {
+    input: null
+  }
+}`,...a.parameters?.docs?.source}}}})))()}s();export{a as NoInput,i as Open,o as __namedExportsOrder,r as default};

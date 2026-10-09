@@ -1,0 +1,24 @@
+{
+  "firstFacts": {
+    "rows": 13,
+    "lastFocused": true,
+    "lastHref": "/app/calendar",
+    "menu": {
+      "y": 60,
+      "height": 382
+    },
+    "last": {
+      "top": 405,
+      "bottom": 437
+    },
+    "noHorizontalOverflow": true,
+    "renders": []
+  },
+  "escapeFocused": true,
+  "searchFacts": {
+    "focused": true,
+    "pages": 120
+  },
+  "optionVisible": true,
+  "selected": "/app/calendar"
+}

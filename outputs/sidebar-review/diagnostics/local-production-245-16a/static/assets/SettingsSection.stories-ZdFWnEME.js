@@ -1,0 +1,7 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{r as n,t as r}from"./button-BSHhPV4e.js";import{n as i,t as a}from"./SettingsPanel-C5KHHcGC.js";import{r as o,t as s}from"./rendered-family-DM7S6Kg-.js";import{n as c,t as l}from"./SettingsSection-ASx6BKxx.js";var u,d,f,p,m;function h(){return(h=e((()=>{u=t(),n(),o(),i(),c(),d={title:`Dashboard/Organisms/SettingsSection`,component:l,parameters:{layout:`fullscreen`},decorators:[(e,t)=>(0,u.jsx)(s,{name:`settings-section`,owner:`SettingsSection`,interactive:!!t.args.headerAction,children:(0,u.jsx)(e,{})})],args:{id:`audience`,title:`Audience & Tracking`,description:`Fan verification, opt-ins, and tracking.`,children:(0,u.jsx)(a,{title:`Audience verification`,description:`Control whether new fans must confirm their email.`,bodyClassName:`px-4 py-4 sm:px-5`,children:(0,u.jsx)(`p`,{className:`text-app text-secondary-token`,children:`Settings content`})})}},f={},p={args:{headerAction:(0,u.jsx)(r,{variant:`secondary`,size:`sm`,children:`View Profile`})}},m=[`Default`,`WithHeaderAction`],f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{}`,...f.parameters?.docs?.source}}},p.parameters={...p.parameters,docs:{...p.parameters?.docs,source:{originalSource:`{
+  args: {
+    headerAction: <Button variant='secondary' size='sm'>
+        View Profile
+      </Button>
+  }
+}`,...p.parameters?.docs?.source}}}})))()}h();export{f as Default,p as WithHeaderAction,m as __namedExportsOrder,d as default};

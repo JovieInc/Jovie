@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./UsageLimitUpgradePrompt-sag04tnj.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Molecules/UsageLimitUpgradePrompt`,component:r,parameters:{layout:`centered`,backgrounds:{default:`dark`}},decorators:[e=>(0,i.jsx)(`div`,{style:{width:`32rem`},children:(0,i.jsx)(e,{})})],args:{current:12,limit:15,featureName:`weekly messages`,upgradeCopy:`70 messages per week`}},o={},s={args:{current:15}},c=[`NearLimit`,`Exhausted`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    current: 15
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{s as Exhausted,o as NearLimit,c as __namedExportsOrder,a as default};

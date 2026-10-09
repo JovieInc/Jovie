@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ReleaseDueBadge-DsVBzF_v.js";function i({dueDate:e,dueDaysOffset:t,isCompleted:n,onSetDate:i}){return(0,a.jsx)(r,{dueDate:e,dueDaysOffset:t,isCompleted:n,onSetDate:i})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

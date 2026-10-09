@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";var t;function n(){return(n=e((()=>{t={desktopSplitRoute:`desktop-split-route`,interceptedModal:`intercepted-modal`,desktopReturnHandoff:`desktop-return-handoff`,stackRoute:`stack-route`},t.stackRoute,t.interceptedModal,t.desktopReturnHandoff})))()}export{n,t};

@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./AdminVerificationRequired-SFDFxgnl.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Features/Admin/AdminVerificationRequired`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,i.jsx)(`div`,{className:`w-96 bg-surface-1 p-4`,children:(0,i.jsx)(e,{})})]},o={},s={args:{message:`Admin verification required to load pipeline settings.`}},c=[`Default`,`CustomMessage`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    message: 'Admin verification required to load pipeline settings.'
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{s as CustomMessage,o as Default,c as __namedExportsOrder,a as default};

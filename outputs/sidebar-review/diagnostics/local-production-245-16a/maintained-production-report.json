@@ -1,0 +1,907 @@
+{
+  "config": {
+    "configFile": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/playwright.config.storybook.ts",
+    "rootDir": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e",
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/timwhite/.codex/worktrees/94af/Jovie/outputs/sidebar-review/diagnostics/local-production-245-16a/maintained-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/storybook-*.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "storybook-canonical-sidebar.spec.ts",
+      "file": "storybook-canonical-sidebar.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "canonical sidebar keeps geometry and keyboard actions in dark",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 837,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:01.193Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ce6517a9e5a83ce75d74-077012c3b7d1acbecf91",
+          "file": "storybook-canonical-sidebar.spec.ts",
+          "line": 4,
+          "column": 7
+        },
+        {
+          "title": "canonical sidebar keeps geometry and keyboard actions in light",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 677,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:02.215Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ce6517a9e5a83ce75d74-242342c628a09dbcb3d2",
+          "file": "storybook-canonical-sidebar.spec.ts",
+          "line": 4,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "title": "storybook-shared-sidebar.spec.ts",
+      "file": "storybook-shared-sidebar.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "shared Jovie rail keeps vertical geometry and exclusive controls",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 922,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:02.901Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-99bd27b82e6ad4ad7dc1",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 16,
+          "column": 7
+        },
+        {
+          "title": "shared Ovie rail keeps vertical geometry and exclusive controls",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 844,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:03.827Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-79b2f6efd575aa1940d5",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 16,
+          "column": 7
+        },
+        {
+          "title": "compact overflow stays in its drawer at 320px",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 673,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:04.675Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-34458de7294794fd7680",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 110,
+          "column": 7
+        },
+        {
+          "title": "compact overflow stays in its drawer at 375px",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 670,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:05.353Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-c645e031421d7262d776",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 110,
+          "column": 7
+        },
+        {
+          "title": "compact overflow stays in its drawer at 390px",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 682,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:06.026Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-622cf48d06c127239aaa",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 110,
+          "column": 7
+        },
+        {
+          "title": "compact overflow stays in its drawer at 768px",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 695,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:06.712Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-98c1f45e8094eb1434a0",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 110,
+          "column": 7
+        },
+        {
+          "title": "Recent stays within the mobile drawer with a reversible Back action",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 714,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:07.411Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-da64b51ff5e5dcf92e08",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 145,
+          "column": 5
+        },
+        {
+          "title": "detached media preserves the real composer at 1024px and short height",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 723,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:08.128Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-aa1698e0359a15f385c9",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 168,
+          "column": 7
+        },
+        {
+          "title": "detached media preserves the real composer at 1440px and short height",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 695,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:08.855Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-e5db8fdd5936e629ce38",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 168,
+          "column": 7
+        },
+        {
+          "title": "detached media preserves the real composer at 1920px and short height",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 722,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:09.555Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-b68d75de831af94bbf18",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 168,
+          "column": 7
+        },
+        {
+          "title": "keyboard pinning preserves focus and reduced-motion RTL geometry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 590,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:10.280Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-f7df7b54c8a58c08faa5",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 212,
+          "column": 5
+        },
+        {
+          "title": "mobile toggles preserve the saved desktop preference across reload",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 834,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:10.875Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-6d3608d7421cd2fccbda",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 248,
+          "column": 5
+        },
+        {
+          "title": "floating rail preserves the main plane during repeated reversals",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 728,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:11.714Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "rail-performance-summary",
+                      "contentType": "application/json",
+                      "body": "eyJmcmFtZXMiOjE1LCJpbnRlcnZhbE1lZGlhbk1zIjo4LjM5OTk5OTk5OTk5OTk3NywiaW50ZXJ2YWxQOTVNcyI6NDMuMTAwMDAwMDAwMDAwMDIsImludGVydmFsTWF4TXMiOjQzLjEwMDAwMDAwMDAwMDAyLCJmcmFtZXNPdmVyNjBIekJ1ZGdldCI6MSwiZnJhbWVzT3ZlcjEyMEh6QnVkZ2V0Ijo4LCJsb25nVGFza0NvdW50IjowLCJsb25nZXN0VGFza01zIjowLCJhdHRyaWJ1dGlvbiI6IkJyb3dzZXItZG9jdW1lbnQgdGltaW5nIG9uIGEgc2hhcmVkIGJ1c3kgaG9zdDsgdGFzayBlbnRyaWVzIGRvIG5vdCBpZGVudGlmeSBzaWRlYmFyIG93bmVyc2hpcC4gVGhpcyBkaXNwbGF5IGlzIG5vdCBhIHBoeXNpY2FsIDEyMEh6IHJlY2VpcHQuIn0="
+                    },
+                    {
+                      "name": "rail-frame-measurement",
+                      "contentType": "application/json",
+                      "body": "eyJzYW1wbGVzIjpbeyJ0aW1lIjo1MjkuNywiYm91bmRzIjp7Im1haW4iOlsyNCw2MCwxNDAwLDY0NF0sImhlYWRlciI6WzE2LDgsMTQxNiw0NF0sImZvb3RlciI6WzAsNjMxLDAsODFdLCJhY2NvdW50IjpbMTIsNjcyLDAsMzJdLCJuYXZpZ2F0aW9uIjpbOCwxNjIsMjAsMjhdfSwic2Nyb2xsIjpbMCwwLDAsMF19LHsidGltZSI6NTM2LjYsImJvdW5kcyI6eyJtYWluIjpbMjQsNjAsMTQwMCw2NDRdLCJoZWFkZXIiOlsxNiw4LDE0MTYsNDRdLCJmb290ZXIiOlswLDYzMSwwLDgxXSwiYWNjb3VudCI6WzEyLDY3MiwwLDMyXSwibmF2aWdhdGlvbiI6WzgsMTYyLDIwLDI4XX0sInNjcm9sbCI6WzAsMCwwLDBdfSx7InRpbWUiOjU3OS43LCJib3VuZHMiOnsibWFpbiI6WzI0LDYwLDE0MDAsNjQ0XSwiaGVhZGVyIjpbMTYsOCwxNDE2LDQ0XSwiZm9vdGVyIjpbMCw2MzEsMCw4MV0sImFjY291bnQiOlsxMiw2NzIsMCwzMl0sIm5hdmlnYXRpb24iOls4LDE2MiwyMCwyOF19LCJzY3JvbGwiOlswLDAsMCwwXX0seyJ0aW1lIjo1ODguMSwiYm91bmRzIjp7Im1haW4iOlsyNCw2MCwxNDAwLDY0NF0sImhlYWRlciI6WzE2LDgsMTQxNiw0NF0sImZvb3RlciI6WzAsNjMxLDAsODFdLCJhY2NvdW50IjpbMTIsNjcyLDAsMzJdLCJuYXZpZ2F0aW9uIjpbOCwxNjIsMjAsMjhdfSwic2Nyb2xsIjpbMCwwLDAsMF19LHsidGltZSI6NTk2LjYsImJvdW5kcyI6eyJtYWluIjpbMjQsNjAsMTQwMCw2NDRdLCJoZWFkZXIiOlsxNiw4LDE0MTYsNDRdLCJmb290ZXIiOls4LDYzMSwyNDQsODFdLCJhY2NvdW50IjpbMjAsNjcyLDIyMCwzMl0sIm5hdmlnYXRpb24iOlsxNiwxNjIsMjI4LDI4XSwicmVjZW50IjpbMTYsMzE0LDIyOCwyOF19LCJzY3JvbGwiOlswLDAsMCwwXX0seyJ0aW1lIjo2MDQuOSwiYm91bmRzIjp7Im1haW4iOlsyNCw2MCwxNDAwLDY0NF0sImhlYWRlciI6WzE2LDgsMTQxNiw0NF0sImZvb3RlciI6WzgsNjMxLDI0NCw4MV0sImFjY291bnQiOlsyMCw2NzIsMjIwLDMyXSwibmF2aWdhdGlvbiI6WzE2LDE2MiwyMjgsMjhdLCJyZWNlbnQiOlsxNiwzMTQsMjI4LDI4XX0sInNjcm9sbCI6WzAsMCwwLDBdfSx7InRpbWUiOjYxMy4zLCJib3VuZHMiOnsibWFpbiI6WzI0LDYwLDE0MDAsNjQ0XSwiaGVhZGVyIjpbMTYsOCwxNDE2LDQ0XSwiZm9vdGVyIjpbOCw2MzEsMjQ0LDgxXSwiYWNjb3VudCI6WzIwLDY3MiwyMjAsMzJdLCJuYXZpZ2F0aW9uIjpbMTYsMTYyLDIyOCwyOF0sInJlY2VudCI6WzE2LDMxNCwyMjgsMjhdfSwic2Nyb2xsIjpbMCwwLDAsMF19LHsidGltZSI6NjIwLjMsImJvdW5kcyI6eyJtYWluIjpbMjQsNjAsMTQwMCw2NDRdLCJoZWFkZXIiOlsxNiw4LDE0MTYsNDRdLCJmb290ZXIiOlstMjQ0LDYzMSwyNDQsODFdLCJhY2NvdW50IjpbLTIzMiw2NzIsMjIwLDMyXSwibmF2aWdhdGlvbiI6Wy0yMzYsMTYyLDIyOCwyOF19LCJzY3JvbGwiOlswLDAsMCwwXX0seyJ0aW1lIjo2MzAuMiwiYm91bmRzIjp7Im1haW4iOlsyNCw2MCwxNDAwLDY0NF0sImhlYWRlciI6WzE2LDgsMTQxNiw0NF0sImZvb3RlciI6Wy0yNDQsNjMxLDI0NCw4MV0sImFjY291bnQiOlstMjMyLDY3MiwyMjAsMzJdLCJuYXZpZ2F0aW9uIjpbLTIzNiwxNjIsMjI4LDI4XX0sInNjcm9sbCI6WzAsMCwwLDBdfSx7InRpbWUiOjYzOC4yLCJib3VuZHMiOnsibWFpbiI6WzI0LDYwLDE0MDAsNjQ0XSwiaGVhZGVyIjpbMTYsOCwxNDE2LDQ0XSwiZm9vdGVyIjpbOCw2MzEsMjQ0LDgxXSwiYWNjb3VudCI6WzIwLDY3MiwyMjAsMzJdLCJuYXZpZ2F0aW9uIjpbMTYsMTYyLDIyOCwyOF0sInJlY2VudCI6WzE2LDMxNCwyMjgsMjhdfSwic2Nyb2xsIjpbMCwwLDAsMF19LHsidGltZSI6NjQ2LjYsImJvdW5kcyI6eyJtYWluIjpbMjQsNjAsMTQwMCw2NDRdLCJoZWFkZXIiOlsxNiw4LDE0MTYsNDRdLCJmb290ZXIiOls4LDYzMSwyNDQsODFdLCJhY2NvdW50IjpbMjAsNjcyLDIyMCwzMl0sIm5hdmlnYXRpb24iOlsxNiwxNjIsMjI4LDI4XSwicmVjZW50IjpbMTYsMzE0LDIyOCwyOF19LCJzY3JvbGwiOlswLDAsMCwwXX0seyJ0aW1lIjo2NTMuNywiYm91bmRzIjp7Im1haW4iOlsyNCw2MCwxNDAwLDY0NF0sImhlYWRlciI6WzE2LDgsMTQxNiw0NF0sImZvb3RlciI6Wy0yNDQsNjMxLDI0NCw4MV0sImFjY291bnQiOlstMjMyLDY3MiwyMjAsMzJdLCJuYXZpZ2F0aW9uIjpbLTIzNiwxNjIsMjI4LDI4XX0sInNjcm9sbCI6WzAsMCwwLDBdfSx7InRpbWUiOjY2My41LCJib3VuZHMiOnsibWFpbiI6WzI0LDYwLDE0MDAsNjQ0XSwiaGVhZGVyIjpbMTYsOCwxNDE2LDQ0XSwiZm9vdGVyIjpbLTI0NCw2MzEsMjQ0LDgxXSwiYWNjb3VudCI6Wy0yMzIsNjcyLDIyMCwzMl0sIm5hdmlnYXRpb24iOlstMjM2LDE2MiwyMjgsMjhdfSwic2Nyb2xsIjpbMCwwLDAsMF19LHsidGltZSI6NjcwLjIsImJvdW5kcyI6eyJtYWluIjpbMjQsNjAsMTQwMCw2NDRdLCJoZWFkZXIiOlsxNiw4LDE0MTYsNDRdLCJmb290ZXIiOls4LDYzMSwyNDQsODFdLCJhY2NvdW50IjpbMjAsNjcyLDIyMCwzMl0sIm5hdmlnYXRpb24iOlsxNiwxNjIsMjI4LDI4XSwicmVjZW50IjpbMTYsMzE0LDIyOCwyOF19LCJzY3JvbGwiOlswLDAsMCwwXX0seyJ0aW1lIjo2NzkuMiwiYm91bmRzIjp7Im1haW4iOlsyNCw2MCwxNDAwLDY0NF0sImhlYWRlciI6WzE2LDgsMTQxNiw0NF0sImZvb3RlciI6WzgsNjMxLDI0NCw4MV0sImFjY291bnQiOlsyMCw2NzIsMjIwLDMyXSwibmF2aWdhdGlvbiI6WzE2LDE2MiwyMjgsMjhdLCJyZWNlbnQiOlsxNiwzMTQsMjI4LDI4XX0sInNjcm9sbCI6WzAsMCwwLDBdfV0sInRhc2tzIjpbXX0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-42e6196e27a0ee2b978e",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 283,
+          "column": 5
+        },
+        {
+          "title": "touch Jovie controls provide 44px targets",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 643,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:12.446Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-162df837bcaef5c98009",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 432,
+          "column": 7
+        },
+        {
+          "title": "touch Ovie controls provide 44px targets",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 662,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:13.092Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-ac008234077e4ff04b74",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 432,
+          "column": 7
+        },
+        {
+          "title": "phone Find a page closes the drawer and searches only permitted Ovie pages",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 729,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:13.757Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-d315d022202a7e922678",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 495,
+          "column": 5
+        },
+        {
+          "title": "Ovie Recent reads the private Summer door and resumes its existing conversation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 526,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:14.490Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-a5529c6b8320878b76ef",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 539,
+          "column": 5
+        },
+        {
+          "title": "effective 200% layout zoom keeps Jovie navigation reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 640,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:15.020Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-b976663458da12135fda",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 590,
+          "column": 7
+        },
+        {
+          "title": "effective 200% layout zoom keeps Ovie navigation reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 638,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:15.663Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-9106d79fc27ed6da70bb",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 590,
+          "column": 7
+        },
+        {
+          "title": "long Recent labels remain bounded with a large real-schema conversation fixture",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 602,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:16.304Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-db85c1a460cae6d8e9e4",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 636,
+          "column": 5
+        },
+        {
+          "title": "More keeps the complete permitted operator collection reachable at short height",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 876,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:16.910Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-08e346a3edb98baf0114",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 664,
+          "column": 5
+        },
+        {
+          "title": "attention, audio and the inspector coexist without moving the account or losing a draft",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 701,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:39:17.789Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-afb2fb0d72f969b6231b",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 695,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-08T09:39:00.918Z",
+    "duration": 17610.324,
+    "expected": 24,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

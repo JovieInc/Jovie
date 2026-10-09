@@ -1,0 +1,12 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./external-link-BBnrbU00.js";import{a as i,r as a}from"./ShellListRowFrame-j_Iy71Lh.js";import{r as o,t as s}from"./ContentSurfaceCard-NsoaLSLh.js";import{r as c,t as l}from"./hud-cockpit-B7HADZRt.js";import{n as u,r as d}from"./cockpit-ZfQ-qsn_.js";function f({metrics:e,funnel:t=null}){let n=d(e,t);return(0,p.jsx)(s,{surface:`details`,className:`overflow-hidden`,"data-testid":`hud-bottlenecks`,children:(0,p.jsxs)(`div`,{className:`space-y-2 p-3`,children:[(0,p.jsx)(`p`,{className:`text-xs font-caption text-tertiary-token`,children:`Bottlenecks`}),n.length===0?(0,p.jsx)(`p`,{className:`text-app text-secondary-token`,children:`No bottlenecks detected.`}):(0,p.jsx)(`ol`,{className:`grid gap-2`,children:n.map((e,t)=>(0,p.jsxs)(a,{className:`flex items-center gap-3 border border-subtle bg-surface-0 px-3 py-2`,children:[(0,p.jsx)(`span`,{className:`shrink-0 text-xs font-semibold tabular-nums text-tertiary-token`,children:t+1}),(0,p.jsxs)(`div`,{className:`min-w-0 flex-1`,children:[(0,p.jsx)(`p`,{className:`truncate text-app font-semibold text-primary-token`,children:e.title}),e.detail?(0,p.jsx)(`p`,{className:`mt-0.5 truncate text-2xs text-tertiary-token`,children:e.detail}):null]}),e.href?(0,p.jsx)(`a`,{href:e.href,target:`_blank`,rel:`noopener noreferrer`,className:`shrink-0 text-tertiary-token transition-colors hover:text-primary-token`,"aria-label":`Inspect ${e.title}`,children:(0,p.jsx)(r,{className:`h-3.5 w-3.5`,"aria-hidden":`true`})}):null]},e.id))})]})})}var p;function m(){return(m=e((()=>{p=t(),n(),o(),i(),u()})))()}var h,g,_;function v(){return(v=e((()=>{c(),m(),h={title:`Features/Admin/Hud/HudBottlenecksCard`,component:f,parameters:{layout:`centered`}},g={args:{metrics:l({deployments:{current:{status:`failure`,branch:`main`}}})}},_=[`DeployFailing`],g.parameters={...g.parameters,docs:{...g.parameters?.docs,source:{originalSource:`{
+  args: {
+    metrics: cockpitMetrics({
+      deployments: {
+        current: {
+          status: 'failure',
+          branch: 'main'
+        }
+      }
+    })
+  }
+}`,...g.parameters?.docs?.source}}}})))()}v();export{g as DeployFailing,_ as __namedExportsOrder,h as default};

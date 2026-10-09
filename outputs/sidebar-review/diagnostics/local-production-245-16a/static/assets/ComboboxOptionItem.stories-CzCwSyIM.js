@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{a as n,i as r,n as i,o as a,t as o}from"./ComboboxOptionItem-dTwhDc1Z.js";function s({selected:e=!1}){return(0,c.jsx)(`div`,{className:`w-80 bg-neutral-950 p-4`,children:(0,c.jsx)(r,{value:e?l:null,onChange:()=>void 0,children:(0,c.jsx)(n,{static:!0,className:`space-y-1`,children:(0,c.jsx)(o,{option:l,index:0})})})})}var c,l,u,d,f,p;function m(){return(m=e((()=>{c=t(),a(),i(),l={id:`first-artist`,name:`First Artist`},u={title:`Organisms/Combobox/ComboboxOptionItem`,component:o,parameters:{layout:`centered`}},d={render:()=>(0,c.jsx)(s,{})},f={render:()=>(0,c.jsx)(s,{selected:!0})},p=[`Default`,`Selected`],d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
+  render: () => <OptionItemStory />
+}`,...d.parameters?.docs?.source}}},f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{
+  render: () => <OptionItemStory selected />
+}`,...f.parameters?.docs?.source}}}})))()}m();export{d as Default,f as Selected,p as __namedExportsOrder,u as default};

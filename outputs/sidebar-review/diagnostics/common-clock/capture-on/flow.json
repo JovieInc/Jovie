@@ -1,0 +1,209 @@
+{
+  "marks": [
+    {
+      "phase": "idle-start",
+      "time": 1724.8000001907349
+    },
+    {
+      "phase": "more",
+      "time": 1850
+    },
+    {
+      "phase": "search-open",
+      "time": 2010.2000002861023
+    },
+    {
+      "phase": "search-query",
+      "time": 2108.6000003814697
+    },
+    {
+      "phase": "selection",
+      "time": 2129.4000000953674
+    },
+    {
+      "phase": "flow-end",
+      "time": 2167.5
+    }
+  ],
+  "frames": [
+    1723.6,
+    1732.2,
+    1740.8,
+    1749.1,
+    1757.4,
+    1765.1,
+    1772.6,
+    1782.2,
+    1790.8,
+    1797.4,
+    1806.3,
+    1814.3,
+    1823.1,
+    1831.2,
+    1839.7,
+    1847.4,
+    1856.8,
+    1865.9,
+    1874,
+    1914.7,
+    1922.8,
+    1932.3,
+    1940.1,
+    1947.5,
+    1957.7,
+    1973.2,
+    1982.6,
+    2006.4,
+    2015.4,
+    2024.2,
+    2032.4,
+    2057.4,
+    2065.8,
+    2074,
+    2082,
+    2090.8,
+    2099,
+    2106.5,
+    2116,
+    2123.7,
+    2132,
+    2140.8,
+    2149,
+    2156.8,
+    2165.8
+  ],
+  "tasks": [],
+  "timeOrigin": 1791440805531.5,
+  "paletteRenders": [
+    {
+      "phase": "mount",
+      "duration": 0.7999997138977051
+    },
+    {
+      "phase": "update",
+      "duration": 3.4000000953674316
+    },
+    {
+      "phase": "update",
+      "duration": 1.6999998092651367
+    },
+    {
+      "phase": "update",
+      "duration": 0.8000001907348633
+    },
+    {
+      "phase": "update",
+      "duration": 0.5
+    }
+  ],
+  "moreRenders": [
+    {
+      "phase": "update",
+      "duration": 1.3000001907348633
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0
+    },
+    {
+      "phase": "nested-update",
+      "duration": 8.799999713897705
+    },
+    {
+      "phase": "nested-update",
+      "duration": 3.299999713897705
+    },
+    {
+      "phase": "nested-update",
+      "duration": 1.9000000953674316
+    },
+    {
+      "phase": "update",
+      "duration": 0.20000028610229492
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0.09999990463256836
+    },
+    {
+      "phase": "update",
+      "duration": 0.20000028610229492
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0.19999980926513672
+    },
+    {
+      "phase": "update",
+      "duration": 1.5999999046325684
+    },
+    {
+      "phase": "update",
+      "duration": 5.899999618530273
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0.20000028610229492
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0
+    },
+    {
+      "phase": "update",
+      "duration": 0.8999996185302734
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0
+    },
+    {
+      "phase": "nested-update",
+      "duration": 5.300000190734863
+    },
+    {
+      "phase": "nested-update",
+      "duration": 2.1000003814697266
+    },
+    {
+      "phase": "nested-update",
+      "duration": 1.3999996185302734
+    },
+    {
+      "phase": "update",
+      "duration": 0.10000038146972656
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0.10000038146972656
+    },
+    {
+      "phase": "update",
+      "duration": 0.19999980926513672
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0.09999990463256836
+    },
+    {
+      "phase": "update",
+      "duration": 5.100000381469727
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0.09999990463256836
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0.09999990463256836
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0
+    }
+  ]
+}

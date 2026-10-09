@@ -1,0 +1,24 @@
+{
+  "head": "2a9ac581e904a95b9e8464aca304dd48ec3d1b92",
+  "status": "historical; route-manifest/test correction supersedes this head",
+  "selectedPassed": 29,
+  "selectedSkipped": 0,
+  "drawerCoverage": {
+    "covered": 1704,
+    "executable": 1868
+  },
+  "fullCIUnit": "failed three Profiles vs Identity coherence assertions; fixture seed test passed",
+  "nextHead": "4b407aac7b516e2bab9c9f937b805b4cfe88f78e",
+  "files": {
+    "sidebar-native-grouped-ci-unit-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "sidebar-native-grouped-fixed-coverage.json": "a92c7a42e94524da1eeb332f8c3b47e4b22e53a014c8deeb15b7597fe9b3d7a6",
+    "ios-shared-sidebar-grouped-recent.png": "3611883f104657ed646de1e676f672c977d29a2b3450fd6965cf5f84af49ebbe",
+    "sidebar-native-grouped-fixed-restored-state.json": "a5b4fd890b714a779cb309b07eb12192954126d475fc6d941ba4b4502bba7679",
+    "sidebar-native-grouped-fixed.log": "db2b3cb61af15d26bc1a9e1d8157c75c64bd45559afe9fe69e170a4526cc8799",
+    "sidebar-native-grouped-fixed-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "sidebar-native-grouped-ci-unit-restored-state.json": "55ee349a9df26a68bdc4c743aa89c7ba1aa7bf8d0dba3e5b11e2c1def055226a",
+    "sidebar-native-grouped-fixed-summary.json": "72e98cf0f7e384435a78f923874218949ea735e2344dcf6f34ef9843b8f4ada7",
+    "sidebar-native-grouped-fixed-metrics.json": "9ff45d079a7889866171b75a27bf09b7679e730523034f1944e6685191628b02",
+    "sidebar-native-grouped-ci-unit.log": "a5f39804de15848a3d84b315934f20afdd1b9a309d2f87b4eefde57fd73e34c0"
+  }
+}

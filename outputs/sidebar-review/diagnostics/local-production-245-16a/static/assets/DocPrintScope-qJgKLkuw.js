@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";function n(){return(0,r.useEffect)(()=>(document.documentElement.dataset.docPage=`true`,()=>{delete document.documentElement.dataset.docPage}),[]),null}var r;function i(){return(i=e((()=>{r=t()})))()}export{i as n,n as t};

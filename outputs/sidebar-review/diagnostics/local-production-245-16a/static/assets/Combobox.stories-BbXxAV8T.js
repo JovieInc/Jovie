@@ -1,0 +1,7 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{t as n}from"./jsx-runtime-BbDfbRii.js";import{n as r,t as i}from"./Combobox-C7WsFRL_.js";function a({disabled:e=!1,isLoading:t=!1}){let[n,r]=(0,s.useState)(null);return(0,o.jsx)(`div`,{className:`w-96 bg-neutral-950 p-6`,children:(0,o.jsx)(i,{options:c,value:n,onChange:r,onInputChange:()=>void 0,disabled:e,isLoading:t})})}var o,s,c,l,u,d,f,p;function m(){return(m=e((()=>{o=n(),s=t(),r(),c=[{id:`one`,name:`First Artist`},{id:`two`,name:`Second Artist`}],l={title:`Organisms/Combobox/Combobox`,component:i,parameters:{layout:`centered`}},u={render:()=>(0,o.jsx)(a,{})},d={render:()=>(0,o.jsx)(a,{isLoading:!0})},f={render:()=>(0,o.jsx)(a,{disabled:!0})},p=[`Default`,`Loading`,`Disabled`],u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
+  render: () => <InteractiveCombobox />
+}`,...u.parameters?.docs?.source}}},d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
+  render: () => <InteractiveCombobox isLoading />
+}`,...d.parameters?.docs?.source}}},f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{
+  render: () => <InteractiveCombobox disabled />
+}`,...f.parameters?.docs?.source}}}})))()}m();export{u as Default,f as Disabled,d as Loading,p as __namedExportsOrder,l as default};

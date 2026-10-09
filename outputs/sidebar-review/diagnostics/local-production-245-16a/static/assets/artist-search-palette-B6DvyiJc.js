@@ -1,0 +1,1 @@
+import{n as e,r as t}from"./rolldown-runtime-BcKkbAw3.js";import{n,t as r}from"./ArtistSearchCommandPalette-DYqY0IVS.js";var i=t({ArtistSearchCommandPalette:()=>r});function a(){return(a=e((()=>{n()})))()}export{a as n,i as t};

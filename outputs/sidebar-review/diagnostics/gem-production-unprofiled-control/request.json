@@ -1,0 +1,74 @@
+{
+  "kind": "prepared control for existing owner task executor;not an admission or new actor",
+  "extendsCompletedRequestSha256": "4c06233300c774e0e726692dff67a853c3cb09eeffb202ff31de01a9a1b25e42",
+  "completedRun": "owner-diagnostic-sidebar-245-16a-4c06233300c7",
+  "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "sourceTree": "8ecb24fde1992b0038951de59cdd4965b1122d03",
+  "compilerDependencyHead": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+  "sourceArchive": "/Users/timwhite/.codex/worktrees/94af/Jovie/outputs/sidebar-review/diagnostics/gem-production-request/source-245ec38c.tar.gz",
+  "sourceArchiveSha256": "d1de21ef3713b0243ebd069be7adedf1ca41feb259f0f54fb463821c9e82e39d",
+  "qualifiedOverlayArchive": "/Users/timwhite/.codex/worktrees/94af/Jovie/outputs/sidebar-review/diagnostics/gem-production-request/diagnostic-overlay.tar.gz",
+  "qualifiedOverlayArchiveSha256": "81de23fa30901f2a8201f0200273ca8b2808fdd855417f6b150cb2aa9cc84e77",
+  "runner": "/Users/timwhite/.codex/worktrees/94af/Jovie/outputs/sidebar-review/diagnostics/gem-production-unprofiled-control/runner.cjs",
+  "runnerSha256": "f6e7401fd1850fa32c725b6b432eb6233ba95ad9bf774b5f5da7faaa3ad3e3c4",
+  "runnerWorkspaceDestination": "diagnostics/sidebar-production-unprofiled.cjs",
+  "sampleCommands": [
+    [
+      "node",
+      "diagnostics/sidebar-production-unprofiled.cjs",
+      "0"
+    ],
+    [
+      "node",
+      "diagnostics/sidebar-production-unprofiled.cjs",
+      "1"
+    ],
+    [
+      "node",
+      "diagnostics/sidebar-production-unprofiled.cjs",
+      "2"
+    ],
+    [
+      "node",
+      "diagnostics/sidebar-production-unprofiled.cjs",
+      "3"
+    ],
+    [
+      "node",
+      "diagnostics/sidebar-production-unprofiled.cjs",
+      "4"
+    ]
+  ],
+  "existingBuildReuseBoundary": "Reuse completed exact245+16a output only if owner verifies retained input/build identity andall1231 inventory;otherwise existing guarded fullbuild command unchanged",
+  "buildCommand": [
+    "pnpm",
+    "--filter",
+    "@jovie/web",
+    "build-storybook",
+    "--config-dir",
+    ".cache/sidebar-production-full-config",
+    "--output-dir",
+    "storybook-static-sidebar-diagnostic"
+  ],
+  "serveCommand": [
+    "python3",
+    "-m",
+    "http.server",
+    "6027",
+    "--bind",
+    "127.0.0.1",
+    "--directory",
+    "apps/web/storybook-static-sidebar-diagnostic"
+  ],
+  "sameFlowAndAssertionsRetained": true,
+  "runtimeRendererRequired": "all hook bundleType0;productionReact19.2.8 expected from existing result",
+  "experimentalChange": "only disable CDP CPU/render trace and Playwright snapshot capture;keep same1024x450 flow/RAF/LongTasks/scalar facts and outside-window screenshot",
+  "limits": "five cold contexts;each existing bounded command lifecycle;no newservice/provider/account/cap/certificate/gate override;normalowned cleanup+seat release",
+  "owner": "Decouple subscription shipping / 01a11209-100a-71c3-9c93-7c7d51619016",
+  "productSourceChanged": false,
+  "dispatched": false,
+  "admitted": false,
+  "executed": false,
+  "publicationActionActive": false,
+  "purpose": "separate trace observer cost before targeted keyboard-open/focus/commit/layout repair;not retrying prior terminaljob or claimingbudgetpass"
+}

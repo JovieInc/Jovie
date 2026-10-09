@@ -1,0 +1,22 @@
+[
+  {
+    "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+    "file": "/private/tmp/sidebar-success-recordings/jovie-desktop-success.webm",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "story": "shared-shell",
+    "scope": "Successful headless Storybook fixture interaction recording; deliberate viewing dwell and video capture occur outside all performance sample windows. No physical-device or authenticated/deployed runtime claim."
+  },
+  {
+    "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+    "file": "/private/tmp/sidebar-success-recordings/ovie-compact-success.webm",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "story": "operator-shared-shell",
+    "scope": "Successful headless Storybook fixture interaction recording; deliberate viewing dwell and video capture occur outside all performance sample windows. No physical-device or authenticated/deployed runtime claim."
+  }
+]

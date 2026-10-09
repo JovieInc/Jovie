@@ -1,0 +1,61 @@
+{
+  "observedAt": "2026-10-08T09:13:15.012074+00:00",
+  "webHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "nativeHead": "545b383925854b8a1632fffe9b48087fe88f6e37",
+  "source": {
+    "apps/ios/Jovie/Core/ChatRepository.swift": {
+      "gitBlob": "a9d07528ad007eb92bc5e1256159957fef99c38a",
+      "sha256": "be4922847a43bc7a7b394c841ae42b3739df0ba68286a4a10d51fd745e586ccc"
+    },
+    "apps/ios/Jovie/Core/MobileChatClient.swift": {
+      "gitBlob": "e8e1600af8117873ef69e379d79382b8aa8d81c8",
+      "sha256": "9a4b44a334ad487932c11defb8b453a7287f9742932c6114c58f82e634790edc"
+    },
+    "apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatTransport.swift": {
+      "gitBlob": "abaa710e388fec51bc173c72119ea4332376c843",
+      "sha256": "0f3829a8811b6020f6c872d66cf3f0d5630312fcb73ddf784165f55aab3246ba"
+    },
+    "apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift": {
+      "gitBlob": "aa85dce5b681580b646fed0118c34cd4613412e9",
+      "sha256": "05dee94cf1e05715adea060a7c44c792239ab550074e74307956cc2c8ee980e2"
+    },
+    "apps/web/lib/mobile/chat/conversations.ts": {
+      "gitBlob": "619b24a33fa3fe4a5d801a4fb2180ff4e654b629",
+      "sha256": "c4908021970cd19954eb247744634345dc321b3da0b25800e24e9e9c1b94265e"
+    },
+    "apps/web/lib/mobile/workspace.ts": {
+      "gitBlob": "61752606f47469ed4a7e945c6ebb8c0921ead3af",
+      "sha256": "7f6019581f116af16a10ec35bfab5c349888eb92d20c27529efe57ca3cd22794"
+    },
+    "apps/web/lib/mobile/chat/turn-handler-ov.ts": {
+      "gitBlob": "b6439241d96c49f4bf4294f4c98e9e9c549e9144",
+      "sha256": "0f1be98afa68ec9aab3ddad26d5f926663e1f2b00fba822085a91dbe440d1946"
+    },
+    "apps/web/app/api/ovie/summer/history/route.ts": {
+      "gitBlob": "d83d5107d7d002e8781fd36b9f77c52fb413f817",
+      "sha256": "0500a98e1745876a4a4d95bcd9f793fa5613de67fa8a0d26c22b295e76de168d"
+    },
+    "apps/web/lib/queries/useChatConversationQuery.ts": {
+      "gitBlob": "b3a03883f0c140a50daf9a479dbb3e153485db5c",
+      "sha256": "d542d4a22f49812b3baa0e8584b5d5ec92795b85513e9343554959d5c24c7bee"
+    },
+    "apps/web/lib/auth/request-session.ts": {
+      "gitBlob": "7230b10b0f0b8df46aee869434a9d1ee492ef3e5",
+      "sha256": "a4dc532e213f79094a4885e79b6ec99e22db746a534ec8ec619911a411966fb6"
+    },
+    "apps/web/lib/auth/better-auth.ts": {
+      "gitBlob": "af4c4a1d52e7d0d527f8b20e1d2f3828399ecdcc",
+      "sha256": "cb82046176a66228c3f661b64440074071da785f86ce86ce2d539bba4bac1b3a"
+    }
+  },
+  "nativeMobileHistoryAuthority": "creator table plus OV title prefix; not private durable Summer",
+  "privateHistoryEndpoint": "/api/ovie/summer/history",
+  "privateHistoryAuthority": "validated fixed Summer identity and SUMMER_SESSION_DECISION_ID",
+  "existingAuthSource": "getRequestSession passes headers to Better Auth with bearer plugin; native acceptance not executed",
+  "nativeWriteBoundary": "supplied conversationID is creator-profile detail checked before reservation",
+  "decision": "compose existing private endpoint and maintained native transport; reconcile JOV-6750/current native session writer first",
+  "sourceOrBackendEdited": false,
+  "liveEndpointCalled": false,
+  "runtimeParityProven": false,
+  "publicationActionActive": false
+}

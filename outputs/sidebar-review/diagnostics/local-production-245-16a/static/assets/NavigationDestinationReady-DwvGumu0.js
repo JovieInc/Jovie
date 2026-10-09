@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{n,r}from"./navigation-telemetry-pPb2pJYA.js";function i({destination:e,ready:t=!0}){return(0,a.useEffect)(()=>{t&&r(e)},[e,t]),null}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./HeroSpotifySearch-CbGEfPN9.js";function i(e){return(0,a.jsx)(r,{...e})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

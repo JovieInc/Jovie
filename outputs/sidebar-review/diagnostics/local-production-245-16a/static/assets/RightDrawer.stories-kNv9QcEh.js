@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./RightDrawer-Dym2xKcC.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Molecules/Drawer/RightDrawer`,component:r,parameters:{layout:`fullscreen`},args:{isOpen:!0,width:360,ariaLabel:`Entity details`,children:(0,i.jsx)(`div`,{className:`p-4`,children:`Inspector content`})}},o={},s={args:{isOpen:!1}},c=[`Open`,`Closed`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    isOpen: false
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{s as Closed,o as Open,c as __namedExportsOrder,a as default};

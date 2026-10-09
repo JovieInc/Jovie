@@ -1,0 +1,104 @@
+{
+  "kind": "task-scoped immutable diagnostic request for existing supported Gem model-free executor; not an admission or publication",
+  "sourceHead": "10e76a95b87efd5c25abe6b757081c2265ee63d7",
+  "sourceTree": "ae7b7b3864c9bc794d6fccbcc0a569ac7ea98bf3",
+  "compilerDependencyHead": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+  "sidebarOwner": "Polish the shared sidebar / 01a118b8-6fe1-7622-8ce0-57066fea7086",
+  "resourceCompilerOwner": "Decouple subscription shipping / 01a11209-100a-71c3-9c93-7c7d51619016",
+  "publicationActionActive": false,
+  "sourceArchive": "source-10e76a95.tar.gz",
+  "overlayArchive": "diagnostic-overlay.tar.gz",
+  "sha256": {
+    "full-story-source-inventory.json": "f21bd7c7809db0bfda285a843a5b91d7f8334753d69f93111b7e03d2ab8ca82b",
+    "source-10e76a95.tar.gz": "93927e3004a1d52eda2bdcc0acc6405196b8cdfc0c1e622e9aa952f0b3109563",
+    "qualified-16a-component-live-storybook-lifecycle.mjs": "d05f9627d9608d7529a76e7b517cf8bc31df5bbc81f1490a1943879ffe8fb76c",
+    "qualified-16a-main.ts": "f028908066e6ac939e08846359b15552d0f9a3ddc45cb3a16d67bd0f2e394dc3",
+    "diagnostic-overlay.tar.gz": "f9ebcc2b549c62922cf54c0af631f55cd73c5b0e1512e42d8396d99c145d84c4",
+    "overlay/diagnostics/sidebar-production-unprofiled.cjs": "ef99771295dddf5a5995611874dd3df7ab5e86a74ca4e88a36d5c2efa274bf35",
+    "overlay/diagnostics/sidebar-production-common-clock.cjs": "f79bae3a9fba075ca1491e1694636ca6a8809ea3773bbd5f27640837f6cfcd09",
+    "overlay/apps/web/.cache/sidebar-production-full-config/main.ts": "97d9292db9b9837039473a09f1939da08c1af10c8b9743c0e30f8062daa31182",
+    "overlay/apps/web/.cache/sidebar-production-full-config/preview.tsx": "fdbe7bdc779eb7ee29436519ea621754a9fbcdc3a1598ddf28bd8a2d9b1085fd",
+    "overlay/apps/web/.cache/sidebar-production-full-config/preview-head.html": "2f1f1b44758cd3fbc91695c3a36417af3c1ac38bc300a00739417f5f0e5f0c1e"
+  },
+  "originalSourceHashes": {
+    "apps/web/.storybook/main.ts": "734b6c1f82e99b63768a8b96c5a4c3b2620331f59d3e7dd6170431a485fe3a2d",
+    "apps/web/.storybook/preview.tsx": "1bff484d455037c69b73e261bdf108e41c7525e0cd51e667a5c09f07973ceda4",
+    "apps/web/app/globals.css": "8160b13d4d3a2ab43b26598b082dbae0311bc5e22784934f79279461e70b83f3",
+    "apps/web/package.json": "87f8c128227c3f7886f81db25c237738216b135909fec93958cbd8f2f6c8aaec",
+    "pnpm-lock.yaml": "fa8e37621d4d69e35d75bbcdcaa686fe401a46bc61b5a66be292a1d4df5514fc",
+    ".nvmrc": "73fb1b615e2043a933be1c0895cde4358036acc28d785692509b822aa53c761f",
+    "package.json": "e97669b6eb70d55b3fd37349ca68fc9f7c8da35075b39b5b86c67d29b198a464"
+  },
+  "storyInventoryCount": 1231,
+  "sourceModified": false,
+  "diagnosticComposition": true,
+  "fullStoryConfigPreserved": true,
+  "fullAddonsGlobalsStylesPreserved": true,
+  "envUnset": [
+    "JOVIE_LIVE_STORYBOOK_CERT",
+    "JOVIE_STORYBOOK_MANUAL_AXE"
+  ],
+  "preparation": [
+    "Use owner-admitted isolated existing executor workspace with source archive extracted at root. Verify every archive SHA before extraction.",
+    "Extract overlay into the isolated workspace; only ignored temporary Storybook config and task diagnostic runner are added.",
+    "Restore dependencies using pinned Node24.21.0/pnpm9.15.9/lockfile through the existing supported owner dependency route; no package or lockfile edits.",
+    "Use exact16a maintained lifecycle resource functions through the existing resource owner supervisor; its storybookBuildEnvironment sets slim LIVE_CERT=1 and must not be used for this full-style diagnostic. Retain existing heap/thread bounds without that slim-mode flag."
+  ],
+  "buildCommand": [
+    "pnpm",
+    "--filter",
+    "@jovie/web",
+    "build-storybook",
+    "--config-dir",
+    ".cache/sidebar-production-full-config",
+    "--output-dir",
+    "storybook-static-sidebar-diagnostic"
+  ],
+  "serveCommand": [
+    "python3",
+    "-m",
+    "http.server",
+    "6027",
+    "--bind",
+    "127.0.0.1",
+    "--directory",
+    "apps/web/storybook-static-sidebar-diagnostic"
+  ],
+  "profilerCommands": [
+    "node diagnostics/sidebar-production-unprofiled.cjs 0",
+    "node diagnostics/sidebar-production-unprofiled.cjs 1",
+    "node diagnostics/sidebar-production-unprofiled.cjs 2",
+    "node diagnostics/sidebar-production-unprofiled.cjs 3",
+    "node diagnostics/sidebar-production-unprofiled.cjs 4",
+    "SIDEBAR_DIAGNOSTIC_SNAPSHOTS=0 node diagnostics/sidebar-production-common-clock.cjs",
+    "SIDEBAR_DIAGNOSTIC_SNAPSHOTS=1 node diagnostics/sidebar-production-common-clock.cjs"
+  ],
+  "requiredAssertions": [
+    "Owner supported executor admission and model-free seat authority before any heavy build. No reused unrelated PR identity/certificate.",
+    "Exact16a requireStorybookBuildMemory must pass measured Linux MemAvailable plus30% reserve and8GiB headroom before build.",
+    "watchStorybookBuildResources must supervise detached owned process group from launch, 8GiB RSS limit and30% host reserve; collector failure stops fail-closed.",
+    "Bound build/server/browser time using existing maintained lifecycle deadlines; preserve normal owner evidence and nonzero terminal failures.",
+    "No skip flags, disabled checks, removed stories/addons/styles, live-cert slim mode or arbitrary admission override.",
+    "Capture complete build index.json and compare full original source inventory; requested large-more-shell story must exist.",
+    "Actual React renderer hook must show production bundleType0 exclusively. Production onRender absence is explicit and is not a frame-budget pass.",
+    "Same120-page More/End/Escape/reopen/searchPage120/Calendar flow, common-clock trace/CPU/RAF/scalar facts; snapshots-off/on control.",
+    "Stop only task-owned build/server/browser identities using maintained birth-identity checks, verify no live survivors, release normal seat."
+  ],
+  "requiredOutputs": [
+    "owner admission/seat/request receipt",
+    "command logs and terminal codes",
+    "resource samples/peakRSS/cleanup/seat-release receipt",
+    "full index.json and inventory comparison",
+    "two runtime renderer receipts, semantic checkpoint facts, RAF/longtask/common-clock timelines and raw CPU profiles",
+    "after-sampling screenshots and snapshots-on control trace",
+    "source/overlay/command provenance and artifact hashes"
+  ],
+  "currentStatus": "prepared locallyonly;not sent,admitted,transferredor executed",
+  "localBuildProhibitedByActualAdmission": "Darwin host-memory-reserve at2026-10-08T07:54:02.792Z",
+  "scopeLimit": "Exact10e+16a diagnostic composition only;not unchanged-source/full combined qualification/installedMac/physical/authenticated/deployed/fullgoal proof",
+  "derivedFromRequestSha256": "4c06233300c774e0e726692dff67a853c3cb09eeffb202ff31de01a9a1b25e42",
+  "nativeTitlebarRepairEvidence": "../electron-production-245/receipt.json",
+  "sourceInventoryMeaning": "1231 indexed story source import paths;not count of stories",
+  "old245BaselineControlStillValid": "Prior245+16a results/requests remain immutablehistoricalbaseline;preparedsameGem-host unprofiled245 control maystillclarify hosteffects. This newrequest doesnot admit/cancel either job.",
+  "resourceAdmission": "Existingowner mustreconcile currentlyqualifiedcompiler/supervisor andseat after livequalification completes;no dispatch oradmission authority granted by this artifact."
+}

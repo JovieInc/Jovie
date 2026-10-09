@@ -1,0 +1,59 @@
+{
+  "count": 120,
+  "inlinePages": 12,
+  "longTasks": [
+    {
+      "duration": 99,
+      "start": 2621.3999996185303
+    }
+  ],
+  "eventToAssertionMs": 262.09999990463257,
+  "renders": [
+    {
+      "phase": "update",
+      "duration": 1.4000000953674316
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0.10000038146972656
+    },
+    {
+      "phase": "nested-update",
+      "duration": 9
+    },
+    {
+      "phase": "nested-update",
+      "duration": 3.499999523162842
+    },
+    {
+      "phase": "nested-update",
+      "duration": 2
+    },
+    {
+      "phase": "update",
+      "duration": 0.09999990463256836
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0.3000001907348633
+    },
+    {
+      "phase": "update",
+      "duration": 0.09999990463256836
+    },
+    {
+      "phase": "nested-update",
+      "duration": 0.09999990463256836
+    },
+    {
+      "phase": "update",
+      "duration": 2
+    }
+  ],
+  "budgetsMs": {
+    "sixtyHz": 16.7,
+    "oneTwentyHz": 8.3,
+    "longTask": 50
+  },
+  "scope": "Storybook React Profiler actual render duration; opening wall time includes browser automation. Not physical 120Hz or native proof."
+}

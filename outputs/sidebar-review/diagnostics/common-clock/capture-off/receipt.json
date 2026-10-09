@@ -1,0 +1,74 @@
+{
+  "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "viewport": {
+    "width": 1024,
+    "height": 450
+  },
+  "capture": "Playwright tracing/screenshots/video disabled during sampling; CDP render trace/CPU and scalar state queries included",
+  "assertions": "original large fixture interaction/geometry checks retained and evaluated after sampling, using checkpoint scalar facts; final viewport assertion and screenshot after sampling",
+  "assertionsPassed": true,
+  "eventToAssertionCheckpointMs": 65.7000002861023,
+  "firstFacts": {
+    "rows": 13,
+    "lastFocused": true,
+    "lastHref": "/app/calendar",
+    "menu": {
+      "y": 60,
+      "height": 382
+    },
+    "last": {
+      "top": 405,
+      "bottom": 437
+    },
+    "noHorizontalOverflow": true,
+    "renders": [
+      {
+        "phase": "update",
+        "duration": 1.299999713897705
+      },
+      {
+        "phase": "nested-update",
+        "duration": 0
+      },
+      {
+        "phase": "nested-update",
+        "duration": 8.600000381469727
+      },
+      {
+        "phase": "nested-update",
+        "duration": 3.200000286102295
+      },
+      {
+        "phase": "nested-update",
+        "duration": 1.8999996185302734
+      },
+      {
+        "phase": "update",
+        "duration": 0.19999980926513672
+      },
+      {
+        "phase": "nested-update",
+        "duration": 0.20000028610229492
+      },
+      {
+        "phase": "update",
+        "duration": 0.09999990463256836
+      },
+      {
+        "phase": "nested-update",
+        "duration": 0.09999990463256836
+      },
+      {
+        "phase": "update",
+        "duration": 1.700000286102295
+      }
+    ]
+  },
+  "escapeFocused": true,
+  "searchFacts": {
+    "focused": true,
+    "pages": 120
+  },
+  "optionVisible": true,
+  "selected": "/app/calendar"
+}

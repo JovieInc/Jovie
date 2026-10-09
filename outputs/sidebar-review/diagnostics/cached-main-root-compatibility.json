@@ -1,0 +1,32 @@
+{
+  "cachedMain": "b09456f1acbebabc0dd8e30906cc3ce3a4e0ad90",
+  "remoteMainRefreshed": false,
+  "roots": [
+    {
+      "layer": "native",
+      "branch": "codex/shared-sidebar-native",
+      "head": "3cdda15bd68479050c0acb421651554f004e49a4",
+      "comparisonBase": "b09456f1acbebabc0dd8e30906cc3ce3a4e0ad90",
+      "mergeTree": "6b4839aaa78137f0fc661ef9bccf7e18c634503a",
+      "mergeConflicts": 0,
+      "files": 6,
+      "changedLines": 474,
+      "branchMoved": false,
+      "qualifiedMergeTree": false
+    },
+    {
+      "layer": "foundation",
+      "branch": "codex/shared-sidebar-foundation",
+      "head": "8d36078f1a658e7bb130a2cc998e20a936ac4db5",
+      "comparisonBase": "b09456f1acbebabc0dd8e30906cc3ce3a4e0ad90",
+      "mergeTree": "2a7216342af0a528814d16cc9627fc2afde9f8d2",
+      "mergeConflicts": 0,
+      "files": 47,
+      "changedLines": 1390,
+      "branchMoved": false,
+      "qualifiedMergeTree": false
+    }
+  ],
+  "scope": "git merge-tree only; no branch movement, working tree changes, push or PR; tree not tested",
+  "publicationRequirement": "fresh remote main comparison and exact-head required tests/checks remain necessary before promotion; does not supersede prepared root heads"
+}

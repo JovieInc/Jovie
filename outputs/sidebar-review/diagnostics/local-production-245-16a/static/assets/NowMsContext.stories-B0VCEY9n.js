@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{i as n,n as r,r as i,t as a}from"./NowMsContext-Bus_HZRq.js";function o(){let e=n();return(0,s.jsxs)(`div`,{className:`text-app text-secondary-token`,children:[(0,s.jsxs)(`p`,{children:[`now: `,e]}),(0,s.jsx)(`p`,{children:i(e)?`SSR placeholder value`:`hydrated value`})]})}var s,c,l,u;function d(){return(d=e((()=>{s=t(),r(),c={title:`Dashboard/Organisms/DashboardAudienceTable/NowMsContext`,parameters:{layout:`centered`}},l={render:()=>(0,s.jsx)(a,{children:(0,s.jsx)(o,{})})},u=[`WithProvider`],l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{
+  render: () => <NowMsProvider>
+      <NowMsConsumerDemo />
+    </NowMsProvider>
+}`,...l.parameters?.docs?.source}}}})))()}d();export{l as WithProvider,u as __namedExportsOrder,c as default};

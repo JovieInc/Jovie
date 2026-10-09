@@ -1,0 +1,150 @@
+{
+  "requestSha256": "4c06233300c774e0e726692dff67a853c3cb09eeffb202ff31de01a9a1b25e42",
+  "artifactArchiveSha256": "c23d280db26514010a7710013b6964d30adb2348d851f55abe9ea96b3ed5520b",
+  "productionRendererVerified": true,
+  "all1231Built": true,
+  "commandExit": 0,
+  "cleanupVerified": true,
+  "seatReleasedReadback": true,
+  "modes": [
+    {
+      "mode": "off",
+      "flowDurationMs": 392.427,
+      "frames": 21,
+      "rafMedianMs": 16.700000000000045,
+      "rafP95Ms": 33.19999999999982,
+      "rafMaxMs": 50.09999999999991,
+      "flowLongTasks": [
+        {
+          "start": 1348,
+          "duration": 60
+        }
+      ],
+      "preMoreLongTasks": [
+        {
+          "start": 1224.6000001430511,
+          "duration": 93
+        }
+      ],
+      "sameClock": {
+        "offsetUs": 1609009113798.0,
+        "offsetSpreadUs": 67.0,
+        "rendererPid": 3761910,
+        "rendererTid": 3761910
+      },
+      "keyboardEventDispatch": [
+        {
+          "durationMs": 60.302,
+          "relativeToMoreMs": 15.799,
+          "type": "keydown"
+        },
+        {
+          "durationMs": 32.793,
+          "relativeToMoreMs": 153.705,
+          "type": "keydown"
+        },
+        {
+          "durationMs": 15.455,
+          "relativeToMoreMs": 122.079,
+          "type": "keydown"
+        },
+        {
+          "durationMs": 11.482,
+          "relativeToMoreMs": 232.332,
+          "type": "click"
+        },
+        {
+          "durationMs": 8.794,
+          "relativeToMoreMs": 350.403,
+          "type": "keydown"
+        },
+        {
+          "durationMs": 8.772,
+          "relativeToMoreMs": 55.577,
+          "type": "focusScope.autoFocusOnMount"
+        },
+        {
+          "durationMs": 6.883,
+          "relativeToMoreMs": 172.49,
+          "type": "focusScope.autoFocusOnMount"
+        },
+        {
+          "durationMs": 5.463,
+          "relativeToMoreMs": 58.883,
+          "type": "focusin"
+        }
+      ]
+    },
+    {
+      "mode": "on",
+      "flowDurationMs": 521.242,
+      "frames": 28,
+      "rafMedianMs": 16.699999999999818,
+      "rafP95Ms": 33.299999999999955,
+      "rafMaxMs": 50.09999999999991,
+      "flowLongTasks": [
+        {
+          "start": 1524.6999998092651,
+          "duration": 50
+        }
+      ],
+      "preMoreLongTasks": [
+        {
+          "start": 1287.2999999523163,
+          "duration": 105
+        }
+      ],
+      "sameClock": {
+        "offsetUs": 1609012209931.0,
+        "offsetSpreadUs": 134.0,
+        "rendererPid": 3762551,
+        "rendererTid": 3762551
+      },
+      "keyboardEventDispatch": [
+        {
+          "durationMs": 50.519,
+          "relativeToMoreMs": 30.485,
+          "type": "keydown"
+        },
+        {
+          "durationMs": 33.952,
+          "relativeToMoreMs": 209.384,
+          "type": "keydown"
+        },
+        {
+          "durationMs": 15.631,
+          "relativeToMoreMs": 161.186,
+          "type": "keydown"
+        },
+        {
+          "durationMs": 12.955,
+          "relativeToMoreMs": 311.196,
+          "type": "click"
+        },
+        {
+          "durationMs": 9.447,
+          "relativeToMoreMs": 459.966,
+          "type": "keydown"
+        },
+        {
+          "durationMs": 8.892,
+          "relativeToMoreMs": 60.259,
+          "type": "focusScope.autoFocusOnMount"
+        },
+        {
+          "durationMs": 7.141,
+          "relativeToMoreMs": 228.941,
+          "type": "focusScope.autoFocusOnMount"
+        },
+        {
+          "durationMs": 5.392,
+          "relativeToMoreMs": 63.756,
+          "type": "focusin"
+        }
+      ]
+    }
+  ],
+  "frameBudgetsAccepted": false,
+  "conclusion": "Supported production composition now builds and preserves geometry/navigation assertions;More-phase keyboard React work still crosses16.7ms and50ms bounds with Playwright snapshots disabled. Pre-More idle93/105ms retained but not charged to sidebar. Tracing observer effect remains unseparated.",
+  "nextEvidence": "Unprofiled RAF/LongTasks control on same production build/host;then source-specific focus/commit/layout attribution before changing primitives. No heavy local rebuild or repeat job started."
+}

@@ -1,0 +1,9 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{o as n,r}from"./navigation-lA0z5ElE.js";import{t as i}from"./jsx-runtime-BbDfbRii.js";import{n as a,t as o}from"./HudObservationStatus-CKS4UJyE.js";function s({message:e}){let t=n(),[r,i]=(0,l.useTransition)();return(0,c.jsx)(`div`,{role:`status`,"aria-live":`polite`,"aria-busy":r,children:(0,c.jsx)(o,{state:`unavailable`,message:r?`Reading current data…`:e,onRetry:()=>{r||i(()=>t.refresh())}})})}var c,l;function u(){return(u=e((()=>{c=i(),r(),l=t(),a()})))()}var d,f,p,m,h;function g(){return(g=e((()=>{u(),d={title:`Features/Admin/AdminReadUnavailable`,component:s,parameters:{layout:`padded`,nextjs:{appDirectory:!0}},args:{message:`Feature flag values could not be read. Changes are unavailable until the current values can be verified.`}},f={},p={args:{message:`Manual cost records could not be read. Spend is unknown, not zero.`}},m={args:{message:`Publisher connection and playlist settings could not be read. Their status is unknown; changes are unavailable until the current settings can be verified.`}},h=[`Flags`,`Costs`,`Connections`],f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{}`,...f.parameters?.docs?.source}}},p.parameters={...p.parameters,docs:{...p.parameters?.docs,source:{originalSource:`{
+  args: {
+    message: 'Manual cost records could not be read. Spend is unknown, not zero.'
+  }
+}`,...p.parameters?.docs?.source}}},m.parameters={...m.parameters,docs:{...m.parameters?.docs,source:{originalSource:`{
+  args: {
+    message: 'Publisher connection and playlist settings could not be read. Their status is unknown; changes are unavailable until the current settings can be verified.'
+  }
+}`,...m.parameters?.docs?.source}}}})))()}g();export{m as Connections,p as Costs,f as Flags,h as __namedExportsOrder,d as default};

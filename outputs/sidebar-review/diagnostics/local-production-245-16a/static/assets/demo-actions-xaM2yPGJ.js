@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{i as t,r as n}from"./toast-B4bc7zKP.js";async function r({successMessage:e,loadingMessage:n,latencyMs:r=350}){let a=n?t.loading(n):null;await i(r),a&&t.dismiss(a),t.success(e)}var i;function a(){return(a=e((()=>{n(),i=e=>new Promise(t=>setTimeout(t,e))})))()}export{r as n,a as t};

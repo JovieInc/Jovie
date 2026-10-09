@@ -1,0 +1,9 @@
+{
+  "at": "2026-10-08T09:41Z",
+  "thread": "Decouple subscription shipping",
+  "threadId": "01a11209-100a-71c3-9c93-7c7d51619016",
+  "cursor": "140154f0-6f99-464d-8af6-e1b07c9c5ac0:239",
+  "status": "active",
+  "evidence": "Owner reports stale structural assertion repair plus detached-shard memory accounting and canonical result-pipe lifecycle corrections before admitting a run. No new qualified correction head/run established.",
+  "outboundMessageSent": false
+}

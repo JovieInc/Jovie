@@ -1,0 +1,14 @@
+{
+  "goal": {
+    "threadId": "01a118b8-6fe1-7622-8ce0-57066fea7086",
+    "objective": "Implement, qualify and verify the shared Jovie/Ovie sidebar experience across supported runtimes, preserving authorized navigation and shell behavior.",
+    "status": "blocked",
+    "tokensUsed": 4901363,
+    "timeUsedSeconds": 42776,
+    "createdAt": 1791416153,
+    "updatedAt": 1791458930
+  },
+  "remainingTokens": null,
+  "completionBudgetReport": null
+}
+

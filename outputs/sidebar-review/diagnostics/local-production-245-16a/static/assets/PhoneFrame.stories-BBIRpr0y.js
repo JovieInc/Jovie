@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./PhoneFrame-B4t0NSH6.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Molecules/PhoneFrame`,component:r,parameters:{layout:`centered`},args:{children:(0,i.jsx)(`div`,{className:`flex h-full w-full items-center justify-center bg-surface-0 text-sm text-secondary-token`,children:`Profile preview`})}},o={},s={args:{className:`scale-90`}},c=[`Default`,`CustomClassName`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    className: 'scale-90'
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{s as CustomClassName,o as Default,c as __namedExportsOrder,a as default};

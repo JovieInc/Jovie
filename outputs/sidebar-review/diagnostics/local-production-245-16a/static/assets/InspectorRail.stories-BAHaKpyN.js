@@ -1,0 +1,15 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{t as n}from"./jsx-runtime-BbDfbRii.js";import{r,t as i}from"./button-BSHhPV4e.js";import{i as a,t as o}from"./EntityHeader-D9vRkk0Q.js";import{r as s,t as c}from"./inspector-tabs-DtsUdm8N.js";import{n as l,t as u}from"./InspectorRail-DK82fb4J.js";function d(){let[e,t]=(0,p.useState)(!1),[n,r]=(0,p.useState)(!0),[a,s]=(0,p.useState)(`details`);return(0,f.jsxs)(`div`,{className:`flex min-h-0 flex-1 justify-end gap-3`,children:[(0,f.jsxs)(`div`,{children:[(0,f.jsx)(i,{onMouseDown:e=>e.preventDefault(),onClick:()=>t(e=>!e),children:`Toggle loading`}),(0,f.jsx)(i,{onClick:()=>r(e=>!e),children:`Toggle rail`})]}),(0,f.jsxs)(u,{isOpen:n,ariaLabel:`Refresh inspector`,objectHeader:(0,f.jsx)(o,{className:`px-3 pt-3`,title:`A deliberately long release title with enough words to wrap`,stableLayout:!0,titleLineClamp:1,reserveSubtitleSlot:!0,reserveMetaSlot:!0}),tabs:c,activeTab:a,onTabChange:s,tabsAriaLabel:`Inspector tabs`,isLoading:e,onKeyDown:e=>{e.key===`Escape`&&r(!1),e.key===`r`&&(e.preventDefault(),t(e=>!e))},onClose:()=>r(!1),children:[(0,f.jsx)(`input`,{"aria-label":`Asset note`,defaultValue:`Unsaved note`}),b.map(e=>(0,f.jsxs)(`p`,{className:`py-2`,children:[e,`: `,a]},e))]})]})}var f,p,m,h,g,_,v,y,b,x,S;function C(){return(C=e((()=>{f=n(),r(),p=t(),a(),l(),s(),{fn:m}=__STORYBOOK_MODULE_TEST__,h={title:`Molecules/Inspector/InspectorShell`,component:u,args:{isOpen:!0,ariaLabel:`Release inspector`,tabs:c,activeTab:`details`,onTabChange:m(),tabsAriaLabel:`Inspector tabs`,objectHeader:(0,f.jsx)(o,{className:`px-3 pt-3`,title:`Take Me Over`}),children:(0,f.jsx)(`p`,{children:`Details body`}),isLoading:!1},decorators:[e=>(0,f.jsx)(`div`,{className:`flex min-h-0 justify-end`,style:{height:`calc(100svh - 2rem)`},children:(0,f.jsx)(e,{})})]},g={},_={args:{isLoading:!0}},v={args:{isEmpty:!0}},y={args:{children:(0,f.jsx)(`p`,{role:`alert`,children:`Unable to load assets. Try again.`})}},b=Array.from({length:50},(e,t)=>`Fact ${t+1}`),x={render:()=>(0,f.jsx)(d,{})},S=[`Default`,`Loading`,`Empty`,`Error`,`RefreshStability`],g.parameters={...g.parameters,docs:{...g.parameters?.docs,source:{originalSource:`{}`,...g.parameters?.docs?.source}}},_.parameters={..._.parameters,docs:{..._.parameters?.docs,source:{originalSource:`{
+  args: {
+    isLoading: true
+  }
+}`,..._.parameters?.docs?.source}}},v.parameters={...v.parameters,docs:{...v.parameters?.docs,source:{originalSource:`{
+  args: {
+    isEmpty: true
+  }
+}`,...v.parameters?.docs?.source}}},y.parameters={...y.parameters,docs:{...y.parameters?.docs,source:{originalSource:`{
+  args: {
+    children: <p role='alert'>Unable to load assets. Try again.</p>
+  }
+}`,...y.parameters?.docs?.source}}},x.parameters={...x.parameters,docs:{...x.parameters?.docs,source:{originalSource:`{
+  render: () => <RefreshFixture />
+}`,...x.parameters?.docs?.source}}}})))()}C();export{g as Default,v as Empty,y as Error,_ as Loading,x as RefreshStability,S as __namedExportsOrder,h as default};

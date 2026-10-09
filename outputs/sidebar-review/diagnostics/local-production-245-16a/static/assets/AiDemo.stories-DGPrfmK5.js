@@ -1,0 +1,33 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{t as n}from"./jsx-runtime-BbDfbRii.js";import{n as r,t as i}from"./pause-CHxkoeKx.js";import{n as a,t as o}from"./play-DZgtukkA.js";import{i as s,t as c}from"./utils-AN1vFgqV.js";function l(){return g+crypto.getRandomValues(new Uint32Array(1))[0]/2**32*60}function u(e,t){return e?`Show next demo`:t?`Resume demo`:`Pause demo`}function d(){return(0,p.jsx)(`span`,{className:`ai-demo-cursor ml-0.5 inline-block h-4 w-2 bg-current align-text-bottom text-primary-token`,"aria-hidden":`true`})}function f({className:e,variant:t=`default`,contextChips:n=[]}){let[r,a]=(0,m.useState)(0),[s,f]=(0,m.useState)(0),[g,v]=(0,m.useState)(!1),[y,b]=(0,m.useState)(!1),[x,S]=(0,m.useState)(!1),[C,w]=(0,m.useState)(!1),T=(0,m.useRef)(null),E=(0,m.useRef)(null),D=h[r],O=t===`premium`;(0,m.useEffect)(()=>{let e=globalThis.matchMedia(`(prefers-reduced-motion: reduce)`);w(e.matches);let t=e=>w(e.matches);return e.addEventListener(`change`,t),()=>e.removeEventListener(`change`,t)},[]);let k=(0,m.useCallback)(()=>{f(0),v(!0)},[]),A=(0,m.useCallback)(e=>{e?.isIntersecting&&!y&&(b(!0),C?D&&f(D.segments.length):k())},[D,y,C,k]);(0,m.useEffect)(()=>{let e=T.current;if(!e)return;let t=new IntersectionObserver(([e])=>A(e),{threshold:.3});return t.observe(e),()=>t.disconnect()},[A]);let j=(0,m.useCallback)(()=>{if(D){if(s>=D.segments.length){v(!1),E.current=setTimeout(()=>{let e=(r+1)%h.length;a(e),f(0),v(!0)},_);return}E.current=setTimeout(()=>{f(e=>e+1)},l())}},[D,r,s]);(0,m.useEffect)(()=>{if(!(!g||x||C))return j(),()=>{E.current&&clearTimeout(E.current)}},[j,x,g,C]),(0,m.useEffect)(()=>()=>{E.current&&clearTimeout(E.current)},[]);let M=(0,m.useCallback)(()=>{S(e=>!e),x&&E.current&&clearTimeout(E.current)},[x]),N=(0,m.useCallback)(()=>{let e=(r+1)%h.length;a(e);let t=h[e];t&&f(t.segments.length)},[r]),P=u(C,x);return(0,p.jsxs)(`figure`,{ref:T,"aria-label":`AI writing demo`,className:c(`overflow-hidden font-sans`,O?`rounded-[1.35rem] border border-subtle bg-surface-1 shadow-panel-ring`:`rounded-t-xl rounded-b-none bg-surface-0 shadow-panel-ring`,e),children:[(0,p.jsx)(`style`,{children:`
+        @keyframes segmentIn {
+          from {
+            filter: blur(4px);
+          }
+          to {
+            filter: blur(0);
+          }
+        }
+        @keyframes cursorBlink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        .ai-demo-segment {
+          animation: segmentIn 0.3s ease forwards;
+        }
+        .ai-demo-cursor {
+          animation: cursorBlink 1s step-end infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .ai-demo-segment { animation: none !important; }
+          .ai-demo-cursor { animation: none !important; }
+        }
+      `}),(0,p.jsxs)(`div`,{className:c(`flex items-center gap-2 border-b border-subtle px-3.5 py-2.5`,O&&`bg-surface-0`),children:[(0,p.jsx)(`div`,{className:`flex gap-1`,children:[1,2,3].map(e=>(0,p.jsx)(`span`,{className:`h-2 w-2 rounded-full bg-surface-3`},e))}),(0,p.jsx)(`div`,{className:`flex-1 text-center text-xs text-tertiary-token`,children:`Jovie AI`}),(0,p.jsx)(`button`,{type:`button`,onClick:C?N:M,"aria-label":P,className:c(`focus-ring flex h-6 w-6 items-center justify-center rounded transition-colors`,O?`text-tertiary-token hover:text-primary-token`:`text-tertiary-token hover:text-secondary-token`),children:C||x?(0,p.jsx)(o,{className:`h-3 w-3`,"aria-hidden":`true`}):(0,p.jsx)(i,{className:`h-3 w-3`,"aria-hidden":`true`})})]}),O&&n.length>0?(0,p.jsx)(`div`,{className:`flex flex-wrap gap-2 border-b border-subtle px-4 py-3`,children:n.map(e=>(0,p.jsx)(`span`,{className:`rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-3xs text-tertiary-token`,children:e},e))}):null,(0,p.jsx)(`div`,{className:`border-b border-subtle px-4 py-3`,children:(0,p.jsx)(`p`,{className:`font-mono text-xs text-tertiary-token`,children:D.prompt})}),(0,p.jsx)(`div`,{className:c(`min-h-40 px-4 py-4`,O&&`bg-surface-0`),children:(0,p.jsxs)(`output`,{"aria-live":`polite`,className:`block text-app leading-[1.75] text-secondary-token`,children:[D.segments.map((e,t)=>t>=s?null:(0,p.jsx)(`span`,{className:c(`ai-demo-segment`,e.highlight&&`font-medium text-primary-token`),children:e.text},`${r}-${e.text.slice(0,20)}`)),y&&!C?(0,p.jsx)(d,{}):null]})})]})}var p,m,h,g,_;function v(){return(v=e((()=>{p=n(),r(),a(),m=t(),s(),h=[{prompt:`> Write me a bio for a press kit`,segments:[{text:`Tim White`,highlight:!0},{text:` is an independent artist based in `},{text:`Los Angeles`,highlight:!0},{text:` whose catalog spans singles, EPs, and full-length albums since `},{text:`his 2018 debut single The Sound`,highlight:!0},{text:`. Across `},{text:`21 releases and 4 projects`,highlight:!0},{text:`, he has accumulated `},{text:`1.2M streams`,highlight:!0},{text:` across platforms and earned placements on `},{text:`New Music Friday, Indie Pop, and Alternative Rising`,highlight:!0},{text:`.`}]},{prompt:`> Generate a press release for Signals`,segments:[{text:`FOR IMMEDIATE RELEASE`,highlight:!0},{text:` — `},{text:`Tim White`,highlight:!0},{text:` announces the release of `},{text:`Signals`,highlight:!0},{text:`, a 12-track album marking his most ambitious project to date. Produced across `},{text:`three continents`,highlight:!0},{text:`, the album features collaborations with `},{text:`6 producers`,highlight:!0},{text:` and explores themes of distance, connection, and digital intimacy.`}]},{prompt:`> How are my streams trending this month?`,segments:[{text:`Your streams are up `},{text:`23% month-over-month`,highlight:!0},{text:`. `},{text:`The Sound`,highlight:!0},{text:` is driving `},{text:`62%`,highlight:!0},{text:` of total volume, likely from its placement on `},{text:`Alternative Rising`,highlight:!0},{text:` (added Feb 3). `},{text:`Signals`,highlight:!0},{text:` tracks are up `},{text:`8%`,highlight:!0},{text:` collectively, steady organic growth.`}]}],g=80,_=6e3})))()}var y,b,x,S;function C(){return(C=e((()=>{v(),y={title:`Features/Home/AiDemo`,component:f,parameters:{layout:`centered`}},b={args:{variant:`default`}},x={args:{variant:`premium`,contextChips:[`Tim White`,`The Sound`,`1.2M streams`]}},S=[`Default`,`Premium`],b.parameters={...b.parameters,docs:{...b.parameters?.docs,source:{originalSource:`{
+  args: {
+    variant: 'default'
+  }
+}`,...b.parameters?.docs?.source}}},x.parameters={...x.parameters,docs:{...x.parameters?.docs,source:{originalSource:`{
+  args: {
+    variant: 'premium',
+    contextChips: ['Tim White', 'The Sound', '1.2M streams']
+  }
+}`,...x.parameters?.docs?.source}}}})))()}C();export{b as Default,x as Premium,S as __namedExportsOrder,y as default};

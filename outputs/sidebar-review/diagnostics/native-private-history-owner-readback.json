@@ -1,0 +1,242 @@
+{
+  "observedAt": "2026-10-08T09:14:00.114Z",
+  "issues": [
+    {
+      "id": "JOV-6750",
+      "title": "Extract JovieKit Swift package shared by iOS and JovieMac",
+      "status": "In Progress",
+      "updatedAt": "2026-10-07T21:11:14.641Z",
+      "assignee": "Tim White",
+      "relations": {
+        "blocks": [
+          {
+            "id": "JOV-6753",
+            "title": "Native Ovie home on live /api/hud/metrics (JovieMac)"
+          },
+          {
+            "id": "JOV-6752",
+            "title": "Mac PKCE browser sign-in fallback (client=macos)"
+          },
+          {
+            "id": "JOV-6749",
+            "title": "Prove Mac passkey sign-in on staging + production with 1Password"
+          },
+          {
+            "id": "JOV-6751",
+            "title": "Rename apps/ios to apps/apple after JovieKit lands"
+          },
+          {
+            "id": "JOV-6754",
+            "title": "Native chat on Mac (port MobileChatClient, ChatRepository, message views)"
+          }
+        ],
+        "blockedBy": [],
+        "relatedTo": [
+          {
+            "id": "JOV-7501",
+            "title": "Extract the shared Swift chat wire decoder into JovieKit"
+          },
+          {
+            "id": "JOV-7740",
+            "title": "Restore the Electron titlebar flex contract"
+          },
+          {
+            "id": "JOV-7738",
+            "title": "Connect Mac browser sign-in to the retained native session"
+          },
+          {
+            "id": "JOV-7712",
+            "title": "Centralize iOS auth platform settings for shared native code"
+          },
+          {
+            "id": "JOV-7699",
+            "title": "Render standalone successful merch results once in native chat"
+          },
+          {
+            "id": "JOV-7692",
+            "title": "Show browser continuation for durably saved live mobile merch results"
+          },
+          {
+            "id": "JOV-7528",
+            "title": "Add an isolated native Mac development target with shared foundations"
+          },
+          {
+            "id": "JOV-7526",
+            "title": "Reuse the existing Jovie theme on macOS"
+          },
+          {
+            "id": "JOV-7466",
+            "title": "Candidate follow-up: confirm use of the deprecated Ovie polling runtime"
+          },
+          {
+            "id": "JOV-7500",
+            "title": "Align Mac direction rules and source guards with staged native migration"
+          },
+          {
+            "id": "JOV-6760",
+            "title": "Adopt amended Mac Swift-control invariants into canon"
+          }
+        ],
+        "duplicateOf": null
+      },
+      "ownership": null,
+      "sourceScope": "Phase 1. Move the shared, platform-neutral sources (JovieTheme, APIClient + response models, NativeSessionTokenStore, MobileAuthReturn, AppRouter, passkey client) into `apps/ios/Packages/JovieKit` (local SwiftPM), and consume it from both `Jovie.xcodeproj` and the generated `JovieMac.xcodeproj` (`apps/ios/scripts/generate-mac-project.rb`)."
+    },
+    {
+      "id": "JOV-7738",
+      "title": "Connect Mac browser sign-in to the retained native session",
+      "status": "Todo",
+      "updatedAt": "2026-10-04T23:45:23.306Z",
+      "assignee": "Tim White",
+      "relations": {
+        "blocks": [],
+        "blockedBy": [
+          {
+            "id": "JOV-7712",
+            "title": "Centralize iOS auth platform settings for shared native code"
+          }
+        ],
+        "relatedTo": [
+          {
+            "id": "JOV-6749",
+            "title": "Prove Mac passkey sign-in on staging + production with 1Password"
+          },
+          {
+            "id": "JOV-6750",
+            "title": "Extract JovieKit Swift package shared by iOS and JovieMac"
+          },
+          {
+            "id": "JOV-7632",
+            "title": "W-06: Keep web-only workspaces out of iOS navigation"
+          }
+        ],
+        "duplicateOf": null
+      },
+      "ownership": "Ownership: Tim White; native_session_delivery owns the later source delivery after the portability owner releases the checkout. This claim does not authorize applying the layer before its actual prerequisites merge.",
+      "sourceScope": "Connect the native Mac app to the retained browser sign-in and shared profile/session implementation after <issue id=\"e23a8f5f-97f0-418c-85d7-fc25507e1889\" href=\"https://linear.app/jovie/issue/JOV-7712/centralize-ios-auth-platform-settings-for-shared-native-code\">JOV-7712</issue> lands."
+    },
+    {
+      "id": "JOV-7632",
+      "title": "W-06: Keep web-only workspaces out of iOS navigation",
+      "status": "Merging",
+      "updatedAt": "2026-10-04T08:49:51.733Z",
+      "assignee": "Tim White",
+      "relations": {
+        "blocks": [],
+        "blockedBy": [],
+        "relatedTo": [
+          {
+            "id": "JOV-7738",
+            "title": "Connect Mac browser sign-in to the retained native session"
+          },
+          {
+            "id": "JOV-7673",
+            "title": "Match native sign-in returns to their originating attempt"
+          },
+          {
+            "id": "JOV-7690",
+            "title": "Symphony doctor: no-landing (mac)"
+          },
+          {
+            "id": "JOV-7541",
+            "title": "Design gate: IA-first + certified capabilities before UI/landing work"
+          }
+        ],
+        "duplicateOf": null
+      },
+      "ownership": null,
+      "sourceScope": "Audit ID: W-06. Status: fix in progress (product-audit wave 2). The iOS manifest has no surfaces for YouTube, Insights, Jovie Work, release plan, or merch checkout; do not nav users to web-only tools until an iOS surface exists, and document intentional web-only boundaries. Sources: /workspace/cloud-agent-artifacts/bc-114e3821-fb21-5137-8395-daf7cbb7ca5c/product-audit.md:129; /workspace/cloud-agent-artifacts/bc-114e3821-fb21-5137-8395-daf7cbb7ca5c/orphaned-pages-audit.md:64."
+    },
+    {
+      "id": "JOV-5848",
+      "title": "Ovie iOS: durable Eve-backed Summer conversation",
+      "status": "Done",
+      "updatedAt": "2026-09-05T00:39:28.998Z",
+      "assignee": "Tim White",
+      "relations": {
+        "blocks": [],
+        "blockedBy": [],
+        "relatedTo": [
+          {
+            "id": "JOV-4320",
+            "title": "Isolate Jovie customer and Summer operator identities, memory, credentials, tools, sessions, and audit"
+          },
+          {
+            "id": "JOV-5211",
+            "title": "iOS Settings: admin-only Ovie ↔ Jovie switch (Taste Inbox + Summer chat on phone)"
+          },
+          {
+            "id": "JOV-5212",
+            "title": "Mac Ovie door: Eve-backed multi-turn conversation with real current Summer"
+          },
+          {
+            "id": "JOV-5468",
+            "title": "iOS eyes-free capture with founder-only Summer routing"
+          },
+          {
+            "id": "JOV-5373",
+            "title": "Ovie Eve queue handoff and founder HTTP contract"
+          },
+          {
+            "id": "JOV-5214",
+            "title": "Ovie → Eve intake → Summer CoS → Symphony/Gem program"
+          },
+          {
+            "id": "JOV-6021",
+            "title": "P0: Restore Ovie web conversation after retiring the Summer Mac consumer"
+          },
+          {
+            "id": "JOV-5991",
+            "title": "P0: Bind assigned Jovie and Summer Photon lines; present Summer through Ovie"
+          },
+          {
+            "id": "JOV-4693",
+            "title": "Ovi desktop client: full-duplex Summer voice over the canonical realtime gateway"
+          },
+          {
+            "id": "JOV-5920",
+            "title": "Summer full-duplex voice gateway: provider-neutral realtime shell + concurrent tool execution on iOS"
+          },
+          {
+            "id": "JOV-5868",
+            "title": "Promote #17045 Photon door to Eve production alias — Summer still not live"
+          }
+        ],
+        "duplicateOf": null
+      },
+      "ownership": null,
+      "sourceScope": "## Source"
+    },
+    {
+      "id": "JOV-6077",
+      "title": "Ovie iOS/Mac door quality: runtime state and continuity acceptance",
+      "status": "Done",
+      "updatedAt": "2026-09-22T16:44:54.878Z",
+      "assignee": "Tim White",
+      "relations": {
+        "blocks": [],
+        "blockedBy": [],
+        "relatedTo": [
+          {
+            "id": "JOV-4082",
+            "title": "OV nav: customer and admin navigation become mutually exclusive by shell mode"
+          },
+          {
+            "id": "JOV-5212",
+            "title": "Mac Ovie door: Eve-backed multi-turn conversation with real current Summer"
+          },
+          {
+            "id": "JOV-6021",
+            "title": "P0: Restore Ovie web conversation after retiring the Summer Mac consumer"
+          }
+        ],
+        "duplicateOf": null
+      },
+      "ownership": null,
+      "sourceScope": "## Source"
+    }
+  ],
+  "issueMutated": false,
+  "fileLeaseAcquired": false,
+  "sourceWriterChanged": false
+}

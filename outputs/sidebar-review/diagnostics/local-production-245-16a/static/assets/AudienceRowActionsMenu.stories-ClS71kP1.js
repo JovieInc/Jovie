@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./AudienceRowActionsMenu-jFqISekU.js";var r,i,a,o,s;function c(){return(c=e((()=>{t(),{fn:r}=__STORYBOOK_MODULE_TEST__,i={title:`Dashboard/AudienceRowActionsMenu`,component:n,parameters:{layout:`centered`},args:{row:{id:`member-1`,type:`email`,displayName:`Ada`,locationLabel:`Unknown`,geoCity:null,geoCountry:null,visits:1,engagementScore:0,intentLevel:`low`,latestActions:[],referrerHistory:[],utmParams:{},email:`ada@example.com`,phone:null,spotifyConnected:!1,purchaseCount:0,tipAmountTotalCents:0,tipCount:0,tags:[],deviceType:null,lastSeenAt:null},open:!0,onOpenChange:r()}},a={},o={args:{open:!1}},s=[`Open`,`Closed`],a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{}`,...a.parameters?.docs?.source}}},o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  args: {
+    open: false
+  }
+}`,...o.parameters?.docs?.source}}}})))()}c();export{o as Closed,a as Open,s as __namedExportsOrder,i as default};

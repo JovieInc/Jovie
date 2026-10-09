@@ -1,0 +1,20 @@
+{
+  "checkedLocalHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "checkedCachedMain": "b09456f1acbebabc0dd8e30906cc3ce3a4e0ad90",
+  "remoteMainRefreshed": false,
+  "documentationException": [
+    "docs/PR_FLOW.md:57-79",
+    ".claude/rules/pr-stacking.md:44-80"
+  ],
+  "executableGuard": ".github/workflows/pr-targets-main.yml:62-64",
+  "draftExceptionInGuard": false,
+  "decision": "compose existing sequential main-targeted PR flow; do not weaken guard or rebase qualified source prematurely",
+  "formerFiveAtOnceProposal": "superseded; unanswered approval is not authority",
+  "initialAction": "Inactive review proposal only: native545b3839 and foundation8d360 against main after required renewed qualification and applicable new authority;4b/93fc/ca37 and former five-at-once action are superseded",
+  "laterAction": "hold other three local branches unpublished; after each parent lands, preserve recorded parent boundary, fetch/rebase onto fresh main, verify semantic diff, caps, exact-head tests/coverage and fresh hosted checks, then prepare the next main-targeted draft",
+  "acceptance": "initial root heads require fresh-main comparison before publication; this is a local plan, not hosted admission",
+  "historicalInitialAction": "push only native3cdda and foundation8d360, create two draft PRs against main in JovieInc/Jovie after applicable authorization",
+  "publicationActionActive": false,
+  "publishNow": false,
+  "freshMainComparison": "native545 vs freshly fetched91faaa39: conflict-free47c01204 derived tree, unqualified; source unchanged by comparison"
+}

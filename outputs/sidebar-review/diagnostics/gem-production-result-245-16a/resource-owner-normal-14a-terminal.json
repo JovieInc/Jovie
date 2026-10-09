@@ -1,0 +1,63 @@
+{
+  "at": "2026-10-08T09:01:16.716147+00:00",
+  "exit": 0,
+  "stderr": "",
+  "remote": {
+    "runId": "owner-normal-PR20988-14a3fe8-20261008T0820Z",
+    "kind": "normal-qualification",
+    "pr": 20988,
+    "head": "14a3fe807b7605edd11348165e999b1ef32618f4",
+    "base": "5cc5ddd8363d990aaed675aa431b25dd3cf6d0cb",
+    "branch": "codex/gem-storybook-resource-bounds",
+    "bundleSha256": "2014762c30af7c917a2faf0220891d1f91b204cae6120b6823ae0bf0c19ebd7a",
+    "sourceOwner": "existing sole Gem/native repair writer",
+    "modelFree": true,
+    "preparedAt": "2026-10-08T08:20:54.748235+00:00",
+    "priorRunTerminal": "owner-normal-PR20988-16a2bda-20261008T072852Z ended07:59:03.454058Z; natural seat release and matchingprocesszero",
+    "routeCorrection": "freshcanonicalorigin/main; existingHost.gate_timeout; unchangedtests/shardcaps",
+    "at": "2026-10-08T08:21:04.943803+00:00",
+    "accepted": true,
+    "providerInvoked": false,
+    "credentialsCopied": false,
+    "sourceWriterChanged": false,
+    "gatesChanged": false,
+    "healthSamples": [
+      {
+        "cpuIdlePercent": 92.5,
+        "memoryAvailablePercent": 95.16,
+        "load1": 1.6064453125,
+        "admitted": true
+      },
+      {
+        "cpuIdlePercent": 88.25,
+        "memoryAvailablePercent": 95.12,
+        "load1": 1.6064453125,
+        "admitted": true
+      }
+    ],
+    "gateSeat": 0,
+    "admittedAt": "2026-10-08T08:21:06.946254+00:00",
+    "checkout": "/home/timwhite/.local/state/jovie-lanes/runs/owner-normal-PR20988-14a3fe8-20261008T0820Z/checkout",
+    "installExit": 0,
+    "qualificationBase": "91faaa3933a092b4bce8c3174346d81eb5c1bcdf",
+    "qualificationMergeBase": "5cc5ddd8363d990aaed675aa431b25dd3cf6d0cb",
+    "qualificationDiff": [
+      "apps/web/.storybook/main.ts",
+      "apps/web/tests/unit/storybook/production-react-resolution.test.ts",
+      "scripts/component-live-storybook-browser.mjs",
+      "scripts/component-live-storybook-lifecycle.mjs",
+      "scripts/lib/__tests__/component-live-storybook-certification.test.mjs"
+    ],
+    "command": [
+      "git",
+      "push",
+      "origin",
+      "codex/gem-storybook-resource-bounds"
+    ],
+    "canonicalGateTimeoutSeconds": 2400,
+    "outcome": "held-or-failed",
+    "error": "Command '['git', 'push', 'origin', 'codex/gem-storybook-resource-bounds']' timed out after 2400 seconds",
+    "finishedAt": "2026-10-08T09:01:16.675708+00:00",
+    "gateSeatReleased": true
+  }
+}

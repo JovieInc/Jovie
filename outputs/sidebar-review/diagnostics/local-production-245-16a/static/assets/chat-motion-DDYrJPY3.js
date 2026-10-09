@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";var t,n,r,i;function a(){return(a=e((()=>{t=[.32,.72,0,1],n=[.25,.46,.45,.94],r={duration:.32,ease:t},i={duration:.1,ease:n}})))()}export{r as n,a as r,i as t};

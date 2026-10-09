@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./AlertGrowthLanding-CagRQciY.js";var r,i,a,o;function s(){return(s=e((()=>{t(),r={id:`mock-artist-id`,owner_user_id:`mock-user-id`,handle:`artisthandle`,spotify_id:`mock-spotify-id`,name:`Mock Artist`,image_url:`https://example.com/avatar.jpg`,tagline:`Mock artist tagline`,published:!0,is_verified:!0,is_featured:!1,marketing_opt_out:!1,created_at:`2023-01-01T00:00:00Z`},i={title:`Features/Alerts/AlertGrowthLanding`,component:n,parameters:{layout:`centered`,jovie:{uncoveredProps:[`artist`,`disabled`]}}},a={args:{artist:r}},o=[`Default`],a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{
+  args: {
+    artist
+  }
+}`,...a.parameters?.docs?.source}}}})))()}s();export{a as Default,o as __namedExportsOrder,i as default};

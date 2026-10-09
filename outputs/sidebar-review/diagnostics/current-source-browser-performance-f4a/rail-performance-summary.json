@@ -1,0 +1,1 @@
+{"frames":20,"intervalMedianMs":8.299999999999955,"intervalP95Ms":15.700000000000045,"intervalMaxMs":15.700000000000045,"framesOver60HzBudget":0,"framesOver120HzBudget":8,"longTaskCount":0,"longestTaskMs":0,"attribution":"Browser-document timing on a shared busy host; task entries do not identify sidebar ownership. This display is not a physical 120Hz receipt."}

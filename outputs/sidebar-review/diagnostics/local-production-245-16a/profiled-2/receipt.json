@@ -1,0 +1,45 @@
+{
+  "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "compilerOverlay": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+  "diagnosticComposition": true,
+  "runtime": "production",
+  "runtimeProof": [
+    {
+      "bundleType": 0,
+      "version": "19.2.8",
+      "rendererPackageName": "react-dom"
+    }
+  ],
+  "browserVersion": "148.0.7778.96",
+  "profilerBoundary": "Production React onRender callbacks absent; actual trace/RAF and preserved semantic geometry checks used. Original development CI assertion unchanged.",
+  "viewport": {
+    "width": 1024,
+    "height": 450
+  },
+  "capture": "Playwright tracing/screenshots/video disabled during sampling; CDP render trace/CPU and scalar state queries included",
+  "assertions": "original large fixture interaction/geometry checks retained and evaluated after sampling, using checkpoint scalar facts; final viewport assertion and screenshot after sampling",
+  "assertionsPassed": true,
+  "eventToAssertionCheckpointMs": 39.299999713897705,
+  "firstFacts": {
+    "rows": 13,
+    "lastFocused": true,
+    "lastHref": "/app/calendar",
+    "menu": {
+      "y": 60,
+      "height": 382
+    },
+    "last": {
+      "top": 405,
+      "bottom": 437
+    },
+    "noHorizontalOverflow": true,
+    "renders": []
+  },
+  "escapeFocused": true,
+  "searchFacts": {
+    "focused": true,
+    "pages": 120
+  },
+  "optionVisible": true,
+  "selected": "/app/calendar"
+}

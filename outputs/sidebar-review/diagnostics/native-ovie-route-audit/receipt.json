@@ -1,0 +1,191 @@
+{
+  "mainHead": "485542fe6f370f20191e3e67e427f3870d84f984",
+  "nativeCheckpoint": "d8157055debb9368eb5d607e090cd0dec3ecec16",
+  "brainQuery": "Ovie mobile operator workspace navigation Now Growth Product Operations Needs You native authorized route adapters",
+  "brainResult": "Known canonical page retrieved in full; original weak query did not settle the native composition.",
+  "existingCapabilities": [
+    "Admin-only per-session workspace switch and workspace-aware Summer chat",
+    "Workspace-scoped action-loop Inbox and Summer-card decisions",
+    "Creator AppShellTab destinations and creator More Inbox/Calendar"
+  ],
+  "gap": "AppShellPanePolicy root/child destinations and AppShellTab content adapter have no workspace parameter or native Now/Growth/Product/Operations/Needs You destination set. Web ADMIN_PRIMARY_WORKSPACE_IDS includes overview/growth/product/operations/needs_you and separate utility inventory. Existing Inbox does not supply the other four operator roots or utility graph.",
+  "privateHistoryBoundary": "Mobile transport workspace=ov is not canonical private Summer history proof; creator conversation list is scoped by creatorProfileId. Keep explicit Open Summer web door.",
+  "nextCapability": "Existing native workspace/navigation owner must provide permission-aware operator destination adapters and approved web/native composition boundaries. Reuse the current authenticated Inbox/Summer capabilities where applicable; no invented routes, permissions or backend API in sidebar grouping slice.",
+  "publicationAuthority": false,
+  "runtimeParityProven": false,
+  "files": [
+    {
+      "path": "apps/ios/Jovie/Features/AppShell/AppShellView.swift",
+      "gitBlob": "64c1d3d52448774ab2507756d76ea60035b09196",
+      "sha256": "247b2821d0bdea05ec00d62585780293a5a4be0422e32ada74899664741d6bc0",
+      "artifact": "apps__ios__Jovie__Features__AppShell__AppShellView.swift"
+    },
+    {
+      "path": "apps/ios/Jovie/Features/AppShell/AppShellTabBar.swift",
+      "gitBlob": "3b0c6c26cf8a2a9299c6acf21c618b6ee5c89364",
+      "sha256": "953d38818a6de8af661edf1dd7e2b4bab559883ca8a8b4eb025aceec1851d421",
+      "artifact": "apps__ios__Jovie__Features__AppShell__AppShellTabBar.swift"
+    },
+    {
+      "path": "apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift",
+      "gitBlob": "92ce723b2ba8ec2e64b5edcf3952c79145d177ce",
+      "sha256": "bd6f405974a29027db6e2fcb54d61f5c7428b359b7a2535fe1d02b07084ad57a",
+      "artifact": "apps__ios__Jovie__Features__AppShell__AppShellLeftDrawer.swift"
+    },
+    {
+      "path": "apps/ios/Jovie/App/RootView.swift",
+      "gitBlob": "eb4858ab1a65f6e9c4af9ca6b2e8c677878fafcd",
+      "sha256": "3fadd3134fb9a870cdfacbbc857b7eb4b33e32b62bc4d438b8131cd5004df30e",
+      "artifact": "apps__ios__Jovie__App__RootView.swift"
+    },
+    {
+      "path": "apps/ios/Jovie/App/AppRouteManifest.swift",
+      "gitBlob": "8d41a745625ab04492f056866df93e0a1ecdaf4b",
+      "sha256": "55fa40459837ccbba915d140a562b3a78092ab25962f9871cad3c2be00d087c1",
+      "artifact": "apps__ios__Jovie__App__AppRouteManifest.swift"
+    },
+    {
+      "path": "apps/ios/Jovie/Core/MobileWorkspaceMode.swift",
+      "gitBlob": "f2ab1961a2f3740e83c1f363fc74cc4fff9ab239",
+      "sha256": "bcfcdf8d819d1dc74e04b7ebe36482ec2d84fe1b40a9a78ebe8fd199c1e73be1",
+      "artifact": "apps__ios__Jovie__Core__MobileWorkspaceMode.swift"
+    },
+    {
+      "path": "apps/ios/Jovie/Core/MobileHomeDataStore.swift",
+      "gitBlob": "dfec845b053f579641126d62d85589ea0d0f6785",
+      "sha256": "6fd1b2ed5d0293794be7607cb9ffd78e261a6fb075eef6f84bd33f82e52fd406",
+      "artifact": "apps__ios__Jovie__Core__MobileHomeDataStore.swift"
+    },
+    {
+      "path": "apps/ios/Jovie/Core/APIClient.swift",
+      "gitBlob": "d9cb5b489291b2f41b11a06b006f28efa0035683",
+      "sha256": "9cba83c67793b2319c81fc062da04bfc773eed1ed32f8c90d53a7de15335ff59",
+      "artifact": "apps__ios__Jovie__Core__APIClient.swift"
+    },
+    {
+      "path": "apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatTransport.swift",
+      "gitBlob": "abaa710e388fec51bc173c72119ea4332376c843",
+      "sha256": "0f3829a8811b6020f6c872d66cf3f0d5630312fcb73ddf784165f55aab3246ba",
+      "artifact": "apps__ios__Packages__JovieKit__Sources__JovieKit__MobileChatTransport.swift"
+    },
+    {
+      "path": "apps/web/constants/admin-navigation.ts",
+      "gitBlob": "e68be5e6898d1ce60f6a83edf3e7546a12dbe516",
+      "sha256": "e436728538a426b0cf33c60f604dedfdf2ab447b9985adf3dbf56375f724b755",
+      "artifact": "apps__web__constants__admin-navigation.ts"
+    },
+    {
+      "path": "apps/web/lib/mobile/chat/conversations.ts",
+      "gitBlob": "619b24a33fa3fe4a5d801a4fb2180ff4e654b629",
+      "sha256": "c4908021970cd19954eb247744634345dc321b3da0b25800e24e9e9c1b94265e",
+      "artifact": "apps__web__lib__mobile__chat__conversations.ts"
+    },
+    {
+      "path": "apps/web/lib/mobile/workspace.ts",
+      "gitBlob": "61752606f47469ed4a7e945c6ebb8c0921ead3af",
+      "sha256": "7f6019581f116af16a10ec35bfab5c349888eb92d20c27529efe57ca3cd22794",
+      "artifact": "apps__web__lib__mobile__workspace.ts"
+    },
+    {
+      "path": "apps/web/lib/app-shell/workspaces.ts",
+      "gitBlob": "ff58ab6a01d1e6ee65dbf3b880803b53fefd91e0",
+      "sha256": "f823ed425abd8c76fc9cd302b3943505de4805e5f0e0e3ad42c6525cb20039a3",
+      "artifact": "apps__web__lib__app-shell__workspaces.ts"
+    },
+    {
+      "path": "apps/web/lib/admin/page-access.ts",
+      "gitBlob": "b7680b4934748ead05284d34f7a6393fa71fb354",
+      "sha256": "5da10f281d3cbdc90064f7cef3824242fdb5a8731b2087dc323b2c3ba25d605f",
+      "artifact": "apps__web__lib__admin__page-access.ts"
+    },
+    {
+      "path": "apps/web/lib/ios/apple-app-site-association.ts",
+      "gitBlob": "5a0c68951d10dba004aa90cdf0c2b6b7d88873b2",
+      "sha256": "63ab9ca9956e5e602df189bc6d0c1ee05a017f1a79c16e3bca4e1d469d248d7b",
+      "artifact": "apps__web__lib__ios__apple-app-site-association.ts"
+    },
+    {
+      "path": "apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift",
+      "gitBlob": "31949748a5c46f6f146d377028b89da45780b75f",
+      "sha256": "15e70a9437da78f4761b5e65aa7e0879692a8a29cc6f82d7400ad1d65aaf44f7",
+      "artifact": "apps__ios__Jovie__Features__AppShell__AppShellIntentNavigation.swift"
+    },
+    {
+      "path": "apps/ios/Jovie/Features/Auth/MobileAuthCoordinator.swift",
+      "gitBlob": "66a1d4e0cedd9af3c4a55f51dcabc0e9d1ae3c15",
+      "sha256": "5d7fbf77375f36a0f367c1c3f39a2dda237a091b1b3df76e7e659ac44d58b374",
+      "artifact": "apps__ios__Jovie__Features__Auth__MobileAuthCoordinator.swift"
+    },
+    {
+      "path": "apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift",
+      "gitBlob": "910fca469125fa4c7335fb6422786c89599ca6d6",
+      "sha256": "12002bc0aa91da214bef35dff004382afcb04cce6c4ee58353feb6ba777c607e",
+      "artifact": "apps__ios__Jovie__Features__Dashboard__PublicProfileBrowserView.swift"
+    },
+    {
+      "path": "apps/ios/Jovie/Core/MobileMeResponse.swift",
+      "gitBlob": "b2bcddcbdc5d5d33593b390a18ff9126dcd0e149",
+      "sha256": "6626a55a43a1427b64941a003be530d999ad32ec8610e8469d7754407372e9f2",
+      "artifact": "apps__ios__Jovie__Core__MobileMeResponse.swift"
+    },
+    {
+      "path": "apps/web/app/api/mobile/v1/me/route.ts",
+      "gitBlob": "ee5b1d1bcc7c4f36ecc1466e47508ab992549af9",
+      "sha256": "357b8169d8b589d1c76a4a6c607224491b31191effc6582b62147eb515c427af",
+      "artifact": "apps__web__app__api__mobile__v1__me__route.ts"
+    },
+    {
+      "path": "apps/web/lib/ovie/privacy-lock/server.ts",
+      "gitBlob": "1697b79ba3063d06f24b1f48ba9b0dbeddd4efe7",
+      "sha256": "eba88e7c7f50937848e58034e9d73da16d4b5bcf1b369765e67228d7b111a7d4",
+      "artifact": "apps__web__lib__ovie__privacy-lock__server.ts"
+    },
+    {
+      "path": "apps/web/constants/routes.ts",
+      "gitBlob": "8630775ef15d07abff164265154f6b483acb6032",
+      "sha256": "de521f4c05d82e146950f20f29980fcd43b9341bd697daa262ebfeee5e1efe63",
+      "artifact": "apps__web__constants__routes.ts"
+    }
+  ],
+  "currentNativeHead": "4b407aac7b516e2bab9c9f937b805b4cfe88f78e",
+  "canonicalDecision": {
+    "slug": "jovie/jov-4082-responsive-ov-navigation",
+    "contentHash": "d6d710b53a5fe0ba7416f6b1f75486b6009a9d1d5eab7baf65e11627b955d562",
+    "applied": "registry-derived operator navigation excludes creator links; latest five-root implementation spec supersedes older four-root count"
+  },
+  "authorizationFinding": "MobileMeResponse.appShell.canAccessOvie requires ov/secondary/admin. /api/mobile/v1/me derives that contract from the same checkAdminRole used by getCurrentAdminPageAccess. OPERATOR_NAV_ITEMS maps all ADMIN_NAV_REGISTRY entries with no per-item privilege filter. Registry-derived read navigation can use existing admin gate; do not invent a new destination-permission API. Web pages preserve privacy unlock and mutations preserve MFA/entitlement gates.",
+  "essentialMissingCapabilities": [
+    {
+      "symbol": "AppShellTab / AppShellPanePolicy.rootDestinations / AppShellView.surfaceContent",
+      "path": "apps/ios/Jovie/Features/AppShell/AppShellView.swift and AppShellTabBar.swift",
+      "gap": "No operator destination or mounted page adapter; creator selected-tab state cannot identify operator pathname/query."
+    },
+    {
+      "symbol": "MobileSignedInLinkRoute.resolve / MobileWebOnlyRouteBoundary.pathPrefixes",
+      "path": "apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift",
+      "gap": "Only Settings/Chat native routes and five unrelated web-only prefixes; /app/ov remains unmatched. normalizedRoutePath lowercases whole paths; webFallbackURL reconstructs queryItems and drops fragment, unsuitable for exact case-sensitive operator resource URLs."
+    },
+    {
+      "symbol": "JOVIE_APPLE_APP_SITE_ASSOCIATION / IOS_WEB_ONLY_APP_PATH_PREFIXES",
+      "path": "apps/web/lib/ios/apple-app-site-association.ts",
+      "gap": "/app/* claims operator URLs; no Ovie NOT exclusion or registered native route to consume them. /hud already remains outside claimed wildcard."
+    },
+    {
+      "symbol": "PublicProfileURLPolicy / PublicProfileBrowserState",
+      "path": "apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift",
+      "gap": "Only profile roots; app/hud/auth reserved and WK store nonPersistent. Cannot reuse as authenticated operator web view or copy native bearer/session data into it."
+    }
+  ],
+  "smallestCompatibleDependency": "Extend the existing typed native route/intent and intentional-web-only/AASA contract for canonical operator destinations, preserving full URL/query/fragment and native/browser ownership. Declare actual web-only routes in existing versioned route manifest, retain server admin/privacy gates and mutation MFA. A mounted operator page adapter with truthful active/back state is absent; intentional Safari handoff must remain explicitly external and cannot count as seamless native parity. Existing routing/auth owner (JOV-7632 scope) and coordinator must reconcile the composition and source lease before touching shared surfaces. No new page/API/framework/permission grant.",
+  "ownerStatus": "Read-only28-worktree census corrected to actual Features/Auth path: only our local IntentNavigation/AASA edits; lanes/7706-on-7587 has clean MobileAuthCoordinator delta, not touched here. Separate offline-toolbar branch has clean nonoverlapping AppShellView delta. Local inventory is not exhaustive remote lease proof.",
+  "proposal": "route-adapter-proposal.md",
+  "implementationStatus": "Implemented and locally qualified:690units,35semantic/UI,6webAASA/parity,1same-buildrecording. All20 destinations explicitly webOnly; full protected in-app/runtime parity unresolved",
+  "lastQualifiedGroupingHead": "4b407aac7b516e2bab9c9f937b805b4cfe88f78e",
+  "newCandidateHead": "545b383925854b8a1632fffe9b48087fe88f6e37",
+  "gbrainReceipt": {
+    "slug": "receipts/shared-sidebar-native-ovie-adapter-545b3839-2026-10-08",
+    "contentHash": "ddb2e5276aa2023530e20532373d8b5a47ea17015991f157bfd9080b39c5ed21",
+    "fullBodyMatch": true,
+    "verifiedAt": "2026-10-08T08:50:18.669Z"
+  }
+}

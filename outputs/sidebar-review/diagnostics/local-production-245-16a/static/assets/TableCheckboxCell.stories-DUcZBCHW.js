@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./TableCheckboxCell-516c619O.js";var r,i,a,o,s;function c(){return(c=e((()=>{t(),{fn:r}=__STORYBOOK_MODULE_TEST__,i={title:`Organisms/Table/Atoms/TableCheckboxCell`,component:n,parameters:{layout:`centered`,jovie:{uncoveredProps:[`table`,`row`,`rowNumber`,`isChecked`,`onToggleSelect`,`headerCheckboxState`,`onToggleSelectAll`,`isHeader`,`indeterminate`]}},args:{checked:!1,onChange:r(),ariaLabel:`Select row 1`,rowNumber:1}},a={},o={args:{checked:!0}},s=[`Default`,`Checked`],a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{}`,...a.parameters?.docs?.source}}},o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  args: {
+    checked: true
+  }
+}`,...o.parameters?.docs?.source}}}})))()}c();export{o as Checked,a as Default,s as __namedExportsOrder,i as default};

@@ -1,0 +1,1 @@
+245ec38: standalone capture helper timed out attempting More Pages in the Jovie fixture, which has no permitted extra-page trigger. The unchanged 25-case suite passed; corrected capture follows Jovie Recent and Ovie More as used by the actual suite. No application source change.

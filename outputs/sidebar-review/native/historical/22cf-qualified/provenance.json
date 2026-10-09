@@ -1,0 +1,118 @@
+{
+  "head": "22cf14a9e614a66ec0dbb95361cd4077c82328d7",
+  "tree": "3568c1e235b0a41d1937be414c4d9d9a415fa412",
+  "semanticPassed": 14,
+  "largestTextUiPassed": 1,
+  "navigationPerformancePassed": 1,
+  "passed": 16,
+  "skipped": 0,
+  "coveredLines": 1470,
+  "executableLines": 1737,
+  "percent": 84.6286701208981,
+  "metrics": [
+    {
+      "name": "CPU Cycles (Jovie)",
+      "unit": "kC",
+      "mean": 2740272.7376,
+      "values": [
+        2603032.992,
+        2843453.424,
+        2625496.062,
+        2970845.002,
+        2658536.208
+      ]
+    },
+    {
+      "name": "Clock Monotonic Time",
+      "unit": "s",
+      "mean": 2.2043890916000004,
+      "values": [
+        2.0473916620000003,
+        2.119134159,
+        2.189280198,
+        2.5730945640000003,
+        2.093044875
+      ]
+    },
+    {
+      "name": "CPU Time (Jovie)",
+      "unit": "s",
+      "mean": 0.6952988034,
+      "values": [
+        0.650159099,
+        0.694799284,
+        0.6623520890000001,
+        0.7859152650000001,
+        0.6832682800000001
+      ]
+    },
+    {
+      "name": "CPU Instructions Retired (Jovie)",
+      "unit": "kI",
+      "mean": 5832434.2488,
+      "values": [
+        5675541.11,
+        6480744.245,
+        5669670.876,
+        5673494.717,
+        5662720.296
+      ]
+    },
+    {
+      "name": "Memory Peak Physical (Jovie)",
+      "unit": "kB",
+      "mean": 92630.9344,
+      "values": [
+        92621.104,
+        92637.488,
+        92440.88,
+        92801.328,
+        92653.872
+      ]
+    },
+    {
+      "name": "Memory Physical (Jovie)",
+      "unit": "kB",
+      "mean": 1451.6224000000002,
+      "values": [
+        2605.056,
+        901.12,
+        917.504,
+        1277.952,
+        1556.48
+      ]
+    },
+    {
+      "name": "Absolute Memory Physical (Jovie)",
+      "unit": "kB",
+      "mean": 91752.75200000001,
+      "values": [
+        92227.888,
+        91244.848,
+        91294,
+        91687.216,
+        92309.808
+      ]
+    }
+  ],
+  "hitchValuesExported": false,
+  "scope": "Simulator fixture proof; no metric baseline or physical120Hz/hitch-budget acceptance",
+  "simulator": "7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5",
+  "text": "accessibility-extra-extra-extra-large",
+  "productionSourceSha": "7c2adbd000031ec8a00ef350f30b34dc393f3346",
+  "artifacts": {
+    "ios-shared-sidebar-more.png": "0572837c6632f58ec9e33ed437f48d30d628cdea89b5bcf4c8ade4a7b0a5edec",
+    "ios-canonical-information-architecture.png": "845852c8c0849bad64ab5068e3826048e9dbe2f1b456e0c79856d71fe936ebb0",
+    "sidebar-native-recent-verified-restored-state.json": "4617f0bd7bd5febb4aa5c085636c08d484724acfa415efed1de150eff279b0d7",
+    "sidebar-native-recent-verified-qualification.log": "9253d6f6eff968680ea63ea3f7fcf66b1466f38425a39da475dd9a9879bfac62",
+    "ios-shared-sidebar-recent.png": "fc5e3c15a863f87a0e8de600259e3d0b6f41d772d29c89fcf4786e4a31cc6420",
+    "sidebar-native-recent-verified-coverage.json": "44a0d940f3f1f63a4d8c7f48e6e5b7e5262ca8c27c19354fbd16d560cd1bbfae",
+    "sidebar-native-recent-verified-summary.json": "e0f215c283ed45eff3b610ba968ddee5c2d7fc1b825b0be258281226fc86648d",
+    "sidebar-native-recent-verified-metrics.json": "b0f15bb32810fbefc4519711199eccb4b5e0fd731ba6788b2e7d70d77aa06163",
+    "ios-shared-sidebar-footer-probe.png": "3f5c66f7418e71e3c4b92ef82769afecb53dd7c14aa35063d15432709159cbea"
+  },
+  "restoredText": "large",
+  "restoredState": "Shutdown",
+  "recordings": "recordings/provenance.json",
+  "recentPinsPolicyCoveragePercent": 100
+}

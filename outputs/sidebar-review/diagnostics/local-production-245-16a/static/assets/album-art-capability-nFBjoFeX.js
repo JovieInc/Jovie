@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(e){return e.availability===`unavailable`&&(e.reasonCode===`PROVIDER_UNAVAILABLE`||e.reasonCode===`FEATURE_DISABLED`)}function n(e,n){return!n||!t(n)?e:e.filter(e=>e.id!==`generateAlbumArt`)}function r(){return(r=e((()=>{})))()}export{r as n,t as r,n as t};

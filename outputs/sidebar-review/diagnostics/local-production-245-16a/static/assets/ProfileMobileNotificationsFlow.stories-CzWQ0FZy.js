@@ -1,0 +1,10 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ProfileMobileNotificationsFlow-DnBHSHTY.js";import{r as i,t as a}from"./CountrySelector-Dgv_iw98.js";var o,s,c,l,u,d,f;function p(){return(p=e((()=>{o=t(),i(),n(),{fn:s}=__STORYBOOK_MODULE_TEST__,c={title:`Profile/ProfileMobileNotificationsFlow`,component:r,parameters:{layout:`fullscreen`,jovie:{uncoveredProps:[`disabled`]}},args:{open:!0,presentation:`inline`,artistName:`Tim White`,channel:`email`,country:a[0],step:`email`,emailInput:``,phoneInput:``,otpCode:``,nameInput:``,birthdayInput:``,error:null,isSubmitting:!1,isNameSaving:!1,isBirthdaySaving:!1,isPreferencesSaving:!1,birthdayHintShown:!1,resendCooldownEnd:0,isResending:!1,isCountryOpen:!1,contentPrefs:{newMusic:!0,tourDates:!0,merch:!1,general:!0},onClose:s(),onBack:s(),onChannelChange:s(),onCountryOpenChange:s(),onCountrySelect:s(),onEmailChange:s(),onPhoneChange:s(),onEmailSubmit:s(),onOtpChange:s(),onOtpComplete:s(),onOtpSubmit:s(),onResendOtp:s(),onNameChange:s(),onNameSubmit:s(),onBirthdayChange:s(),onBirthdaySubmit:s(),onTogglePref:s(),onPreferencesSubmit:s()},decorators:[e=>(0,o.jsx)(`div`,{className:`dark min-h-screen max-w-md bg-base text-primary-token`,children:(0,o.jsx)(e,{})})]},l={},u={args:{step:`preferences`,canEditPreferences:!0}},d={args:{step:`done`}},f=[`Email`,`Preferences`,`Done`],l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{}`,...l.parameters?.docs?.source}}},u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
+  args: {
+    step: 'preferences',
+    canEditPreferences: true
+  }
+}`,...u.parameters?.docs?.source}}},d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
+  args: {
+    step: 'done'
+  }
+}`,...d.parameters?.docs?.source}}}})))()}p();export{d as Done,l as Email,u as Preferences,f as __namedExportsOrder,c as default};

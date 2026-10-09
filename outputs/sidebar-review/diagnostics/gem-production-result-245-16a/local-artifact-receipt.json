@@ -1,0 +1,151 @@
+{
+  "archiveSha256": "c23d280db26514010a7710013b6964d30adb2348d851f55abe9ea96b3ed5520b",
+  "directory": "/Users/timwhite/Documents/Codex/2026-10-06/task-2/repair-gem-sidebar-corrected-diagnostic-evidence",
+  "taskReceipt": {
+    "at": "2026-10-08T09:07:19.930677+00:00",
+    "runId": "owner-diagnostic-sidebar-245-16a-4c06233300c7",
+    "kind": "owner-task-diagnostic",
+    "requestSha256": "4c06233300c774e0e726692dff67a853c3cb09eeffb202ff31de01a9a1b25e42",
+    "accepted": true,
+    "providerInvoked": false,
+    "prCertificatePublished": false,
+    "productSourceModified": false,
+    "healthSamples": [
+      {
+        "observedAt": "2026-10-08T09:07:20.931274+00:00",
+        "cpuIdlePercent": 89.12,
+        "memoryAvailablePercent": 95.09,
+        "load1": 1.65673828125,
+        "admitted": true
+      },
+      {
+        "observedAt": "2026-10-08T09:07:21.931701+00:00",
+        "cpuIdlePercent": 86.85,
+        "memoryAvailablePercent": 95.08,
+        "load1": 1.65673828125,
+        "admitted": true
+      }
+    ],
+    "gateSeat": 0,
+    "postSeatHealthSamples": [
+      {
+        "observedAt": "2026-10-08T09:07:22.935142+00:00",
+        "cpuIdlePercent": 91.23,
+        "memoryAvailablePercent": 95.07,
+        "load1": 1.65673828125,
+        "admitted": true
+      },
+      {
+        "observedAt": "2026-10-08T09:08:23.935757+00:00",
+        "cpuIdlePercent": 77.88,
+        "memoryAvailablePercent": 94.6,
+        "load1": 1.85400390625,
+        "admitted": true
+      }
+    ],
+    "admittedAt": "2026-10-08T09:08:23.935778+00:00",
+    "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+    "compilerDependencyHead": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+    "inputHashesVerified": true,
+    "originalStoryCount": 1231,
+    "installExit": 0,
+    "command": [
+      "node",
+      "/home/timwhite/.local/state/jovie-lanes/owner-inputs/sidebar-4c06233300c774e0e726692dff67a853c3cb09eeffb202ff31de01a9a1b25e42/run-diagnostic.mjs",
+      "/home/timwhite/.local/state/jovie-lanes/runs/owner-diagnostic-sidebar-245-16a-4c06233300c7/workspace",
+      "/home/timwhite/.local/state/jovie-lanes/runs/owner-diagnostic-sidebar-245-16a-4c06233300c7/artifacts"
+    ],
+    "diagnosticExit": 0,
+    "diagnostic": {
+      "requestSha256": "4c06233300c774e0e726692dff67a853c3cb09eeffb202ff31de01a9a1b25e42",
+      "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+      "compilerDependencyHead": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+      "diagnosticComposition": true,
+      "unchangedSourceQualification": false,
+      "providerInvoked": false,
+      "commands": [
+        {
+          "name": "full-storybook-build",
+          "command": [
+            "pnpm",
+            "--filter",
+            "@jovie/web",
+            "build-storybook",
+            "--config-dir",
+            ".cache/sidebar-production-full-config",
+            "--output-dir",
+            "storybook-static-sidebar-diagnostic"
+          ],
+          "pid": 3759532,
+          "startedAt": "2026-10-08T09:08:35.644Z",
+          "exit": 0,
+          "signal": null,
+          "peakRssBytes": 5234368512,
+          "endedAt": "2026-10-08T09:09:10.523Z"
+        },
+        {
+          "name": "loopback-server",
+          "command": [
+            "python3",
+            "-m",
+            "http.server",
+            "6027",
+            "--bind",
+            "127.0.0.1",
+            "--directory",
+            "apps/web/storybook-static-sidebar-diagnostic"
+          ],
+          "pid": 3761838,
+          "startedAt": "2026-10-08T09:09:10.548Z"
+        },
+        {
+          "name": "profiler-snapshots-0",
+          "command": [
+            "node",
+            "diagnostics/sidebar-production-common-clock.cjs"
+          ],
+          "pid": 3761843,
+          "startedAt": "2026-10-08T09:09:10.615Z",
+          "exit": 0,
+          "signal": null,
+          "peakRssBytes": 184401920,
+          "endedAt": "2026-10-08T09:09:13.710Z"
+        },
+        {
+          "name": "profiler-snapshots-1",
+          "command": [
+            "node",
+            "diagnostics/sidebar-production-common-clock.cjs"
+          ],
+          "pid": 3762503,
+          "startedAt": "2026-10-08T09:09:13.711Z",
+          "exit": 0,
+          "signal": null,
+          "peakRssBytes": 214597632,
+          "endedAt": "2026-10-08T09:09:17.149Z"
+        }
+      ],
+      "startedAt": "2026-10-08T09:08:35.641Z",
+      "memoryBefore": {
+        "totalBytes": 67319287808,
+        "availableBytes": 63468560384
+      },
+      "outcome": "diagnostic-built-and-profiled",
+      "inventory": {
+        "expectedSourceFiles": 1231,
+        "builtSourceFiles": 1231,
+        "missing": [],
+        "extra": [],
+        "largeStoryPresent": true
+      },
+      "cleanupVerified": true,
+      "resourceCensusAvailableAfter": true,
+      "finishedAt": "2026-10-08T09:09:17.269Z"
+    },
+    "outcome": "owner-diagnostic-passed",
+    "finishedAt": "2026-10-08T09:09:17.348499+00:00",
+    "ownedCommandDrained": true,
+    "gateSeatReleased": true,
+    "gateSeatAvailableAtReadback": true
+  }
+}

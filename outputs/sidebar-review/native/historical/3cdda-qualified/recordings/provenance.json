@@ -1,0 +1,34 @@
+{
+  "head": "3cdda15bd68479050c0acb421651554f004e49a4",
+  "sameDerivedData": "/private/tmp/sidebar-native-ci-derived",
+  "testPassed": 1,
+  "text": "accessibility-extra-extra-extra-large",
+  "outsidePerformanceWindow": true,
+  "restoredText": "large",
+  "restoredState": "Shutdown",
+  "media": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 1320,
+        "height": 2868
+      }
+    ],
+    "format": {
+      "duration": "32.623333"
+    }
+  },
+  "files": {
+    "record-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "sidebar-native-success.mp4": "427cd5a9fe2dd096b26e1a96182fe3ac9cd6859a0e280916fd67dfc5a7ceae65",
+    "record.sh": "61ae8d0a62ab2a39ec5211af981de807e30a880207b83adaa4117847dbdb1d03",
+    "frame-27.png": "b7de228cb162e44dc890ebac6d2eb61423a88474cca35d9ce1fcc682455b938e",
+    "sidebar-native-success.mov": "be971ba8d3b0175727eeb0ff68a74e6fa421f8c92e053417b03aa2c67a2db28c",
+    "record-restored-state.json": "0ef6b0c2b34a39fda684a59b854226119bc19da08ecac9bdec2e0487f7932d30",
+    "record.log": "9cfaf5bf6332e2585d1c5868ca7a728a56f32962a3b59b5b5263e088e33c46b3",
+    "media-verification.json": "99c54c83a4fd77724bff4af330989256b1aac4d4bbe89fe2ca9f765699495ec7"
+  },
+  "frameInspected": "frame-27.png"
+}

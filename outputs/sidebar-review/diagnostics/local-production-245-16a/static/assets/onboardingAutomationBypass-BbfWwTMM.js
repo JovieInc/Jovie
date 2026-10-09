@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(){return typeof document>`u`?!1:document.documentElement.dataset.e2eMode===`1`}function n(){return(n=e((()=>{})))()}export{t as n,n as t};

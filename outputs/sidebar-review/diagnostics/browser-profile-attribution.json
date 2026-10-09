@@ -1,0 +1,195 @@
+{
+  "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "scope": "offline audit of saved current full-flow run; no new browser measurement or source mutation",
+  "profileSha256": "fe765f5d7075853cebe8e095d22c00ef5adea6550330b08195ec61afd0aec95c",
+  "flowSha256": "b896ffa67377bfb7a2971263f63563a7f3b409742c2b3f2819db7bcaf96d0b4f",
+  "profileDurationMs": 565.549,
+  "sumSampleDeltasMs": 565.223,
+  "firstSample": {
+    "function": "(program)",
+    "intervalMs": 227.001
+  },
+  "flowSpanMs": 333.5799999999999,
+  "over16_7": [
+    {
+      "start": 1562.7,
+      "end": 1596.3,
+      "durationMs": 33.59999999999991
+    },
+    {
+      "start": 1712.1,
+      "end": 1729.3,
+      "durationMs": 17.200000000000045
+    },
+    {
+      "start": 1761,
+      "end": 1787.7,
+      "durationMs": 26.700000000000045
+    }
+  ],
+  "over8_3Count": 16,
+  "phaseMarks": [
+    {
+      "phase": "more",
+      "time": 1547.1000003814697
+    },
+    {
+      "phase": "search-open",
+      "time": 1740.2000002861023
+    },
+    {
+      "phase": "search-query",
+      "time": 1825.4000000953674
+    },
+    {
+      "phase": "selection",
+      "time": 1843.7000002861023
+    }
+  ],
+  "topSamplingWeights": [
+    {
+      "function": "(program)",
+      "url": "",
+      "line": 0,
+      "samplingWeightMs": 277.07099999999997
+    },
+    {
+      "function": "(idle)",
+      "url": "",
+      "line": 0,
+      "samplingWeightMs": 110.73700000000004
+    },
+    {
+      "function": "visitNode",
+      "url": "",
+      "line": 267,
+      "samplingWeightMs": 20.220000000000006
+    },
+    {
+      "function": "exports.jsx",
+      "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/react_jsx-runtime.js?v=0b1464cf",
+      "line": 192,
+      "samplingWeightMs": 15.628999999999998
+    },
+    {
+      "function": "exports.jsxDEV",
+      "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/react_jsx-dev-runtime.js?v=0b1464cf",
+      "line": 192,
+      "samplingWeightMs": 8.251
+    },
+    {
+      "function": "exports.createElement",
+      "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/next_dist_compiled_react.js?v=0b1464cf",
+      "line": 624,
+      "samplingWeightMs": 6.272
+    },
+    {
+      "function": "getCssDimensions",
+      "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/dist-ChjovbH6.js?v=0b1464cf",
+      "line": 794,
+      "samplingWeightMs": 6.124
+    },
+    {
+      "function": "",
+      "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/storybook_internal_preview_runtime.js?v=0b1464cf",
+      "line": 29598,
+      "samplingWeightMs": 5.699999999999999
+    },
+    {
+      "function": "now",
+      "url": "",
+      "line": 0,
+      "samplingWeightMs": 4.332
+    },
+    {
+      "function": "(garbage collector)",
+      "url": "",
+      "line": 0,
+      "samplingWeightMs": 4.2829999999999995
+    },
+    {
+      "function": "run",
+      "url": "",
+      "line": 0,
+      "samplingWeightMs": 4.253
+    },
+    {
+      "function": "setAttribute",
+      "url": "",
+      "line": 0,
+      "samplingWeightMs": 4.151999999999999
+    }
+  ],
+  "selectedAncestry": [
+    {
+      "leaf": "visitNode",
+      "chain": [
+        {
+          "function": "visitNode",
+          "url": ""
+        },
+        {
+          "function": "captureSnapshot",
+          "url": ""
+        },
+        {
+          "function": "",
+          "url": ""
+        },
+        {
+          "function": "(root)",
+          "url": ""
+        }
+      ]
+    },
+    {
+      "leaf": "isVisibleBlockingOverlay",
+      "chain": [
+        {
+          "function": "isVisibleBlockingOverlay",
+          "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/lib/a11y/overlay-interaction-lock.ts"
+        },
+        {
+          "function": "hasGenuineBlockingOverlay",
+          "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/lib/a11y/overlay-interaction-lock.ts"
+        },
+        {
+          "function": "restoreLeakedOverlayLocks",
+          "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/lib/a11y/overlay-interaction-lock.ts"
+        },
+        {
+          "function": "",
+          "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/components/shell/OverlayInteractionGuard.tsx"
+        },
+        {
+          "function": "(root)",
+          "url": ""
+        }
+      ]
+    },
+    {
+      "leaf": "getCssDimensions",
+      "chain": [
+        {
+          "function": "getCssDimensions",
+          "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/dist-ChjovbH6.js?v=0b1464cf"
+        },
+        {
+          "function": "getDimensions",
+          "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/dist-ChjovbH6.js?v=0b1464cf"
+        },
+        {
+          "function": "fn",
+          "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/dist-ChjovbH6.js?v=0b1464cf"
+        },
+        {
+          "function": "(root)",
+          "url": ""
+        }
+      ]
+    }
+  ],
+  "clockAlignment": "missing performance.now/time-origin paired marker for CDP start/trace clocks",
+  "interpretation": "Sampling weights are not exact function execution durations. Snapshot-capture frames, development runtime and unlabeled program intervals coexist with application frames. Existing CPU profile cannot causally assign the slow RAF intervals or establish frame-budget acceptance. Preserve every raw sample.",
+  "nextMeasurement": "Use maintained Playwright/CDP capability in one bounded current-case diagnostic: trace rendering/style/layout plus synchronized performance marks and paired clock origin; record idle/control intervals and profiler overhead. Capture screenshots/video afterward. Do not alter test thresholds/selectors or edit effects without observed cause."
+}

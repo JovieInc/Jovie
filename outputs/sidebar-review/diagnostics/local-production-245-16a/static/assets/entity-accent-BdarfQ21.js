@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";var t;function n(){return(n=e((()=>{t={release:`--system-b-entity-chip-release-accent`,artist:`--system-b-entity-chip-artist-accent`,track:`--system-b-entity-chip-track-accent`,event:`--system-b-entity-chip-event-accent`}})))()}export{n,t};

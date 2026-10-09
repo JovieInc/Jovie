@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ContentMetricCard-uRl6lpQ5.js";function i({title:e,value:t,metadata:n,icon:i,iconClassName:o}){return(0,a.jsx)(r,{label:e,value:t,subtitle:n,icon:i,iconClassName:o})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

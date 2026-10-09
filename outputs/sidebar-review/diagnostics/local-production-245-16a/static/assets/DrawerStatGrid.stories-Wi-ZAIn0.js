@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./DrawerStatGrid-BGfNnDME.js";import{n as i,t as a}from"./StatTile-i7LxmMN5.js";var o,s,c,l,u;function d(){return(d=e((()=>{o=t(),n(),i(),s={title:`Molecules/Drawer/DrawerStatGrid`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,o.jsx)(`div`,{className:`w-80 bg-surface-0`,children:(0,o.jsx)(e,{})})],args:{children:(0,o.jsxs)(o.Fragment,{children:[(0,o.jsx)(a,{label:`Views`,value:`12.4k`,hint:`+8% vs last week`}),(0,o.jsx)(a,{label:`Clicks`,value:`3,204`,hint:`+2% vs last week`})]})}},c={},l={args:{variant:`card`}},u=[`Flush`,`Card`],c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{}`,...c.parameters?.docs?.source}}},l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{
+  args: {
+    variant: 'card'
+  }
+}`,...l.parameters?.docs?.source}}}})))()}d();export{l as Card,c as Flush,u as __namedExportsOrder,s as default};

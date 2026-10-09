@@ -1,0 +1,114 @@
+{
+  "sidebarHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "compilerHead": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+  "receipt": {
+    "runId": "owner-resource-PR20988-16a2bda-20261008T072534Z",
+    "head": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+    "base": "5cc5ddd8363d990aaed675aa431b25dd3cf6d0cb",
+    "accepted": true,
+    "outcome": "full-selector-and-resource-bounded-storybook-certified",
+    "finishedAt": "2026-10-08T07:27:50.826698+00:00",
+    "gateSeatReleased": true,
+    "trackedStatusAfter": "",
+    "sourceOwner": "existing sole Gem/native repair writer",
+    "providerInvoked": false,
+    "credentialsCopied": false
+  },
+  "commands": [
+    {
+      "command": [
+        "pnpm",
+        "run",
+        "typecheck:scripts"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "pnpm",
+        "--filter",
+        "@jovie/web",
+        "test:coverage",
+        "--changed",
+        "5cc5ddd8363d990aaed675aa431b25dd3cf6d0cb",
+        "--bail",
+        "1"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "node",
+        "scripts/check-changed-test-coverage.mjs",
+        "--base",
+        "5cc5ddd8363d990aaed675aa431b25dd3cf6d0cb",
+        "--head",
+        "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+        "--coverage",
+        "/home/timwhite/.local/state/jovie-lanes/runs/owner-resource-PR20988-16a2bda-20261008T072534Z/checkout/apps/web/coverage/coverage-final.json"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "--root",
+        "scripts",
+        "--config",
+        "vitest.config.mts",
+        "run",
+        "lib/__tests__/component-live-storybook-certification.test.mjs",
+        "--coverage",
+        "--coverage.include",
+        "component-live-storybook-lifecycle.mjs",
+        "--coverage.include",
+        "component-live-storybook-browser.mjs",
+        "--coverage.include",
+        "../apps/web/.storybook/main.ts",
+        "--coverage.reporter=json",
+        "--coverage.reporter=text"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "node",
+        "scripts/component-live-storybook-browser.mjs",
+        "--collect",
+        "--head=16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+        "--receipt=/home/timwhite/.local/state/jovie-lanes/runs/owner-resource-PR20988-16a2bda-20261008T072534Z/certification.json"
+      ],
+      "exit": 0
+    }
+  ],
+  "certificateOK": true,
+  "certificateScope": "enrolled-canonical-primitive-stories-only",
+  "sourceSha256": {
+    "component-live-storybook-lifecycle.mjs": "d05f9627d9608d7529a76e7b517cf8bc31df5bbc81f1490a1943879ffe8fb76c",
+    "component-live-storybook-browser.mjs": "aa8c66bcb6424774fbd81f387e25ec7221e2342ba3b438d7bec6593439889606"
+  },
+  "upstreamProofPath": "/Users/timwhite/Documents/Codex/2026-10-06/task-2/repair-gem-storybook-resource-16a2-exact-native-proof.json",
+  "upstreamProofSha256": "9f92978c16b22978a865b1aa47ef22c3a5e328e024b17bd5f1ef796e88b63f23",
+  "composition": "Temporary ignored config replaces only matching React resolver plugin with exact qualified16a block; existing245 base/addon helper retained; JOVIE_LIVE_STORYBOOK_CERT stays unset so canonical globals/styles remain. No shared compiler/sidebar source commit or CI gate change.",
+  "productionBuildStarted": false,
+  "sidebarProductionRendererVerified": false,
+  "resourceAdmission": {
+    "accepted": false,
+    "collector": "exact qualified16a storybookHostMemory/requireStorybookBuildMemory",
+    "platform": "darwin",
+    "totalBytes": 34359738368,
+    "availableBytes": 450953216,
+    "capBytes": 8589934592,
+    "error": "Storybook build resource admission held: host-memory-reserve",
+    "memoryMeaning": "qualified source uses Linux MemAvailable on Linux, Node os.freemem on Darwin. Different kernel memory_pressure free57% is not interchangeable or authority to override.",
+    "next": "Existing resource/lifecycle owner must qualify Darwin collector/admission or supply a supported existing executor/admission for this frozen sidebar+compiler composition. No caps reset, manual reserve override, purge or process kill."
+  },
+  "files": {
+    "prepared-sidebar-production-main.ts": "02b61691515e8429e7a1869cc6a007a296feca364144c644665ce2e187e63c2f",
+    "main.ts": "f028908066e6ac939e08846359b15552d0f9a3ddc45cb3a16d67bd0f2e394dc3",
+    "exact-qualified-resolver-block.ts": "31ef79a0743367dae48c386f31137eed1cd669def1a344a9ecc42c8767b0d798",
+    "component-live-storybook-lifecycle.mjs": "d05f9627d9608d7529a76e7b517cf8bc31df5bbc81f1490a1943879ffe8fb76c"
+  }
+}

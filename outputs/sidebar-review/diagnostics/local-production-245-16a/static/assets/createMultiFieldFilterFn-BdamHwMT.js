@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(e){return(t,n,r)=>{let i=String(r).toLowerCase().trim();return!i||e.some(e=>{let n=e(t.original);return n!=null&&String(n).toLowerCase().includes(i)})}}function n(){return(n=e((()=>{})))()}export{n,t};

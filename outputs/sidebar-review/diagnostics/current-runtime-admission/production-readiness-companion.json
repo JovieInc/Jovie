@@ -1,0 +1,42 @@
+{
+  "at": "2026-10-08T10:28:35.087832+00:00",
+  "kind": "Readiness companion; immutable diagnostic request and payloads unchanged",
+  "sourceHead": "10e76a95b87efd5c25abe6b757081c2265ee63d7",
+  "sourceTree": "ae7b7b3864c9bc794d6fccbcc0a569ac7ea98bf3",
+  "requestSha256": "cfb06155dd332a1c112e5acbaf36b0f6d05e112bdf343be79fe1852cf0a82128",
+  "request": "../gem-production-request-10e76a95/request.json",
+  "payloadHashesVerified": {
+    "full-story-source-inventory.json": true,
+    "source-10e76a95.tar.gz": true,
+    "qualified-16a-component-live-storybook-lifecycle.mjs": true,
+    "qualified-16a-main.ts": true,
+    "diagnostic-overlay.tar.gz": true,
+    "overlay/diagnostics/sidebar-production-unprofiled.cjs": true,
+    "overlay/diagnostics/sidebar-production-common-clock.cjs": true,
+    "overlay/apps/web/.cache/sidebar-production-full-config/main.ts": true,
+    "overlay/apps/web/.cache/sidebar-production-full-config/preview.tsx": true,
+    "overlay/apps/web/.cache/sidebar-production-full-config/preview-head.html": true
+  },
+  "normalQualifiedDependencyHead": "14a3fe807b7605edd11348165e999b1ef32618f4",
+  "preparedCompilerDependencyHead": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+  "compilerMainAndLifecycleByteIdentical": true,
+  "dependencyEvidence": "compiler-owner-normal-receipt.json",
+  "dependencyEvidenceSha256": "bbd5d1f3767e26012c3eee2cd406e3e7c79d77aa51712252c09d5638d6d9324d",
+  "ownerRunId": "owner-normal-PR20988-14a-paired-20261008T0937Z",
+  "normalQualificationExit": 0,
+  "ownedCommandDrained": true,
+  "gateSeatReleased": true,
+  "localBuildAdmission": "local-memory.json",
+  "localBuildStarted": false,
+  "newRemoteJobDispatched": false,
+  "requestTransferred": false,
+  "publicationActionActive": false,
+  "nextAuthorizedBoundary": "Existing resource owner must reconcile exact qualified source, supervisor and seat before admitting a new job. This companion grants no dispatch or publication authority.",
+  "remainingAcceptance": [
+    "Current10e exact production composition and full combined CI/coverage",
+    "Physical120Hz and human VoiceOver; paired device presently unavailable",
+    "Installed Mac OS drag/window behavior",
+    "Protected native Ovie authentication and private Summer history/resume per current owner prerequisites"
+  ],
+  "scopeLimit": "14a compiler dependency qualification only. Not sidebar10e qualification, installed/native auth acceptance, hosted CI, deployment or goal completion."
+}

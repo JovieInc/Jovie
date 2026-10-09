@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./LazyProviders-BkVoNCTp.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Providers/LazyProviders`,component:r,parameters:{layout:`centered`},args:{children:(0,i.jsx)(`p`,{className:`rounded-lg border border-subtle bg-surface-0 p-4 text-sm text-primary-token`,children:`Page content`})}},o={},s={args:{enableAnalytics:!1}},c=[`Default`,`AnalyticsDisabled`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    enableAnalytics: false
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{s as AnalyticsDisabled,o as Default,c as __namedExportsOrder,a as default};

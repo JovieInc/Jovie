@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{r as n,t as r}from"./badge-DqMNX1OQ.js";function i({label:e,tone:t}){return(0,a.jsx)(r,{variant:`outline`,size:`sm`,"data-status-tone":t,children:e})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./ReleaseTaskAssigneeBadge-DPffcQSK.js";var r,i,a,o;function s(){return(s=e((()=>{t(),r={title:`Dashboard/ReleaseTasks/ReleaseTaskAssigneeBadge`,component:n,parameters:{layout:`centered`},args:{assigneeType:`human`},argTypes:{assigneeType:{control:`select`,options:[`human`,`ai_workflow`]}}},i={},a={args:{assigneeType:`ai_workflow`}},o=[`Human`,`AiWorkflow`],i.parameters={...i.parameters,docs:{...i.parameters?.docs,source:{originalSource:`{}`,...i.parameters?.docs?.source}}},a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{
+  args: {
+    assigneeType: 'ai_workflow'
+  }
+}`,...a.parameters?.docs?.source}}}})))()}s();export{a as AiWorkflow,i as Human,o as __namedExportsOrder,r as default};

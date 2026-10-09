@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./field-ZRu8i5Na.js";function i({label:e,error:t,required:n=!1,className:i,children:o,id:s,helpText:c}){return(0,a.jsx)(r,{label:e,description:c,error:t,required:n,id:s,className:i,children:o})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

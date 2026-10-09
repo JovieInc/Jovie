@@ -1,0 +1,7 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./VerticalDivider-DufEuA6w.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Dashboard/Atoms/VerticalDivider`,component:r,parameters:{layout:`centered`}},o={},s={render:()=>(0,i.jsxs)(`div`,{className:`flex items-center gap-2 rounded-full border border-subtle bg-surface-1 px-2 py-1`,children:[(0,i.jsx)(`span`,{className:`text-xs text-secondary-token`,children:`Filter`}),(0,i.jsx)(r,{}),(0,i.jsx)(`span`,{className:`text-xs text-secondary-token`,children:`Sort`})]})},c=[`Default`,`BetweenActions`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  render: () => <div className='flex items-center gap-2 rounded-full border border-subtle bg-surface-1 px-2 py-1'>
+      <span className='text-xs text-secondary-token'>Filter</span>
+      <VerticalDivider />
+      <span className='text-xs text-secondary-token'>Sort</span>
+    </div>
+}`,...s.parameters?.docs?.source}}}})))()}l();export{s as BetweenActions,o as Default,c as __namedExportsOrder,a as default};

@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";var t;function n(){return(n=e((()=>{t={title:`Something went wrong`,retryLabel:`Try again`,detailsLabel:`Error details`}})))()}export{n,t};

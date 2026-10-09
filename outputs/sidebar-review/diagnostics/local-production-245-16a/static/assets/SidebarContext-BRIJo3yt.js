@@ -1,0 +1,1 @@
+import{n as e,s as t}from"./rolldown-runtime-BcKkbAw3.js";import{t as n}from"./react-CFeKwT_a.js";function r(){let e=i.useContext(a);if(!e)throw TypeError(`useSidebar must be used within a SidebarProvider.`);return e}var i,a;function o(){return(o=e((()=>{i=t(n()),a=i.createContext(null)})))()}export{o as n,r,a as t};

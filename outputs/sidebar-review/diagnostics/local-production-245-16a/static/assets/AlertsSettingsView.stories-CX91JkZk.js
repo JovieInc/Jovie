@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./AlertsSettingsView-zq_KzMxP.js";import{i,n as a,r as o}from"./profile-story-fixture-x0SfJ1Ud.js";var s,c,l,u;function d(){return(d=e((()=>{s=t(),n(),o(),c={title:`Profile/AlertsSettingsView`,component:r,parameters:{layout:`centered`,jovie:{uncoveredProps:[`disabled`]}},args:{presentation:`embedded`,isSubscribed:!0,contentPrefs:a,onTogglePref:i,onUnsubscribe:i,isUnsubscribing:!1}},l={render:e=>(0,s.jsx)(`div`,{className:`w-full max-w-md bg-base p-6`,children:(0,s.jsx)(r,{...e})})},u=[`Manage`],l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{
+  render: args => <div className='w-full max-w-md bg-base p-6'>
+      <AlertsSettingsView {...args} />
+    </div>
+}`,...l.parameters?.docs?.source}}}})))()}d();export{l as Manage,u as __namedExportsOrder,c as default};

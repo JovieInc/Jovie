@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(e){if(!Number.isFinite(e))return`0:00`;let t=Math.max(0,Math.floor(e));return`${Math.floor(t/60)}:${(t%60).toString().padStart(2,`0`)}`}function n(){return(n=e((()=>{})))()}export{n,t};

@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ProfileClaimFooter-B--oQhoS.js";var i,a,o,s;function c(){return(c=e((()=>{i=t(),n(),a={title:`Profile/ProfileClaimFooter`,component:r,parameters:{layout:`centered`},args:{href:`/waitlist?campaign=proof-to-claim`,label:`Request access`,proofClaim:!0,enabled:!0}},o={render:e=>(0,i.jsx)(`div`,{className:`min-h-24 w-full bg-base p-8 text-primary-token`,children:(0,i.jsx)(r,{...e,className:`flex`})})},s=[`RequestAccess`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  render: args => <div className='min-h-24 w-full bg-base p-8 text-primary-token'>
+      <ProfileClaimFooter {...args} className='flex' />
+    </div>
+}`,...o.parameters?.docs?.source}}}})))()}c();export{o as RequestAccess,s as __namedExportsOrder,a as default};

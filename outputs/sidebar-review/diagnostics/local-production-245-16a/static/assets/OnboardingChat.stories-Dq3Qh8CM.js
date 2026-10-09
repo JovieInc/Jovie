@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./OnboardingChat-BX1Xa2eo.js";var r,i,a;function o(){return(o=e((()=>{t(),r={title:`Features/Onboarding/OnboardingChat`,component:n,parameters:{layout:`centered`,jovie:{uncoveredProps:[`turnstileToken`,`state`,`shouldShowTurnstileBanner`,`turnstilePanel`,`displayMessages`,`hasConversationStarted`,`isBusy`,`isStreaming`,`lastAssistantMessageId`,`onboardingComposerSurface`,`onHandleCandidateChange`,`onConfirmHandle`,`onAttachAccount`,`onNoneOfTheseArtists`,`onSelectArtist`,`profileBuilderState`,`shouldDockComposer`,`entryMode`,`composerPickerOpen`,`isLoading`]}}},i={args:{turnstileToken:null}},a=[`Default`],i.parameters={...i.parameters,docs:{...i.parameters?.docs,source:{originalSource:`{
+  args: {
+    turnstileToken: null
+  }
+}`,...i.parameters?.docs?.source}}}})))()}o();export{i as Default,a as __namedExportsOrder,r as default};

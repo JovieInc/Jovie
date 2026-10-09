@@ -1,0 +1,25 @@
+{
+  "at": "2026-10-08T11:25:26.893476+00:00",
+  "previousGoalTurn": "progress: exact-head inventory correction and current browser evidence reconciliation",
+  "currentGoalTurn": "progress: canonical nonce source ancestry/rebased patch equivalence and independent resource-owner metadata readback change next action",
+  "sourceHead": "f4a73e59c09c62f349195c486419b2278df79b9b",
+  "nativeHead": "545b383925854b8a1632fffe9b48087fe88f6e37",
+  "sourceTrackedClean": true,
+  "productSourceEdited": false,
+  "sourceTestsRerun": false,
+  "reason": "Evidence metadata only; no executable product behavior changed. Actual git ancestry/patch-id and owner hash commands passed. Exact immutable payload revalidated. Existing source test scopes retained, not relabeled.",
+  "canonicalNonceReceipt": "outputs/sidebar-review/diagnostics/current-runtime-admission/native-nonce-prerequisite-source.json",
+  "ownerReadback": "outputs/sidebar-review/diagnostics/gem-production-request-f4a73e59-r2/owner-metadata-readback.json",
+  "sourceNoncePrerequisitePresent": true,
+  "hostedMergeReceiptVerified": false,
+  "nativeOwnerReleaseVerified": false,
+  "executionApprovalPending": true,
+  "ownerProductionBuildStarted": false,
+  "goalComplete": false,
+  "verifiedGBrain": {
+    "slug": "receipts/shared-sidebar-nonce-source-prerequisite-2026-10-08",
+    "contentHash": "242b8b57b64804ac9d89c440a818d71ee8da0d0e8f5bb44c0fdbe69082f9e88e",
+    "canonicalBodyExactMatch": true,
+    "verifiedAt": "2026-10-08T11:24:48.609Z"
+  }
+}

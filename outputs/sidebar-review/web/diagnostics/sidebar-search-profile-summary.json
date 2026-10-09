@@ -1,0 +1,37 @@
+[
+  {
+    "tasks": [],
+    "started": 1851.9000000953674,
+    "finished": 2004.6999998092651,
+    "index": 0,
+    "profile": "/private/tmp/sidebar-search-0.cpuprofile"
+  },
+  {
+    "tasks": [],
+    "started": 1880,
+    "finished": 2056.1000003814697,
+    "index": 1,
+    "profile": "/private/tmp/sidebar-search-1.cpuprofile"
+  },
+  {
+    "tasks": [],
+    "started": 1898.3999996185303,
+    "finished": 2052.7999997138977,
+    "index": 2,
+    "profile": "/private/tmp/sidebar-search-2.cpuprofile"
+  },
+  {
+    "tasks": [],
+    "started": 2065.9000000953674,
+    "finished": 2230.0999999046326,
+    "index": 3,
+    "profile": "/private/tmp/sidebar-search-3.cpuprofile"
+  },
+  {
+    "tasks": [],
+    "started": 1807.8000001907349,
+    "finished": 1971.5999999046326,
+    "index": 4,
+    "profile": "/private/tmp/sidebar-search-4.cpuprofile"
+  }
+]

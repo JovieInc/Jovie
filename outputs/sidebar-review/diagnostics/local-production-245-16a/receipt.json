@@ -1,0 +1,61 @@
+{
+  "at": "2026-10-08T09:41:32.338822+00:00",
+  "run": "local-rehost-sidebar-245-16a-20261008T0937Z",
+  "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "tree": "8ecb24fde1992b0038951de59cdd4965b1122d03",
+  "compilerOverlay": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+  "sourceChanged": false,
+  "remoteJobDispatched": false,
+  "readOnlyRemoteArtifactRetrieval": true,
+  "all2771CompiledFileHashesVerified": true,
+  "1231IndexedImportPaths": true,
+  "maintainedProductionSelector": {
+    "config": "apps/web/playwright.config.storybook.ts",
+    "specs": [
+      "storybook-shared-sidebar.spec.ts",
+      "storybook-canonical-sidebar.spec.ts"
+    ],
+    "project": "chromium",
+    "workers": 1,
+    "retries": 0,
+    "diagnosticGrepInvert": "large permitted page fixture stays bounded and keyboard reachable",
+    "reason": "That unchanged CI test requires development React onRender callbacks. Equivalent production geometry/input assertions remain in ten controls; no CI selector or assertion edited.",
+    "result": {
+      "startTime": "2026-10-08T09:39:00.918Z",
+      "duration": 17610.324,
+      "expected": 24,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "exit": 0
+  },
+  "performanceControls": {
+    "unprofiledPassed": 5,
+    "profiledPassed": 5,
+    "capture": "Playwright snapshots/video/screenshots disabled during sample; CDP tracing+CPU only for profiled mode",
+    "browser": "148.0.7778.96",
+    "renderer": "production React19.2.8 bundleType0",
+    "flowLongTasks": 0,
+    "unprofiledMaxRafMs": 18.3,
+    "profiledOpeningDispatchRangeMs": [
+      19.5,
+      21.158
+    ],
+    "frameBudgetsAccepted": false,
+    "limitations": "Exact local composition only; not same Gem host, source repair, installed Electron/window geometry, native device120Hz, authenticated/persisted outcome or full-source qualification."
+  },
+  "ownedCleanup": {
+    "serverSession": 20604,
+    "serverTerminalExit": 0,
+    "port6027ListenerAfterCleanup": false,
+    "controlWrapperSession": 17325,
+    "controlWrapperExit": 0,
+    "maintainedRunnerSession": 87785,
+    "maintainedRunnerExit": 0,
+    "browsersClosedInFinally": true,
+    "nativeSimulator": "previously restored Shutdown/large; untouched this run"
+  },
+  "publicationActionActive": false,
+  "goalComplete": false
+}

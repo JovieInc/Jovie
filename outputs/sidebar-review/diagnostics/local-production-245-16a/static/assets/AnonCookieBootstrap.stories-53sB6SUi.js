@@ -1,0 +1,4 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./AnonCookieBootstrap-CoDmjPWM.js";var r,i,a;function o(){return(o=e((()=>{t(),r={title:`Profile/AnonCookieBootstrap`,component:n,parameters:{layout:`centered`}},i={args:{}},a=[`Default`],i.parameters={...i.parameters,docs:{...i.parameters?.docs,source:{originalSource:`{
+  args: {}
+}`,...i.parameters?.docs?.source},description:{story:`The bootstrap renders nothing visible; it resolves the per-user experiment
+assignment on mount and reports it through callbacks.`,...i.parameters?.docs?.description}}}})))()}o();export{i as Default,a as __namedExportsOrder,r as default};

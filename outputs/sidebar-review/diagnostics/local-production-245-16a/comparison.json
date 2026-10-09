@@ -1,0 +1,3220 @@
+{
+  "at": "2026-10-08T09:39:01.062774+00:00",
+  "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "compilerOverlay": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+  "exactStaticBuildFilesVerified": 2771,
+  "indexedStoryImportPaths": 1231,
+  "diagnosticComposition": true,
+  "sameHostSameBuild": true,
+  "samplesPerMode": 5,
+  "snapshots": false,
+  "sequence": "unprofiled0 first;profiled0; alternating unprofiled/profiled1..4; fresh browser context each sample",
+  "modes": [
+    {
+      "mode": "unprofiled",
+      "runsPassed": 5,
+      "rafMaxRangeMs": [
+        16.5,
+        18.299999999999955
+      ],
+      "rafP95RangeMs": [
+        10.0,
+        16.699999999999932
+      ],
+      "flowDurationRangeMs": [
+        180.80000019073486,
+        223.60000038146973
+      ],
+      "flowLongTasks": 0,
+      "openingCheckpointMedianMs": 30.5,
+      "maxEventDispatchMs": null
+    },
+    {
+      "mode": "profiled",
+      "runsPassed": 5,
+      "rafMaxRangeMs": [
+        9.700000000000045,
+        17.0
+      ],
+      "rafP95RangeMs": [
+        9.200000000000045,
+        16.600000000000023
+      ],
+      "flowDurationRangeMs": [
+        191.69999980926514,
+        223.90000009536743
+      ],
+      "flowLongTasks": 0,
+      "openingCheckpointMedianMs": 38.40000009536743,
+      "maxEventDispatchMs": 21.158
+    }
+  ],
+  "samples": [
+    {
+      "mode": "unprofiled",
+      "sample": 0,
+      "assertionsPassed": true,
+      "flowDurationMs": 223.60000038146973,
+      "frames": 25,
+      "rafMedianMs": 8.300000000000068,
+      "rafP95Ms": 16.699999999999932,
+      "rafMaxMs": 16.799999999999955,
+      "flowLongTasks": [],
+      "preMoreLongTasks": [
+        {
+          "start": 568.5,
+          "duration": 50
+        }
+      ],
+      "eventToAssertionCheckpointMs": 34.30000019073486,
+      "browser": "148.0.7778.96",
+      "runtimeProof": [
+        {
+          "bundleType": 0,
+          "version": "19.2.8",
+          "rendererPackageName": "react-dom"
+        }
+      ]
+    },
+    {
+      "mode": "unprofiled",
+      "sample": 1,
+      "assertionsPassed": true,
+      "flowDurationMs": 211.40000009536743,
+      "frames": 25,
+      "rafMedianMs": 8.399999999999977,
+      "rafP95Ms": 10.299999999999955,
+      "rafMaxMs": 16.5,
+      "flowLongTasks": [],
+      "preMoreLongTasks": [],
+      "eventToAssertionCheckpointMs": 30.5,
+      "browser": "148.0.7778.96",
+      "runtimeProof": [
+        {
+          "bundleType": 0,
+          "version": "19.2.8",
+          "rendererPackageName": "react-dom"
+        }
+      ]
+    },
+    {
+      "mode": "unprofiled",
+      "sample": 2,
+      "assertionsPassed": true,
+      "flowDurationMs": 205.59999990463257,
+      "frames": 24,
+      "rafMedianMs": 8.399999999999977,
+      "rafP95Ms": 10.100000000000023,
+      "rafMaxMs": 18.299999999999955,
+      "flowLongTasks": [],
+      "preMoreLongTasks": [],
+      "eventToAssertionCheckpointMs": 28.700000286102295,
+      "browser": "148.0.7778.96",
+      "runtimeProof": [
+        {
+          "bundleType": 0,
+          "version": "19.2.8",
+          "rendererPackageName": "react-dom"
+        }
+      ]
+    },
+    {
+      "mode": "unprofiled",
+      "sample": 3,
+      "assertionsPassed": true,
+      "flowDurationMs": 212.30000019073486,
+      "frames": 25,
+      "rafMedianMs": 8.299999999999955,
+      "rafP95Ms": 10.0,
+      "rafMaxMs": 16.699999999999932,
+      "flowLongTasks": [],
+      "preMoreLongTasks": [],
+      "eventToAssertionCheckpointMs": 30.59999990463257,
+      "browser": "148.0.7778.96",
+      "runtimeProof": [
+        {
+          "bundleType": 0,
+          "version": "19.2.8",
+          "rendererPackageName": "react-dom"
+        }
+      ]
+    },
+    {
+      "mode": "unprofiled",
+      "sample": 4,
+      "assertionsPassed": true,
+      "flowDurationMs": 180.80000019073486,
+      "frames": 21,
+      "rafMedianMs": 8.300000000000011,
+      "rafP95Ms": 10.0,
+      "rafMaxMs": 16.699999999999932,
+      "flowLongTasks": [],
+      "preMoreLongTasks": [],
+      "eventToAssertionCheckpointMs": 28.09999990463257,
+      "browser": "148.0.7778.96",
+      "runtimeProof": [
+        {
+          "bundleType": 0,
+          "version": "19.2.8",
+          "rendererPackageName": "react-dom"
+        }
+      ]
+    },
+    {
+      "mode": "profiled",
+      "sample": 0,
+      "assertionsPassed": true,
+      "flowDurationMs": 223.90000009536743,
+      "frames": 25,
+      "rafMedianMs": 8.399999999999977,
+      "rafP95Ms": 15.600000000000023,
+      "rafMaxMs": 16.0,
+      "flowLongTasks": [],
+      "preMoreLongTasks": [],
+      "eventToAssertionCheckpointMs": 38.40000009536743,
+      "browser": "148.0.7778.96",
+      "runtimeProof": [
+        {
+          "bundleType": 0,
+          "version": "19.2.8",
+          "rendererPackageName": "react-dom"
+        }
+      ],
+      "sameClock": {
+        "offsetSpreadUs": 124.0,
+        "rendererPid": 10460,
+        "rendererTid": 905474774
+      },
+      "eventDispatch": [
+        {
+          "type": "keydown",
+          "durationMs": 19.875,
+          "relativeToMoreMs": 11.022
+        },
+        {
+          "type": "keydown",
+          "durationMs": 12.974,
+          "relativeToMoreMs": 85.927
+        },
+        {
+          "type": "keydown",
+          "durationMs": 6.46,
+          "relativeToMoreMs": 58.867
+        },
+        {
+          "type": "click",
+          "durationMs": 4.702,
+          "relativeToMoreMs": 124.489
+        },
+        {
+          "type": "keydown",
+          "durationMs": 4.19,
+          "relativeToMoreMs": 201.599
+        },
+        {
+          "type": "focusScope.autoFocusOnMount",
+          "durationMs": 3.37,
+          "relativeToMoreMs": 23.052
+        },
+        {
+          "type": "focusScope.autoFocusOnMount",
+          "durationMs": 2.564,
+          "relativeToMoreMs": 93.437
+        },
+        {
+          "type": "input",
+          "durationMs": 2.064,
+          "relativeToMoreMs": 193.598
+        },
+        {
+          "type": "focusin",
+          "durationMs": 2.062,
+          "relativeToMoreMs": 24.359
+        },
+        {
+          "type": "focusin",
+          "durationMs": 1.519,
+          "relativeToMoreMs": 94.481
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.467,
+          "relativeToMoreMs": 3.554
+        },
+        {
+          "type": "keydown",
+          "durationMs": 0.43,
+          "relativeToMoreMs": 39.209
+        },
+        {
+          "type": "textInput",
+          "durationMs": 0.398,
+          "relativeToMoreMs": 193.193
+        },
+        {
+          "type": "focusScope.autoFocusOnUnmount",
+          "durationMs": 0.299,
+          "relativeToMoreMs": 71.925
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.273,
+          "relativeToMoreMs": 123.089
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.231,
+          "relativeToMoreMs": 62.675
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.224,
+          "relativeToMoreMs": 62.45
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.209,
+          "relativeToMoreMs": 62.906
+        },
+        {
+          "type": "pointerdown",
+          "durationMs": 0.205,
+          "relativeToMoreMs": 124.119
+        },
+        {
+          "type": "focusScope.autoFocusOnUnmount",
+          "durationMs": 0.202,
+          "relativeToMoreMs": 153.642
+        },
+        {
+          "type": "pointermove",
+          "durationMs": 0.199,
+          "relativeToMoreMs": 123.421
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.191,
+          "relativeToMoreMs": 146.992
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.19,
+          "relativeToMoreMs": 23.659
+        },
+        {
+          "type": "scroll",
+          "durationMs": 0.174,
+          "relativeToMoreMs": 54.922
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.169,
+          "relativeToMoreMs": 26.1
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.159,
+          "relativeToMoreMs": 25.194
+        },
+        {
+          "type": "menu.itemSelect",
+          "durationMs": 0.158,
+          "relativeToMoreMs": 124.572
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.153,
+          "relativeToMoreMs": 127.233
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.151,
+          "relativeToMoreMs": 127.387
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.149,
+          "relativeToMoreMs": 164.952
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.145,
+          "relativeToMoreMs": 22.885
+        },
+        {
+          "type": "rovingFocusGroup.onEntryFocus",
+          "durationMs": 0.143,
+          "relativeToMoreMs": 24.601
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.141,
+          "relativeToMoreMs": 127.538
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.138,
+          "relativeToMoreMs": 93.903
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.137,
+          "relativeToMoreMs": 23.521
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.137,
+          "relativeToMoreMs": 24.221
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.13,
+          "relativeToMoreMs": 95.736
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.127,
+          "relativeToMoreMs": 165.102
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.126,
+          "relativeToMoreMs": 25.973
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.126,
+          "relativeToMoreMs": 203.281
+        },
+        {
+          "type": "change",
+          "durationMs": 0.125,
+          "relativeToMoreMs": 203.022
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.122,
+          "relativeToMoreMs": 25.072
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.122,
+          "relativeToMoreMs": 26.27
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.121,
+          "relativeToMoreMs": 203.159
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.12,
+          "relativeToMoreMs": 23.85
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.12,
+          "relativeToMoreMs": 25.354
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.114,
+          "relativeToMoreMs": 95.053
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.113,
+          "relativeToMoreMs": 93.789
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.112,
+          "relativeToMoreMs": 94.368
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.111,
+          "relativeToMoreMs": 164.458
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.111,
+          "relativeToMoreMs": 203.407
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.11,
+          "relativeToMoreMs": 93.318
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.109,
+          "relativeToMoreMs": 95.168
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.109,
+          "relativeToMoreMs": 209.313
+        },
+        {
+          "type": "rovingFocusGroup.onEntryFocus",
+          "durationMs": 0.108,
+          "relativeToMoreMs": 94.604
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.104,
+          "relativeToMoreMs": 94.948
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.104,
+          "relativeToMoreMs": 95.63
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.103,
+          "relativeToMoreMs": 95.867
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.102,
+          "relativeToMoreMs": 94.042
+        },
+        {
+          "type": "tooltip.open",
+          "durationMs": 0.099,
+          "relativeToMoreMs": 206.723
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.096,
+          "relativeToMoreMs": 164.361
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.087,
+          "relativeToMoreMs": 64.526
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.087,
+          "relativeToMoreMs": 128.735
+        },
+        {
+          "type": "mousemove",
+          "durationMs": 0.086,
+          "relativeToMoreMs": 123.621
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.084,
+          "relativeToMoreMs": 164.569
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.084,
+          "relativeToMoreMs": 166.202
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.082,
+          "relativeToMoreMs": 46.785
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.08,
+          "relativeToMoreMs": 165.23
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.075,
+          "relativeToMoreMs": 205.957
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.069,
+          "relativeToMoreMs": 155.111
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.066,
+          "relativeToMoreMs": 34.506
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.063,
+          "relativeToMoreMs": 72.137
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.063,
+          "relativeToMoreMs": 206.346
+        },
+        {
+          "type": "mousedown",
+          "durationMs": 0.062,
+          "relativeToMoreMs": 124.326
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.057,
+          "relativeToMoreMs": 3.496
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.05,
+          "relativeToMoreMs": 123.37
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.048,
+          "relativeToMoreMs": 153.777
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.044,
+          "relativeToMoreMs": 47.129
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.042,
+          "relativeToMoreMs": 66.796
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.042,
+          "relativeToMoreMs": 147.192
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.039,
+          "relativeToMoreMs": 211.138
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.038,
+          "relativeToMoreMs": 206.038
+        },
+        {
+          "type": "pointerup",
+          "durationMs": 0.036,
+          "relativeToMoreMs": 124.416
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.036,
+          "relativeToMoreMs": 155.19
+        },
+        {
+          "type": "jovie:sidebar-flyout-open",
+          "durationMs": 0.035,
+          "relativeToMoreMs": 11.413
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.034,
+          "relativeToMoreMs": 101.766
+        },
+        {
+          "type": "mouseup",
+          "durationMs": 0.033,
+          "relativeToMoreMs": 124.453
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.03,
+          "relativeToMoreMs": 166.293
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.028,
+          "relativeToMoreMs": 39.778
+        },
+        {
+          "type": "jovie:sidebar-flyout-open",
+          "durationMs": 0.026,
+          "relativeToMoreMs": 86.04
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.022,
+          "relativeToMoreMs": 206.324
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.021,
+          "relativeToMoreMs": 47.107
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.017,
+          "relativeToMoreMs": 1.939
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.017,
+          "relativeToMoreMs": 9.57
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.017,
+          "relativeToMoreMs": 192.255
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.017,
+          "relativeToMoreMs": 198.731
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.017,
+          "relativeToMoreMs": 200.854
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.016,
+          "relativeToMoreMs": 85.118
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.012,
+          "relativeToMoreMs": 104.083
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.011,
+          "relativeToMoreMs": 46.773
+        },
+        {
+          "type": "scrollend",
+          "durationMs": 0.011,
+          "relativeToMoreMs": 55.096
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.011,
+          "relativeToMoreMs": 72.126
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.011,
+          "relativeToMoreMs": 153.766
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.009,
+          "relativeToMoreMs": 166.976
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.007,
+          "relativeToMoreMs": 195.681
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.006,
+          "relativeToMoreMs": 47.173
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.005,
+          "relativeToMoreMs": 4.022
+        },
+        {
+          "type": "beforeinput",
+          "durationMs": 0.005,
+          "relativeToMoreMs": 193.185
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 46.867
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 72.201
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 153.825
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.002,
+          "relativeToMoreMs": 206.41
+        },
+        {
+          "type": "DOMActivate",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 129.19
+        },
+        {
+          "type": "load",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 155.674
+        },
+        {
+          "type": "load",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 155.702
+        }
+      ],
+      "maxEventDispatchMs": 19.875,
+      "cpu": {
+        "negativeTimeDeltas": 45,
+        "quantitativeFunctionAttributionUsed": false
+      },
+      "traceEventMaxMs": {
+        "RunTask": 19.972,
+        "FunctionCall": 16.268,
+        "UpdateLayoutTree": 1.925,
+        "Layout": 1.039,
+        "Paint": 0.261
+      }
+    },
+    {
+      "mode": "profiled",
+      "sample": 1,
+      "assertionsPassed": true,
+      "flowDurationMs": 215.40000009536743,
+      "frames": 25,
+      "rafMedianMs": 8.350000000000023,
+      "rafP95Ms": 9.200000000000045,
+      "rafMaxMs": 17.0,
+      "flowLongTasks": [],
+      "preMoreLongTasks": [],
+      "eventToAssertionCheckpointMs": 36.80000019073486,
+      "browser": "148.0.7778.96",
+      "runtimeProof": [
+        {
+          "bundleType": 0,
+          "version": "19.2.8",
+          "rendererPackageName": "react-dom"
+        }
+      ],
+      "sameClock": {
+        "offsetSpreadUs": 136.00048828125,
+        "rendererPid": 10535,
+        "rendererTid": 905476458
+      },
+      "eventDispatch": [
+        {
+          "type": "keydown",
+          "durationMs": 19.952,
+          "relativeToMoreMs": 10.104
+        },
+        {
+          "type": "keydown",
+          "durationMs": 12.197,
+          "relativeToMoreMs": 83.853
+        },
+        {
+          "type": "keydown",
+          "durationMs": 6.324,
+          "relativeToMoreMs": 59.83
+        },
+        {
+          "type": "click",
+          "durationMs": 4.649,
+          "relativeToMoreMs": 115.726
+        },
+        {
+          "type": "keydown",
+          "durationMs": 3.82,
+          "relativeToMoreMs": 190.925
+        },
+        {
+          "type": "focusScope.autoFocusOnMount",
+          "durationMs": 3.354,
+          "relativeToMoreMs": 22.029
+        },
+        {
+          "type": "focusScope.autoFocusOnMount",
+          "durationMs": 2.549,
+          "relativeToMoreMs": 90.832
+        },
+        {
+          "type": "focusin",
+          "durationMs": 2.056,
+          "relativeToMoreMs": 23.326
+        },
+        {
+          "type": "input",
+          "durationMs": 1.969,
+          "relativeToMoreMs": 183.051
+        },
+        {
+          "type": "focusin",
+          "durationMs": 1.479,
+          "relativeToMoreMs": 91.9
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.494,
+          "relativeToMoreMs": 3.089
+        },
+        {
+          "type": "keydown",
+          "durationMs": 0.417,
+          "relativeToMoreMs": 37.778
+        },
+        {
+          "type": "textInput",
+          "durationMs": 0.415,
+          "relativeToMoreMs": 182.63
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.25,
+          "relativeToMoreMs": 114.53
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.233,
+          "relativeToMoreMs": 63.547
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.228,
+          "relativeToMoreMs": 63.319
+        },
+        {
+          "type": "scroll",
+          "durationMs": 0.216,
+          "relativeToMoreMs": 56.357
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.21,
+          "relativeToMoreMs": 63.78
+        },
+        {
+          "type": "focusScope.autoFocusOnUnmount",
+          "durationMs": 0.207,
+          "relativeToMoreMs": 143.82
+        },
+        {
+          "type": "focusScope.autoFocusOnUnmount",
+          "durationMs": 0.206,
+          "relativeToMoreMs": 71.605
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.189,
+          "relativeToMoreMs": 22.607
+        },
+        {
+          "type": "pointerdown",
+          "durationMs": 0.179,
+          "relativeToMoreMs": 115.39
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.171,
+          "relativeToMoreMs": 137.334
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.167,
+          "relativeToMoreMs": 25.065
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.159,
+          "relativeToMoreMs": 118.395
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.156,
+          "relativeToMoreMs": 24.147
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.156,
+          "relativeToMoreMs": 154.491
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.154,
+          "relativeToMoreMs": 21.851
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.15,
+          "relativeToMoreMs": 118.557
+        },
+        {
+          "type": "rovingFocusGroup.onEntryFocus",
+          "durationMs": 0.142,
+          "relativeToMoreMs": 23.562
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.142,
+          "relativeToMoreMs": 118.708
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.136,
+          "relativeToMoreMs": 22.47
+        },
+        {
+          "type": "menu.itemSelect",
+          "durationMs": 0.134,
+          "relativeToMoreMs": 115.804
+        },
+        {
+          "type": "change",
+          "durationMs": 0.133,
+          "relativeToMoreMs": 192.101
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.132,
+          "relativeToMoreMs": 23.194
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.132,
+          "relativeToMoreMs": 91.316
+        },
+        {
+          "type": "pointermove",
+          "durationMs": 0.132,
+          "relativeToMoreMs": 114.838
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.13,
+          "relativeToMoreMs": 154.648
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.124,
+          "relativeToMoreMs": 24.022
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.124,
+          "relativeToMoreMs": 24.304
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.124,
+          "relativeToMoreMs": 24.94
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.123,
+          "relativeToMoreMs": 22.796
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.122,
+          "relativeToMoreMs": 93.129
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.122,
+          "relativeToMoreMs": 192.365
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.121,
+          "relativeToMoreMs": 25.233
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.121,
+          "relativeToMoreMs": 192.244
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.12,
+          "relativeToMoreMs": 192.488
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.116,
+          "relativeToMoreMs": 92.457
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.115,
+          "relativeToMoreMs": 91.785
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.113,
+          "relativeToMoreMs": 91.202
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.113,
+          "relativeToMoreMs": 153.998
+        },
+        {
+          "type": "rovingFocusGroup.onEntryFocus",
+          "durationMs": 0.108,
+          "relativeToMoreMs": 92.02
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.104,
+          "relativeToMoreMs": 90.721
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.104,
+          "relativeToMoreMs": 93.025
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.102,
+          "relativeToMoreMs": 91.448
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.1,
+          "relativeToMoreMs": 92.573
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.1,
+          "relativeToMoreMs": 93.252
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.099,
+          "relativeToMoreMs": 92.357
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.099,
+          "relativeToMoreMs": 199.077
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.096,
+          "relativeToMoreMs": 46.871
+        },
+        {
+          "type": "tooltip.open",
+          "durationMs": 0.092,
+          "relativeToMoreMs": 196.578
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.089,
+          "relativeToMoreMs": 65.379
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.089,
+          "relativeToMoreMs": 119.903
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.086,
+          "relativeToMoreMs": 153.911
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.082,
+          "relativeToMoreMs": 154.779
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.08,
+          "relativeToMoreMs": 154.112
+        },
+        {
+          "type": "mousemove",
+          "durationMs": 0.077,
+          "relativeToMoreMs": 114.97
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.076,
+          "relativeToMoreMs": 149.539
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.076,
+          "relativeToMoreMs": 195.835
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.068,
+          "relativeToMoreMs": 196.216
+        },
+        {
+          "type": "mousedown",
+          "durationMs": 0.059,
+          "relativeToMoreMs": 115.57
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.057,
+          "relativeToMoreMs": 33.606
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.049,
+          "relativeToMoreMs": 3.039
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.048,
+          "relativeToMoreMs": 114.788
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.047,
+          "relativeToMoreMs": 47.268
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.044,
+          "relativeToMoreMs": 67.592
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.043,
+          "relativeToMoreMs": 143.966
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.041,
+          "relativeToMoreMs": 149.623
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.04,
+          "relativeToMoreMs": 71.753
+        },
+        {
+          "type": "pointerup",
+          "durationMs": 0.036,
+          "relativeToMoreMs": 115.655
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.035,
+          "relativeToMoreMs": 137.519
+        },
+        {
+          "type": "jovie:sidebar-flyout-open",
+          "durationMs": 0.033,
+          "relativeToMoreMs": 10.449
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.032,
+          "relativeToMoreMs": 195.917
+        },
+        {
+          "type": "mouseup",
+          "durationMs": 0.03,
+          "relativeToMoreMs": 115.692
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.029,
+          "relativeToMoreMs": 38.321
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.026,
+          "relativeToMoreMs": 98.83
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.025,
+          "relativeToMoreMs": 47.243
+        },
+        {
+          "type": "jovie:sidebar-flyout-open",
+          "durationMs": 0.022,
+          "relativeToMoreMs": 83.948
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.021,
+          "relativeToMoreMs": 8.849
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.021,
+          "relativeToMoreMs": 194.971
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.013,
+          "relativeToMoreMs": 1.764
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.013,
+          "relativeToMoreMs": 83.226
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.013,
+          "relativeToMoreMs": 190.285
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.012,
+          "relativeToMoreMs": 156.163
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.012,
+          "relativeToMoreMs": 196.204
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.011,
+          "relativeToMoreMs": 143.955
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.011,
+          "relativeToMoreMs": 187.777
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.01,
+          "relativeToMoreMs": 46.86
+        },
+        {
+          "type": "scrollend",
+          "durationMs": 0.01,
+          "relativeToMoreMs": 56.574
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.01,
+          "relativeToMoreMs": 101.013
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.01,
+          "relativeToMoreMs": 181.729
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.009,
+          "relativeToMoreMs": 185.034
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.008,
+          "relativeToMoreMs": 71.744
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.007,
+          "relativeToMoreMs": 71.793
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.006,
+          "relativeToMoreMs": 47.316
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.005,
+          "relativeToMoreMs": 3.583
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 46.968
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 144.01
+        },
+        {
+          "type": "beforeinput",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 182.622
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.002,
+          "relativeToMoreMs": 196.285
+        },
+        {
+          "type": "DOMActivate",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 120.373
+        },
+        {
+          "type": "load",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 144.442
+        },
+        {
+          "type": "load",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 144.467
+        }
+      ],
+      "maxEventDispatchMs": 19.952,
+      "cpu": {
+        "negativeTimeDeltas": 48,
+        "quantitativeFunctionAttributionUsed": false
+      },
+      "traceEventMaxMs": {
+        "RunTask": 20.044,
+        "FunctionCall": 16.33,
+        "UpdateLayoutTree": 2.116,
+        "Layout": 1.028,
+        "Paint": 0.217
+      }
+    },
+    {
+      "mode": "profiled",
+      "sample": 2,
+      "assertionsPassed": true,
+      "flowDurationMs": 204.30000019073486,
+      "frames": 24,
+      "rafMedianMs": 8.300000000000068,
+      "rafP95Ms": 10.0,
+      "rafMaxMs": 16.800000000000068,
+      "flowLongTasks": [],
+      "preMoreLongTasks": [],
+      "eventToAssertionCheckpointMs": 39.299999713897705,
+      "browser": "148.0.7778.96",
+      "runtimeProof": [
+        {
+          "bundleType": 0,
+          "version": "19.2.8",
+          "rendererPackageName": "react-dom"
+        }
+      ],
+      "sameClock": {
+        "offsetSpreadUs": 140.00048828125,
+        "rendererPid": 10605,
+        "rendererTid": 905478052
+      },
+      "eventDispatch": [
+        {
+          "type": "keydown",
+          "durationMs": 20.99,
+          "relativeToMoreMs": 11.001
+        },
+        {
+          "type": "keydown",
+          "durationMs": 12.592,
+          "relativeToMoreMs": 73.242
+        },
+        {
+          "type": "keydown",
+          "durationMs": 6.26,
+          "relativeToMoreMs": 51.715
+        },
+        {
+          "type": "click",
+          "durationMs": 4.334,
+          "relativeToMoreMs": 104.886
+        },
+        {
+          "type": "keydown",
+          "durationMs": 3.951,
+          "relativeToMoreMs": 180.758
+        },
+        {
+          "type": "focusScope.autoFocusOnMount",
+          "durationMs": 3.433,
+          "relativeToMoreMs": 23.874
+        },
+        {
+          "type": "focusScope.autoFocusOnMount",
+          "durationMs": 2.522,
+          "relativeToMoreMs": 80.629
+        },
+        {
+          "type": "focusin",
+          "durationMs": 2.098,
+          "relativeToMoreMs": 25.207
+        },
+        {
+          "type": "input",
+          "durationMs": 2.057,
+          "relativeToMoreMs": 172.575
+        },
+        {
+          "type": "focusin",
+          "durationMs": 1.489,
+          "relativeToMoreMs": 81.661
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.523,
+          "relativeToMoreMs": 3.467
+        },
+        {
+          "type": "textInput",
+          "durationMs": 0.456,
+          "relativeToMoreMs": 172.112
+        },
+        {
+          "type": "keydown",
+          "durationMs": 0.395,
+          "relativeToMoreMs": 39.994
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.248,
+          "relativeToMoreMs": 103.776
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.227,
+          "relativeToMoreMs": 55.166
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.227,
+          "relativeToMoreMs": 55.394
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.213,
+          "relativeToMoreMs": 55.622
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.211,
+          "relativeToMoreMs": 142.983
+        },
+        {
+          "type": "focusScope.autoFocusOnUnmount",
+          "durationMs": 0.197,
+          "relativeToMoreMs": 60.525
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.195,
+          "relativeToMoreMs": 24.462
+        },
+        {
+          "type": "focusScope.autoFocusOnUnmount",
+          "durationMs": 0.176,
+          "relativeToMoreMs": 132.685
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.174,
+          "relativeToMoreMs": 26.975
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.167,
+          "relativeToMoreMs": 26.053
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.165,
+          "relativeToMoreMs": 125.693
+        },
+        {
+          "type": "pointerdown",
+          "durationMs": 0.157,
+          "relativeToMoreMs": 104.562
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.155,
+          "relativeToMoreMs": 23.687
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.148,
+          "relativeToMoreMs": 107.548
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.147,
+          "relativeToMoreMs": 107.696
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.146,
+          "relativeToMoreMs": 107.401
+        },
+        {
+          "type": "rovingFocusGroup.onEntryFocus",
+          "durationMs": 0.142,
+          "relativeToMoreMs": 25.457
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.139,
+          "relativeToMoreMs": 25.067
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.138,
+          "relativeToMoreMs": 24.323
+        },
+        {
+          "type": "menu.itemSelect",
+          "durationMs": 0.132,
+          "relativeToMoreMs": 104.959
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.131,
+          "relativeToMoreMs": 82.878
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.13,
+          "relativeToMoreMs": 26.221
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.13,
+          "relativeToMoreMs": 81.1
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.129,
+          "relativeToMoreMs": 143.194
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.127,
+          "relativeToMoreMs": 24.658
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.127,
+          "relativeToMoreMs": 26.848
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.125,
+          "relativeToMoreMs": 27.149
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.123,
+          "relativeToMoreMs": 182.331
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.121,
+          "relativeToMoreMs": 25.932
+        },
+        {
+          "type": "change",
+          "durationMs": 0.121,
+          "relativeToMoreMs": 182.079
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.121,
+          "relativeToMoreMs": 182.209
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.119,
+          "relativeToMoreMs": 81.541
+        },
+        {
+          "type": "pointermove",
+          "durationMs": 0.118,
+          "relativeToMoreMs": 104.077
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.118,
+          "relativeToMoreMs": 182.455
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.114,
+          "relativeToMoreMs": 83.01
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.11,
+          "relativeToMoreMs": 82.218
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.109,
+          "relativeToMoreMs": 142.505
+        },
+        {
+          "type": "rovingFocusGroup.onEntryFocus",
+          "durationMs": 0.106,
+          "relativeToMoreMs": 81.783
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.106,
+          "relativeToMoreMs": 82.772
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.105,
+          "relativeToMoreMs": 80.517
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.104,
+          "relativeToMoreMs": 80.995
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.104,
+          "relativeToMoreMs": 188.352
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.101,
+          "relativeToMoreMs": 82.116
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.1,
+          "relativeToMoreMs": 81.231
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.099,
+          "relativeToMoreMs": 82.328
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.098,
+          "relativeToMoreMs": 46.317
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.089,
+          "relativeToMoreMs": 57.221
+        },
+        {
+          "type": "tooltip.open",
+          "durationMs": 0.088,
+          "relativeToMoreMs": 186.122
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.087,
+          "relativeToMoreMs": 142.417
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.086,
+          "relativeToMoreMs": 108.837
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.082,
+          "relativeToMoreMs": 143.324
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.079,
+          "relativeToMoreMs": 142.615
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.078,
+          "relativeToMoreMs": 132.251
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.076,
+          "relativeToMoreMs": 138.154
+        },
+        {
+          "type": "mousemove",
+          "durationMs": 0.074,
+          "relativeToMoreMs": 104.196
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.065,
+          "relativeToMoreMs": 185.441
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.061,
+          "relativeToMoreMs": 35.526
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.061,
+          "relativeToMoreMs": 185.799
+        },
+        {
+          "type": "mousedown",
+          "durationMs": 0.054,
+          "relativeToMoreMs": 104.72
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.05,
+          "relativeToMoreMs": 3.416
+        },
+        {
+          "type": "mouseup",
+          "durationMs": 0.046,
+          "relativeToMoreMs": 104.836
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.045,
+          "relativeToMoreMs": 104.03
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.044,
+          "relativeToMoreMs": 46.696
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.044,
+          "relativeToMoreMs": 59.467
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.04,
+          "relativeToMoreMs": 60.667
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.039,
+          "relativeToMoreMs": 88.651
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.039,
+          "relativeToMoreMs": 185.512
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.037,
+          "relativeToMoreMs": 40.534
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.037,
+          "relativeToMoreMs": 125.875
+        },
+        {
+          "type": "pointerup",
+          "durationMs": 0.036,
+          "relativeToMoreMs": 104.799
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.032,
+          "relativeToMoreMs": 132.811
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.032,
+          "relativeToMoreMs": 138.237
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.031,
+          "relativeToMoreMs": 132.34
+        },
+        {
+          "type": "jovie:sidebar-flyout-open",
+          "durationMs": 0.027,
+          "relativeToMoreMs": 11.39
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.026,
+          "relativeToMoreMs": 184.896
+        },
+        {
+          "type": "jovie:sidebar-flyout-open",
+          "durationMs": 0.024,
+          "relativeToMoreMs": 73.34
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.023,
+          "relativeToMoreMs": 9.107
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.021,
+          "relativeToMoreMs": 72.576
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.02,
+          "relativeToMoreMs": 46.675
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.019,
+          "relativeToMoreMs": 185.779
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.017,
+          "relativeToMoreMs": 2.041
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.017,
+          "relativeToMoreMs": 177.078
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.014,
+          "relativeToMoreMs": 144.719
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.014,
+          "relativeToMoreMs": 170.988
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.012,
+          "relativeToMoreMs": 180.04
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.011,
+          "relativeToMoreMs": 90.869
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.01,
+          "relativeToMoreMs": 46.306
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.009,
+          "relativeToMoreMs": 60.658
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.008,
+          "relativeToMoreMs": 132.802
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.008,
+          "relativeToMoreMs": 174.651
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.007,
+          "relativeToMoreMs": 132.844
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.005,
+          "relativeToMoreMs": 3.991
+        },
+        {
+          "type": "beforeinput",
+          "durationMs": 0.005,
+          "relativeToMoreMs": 172.104
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 46.416
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 60.707
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.002,
+          "relativeToMoreMs": 46.741
+        },
+        {
+          "type": "scroll",
+          "durationMs": 0.002,
+          "relativeToMoreMs": 58.011
+        },
+        {
+          "type": "load",
+          "durationMs": 0.002,
+          "relativeToMoreMs": 133.286
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.002,
+          "relativeToMoreMs": 185.861
+        },
+        {
+          "type": "scrollend",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 58.013
+        },
+        {
+          "type": "DOMActivate",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 109.218
+        },
+        {
+          "type": "load",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 133.304
+        }
+      ],
+      "maxEventDispatchMs": 20.99,
+      "cpu": {
+        "negativeTimeDeltas": 46,
+        "quantitativeFunctionAttributionUsed": false
+      },
+      "traceEventMaxMs": {
+        "RunTask": 21.093,
+        "FunctionCall": 17.312,
+        "UpdateLayoutTree": 2.123,
+        "Layout": 1.015,
+        "Paint": 0.203
+      }
+    },
+    {
+      "mode": "profiled",
+      "sample": 3,
+      "assertionsPassed": true,
+      "flowDurationMs": 217.90000009536743,
+      "frames": 24,
+      "rafMedianMs": 8.399999999999977,
+      "rafP95Ms": 16.600000000000023,
+      "rafMaxMs": 16.700000000000045,
+      "flowLongTasks": [],
+      "preMoreLongTasks": [],
+      "eventToAssertionCheckpointMs": 41.09999990463257,
+      "browser": "148.0.7778.96",
+      "runtimeProof": [
+        {
+          "bundleType": 0,
+          "version": "19.2.8",
+          "rendererPackageName": "react-dom"
+        }
+      ],
+      "sameClock": {
+        "offsetSpreadUs": 127.0,
+        "rendererPid": 10695,
+        "rendererTid": 905479782
+      },
+      "eventDispatch": [
+        {
+          "type": "keydown",
+          "durationMs": 21.158,
+          "relativeToMoreMs": 11.635
+        },
+        {
+          "type": "keydown",
+          "durationMs": 14.225,
+          "relativeToMoreMs": 70.376
+        },
+        {
+          "type": "keydown",
+          "durationMs": 6.469,
+          "relativeToMoreMs": 56.443
+        },
+        {
+          "type": "click",
+          "durationMs": 4.579,
+          "relativeToMoreMs": 110.342
+        },
+        {
+          "type": "keydown",
+          "durationMs": 4.464,
+          "relativeToMoreMs": 187.949
+        },
+        {
+          "type": "focusScope.autoFocusOnMount",
+          "durationMs": 3.656,
+          "relativeToMoreMs": 24.269
+        },
+        {
+          "type": "focusScope.autoFocusOnMount",
+          "durationMs": 2.814,
+          "relativeToMoreMs": 78.06
+        },
+        {
+          "type": "focusin",
+          "durationMs": 2.244,
+          "relativeToMoreMs": 25.679
+        },
+        {
+          "type": "input",
+          "durationMs": 2.192,
+          "relativeToMoreMs": 179.414
+        },
+        {
+          "type": "focusin",
+          "durationMs": 1.714,
+          "relativeToMoreMs": 79.159
+        },
+        {
+          "type": "keydown",
+          "durationMs": 0.757,
+          "relativeToMoreMs": 42.178
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.492,
+          "relativeToMoreMs": 3.675
+        },
+        {
+          "type": "textInput",
+          "durationMs": 0.463,
+          "relativeToMoreMs": 178.944
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.274,
+          "relativeToMoreMs": 109.081
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.224,
+          "relativeToMoreMs": 60.051
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.22,
+          "relativeToMoreMs": 60.276
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.208,
+          "relativeToMoreMs": 24.886
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.207,
+          "relativeToMoreMs": 60.497
+        },
+        {
+          "type": "focusScope.autoFocusOnUnmount",
+          "durationMs": 0.205,
+          "relativeToMoreMs": 64.705
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.178,
+          "relativeToMoreMs": 27.579
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.175,
+          "relativeToMoreMs": 26.571
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.173,
+          "relativeToMoreMs": 132.344
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.173,
+          "relativeToMoreMs": 196.192
+        },
+        {
+          "type": "focusScope.autoFocusOnUnmount",
+          "durationMs": 0.172,
+          "relativeToMoreMs": 138.635
+        },
+        {
+          "type": "pointerdown",
+          "durationMs": 0.17,
+          "relativeToMoreMs": 110.003
+        },
+        {
+          "type": "rovingFocusGroup.onEntryFocus",
+          "durationMs": 0.168,
+          "relativeToMoreMs": 25.923
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.165,
+          "relativeToMoreMs": 80.541
+        },
+        {
+          "type": "menu.itemSelect",
+          "durationMs": 0.16,
+          "relativeToMoreMs": 110.419
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.156,
+          "relativeToMoreMs": 24.086
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.154,
+          "relativeToMoreMs": 24.729
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.151,
+          "relativeToMoreMs": 25.528
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.151,
+          "relativeToMoreMs": 113.006
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.147,
+          "relativeToMoreMs": 113.158
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.147,
+          "relativeToMoreMs": 113.306
+        },
+        {
+          "type": "pointermove",
+          "durationMs": 0.143,
+          "relativeToMoreMs": 109.41
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.139,
+          "relativeToMoreMs": 80.401
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.138,
+          "relativeToMoreMs": 78.567
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.137,
+          "relativeToMoreMs": 80.707
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.137,
+          "relativeToMoreMs": 148.227
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.13,
+          "relativeToMoreMs": 27.758
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.129,
+          "relativeToMoreMs": 26.441
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.128,
+          "relativeToMoreMs": 25.095
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.128,
+          "relativeToMoreMs": 27.45
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.126,
+          "relativeToMoreMs": 79.744
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.124,
+          "relativeToMoreMs": 26.747
+        },
+        {
+          "type": "change",
+          "durationMs": 0.124,
+          "relativeToMoreMs": 189.438
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.124,
+          "relativeToMoreMs": 189.575
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.123,
+          "relativeToMoreMs": 148.365
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.122,
+          "relativeToMoreMs": 77.928
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.122,
+          "relativeToMoreMs": 189.7
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.121,
+          "relativeToMoreMs": 79.037
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.117,
+          "relativeToMoreMs": 79.87
+        },
+        {
+          "type": "rovingFocusGroup.onEntryFocus",
+          "durationMs": 0.113,
+          "relativeToMoreMs": 79.29
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.112,
+          "relativeToMoreMs": 189.822
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.111,
+          "relativeToMoreMs": 147.758
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.107,
+          "relativeToMoreMs": 78.458
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.102,
+          "relativeToMoreMs": 78.706
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.101,
+          "relativeToMoreMs": 79.643
+        },
+        {
+          "type": "tooltip.open",
+          "durationMs": 0.099,
+          "relativeToMoreMs": 193.47
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.092,
+          "relativeToMoreMs": 147.665
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.089,
+          "relativeToMoreMs": 62.105
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.089,
+          "relativeToMoreMs": 114.471
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.088,
+          "relativeToMoreMs": 192.587
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.087,
+          "relativeToMoreMs": 49.611
+        },
+        {
+          "type": "mousemove",
+          "durationMs": 0.084,
+          "relativeToMoreMs": 109.556
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.082,
+          "relativeToMoreMs": 193.048
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.081,
+          "relativeToMoreMs": 147.87
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.08,
+          "relativeToMoreMs": 148.489
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.077,
+          "relativeToMoreMs": 3.597
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.07,
+          "relativeToMoreMs": 36.486
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.065,
+          "relativeToMoreMs": 64.448
+        },
+        {
+          "type": "mousedown",
+          "durationMs": 0.063,
+          "relativeToMoreMs": 110.174
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.063,
+          "relativeToMoreMs": 149.381
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.059,
+          "relativeToMoreMs": 139.007
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.051,
+          "relativeToMoreMs": 49.976
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.049,
+          "relativeToMoreMs": 43.165
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.049,
+          "relativeToMoreMs": 88.341
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.047,
+          "relativeToMoreMs": 109.362
+        },
+        {
+          "type": "pointerup",
+          "durationMs": 0.044,
+          "relativeToMoreMs": 110.263
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.043,
+          "relativeToMoreMs": 192.685
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.041,
+          "relativeToMoreMs": 197.955
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.04,
+          "relativeToMoreMs": 64.854
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.038,
+          "relativeToMoreMs": 132.527
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.037,
+          "relativeToMoreMs": 149.454
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.036,
+          "relativeToMoreMs": 138.755
+        },
+        {
+          "type": "jovie:sidebar-flyout-open",
+          "durationMs": 0.032,
+          "relativeToMoreMs": 12.012
+        },
+        {
+          "type": "mouseup",
+          "durationMs": 0.03,
+          "relativeToMoreMs": 110.308
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.03,
+          "relativeToMoreMs": 139.075
+        },
+        {
+          "type": "jovie:sidebar-flyout-open",
+          "durationMs": 0.024,
+          "relativeToMoreMs": 70.482
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.024,
+          "relativeToMoreMs": 193.023
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.022,
+          "relativeToMoreMs": 49.953
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.021,
+          "relativeToMoreMs": 69.42
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.017,
+          "relativeToMoreMs": 177.989
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.016,
+          "relativeToMoreMs": 2.069
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.016,
+          "relativeToMoreMs": 10.172
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.016,
+          "relativeToMoreMs": 187.101
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.015,
+          "relativeToMoreMs": 91.261
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.013,
+          "relativeToMoreMs": 184.504
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.011,
+          "relativeToMoreMs": 49.596
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.01,
+          "relativeToMoreMs": 138.744
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.01,
+          "relativeToMoreMs": 150.09
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.008,
+          "relativeToMoreMs": 64.846
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.007,
+          "relativeToMoreMs": 181.632
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.006,
+          "relativeToMoreMs": 49.699
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.005,
+          "relativeToMoreMs": 4.168
+        },
+        {
+          "type": "beforeinput",
+          "durationMs": 0.005,
+          "relativeToMoreMs": 178.935
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 50.027
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 64.895
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.003,
+          "relativeToMoreMs": 138.792
+        },
+        {
+          "type": "scroll",
+          "durationMs": 0.002,
+          "relativeToMoreMs": 62.951
+        },
+        {
+          "type": "DOMActivate",
+          "durationMs": 0.002,
+          "relativeToMoreMs": 114.919
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.002,
+          "relativeToMoreMs": 193.131
+        },
+        {
+          "type": "load",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 139.701
+        },
+        {
+          "type": "load",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 139.704
+        }
+      ],
+      "maxEventDispatchMs": 21.158,
+      "cpu": {
+        "negativeTimeDeltas": 44,
+        "quantitativeFunctionAttributionUsed": false
+      },
+      "traceEventMaxMs": {
+        "RunTask": 21.255,
+        "FunctionCall": 17.42,
+        "UpdateLayoutTree": 2.201,
+        "Layout": 1.021,
+        "Paint": 0.254
+      }
+    },
+    {
+      "mode": "profiled",
+      "sample": 4,
+      "assertionsPassed": true,
+      "flowDurationMs": 191.69999980926514,
+      "frames": 23,
+      "rafMedianMs": 8.5,
+      "rafP95Ms": 9.5,
+      "rafMaxMs": 9.700000000000045,
+      "flowLongTasks": [],
+      "preMoreLongTasks": [],
+      "eventToAssertionCheckpointMs": 36.5,
+      "browser": "148.0.7778.96",
+      "runtimeProof": [
+        {
+          "bundleType": 0,
+          "version": "19.2.8",
+          "rendererPackageName": "react-dom"
+        }
+      ],
+      "sameClock": {
+        "offsetSpreadUs": 60.0,
+        "rendererPid": 10770,
+        "rendererTid": 905481393
+      },
+      "eventDispatch": [
+        {
+          "type": "keydown",
+          "durationMs": 19.5,
+          "relativeToMoreMs": 10.126
+        },
+        {
+          "type": "keydown",
+          "durationMs": 14.13,
+          "relativeToMoreMs": 61.377
+        },
+        {
+          "type": "keydown",
+          "durationMs": 6.336,
+          "relativeToMoreMs": 48.773
+        },
+        {
+          "type": "click",
+          "durationMs": 4.623,
+          "relativeToMoreMs": 93.789
+        },
+        {
+          "type": "keydown",
+          "durationMs": 4.171,
+          "relativeToMoreMs": 168.645
+        },
+        {
+          "type": "focusScope.autoFocusOnMount",
+          "durationMs": 3.445,
+          "relativeToMoreMs": 21.835
+        },
+        {
+          "type": "focusScope.autoFocusOnMount",
+          "durationMs": 2.766,
+          "relativeToMoreMs": 69.18
+        },
+        {
+          "type": "focusin",
+          "durationMs": 2.135,
+          "relativeToMoreMs": 23.144
+        },
+        {
+          "type": "input",
+          "durationMs": 2.105,
+          "relativeToMoreMs": 160.778
+        },
+        {
+          "type": "focusin",
+          "durationMs": 1.614,
+          "relativeToMoreMs": 70.33
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.498,
+          "relativeToMoreMs": 3.205
+        },
+        {
+          "type": "textInput",
+          "durationMs": 0.437,
+          "relativeToMoreMs": 160.334
+        },
+        {
+          "type": "keydown",
+          "durationMs": 0.374,
+          "relativeToMoreMs": 37.19
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.243,
+          "relativeToMoreMs": 92.639
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.234,
+          "relativeToMoreMs": 52.246
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.226,
+          "relativeToMoreMs": 52.481
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.21,
+          "relativeToMoreMs": 52.707
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.193,
+          "relativeToMoreMs": 22.434
+        },
+        {
+          "type": "focusScope.autoFocusOnUnmount",
+          "durationMs": 0.191,
+          "relativeToMoreMs": 56.785
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.174,
+          "relativeToMoreMs": 24.947
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.17,
+          "relativeToMoreMs": 23.996
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.163,
+          "relativeToMoreMs": 21.65
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.159,
+          "relativeToMoreMs": 131.631
+        },
+        {
+          "type": "focusScope.autoFocusOnUnmount",
+          "durationMs": 0.158,
+          "relativeToMoreMs": 121.216
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.157,
+          "relativeToMoreMs": 69.654
+        },
+        {
+          "type": "pointerdown",
+          "durationMs": 0.155,
+          "relativeToMoreMs": 93.481
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.154,
+          "relativeToMoreMs": 96.505
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.151,
+          "relativeToMoreMs": 114.528
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.15,
+          "relativeToMoreMs": 22.993
+        },
+        {
+          "type": "menu.itemSelect",
+          "durationMs": 0.15,
+          "relativeToMoreMs": 93.875
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.15,
+          "relativeToMoreMs": 96.809
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.148,
+          "relativeToMoreMs": 96.661
+        },
+        {
+          "type": "rovingFocusGroup.onEntryFocus",
+          "durationMs": 0.145,
+          "relativeToMoreMs": 23.377
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.143,
+          "relativeToMoreMs": 22.29
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.141,
+          "relativeToMoreMs": 71.653
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.131,
+          "relativeToMoreMs": 23.865
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.131,
+          "relativeToMoreMs": 24.166
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.131,
+          "relativeToMoreMs": 24.815
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.131,
+          "relativeToMoreMs": 25.121
+        },
+        {
+          "type": "pointermove",
+          "durationMs": 0.129,
+          "relativeToMoreMs": 92.933
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.128,
+          "relativeToMoreMs": 131.791
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.128,
+          "relativeToMoreMs": 170.144
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.127,
+          "relativeToMoreMs": 22.627
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.126,
+          "relativeToMoreMs": 170.272
+        },
+        {
+          "type": "change",
+          "durationMs": 0.124,
+          "relativeToMoreMs": 170.009
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.122,
+          "relativeToMoreMs": 70.929
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.121,
+          "relativeToMoreMs": 70.208
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.117,
+          "relativeToMoreMs": 69.053
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.115,
+          "relativeToMoreMs": 170.398
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.114,
+          "relativeToMoreMs": 71.795
+        },
+        {
+          "type": "rovingFocusGroup.onEntryFocus",
+          "durationMs": 0.113,
+          "relativeToMoreMs": 70.458
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.113,
+          "relativeToMoreMs": 71.54
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.112,
+          "relativeToMoreMs": 69.541
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.109,
+          "relativeToMoreMs": 131.148
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.108,
+          "relativeToMoreMs": 70.821
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.107,
+          "relativeToMoreMs": 69.812
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.103,
+          "relativeToMoreMs": 71.051
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.102,
+          "relativeToMoreMs": 177.213
+        },
+        {
+          "type": "tooltip.open",
+          "durationMs": 0.097,
+          "relativeToMoreMs": 174.698
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.092,
+          "relativeToMoreMs": 54.316
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.088,
+          "relativeToMoreMs": 131.059
+        },
+        {
+          "type": "dismissableLayer.update",
+          "durationMs": 0.086,
+          "relativeToMoreMs": 97.969
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.084,
+          "relativeToMoreMs": 173.82
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.081,
+          "relativeToMoreMs": 131.258
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.08,
+          "relativeToMoreMs": 131.921
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.078,
+          "relativeToMoreMs": 174.283
+        },
+        {
+          "type": "mousemove",
+          "durationMs": 0.076,
+          "relativeToMoreMs": 93.065
+        },
+        {
+          "type": "focusout",
+          "durationMs": 0.074,
+          "relativeToMoreMs": 43.656
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.074,
+          "relativeToMoreMs": 126.719
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.068,
+          "relativeToMoreMs": 3.136
+        },
+        {
+          "type": "pointerover",
+          "durationMs": 0.063,
+          "relativeToMoreMs": 120.808
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.055,
+          "relativeToMoreMs": 32.944
+        },
+        {
+          "type": "mousedown",
+          "durationMs": 0.053,
+          "relativeToMoreMs": 93.637
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.05,
+          "relativeToMoreMs": 56.611
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.048,
+          "relativeToMoreMs": 43.964
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.045,
+          "relativeToMoreMs": 92.887
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.042,
+          "relativeToMoreMs": 173.912
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.038,
+          "relativeToMoreMs": 56.923
+        },
+        {
+          "type": "pointerup",
+          "durationMs": 0.037,
+          "relativeToMoreMs": 93.715
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.035,
+          "relativeToMoreMs": 173.072
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.034,
+          "relativeToMoreMs": 37.687
+        },
+        {
+          "type": "keyup",
+          "durationMs": 0.034,
+          "relativeToMoreMs": 78.681
+        },
+        {
+          "type": "mouseup",
+          "durationMs": 0.032,
+          "relativeToMoreMs": 93.753
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.031,
+          "relativeToMoreMs": 114.687
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.031,
+          "relativeToMoreMs": 126.8
+        },
+        {
+          "type": "mouseover",
+          "durationMs": 0.03,
+          "relativeToMoreMs": 120.878
+        },
+        {
+          "type": "focusin",
+          "durationMs": 0.03,
+          "relativeToMoreMs": 121.329
+        },
+        {
+          "type": "jovie:sidebar-flyout-open",
+          "durationMs": 0.025,
+          "relativeToMoreMs": 10.462
+        },
+        {
+          "type": "jovie:sidebar-flyout-open",
+          "durationMs": 0.025,
+          "relativeToMoreMs": 61.494
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.024,
+          "relativeToMoreMs": 174.258
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.019,
+          "relativeToMoreMs": 60.663
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.018,
+          "relativeToMoreMs": 43.945
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.017,
+          "relativeToMoreMs": 1.872
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.016,
+          "relativeToMoreMs": 159.404
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.015,
+          "relativeToMoreMs": 133.283
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.014,
+          "relativeToMoreMs": 165.806
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.013,
+          "relativeToMoreMs": 81.141
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.012,
+          "relativeToMoreMs": 167.947
+        },
+        {
+          "type": "__playwright_mark_target__",
+          "durationMs": 0.011,
+          "relativeToMoreMs": 8.902
+        },
+        {
+          "type": "blur",
+          "durationMs": 0.008,
+          "relativeToMoreMs": 43.645
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.008,
+          "relativeToMoreMs": 121.321
+        },
+        {
+          "type": "selectionchange",
+          "durationMs": 0.008,
+          "relativeToMoreMs": 162.903
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.007,
+          "relativeToMoreMs": 3.705
+        },
+        {
+          "type": "focus",
+          "durationMs": 0.007,
+          "relativeToMoreMs": 56.915
+        },
+        {
+          "type": "beforeinput",
+          "durationMs": 0.005,
+          "relativeToMoreMs": 160.324
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 56.961
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.004,
+          "relativeToMoreMs": 121.36
+        },
+        {
+          "type": "DOMFocusOut",
+          "durationMs": 0.003,
+          "relativeToMoreMs": 43.731
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.003,
+          "relativeToMoreMs": 44.012
+        },
+        {
+          "type": "DOMFocusIn",
+          "durationMs": 0.003,
+          "relativeToMoreMs": 174.363
+        },
+        {
+          "type": "scroll",
+          "durationMs": 0.002,
+          "relativeToMoreMs": 55.149
+        },
+        {
+          "type": "DOMActivate",
+          "durationMs": 0.002,
+          "relativeToMoreMs": 98.409
+        },
+        {
+          "type": "load",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 121.819
+        },
+        {
+          "type": "load",
+          "durationMs": 0.001,
+          "relativeToMoreMs": 121.822
+        }
+      ],
+      "maxEventDispatchMs": 19.5,
+      "cpu": {
+        "negativeTimeDeltas": 41,
+        "quantitativeFunctionAttributionUsed": false
+      },
+      "traceEventMaxMs": {
+        "RunTask": 19.589,
+        "FunctionCall": 16.148,
+        "UpdateLayoutTree": 2.004,
+        "Layout": 1.061,
+        "Paint": 0.224
+      }
+    }
+  ],
+  "interpretation": "Five sequential samples per mode on local headless Chromium, identical compiled Gem diagnostic artifact. Neither mode has a flow long task. Gem 50.1ms frame and 60.302ms opening event did not reproduce locally; host/runtime/path differ, so do not infer a causal Gem fix or universal observer effect. RAF intervals include scheduling/automation and are not per-handler execution time. Exact 16.7ms budget not accepted (unprofiled max18.3ms);Headless RAF cadence does not qualify physical8.3ms120Hz performance. Production React omits onRender callbacks; maintained development CI assertion remains unchanged. No source change, installed Electron, native physical120Hz, authenticated/persisted runtime or full-source qualification claim. Ship now: retain source; Re-evaluate when: unprofiled same-Gem-host or supported-runtime trace; Then: repair only source-attributed work."
+}

@@ -1,0 +1,33 @@
+{
+  "mainHead": "485542fe6f370f20191e3e67e427f3870d84f984",
+  "readAt": "2026-10-08T07:27:27.314225+00:00",
+  "roots": [
+    {
+      "layer": "native",
+      "sourceHead": "4b407aac7b516e2bab9c9f937b805b4cfe88f78e",
+      "mergedTree": "1ac1c2c0b06e448f1e8e37a722c1c02bef970f94",
+      "exitCode": 0,
+      "output": "1ac1c2c0b06e448f1e8e37a722c1c02bef970f94\n",
+      "caps": {
+        "files": 10,
+        "changedLines": 791
+      },
+      "derivedTreeQualified": false,
+      "sourceHeadMoved": false
+    },
+    {
+      "layer": "foundation",
+      "sourceHead": "8d36078f1a658e7bb130a2cc998e20a936ac4db5",
+      "mergedTree": "df937b9521c48f73041ada6a35ae84fdc8e75423",
+      "exitCode": 0,
+      "output": "df937b9521c48f73041ada6a35ae84fdc8e75423\n",
+      "caps": {
+        "files": 47,
+        "changedLines": 1390
+      },
+      "derivedTreeQualified": false,
+      "sourceHeadMoved": false
+    }
+  ],
+  "authority": "read-only local compatibility; no source rebase, push or PR"
+}

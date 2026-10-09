@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ProfileSidebarHeader-CYfJIrhz.js";function i({username:e,displayName:t,profilePath:r}){let{title:i,actions:o}=n({username:e,displayName:t,profilePath:r});return(0,a.jsxs)(`div`,{className:`flex items-center justify-between gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2`,children:[i,o]})}var a,o,s,c,l;function u(){return(u=e((()=>{a=t(),r(),o={title:`Organisms/ProfileSidebar/ProfileSidebarHeader`,component:i,parameters:{layout:`centered`},decorators:[e=>(0,a.jsx)(`div`,{className:`w-80`,children:(0,a.jsx)(e,{})})],args:{username:`tim`,displayName:`Tim White`,profilePath:`/tim`}},s={},c={args:{displayName:`tim`}},l=[`Default`,`UsernameOnly`],s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{}`,...s.parameters?.docs?.source}}},c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    displayName: 'tim'
+  }
+}`,...c.parameters?.docs?.source}}}})))()}u();export{s as Default,c as UsernameOnly,l as __namedExportsOrder,o as default};

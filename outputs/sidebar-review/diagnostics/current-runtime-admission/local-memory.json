@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-08T10:21:58.691Z",
+  "sourceHead": "10e76a95b87efd5c25abe6b757081c2265ee63d7",
+  "platform": "darwin",
+  "sample": {
+    "totalBytes": 34359738368,
+    "availableBytes": 1655226368
+  },
+  "reserveBytes": 10307921511,
+  "ownedHeadroomBytes": 8589934592,
+  "admitted": false,
+  "error": "Storybook build resource admission held: host-memory-reserve",
+  "buildStarted": false,
+  "gateChanged": false
+}

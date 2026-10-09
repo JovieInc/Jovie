@@ -1,0 +1,203 @@
+{
+  "config": {
+    "configFile": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/playwright.config.storybook.ts",
+    "rootDir": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e",
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/timwhite/.codex/worktrees/94af/Jovie/outputs/sidebar-review/diagnostics/electron-production-245/regression-red-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/storybook-*.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "storybook-shared-sidebar.spec.ts",
+      "file": "storybook-shared-sidebar.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Electron collapsed Jovie titlebar clears native controls",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 737,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"height\": 28,\u001b[22m\n\u001b[32m-   \"width\": 28,\u001b[39m\n\u001b[31m+   \"width\": 16,\u001b[39m\n\u001b[2m    \"x\": 140,\u001b[22m\n\u001b[2m    \"y\": 6,\u001b[22m\n\u001b[2m  }\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"height\": 28,\u001b[22m\n\u001b[32m-   \"width\": 28,\u001b[39m\n\u001b[31m+   \"width\": 16,\u001b[39m\n\u001b[2m    \"x\": 140,\u001b[22m\n\u001b[2m    \"y\": 6,\u001b[22m\n\u001b[2m  }\u001b[22m\n    at /Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e/storybook-shared-sidebar.spec.ts:59:31",
+                    "location": {
+                      "file": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e/storybook-shared-sidebar.spec.ts",
+                      "column": 31,
+                      "line": 59
+                    },
+                    "snippet": "  57 |         controls!.x + controls!.width\n  58 |       );\n> 59 |       expect(collapsedToggle).toEqual(pinnedToggle);\n     |                               ^\n  60 |       expect(collapsedHeader!.y).toBe(pinnedHeader!.y);\n  61 |       expect((await titlebar.boundingBox())!.height).toBe(44);\n  62 |       expect(collapsedHeader!.height).toBe(44);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e/storybook-shared-sidebar.spec.ts",
+                        "column": 31,
+                        "line": 59
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"height\": 28,\u001b[22m\n\u001b[32m-   \"width\": 28,\u001b[39m\n\u001b[31m+   \"width\": 16,\u001b[39m\n\u001b[2m    \"x\": 140,\u001b[22m\n\u001b[2m    \"y\": 6,\u001b[22m\n\u001b[2m  }\u001b[22m\n\n  57 |         controls!.x + controls!.width\n  58 |       );\n> 59 |       expect(collapsedToggle).toEqual(pinnedToggle);\n     |                               ^\n  60 |       expect(collapsedHeader!.y).toBe(pinnedHeader!.y);\n  61 |       expect((await titlebar.boundingBox())!.height).toBe(44);\n  62 |       expect(collapsedHeader!.height).toBe(44);\n    at /Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e/storybook-shared-sidebar.spec.ts:59:31"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:56:47.695Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/timwhite/.codex/worktrees/94af/Jovie/outputs/sidebar-review/diagnostics/electron-production-245/regression-red-results/storybook-shared-sidebar-E-9bdfd-ebar-clears-native-controls-chromium/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e/storybook-shared-sidebar.spec.ts",
+                    "column": 31,
+                    "line": 59
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-c364f43ea50c9539562f",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 16,
+          "column": 7
+        },
+        {
+          "title": "Electron collapsed Ovie titlebar clears native controls",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 581,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"height\": 28,\u001b[22m\n\u001b[32m-   \"width\": 28,\u001b[39m\n\u001b[31m+   \"width\": 16,\u001b[39m\n\u001b[2m    \"x\": 140,\u001b[22m\n\u001b[2m    \"y\": 6,\u001b[22m\n\u001b[2m  }\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"height\": 28,\u001b[22m\n\u001b[32m-   \"width\": 28,\u001b[39m\n\u001b[31m+   \"width\": 16,\u001b[39m\n\u001b[2m    \"x\": 140,\u001b[22m\n\u001b[2m    \"y\": 6,\u001b[22m\n\u001b[2m  }\u001b[22m\n    at /Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e/storybook-shared-sidebar.spec.ts:59:31",
+                    "location": {
+                      "file": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e/storybook-shared-sidebar.spec.ts",
+                      "column": 31,
+                      "line": 59
+                    },
+                    "snippet": "  57 |         controls!.x + controls!.width\n  58 |       );\n> 59 |       expect(collapsedToggle).toEqual(pinnedToggle);\n     |                               ^\n  60 |       expect(collapsedHeader!.y).toBe(pinnedHeader!.y);\n  61 |       expect((await titlebar.boundingBox())!.height).toBe(44);\n  62 |       expect(collapsedHeader!.height).toBe(44);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e/storybook-shared-sidebar.spec.ts",
+                        "column": 31,
+                        "line": 59
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"height\": 28,\u001b[22m\n\u001b[32m-   \"width\": 28,\u001b[39m\n\u001b[31m+   \"width\": 16,\u001b[39m\n\u001b[2m    \"x\": 140,\u001b[22m\n\u001b[2m    \"y\": 6,\u001b[22m\n\u001b[2m  }\u001b[22m\n\n  57 |         controls!.x + controls!.width\n  58 |       );\n> 59 |       expect(collapsedToggle).toEqual(pinnedToggle);\n     |                               ^\n  60 |       expect(collapsedHeader!.y).toBe(pinnedHeader!.y);\n  61 |       expect((await titlebar.boundingBox())!.height).toBe(44);\n  62 |       expect(collapsedHeader!.height).toBe(44);\n    at /Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e/storybook-shared-sidebar.spec.ts:59:31"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T09:56:48.843Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/timwhite/.codex/worktrees/94af/Jovie/outputs/sidebar-review/diagnostics/electron-production-245/regression-red-results/storybook-shared-sidebar-E-c5dc2-ebar-clears-native-controls-chromium/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e/storybook-shared-sidebar.spec.ts",
+                    "column": 31,
+                    "line": 59
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-b0baec5e6418e89312f1",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 16,
+          "column": 7
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-08T09:56:47.410Z",
+    "duration": 2110.558,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}
+undefined
+/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: playwright test tests/e2e/storybook-shared-sidebar.spec.ts --config=playwright.config.storybook.ts --project=chromium --workers=1 --retries=0 --grep Electron collapsed --reporter=json --output=/Users/timwhite/.codex/worktrees/94af/Jovie/outputs/sidebar-review/diagnostics/electron-production-245/regression-red-results

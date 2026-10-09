@@ -1,0 +1,32 @@
+{
+  "observedAt": "2026-10-08T11:16:19.422346+00:00",
+  "sourceHead": "f4a73e59c09c62f349195c486419b2278df79b9b",
+  "sourceTree": "ba71eaede1e5643fa137265387bdbd6ff43d39e1",
+  "requestPath": "outputs/sidebar-review/diagnostics/gem-production-request-f4a73e59-r2/request.json",
+  "requestSha256": "4c63a875bc4abe1cd09e5a62417a35ea894d9a7e15b815176422b13730ebd803",
+  "supersedesRejectedRequestSha256": "a273598b2aa46817b169314dd26c87ac0338c156ff665498d40f65c08b9d6b06",
+  "originalPreflight": "not accepted; no seat, remote job or build; source inventory semantic identity mismatch",
+  "revisionVerification": "outputs/sidebar-review/diagnostics/gem-production-request-f4a73e59-r2/verification.json",
+  "newInventorySha256": "4b7ae7694cc3bf7c876d2aed41627cfbac58de621345930ea25d3ee2a9211bfe",
+  "configuredUniqueSourceImports": 1231,
+  "otherNineOriginalPayloadsUnchanged": true,
+  "sendAttempt": "initial tool call aborted; bounded owner read showed no revision delivery; subsequent explicit tool attempt rejected by automatic approval review",
+  "automaticReviewRejection": "Externally visible cross-task message may initiate resource-consuming admission; no trusted user message explicitly authorizes this destination/revised request. Do not bypass.",
+  "approvalQuestionPending": true,
+  "ownerAdmitted": false,
+  "remoteJobDispatched": false,
+  "buildStarted": false,
+  "publicationActionActive": false,
+  "nextAction": "After explicit user approval, send exact reviewed corrected request to existing resource owner; coalesce same logical request and preserve all caps and other jobs.",
+  "ownerReadOnlyMetadataReconciled": {
+    "observedAt": "2026-10-08T04:19:52.360597-07:00",
+    "sameLogicalScope": true,
+    "metadataHashesVerified": true,
+    "receipt": "outputs/sidebar-review/diagnostics/gem-production-request-f4a73e59-r2/owner-metadata-readback.json",
+    "provenance": "outputs/sidebar-review/diagnostics/gem-production-request-f4a73e59-r2/owner-metadata-provenance.json",
+    "seatReserved": false,
+    "buildStarted": false,
+    "profilingStarted": false,
+    "authority": "metadata reconciliation only; rejected execution handoff approval remains pending"
+  }
+}

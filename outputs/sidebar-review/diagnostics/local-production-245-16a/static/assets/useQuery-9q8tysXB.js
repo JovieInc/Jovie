@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{a as t,n,o as r,t as i}from"./useBaseQuery-dsTAVrrJ.js";function a(e,r){return n(e,t,r)}function o(){return(o=e((()=>{i(),r()})))()}export{a as n,o as t};

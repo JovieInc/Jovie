@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./WorkspaceSelector-b9kKlP-A.js";var r,i,a,o;function s(){return(s=e((()=>{t(),r={title:`Molecules/WorkspaceSelector`,component:n,parameters:{layout:`centered`},args:{currentWorkspaceId:`customer`,workspaces:[{id:`customer`,label:`Jovie`,href:`/app`,brandVariant:`jovie`},{id:`ov`,label:`OV`,href:`/app/ov`,brandVariant:`ov`},{id:`support`,label:`Support`,href:`/app/support`,brandVariant:`jovie`}]}},i={},a={args:{currentWorkspaceId:`ov`}},o=[`Default`,`OVActive`],i.parameters={...i.parameters,docs:{...i.parameters?.docs,source:{originalSource:`{}`,...i.parameters?.docs?.source}}},a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{
+  args: {
+    currentWorkspaceId: 'ov'
+  }
+}`,...a.parameters?.docs?.source}}}})))()}s();export{i as Default,a as OVActive,o as __namedExportsOrder,r as default};

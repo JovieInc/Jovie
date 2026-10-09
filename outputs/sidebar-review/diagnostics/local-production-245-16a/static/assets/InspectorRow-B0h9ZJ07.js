@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./DrawerPropertyRow-Cy5f2ZCe.js";function i({labelWidth:e=o,size:t=`sm`,...n}){return(0,a.jsx)(r,{labelWidth:e,size:t,...n})}var a,o;function s(){return(s=e((()=>{a=t(),n(),o=96})))()}export{s as n,i as t};

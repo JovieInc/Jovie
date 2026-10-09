@@ -1,0 +1,20 @@
+{
+  "observedAt": "2026-10-08T11:00:31.791527+00:00",
+  "logicalRequestSha256": "a273598b2aa46817b169314dd26c87ac0338c156ff665498d40f65c08b9d6b06",
+  "sourceHead": "f4a73e59c09c62f349195c486419b2278df79b9b",
+  "inventoryDeclaredHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "inventorySha256": "f21bd7c7809db0bfda285a843a5b91d7f8334753d69f93111b7e03d2ab8ca82b",
+  "expectedInventorySha256": "f21bd7c7809db0bfda285a843a5b91d7f8334753d69f93111b7e03d2ab8ca82b",
+  "count": 1231,
+  "uniqueCount": 1231,
+  "sourceArchiveSha256": "7b9f3060ce7cb8065fce99dea800dd28bb80e665eee3a432ee950d0d9dd78e85",
+  "preflightException": "ValueError: source inventory identity mismatch",
+  "accepted": false,
+  "remoteJobDispatched": false,
+  "seatAcquired": false,
+  "buildStarted": false,
+  "payloadChanged": false,
+  "adapterReview": "CLEAR",
+  "nextOwnerAction": "Sidebar source owner regenerate inventory bound to exact f4 source and validate actual configured import paths, update inventory hash and issue a new immutable request digest. Existing request remains preserved; no old-digest execution.",
+  "sourceArchivePaxComment": "f4a73e59c09c62f349195c486419b2278df79b9b"
+}

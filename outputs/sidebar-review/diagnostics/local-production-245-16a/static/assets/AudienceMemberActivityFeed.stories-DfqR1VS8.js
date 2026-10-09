@@ -1,0 +1,8 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./AudienceMemberActivityFeed-CCx_iWu_.js";var i,a,o,s,c,l;function u(){return(u=e((()=>{i=t(),n(),a={id:`story-audience-member`,type:`anonymous`,displayName:`Avery Stone`,locationLabel:`Brooklyn, NY`,geoCity:`Brooklyn`,geoCountry:`US`,visits:8,engagementScore:82,intentLevel:`high`,latestActions:[{label:`profile_view`,sourceLabel:`Instagram`,confidence:`verified`,timestamp:`2026-08-31T18:20:00.000Z`},{label:`link_click`,sourceLabel:`Listen Now`,timestamp:`2026-08-31T17:05:00.000Z`},{label:`follow`,timestamp:`2026-08-31T16:30:00.000Z`}],referrerHistory:[],utmParams:{},email:`avery@example.com`,phone:null,spotifyConnected:!0,purchaseCount:1,tipAmountTotalCents:500,tipCount:1,tags:[`superfan`],deviceType:`mobile`,lastSeenAt:`2026-08-31T18:20:00.000Z`},o={title:`Features/Dashboard/AudienceMemberActivityFeed`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,i.jsx)(`div`,{className:`w-[20rem] max-w-[calc(100vw-2rem)] bg-base p-4 text-primary-token`,children:(0,i.jsx)(e,{})})],args:{member:a}},s={},c={args:{member:{...a,latestActions:[]}}},l=[`RecentActions`,`Empty`],s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{}`,...s.parameters?.docs?.source}}},c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    member: {
+      ...audienceMember,
+      latestActions: []
+    }
+  }
+}`,...c.parameters?.docs?.source}}}})))()}u();export{c as Empty,s as RecentActions,l as __namedExportsOrder,o as default};

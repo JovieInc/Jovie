@@ -1,0 +1,165 @@
+{
+  "native": {
+    "electron": "44.5.1",
+    "chrome": "152.0.7977.130",
+    "arch": "arm64",
+    "isPackaged": false,
+    "profile": "/private/tmp/sidebar-electron-245-44.5.1/isolated-user-data",
+    "visible": false,
+    "focused": false,
+    "bounds": {
+      "x": 40,
+      "y": 80,
+      "width": 1440,
+      "height": 900
+    },
+    "contentBounds": {
+      "x": 40,
+      "y": 80,
+      "width": 1440,
+      "height": 900
+    },
+    "buttonPosition": {
+      "x": 20,
+      "y": 17
+    },
+    "security": {
+      "allowRunningInsecureContent": false,
+      "contextIsolation": true,
+      "disableDialogs": false,
+      "disablePopups": false,
+      "enableBlinkFeatures": "",
+      "experimentalFeatures": false,
+      "javascript": true,
+      "nodeIntegration": false,
+      "nodeIntegrationInSubFrames": false,
+      "nodeIntegrationInWorker": false,
+      "safeDialogs": false,
+      "safeDialogsMessage": "",
+      "sandbox": true,
+      "webSecurity": true,
+      "webviewTag": false
+    },
+    "display": {
+      "accelerometerSupport": "unknown",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1512,
+        "height": 982
+      },
+      "colorDepth": 30,
+      "colorSpace": "{primaries:P3, transfer:{0.0777*x + 0.0000 if abs(x) < 0.0450 else sign(x)*((0.9495*abs(x) + 0.0495)**2.3955 + 0.0003)}, matrix:RGB, range:FULL}",
+      "depthPerComponent": 10,
+      "detected": true,
+      "displayFrequency": 120.0006103515625,
+      "id": 1,
+      "internal": true,
+      "label": "Built-in Retina Display",
+      "maximumCursorSize": {
+        "width": 0,
+        "height": 0
+      },
+      "monochrome": false,
+      "nativeOrigin": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "scaleFactor": 2,
+      "size": {
+        "width": 1512,
+        "height": 982
+      },
+      "workArea": {
+        "x": 0,
+        "y": 33,
+        "width": 1512,
+        "height": 949
+      },
+      "workAreaSize": {
+        "width": 1512,
+        "height": 949
+      },
+      "touchSupport": "unknown"
+    }
+  },
+  "renderer": {
+    "url": "http://127.0.0.1:6027/iframe.html?id=organisms-unifiedsidebar--shared-shell&viewMode=story",
+    "platform": "darwin",
+    "electron": "44.5.1",
+    "marker": "electron",
+    "controls": {
+      "x": 100,
+      "y": 0,
+      "width": 1340,
+      "height": 44,
+      "visible": true
+    },
+    "titlebar": {
+      "x": 0,
+      "y": 0,
+      "width": 244,
+      "height": 40,
+      "drag": "drag",
+      "visibility": "visible",
+      "display": "flex"
+    },
+    "safeArea": {
+      "x": 18,
+      "y": 20,
+      "width": 100,
+      "height": 0,
+      "drag": "drag",
+      "visibility": "visible",
+      "display": "block"
+    },
+    "header": {
+      "x": 260,
+      "y": 0,
+      "width": 1172,
+      "height": 40,
+      "drag": "none",
+      "visibility": "visible",
+      "display": "block"
+    },
+    "body": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "drag": "none",
+      "visibility": "visible",
+      "display": "flex"
+    },
+    "anchor": {
+      "x": 8,
+      "y": 6,
+      "width": 236,
+      "height": 28,
+      "drag": "drag",
+      "visibility": "visible",
+      "display": "flex"
+    },
+    "floating": {
+      "x": 8,
+      "y": 40,
+      "width": 244,
+      "height": 852,
+      "drag": "none",
+      "visibility": "visible",
+      "display": "block"
+    },
+    "footer": {
+      "x": 8,
+      "y": 811,
+      "width": 244,
+      "height": 81,
+      "drag": "none",
+      "visibility": "visible",
+      "display": "flex"
+    },
+    "toggle": null,
+    "cssWidth": "100px"
+  }
+}

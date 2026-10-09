@@ -1,0 +1,34 @@
+{
+  "head": "3cdda15bd68479050c0acb421651554f004e49a4",
+  "tree": "92a58c95e0aa0069a59a3eb5463e46dae722e4e6",
+  "productionSourceSha": "7c2adbd000031ec8a00ef350f30b34dc393f3346",
+  "previousHead": "22cf14a9e614a66ec0dbb95361cd4077c82328d7",
+  "delta": "UITests only; all product source identical",
+  "ciPassed": 22,
+  "ciSkipped": 0,
+  "ciSelector": "qualify.sh",
+  "coverage": {
+    "covered": 1481,
+    "executable": 1737,
+    "percent": 85.26194588370754
+  },
+  "largestTextUiPassed": 1,
+  "recordingOutsidePerformanceWindow": true,
+  "restoredText": "large",
+  "restoredState": "Shutdown",
+  "historicalPerformance": "../historical/22cf-qualified/provenance.json",
+  "currentHitchMeasurement": false,
+  "files": {
+    "ios-shared-sidebar-more.png": "9e6ddeaa9a1beccac3a458ce533ca5f370de57c2f9b99d5256d927d0ea03d2bc",
+    "ci-qualification.log": "2affa5e4b270a898f14719572c2371eb0c40cd94efa8667264c13da8e001c240",
+    "ios-canonical-information-architecture.png": "2b06d8fba7cf1075a1f5945cb68ea1217f8991fc1ffe205b3c3eedf12683c84a",
+    "publication-preflight.log": "ba5750f211123b50469e4cf0085f092bbd522de446a05eb18ebaf29b5a65d91f",
+    "ci-coverage.json": "68c86b8045842e58231c7b2a9b27b69b652f32843ca434468baa824358164ac2",
+    "ci-summary.json": "8a0729a17c004227f0d9657c345e67daed8d4e8b986e8fb1255ed9f61564b3f5",
+    "ci-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "ios-shared-sidebar-recent.png": "cd088694078c55b213b8a994a0c8dea2b06b1749b73b50f01b13cc585f918a2c",
+    "qualify.sh": "1dacc58b656ec526a3be439ac310c465e701663cf42690954b7eb62911afc068",
+    "ci-restored-state.json": "aa29945cbd5e888c1551d2f734e4c88c16beea441ee5613d3ba4ccb090f5290c",
+    "ios-shared-sidebar-footer-probe.png": "2b06d8fba7cf1075a1f5945cb68ea1217f8991fc1ffe205b3c3eedf12683c84a"
+  }
+}

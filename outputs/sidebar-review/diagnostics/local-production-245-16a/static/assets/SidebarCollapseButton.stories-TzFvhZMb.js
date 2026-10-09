@@ -1,0 +1,7 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./SidebarCollapseButton-BbUnM_ZW.js";import{n as i,t as a}from"./context-CDpFhzjN.js";var o,s,c,l,u;function d(){return(d=e((()=>{o=t(),i(),n(),s={title:`Molecules/SidebarCollapseButton`,component:r,tags:[`autodocs`],parameters:{docs:{description:{component:`Borderless circular System B icon control for expanding/collapsing the app sidebar. No border in any state; hover uses a soft surface fill.`}}},decorators:[e=>(0,o.jsx)(a,{children:(0,o.jsxs)(`div`,{className:`flex items-center gap-4 bg-surface-1 p-6`,children:[(0,o.jsx)(e,{}),(0,o.jsx)(`span`,{className:`text-xs text-secondary-token`,children:`Hover for circular highlight · no border`})]})})]},c={},l={decorators:[e=>(0,o.jsx)(a,{children:(0,o.jsx)(`div`,{className:`flex items-center gap-3 bg-(--app-shell-content-surface) p-4`,children:(0,o.jsx)(e,{})})})]},u=[`Default`,`OnContentSurface`],c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{}`,...c.parameters?.docs?.source}}},l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{
+  decorators: [Story => <SidebarProvider>
+        <div className='flex items-center gap-3 bg-(--app-shell-content-surface) p-4'>
+          <Story />
+        </div>
+      </SidebarProvider>]
+}`,...l.parameters?.docs?.source}}}})))()}d();export{c as Default,l as OnContentSurface,u as __namedExportsOrder,s as default};

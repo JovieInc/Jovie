@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{t as n}from"./jsx-runtime-BbDfbRii.js";import{n as r,t as i}from"./ClusterFilterChips-O82V_u5t.js";function a({initialSelected:e=[]}){let[t,n]=(0,s.useState)(e);return(0,o.jsx)(i,{clusters:c,selectedSlugs:t,onChange:n})}var o,s,c,l,u,d,f;function p(){return(p=e((()=>{o=n(),s=t(),r(),c=[{slug:`streaming`,displayName:`Streaming`},{slug:`social`,displayName:`Social`},{slug:`press`,displayName:`Press`}],l={title:`Dashboard/ReleaseTasks/ClusterFilterChips`,parameters:{layout:`padded`}},u={render:()=>(0,o.jsx)(a,{})},d={render:()=>(0,o.jsx)(a,{initialSelected:[`social`]})},f=[`AllSelected`,`OneFiltered`],u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
+  render: () => <ControlledClusterFilterChips />
+}`,...u.parameters?.docs?.source}}},d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
+  render: () => <ControlledClusterFilterChips initialSelected={['social']} />
+}`,...d.parameters?.docs?.source}}}})))()}p();export{u as AllSelected,d as OneFiltered,f as __namedExportsOrder,l as default};

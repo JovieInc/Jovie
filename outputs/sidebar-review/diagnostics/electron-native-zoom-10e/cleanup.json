@@ -1,0 +1,10 @@
+{
+  "at": "2026-10-08T10:45:20.850368+00:00",
+  "scope": "exact task-owned temporary Electron executable prefix only",
+  "ownedElectronSurvivorPids": [],
+  "ownedProcessesStopped": true,
+  "installedAppsAndPersonalSessionsUntouched": true,
+  "existingStorybook6017Preserved": true,
+  "devicePairUnlockInstallLaunchPerformed": false,
+  "nativeSimulatorUntouched": true
+}

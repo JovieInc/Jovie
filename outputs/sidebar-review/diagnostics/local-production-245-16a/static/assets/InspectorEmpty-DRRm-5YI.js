@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./DrawerInlineNote-Buvm1Juy.js";function i({message:e,testId:t}){return(0,a.jsx)(r,{message:e,testId:t??`inspector-empty`,className:`min-h-16 px-1 py-2`})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

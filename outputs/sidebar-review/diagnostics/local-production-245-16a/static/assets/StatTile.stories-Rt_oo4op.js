@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./StatTile-i7LxmMN5.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Molecules/Drawer/StatTile`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,i.jsx)(`div`,{className:`w-40 bg-surface-0 p-3`,children:(0,i.jsx)(e,{})})],args:{label:`Views`,value:`12.4k`}},o={},s={args:{hint:`+8% vs last week`}},c=[`Default`,`WithHint`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    hint: '+8% vs last week'
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{o as Default,s as WithHint,c as __namedExportsOrder,a as default};

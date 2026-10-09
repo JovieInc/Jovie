@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ReleaseTaskEmptyState-MU_kkUSR.js";var i,a,o,s,c,l;function u(){return(u=e((()=>{i=t(),n(),{fn:a}=__STORYBOOK_MODULE_TEST__,o={title:`Dashboard/Release Tasks/ReleaseTaskEmptyState`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,i.jsx)(`div`,{className:`w-full max-w-2xl bg-surface-0 p-4 text-primary-token`,children:(0,i.jsx)(e,{})})],args:{onSetUp:a(),isLoading:!1}},s={},c={args:{isLoading:!0}},l=[`Ready`,`Generating`],s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{}`,...s.parameters?.docs?.source}}},c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    isLoading: true
+  }
+}`,...c.parameters?.docs?.source}}}})))()}u();export{c as Generating,s as Ready,l as __namedExportsOrder,o as default};

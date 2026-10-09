@@ -1,0 +1,214 @@
+{
+  "devices" : {
+    "com.apple.CoreSimulator.SimRuntime.iOS-26-5" : [
+      {
+        "lastBootedAt" : "2026-10-04T07:07:07Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/1F5679FD-2B72-40E4-816A-4B58E36C032B\/data",
+        "dataPathSize" : 4356149248,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/1F5679FD-2B72-40E4-816A-4B58E36C032B",
+        "udid" : "1F5679FD-2B72-40E4-816A-4B58E36C032B",
+        "isAvailable" : true,
+        "logPathSize" : 634880,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
+        "state" : "Shutdown",
+        "name" : "iPhone 17 Pro"
+      },
+      {
+        "lastBootedAt" : "2026-08-30T19:13:54Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/80F21595-BFD2-4F77-A8C9-6ADE27BEB3C6\/data",
+        "dataPathSize" : 2038919168,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/80F21595-BFD2-4F77-A8C9-6ADE27BEB3C6",
+        "udid" : "80F21595-BFD2-4F77-A8C9-6ADE27BEB3C6",
+        "isAvailable" : true,
+        "logPathSize" : 40960,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
+        "state" : "Shutdown",
+        "name" : "Jovie JOV-5148 QA"
+      },
+      {
+        "lastBootedAt" : "2026-09-30T20:36:04Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/F33BA0AD-8F1A-41DE-ABA8-566B6B26EB4B\/data",
+        "dataPathSize" : 3048828928,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/F33BA0AD-8F1A-41DE-ABA8-566B6B26EB4B",
+        "udid" : "F33BA0AD-8F1A-41DE-ABA8-566B6B26EB4B",
+        "isAvailable" : true,
+        "logPathSize" : 466944,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
+        "state" : "Shutdown",
+        "name" : "LYB-Cert iPhone 17 Pro"
+      },
+      {
+        "lastBootedAt" : "2026-09-27T05:48:13Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/289E933F-26A4-4D5D-839D-491126EA6661\/data",
+        "dataPathSize" : 1882873856,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/289E933F-26A4-4D5D-839D-491126EA6661",
+        "udid" : "289E933F-26A4-4D5D-839D-491126EA6661",
+        "isAvailable" : true,
+        "logPathSize" : 274432,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
+        "state" : "Shutdown",
+        "name" : "LYB-Cert Walk"
+      },
+      {
+        "lastBootedAt" : "2026-10-06T23:11:25Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/D89D8220-531A-4E7A-B6A9-FEC1CDA4F712\/data",
+        "dataPathSize" : 1956478976,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/D89D8220-531A-4E7A-B6A9-FEC1CDA4F712",
+        "udid" : "D89D8220-531A-4E7A-B6A9-FEC1CDA4F712",
+        "isAvailable" : true,
+        "logPathSize" : 507904,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max",
+        "state" : "Shutdown",
+        "name" : "CI JOV-7952 capture"
+      },
+      {
+        "lastBootedAt" : "2026-10-08T06:45:15Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5\/data",
+        "dataPathSize" : 3653009408,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5",
+        "udid" : "7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5",
+        "isAvailable" : true,
+        "logPathSize" : 950272,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max",
+        "state" : "Shutdown",
+        "name" : "iPhone 17 Pro Max"
+      },
+      {
+        "lastBootedAt" : "2026-07-15T02:35:23Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/F0D37D1B-F0A4-4DA7-8564-AB40617136A1\/data",
+        "dataPathSize" : 2846322688,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/F0D37D1B-F0A4-4DA7-8564-AB40617136A1",
+        "udid" : "F0D37D1B-F0A4-4DA7-8564-AB40617136A1",
+        "isAvailable" : true,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-17e",
+        "state" : "Shutdown",
+        "name" : "iPhone 17e"
+      },
+      {
+        "lastBootedAt" : "2026-08-17T20:54:27Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/77F863E5-F9BB-4005-BF79-5FC17B6E78DF\/data",
+        "dataPathSize" : 3282821120,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/77F863E5-F9BB-4005-BF79-5FC17B6E78DF",
+        "udid" : "77F863E5-F9BB-4005-BF79-5FC17B6E78DF",
+        "isAvailable" : true,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-Air",
+        "state" : "Shutdown",
+        "name" : "iPhone Air"
+      },
+      {
+        "lastBootedAt" : "2026-10-06T22:26:40Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/D5F9D253-17AC-4423-9308-4B9D1803DD50\/data",
+        "dataPathSize" : 1632948224,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/D5F9D253-17AC-4423-9308-4B9D1803DD50",
+        "udid" : "D5F9D253-17AC-4423-9308-4B9D1803DD50",
+        "isAvailable" : true,
+        "logPathSize" : 364544,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+        "state" : "Shutdown",
+        "name" : "CI JOV-7763 status-motion"
+      },
+      {
+        "lastBootedAt" : "2026-08-09T18:16:43Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/605A3ECA-AFF8-4804-AFCC-ACC5D5646D5D\/data",
+        "dataPathSize" : 2242777088,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/605A3ECA-AFF8-4804-AFCC-ACC5D5646D5D",
+        "udid" : "605A3ECA-AFF8-4804-AFCC-ACC5D5646D5D",
+        "isAvailable" : true,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-16",
+        "state" : "Shutdown",
+        "name" : "LogYourBody QA iPhone 16"
+      },
+      {
+        "lastBootedAt" : "2026-10-01T01:50:42Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/7EB60D3E-3637-43EA-969D-167ADC72BAEC\/data",
+        "dataPathSize" : 4650606592,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/7EB60D3E-3637-43EA-969D-167ADC72BAEC",
+        "udid" : "7EB60D3E-3637-43EA-969D-167ADC72BAEC",
+        "isAvailable" : true,
+        "logPathSize" : 466944,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-16",
+        "state" : "Shutdown",
+        "name" : "LYB Golden iPhone 16"
+      },
+      {
+        "lastBootedAt" : "2026-10-08T02:35:10Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/5AE8BF86-FD78-4D5C-8B7A-175FE8108118\/data",
+        "dataPathSize" : 2089865216,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/5AE8BF86-FD78-4D5C-8B7A-175FE8108118",
+        "udid" : "5AE8BF86-FD78-4D5C-8B7A-175FE8108118",
+        "isAvailable" : true,
+        "logPathSize" : 458752,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-16",
+        "state" : "Shutdown",
+        "name" : "LYB Integrations 2ff8"
+      },
+      {
+        "lastBootedAt" : "2026-08-02T04:54:50Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/9E87D254-BB24-4CF9-9E7D-64F45DF031E0\/data",
+        "dataPathSize" : 2014998528,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/9E87D254-BB24-4CF9-9E7D-64F45DF031E0",
+        "udid" : "9E87D254-BB24-4CF9-9E7D-64F45DF031E0",
+        "isAvailable" : true,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-16",
+        "state" : "Shutdown",
+        "name" : "LYB Luna Share QA"
+      },
+      {
+        "lastBootedAt" : "2026-09-28T23:02:40Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/6E02F35A-4F6D-4929-AC68-55DF6BE18ABE\/data",
+        "dataPathSize" : 2492665856,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/6E02F35A-4F6D-4929-AC68-55DF6BE18ABE",
+        "udid" : "6E02F35A-4F6D-4929-AC68-55DF6BE18ABE",
+        "isAvailable" : true,
+        "logPathSize" : 20480,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro",
+        "state" : "Shutdown",
+        "name" : "LYB iPhone 15 Pro"
+      },
+      {
+        "lastBootedAt" : "2026-08-05T00:16:25Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/DAB13BCA-BC35-4832-8960-B10767DB8A2A\/data",
+        "dataPathSize" : 2004336640,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/DAB13BCA-BC35-4832-8960-B10767DB8A2A",
+        "udid" : "DAB13BCA-BC35-4832-8960-B10767DB8A2A",
+        "isAvailable" : true,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro-Max",
+        "state" : "Shutdown",
+        "name" : "LYB iPhone 15 Pro Max 430"
+      },
+      {
+        "lastBootedAt" : "2026-08-09T09:17:06Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/E75AB3A5-3D8C-4412-92B8-764CE4EFCD56\/data",
+        "dataPathSize" : 2806202368,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/E75AB3A5-3D8C-4412-92B8-764CE4EFCD56",
+        "udid" : "E75AB3A5-3D8C-4412-92B8-764CE4EFCD56",
+        "isAvailable" : true,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-14",
+        "state" : "Shutdown",
+        "name" : "LYB Responsive 390"
+      },
+      {
+        "lastBootedAt" : "2026-08-09T09:19:14Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/D6BB8638-F6BA-4C54-84F9-2EFEE580A406\/data",
+        "dataPathSize" : 2286067712,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/D6BB8638-F6BA-4C54-84F9-2EFEE580A406",
+        "udid" : "D6BB8638-F6BA-4C54-84F9-2EFEE580A406",
+        "isAvailable" : true,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation",
+        "state" : "Shutdown",
+        "name" : "LYB Responsive 320"
+      },
+      {
+        "lastBootedAt" : "2026-08-20T19:17:03Z",
+        "dataPath" : "\/Users\/timwhite\/Library\/Developer\/CoreSimulator\/Devices\/9CA669C0-85C6-4B86-82EB-402DFEA48DB0\/data",
+        "dataPathSize" : 2552967168,
+        "logPath" : "\/Users\/timwhite\/Library\/Logs\/CoreSimulator\/9CA669C0-85C6-4B86-82EB-402DFEA48DB0",
+        "udid" : "9CA669C0-85C6-4B86-82EB-402DFEA48DB0",
+        "isAvailable" : true,
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-11-Pro",
+        "state" : "Shutdown",
+        "name" : "LYB Responsive 375"
+      }
+    ]
+  }
+}

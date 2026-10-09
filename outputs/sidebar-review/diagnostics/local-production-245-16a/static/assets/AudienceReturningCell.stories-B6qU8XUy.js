@@ -1,0 +1,9 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./createLucideIcon-DKtuYzxz.js";import{n as i,t as a}from"./sparkles-D0KQCtGE.js";import{n as o,t as s}from"./star-B8-SATVE.js";import{n as c,t as l}from"./simple-tooltip-DjmLZRou.js";import{i as u,t as d}from"./utils-AN1vFgqV.js";var f,p;function m(){return(m=e((()=>{n(),f={name:`arrow-left-right`,size:24,node:[[`path`,{d:`M8 3 4 7l4 4`,key:`9rb6wj`}],[`path`,{d:`M4 7h16`,key:`6tx8e3`}],[`path`,{d:`m16 21 4-4-4-4`,key:`siv7j2`}],[`path`,{d:`M20 17H4`,key:`h6l3hr`}]]},f.node,p=r(f)})))()}function h({visits:e,className:t}){let n=e>1,r=e===1,i,a;return n?(i=_,a=`Returning`):r?(i=v,a=`First visit`):(i=y,a=`New`),(0,g.jsx)(l,{content:a,side:`top`,children:(0,g.jsx)(`div`,{className:d(`flex items-center justify-center w-8`,t),children:i})})}var g,_,v,y;function b(){return(b=e((()=>{g=t(),c(),m(),i(),o(),u(),_=(0,g.jsx)(p,{className:`h-3.5 w-3.5 shrink-0 text-blue-400`,"aria-hidden":`true`}),v=(0,g.jsx)(s,{className:`h-3.5 w-3.5 shrink-0 text-amber-400`,"aria-hidden":`true`}),y=(0,g.jsx)(a,{className:`h-3.5 w-3.5 shrink-0 text-emerald-400`,"aria-hidden":`true`})})))()}var x,S,C,w,T;function E(){return(E=e((()=>{b(),x={title:`Organisms/Table/Atoms/AudienceReturningCell`,component:h,parameters:{layout:`centered`},args:{visits:3}},S={},C={args:{visits:1}},w={args:{visits:0}},T=[`Returning`,`FirstVisit`,`New`],S.parameters={...S.parameters,docs:{...S.parameters?.docs,source:{originalSource:`{}`,...S.parameters?.docs?.source}}},C.parameters={...C.parameters,docs:{...C.parameters?.docs,source:{originalSource:`{
+  args: {
+    visits: 1
+  }
+}`,...C.parameters?.docs?.source}}},w.parameters={...w.parameters,docs:{...w.parameters?.docs,source:{originalSource:`{
+  args: {
+    visits: 0
+  }
+}`,...w.parameters?.docs?.source}}}})))()}E();export{C as FirstVisit,w as New,S as Returning,T as __namedExportsOrder,x as default};

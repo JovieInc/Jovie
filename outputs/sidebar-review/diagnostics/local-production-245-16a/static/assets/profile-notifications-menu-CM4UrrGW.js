@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./ProfileNotificationsMenu-BVuZrvD1.js";function r(){return(r=e((()=>{t()})))()}r();export{n as ProfileNotificationsMenu};

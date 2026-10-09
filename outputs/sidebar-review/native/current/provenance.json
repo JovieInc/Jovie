@@ -1,0 +1,237 @@
+{
+  "head": "545b383925854b8a1632fffe9b48087fe88f6e37",
+  "tree": "105ef3d9a6c586b5380628d180f5f11830eff8eb",
+  "sourceFiles": {
+    "apps/ios/Jovie/App/AppRouteManifest.swift": "593bd5c228e8c09d8ead8247df20a9de5bd07d8b",
+    "apps/ios/Jovie/App/RootView.swift": "3d0ec909678e4d7f50a2e55645de97e2c82effb6",
+    "apps/ios/Jovie/Core/ChatRepository.swift": "a9d07528ad007eb92bc5e1256159957fef99c38a",
+    "apps/ios/Jovie/DesignSystem/JovieTheme.swift": "750bb6a2d724c148e56bfba5be5831fcef111a0e",
+    "apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift": "34052c7f9c63aaaeee791725b76828e8ef92365d",
+    "apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift": "aa85dce5b681580b646fed0118c34cd4613412e9",
+    "apps/ios/Jovie/Features/AppShell/AppShellView.swift": "09472facec00f20920809d14a199817bd04daa03",
+    "apps/ios/JovieTests/AppRouteManifestTests.swift": "ef5caa725d5a4319a8b6cce3cc3a43da08720515",
+    "apps/ios/JovieTests/AppShellDrawerThreadsFilterTests.swift": "0dad5c7765f8d8796453a1104ba3d464e9ea30c8",
+    "apps/ios/JovieTests/AppShellIntentNavigationTests.swift": "c3abfd34496ae6611056472ba0e9a6e9626152a8",
+    "apps/ios/JovieTests/AppShellTabBarTests.swift": "5ec7ed59b73b755d63086a37ef257bf5401ff922",
+    "apps/ios/JovieTests/ChatRepositoryTests.swift": "8bf20b5c7f1b3d3805e84d92d3fa3883f1d71839",
+    "apps/ios/JovieUITests/JovieUITests.swift": "ccd994747b8dcf2a29aeae9acd88292fe856b9c2",
+    "apps/web/lib/ios/apple-app-site-association.ts": "857ffcaec672f5e5867157105bfaf14356689d57",
+    "apps/web/tests/unit/ios/apple-app-site-association.test.ts": "27ad5f238d4c75f7ac3aa1fb55ae7880367a3c1f"
+  },
+  "baseline": "95c4afede3605e63a3dd9d2519ff843aae81f26e",
+  "filesChanged": 15,
+  "changedLines": 1213,
+  "fullCIUnit": {
+    "passed": 690,
+    "failed": 0,
+    "skipped": 0,
+    "selector": "unchanged run-unit-tests.sh;JovieUnitTests;only-testing:JovieTests;coverage YES;unchanged check_coverage.sh",
+    "appCoverage": {
+      "covered": 10709,
+      "executable": 31030,
+      "percent": 34.5117628101837
+    },
+    "intentNavigationCoverage": {
+      "covered": 219,
+      "executable": 223,
+      "percent": 98.20627802690582
+    },
+    "floor": 18,
+    "gatePassed": true,
+    "ratchetEnforced": false,
+    "baselineWarning": "No coverage_baseline.txt at this source"
+  },
+  "selectedQualification": {
+    "passed": 35,
+    "failed": 0,
+    "skipped": 0,
+    "semantic": 23,
+    "UI": 12,
+    "text": "accessibility-extra-extra-extra-large",
+    "drawerCoverage": {
+      "covered": 2123,
+      "executable": 2293,
+      "percent": 92.58613170518971
+    }
+  },
+  "webAASA": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "coverageLines": "7/7",
+    "selector": "CI vitest.config.mts, forks,maxWorkers2;tests/unit/ios/apple-app-site-association.test.ts;actual canonical registry and native prefix parity"
+  },
+  "recording": {
+    "passed": 1,
+    "failed": 0,
+    "sameBuildAsSelectedQualification": true,
+    "media": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1320,
+          "height": 2868
+        }
+      ],
+      "format": {
+        "duration": "33.708333"
+      }
+    },
+    "outsidePerformanceWindow": true,
+    "flow": "existing admin fixture;Ovie five roots/More12/full search/retained scoped pin toggle/Jovie restoration;no external page/session proof"
+  },
+  "metrics": [
+    {
+      "name": "CPU Cycles (Jovie)",
+      "unit": "kC",
+      "values": [
+        5025661.49,
+        5018318.144,
+        4920958.4,
+        5132433.609,
+        5377161.14
+      ],
+      "mean": 5094906.5566
+    },
+    {
+      "name": "Clock Monotonic Time",
+      "unit": "s",
+      "values": [
+        4.1987083610000004,
+        4.235913483,
+        4.24658812,
+        4.249670459,
+        4.329873593
+      ],
+      "mean": 4.2521508032
+    },
+    {
+      "name": "CPU Time (Jovie)",
+      "unit": "s",
+      "values": [
+        1.266964862,
+        1.3142093670000001,
+        1.309050091,
+        1.30181396,
+        1.323973271
+      ],
+      "mean": 1.3032023102
+    },
+    {
+      "name": "CPU Instructions Retired (Jovie)",
+      "unit": "kI",
+      "values": [
+        13881867.963,
+        13851778.33,
+        13856729.634,
+        13874608.39,
+        13858280.448
+      ],
+      "mean": 13864652.953
+    },
+    {
+      "name": "Memory Peak Physical (Jovie)",
+      "unit": "kB",
+      "values": [
+        88361.264,
+        88312.112,
+        88262.96,
+        94062.896,
+        94505.264
+      ],
+      "mean": 90700.89920000001
+    },
+    {
+      "name": "Memory Physical (Jovie)",
+      "unit": "kB",
+      "values": [
+        2621.44,
+        1605.632,
+        1605.632,
+        8142.848,
+        1458.176
+      ],
+      "mean": 3086.7455999999997
+    },
+    {
+      "name": "Absolute Memory Physical (Jovie)",
+      "unit": "kB",
+      "values": [
+        87492.912,
+        87443.76,
+        87394.608,
+        93882.672,
+        93653.296
+      ],
+      "mean": 89973.4496
+    }
+  ],
+  "performanceScope": "existing creator empty-Recent/More/Back/Profile/Chat flow;Ovie hierarchy has separate UI/recording only;Clock includes automation waits",
+  "namedHitchExported": false,
+  "existingHitchCollectorAlreadyPresent": true,
+  "allOperatorDestinations": "20 canonical registry entries,explicit webOnly kinds;no false native selected Safari route",
+  "privateHistoryProof": "explicit existing web door only;no private native history acceptance",
+  "unproven": [
+    "protected in-app operator composition/same-account web session/back/active/drafts/media acceptance",
+    "production245+16a renderer/frame diagnostic execution",
+    "physical120Hz and human VoiceOver",
+    "hosted CI/native queue/deployment/authenticated runtime",
+    "complete goal"
+  ],
+  "publicationActionActive": false,
+  "publishNow": false,
+  "sourceClean": true,
+  "ownedSimulatorRestored": true,
+  "artifactSHA256": {
+    "ci-unit-coverage.json": "66d8d6658d65a48df4a927ffe1aa703dcc9321babb88ec6ba12d52a583192f51",
+    "ci-unit-restored-state.json": "8ba573a8620a3213b43b456ca82727b212907f675a64108a36cc33262627f0b8",
+    "ci-unit-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "ci-unit-summary.json": "5c4c12170703620f4cdfb8f9171a08a500e6532e7d721a9462bfa711998bd08a",
+    "ci-unit.log": "8a3c7a45955ed84f71c0824c9b5526ec4ed3cb9d06127985c69e839b368c4691",
+    "ci-unit.sh": "50f20cde406171e83e4f79cce8e3af33e8d2798423783e1a74d7ab7bd8b79c67",
+    "media.json": "95ce8569f75a1ed55f32b81a5b2659e78cecff8fe2079db5bb8011419e303567",
+    "publication.log": "6df7603f2c4afc1b8e10fc2349ecc7cc697bc87241bebb0c4de79980222d5754",
+    "qualified-coverage.json": "1a10d4bf9e4d27784e1500bf18198394731ae9d32619e481d93e3946ec441d33",
+    "qualified-metrics.json": "f8398542f28432032ff0e5704b3245247354b216ed9057076666fa43406644bc",
+    "qualified-summary.json": "81935f41e20d25e3ea056972f4b941460f8ec27e4d6d3977ea77a7b2143b5d0f",
+    "qualified.log": "f95eae60c1e05e4165d1c477ecb8a2cdee61455f85d24f602fec3079f02596c8",
+    "qualified.sh": "7e457602e743204f41afd53e56e3cb1089739dc2f620ea2c39527e82a31b5875",
+    "record-frame32.png": "daa54d03421f20d4d1759c8afe9c90ad27c1fb203d4d9a78a80dcf12d246abb4",
+    "record-restored-state.json": "a26f736f893511e8ecdcae51199443da2c5ac150189a3e73ba5322e0dc62e9d4",
+    "record-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "record-screenshots/ios-shared-sidebar-ovie-operator-roots.png": "a9554ca49e657a1db8a77840512d8d4212a88c106cf47f5e7863e059ed87edd7",
+    "record-summary.json": "f04a43313fc206decef759fdd4bd7321f98b5ac2adb3518216f57fcc80e3cbca",
+    "record-video.log": "fab94b5551b4c1f352268b83fc7b56e2c2c796c64118be538b2a93dee26baff5",
+    "record.log": "c2281f238070c04eff5caa4a7d2797ce4d5ca692d42506d4e567a3e786e1bede",
+    "record.sh": "7f4f2162dd4cfb4e4d5dcae58ff01936038ae9bae08a76da79031d10a37b6cc6",
+    "restored-state.json": "2c483e256567d04ca486d7e2170c59beecfb8349e588c318b49ef055a9a7b305",
+    "restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "screenshots/drawer-base-plane-occluded-closed.png": "25875777c6b83f41c57e9671827d30470b2a0fb059fb52377aad920fb80225b4",
+    "screenshots/ios-canonical-information-architecture.png": "f502306424795f5851db60e53f4c5b81e1a70e89ee25d34cfbc9d8d8002bee6a",
+    "screenshots/ios-offline-stable-toolbar.png": "d79cf4ea307d4c551cd71da8161bfa618f43cfbf06ca7d7e962864ceb0c77be3",
+    "screenshots/ios-shared-sidebar-footer-probe.png": "b62a94de77749a201b285fdf78ba9e82e9f14cac85063cfe0fcc834079ebd7ae",
+    "screenshots/ios-shared-sidebar-grouped-recent.png": "4475ea43cbda5c20f1b93d1abd36457093ae383d0f5aba7fa7f24419bf67e723",
+    "screenshots/ios-shared-sidebar-more.png": "86f03ae760bec3574d88645717b2f75b7f12aa1c7b5032ebe1b3f39a92942493",
+    "screenshots/ios-shared-sidebar-ovie-operator-roots.png": "e1d81ef1724785637f46cf0c8b2394f95b6996e01ddd2d792d0661e1b9363263",
+    "screenshots/ios-shared-sidebar-recent.png": "18a89d7ecb4d8c5de47ac7f195c017e69bd51159b419a3192c8dcd9eb7faef75",
+    "sidebar-native-ovie-commit.log": "63c6d92e6807ec8344a4c79cfba516dbe7c35aca63d79ea59559681ab8bf5570",
+    "sidebar-native-ovie-panel-commit.log": "181ca0629fb187d0807cf49657064c105f8aab0e79492dc59ad2c8cdb88b214f",
+    "sidebar-native-ovie-pin-commit.log": "6dfec70da08dd69a508a140d53f5b5e3e717e2e1e8226e970c6abb36aa9b8434",
+    "sidebar-ovie-final-aasa-tests.log": "095f08a2a011ecea4d41f111f8bb9cfc52f3757ccd36fe7d09ee87f52f46bfbf",
+    "success.mov": "d40412a0ccc4d49961175d34c47eaf442cc043d3d5e1f93510a264f94e5abec5",
+    "success.mp4": "9226cb9c038722abacc182f104334f3efe1e8e80ecc2bf638753394172fa3bae",
+    "web-aasa-coverage-final.json": "12cd36249283dad2ed18d1fe064195bfb44b958049e2a47f76dd44d45d9f0a74"
+  },
+  "gbrainReceipt": {
+    "slug": "receipts/shared-sidebar-native-ovie-adapter-545b3839-2026-10-08",
+    "contentHash": "ddb2e5276aa2023530e20532373d8b5a47ea17015991f157bfd9080b39c5ed21",
+    "fullBodyMatch": true,
+    "verifiedAt": "2026-10-08T08:50:18.669Z"
+  },
+  "managedWorktreeArchived": true,
+  "archiveReadbackVerified": true,
+  "archiveAttachmentId": "01a11aca-c41f-7a40-83ef-dcbf95de415b",
+  "nativeHitchCapabilityDiagnostic": "outputs/sidebar-review/diagnostics/native-hitches-545b3839/receipt.json"
+}

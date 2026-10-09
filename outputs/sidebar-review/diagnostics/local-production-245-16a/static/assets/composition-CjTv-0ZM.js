@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(e){return r[e]}var n,r,i;function a(){return(a=e((()=>{n=`aspect-hero min-h-60 w-full`,r={compact:`aspect-square`,standard:`aspect-card-standard`,wide:`aspect-video`},i=`mt-auto shrink-0`})))()}export{a as i,n,t as r,i as t};

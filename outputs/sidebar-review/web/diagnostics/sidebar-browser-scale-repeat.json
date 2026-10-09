@@ -1,0 +1,225 @@
+{
+  "config": {
+    "configFile": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/playwright.config.storybook.ts",
+    "rootDir": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/test-results",
+        "repeatEach": 3,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/storybook-*.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "storybook-shared-sidebar.spec.ts",
+      "file": "storybook-shared-sidebar.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "large permitted page fixture stays bounded and keyboard reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2022,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T04:14:09.019Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "large-page-opening-timing",
+                      "contentType": "application/json",
+                      "body": "ewogICJjb3VudCI6IDEyMCwKICAiaW5saW5lUGFnZXMiOiAxMiwKICAibG9uZ1Rhc2tzIjogW10sCiAgImV2ZW50VG9Bc3NlcnRpb25NcyI6IDYxLjcwMDAwMDI4NjEwMjI5NSwKICAicmVuZGVycyI6IFsKICAgIHsKICAgICAgInBoYXNlIjogInVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDEuMTk5OTk5ODA5MjY1MTM2NwogICAgfSwKICAgIHsKICAgICAgInBoYXNlIjogIm5lc3RlZC11cGRhdGUiLAogICAgICAiZHVyYXRpb24iOiAwLjA5OTk5OTkwNDYzMjU2ODM2CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAibmVzdGVkLXVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDkKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJuZXN0ZWQtdXBkYXRlIiwKICAgICAgImR1cmF0aW9uIjogMy45MDAwMDAwOTUzNjc0MzE2CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAibmVzdGVkLXVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDEuNTk5OTk5OTA0NjMyNTY4NAogICAgfSwKICAgIHsKICAgICAgInBoYXNlIjogInVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDAuMTk5OTk5ODA5MjY1MTM2NzIKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJuZXN0ZWQtdXBkYXRlIiwKICAgICAgImR1cmF0aW9uIjogMC4yMDAwMDAyODYxMDIyOTQ5MgogICAgfSwKICAgIHsKICAgICAgInBoYXNlIjogInVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDAuMDk5OTk5OTA0NjMyNTY4MzYKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJuZXN0ZWQtdXBkYXRlIiwKICAgICAgImR1cmF0aW9uIjogMC4yMDAwMDAyODYxMDIyOTQ5MgogICAgfSwKICAgIHsKICAgICAgInBoYXNlIjogInVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDEuNTAwMDAwNDc2ODM3MTU4MgogICAgfQogIF0sCiAgImJ1ZGdldHNNcyI6IHsKICAgICJzaXh0eUh6IjogMTYuNywKICAgICJvbmVUd2VudHlIeiI6IDguMywKICAgICJsb25nVGFzayI6IDUwCiAgfSwKICAic2NvcGUiOiAiU3Rvcnlib29rIFJlYWN0IFByb2ZpbGVyIGFjdHVhbCByZW5kZXIgZHVyYXRpb247IG9wZW5pbmcgd2FsbCB0aW1lIGluY2x1ZGVzIGJyb3dzZXIgYXV0b21hdGlvbi4gTm90IHBoeXNpY2FsIDEyMEh6IG9yIG5hdGl2ZSBwcm9vZi4iCn0="
+                    },
+                    {
+                      "name": "large-page-complete-flow",
+                      "contentType": "application/json",
+                      "body": "eyJtYXJrcyI6W3sicGhhc2UiOiJtb3JlIiwidGltZSI6MTQxMi4yOTk5OTk3MTM4OTc3fSx7InBoYXNlIjoic2VhcmNoLW9wZW4iLCJ0aW1lIjoxNTgzLjM5OTk5OTYxODUzMDN9LHsicGhhc2UiOiJzZWFyY2gtcXVlcnkiLCJ0aW1lIjoxNjc1LjY5OTk5OTgwOTI2NTF9LHsicGhhc2UiOiJzZWxlY3Rpb24iLCJ0aW1lIjoxNjk2LjU5OTk5OTkwNDYzMjZ9XSwiZnJhbWVzIjpbMTQxMS4yLDE0MjAsMTQyOC4zLDE0MzYuNywxNDYyLjUsMTQ3MC44LDE0NzkuMSwxNDg2LDE0OTUuNSwxNTAzLjIsMTUxMS42LDE1MjAsMTUyOS40LDE1MzYuNywxNTQ1LDE1NTMuMywxNTcwLDE1NzguMywxNTg1LjksMTU5NS44LDE2MDQuMiwxNjEyLjUsMTYzNy40LDE2NDUuMiwxNjUyLjYsMTY2MS43LDE2NzAsMTY3OS4xLDE2ODcuNCwxNjk1LDE3MDQsMTcxMS43LDE3MjAsMTcyOC4yXSwidGFza3MiOltdLCJwYWxldHRlUmVuZGVycyI6W3sicGhhc2UiOiJtb3VudCIsImR1cmF0aW9uIjowLjkwMDAwMDA5NTM2NzQzMTZ9LHsicGhhc2UiOiJ1cGRhdGUiLCJkdXJhdGlvbiI6My4wOTk5OTk5MDQ2MzI1Njg0fSx7InBoYXNlIjoidXBkYXRlIiwiZHVyYXRpb24iOjEuMTAwMDAwMzgxNDY5NzI2Nn0seyJwaGFzZSI6InVwZGF0ZSIsImR1cmF0aW9uIjoxLjE5OTk5OTgwOTI2NTEzNjd9LHsicGhhc2UiOiJ1cGRhdGUiLCJkdXJhdGlvbiI6MC4yOTk5OTk3MTM4OTc3MDUxfV19"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/test-results/storybook-shared-sidebar-l-125ed-nded-and-keyboard-reachable-chromium/trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-623bacb2900f824641d4",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 768,
+          "column": 5
+        },
+        {
+          "title": "large permitted page fixture stays bounded and keyboard reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1950,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T04:14:11.579Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "large-page-opening-timing",
+                      "contentType": "application/json",
+                      "body": "ewogICJjb3VudCI6IDEyMCwKICAiaW5saW5lUGFnZXMiOiAxMiwKICAibG9uZ1Rhc2tzIjogW10sCiAgImV2ZW50VG9Bc3NlcnRpb25NcyI6IDU3LjIwMDAwMDI4NjEwMjI5NSwKICAicmVuZGVycyI6IFsKICAgIHsKICAgICAgInBoYXNlIjogInVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDEuMjAwMDAwMjg2MTAyMjk1CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAibmVzdGVkLXVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDAuMDk5OTk5OTA0NjMyNTY4MzYKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJuZXN0ZWQtdXBkYXRlIiwKICAgICAgImR1cmF0aW9uIjogOC41CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAibmVzdGVkLXVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDIuNzk5OTk5MjM3MDYwNTQ3CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAibmVzdGVkLXVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDEuNzk5OTk5NzEzODk3NzA1CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAidXBkYXRlIiwKICAgICAgImR1cmF0aW9uIjogMC4wOTk5OTk5MDQ2MzI1NjgzNgogICAgfSwKICAgIHsKICAgICAgInBoYXNlIjogIm5lc3RlZC11cGRhdGUiLAogICAgICAiZHVyYXRpb24iOiAwLjE5OTk5OTgwOTI2NTEzNjcyCiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAidXBkYXRlIiwKICAgICAgImR1cmF0aW9uIjogMC4wOTk5OTk5MDQ2MzI1NjgzNgogICAgfSwKICAgIHsKICAgICAgInBoYXNlIjogIm5lc3RlZC11cGRhdGUiLAogICAgICAiZHVyYXRpb24iOiAwLjE5OTk5OTgwOTI2NTEzNjcyCiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAidXBkYXRlIiwKICAgICAgImR1cmF0aW9uIjogMS42OTk5OTk4MDkyNjUxMzY3CiAgICB9CiAgXSwKICAiYnVkZ2V0c01zIjogewogICAgInNpeHR5SHoiOiAxNi43LAogICAgIm9uZVR3ZW50eUh6IjogOC4zLAogICAgImxvbmdUYXNrIjogNTAKICB9LAogICJzY29wZSI6ICJTdG9yeWJvb2sgUmVhY3QgUHJvZmlsZXIgYWN0dWFsIHJlbmRlciBkdXJhdGlvbjsgb3BlbmluZyB3YWxsIHRpbWUgaW5jbHVkZXMgYnJvd3NlciBhdXRvbWF0aW9uLiBOb3QgcGh5c2ljYWwgMTIwSHogb3IgbmF0aXZlIHByb29mLiIKfQ=="
+                    },
+                    {
+                      "name": "large-page-complete-flow",
+                      "contentType": "application/json",
+                      "body": "eyJtYXJrcyI6W3sicGhhc2UiOiJtb3JlIiwidGltZSI6MTQyNi43MDAwMDAyODYxMDIzfSx7InBoYXNlIjoic2VhcmNoLW9wZW4iLCJ0aW1lIjoxNTkyfSx7InBoYXNlIjoic2VhcmNoLXF1ZXJ5IiwidGltZSI6MTY4Mi4wOTk5OTk5MDQ2MzI2fSx7InBoYXNlIjoic2VsZWN0aW9uIiwidGltZSI6MTcwMC4wOTk5OTk5MDQ2MzI2fV0sImZyYW1lcyI6WzE0MjAuOTkyLDE0MjguNiwxNDM3LjcsMTQ0NS45LDE0NzAsMTQ3OC42LDE0ODYuNSwxNDk1LDE1MDMuNSwxNTEyLjUsMTUyMC4yLDE1MjcuOCwxNTM2LjIsMTU0NS4yLDE1NTQuMiwxNTYyLjUsMTU4Ni4yLDE1OTYuMiwxNjAzLjEsMTYxMy4xLDE2MjAuNiwxNjQ0LjUsMTY1My41LDE2NjIuOSwxNjcwLjIsMTY3OC42LDE2ODcuNiwxNjk0LjcsMTcwNC43LDE3MTIuMSwxNzE5LjYsMTcyOC40LDE3MzcuNF0sInRhc2tzIjpbXSwicGFsZXR0ZVJlbmRlcnMiOlt7InBoYXNlIjoibW91bnQiLCJkdXJhdGlvbiI6MC44MDAwMDAxOTA3MzQ4NjMzfSx7InBoYXNlIjoidXBkYXRlIiwiZHVyYXRpb24iOjMuMjk5OTk5NzEzODk3NzA1fSx7InBoYXNlIjoidXBkYXRlIiwiZHVyYXRpb24iOjEuMzAwMDAwMTkwNzM0ODYzM30seyJwaGFzZSI6InVwZGF0ZSIsImR1cmF0aW9uIjowLjc5OTk5OTcxMzg5NzcwNTF9LHsicGhhc2UiOiJ1cGRhdGUiLCJkdXJhdGlvbiI6MC4zMDAwMDAxOTA3MzQ4NjMzfV19"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/test-results/storybook-shared-sidebar-l-125ed-nded-and-keyboard-reachable-chromium-repeat1/trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-e869814e4f39e87aafba",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 768,
+          "column": 5
+        },
+        {
+          "title": "large permitted page fixture stays bounded and keyboard reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1975,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-08T04:14:13.957Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "large-page-opening-timing",
+                      "contentType": "application/json",
+                      "body": "ewogICJjb3VudCI6IDEyMCwKICAiaW5saW5lUGFnZXMiOiAxMiwKICAibG9uZ1Rhc2tzIjogW10sCiAgImV2ZW50VG9Bc3NlcnRpb25NcyI6IDYwLjc5OTk5OTcxMzg5NzcwNSwKICAicmVuZGVycyI6IFsKICAgIHsKICAgICAgInBoYXNlIjogInVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDEuMjk5OTk5NzEzODk3NzA1CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAibmVzdGVkLXVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDAuMDk5OTk5OTA0NjMyNTY4MzYKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJuZXN0ZWQtdXBkYXRlIiwKICAgICAgImR1cmF0aW9uIjogOC43OTk5OTk3MTM4OTc3MDUKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJuZXN0ZWQtdXBkYXRlIiwKICAgICAgImR1cmF0aW9uIjogMi45OTk5OTk1MjMxNjI4NDIKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJuZXN0ZWQtdXBkYXRlIiwKICAgICAgImR1cmF0aW9uIjogMi4wOTk5OTk5MDQ2MzI1Njg0CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAidXBkYXRlIiwKICAgICAgImR1cmF0aW9uIjogMC4yMDAwMDAyODYxMDIyOTQ5MgogICAgfSwKICAgIHsKICAgICAgInBoYXNlIjogIm5lc3RlZC11cGRhdGUiLAogICAgICAiZHVyYXRpb24iOiAwLjMwMDAwMDE5MDczNDg2MzMKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJ1cGRhdGUiLAogICAgICAiZHVyYXRpb24iOiAwLjA5OTk5OTkwNDYzMjU2ODM2CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAibmVzdGVkLXVwZGF0ZSIsCiAgICAgICJkdXJhdGlvbiI6IDAuMDk5OTk5OTA0NjMyNTY4MzYKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJ1cGRhdGUiLAogICAgICAiZHVyYXRpb24iOiAxLjY5OTk5OTMzMjQyNzk3ODUKICAgIH0KICBdLAogICJidWRnZXRzTXMiOiB7CiAgICAic2l4dHlIeiI6IDE2LjcsCiAgICAib25lVHdlbnR5SHoiOiA4LjMsCiAgICAibG9uZ1Rhc2siOiA1MAogIH0sCiAgInNjb3BlIjogIlN0b3J5Ym9vayBSZWFjdCBQcm9maWxlciBhY3R1YWwgcmVuZGVyIGR1cmF0aW9uOyBvcGVuaW5nIHdhbGwgdGltZSBpbmNsdWRlcyBicm93c2VyIGF1dG9tYXRpb24uIE5vdCBwaHlzaWNhbCAxMjBIeiBvciBuYXRpdmUgcHJvb2YuIgp9"
+                    },
+                    {
+                      "name": "large-page-complete-flow",
+                      "contentType": "application/json",
+                      "body": "eyJtYXJrcyI6W3sicGhhc2UiOiJtb3JlIiwidGltZSI6MTQxNS41OTk5OTk5MDQ2MzI2fSx7InBoYXNlIjoic2VhcmNoLW9wZW4iLCJ0aW1lIjoxNjA4LjY5OTk5OTgwOTI2NTF9LHsicGhhc2UiOiJzZWFyY2gtcXVlcnkiLCJ0aW1lIjoxNjkzLjc5OTk5OTcxMzg5Nzd9LHsicGhhc2UiOiJzZWxlY3Rpb24iLCJ0aW1lIjoxNzEyfV0sImZyYW1lcyI6WzE0MTIuOCwxNDIwLjQsMTQzMC40LDE0MzguNiwxNDYyLjMsMTQ3MC43LDE0ODAuNywxNDg4LDE0OTcuMiwxNTA1LDE1MTMuNiwxNTIxLjksMTUzMC4zLDE1MzcuMiwxNTQ2LjEsMTU1NS41LDE1NjMuNiwxNTcwLjUsMTU4MC43LDE1OTcuMSwxNjA0LjMsMTYxMy45LDE2MjAuOSwxNjI5LjUsMTY1NC42LDE2NjMuNiwxNjcwLjgsMTY3OS41LDE2ODguMywxNjk3LjEsMTcwNS4zLDE3MTIuMSwxNzIwLjcsMTczMC43LDE3MzcuNSwxNzQ3LjNdLCJ0YXNrcyI6W10sInBhbGV0dGVSZW5kZXJzIjpbeyJwaGFzZSI6Im1vdW50IiwiZHVyYXRpb24iOjAuODAwMDAwMTkwNzM0ODYzM30seyJwaGFzZSI6InVwZGF0ZSIsImR1cmF0aW9uIjozLjM5OTk5OTYxODUzMDI3MzR9LHsicGhhc2UiOiJ1cGRhdGUiLCJkdXJhdGlvbiI6MS4xMDAwMDAzODE0Njk3MjY2fSx7InBoYXNlIjoidXBkYXRlIiwiZHVyYXRpb24iOjAuNzAwMDAwMjg2MTAyMjk0OX0seyJwaGFzZSI6InVwZGF0ZSIsImR1cmF0aW9uIjowLjV9XX0="
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/test-results/storybook-shared-sidebar-l-125ed-nded-and-keyboard-reachable-chromium-repeat2/trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ad03c4c6a069ed86bd9-632856740303ccd3f3de",
+          "file": "storybook-shared-sidebar.spec.ts",
+          "line": 768,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-08T04:14:08.751Z",
+    "duration": 7369.557,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

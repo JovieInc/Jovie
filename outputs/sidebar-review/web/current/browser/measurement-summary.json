@@ -1,0 +1,81 @@
+{
+  "fullFlow": {
+    "intervalCount": 34,
+    "medianMs": 8.299999999999955,
+    "p95Ms": 26.700000000000045,
+    "maxMs": 33.59999999999991,
+    "over16_7": 3,
+    "over8_3": 16,
+    "longTaskCount": 0,
+    "longestTaskMs": 0,
+    "paletteRenderMaxMs": 3.299999713897705,
+    "percentileMethod": "nearest rank"
+  },
+  "cpuProfile": {
+    "durationMs": 565.549,
+    "nodes": 5047,
+    "samples": 656,
+    "topSelfSamples": [
+      {
+        "function": "(program)",
+        "url": "",
+        "selfMs": 277.071
+      },
+      {
+        "function": "(idle)",
+        "url": "",
+        "selfMs": 110.737
+      },
+      {
+        "function": "exports.createElement",
+        "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/next_dist_compiled_react.js?v=0b1464cf",
+        "selfMs": 6.272
+      },
+      {
+        "function": "getCssDimensions",
+        "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/dist-ChjovbH6.js?v=0b1464cf",
+        "selfMs": 6.124
+      },
+      {
+        "function": "",
+        "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/storybook_internal_preview_runtime.js?v=0b1464cf",
+        "selfMs": 5.7
+      },
+      {
+        "function": "exports.jsx",
+        "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/react_jsx-runtime.js?v=0b1464cf",
+        "selfMs": 4.418
+      },
+      {
+        "function": "(garbage collector)",
+        "url": "",
+        "selfMs": 4.283
+      },
+      {
+        "function": "visitNode",
+        "url": "",
+        "selfMs": 3.09
+      },
+      {
+        "function": "isVisibleBlockingOverlay",
+        "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/lib/a11y/overlay-interaction-lock.ts",
+        "selfMs": 3.016
+      },
+      {
+        "function": "exports.jsx",
+        "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/react_jsx-runtime.js?v=0b1464cf",
+        "selfMs": 2.986
+      },
+      {
+        "function": "visitNode",
+        "url": "",
+        "selfMs": 2.765
+      },
+      {
+        "function": "isOverflowElement",
+        "url": "http://localhost:6017/@fs/Users/timwhite/.codex/worktrees/94af/Jovie/apps/web/node_modules/.cache/storybook/10.6.1/4c646b860ff0a7e90ae3ed30684bfb5e0362027bee8eab9dacc174339258e449/sb-vite/deps/dist-ChjovbH6.js?v=0b1464cf",
+        "selfMs": 2.639
+      }
+    ]
+  }
+}

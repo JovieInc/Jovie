@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(e){return e===null?`—`:`${(e*100).toFixed(1)}%`}function n(e){return e.toLocaleString(`en-US`,{style:`currency`,currency:`USD`,maximumFractionDigits:e>=1e3?0:2})}function r(){return(r=e((()=>{})))()}export{n,r,t};

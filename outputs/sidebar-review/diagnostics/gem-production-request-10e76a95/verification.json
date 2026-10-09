@@ -1,0 +1,12 @@
+{
+  "verified": true,
+  "gitArchiveEmbeddedHead": "10e76a95b87efd5c25abe6b757081c2265ee63d7",
+  "changedSourceFilesMatched": [
+    "apps/desktop/scripts/desktop-shell-contract.test.mjs",
+    "apps/web/app/globals.css",
+    "apps/web/components/organisms/DesktopTitlebar.tsx",
+    "apps/web/tests/e2e/storybook-shared-sidebar.spec.ts"
+  ],
+  "payloadHashesMatched": 10,
+  "preparedOnly": true
+}

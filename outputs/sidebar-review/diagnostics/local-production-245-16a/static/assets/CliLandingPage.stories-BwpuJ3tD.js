@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./PublicPageShell-BkQfPJxe.js";import{n as i,t as a}from"./CliLandingPage-BvTQ-ODD.js";import{i as o,n as s,t as c}from"./marketingStoryMeta-B12ISWnH.js";var l,u,d,f;function p(){return(p=e((()=>{l=t(),n(),i(),s(),u={title:`Marketing/Components/CliLandingPage`,component:a,parameters:{...o,chromatic:{disable:!0},docs:{description:{component:`${c} Exact production body for /cli.`}}}},d={render:()=>(0,l.jsx)(r,{children:(0,l.jsx)(a,{})})},f=[`Default`],d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
+  render: () => <PublicPageShell>
+      <CliLandingPage />
+    </PublicPageShell>
+}`,...d.parameters?.docs?.source}}}})))()}p();export{d as Default,f as __namedExportsOrder,u as default};

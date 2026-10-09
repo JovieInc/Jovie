@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,r,t as i}from"./PendingShellContext-D7cIQ1y4.js";function a(){let{pendingShellRoute:e}=r();return(0,o.jsxs)(`div`,{className:`p-4 text-sm text-primary-token`,children:[`pendingShellRoute:`,` `,(0,o.jsx)(`span`,{className:`font-caption`,children:e??`none`})]})}var o,s,c,l,u,d;function f(){return(f=e((()=>{o=t(),n(),s={clearPendingShell:()=>{},pendingShellRoute:`releases`,showPendingShell:()=>{}},c={title:`Organisms/PendingShellContext`,component:a,parameters:{layout:`centered`}},l={},u={decorators:[e=>(0,o.jsx)(i.Provider,{value:s,children:(0,o.jsx)(e,{})})]},d=[`NoopDefault`,`PendingRoute`],l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{}`,...l.parameters?.docs?.source}}},u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
+  decorators: [Story => <PendingShellContext.Provider value={activeValue}>
+        <Story />
+      </PendingShellContext.Provider>]
+}`,...u.parameters?.docs?.source}}}})))()}f();export{l as NoopDefault,u as PendingRoute,d as __namedExportsOrder,c as default};

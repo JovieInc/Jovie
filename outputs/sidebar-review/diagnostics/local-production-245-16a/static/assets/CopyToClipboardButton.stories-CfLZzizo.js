@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./CopyToClipboardButton-cF9WFP8D.js";var r,i,a,o;function s(){return(s=e((()=>{t(),r={title:`Dashboard/Molecules/CopyToClipboardButton`,component:n,parameters:{layout:`padded`},args:{relativePath:`/example-handle`,idleLabel:`Copy URL`,successLabel:`Copied!`,errorLabel:`Failed to copy`,iconName:void 0},argTypes:{relativePath:{control:`text`},idleLabel:{control:`text`},successLabel:{control:`text`},errorLabel:{control:`text`},iconName:{control:`text`},className:{control:`text`},onCopySuccess:{action:`copy-success`},onCopyError:{action:`copy-error`}}},i={},a={args:{iconName:`Copy`}},o=[`Default`,`WithIcon`],i.parameters={...i.parameters,docs:{...i.parameters?.docs,source:{originalSource:`{}`,...i.parameters?.docs?.source}}},a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{
+  args: {
+    iconName: 'Copy'
+  }
+}`,...a.parameters?.docs?.source}}}})))()}s();export{i as Default,a as WithIcon,o as __namedExportsOrder,r as default};

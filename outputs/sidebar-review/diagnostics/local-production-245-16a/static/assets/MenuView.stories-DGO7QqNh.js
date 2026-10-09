@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./MenuView-B23f-Er2.js";var i,a,o,s,c,l;function u(){return(u=e((()=>{i=t(),n(),{fn:a}=__STORYBOOK_MODULE_TEST__,o={title:`Profile/Views/MenuView`,component:r,args:{onNavigate:a(),hasReleases:!0,hasTourDates:!1,hasTip:!0,hasContacts:!0},decorators:[e=>(0,i.jsx)(`div`,{className:`bg-base p-6`,children:(0,i.jsx)(e,{})})]},s={},c={args:{onOpenReleaseCredits:a()}},l=[`Default`,`WithReleaseCredits`],s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{}`,...s.parameters?.docs?.source}}},c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    onOpenReleaseCredits: fn()
+  }
+}`,...c.parameters?.docs?.source}}}})))()}u();export{s as Default,c as WithReleaseCredits,l as __namedExportsOrder,o as default};

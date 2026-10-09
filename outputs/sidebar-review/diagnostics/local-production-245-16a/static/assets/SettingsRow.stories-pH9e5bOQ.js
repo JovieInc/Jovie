@@ -1,0 +1,6 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{i as n,t as r}from"./utils-AN1vFgqV.js";function i({label:e,description:t,control:n,tone:i=`default`,divider:o,className:s}){return(0,a.jsxs)(`div`,{className:r(`flex items-center gap-4 px-4 py-3.5`,o&&`border-t border-(--app-shell-border)/50`,s),children:[(0,a.jsxs)(`div`,{className:`flex-1 min-w-0`,children:[(0,a.jsx)(`p`,{className:r(`text-app font-medium`,i===`danger`?`text-rose-300/90`:`text-primary-token`),children:e}),t&&(0,a.jsx)(`p`,{className:`text-2xs text-tertiary-token mt-0.5`,children:t})]}),(0,a.jsx)(`div`,{className:`shrink-0`,children:n})]})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}var s,c,l;function u(){return(u=e((()=>{o(),s={title:`Shell/SettingsRow`,component:i,parameters:{layout:`centered`,jovie:{uncoveredProps:[`label`,`control`]}}},c={args:{label:`Two-factor authentication`,control:`On`}},l=[`Default`],c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    label: 'Two-factor authentication',
+    control: 'On'
+  }
+}`,...c.parameters?.docs?.source}}}})))()}u();export{c as Default,l as __namedExportsOrder,s as default};

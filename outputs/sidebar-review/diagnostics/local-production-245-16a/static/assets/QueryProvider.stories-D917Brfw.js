@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{U as n,W as r}from"./removable-_8fTgXVw.js";import{n as i,t as a}from"./QueryProvider-BWxlXvp0.js";function o(){let e=r().getDefaultOptions().queries?.staleTime;return(0,s.jsxs)(`p`,{className:`text-primary-token text-sm`,children:[`Query client ready · `,Number(e)/6e4,` minute stale time`]})}var s,c,l,u;function d(){return(d=e((()=>{s=t(),n(),i(),c={title:`Providers/QueryProvider`,component:a,parameters:{layout:`centered`,docs:{description:{component:`Application query boundary with the production client defaults and hydration-safe development tools.`}}},tags:[`autodocs`]},l={args:{children:(0,s.jsx)(o,{})}},u=[`Ready`],l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{
+  args: {
+    children: <QueryProviderStatus />
+  }
+}`,...l.parameters?.docs?.source}}}})))()}d();export{l as Ready,u as __namedExportsOrder,c as default};

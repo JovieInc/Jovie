@@ -1,0 +1,47 @@
+{
+  "at": "2026-10-08T10:53:25.341415+00:00",
+  "sourceHead": "f4a73e59c09c62f349195c486419b2278df79b9b",
+  "sourceTree": "ba71eaede1e5643fa137265387bdbd6ff43d39e1",
+  "sourceReportSha256": "c5cc37adb754f8b5a269d3193e8c5912d7ee8a76e5e469cfeb9165f3ca34d479",
+  "stats": {
+    "startTime": "2026-10-08T10:41:36.000Z",
+    "duration": 39854.458,
+    "expected": 29,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "artifacts": {
+    "rail-performance-summary.json": {
+      "sha256": "fa60103a1846fdd3f262057d478760e56607c16bbfed139123e15704caaf738a",
+      "test": "floating rail preserves the main plane during repeated reversals",
+      "testStatus": "passed",
+      "bytes": 364
+    },
+    "rail-frame-measurement.json": {
+      "sha256": "9f254575eba2f37e61772befa4401b3807236645a2d54d6ed5baa9956319c863",
+      "test": "floating rail preserves the main plane during repeated reversals",
+      "testStatus": "passed",
+      "bytes": 3778
+    },
+    "large-page-opening-timing.json": {
+      "sha256": "11e96245ef2c9b1759521ee09fbbad5d4a56cc561732b4b0da3746e145ca5b43",
+      "test": "large permitted page fixture stays bounded and keyboard reachable",
+      "testStatus": "passed",
+      "bytes": 1118
+    },
+    "large-page-cpu-profile.json": {
+      "sha256": "002b0c150a9770eddd95564e2a3d2004473fce7511f888dc4de6fecedf6f80b7",
+      "test": "large permitted page fixture stays bounded and keyboard reachable",
+      "testStatus": "passed",
+      "bytes": 2329376
+    },
+    "large-page-complete-flow.json": {
+      "sha256": "91b4f63faf860dc7b68ccad6bda870bff82478a050f801e424e0ef7862dafd62",
+      "test": "large permitted page fixture stays bounded and keyboard reachable",
+      "testStatus": "passed",
+      "bytes": 668
+    }
+  },
+  "scope": "Current-source maintained development Storybook CI-selector browser diagnostics, not production/physical120Hz qualification"
+}

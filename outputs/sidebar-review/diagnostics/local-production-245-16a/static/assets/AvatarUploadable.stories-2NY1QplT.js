@@ -1,0 +1,8 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{t as n}from"./jsx-runtime-BbDfbRii.js";import{n as r,t as i}from"./AvatarUploadable-BIWtr0Eg.js";function a(e){let[t,n]=(0,s.useState)(`https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop`),[r,a]=(0,s.useState)(0),c=async e=>{a(0),await new Promise(e=>{let t=setInterval(()=>{a(n=>n>=90?(clearInterval(t),e(),90):n+15)},120)});let t=URL.createObjectURL(e);return n(t),a(100),t};return(0,o.jsxs)(`div`,{className:`space-y-3 text-center`,children:[(0,o.jsx)(i,{...e,src:t,onUpload:c,onSuccess:e=>n(e),progress:r}),(0,o.jsx)(`p`,{className:`text-sm text-secondary-token`,children:`Simulated upload with progress`})]})}var o,s,c,l,u,d;function f(){return(f=e((()=>{o=n(),s=t(),r(),c={title:`Molecules/AvatarUploadable`,component:i,parameters:{layout:`centered`,backgrounds:{default:`light`,values:[{name:`light`,value:`#ffffff`},{name:`dark`,value:`#0a0a0a`}]}},args:{alt:`Profile photo`,name:`Jordan Lee`,size:`lg`,uploadable:!0,showHoverOverlay:!0}},l={render:e=>(0,o.jsx)(a,{...e})},u={args:{src:`https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop`,uploadable:!1}},d=[`Uploadable`,`ReadOnly`],l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{
+  render: args => <WithState {...args} />
+}`,...l.parameters?.docs?.source}}},u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
+  args: {
+    src: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop',
+    uploadable: false
+  }
+}`,...u.parameters?.docs?.source}}}})))()}f();export{u as ReadOnly,l as Uploadable,d as __namedExportsOrder,c as default};

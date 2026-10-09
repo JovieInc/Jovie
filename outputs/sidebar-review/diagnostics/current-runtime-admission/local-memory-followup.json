@@ -1,0 +1,10 @@
+{
+  "at": "2026-10-08T10:56:39.766Z",
+  "totalBytes": 34359738368,
+  "availableBytes": 798031872,
+  "ownedHeadroomBytes": 8589934592,
+  "admitted": false,
+  "reason": "Storybook build resource admission held: host-memory-reserve",
+  "buildStarted": false,
+  "gateChanged": false
+}

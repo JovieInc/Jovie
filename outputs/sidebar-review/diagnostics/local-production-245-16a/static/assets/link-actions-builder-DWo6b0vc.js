@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t({isVisible:e,callbacks:t}){let n=[];return t.onEdit&&n.push({id:`edit`,label:`Edit`,onClick:t.onEdit}),n.push({id:`toggle`,label:e?`Hide`:`Show`,onClick:t.onToggle},{type:`separator`},{id:`remove`,label:`Delete`,onClick:t.onRemove,destructive:!0}),n}function n(){return(n=e((()=>{})))()}export{n,t};

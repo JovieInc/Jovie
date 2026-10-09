@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ProofClaimCtaLink-BhW7ISVs.js";var i,a,o,s;function c(){return(c=e((()=>{i=t(),n(),a={title:`Profile/ProofClaimCtaLink`,component:r,parameters:{layout:`centered`},args:{href:`/waitlist?campaign=proof-to-claim`,label:`Request access`,ariaLabel:`Request access — get your Jovie from the Tim White profile`}},o={render:e=>(0,i.jsx)(`div`,{className:`bg-base p-8 text-primary-token`,children:(0,i.jsx)(r,{...e,className:`profile-aeo-claim-card__cta inline-flex min-h-12 items-center justify-center rounded-full px-6 text-sm font-semibold`})})},s=[`RequestAccess`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  render: args => <div className='bg-base p-8 text-primary-token'>
+      <ProofClaimCtaLink {...args} className='profile-aeo-claim-card__cta inline-flex min-h-12 items-center justify-center rounded-full px-6 text-sm font-semibold' />
+    </div>
+}`,...o.parameters?.docs?.source}}}})))()}c();export{o as RequestAccess,s as __namedExportsOrder,a as default};

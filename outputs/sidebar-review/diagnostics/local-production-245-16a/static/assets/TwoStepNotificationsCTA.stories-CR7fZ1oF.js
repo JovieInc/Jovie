@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{i as t,n}from"./db-CVoez3nN.js";import{n as r,t as i}from"./TwoStepNotificationsCTA-DRbbY6AS.js";import{i as a,r as o}from"./mock-dashboard-data-CTNHFFNy.js";var s,c,l,u,d;function f(){return(f=e((()=>{a(),t(),r(),s=n(o()),c={title:`Features/Profile/TwoStepNotificationsCTA`,component:i,parameters:{layout:`centered`},args:{artist:s}},l={},u={args:{startExpanded:!0}},d=[`Collapsed`,`Expanded`],l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{}`,...l.parameters?.docs?.source}}},u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
+  args: {
+    startExpanded: true
+  }
+}`,...u.parameters?.docs?.source}}}})))()}f();export{l as Collapsed,u as Expanded,d as __namedExportsOrder,c as default};

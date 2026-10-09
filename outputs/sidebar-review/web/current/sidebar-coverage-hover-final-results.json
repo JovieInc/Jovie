@@ -1,0 +1,34 @@
+[
+  {
+    "shard": 1,
+    "started": "2026-10-08T05:15:36.652Z",
+    "finished": "2026-10-08T05:16:27.930Z",
+    "exit": 0,
+    "log": "/private/tmp/sidebar-coverage-hover-final.1.log",
+    "coverage": "/private/tmp/sidebar-coverage-hover-final.1.json"
+  },
+  {
+    "shard": 2,
+    "started": "2026-10-08T05:16:27.932Z",
+    "finished": "2026-10-08T05:17:15.021Z",
+    "exit": 0,
+    "log": "/private/tmp/sidebar-coverage-hover-final.2.log",
+    "coverage": "/private/tmp/sidebar-coverage-hover-final.2.json"
+  },
+  {
+    "shard": 3,
+    "started": "2026-10-08T05:17:15.023Z",
+    "finished": "2026-10-08T05:17:56.392Z",
+    "exit": 0,
+    "log": "/private/tmp/sidebar-coverage-hover-final.3.log",
+    "coverage": "/private/tmp/sidebar-coverage-hover-final.3.json"
+  },
+  {
+    "shard": 4,
+    "started": "2026-10-08T05:17:56.392Z",
+    "finished": "2026-10-08T05:18:38.981Z",
+    "exit": 0,
+    "log": "/private/tmp/sidebar-coverage-hover-final.4.log",
+    "coverage": "/private/tmp/sidebar-coverage-hover-final.4.json"
+  }
+]

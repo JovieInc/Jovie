@@ -1,0 +1,4712 @@
+[
+  {
+    "id": "jovie-light-1024",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--shared-shell",
+      "expectedRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "checkedVisibleRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 756,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 740,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1000,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 984,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1000,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 984,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 270,
+      "width": 320,
+      "height": 322
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "jovie-light-1440",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--shared-shell",
+      "expectedRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "checkedVisibleRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 1172,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 1156,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1416,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1400,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1416,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1400,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 270,
+      "width": 320,
+      "height": 322
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "jovie-light-1920",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--shared-shell",
+      "expectedRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "checkedVisibleRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 1652,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 1636,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1896,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1880,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1896,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1880,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 270,
+      "width": 320,
+      "height": 322
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "jovie-dark-1024",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--shared-shell",
+      "expectedRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "checkedVisibleRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 756,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 740,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1000,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 984,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1000,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 984,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 270,
+      "width": 320,
+      "height": 322
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "jovie-dark-1440",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--shared-shell",
+      "expectedRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "checkedVisibleRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 1172,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 1156,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1416,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1400,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1416,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1400,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 270,
+      "width": 320,
+      "height": 322
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "jovie-dark-1920",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--shared-shell",
+      "expectedRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "checkedVisibleRoots": [
+        "Home",
+        "Profiles",
+        "Work",
+        "Audience"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 1652,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 1636,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1896,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1880,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1896,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1880,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 270,
+      "width": 320,
+      "height": 322
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "ovie-light-1024",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--operator-shared-shell",
+      "expectedRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "checkedVisibleRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 756,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 740,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1000,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 984,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1000,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 984,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 208,
+      "width": 256,
+      "height": 384
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "ovie-light-1440",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--operator-shared-shell",
+      "expectedRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "checkedVisibleRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 1172,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 1156,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1416,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1400,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1416,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1400,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 208,
+      "width": 256,
+      "height": 384
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "ovie-light-1920",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--operator-shared-shell",
+      "expectedRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "checkedVisibleRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 1652,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 1636,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1896,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1880,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1896,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1880,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 208,
+      "width": 256,
+      "height": 384
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "ovie-dark-1024",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--operator-shared-shell",
+      "expectedRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "checkedVisibleRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 756,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 740,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1000,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 984,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1000,
+        "height": 44,
+        "right": 1016,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 984,
+        "height": 532,
+        "right": 1008,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 924,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1024,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 208,
+      "width": 256,
+      "height": 384
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "ovie-dark-1440",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--operator-shared-shell",
+      "expectedRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "checkedVisibleRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 1172,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 1156,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1416,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1400,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1416,
+        "height": 44,
+        "right": 1432,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1400,
+        "height": 532,
+        "right": 1424,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1340,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 208,
+      "width": 256,
+      "height": 384
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "ovie-dark-1920",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--operator-shared-shell",
+      "expectedRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "checkedVisibleRoots": [
+        "Now",
+        "Growth",
+        "Product",
+        "Operations",
+        "Needs You"
+      ],
+      "fixtureHeading": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 260,
+        "y": 0,
+        "width": 1652,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 272,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 306.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 268,
+        "y": 52,
+        "width": 1636,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 44,
+        "width": 244,
+        "height": 548,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "collapsed": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1896,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1880,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 0,
+        "height": 81,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 552,
+        "width": 0,
+        "height": 32,
+        "right": 12,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 44,
+        "width": 0,
+        "height": 548,
+        "right": 0,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "floating": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 262,
+        "height": 44,
+        "right": 262,
+        "bottom": 44,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 124,
+        "y": 8,
+        "width": 38,
+        "height": 28,
+        "right": 162,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 168,
+        "y": 8,
+        "width": 28,
+        "height": 28,
+        "right": 196,
+        "bottom": 36,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 202,
+        "y": 10,
+        "width": 50,
+        "height": 24,
+        "right": 252,
+        "bottom": 34,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 16,
+        "y": 0,
+        "width": 1896,
+        "height": 44,
+        "right": 1912,
+        "bottom": 44,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 274,
+        "y": 14,
+        "width": 34.0390625,
+        "height": 16,
+        "right": 308.0390625,
+        "bottom": 30,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 24,
+        "y": 52,
+        "width": 1880,
+        "height": 532,
+        "right": 1904,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 8,
+        "y": 511,
+        "width": 244,
+        "height": 81,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "account": {
+        "x": 20,
+        "y": 552,
+        "width": 220,
+        "height": 32,
+        "right": 240,
+        "bottom": 584,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 8,
+        "y": 52,
+        "width": 244,
+        "height": 540,
+        "right": 252,
+        "bottom": 592,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 100,
+        "y": 0,
+        "width": 1820,
+        "height": 44
+      },
+      "viewport": {
+        "width": 1920,
+        "height": 600
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "menu": {
+      "x": 252,
+      "y": 208,
+      "width": 256,
+      "height": 384
+    },
+    "collapsedHeaderNavCollision": false
+  },
+  {
+    "id": "jovie-native-zoom2",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--shared-shell",
+      "expectedRoot": "Home",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 212,
+        "height": 22,
+        "right": 212,
+        "bottom": 22,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 74,
+        "y": -3,
+        "width": 38,
+        "height": 28,
+        "right": 112,
+        "bottom": 25,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 118,
+        "y": -3,
+        "width": 28,
+        "height": 28,
+        "right": 146,
+        "bottom": 25,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 152,
+        "y": -1,
+        "width": 50,
+        "height": 24,
+        "right": 202,
+        "bottom": 23,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 720,
+        "height": 22,
+        "right": 720,
+        "bottom": 22,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 224,
+        "y": 3,
+        "width": 34.03515625,
+        "height": 16,
+        "right": 258.03515625,
+        "bottom": 19,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 8,
+        "y": 30,
+        "width": 704,
+        "height": 412,
+        "right": 712,
+        "bottom": 442,
+        "drag": "none"
+      },
+      "footer": null,
+      "account": null,
+      "surface": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "right": 0,
+        "bottom": 0,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 50,
+        "y": 0,
+        "width": 670,
+        "height": 22
+      },
+      "viewport": {
+        "width": 720,
+        "height": 450
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "opened": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 212,
+        "height": 22,
+        "right": 212,
+        "bottom": 22,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 74,
+        "y": -3,
+        "width": 38,
+        "height": 28,
+        "right": 112,
+        "bottom": 25,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 118,
+        "y": -3,
+        "width": 28,
+        "height": 28,
+        "right": 146,
+        "bottom": 25,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 152,
+        "y": -1,
+        "width": 50,
+        "height": 24,
+        "right": 202,
+        "bottom": 23,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 720,
+        "height": 22,
+        "right": 720,
+        "bottom": 22,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 224,
+        "y": 3,
+        "width": 34.03515625,
+        "height": 16,
+        "right": 258.03515625,
+        "bottom": 19,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 8,
+        "y": 30,
+        "width": 704,
+        "height": 412,
+        "right": 712,
+        "bottom": 442,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 369,
+        "width": 243,
+        "height": 81,
+        "right": 243,
+        "bottom": 450,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 410,
+        "width": 219,
+        "height": 32,
+        "right": 231,
+        "bottom": 442,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "right": 0,
+        "bottom": 0,
+        "drag": "none"
+      },
+      "drawer": {
+        "x": 0,
+        "y": 0,
+        "width": 244,
+        "height": 450,
+        "right": 244,
+        "bottom": 450,
+        "drag": "none"
+      },
+      "controls": {
+        "x": 50,
+        "y": 0,
+        "width": 670,
+        "height": 22
+      },
+      "viewport": {
+        "width": 720,
+        "height": 450
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "id": "ovie-native-zoom2",
+    "identity": {
+      "storyId": "organisms-unifiedsidebar--operator-shared-shell",
+      "expectedRoot": "Now",
+      "authenticatedWorkspaceVerified": false
+    },
+    "assertionsPassed": true,
+    "initial": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 212,
+        "height": 22,
+        "right": 212,
+        "bottom": 22,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 74,
+        "y": -3,
+        "width": 38,
+        "height": 28,
+        "right": 112,
+        "bottom": 25,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 118,
+        "y": -3,
+        "width": 28,
+        "height": 28,
+        "right": 146,
+        "bottom": 25,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 152,
+        "y": -1,
+        "width": 50,
+        "height": 24,
+        "right": 202,
+        "bottom": 23,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 720,
+        "height": 22,
+        "right": 720,
+        "bottom": 22,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 224,
+        "y": 3,
+        "width": 34.03515625,
+        "height": 16,
+        "right": 258.03515625,
+        "bottom": 19,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 8,
+        "y": 30,
+        "width": 704,
+        "height": 412,
+        "right": 712,
+        "bottom": 442,
+        "drag": "none"
+      },
+      "footer": null,
+      "account": null,
+      "surface": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "right": 0,
+        "bottom": 0,
+        "drag": "none"
+      },
+      "drawer": null,
+      "controls": {
+        "x": 50,
+        "y": 0,
+        "width": 670,
+        "height": 22
+      },
+      "viewport": {
+        "width": 720,
+        "height": 450
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    },
+    "opened": {
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "width": 212,
+        "height": 22,
+        "right": 212,
+        "bottom": 22,
+        "drag": "drag"
+      },
+      "brand": {
+        "x": 74,
+        "y": -3,
+        "width": 38,
+        "height": 28,
+        "right": 112,
+        "bottom": 25,
+        "drag": "no-drag"
+      },
+      "toggle": {
+        "x": 118,
+        "y": -3,
+        "width": 28,
+        "height": 28,
+        "right": 146,
+        "bottom": 25,
+        "drag": "no-drag"
+      },
+      "navPill": {
+        "x": 152,
+        "y": -1,
+        "width": 50,
+        "height": 24,
+        "right": 202,
+        "bottom": 23,
+        "drag": "no-drag"
+      },
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 720,
+        "height": 22,
+        "right": 720,
+        "bottom": 22,
+        "drag": "none"
+      },
+      "heading": {
+        "x": 224,
+        "y": 3,
+        "width": 34.03515625,
+        "height": 16,
+        "right": 258.03515625,
+        "bottom": 19,
+        "drag": "drag"
+      },
+      "content": {
+        "x": 8,
+        "y": 30,
+        "width": 704,
+        "height": 412,
+        "right": 712,
+        "bottom": 442,
+        "drag": "none"
+      },
+      "footer": {
+        "x": 0,
+        "y": 369,
+        "width": 243,
+        "height": 81,
+        "right": 243,
+        "bottom": 450,
+        "drag": "none"
+      },
+      "account": {
+        "x": 12,
+        "y": 410,
+        "width": 219,
+        "height": 32,
+        "right": 231,
+        "bottom": 442,
+        "drag": "none"
+      },
+      "surface": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "right": 0,
+        "bottom": 0,
+        "drag": "none"
+      },
+      "drawer": {
+        "x": 0,
+        "y": 0,
+        "width": 244,
+        "height": 450,
+        "right": 244,
+        "bottom": 450,
+        "drag": "none"
+      },
+      "controls": {
+        "x": 50,
+        "y": 0,
+        "width": 670,
+        "height": 22
+      },
+      "viewport": {
+        "width": 720,
+        "height": 450
+      },
+      "noHorizontalOverflow": true,
+      "scroll": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+]

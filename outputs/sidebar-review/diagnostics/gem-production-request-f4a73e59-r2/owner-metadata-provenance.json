@@ -1,0 +1,10 @@
+{
+  "threadId": "01a11209-100a-71c3-9c93-7c7d51619016",
+  "title": "Decouple subscription shipping",
+  "hostId": "durable",
+  "itemId": "exec-c2d7e89e-def1-4ff6-bac0-9eca8497cff7",
+  "exitCode": 0,
+  "kind": "full read-only owner tool output retained from chat; no execution admission",
+  "observedAt": "2026-10-08T11:23:25.109Z"
+}
+

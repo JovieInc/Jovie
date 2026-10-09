@@ -1,0 +1,9 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ReleaseTrackList-ByM4m8Tj.js";var i,a,o,s,c,l,u;function d(){return(d=e((()=>{i=t(),n(),a={profileId:`profile-1`,id:`release-1`,title:`Midnight Echo`,artistNames:[`Nova Rey`],status:`released`,slug:`midnight-echo`,smartLinkPath:`/r/midnight-echo`,providers:[],releaseType:`ep`,isExplicit:!1,totalTracks:3,totalDiscs:1},o=[{id:`track-1`,releaseId:`release-1`,releaseSlug:`midnight-echo`,title:`Midnight Echo`,slug:`midnight-echo`,smartLinkPath:`/r/midnight-echo/track-1`,trackNumber:1,discNumber:1,durationMs:181e3,isrc:`USRC17607839`,isExplicit:!1,previewUrl:null,audioUrl:null,audioFormat:null,providers:[]},{id:`track-2`,releaseId:`release-1`,releaseSlug:`midnight-echo`,title:`Static Bloom`,slug:`static-bloom`,smartLinkPath:`/r/midnight-echo/track-2`,trackNumber:2,discNumber:1,durationMs:204e3,isrc:`USRC17607840`,isExplicit:!1,previewUrl:null,audioUrl:null,audioFormat:null,providers:[]},{id:`track-3`,releaseId:`release-1`,releaseSlug:`midnight-echo`,title:`Glass Avenue`,slug:`glass-avenue`,smartLinkPath:`/r/midnight-echo/track-3`,trackNumber:3,discNumber:1,durationMs:197e3,isrc:null,isExplicit:!0,previewUrl:null,audioUrl:null,audioFormat:null,providers:[]}],s={title:`Organisms/ReleaseSidebar/ReleaseTrackList`,component:r,parameters:{layout:`centered`},args:{release:a},decorators:[e=>(0,i.jsx)(`div`,{className:`w-80`,children:(0,i.jsx)(e,{})})]},c={args:{tracksOverride:[]}},l={args:{tracksOverride:o}},u=[`Empty`,`Populated`],c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    tracksOverride: []
+  }
+}`,...c.parameters?.docs?.source}}},l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{
+  args: {
+    tracksOverride: mockTracks
+  }
+}`,...l.parameters?.docs?.source}}}})))()}d();export{c as Empty,l as Populated,u as __namedExportsOrder,s as default};

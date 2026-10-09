@@ -1,0 +1,153 @@
+[
+  {
+    "testIdentifier" : "JovieUITests/testShellNavigationRuntimePerformance()",
+    "testIdentifierURL" : "test://com.apple.xcode/Jovie/JovieUITests/JovieUITests/testShellNavigationRuntimePerformance",
+    "testRuns" : [
+      {
+        "device" : {
+          "deviceId" : "7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5",
+          "deviceName" : "iPhone 17 Pro Max"
+        },
+        "metrics" : [
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "CPU Cycles (Jovie)",
+            "identifier" : "com.apple.dt.XCTMetric_CPU-ie.jov.Jovie.cycles",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              5025661.49,
+              5018318.144,
+              4920958.4,
+              5132433.609,
+              5377161.14
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kC"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Clock Monotonic Time",
+            "identifier" : "com.apple.dt.XCTMetric_Clock.time.monotonic",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              4.1987083610000004,
+              4.235913483,
+              4.24658812,
+              4.249670459,
+              4.329873593
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "s"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "CPU Time (Jovie)",
+            "identifier" : "com.apple.dt.XCTMetric_CPU-ie.jov.Jovie.time",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              1.266964862,
+              1.3142093670000001,
+              1.309050091,
+              1.30181396,
+              1.323973271
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "s"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "CPU Instructions Retired (Jovie)",
+            "identifier" : "com.apple.dt.XCTMetric_CPU-ie.jov.Jovie.instructions_retired",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              13881867.963,
+              13851778.33,
+              13856729.634,
+              13874608.39,
+              13858280.448
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kI"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Memory Peak Physical (Jovie)",
+            "identifier" : "com.apple.dt.XCTMetric_Memory-ie.jov.Jovie.physical_peak",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              88361.264,
+              88312.112,
+              88262.96,
+              94062.896,
+              94505.264
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kB"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Memory Physical (Jovie)",
+            "identifier" : "com.apple.dt.XCTMetric_Memory-ie.jov.Jovie.physical",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              2621.44,
+              1605.632,
+              1605.632,
+              8142.848,
+              1458.176
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kB"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Absolute Memory Physical (Jovie)",
+            "identifier" : "com.apple.dt.XCTMetric_Memory-ie.jov.Jovie.physical_absolute",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              87492.912,
+              87443.76,
+              87394.608,
+              93882.672,
+              93653.296
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kB"
+          }
+        ],
+        "testPlanConfiguration" : {
+          "configurationId" : "1",
+          "configurationName" : "Test Scheme Action"
+        }
+      }
+    ]
+  }
+]

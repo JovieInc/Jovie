@@ -1,0 +1,11 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ReleaseTaskCompactRow-CzDs9KpC.js";import{n as i,t as a}from"./ReleaseTaskRow-gejOjO8Z.js";var o,s,c,l,u,d,f,p;function m(){return(m=e((()=>{o=t(),n(),i(),{fn:s}=__STORYBOOK_MODULE_TEST__,c={id:`task-story`,releaseId:`release-story`,creatorProfileId:`profile-story`,templateItemId:`template-story`,title:`Pitch playlist editors`,description:null,explainerText:`Share the release with curators who fit the track.`,learnMoreUrl:`/releases/release-story`,videoUrl:null,category:`Marketing`,status:`todo`,priority:`high`,position:1,assigneeType:`human`,assigneeUserId:null,aiWorkflowId:null,dueDaysOffset:3,dueDate:new Date(`2026-09-10T00:00:00.000Z`),completedAt:null,metadata:null,createdAt:new Date(`2026-09-01T00:00:00.000Z`),updatedAt:new Date(`2026-09-01T00:00:00.000Z`)},l={title:`Features/Dashboard/Release Tasks/ReleaseTaskRow`,component:a,parameters:{layout:`centered`},decorators:[e=>(0,o.jsx)(`div`,{className:`w-96 rounded-lg border border-subtle bg-surface-1 p-2`,children:(0,o.jsx)(e,{})})],args:{task:c,onToggle:s()}},u={},d={args:{task:{...c,status:`done`,completedAt:new Date(`2026-09-08T00:00:00.000Z`)}}},f={render:e=>(0,o.jsx)(r,{task:e.task,onNavigate:s(),onToggle:e.onToggle})},p=[`Todo`,`Done`,`Compact`],u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{}`,...u.parameters?.docs?.source}}},d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
+  args: {
+    task: {
+      ...task,
+      status: 'done',
+      completedAt: new Date('2026-09-08T00:00:00.000Z')
+    }
+  }
+}`,...d.parameters?.docs?.source}}},f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{
+  render: args => <ReleaseTaskCompactRow task={args.task} onNavigate={fn()} onToggle={args.onToggle} />
+}`,...f.parameters?.docs?.source}}}})))()}m();export{f as Compact,d as Done,u as Todo,p as __namedExportsOrder,l as default};

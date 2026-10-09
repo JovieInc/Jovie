@@ -1,0 +1,39 @@
+{
+  "baseHead": "4b407aac7b516e2bab9c9f937b805b4cfe88f78e",
+  "status": "locally qualified;protected in-app and supported production diagnostic remain unresolved",
+  "sourceHashes": {
+    "apps/ios/Jovie/App/AppRouteManifest.swift": "1623d359d4a5c77f62a20da74e0cd85e7e4f059563d605aede55b14e87b288c3",
+    "apps/ios/Jovie/App/RootView.swift": "66e383da113b7780d175e6b68a2650d9decdc7b842fac51fe6f7644f48327d99",
+    "apps/ios/Jovie/Core/ChatRepository.swift": "be4922847a43bc7a7b394c841ae42b3739df0ba68286a4a10d51fd745e586ccc",
+    "apps/ios/Jovie/DesignSystem/JovieTheme.swift": "7c31282d6bba1f7c63e92e18f2baea1b8a7301c4c6220462d48ce0f6d2d88228",
+    "apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift": "9ca0fad0e1d89e0867c3076d3438029b2f15a7ae3bd63d7ecde8537a7192f2ab",
+    "apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift": "05dee94cf1e05715adea060a7c44c792239ab550074e74307956cc2c8ee980e2",
+    "apps/ios/Jovie/Features/AppShell/AppShellView.swift": "df06fe12b9604ec022689c13fb000d351142ce67dcca161f92880e5e2de79f58",
+    "apps/ios/JovieTests/AppRouteManifestTests.swift": "d0b105aa34dcd6db0ee1b558d09da1e252d4456b47100d82d2e5b495ba758c95",
+    "apps/ios/JovieTests/AppShellDrawerThreadsFilterTests.swift": "864a5a2715b09b60e7e6c33ba43f5ddf11e8a391dc55b31ea2f4c8902ee9bb31",
+    "apps/ios/JovieTests/AppShellIntentNavigationTests.swift": "898f360adc061e7846c028ea91770edbb465950703c6d06dfd4e415eb5924556",
+    "apps/ios/JovieTests/AppShellTabBarTests.swift": "ea20a1457279efe828eb883a6483141d2b50c4a8a9c6044cfd5b3ab9354d5333",
+    "apps/ios/JovieTests/ChatRepositoryTests.swift": "315e6aac5ab6b005d46c5edde7d6914f4a4322804daf239dea82a9abb4aa7255",
+    "apps/ios/JovieUITests/JovieUITests.swift": "a3be35b6395f06508c0bd64dafc74bc7cc178733709f8334cdc776f32467f4e9",
+    "apps/web/lib/ios/apple-app-site-association.ts": "2e84d2d457cdce14c2ed6f746472e793428edadd505768ea86273a27e2c63374",
+    "apps/web/tests/unit/ios/apple-app-site-association.test.ts": "11d54502c02db2ec9cfbc5564c5a83aa4ed62a488d1434b136c11afe53ccbe2a"
+  },
+  "publicationActionActive": false,
+  "publishNow": false,
+  "productionAdmission": "held: host-memory-reserve; existing resource owner owns supported executor dependency",
+  "protectedInAppParity": "unresolved; all registry destinations explicitly web-only",
+  "head": "545b383925854b8a1632fffe9b48087fe88f6e37",
+  "qualification": {
+    "passed": 35,
+    "failed": 0,
+    "skipped": 0,
+    "semantic": 23,
+    "UI": 12,
+    "text": "accessibility-extra-extra-extra-large",
+    "drawerCoverage": {
+      "covered": 2123,
+      "executable": 2293,
+      "percent": 92.58613170518971
+    }
+  }
+}

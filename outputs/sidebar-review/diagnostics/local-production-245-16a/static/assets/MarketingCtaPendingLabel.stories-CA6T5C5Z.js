@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./link-e-necIhk.js";import{n as i,t as a}from"./MarketingCtaPendingLabel-B0UvCbFd.js";var o,s,c,l;function u(){return(u=e((()=>{o=t(),r(),i(),s={title:`Marketing/Primitives/MarketingCtaPendingLabel`,component:a,parameters:{layout:`centered`},decorators:[e=>(0,o.jsx)(n,{href:`/signup`,className:`relative inline-flex min-h-11 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground`,children:(0,o.jsx)(e,{})})]},c={args:{children:`Get started`}},l=[`Default`],c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    children: 'Get started'
+  }
+}`,...c.parameters?.docs?.source}}}})))()}u();export{c as Default,l as __namedExportsOrder,s as default};

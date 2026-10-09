@@ -1,0 +1,44 @@
+{
+  "head": "22cf14a9e614a66ec0dbb95361cd4077c82328d7",
+  "scope": "Same qualified DerivedData build via existing test-without-building; successful largest-text drawer/More/Recent/All chats/Back/Profile fixture capture outside performance window. No Simulator app foreground or Mac session created. No physical or authenticated proof.",
+  "testPassed": 1,
+  "bundle": "/private/tmp/sidebar-native-success-recording.xcresult",
+  "media": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "width": 1320,
+        "height": 2868
+      }
+    ],
+    "format": {
+      "duration": "35.033333"
+    }
+  },
+  "restoredText": "large",
+  "restoredState": "Shutdown",
+  "artifacts": {
+    "capture.sh": "016e3f08f119dfc90325b2f98d1dbe90c15015346eaf76a1cef51906f475c496",
+    "sidebar-native-success.mp4": "9605d39a9df0ef9f1b8122300145d6955741e5e1b6724741c301bb1746a0b1b2",
+    "frame-20.png": "d9ec6d760ef791ae71856f322b763c2412305857a5e0ab1d8c95dcf2dd88bbc5",
+    "frame-31.png": "ef6d2b932d1c05fdf92ec285c09b57d4f0d967f46586a65b433eddc73372e8da",
+    "frame-25.png": "7415c472640f9593962f5fe47ad12bebd3478367533e92993554cdc7d8433d0d",
+    "frame-33.png": "1ff88d805e7dac509a45f22b74c072577b1e1f9cffede6e393d17a35e8cf841b",
+    "sidebar-native-success.mov": "2246bb3beebefceb4e86460f582e655265e4087fa25682ce96deafc924f28d77",
+    "sidebar-native-record-video.log": "eb7255a9d66329be09df3cc3d3eb3ad8c39ab5673365206928c7f5973cb10c56",
+    "sidebar-native-drawer-short.mp4": "c1a7d2751d0128dbfae9ec2fd02290b88f17d4dc3b3097d053af497371fa1df7",
+    "sidebar-native-record-restored-state.json": "3153a99d2dd6b19b2858ac00aa41b4b0518e4fd6176ddc0904d90bbbadfbde6d",
+    "frame-28.png": "43bfeb0b8ec0801e8358a10366b4f82566e4599efa97bd7d1b6c761cf97abb48",
+    "frame-15.png": "70d8972cfbc4c6959cd472b702a95ed09d3ee55e2966ea92ae477461f72ef707",
+    "sidebar-native-record-success.log": "3152da2742a1715a0f9113a723bb09e65c5e3c3c546f41637fc2aa49929ace04",
+    "sidebar-native-record-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1"
+  },
+  "reviewExcerpt": {
+    "file": "sidebar-native-drawer-short.mp4",
+    "startSeconds": 27,
+    "durationSeconds": 5.6,
+    "source": "sidebar-native-success.mp4",
+    "scope": "Viewing excerpt only; complete35.03s capture and successful UI log retained"
+  }
+}

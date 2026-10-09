@@ -1,0 +1,44 @@
+{
+  "at": "2026-10-08T09:07:19.930677+00:00",
+  "runId": "owner-diagnostic-sidebar-245-16a-4c06233300c7",
+  "kind": "owner-task-diagnostic",
+  "requestSha256": "4c06233300c774e0e726692dff67a853c3cb09eeffb202ff31de01a9a1b25e42",
+  "accepted": true,
+  "providerInvoked": false,
+  "prCertificatePublished": false,
+  "productSourceModified": false,
+  "healthSamples": [
+    {
+      "observedAt": "2026-10-08T09:07:20.931274+00:00",
+      "cpuIdlePercent": 89.12,
+      "memoryAvailablePercent": 95.09,
+      "load1": 1.65673828125,
+      "admitted": true
+    },
+    {
+      "observedAt": "2026-10-08T09:07:21.931701+00:00",
+      "cpuIdlePercent": 86.85,
+      "memoryAvailablePercent": 95.08,
+      "load1": 1.65673828125,
+      "admitted": true
+    }
+  ],
+  "gateSeat": 0,
+  "postSeatHealthSamples": [
+    {
+      "observedAt": "2026-10-08T09:07:22.935142+00:00",
+      "cpuIdlePercent": 91.23,
+      "memoryAvailablePercent": 95.07,
+      "load1": 1.65673828125,
+      "admitted": true
+    },
+    {
+      "observedAt": "2026-10-08T09:08:23.935757+00:00",
+      "cpuIdlePercent": 77.88,
+      "memoryAvailablePercent": 94.6,
+      "load1": 1.85400390625,
+      "admitted": true
+    }
+  ],
+  "admittedAt": "2026-10-08T09:08:23.935778+00:00"
+}

@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{H as n,U as r}from"./removable-_8fTgXVw.js";import{c as i,s as a}from"./iframe-B1b4EUuv.js";import{n as o,t as s}from"./GrowthAccessRequestModal-DdTEAGv2.js";function c({children:e}){let t=new a({defaultOptions:{queries:{retry:!1},mutations:{retry:!1}}});return(0,l.jsx)(n,{client:t,children:e})}var l,u,d,f,p,m;function h(){return(h=e((()=>{l=t(),i(),r(),o(),{fn:u}=__STORYBOOK_MODULE_TEST__,d={title:`Organisms/Billing/GrowthAccessRequestModal`,component:s,parameters:{layout:`centered`},decorators:[e=>(0,l.jsx)(c,{children:(0,l.jsx)(e,{})})],args:{open:!0,onOpenChange:u()}},f={},p={args:{open:!1}},m=[`Default`,`Closed`],f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{}`,...f.parameters?.docs?.source}}},p.parameters={...p.parameters,docs:{...p.parameters?.docs,source:{originalSource:`{
+  args: {
+    open: false
+  }
+}`,...p.parameters?.docs?.source}}}})))()}h();export{p as Closed,f as Default,m as __namedExportsOrder,d as default};

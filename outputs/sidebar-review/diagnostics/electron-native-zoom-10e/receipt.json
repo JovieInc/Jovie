@@ -1,0 +1,159 @@
+{
+  "at": "2026-10-08T10:47:39.795669+00:00",
+  "head": "f4a73e59c09c62f349195c486419b2278df79b9b",
+  "tree": "ba71eaede1e5643fa137265387bdbd6ff43d39e1",
+  "parent": "278700c006d648ca4f03c08abffb4087d838f4a2",
+  "previousGeometryHead": "10e76a95b87efd5c25abe6b757081c2265ee63d7",
+  "nativeHead": "545b383925854b8a1632fffe9b48087fe88f6e37",
+  "profile": "coder",
+  "issue": "no Linear issue \u2014 ad-hoc",
+  "commits": [
+    {
+      "head": "278700c006d648ca4f03c08abffb4087d838f4a2",
+      "change": "Restore compact drawer focus without stealing focus already transferred to a live route/editor/palette"
+    },
+    {
+      "head": "f4a73e59c09c62f349195c486419b2278df79b9b",
+      "change": "Clamp application titlebar to44CSSpx minimum while respecting taller actual native overlay bounds"
+    }
+  ],
+  "sourceFiles": {
+    "apps/web/components/organisms/sidebar/sidebar.tsx": "5a9c7964d0a9f3ca5812f5066f97b8a447c325ab81f415793c69e62be187a720",
+    "apps/web/components/organisms/sidebar/sidebar.test.tsx": "1dbfc7fafb13470c76e15fe47a12195ec1866b5309db4a9987e2078917e0ec2d",
+    "apps/web/app/globals.css": "9208dbf93c11a08b36edbfe355c5d3e49326bec20bbf9c0b44fced60a2eb6813",
+    "apps/web/tests/e2e/storybook-shared-sidebar.spec.ts": "827b5b60ca756185d155fe886e1493b5389a9c3e427946086fdfc95c0a394a5b",
+    "apps/desktop/scripts/desktop-shell-contract.test.mjs": "56d87955058ed1e9f21536a60d2823a190a98276fd2ec375a4918d1e47a13c67"
+  },
+  "sourceHashesStillMatchCommits": true,
+  "normalHooksPassed": true,
+  "bug": {
+    "nativeZoom": {
+      "source": "10e76a95b87efd5c25abe6b757081c2265ee63d7",
+      "zoom": 2,
+      "nativeOverlayHeight": 22,
+      "applicationRowHeight": 22,
+      "logoAndToggleY": -3,
+      "historyControlY": -1,
+      "missingPriorAssertion": "Viewport/control containment was omitted by the prior passing native zoom branch"
+    },
+    "compactKeyboard": "Radix modal without its own Trigger lost focus on Escape; new CI focus assertion red-tested this latent boundary"
+  },
+  "supersession": "10e desktop collision correction remains valid. Its14-case passing label did not establish zoom containment; current strengthened checks supersede only that acceptance claim. Old receipts/build inputs remain historical.",
+  "qualification": {
+    "browser": {
+      "startTime": "2026-10-08T10:41:36.000Z",
+      "duration": 39854.458,
+      "expected": 29,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "browserSelectors": [
+      "storybook-shared-sidebar.spec.ts",
+      "storybook-canonical-sidebar.spec.ts"
+    ],
+    "browserConfig": "playwright.config.storybook.ts",
+    "unitTestsPassed": 57,
+    "coverageConfig": "vitest.config.ci.mts",
+    "unitSelectors": [
+      "components/organisms/sidebar/sidebar.test.tsx",
+      "components/organisms/sidebar/context.test.tsx",
+      "tests/unit/components/organisms/DesktopTitlebar.test.tsx",
+      "tests/unit/components/organisms/AppShellFrame.test.tsx"
+    ],
+    "coverage": {
+      "lines": {
+        "total": 96,
+        "covered": 92,
+        "skipped": 0,
+        "pct": 95.83
+      },
+      "statements": {
+        "total": 104,
+        "covered": 99,
+        "skipped": 0,
+        "pct": 95.19
+      },
+      "functions": {
+        "total": 18,
+        "covered": 16,
+        "skipped": 0,
+        "pct": 88.88
+      },
+      "branches": {
+        "total": 171,
+        "covered": 159,
+        "skipped": 0,
+        "pct": 92.98
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    },
+    "cssCoverage": "CSS is not V8-instrumentable; real-browser native-height22/44/55 and actual Electron200%/80% containment/state assertions cover the behavior. Thresholds unchanged.",
+    "desktopContractsPassed": 28,
+    "webTypecheckExit": 0,
+    "nativeFixtureMatrixPassed": 14,
+    "additionalActualZoomCasesPassed": 4,
+    "native200Percent": {
+      "nativeOverlayCssHeight": 22,
+      "applicationRowCssHeight": 44,
+      "brandAndToggleY": 8,
+      "controlsContained": true
+    },
+    "native80Percent": {
+      "nativeOverlayCssHeight": 55,
+      "applicationRowCssHeight": 55,
+      "controlsContained": true
+    }
+  },
+  "runtimeScope": "Hidden, unfocused unpackaged Electron44.5.1/Chromium152 fixture with existing cached runtime, maintained isolated preload/native options, temporary profile and loopback6017 development source. Auth/updater/full main lifecycle not booted; not installed/signed-app or founder-review-ready evidence. Jovie/Ovie root identities checked; fixture Home/Yourworkspace canvas is synthetic.",
+  "designRead": "Reading this as: shared native application chrome for creators and operators, with a compact calm language, leaning toward macOS conventions.",
+  "designChecks": {
+    "hierarchy": "pass: source brand/toggle/history/page heading remain ordered and contained",
+    "spacing": "pass:44CSSpx minimum; taller native overlay respected; no collapsed heading collision",
+    "typographyScale": "pass: existing text/icon sizes unchanged",
+    "visualDensity": "pass for bounded native chrome fixture",
+    "interactionStates": "pass: keyboard drawer/Escape/focus and palette transfer; full29browser selector",
+    "contrast": "retained existing light/dark tokens; desktop fixture both themes; no token changes",
+    "macOSNativeAffordances": "native reserve and drag/no-drag markers pass; actualOS drag unverified",
+    "layoutJank": "open/close header/content geometry stable in measured fixture; physical120Hz acceptance unverified"
+  },
+  "dependency": {
+    "normalQualifiedHead": "14a3fe807b7605edd11348165e999b1ef32618f4",
+    "receipt": "../current-runtime-admission/compiler-owner-normal-receipt.json",
+    "normalExit": 0,
+    "ownedCommandsDrained": true,
+    "seatsReleased": true,
+    "compilerBytesMatchPrepared16a": true
+  },
+  "productionPreparation": {
+    "request": "outputs/sidebar-review/diagnostics/gem-production-request-f4a73e59/request.json",
+    "sha256": "a273598b2aa46817b169314dd26c87ac0338c156ff665498d40f65c08b9d6b06",
+    "payloadsVerified": 10,
+    "sourceArchiveBytes": 84458598,
+    "admitted": false,
+    "transferred": false,
+    "executed": false,
+    "newRemoteJobDispatched": false
+  },
+  "remaining": [
+    "Current exact production composition and full combined CI/coverage/future fresh-main integration",
+    "InstalledMacOS drag/window and packaged behavior",
+    "Physical120Hz and human VoiceOver; successful device inventory reports paired tunnel unavailable",
+    "Protected native Ovie auth and private Summer resume per existing owner prerequisites",
+    "HostedCI/native merge admission/deploy/runtime/persistence acceptance"
+  ],
+  "cleanup": "cleanup.json confirms zero task-owned temporary Electron survivors;6017 preserved; installedapps/personal sessions/simulator untouched",
+  "publicationActionActive": false,
+  "goalComplete": false,
+  "verifiedGBrainReceipt": {
+    "slug": "receipts/shared-sidebar-native-zoom-f4a73e59-2026-10-08",
+    "contentHash": "180d2601d80f3ea13cba7ff84dd5a23057ae6b018244cca87c7cc4d10d97f074",
+    "bodyMatches": true,
+    "canonicalContentAvailable": true
+  }
+}

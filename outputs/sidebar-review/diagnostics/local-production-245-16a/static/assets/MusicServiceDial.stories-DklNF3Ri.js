@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./MusicServiceDial-7r5yTzy6.js";var i,a,o,s,c,l,u;function d(){return(d=e((()=>{i=t(),n(),{fn:a}=__STORYBOOK_MODULE_TEST__,o=[{key:`spotify`,label:`Spotify`,url:`https://open.spotify.com`},{key:`apple_music`,label:`Apple Music`,url:`https://music.apple.com`},{key:`deezer`,label:`Deezer`,url:`https://www.deezer.com`}],s={title:`Release/MusicServiceDial`,component:r,parameters:{layout:`centered`,backgrounds:{default:`dark`}},decorators:[e=>(0,i.jsx)(`div`,{className:`w-80 rounded-3xl bg-surface-2 p-4`,children:(0,i.jsx)(e,{})})],args:{providers:o,utmParams:{},onStream:a()}},c={},l={args:{providers:o.slice(0,1)}},u=[`ThreeServices`,`OneService`],c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{}`,...c.parameters?.docs?.source}}},l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{
+  args: {
+    providers: providers.slice(0, 1)
+  }
+}`,...l.parameters?.docs?.source}}}})))()}d();export{l as OneService,c as ThreeServices,u as __namedExportsOrder,s as default};

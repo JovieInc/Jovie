@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./GroupHeader-BUuiaDNl.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Organisms/Table/Atoms/GroupHeader`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,i.jsx)(`table`,{className:`w-96`,children:(0,i.jsx)(`tbody`,{children:(0,i.jsx)(e,{})})})],args:{label:`New`,count:12,colSpan:4}},o={},s={args:{isSticky:!1}},c=[`Default`,`NotSticky`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    isSticky: false
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{o as Default,s as NotSticky,c as __namedExportsOrder,a as default};

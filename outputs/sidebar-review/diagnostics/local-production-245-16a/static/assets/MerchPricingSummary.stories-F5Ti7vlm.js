@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./MerchPricingSummary-CDl2l57b.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Molecules/MerchPricingSummary`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,i.jsx)(`div`,{className:`w-48`,children:(0,i.jsx)(e,{})})],args:{salePrice:`$28.00`,profit:`$10.40`}},o={},s={args:{compact:!0}},c=[`Default`,`Compact`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    compact: true
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{s as Compact,o as Default,c as __namedExportsOrder,a as default};

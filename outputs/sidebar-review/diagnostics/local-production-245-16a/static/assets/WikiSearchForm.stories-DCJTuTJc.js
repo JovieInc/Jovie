@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";function n({initialQuery:e}){return(0,r.jsx)(`form`,{action:`/hud/wiki`,method:`GET`,className:`mb-6`,children:(0,r.jsx)(`input`,{type:`search`,name:`q`,defaultValue:e||``,placeholder:`Search wiki...`,className:`w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white`})})}var r;function i(){return(i=e((()=>{r=t()})))()}var a,o,s,c;function l(){return(l=e((()=>{i(),a={title:`Features/Admin/WikiSearchForm`,component:n,parameters:{layout:`centered`}},o={},s={args:{initialQuery:`deployment runbook`}},c=[`Empty`,`WithQuery`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    initialQuery: 'deployment runbook'
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{o as Empty,s as WithQuery,c as __namedExportsOrder,a as default};

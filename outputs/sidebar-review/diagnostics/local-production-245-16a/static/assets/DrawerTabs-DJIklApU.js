@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{a as n,i as r}from"./TabBar-Dt4q96OD.js";function i({overflowMode:e=`collapse`,distribution:t=`fill`,...n}){return(0,a.jsx)(r,{...n,distribution:t,overflowMode:e,variant:`drawer`})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

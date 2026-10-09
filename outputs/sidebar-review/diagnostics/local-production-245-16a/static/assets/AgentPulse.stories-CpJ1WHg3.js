@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./AgentPulse-C-leEvAz.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Shell/AgentPulse`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,i.jsxs)(`span`,{className:`relative inline-flex h-8 w-8 items-center justify-center rounded bg-surface-1 text-secondary-token`,children:[`A`,(0,i.jsx)(e,{})]})]},o={},s={args:{durationMs:3200}},c=[`Default`,`SlowerPulse`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    durationMs: 3200
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{o as Default,s as SlowerPulse,c as __namedExportsOrder,a as default};

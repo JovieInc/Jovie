@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{n,t as r}from"./useMediaQuery-u0jZUA4z.js";function i(e){let t=`(min-width: ${o[e]}px)`;return n(t)}function a(e){let t=`(max-width: ${o[e]-1}px)`;return n(t)}var o;function s(){return(s=e((()=>{t(),r(),o={sm:640,md:768,lg:1024,xl:1280,"2xl":1536}})))()}export{i as n,a as r,s as t};

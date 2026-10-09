@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ProfileDesktopSurface-BEwZjJeN.js";import{i,n as a,r as o,t as s}from"./profile-story-fixture-x0SfJ1Ud.js";var c,l,u,d;function f(){return(f=e((()=>{c=t(),o(),n(),l={title:`Profile/ProfileDesktopSurface`,component:r,parameters:{layout:`fullscreen`,jovie:{uncoveredProps:[`disabled`]}},args:{artist:s,socialLinks:[],contacts:[],drawerOpen:!1,drawerView:`menu`,onDrawerOpenChange:i,onDrawerViewChange:i,onOpenMenu:i,onPlayClick:i,onBack:i,profileHref:`/timwhite`,contentPrefs:a,latestRelease:{title:`Never Say A Word`,slug:`never-say-a-word`,artworkUrl:`/images/avatars/tim-white.jpg`,releaseDate:`2026-08-01T00:00:00.000Z`,releaseType:`single`}}},u={render:e=>(0,c.jsx)(`div`,{className:`min-h-dvh bg-base p-6`,children:(0,c.jsx)(r,{...e})})},d=[`Home`],u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
+  render: args => <div className='min-h-dvh bg-base p-6'>
+      <ProfileDesktopSurface {...args} />
+    </div>
+}`,...u.parameters?.docs?.source}}}})))()}f();export{u as Home,d as __namedExportsOrder,l as default};

@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{a as t,o as n}from"./chunk-D32TOXHM-DSSK3b9r.js";function r(){return(r=e((()=>{t()})))()}r();export{n as Mermaid};

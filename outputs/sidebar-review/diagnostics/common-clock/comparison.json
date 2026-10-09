@@ -1,0 +1,30 @@
+{
+  "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "assertionsPreserved": true,
+  "modes": [
+    {
+      "mode": "capture-off",
+      "durationMs": 290.327,
+      "rafP95Ms": 24.90000000000009,
+      "rafMaxMs": 33.399999999999864,
+      "over16_7": 3,
+      "over8_3": 16,
+      "longTasks": 0,
+      "clockSpreadUs": 104.99951171875,
+      "snapshotLeafSamples": 0
+    },
+    {
+      "mode": "capture-on",
+      "durationMs": 317.456,
+      "rafP95Ms": 25.0,
+      "rafMaxMs": 40.700000000000045,
+      "over16_7": 3,
+      "over8_3": 16,
+      "longTasks": 0,
+      "clockSpreadUs": 82.99951171875,
+      "snapshotLeafSamples": 54
+    }
+  ],
+  "conclusion": "Frame budget still missed with snapshots off. Common-clock trace ties two capture-off misses to44.387ms/29.099ms keyboard React event dispatches. Snapshot-enabled control is slower in this pair, but one pair cannot estimate its general cost. No program227ms startup charge assigned to sidebar.",
+  "next": "Inspect common-clock opening/focus/update work and distinguish development-runtime overhead from production behavior before source changes. Preserve maintained primitives, interaction waits and all existing CI gates; no new framework."
+}

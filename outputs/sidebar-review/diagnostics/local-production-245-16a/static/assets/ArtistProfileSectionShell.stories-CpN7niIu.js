@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{i as n,t as r}from"./ArtistProfileSectionHeader-Dx6lOpc5.js";import{n as i,t as a}from"./ArtistProfileSectionShell-B2Mgk5JX.js";import{n as o,t as s}from"./artistProfileCopy-j-Y_pNlk.js";var c,l,u,d,f;function p(){return(p=e((()=>{c=t(),o(),n(),i(),l={title:`Marketing/Artist Profile/ArtistProfileSectionShell`,component:a,parameters:{layout:`fullscreen`},args:{width:`page`,children:(0,c.jsx)(r,{align:`left`,headline:s.outcomes.headline,body:s.outcomes.body})}},u={},d={args:{width:`landing`}},f=[`Page`,`Landing`],u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{}`,...u.parameters?.docs?.source}}},d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
+  args: {
+    width: 'landing'
+  }
+}`,...d.parameters?.docs?.source}}}})))()}p();export{d as Landing,u as Page,f as __namedExportsOrder,l as default};

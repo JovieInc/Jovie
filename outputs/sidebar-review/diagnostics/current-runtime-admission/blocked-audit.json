@@ -1,0 +1,75 @@
+{
+  "at": "2026-10-08T11:28:44.455963+00:00",
+  "sourceHead": "f4a73e59c09c62f349195c486419b2278df79b9b",
+  "nativeHead": "545b383925854b8a1632fffe9b48087fe88f6e37",
+  "sourceTrackedClean": true,
+  "fullGoalComplete": false,
+  "completionLeavesAudited": 18,
+  "missingCompletionEvidence": [
+    "exact-current production/performance",
+    "full current combined CI and integration",
+    "installed macOS drag/window/runtime",
+    "physical120Hz and humanVoiceOver",
+    "protected native auth/privateSummer/history acceptance",
+    "original publication/deployment receipts"
+  ],
+  "primaryBlockingCondition": "Exact corrected production execution handoff lacks accepted user approval after automatic-review rejection; no owner job admitted or running. Protected native path also lacks owner release and prerequisites.",
+  "consecutiveGoalTurnsWithSamePrimaryBlocker": 3,
+  "countedTurns": [
+    {
+      "receipt": "diagnostics/current-runtime-admission/input-revision-reconciliation.json",
+      "condition": "revised resource handoff explicitly rejected; exact approval pending",
+      "progress": "actual inventory repair and current timing audit"
+    },
+    {
+      "receipt": "diagnostics/current-runtime-admission/nonce-and-owner-input-reconciliation.json",
+      "condition": "same execution approval pending; resource owner only reconciled metadata",
+      "progress": "nonce source ancestry and same-logical-scope owner proof"
+    },
+    {
+      "receipt": "diagnostics/current-runtime-admission/blocked-audit.json",
+      "condition": "fresh owner remains idle at metadata-only final, exact approval unanswered; no source/runtime release",
+      "progress": "no remaining independent implementation action identified; read-only admission/device census confirm barriers"
+    }
+  ],
+  "remainingSafeAlternativesAudited": {
+    "localFullBuild": "actual maintained gate rejected; available230359040 vs required18897856103bytes; no override",
+    "remoteProduction": "owner metadata proof is terminal; no actual admission/job handle; approved dispatch pending",
+    "nativeAuth": "freshJOV7738 Todo explicitly forbids applying before actual7712landing and portability-owner release; no release receipt",
+    "physical": "read-only inventory succeeds but tunnel unavailable; no installed candidate/runtime proof",
+    "publication": "inactive proposal, no authorized push/PR/merge/deploy action",
+    "moreSourceChanges": "known titlebar/focus defects fixed and current scoped source tests pass; performance attribution requires held production controls. Do not invent an unmeasured product change."
+  },
+  "physicalInventory": {
+    "outcome": "success",
+    "rawSha256": "c0832e7571d6a79d8d6082ee3af790af55982c9d2acab611c05d1f08594a7022",
+    "devices": [
+      {
+        "pairingState": "paired",
+        "tunnelState": "unavailable",
+        "ddiServicesAvailable": false,
+        "developerModeStatus": "enabled",
+        "osVersion": "27.0"
+      }
+    ],
+    "deviceMutation": false
+  },
+  "sourceEdited": false,
+  "buildStarted": false,
+  "newRemoteJobDispatched": false,
+  "liveGoalWorkerVerified": false,
+  "approvalQuestionAlreadyPending": true,
+  "newPermissionQuestionSent": false,
+  "blockedThresholdSatisfied": true,
+  "proposedGoalStatus": "blocked",
+  "resumeAction": "Approve exact corrected request to Decouple subscription shipping, then obtain real maintained admission/run handle. Native owner separately verifies/relinquishes prerequisites. Preserve full goal scope.",
+  "actualGoalStatus": "blocked",
+  "goalStatusReceipt": "outputs/sidebar-review/diagnostics/current-runtime-admission/blocked-goal-status.json",
+  "verifiedGBrain": {
+    "slug": "receipts/shared-sidebar-blocked-runtime-admission-2026-10-08",
+    "contentHash": "4dfe7d29d832711a498d81045a5e1ee8b28535ab42d4c2b02696591266ff6bc9",
+    "canonicalBodyExactMatch": true,
+    "verifiedAt": "2026-10-08T11:30:04.927Z",
+    "goalStatus": "blocked"
+  }
+}

@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(e){return[e.contactName??e.primaryContactLabel,e.companyLabel??e.secondaryLabel].filter(Boolean).join(` · `)}function n(){return(n=e((()=>{})))()}export{n,t};

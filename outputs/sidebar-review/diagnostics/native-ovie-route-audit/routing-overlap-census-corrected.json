@@ -1,0 +1,23 @@
+{
+  "pathsCorrected": true,
+  "sharedRoutingFiles": [
+    "apps/ios/Jovie/Features/Auth/MobileAuthCoordinator.swift",
+    "apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift",
+    "apps/web/lib/ios/apple-app-site-association.ts"
+  ],
+  "localWorktreeCount": 28,
+  "candidateOverlaps": [
+    {
+      "path": "/Users/timwhite/.cache/jovie/agents/lanes/wt",
+      "dirty": "",
+      "branchDelta": "apps/ios/Jovie/Features/Auth/MobileAuthCoordinator.swift"
+    },
+    {
+      "path": "/Users/timwhite/.codex/worktrees/sidebar-native-ci-parity/Jovie",
+      "dirty": "M apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift\n M apps/web/lib/ios/apple-app-site-association.ts",
+      "branchDelta": ""
+    }
+  ],
+  "noOtherLocalSharedRoutingChanges": false,
+  "limitations": "Read-only local shared-repository census plus app inventory; not exhaustive of remote hosts. Existing clean offline-status AppShellView change is unrelated and untouched."
+}

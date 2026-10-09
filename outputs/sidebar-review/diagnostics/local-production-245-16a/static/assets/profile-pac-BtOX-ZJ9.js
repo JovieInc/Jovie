@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";var t;function n(){return(n=e((()=>{t={copyArm:`default`,triggerThreshold:`30s`,s2Slot:`merch`,tabBar:`visible`,dismissAffordance:`text`}})))()}export{n,t};

@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./ContactDetailSidebar-CZ-9DH7s.js";var r,i,a,o,s;function c(){return(c=e((()=>{t(),{fn:r}=__STORYBOOK_MODULE_TEST__,i={title:`Features/Dashboard/Contacts/ContactDetailSidebar`,component:n,args:{contact:{id:`contact-1`,creatorProfileId:`profile-1`,role:`management`,customLabel:null,personName:`Alex Rivera`,companyName:`North Star`,territories:[`North America`],email:`alex@example.com`,phone:`+1 555-0101`,preferredChannel:`email`,isActive:!0,sortOrder:0,isSaving:!1,isDeleting:!1,error:null,isExpanded:!0,customTerritory:``,isNew:!1},isOpen:!0,onClose:r(),onUpdate:r(),onSave:r(),onDelete:r()}},a={},o={args:{contact:null}},s=[`Selected`,`Empty`],a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{}`,...a.parameters?.docs?.source}}},o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  args: {
+    contact: null
+  }
+}`,...o.parameters?.docs?.source}}}})))()}c();export{o as Empty,a as Selected,s as __namedExportsOrder,i as default};

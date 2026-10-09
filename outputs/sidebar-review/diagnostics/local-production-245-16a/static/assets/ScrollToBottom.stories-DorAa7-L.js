@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ScrollToBottom-DVwm3ziv.js";var i,a,o,s,c,l;function u(){return(u=e((()=>{i=t(),n(),{fn:a}=__STORYBOOK_MODULE_TEST__,o={title:`Jovie/ScrollToBottom`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,i.jsx)(`div`,{className:`relative h-32 w-64 bg-base`,children:(0,i.jsx)(e,{})})],args:{visible:!0,onClick:a()}},s={},c={args:{visible:!1}},l=[`Visible`,`Hidden`],s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{}`,...s.parameters?.docs?.source}}},c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    visible: false
+  }
+}`,...c.parameters?.docs?.source}}}})))()}u();export{c as Hidden,s as Visible,l as __namedExportsOrder,o as default};

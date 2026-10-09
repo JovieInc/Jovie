@@ -1,0 +1,40 @@
+{
+  "readOnlyMetadata": true,
+  "sidebarHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "runtimeExercised": false,
+  "apps": [
+    {
+      "app": "/Applications/Jovie.app",
+      "identity": {
+        "channel": "production",
+        "version": "26.10.0",
+        "sourceRevision": "4777fd7d6887596d22de3c3edae5c7c16bf1b0bd",
+        "builtAt": "2026-10-02T22:29:34.888Z"
+      },
+      "buildIdentitySha256": "db5c06af78dbcb7ae3648710f95473317bb0bacec2e7f0d5a065614d53e7e56e",
+      "archiveSize": 3077025
+    },
+    {
+      "app": "/Applications/Jovie Local.app",
+      "identity": {
+        "channel": "local",
+        "version": "26.10.0",
+        "sourceRevision": "a6deb5a1c47e18b43fb6f9f81b92bc431324664c",
+        "builtAt": null
+      },
+      "buildIdentitySha256": "cd9cbfdd68c0c448c9467b770b09655800f7783f4991346138cfa2d01d0b1994",
+      "archiveSize": 3076992
+    },
+    {
+      "app": "/Applications/Jovie Staging.app",
+      "identity": {
+        "channel": "staging",
+        "version": "26.10.1-staging.37658862475.1",
+        "sourceRevision": "96d8881bb53e391d2c92936eca838e7fae7353a4",
+        "builtAt": "2026-10-07T17:28:18.003Z"
+      },
+      "buildIdentitySha256": "5549ebb242f229750ef852eabd7d3e5eed1ab2bf8b2d8b9c54ec3391b65ff0a6",
+      "archiveSize": 3079227
+    }
+  ]
+}

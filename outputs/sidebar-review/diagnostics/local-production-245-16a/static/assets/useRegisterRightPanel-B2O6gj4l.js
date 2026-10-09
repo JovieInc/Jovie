@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{i as n,n as r}from"./RightPanelContext-YZbrsGtE.js";function i(e){let t=n();(0,a.useEffect)(()=>{t(e)},[e,t]),(0,a.useEffect)(()=>()=>t(null),[t])}var a;function o(){return(o=e((()=>{a=t(),r()})))()}export{i as n,o as t};

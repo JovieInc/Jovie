@@ -1,0 +1,11 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,r,t as i}from"./ChatMerchCard-B7EVSVrO.js";var a,o,s,c,l;function u(){return(u=e((()=>{a=t(),r(),o={title:`Jovie/Components/ChatMerchCard`,component:i,parameters:{layout:`centered`},args:{result:{success:!0,generationId:`00000000-0000-4000-8000-000000000100`,nextStep:`Pick one to save it to Work.`,options:[{id:`00000000-0000-4000-8000-000000000101`,option_number:1,design_name:`Signal Tee`,product_type:`Premium Tee`,colorway:`black`,concept:`A premium shirt with restrained artist typography.`,mockup_urls:[],price_recommendation:{sale_price:`$45.00`,profit:`$11.87`,margin_preset:`standard`,presets:[{preset:`safe`,label:`Safe`,sale_price:`$42.00`,profit:`$10.50`},{preset:`standard`,label:`Standard`,sale_price:`$45.00`,profit:`$11.87`}]},sellability:{sellable:!0,reasons:[]},production_warnings:[]},{id:`00000000-0000-4000-8000-000000000102`,option_number:2,design_name:`Draft Hoodie`,product_type:`Hoodie`,colorway:`black`,concept:`A heavier item waiting on provider pricing.`,mockup_urls:[],price_recommendation:{sale_price:`$58.00`,profit:`$0.00`,margin_preset:`standard`},sellability:{sellable:!1,reasons:[`Printful product cost must come from Printful before sale.`]},production_warnings:[]}]}}},s={},c={render:()=>(0,a.jsx)(n,{result:{success:!0,merchCardId:`00000000-0000-4000-8000-000000000201`,status:`draft`,selectedOptionId:`00000000-0000-4000-8000-000000000102`,title:`Draft Hoodie`,publicUrl:null,publishBlockedReasons:[`Printful product cost must come from Printful before sale.`]}})},l=[`Options`,`SelectionDraft`],s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{}`,...s.parameters?.docs?.source}}},c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  render: () => <ChatMerchSelectionCard result={{
+    success: true,
+    merchCardId: '00000000-0000-4000-8000-000000000201',
+    status: 'draft',
+    selectedOptionId: '00000000-0000-4000-8000-000000000102',
+    title: 'Draft Hoodie',
+    publicUrl: null,
+    publishBlockedReasons: ['Printful product cost must come from Printful before sale.']
+  }} />
+}`,...c.parameters?.docs?.source}}}})))()}u();export{s as Options,c as SelectionDraft,l as __namedExportsOrder,o as default};

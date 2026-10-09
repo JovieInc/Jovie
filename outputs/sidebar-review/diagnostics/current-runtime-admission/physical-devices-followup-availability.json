@@ -1,0 +1,13 @@
+{
+  "observedAt": "2026-10-08T11:16:19.422346+00:00",
+  "kind": "redacted read-only device census; no pairing/unlock/install/launch",
+  "rawReceiptSha256": "921f1096e788d1994a3a04b5bf55f2274aef56ebf19068ca3081b01e977a4a8c",
+  "inventoryOutcome": "success",
+  "devices": 1,
+  "paired": true,
+  "tunnelState": "unavailable",
+  "developerModeStatus": "enabled",
+  "ddiServicesAvailable": false,
+  "osVersion": "27.0",
+  "physicalRuntimeAcceptance": false
+}

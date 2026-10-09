@@ -1,0 +1,140 @@
+[
+  {
+    "id": "jovie-zoom2",
+    "initial": {
+      "header": {
+        "x": 0,
+        "y": 0,
+        "right": 720,
+        "bottom": 44,
+        "width": 720,
+        "height": 44
+      },
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "right": 212,
+        "bottom": 44,
+        "width": 212,
+        "height": 44
+      },
+      "brand": {
+        "x": 74,
+        "y": 8,
+        "right": 112,
+        "bottom": 36,
+        "width": 38,
+        "height": 28
+      },
+      "toggle": {
+        "x": 118,
+        "y": 8,
+        "right": 146,
+        "bottom": 36,
+        "width": 28,
+        "height": 28
+      },
+      "back": {
+        "x": 152,
+        "y": 10,
+        "right": 176,
+        "bottom": 34,
+        "width": 24,
+        "height": 24
+      },
+      "forward": {
+        "x": 178,
+        "y": 10,
+        "right": 202,
+        "bottom": 34,
+        "width": 24,
+        "height": 24
+      },
+      "controls": {
+        "x": 50,
+        "y": 0,
+        "width": 670,
+        "height": 22
+      },
+      "viewport": {
+        "width": 720,
+        "height": 450
+      }
+    },
+    "containment": {
+      "brand": true,
+      "toggle": true,
+      "back": true,
+      "forward": true
+    }
+  },
+  {
+    "id": "jovie-zoom0.8",
+    "initial": {
+      "header": {
+        "x": 259.990234375,
+        "y": 0,
+        "right": 1792.001953125,
+        "bottom": 55,
+        "width": 1532.01171875,
+        "height": 55
+      },
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "right": 286.9921875,
+        "bottom": 55,
+        "width": 286.9921875,
+        "height": 55
+      },
+      "brand": {
+        "x": 148.994140625,
+        "y": 13.49609375,
+        "right": 186.97265625,
+        "bottom": 41.494140625,
+        "width": 37.978515625,
+        "height": 27.998046875
+      },
+      "toggle": {
+        "x": 192.96875,
+        "y": 13.49609375,
+        "right": 220.966796875,
+        "bottom": 41.494140625,
+        "width": 27.998046875,
+        "height": 27.998046875
+      },
+      "back": {
+        "x": 226.962890625,
+        "y": 15.498046875,
+        "right": 250.95703125,
+        "bottom": 39.4921875,
+        "width": 23.994140625,
+        "height": 23.994140625
+      },
+      "forward": {
+        "x": 252.94921875,
+        "y": 15.498046875,
+        "right": 276.943359375,
+        "bottom": 39.4921875,
+        "width": 23.994140625,
+        "height": 23.994140625
+      },
+      "controls": {
+        "x": 125,
+        "y": 0,
+        "width": 1675,
+        "height": 55
+      },
+      "viewport": {
+        "width": 1800,
+        "height": 1125
+      }
+    },
+    "containment": {
+      "brand": true,
+      "toggle": true,
+      "back": true,
+      "forward": true
+    }
+  }
+]

@@ -1,0 +1,13 @@
+Please reconcile and admit this exact task-scoped production diagnostic through your existing qualified model-free resource executor if its current source/supervisor/seat and host-health gates permit it.
+
+Sidebar source: f4a73e59c09c62f349195c486419b2278df79b9b, tree ba71eaede1e5643fa137265387bdbd6ff43d39e1. Compiler dependency: 14a3fe807b7605edd11348165e999b1ef32618f4; copied terminal normal receipt confirms exit0, drain and seat release, with main/lifecycle byte-identical to16a.
+
+Immutable input: /Users/timwhite/.codex/worktrees/94af/Jovie/outputs/sidebar-review/diagnostics/gem-production-request-f4a73e59/request.json
+Request SHA256: a273598b2aa46817b169314dd26c87ac0338c156ff665498d40f65c08b9d6b06
+Verification: same directory verification.json. Ten payload hashes verified; exact-source archive84,458,598bytes. Current source retains the normal29-case browser selector and57-test affected CI coverage, plus actualnative200%/80% containment evidence at diagnostics/electron-native-zoom-10e/receipt.json.
+
+The request preserves all1231 story source import paths/full addons/styles and existing30% host reserve/8GiB owned headroom/RSS cap, fail-closed birth-bound supervision and owned cleanup/seat release. No slim/live-cert flag, removed story, skip, gate override, credential copy, alternate routing or extra source writer. Use the existing maintained dependency restore and executor authority. If no applicable owner admission exists, report the concrete blocker; do not bypass it.
+
+Requested outputs are a fresh full production diagnostic build and five unprofiled plus two common-clock profiled120-page More/search controls with exact provenance, artifact hashes, resource/cleanup/seat receipts. This is a diagnostic composition, not full combined CI, live certificate, physical/native/installed/authenticated acceptance or publication authority. Earlier245 and10e evidence stays historical and uncanceled.
+
+Do not push, create PRs or alter native/auth ownership as part of this request.

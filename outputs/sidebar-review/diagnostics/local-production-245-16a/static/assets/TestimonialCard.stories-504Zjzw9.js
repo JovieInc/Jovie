@@ -1,0 +1,8 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";function n({name:e,title:t,quote:n,initials:i}){return(0,r.jsxs)(`div`,{className:`relative flex flex-col items-center rounded-xl p-8 text-center transition-colors duration-(--duration-normal)`,style:{backgroundColor:`var(--linear-bg-surface-0)`,border:`1px solid var(--linear-border-subtle)`,boxShadow:`0 2px 8px rgba(0,0,0,0.15)`},children:[(0,r.jsx)(`div`,{className:`mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-surface-2 text-lg font-semibold text-secondary-token`,children:i}),(0,r.jsxs)(`blockquote`,{className:`flex-1 text-mid leading-relaxed text-secondary-token italic`,children:[`“`,n,`”`]}),(0,r.jsxs)(`div`,{className:`mt-5`,children:[(0,r.jsx)(`p`,{className:`text-mid font-medium text-primary-token`,children:e}),(0,r.jsx)(`p`,{className:`mt-0.5 text-app text-tertiary-token`,children:t})]})]})}var r;function i(){return(i=e((()=>{r=t()})))()}var a,o,s;function c(){return(c=e((()=>{i(),a={title:`Marketing/Sections/TestimonialCard`,component:n,parameters:{layout:`padded`}},o={args:{name:`Tim White`,title:`Artist`,quote:`Jovie keeps the release work in one place.`,initials:`TW`}},s=[`Default`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  args: {
+    name: 'Tim White',
+    title: 'Artist',
+    quote: 'Jovie keeps the release work in one place.',
+    initials: 'TW'
+  }
+}`,...o.parameters?.docs?.source}}}})))()}c();export{o as Default,s as __namedExportsOrder,a as default};

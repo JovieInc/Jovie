@@ -1,0 +1,6 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{r as n,t as r}from"./OnboardingV2Form-suDTNrxp.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Features/Dashboard/Onboarding/OnboardingV2Form`,component:r,parameters:{layout:`fullscreen`,nextjs:{appDirectory:!0},jovie:{uncoveredProps:[`title`]}},args:{isHydrated:!0,userId:`storybook-user`,userEmail:`artist@example.com`,initialDisplayName:`Avery Stone`,initialHandle:`averystone`,assumeInitialHandleAvailable:!0},render:e=>(0,i.jsx)(`div`,{className:`min-h-screen bg-base`,children:(0,i.jsx)(r,{...e})})},o={},s={args:{initialProfileId:`storybook-profile`,initialResumeStep:`spotify`}},c=[`HandleStep`,`SpotifyStep`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    initialProfileId: 'storybook-profile',
+    initialResumeStep: 'spotify'
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{o as HandleStep,s as SpotifyStep,c as __namedExportsOrder,a as default};

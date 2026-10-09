@@ -1,0 +1,33 @@
+{
+  "observedAt": "2026-10-08T10:12:41.186428+00:00",
+  "issueMutated": false,
+  "fileLeaseAcquired": false,
+  "issues": [
+    {
+      "id": "JOV-6750",
+      "status": "In Progress",
+      "updatedAt": "2026-10-07T21:11:14.641Z",
+      "boundary": "sharedclients/platformportability owner stillactive;origin-scopedcredentialsrequired"
+    },
+    {
+      "id": "JOV-7712",
+      "status": "Todo",
+      "updatedAt": "2026-10-04T20:45:18.603Z",
+      "ownership": "context_audit after actualnonceparent mergeandrelease",
+      "blockedBy": "JOV-7673"
+    },
+    {
+      "id": "JOV-7738",
+      "status": "Todo",
+      "updatedAt": "2026-10-04T23:45:23.306Z",
+      "ownership": "native_session_delivery after portabilityowner releases",
+      "blockedBy": "JOV-7712"
+    },
+    {
+      "id": "JOV-7740",
+      "status": "In Review",
+      "updatedAt": "2026-10-04T00:54:36.772Z",
+      "scope": "obsoletegridcolumn removal;currentbounded titlebar allocationnotauthsource"
+    }
+  ]
+}

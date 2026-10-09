@@ -1,0 +1,12 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{t as n}from"./jsx-runtime-BbDfbRii.js";import{H as r,U as i}from"./removable-_8fTgXVw.js";import{c as a,h as o,p as s,s as c}from"./iframe-B1b4EUuv.js";import{n as l,r as u,t as d}from"./RightPanelContext-YZbrsGtE.js";import{n as f,t as p}from"./keys-CNuKOgyu.js";import{a as m,t as h}from"./fixtures-CkBtG5dP.js";import{n as g,t as _}from"./OvieCertificationsWorkspace-dU8tUUL2.js";function v(e){let t=new c({defaultOptions:{queries:{retry:!1,staleTime:1/0},mutations:{retry:!1}}}),n=f.admin.certifications();return t.setQueryDefaults(n,{enabled:!1,staleTime:1/0}),e&&t.setQueryData(n,e),t}function y(){let e=u();return(0,x.jsxs)(`div`,{className:`flex h-180 min-w-0 bg-(--app-shell-content-surface) text-primary-token`,children:[(0,x.jsx)(`div`,{className:`min-w-0 flex-1`,children:(0,x.jsx)(_,{})}),e]})}function b({inventory:e}){let t=(0,S.useMemo)(()=>v(e),[e]);return(0,x.jsx)(r,{client:t,children:(0,x.jsx)(s,{children:(0,x.jsx)(d,{children:(0,x.jsx)(y,{})})})})}var x,S,C,w,T,E,D,O,k,A,j;function M(){return(M=e((()=>{x=n(),o(),a(),i(),S=t(),l(),m(),p(),g(),{userEvent:C,within:w}=__STORYBOOK_MODULE_TEST__,T=h(),E={...T,counts:{working:0,review_ready:0,founder_locked:0,shipped:0,monitored:0,total:0},rows:[]},D={title:`Features/Admin/Certifications/OvieCertificationsWorkspace`,component:_,parameters:{layout:`fullscreen`,viewport:{defaultViewport:`desktop`}}},O={render:()=>(0,x.jsx)(b,{inventory:T}),play:async({canvasElement:e})=>{await C.click(await w(e).findByText(`Flow signup-golden-path`))}},k={render:()=>(0,x.jsx)(b,{inventory:E})},A={render:()=>(0,x.jsx)(b,{})},j=[`ReviewQueue`,`Empty`,`Loading`],O.parameters={...O.parameters,docs:{...O.parameters?.docs,source:{originalSource:`{
+  render: () => <WorkspaceStory inventory={inventory} />,
+  play: async ({
+    canvasElement
+  }) => {
+    await userEvent.click(await within(canvasElement).findByText('Flow signup-golden-path'));
+  }
+}`,...O.parameters?.docs?.source}}},k.parameters={...k.parameters,docs:{...k.parameters?.docs,source:{originalSource:`{
+  render: () => <WorkspaceStory inventory={emptyInventory} />
+}`,...k.parameters?.docs?.source}}},A.parameters={...A.parameters,docs:{...A.parameters?.docs,source:{originalSource:`{
+  render: () => <WorkspaceStory />
+}`,...A.parameters?.docs?.source}}}})))()}M();export{k as Empty,A as Loading,O as ReviewQueue,j as __namedExportsOrder,D as default};

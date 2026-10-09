@@ -1,0 +1,6 @@
+{
+  "head": "ca37a68405b5f2521c3a5e98fae5a00445da20fd",
+  "terminalExit": 65,
+  "failure": "UI1299: global Features query saw retained scoped pin while asserting collapsed More. Corrected locator scopes More panel. Production source unchanged.",
+  "noPassClaim": true
+}

@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{r as t,t as n}from"./registry-CT9kYjrl.js";import{n as r,t as i}from"./ProductScreenshot-CC6e-m_L.js";var a,o,s,c,l;function u(){return(u=e((()=>{t(),r(),a=n(`dashboard-audience-desktop`),o={title:`Features/Home/ProductScreenshot`,component:i,parameters:{layout:`centered`},args:{src:a.publicUrl,alt:a.alt,width:720,height:450,skipCheck:!0}},s={},c={args:{chrome:`minimal`}},l=[`WindowChrome`,`MinimalChrome`],s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{}`,...s.parameters?.docs?.source}}},c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    chrome: 'minimal'
+  }
+}`,...c.parameters?.docs?.source}}}})))()}u();export{c as MinimalChrome,s as WindowChrome,l as __namedExportsOrder,o as default};

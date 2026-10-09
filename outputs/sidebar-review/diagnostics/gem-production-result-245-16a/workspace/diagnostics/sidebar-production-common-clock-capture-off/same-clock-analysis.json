@@ -1,0 +1,598 @@
+{
+  "mode": "off",
+  "runtimeProof": [
+    {
+      "bundleType": 0,
+      "version": "19.2.8",
+      "rendererPackageName": "react-dom"
+    }
+  ],
+  "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "compilerOverlay": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+  "diagnosticComposition": true,
+  "unchangedSourceQualification": false,
+  "assertionsPassed": true,
+  "flowScope": "More activation through120page search/Calendar selection;pre-More idle longtasks retained separately",
+  "sameClock": {
+    "offsetUs": 1609009113798.0,
+    "offsetSpreadUs": 67.0,
+    "rendererPid": 3761910,
+    "rendererTid": 3761910
+  },
+  "frames": 21,
+  "intervals": 20,
+  "flowDurationMs": 392.427,
+  "rafMedianMs": 16.700000000000045,
+  "rafP95Ms": 33.19999999999982,
+  "rafMaxMs": 50.09999999999991,
+  "over16_7": 14,
+  "over8_3": 20,
+  "flowLongTasks": [
+    {
+      "start": 1348,
+      "duration": 60
+    }
+  ],
+  "preMoreLongTasks": [
+    {
+      "start": 1224.6000001430511,
+      "duration": 93
+    }
+  ],
+  "slowFrames": [
+    {
+      "startMs": 1356.5,
+      "endMs": 1406.6,
+      "gapMs": 50.09999999999991,
+      "phase": "more",
+      "events": [
+        {
+          "name": "RunTask",
+          "durationMs": 60.454,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 60.302,
+          "type": "keydown",
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 51.038,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 4.208,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 4.886,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "Layout",
+          "durationMs": 12.068,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 8.772,
+          "type": "focusScope.autoFocusOnMount",
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 5.463,
+          "type": "focusin",
+          "url": null
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 2.941,
+          "type": null,
+          "url": null
+        }
+      ]
+    },
+    {
+      "startMs": 1423.2,
+      "endMs": 1439.9,
+      "gapMs": 16.700000000000045,
+      "phase": "more",
+      "events": [
+        {
+          "name": "RunTask",
+          "durationMs": 7.77,
+          "type": null,
+          "url": null
+        }
+      ]
+    },
+    {
+      "startMs": 1456.5,
+      "endMs": 1473.2,
+      "gapMs": 16.700000000000045,
+      "phase": "more",
+      "events": [
+        {
+          "name": "RunTask",
+          "durationMs": 15.529,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 15.455,
+          "type": "keydown",
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 14.961,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 3.384,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 2.415,
+          "type": null,
+          "url": null
+        }
+      ]
+    },
+    {
+      "startMs": 1473.2,
+      "endMs": 1489.9,
+      "gapMs": 16.700000000000045,
+      "phase": "more",
+      "events": [
+        {
+          "name": "RunTask",
+          "durationMs": 3.384,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 2.081,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 32.86,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 32.793,
+          "type": "keydown",
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 27.747,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        }
+      ]
+    },
+    {
+      "startMs": 1489.9,
+      "endMs": 1523.1,
+      "gapMs": 33.19999999999982,
+      "phase": "more",
+      "events": [
+        {
+          "name": "RunTask",
+          "durationMs": 32.86,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 32.793,
+          "type": "keydown",
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 27.747,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 3.81,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 4.515,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 6.883,
+          "type": "focusScope.autoFocusOnMount",
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 4.188,
+          "type": "focusin",
+          "url": null
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 2.483,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 7.303,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 2.616,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/OverlayInteractionGuard-CJ4Aq4z_.js"
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 2.445,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 2.415,
+          "type": null,
+          "url": null
+        }
+      ]
+    },
+    {
+      "startMs": 1523.1,
+      "endMs": 1539.8,
+      "gapMs": 16.700000000000045,
+      "phase": "more",
+      "events": [
+        {
+          "name": "RunTask",
+          "durationMs": 7.303,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 2.415,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 1.943,
+          "type": null,
+          "url": null
+        }
+      ]
+    },
+    {
+      "startMs": 1539.8,
+      "endMs": 1556.5,
+      "gapMs": 16.700000000000045,
+      "phase": "search-open",
+      "events": []
+    },
+    {
+      "startMs": 1556.5,
+      "endMs": 1573.2,
+      "gapMs": 16.700000000000045,
+      "phase": "search-open",
+      "events": [
+        {
+          "name": "RunTask",
+          "durationMs": 1.884,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 15.23,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 11.482,
+          "type": "click",
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 10.841,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        }
+      ]
+    },
+    {
+      "startMs": 1573.2,
+      "endMs": 1589.9,
+      "gapMs": 16.700000000000045,
+      "phase": "search-open",
+      "events": [
+        {
+          "name": "RunTask",
+          "durationMs": 15.23,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 11.482,
+          "type": "click",
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 10.841,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 2.41,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 13.722,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 8.884,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 4.565,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/iframe-B1b4EUuv.js"
+        }
+      ]
+    },
+    {
+      "startMs": 1606.5,
+      "endMs": 1623.2,
+      "gapMs": 16.700000000000045,
+      "phase": "search-open",
+      "events": [
+        {
+          "name": "RunTask",
+          "durationMs": 14.313,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 7.142,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/iframe-B1b4EUuv.js"
+        },
+        {
+          "name": "Layout",
+          "durationMs": 5.647,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 1.509,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 10.935,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 10.106,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        }
+      ]
+    },
+    {
+      "startMs": 1639.8,
+      "endMs": 1656.5,
+      "gapMs": 16.700000000000045,
+      "phase": "search-open",
+      "events": []
+    },
+    {
+      "startMs": 1656.5,
+      "endMs": 1673.2,
+      "gapMs": 16.700000000000045,
+      "phase": "search-open",
+      "events": [
+        {
+          "name": "RunTask",
+          "durationMs": 5.425,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 4.427,
+          "type": "input",
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 2.294,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 1.937,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/iframe-B1b4EUuv.js"
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 4.008,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 3.951,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 1.594,
+          "type": null,
+          "url": null
+        }
+      ]
+    },
+    {
+      "startMs": 1689.8,
+      "endMs": 1706.5,
+      "gapMs": 16.700000000000045,
+      "phase": "selection",
+      "events": [
+        {
+          "name": "RunTask",
+          "durationMs": 8.856,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "EventDispatch",
+          "durationMs": 8.794,
+          "type": "keydown",
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 7.444,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        },
+        {
+          "name": "RunTask",
+          "durationMs": 11.128,
+          "type": null,
+          "url": null
+        },
+        {
+          "name": "FunctionCall",
+          "durationMs": 6.893,
+          "type": null,
+          "url": "http://127.0.0.1:6027/assets/react-18-evYLipn4.js"
+        },
+        {
+          "name": "UpdateLayoutTree",
+          "durationMs": 1.839,
+          "type": null,
+          "url": null
+        }
+      ]
+    },
+    {
+      "startMs": 1706.5,
+      "endMs": 1723.2,
+      "gapMs": 16.700000000000045,
+      "phase": "selection",
+      "events": []
+    }
+  ],
+  "keyboardEventDispatch": [
+    {
+      "durationMs": 60.302,
+      "relativeToMoreMs": 15.799,
+      "type": "keydown"
+    },
+    {
+      "durationMs": 32.793,
+      "relativeToMoreMs": 153.705,
+      "type": "keydown"
+    },
+    {
+      "durationMs": 15.455,
+      "relativeToMoreMs": 122.079,
+      "type": "keydown"
+    },
+    {
+      "durationMs": 11.482,
+      "relativeToMoreMs": 232.332,
+      "type": "click"
+    },
+    {
+      "durationMs": 8.794,
+      "relativeToMoreMs": 350.403,
+      "type": "keydown"
+    },
+    {
+      "durationMs": 8.772,
+      "relativeToMoreMs": 55.577,
+      "type": "focusScope.autoFocusOnMount"
+    },
+    {
+      "durationMs": 6.883,
+      "relativeToMoreMs": 172.49,
+      "type": "focusScope.autoFocusOnMount"
+    },
+    {
+      "durationMs": 5.463,
+      "relativeToMoreMs": 58.883,
+      "type": "focusin"
+    }
+  ],
+  "cpu": {
+    "samples": 1761,
+    "negativeTimeDeltas": 56,
+    "quantitativeFunctionAttributionUsed": false
+  },
+  "limitations": [
+    "one headless Linux sample per mode",
+    "CDP CPU/render tracing active in both;off disables Playwright snapshots only",
+    "minified React chunk name is not renderer version evidence",
+    "nested event durations are inclusive/nonadditive",
+    "no statistical host or snapshot effect estimate;no Mac/physical120Hz/live-auth proof"
+  ],
+  "frameBudgetsAccepted": false
+}

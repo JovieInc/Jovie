@@ -1,0 +1,1738 @@
+diff --git a/apps/ios/Jovie/App/AppRouteManifest.swift b/apps/ios/Jovie/App/AppRouteManifest.swift
+index 8d41a745625..593bd5c228e 100644
+--- a/apps/ios/Jovie/App/AppRouteManifest.swift
++++ b/apps/ios/Jovie/App/AppRouteManifest.swift
+@@ -131,7 +131,7 @@ extension IntentNavigationRequest {
+ /// Versioned, executable census of the iOS route graph (JOV-6095). Bump
+ /// `version` whenever a route is added, reclassified, or removed.
+ enum AppRouteManifest {
+-  static let version = 3
++  static let version = 4
+ 
+   static let entries: [AppRouteEntry] = [
+     // MARK: Root routes (AppState.route → RootView)
+@@ -247,7 +247,7 @@ enum AppRouteManifest {
+     ),
+     AppRouteEntry(
+       id: "surface.profile",
+-      title: "Identity",
++      title: "Profiles",
+       classification: .shipped,
+       presentation: .surfacePane,
+       source: "Jovie/Features/Dashboard/DashboardView.swift",
+@@ -715,6 +715,32 @@ enum AppRouteManifest {
+       entry: "Browser only — excluded from universal links",
+       exit: "Safari"
+     ),
++    AppRouteEntry(
++      id: "webOnly.operatorWorkspace",
++      title: "Ovie",
++      classification: .webOnly,
++      presentation: .externalLink,
++      source: "Jovie/Features/AppShell/AppShellLeftDrawer.swift",
++      userTask: "Open a canonical operator destination in the browser",
++      stateOwner: "web app; AASA NOT /app/ov and /app/ov/*",
++      entry: "Authorized Ovie drawer roots, More or pins; stale universal/custom link",
++      exit: "Browser; native drafts and selected pane remain mounted",
++      gate: "canAccessOvie for drawer; web admin/privacy gates for pages",
++      test: "AppShellIntentNavigationTests; apple-app-site-association.test.ts"
++    ),
++    AppRouteEntry(
++      id: "webOnly.operatorNow",
++      title: "Now",
++      classification: .webOnly,
++      presentation: .externalLink,
++      source: "Jovie/Features/AppShell/AppShellLeftDrawer.swift",
++      userTask: "Open the operator company pulse in the browser",
++      stateOwner: "web app; /hud is outside /app/*",
++      entry: "Authorized Ovie Now row; custom link",
++      exit: "Browser; native selected pane is unchanged",
++      gate: "canAccessOvie for drawer; web admin/privacy gates for page",
++      test: "AppShellIntentNavigationTests"
++    ),
+     AppRouteEntry(
+       id: "webOnly.merchCheckout",
+       title: "Merch Checkout",
+diff --git a/apps/ios/Jovie/App/RootView.swift b/apps/ios/Jovie/App/RootView.swift
+index eb4858ab1a6..3d0ec909678 100644
+--- a/apps/ios/Jovie/App/RootView.swift
++++ b/apps/ios/Jovie/App/RootView.swift
+@@ -1,3 +1,4 @@
++import JovieKit
+ import Observation
+ import SwiftUI
+ 
+@@ -122,6 +123,10 @@ private struct AppContentView: View {
+           chatEnabled: false,
+           audienceEnabled: false,
+           recentConversations: chatRepository?.conversations ?? [],
++          isLoadingConversations: chatRepository?.isLoadingConversations ?? false,
++          sidebarPinScope: appState.activeUserID.map { "\($0):\(workspaceMode.rawValue)" },
++          conversationsError: chatRepository?.lastErrorMessage,
++          onRetryConversations: { Task { await chatRepository?.refreshConversations() } },
+           activeConversationID: chatRepository?.activeConversationID,
+           onSelectConversation: { conversationID in
+             Task { await chatRepository?.openConversation(conversationID) }
+@@ -196,6 +201,10 @@ private struct AppContentView: View {
+           chatEnabled: appState.loadedDashboardResponse != nil,
+           audienceEnabled: appState.loadedDashboardResponse != nil,
+           recentConversations: chatRepository?.conversations ?? [],
++          isLoadingConversations: chatRepository?.isLoadingConversations ?? false,
++          sidebarPinScope: appState.activeUserID.map { "\($0):\(workspaceMode.rawValue)" },
++          conversationsError: chatRepository?.lastErrorMessage,
++          onRetryConversations: { Task { await chatRepository?.refreshConversations() } },
+           activeConversationID: chatRepository?.activeConversationID,
+           onSelectConversation: { conversationID in
+             Task { await chatRepository?.openConversation(conversationID) }
+@@ -339,10 +348,26 @@ private struct AppContentView: View {
+           if appState.launchMode == .uiTestingStorefrontChat {
+             MobileChatStorefrontFixture.primeMockupImages()
+           }
++          var fixtureConversations: [MobileConversationSummary]?
++          if appState.launchMode == .uiTestingChatAllComponents {
++            let now = Date()
++            let earlier = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
++            let formatter = ISO8601DateFormatter()
++            fixtureConversations = (0..<7).map { index in
++              let date = formatter.string(from: index < 2 ? now : earlier)
++              return MobileConversationSummary(
++                id: index == 0 ? MobileChatAllComponentsFixture.conversationID : "fixture-recent-\(index)",
++                title: index < 2 ? "Today conversation \(index)" : "Earlier conversation \(index)",
++                createdAt: date, updatedAt: date,
++                latestMessageRole: "assistant", latestTurnStatus: "completed"
++              )
++            }
++          }
+           repository.seedTimelineForUITesting(
+             fixtureTimeline,
+             activeConversationID: appState.launchMode.chatFixtureConversationID
+-              ?? MobileChatEntityFixture.conversationID
++              ?? MobileChatEntityFixture.conversationID,
++            conversations: fixtureConversations
+           )
+         } else {
+           Task { await repository.bootstrap() }
+diff --git a/apps/ios/Jovie/Core/ChatRepository.swift b/apps/ios/Jovie/Core/ChatRepository.swift
+index 2bbb6425462..a9d07528ad0 100644
+--- a/apps/ios/Jovie/Core/ChatRepository.swift
++++ b/apps/ios/Jovie/Core/ChatRepository.swift
+@@ -259,11 +259,13 @@ final class ChatRepository {
+   /// trivially testable in isolation.
+   func seedTimelineForUITesting(
+     _ timeline: [MobileChatTimelineItem],
+-    activeConversationID: String
++    activeConversationID: String,
++    conversations: [MobileConversationSummary]? = nil
+   ) {
+     isFixtureSeeded = true
+     self.activeConversationID = activeConversationID
+     self.timeline = timeline
++    if let conversations { self.conversations = conversations }
+     hasMoreOlder = false
+     olderCursor = nil
+     isOffline = false
+diff --git a/apps/ios/Jovie/DesignSystem/JovieTheme.swift b/apps/ios/Jovie/DesignSystem/JovieTheme.swift
+index c73167aa5c9..750bb6a2d72 100644
+--- a/apps/ios/Jovie/DesignSystem/JovieTheme.swift
++++ b/apps/ios/Jovie/DesignSystem/JovieTheme.swift
+@@ -189,6 +189,8 @@ enum JovieMotion {
+   static let subtleDuration: Double = 0.15
+   static let slowDuration: Double = 0.25
+   static let cinematicDuration: Double = 0.42
++  /// Shared navigation rail token; independent of modal and splash timing.
++  static let shellRailDuration: Double = 0.22
+   /// Ambient indicator pulse — constant-motion surfaces only (e.g. the chat
+   /// thinking dots). Not a UI transition; deliberately above the <300ms ladder
+   /// so a repeated cycle reads as calm, not frantic.
+@@ -198,6 +200,7 @@ enum JovieMotion {
+   static let subtle = Animation.timingCurve(0.4, 0, 0.2, 1, duration: subtleDuration)
+   /// --ease-cinematic @ 420ms — drawers, modals, surface morphs.
+   static let cinematic = Animation.timingCurve(0.22, 1, 0.36, 1, duration: cinematicDuration)
++  static let shellRail = Animation.timingCurve(0.22, 1, 0.36, 1, duration: shellRailDuration)
+   /// --ease-out — enter/exit; starts fast so it feels responsive.
+   static func easeOut(duration: Double = normalDuration) -> Animation {
+     .timingCurve(0.16, 1, 0.3, 1, duration: duration)
+diff --git a/apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift b/apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift
+index 31949748a5c..34052c7f9c6 100644
+--- a/apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift
++++ b/apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift
+@@ -77,6 +77,81 @@ struct AppShellIntentNavigationState: Equatable {
+   var pendingRequest: IntentNavigationRequest?
+ }
+ 
++/// Native counterpart of ADMIN_NAV_REGISTRY. CI checks IDs, order, titles and
++/// paths against the canonical web registry. No operator page currently mounts
++/// in the native shell; explicit external handoff keeps its native state intact.
++struct AppShellOperatorDestination: Identifiable, Equatable, Sendable {
++  enum Kind: Equatable, Sendable { case webOnly }
++  let id: String
++  let title: String
++  let path: String
++  let systemImage: String
++  let kind: Kind = .webOnly
++
++  func url(webBaseURL: URL) -> URL? {
++    guard webBaseURL.scheme == "https", webBaseURL.host != nil,
++          webBaseURL.user == nil, webBaseURL.password == nil else { return nil }
++    var components = URLComponents(url: webBaseURL, resolvingAgainstBaseURL: false)
++    components?.path = path
++    components?.query = nil
++    components?.fragment = nil
++    return components?.url
++  }
++}
++
++enum AppShellOperatorNavigation {
++  static let entries: [AppShellOperatorDestination] = [
++    .init(id: "overview", title: "Now", path: "/hud", systemImage: "house"),
++    .init(id: "growth", title: "Growth", path: "/app/ov/growth", systemImage: "chart.line.uptrend.xyaxis"),
++    .init(id: "product", title: "Product", path: "/app/ov/product", systemImage: "square.stack"),
++    .init(id: "operations", title: "Operations", path: "/app/ov/operations", systemImage: "gearshape.2"),
++    .init(id: "needs_you", title: "Needs You", path: "/app/ov/needs-you", systemImage: "person.crop.circle.badge.exclamationmark"),
++    .init(id: "chat", title: "Chat", path: "/app/ov/chat", systemImage: "bubble.left"),
++    .init(id: "certifications", title: "Certifications", path: "/app/ov/certifications", systemImage: "checkmark.seal"),
++    .init(id: "shipping", title: "Shipping", path: "/app/ov/shipping", systemImage: "shippingbox"),
++    .init(id: "people", title: "People", path: "/app/ov/people", systemImage: "person.2"),
++    .init(id: "interviews", title: "Interviews", path: "/app/ov/interviews", systemImage: "quote.bubble"),
++    .init(id: "platform_connections", title: "Platform Connections", path: "/app/ov/platform-connections", systemImage: "link"),
++    .init(id: "playlists", title: "Playlists", path: "/app/ov/playlists", systemImage: "music.note.list"),
++    .init(id: "presence", title: "Presence", path: "/app/ov/presence", systemImage: "globe"),
++    .init(id: "activity", title: "Timeline", path: "/app/ov/activity", systemImage: "clock"),
++    .init(id: "investors", title: "Investors", path: "/app/ov/investors", systemImage: "person.3"),
++    .init(id: "feature_registry", title: "Feature Registry", path: "/app/ov/feature-registry", systemImage: "list.bullet.rectangle"),
++    .init(id: "costs", title: "Costs", path: "/app/ov/costs", systemImage: "dollarsign.circle"),
++    .init(id: "revenue_lift", title: "Revenue Lift", path: "/app/ov/revenue-lift", systemImage: "chart.bar"),
++    .init(id: "share_studio", title: "Share Studio", path: "/app/ov/share-studio", systemImage: "square.and.arrow.up"),
++    .init(id: "features", title: "Features", path: "/app/ov/features", systemImage: "square.grid.2x2"),
++  ]
++
++  static func allowed(workspace: MobileWorkspaceMode, canAccessOvie: Bool) -> [AppShellOperatorDestination] {
++    workspace == .ovie && canAccessOvie ? entries : []
++  }
++
++  static func more(_ destinations: [AppShellOperatorDestination], query: String, expanded: Bool) -> [AppShellOperatorDestination] {
++    let utilities = Array(destinations.dropFirst(5))
++    let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
++    if !query.isEmpty { return utilities.filter { $0.title.localizedCaseInsensitiveContains(query) } }
++    return expanded ? utilities : Array(utilities.prefix(12))
++  }
++
++  static func pins(ids: [String], allowed: [AppShellOperatorDestination]) -> [AppShellOperatorDestination] {
++    var seen = Set<String>()
++    let utilities = allowed.dropFirst(5)
++    return ids.compactMap { id in
++      guard seen.insert(id).inserted else { return nil }
++      return utilities.first { $0.id == id }
++    }
++  }
++
++  /// Full URL is owned by the external browser. Resolving it never assigns a
++  /// selected native tab or claims the last launched URL is still active.
++  static func resolve(_ url: URL, webBaseURL: URL) -> (destination: AppShellOperatorDestination, url: URL)? {
++    guard let target = MobileWebOnlyRouteBoundary.firstPartyURL(for: url, webBaseURL: webBaseURL) else { return nil }
++    guard let destination = entries.first(where: { target.path == $0.path || target.path.hasPrefix($0.path + "/") }) else { return nil }
++    return (destination, target)
++  }
++}
++
+ enum MobileSignedInLinkRoute: String, Equatable, Sendable {
+   case settings
+   case chatHome
+@@ -135,21 +210,41 @@ enum MobileWebOnlyRouteBoundary {
+     "/app/jovie-work",
+     "/app/dashboard/release-plan",
+     "/app/dashboard/insights",
++    "/app/ov",
+   ]
+ 
+   static func isWebOnly(_ url: URL) -> Bool {
+     let path = MobileSignedInLinkRoute.normalizedRoutePath(url)
+-    return pathPrefixes.contains { path == $0 || path.hasPrefix($0 + "/") }
++    return path == "/hud" || path.hasPrefix("/hud/")
++      || pathPrefixes.contains { path == $0 || path.hasPrefix($0 + "/") }
+   }
+ 
+   /// The web page to send the user to when a web-only URL reaches the app.
+   static func webFallbackURL(for url: URL, webBaseURL: URL) -> URL {
+-    var components = URLComponents(url: webBaseURL, resolvingAgainstBaseURL: false)
+-    components?.path = MobileSignedInLinkRoute.normalizedRoutePath(url)
+-    components?.queryItems = URLComponents(
+-      url: url, resolvingAgainstBaseURL: false
+-    )?.queryItems
+-    return components?.url ?? webBaseURL
++    firstPartyURL(for: url, webBaseURL: webBaseURL) ?? webBaseURL
++  }
++
++  /// Keep encoded path case, ordered/duplicate query values and fragment.
++  /// Accept only the configured HTTPS origin or the existing custom scheme.
++  static func firstPartyURL(for url: URL, webBaseURL: URL) -> URL? {
++    guard webBaseURL.scheme == "https", webBaseURL.host != nil,
++          webBaseURL.user == nil, webBaseURL.password == nil,
++          url.user == nil, url.password == nil,
++          let source = URLComponents(url: url, resolvingAgainstBaseURL: false)
++    else { return nil }
++    if url.scheme?.lowercased() == "https" {
++      guard url.host?.lowercased() == webBaseURL.host?.lowercased(),
++            url.port == webBaseURL.port else { return nil }
++      return url
++    }
++    guard url.scheme?.lowercased() == "ie.jov.jovie",
++          let host = url.host, ["app", "hud"].contains(host.lowercased()),
++          url.port == nil else { return nil }
++    var target = URLComponents(url: webBaseURL, resolvingAgainstBaseURL: false)
++    target?.percentEncodedPath = "/" + host.lowercased() + source.percentEncodedPath
++    target?.percentEncodedQuery = source.percentEncodedQuery
++    target?.percentEncodedFragment = source.percentEncodedFragment
++    return target?.url
+   }
+ }
+ 
+diff --git a/apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift b/apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift
+index 92ce723b2ba..aa85dce5b68 100644
+--- a/apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift
++++ b/apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift
+@@ -21,6 +21,9 @@ enum AppShellDrawerSurfaceLayout {
+ }
+ 
+ enum AppShellDrawerThreadsFilter {
++  static func shouldShowError(isLoading: Bool, conversations: [MobileConversationSummary], errorMessage: String?) -> Bool {
++    !isLoading && conversations.isEmpty && errorMessage != nil
++  }
+   static func filtered(
+     conversations: [MobileConversationSummary],
+     query: String
+@@ -46,6 +49,83 @@ enum AppShellDrawerThreadsFilter {
+   }
+ }
+ 
++enum AppShellDrawerRecentPolicy {
++  static func privateHistoryURL(workspace: MobileWorkspaceMode, webBaseURL: URL) -> URL? {
++    workspace == .ovie ? webBaseURL.appending(path: "/app/ov/chat") : nil
++  }
++  enum Bucket: String, CaseIterable {
++    case today, earlier
++    var title: String { self == .today ? "Today" : "Earlier" }
++  }
++  struct Entry: Equatable {
++    let id: String
++    let bucket: Bucket
++  }
++  struct Snapshot: Equatable {
++    let scope: String?
++    let entries: [Entry]
++  }
++  struct Group: Identifiable {
++    let id: Bucket
++    let conversations: [MobileConversationSummary]
++  }
++
++  /// Freeze membership and local-day assignment together. Empty first loads
++  /// may capture once data arrives; revalidation never refills an open panel.
++  static func capture(
++    conversations: [MobileConversationSummary], scope: String?, current: Snapshot? = nil,
++    now: Date = Date(), calendar: Calendar = .current
++  ) -> Snapshot {
++    if let current, current.scope == scope, !current.entries.isEmpty { return current }
++    guard !conversations.isEmpty else { return Snapshot(scope: scope, entries: []) }
++    let fractional = ISO8601DateFormatter()
++    fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
++    let standard = ISO8601DateFormatter()
++    func date(_ value: String) -> Date? {
++      fractional.date(from: value) ?? standard.date(from: value)
++    }
++    var seen = Set<String>()
++    let entries = conversations.filter { seen.insert($0.id).inserted }.prefix(5).map { conversation in
++      let timestamp = date(conversation.updatedAt) ?? date(conversation.createdAt)
++      let today = timestamp.map { calendar.isDate($0, inSameDayAs: now) } ?? false
++      return Entry(id: conversation.id, bucket: today ? .today : .earlier)
++    }
++    return Snapshot(scope: scope, entries: Array(entries))
++  }
++
++  static func visible(
++    conversations: [MobileConversationSummary], snapshot: Snapshot?, scope: String?
++  ) -> [MobileConversationSummary] {
++    guard let snapshot, snapshot.scope == scope else { return [] }
++    return snapshot.entries.compactMap { entry in conversations.first { $0.id == entry.id } }
++  }
++
++  static func groups(
++    conversations: [MobileConversationSummary], snapshot: Snapshot?, scope: String?
++  ) -> [Group] {
++    guard let snapshot, snapshot.scope == scope else { return [] }
++    return Bucket.allCases.compactMap { bucket in
++      let rows = snapshot.entries.filter { $0.bucket == bucket }.compactMap { entry in
++        conversations.first { $0.id == entry.id }
++      }
++      return rows.isEmpty ? nil : Group(id: bucket, conversations: rows)
++    }
++  }
++}
++
++enum AppShellDrawerPinsPolicy {
++  static func visible(ids: [String], allowed: [AppShellTab]) -> [AppShellTab] {
++    var seen = Set<String>()
++    return ids.compactMap { id in
++      guard seen.insert(id).inserted else { return nil }
++      return allowed.first { $0.accessibilityID == id }
++    }
++  }
++}
++
++private enum DrawerPanel: Equatable { case recent, history, more }
++private enum DrawerFocus: Hashable { case recent, more, back }
++
+ // The drawer is mounted as the recessed BASE plane behind the elevated content
+ // card (see AppShellView.body). It never overlays, dims, or offsets itself —
+ // AppShellView owns all drag/open state, moves the content plane, and sets
+@@ -67,10 +147,48 @@ struct AppShellLeftDrawer: View {
+   let onSelectConversation: (String) -> Void
+   let onOpenSettings: () -> Void
+   let onTalk: () -> Void
++  var pinScope: String? = nil
++  var conversationsError: String? = nil
++  var onRetryConversations: () -> Void = {}
+   var onOpenPublicProfile: () -> Void = {}
+   var onOpenProfileQR: () -> Void = {}
++  var privateHistoryURL: URL? = nil
++  var workspaceMode: MobileWorkspaceMode = .jovie
++  var canAccessOvie = false
++  var webBaseURL: URL? = nil
++  var onOpenOperatorDestination: (URL) -> Void = { _ in }
+ 
+   @State private var threadSearch = ""
++  @State private var operatorSearch = ""
++  @State private var showsAllOperatorDestinations = false
++  @State private var panel: DrawerPanel?
++  @State private var recentSnapshot: AppShellDrawerRecentPolicy.Snapshot?
++  @State private var savedPins: [String] = []
++  @State private var loadedPinScope: String?
++  @AccessibilityFocusState private var focusedControl: DrawerFocus?
++
++  private func showPanel(_ value: DrawerPanel) {
++    recentSnapshot = value == .recent
++      ? AppShellDrawerRecentPolicy.capture(conversations: recentConversations, scope: pinScope) : nil
++    panel = value
++    focusedControl = .back
++  }
++
++  private func closePanel() {
++    let previous = panel
++    panel = nil
++    recentSnapshot = nil
++    focusedControl = previous == .more ? .more : .recent
++  }
++  private var visibleRecent: [MobileConversationSummary] {
++    AppShellDrawerRecentPolicy.visible(conversations: recentConversations, snapshot: recentSnapshot, scope: pinScope)
++  }
++  private var recentGroups: [AppShellDrawerRecentPolicy.Group] {
++    AppShellDrawerRecentPolicy.groups(conversations: recentConversations, snapshot: recentSnapshot, scope: pinScope)
++  }
++  private var isAwaitingRecentCapture: Bool {
++    !recentConversations.isEmpty && (recentSnapshot?.scope != pinScope || recentSnapshot?.entries.isEmpty != false)
++  }
+   private var filteredConversations: [MobileConversationSummary] {
+     AppShellDrawerThreadsFilter.filtered(
+       conversations: recentConversations,
+@@ -78,77 +196,327 @@ struct AppShellLeftDrawer: View {
+     )
+   }
+ 
++  private var operatorDestinations: [AppShellOperatorDestination] {
++    guard webBaseURL != nil else { return [] }
++    return AppShellOperatorNavigation.allowed(workspace: workspaceMode, canAccessOvie: canAccessOvie)
++  }
++  private var operatorPins: [AppShellOperatorDestination] {
++    guard pinScope != nil, loadedPinScope == pinScope else { return [] }
++    return AppShellOperatorNavigation.pins(ids: savedPins, allowed: operatorDestinations)
++  }
++  private func toggleOperatorPin(_ destination: AppShellOperatorDestination) {
++    guard let pinScope else { return }
++    let ids = operatorPins.map(\.id)
++    savedPins = ids.contains(destination.id) ? ids.filter { $0 != destination.id } : ids + [destination.id]
++    loadedPinScope = pinScope
++    UserDefaults.standard.set(savedPins, forKey: "jovie:sidebar:pins:v1:\(pinScope)")
++  }
++  @ViewBuilder private func operatorRow(_ destination: AppShellOperatorDestination) -> some View {
++    if let webBaseURL, let url = destination.url(webBaseURL: webBaseURL) {
++      DrawerOperatorButton(destination: destination, action: { onOpenOperatorDestination(url) })
++    }
++  }
++
++  private var pinnableTabs: [AppShellTab] { AppShellPanePolicy.childDestinations(of: .library) }
++  private var pins: [AppShellTab] {
++    guard pinScope != nil, loadedPinScope == pinScope else { return [] }
++    return AppShellDrawerPinsPolicy.visible(ids: savedPins, allowed: pinnableTabs)
++  }
++  private func togglePin(_ tab: AppShellTab) {
++    guard let pinScope else { return }
++    let id = tab.accessibilityID
++    let current = pins.map(\.accessibilityID)
++    savedPins = current.contains(id) ? current.filter { $0 != id } : current + [id]
++    loadedPinScope = pinScope
++    UserDefaults.standard.set(savedPins, forKey: "jovie:sidebar:pins:v1:\(pinScope)")
++  }
++
+   var body: some View {
+     VStack(alignment: .leading, spacing: 0) {
+-      Text("Jovie")
++      Text(workspaceMode == .ovie ? "Ovie" : "Jovie")
+         .font(JovieFont.display(size: 22))
+         .foregroundStyle(JovieColor.textPrimary)
+         .padding(.horizontal, JovieSpacing.large)
+         .padding(.top, JovieSpacing.large)
+         .padding(.bottom, JovieSpacing.medium)
+ 
+-      ScrollView {
+-        VStack(alignment: .leading, spacing: JovieSpacing.xLarge) {
+-          // Job-level roots lead; Work owns its review and planning workflows.
+-          // Account controls and conversation history follow navigation.
+-          DrawerSurfaceSwitcher(
+-            chatEnabled: chatEnabled,
+-            audienceEnabled: audienceEnabled,
+-            selectedTab: selectedTab,
+-            hasProfileQR: profile.qrPayload != nil,
+-            onSelectTab: onSelectTab,
+-            onOpenProfileQR: onOpenProfileQR
+-          )
+-
+-          DrawerAccountHeader(
+-            profile: profile,
+-            action: {
+-              if AppShellDrawerProfilePolicy.accountHeaderOpensEmbeddedPublicProfile(
+-                publicProfileURL: profile.publicProfileURL
+-              ) {
+-                onOpenPublicProfile()
++      ZStack(alignment: .topLeading) {
++        ScrollView {
++          VStack(alignment: .leading, spacing: JovieSpacing.large) {
++            if chatEnabled { DrawerNewChatButton(action: onStartNewChat) }
++            if workspaceMode == .ovie {
++              VStack(spacing: JovieSpacing.small) {
++                ForEach(Array(operatorDestinations.prefix(5))) { destination in
++                  operatorRow(destination)
++                }
++              }
++            } else {
++            DrawerSurfaceSwitcher(
++              chatEnabled: chatEnabled,
++              audienceEnabled: audienceEnabled,
++              selectedTab: selectedTab,
++              hasProfileQR: profile.qrPayload != nil,
++              onSelectTab: onSelectTab,
++              onOpenProfileQR: onOpenProfileQR
++            )
++            }
++            if chatEnabled {
++              Button { showPanel(.recent) } label: {
++                HStack(spacing: JovieSpacing.medium) {
++                  Image(systemName: "clock")
++                    .font(.system(size: 16, weight: .semibold))
++                    .frame(width: 22)
++                  Text("Recent")
++                    .font(JovieFont.body(size: 16, weight: .semibold))
++                  Spacer(minLength: 0)
++                }
++                  .padding(.horizontal, JovieSpacing.medium)
++                  .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
++                  .contentShape(Rectangle())
++              }
++              .buttonStyle(.plain)
++              .accessibilityLabel("Recent")
++              .accessibilityFocused($focusedControl, equals: .recent)
++              .accessibilityIdentifier("shell-drawer-recent")
++            }
++            Button { showPanel(.more) } label: {
++              HStack(spacing: JovieSpacing.medium) {
++                Image(systemName: "ellipsis")
++                  .font(.system(size: 16, weight: .semibold))
++                  .frame(width: 22)
++                Text("More")
++                  .font(JovieFont.body(size: 16, weight: .semibold))
++                Spacer(minLength: 0)
++              }
++                .padding(.horizontal, JovieSpacing.medium)
++                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
++                .contentShape(Rectangle())
++            }
++            .buttonStyle(.plain)
++            .accessibilityLabel("More")
++            .accessibilityFocused($focusedControl, equals: .more)
++            .accessibilityIdentifier("shell-drawer-more")
++            if workspaceMode == .ovie {
++              if !operatorPins.isEmpty {
++                VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
++                  Text("Pins").font(JovieFont.body(size: 13, weight: .medium))
++                    .foregroundStyle(JovieColor.textTertiary)
++                  ForEach(operatorPins) { destination in operatorRow(destination) }
++                }
++                .accessibilityElement(children: .contain)
++                .accessibilityIdentifier("shell-drawer-pins")
++              }
++            } else {
++            if !pins.isEmpty {
++              VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
++                Text("Pins").font(JovieFont.body(size: 13, weight: .medium))
++                  .foregroundStyle(JovieColor.textTertiary)
++                ForEach(pins, id: \.self) { tab in
++                  DrawerSurfaceButton(tab: tab, isSelected: selectedTab == tab, action: { onSelectTab(tab) })
++                }
++              }
++              .accessibilityElement(children: .contain)
++              .accessibilityIdentifier("shell-drawer-pins")
++            }
++            }
++          }
++          .padding(.horizontal, JovieSpacing.large)
++          .padding(.bottom, JovieSpacing.large)
++        }
++        .accessibilityHidden(panel != nil)
++        .allowsHitTesting(panel == nil)
++
++        if let panel {
++          VStack(alignment: .leading, spacing: 0) {
++            Button(action: closePanel) {
++              Label("Back", systemImage: "chevron.left")
++                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
++                .contentShape(Rectangle())
++            }
++              .frame(minHeight: 44)
++              .accessibilityFocused($focusedControl, equals: .back)
++              .accessibilityIdentifier("shell-drawer-panel-back")
++            Text(panel == .more ? "More" : panel == .history ? "All chats" : "Recent chats")
++              .font(JovieFont.body(size: 16, weight: .semibold))
++              .padding(.bottom, JovieSpacing.medium)
++            if panel == .more && workspaceMode == .ovie {
++              TextField("Search pages", text: $operatorSearch)
++                .textInputAutocapitalization(.never)
++                .disableAutocorrection(true)
++                .font(JovieFont.body(size: 15))
++                .frame(minHeight: 44)
++                .accessibilityIdentifier("shell-drawer-more-search")
++            }
++            ScrollView {
++              if panel == .more && workspaceMode == .ovie {
++                VStack(spacing: JovieSpacing.small) {
++                  ForEach(AppShellOperatorNavigation.more(operatorDestinations, query: operatorSearch, expanded: showsAllOperatorDestinations)) { destination in
++                    HStack(spacing: 0) {
++                      operatorRow(destination)
++                      if pinScope != nil {
++                        Button { toggleOperatorPin(destination) } label: {
++                          Image(systemName: operatorPins.contains(destination) ? "pin.slash" : "pin")
++                            .frame(width: 44, height: 44)
++                        }
++                        .buttonStyle(.plain)
++                        .accessibilityLabel("\(operatorPins.contains(destination) ? "Unpin" : "Pin") \(destination.title)")
++                        .accessibilityIdentifier("shell-drawer-operator-pin-\(destination.id)")
++                      }
++                    }
++                  }
++                  if operatorSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && operatorDestinations.count > 17 {
++                    Button(showsAllOperatorDestinations ? "Show fewer" : "Show all (\(operatorDestinations.count - 5))") {
++                      showsAllOperatorDestinations.toggle()
++                    }
++                    .frame(minHeight: 44)
++                    .accessibilityIdentifier("shell-drawer-more-expand")
++                  } else if AppShellOperatorNavigation.more(operatorDestinations, query: operatorSearch, expanded: true).isEmpty {
++                    Text("No pages found.").foregroundStyle(JovieColor.textSecondary)
++                  }
++                  if chatEnabled { DrawerTalkRow(action: onTalk) }
++                }
++              } else if panel == .more {
++                VStack(spacing: JovieSpacing.small) {
++                  ForEach(AppShellPanePolicy.childDestinations(of: .library), id: \.self) { tab in
++                    HStack {
++                      DrawerSurfaceButton(tab: tab, isSelected: selectedTab == tab, action: { onSelectTab(tab) })
++                      if pinScope != nil {
++                        Button { togglePin(tab) } label: {
++                          Image(systemName: pins.contains(tab) ? "pin.slash" : "pin")
++                            .font(.system(size: 17))
++                            .frame(width: 44, height: 44)
++                        }
++                        .buttonStyle(.plain)
++                        .accessibilityLabel("\(pins.contains(tab) ? "Unpin" : "Pin") \(tab.title)")
++                      }
++                    }
++                  }
++                  if chatEnabled { DrawerTalkRow(action: onTalk) }
++                }
++              } else if let privateHistoryURL {
++                VStack(alignment: .leading, spacing: JovieSpacing.medium) {
++                  Text("Open Summer to view your private history.")
++                    .font(JovieFont.body(size: 15))
++                    .foregroundStyle(JovieColor.textSecondary)
++                  Link("Open Summer", destination: privateHistoryURL)
++                    .frame(minHeight: 44)
++                    .accessibilityIdentifier("shell-drawer-private-history")
++                }
+               } else {
+-                onSelectTab(.profile)
++                DrawerThreadsSection(
++                  searchText: $threadSearch,
++                  conversations: panel == .history ? filteredConversations : visibleRecent,
++                  totalCount: recentConversations.count,
++                  isLoading: isLoadingConversations || (panel == .recent && isAwaitingRecentCapture),
++                  activeConversationID: activeConversationID,
++                  onSelectConversation: onSelectConversation,
++                  showsSearch: panel == .history,
++                  groups: panel == .recent ? recentGroups : nil,
++                  errorMessage: conversationsError,
++                  onRetry: onRetryConversations
++                )
+               }
+             }
+-          )
+-
+-          if chatEnabled {
+-            DrawerTalkRow(action: onTalk)
+-
+-            DrawerNewChatButton(action: onStartNewChat)
+-
+-            DrawerThreadsSection(
+-              searchText: $threadSearch,
+-              conversations: filteredConversations,
+-              totalCount: recentConversations.count,
+-              isLoading: isLoadingConversations,
+-              activeConversationID: activeConversationID,
+-              onSelectConversation: onSelectConversation
+-            )
++            .accessibilityElement(children: .contain)
++            .accessibilityIdentifier("shell-drawer-panel-list")
++            if panel == .recent && privateHistoryURL == nil {
++              Button("All chats") { self.panel = .history; focusedControl = .back }
++                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
++                .accessibilityIdentifier("shell-drawer-all-chats")
++            }
+           }
+-
+-          DrawerSettingsRow(action: onOpenSettings)
++          .padding(.horizontal, JovieSpacing.large)
++          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
++          .background(JovieColor.backgroundBase)
++          .accessibilityElement(children: .contain)
++          .accessibilityIdentifier("shell-drawer-panel")
+         }
+-        .padding(.horizontal, JovieSpacing.large)
+-        .padding(.bottom, JovieSpacing.xxLarge)
+       }
++      .frame(maxWidth: .infinity, maxHeight: .infinity)
++
++      VStack(spacing: JovieSpacing.small) {
++        DrawerAccountHeader(profile: profile, opensSettings: workspaceMode == .ovie, action: {
++          if workspaceMode == .ovie { onOpenSettings() }
++          else if AppShellDrawerProfilePolicy.accountHeaderOpensEmbeddedPublicProfile(publicProfileURL: profile.publicProfileURL) {
++            onOpenPublicProfile()
++          } else { onSelectTab(.profile) }
++        })
++        DrawerSettingsRow(action: onOpenSettings)
++      }
++      .padding(.horizontal, JovieSpacing.large)
++      .padding(.bottom, JovieSpacing.large)
+     }
+     .frame(width: drawerWidth, alignment: .leading)
+     .frame(maxHeight: .infinity)
+     .background(JovieColor.backgroundBase)
+     .allowsHitTesting(isPresented)
+     .accessibilityHidden(!isPresented)
++    .accessibilityElement(children: .contain)
+     .accessibilityIdentifier("shell-drawer")
++    .onKeyPress(.escape) {
++      guard panel != nil else { return .ignored }
++      closePanel()
++      return .handled
++    }
++    .onChange(of: recentConversations) {
++      if panel == .recent {
++        recentSnapshot = AppShellDrawerRecentPolicy.capture(
++          conversations: recentConversations, scope: pinScope, current: recentSnapshot
++        )
++      }
++    }
++    .onChange(of: pinScope) {
++      threadSearch = ""
++      operatorSearch = ""
++      showsAllOperatorDestinations = false
++      panel = nil
++      recentSnapshot = nil
++      focusedControl = nil
++    }
+     .onChange(of: isPresented) {
+       guard !isPresented else { return }
+       threadSearch = ""
++      operatorSearch = ""
++      showsAllOperatorDestinations = false
++      panel = nil
++      recentSnapshot = nil
++    }
++    .task(id: pinScope) {
++      savedPins = pinScope.flatMap { UserDefaults.standard.array(forKey: "jovie:sidebar:pins:v1:\($0)") as? [String] } ?? []
++      loadedPinScope = pinScope
++    }
++  }
++}
++
++/// Web-only destinations never acquire a native selected/active state.
++private struct DrawerOperatorButton: View {
++  let destination: AppShellOperatorDestination
++  let action: () -> Void
++
++  var body: some View {
++    Button(action: action) {
++      HStack(spacing: JovieSpacing.medium) {
++        Image(systemName: destination.systemImage).font(.system(size: 16)).frame(width: 22)
++        Text(destination.title).font(JovieFont.body(size: 16, weight: .semibold))
++          .lineLimit(1).minimumScaleFactor(AppShellDrawerSurfaceLayout.labelMinimumScaleFactor)
++        Spacer(minLength: 0)
++        Image(systemName: "arrow.up.right").font(.system(size: 12))
++      }
++      .foregroundStyle(JovieColor.textSecondary)
++      .padding(.horizontal, JovieSpacing.medium)
++      .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
++      .contentShape(Rectangle())
+     }
++    .buttonStyle(.plain)
++    .accessibilityLabel(destination.title)
++    .accessibilityHint("Opens in your browser")
++    .accessibilityIdentifier("shell-drawer-operator-\(destination.id)")
+   }
+ }
+ 
+ private struct DrawerAccountHeader: View {
+   let profile: AppShellProfile
++  var opensSettings = false
+   let action: () -> Void
+ 
+   var body: some View {
+@@ -174,10 +542,12 @@ private struct DrawerAccountHeader: View {
+ 
+         Spacer(minLength: 0)
+       }
++      .frame(maxWidth: .infinity, minHeight: 44)
++      .contentShape(Rectangle())
+     }
+     .buttonStyle(.plain)
+     .accessibilityElement(children: .combine)
+-    .accessibilityLabel("Open \(profile.displayName) public profile")
++    .accessibilityLabel(opensSettings ? "Account settings" : "Open \(profile.displayName) public profile")
+     .accessibilityIdentifier("shell-drawer-account")
+   }
+ }
+@@ -229,15 +599,7 @@ private struct DrawerSurfaceSwitcher: View {
+                 .accessibilityIdentifier("shell-drawer-profile-qr")
+               }
+             }
+-            ForEach(AppShellPanePolicy.childDestinations(of: tab), id: \.self) { child in
+-              DrawerSurfaceButton(
+-                tab: child,
+-                isSelected: selectedTab == child,
+-                isChild: true,
+-                action: { onSelectTab(child) }
+-              )
+-              .padding(.leading, JovieSpacing.large)
+-            }
++
+           }
+         }
+       }
+@@ -267,6 +629,7 @@ private struct DrawerSurfaceButton: View {
+       }
+       .foregroundStyle(isSelected ? JovieColor.textPrimary : JovieColor.textSecondary)
+       .padding(.horizontal, JovieSpacing.medium)
++      .contentShape(Rectangle())
+       .padding(.vertical, 11)
+       .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 48, alignment: .leading)
+       .background(
+@@ -293,6 +656,7 @@ private struct DrawerTalkRow: View {
+     Button(action: action) {
+       HStack(spacing: JovieSpacing.medium) {
+         Image(systemName: "mic.fill")
++          .font(.system(size: 18, weight: .semibold))
+           .frame(width: 22)
+ 
+         Text("Talk")
+@@ -319,6 +683,7 @@ private struct DrawerNewChatButton: View {
+     Button(action: action) {
+       HStack(spacing: JovieSpacing.medium) {
+         Image(systemName: "square.and.pencil")
++          .font(.system(size: 18, weight: .semibold))
+           .frame(width: 22)
+ 
+         Text("New chat")
+@@ -346,14 +711,16 @@ private struct DrawerThreadsSection: View {
+   let activeConversationID: String?
+   let onSelectConversation: (String) -> Void
+ 
++  var showsSearch = true
++  var groups: [AppShellDrawerRecentPolicy.Group]? = nil
++  var errorMessage: String? = nil
++  var onRetry: () -> Void = {}
++
+   private static let skeletonRowCount = 5
+ 
+   var body: some View {
+     VStack(alignment: .leading, spacing: JovieSpacing.medium) {
+-      Text("Conversations")
+-        .font(JovieFont.body(size: 13, weight: .semibold))
+-        .foregroundStyle(JovieColor.textTertiary)
+-
++      if showsSearch {
+       HStack(spacing: JovieSpacing.small) {
+         Image(systemName: "magnifyingglass")
+           .font(.system(size: 14, weight: .medium))
+@@ -364,11 +731,12 @@ private struct DrawerThreadsSection: View {
+           .disableAutocorrection(true)
+           .font(JovieFont.body(size: 15))
+           .foregroundStyle(JovieColor.textPrimary)
++          .accessibilityIdentifier("shell-drawer-search")
+       }
+       .padding(.horizontal, JovieSpacing.medium)
+       .padding(.vertical, 11)
+       .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+-      .accessibilityIdentifier("shell-drawer-search")
++      }
+ 
+       // Skeleton mirrors DrawerThreadRow's exact paddings/height so the
+       // skeleton -> loaded swap causes zero layout shift. Only shown while
+@@ -382,30 +750,54 @@ private struct DrawerThreadsSection: View {
+         }
+         .redacted(reason: .placeholder)
+         .accessibilityHidden(true)
++      } else if AppShellDrawerThreadsFilter.shouldShowError(isLoading: isLoading, conversations: conversations, errorMessage: errorMessage) {
++        VStack(alignment: .leading, spacing: JovieSpacing.small) {
++          Text("Couldn’t load chats.").foregroundStyle(JovieColor.textSecondary)
++          Button("Retry", action: onRetry).frame(minHeight: 44)
++            .accessibilityIdentifier("shell-drawer-chats-retry")
++        }
+       } else if totalCount == 0 {
+-        Text("Start a conversation to see recent conversations here.")
++        Text(showsSearch ? "No chats yet" : "No recent chats yet")
+           .font(JovieFont.body(size: 15))
+           .foregroundStyle(JovieColor.textTertiary)
+           .fixedSize(horizontal: false, vertical: true)
+       } else if conversations.isEmpty {
+-        Text("No conversations match your search.")
++        Text(showsSearch ? "No conversations match your search." : "No recent chats yet")
+           .font(JovieFont.body(size: 15))
+           .foregroundStyle(JovieColor.textTertiary)
+           .fixedSize(horizontal: false, vertical: true)
+       } else {
+-        LazyVStack(spacing: JovieSpacing.xSmall) {
+-          ForEach(conversations) { conversation in
+-            DrawerThreadRow(
+-              conversation: conversation,
+-              isActive: activeConversationID == conversation.id,
+-              action: { onSelectConversation(conversation.id) }
+-            )
++        LazyVStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
++          if let groups {
++            ForEach(groups) { group in
++              Text(group.id.title)
++                .font(JovieFont.body(size: 13, weight: .medium))
++                .foregroundStyle(JovieColor.textTertiary)
++                .accessibilityAddTraits(.isHeader)
++                .accessibilityIdentifier("shell-drawer-recent-group-\(group.id.rawValue)")
++              ForEach(group.conversations) { conversation in
++                threadRow(conversation)
++              }
++            }
++          } else {
++            ForEach(conversations) { conversation in
++              threadRow(conversation)
++            }
+           }
+         }
+       }
+     }
++    .accessibilityElement(children: .contain)
+     .accessibilityIdentifier("shell-drawer-threads")
+   }
++
++  private func threadRow(_ conversation: MobileConversationSummary) -> some View {
++    DrawerThreadRow(
++      conversation: conversation,
++      isActive: activeConversationID == conversation.id,
++      action: { onSelectConversation(conversation.id) }
++    )
++  }
+ }
+ 
+ private struct DrawerThreadRow: View {
+@@ -416,6 +808,14 @@ private struct DrawerThreadRow: View {
+   var body: some View {
+     Button(action: action) {
+       HStack(spacing: JovieSpacing.medium) {
++        ZStack {
++        if let status = conversation.latestTurnStatus, status == "reserved" || status == "streaming" || status == "running" || status.hasPrefix("failed") || status == "errored" {
++          Image(systemName: (status.hasPrefix("failed") || status == "errored") ? "exclamationmark.circle" : "waveform")
++            .font(.system(size: 12))
++            .accessibilityLabel((status.hasPrefix("failed") || status == "errored") ? "Error" : "Running")
++        }
++        }
++        .frame(width: 16, height: 16)
+         Text(conversation.title ?? "New Conversation")
+           .font(JovieFont.body(size: 15, weight: isActive ? .semibold : .regular))
+           .foregroundStyle(isActive ? JovieColor.textPrimary : JovieColor.textSecondary)
+@@ -423,6 +823,7 @@ private struct DrawerThreadRow: View {
+ 
+         Spacer(minLength: 0)
+       }
++      .frame(minHeight: 44)
+       .padding(.vertical, JovieSpacing.small)
+       .padding(.horizontal, JovieSpacing.small)
+       .background(
+@@ -449,6 +850,7 @@ private struct DrawerThreadRowSkeleton: View {
+ 
+       Spacer(minLength: 0)
+     }
++    .frame(minHeight: 44)
+     .padding(.vertical, JovieSpacing.small)
+     .padding(.horizontal, JovieSpacing.small)
+     .background(
+@@ -465,6 +867,7 @@ private struct DrawerSettingsRow: View {
+     Button(action: action) {
+       HStack(spacing: JovieSpacing.medium) {
+         Image(systemName: "gearshape")
++          .font(.system(size: 18, weight: .semibold))
+           .frame(width: 22)
+ 
+         Text("Settings")
+@@ -476,6 +879,7 @@ private struct DrawerSettingsRow: View {
+       .foregroundStyle(JovieColor.textSecondary)
+       .padding(.vertical, 13)
+       .padding(.horizontal, JovieSpacing.medium)
++      .contentShape(Rectangle())
+     }
+     .buttonStyle(JoviePressFeedbackButtonStyle())
+     .accessibilityLabel("Settings")
+diff --git a/apps/ios/Jovie/Features/AppShell/AppShellView.swift b/apps/ios/Jovie/Features/AppShell/AppShellView.swift
+index 64c1d3d5244..09472facec0 100644
+--- a/apps/ios/Jovie/Features/AppShell/AppShellView.swift
++++ b/apps/ios/Jovie/Features/AppShell/AppShellView.swift
+@@ -27,7 +27,7 @@ enum AppShellTab: Equatable, Hashable, CaseIterable {
+     case .library: return "Work"
+     case .calendar: return "Calendar"
+     case .inbox: return "Inbox"
+-    case .profile: return "Identity"
++    case .profile: return "Profiles"
+     case .audience: return "Audience"
+     }
+   }
+@@ -140,6 +140,9 @@ struct AppShellView<
+   let audienceEnabled: Bool
+   let recentConversations: [MobileConversationSummary]
+   let isLoadingConversations: Bool
++  let sidebarPinScope: String?
++  let conversationsError: String?
++  let onRetryConversations: () -> Void
+   let activeConversationID: String?
+   let onSelectConversation: (String) -> Void
+   let onStartNewChat: () -> Void
+@@ -191,6 +194,7 @@ struct AppShellView<
+   @State private var entityContext: EntityContextItem?
+   @State private var lastEntityContext: EntityContextItem?
+   @State private var intentStore = IntentNavigationStore.shared
++  @Environment(\.openURL) private var openURL
+   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+ #if DEBUG
+   @State private var didExposeInteractiveRailProgressForUITest = false
+@@ -208,6 +212,9 @@ struct AppShellView<
+     audienceEnabled: Bool = true,
+     recentConversations: [MobileConversationSummary] = [],
+     isLoadingConversations: Bool = false,
++    sidebarPinScope: String? = nil,
++    conversationsError: String? = nil,
++    onRetryConversations: @escaping () -> Void = {},
+     activeConversationID: String? = nil,
+     onSelectConversation: @escaping (String) -> Void = { _ in },
+     onStartNewChat: @escaping () -> Void = {},
+@@ -248,6 +255,9 @@ struct AppShellView<
+     self.chatEnabled = chatEnabled
+     self.audienceEnabled = audienceEnabled
+     self.recentConversations = recentConversations
++    self.sidebarPinScope = sidebarPinScope
++    self.conversationsError = conversationsError
++    self.onRetryConversations = onRetryConversations
+     self.isLoadingConversations = isLoadingConversations
+     self.activeConversationID = activeConversationID
+     self.onSelectConversation = onSelectConversation
+@@ -324,11 +334,22 @@ struct AppShellView<
+               closeDrawer()
+               openTalkOverlay()
+             },
++            pinScope: sidebarPinScope,
++            conversationsError: conversationsError,
++            onRetryConversations: onRetryConversations,
+             onOpenPublicProfile: {
+               openPublicProfile()
+             },
+             onOpenProfileQR: {
+               openProfileQR()
++            },
++            privateHistoryURL: AppShellDrawerRecentPolicy.privateHistoryURL(workspace: workspaceMode, webBaseURL: webBaseURL),
++            workspaceMode: workspaceMode,
++            canAccessOvie: showsWorkspaceSwitch,
++            webBaseURL: webBaseURL,
++            onOpenOperatorDestination: { url in
++              closeDrawer()
++              openURL(url)
+             }
+           )
+           .opacity(
+@@ -777,7 +798,7 @@ struct AppShellView<
+   }
+ 
+   private var drawerAnimation: Animation {
+-    isReduceMotionEnabled ? JovieMotion.subtle : JovieMotion.cinematic
++    isReduceMotionEnabled ? .linear(duration: 0) : JovieMotion.shellRail
+   }
+ 
+   private var isReduceMotionEnabled: Bool {
+@@ -1117,11 +1138,9 @@ struct AppShellView<
+   private var shellToolbar: some View {
+     HStack(alignment: .center, spacing: JovieSpacing.medium) {
+       Button(action: openDrawer) {
+-        DashboardAvatarView(
+-          name: profile.displayName,
+-          avatarURL: profile.avatarURL
+-        )
+-        .frame(width: 32, height: 32)
++        JovieLogoMark(size: 24)
++          .frame(width: 44, height: 44)
++          .contentShape(Rectangle())
+       }
+       .buttonStyle(.plain)
+       .accessibilityLabel("Open navigation drawer")
+diff --git a/apps/ios/JovieTests/AppRouteManifestTests.swift b/apps/ios/JovieTests/AppRouteManifestTests.swift
+index 1696b57cff5..ef5caa725d5 100644
+--- a/apps/ios/JovieTests/AppRouteManifestTests.swift
++++ b/apps/ios/JovieTests/AppRouteManifestTests.swift
+@@ -98,7 +98,7 @@ struct AppRouteManifestTests {
+   // the manifest, and no web-only entry may present as an in-app surface.
+   @Test func webOnlyBoundariesAreDocumented() {
+     let webOnly = AppRouteManifest.entries(classification: .webOnly)
+-    #expect(webOnly.count == MobileWebOnlyRouteBoundary.pathPrefixes.count + 1)
++    #expect(webOnly.count == MobileWebOnlyRouteBoundary.pathPrefixes.count + 2)
+     for prefix in MobileWebOnlyRouteBoundary.pathPrefixes {
+       #expect(
+         webOnly.contains { $0.stateOwner.contains(prefix) },
+diff --git a/apps/ios/JovieTests/AppShellDrawerThreadsFilterTests.swift b/apps/ios/JovieTests/AppShellDrawerThreadsFilterTests.swift
+index af4b882e8d5..0dad5c7765f 100644
+--- a/apps/ios/JovieTests/AppShellDrawerThreadsFilterTests.swift
++++ b/apps/ios/JovieTests/AppShellDrawerThreadsFilterTests.swift
+@@ -1,3 +1,4 @@
++import Foundation
+ import JovieKit
+ import Testing
+ @testable import Jovie
+@@ -22,6 +23,15 @@ struct AppShellDrawerThreadsFilterTests {
+     ),
+   ]
+ 
++  @Test func privateOvieHistoryUsesTheExistingWebDoorWithoutAReaderForCustomerHistory() {
++    let origin = URL(string: "https://jov.ie")!
++    #expect(AppShellDrawerRecentPolicy.privateHistoryURL(workspace: .jovie, webBaseURL: origin) == nil)
++    let privateURL = AppShellDrawerRecentPolicy.privateHistoryURL(workspace: .ovie, webBaseURL: origin)
++    #expect(privateURL?.host == "jov.ie")
++    #expect(privateURL?.path == "/app/ov/chat")
++    #expect(privateURL?.query == nil)
++  }
++
+   @Test func emptyQueryReturnsAllConversations() {
+     let filtered = AppShellDrawerThreadsFilter.filtered(
+       conversations: conversations,
+@@ -130,4 +140,115 @@ struct AppShellDrawerBasePlaneOcclusionTests {
+       appShellDrawerBasePlaneOpacity(isShowingDrawer: true, drawerDragOffset: -32) == 1
+     )
+   }
+-}
+\ No newline at end of file
++}
++struct AppShellDrawerRecentPolicyTests {
++  @Test func failureOnlyReplacesEmptyFinishedLoad() {
++    #expect(AppShellDrawerThreadsFilter.shouldShowError(isLoading: false, conversations: [], errorMessage: "offline"))
++    #expect(!AppShellDrawerThreadsFilter.shouldShowError(isLoading: true, conversations: [], errorMessage: "offline"))
++    #expect(!AppShellDrawerThreadsFilter.shouldShowError(isLoading: false, conversations: [], errorMessage: nil))
++  }
++  private let now = ISO8601DateFormatter().date(from: "2026-10-08T00:30:00Z")!
++  private var utc: Calendar {
++    var calendar = Calendar(identifier: .gregorian)
++    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
++    return calendar
++  }
++  private func conversation(
++    _ id: String, updatedAt: String = "2026-10-08T00:20:00Z",
++    createdAt: String = "2026-10-07T12:00:00Z", status: String = "completed"
++  ) -> MobileConversationSummary {
++    MobileConversationSummary(id: id, title: id, createdAt: createdAt, updatedAt: updatedAt,
++                              latestMessageRole: "assistant", latestTurnStatus: status)
++  }
++  private func capture(
++    _ values: [MobileConversationSummary], scope: String? = "account:customer",
++    current: AppShellDrawerRecentPolicy.Snapshot? = nil, at date: Date? = nil
++  ) -> AppShellDrawerRecentPolicy.Snapshot {
++    AppShellDrawerRecentPolicy.capture(conversations: values, scope: scope, current: current,
++                                      now: date ?? now, calendar: utc)
++  }
++
++  @Test func lateFirstLoadUsesArrivalDayAndFreezesOnce() {
++    let empty = capture([], at: now.addingTimeInterval(-3600))
++    #expect(empty.entries.isEmpty)
++    #expect(AppShellDrawerRecentPolicy.visible(conversations: [conversation("late")], snapshot: empty, scope: empty.scope).isEmpty)
++    let loaded = capture([conversation("late", updatedAt: "2026-10-07T23:59:00Z")], current: empty)
++    #expect(loaded.entries.map(\.id) == ["late"])
++    #expect(loaded.entries.map(\.bucket) == [.earlier])
++    #expect(capture([conversation("replacement")], current: loaded) == loaded)
++  }
++
++  @Test func boundedMembershipPreservesOrderAndLiveStatus() {
++    let values = (0..<8).map { conversation("c-\($0)") }
++    let snapshot = capture([values[0]] + values)
++    #expect(snapshot.entries.map(\.id) == Array(values.prefix(5).map(\.id)))
++    let updated = [conversation("c-0", status: "running")] + Array(values.dropFirst().reversed())
++    let visible = AppShellDrawerRecentPolicy.visible(conversations: updated, snapshot: snapshot, scope: snapshot.scope)
++    #expect(visible.map(\.id) == snapshot.entries.map(\.id))
++    #expect(visible.first?.latestTurnStatus == "running")
++    #expect(capture(updated, current: snapshot) == snapshot)
++  }
++
++  @Test func groupsUseDeviceDayIncludingFractionalAndOffsetDates() {
++    let values = [conversation("yesterday", updatedAt: "2026-10-07T23:00:00Z"),
++                  conversation("today", updatedAt: "2026-10-08T02:20:00.123+02:00")]
++    let snapshot = capture(values)
++    let groups = AppShellDrawerRecentPolicy.groups(conversations: values, snapshot: snapshot, scope: snapshot.scope)
++    #expect(groups.map(\.id) == [.today, .earlier])
++    #expect(groups.map { $0.conversations.map(\.id) } == [["today"], ["yesterday"]])
++    var local = utc
++    local.timeZone = TimeZone(identifier: "America/Los_Angeles")!
++    let localSnapshot = AppShellDrawerRecentPolicy.capture(conversations: values, scope: snapshot.scope, now: now, calendar: local)
++    #expect(localSnapshot.entries.map(\.bucket) == [.today, .today])
++  }
++
++  @Test func malformedUpdateFallsBackToCreationAndUnknownDatesStayEarlier() {
++    let values = [conversation("fallback", updatedAt: "bad", createdAt: "2026-10-08T00:25:00Z"),
++                  conversation("unknown", updatedAt: "bad", createdAt: "bad")]
++    #expect(capture(values).entries.map(\.bucket) == [.today, .earlier])
++  }
++
++  @Test func midnightAndRevalidationCannotRegroupUntilReopen() {
++    let values = [conversation("current"), conversation("older", updatedAt: "2026-10-07T12:00:00Z")]
++    let snapshot = capture(values)
++    let tomorrow = now.addingTimeInterval(86400)
++    let changed = [conversation("older", updatedAt: "2026-10-09T00:20:00Z"), values[0]]
++    #expect(capture(changed, current: snapshot, at: tomorrow) == snapshot)
++    let frozen = AppShellDrawerRecentPolicy.groups(conversations: changed, snapshot: snapshot, scope: snapshot.scope)
++    #expect(frozen.map { $0.conversations.map(\.id) } == [["current"], ["older"]])
++    let reopened = capture(changed, at: tomorrow)
++    #expect(reopened.entries.map(\.id) == ["older", "current"])
++    #expect(reopened.entries.map(\.bucket) == [.today, .earlier])
++  }
++
++  @Test func accountAndWorkspaceScopesRejectPreviousRowsEvenWithSameID() {
++    let snapshot = capture([conversation("shared")])
++    for scope in ["other:customer", "account:ov", nil] as [String?] {
++      let next = [conversation("shared", updatedAt: "2026-10-07T12:00:00Z")]
++      #expect(AppShellDrawerRecentPolicy.visible(conversations: next, snapshot: snapshot, scope: scope).isEmpty)
++      #expect(AppShellDrawerRecentPolicy.groups(conversations: next, snapshot: snapshot, scope: scope).isEmpty)
++      let replacement = capture(next, scope: scope, current: snapshot)
++      #expect(replacement.scope == scope)
++      #expect(replacement.entries.map(\.bucket) == [.earlier])
++    }
++    #expect(AppShellDrawerRecentPolicy.groups(conversations: [], snapshot: nil, scope: nil).isEmpty)
++  }
++
++  @Test func removedRowsDropEmptyGroupsWithoutRefillingTheOpenPanel() {
++    let values = [conversation("today"), conversation("earlier", updatedAt: "2026-10-07T12:00:00Z")]
++    let snapshot = capture(values)
++    let remaining = [values[1], conversation("new")]
++    let groups = AppShellDrawerRecentPolicy.groups(conversations: remaining, snapshot: snapshot, scope: snapshot.scope)
++    #expect(groups.map(\.id) == [.earlier])
++    #expect(groups.first?.conversations.map(\.id) == ["earlier"])
++    #expect(capture([conversation("new")], current: snapshot) == snapshot)
++    #expect(AppShellDrawerRecentPolicy.visible(conversations: [conversation("new")], snapshot: snapshot, scope: snapshot.scope).isEmpty)
++  }
++}
++
++struct AppShellDrawerPinsPolicyTests {
++  @Test func preservesOrderAndRejectsUnknownDuplicateOrUnauthorizedIDs() {
++    #expect(AppShellDrawerPinsPolicy.visible(ids: ["shell-tab-calendar", "unknown", "shell-tab-calendar", "shell-tab-profile", "shell-tab-inbox"], allowed: [.inbox, .calendar]) == [.calendar, .inbox])
++    #expect(AppShellDrawerPinsPolicy.visible(ids: ["shell-tab-inbox"], allowed: []).isEmpty)
++  }
++}
+diff --git a/apps/ios/JovieTests/AppShellIntentNavigationTests.swift b/apps/ios/JovieTests/AppShellIntentNavigationTests.swift
+index f93fcb33044..c3abfd34496 100644
+--- a/apps/ios/JovieTests/AppShellIntentNavigationTests.swift
++++ b/apps/ios/JovieTests/AppShellIntentNavigationTests.swift
+@@ -379,3 +379,60 @@ private func eyesFreeState(
+     )
+   )
+ }
++
++struct AppShellOperatorNavigationTests {
++  private let origin = URL(string: "https://jov.ie")!
++
++  @Test func operatorInventoryRequiresOvieAndExistingAdminAccess() {
++    #expect(AppShellOperatorNavigation.allowed(workspace: .jovie, canAccessOvie: true).isEmpty)
++    #expect(AppShellOperatorNavigation.allowed(workspace: .ovie, canAccessOvie: false).isEmpty)
++    let allowed = AppShellOperatorNavigation.allowed(workspace: .ovie, canAccessOvie: true)
++    #expect(allowed.count == 20)
++    #expect(allowed.prefix(5).map(\.title) == ["Now", "Growth", "Product", "Operations", "Needs You"])
++    #expect(allowed.allSatisfy { $0.kind == .webOnly })
++    #expect(allowed.allSatisfy { $0.url(webBaseURL: origin)?.host == "jov.ie" })
++    #expect(allowed.allSatisfy { MobileWebOnlyRouteBoundary.isWebOnly($0.url(webBaseURL: origin)!) })
++  }
++
++  @Test func boundedMoreSearchesFullInventoryAndPinsOnlyAllowedUtilities() {
++    let allowed = AppShellOperatorNavigation.entries
++    let collapsed = AppShellOperatorNavigation.more(allowed, query: " ", expanded: false)
++    #expect(collapsed.count == 12)
++    #expect(!collapsed.contains { $0.id == "features" })
++    #expect(AppShellOperatorNavigation.more(allowed, query: " FeAtUrEs ", expanded: false).map(\.id) == ["features"])
++    #expect(AppShellOperatorNavigation.more(allowed, query: "", expanded: true).count == 15)
++    #expect(AppShellOperatorNavigation.pins(ids: ["features", "overview", "features", "shell-tab-inbox", "costs"], allowed: allowed).map(\.id) == ["features", "costs"])
++    #expect(AppShellOperatorNavigation.pins(ids: ["features"], allowed: []).isEmpty)
++    #expect(AppShellOperatorNavigation.more([], query: "", expanded: true).isEmpty)
++    #expect(AppShellOperatorNavigation.more(allowed, query: "missing", expanded: false).isEmpty)
++  }
++
++  @Test func externalRouteKeepsEncodedResourceAndOrderedQueriesWithFragment() {
++    let suffix = "/app/ov/people/Creator%2FID?view=Users&tag=A%2FB&tag=C#Evidence%2FOne"
++    let universal = URL(string: "https://jov.ie" + suffix)!
++    let custom = URL(string: "ie.jov.jovie://app" + suffix.dropFirst(4))!
++    for source in [universal, custom] {
++      let route = AppShellOperatorNavigation.resolve(source, webBaseURL: origin)
++      #expect(route?.destination.id == "people")
++      #expect(route?.url.absoluteString == universal.absoluteString)
++      #expect(MobileWebOnlyRouteBoundary.webFallbackURL(for: source, webBaseURL: origin).absoluteString == universal.absoluteString)
++      #expect(MobileSignedInLinkRoute.resolve(source) == nil)
++    }
++    let now = URL(string: "ie.jov.jovie://hud?view=Today#Signals")!
++    #expect(AppShellOperatorNavigation.resolve(now, webBaseURL: origin)?.url.absoluteString == "https://jov.ie/hud?view=Today#Signals")
++    #expect(MobileWebOnlyRouteBoundary.isWebOnly(now))
++    #expect(!MobileWebOnlyRouteBoundary.isWebOnly(URL(string: "https://jov.ie/app/ov-lookalike")!))
++  }
++
++  @Test func operatorLinksRejectForeignOriginsCredentialsAndUnsupportedIngress() {
++    for source in ["https://evil.example/app/ov/people", "http://jov.ie/app/ov/people", "https://jov.ie:444/app/ov/people", "https://user@jov.ie/app/ov/people", "ie.jov.jovie://user@app/ov/people", "ie.jov.jovie://evil/app/ov/people", "file:///app/ov/people"] {
++      let url = URL(string: source)!
++      #expect(AppShellOperatorNavigation.resolve(url, webBaseURL: origin) == nil)
++      #expect(MobileWebOnlyRouteBoundary.firstPartyURL(for: url, webBaseURL: origin) == nil)
++    }
++    #expect(AppShellOperatorNavigation.entries[0].url(webBaseURL: URL(string: "http://jov.ie")!) == nil)
++    #expect(AppShellOperatorNavigation.resolve(URL(string: "https://jov.ie/app/settings")!, webBaseURL: origin) == nil)
++    #expect(MobileSignedInLinkRoute.resolve(URL(string: "https://jov.ie/app/settings")!) == .settings)
++    #expect(MobileWebOnlyRouteBoundary.webFallbackURL(for: URL(string: "https://evil.example/app/ov/people")!, webBaseURL: origin) == origin)
++  }
++}
+diff --git a/apps/ios/JovieTests/AppShellTabBarTests.swift b/apps/ios/JovieTests/AppShellTabBarTests.swift
+index 4791c008d90..5ec7ed59b73 100644
+--- a/apps/ios/JovieTests/AppShellTabBarTests.swift
++++ b/apps/ios/JovieTests/AppShellTabBarTests.swift
+@@ -340,7 +340,7 @@ struct AppShellTabBarTests {
+       }
+     }
+     #expect(AppShellTab.chat.title == "Home")
+-    #expect(AppShellTab.profile.title == "Identity")
++    #expect(AppShellTab.profile.title == "Profiles")
+   }
+ 
+   @Test func resolveInitialTabKeepsFixtureDestinationWhenChatEnabled() {
+diff --git a/apps/ios/JovieTests/ChatRepositoryTests.swift b/apps/ios/JovieTests/ChatRepositoryTests.swift
+index c0f91daa3cb..8bf20b5c7f1 100644
+--- a/apps/ios/JovieTests/ChatRepositoryTests.swift
++++ b/apps/ios/JovieTests/ChatRepositoryTests.swift
+@@ -1398,12 +1398,19 @@ struct ChatRepositoryTests {
+       webBaseURL: URL(string: "https://preview.example")!
+     )
+ 
++    let summaries = [MobileConversationSummary(
++      id: MobileChatAllComponentsFixture.conversationID, title: "Fixture",
++      createdAt: "2026-10-08T00:00:00Z", updatedAt: "2026-10-08T00:00:00Z",
++      latestMessageRole: "assistant", latestTurnStatus: "completed"
++    )]
+     repository.seedTimelineForUITesting(
+       MobileChatAllComponentsFixture.default,
+-      activeConversationID: MobileChatAllComponentsFixture.conversationID
++      activeConversationID: MobileChatAllComponentsFixture.conversationID,
++      conversations: summaries
+     )
+     await repository.refreshConversations()
+ 
++    #expect(repository.conversations == summaries)
+     #expect(repository.activeConversationID == MobileChatAllComponentsFixture.conversationID)
+     #expect(repository.timeline.count == MobileChatAllComponentsFixture.default.count)
+     #expect(repository.timeline.contains { $0.content.contains("<tool_call>") })
+diff --git a/apps/ios/JovieUITests/JovieUITests.swift b/apps/ios/JovieUITests/JovieUITests.swift
+index fd7dfa27c4f..ccd994747b8 100644
+--- a/apps/ios/JovieUITests/JovieUITests.swift
++++ b/apps/ios/JovieUITests/JovieUITests.swift
+@@ -485,8 +485,8 @@ final class JovieUITests: XCTestCase {
+       "Drawer surface switcher is hittable with drawer closed.\n\(app.debugDescription)"
+     )
+     XCTAssertFalse(
+-      app.staticTexts["Start a conversation to see recent conversations here."].isHittable,
+-      "Drawer empty-threads copy is hittable under content with drawer closed.\n\(app.debugDescription)"
++      app.buttons["shell-drawer-recent"].isHittable,
++      "Drawer Recent control is hittable under content with drawer closed.\n\(app.debugDescription)"
+     )
+     attachScreenshot(named: "drawer-base-plane-occluded-closed", app: app)
+   }
+@@ -539,28 +539,66 @@ final class JovieUITests: XCTestCase {
+     XCTAssertTrue(waitForHittable(home, timeout: 3))
+     let identity = app.buttons["shell-drawer-surface-shell-tab-profile"]
+     let work = app.buttons["shell-drawer-surface-shell-tab-library"]
+-    let inbox = app.buttons["shell-drawer-surface-shell-tab-inbox"]
+-    let calendar = app.buttons["shell-drawer-surface-shell-tab-calendar"]
+     let audience = app.buttons["shell-drawer-surface-shell-tab-audience"]
+     XCTAssertEqual(home.label, "Home")
+-    XCTAssertEqual(identity.label, "Identity")
+-    let rows = [home, identity, work, inbox, calendar, audience]
++    XCTAssertEqual(identity.label, "Profiles")
++    let rows = [home, identity, work, audience]
+     for (above, below) in zip(rows, rows.dropFirst()) {
+       XCTAssertLessThan(above.frame.maxY, below.frame.maxY)
+       XCTAssertGreaterThanOrEqual(below.frame.height, 44)
+     }
+-    XCTAssertGreaterThan(inbox.frame.minX, work.frame.minX)
+-    XCTAssertEqual(inbox.frame.minX, calendar.frame.minX, accuracy: 1)
++    let settings = app.buttons["shell-drawer-settings"]
++    attachScreenshot(named: "ios-shared-sidebar-footer-probe", app: app)
++    XCTAssertTrue(waitForHittable(settings, timeout: 3), "Footer inaccessible.\n\(app.debugDescription)")
++    let footerFrame = settings.frame
++    func assertStableFrame(_ actual: CGRect, _ expected: CGRect, file: StaticString = #filePath, line: UInt = #line) {
++      // Accessibility coordinates may differ at floating-point epsilon; one
++      // thousandth of a point still catches any visible movement.
++      for (value, baseline) in zip(
++        [actual.minX, actual.minY, actual.width, actual.height],
++        [expected.minX, expected.minY, expected.width, expected.height]
++      ) {
++        XCTAssertEqual(value, baseline, accuracy: 0.001, file: file, line: line)
++      }
++      XCTAssertTrue(app.frame.contains(actual), file: file, line: line)
++    }
++    let brand = app.staticTexts["Jovie"].firstMatch
++    let account = app.buttons["shell-drawer-account"]
++    XCTAssertTrue(brand.exists)
++    XCTAssertTrue(account.isHittable)
++    let brandFrame = brand.frame
++    let accountFrame = account.frame
++    app.buttons["shell-drawer-more"].tap()
++    let back = app.buttons["shell-drawer-panel-back"]
++    XCTAssertTrue(waitForHittable(back, timeout: 3))
++    let inbox = app.buttons["shell-drawer-surface-shell-tab-inbox"]
++    let calendar = app.buttons["shell-drawer-surface-shell-tab-calendar"]
++    XCTAssertTrue(inbox.isHittable)
++    XCTAssertTrue(calendar.isHittable)
++    XCTAssertEqual(settings.frame, footerFrame)
++    attachScreenshot(named: "ios-shared-sidebar-more", app: app)
++    back.tap()
++    XCTAssertTrue(waitForHittable(home, timeout: 3))
++    app.buttons["shell-drawer-recent"].tap()
++    XCTAssertTrue(waitForHittable(back, timeout: 3))
++    XCTAssertTrue(app.buttons["shell-drawer-all-chats"].isHittable)
++    XCTAssertTrue(app.staticTexts["No recent chats yet"].exists)
++    XCTAssertFalse(app.staticTexts["Conversations"].exists)
++    assertStableFrame(brand.frame, brandFrame)
++    XCTAssertTrue(account.isHittable)
++    assertStableFrame(account.frame, accountFrame)
++    XCTAssertEqual(settings.frame, footerFrame)
++    attachScreenshot(named: "ios-shared-sidebar-recent", app: app)
++    app.buttons["shell-drawer-all-chats"].tap()
++    XCTAssertTrue(waitForHittable(back, timeout: 3))
++    XCTAssertTrue(app.staticTexts["No chats yet"].exists)
++    XCTAssertTrue(
++      waitForHittable(app.textFields["shell-drawer-search"], timeout: 3),
++      "History search was not reachable.\n\(app.debugDescription)"
++    )
++    back.tap()
++    XCTAssertTrue(waitForHittable(home, timeout: 3))
+     attachScreenshot(named: "ios-canonical-information-architecture", app: app)
+-
+-    inbox.tap()
+-    XCTAssertTrue(app.descendants(matching: .any)["inbox-surface"].waitForExistence(timeout: 3))
+-    app.buttons["Open navigation drawer"].tap()
+-    XCTAssertTrue(waitForHittable(calendar, timeout: 3))
+-    calendar.tap()
+-    XCTAssertTrue(app.descendants(matching: .any)["calendar-surface"].waitForExistence(timeout: 3))
+-    app.buttons["Open navigation drawer"].tap()
+-    XCTAssertTrue(waitForHittable(identity, timeout: 3))
+     identity.tap()
+     XCTAssertTrue(app.buttons["Copy URL"].waitForExistence(timeout: 3))
+   }
+@@ -1226,6 +1264,70 @@ final class JovieUITests: XCTestCase {
+     )
+   }
+ 
++  func testOvieDrawerUsesOperatorRootsBoundedMoreAndScopedPins() {
++    let app = launchMockApp(
++      launchArgument: "-ui-testing-chat-all-components",
++      additionalLaunchArguments: ["-ui-testing-admin"],
++      expectedElementDescription: "chat-composer-input"
++    ) { $0.textFields["chat-composer-input"] }
++    openSettingsFromActionsMenu(app)
++    let workspaceSwitch = app.buttons["settings-workspace-switch"]
++    XCTAssertTrue(waitForLabel(workspaceSwitch, label: "Workspace Jovie", timeout: 3))
++    workspaceSwitch.tap()
++    XCTAssertTrue(waitForLabel(workspaceSwitch, label: "Workspace Ovie", timeout: 3))
++    app.buttons["Close Settings"].tap()
++    app.buttons["Open navigation drawer"].tap()
++    let now = app.buttons["shell-drawer-operator-overview"]
++    XCTAssertTrue(waitForHittable(now, timeout: 3))
++    let rootIDs = ["overview", "growth", "product", "operations", "needs_you"]
++    var previousY: CGFloat = -1
++    for id in rootIDs {
++      let row = app.buttons["shell-drawer-operator-" + id]
++      XCTAssertTrue(row.exists)
++      XCTAssertGreaterThan(row.frame.minY, previousY)
++      previousY = row.frame.minY
++      XCTAssertFalse(row.isSelected)
++    }
++    XCTAssertFalse(app.buttons["shell-drawer-surface-shell-tab-profile"].exists)
++    XCTAssertFalse(app.buttons["shell-drawer-surface-shell-tab-library"].exists)
++    let account = app.buttons["shell-drawer-account"]
++    let settings = app.buttons["Settings"]
++    let accountFrame = account.frame
++    let settingsFrame = settings.frame
++    app.buttons["shell-drawer-more"].tap()
++    let morePanel = app.descendants(matching: .any)["shell-drawer-panel"]
++    XCTAssertTrue(morePanel.buttons["shell-drawer-operator-chat"].exists)
++    XCTAssertFalse(morePanel.buttons["shell-drawer-operator-features"].exists)
++    let search = morePanel.textFields["shell-drawer-more-search"]
++    search.tap()
++    search.typeText("Features")
++    let features = morePanel.buttons["shell-drawer-operator-features"]
++    XCTAssertTrue(waitForHittable(features, timeout: 3))
++    let pinFeatures = morePanel.buttons["shell-drawer-operator-pin-features"]
++    // The same fixture account may retain scoped pins between qualification
++    // and recording runs. Establish the desired state without losing coverage
++    // of the real toggle/persistence path.
++    if pinFeatures.label == "Unpin Features" { pinFeatures.tap() }
++    pinFeatures.tap()
++    app.buttons["shell-drawer-panel-back"].tap()
++    let pinnedFeatures = app.buttons["shell-drawer-operator-features"]
++    XCTAssertTrue(pinnedFeatures.exists)
++    XCTAssertFalse(pinnedFeatures.isSelected)
++    for (actual, expected) in [(account.frame, accountFrame), (settings.frame, settingsFrame)] {
++      XCTAssertEqual(actual.minY, expected.minY, accuracy: 0.001)
++      XCTAssertEqual(actual.height, expected.height, accuracy: 0.001)
++    }
++    attachScreenshot(named: "ios-shared-sidebar-ovie-operator-roots", app: app)
++    settings.tap()
++    XCTAssertTrue(waitForLabel(workspaceSwitch, label: "Workspace Ovie", timeout: 3))
++    workspaceSwitch.tap()
++    app.buttons["Close Settings"].tap()
++    app.buttons["Open navigation drawer"].tap()
++    XCTAssertTrue(waitForHittable(app.buttons["shell-drawer-surface-shell-tab-profile"], timeout: 3))
++    XCTAssertFalse(app.buttons["shell-drawer-operator-overview"].exists)
++    XCTAssertFalse(app.buttons["shell-drawer-operator-features"].exists)
++  }
++
+   func testAdminSettingsWorkspaceSwitchUpdatesOvieAndRestoresJovie() {
+     let app = launchMockApp(
+       launchArgument: "-ui-testing-chat-all-components",
+@@ -1459,6 +1561,27 @@ final class JovieUITests: XCTestCase {
+     let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
+     let profileReady = app.buttons["Copy URL"]
+     let chatReady = app.textFields["chat-composer-input"]
++    let more = app.buttons["shell-drawer-more"]
++    let recent = app.buttons["shell-drawer-recent"]
++    let panelBack = app.buttons["shell-drawer-panel-back"]
++    let allChats = app.buttons["shell-drawer-all-chats"]
++    let historySearch = app.textFields["shell-drawer-search"]
++    let brand = app.staticTexts["Jovie"].firstMatch
++    let account = app.buttons["shell-drawer-account"]
++
++    func assertDrawerAnchors(brandFrame: CGRect, accountFrame: CGRect) {
++      XCTAssertTrue(brand.exists, "Measured panel lost its brand anchor.")
++      XCTAssertTrue(account.isHittable, "Measured panel made the account unreachable.")
++      for (actual, expected) in [(brand.frame, brandFrame), (account.frame, accountFrame)] {
++        XCTAssertTrue(app.frame.contains(actual), "Measured panel moved an anchor off-screen.")
++        for (value, baseline) in zip(
++          [actual.minX, actual.minY, actual.width, actual.height],
++          [expected.minX, expected.minY, expected.width, expected.height]
++        ) {
++          XCTAssertEqual(value, baseline, accuracy: 0.001)
++        }
++      }
++    }
+ 
+     XCTAssertTrue(
+       drawerOpenButton.waitForExistence(timeout: timeoutSeconds),
+@@ -1475,6 +1598,27 @@ final class JovieUITests: XCTestCase {
+         ),
+         "Drawer surface switcher stayed covered by the content plane.\n\(app.debugDescription)"
+       )
++      XCTAssertTrue(brand.exists)
++      XCTAssertTrue(account.isHittable)
++      let brandFrame = brand.frame
++      let accountFrame = account.frame
++      XCTAssertTrue(waitForHittable(more, timeout: timeoutSeconds))
++      more.tap()
++      XCTAssertTrue(waitForHittable(panelBack, timeout: timeoutSeconds))
++      XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-inbox"].isHittable)
++      XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-calendar"].isHittable)
++      assertDrawerAnchors(brandFrame: brandFrame, accountFrame: accountFrame)
++      panelBack.tap()
++      XCTAssertTrue(waitForHittable(recent, timeout: timeoutSeconds))
++      recent.tap()
++      XCTAssertTrue(waitForHittable(panelBack, timeout: timeoutSeconds))
++      XCTAssertTrue(waitForHittable(allChats, timeout: timeoutSeconds))
++      assertDrawerAnchors(brandFrame: brandFrame, accountFrame: accountFrame)
++      allChats.tap()
++      XCTAssertTrue(waitForHittable(historySearch, timeout: timeoutSeconds))
++      assertDrawerAnchors(brandFrame: brandFrame, accountFrame: accountFrame)
++      panelBack.tap()
++      XCTAssertTrue(waitForHittable(profileSurface, timeout: timeoutSeconds))
+       profileSurface.tap()
+       XCTAssertTrue(
+         waitForHittable(profileReady, timeout: timeoutSeconds),
+@@ -1756,6 +1900,58 @@ final class JovieUITests: XCTestCase {
+     attachScreenshot(named: "calendar-loading", app: app)
+   }
+ 
++  func testDrawerRecentGroupsKeepOuterAnchorsStable() {
++    let app = launchMockApp(
++      launchArgument: "-ui-testing-chat-all-components",
++      expectedElementDescription: "chat composer", timeout: 10
++    ) { $0.textFields["chat-composer-input"] }
++    let recent = app.buttons["shell-drawer-recent"]
++    openDrawerAndWaitForControl(recent, in: app)
++    let brand = app.staticTexts["Jovie"].firstMatch
++    let account = app.buttons["shell-drawer-account"]
++    let settings = app.buttons["shell-drawer-settings"]
++    let anchors = [brand, account, settings]
++    let frames = anchors.map(\.frame)
++    func assertAnchors() {
++      for (anchor, frame) in zip(anchors, frames) {
++        XCTAssertTrue(anchor.isHittable)
++        XCTAssertTrue(app.frame.contains(anchor.frame))
++        for (actual, expected) in zip(
++          [anchor.frame.minX, anchor.frame.minY, anchor.frame.width, anchor.frame.height],
++          [frame.minX, frame.minY, frame.width, frame.height]
++        ) { XCTAssertEqual(actual, expected, accuracy: 0.001) }
++      }
++    }
++    recent.tap()
++    let today = app.staticTexts["shell-drawer-recent-group-today"]
++    let earlier = app.staticTexts["shell-drawer-recent-group-earlier"]
++    XCTAssertTrue(today.waitForExistence(timeout: 3), "Recent omitted Today.")
++    XCTAssertTrue(earlier.exists, "Recent omitted Earlier.")
++    XCTAssertLessThan(today.frame.minY, earlier.frame.minY)
++    XCTAssertTrue(app.buttons["shell-drawer-thread-fixture-recent-4"].exists)
++    XCTAssertFalse(app.buttons["shell-drawer-thread-fixture-recent-5"].exists)
++    let allChats = app.buttons["shell-drawer-all-chats"]
++    XCTAssertTrue(waitForHittable(allChats, timeout: 3))
++    let footerFrame = allChats.frame
++    assertAnchors()
++    attachScreenshot(named: "ios-shared-sidebar-grouped-recent", app: app)
++    app.scrollViews["shell-drawer-panel-list"].swipeUp()
++    XCTAssertEqual(allChats.frame, footerFrame)
++    assertAnchors()
++    allChats.tap()
++    XCTAssertTrue(app.textFields["shell-drawer-search"].waitForExistence(timeout: 3))
++    XCTAssertFalse(today.exists)
++    XCTAssertFalse(earlier.exists)
++    assertAnchors()
++    app.buttons["shell-drawer-panel-back"].tap()
++    XCTAssertTrue(waitForHittable(recent, timeout: 3))
++    assertAnchors()
++    recent.tap()
++    XCTAssertTrue(today.waitForExistence(timeout: 3))
++    XCTAssertTrue(earlier.exists)
++    assertAnchors()
++  }
++
+   func testShellDrawerAndSettingsNavigation() {
+     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+       $0.buttons["Copy URL"]
+@@ -1767,10 +1963,18 @@ final class JovieUITests: XCTestCase {
+       app.descendants(matching: .any)["shell-drawer"].waitForExistence(timeout: 3),
+       "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)"
+     )
++    let recent = app.buttons["shell-drawer-recent"]
++    XCTAssertTrue(waitForHittable(recent, timeout: 3))
++    recent.tap()
++    let back = app.buttons["shell-drawer-panel-back"]
++    XCTAssertTrue(waitForHittable(back, timeout: 3))
+     XCTAssertTrue(
+-      app.staticTexts["Start a conversation to see recent conversations here."].exists,
+-      "Shell drawer did not show the empty recent conversations state.\n\(app.debugDescription)"
++      app.staticTexts["No recent chats yet"].exists,
++      "Recent panel did not show its empty state.\n\(app.debugDescription)"
+     )
++    XCTAssertTrue(drawerSettings.isHittable)
++    back.tap()
++    XCTAssertTrue(waitForHittable(recent, timeout: 3))
+     XCTAssertTrue(app.buttons["New chat"].exists)
+     XCTAssertTrue(app.buttons["Settings"].exists)
+     XCTAssertFalse(
+diff --git a/apps/web/lib/ios/apple-app-site-association.ts b/apps/web/lib/ios/apple-app-site-association.ts
+index 5a0c68951d1..857ffcaec67 100644
+--- a/apps/web/lib/ios/apple-app-site-association.ts
++++ b/apps/web/lib/ios/apple-app-site-association.ts
+@@ -21,6 +21,7 @@ export const IOS_WEB_ONLY_APP_PATH_PREFIXES = [
+   APP_ROUTES.JOVIE_WORK,
+   APP_ROUTES.DASHBOARD_RELEASE_PLAN,
+   APP_ROUTES.LEGACY_DASHBOARD_INSIGHTS,
++  APP_ROUTES.ADMIN,
+ ] as const;
+ 
+ /**
+diff --git a/apps/web/tests/unit/ios/apple-app-site-association.test.ts b/apps/web/tests/unit/ios/apple-app-site-association.test.ts
+index 0e9cf0ee4f5..27ad5f238d4 100644
+--- a/apps/web/tests/unit/ios/apple-app-site-association.test.ts
++++ b/apps/web/tests/unit/ios/apple-app-site-association.test.ts
+@@ -1,6 +1,9 @@
++import fs from 'node:fs';
++import path from 'node:path';
+ import { describe, expect, it } from 'vitest';
+ import { GET as getWellKnown } from '@/app/.well-known/apple-app-site-association/route';
+ import { GET as getLegacy } from '@/app/apple-app-site-association/route';
++import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
+ import {
+   IOS_WEB_ONLY_APP_PATH_PREFIXES,
+   JOVIE_APPLE_APP_SITE_ASSOCIATION,
+@@ -61,6 +64,7 @@ describe('apple-app-site-association routes', () => {
+       '/app/jovie-work',
+       '/app/dashboard/release-plan',
+       '/app/dashboard/insights',
++      '/app/ov',
+     ]);
+   });
+ 
+@@ -85,3 +89,36 @@ describe('apple-app-site-association routes', () => {
+     expect(wellKnown.status).toBe(legacy.status);
+   });
+ });
++
++// The Swift counterpart is manually adapted to native presentation; route data
++// remains controlled by the canonical registry and this real CI parity check.
++it('native operator drawer matches every canonical registry destination', () => {
++  const swift = fs.readFileSync(
++    path.resolve(
++      __dirname,
++      '../../../../ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift'
++    ),
++    'utf8'
++  );
++  const destinations = [
++    ...swift.matchAll(
++      /\.init\(id: "([^"]+)", title: "([^"]+)", path: "([^"]+)", systemImage:/g
++    ),
++  ].map(match => ({ id: match[1], label: match[2], href: match[3] }));
++  expect(destinations).toEqual(
++    ADMIN_NAV_REGISTRY.map(({ id, label, href }) => ({ id, label, href }))
++  );
++  const nativePrefixes =
++    swift.match(/static let pathPrefixes = \[([\s\S]*?)\]/)?.[1] ?? '';
++  expect(
++    [...nativePrefixes.matchAll(/"([^"]+)"/g)].map(match => match[1])
++  ).toEqual(IOS_WEB_ONLY_APP_PATH_PREFIXES);
++  for (const { href } of ADMIN_NAV_REGISTRY) {
++    expect(
++      href === '/hud' ||
++        IOS_WEB_ONLY_APP_PATH_PREFIXES.some(
++          prefix => href === prefix || href.startsWith(`${prefix}/`)
++        )
++    ).toBe(true);
++  }
++});

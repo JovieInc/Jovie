@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{r as n,t as r}from"./homepageV2Copy-C2DP_rP0.js";import{i,n as a,r as o,t as s}from"./HomepageV2Ctas-BZ5r2tDl.js";var c,l,u,d,f,p;function m(){return(m=e((()=>{c=t(),n(),i(),l={title:`Marketing/Homepage V2/HomepageV2Ctas`,component:a,parameters:{layout:`fullscreen`}},u={},d={render:()=>(0,c.jsx)(o,{})},f={render:()=>(0,c.jsx)(s,{headline:r.pricing.headline,body:`Jovie profiles are free forever.`})},p=[`FinalCta`,`Pricing`,`StoryHeader`],u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{}`,...u.parameters?.docs?.source}}},d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
+  render: () => <HomepageV2Pricing />
+}`,...d.parameters?.docs?.source}}},f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{
+  render: () => <HomepageStoryHeader headline={HOMEPAGE_V2_COPY.pricing.headline} body='Jovie profiles are free forever.' />
+}`,...f.parameters?.docs?.source}}}})))()}m();export{u as FinalCta,d as Pricing,f as StoryHeader,p as __namedExportsOrder,l as default};

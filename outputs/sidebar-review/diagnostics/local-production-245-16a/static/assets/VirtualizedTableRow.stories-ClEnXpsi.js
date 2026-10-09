@@ -1,0 +1,7 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./VirtualizedTableRow-BJi-HEer.js";function i(e,t){return{id:e,original:{id:e,name:t},getVisibleCells:()=>[{id:`${e}-name`,column:{id:`name`,columnDef:{cell:()=>t,meta:void 0},getSize:()=>160},getContext:()=>({})}],getIsSelected:()=>!1}}var a,o,s,c;function l(){return(l=e((()=>{a=t(),n(),o={title:`Organisms/Table/VirtualizedTableRow`,component:r,parameters:{layout:`padded`}},s={render:()=>(0,a.jsx)(`table`,{className:`w-full border border-subtle bg-surface text-primary`,children:(0,a.jsx)(`tbody`,{children:(0,a.jsx)(r,{row:i(`1`,`Alpha`),rowIndex:0,rowRefsMap:new Map,shouldEnableKeyboardNav:!1,shouldVirtualize:!1,isFocused:!1,onKeyDown:()=>void 0,onFocusChange:()=>void 0})})})},c=[`Default`],s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  render: () => <table className='w-full border border-subtle bg-surface text-primary'>
+      <tbody>
+        <VirtualizedTableRow row={mockRow('1', 'Alpha')} rowIndex={0} rowRefsMap={new Map()} shouldEnableKeyboardNav={false} shouldVirtualize={false} isFocused={false} onKeyDown={() => undefined} onFocusChange={() => undefined} />
+      </tbody>
+    </table>
+}`,...s.parameters?.docs?.source}}}})))()}l();export{s as Default,c as __namedExportsOrder,o as default};

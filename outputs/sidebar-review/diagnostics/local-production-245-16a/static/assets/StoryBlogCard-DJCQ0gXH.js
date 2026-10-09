@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./BlogCard-C4ncPzzY.js";function i({post:e,variant:t=`default`}){return(0,a.jsx)(r,{post:{...e,tags:[],wordCount:0},author:{name:e.author,avatarUrl:null,isVerified:!1},variant:t})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

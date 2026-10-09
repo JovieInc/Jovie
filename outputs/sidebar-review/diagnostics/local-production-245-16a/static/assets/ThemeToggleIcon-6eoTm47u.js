@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{a as n,o as r,s as i,t as a}from"./ThemeIcons-DXNQ1YTX.js";function o({theme:e,resolvedTheme:t}){return e===`system`?(0,s.jsx)(r,{}):t===`light`?(0,s.jsx)(a,{}):(0,s.jsx)(n,{})}var s;function c(){return(c=e((()=>{s=t(),i()})))()}export{c as n,o as t};

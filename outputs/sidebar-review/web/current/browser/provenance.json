@@ -1,0 +1,186 @@
+{
+  "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "tree": "8ecb24fde1992b0038951de59cdd4965b1122d03",
+  "stats": {
+    "startTime": "2026-10-08T05:22:02.118Z",
+    "duration": 47894.212,
+    "expected": 25,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "artifacts": [
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-canonical-sideba-aae83-nd-keyboard-actions-in-dark-chromium-trace.zip",
+      "sha256": "d78b4c4e2fee12a934cec3c26a5d8605eacbadcc70bde0ccc827de2c34b3d439"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-canonical-sideba-dd6db-d-keyboard-actions-in-light-chromium-trace.zip",
+      "sha256": "7f727b6a323cffbdc259522f071798dfbac8a24cbdacece7db96fc569bf9c895"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-s-da53e-etry-and-exclusive-controls-chromium-trace.zip",
+      "sha256": "89f08931d1421d4081bfcb21388b4e49464d6d0324154a68cb15e6dfdeb7dfb8"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-s-7e43d-etry-and-exclusive-controls-chromium-trace.zip",
+      "sha256": "fde5793462a8d4e6aedd9dba03983a71d1de747a1a3862044a747e5172a0d4da"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-c-3388b-tays-in-its-drawer-at-320px-chromium-trace.zip",
+      "sha256": "edbce877d48f5f232c5d4033bb870e979e3ae7fe3b49a2b21203e38bdc858df0"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-c-deaa2-tays-in-its-drawer-at-375px-chromium-trace.zip",
+      "sha256": "9cffd0b5e32dc86fd6f2d62541c33476878322023c0c34c73c2f9e0f1b8ed2cb"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-c-44ed6-tays-in-its-drawer-at-390px-chromium-trace.zip",
+      "sha256": "258f94530ecc4d981d9c9fdc6e9659500fad28d257b572ffca036afd2ea5992b"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-c-8daac-tays-in-its-drawer-at-768px-chromium-trace.zip",
+      "sha256": "6d6a1754f3b71c2fb199d4d0b433212671b595035ac63f67822b97d739aec214"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-R-5b727-th-a-reversible-Back-action-chromium-trace.zip",
+      "sha256": "f34b0a251042d6311a4b2d9969fdc358cddee7486de8ba74c583b6e8d9b5c9f2"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-d-43a64--at-1024px-and-short-height-chromium-trace.zip",
+      "sha256": "01a24e53b51a3812d84a7531d0074528a4125d6f8fb793db69575fc48edb2b65"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-d-be494--at-1440px-and-short-height-chromium-trace.zip",
+      "sha256": "58a21a124785657c234fef68852b8c53165ec15bae9bc8524ba060ba7528afbd"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-d-62d40--at-1920px-and-short-height-chromium-trace.zip",
+      "sha256": "15af4125535e51aabb07628d4ee81c079fe91d5a2744f86ae63543a50c2d619c"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-k-dcd61-reduced-motion-RTL-geometry-chromium-trace.zip",
+      "sha256": "64fb12655ca61acb8fd2ed2d4deec72eeffad4dbe6fea09a1d692cd980702177"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-m-53cf9-op-preference-across-reload-chromium-trace.zip",
+      "sha256": "ef417b78fcd0e2ac6c371c42c930a1f9acb7033b2bc4c3921c47c123fe9d70f2"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/rail-performance-summary.json",
+      "sha256": "b8d9805f0026631f99cf66ded92ce8d4b6ede0bfc8dd4e67f4b75bfb9b61be39"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/rail-frame-measurement.json",
+      "sha256": "8466abe2b9afbba9e7f544cbfde4cc0e53b6e38217237677a9decc0d6b26e4a2"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-f-cd0da-e-during-repeated-reversals-chromium-trace.zip",
+      "sha256": "c30b2dd9973a09ec6651ea5283f097e4059be2811586b59a28903d9e4625343d"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-t-0d32c-ntrols-provide-44px-targets-chromium-trace.zip",
+      "sha256": "564c7ce17f796fbc0e8665f6821f6b95a4c024728e83961b06a42fe21dba958d"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-t-f5891-ntrols-provide-44px-targets-chromium-trace.zip",
+      "sha256": "849a4cb2431a4f59c24f7ded5aeff7dbb3a68f8159568a3429fd21f7d1545f68"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-p-a4878-s-only-permitted-Ovie-pages-chromium-trace.zip",
+      "sha256": "be6ff93407d78c8e9fc1f46fbf2917ffb59994359828ce9531e146d21fc91a87"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-O-4b9ef-s-its-existing-conversation-chromium-trace.zip",
+      "sha256": "e50e374d8c11481eecfe8b3107372bf67dbd63ed00bb45a11642e0fe34ec2893"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-e-eb5df--Jovie-navigation-reachable-chromium-trace.zip",
+      "sha256": "c3a062d764f9a9d52e6eb4524d1e167de70f8486f3795fef9d366fb0f2a2ddc9"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-e-8609e-s-Ovie-navigation-reachable-chromium-trace.zip",
+      "sha256": "cd65820a1697d3a875655cd33628b4f152cb84980eee2663468afd1b892c8c7b"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-l-37fda-schema-conversation-fixture-chromium-trace.zip",
+      "sha256": "ef6c0cf3a8fe862d435fbabffc2b69e65de2669909a8f886a7892c16b9e8abf6"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-M-85fac-n-reachable-at-short-height-chromium-trace.zip",
+      "sha256": "5bf64d28d6710bd7c1716ddce2908e668e640b4ad3183206ba73901cb3f74f7d"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-a-d0c46-e-account-or-losing-a-draft-chromium-trace.zip",
+      "sha256": "6642b24d893f5acef02d2b64a9743c15495372cd4ec4b722dd785decaff60b7a"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/large-page-opening-timing.json",
+      "sha256": "d6d87be29332e45970d6255f34baf0709697b283abe03dab05c855d11beed1ac"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/large-page-cpu-profile.json",
+      "sha256": "fe765f5d7075853cebe8e095d22c00ef5adea6550330b08195ec61afd0aec95c"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/large-page-complete-flow.json",
+      "sha256": "b896ffa67377bfb7a2971263f63563a7f3b409742c2b3f2819db7bcaf96d0b4f"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/traces/storybook-shared-sidebar-l-125ed-nded-and-keyboard-reachable-chromium-trace.zip",
+      "sha256": "cd12a655712f1a7e8549d9c3c256202a9fd0e8bcf6895d15fbd77c673b945b84"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/screenshots/storybook-shared-sidebar-l-125ed-nded-and-keyboard-reachable-chromium-large-more-end.png",
+      "sha256": "0ba8f1cf3f40bb1c6c0a219364d71e7ae365077dff72e8b5ed2c275b142d2e8b"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/screenshots/storybook-canonical-sideba-aae83-nd-keyboard-actions-in-dark-chromium-canonical-sidebar-dark.png",
+      "sha256": "86ac64c4658d289c0f9a98436018bc1244c530b68cc0464bd406db6ebae5d8c5"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/screenshots/storybook-shared-sidebar-s-7e43d-etry-and-exclusive-controls-chromium-pinned.png",
+      "sha256": "d6843571671b40f0348c27e2dbfac7e609c477fb348b0163394bdd7532fca62b"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/screenshots/storybook-shared-sidebar-s-7e43d-etry-and-exclusive-controls-chromium-collapsed.png",
+      "sha256": "24701aa39ff8f47d7fd77ecaa8d9ba93b6f3ec2ba1e690a33de725b070115ffc"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/screenshots/storybook-shared-sidebar-s-7e43d-etry-and-exclusive-controls-chromium-floating.png",
+      "sha256": "01f8e97077f8b769f41ab9b777b467ae0cc2f9fe846c82d330d4bd445cb2f516"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/screenshots/storybook-shared-sidebar-s-7e43d-etry-and-exclusive-controls-chromium-open-menu.png",
+      "sha256": "031fa26719efa3378da16b5b6cf2d2119108f460036a5521dce7f1deb69ed455"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/screenshots/storybook-canonical-sideba-dd6db-d-keyboard-actions-in-light-chromium-canonical-sidebar-light.png",
+      "sha256": "2629fbb1064d8d386a6822bd3b1774724d12c0c10c58745f9d01b963379c5cdc"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/screenshots/storybook-shared-sidebar-s-da53e-etry-and-exclusive-controls-chromium-pinned.png",
+      "sha256": "939704725fbbf88b7312539f4120b5bb2b01d1debfec74cd0d79c8084bcb5ec2"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/screenshots/storybook-shared-sidebar-s-da53e-etry-and-exclusive-controls-chromium-collapsed.png",
+      "sha256": "24701aa39ff8f47d7fd77ecaa8d9ba93b6f3ec2ba1e690a33de725b070115ffc"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/screenshots/storybook-shared-sidebar-s-da53e-etry-and-exclusive-controls-chromium-floating.png",
+      "sha256": "fe8686c8f1f04b2d1404e16d0f0f8d759d48d92cede22cc879d2650c5b4e6df9"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/screenshots/storybook-shared-sidebar-s-da53e-etry-and-exclusive-controls-chromium-open-menu.png",
+      "sha256": "9f46449b20e148de53312713e6616a5976d9d92ef7915eac05b27eee51f7ec14"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/report.json",
+      "sha256": "0ed859969b1f772ccebcfb0de22bc14660ffb63505c3ee823c6f6d1ed6060bc3"
+    },
+    {
+      "path": "outputs/sidebar-review/web/current/browser/runner.log",
+      "sha256": "7e7b9bda4283a5182af041994f056180102304fb82c33fa732d29325e9135d83"
+    }
+  ]
+}

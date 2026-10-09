@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./ReleaseCreditsDrawer-X1Ul5iH_.js";var r,i,a,o,s;function c(){return(c=e((()=>{t(),{fn:r}=__STORYBOOK_MODULE_TEST__,i={title:`Release/ReleaseCreditsDrawer`,component:n,parameters:{layout:`fullscreen`,backgrounds:{default:`dark`}},args:{open:!0,onOpenChange:r(),presentation:`modal`,credits:[{role:`producer`,label:`PRODUCER`,entries:[{artistId:`ada`,name:`Ada Lovelace`,handle:`ada`,role:`producer`,position:0},{artistId:`grace`,name:`Grace Hopper`,handle:null,role:`producer`,position:1}]},{role:`composer`,label:`COMPOSER`,entries:[{artistId:`katherine`,name:`Katherine Johnson`,handle:null,role:`composer`,position:0}]}]}},a={},o={args:{open:!1}},s=[`Open`,`Closed`],a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{}`,...a.parameters?.docs?.source}}},o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  args: {
+    open: false
+  }
+}`,...o.parameters?.docs?.source}}}})))()}c();export{o as Closed,a as Open,s as __namedExportsOrder,i as default};

@@ -1,0 +1,6 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./Calendar-SH3z3MdF.js";var r,i,a,o,s;function c(){return(c=e((()=>{t(),{fn:r}=__STORYBOOK_MODULE_TEST__,i={title:`Atoms/Calendar`,component:n,parameters:{layout:`centered`,docs:{description:{component:"`Calendar` is a `next/dynamic`, client-only wrapper around\n{@link ./CalendarInner} (react-day-picker). See `CalendarInner.stories.tsx`\nfor the full themed calendar surface — this story covers the lazy-load\nwrapper contract itself."}}},args:{mode:`single`}},a={},o={args:{selected:new Date(`2026-01-15T00:00:00.000Z`),onSelect:r()}},s=[`Default`,`WithSelectedDate`],a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{}`,...a.parameters?.docs?.source}}},o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  args: {
+    selected: new Date('2026-01-15T00:00:00.000Z'),
+    onSelect: fn()
+  }
+}`,...o.parameters?.docs?.source}}}})))()}c();export{a as Default,o as WithSelectedDate,s as __namedExportsOrder,i as default};

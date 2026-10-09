@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,r}from"./useJovieAuth-BIVJUTCS.js";import{n as i,t as a}from"./QueryProvider-BWxlXvp0.js";function o(e){return(0,c.jsx)(a,{children:e})}function s({children:e}){return(0,c.jsx)(n,{children:o(e)})}var c;function l(){return(l=e((()=>{c=t(),r(),i()})))()}var u,d,f,p;function m(){return(m=e((()=>{u=t(),l(),d={title:`Providers/AuthClientProviders`,component:s,parameters:{layout:`fullscreen`}},f={args:{children:(0,u.jsx)(`p`,{children:`Auth route shell`})}},p=[`Default`],f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{
+  args: {
+    children: <p>Auth route shell</p>
+  }
+}`,...f.parameters?.docs?.source}}}})))()}m();export{f as Default,p as __namedExportsOrder,d as default};

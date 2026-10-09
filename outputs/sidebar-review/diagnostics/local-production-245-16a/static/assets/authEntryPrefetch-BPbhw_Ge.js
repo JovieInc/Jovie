@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{s as t,t as n}from"./routes-NOD5Mahi.js";function r(e,t){if(t!==void 0)return t;let r=e.split(/[?#]/,1)[0];return![n.SIGNUP,n.SIGNIN,n.START,n.CHAT,n.WAITLIST].some(e=>e===r)&&void 0}function i(){return(i=e((()=>{t()})))()}export{r as n,i as t};

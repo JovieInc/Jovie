@@ -1,0 +1,30 @@
+{
+  "head": "d8157055debb9368eb5d607e090cd0dec3ecec16",
+  "resultBundle": "/private/tmp/sidebar-native-panels-success-recording.xcresult",
+  "passed": 1,
+  "capturedOutsidePerformanceWindow": true,
+  "media": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 1320,
+        "height": 2868
+      }
+    ],
+    "format": {
+      "duration": "25.165000"
+    }
+  },
+  "files": {
+    "record-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "sidebar-native-success.mp4": "a42144fb9ebcf6d8f900f595afe97b46f30f67b76211b435d06c2a7eb22c1017",
+    "frame-20.png": "c3895e7dbd66a2e68d39ca864d26c935f39007f0a83e129f0248ff257365b5e3",
+    "record.sh": "12de6533972ee286259dada7dc9f594bcd60871e8492d9e5268ec34d1dc18e9d",
+    "sidebar-native-success.mov": "0b38c54bba7e35c3c64b257dd69e5d58626d31b355e6d8056fe4e07d485127d5",
+    "record-restored-state.json": "b7c59a55b78d50d556dd1c566f01e1fd0968808b6d3ac7ba8e815f44dc7fbf4c",
+    "record.log": "df3e14c70a6d7e3b3bde20d0f91b8720340a37baa415615d617a45eaa888a54c",
+    "media-verification.json": "6d77345d5022e346eef7d3130f45a06df4c391f1c3acac9527c792e2992b7c2f"
+  }
+}

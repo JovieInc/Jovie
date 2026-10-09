@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(e){return e===`public`?`Public`:`Private`}function n(e){return e.replace(/^https?:\/\//,``)}var r;function i(){return(i=e((()=>{r=`private`})))()}export{i,n,t as r,r as t};

@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";async function t(...e){return[]}async function n(...e){return[]}async function r(...e){return[]}async function i(...e){return{success:!0}}async function a(){return[]}async function o(){return[]}async function s(...e){return[]}function c(){return(c=e((()=>{})))()}export{t as a,i as c,n as i,r as n,a as o,c as r,o as s,s as t};

@@ -1,0 +1,10 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{r as n,t as r}from"./MobileReleaseList-kUXQqni6.js";var i,a,o,s,c,l,u;function d(){return(d=e((()=>{i=t(),n(),{fn:a}=__STORYBOOK_MODULE_TEST__,o={title:`Dashboard/Releases/MobileReleaseList`,component:r,parameters:{layout:`centered`,jovie:{uncoveredProps:[`path`,`label`,`testId`]}},decorators:[e=>(0,i.jsx)(`div`,{className:`w-96 bg-surface-0 p-3 text-primary-token`,children:(0,i.jsx)(e,{})})],args:{releases:[{profileId:`profile-1`,id:`release-1`,title:`Summer Lights`,artistNames:[`Jovie Artist`],slug:`summer-lights`,releaseType:`single`,isExplicit:!1,releaseDate:`2026-06-15`,artworkUrl:void 0,totalTracks:1,providers:[],spotifyPopularity:67,smartLinkPath:`/summer-lights`,previewUrl:null,primaryIsrc:null,upc:null,status:`released`},{profileId:`profile-1`,id:`release-2`,title:`Night Drive`,artistNames:[`Jovie Artist`,`Guest Vocal`],slug:`night-drive`,releaseType:`ep`,isExplicit:!1,releaseDate:`2026-09-18`,artworkUrl:void 0,totalTracks:4,providers:[],spotifyPopularity:44,smartLinkPath:`/night-drive`,previewUrl:null,primaryIsrc:null,upc:null,status:`scheduled`}],artistName:`Jovie Artist`,onEdit:a(),onCopy:async()=>`Copied`,canGenerateAlbumArt:!0,onGenerateAlbumArt:a(),onGeneratePitch:a()}},s={},c={args:{groupByYear:!0}},l={args:{isSmartLinkLocked:e=>e===`release-2`,getSmartLinkLockReason:e=>e===`release-2`?`scheduled`:null}},u=[`Ungrouped`,`GroupedByYear`,`SmartLinkLocked`],s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{}`,...s.parameters?.docs?.source}}},c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    groupByYear: true
+  }
+}`,...c.parameters?.docs?.source}}},l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{
+  args: {
+    isSmartLinkLocked: releaseId => releaseId === 'release-2',
+    getSmartLinkLockReason: releaseId => releaseId === 'release-2' ? 'scheduled' : null
+  }
+}`,...l.parameters?.docs?.source}}}})))()}d();export{c as GroupedByYear,l as SmartLinkLocked,s as Ungrouped,u as __namedExportsOrder,o as default};

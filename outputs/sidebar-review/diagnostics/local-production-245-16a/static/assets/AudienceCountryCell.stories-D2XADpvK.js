@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./Icon-By9Ml2cP.js";import{i,t as a}from"./utils-AN1vFgqV.js";import{t as o}from"./audience-BlHSfCoN.js";function s({geoCountry:e,className:t}){return(0,c.jsxs)(`div`,{className:a(`inline-flex items-center gap-2 text-app text-secondary-token`,t),children:[(0,c.jsx)(r,{name:`MapPin`,className:`h-3.5 w-3.5 text-tertiary-token`,"aria-hidden":`true`}),(0,c.jsx)(`span`,{className:`line-clamp-1`,children:e?o(e):`Unknown`})]})}var c;function l(){return(l=e((()=>{c=t(),n(),i()})))()}var u,d,f,p;function m(){return(m=e((()=>{l(),u={title:`Organisms/Table/Atoms/AudienceCountryCell`,component:s,parameters:{layout:`centered`},args:{geoCountry:`US`}},d={},f={args:{geoCountry:null}},p=[`Default`,`Unknown`],d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{}`,...d.parameters?.docs?.source}}},f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{
+  args: {
+    geoCountry: null
+  }
+}`,...f.parameters?.docs?.source}}}})))()}m();export{d as Default,f as Unknown,p as __namedExportsOrder,u as default};

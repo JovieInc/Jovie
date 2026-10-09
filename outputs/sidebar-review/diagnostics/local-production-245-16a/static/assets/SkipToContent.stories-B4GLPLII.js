@@ -1,0 +1,6 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./SkipToContent-DFWdDMg5.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Atoms/SkipToContent`,component:r,parameters:{layout:`centered`,docs:{description:{component:"`SkipToContent` is visually hidden until it receives keyboard focus\n(`sr-only` → `focus:not-sr-only`). Tab into the canvas to see it appear."}}},render:e=>(0,i.jsxs)(`div`,{className:`relative h-24 w-72 rounded-md border border-subtle bg-surface-0 p-4`,children:[(0,i.jsx)(r,{...e}),(0,i.jsx)(`p`,{className:`text-app text-secondary-token`,children:`Press Tab to reveal the skip link.`})]})},o={},s={args:{targetId:`app-main`,linkText:`Skip to main content`}},c=[`Default`,`CustomText`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    targetId: 'app-main',
+    linkText: 'Skip to main content'
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{s as CustomText,o as Default,c as __namedExportsOrder,a as default};

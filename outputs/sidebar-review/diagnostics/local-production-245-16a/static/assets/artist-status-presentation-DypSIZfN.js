@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(e){return{action:`view_listing`,explanation:e?.jovieCreated?i:r,label:n}}var n,r,i;function a(){return(a=e((()=>{n=`Jovie listing`,r=`Listed from public music data. Artist or team management hasn’t been verified.`,i=`Not managed by the artist or their team.`})))()}export{t as n,a as t};

@@ -1,0 +1,26 @@
+{
+  "at": "2026-10-08",
+  "scope": [
+    "apps/ios/Jovie/Features/AppShell/AppShellIntentNavigation.swift",
+    "apps/ios/Jovie/Core/MobileAuthCoordinator.swift",
+    "apps/web/lib/ios/apple-app-site-association.ts",
+    "apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift",
+    "apps/ios/Jovie/Features/AppShell/AppShellView.swift"
+  ],
+  "localSharedRepositoryWorktreeCount": 28,
+  "candidateOverlaps": [
+    {
+      "path": "/Users/timwhite/.codex/worktrees/sidebar-native-ci-parity/Jovie",
+      "dirty": "",
+      "branchDelta": "apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift\napps/ios/Jovie/Features/AppShell/AppShellView.swift",
+      "errors": ""
+    },
+    {
+      "path": "/Users/timwhite/Documents/Codex/2026-10-06/task-3/jovie-offline-status",
+      "dirty": "",
+      "branchDelta": "apps/ios/Jovie/Features/AppShell/AppShellView.swift",
+      "errors": ""
+    }
+  ],
+  "limitations": "Local shared-repository census is not exhaustive of remote hosts or leases. App inventory found no native routing writer; historical JOV-7632 is not an active lease."
+}

@@ -1,0 +1,16 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{t as n}from"./jsx-runtime-BbDfbRii.js";import{n as r,t as i}from"./triangle-alert-tSalnSyS.js";import{r as a,t as o}from"./button-BSHhPV4e.js";import{r as s,t as c}from"./capture-B6zVxw45.js";import{n as l,t as u}from"./recovery-contract-C3cRRZE0.js";import{n as d,t as f}from"./ErrorDetails-Dj9vo9Je.js";function p(e){let t=e.constructor?.name?.toLowerCase()??``,n=e.message?.toLowerCase()??``;return t===`unrecognizedactionerror`||n.includes(`was not found on the server`)||n.includes(`failed to find server action`)}function m({error:e,reset:t,context:n,message:r=`We couldn't load this page. Give it another try, or head home.`}){let a=p(e);(0,g.useEffect)(()=>{a||c(e,n.toLowerCase(),{digest:e.digest})},[e,n,a]);let s=a?`The app was just updated. Reload to continue.`:r,l=a?{label:`Reload`,onClick:()=>globalThis.location.reload()}:{label:u.retryLabel,onClick:t};return(0,h.jsx)(`div`,{className:`flex flex-1 flex-col items-center justify-center px-4 py-12 text-center`,role:`alert`,"aria-live":`polite`,children:(0,h.jsxs)(`div`,{className:`w-full max-w-sm space-y-4`,children:[(0,h.jsx)(`div`,{className:`flex justify-center`,children:(0,h.jsx)(`div`,{className:`flex h-10 w-10 items-center justify-center text-destructive`,children:(0,h.jsx)(i,{className:`h-6 w-6`,"aria-hidden":`true`})})}),(0,h.jsxs)(`div`,{className:`space-y-1.5`,children:[(0,h.jsx)(`h3`,{className:`text-sm font-medium text-secondary-token`,children:a?`App updated`:`Something went wrong`}),(0,h.jsx)(`p`,{className:`text-app text-tertiary-token`,children:s})]}),(0,h.jsx)(`div`,{className:`flex justify-center`,"data-recovery-actions":``,children:(0,h.jsx)(o,{variant:`primary`,size:`sm`,onClick:l.onClick,children:l.label})}),!a&&(0,h.jsx)(f,{error:e,extraContext:{Context:n}})]})})}var h,g;function _(){return(_=e((()=>{h=n(),a(),r(),g=t(),d(),l(),s()})))()}var v,y,b,x,S;function C(){return(C=e((()=>{v=n(),_(),y={title:`Organisms/ErrorBoundary`,component:m,parameters:{layout:`fullscreen`},decorators:[e=>(0,v.jsx)(`div`,{className:`flex min-h-screen`,children:(0,v.jsx)(e,{})})]},b={args:{error:Object.assign(Error(`The dashboard request timed out.`),{digest:`dashboard-timeout`}),reset:()=>void 0,context:`Dashboard`}},x={args:{error:Error(`Failed to find server action. Refresh to try again.`),reset:()=>void 0,context:`Global`,message:`This app was updated. Reload to get the latest version.`}},S=[`DashboardRetry`,`DeploymentSkewReload`],b.parameters={...b.parameters,docs:{...b.parameters?.docs,source:{originalSource:`{
+  args: {
+    error: Object.assign(new Error('The dashboard request timed out.'), {
+      digest: 'dashboard-timeout'
+    }),
+    reset: () => undefined,
+    context: 'Dashboard'
+  }
+}`,...b.parameters?.docs?.source}}},x.parameters={...x.parameters,docs:{...x.parameters?.docs,source:{originalSource:`{
+  args: {
+    error: new Error('Failed to find server action. Refresh to try again.'),
+    reset: () => undefined,
+    context: 'Global',
+    message: 'This app was updated. Reload to get the latest version.'
+  }
+}`,...x.parameters?.docs?.source}}}})))()}C();export{b as DashboardRetry,x as DeploymentSkewReload,S as __namedExportsOrder,y as default};

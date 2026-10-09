@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{i as n,r}from"./PageShell-CxlxIPuU.js";function i({toolbar:e,...t}){return t.surfaceMode===`table`?(0,a.jsx)(r,{...t,surfaceMode:`table`,toolbar:e}):(0,a.jsx)(r,{...t,frame:`none`,toolbar:e})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

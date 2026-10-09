@@ -1,0 +1,2524 @@
+{
+  "runId": "owner-diagnostic-sidebar-245-16a-4c06233300c7",
+  "files": [
+    {
+      "path": "iframe.html",
+      "status": 200,
+      "mimeType": "text/html",
+      "recordedBodySha1": "f97bc55e3f97a85e8782d5e62c2abf3529a1a0bf.html"
+    },
+    {
+      "path": "assets/preload-helper-DhnkWCfy.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/iframe-Dy9BbHe_.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/rolldown-runtime-BcKkbAw3.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/chunk-7PIQR4A3-CxeHe7fY.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/react-CFeKwT_a.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/iframe-CrvmR2WC.css",
+      "status": 200,
+      "mimeType": "text/css",
+      "recordedBodySha1": "1060d86d67bc5672fa879bc849c3b01ce294badd.css"
+    },
+    {
+      "path": "vite-inject-mocker-entry.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/chunk-IMSF75WX-Bj7yKzVT.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/_interop_require_wildcard-C8_d9R3i.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/navigation-BK3Vz7yE.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/_interop_require_default-D7kajm71.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/action-async-storage.external-lTfyzZf1.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/navigation-lA0z5ElE.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/jsx-runtime-BbDfbRii.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/react-dom-ChdriqrQ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-bdO7kGuA.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-CFRhEdJy.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/floating-ui.react-dom-PvDXErZE.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-CUteRhie.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-ztkn1e7C.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-CINgfuk0.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-DzN_z7nq.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-dJ7iQDIJ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/bundle-mjs-CM1P9So-.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/clsx-rPuJnTY1.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/utils-CTJK0RKy.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/removable-_8fTgXVw.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-Dh4pQjBy.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/circle-check-CjH05h9T.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/reset-Cwe7SWyj-BrpD7S9e.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/createLucideIcon-DKtuYzxz.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/mutation-ClURBdFe.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/query-Dy-w6N1U.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/debounce-Ynq26WfO-DDEYt1fQ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/triangle-alert-tSalnSyS.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/x-4tQOC7Cc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/button-BSHhPV4e.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/info-DQOLpsPX.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-5F7-6bKS.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/spinner-DFr-ocjD.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/next-themes-mock-BTTZ5A_l.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/toast-B4bc7zKP.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/utils-AN1vFgqV.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/link-e-necIhk.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/BannerViewport-DvcMDGqc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/Banner-PZ9WjRrY.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/iframe-B1b4EUuv.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "index.json",
+      "purpose": "full built-source inventory"
+    },
+    {
+      "path": "assets/SidebarIdentityGroup-CmJK4g_U.css",
+      "status": 200,
+      "mimeType": "text/css",
+      "recordedBodySha1": "7314cc93c29a65873993e58c89e91549ab089d4f.css"
+    },
+    {
+      "path": "assets/system-b-app-DxrlOg4h.css",
+      "status": 200,
+      "mimeType": "text/css",
+      "recordedBodySha1": "d06dda5a51dcf548d6776c35823dbd7647a8f236.css"
+    },
+    {
+      "path": "assets/UnifiedSidebar.stories-CugbjpEL.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/navigation-state-Dd8clVGa.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/calendar-days-C34h9eno.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/gauge-o86bX9Z1.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/circle-user-WPgl7Vxc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/banknote-EwJcpFn3.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/inbox-VJJ2W7P8.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/house-i_0Pt133.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/id-card-BesED_hj.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/layers-0JBqYfd7.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/link-czgkDKPu.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/lock-G5T-1bnm.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/mail-check-CF1Y_9wL.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/settings-BcsOcbVa.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/shield-check-BTEcibQL.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/square-check-big-BMlqUyop.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/square-pen-KVqxHhwl.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/user-Dl3uAoYs.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/users-Bhmwu0CV.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/productOntology-D9PDy77i.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/routes-NOD5Mahi.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useMutation-B0v0Frsd.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/archive-CVwcZmQc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/DashboardNav-BDxpkM3d.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/bell-Cp-0raX7.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/panel-left-DhCKUHGz.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/columns-2-Cbtop1XR.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/chevron-left-BfjoQV8I.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/audio-lines-Dh7soz_k.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/chevron-right-DEG-SFTJ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/keyboard-shortcuts-CPQHIOjk.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/panel-right-CrhWUG1H.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/log-out-CJ7cOC5k.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/mic-vocal-BUZZHl_i.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/message-circle-YoglDim9.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/link-2-BbP9M1Y9.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/music-BAP0u1GG.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/play-DZgtukkA.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/copy-Ak4aYcMX.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/radio-BXecQ92x.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/search-Binh2gA_.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/sun-BX0Zf8Ga.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ellipsis-DPV-Uvav.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/pin-B6u26tQg.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/check-C93bwYa6.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/plus-BkSJRkAg.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dropdown-menu-Y42T2GdN.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/circle-DE8HG6Zf.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-C7956Sp6.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-Cbn42f9i.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-BqmbkeY0.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-DMwvycbU.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/popover-BXx8dM3W.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-B9lrgDXK.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/es2015-CSmdsEO0.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/DashboardDataContext-C9tVUD5-.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/rail-motion-Bfzjkm1V.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/cache-isolation-Csunjkdv.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/avatar-quality-PS6W96Rp.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useRailFocusReturn-hoIIohYQ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/HeaderActionsContext-jlsme0ww.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SidebarContext-BRIJo3yt.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/group-DZVwYp8u.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/skeleton-r-sDwcX3.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/keyboard-D7rKJ46k.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/context-CDpFhzjN.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/menu-CJFNJyuU.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useBreakpoint-ChaeM0Za.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useRailPreview-DD1Ed2ol.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useMediaQuery-u0jZUA4z.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useSidebarKeyboardShortcut-CniYuLpc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/electron-bridge-D5mDfl5a.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/error-tracking-D688D1Cu.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/safeCallback-eILJRdyt.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/breadcrumbs-Cm4V0nBt.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/logger-OLEc2Rxi.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/web-vitals-BVi8EYmS.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/exports-R95eBpPm.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/test-mode-constants-DFsFGbvS.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/compat-By3RfjDv.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/iso-BqUkZscz.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/email-Bi4xMit5.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/schemas-BLXHay2x.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dsp-registry-BkdAVOX9.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/plan-prices-BZ1xPhp0.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/domains-DzNsaUR3.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/jovie-user-kjtEaTe2.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/env-public-BXg9ScLW.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/config-CooXzWH1.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/library-CVP6ZfQZ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dashboard-data-DkkN-Hgc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/env-server-CG--Ldbb.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/tim-white-pYveBwGf.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/__vite-browser-external-rzXbT8Yi.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dev-test-auth-server-mock-CsTwuIa4.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/headers-DYNab93M.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/errors-DgdKNXRe.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/health-ePGhrqew.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/registry-D8x7WrOy.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/avatar-url-Duihja-0.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/server-DP8GLnqP.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/instagram-activation-Du84BuKC.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/build-url-BKTkBKeE.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/state-B-eYaFN9.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/keys-CNuKOgyu.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/fetch-Ci5XMwUg.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/presets-BYEpDKQQ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/connection-vmhYZeS2.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useChatConversationsQuery-Bqze5uLp.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useBaseQuery-dsTAVrrJ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useQuery-9q8tysXB.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/retry-policy-Cp9JsP1B.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/cache-strategies-BouXlmy9.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/client-DQQ7krb1.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/contracts-Pk-CzMuN.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/DesktopUpdateProvider-BtDbK-gH.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/DesktopUpdateModal-BufLEFme.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dialog-D3PBJ2jy.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/RuntimeUpdateProvider-tkJec13O.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/session-work-state-TNC_SPt2.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-K-sQaU_6.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/close-button-B2m3CqCG.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/overlay-styles-BnRQ4ViP.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useBuildInfoQuery-Dc9zzpVg.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/progress-UV5I_KTq.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/Dialog-BDOx20rK.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/env-client-g5g4P_rn.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/kbd-CZIwuZaY.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SidebarNavItem-DGDNgild.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useNotifications-CAnklElK.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/Tooltip-CBVX_M78.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useSidebarFlyout-DsSWsQoe.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SidebarThreadsSection-q3wHEFNZ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/Icon-By9Ml2cP.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/arrow-up-right-Bz4P0vTh.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/arrow-right-Cl8JKg4j.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/activity-0PhR8yNO.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/arrow-down-BZ3k7_e2.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/arrow-up-down-7-7Ee-aD.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/circle-check-big-CApiBQAi.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/arrow-up-XomoXdJh.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/camera-CxuDMU4M.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/circle-alert-B-EGAHI2.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/calendar-plus-BC1fRLd-.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/briefcase-DbMSQW1o.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/credit-card-DAeVYMzK.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/circle-x-Bday-MTH.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/circle-question-mark-CQe7vdRq.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ellipsis-vertical-ov8Is3_T.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/eye-off-Sj3wPMl_.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/external-link-BBnrbU00.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/eye-CladS-wW.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/funnel-DblyWAAc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/grip-vertical-gJD1I9nb.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/handshake-CY08IsM1.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/user-plus-B9YmWaIY.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/file-text-BrPw0-2F.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/list-music-Rus-BoF9.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/loader-circle-DocofC0V.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/monitor-Bd7mW-he.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/message-square-Gv8EmnKL.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/newspaper-vCFeKfK_.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/map-pin-D-OWoYxT.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/sliders-horizontal-BqzHp2Dy.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/rocket-CB9dckon.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/pencil-line-DDeAdxJZ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/refresh-cw-Do5j6SQ6.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/pencil-wXa6-Cfc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/send-BhVqWaDv.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ticket-BRtq8bMc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/trending-up-CNZp4vPt.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/sparkles-D0KQCtGE.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/NavBadge-DVy2mxTI.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SidebarCollapsibleGroup-BqCqW1WP.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/trash-DM9Ayg-e.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/navigation-telemetry-pPb2pJYA.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useClipboard-BzDsYpwD.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/shortcuts-DihRWxWk.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useIsomorphicLayoutEffect-DWrsJJ32.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/json-beacon-CL7aG7LX.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ContextMenuOverlay-rpc7is3U.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/interaction-latency-e7275BZ1.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/consent-regions-D2dqoVDh.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/consent-DbA7_Sq5.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/context-menu-C2Af1BER.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/NavMenuItem-SiAMec7v.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-DaUa3F92.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/UnifiedSidebar-D-cyGG9o.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/arrow-left-C89eTb__.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/operator-navigation-Bkr_xGM9.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/badge-check-C6voXKFX.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/cable-_a9JRVjL.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/flag-1PDKvBEe.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/messages-square-DLcv8MJG.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/image-rAVYTnVY.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/admin-navigation-Ca8qE3QF.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/share-2-D5dRJrT2.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/list-checks-Dhks59aB.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/workspaces-Cuj9PTEl.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/tokens-gwxcSXdR.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/AskJovie-Bt7fGFi_.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/BrandLogo-tpJ0vkQV.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SidebarCollapseButton-BbUnM_ZW.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/RailToggleButton-BXgbCyM3.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/icon-button-ChwKjABM.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/send-horizontal-Ct_7otQy.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/icon-button-contract-Cl-QiCER.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/input-BYNkmjMu.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/sidebar-3763fr4e.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/layout-CQMjmBHb.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/tooltip-shortcut-UpsS-Y_2.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/Divider-CF7nUEFv.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/sheet-bREDym29.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useRailMotionPhase-Chn4F276.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useReducedMotion-Cwl4L1iT.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/UpdateAvailablePill-DUfElU6P.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useChatConversationQuery-DItY1y_R.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/WorkspaceSelector-b9kKlP-A.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/download-Cu9d8wEM.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/rotate-ccw-DFvTQeVB.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useDashboardProfileQuery-PTs_gfm6.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/UserButton-BkGsA1t7.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/badge-DqMNX1OQ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/arrow-down-to-line-CZUkKFHh.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/common-dropdown-CkbgKmra.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/file-check-corner-Dy3aUDC2.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SidebarIdentityGroup-D3zy-M1O.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/common-dropdown-item-renderers-Cc3L7v5c.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useJovieAuth-BIVJUTCS.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/chevron-down-DIv2YHYC.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/KeyboardShortcutsContext-7paoV4zt.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dynamic-CilPZhxc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/common-dropdown-renderer-CYd8Lw32.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useBillingMutations-D4oB1V6e.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useClerkSafe-B6kyP_Xe.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/mutation-utils-CYa-sQYu.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/workspace-lock-Cv_ljMbs.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/auth-session-cookies-Bwv6XS3B.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/client-h3_Nwu6U.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useBillingStatusQuery-73nHifw2.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/usePricingOptionsQuery-BwUMJcAA.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/DesktopTitlebar-tLc6tJD8.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useFeedbackMutation-D0TigZ5r.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/analytics-BrBhj50K.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/signup-funnel-client-NsG-62NR.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/unlock-with-passkey-B7Y3r5_M.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/avatar-BiiFm6lb.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/VerifiedBadge-BniIV21I.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/avatar-contract-DTDMCnae.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/Avatar-Bn2IIjLh.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/image-CenGJ5UI.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/OviePrivacyLockControl-CD59dQYw.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/data-DDljx5U_.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/metrics-DqXtGl4G.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dsp-images-C4906Fw6.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/copy-T99UxvnY.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/UsageMenuItem-DG4FrT-b.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SidebarInboxLink-BZp_2oro.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/UsageMeter-DULyi3Hw.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/HeaderSearchSurfaceFromContext-CcDiEroS.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ProfileSwitcher-DNRWK43-.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/RailStagedContent-Dz8T3POw.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useProfileData-DnLbDrTc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SidebarBottomNowPlayingBridge-C4r1ADfq.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SidebarBottomNowPlaying-BUikr4ZF.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/label-CaJvPCxj.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/CreateProfileDialog-DZD0hwAG.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dist-GsJhdOEU.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useTrackAudioPlayer-DNE0yCEn.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ArtworkFrame-QQklsNHt.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/pause-CHxkoeKx.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/WhatsNewBanner-C2e6nInh.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/audio-chrome-state-CYxsamkV.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/DashboardHeader-98hmbfnT.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/IconBtn-CZTZXSig.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/VerticalDivider-DufEuA6w.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/AppShellFrame-CzA8Me4D.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/overlay-interaction-lock-DYghTDLC.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/AppShellRightRail-LDNKfzAM.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/OverlayInteractionGuard-CJ4Aq4z_.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/PersistentAudioBar-Dgywxs-X.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/AudioBar-BmxEitpe.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/skip-forward-bOj_zm5W.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/AudioPlayControl-BZ6K3lW0.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/chevron-up-DmaVZmn2.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/format-time-CfEhjVjB.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/repeat-B26ZkB4v.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ShellAudioDock-TfvAgo1j.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/formatDuration-DRY0gSfD.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SeekBar-Bcpp0dM6.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/palette-ranking-BLawBVzy.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/TruncatedText-DV7DVL3j.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/CommandPalette-DdYR070N.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/system-b-app-0raEe-jZ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/rendered-family-DM7S6Kg-.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/file-headphone-CRyKNgra.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/signed-in-session-D_LAMto1.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ChatComposerToolbar-BfM2uS5Y.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ChatInput-DlCeeZXi.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/simple-tooltip-DjmLZRou.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/is-ref-object-DtBghz9d.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/reduced-motion-DW5UjKZU.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/mic-DOXnzQrE.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/motion-D-8Qiuww.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/AnimatePresence-DAiBG9KF.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/route-config-CfOO2lIN.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/user-round-DdCjBuDH.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/react-BHuztmV8.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/music-2-Fs3dTgT3.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/BottomTabBar-b_GYDJZO.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/use-reduced-motion-BlK4K3h2.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/layout-Dgg7uioF.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ReleaseCalendar.stories-C_4jzRUP.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/demo-plan-BsCoJAVx.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/elements-DzM8DpZA.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ContentSurfaceCard-NsoaLSLh.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/card-MwNxHyIZ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/chat-composer-copy-BnzbLA7s.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/chat-motion-DDYrJPY3.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/column-snap-features-YoBRjMWQ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/transcriber-BjcJA_oV.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/Composer-BfYaHOI6.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/paperclip-CSZfKawr.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/types-USKopgPO.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/normalizer-CMIFmz3S.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/chat-layout-DNN6Rizl.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/starter-actions-B7n_BUNl.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/tokens-ChCetwzJ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/registry-grYmRXYk.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/DictationWaveform-D4dAYjag.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/entity-accent-BdarfQ21.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/system-b-radius-B--h2uHA.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/EntityChip-72qZAK7Q.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/entity-mappers-DAyvBUE_.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useTextareaAutosize-DiaQhBfE.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/calendar-v6BA0KFT.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useAsyncDebouncer-CI2RQHTM.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useArtistSearchQuery-CYSAXua3.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/event-client-hYNpmNUc.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/PacerProvider-BE09DYn0.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SlashCommandMenu-CfUymp8D.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useChatCapabilitiesQuery-CvCJ_C4W.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/shim-CteIqfs5.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/timing-DmxXlZy1.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/with-selector-iRPJy5nQ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/async-retryer-CREKdfrD.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useSelector-JBo2bZTq.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/event-provider-BpVX5EfP.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/dashboard-actions-mock-Ca9F-_1J.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useEventsQuery-D2MTq3us.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/composer-catalog-actions-mock-Bz3xoZ9d.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/useReleasesQuery-DO64Nh-f.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/SharedCommandPalette-BI4LRe81.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/picker-rows-CfS-E_HV.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/megaphone-BDf5H6EW.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/ShellListRowFrame-j_Iy71Lh.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/table.styles-C1U-LPyh.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/list-todo-DtPNzK8_.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/link-2-off-BPI71Kgl.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/album-art-capability-nFBjoFeX.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/react-18-evYLipn4.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/DashboardFeedbackModal-DnIcl8QQ.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/textarea-D63TVxG8.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/field-ZRu8i5Na.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/FormField-Bz2hJlJb.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/axe-DMBqtp5z.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/axe-BAL6MdNP.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/CmdKPalette-Cy_02gVi.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    },
+    {
+      "path": "assets/CmdKMainPlaneSearchInput-Bn_gM7jB.js",
+      "status": 200,
+      "mimeType": "text/javascript",
+      "recordedBodySha1": null
+    }
+  ],
+  "basis": "GET200 resources from the exact successful production trace plus full index;read-only build artifact subset"
+}

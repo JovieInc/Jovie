@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{i as n,t as r}from"./utils-AN1vFgqV.js";function i({children:e,className:t}){return(0,a.jsx)(`div`,{className:r(`shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]`,t),children:e})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

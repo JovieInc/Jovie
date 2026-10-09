@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-08T10:47:39.795669+00:00",
+  "classification": "Concreteprogress: nativezoom clipping and compactdrawerfocus red-tested,repaired,locallycommitted,andqualified withcurrentrunner/nativecandidate",
+  "head": "f4a73e59c09c62f349195c486419b2278df79b9b",
+  "tree": "ba71eaede1e5643fa137265387bdbd6ff43d39e1",
+  "publicationActionActive": false,
+  "goalComplete": false,
+  "blockedThresholdSatisfied": false,
+  "evidence": "outputs/sidebar-review/diagnostics/electron-native-zoom-10e/receipt.json",
+  "next": "Existingresourceowner exactheadproduction/combinedqualification admission; nativeauthowners andphysical/installed acceptance remainopen",
+  "verifiedCurrentGBrainReceipt": {
+    "slug": "receipts/shared-sidebar-native-zoom-f4a73e59-2026-10-08",
+    "contentHash": "180d2601d80f3ea13cba7ff84dd5a23057ae6b018244cca87c7cc4d10d97f074",
+    "bodyMatches": true,
+    "canonicalContentAvailable": true
+  }
+}

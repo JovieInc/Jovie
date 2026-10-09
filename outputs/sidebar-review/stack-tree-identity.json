@@ -1,0 +1,61 @@
+{
+  "beforeRepackHead": "3296d528fab787433f330828418e9124f8c1ab6a",
+  "afterRepackHead": "e02d883b4d3d87bce976a38ba96f76077db19fa7",
+  "tree": "19656835712afd41a7738e25596910922e30161d",
+  "identical": true,
+  "change": "move compatibility tests into behavior-owning layers without changing the combined tree",
+  "subsequentCorrection": {
+    "head": "c910b0b11df0d4c7aa937758f76c873a2c152d91",
+    "tree": "1e062875dc1c11a59231001df0731db4134013ff",
+    "change": "five owned controls converted to approved canonical Button variants; qualification renewed"
+  },
+  "finalRepair": {
+    "head": "7e749635bd3d65b40d7886a607fda70575c81e77",
+    "tree": "5367eff1177623c8ad6190e23a50d369a1a6c0b0",
+    "change": "bound canonical pin hit area and use real persistence in Storybook; qualification renewed"
+  },
+  "boundedScaleRepair": {
+    "head": "e26b95db8444fa1efdf36918ec653b693fee0dfb",
+    "tree": "3532a82fb7352e47b158b68a18b0019cc7e2d3f7",
+    "change": "Limit inline More pages to 12 when existing scoped search is available; preserve current page and full permitted search/pin registries; capture full-flow performance before screenshots."
+  },
+  "hoverIntentRepair": {
+    "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+    "tree": "8ecb24fde1992b0038951de59cdd4965b1122d03",
+    "change": "Promote hover preview to explicit access on activation; next activation closes. Add meaningful red/green provider regression and CPU profile capture for full-flow diagnosis. Matching18typecheck/4coverage/25browser passed."
+  },
+  "nativeRecentRepair": {
+    "head": "22cf14a9e614a66ec0dbb95361cd4077c82328d7",
+    "tree": "3568c1e235b0a41d1937be414c4d9d9a415fa412",
+    "change": "Quiet Recent state and explicit accessibility container/searchID; meaningful large-text reachability/geometry regression;16tests+capture passed."
+  },
+  "nativeCiRepair": {
+    "head": "3cdda15bd68479050c0acb421651554f004e49a4",
+    "tree": "92a58c95e0aa0069a59a3eb5463e46dae722e4e6",
+    "parent": "22cf14a9e614a66ec0dbb95361cd4077c82328d7",
+    "changedFiles": [
+      "apps/ios/JovieUITests/JovieUITests.swift"
+    ],
+    "productSourceIdentical": true,
+    "drawerBlob": "7c2adbd000031ec8a00ef350f30b34dc393f3346"
+  },
+  "nativeTitlebarRepair": {
+    "head": "10e76a95b87efd5c25abe6b757081c2265ee63d7",
+    "tree": "ae7b7b3864c9bc794d6fccbcc0a569ac7ea98bf3",
+    "parent": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+    "sourceFiles": {
+      "apps/desktop/scripts/desktop-shell-contract.test.mjs": "81db6f028d4c0e7e0abf386bc370726c46fc5fda",
+      "apps/web/app/globals.css": "442c5ffa19f81824bf2aabaa4e4111237c4c73ce",
+      "apps/web/components/organisms/DesktopTitlebar.tsx": "f8b618f84cc9eb8797589a2a4c71b49b410b3299",
+      "apps/web/tests/e2e/storybook-shared-sidebar.spec.ts": "1c0a1a431df935ba9ae5efc4fb6989b4f1d12580"
+    },
+    "evidence": "outputs/sidebar-review/diagnostics/electron-production-245/receipt.json"
+  },
+  "nativeZoomRepair": {
+    "head": "f4a73e59c09c62f349195c486419b2278df79b9b",
+    "tree": "ba71eaede1e5643fa137265387bdbd6ff43d39e1",
+    "previousHead": "10e76a95b87efd5c25abe6b757081c2265ee63d7",
+    "focusCommit": "278700c006d648ca4f03c08abffb4087d838f4a2",
+    "receipt": "outputs/sidebar-review/diagnostics/electron-native-zoom-10e/receipt.json"
+  }
+}

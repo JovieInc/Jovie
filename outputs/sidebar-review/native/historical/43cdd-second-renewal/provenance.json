@@ -1,0 +1,9 @@
+{
+  "head": "43cdd871ab99561d1a475197b210934f95b45a42",
+  "semanticPassed": 14,
+  "navigationPerformancePassed": 1,
+  "uiFailed": 1,
+  "failure": "New history search assertion queried placeholder rather than assigned native identifier; reachability being verified with actualID and hierarchy diagnostic",
+  "bundle": "/private/tmp/sidebar-native-recent-final.xcresult",
+  "recentAnchors": "Back/All chats/account hittable, brand/account frames stable within0.001point and on screen, Settings frame identical; fresh full-window screenshot inspected"
+}

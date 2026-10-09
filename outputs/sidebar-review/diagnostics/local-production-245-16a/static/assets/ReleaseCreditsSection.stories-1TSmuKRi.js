@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ReleaseCreditsSection-CmEJtdHt.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Organisms/ReleaseSidebar/ReleaseCreditsSection`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,i.jsx)(`div`,{className:`w-80`,children:(0,i.jsx)(e,{})})],args:{releaseId:`rel-1`,creditsGroups:[{role:`producer`,label:`Producer`,entries:[{artistId:`artist-1`,name:`Jane Producer`,handle:`janeproducer`,role:`producer`,position:0}]},{role:`composer`,label:`Composer`,entries:[{artistId:`artist-2`,name:`Alex Writer`,handle:null,role:`composer`,position:0}]}]}},o={},s={args:{variant:`flat`}},c=[`Default`,`Flat`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    variant: 'flat'
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{o as Default,s as Flat,c as __namedExportsOrder,a as default};

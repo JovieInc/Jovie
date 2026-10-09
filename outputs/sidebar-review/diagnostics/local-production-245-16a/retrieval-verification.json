@@ -1,0 +1,12 @@
+{
+  "verified": true,
+  "fileCount": 2771,
+  "totalBytes": 26943900,
+  "archiveSha256": "baf3d5d076f6d94880c9942ed9ba0943e72c97277206e76d914a4563f034ec05",
+  "indexEntryCount": 3309,
+  "storyCount": 3190,
+  "indexedImportPaths": 1231,
+  "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "compilerOverlay": "16a2bda8acf14bc77b6922f47b080d76fefb1bee",
+  "qualification": "Exact file hashes of completed diagnostic build verified; 1231 refers to build source inventory, not story entries. Rehost is not fresh build or normal qualification"
+}

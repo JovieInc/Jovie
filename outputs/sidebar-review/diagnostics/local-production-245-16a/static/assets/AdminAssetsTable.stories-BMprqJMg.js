@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{H as n,U as r}from"./removable-_8fTgXVw.js";import{c as i,s as a}from"./iframe-B1b4EUuv.js";import"./system-b-app-0raEe-jZ.js";import{i as o,n as s,r as c,t as l}from"./story-fixtures-ByROuCFp.js";var u,d,f,p,m,h;function g(){return(g=e((()=>{u=t(),i(),r(),o(),s(),d=new a({defaultOptions:{queries:{retry:!1,staleTime:1/0}}}),f={title:`Admin/Tables/Assets`,component:c,parameters:{layout:`fullscreen`},decorators:[e=>(0,u.jsx)(n,{client:d,children:(0,u.jsx)(`div`,{className:`h-160 bg-base text-primary-token`,children:(0,u.jsx)(e,{})})})],args:{assets:l,pageSize:20,total:l.length,search:``,sort:`created_desc`,type:`all`,issues:`all`,verified:`all`}},p={},m={args:{issues:`issues`}},h=[`Default`,`IssuesOnly`],p.parameters={...p.parameters,docs:{...p.parameters?.docs,source:{originalSource:`{}`,...p.parameters?.docs?.source}}},m.parameters={...m.parameters,docs:{...m.parameters?.docs,source:{originalSource:`{
+  args: {
+    issues: 'issues'
+  }
+}`,...m.parameters?.docs?.source}}}})))()}g();export{p as Default,m as IssuesOnly,h as __namedExportsOrder,f as default};

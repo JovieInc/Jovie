@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{r as n,t as r}from"./ProfileModeCard-CYanlh1R.js";function i({accent:e,children:t}){return(0,a.jsx)(r,{accent:e,eyebrow:`Stay close`,dataTestId:`profile-primary-tab-subscribe`,children:t})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

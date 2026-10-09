@@ -1,0 +1,34 @@
+[
+  {
+    "file": "outputs/sidebar-review/web/current/recordings/jovie-desktop-success.webm",
+    "media": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "width": 1440,
+          "height": 900
+        }
+      ],
+      "format": {
+        "duration": "5.840000"
+      }
+    }
+  },
+  {
+    "file": "outputs/sidebar-review/web/current/recordings/ovie-compact-success.webm",
+    "media": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "width": 390,
+          "height": 844
+        }
+      ],
+      "format": {
+        "duration": "4.880000"
+      }
+    }
+  }
+]

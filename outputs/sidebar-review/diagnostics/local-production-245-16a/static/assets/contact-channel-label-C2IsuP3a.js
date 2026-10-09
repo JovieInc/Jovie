@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(e,t){let r=n[e],i=t.contactName?.trim()||t.primaryContactLabel?.trim()||``;return i?`${r} ${t.roleLabel}, ${i}`:`${r} ${t.roleLabel}`}var n;function r(){return(r=e((()=>{n={email:`Email`,sms:`Text`,phone:`Call`}})))()}export{r as n,t};

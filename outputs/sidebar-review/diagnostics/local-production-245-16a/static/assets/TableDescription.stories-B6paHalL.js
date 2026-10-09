@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import"./system-b-app-0raEe-jZ.js";import{n as t,t as n}from"./TableDescription-94jIKPb3.js";var r,i,a,o;function s(){return(s=e((()=>{t(),r={title:`Organisms/Table/TableDescription`,component:n,args:{label:`Hosting notes`,text:`Usage includes application hosting, image processing, and scheduled jobs. This deliberately long description remains available in full through the disclosure without changing table row height.`}},i={},a={args:{text:``}},o=[`Default`,`Empty`],i.parameters={...i.parameters,docs:{...i.parameters?.docs,source:{originalSource:`{}`,...i.parameters?.docs?.source}}},a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{
+  args: {
+    text: ''
+  }
+}`,...a.parameters?.docs?.source}}}})))()}s();export{i as Default,a as Empty,o as __namedExportsOrder,r as default};

@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";function n(){return(0,r.useContext)(a)}var r,i,a;function o(){return(o=e((()=>{r=t(),i={clearPendingShell:()=>{},pendingShellRoute:null,showPendingShell:()=>{}},a=(0,r.createContext)(i)})))()}export{o as n,n as r,a as t};

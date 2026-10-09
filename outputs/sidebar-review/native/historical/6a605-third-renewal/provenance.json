@@ -1,0 +1,7 @@
+{
+  "head": "6a60503b1ccdfa87b0b8a4c43cedd2463d52f13d",
+  "semanticPassed": 14,
+  "uiFailed": 1,
+  "failure": "Accessibility hierarchy proves TextField visible at53,306.3,239,51 but identifier inherited shell-drawer-threads from parent rather than search. Parent now explicit contain and field gets direct assignedID. No hitability/layout relaxation.",
+  "bundle": "/private/tmp/sidebar-native-recent-qualified.xcresult"
+}

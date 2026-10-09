@@ -1,0 +1,25 @@
+{
+  "head": "f4a73e59c09c62f349195c486419b2278df79b9b",
+  "tree": "ba71eaede1e5643fa137265387bdbd6ff43d39e1",
+  "gitArchivePaxCommentMatched": true,
+  "testedFiveFilesMatched": true,
+  "qualifiedCompilerBytesMatched16aAnd14a": true,
+  "payloadHashesVerified": {
+    "full-story-source-inventory.json": true,
+    "source-f4a73e59.tar.gz": true,
+    "qualified-14a-component-live-storybook-lifecycle.mjs": true,
+    "qualified-14a-main.ts": true,
+    "diagnostic-overlay.tar.gz": true,
+    "overlay/diagnostics/sidebar-production-unprofiled.cjs": true,
+    "overlay/diagnostics/sidebar-production-common-clock.cjs": true,
+    "overlay/apps/web/.cache/sidebar-production-full-config/main.ts": true,
+    "overlay/apps/web/.cache/sidebar-production-full-config/preview.tsx": true,
+    "overlay/apps/web/.cache/sidebar-production-full-config/preview-head.html": true
+  },
+  "requestSha256": "a273598b2aa46817b169314dd26c87ac0338c156ff665498d40f65c08b9d6b06",
+  "sourceArchiveBytes": 84458598,
+  "sourceArchiveSha256": "7b9f3060ce7cb8065fce99dea800dd28bb80e665eee3a432ee950d0d9dd78e85",
+  "preparedOnly": true,
+  "admitted": false,
+  "remoteJobDispatched": false
+}

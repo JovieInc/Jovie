@@ -1,0 +1,87 @@
+{
+  "observedAt": "2026-10-08T04:19:52.360597-07:00",
+  "requestSha256": "4c63a875bc4abe1cd09e5a62417a35ea894d9a7e15b815176422b13730ebd803",
+  "revision": 2,
+  "supersedes": "a273598b2aa46817b169314dd26c87ac0338c156ff665498d40f65c08b9d6b06",
+  "sameLogicalScope": true,
+  "inventoryHead": "f4a73e59c09c62f349195c486419b2278df79b9b",
+  "inventoryTree": "ba71eaede1e5643fa137265387bdbd6ff43d39e1",
+  "uniqueConfiguredPaths": 1231,
+  "samePathSetAsHistoricalInventory": true,
+  "metadataHashChecks": {
+    "full-story-source-inventory.json": true,
+    "generate-source-inventory.cjs": true,
+    "inventory-generation-proof.json": true,
+    "rejected-original-preflight.json": true
+  },
+  "payloadDigestDeclarationsUnchanged": {
+    "source-f4a73e59.tar.gz": true,
+    "diagnostic-overlay.tar.gz": true,
+    "qualified-14a-component-live-storybook-lifecycle.mjs": true,
+    "qualified-14a-main.ts": true
+  },
+  "generationProof": {
+    "verifiedAt": "2026-10-08T11:13:19.421192+00:00",
+    "sourceHead": "f4a73e59c09c62f349195c486419b2278df79b9b",
+    "sourceTree": "ba71eaede1e5643fa137265387bdbd6ff43d39e1",
+    "generator": "generate-source-inventory.cjs",
+    "generatorSha256": "81b22e7159661dec1a20060fd29494cdd77bb6c95a6f9f80efa37490fbeee575",
+    "method": "TypeScript AST actual FULL_CATALOG_STORIES, exact-head tracked files, independently compared Python recursive glob filtered against exact source archive",
+    "sourceConfigSha256": "734b6c1f82e99b63768a8b96c5a4c3b2620331f59d3e7dd6170431a485fe3a2d",
+    "inventorySha256": "4b7ae7694cc3bf7c876d2aed41627cfbac58de621345930ea25d3ee2a9211bfe",
+    "count": 1231,
+    "uniqueCount": 1231,
+    "countsByConfiguredGlob": {
+      "./stories/**/*.stories.@(js|jsx|ts|tsx|mdx)": 3,
+      "../components/**/*.stories.@(js|jsx|ts|tsx|mdx)": 1186,
+      "../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)": 42
+    },
+    "independentPathSetExactMatch": true,
+    "allPathsInExactSourceArchive": true,
+    "archivePaxHeadExactMatch": true,
+    "unchangedOtherPayloads": [
+      "source-f4a73e59.tar.gz",
+      "qualified-14a-component-live-storybook-lifecycle.mjs",
+      "qualified-14a-main.ts",
+      "diagnostic-overlay.tar.gz",
+      "overlay/diagnostics/sidebar-production-unprofiled.cjs",
+      "overlay/diagnostics/sidebar-production-common-clock.cjs",
+      "overlay/apps/web/.cache/sidebar-production-full-config/main.ts",
+      "overlay/apps/web/.cache/sidebar-production-full-config/preview.tsx",
+      "overlay/apps/web/.cache/sidebar-production-full-config/preview-head.html"
+    ],
+    "preservedRejectedRequestSha256": "a273598b2aa46817b169314dd26c87ac0338c156ff665498d40f65c08b9d6b06",
+    "oldInventoryDeclaredHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+    "oldRequestNotAdmitted": true,
+    "scopeLimit": "Configured source imports only; built index and actual generated story IDs require owner execution."
+  },
+  "preservedOriginalFailureRecord": {
+    "observedAt": "2026-10-08T11:00:31.791527+00:00",
+    "logicalRequestSha256": "a273598b2aa46817b169314dd26c87ac0338c156ff665498d40f65c08b9d6b06",
+    "sourceHead": "f4a73e59c09c62f349195c486419b2278df79b9b",
+    "inventoryDeclaredHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+    "inventorySha256": "f21bd7c7809db0bfda285a843a5b91d7f8334753d69f93111b7e03d2ab8ca82b",
+    "expectedInventorySha256": "f21bd7c7809db0bfda285a843a5b91d7f8334753d69f93111b7e03d2ab8ca82b",
+    "count": 1231,
+    "uniqueCount": 1231,
+    "sourceArchiveSha256": "7b9f3060ce7cb8065fce99dea800dd28bb80e665eee3a432ee950d0d9dd78e85",
+    "preflightException": "ValueError: source inventory identity mismatch",
+    "accepted": false,
+    "remoteJobDispatched": false,
+    "seatAcquired": false,
+    "buildStarted": false,
+    "payloadChanged": false,
+    "adapterReview": "CLEAR",
+    "nextOwnerAction": "Sidebar source owner regenerate inventory bound to exact f4 source and validate actual configured import paths, update inventory hash and issue a new immutable request digest. Existing request remains preserved; no old-digest execution.",
+    "sourceArchivePaxComment": "f4a73e59c09c62f349195c486419b2278df79b9b"
+  },
+  "authority": "metadata reconciliation only; rejected execution handoff approval remains pending",
+  "seatReserved": false,
+  "archivesOpenedOrExtracted": false,
+  "dependenciesRestored": false,
+  "buildStarted": false,
+  "profilingStarted": false,
+  "providerInvoked": false,
+  "sourceOrExternalStateChanged": false
+}
+

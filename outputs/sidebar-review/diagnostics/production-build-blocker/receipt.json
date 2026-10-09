@@ -1,0 +1,53 @@
+{
+  "webHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "sourceUnchanged": true,
+  "fullBuild": {
+    "session": 43372,
+    "pid": 92803,
+    "status": "intentionally stopped before completion; normal addon graph retained despite one story file",
+    "terminalExit": 1
+  },
+  "boundedBuild": {
+    "session": 65956,
+    "pid": 99762,
+    "parentPid": 99740,
+    "config": "bounded-scoped-config.ts",
+    "command": "JOVIE_AGENT_PROFILE=coder NODE_ENV=production pnpm --filter @jovie/web exec storybook build --preview-only --disable-telemetry --config-dir .cache/sidebar-production-story-config --output-dir /private/tmp/sidebar-production-bounded-fixture",
+    "status": "intentionally terminated for measured runaway resource use; not built or rendered",
+    "physicalFootprintGiB": 52.4,
+    "peakPhysicalFootprintGiB": 52.4,
+    "stackSubsystem": "native rolldown-binding.darwin-arm64.node; main event loop and native async callbacks",
+    "sampledAt": "2026-10-08T06:42:49Z",
+    "terminalExit": 1
+  },
+  "stopReadback": {
+    "checkedAt": "2026-10-08T06:46:09Z",
+    "pids": [
+      92803,
+      99762
+    ],
+    "command": "ps -p 92803,99762 -o pid=,ppid=,comm=",
+    "exit": 1,
+    "output": "",
+    "interpretation": "both verified owned build PIDs absent"
+  },
+  "modeBoundary": "NODE_ENV=production and Vite production transform log observed; actual browser React bundleType not observed because no successful build/server/measurement",
+  "adoptFirst": "composed existing storybookAddonsForEnvironment(true) in temporary diagnostic config; left JOVIE_LIVE_STORYBOOK_CERT unset to preserve actual app globals/styles; no CI or maintained compiler policy edited",
+  "resourceRepairOwnerReportedByCoordinator": {
+    "threadId": "B01a11209-100a-71c3-9c93-7c7d51619016",
+    "scope": "existing Gem Storybook maintained lifecycle/resource repair; no second compiler or gate writer started"
+  },
+  "reviewServer": "owned6017 left intact",
+  "next": "owner reconciles same native memory-growth class; no blind production rebuild. Continue task-scoped native verification after build resource released.",
+  "files": {
+    "preview.tsx": "fdbe7bdc779eb7ee29436519ea621754a9fbcdc3a1598ddf28bd8a2d9b1085fd",
+    "bounded-build-stopped.log": "47395d168e3dea7dfa4e05211cb8df27065dbda320c833fc949d7ce443eb0eb2",
+    "preview-head.html": "2f1f1b44758cd3fbc91695c3a36417af3c1ac38bc300a00739417f5f0e5f0c1e",
+    "bounded-scoped-config.ts": "b6ccd53024e0d9636b44b9ec411bed88a1b069062ff3ca5e13b9bda9b70254c4",
+    "sample-command.log": "bcba531d8a7836c45f34bcf1d367960eb214470bd1e02b177e8daed01bdcbfdf",
+    "prepared-production-diagnostic.cjs": "18b17eecda3bd97a463a7a20348124f47349c7c5c746c5e90adf32264b789e97",
+    "owned-rolldown-sample.txt": "7e26cf583daddf5feb4620bf1ce3a0628b32b2e79d205fa914621aacea9074c3",
+    "full-addons-stopped.log": "7c5e96e0e0cc42a9023dd95fc00b08d96edc9ee7fd2b95d73f857e31547d329c",
+    "original-scoped-config.ts": "d487d1ac13ccdd5a293e6d395247ca024ebbb15d2747b1956cfc214ab8856b19"
+  }
+}

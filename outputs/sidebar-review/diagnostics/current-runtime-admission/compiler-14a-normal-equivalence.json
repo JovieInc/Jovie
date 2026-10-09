@@ -1,0 +1,44 @@
+{
+  "at": "2026-10-08T10:23:25.351554+00:00",
+  "ownerNormalReceiptSha256": "bbd5d1f3767e26012c3eee2cd406e3e7c79d77aa51712252c09d5638d6d9324d",
+  "runId": "owner-normal-PR20988-14a-paired-20261008T0937Z",
+  "head": "14a3fe807b7605edd11348165e999b1ef32618f4",
+  "terminal": "2026-10-08T10:11:34.583337+00:00",
+  "qualificationExit": 0,
+  "outcome": "normal-qualification-passed",
+  "ownedCommandDrained": true,
+  "gateSeatReleased": true,
+  "resourceReceipt": {
+    "startedAt": "2026-10-08T09:40:42.390Z",
+    "timeoutSeconds": 2400,
+    "selectorChanged": false,
+    "shardConcurrency": 2,
+    "maxWorkers": 1,
+    "rssLimitBytes": 8589934592,
+    "memoryBefore": {
+      "totalBytes": 67319287808,
+      "availableBytes": 63185981440
+    },
+    "ownedPid": 3888443,
+    "childExit": 0,
+    "childSignal": null,
+    "peakRssBytes": 6115422208,
+    "rootGroupCleanupVerified": true,
+    "completeTreeCleanupAuthority": "canonical lifecycle result-pipe helper",
+    "outcome": "normal-qualification-passed",
+    "finishedAt": "2026-10-08T10:11:34.506Z"
+  },
+  "productionCompilerBlobEquivalence": {
+    "apps/web/.storybook/main.ts": {
+      "16a": "8a470eb24a9d2f1f193d3358066874bd8f47c0a7",
+      "14a": "8a470eb24a9d2f1f193d3358066874bd8f47c0a7"
+    },
+    "scripts/component-live-storybook-lifecycle.mjs": {
+      "16a": "48f60344147e37dea2ba1703f5f3d120d43aa1db",
+      "14a": "48f60344147e37dea2ba1703f5f3d120d43aa1db"
+    }
+  },
+  "sourceDelta": "Only production-react-resolution.test.ts changes16a\u219214a;compiler main/lifecycle byteidentical.14a normalfullsuite pass is ownerdependency proof,not current10equalification orliveStorybookcertificate.",
+  "sourceOwnerChanged": false,
+  "newRemoteJobDispatched": false
+}

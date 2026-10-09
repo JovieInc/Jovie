@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";function n(){return(0,r.useEffect)(()=>(document.documentElement.style.overflowY=`auto`,()=>{document.documentElement.style.removeProperty(`overflow-y`)}),[]),null}var r;function i(){return(i=e((()=>{r=t()})))()}i();export{n as MarketingScrollUnlock};

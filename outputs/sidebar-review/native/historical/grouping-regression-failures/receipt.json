@@ -1,0 +1,7 @@
+{
+  "compileFailure": "Initial fixture was missing JovieKit import; fixed before behavior-red run",
+  "behaviorRed": "Recent omitted Today on d815 production drawer plus populated fixture/new UI assertion",
+  "firstImplementationFailure": "Lazy stateful duplicate filtering re-evaluated and emptied snapshot; fixed with eager filter before prefix(5)",
+  "failedOwnedRunStop": "verified xcodebuild PID74061 arguments, TERM only owned failed grouped result; terminal143; text large and Shutdown readback",
+  "qualificationPassed": false
+}

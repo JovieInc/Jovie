@@ -1,0 +1,1 @@
+@layer components{.ap-phone-frame{--ap-phone-max-width:21.25rem;width:100%;max-width:var(--ap-phone-max-width);margin-inline:auto}.ap-phone-frame[data-size=md]{--ap-phone-max-width:15rem}.ap-phone-frame[data-size=sm]{--ap-phone-max-width:12rem}.ap-phone-frame__viewport{width:100%;height:100%;position:relative}}

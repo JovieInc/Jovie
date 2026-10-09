@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{c as n,n as r}from"./phone-showcase-primitives-DhuOVDPS.js";import{r as i,t as a}from"./StickyPhoneTourClient-C5EZiZyS.js";var o,s,c,l;function u(){return(u=e((()=>{o=t(),n(),i(),s={title:`Marketing/StickyPhoneTourClient`,component:a,parameters:{layout:`fullscreen`},args:{modes:r,introTitle:`The right action for every fan.`,introBadge:`One profile. Every way fans support you.`,artistHandle:`tim`}},c={render:e=>(0,o.jsx)(`div`,{className:`min-h-dvh bg-page`,children:(0,o.jsx)(a,{...e})})},l=[`ScrollDriven`],c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  render: args => <div className='min-h-dvh bg-page'>
+      <StickyPhoneTourClient {...args} />
+    </div>
+}`,...c.parameters?.docs?.source}}}})))()}u();export{c as ScrollDriven,l as __namedExportsOrder,s as default};

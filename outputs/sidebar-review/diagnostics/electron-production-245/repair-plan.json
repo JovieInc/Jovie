@@ -1,0 +1,32 @@
+{
+  "at": "2026-10-08T09:56:17.931364+00:00",
+  "profile": "coder",
+  "issue": "no Linear issue \u2014 ad-hoc",
+  "bottleneck": "Real native100px control reserve overflows collapsed200px titlebar allocation;heading x212 vsnavright240,28px overlap in12desktop cases",
+  "primaryTask": "Collapse/open sidebar with permanent native brand/toggle and readable page heading",
+  "context": "Preserve brand/toggle/header/content vertical coordinates,focus,deeperEscape,scroll andzeroallocationfloating rail",
+  "states": [
+    "pinned",
+    "collapsed",
+    "floating",
+    "compactdrawer",
+    "light",
+    "dark",
+    "zoom2"
+  ],
+  "input": [
+    "pointer",
+    "keyboard",
+    "44px touch adaptations",
+    "reducedmotion",
+    "desktopdrag/no-dragregions"
+  ],
+  "smallestCorrection": "env(titlebar-area-height,44px);native window-control safe width+full162px chrome (shell inset8,cell padding20,brand38,toggle28,historycontrols50,3gaps18);existingtoggle shrink-0. Compatibility fallback72+162=234px,not200px.",
+  "ownership": "Sole sharedsidebar writer;JOV7740InReview is obsoletegrid removal only;currentmainGLOBALS delta is only this writer foundation,other scope retained;noauthsourceedit",
+  "verification": "Red/green existingStorybookCI spec,maintainedDesktop shell contract,currentaffectedcomponentcoverage,actualhiddenElectron before/after fixture geometry plus14matrix cases",
+  "publicationActionActive": false,
+  "originalPlan": "repair-plan-before-footprint-correction-history.json",
+  "supersession": "Original128px footprint/200px fallback was insufficient: regression exposed28\u219216px toggle shrink. Superseded by tested full162px chrome footprint andnonshrinking28px toggle.",
+  "finalHead": "10e76a95b87efd5c25abe6b757081c2265ee63d7",
+  "finalSourceReceipt": "receipt.json"
+}

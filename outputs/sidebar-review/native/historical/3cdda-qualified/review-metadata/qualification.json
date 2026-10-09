@@ -1,0 +1,1049 @@
+{
+  "nativeHead": "3cdda15bd68479050c0acb421651554f004e49a4",
+  "base": "95c4afede3605e63a3dd9d2519ff843aae81f26e",
+  "typecheck": {
+    "passed": 18,
+    "total": 18,
+    "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07"
+  },
+  "coverage": {
+    "shards": 4,
+    "passedTests": 2274,
+    "skippedTests": 12,
+    "changedCovered": 1573,
+    "changedExecutable": 1588,
+    "percent": 99.1,
+    "threshold": 60,
+    "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+    "selector": "pnpm --filter @jovie/web test:coverage --changed 95c4afede3605e63a3dd9d2519ff843aae81f26e --bail 1 --shard N/4, using actual plan coverage include and related tests"
+  },
+  "browser": {
+    "startTime": "2026-10-08T05:22:02.118Z",
+    "duration": 47894.212,
+    "expected": 25,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0,
+    "status": "passed",
+    "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+    "artifacts": "web/current/browser/provenance.json"
+  },
+  "performance": {
+    "rail": {
+      "frames": 26,
+      "intervalMedianMs": 8.400000000000091,
+      "intervalP95Ms": 9.5,
+      "intervalMaxMs": 9.5,
+      "framesOver60HzBudget": 0,
+      "framesOver120HzBudget": 15,
+      "longTaskCount": 0,
+      "longestTaskMs": 0,
+      "attribution": "Browser-document timing on a shared busy host; task entries do not identify sidebar ownership. This display is not a physical 120Hz receipt."
+    },
+    "largeMenu": {
+      "count": 120,
+      "inlinePages": 12,
+      "longTasks": [],
+      "eventToAssertionMs": 57,
+      "renders": [
+        {
+          "phase": "update",
+          "duration": 1.299999713897705
+        },
+        {
+          "phase": "nested-update",
+          "duration": 0.09999990463256836
+        },
+        {
+          "phase": "nested-update",
+          "duration": 9.799999713897705
+        },
+        {
+          "phase": "nested-update",
+          "duration": 3
+        },
+        {
+          "phase": "nested-update",
+          "duration": 2.200000286102295
+        },
+        {
+          "phase": "update",
+          "duration": 0.19999980926513672
+        },
+        {
+          "phase": "nested-update",
+          "duration": 0.19999980926513672
+        },
+        {
+          "phase": "update",
+          "duration": 0.10000038146972656
+        },
+        {
+          "phase": "nested-update",
+          "duration": 0.20000028610229492
+        },
+        {
+          "phase": "update",
+          "duration": 1.6999998092651367
+        }
+      ],
+      "budgetsMs": {
+        "sixtyHz": 16.7,
+        "oneTwentyHz": 8.3,
+        "longTask": 50
+      },
+      "scope": "Storybook React Profiler actual render duration; opening wall time includes browser automation. Not physical 120Hz or native proof."
+    },
+    "completeFlow": {
+      "intervalCount": 34,
+      "medianMs": 8.299999999999955,
+      "p95Ms": 26.700000000000045,
+      "maxMs": 33.59999999999991,
+      "over16_7": 3,
+      "over8_3": 16,
+      "longTaskCount": 0,
+      "longestTaskMs": 0,
+      "paletteRenderMaxMs": 3.299999713897705,
+      "percentileMethod": "nearest rank"
+    },
+    "cpuProfile": {
+      "path": "web/current/browser/large-page-cpu-profile.json",
+      "nodes": 5047,
+      "samples": 656,
+      "durationMs": 565.549
+    },
+    "acceptance": "Current full-run browser sample has no >50ms task. Full-flow RAF max33.6ms/p9526.7ms still exceeds16.7/8.3 budgets; physical120Hz unverified. Earlier95/99ms observations retained; no causal claim from this clean sample.",
+    "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07"
+  },
+  "native": {
+    "head": "3cdda15bd68479050c0acb421651554f004e49a4",
+    "passed": 22,
+    "skipped": 0,
+    "coverage": 0.8526194588370755,
+    "largestTextSeparatePassed": 1,
+    "provenance": "native/current/provenance.json"
+  },
+  "publication": {
+    "remote": "git@github.com:JovieInc/Jovie.git",
+    "branchesPushed": 0,
+    "pullRequestsCreated": 0,
+    "blockedBy": "automatic approval review requires direct publication authority in this chat",
+    "preparedDrafts": [
+      {
+        "layer": "native",
+        "branch": "codex/shared-sidebar-native",
+        "base": "main",
+        "head": "3cdda15bd68479050c0acb421651554f004e49a4",
+        "files": 6,
+        "changedLines": 474,
+        "publication": "unpublished; specific authorization pending",
+        "comparisonBase": "95c4afede3605e63a3dd9d2519ff843aae81f26e",
+        "title": "feat(ios): share canonical sidebar navigation and bounded panels",
+        "destination": "JovieInc/Jovie",
+        "draft": true,
+        "bodyFile": "outputs/sidebar-review/native-pr.md",
+        "remote": "git@github.com:JovieInc/Jovie.git",
+        "stage": 1,
+        "publishNow": true
+      },
+      {
+        "layer": "foundation",
+        "branch": "codex/shared-sidebar-foundation",
+        "base": "main",
+        "head": "8d36078f1a658e7bb130a2cc998e20a936ac4db5",
+        "files": 47,
+        "changedLines": 1390,
+        "publication": "unpublished; specific authorization pending",
+        "comparisonBase": "95c4afede3605e63a3dd9d2519ff843aae81f26e",
+        "title": "feat(shell): stabilize shared sidebar toolbar and footer",
+        "destination": "JovieInc/Jovie",
+        "draft": true,
+        "bodyFile": "outputs/sidebar-review/foundation-pr.md",
+        "remote": "git@github.com:JovieInc/Jovie.git",
+        "stage": 1,
+        "publishNow": true
+      },
+      {
+        "layer": "overflow-search",
+        "branch": "codex/shared-sidebar-overflow-search",
+        "base": "main",
+        "head": "a4914f19134d74185d574c61c82a3a7e27d1219a",
+        "files": 11,
+        "changedLines": 1031,
+        "publication": "unpublished; wait for parent landing, rebase and renewed qualification",
+        "comparisonBase": "8d36078f1a658e7bb130a2cc998e20a936ac4db5",
+        "title": "feat(shell): bound More and scope page search",
+        "destination": "JovieInc/Jovie",
+        "draft": true,
+        "bodyFile": "outputs/sidebar-review/overflow-search-pr.md",
+        "remote": "git@github.com:JovieInc/Jovie.git",
+        "stage": 2,
+        "publishNow": false,
+        "parentBoundary": "8d36078f1a658e7bb130a2cc998e20a936ac4db5",
+        "currentHeadIsFrozenQualificationOnly": true,
+        "publicationHead": "to be recorded after future rebase and qualification"
+      },
+      {
+        "layer": "history-navigation",
+        "branch": "codex/shared-sidebar-history-navigation",
+        "base": "main",
+        "head": "4686b36bfd4801f23a4d78e30102f65b1062eda9",
+        "files": 20,
+        "changedLines": 1264,
+        "publication": "unpublished; wait for parent landing, rebase and renewed qualification",
+        "comparisonBase": "a4914f19134d74185d574c61c82a3a7e27d1219a",
+        "title": "feat(shell): share scoped Recent and canonical roots",
+        "destination": "JovieInc/Jovie",
+        "draft": true,
+        "bodyFile": "outputs/sidebar-review/history-navigation-pr.md",
+        "remote": "git@github.com:JovieInc/Jovie.git",
+        "stage": 3,
+        "publishNow": false,
+        "parentBoundary": "a4914f19134d74185d574c61c82a3a7e27d1219a",
+        "currentHeadIsFrozenQualificationOnly": true,
+        "publicationHead": "to be recorded after future rebase and qualification"
+      },
+      {
+        "layer": "browser-proof",
+        "branch": "codex/shared-sidebar-browser-proof",
+        "base": "main",
+        "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+        "files": 5,
+        "changedLines": 1417,
+        "publication": "unpublished; wait for parent landing, rebase and renewed qualification",
+        "comparisonBase": "4686b36bfd4801f23a4d78e30102f65b1062eda9",
+        "title": "test(shell): qualify shared sidebar behavior and scale",
+        "destination": "JovieInc/Jovie",
+        "draft": true,
+        "bodyFile": "outputs/sidebar-review/browser-proof-pr.md",
+        "remote": "git@github.com:JovieInc/Jovie.git",
+        "stage": 4,
+        "publishNow": false,
+        "parentBoundary": "4686b36bfd4801f23a4d78e30102f65b1062eda9",
+        "currentHeadIsFrozenQualificationOnly": true,
+        "publicationHead": "to be recorded after future rebase and qualification"
+      }
+    ],
+    "stack": [
+      {
+        "layer": "native",
+        "branch": "codex/shared-sidebar-native",
+        "base": "main",
+        "head": "3cdda15bd68479050c0acb421651554f004e49a4",
+        "files": 6,
+        "changedLines": 474,
+        "publication": "unpublished; specific authorization pending",
+        "comparisonBase": "95c4afede3605e63a3dd9d2519ff843aae81f26e",
+        "stage": 1,
+        "publishNow": true
+      },
+      {
+        "layer": "foundation",
+        "branch": "codex/shared-sidebar-foundation",
+        "base": "main",
+        "head": "8d36078f1a658e7bb130a2cc998e20a936ac4db5",
+        "files": 47,
+        "changedLines": 1390,
+        "publication": "unpublished; specific authorization pending",
+        "comparisonBase": "95c4afede3605e63a3dd9d2519ff843aae81f26e",
+        "stage": 1,
+        "publishNow": true
+      },
+      {
+        "layer": "overflow-search",
+        "branch": "codex/shared-sidebar-overflow-search",
+        "base": "main",
+        "head": "a4914f19134d74185d574c61c82a3a7e27d1219a",
+        "files": 11,
+        "changedLines": 1031,
+        "publication": "unpublished; wait for parent landing, rebase and renewed qualification",
+        "comparisonBase": "8d36078f1a658e7bb130a2cc998e20a936ac4db5",
+        "stage": 2,
+        "publishNow": false,
+        "parentBoundary": "8d36078f1a658e7bb130a2cc998e20a936ac4db5",
+        "currentHeadIsFrozenQualificationOnly": true,
+        "publicationHead": "to be recorded after future rebase and qualification"
+      },
+      {
+        "layer": "history-navigation",
+        "branch": "codex/shared-sidebar-history-navigation",
+        "base": "main",
+        "head": "4686b36bfd4801f23a4d78e30102f65b1062eda9",
+        "files": 20,
+        "changedLines": 1264,
+        "publication": "unpublished; wait for parent landing, rebase and renewed qualification",
+        "comparisonBase": "a4914f19134d74185d574c61c82a3a7e27d1219a",
+        "stage": 3,
+        "publishNow": false,
+        "parentBoundary": "a4914f19134d74185d574c61c82a3a7e27d1219a",
+        "currentHeadIsFrozenQualificationOnly": true,
+        "publicationHead": "to be recorded after future rebase and qualification"
+      },
+      {
+        "layer": "browser-proof",
+        "branch": "codex/shared-sidebar-browser-proof",
+        "base": "main",
+        "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+        "files": 5,
+        "changedLines": 1417,
+        "publication": "unpublished; wait for parent landing, rebase and renewed qualification",
+        "comparisonBase": "4686b36bfd4801f23a4d78e30102f65b1062eda9",
+        "stage": 4,
+        "publishNow": false,
+        "parentBoundary": "4686b36bfd4801f23a4d78e30102f65b1062eda9",
+        "currentHeadIsFrozenQualificationOnly": true,
+        "publicationHead": "to be recorded after future rebase and qualification"
+      }
+    ],
+    "currentStatus": "local packet renewed; two root draft action prepared; children held until each parent lands; authority absent",
+    "policy": "publication-policy.json"
+  },
+  "limits": [
+    "Local source/fixture receipts do not establish hosted CI/queue/deployment or authenticated runtime",
+    "Actual Mac window-control geometry not established",
+    "Physical120Hz and humanVoiceOver not witnessed",
+    "Native private Summer resume uses explicit existing web handoff",
+    "Current full-flow RAFp9526.7/max33.6ms exceeds frame budgets; historical95/99ms cause unresolved"
+  ],
+  "artifacts": [
+    {
+      "test": "canonical sidebar keeps geometry and keyboard actions in dark",
+      "name": "trace",
+      "file": "web/browser/storybook-canonical-sideba-aae83-nd-keyboard-actions-in-dark-chromium--trace.zip",
+      "sha256": "419771dd4dad4b3fedb20fa87f31c6e24a7d45400bdece5a657d8057c3c05558"
+    },
+    {
+      "test": "canonical sidebar keeps geometry and keyboard actions in light",
+      "name": "trace",
+      "file": "web/browser/storybook-canonical-sideba-dd6db-d-keyboard-actions-in-light-chromium--trace.zip",
+      "sha256": "9d66f4875e3436d218423ec8b73bd55a28f14d715f47990fec9cd1610de4c6a8"
+    },
+    {
+      "test": "shared Jovie rail keeps vertical geometry and exclusive controls",
+      "name": "video",
+      "file": "web/browser/storybook-shared-sidebar-s-da53e-etry-and-exclusive-controls-chromium--video.webm",
+      "sha256": "89ac74a417458f4aa9191f844aaa2c1389035da626ce5ea10b11b74af0c30405"
+    },
+    {
+      "test": "shared Jovie rail keeps vertical geometry and exclusive controls",
+      "name": "error-context",
+      "file": "web/browser/storybook-shared-sidebar-s-da53e-etry-and-exclusive-controls-chromium--error-context.md",
+      "sha256": "5d12abd3a77b9efe29332435312e6c8d06b2ce1a85fd8e721c4d7bb73d3eb924"
+    },
+    {
+      "test": "shared Jovie rail keeps vertical geometry and exclusive controls",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-s-da53e-etry-and-exclusive-controls-chromium--trace.zip",
+      "sha256": "9942d48ac3a5a79b75b613273e9382c627f067d13bbbbca1b2a7ac3076769374"
+    },
+    {
+      "test": "shared Ovie rail keeps vertical geometry and exclusive controls",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-s-7e43d-etry-and-exclusive-controls-chromium--trace.zip",
+      "sha256": "7628f5df25966f22bb577a3f4468076955cbb97a9e036a04294fb499692e12f3"
+    },
+    {
+      "test": "compact overflow stays in its drawer at 320px",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-c-3388b-tays-in-its-drawer-at-320px-chromium--trace.zip",
+      "sha256": "bacaee54b35e199b9d83b6cc478b221946f99ddad0eb6644d3b0373b75b0b450"
+    },
+    {
+      "test": "compact overflow stays in its drawer at 375px",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-c-deaa2-tays-in-its-drawer-at-375px-chromium--trace.zip",
+      "sha256": "5f1a480011d6aaa3fa33bed462531c923e30ea42b6f6906d5afd186000310630"
+    },
+    {
+      "test": "compact overflow stays in its drawer at 390px",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-c-44ed6-tays-in-its-drawer-at-390px-chromium--trace.zip",
+      "sha256": "072c8c138ef9f9707791ed6e6b0f7edf3959d4c2c508085145095b18517447b4"
+    },
+    {
+      "test": "compact overflow stays in its drawer at 768px",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-c-8daac-tays-in-its-drawer-at-768px-chromium--trace.zip",
+      "sha256": "80d99b485c0e4ced7b0a0faef7c37c88c57f64b93be53066239561b9aabd2732"
+    },
+    {
+      "test": "Recent stays within the mobile drawer with a reversible Back action",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-R-5b727-th-a-reversible-Back-action-chromium--trace.zip",
+      "sha256": "1b1be880042c0f4bdd1c052c42911a46a338cb5ea0d62c916b947c442e922236"
+    },
+    {
+      "test": "detached media preserves the real composer at 1024px and short height",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-d-43a64--at-1024px-and-short-height-chromium--trace.zip",
+      "sha256": "5e697e343679e07338a5de7fb8db2e437ebc2101ecedbbfffc97eaf2f6fead0c"
+    },
+    {
+      "test": "detached media preserves the real composer at 1440px and short height",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-d-be494--at-1440px-and-short-height-chromium--trace.zip",
+      "sha256": "071d90a07be15a22de551a76ace927c52a392a3c2ecb0f56a8f0d335d3b9a833"
+    },
+    {
+      "test": "detached media preserves the real composer at 1920px and short height",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-d-62d40--at-1920px-and-short-height-chromium--trace.zip",
+      "sha256": "23dd20954a4db87bcf863166f917f017a1d39dd6ce18083b6de23a980fd8bb6e"
+    },
+    {
+      "test": "keyboard pinning preserves focus and reduced-motion RTL geometry",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-k-dcd61-reduced-motion-RTL-geometry-chromium--trace.zip",
+      "sha256": "ee94cc7e89cb6ac7914aaee0c2bdae0bee33db88bda254f83aa135836b259d9f"
+    },
+    {
+      "test": "mobile toggles preserve the saved desktop preference across reload",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-m-53cf9-op-preference-across-reload-chromium--trace.zip",
+      "sha256": "d5afdadfca400825990ed266935c8dd42f1888351733208b385d5928648ade99"
+    },
+    {
+      "test": "floating rail preserves the main plane during repeated reversals",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-f-cd0da-e-during-repeated-reversals-chromium--trace.zip",
+      "sha256": "866388db4f77fbc1646e1d07cec34e3da8a7aa638763daa4bc944610eb842543"
+    },
+    {
+      "test": "touch Jovie controls provide 44px targets",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-t-0d32c-ntrols-provide-44px-targets-chromium--trace.zip",
+      "sha256": "44ac45ef76b5c2c77c01f7e77b73fe65fa8a989c93d8ba700fdfbb272b54aef0"
+    },
+    {
+      "test": "touch Ovie controls provide 44px targets",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-t-f5891-ntrols-provide-44px-targets-chromium--trace.zip",
+      "sha256": "db047d11719550c260da51981839736954b97614cd2ea0e8323eed7d12bb8ec4"
+    },
+    {
+      "test": "phone Find a page closes the drawer and searches only permitted Ovie pages",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-p-a4878-s-only-permitted-Ovie-pages-chromium--trace.zip",
+      "sha256": "df2713df78e497e9508ca5f57a830929aebc9db0a697de9684b0261382f9f698"
+    },
+    {
+      "test": "Ovie Recent reads the private Summer door and resumes its existing conversation",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-O-4b9ef-s-its-existing-conversation-chromium--trace.zip",
+      "sha256": "84b10e0aa2445604ff9463dc424ac99008773001eafee426d96c9b8eec27d88d"
+    },
+    {
+      "test": "effective 200% layout zoom keeps Jovie navigation reachable",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-e-eb5df--Jovie-navigation-reachable-chromium--trace.zip",
+      "sha256": "5ceb95666fbae445e370801e1d1b5119637fa1af8fad9af19299dba5b255e01b"
+    },
+    {
+      "test": "effective 200% layout zoom keeps Ovie navigation reachable",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-e-8609e-s-Ovie-navigation-reachable-chromium--trace.zip",
+      "sha256": "0ef24875f6121966e4201bf11297e0bf6997fae400237593ab25a22056deb788"
+    },
+    {
+      "test": "long Recent labels remain bounded with a large real-schema conversation fixture",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-l-37fda-schema-conversation-fixture-chromium--trace.zip",
+      "sha256": "0bddc34d2006ddacf4181edadebe2f4bf5e5c184c523bbeb0850a81b5eb72f43"
+    },
+    {
+      "test": "More keeps the complete permitted operator collection reachable at short height",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-M-85fac-n-reachable-at-short-height-chromium--trace.zip",
+      "sha256": "548afaf8590445566338e0475c8d94ce9bc9a81e9faeba084a934ee6bd8ad8bb"
+    },
+    {
+      "test": "attention, audio and the inspector coexist without moving the account or losing a draft",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-a-d0c46-e-account-or-losing-a-draft-chromium--trace.zip",
+      "sha256": "0fa9aef8c19079067c440d248fa755658d8f1883ed60d1ab9ab2cbed4d589e0e"
+    },
+    {
+      "test": "large permitted page fixture stays bounded and keyboard reachable",
+      "name": "trace",
+      "file": "web/browser/storybook-shared-sidebar-l-125ed-nded-and-keyboard-reachable-chromium--trace.zip",
+      "sha256": "b2807394a1fcbcf2177a7951ae614d6cdc8759f9b1f3bde8e38016ac5c074640"
+    },
+    {
+      "name": "screenshot",
+      "file": "web/browser/storybook-shared-sidebar-l-125ed-nded-and-keyboard-reachable-chromium--large-more-end.png",
+      "sha256": "0ba8f1cf3f40bb1c6c0a219364d71e7ae365077dff72e8b5ed2c275b142d2e8b"
+    },
+    {
+      "name": "screenshot",
+      "file": "web/browser/storybook-canonical-sideba-aae83-nd-keyboard-actions-in-dark-chromium--canonical-sidebar-dark.png",
+      "sha256": "86ac64c4658d289c0f9a98436018bc1244c530b68cc0464bd406db6ebae5d8c5"
+    },
+    {
+      "name": "screenshot",
+      "file": "web/browser/storybook-shared-sidebar-s-7e43d-etry-and-exclusive-controls-chromium--pinned.png",
+      "sha256": "d6843571671b40f0348c27e2dbfac7e609c477fb348b0163394bdd7532fca62b"
+    },
+    {
+      "name": "screenshot",
+      "file": "web/browser/storybook-shared-sidebar-s-7e43d-etry-and-exclusive-controls-chromium--collapsed.png",
+      "sha256": "24701aa39ff8f47d7fd77ecaa8d9ba93b6f3ec2ba1e690a33de725b070115ffc"
+    },
+    {
+      "name": "screenshot",
+      "file": "web/browser/storybook-shared-sidebar-s-7e43d-etry-and-exclusive-controls-chromium--floating.png",
+      "sha256": "01f8e97077f8b769f41ab9b777b467ae0cc2f9fe846c82d330d4bd445cb2f516"
+    },
+    {
+      "name": "screenshot",
+      "file": "web/browser/storybook-shared-sidebar-s-7e43d-etry-and-exclusive-controls-chromium--open-menu.png",
+      "sha256": "031fa26719efa3378da16b5b6cf2d2119108f460036a5521dce7f1deb69ed455"
+    },
+    {
+      "name": "screenshot",
+      "file": "web/browser/storybook-canonical-sideba-dd6db-d-keyboard-actions-in-light-chromium--canonical-sidebar-light.png",
+      "sha256": "2629fbb1064d8d386a6822bd3b1774724d12c0c10c58745f9d01b963379c5cdc"
+    },
+    {
+      "name": "screenshot",
+      "file": "web/browser/storybook-shared-sidebar-s-da53e-etry-and-exclusive-controls-chromium--pinned.png",
+      "sha256": "939704725fbbf88b7312539f4120b5bb2b01d1debfec74cd0d79c8084bcb5ec2"
+    },
+    {
+      "name": "screenshot",
+      "file": "web/browser/storybook-shared-sidebar-s-da53e-etry-and-exclusive-controls-chromium--collapsed.png",
+      "sha256": "24701aa39ff8f47d7fd77ecaa8d9ba93b6f3ec2ba1e690a33de725b070115ffc"
+    },
+    {
+      "name": "screenshot",
+      "file": "web/browser/storybook-shared-sidebar-s-da53e-etry-and-exclusive-controls-chromium--open-menu.png",
+      "sha256": "9f46449b20e148de53312713e6616a5976d9d92ef7915eac05b27eee51f7ec14"
+    }
+  ],
+  "priorWebHead": "e26b95db8444fa1efdf36918ec653b693fee0dfb",
+  "priorWebTree": "3532a82fb7352e47b158b68a18b0019cc7e2d3f7",
+  "currentWebHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "currentWebTree": "8ecb24fde1992b0038951de59cdd4965b1122d03",
+  "currentQualification": {
+    "status": "local current-head CI cases and recording passed; external/physical/performance acceptance unfinished",
+    "focusedTestsPassed": 27,
+    "sourceRepair": "hover-open preview activation becomes explicit; next activation closes; no pin preference mutation",
+    "deliberateRed": "new provider regression failed before repair, passed after repair",
+    "sourceHooksPassed": true,
+    "typecheck": {
+      "passed": 18,
+      "total": 18,
+      "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07"
+    },
+    "coverage": {
+      "shards": 4,
+      "passedTests": 2274,
+      "skippedTests": 12,
+      "changedCovered": 1573,
+      "changedExecutable": 1588,
+      "percent": 99.1,
+      "threshold": 60,
+      "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07"
+    },
+    "browser": {
+      "startTime": "2026-10-08T05:22:02.118Z",
+      "duration": 47894.212,
+      "expected": 25,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0,
+      "status": "passed",
+      "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+      "artifacts": "web/current/browser/provenance.json"
+    },
+    "CPUProfileAttachment": "web/current/browser/large-page-cpu-profile.json",
+    "performance": {
+      "rail": {
+        "frames": 26,
+        "intervalMedianMs": 8.400000000000091,
+        "intervalP95Ms": 9.5,
+        "intervalMaxMs": 9.5,
+        "framesOver60HzBudget": 0,
+        "framesOver120HzBudget": 15,
+        "longTaskCount": 0,
+        "longestTaskMs": 0,
+        "attribution": "Browser-document timing on a shared busy host; task entries do not identify sidebar ownership. This display is not a physical 120Hz receipt."
+      },
+      "largeMenu": {
+        "count": 120,
+        "inlinePages": 12,
+        "longTasks": [],
+        "eventToAssertionMs": 57,
+        "renders": [
+          {
+            "phase": "update",
+            "duration": 1.299999713897705
+          },
+          {
+            "phase": "nested-update",
+            "duration": 0.09999990463256836
+          },
+          {
+            "phase": "nested-update",
+            "duration": 9.799999713897705
+          },
+          {
+            "phase": "nested-update",
+            "duration": 3
+          },
+          {
+            "phase": "nested-update",
+            "duration": 2.200000286102295
+          },
+          {
+            "phase": "update",
+            "duration": 0.19999980926513672
+          },
+          {
+            "phase": "nested-update",
+            "duration": 0.19999980926513672
+          },
+          {
+            "phase": "update",
+            "duration": 0.10000038146972656
+          },
+          {
+            "phase": "nested-update",
+            "duration": 0.20000028610229492
+          },
+          {
+            "phase": "update",
+            "duration": 1.6999998092651367
+          }
+        ],
+        "budgetsMs": {
+          "sixtyHz": 16.7,
+          "oneTwentyHz": 8.3,
+          "longTask": 50
+        },
+        "scope": "Storybook React Profiler actual render duration; opening wall time includes browser automation. Not physical 120Hz or native proof."
+      },
+      "completeFlow": {
+        "intervalCount": 34,
+        "medianMs": 8.299999999999955,
+        "p95Ms": 26.700000000000045,
+        "maxMs": 33.59999999999991,
+        "over16_7": 3,
+        "over8_3": 16,
+        "longTaskCount": 0,
+        "longestTaskMs": 0,
+        "paletteRenderMaxMs": 3.299999713897705,
+        "percentileMethod": "nearest rank"
+      },
+      "cpuProfile": {
+        "path": "web/current/browser/large-page-cpu-profile.json",
+        "nodes": 5047,
+        "samples": 656,
+        "durationMs": 565.549
+      },
+      "acceptance": "Current full-run browser sample has no >50ms task. Full-flow RAF max33.6ms/p9526.7ms still exceeds16.7/8.3 budgets; physical120Hz unverified. Earlier95/99ms observations retained; no causal claim from this clean sample.",
+      "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07"
+    },
+    "recordings": {
+      "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+      "path": "web/current/recordings",
+      "files": [
+        "jovie-desktop-success.webm",
+        "ovie-compact-success.webm"
+      ],
+      "outsidePerformanceWindow": true
+    },
+    "native": {
+      "head": "3cdda15bd68479050c0acb421651554f004e49a4",
+      "tree": "92a58c95e0aa0069a59a3eb5463e46dae722e4e6",
+      "productionSourceSha": "7c2adbd000031ec8a00ef350f30b34dc393f3346",
+      "previousHead": "22cf14a9e614a66ec0dbb95361cd4077c82328d7",
+      "delta": "UITests only; all product source identical",
+      "ciPassed": 22,
+      "ciSkipped": 0,
+      "ciSelector": "qualify.sh",
+      "coverage": {
+        "covered": 1481,
+        "executable": 1737,
+        "percent": 85.26194588370754
+      },
+      "largestTextUiPassed": 1,
+      "recordingOutsidePerformanceWindow": true,
+      "restoredText": "large",
+      "restoredState": "Shutdown",
+      "historicalPerformance": "../historical/22cf-qualified/provenance.json",
+      "currentHitchMeasurement": false,
+      "files": {
+        "ios-shared-sidebar-more.png": "9e6ddeaa9a1beccac3a458ce533ca5f370de57c2f9b99d5256d927d0ea03d2bc",
+        "ci-qualification.log": "2affa5e4b270a898f14719572c2371eb0c40cd94efa8667264c13da8e001c240",
+        "ios-canonical-information-architecture.png": "2b06d8fba7cf1075a1f5945cb68ea1217f8991fc1ffe205b3c3eedf12683c84a",
+        "publication-preflight.log": "ba5750f211123b50469e4cf0085f092bbd522de446a05eb18ebaf29b5a65d91f",
+        "ci-coverage.json": "68c86b8045842e58231c7b2a9b27b69b652f32843ca434468baa824358164ac2",
+        "ci-summary.json": "8a0729a17c004227f0d9657c345e67daed8d4e8b986e8fb1255ed9f61564b3f5",
+        "ci-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+        "ios-shared-sidebar-recent.png": "cd088694078c55b213b8a994a0c8dea2b06b1749b73b50f01b13cc585f918a2c",
+        "qualify.sh": "1dacc58b656ec526a3be439ac310c465e701663cf42690954b7eb62911afc068",
+        "ci-restored-state.json": "aa29945cbd5e888c1551d2f734e4c88c16beea441ee5613d3ba4ccb090f5290c",
+        "ios-shared-sidebar-footer-probe.png": "2b06d8fba7cf1075a1f5945cb68ea1217f8991fc1ffe205b3c3eedf12683c84a"
+      },
+      "semanticPassed": 14,
+      "uiPassed": 8,
+      "passed": 22,
+      "skipped": 0,
+      "largestTextSeparateRun": true,
+      "coveredLines": 1481,
+      "executableLines": 1737,
+      "percent": 85.26194588370754,
+      "recording": "native/current/recordings/provenance.json",
+      "historicalMetricsHead": "22cf14a9e614a66ec0dbb95361cd4077c82328d7",
+      "hitchValuesExported": false
+    },
+    "sourceHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+    "localPublication": {
+      "nativeHead": "22cf14a9e614a66ec0dbb95361cd4077c82328d7",
+      "webHead": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+      "contractsPassedPerHead": 6,
+      "secretsPassed": true,
+      "bodyAdmissionPassed": 5,
+      "remoteWrites": 0
+    }
+  },
+  "gbrainReceipt": {
+    "slug": "decisions/shared-sidebar-hover-activation-rca-2026-10-08",
+    "hash": "b989ac7145ff196b6c98aeb90029c05fe25a77c27af2acc0957255525db20e68",
+    "canonicalReadbackMatches": true
+  },
+  "draftBodyAdmission": [
+    {
+      "layer": "native",
+      "head": "3cdda15bd68479050c0acb421651554f004e49a4",
+      "status": 0,
+      "receipt": "{\"allowed\":true,\"blockers\":[]}",
+      "scope": "title/body policy only"
+    },
+    {
+      "layer": "foundation",
+      "head": "8d36078f1a658e7bb130a2cc998e20a936ac4db5",
+      "status": 0,
+      "receipt": "{\"allowed\":true,\"blockers\":[]}",
+      "scope": "title/body policy only"
+    },
+    {
+      "layer": "overflow-search",
+      "head": "a4914f19134d74185d574c61c82a3a7e27d1219a",
+      "status": 0,
+      "receipt": "{\"allowed\":true,\"blockers\":[]}",
+      "scope": "title/body policy only"
+    },
+    {
+      "layer": "history-navigation",
+      "head": "4686b36bfd4801f23a4d78e30102f65b1062eda9",
+      "status": 0,
+      "receipt": "{\"allowed\":true,\"blockers\":[]}",
+      "scope": "title/body policy only"
+    },
+    {
+      "layer": "browser-proof",
+      "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+      "status": 0,
+      "receipt": "{\"allowed\":true,\"blockers\":[]}",
+      "scope": "title/body policy only"
+    }
+  ],
+  "nativeHistorical": {
+    "semanticPassed": 14,
+    "largestTextUiPassed": 1,
+    "fileCovered": 1476,
+    "fileExecutable": 1743,
+    "fileCoveragePercent": 84.6815834767642,
+    "recentPinsPolicyCoveragePercent": 100,
+    "simulator": "7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5",
+    "textSize": "accessibility-extra-extra-extra-large",
+    "restoredTextSize": "large",
+    "restoredState": "Shutdown",
+    "independentOpticalReview": "design owner accepted exact f66a51353651 footer",
+    "sourceHead": "f66a51353651afc26772447e9589b4eef2cfcf73"
+  },
+  "historicalWebQualification": {
+    "typecheck": {
+      "successful": 18,
+      "total": 18,
+      "sourceHead": "e26b95db8444fa1efdf36918ec653b693fee0dfb"
+    },
+    "coverage": {
+      "shards": 4,
+      "passedTests": 2273,
+      "skippedTests": 12,
+      "passedFiles": 295,
+      "skippedFiles": 2,
+      "changedCovered": 1570,
+      "changedExecutable": 1585,
+      "percent": 99.1,
+      "requiredPercent": 60,
+      "selector": "pnpm --filter @jovie/web test:coverage --changed 95c4afede3605e63a3dd9d2519ff843aae81f26e --bail 1 --shard N/4; actual planned coverage include and related-test env",
+      "sourceHead": "e26b95db8444fa1efdf36918ec653b693fee0dfb"
+    },
+    "browser": {
+      "startTime": "2026-10-08T04:16:49.225Z",
+      "duration": 139936.90000000002,
+      "expected": 24,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0,
+      "sourceHead": "e26b95db8444fa1efdf36918ec653b693fee0dfb"
+    },
+    "performance": {
+      "railReversal": {
+        "frames": 35,
+        "intervalMedianMs": 8.400000000000091,
+        "intervalP95Ms": 11.099999999999909,
+        "intervalMaxMs": 17.233999999999924,
+        "framesOver60HzBudget": 1,
+        "framesOver120HzBudget": 18,
+        "longTaskCount": 0,
+        "longestTaskMs": 0,
+        "attribution": "Browser-document timing on a shared busy host; task entries do not identify sidebar ownership. This display is not a physical 120Hz receipt."
+      },
+      "largeMore": {
+        "maxReactRenderMs": 9,
+        "eventToAssertionMs": 262.09999990463257,
+        "longTasks": [
+          {
+            "duration": 99,
+            "start": 2621.3999996185303
+          }
+        ]
+      },
+      "completeFlow": {
+        "frames": {
+          "samples": 97,
+          "intervals": 96,
+          "medianMs": 8.400000000000091,
+          "p95Ms": 16.699999999999818,
+          "maxMs": 101.40000000000009,
+          "over16_7Ms": 4,
+          "over8_3Ms": 55,
+          "percentileMethod": "nearest rank"
+        },
+        "paletteMaxReactRenderMs": 3.3999996185302734,
+        "longTasks": [
+          {
+            "duration": 99,
+            "start": 2621.3999996185303
+          }
+        ]
+      },
+      "initialCompleteFlow": {
+        "frames": {
+          "samples": 40,
+          "intervals": 39,
+          "medianMs": 8.400000000000091,
+          "p95Ms": 33.90000000000009,
+          "maxMs": 132.89999999999986,
+          "over16_7Ms": 5,
+          "over8_3Ms": 23,
+          "percentileMethod": "nearest rank"
+        },
+        "longTasks": [
+          {
+            "duration": 95,
+            "start": 1633.4000000953674
+          }
+        ]
+      },
+      "isolatedRunnerRepeats": 3,
+      "diagnosticProfileFlows": 5,
+      "isolatedLongTasks": 0,
+      "status": "historical prior-e26 full-run95/99ms observations retained; current245 exact-head metrics are in currentQualification.performance",
+      "secondFullFlow": {
+        "frames": {
+          "samples": 97,
+          "intervals": 96,
+          "medianMs": 8.400000000000091,
+          "p95Ms": 16.699999999999818,
+          "maxMs": 101.40000000000009,
+          "over16_7Ms": 4,
+          "over8_3Ms": 55,
+          "percentileMethod": "nearest rank"
+        },
+        "paletteMaxReactRenderMs": 3.3999996185302734,
+        "longTasks": [
+          {
+            "duration": 99,
+            "start": 2621.3999996185303
+          }
+        ]
+      }
+    },
+    "sourceHead": "e26b95db8444fa1efdf36918ec653b693fee0dfb"
+  },
+  "gbrainFinalReceipt": {
+    "slug": "decisions/shared-sidebar-local-qualification-2026-10-08",
+    "hash": "bc8688b87654d9a848422dc9f74953d3a3c228f91219f883fb921258fd95e188",
+    "canonicalReadbackMatches": true
+  },
+  "reviewPrototype": {
+    "url": "http://localhost:6017/iframe.html?id=organisms-unifiedsidebar--shared-shell&viewMode=story",
+    "head": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+    "serverSession": 2161,
+    "scope": "Owned no-open Storybook fixture; browser panel queued, no visible/native/live-auth acceptance inferred"
+  },
+  "currentNativeCiAudit": {
+    "head": "3cdda15bd68479050c0acb421651554f004e49a4",
+    "status": "passed22/22 plus same-build largest-text capture1/1",
+    "redHead": "22cf14a9e614a66ec0dbb95361cd4077c82328d7",
+    "redCase": "testShellDrawerAndSettingsNavigation",
+    "redFailure": "obsolete inline Recent paragraph assertion",
+    "correction": "test-only navigation assertion follows actual Recent panel; base-plane test checks actual hittability",
+    "selector": "native/current/qualify.sh",
+    "ciWorkflow": ".github/workflows/ios-ci.yml:227",
+    "scope": "targeted real CI-discovered cases; not entire hosted iOS CI suite"
+  },
+  "historicalNative22cfQualification": {
+    "head": "22cf14a9e614a66ec0dbb95361cd4077c82328d7",
+    "tree": "3568c1e235b0a41d1937be414c4d9d9a415fa412",
+    "semanticPassed": 14,
+    "largestTextUiPassed": 1,
+    "navigationPerformancePassed": 1,
+    "passed": 16,
+    "skipped": 0,
+    "coveredLines": 1470,
+    "executableLines": 1737,
+    "percent": 84.6286701208981,
+    "metrics": [
+      {
+        "name": "CPU Cycles (Jovie)",
+        "unit": "kC",
+        "mean": 2740272.7376,
+        "values": [
+          2603032.992,
+          2843453.424,
+          2625496.062,
+          2970845.002,
+          2658536.208
+        ]
+      },
+      {
+        "name": "Clock Monotonic Time",
+        "unit": "s",
+        "mean": 2.2043890916000004,
+        "values": [
+          2.0473916620000003,
+          2.119134159,
+          2.189280198,
+          2.5730945640000003,
+          2.093044875
+        ]
+      },
+      {
+        "name": "CPU Time (Jovie)",
+        "unit": "s",
+        "mean": 0.6952988034,
+        "values": [
+          0.650159099,
+          0.694799284,
+          0.6623520890000001,
+          0.7859152650000001,
+          0.6832682800000001
+        ]
+      },
+      {
+        "name": "CPU Instructions Retired (Jovie)",
+        "unit": "kI",
+        "mean": 5832434.2488,
+        "values": [
+          5675541.11,
+          6480744.245,
+          5669670.876,
+          5673494.717,
+          5662720.296
+        ]
+      },
+      {
+        "name": "Memory Peak Physical (Jovie)",
+        "unit": "kB",
+        "mean": 92630.9344,
+        "values": [
+          92621.104,
+          92637.488,
+          92440.88,
+          92801.328,
+          92653.872
+        ]
+      },
+      {
+        "name": "Memory Physical (Jovie)",
+        "unit": "kB",
+        "mean": 1451.6224000000002,
+        "values": [
+          2605.056,
+          901.12,
+          917.504,
+          1277.952,
+          1556.48
+        ]
+      },
+      {
+        "name": "Absolute Memory Physical (Jovie)",
+        "unit": "kB",
+        "mean": 91752.75200000001,
+        "values": [
+          92227.888,
+          91244.848,
+          91294,
+          91687.216,
+          92309.808
+        ]
+      }
+    ],
+    "hitchValuesExported": false,
+    "scope": "Simulator fixture proof; no metric baseline or physical120Hz/hitch-budget acceptance",
+    "simulator": "7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5",
+    "text": "accessibility-extra-extra-extra-large",
+    "productionSourceSha": "7c2adbd000031ec8a00ef350f30b34dc393f3346",
+    "artifacts": {
+      "ios-shared-sidebar-more.png": "0572837c6632f58ec9e33ed437f48d30d628cdea89b5bcf4c8ade4a7b0a5edec",
+      "ios-canonical-information-architecture.png": "845852c8c0849bad64ab5068e3826048e9dbe2f1b456e0c79856d71fe936ebb0",
+      "sidebar-native-recent-verified-restored-state.json": "4617f0bd7bd5febb4aa5c085636c08d484724acfa415efed1de150eff279b0d7",
+      "sidebar-native-recent-verified-qualification.log": "9253d6f6eff968680ea63ea3f7fcf66b1466f38425a39da475dd9a9879bfac62",
+      "ios-shared-sidebar-recent.png": "fc5e3c15a863f87a0e8de600259e3d0b6f41d772d29c89fcf4786e4a31cc6420",
+      "sidebar-native-recent-verified-coverage.json": "44a0d940f3f1f63a4d8c7f48e6e5b7e5262ca8c27c19354fbd16d560cd1bbfae",
+      "sidebar-native-recent-verified-summary.json": "e0f215c283ed45eff3b610ba968ddee5c2d7fc1b825b0be258281226fc86648d",
+      "sidebar-native-recent-verified-metrics.json": "b0f15bb32810fbefc4519711199eccb4b5e0fd731ba6788b2e7d70d77aa06163",
+      "ios-shared-sidebar-footer-probe.png": "3f5c66f7418e71e3c4b92ef82769afecb53dd7c14aa35063d15432709159cbea"
+    },
+    "restoredText": "large",
+    "restoredState": "Shutdown",
+    "recording": "native/historical/22cf-qualified/recordings/provenance.json",
+    "recentPinsPolicyCoveragePercent": 100
+  },
+  "gbrainCiPolicyReceipt": {
+    "slug": "decisions/shared-sidebar-ci-parity-and-main-base-policy-2026-10-08",
+    "hash": "c27de03c0436ef2e3fd2b09b098093fe7ede3eb6dd6ca77f0b2e4413f8a0ac13",
+    "fullCanonicalBodyMatched": true
+  },
+  "nativeQaWorktree": {
+    "root": "/Users/timwhite/.codex/worktrees/sidebar-native-ci-parity/Jovie",
+    "status": "archived via managed tool; attachment readback verified",
+    "branchHeadPreserved": "3cdda15bd68479050c0acb421651554f004e49a4"
+  },
+  "additionalDiagnostics": {
+    "cachedMainMerge": "diagnostics/cached-main-root-compatibility.json",
+    "synchronizedPerformance": "diagnostics/common-clock/comparison.json",
+    "sourceUnchanged": true,
+    "snapshotOffFrameMaxMs": 33.4,
+    "snapshotOnFrameMaxMs": 40.7,
+    "frameBudgetAccepted": false,
+    "gbrain": {
+      "slug": "receipts/shared-sidebar-cached-main-and-profile-audit-2026-10-08",
+      "hash": "80fc9897b483d3727f39a92450f829ef5f8c67651b435064d979ff6ed6a3b7e5",
+      "fullBodyMatched": true
+    }
+  },
+  "nativeStatus": {
+    "status": "historical; grouping qualification pending",
+    "historicalHead": "3cdda15bd68479050c0acb421651554f004e49a4",
+    "preservedMeasurementHead": "d8157055debb9368eb5d607e090cd0dec3ecec16",
+    "routeAudit": "diagnostics/native-ovie-route-audit/receipt.json",
+    "publicationActionActive": false
+  }
+}

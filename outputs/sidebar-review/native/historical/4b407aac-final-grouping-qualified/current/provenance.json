@@ -1,0 +1,222 @@
+{
+  "head": "4b407aac7b516e2bab9c9f937b805b4cfe88f78e",
+  "tree": "45b943f9ddf6fde8bec29cfdb9b4dcf74a448cb4",
+  "drawerBlob": "179253a579dcbb6d490c39cbc8466846038483cb",
+  "sourceFiles": {
+    "apps/ios/Jovie/App/AppRouteManifest.swift": "69fcec086fe91993d5916c525e90e2569142c7b0",
+    "apps/ios/Jovie/App/RootView.swift": "3d0ec909678e4d7f50a2e55645de97e2c82effb6",
+    "apps/ios/Jovie/Core/ChatRepository.swift": "a9d07528ad007eb92bc5e1256159957fef99c38a",
+    "apps/ios/Jovie/DesignSystem/JovieTheme.swift": "750bb6a2d724c148e56bfba5be5831fcef111a0e",
+    "apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift": "179253a579dcbb6d490c39cbc8466846038483cb",
+    "apps/ios/Jovie/Features/AppShell/AppShellView.swift": "b1e2e913dbd69441c90d449529998a2da79b182a",
+    "apps/ios/JovieTests/AppShellDrawerThreadsFilterTests.swift": "0dad5c7765f8d8796453a1104ba3d464e9ea30c8",
+    "apps/ios/JovieTests/AppShellTabBarTests.swift": "5ec7ed59b73b755d63086a37ef257bf5401ff922",
+    "apps/ios/JovieTests/ChatRepositoryTests.swift": "8bf20b5c7f1b3d3805e84d92d3fa3883f1d71839",
+    "apps/ios/JovieUITests/JovieUITests.swift": "92a9ce62582a640785dc9fdad585096fe50912e9"
+  },
+  "baseline": "95c4afede3605e63a3dd9d2519ff843aae81f26e",
+  "filesChanged": 10,
+  "changedLines": 791,
+  "fullCIUnit": {
+    "selector": "unchanged apps/ios/scripts/run-unit-tests.sh: JovieUnitTests scheme, -only-testing:JovieTests, enableCodeCoverage YES; unchanged check_coverage.sh",
+    "passed": 686,
+    "failed": 0,
+    "skipped": 0,
+    "appCoverage": {
+      "covered": 10637,
+      "executable": 30514,
+      "percent": 34.85940879596251
+    },
+    "repositoryCoverage": {
+      "covered": 945,
+      "executable": 961,
+      "percent": 98.33506763787722
+    },
+    "floor": 18,
+    "gatePassed": true,
+    "ratchetEnforced": false,
+    "baselineWarning": "No coverage_baseline.txt in this source; maintained script applies absolute floor only",
+    "fixtureCaseActuallyDiscovered": "ChatRepositoryTests/seedAllComponentsFixtureKeepsWireContentAndSkipsNetworkRefresh()"
+  },
+  "selectedQualification": {
+    "passed": 29,
+    "failed": 0,
+    "skipped": 0,
+    "semantic": 19,
+    "UI": 10,
+    "text": "accessibility-extra-extra-extra-large",
+    "drawerCoverage": {
+      "covered": 1704,
+      "executable": 1868,
+      "percent": 91.22055674518201
+    }
+  },
+  "recording": {
+    "passed": 1,
+    "media": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1320,
+          "height": 2868
+        }
+      ],
+      "format": {
+        "duration": "28.923333"
+      }
+    },
+    "outsidePerformanceWindow": true
+  },
+  "metrics": [
+    {
+      "name": "CPU Cycles (Jovie)",
+      "unit": "kC",
+      "values": [
+        5111254.483,
+        4975528.811,
+        5122218.464,
+        5188300.433,
+        5080979.294
+      ],
+      "mean": 5095656.297
+    },
+    {
+      "name": "Clock Monotonic Time",
+      "unit": "s",
+      "values": [
+        4.392440331,
+        4.132130593,
+        4.265706379,
+        4.332748595,
+        4.323375954
+      ],
+      "mean": 4.2892803704
+    },
+    {
+      "name": "CPU Time (Jovie)",
+      "unit": "s",
+      "values": [
+        1.33843106,
+        1.192655806,
+        1.319219567,
+        1.377124728,
+        1.313475057
+      ],
+      "mean": 1.3081812436
+    },
+    {
+      "name": "CPU Instructions Retired (Jovie)",
+      "unit": "kI",
+      "values": [
+        13691726.935,
+        13667083.396,
+        13659497.181,
+        13648699.685,
+        13657656.812
+      ],
+      "mean": 13664932.801800001
+    },
+    {
+      "name": "Memory Peak Physical (Jovie)",
+      "unit": "kB",
+      "values": [
+        87623.984,
+        94046.512,
+        93849.904,
+        93767.984,
+        93735.216
+      ],
+      "mean": 92604.72
+    },
+    {
+      "name": "Memory Physical (Jovie)",
+      "unit": "kB",
+      "values": [
+        2670.592,
+        8192,
+        1507.328,
+        1540.096,
+        1622.016
+      ],
+      "mean": 3106.4064
+    },
+    {
+      "name": "Absolute Memory Physical (Jovie)",
+      "unit": "kB",
+      "values": [
+        87263.536,
+        93800.752,
+        93440.304,
+        93391.152,
+        93342
+      ],
+      "mean": 92247.5488
+    }
+  ],
+  "metricScope": "Five automated More/Back, empty Recent/All chats/Back, Profile/Chat round trips with brand/account geometry; populated grouping uses separate UI regression and recording. Clock includes automation/waits; no frame-budget acceptance.",
+  "hitchValuesExported": false,
+  "restoration": {
+    "text": "large",
+    "state": "Shutdown",
+    "device": "7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5"
+  },
+  "unproven": [
+    "native Ovie operator roots/permitted utility adapters",
+    "full native private Summer history/resume",
+    "Mac window geometry",
+    "human VoiceOver/physical120Hz",
+    "production React sidebar comparison and frame budgets",
+    "hosted CI/merge/deployment/live auth"
+  ],
+  "publicationAuthority": false,
+  "files": {
+    "metrics.json": "4a6baaa718c1d3bb52b0691fca10d81e513ddc51dd3da2c4ad249194bb7c29a7",
+    "summary.json": "ed953aa33286c02b90e34dfa5efb3e28a40fb95041064a30b44d2dd44c2c5edd",
+    "ci-unit.log": "72d5c07e405290799b27a466b6df4b5b6e20f6b4bdd51e9bd1b7acb843db526b",
+    "ios-shared-sidebar-more.png": "2044249ec5e8f0992bcc6836947105db682207ec4f6bf9220bdf8911aedc6e20",
+    "restored-state.json": "f4e0688bd8c0dda904b786456b04774e0a5646cfd39bb42e59cd1ff739dfbecf",
+    "ios-canonical-information-architecture.png": "f22196ce1fb51c3d785341630bfa8e4473a2d3f2bfd6d46c44fe08941ea98622",
+    "publication-preflight.log": "41c6e160bea6836332aea0402bf3c2c2e21bf2091d7277bb427ed2a89f776f10",
+    "restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "grouping-commit.log": "8a7daa94963ce87138753e58587456b96fed13111b156723898f1dca4ed8d7c2",
+    "ci-unit.sh": "79f9381fc4f1abf9ddc915a12c39fd086da7ac5f936d2cb270d2a38cf3d6c0df",
+    "ios-shared-sidebar-grouped-recent.png": "598a6a94eba214bae10cff0d22ff4350d2aa48aa6e557b5cd5410c16d2fd1428",
+    "qualification.log": "ea3a1812ba800e8cb0101edadb235a0fbffdece7cf80d37f52e3c5f2b631c892",
+    "ios-shared-sidebar-recent.png": "3e2793b235934464c7cb4c185812a87b0e012e3119a00cd2575bdd57702d3a81",
+    "manifest-commit.log": "b4885fe524dd98bf0091ab9056a4c7b7fe41bcedb53b0df2930eb07662facaf6",
+    "qualify.sh": "ae2027c7c09dda78217022b24e44781330dbdc38a1742a864f4e0394f9235987",
+    "ci-unit-summary.json": "b50b56c650e0b9c493d274868b716abdc708ba5312e4779ce27d40d219c616b7",
+    "ci-unit-restored-state.json": "d3d75e42b7aaf3ca5ffaedf02644d5b97dee0d4efd975af0753166989890e00e",
+    "ci-unit-tests.json": "7def9d5308d2d3161ca290227cc0a594f3579ced9f09b4ece858335bce13636f",
+    "coverage.json": "9d5723dab71628e82f557ff01b2250c70618916fb31baeac507ab86f7853d291",
+    "ios-offline-stable-toolbar.png": "b2ea737876549f7f243118a5b43896132eb0471fb81c87310b836ca90ba086b1",
+    "drawer-base-plane-occluded-closed.png": "12b811820341bf277b3f44f3d157ba51f26bad4743aac134f5518af29c0ef42a",
+    "ci-unit-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "ios-shared-sidebar-footer-probe.png": "b74472690fe4a6c8bca0f7157d7b94fa7676847fb1460c242a4a292999e05241",
+    "ci-unit-coverage.json": "7682cf1a5a19a7800596f4350256c22c8fd7f197a3dcd87ba6db9e1bb6aad31b",
+    "recordings/frame-22.png": "58b47aee7ea1a92907e23d716552a0d5875512d8c251f167639e7cc39af196e8",
+    "recordings/summary.json": "d00a66dd949d4ed979936d94f451a5d415ea0c2fecf2787abf0d8941e47b732b",
+    "recordings/sidebar-native-success.mp4": "af16e73cd64a63d70a12406b398bc702085a890c871ff7550ce377fe8e7af191",
+    "recordings/restored-state.json": "9c564f3ec941dc20358e7ed6d4cd1e2398f41c8c88dcadccfaf023ef002063da",
+    "recordings/record.sh": "c7df75c431ca5363997cd30275a9498389edc44dbc06a4df51f9837e3a7f8d3e",
+    "recordings/frame-25.png": "d9a9fc1e203071e3035115656a05d92537b1c25543c2566e87bd0ad98d8da25b",
+    "recordings/restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "recordings/sidebar-native-success.mov": "f06e8c4afcc0b77e8f87317b9fd71e70c522fabdc593c11762834ff9557cceb2",
+    "recordings/record.log": "ceaabec1cfd96f4425936633418f57dd7faf93a7190e8367397d1cf804750191",
+    "recordings/frame-14.png": "61b1a5aae14412f0d36316eeb014d6342e3126b99f8ad68b7eca20f4b0979d33",
+    "recordings/media-verification.json": "8f8289e05c4fef375542465a08b0a8904a461f9ccb1a5bbfa48aa8af59ca0e03"
+  },
+  "publicationPreflight": {
+    "passed": 6,
+    "failed": 0,
+    "secretScanPassed": true,
+    "remoteSideEffect": false
+  },
+  "worktree": {
+    "root": "/Users/timwhite/.codex/worktrees/sidebar-native-ci-parity/Jovie",
+    "status": "archived_worktree attachment readback verified",
+    "branchHeadPreserved": "4b407aac7b516e2bab9c9f937b805b4cfe88f78e"
+  }
+}

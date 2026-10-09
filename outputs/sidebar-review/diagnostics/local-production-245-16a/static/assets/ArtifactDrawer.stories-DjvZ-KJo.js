@@ -1,0 +1,9 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{n as t,t as n}from"./ArtifactDrawer-CNxN_HLK.js";import{n as r,t as i}from"./artifact-CnVytPnt.js";var a,o,s,c,l,u;function d(){return(d=e((()=>{r(),t(),a=new Date(`2026-01-15T12:00:00.000Z`).toISOString(),o=i.parse({id:`run-1`,source:`github`,sourceRunId:`abc123`,kind:`code_review`,status:`done`,title:`Add stories for ranked feature components`,summary:`Story-coverage batch touching 15 apps/web/components/features files.`,modelRoute:`claude-code`,allowedActions:[`open_pr`,`ready_pr`],forbiddenActions:[`deploy`],humanApprovalRequired:!1,humanGate:{required:!1,status:`not_required`,reason:null,reviewer:null,reviewedAt:null},linearIssueId:`JOV-6778`,linearIssueUrl:`https://linear.app/jovieinc/issue/JOV-6778`,pullRequestUrl:`https://github.com/JovieInc/Jovie/pull/19385`,adminSurface:null,verificationGates:[{name:`github.ci`,required:!0,status:`passed`,evidenceUrl:null,summary:`All checks passed.`,checkedAt:a}],costEstimate:{usd:.42,route:`claude-code`,inputTokens:12e4,outputTokens:8e3,notes:null},blockedReason:null,createdAt:a,updatedAt:a,metadata:{}}),s={title:`Features/Admin/ArtifactDrawer`,component:n,parameters:{layout:`centered`}},c={args:{artifact:o}},l={args:{artifact:null}},u=[`Selected`,`NoneSelected`],c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    artifact
+  }
+}`,...c.parameters?.docs?.source}}},l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{
+  args: {
+    artifact: null
+  }
+}`,...l.parameters?.docs?.source}}}})))()}d();export{l as NoneSelected,c as Selected,u as __namedExportsOrder,s as default};

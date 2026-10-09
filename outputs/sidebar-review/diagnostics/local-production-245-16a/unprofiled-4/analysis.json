@@ -1,0 +1,21 @@
+{
+  "mode": "unprofiled",
+  "sample": 4,
+  "assertionsPassed": true,
+  "flowDurationMs": 180.80000019073486,
+  "frames": 21,
+  "rafMedianMs": 8.300000000000011,
+  "rafP95Ms": 10.0,
+  "rafMaxMs": 16.699999999999932,
+  "flowLongTasks": [],
+  "preMoreLongTasks": [],
+  "eventToAssertionCheckpointMs": 28.09999990463257,
+  "browser": "148.0.7778.96",
+  "runtimeProof": [
+    {
+      "bundleType": 0,
+      "version": "19.2.8",
+      "rendererPackageName": "react-dom"
+    }
+  ]
+}

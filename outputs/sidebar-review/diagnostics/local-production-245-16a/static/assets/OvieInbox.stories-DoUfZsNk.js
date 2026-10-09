@@ -1,0 +1,13 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{t as n}from"./jsx-runtime-BbDfbRii.js";import{H as r,U as i}from"./removable-_8fTgXVw.js";import{c as a,s as o}from"./iframe-B1b4EUuv.js";import{n as s,t as c}from"./OvieInbox-jgSPGCMS.js";function l({children:e,data:t}){let[n]=(0,f.useState)(()=>{let e=new o({defaultOptions:{queries:{retry:!1}}});return e.setQueryData([`ovie`,`inbox`],t),e});return(0,f.useEffect)(()=>{let e=window,n=e.__jovieApiMock;return e.__jovieApiMock=({url:e,init:r})=>e.pathname===`/api/ovie/inbox`?Response.json(t):r?.method===`POST`?new Response(`{}`,{status:503}):n?.({url:e,init:r}),()=>{e.__jovieApiMock=n}},[t]),(0,d.jsx)(r,{client:n,children:(0,d.jsx)(`div`,{className:`max-w-3xl p-4`,children:e})})}function u(e){return[t=>(0,d.jsx)(l,{data:e,children:(0,d.jsx)(t,{})})]}var d,f,p,m,h,g,_,v;function y(){return(y=e((()=>{d=n(),a(),i(),f=t(),s(),p={cases:[{contract:`jovie.interaction-case/v1`,id:`review:release`,kind:`certification`,source:{system:`certification`,id:`release`,revision:`evidence-v1`},title:`Review the release announcement`,body:`The announcement is ready. Review the copy and evidence before approving.`,recommendation:`Approve the current draft after checking the artist names and release date.`,owner:`founder`,state:`needs_you`,priority:2,createdAt:`2026-10-02T12:00:00Z`,nextAction:`Review`,waitingUntil:null,confidence:null,evidence:[`https://example.com/release-proof`],decisionTarget:{kind:`certification`,id:`release`,evidenceDigest:`evidence-v1`}}],issues:[]},m={title:`Features/Admin/Hud/OvieInbox`,component:c,parameters:{layout:`fullscreen`}},h={decorators:u(p)},g={decorators:u({cases:[],issues:[]})},_={decorators:u({cases:[],issues:[`Customer inventory is not connected.`]})},v=[`Pending`,`Empty`,`IncompleteCoverage`],h.parameters={...h.parameters,docs:{...h.parameters?.docs,source:{originalSource:`{
+  decorators: withInbox(pending)
+}`,...h.parameters?.docs?.source}}},g.parameters={...g.parameters,docs:{...g.parameters?.docs,source:{originalSource:`{
+  decorators: withInbox({
+    cases: [],
+    issues: []
+  })
+}`,...g.parameters?.docs?.source}}},_.parameters={..._.parameters,docs:{..._.parameters?.docs,source:{originalSource:`{
+  decorators: withInbox({
+    cases: [],
+    issues: ['Customer inventory is not connected.']
+  })
+}`,..._.parameters?.docs?.source}}}})))()}y();export{g as Empty,_ as IncompleteCoverage,h as Pending,v as __namedExportsOrder,m as default};

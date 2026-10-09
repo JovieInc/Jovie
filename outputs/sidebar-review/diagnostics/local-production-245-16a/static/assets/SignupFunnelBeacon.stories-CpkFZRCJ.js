@@ -1,0 +1,9 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./react-CFeKwT_a.js";import{t as n}from"./jsx-runtime-BbDfbRii.js";import{s as r,t as i}from"./routes-NOD5Mahi.js";import{i as a,n as o}from"./signup-funnel-client-NsG-62NR.js";function s(e,t){try{let n=new URL(e,t);return n.origin===t?u.has(n.pathname)||n.pathname.endsWith(`/claim`):!1}catch{return!1}}function c({surface:e,trackLanding:t=!0}){return(0,l.useEffect)(()=>{t&&a({funnel:`artist_signup`,step:`landing_view`,surface:e});let n=t=>{let n=t.target;if(!(n instanceof Element))return;let r=n.closest(`a[href]`)?.getAttribute(`href`);r&&s(r,globalThis.location.origin)&&a({funnel:`artist_signup`,step:`cta_click`,surface:e})};return document.addEventListener(`click`,n,{capture:!0}),()=>document.removeEventListener(`click`,n,{capture:!0})},[e,t]),null}var l,u;function d(){return(d=e((()=>{l=t(),r(),o(),u=new Set([i.SIGNUP,i.START,i.ONBOARDING])})))()}var f,p,m,h;function g(){return(g=e((()=>{f=n(),d(),p={title:`Tracking/SignupFunnelBeacon`,component:c,parameters:{layout:`centered`},args:{surface:`homepage`,trackLanding:!0}},m={render:e=>(0,f.jsxs)(`div`,{className:`min-h-40 bg-base p-8 text-primary-token`,children:[(0,f.jsx)(`p`,{className:`text-sm`,children:`The funnel beacon mounts with no visible chrome. It records a landing view, and a CTA click for links into signup or a profile claim.`}),(0,f.jsx)(c,{...e})]})},h=[`Homepage`],m.parameters={...m.parameters,docs:{...m.parameters?.docs,source:{originalSource:`{
+  render: args => <div className='min-h-40 bg-base p-8 text-primary-token'>
+      <p className='text-sm'>
+        The funnel beacon mounts with no visible chrome. It records a landing
+        view, and a CTA click for links into signup or a profile claim.
+      </p>
+      <SignupFunnelBeacon {...args} />
+    </div>
+}`,...m.parameters?.docs?.source}}}})))()}g();export{m as Homepage,h as __namedExportsOrder,p as default};

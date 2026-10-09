@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(){if(typeof navigator>`u`)return!1;let e=navigator.userAgent;return/iPad|iPhone|iPod/.test(e)}function n(){globalThis.location.assign(r)}var r;function i(){return(i=e((()=>{r=`/api/wallet/apple/profile-pass`})))()}export{t as n,n as r,i as t};

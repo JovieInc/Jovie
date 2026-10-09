@@ -1,0 +1,71 @@
+{
+  "observedAt": "2026-10-08T11:22:33.592692+00:00",
+  "kind": "read-only local source ancestry; no GitHub API refresh or fetch",
+  "canonicalMainNonceCommit": "2d595a1e86ef9f76fd9c4449bb155084ee6060aa",
+  "commitMetadata": "2d595a1e86ef9f76fd9c4449bb155084ee6060aa\nb8f471714e070805a5da9ee45bf741112dc7db75\n2026-10-04T01:37:33Z\nfix(auth): bind native returns to their sign-in attempt (#20381)\n* fix(auth): correlate native returns with their pending attempt\n\n* fix(ios): use app configuration in nonce fixture\n",
+  "changedFiles": [
+    "M\tapps/ios/Jovie/App/LiveRootContainer.swift",
+    "M\tapps/ios/Jovie/App/MobileAuthReturn.swift",
+    "M\tapps/ios/Jovie/App/UITestHarnessViews.swift",
+    "M\tapps/ios/Jovie/Core/AuthTokenExchange.swift",
+    "M\tapps/ios/Jovie/Core/MobileAuthFinalization.swift",
+    "M\tapps/ios/Jovie/Core/Observability/ObservabilityRedactor.swift",
+    "M\tapps/ios/Jovie/Features/Auth/MobileAuthCoordinator.swift",
+    "M\tapps/ios/JovieTests/APIClientTests.swift",
+    "M\tapps/ios/JovieTests/AppStateTests.swift",
+    "M\tapps/ios/JovieTests/MobileAuthFinalizationTests.swift",
+    "M\tapps/ios/JovieTests/ObservabilityTests.swift",
+    "M\tapps/ios/JovieUITests/JovieUITests.swift",
+    "M\tapps/ios/scripts/test-auth-callback.sh",
+    "M\tapps/web/app/(auth)/auth/native-return/page.test.tsx",
+    "M\tapps/web/app/(auth)/auth/native-return/page.tsx",
+    "M\tapps/web/app/api/auth/native/exchange/route.ts",
+    "M\tapps/web/app/api/dev/test-auth/mobile-callback/route.ts",
+    "M\tapps/web/app/api/dev/test-auth/mobile-provider-complete/route.ts",
+    "M\tapps/web/app/auth/callback/route.test.ts",
+    "M\tapps/web/app/auth/callback/route.ts",
+    "M\tapps/web/app/auth/start/route.test.ts",
+    "M\tapps/web/app/auth/start/route.ts",
+    "M\tapps/web/lib/auth/routing-state.server.ts",
+    "M\tapps/web/tests/unit/api/auth/native-exchange.test.ts",
+    "M\tapps/web/tests/unit/api/dev/test-auth-routes.test.ts",
+    "M\tapps/web/tests/unit/lib/auth/routing-state.server.test.ts",
+    "M\tpackages/auth-routing/auth-routing.test.ts",
+    "M\tpackages/auth-routing/index.ts"
+  ],
+  "sourceRefs": {
+    "HEAD": {
+      "head": "f4a73e59c09c62f349195c486419b2278df79b9b",
+      "nonceCommitAncestor": true,
+      "exitCode": 0
+    },
+    "refs/heads/main": {
+      "head": "7210f57c41f2c2a7bf2d03df6afae19f4461439a",
+      "nonceCommitAncestor": false,
+      "exitCode": 1
+    },
+    "refs/remotes/origin/main": {
+      "head": "99719a1f942965f737c742287465fb5bc2aeb042",
+      "nonceCommitAncestor": true,
+      "exitCode": 0
+    },
+    "545b383925854b8a1632fffe9b48087fe88f6e37": {
+      "head": "545b383925854b8a1632fffe9b48087fe88f6e37",
+      "nonceCommitAncestor": true,
+      "exitCode": 0
+    }
+  },
+  "otherAllRefsNonceCommit": "a98f3f7b187f2e4a0492c2cbdf3d499179f17cfb",
+  "stablePatchId": "079e0093fe02edafaaedcf45111bd18c2e40c46e",
+  "rebasedPatchEquivalent": true,
+  "linearJOV7673": "Done; completed2026-10-04T01:59:33.874Z; attachedPR20381",
+  "linearJOV7712": "Todo/context_audit ownership; nonce merge AND owner checkout release required before adoption",
+  "localQualifiedBranchesAlreadyContainNonceFix": true,
+  "localMainBranchIsNotCurrentOriginMain": true,
+  "liveGitHubMergeReceiptVerifiedThisTurn": false,
+  "nativeSessionCheckoutOwnerReleaseVerified": false,
+  "portabilityAdopted": false,
+  "nativeSessionAdopted": false,
+  "sourceEdited": false,
+  "decision": "Nonce source is already in both qualified sidebar baselines and cached origin/main. Unrelated stale local main is left intact. Coordinator must still verify hosted receipt and current owner release; no overlapping auth edit."
+}

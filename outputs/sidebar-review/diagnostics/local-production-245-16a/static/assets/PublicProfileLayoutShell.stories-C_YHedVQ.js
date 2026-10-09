@@ -1,0 +1,6 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./PublicProfileLayoutShell-CoVS2vXM.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Profile/PublicProfileLayoutShell`,component:r,parameters:{layout:`fullscreen`,jovie:{uncoveredProps:[`loading`]}},args:{artistName:`Artist Name`,heroImageUrl:null,heroImageError:!1,isDesktopLayout:!1,shouldRenderHeading:!0,profileAccentStyle:{},compactSurface:(0,i.jsx)(`div`,{className:`p-6`,children:`Compact profile`}),desktopSurface:(0,i.jsx)(`div`,{className:`p-6`,children:`Desktop profile`})}},o={},s={args:{isDesktopLayout:!0,desktopSurfaceReady:!0}},c=[`Compact`,`Desktop`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    isDesktopLayout: true,
+    desktopSurfaceReady: true
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{o as Compact,s as Desktop,c as __namedExportsOrder,a as default};

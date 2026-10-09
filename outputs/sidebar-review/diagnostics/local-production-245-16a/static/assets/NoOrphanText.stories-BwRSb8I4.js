@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";function n({children:e}){if(typeof e!=`string`)return e;let t=/^(.*\S\s+)(\S+\s+\S+)$/s.exec(e.trim());return t?(0,r.jsxs)(r.Fragment,{children:[t[1],(0,r.jsx)(`span`,{className:`inline-block`,children:t[2]})]}):e}var r;function i(){return(i=e((()=>{r=t()})))()}var a,o,s;function c(){return(c=e((()=>{i(),a={title:`Marketing/Primitives/NoOrphanText`,component:n,parameters:{layout:`centered`}},o={args:{children:`Built To Stay Out Of The Way.`}},s=[`FinalTwoWordsBound`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  args: {
+    children: 'Built To Stay Out Of The Way.'
+  }
+}`,...o.parameters?.docs?.source}}}})))()}c();export{o as FinalTwoWordsBound,s as __namedExportsOrder,a as default};

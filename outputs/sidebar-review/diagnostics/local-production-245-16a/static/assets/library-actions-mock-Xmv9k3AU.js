@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";var t,n,r,i,a,o,s,c,l,u,d,f,p,m,h,g,_,v,y,b,x,S;function C(){return(C=e((()=>{t=async(...e)=>({success:!0}),n=t,r=t,i=t,a=t,o=t,s=t,c=t,l=t,u=t,d=t,f=t,p=t,m=t,h=t,g=t,_=t,v=t,y=t,b=t,x=t,S=t})))()}export{S,_,o as a,b,l as c,d,f,g,h,a as i,C as l,m,r as n,s as o,p,i as r,c as s,n as t,u,v,x,y};

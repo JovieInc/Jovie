@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";function t(e){let t=(e??``).trim();return t?t.split(/\s+/).filter(Boolean).slice(0,2).map(e=>e.charAt(0)).join(``).toUpperCase():``}function n(){return(n=e((()=>{})))()}export{n,t};

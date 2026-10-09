@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";var t;function n(){return(n=e((()=>{t=`text-3xs font-semibold tracking-normal text-quaternary-token`})))()}export{n,t};

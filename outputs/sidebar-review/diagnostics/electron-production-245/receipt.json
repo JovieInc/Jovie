@@ -1,0 +1,135 @@
+{
+  "at": "2026-10-08T10:08:09.468510+00:00",
+  "head": "10e76a95b87efd5c25abe6b757081c2265ee63d7",
+  "tree": "ae7b7b3864c9bc794d6fccbcc0a569ac7ea98bf3",
+  "parent": "245ec38c89228b87f07c7bfffb2e2ce2f1c69c07",
+  "nativeHead": "545b383925854b8a1632fffe9b48087fe88f6e37",
+  "profile": "coder",
+  "issue": "no Linear issue \u2014 ad-hoc",
+  "sourceFiles": {
+    "apps/desktop/scripts/desktop-shell-contract.test.mjs": "81db6f028d4c0e7e0abf386bc370726c46fc5fda",
+    "apps/web/app/globals.css": "442c5ffa19f81824bf2aabaa4e4111237c4c73ce",
+    "apps/web/components/organisms/DesktopTitlebar.tsx": "f8b618f84cc9eb8797589a2a4c71b49b410b3299",
+    "apps/web/tests/e2e/storybook-shared-sidebar.spec.ts": "1c0a1a431df935ba9ae5efc4fb6989b4f1d12580"
+  },
+  "sourceScope": "Electron titlebar CSS allocation/native height and nonshrinking existing toggle, plus maintained regression/contract tests",
+  "bug": {
+    "productionComposition": "245+16a exact2771-file artifact",
+    "beforeNativeCases": 14,
+    "beforeDesktopCases": 12,
+    "beforeCollapsedCollisions": 12,
+    "beforeHeaderHeightPx": 40,
+    "nativeOverlayHeightPx": 44,
+    "beforeHeadingX": 212,
+    "beforeNavRight": 240,
+    "beforeToggleWidthPx": 16,
+    "redCIRegressionsFailed": 2,
+    "redFailure": "Toggle width shrinks28\u219216 against original build;independent native matrix proves28px heading overlap. First128px-budget attempt also failed toggle regression,not retained."
+  },
+  "correction": "Native measured reserve + documented full162px chrome budget;env(titlebar-area-height,44px);existing toggle shrink-0",
+  "qualification": {
+    "maintainedBrowser": {
+      "startTime": "2026-10-08T10:02:11.363Z",
+      "duration": 36761.164000000004,
+      "expected": 27,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "actualCurrentSourceElectron": {
+      "cases": 14,
+      "collisions": 0,
+      "electron": "44.5.1",
+      "chromium": "152.0.7977.130",
+      "nativeReservePx": 100,
+      "titlebarHeightPx": 44,
+      "toggleWidthPx": 28,
+      "newCollapsedHeadingX": 274,
+      "newNavRight": 252,
+      "hidden": true,
+      "focused": false,
+      "profiles": "/private/tmp/sidebar-electron-245-44.5.1/isolated-user-data and isolated-session-data",
+      "preload": "Existing maintained bundleDesktopPreload(sourceHEAD) with actual sandbox/contextIsolation/nodeIntegrationfalse/windowControlsOverlay",
+      "windowOptions": "AST-extracted existing BrowserWindow options;main product lifecycle/auth/updater not booted",
+      "currentRenderer": "Existing6017developmentStorybook with currentsource;not rebuiltproduction10e",
+      "matrix": "bothworkspaces/lightdark/1024,1440,1920x600 and native zoom2 at1440x900\u2192720x450;focus/Escape/floating/main/scroll stable",
+      "identityAudit": {
+        "casesPassed": 14,
+        "artifact": "current-source-identity-flow-cases.json",
+        "pinnedJovieRoots": [
+          "Home",
+          "Profiles",
+          "Work",
+          "Audience"
+        ],
+        "pinnedOvieRoots": [
+          "Now",
+          "Growth",
+          "Product",
+          "Operations",
+          "Needs You"
+        ],
+        "wrongWorkspaceRootHidden": true,
+        "zoomDrawerRootChecked": true,
+        "authenticatedWorkspaceVerified": false,
+        "sharedCollapsedScreenshotScope": "Shared native header/anchor geometry only;collapsed Jovie/Ovie images are identicalSHA761eb9d7b5ee109c503bdb6e56cefa6815eaa2fafe79fca5eca2a3ea1eb211c7 because navisclosed andfixtureheaderHome/bodyYourworkspace reused. Explicit checked pinned roots/menu plusdifferentstoryID provefixturecontexts;not broaderworkspacesession/customercontent orfounder-review-ready proof.",
+        "navigationIdentityPinnedScreenshots": [
+          "jovie-dark-1440-identity-pinned.png",
+          "ovie-dark-1440-identity-pinned.png"
+        ]
+      }
+    },
+    "componentTests": {
+      "runner": "vitest.config.ci.mts",
+      "selector": [
+        "tests/unit/components/organisms/DesktopTitlebar.test.tsx",
+        "tests/unit/components/organisms/AppShellFrame.test.tsx"
+      ],
+      "passed": 49,
+      "coverageLines": [
+        46,
+        47
+      ],
+      "coverageBranches": [
+        81,
+        82
+      ],
+      "coverageFunctions": [
+        6,
+        7
+      ],
+      "coverageScope": "Current affectedTSX using realCIconfig,all configured thresholds retained. CSS is notV8-instrumentable;realgeometry regressions cover its behavior. Prior full2274tests remain tied to245,not relabeledcurrent."
+    },
+    "desktopContract": {
+      "passed": 28,
+      "runner": "node --test apps/desktop/scripts/desktop-shell-contract.test.mjs"
+    },
+    "typecheck": {
+      "passed": 18,
+      "total": 18,
+      "runner": "pnpm turbo typecheck"
+    },
+    "lint": "Biome,ESLint,stageda11y,normalprecommit hooks passed;no bypass",
+    "fullSourceQualification": "not established by narrow current component coverage or development candidate;production/currentfullCI/nativecombined build still open"
+  },
+  "runtimeReuse": {
+    "cachedZipVersion": "44.5.1",
+    "cachedZipSha256": "1d75703019bb16461ae65f3081d7e6f5c0b11e901d0ccb5c343bcf7bcdd6435c",
+    "zipIntegrity": "existingcachedzip versionread;no download/install/fuse/security/signature mutation",
+    "codesignCheck": "bundleverify reports code has no resources;upstreamcache has no CodeResources andlinkeradhoc signatures. No signing/notarization/installed qualification claim."
+  },
+  "cleanup": {
+    "probe88004": 0,
+    "productionFlow39560": 0,
+    "currentSourceFlow62246": 0,
+    "server62200": 0,
+    "port6027ListenerAfter": false,
+    "allAppContextsClosedFinally": true,
+    "existing6017Preserved": true,
+    "nativeSimulatorUntouched": true,
+    "installedAppsUntouched": true,
+    "identityFlow29130": 0
+  },
+  "publicationActionActive": false,
+  "goalComplete": false
+}

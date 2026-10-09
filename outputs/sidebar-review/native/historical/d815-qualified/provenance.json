@@ -1,0 +1,125 @@
+{
+  "head": "d8157055debb9368eb5d607e090cd0dec3ecec16",
+  "tree": "fb478291777f451c6d219b39190d8f6f347c093c",
+  "productionSourceSha": "7c2adbd000031ec8a00ef350f30b34dc393f3346",
+  "previousHead": "3cdda15bd68479050c0acb421651554f004e49a4",
+  "delta": "42 UI-test-only lines; product source identical",
+  "passed": 23,
+  "skipped": 0,
+  "semanticPassed": 14,
+  "uiPassed": 9,
+  "text": "accessibility-extra-extra-extra-large",
+  "coverage": {
+    "covered": 1481,
+    "executable": 1737,
+    "percent": 85.26194588370754
+  },
+  "metrics": [
+    {
+      "name": "CPU Cycles (Jovie)",
+      "unit": "kC",
+      "values": [
+        5246478.113,
+        5294618.785,
+        5365051.299,
+        5013497.128,
+        4998005.718
+      ],
+      "mean": 5183530.2086
+    },
+    {
+      "name": "Clock Monotonic Time",
+      "unit": "s",
+      "values": [
+        4.230061676,
+        4.2507893900000004,
+        4.324676966,
+        4.190352274,
+        4.0968135210000005
+      ],
+      "mean": 4.2185387654
+    },
+    {
+      "name": "CPU Time (Jovie)",
+      "unit": "s",
+      "values": [
+        1.2627958590000001,
+        1.267033906,
+        1.283360434,
+        1.2004711030000002,
+        1.1929735970000002
+      ],
+      "mean": 1.2413269798000002
+    },
+    {
+      "name": "CPU Instructions Retired (Jovie)",
+      "unit": "kI",
+      "values": [
+        13566479.095,
+        13541760.55,
+        13549659.298,
+        12776381.024,
+        12779828.394
+      ],
+      "mean": 13242821.6722
+    },
+    {
+      "name": "Memory Peak Physical (Jovie)",
+      "unit": "kB",
+      "values": [
+        87951.664,
+        87886.128,
+        87886.128,
+        87886.128,
+        87902.512
+      ],
+      "mean": 87902.512
+    },
+    {
+      "name": "Memory Physical (Jovie)",
+      "unit": "kB",
+      "values": [
+        2670.592,
+        1622.016,
+        1654.784,
+        1671.168,
+        1654.784
+      ],
+      "mean": 1854.6688000000001
+    },
+    {
+      "name": "Absolute Memory Physical (Jovie)",
+      "unit": "kB",
+      "values": [
+        87558.448,
+        87525.68,
+        87525.68,
+        87542.064,
+        87542.064
+      ],
+      "mean": 87538.78719999999
+    }
+  ],
+  "metricScope": "Five full automated More/Back + Recent/All chats/Back + Profile/Chat round trips with stable account/brand checks; expanded scope incomparable with older Profile/Chat-only Clock baseline",
+  "hitchValuesExported": false,
+  "recordingOutsidePerformanceWindow": true,
+  "recordingPassed": 1,
+  "restoredText": "large",
+  "restoredState": "Shutdown",
+  "files": {
+    "ios-shared-sidebar-more.png": "9a41679066745b935de6754031fd1c8d4d854768dac55e654b037893d193d312",
+    "ios-canonical-information-architecture.png": "31e4831bee622d49aa962d368889754f4d391f10a3fc0abf0842c39469b1b1e2",
+    "publication-preflight.log": "4dccd06872c1d4644d4c5d6c9aa481e4d941f9f1c42b06c1c4533914cbfc693a",
+    "panels-coverage.json": "41753fb8a09bf38822086179e8df28faba3a934cb11bbd6e6396ab029e22e7ab",
+    "panels-restored-state.json": "0215b06822fad9227c8ad06165a884ce4327e3de62c68b7e64ebca263a8552b7",
+    "ios-shared-sidebar-recent.png": "8f996e365d37062a28e2461b3b49420081072cc1bd0ec8532b74b1e8a63cd474",
+    "qualify.sh": "314341e162cabe3b79d5526ca67c51bfb4309c166982f18d79faea81df667003",
+    "panels-restored-text.txt": "9bfce334a37bd1bc1d36b0370195b31fe9a9389dd43d0873891a3544ef1140a1",
+    "panels-qualification.log": "33af39bdd1a2d513ce11eecedaf9f3f986f78c3b4f260d586b22de9f44a028e3",
+    "panels-metrics.json": "5c08ef35e19e8c7a13c5a492d6b0b3cdc37ab9adb0b3288fe52d3a2db9faa359",
+    "panels-summary.json": "30c39d4984d631c4e352289309fac33bc40a9be78da0c8859f1d4266e023a27f",
+    "ios-offline-stable-toolbar.png": "d581a9bc7a6b2e72e4d0bfa7c596cdd7c5cf4d2518ed2307f46583b42684d22d",
+    "drawer-base-plane-occluded-closed.png": "c8ccd0abb8d377d12fd79702355d7d1e56b0a87c38ae290623be6cfb909c9811",
+    "ios-shared-sidebar-footer-probe.png": "45bba48cc4878ea6958e34e364d12eb92856957ea180b7c9c865b4135f8ff00b"
+  }
+}

@@ -1,0 +1,6 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{i as n,n as r}from"./AnalyticsSidebar-kSV3G25M.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Dashboard/Organisms/AnalyticsSidebar`,component:r,parameters:{layout:`centered`},args:{isOpen:!0,onClose:()=>{},data:{profile_views:120,unique_users:48,subscribers:12,total_clicks:22,listen_clicks:9,tip_link_visits:4,top_cities:[],top_countries:[],top_referrers:[],top_links:[{id:`spotify`,url:`Spotify`,clicks:5}]},loading:!1,isFetching:!1,range:`30d`,onRangeChange:()=>{},activeTab:`links`,onActiveTabChange:()=>{},testId:`storybook-analytics-sidebar`,tabbedCardTestId:`storybook-analytics-tabbed-card`},decorators:[e=>(0,i.jsx)(`div`,{className:`max-w-full`,style:{width:360},children:(0,i.jsx)(e,{})})]},o={},s={args:{loading:!0,data:void 0}},c=[`FlatRail`,`Loading`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    loading: true,
+    data: undefined
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{o as FlatRail,s as Loading,c as __namedExportsOrder,a as default};

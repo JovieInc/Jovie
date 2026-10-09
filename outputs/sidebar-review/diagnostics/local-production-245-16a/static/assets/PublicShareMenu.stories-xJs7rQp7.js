@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{a as t,i as n}from"./context-9Cw3e9YK.js";import{n as r,r as i}from"./PublicShareMenu-CT1bo63I.js";var a,o,s,c,l;function u(){return(u=e((()=>{t(),i(),a=n({username:`timwhite`,slug:`midnight-drive`,title:`Midnight Drive`,artistName:`Tim White`,artworkUrl:`https://example.com/artwork.png`,pathname:`/timwhite/midnight-drive`}),o={title:`Features/Share/PublicShareMenu`,component:r,parameters:{layout:`padded`},argTypes:{triggerVariant:{control:{type:`select`},options:[`pill`,`text`]},align:{control:{type:`select`},options:[`start`,`center`,`end`]}},args:{context:a}},s={},c={args:{triggerVariant:`text`}},l=[`Pill`,`TextTrigger`],s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{}`,...s.parameters?.docs?.source}}},c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  args: {
+    triggerVariant: 'text'
+  }
+}`,...c.parameters?.docs?.source}}}})))()}u();export{s as Pill,c as TextTrigger,l as __namedExportsOrder,o as default};

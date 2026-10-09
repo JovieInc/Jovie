@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./StaticArtistPage-B591RHB1.js";import{r as i,t as a}from"./profile-story-fixture-x0SfJ1Ud.js";var o,s,c,l;function u(){return(u=e((()=>{o=t(),i(),n(),s={title:`Profile/StaticArtistPage`,component:r,parameters:{layout:`fullscreen`,jovie:{uncoveredProps:[`disabled`]}},args:{mode:`profile`,artist:a,socialLinks:[],contacts:[],subtitle:`Artist profile`,showBackButton:!1,catalogLoadFailed:!1,releases:[{id:`release-1`,title:`Never Say A Word`,slug:`never-say-a-word`,releaseType:`single`,releaseDate:`2026-08-01`,artworkUrl:`/images/avatars/tim-white.jpg`,artistNames:[`Tim White`]}]}},c={render:e=>(0,o.jsx)(`div`,{className:`min-h-dvh bg-base`,children:(0,o.jsx)(r,{...e})})},l=[`Home`],c.parameters={...c.parameters,docs:{...c.parameters?.docs,source:{originalSource:`{
+  render: args => <div className='min-h-dvh bg-base'>
+      <StaticArtistPage {...args} />
+    </div>
+}`,...c.parameters?.docs?.source}}}})))()}u();export{c as Home,l as __namedExportsOrder,s as default};

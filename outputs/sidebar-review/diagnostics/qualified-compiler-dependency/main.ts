@@ -1,0 +1,620 @@
+import type { StorybookConfig } from '@storybook/nextjs-vite';
+import { createRequire } from 'module';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Literal paths so the live-cert build stays bounded and statically analyzable.
+const LIVE_CERT_STORIES = [
+  '../../../packages/ui/atoms/badge.stories.tsx',
+  '../../../packages/ui/atoms/button.stories.tsx',
+  '../../../packages/ui/atoms/Card.stories.tsx',
+  '../../../packages/ui/atoms/switch.stories.tsx',
+] as const;
+
+const FULL_CATALOG_STORIES = [
+  // Local story matrices (e.g. the surface-elevation visual-regression
+  // matrix, JOV-2156) that are not tied to a single component directory.
+  './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+  '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+  // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
+  // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
+  '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+] as const;
+
+export function storybookAddonsForEnvironment(
+  isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1',
+  hasManualAxeSuite = process.env.JOVIE_STORYBOOK_MANUAL_AXE === '1'
+) {
+  // The live certificate reads the preview iframe directly and injects its
+  // own pinned Axe bundle. Loading docs, Vitest, Chromatic, and MCP here adds
+  // an unrelated production build graph that can exhaust the source-gate
+  // runner before any canonical story is measured.
+  if (isLiveStorybookCert) return [];
+
+  return [
+    '@storybook/addon-docs',
+    // The live cert and the surface matrix run their own pinned, fail-closed
+    // axe passes in the preview iframe. Keep Storybook's automatic scan for
+    // normal and scheduled builds, but omit it from those manual suites so the
+    // two axe runs cannot race.
+    ...(hasManualAxeSuite ? [] : ['@storybook/addon-a11y']),
+    '@storybook/addon-vitest',
+    '@chromatic-com/storybook',
+    '@storybook/addon-mcp',
+  ];
+}
+
+export function storybookStyleAliasesForEnvironment(
+  isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+) {
+  return isLiveStorybookCert
+    ? [
+        {
+          find: '../app/globals.css',
+          replacement: require.resolve('./live-cert.css'),
+        },
+      ]
+    : [];
+}
+
+export function storybookFrameworkForEnvironment(
+  _isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+) {
+  // Live certification uses the same Next.js Vite framework as the catalog.
+  // Naming @storybook/react-vite here required a direct dependency that Knip
+  // cannot see, because this directory is ignored.
+  return {
+    name: '@storybook/nextjs-vite',
+    options: {
+      builder: {
+        viteConfigPath: undefined,
+      },
+    },
+  } as const;
+}
+
+// Pinned Vite 8 supports importer-aware alias resolution. Revisit at Vite 9.
+export function resolvePrivacyBoundaryShellAlias(
+  updatedId: string,
+  importer?: string
+) {
+  const boundary = require
+    .resolve('../app/app/(shell)/DashboardShellPrivacyBoundary.tsx')
+    .replaceAll('\\', '/');
+  return importer?.split('?')[0].replaceAll('\\', '/') === boundary
+    ? require.resolve('../components/organisms/AuthShellWrapper.tsx')
+    : updatedId;
+}
+
+const config: StorybookConfig = {
+  stories:
+    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+      ? [...LIVE_CERT_STORIES]
+      : [...FULL_CATALOG_STORIES],
+  addons: storybookAddonsForEnvironment(),
+  framework: storybookFrameworkForEnvironment(),
+  docs: {},
+  typescript:
+    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+      ? { check: false, reactDocgen: false }
+      : {
+          check: true,
+          reactDocgen: 'react-docgen-typescript',
+          reactDocgenTypescriptOptions: {
+            shouldExtractLiteralValuesFromEnum: true,
+            propFilter: prop =>
+              prop.parent ? !/node_modules/.test(prop.parent.fileName) : true,
+            compilerOptions: {
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+            },
+          },
+        },
+  core: {
+    disableTelemetry: true,
+  },
+  viteFinal: async config => {
+    // Handle Node.js modules for browser compatibility.
+    // Chromatic extracts stories in a real browser. Client components that
+    // reference process.env.* crash extraction with
+    // "ReferenceError: process is not defined" (seen on Sidebar.stories).
+    // Define individual keys only — never replace the whole `process` object
+    // with a JSON string (that breaks process.env.FOO member access).
+    config.define = {
+      ...config.define,
+      global: 'globalThis',
+      'process.env.NODE_ENV': JSON.stringify(
+        process.env.NODE_ENV || 'development'
+      ),
+      'process.env.NEXT_PUBLIC_APP_VERSION': JSON.stringify(
+        process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0-storybook'
+      ),
+      'process.env.NEXT_PUBLIC_BUILD_SHA': JSON.stringify(
+        process.env.NEXT_PUBLIC_BUILD_SHA || 'storybook'
+      ),
+      'process.env.NEXT_PUBLIC_CI': JSON.stringify(
+        process.env.NEXT_PUBLIC_CI || ''
+      ),
+      'process.env.NEXT_PUBLIC_DEMO_RECORDING': JSON.stringify(
+        process.env.NEXT_PUBLIC_DEMO_RECORDING || ''
+      ),
+    };
+
+    // Ensure TypeScript files are properly handled
+    const existingAlias = config.resolve?.alias;
+    const normalizedAlias = Array.isArray(existingAlias)
+      ? existingAlias
+      : existingAlias && typeof existingAlias === 'object'
+        ? Object.entries(existingAlias).map(([find, replacement]) => ({
+            find,
+            replacement,
+          }))
+        : [];
+
+    config.resolve = {
+      ...config.resolve,
+      extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
+      alias: [
+        ...storybookStyleAliasesForEnvironment(),
+        // Must come before the generic '@' alias to avoid resolving to the real file.
+        {
+          // The real provider renders an inline bootstrap script. That script is
+          // correct in the app shell, but React cannot execute it inside a
+          // Storybook story. Keep Storybook deterministic and script-free by
+          // resolving the existing provider-compatible mock here only.
+          find: 'next-themes',
+          replacement: require.resolve('./next-themes-mock.tsx'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/DashboardLayoutClient',
+          replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
+        },
+        {
+          find: '@/components/organisms/AuthShellWrapper',
+          replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
+          customResolver: resolvePrivacyBoundaryShellAlias,
+        },
+        {
+          // lib/docs/getMarkdownDocument imports node:fs at module scope
+          // (the file-based getMarkdownDocument path), which crashes the
+          // browser Vite build. createMarkdownDocument is isomorphic, so the
+          // mock keeps the same remark pipeline without the fs reads.
+          find: '@/lib/docs/getMarkdownDocument',
+          replacement: require.resolve('./markdown-document-mock.ts'),
+        },
+        {
+          // lib/recent-releases reads CHANGELOG.md through node:fs for the
+          // homepage Recently Shipped section; serve fixture releases instead.
+          find: '@/lib/recent-releases',
+          replacement: require.resolve('./recent-releases-mock.ts'),
+        },
+        {
+          find: '@/lib/releases/release-matrix-loader',
+          replacement: require.resolve('./composer-catalog-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/tour-dates/actions',
+          replacement: require.resolve('./composer-catalog-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/releases/catalog-task-actions',
+          replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/releases/task-actions',
+          replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
+          find: '@/lib/leads/reporting',
+          replacement: require.resolve('./leads-reporting-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/releases/actions',
+          replacement: require.resolve('./library-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/library/actions',
+          replacement: require.resolve('./library-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/actions/dashboard-data',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/actions/creator-profile',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '@/app/onboarding/actions/connect-spotify',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        {
+          find: '@/app/onboarding/actions/update-profile',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        {
+          find: '@/app/onboarding/actions/enrich-profile',
+          replacement: require.resolve('./enrich-profile-mock.ts'),
+        },
+        {
+          // lib/auth/better-auth.ts imports this RELATIVELY
+          // ('./apple-client-secret'), so a plain '@/…' find never matches.
+          // Full-specifier regex: .replace() swaps the entire id for the
+          // mock's absolute path, for both aliased and relative forms.
+          find: /^(.*\/)?apple-client-secret$/,
+          replacement: require.resolve('./apple-client-secret-mock.ts'),
+        },
+        {
+          // lib/auth/test-mode.ts imports node:net at module scope; matched
+          // by full-specifier regex for both '@/…' and relative imports
+          // ('test-mode-constants' does not match the $-anchored pattern).
+          find: /^(.*\/)?test-mode$/,
+          replacement: require.resolve('./test-mode-mock.ts'),
+        },
+        {
+          find: '@/lib/auth/better-auth',
+          replacement: require.resolve('./better-auth-mock.ts'),
+        },
+        {
+          find: '@/lib/auth/require-auth',
+          replacement: require.resolve('./require-auth-mock.ts'),
+        },
+        {
+          find: '@/lib/auth/dev-test-auth.server',
+          replacement: require.resolve('./dev-test-auth-server-mock.ts'),
+        },
+        {
+          find: '@/lib/auth/dev-test-auth-identity',
+          replacement: require.resolve('./dev-test-auth-identity-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/admin/actions',
+          replacement: require.resolve('./admin-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/actions',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '@/app/onboarding/actions',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        // Also handle absolute imports without alias
+        {
+          find: '../../../app/app/(shell)/dashboard/actions',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '../../app/app/(shell)/dashboard/actions',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '../app/app/(shell)/dashboard/actions',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '../../../app/onboarding/actions',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        {
+          find: '../../app/onboarding/actions',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        {
+          find: '../app/onboarding/actions',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        // Mock Node.js modules that can't run in browser
+        {
+          find: 'node:async_hooks',
+          replacement: require.resolve('./empty-module.js'),
+        },
+        {
+          // Anthropic SDK pulls node:fs / node:crypto (agent-toolset) which
+          // crash Storybook's browser Vite build. Product stories never call it.
+          find: /^@anthropic-ai\/sdk(\/.*)?$/,
+          replacement: require.resolve('./anthropic-sdk-mock.ts'),
+        },
+        {
+          // Statsig's server SDK loads native Node bindings. Stories exercise
+          // deterministic UI states and must never initialize that SDK.
+          find: '@statsig/statsig-node-core',
+          replacement: require.resolve('./statsig-node-core-mock.ts'),
+        },
+        {
+          find: 'server-only',
+          replacement: require.resolve('./empty-module.js'),
+        },
+        {
+          find: 'next/cache',
+          replacement: require.resolve('./empty-module.js'),
+        },
+        {
+          find: 'next/headers',
+          replacement: require.resolve('./empty-module.js'),
+        },
+        {
+          // lib/auth server modules import NextRequest/NextResponse; the
+          // real next/server entry drags in compiled ua-parser-js, which
+          // needs __dirname and crashes the browser story build.
+          find: 'next/server',
+          replacement: require.resolve('./next-server-mock.js'),
+        },
+        // Mock Next.js navigation for Storybook
+        {
+          find: 'next/navigation',
+          replacement: require.resolve('./next-navigation-mock.js'),
+        },
+        // Project aliases
+        {
+          find: '@/features',
+          replacement: path.resolve(__dirname, '../components/features'),
+        },
+        {
+          find: '@jovie/ui',
+          replacement: path.resolve(__dirname, '../../../packages/ui'),
+        },
+        // Keep React as bare package IDs (not absolute CJS paths). Absolute
+        // require.resolve('react') forces Vite to serve raw /@fs CJS without
+        // default-export interop, which breaks browser-mode story tests
+        // ("does not provide an export named 'default'"). Bare IDs let
+        // optimizeDeps prebundle + interop correctly. next/dist/compiled/react
+        // is rewritten to bare 'react' below.
+        { find: '@', replacement: path.resolve(__dirname, '..') },
+        ...normalizedAlias,
+      ],
+      dedupe: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
+      ],
+    };
+
+    // Storybook 10 + modern packages need a current esbuild target.
+    // `es2020` makes esbuild hard-fail on object rest/destructuring in
+    // Storybook/Next packages ("Transforming destructuring ... is not supported"),
+    // which either spams the log or fails the preview build entirely.
+    config.esbuild = {
+      ...config.esbuild,
+      target: 'esnext',
+    };
+
+    // Keep optimizeDeps on, but never hold browser requests until crawl end.
+    // In this monorepo the crawl is huge; holding deps leaves the iframe spinner
+    // forever while /sb-vite/deps/* never materializes.
+    config.optimizeDeps = {
+      ...config.optimizeDeps,
+      exclude: [...(config.optimizeDeps?.exclude || [])],
+      holdUntilCrawlEnd: false,
+      // React 19 CJS entries need default-export interop in the browser ESM graph.
+      needsInterop: [
+        ...new Set([
+          ...(config.optimizeDeps?.needsInterop || []),
+          'react',
+          'react-dom',
+          'react-dom/client',
+        ]),
+      ],
+      include: [
+        ...new Set([
+          ...(config.optimizeDeps?.include || []),
+          'react',
+          'react-dom',
+          'react/jsx-runtime',
+          'react/jsx-dev-runtime',
+          'react-dom/client',
+          // Sentry's browser entry imports this CommonJS module by name.
+          'next/constants.js',
+        ]),
+      ],
+      esbuildOptions: {
+        ...(config.optimizeDeps?.esbuildOptions || {}),
+        target: 'esnext',
+      },
+    };
+
+    // Absolute-path imports of next/dist/compiled/react bypass package resolution.
+    // Re-resolve through Vite so optimizeDeps + needsInterop still apply.
+    // Do NOT return bare 'react' (already-resolved) or absolute CJS paths
+    // (raw /@fs without default-export interop).
+    let isProductionBuild = false;
+    const rewriteNextReactPlugin = {
+      name: 'jovie-storybook-rewrite-next-react',
+      enforce: 'pre' as const,
+      configResolved(resolved: { command: string }) {
+        isProductionBuild = resolved.command === 'build';
+      },
+      async resolveId(
+        this: {
+          resolve: (
+            source: string,
+            importer: string | undefined,
+            options: { skipSelf?: boolean }
+          ) => Promise<{ id: string } | null>;
+        },
+        source: string,
+        importer: string | undefined
+      ) {
+        const normalized = source.replace(/\\/g, '/');
+        if (!normalized.includes('next/dist/compiled/react')) {
+          return null;
+        }
+
+        let bare: string | null = null;
+        // `next/dist/compiled/react-dom/client` contains `.../react-dom`, so
+        // the client path must win. Mapping it to bare `react-dom` drops
+        // createRoot and Storybook's react-18 shim throws in production.
+        if (
+          normalized.includes('next/dist/compiled/react-dom/client') ||
+          normalized.includes(
+            'next/dist/compiled/react-dom/cjs/react-dom-client'
+          )
+        ) {
+          bare = 'react-dom/client';
+        } else if (normalized.includes('next/dist/compiled/react-dom')) {
+          bare = 'react-dom';
+        } else if (
+          normalized.includes('next/dist/compiled/react/jsx-dev-runtime')
+        ) {
+          bare = 'react/jsx-dev-runtime';
+        } else if (
+          normalized.includes('next/dist/compiled/react/jsx-runtime')
+        ) {
+          bare = 'react/jsx-runtime';
+        } else if (
+          normalized.includes('next/dist/compiled/react/index.js') ||
+          normalized.endsWith('next/dist/compiled/react') ||
+          normalized.includes('next/dist/compiled/react.js')
+        ) {
+          bare = 'react';
+        }
+
+        if (!bare) return null;
+
+        // Production's native resolver does not carry nested skipSelf calls
+        // across plugins. Next's bare -> compiled alias and this compiled ->
+        // bare rewrite otherwise recurse indefinitely. Resolve to a terminal
+        // workspace entry; keep the existing named-client interop module.
+        // Dev still needs bare resolution for optimizeDeps CJS interop.
+        if (isProductionBuild) {
+          return {
+            id:
+              bare === 'react-dom/client'
+                ? '\0jovie-react-dom-client'
+                : require.resolve(bare),
+          };
+        }
+        return this.resolve(bare, importer, { skipSelf: true });
+      },
+    };
+
+    // Production Rollup leaves React 19's CJS `react-dom/client` as
+    // `{ default: module.exports }`. Storybook's shim does
+    // `import * as ReactDOM from 'react-dom/client'` then `ReactDOM.createRoot`,
+    // which is undefined unless we re-export named bindings. Dev optimizeDeps
+    // already interops; this plugin is the production equivalent.
+    const reactDomClientPath = require.resolve('react-dom/client');
+    const reactDomClientInteropPlugin = {
+      name: 'jovie-storybook-react-dom-client-interop',
+      enforce: 'pre' as const,
+      resolveId(source: string) {
+        if (source === 'react-dom/client' || source === 'react-dom/client.js') {
+          return '\0jovie-react-dom-client';
+        }
+        return null;
+      },
+      load(id: string) {
+        if (id !== '\0jovie-react-dom-client') return null;
+        return `
+import * as ns from ${JSON.stringify(reactDomClientPath)};
+const client = ns.createRoot
+  ? ns
+  : ns.default?.createRoot
+    ? ns.default
+    : ns.default ?? ns;
+export const createRoot = client.createRoot.bind(client);
+export const hydrateRoot = client.hydrateRoot.bind(client);
+export default client;
+`;
+      },
+    };
+
+    // Vercel Workflow / WDK Vite plugins (from next.config withWorkflow) emit
+    // continuous page reloads of app/.well-known/workflow/* and can starve
+    // Storybook's optimized-deps generation. Strip them for local Storybook.
+    const stripWorkflowPlugins = (plugins: unknown): unknown[] => {
+      const list = Array.isArray(plugins) ? plugins : plugins ? [plugins] : [];
+      return list.filter(plugin => {
+        const name =
+          plugin &&
+          typeof plugin === 'object' &&
+          'name' in plugin &&
+          typeof (plugin as { name?: unknown }).name === 'string'
+            ? String((plugin as { name: string }).name).toLowerCase()
+            : '';
+        if (!name) return true;
+        return !(
+          name.includes('workflow') ||
+          name.includes('wdk') ||
+          name.includes('vercel-toolbar')
+        );
+      });
+    };
+    config.plugins = [
+      {
+        name: 'jovie-storybook-browser-tracing',
+        enforce: 'post',
+        // The Next mock plugin adds a server-only tracing alias in its config
+        // hook. Override it afterwards with the installed browser-safe API.
+        config: () => ({
+          resolve: {
+            alias: [
+              {
+                find: '@opentelemetry/api',
+                replacement: require.resolve('@opentelemetry/api', {
+                  paths: [require.resolve('@opentelemetry/sdk-node')],
+                }),
+              },
+            ],
+          },
+        }),
+      },
+      reactDomClientInteropPlugin,
+      rewriteNextReactPlugin,
+      ...stripWorkflowPlugins(config.plugins),
+    ] as typeof config.plugins;
+
+    // Ignore workflow generated routes so HMR does not thrash the preview iframe.
+    config.server = {
+      ...config.server,
+      watch: {
+        ...(config.server &&
+        typeof config.server === 'object' &&
+        'watch' in config.server &&
+        config.server.watch &&
+        typeof config.server.watch === 'object'
+          ? config.server.watch
+          : {}),
+        ignored: [
+          '**/app/.well-known/workflow/**',
+          '**/.well-known/workflow/**',
+          '**/node_modules/**',
+        ],
+      },
+    };
+
+    // Suppress "use client" directive warnings in build output.
+    // build.target must match the esnext esbuild/optimizeDeps targets above:
+    // `storybook build` lowers final chunks with esbuild against build.target
+    // (default 'modules' = chrome87/edge88/es2020/firefox78/safari14), and that
+    // lowering hard-fails on object rest/destructuring in Storybook/Next
+    // packages ("Transforming destructuring to the configured target
+    // environment ... is not supported yet") — the exact merge-queue failure in
+    // issue #14841. The preview bundle only runs in current Chromium (CI +
+    // Chromatic), so esnext is safe.
+    config.build = {
+      ...config.build,
+      target: 'esnext',
+      rollupOptions: {
+        ...config.build?.rollupOptions,
+        onwarn(warning, warn) {
+          // Suppress "use client" directive warnings
+          if (
+            warning.code === 'MODULE_LEVEL_DIRECTIVE' &&
+            warning.message.includes('use client')
+          ) {
+            return;
+          }
+          warn(warning);
+        },
+      },
+    };
+
+    return config;
+  },
+};
+
+export default config;

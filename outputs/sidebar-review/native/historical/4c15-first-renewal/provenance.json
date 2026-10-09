@@ -1,0 +1,9 @@
+{
+  "head": "4c15b774185239e05d65c0d7bd84bc23f9f8e6a5",
+  "semanticPassed": 14,
+  "uiFailed": 1,
+  "navigationPerformancePassed": 1,
+  "failure": "brandY78 vs77.99999999999994 points; XCTest CGRect exact equality falsepositive",
+  "bundle": "/private/tmp/sidebar-native-recent.xcresult",
+  "scope": "Failed full renewal preserved; no native completion or hitch-budget claim"
+}

@@ -1,0 +1,158 @@
+{
+  "at": "2026-10-08T10:11:34.608818+00:00",
+  "exit": 0,
+  "stderr": "",
+  "remote": {
+    "runId": "owner-normal-PR20988-14a-paired-20261008T0937Z",
+    "kind": "normal-qualification",
+    "pr": 20988,
+    "head": "14a3fe807b7605edd11348165e999b1ef32618f4",
+    "base": "5cc5ddd8363d990aaed675aa431b25dd3cf6d0cb",
+    "branch": "codex/gem-storybook-resource-bounds",
+    "bundleSha256": "2014762c30af7c917a2faf0220891d1f91b204cae6120b6823ae0bf0c19ebd7a",
+    "sourceOwner": "existing sole Gem/native repair writer",
+    "modelFree": true,
+    "preparedAt": "2026-10-08T09:35:47.007963+00:00",
+    "priorRunTerminal": "original14a ended09:01:16.675708Z; canonical drained timeout/natural seat0release; no unchanged replay",
+    "routeCorrection": "both existing dedicated-host seats; unchanged full fallback/all11commands; terminal result-pipe; birth-bound aggregate RSS watchdog",
+    "parallelFullSuite": true,
+    "requiredGateSeats": 2,
+    "shardConcurrency": 2,
+    "maxWorkers": 1,
+    "resourceRssLimitBytes": 8589934592,
+    "hostReserveFraction": 0.3,
+    "rca": "repair-gem-storybook-normal-current-route-rca.json",
+    "routeFileHashes": {
+      "repair-gem-owner-gate-once.py": "0368ab899eb8a6c2364abd06cf731b359f24983efd8a535f378d733dcf2de4ca",
+      "repair-gem-owner-gate-remote.py": "8f99539386bc0ca4954227a6a762f760b480620f1543d76acdff7e7e37f280d1",
+      "repair-gem-parallel-qualification-policy.py": "3691a9308e5b13fe08a19189c2455844216dd100a790976a69f95e051c68adb8",
+      "repair-gem-parallel-qualification-watch.mjs": "ef085e94c20f71f56fe21689bf24c90ea49c04b8f860cedfff5f3d14a4afefe8",
+      "repair-gem-owned-qualification-resources.mjs": "f1432aa58e58af037a46d0a31744205590f4c10192a8453c0f5290c37c3678a3"
+    },
+    "at": "2026-10-08T09:39:28.853352+00:00",
+    "accepted": true,
+    "providerInvoked": false,
+    "credentialsCopied": false,
+    "sourceWriterChanged": false,
+    "gatesChanged": false,
+    "healthSamples": [
+      {
+        "cpuIdlePercent": 91.18,
+        "memoryAvailablePercent": 94.64,
+        "load1": 1.87255859375,
+        "admitted": true,
+        "observedAt": "2026-10-08T09:39:29.854447+00:00",
+        "totalMemoryBytes": 67319287808,
+        "availableMemoryBytes": 63711117312
+      },
+      {
+        "cpuIdlePercent": 84.2,
+        "memoryAvailablePercent": 94.62,
+        "load1": 1.87255859375,
+        "admitted": true,
+        "observedAt": "2026-10-08T09:39:30.854888+00:00",
+        "totalMemoryBytes": 67319287808,
+        "availableMemoryBytes": 63696048128
+      }
+    ],
+    "gateSeats": [
+      0,
+      1
+    ],
+    "gateSeat": 0,
+    "postSeatHealthSamples": [
+      {
+        "cpuIdlePercent": 89.31,
+        "memoryAvailablePercent": 94.56,
+        "load1": 1.87255859375,
+        "admitted": true,
+        "observedAt": "2026-10-08T09:39:31.856534+00:00",
+        "totalMemoryBytes": 67319287808,
+        "availableMemoryBytes": 63654080512
+      },
+      {
+        "cpuIdlePercent": 88.73,
+        "memoryAvailablePercent": 94.25,
+        "load1": 1.9892578125,
+        "admitted": true,
+        "observedAt": "2026-10-08T09:40:32.857130+00:00",
+        "totalMemoryBytes": 67319287808,
+        "availableMemoryBytes": 63448973312
+      }
+    ],
+    "parallelAuthority": {
+      "shardConcurrency": 2,
+      "maxWorkers": 1,
+      "reservedSeatCount": 2,
+      "resourceRssLimitBytes": 8589934592,
+      "hostReserveFraction": 0.3
+    },
+    "admittedAt": "2026-10-08T09:40:32.857169+00:00",
+    "checkout": "/home/timwhite/.local/state/jovie-lanes/runs/owner-normal-PR20988-14a-paired-20261008T0937Z/checkout",
+    "installExit": 0,
+    "qualificationBase": "ddef19f08425c064ddd5474423a19231f1c2817f",
+    "qualificationMergeBase": "5cc5ddd8363d990aaed675aa431b25dd3cf6d0cb",
+    "qualificationDiff": [
+      "apps/web/.storybook/main.ts",
+      "apps/web/tests/unit/storybook/production-react-resolution.test.ts",
+      "scripts/component-live-storybook-browser.mjs",
+      "scripts/component-live-storybook-lifecycle.mjs",
+      "scripts/lib/__tests__/component-live-storybook-certification.test.mjs"
+    ],
+    "affectedPlan": {
+      "selectedTests": [
+        "apps/web/tests/unit/storybook/production-react-resolution.test.ts"
+      ],
+      "rootVitestTests": [],
+      "pythonTests": [],
+      "pythonUnittestTests": [],
+      "scriptVitestTests": [],
+      "scriptVitestCoverageArgs": [],
+      "nodeTests": [],
+      "nodeTestArgs": [],
+      "retouchPromptCoverage": false,
+      "mode": "full",
+      "fallbackReason": "uncovered source path(s): apps/web/.storybook/main.ts",
+      "relatedFiles": [
+        "apps/web/.storybook/main.ts",
+        "apps/web/tests/unit/storybook/production-react-resolution.test.ts"
+      ],
+      "mandatoryTests": []
+    },
+    "command": [
+      "node",
+      "/home/timwhite/.local/state/jovie-lanes/runs/owner-normal-PR20988-14a-paired-20261008T0937Z/parallel-normal-watch.mjs",
+      "/home/timwhite/.local/state/jovie-lanes/runs/owner-normal-PR20988-14a-paired-20261008T0937Z/checkout",
+      "codex/gem-storybook-resource-bounds",
+      "/home/timwhite/.local/state/jovie-lanes/runs/owner-normal-PR20988-14a-paired-20261008T0937Z/resource-receipt.json",
+      "2400"
+    ],
+    "canonicalGateTimeoutSeconds": 2400,
+    "resourceReceipt": {
+      "startedAt": "2026-10-08T09:40:42.390Z",
+      "timeoutSeconds": 2400,
+      "selectorChanged": false,
+      "shardConcurrency": 2,
+      "maxWorkers": 1,
+      "rssLimitBytes": 8589934592,
+      "memoryBefore": {
+        "totalBytes": 67319287808,
+        "availableBytes": 63185981440
+      },
+      "ownedPid": 3888443,
+      "childExit": 0,
+      "childSignal": null,
+      "peakRssBytes": 6115422208,
+      "rootGroupCleanupVerified": true,
+      "completeTreeCleanupAuthority": "canonical lifecycle result-pipe helper",
+      "outcome": "normal-qualification-passed",
+      "finishedAt": "2026-10-08T10:11:34.506Z"
+    },
+    "qualificationExit": 0,
+    "outcome": "normal-qualification-passed",
+    "trackedStatusAfter": "",
+    "finishedAt": "2026-10-08T10:11:34.583337+00:00",
+    "ownedCommandDrained": true,
+    "gateSeatReleased": true
+  }
+}

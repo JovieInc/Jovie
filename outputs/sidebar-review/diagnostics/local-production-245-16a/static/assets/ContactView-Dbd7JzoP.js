@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./ProfileContactDrawerContent-Dxy5y0fC.js";function i({artistHandle:e,contacts:t,primaryChannel:n=e=>e.channels[0]}){return(0,a.jsx)(r,{artistHandle:e,contacts:t,primaryChannel:n})}var a;function o(){return(o=e((()=>{a=t(),n()})))()}export{o as n,i as t};

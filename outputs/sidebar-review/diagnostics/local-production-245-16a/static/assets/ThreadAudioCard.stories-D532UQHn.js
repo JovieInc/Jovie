@@ -1,0 +1,9 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./audio-lines-Dh7soz_k.js";import{n as i,t as a}from"./play-DZgtukkA.js";function o({title:e,artist:t,duration:n,onPlay:i}){return(0,s.jsxs)(`div`,{className:`system-b-thread-media-card system-b-thread-audio-card`,children:[(0,s.jsx)(`div`,{className:`system-b-thread-audio-artwork`,children:(0,s.jsx)(r,{className:`h-4 w-4 text-tertiary-token`,strokeWidth:2.25})}),(0,s.jsxs)(`div`,{className:`system-b-thread-audio-copy`,children:[(0,s.jsx)(`p`,{className:`system-b-thread-audio-title`,children:e}),(0,s.jsxs)(`p`,{className:`system-b-thread-audio-meta`,children:[t,` · `,n]})]}),(0,s.jsx)(`button`,{type:`button`,onClick:i,disabled:!i,className:`system-b-thread-audio-play`,"aria-label":`Play In Global Player`,children:(0,s.jsx)(a,{className:`h-3 w-3 translate-x-px`,strokeWidth:2.5,fill:`currentColor`})})]})}var s;function c(){return(c=e((()=>{s=t(),n(),i()})))()}var l,u,d,f,p;function m(){return(m=e((()=>{c(),{fn:l}=__STORYBOOK_MODULE_TEST__,u={title:`Shell/ThreadAudioCard`,component:o,parameters:{layout:`centered`},args:{title:`Lost in the Light`,artist:`Bahamas`,duration:`3:33`}},d={args:{onPlay:l()}},f={args:{onPlay:void 0}},p=[`Playable`,`NoHandler`],d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
+  args: {
+    onPlay: fn()
+  }
+}`,...d.parameters?.docs?.source}}},f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{
+  args: {
+    onPlay: undefined
+  }
+}`,...f.parameters?.docs?.source}}}})))()}m();export{f as NoHandler,d as Playable,p as __namedExportsOrder,u as default};

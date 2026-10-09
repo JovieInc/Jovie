@@ -1,0 +1,6 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{c as t,t as n}from"./SharedCommandPalette-BI4LRe81.js";var r,i,a,o;function s(){return(s=e((()=>{t(),r={title:`Organisms/SharedCommandPalette`,component:n,parameters:{layout:`centered`,jovie:{uncoveredProps:[`commitIndex`,`item`,`index`,`isActive`,`onMouseEnter`]}},args:{sections:[{id:`go-to`,label:`Go To`,items:[{kind:`nav`,nav:{kind:`nav`,id:`library`,label:`Library`,description:`Manage releases, images, and merch.`,iconName:`Music`,surfaces:[`cmdk`],href:`/app/library`}}]}],selectedIndex:0,setSelectedIndex:()=>void 0,onCommit:()=>void 0,variant:`inline`}},i={},a={args:{sections:[],emptyHint:`No matching commands`}},o=[`SlashSuggestions`,`Empty`],i.parameters={...i.parameters,docs:{...i.parameters?.docs,source:{originalSource:`{}`,...i.parameters?.docs?.source}}},a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{
+  args: {
+    sections: [],
+    emptyHint: 'No matching commands'
+  }
+}`,...a.parameters?.docs?.source}}}})))()}s();export{a as Empty,i as SlashSuggestions,o as __namedExportsOrder,r as default};

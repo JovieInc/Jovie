@@ -1,0 +1,71 @@
+[
+  {
+    "id": "jovie-zoom2",
+    "initial": {
+      "header": {
+        "x": 0,
+        "y": 0,
+        "right": 720,
+        "bottom": 22,
+        "width": 720,
+        "height": 22
+      },
+      "titlebar": {
+        "x": 0,
+        "y": 0,
+        "right": 212,
+        "bottom": 22,
+        "width": 212,
+        "height": 22
+      },
+      "brand": {
+        "x": 74,
+        "y": -3,
+        "right": 112,
+        "bottom": 25,
+        "width": 38,
+        "height": 28
+      },
+      "toggle": {
+        "x": 118,
+        "y": -3,
+        "right": 146,
+        "bottom": 25,
+        "width": 28,
+        "height": 28
+      },
+      "back": {
+        "x": 152,
+        "y": -1,
+        "right": 176,
+        "bottom": 23,
+        "width": 24,
+        "height": 24
+      },
+      "forward": {
+        "x": 178,
+        "y": -1,
+        "right": 202,
+        "bottom": 23,
+        "width": 24,
+        "height": 24
+      },
+      "controls": {
+        "x": 50,
+        "y": 0,
+        "width": 670,
+        "height": 22
+      },
+      "viewport": {
+        "width": 720,
+        "height": 450
+      }
+    },
+    "containment": {
+      "brand": false,
+      "toggle": false,
+      "back": false,
+      "forward": false
+    }
+  }
+]

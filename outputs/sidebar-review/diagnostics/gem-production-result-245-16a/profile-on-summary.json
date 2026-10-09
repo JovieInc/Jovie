@@ -1,0 +1,19 @@
+{
+  "mode": "on",
+  "runtimeProof": [
+    {
+      "bundleType": 0,
+      "version": "19.2.8",
+      "rendererPackageName": "react-dom"
+    }
+  ],
+  "assertionsPassed": true,
+  "profilerBoundary": "Production React onRender callbacks absent; actual trace/RAF and preserved semantic geometry checks used. Original development CI assertion unchanged.",
+  "frameSamples": 35,
+  "maxRafGapMs": 100.0,
+  "longTasks": 2,
+  "maxLongTaskMs": 105,
+  "selected": "/app/calendar",
+  "pages": 120,
+  "frameBudgetCertificationClaimed": false
+}

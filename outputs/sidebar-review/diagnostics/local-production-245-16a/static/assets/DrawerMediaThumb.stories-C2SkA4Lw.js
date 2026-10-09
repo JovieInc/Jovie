@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./DrawerMediaThumb-k0J614UZ.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Molecules/Drawer/DrawerMediaThumb`,component:r,parameters:{layout:`centered`},args:{src:null,alt:`Artist profile`,fallback:(0,i.jsx)(`span`,{className:`text-sm text-secondary-token`,children:`AR`}),dimension:48,sizes:`48px`,sizeClassName:`size-12`}},o={},s={args:{src:`/avatars/default-user.png`}},c=[`Fallback`,`WithImage`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    src: '/avatars/default-user.png'
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{o as Fallback,s as WithImage,c as __namedExportsOrder,a as default};

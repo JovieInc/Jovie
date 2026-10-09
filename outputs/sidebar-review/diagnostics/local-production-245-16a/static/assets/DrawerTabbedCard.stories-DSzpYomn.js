@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./DrawerTabbedCard-Bao3_oDz.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Molecules/Drawer/DrawerTabbedCard`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,i.jsx)(`div`,{className:`h-72 w-80`,children:(0,i.jsx)(e,{})})],args:{tabs:(0,i.jsx)(`div`,{className:`text-xs text-primary-token`,children:`Details · Activity`}),children:(0,i.jsx)(`p`,{className:`text-sm text-secondary-token`,children:`Entity details`})}},o={},s={args:{surfaceVariant:`flat`}},c=[`Card`,`Flat`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    surfaceVariant: 'flat'
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{o as Card,s as Flat,c as __namedExportsOrder,a as default};

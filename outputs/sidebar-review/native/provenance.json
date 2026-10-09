@@ -1,0 +1,25 @@
+{
+  "head": "f66a51353651afc26772447e9589b4eef2cfcf73",
+  "base": "95c4afede3605e63a3dd9d2519ff843aae81f26e",
+  "simulator": "7C4FF1A5-9969-4A7D-898D-45F47B5BE7F5",
+  "text": "accessibility-extra-extra-extra-large",
+  "restoredText": "large",
+  "restoredState": "Shutdown",
+  "tests": {
+    "semantic": 14,
+    "ui": 1,
+    "passed": true
+  },
+  "screenshots": {
+    "ios-shared-sidebar-more.png": "8b5a3f60cad124c703145a799ae003ee9a29a97275dc0ce41da007ab5d35d519",
+    "ios-canonical-information-architecture.png": "7d64f6ee2f7a36c690f2658d0bdb5abdbe371366579d26aec02d642ec311d3e8",
+    "ios-shared-sidebar-recent.png": "549623b7cc261de30020ef0d060e630154fc21fe0ea800b8191ced49c41c7d51",
+    "ios-shared-sidebar-footer-probe.png": "7d64f6ee2f7a36c690f2658d0bdb5abdbe371366579d26aec02d642ec311d3e8"
+  },
+  "limits": [
+    "simulator only",
+    "no physical VoiceOver witness",
+    "no physical 120Hz proof",
+    "private Ovie history uses explicit web handoff"
+  ]
+}

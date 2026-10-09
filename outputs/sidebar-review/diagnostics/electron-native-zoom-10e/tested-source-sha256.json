@@ -1,0 +1,7 @@
+{
+  "apps/web/components/organisms/sidebar/sidebar.tsx": "5a9c7964d0a9f3ca5812f5066f97b8a447c325ab81f415793c69e62be187a720",
+  "apps/web/components/organisms/sidebar/sidebar.test.tsx": "1dbfc7fafb13470c76e15fe47a12195ec1866b5309db4a9987e2078917e0ec2d",
+  "apps/web/app/globals.css": "9208dbf93c11a08b36edbfe355c5d3e49326bec20bbf9c0b44fced60a2eb6813",
+  "apps/web/tests/e2e/storybook-shared-sidebar.spec.ts": "827b5b60ca756185d155fe886e1493b5389a9c3e427946086fdfc95c0a394a5b",
+  "apps/desktop/scripts/desktop-shell-contract.test.mjs": "56d87955058ed1e9f21536a60d2823a190a98276fd2ec375a4918d1e47a13c67"
+}

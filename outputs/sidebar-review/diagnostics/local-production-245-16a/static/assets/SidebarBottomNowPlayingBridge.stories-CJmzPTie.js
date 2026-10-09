@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-BcKkbAw3.js";import{t}from"./jsx-runtime-BbDfbRii.js";import{n,t as r}from"./SidebarBottomNowPlayingBridge-C4r1ADfq.js";var i,a,o,s,c;function l(){return(l=e((()=>{i=t(),n(),a={title:`Organisms/SidebarBottomNowPlayingBridge`,component:r,parameters:{layout:`centered`},decorators:[e=>(0,i.jsx)(`div`,{className:`w-57 bg-base p-2`,children:(0,i.jsx)(e,{})})]},o={},s={args:{collapsed:!0}},c=[`Idle`,`CollapsedSidebarIdle`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{}`,...o.parameters?.docs?.source},description:{story:`The production bridge stays empty until the shared player has an active track.`,...o.parameters?.docs?.description}}},s.parameters={...s.parameters,docs:{...s.parameters?.docs,source:{originalSource:`{
+  args: {
+    collapsed: true
+  }
+}`,...s.parameters?.docs?.source}}}})))()}l();export{s as CollapsedSidebarIdle,o as Idle,c as __namedExportsOrder,a as default};
