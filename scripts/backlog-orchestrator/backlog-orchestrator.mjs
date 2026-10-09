@@ -1423,7 +1423,12 @@ async function ghPullRequestInventory(state, env) {
  * named.
  */
 async function execGhApi(path, env) {
-  const args = ['api', '--repo', 'JovieInc/Jovie', path];
+  // `gh api` takes NO --repo/-R flag (that is a `gh pr` flag — passing it
+  // makes gh exit 1 with its full usage help, whose -F description line
+  // "Add a string parameter in key=value format" is what the Gem runner's
+  // stderr showed). The repository lives inside the endpoint path itself;
+  // the argv is exactly ['api', <full endpoint path+query>].
+  const args = ['api', path];
   const maxAttempts = 3;
   let lastError = null;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
