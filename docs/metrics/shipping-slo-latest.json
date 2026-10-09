@@ -1,19 +1,19 @@
 {
-  "at": "2026-10-08T14:33:50.717Z",
+  "at": "2026-10-09T14:21:01.282Z",
   "ciP95Seconds": {
     "pull_request": null,
-    "merge_group": 925
+    "merge_group": 3488
   },
   "queueWaitP95Seconds": null,
   "queueEjectionRate": null,
   "leadTimeP95Seconds": {
-    "devin": 79493,
-    "codex": 53572,
-    "other": 55449
+    "devin": 35208,
+    "codex": 47126,
+    "other": 33060
   },
   "remediationP95Seconds": {
     "prRedToGreen": null,
-    "mainRedToGreen": 5824,
+    "mainRedToGreen": 2383,
     "productionPromoteHold": null
   },
   "productionLagP95Seconds": null,
@@ -24,6 +24,7 @@
     "growthTrend": "unknown"
   },
   "regressions": [
+    "ci_walltime.merge_group.p95",
     "lead_time.devin.p95",
     "lead_time.codex.p95",
     "remediation.main_red_to_green.p95",
