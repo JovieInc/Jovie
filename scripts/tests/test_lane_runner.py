@@ -4423,10 +4423,27 @@ class UpdateTest(unittest.TestCase):
                                                      if p != "scripts/tests/test_lane_source_admission.py"]):
                     self.assertEqual(lane.update(host), 1)
                 self.assertEqual((host.state / "current").resolve(), legacy)
-                self.assertEqual(lane.update(host), 0)
+                # Complete source without restored pins is still inadmissible.
+                self.assertEqual(lane.update(host), 1)
+                self.assertEqual((host.state / "current").resolve(), legacy)
+                refused = json.loads((host.state / "update-refused.json").read_text())
+                self.assertEqual(refused["why"], "mesh runtime dependency closure failed")
+                # Supply only the actual existing pinned dependency route, then
+                # advance the fixture clock past preserved normal backoff.
+                for rel in ["apps/desktop/node_modules", "packages/agent-transport-contracts/node_modules"]:
+                    (clone / rel).parent.mkdir(parents=True, exist_ok=True)
+                    (clone / rel).symlink_to((ROOT / rel).resolve(), target_is_directory=True)
+                with patch.object(lane.time, "time", return_value=refused["at"] + lane.UPDATE_RETRY_S + 1):
+                    self.assertEqual(lane.update(host), 0)
                 current = (host.state / "current").resolve()
                 self.assertTrue((current / "lane_runner.py").exists())
                 self.assertTrue((current.parent / "promotion-loss-metrics.mjs").exists())  # HUD PROMOTION line
+                mesh = json.loads((current / ".mesh-runtime/manifest.json").read_text())
+                self.assertTrue(mesh["isolatedImportPassed"])
+                self.assertFalse(mesh["recipientAdmission"])
+                for name, proof in mesh["outputs"].items():
+                    self.assertEqual(hashlib.sha256((current / ".mesh-runtime" / name).read_bytes()).hexdigest(),
+                                     proof["sha256"])
                 manifest = json.loads((current / ".release.json").read_text())
                 self.assertEqual(manifest["bundleDigest"], (current / ".bundle").read_text())
                 self.assertEqual(manifest["objects"]["scripts/lanes"], (current / ".tree").read_text())
@@ -4456,6 +4473,30 @@ class UpdateTest(unittest.TestCase):
                     os.environ.pop("LANES_SELFTEST", None)
                 else:
                     os.environ["LANES_SELFTEST"] = old_env
+
+
+class ManagedMeshArchiveTest(unittest.TestCase):
+    def test_managed_archive_retains_exact_verified_portable_closure(self):
+        required = [".nvmrc", "pnpm-lock.yaml", "packages/agent-transport-contracts/work-order.ts",
+                    "scripts/backlog-orchestrator/summer-triage-assessment-client.mjs"]
+        self.assertTrue(set(required) <= set(lane.RELEASE_EXTRAS))
+        if os.environ.get("LANES_SELFTEST") != "1":
+            return  # Real archive verification runs inside every updater self-test.
+        runtime = ROOT / "scripts/lanes/.mesh-runtime"
+        proof = json.loads((runtime / "manifest.json").read_text())
+        self.assertEqual(proof["schema"], "jovie.mesh-managed-runtime/v1")
+        self.assertTrue(proof["isolatedImportPassed"])
+        self.assertFalse(proof["recipientAdmission"])
+        self.assertEqual(set(proof["outputs"]), {"receiver.mjs", "terminal.mjs"})
+        self.assertEqual(proof["lockfileSha256"], hashlib.sha256((ROOT / "pnpm-lock.yaml").read_bytes()).hexdigest())
+        expected = {"scripts/lanes/mesh-host-ack.mjs", "scripts/lanes/mesh-native-terminal.mjs",
+                    "packages/agent-transport-contracts/work-order.ts",
+                    "scripts/backlog-orchestrator/summer-triage-assessment-client.mjs"}
+        self.assertEqual(set(proof["sourceFiles"]), expected)
+        for path, digest in proof["sourceFiles"].items():
+            self.assertEqual(hashlib.sha256((ROOT / path).read_bytes()).hexdigest(), digest)
+        for name, output in proof["outputs"].items():
+            self.assertEqual(hashlib.sha256((runtime / name).read_bytes()).hexdigest(), output["sha256"])
 
 
 class UpdateBackoffTest(unittest.TestCase):
@@ -4613,6 +4654,14 @@ class GateCommandAuthorityTest(unittest.TestCase):
 
 
 class GateSingleflightTest(unittest.TestCase):
+    def test_original_run_receives_the_actual_completed_gate_proof(self):
+        with patch.object(lane, "sh", self.fake):
+            result = lane.gate_pr(self.host, self.pr, Path("/tmp"), None)
+        proof = json.loads((self.host.state / "verified.json").read_text())["7:abc"]
+        self.assertEqual(result["gateResult"], proof)
+        self.assertEqual(proof["policyDigest"], lane.GATE_POLICY_DIGEST)
+        self.assertEqual(proof["reasons"], [])
+        self.assertEqual(result["verdict"], "landing")
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
