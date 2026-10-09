@@ -126,7 +126,12 @@ def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now
             expired["diagnosis"] = _diagnosis([*rows, expired], "failed_unknown")
             return {"admitted": False, "reason": "expired_attempt_reconciled", "terminalState": "failed_unknown"}, [expired]
         used = _usage(rows, now)
-        exhausted = next((key for key in ("attempts", "concurrency", "wallSeconds", "spend", "mutations") if used[key] >= policy[key]), None)
+        # Zero-cost work can claim a zero-spend/mutation policy. Its first
+        # positive boundary still fails closed; positive exhausted caps retain
+        # their existing stop semantics. This never grants a provider route.
+        exhausted = next((key for key in ("attempts", "concurrency", "wallSeconds", "spend", "mutations")
+                          if used[key] >= policy[key] and not
+                          (key in {"spend", "mutations"} and used[key] == policy[key] == 0)), None)
         if exhausted:
             row = {**ident, "schema": SCHEMA, "event": "decision", "at": now, "terminalState": "budget_exhausted", "retryDecision": "stop",
                    "reason": f"{exhausted}_budget_exhausted", "diagnosis": _diagnosis(rows, "budget_exhausted")}
