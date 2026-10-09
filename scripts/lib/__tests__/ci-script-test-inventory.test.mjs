@@ -1,7 +1,9 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  MESH_HOST_ACK_COVERAGE_COMMAND,
+  runStructural,
   SCRIPT_CONTRACT_NODE_TESTS,
   SCRIPT_CONTRACT_VITEST_TESTS,
 } from '../../ci-fast-lanes.mjs';
@@ -31,6 +33,45 @@ describe('scripts test inventory guard', () => {
       )
     ).toBe(true);
   });
+  it('executes receiver tests and their enforced coverage from the maintained structural lane', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_WEB', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_ABORT_STATUS_FILE', '');
+    const execute = vi
+      .fn()
+      .mockReturnValue({ code: 0, output: 'contract fixture\n' });
+    try {
+      const result = await runStructural({ execute });
+      expect(result.code).toBe(0);
+      const commands = execute.mock.calls.map(([command]) => command);
+      expect(commands).toContain(MESH_HOST_ACK_COVERAGE_COMMAND);
+      expect(SCRIPT_CONTRACT_VITEST_TESTS).toContain(
+        'scripts/lib/__tests__/mesh-host-ack.test.mjs'
+      );
+      expect(
+        commands.some(command =>
+          command.includes(
+            'run lib/__tests__/merge-group-failure-hold.test.mjs lib/__tests__/mesh-host-ack.test.mjs'
+          )
+        )
+      ).toBe(true);
+      for (const flag of [
+        '--coverage.include=lanes/mesh-host-ack.mjs',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.lines=99',
+        '--coverage.thresholds.statements=99',
+        '--coverage.thresholds.branches=90',
+        '--coverage.thresholds.functions=100',
+      ])
+        expect(MESH_HOST_ACK_COVERAGE_COMMAND).toContain(flag);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('runs every scripts/ test file from some CI entry point', async () => {
     const { unrun } = await inventoryScriptTests(REPO_ROOT);
     const orphans = unrun.filter(file => !Object.hasOwn(EXCEPTIONS, file));
