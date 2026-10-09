@@ -1,0 +1,13 @@
+STATUS: BLOCKED
+
+- Merged current `origin/main` locally and resolved the root lockfile conflict using main’s copy plus pnpm regeneration.
+- Local merge commit: `8cd73a922090ab86c86ce0956d4077e0e81a7846`.
+- Root frozen install and lockfile preflight passed.
+- Eve isolated frozen install and typecheck passed.
+- Eve tests: 441 passed, 1 failed.
+
+The failure is on current `origin/main`: [package.json](/home/timwhite/.local/state/jovie-lanes/worktrees/20261007T114716Z-PR20892-codex-fix-561838/apps/eve-pilot/package.json) specifies `microsandbox 0.7.7`, while [eve-installation-contract.test.ts:48](/home/timwhite/.local/state/jovie-lanes/worktrees/20261007T114716Z-PR20892-codex-fix-561838/apps/eve-pilot/tests/eve-installation-contract.test.ts:48) and main’s isolated lockfile still require `0.7.6`. This came from merged PR #20880 and is unrelated to PR #20892.
+
+Per contract, I did not alter the unrelated test or push. Local work remains preserved, including the regenerated uncommitted Eve lockfile.
+
+NOT-SHIPPABLE: origin/main has an unrelated Eve microsandbox manifest/lockfile/test version mismatch.
