@@ -431,13 +431,13 @@ describe('fleet gate receipt source order (JOV-8000 follow-up 33)', () => {
           },
           { now }
         );
+        assert.equal(gate.promotionMode, 'hold-intake');
         const health =
           gate.promotionMode === admitter.FLEET_PROMOTION_MODE.BLOCKED
             ? 'blocked'
             : gate.state === admitter.FLEET_GATE_STATE.GREEN
               ? 'healthy'
               : 'degraded';
-        assert.equal(gate.promotionMode, 'hold-intake');
         assert.equal(health, 'degraded');
         const capacity = evaluateRuntimeCapacity(
           {
@@ -2385,13 +2385,15 @@ describe('entrypoint contract', () => {
     const tempDir = await mkdtemp(resolve('/tmp/', 'mm-d-'));
     const fakeBin = resolve(tempDir, 'bin');
     await mkdir(fakeBin, { recursive: true });
+    const currentHead401 = 'a'.repeat(40);
+    const staleHead401 = 'b'.repeat(40);
     await writeMergeabilityFakeGh(
       resolve(fakeBin, 'gh'),
       {
         401: {
           mergeable: null,
           mergeable_state: 'unknown',
-          head: { sha: 'h1' },
+          head: { sha: currentHead401 },
         },
       },
       tempDir
@@ -2399,7 +2401,13 @@ describe('entrypoint contract', () => {
     await writeFile(
       `${tempDir}/refs-body`,
       JSON.stringify([
-        { ref: 'refs/heads/gh-readonly-queue/main/pr-401-ad13f2' },
+        // Live: the ref names the row's current head (enqueued at this head).
+        {
+          ref: `refs/heads/gh-readonly-queue/main/pr-401-${currentHead401}`,
+        },
+        // Leaked/stale: names an older head of a still-open PR — must NOT mark.
+        { ref: `refs/heads/gh-readonly-queue/main/pr-401-${staleHead401}` },
+        // Leaked: a PR not in the population at all.
         { ref: 'refs/heads/gh-readonly-queue/main/pr-10350-stale' },
       ])
     );
@@ -2435,6 +2443,62 @@ describe('entrypoint contract', () => {
     assert.equal(evidence.measured, 1);
     // a stale ref (pr-10350) never marks an unqueued row
     assert.ok(!('inMergeQueue' in rows.find(() => true) && false));
+  });
+
+  it('never marks a row from a leaked queue ref that names an older head (JOV-8000 follow-up 35)', async () => {
+    // ~70 stale gh-readonly-queue/main/* refs exist on the repo. A bare
+    // pr-<N> match previously marked the row in-queue (MERGEABLE), hiding a
+    // real conflict from the capacity error gate. Only a ref naming the
+    // row's CURRENT head is live queue evidence.
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-d2-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const currentHead = 'c'.repeat(40);
+    const enqueuedHead = 'd'.repeat(40);
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        402: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: currentHead },
+        },
+      },
+      tempDir
+    );
+    await writeFile(
+      `${tempDir}/refs-body`,
+      JSON.stringify([
+        { ref: `refs/heads/gh-readonly-queue/main/pr-402-${enqueuedHead}` },
+      ])
+    );
+    const rows = [
+      {
+        number: 402,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    // Stale ref (different head): the row stays unknown — fail closed.
+    assert.equal(rows[0].inMergeQueue, undefined);
+    assert.equal(rows[0].mergeable, undefined);
+    assert.deepEqual(evidence.inMergeQueue, []);
+    assert.deepEqual(evidence.stillUnknown, [402]);
   });
 
   it('leaves rows unknown when the matching-refs call fails', async () => {
