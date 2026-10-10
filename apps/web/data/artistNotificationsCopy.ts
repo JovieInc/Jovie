@@ -48,8 +48,8 @@ export const ARTIST_NOTIFICATIONS_COPY = {
       'Turn new music and nearby shows into repeat visits without writing campaigns.',
   },
   hero: {
-    headline: 'Reach Every Fan Automatically.',
-    headlineLines: ['Reach Every Fan.', 'Automatically.'],
+    headline: 'Reach Every Fan. On Autopilot.',
+    headlineLines: ['Reach Every Fan.', 'On Autopilot.'],
     primaryCtaLabel: 'Start Pro Trial',
     primaryCtaHref: PRO_SIGNUP_HREF,
     floatingCards: [
@@ -168,7 +168,7 @@ export const ARTIST_NOTIFICATIONS_COPY = {
     ],
   },
   reactivation: {
-    headline: 'Notify them automatically.',
+    headline: 'Notify every fan automatically.',
     subhead:
       'When new music drops or a nearby show is coming up, Jovie brings the right fans back.',
     workflow: {
