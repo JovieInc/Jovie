@@ -309,6 +309,42 @@ function outcomeFromInventory(issue, inventoryRow) {
   return null;
 }
 
+/**
+ * Selection-time guard mirroring the bridge handoff (Symphony Owner,
+ * 2026-10-10): an issue the bridge can't hand off (assigned, not Todo, or
+ * carrying a symphony/no-symphony/protected label) must never take the one
+ * cohort slot — the next eligible issue should get it. Returns the exclusion
+ * reason or null. The bridge reuses this same predicate so selection and
+ * handoff stay in sync. Note: an issue whose work already shipped is already
+ * excluded by the existing merged-pr-still-open-in-linear classifier
+ * (outcomeFromInventory), which reads the merged PR inventory's
+ * linear-issue-id attribution — this guard covers the live handoff blockers
+ * that classifier never saw.
+ */
+
+/**
+ * Selection-time guard mirroring the bridge handoff (Symphony Owner,
+ * 2026-10-10): an issue the bridge can't hand off (assigned, not Todo, or
+ * carrying a symphony/no-symphony/protected label) must never take the one
+ * cohort slot — the next eligible issue should get it. Returns the exclusion
+ * reason or null. The bridge reuses this same predicate so selection and
+ * handoff stay in sync.
+ */
+export function selectionHandoffExclusion(issue) {
+  const state = String(issue?.state?.name ?? issue?.state ?? '');
+  if (state !== 'Todo') return 'not-todo';
+  if (issue?.assignee) return 'assigned';
+  const labels = (issue?.labels?.nodes ?? issue?.labels ?? []).map(label =>
+    String(typeof label === 'string' ? label : (label?.name ?? ''))
+  );
+  if (labels.some(label => BRIDGE_EXCLUDED_LABELS.has(label)))
+    return 'protected-label';
+  const preAdmission = preAdmissionDecision(issue);
+  if (!preAdmission.allowed)
+    return preAdmission.reason?.code ?? 'pre-admission';
+  return null;
+}
+
 export function classifyRemediationCandidate(issue, options = {}) {
   const id = identifierOf(issue);
   const inventoryRow = (options.inventory?.rows || []).find(
@@ -368,6 +404,21 @@ export function classifyRemediationCandidate(issue, options = {}) {
       outcome: 'blocked',
       reason: targeting.reason || 'no-jovie-artifact',
       exclusion: targeting.reason || 'no-jovie-artifact',
+      selected: false,
+      inventory: inventoryRow || null,
+    };
+  }
+
+  // Selection-time handoff guard (Symphony Owner, 2026-10-10): an issue the
+  // bridge can't hand off (assigned, not Todo, protected label, pre-admission
+  // trip) must not take the one cohort slot — the next eligible issue should.
+  const handoffExclusion = selectionHandoffExclusion(issue);
+  if (handoffExclusion) {
+    return {
+      identifier: id,
+      outcome: 'blocked',
+      reason: `not-handoffable:${handoffExclusion}`,
+      exclusion: `not-handoffable:${handoffExclusion}`,
       selected: false,
       inventory: inventoryRow || null,
     };
@@ -975,6 +1026,19 @@ export function buildRemediationReceipt({
     observedAt: now,
     inventory,
     capacity,
+    // Surface the measured worker evidence on the receipt so a
+    // workers-saturated stop names its source (the lanes doctor report vs the
+    // legacy 4041 feed) and freshness, not just the aggregate.
+    workers: {
+      running: Number.isInteger(capacitySignals?.workers?.running)
+        ? capacitySignals.workers.running
+        : null,
+      maxConcurrent: Number.isInteger(capacitySignals?.workers?.maxConcurrent)
+        ? capacitySignals.workers.maxConcurrent
+        : null,
+      source: capacitySignals?.workersSource ?? null,
+      observedAt: capacitySignals?.workersObservedAt ?? null,
+    },
     cohort: {
       selected: cohort.selected.map(item => ({
         identifier: item.identifier,
@@ -1053,29 +1117,17 @@ export async function bridgeSelectedIssueToLanes({
   if (!identifier) return { outcome: 'skipped:no-identifier' };
   const issue = await client.fetchIssue(identifier);
   if (!issue?.id) return { issue: identifier, outcome: 'skipped:not-found' };
-  const state = String(issue?.state?.name ?? issue?.state ?? '');
-  if (state !== 'Todo') {
-    return {
-      issue: identifier,
-      outcome: `skipped:state-${state || 'unknown'}`,
-    };
-  }
-  if (issue?.assignee) {
-    return { issue: identifier, outcome: 'skipped:assigned' };
+  // The bridge handoff guard IS the selection guard (selectionHandoffExclusion)
+  // — an issue the bridge can't hand off is excluded from the cohort at
+  // selection time, so the slot goes to the next eligible issue. Both read the
+  // same predicate so they can never drift.
+  const handoffExclusion = selectionHandoffExclusion(issue);
+  if (handoffExclusion) {
+    return { issue: identifier, outcome: `skipped:${handoffExclusion}` };
   }
   const labels = (issue?.labels?.nodes ?? issue?.labels ?? []).map(label =>
     String(typeof label === 'string' ? label : (label?.name ?? ''))
   );
-  if (labels.some(label => BRIDGE_EXCLUDED_LABELS.has(label))) {
-    return { issue: identifier, outcome: 'skipped:protected-label' };
-  }
-  const preAdmission = preAdmissionDecision(issue);
-  if (!preAdmission.allowed) {
-    return {
-      issue: identifier,
-      outcome: `skipped:${preAdmission.reason?.code ?? 'pre-admission'}`,
-    };
-  }
   if ((inventory?.[identifier]?.openPullRequests ?? []).length > 0) {
     return { issue: identifier, outcome: 'skipped:existing-open-pr' };
   }
