@@ -47,7 +47,7 @@ const LINK_DISABLED_CLASSES =
   'pointer-events-none text-(--color-text-disabled-token) opacity-[var(--state-disabled-opacity)]';
 
 const LINK_TOUCH_TARGET_CLASSES =
-  'relative before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
+  'relative before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty';
 
 const LINK_COMPACT_CLASSES = 'btn-linear-login focus-ring-themed';
 
