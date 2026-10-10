@@ -57,8 +57,10 @@ running worker. Production deploys are a separate track: only a red main stops s
 New-issue admission reports three separate counts: raw Todo candidates, candidates
 passing the issue predicate, and new issues after the owning lane's PR budget.
 Worker and doctor share the same budget decision: each dated lane branch counts
-once while non-green, with a cap of configured base slots × 2. Manual branches and
-disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
+once toward the active cap while non-green and advanceable, with a cap of
+configured base slots × 2. Held, repair-exhausted, and escalating PRs count
+separately toward the terminal cap of configured base slots × 4. Manual branches
+and disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
 malformed or truncation-ambiguous inventory stays unknown and cannot admit new
 issues. Maintenance claims still run first and do not depend on that budget read.
 HUD labels this count as new issues; it is not total company demand or a claim of
@@ -367,6 +369,12 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitS` (seconds queued for a gate seat) on its receipt; the doctor aggregates
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
+
+**Ship now:** the gate timeout defaults to 3,600 seconds on macOS and remains 2,400 seconds
+elsewhere; `LANES_GATE_TIMEOUT_S` still overrides either default. **Re-evaluate when:** the mac
+records five gate timeouts in a 24-hour window after a full day on this release. **Then:** use the
+recorded gate waits and receipts to decide whether to reduce `LANES_GATE_SLOTS` before extending
+the timeout again.
 
 `SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. The
 doctor samples one-hour merge throughput every five minutes: queue depth,

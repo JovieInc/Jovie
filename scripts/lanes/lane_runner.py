@@ -460,14 +460,20 @@ def execution_coordination(sha: str) -> dict:
     return {"kind": "github-status", "repository": REPO_SLUG, "sha": sha, "tokenEnv": "GH_TOKEN"}
 
 
+def default_gate_timeout() -> int:
+    """Give the slower macOS gate more time without delaying Linux failures."""
+    return 3600 if sys.platform == "darwin" else 2400
+
+
 @dataclass
 class Host:
-    """Everything host-specific; defaults suit both Gem and the Mac."""
+    """Everything host-specific; defaults suit Gem and the Mac."""
     state: Path = Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes"))
     repo: Path = Path(os.environ.get("LANES_REPO", Path.home() / "devin-sweep/Jovie"))
     linear_env: Path = Path(os.environ.get("LANES_LINEAR_ENV", Path.home() / ".config/symphony/linear.env"))
     agent_timeout: int = int(os.environ.get("LANES_AGENT_TIMEOUT_S", 5400))
-    gate_timeout: int = int(os.environ.get("LANES_GATE_TIMEOUT_S", 2400))
+    gate_timeout: int = field(default_factory=lambda: int(
+        os.environ.get("LANES_GATE_TIMEOUT_S", default_gate_timeout())))
     # Gates (typecheck, vitest, component contracts) are CPU-bound; more than a couple at
     # once only makes all of them time out.
     gate_slots: int = int(os.environ.get("LANES_GATE_SLOTS", 2))
