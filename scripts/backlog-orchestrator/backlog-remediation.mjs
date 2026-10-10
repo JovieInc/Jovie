@@ -9,8 +9,8 @@ import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-
 import { classifyAdmissionDisposition } from './admission-disposition.mjs';
+import { preAdmissionDecision } from './admission-policy.mjs';
 import { classifyBacklogReduction } from './backlog-reduction.mjs';
 import {
   admissionTargetsCollide,
@@ -994,6 +994,180 @@ export function buildRemediationReceipt({
   });
   const complete = { ...receipt, fingerprint };
   return { ...complete, workpad: buildRemediationWorkpad(complete) };
+}
+
+// Selected-to-lanes bridge (Symphony Owner, 2026-10-10): a selected issue
+// previously only produced a workpad comment — nothing a lane could lease.
+// The bridge converts a selected issue into a leasable one by adding the
+// shared `agent-ready` label (the pool lane_runner.py drains) once the
+// freshly re-fetched issue still qualifies. One fetch + at most one write
+// per selected issue (Linear-budget friendly). Every doubt skips with a
+// named reason. Kill-switch env flag BRIDGE_ENABLED defaults ON.
+const BRIDGE_MARKER_PREFIX = '<!-- symphony-backlog-remediation/bridge v1 fp=';
+const BRIDGE_EXCLUDED_LABELS = new Set([
+  'symphony',
+  'no-symphony',
+  'protected',
+]);
+
+function bridgeFingerprint(issue) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        issue?.id,
+        issue?.identifier,
+        issue?.state?.name ?? issue?.state,
+        (issue?.labels?.nodes ?? issue?.labels ?? [])
+          .map(label =>
+            String(typeof label === 'string' ? label : (label?.name ?? ''))
+          )
+          .sort(),
+        issue?.updatedAt ?? null,
+      ])
+    )
+    .digest('hex')
+    .slice(0, 24);
+}
+
+/**
+ * Bridge one selected issue to the lanes. Returns a receipt with
+ * `outcome` ∈ bridged | already-ready | skipped:<reason> and never throws
+ * on a per-issue doubt. `client` is the Linear module (or a fake in tests).
+ */
+export async function bridgeSelectedIssueToLanes({
+  issue: selected,
+  client,
+  agentReadyLabel,
+  inventory,
+}) {
+  const identifier = selected?.identifier;
+  if (!identifier) return { outcome: 'skipped:no-identifier' };
+  const issue = await client.fetchIssue(identifier);
+  if (!issue?.id) return { issue: identifier, outcome: 'skipped:not-found' };
+  const state = String(issue?.state?.name ?? issue?.state ?? '');
+  if (state !== 'Todo') {
+    return {
+      issue: identifier,
+      outcome: `skipped:state-${state || 'unknown'}`,
+    };
+  }
+  if (issue?.assignee) {
+    return { issue: identifier, outcome: 'skipped:assigned' };
+  }
+  const labels = (issue?.labels?.nodes ?? issue?.labels ?? []).map(label =>
+    String(typeof label === 'string' ? label : (label?.name ?? ''))
+  );
+  if (labels.some(label => BRIDGE_EXCLUDED_LABELS.has(label))) {
+    return { issue: identifier, outcome: 'skipped:protected-label' };
+  }
+  const preAdmission = preAdmissionDecision(issue);
+  if (!preAdmission.allowed) {
+    return {
+      issue: identifier,
+      outcome: `skipped:${preAdmission.reason?.code ?? 'pre-admission'}`,
+    };
+  }
+  if ((inventory?.[identifier]?.openPullRequests ?? []).length > 0) {
+    return { issue: identifier, outcome: 'skipped:existing-open-pr' };
+  }
+  if (!agentReadyLabel?.id) {
+    return {
+      issue: identifier,
+      outcome: 'skipped:agent-ready-label-unavailable',
+    };
+  }
+  const fingerprint = bridgeFingerprint(issue);
+  const existingComments = issue?.comments?.nodes ?? issue?.comments ?? [];
+  const alreadyMarked = existingComments.some(comment =>
+    String(
+      typeof comment === 'string' ? comment : (comment?.body ?? '')
+    ).includes(BRIDGE_MARKER_PREFIX)
+  );
+  const alreadyReady = labels.includes('agent-ready');
+  if (alreadyReady && alreadyMarked) {
+    return { issue: identifier, outcome: 'already-ready', fingerprint };
+  }
+  if (!alreadyReady) {
+    const labelIds = (issue?.labels?.nodes ?? issue?.labels ?? [])
+      .map(label => (typeof label === 'string' ? null : (label?.id ?? null)))
+      .filter(Boolean);
+    await client.updateIssue(issue.id, {
+      labelIds: [...labelIds, agentReadyLabel.id],
+    });
+  }
+  if (!alreadyMarked) {
+    await client.addComment(
+      issue.id,
+      `${BRIDGE_MARKER_PREFIX}${fingerprint} -->`
+    );
+  }
+  return {
+    issue: identifier,
+    outcome: alreadyReady ? 'already-ready' : 'bridged',
+    fingerprint,
+  };
+}
+
+/**
+ * Bridge every selected issue in the remediation cohort to the lanes.
+ * `options.client` = Linear module; `options.enabled` defaults true
+ * (kill-switch: JOVIE_BRIDGE_LANES=0|false|off disables). Returns the
+ * `result.bridge` receipt: one row per selected issue, zero Linear calls on
+ * a dry run or an empty cohort.
+ */
+export async function bridgeSelectedToLanes({
+  cohort,
+  client,
+  inventory = {},
+  enabled = true,
+  env = process.env,
+  teamId = null,
+}) {
+  const disabledByEnv = ['0', 'false', 'off'].includes(
+    String(env.JOVIE_BRIDGE_LANES ?? '').toLowerCase()
+  );
+  if (!enabled || disabledByEnv) {
+    return {
+      schema: 'symphony-bridge-lanes/v1',
+      enabled: false,
+      bridged: [],
+      skipped: [],
+      calls: 0,
+    };
+  }
+  const selected = Array.isArray(cohort?.selected) ? cohort.selected : [];
+  if (selected.length === 0) {
+    return {
+      schema: 'symphony-bridge-lanes/v1',
+      enabled: true,
+      bridged: [],
+      skipped: [],
+      calls: 0,
+    };
+  }
+  const agentReadyLabel = teamId
+    ? await client.fetchTeamLabel(teamId, 'agent-ready')
+    : null;
+  const bridged = [];
+  const skipped = [];
+  for (const item of selected) {
+    const receipt = await bridgeSelectedIssueToLanes({
+      issue: item,
+      client,
+      agentReadyLabel,
+      inventory,
+    });
+    if (receipt.outcome === 'bridged' || receipt.outcome === 'already-ready')
+      bridged.push(receipt);
+    else skipped.push(receipt);
+  }
+  return {
+    schema: 'symphony-bridge-lanes/v1',
+    enabled: true,
+    bridged,
+    skipped,
+    calls: bridged.length + skipped.length,
+  };
 }
 
 export async function upsertRemediationWorkpad({
