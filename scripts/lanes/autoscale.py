@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Adaptive per-lane slots on the minute dispatch tick. Default mode is apply. Kill switch: SYMPHONY_AUTOSCALE=0. decide() is pure and does no I/O at import."""
 from __future__ import annotations
-import json; import math; import os; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"
+import json; import math; import os; import stat; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"
 MIN_SLOTS, STALE_S, RATE_QUIET_S = 1, 600, 900; MULTIPLICATIVE_WINDOW_S, HOST_COOLDOWN_S = 300, 120; DEFAULT_INTERVAL_S = LANE_COOLDOWN_S = 1800
 UP_STREAK_REQUIRED = IDLE_STREAK_REQUIRED = DEFAULT_INTERVAL_S // 60; HISTORY_CAP, GIB = 50, 1024 ** 3
 MEM_HEADROOM_BYTES, MEM_EMERGENCY_BYTES = 8 * GIB, 4 * GIB; GITHUB_INCREASE_MIN, GITHUB_DECREASE_BELOW = 1500, 600
@@ -108,9 +108,20 @@ def sample_host(proc_root=Path("/proc")) -> dict:
         "memoryFullAvg10": _pressure_avg(pressure / "memory", "full"),
         "ioFullAvg10": _pressure_avg(pressure / "io", "full")}
     return {"cpuCount": os.cpu_count() or 1, "load1": load1, "memAvailableBytes": mem, "psi": psi}
-def _read_json(path: Path):
+def _read_json(path: Path, *, max_bytes=None):
     try:
-        return json.loads(path.read_text())
+        if max_bytes is None:
+            return json.loads(path.read_text())
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_size > max_bytes:
+                return None
+            with os.fdopen(fd, "rb", closefd=False) as handle:
+                raw = handle.read(max_bytes + 1)
+            return json.loads(raw) if len(raw) <= max_bytes else None
+        finally:
+            os.close(fd)
     except (OSError, ValueError):
         return None
 def _valid_state(state) -> bool:
@@ -145,6 +156,11 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
         if isinstance(metric, dict):
             productive[name], starts[name] = metric.get("productiveRunRate"), metric.get("workerStarts")
     disk, attribution = _obj(_obj(tick).get("disk")), _obj(observed.get("codexAttribution")); maintenance = observed.get("maintenanceQueueByProvider")
+    # Workers publish from their existing claim scan; collecting adds no API reads.
+    census = _obj(_read_json(root / "maintenance-demand.json", max_bytes=65536))
+    if census.get("schema") == "symphony-lanes-maintenance-demand/v1":
+        maintenance = {name: _count(_obj(row).get("pending")) for name, row in _obj(census.get("lanes")).items()
+                       if (at := _num(_obj(row).get("observedAt"))) is not None and 0 <= now - at <= 120}
     merge = _obj(observed.get("mergeThroughput")); merge_at = _num(merge.get("observedAt"))
     return {"doctorFresh": stamp is not None and 0 <= now - stamp <= STALE_S,
             "eligiblePoolByProvider": _obj(observed.get("eligiblePoolByProvider")),
@@ -177,12 +193,17 @@ def _lane_ceiling(name: str, base: int, running, obs: dict, config: dict) -> int
         cap = min(cap, base) if unleased is None or running is None else min(cap, max(0, running) + max(0, unleased))
     return max(MIN_SLOTS, cap)
 def _demand(name: str, obs: dict) -> int | None:
-    budget = _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name)); maint = _count(_obj(obs.get("maintenanceQueueByProvider")).get(name, 0))
-    if not budget or maint is None:
-        return None
+    budget = _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name))
+    maint = _count(_obj(obs.get("maintenanceQueueByProvider")).get(name))
     if budget.get("reason") == "within-budget":
-        eligible = _count(_obj(obs.get("eligiblePoolByProvider")).get(name, 0)); return None if eligible is None else eligible + maint
-    return maint if budget.get("reason") in _HARD_REASONS else None
+        eligible = _count(_obj(obs.get("eligiblePoolByProvider")).get(name))
+        if eligible is not None and maint is not None:
+            return eligible + maint
+        # Positive observed demand is useful even when the other pool is unknown.
+        return eligible if eligible else maint if maint else None
+    if budget.get("reason") in _HARD_REASONS:
+        return maint
+    return maint if maint else None
 def _budget_unknown(obs: dict) -> str | None:
     if _int(obs.get("githubRemaining")) is None:
         return "github-unknown"
@@ -238,7 +259,8 @@ def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
     disk, free = _obj(obs.get("disk")), _num(_obj(obs.get("disk")).get("freePct"))
     starts, rate = _int(_obj(obs.get("starts")).get(name)), _obj(obs.get("productiveRunRate")).get(name)
     pairs = (
-        (reason in ("over-budget", "terminal-pr-backlog"), reason),
+        (reason in ("over-budget", "terminal-pr-backlog") and not (_count(_obj(obs.get("maintenanceQueueByProvider")).get(name)) or 0), reason),
+        (reason == "provider-disabled", reason),
         (demand is None or demand <= 0, "unknown-demand" if demand is None else "zero-demand"),
         (name in set(obs.get("unhealthy") or []), "unhealthy"),
         (name in set(obs.get("cooling") or []), "cooling"),
@@ -264,6 +286,10 @@ def _row(base, effective, running, changed, reason, blockers, ceiling, up=0, idl
 def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, config: dict, now: float) -> dict:
     """Pure AIMD step. Returns the next ``symphony-lanes-autoscale/v1`` receipt."""
     previous, config, sample = _obj(previous), config or {}, host_sample or {}; prev_lanes, prev_host = _obj(previous.get("lanes")), _obj(previous.get("host"))
+    if config.get("mode") == "apply" and previous.get("mode") != "apply":
+        # Only an apply receipt records live capacity. Start other modes at the
+        # configured base, then evaluate the same real safety limits below.
+        prev_lanes, prev_host = {}, {}
     history = [row for row in (previous.get("history") or []) if isinstance(row, dict)]
     interval, need = _pint(config.get("intervalS")) or DEFAULT_INTERVAL_S, 0; need, host_last = streak_ticks(interval), _num(prev_host.get("lastChangeAt"))
     cpu = _int(sample.get("cpuCount")) or 1; cpu = cpu if cpu > 0 else 1; enabled = [base for base in bases.values() if _int(base) is not None and base > 0]
@@ -358,7 +384,7 @@ def effective_slots(state_dir: Path, name: str, base: int, now: float | None = N
     if base <= 0 or mode() != "apply":
         return base
     now, state = time.time() if now is None else now, _read_json(Path(state_dir) / "autoscale.json"); observed = _num(_obj(state).get("observedAt"))
-    if not _valid_state(state) or observed is None or now - observed > STALE_S or now < observed:
+    if not _valid_state(state) or state.get("mode") != "apply" or observed is None or now - observed > STALE_S or now < observed:
         return base
     row = state["lanes"].get(name); effective, floor, ceiling = _int(_obj(row).get("effective")), _int(_obj(row).get("floor")), _int(_obj(row).get("ceiling"))
     if not isinstance(row, dict) or effective is None:
