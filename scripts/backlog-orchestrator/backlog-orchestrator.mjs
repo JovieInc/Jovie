@@ -2049,7 +2049,7 @@ async function runRemediate(isDryRun) {
   // with retries and a hard deadline; merge-queue rows (still null after
   // retries with a gh-readonly-queue pr-<N>- ref) count as known and not
   // conflicting. The receipt carries the full evidence.
-  /** @type {Awaited<ReturnType<typeof measureMergeability>> | null} */
+  /** @type {Record<string, any> | null} */
   let mergeabilityEvidence = null;
   if (Array.isArray(pullRequests)) {
     mergeabilityEvidence = await measureMergeability(
@@ -2183,7 +2183,6 @@ async function runRemediate(isDryRun) {
         },
     feed: receipt.feed,
     workpadUpsert: null,
-    bridge: null,
     // JOV-8000 follow-up 36: the mergeability evidence also rides the
     // printed result top-level (it already sits inside
     // capacitySignals.mergeabilityEvidence) so the deadline/starvation
@@ -2209,13 +2208,28 @@ async function runRemediate(isDryRun) {
         .filter(row => row?.identifier)
         .map(row => [row.identifier, { openPullRequests: [] }])
     );
-    result.bridge = await backlogRemediation.bridgeSelectedToLanes({
-      cohort: receipt.cohort,
-      client: linear,
-      inventory: bridgeInventory,
-      teamId: team.id,
-      env: process.env,
-    });
+    /** @type {Record<string, any>} */ (result).bridge =
+      await backlogRemediation.bridgeSelectedToLanes({
+        cohort: receipt.cohort,
+        client: linear,
+        inventory: bridgeInventory,
+        teamId: team.id,
+        env: process.env,
+      });
+    // Surface lane rejection reasons for the selected issues next to the
+    // bridge receipt, so route-held:frontier / over-budget is visible without
+    // host access (the lanes doctor carries observed.rejectedIssues).
+    const rejectedIssues = lanes?.rejectedIssues ?? {};
+    if (receipt.cohort.selected.length > 0) {
+      for (const item of receipt.cohort.selected) {
+        const id = item?.identifier;
+        if (!id) continue;
+        const reason = rejectedIssues[id] ?? null;
+        console.log(
+          `bridge.selected ${id} -> ${reason ? `lane-rejected reason=${reason}` : 'lane-leasable'}`
+        );
+      }
+    }
     if (receipt.cohort.selected.length > 0) {
       // JOV-8000: the lanes pick up admitted work on their own event-driven
       // tick — there is no HTTP refresh endpoint to POST anymore. Passing no
@@ -2245,10 +2259,7 @@ async function runRemediate(isDryRun) {
     ? backlogRemediation.pullRequestRates(pullRequests)
     : null;
   if (ratesSummary) {
-    const mm =
-      /** @type {Partial<NonNullable<typeof mergeabilityEvidence>>} */ (
-        mergeabilityEvidence ?? {}
-      );
+    const mm = mergeabilityEvidence ?? {};
     console.log(
       `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')} mm.queueSource=${mm.queueSource ?? 'none'} mm.errors=${(mm.errors ?? []).length}`
     );

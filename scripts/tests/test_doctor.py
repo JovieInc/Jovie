@@ -974,6 +974,17 @@ class RunnablePoolTest(unittest.TestCase):
                            "in-flight-pr": 1, "retry-exhausted": 1, "retry-backoff": 1}
                 self.assertEqual(observed["rejectedByProvider"], {
                     "devin": {**reasons, "sensitive-provider": 1}, "codex": reasons, "claude": {}})
+                # Per-issue rejection view (JOV-8000 follow-up 39): bounded
+                # {issueId: reason} so route-held / over-budget is visible
+                # without host access; every rejected candidate is named.
+                rejected_issues = observed["rejectedIssues"]
+                self.assertEqual(rejected_issues.get("JOV-EPIC"), "excluded-label:type:epic")
+                self.assertEqual(rejected_issues.get("JOV-PRICE"), "sensitive-text")
+                self.assertEqual(rejected_issues.get("JOV-OWNED"), "in-flight-pr")
+                self.assertEqual(rejected_issues.get("JOV-EXHAUSTED"), "retry-exhausted")
+                self.assertEqual(rejected_issues.get("JOV-BACKOFF"), "retry-backoff")
+                self.assertNotIn("JOV-GOOD", rejected_issues)
+                self.assertLessEqual(len(rejected_issues), 20)
                 feed = doctor.status_feed(host, lane, observed, {}, {})
                 self.assertEqual(feed["admission"]["rejectedByProvider"], observed["rejectedByProvider"])
                 self.assertEqual(feed["admission"]["poolByProvider"], observed["poolByProvider"])

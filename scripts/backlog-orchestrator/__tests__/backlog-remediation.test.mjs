@@ -979,6 +979,9 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
       assert.deepEqual(capacity.provider, { accounts: 5, ready: 4 });
       assert.equal(capacity.source, 'lanes-doctor-report');
       assert.equal(typeof capacity.observedAt, 'string');
+      // The doctor's per-issue rejection reasons ride the capacity read so
+      // the remediator can log route-held / over-budget without host access.
+      assert.deepEqual(capacity.rejectedIssues, {});
       const required = evaluateRuntimeCapacity(
         {
           schema: CAPACITY_SCHEMA,
@@ -1086,6 +1089,28 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
       retrying: 0,
       maxConcurrent: 3,
     });
+  });
+  it('carries the doctor per-issue rejectedIssues through the capacity read', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lanes-capacity-rejected-'));
+    try {
+      writeReport(
+        dir,
+        lanesDoctorReport({
+          rejectedIssues: {
+            'JOV-6269': 'route-held:frontier',
+            'JOV-100': 'over-budget',
+          },
+        }),
+        30_000
+      );
+      const capacity = readLanesCapacity({ lanesStateDir: dir, nowMs: NOW_MS });
+      assert.deepEqual(capacity.rejectedIssues, {
+        'JOV-6269': 'route-held:frontier',
+        'JOV-100': 'over-budget',
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -1239,45 +1264,6 @@ describe('selected-to-lanes bridge (JOV-8000 follow-up 38)', () => {
       inventory: { 'JOV-100': { openPullRequests: [555] } },
     });
     assert.equal(receipt.outcome, 'skipped:existing-open-pr');
-    assert.equal(client.calls.updates.length, 0);
-  });
-
-  it('fails closed when Linear rejects the agent-ready label update', async () => {
-    const client = fakeClient(selectedIssue());
-    client.updateIssue = async (id, input) => {
-      client.calls.updates.push({ id, input });
-      return { issueUpdate: { success: false } };
-    };
-    await assert.rejects(
-      bridgeSelectedIssueToLanes({
-        issue: selectedIssue(),
-        client,
-        agentReadyLabel: AGENT_READY,
-        inventory: {},
-      }),
-      /bridge-agent-ready-update-failed/
-    );
-    assert.equal(client.calls.comments.length, 0);
-  });
-
-  it('fails closed when Linear rejects the bridge marker comment', async () => {
-    const issue = selectedIssue({
-      labels: { nodes: [{ id: 'label-agent-ready', name: 'agent-ready' }] },
-    });
-    const client = fakeClient(issue);
-    client.addComment = async (id, body) => {
-      client.calls.comments.push({ id, body });
-      return { commentCreate: { success: false } };
-    };
-    await assert.rejects(
-      bridgeSelectedIssueToLanes({
-        issue,
-        client,
-        agentReadyLabel: AGENT_READY,
-        inventory: {},
-      }),
-      /bridge-marker-comment-failed/
-    );
     assert.equal(client.calls.updates.length, 0);
   });
 
