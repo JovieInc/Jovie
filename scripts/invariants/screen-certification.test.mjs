@@ -162,6 +162,17 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(admin.entry?.id, 'web.settings-admin-redirect');
     assert.deepEqual(admin.entry?.viewports, ['desktop', 'mobile']);
   });
+  it('registers the referral settings page and its copy interaction', () => {
+    for (const path of [
+      'apps/web/app/app/(shell)/settings/referral/page.tsx',
+      'apps/web/app/app/(shell)/settings/referral/ReferralCodeCopyClient.tsx',
+    ]) {
+      const classified = classifyScreenPath(path);
+      assert.equal(classified.kind, 'registered');
+      assert.equal(classified.entry?.id, 'web.settings-referral');
+      assert.deepEqual(classified.entry?.viewports, ['desktop', 'mobile']);
+    }
+  });
   it('registers the money route and layout for both viewports', () => {
     for (const path of [
       'apps/web/app/app/money/page.tsx',
