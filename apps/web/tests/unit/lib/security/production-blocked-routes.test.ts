@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   isProductionBlockedDebugPath,
@@ -24,7 +25,25 @@ describe('production-blocked debug routes', () => {
   });
 
   it('keeps the product screenshot capture inventory exact', () => {
-    expect(PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS).toEqual(['/exp/shell-v1']);
+    const selector = readFileSync(
+      new URL(
+        '../../../product-screenshots/route-dom-certification.spec.ts',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    const fixtureList = selector.match(
+      /const shellMaterialRoutes = \[([\s\S]*?)\] as const;/
+    );
+    expect(fixtureList).not.toBeNull();
+    const routes = [...fixtureList![1].matchAll(/'([^']+)'/g)].map(
+      match => match[1]
+    );
+    expect(routes).toHaveLength(8);
+    expect(PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS).toEqual([
+      '/exp/shell-v1',
+      ...routes,
+    ]);
   });
 
   it.each([
@@ -49,6 +68,14 @@ describe('production-blocked debug routes', () => {
   });
 
   it('allows only explicit product screenshot fixture routes when requested', () => {
+    for (const route of PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS) {
+      expect(isProductionBlockedDebugPath(route)).toBe(true);
+      expect(
+        isProductionBlockedDebugPath(route, {
+          allowProductScreenshotCaptureRoutes: true,
+        })
+      ).toBe(false);
+    }
     expect(
       isProductionBlockedDebugPath('/exp/shell-v1', {
         allowProductScreenshotCaptureRoutes: true,
@@ -64,6 +91,30 @@ describe('production-blocked debug routes', () => {
         allowProductScreenshotCaptureRoutes: true,
       })
     ).toBe(true);
+    for (const route of [
+      '/demo/other',
+      '/demo/showcase/public-profile',
+      '/demo/',
+      '/demo%2faudience',
+      '/%64emo/audience',
+      '/demo%252faudience',
+      '/demo%25252faudience',
+      '/demo%252525252faudience',
+      '/demo/video/../showcase/settings',
+      '/demo/video/%2e%2e/showcase/settings',
+      '/demo%5caudience',
+      '/demo/%invalid',
+      '/demo/%2e%2e%2foutside',
+      '/%64emo/%2e%2e%2foutside',
+      '/api/dev/foo/../test-auth/mobile-provider-complete',
+      '/api/dev/%66oo/../test-auth/mobile-provider-complete',
+    ]) {
+      expect(
+        isProductionBlockedDebugPath(route, {
+          allowProductScreenshotCaptureRoutes: true,
+        })
+      ).toBe(true);
+    }
   });
 
   it.each([
