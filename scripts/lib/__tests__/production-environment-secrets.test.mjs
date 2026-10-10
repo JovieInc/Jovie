@@ -93,13 +93,22 @@ describe('production environment secret contract (JOV-7237)', () => {
   ])(
     'injects optional production security credentials and propagates exit $exitCode',
     ({ hasApiKey, exitCode }) => {
-      const workflow = parseYaml(
-        readFileSync(resolve(WORKFLOW_DIR, 'production-release.yml'), 'utf8')
-      );
+      const workflow =
+        /** @type {{ jobs: Record<string, { steps: { name?: string, uses?: string, env?: Record<string, string>, run?: string }[] }> }} */ (
+          parseYaml(
+            readFileSync(
+              resolve(WORKFLOW_DIR, 'production-release.yml'),
+              'utf8'
+            )
+          )
+        );
       const job = workflow.jobs['promote-production'];
       const step = job.steps.find(
         step => step.name === 'Security gate before production promotion'
       );
+      if (!step?.env || !step.run) {
+        throw new Error('Missing production security gate shell step');
+      }
       expect(step.env.DOPPLER_TOKEN).toBe('${{ secrets.DOPPLER_TOKEN_PRD }}');
       expect(step.env).not.toHaveProperty('LINEAR_API_KEY');
       expect(job.steps).toContainEqual({
