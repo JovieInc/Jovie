@@ -163,29 +163,47 @@ class AutoscaleTest(unittest.TestCase):
                 ("gate-pressure", obs(gateWaitMedianS24h=1201), sample())):
             state = decide({"lanes": {"devin": {"effective": 4}}}, seen, host, {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (3, reason))
         held = decide(hot, obs(alerts=["failed-runs"]), sample(), {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (4, "hold:host-cooldown"))
-    def test_merge_throughput_brake_blocks_growth_and_steps_down_after_one_interval(self):
+    def test_merge_throughput_is_diagnostic_and_cannot_throttle_healthy_workers(self):
+        # A faulty queue must not suppress the workers that can repair it.
         deficit = obs(mergeThroughput={"queueDepth": 30, "queueWaitP50Minutes": 22, "mergedPerHour": 6,
                                       "openedPerHour": 31, "ejectionRate": 0.55})
-        state = decide(None, deficit, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+        options, bases = cfg(intervalS=60), {"devin": 4}
+        state = decide(None, deficit, sample(), bases, options, NOW)
         self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]),
-                         (4, "hold:merge-throughput"))
+                         (5, "sustained-demand"))
         self.assertEqual(state["throughputBrake"]["reasons"], ["merge-deficit"])
         self.assertEqual(state["throughputBrake"]["signal"]["ejectionRate"], 0.55)
-        state = decide(state, deficit, sample(), {"devin": 4}, cfg(intervalS=60), NOW + 61)
-        self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]),
-                         (3, "merge-throughput"))
+        deficit["runningByProvider"] = {"devin": 5}
+        state = decide(state, deficit, sample(), bases, options, NOW + 61)
         self.assertTrue(state["throughputBrake"]["sustained"])
-        state = decide(state, deficit, sample(), {"devin": 4}, cfg(intervalS=60), NOW + 182)
-        self.assertEqual(self.lane(state, "devin")["effective"], 2)
-        state = decide(state, deficit, sample(), {"devin": 4}, cfg(intervalS=60), NOW + 303)
+        self.assertEqual(self.lane(state, "devin")["effective"], 5, "host cooldown still applies")
+        state = decide(state, deficit, sample(), bases, options, NOW + 182)
         self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]),
-                         (2, "hold:throughput-floor"))
+                         (6, "sustained-demand"))
+        self.assertTrue(state["throughputBrake"]["active"])
+
+        # A previously queue-throttled lane can recover without waiting for merges.
+        previous = {"lanes": {"devin": {"effective": 2, "lastChangeAt": NOW - 1800}},
+                    "host": {"lastChangeAt": NOW - 1800}}
+        rescued = decide(previous, obs(runningByProvider={"devin": 2},
+                                      mergeThroughput=deficit["mergeThroughput"]),
+                         sample(), bases, options, NOW)
+        self.assertEqual((self.lane(rescued, "devin")["effective"], self.lane(rescued, "devin")["lastReason"]),
+                         (3, "sustained-demand"))
         wait = obs(mergeThroughput={"queueDepth": 12, "queueWaitP50Minutes": A.MERGE_QUEUE_WAIT_BRAKE_MIN,
                                    "mergedPerHour": 40, "openedPerHour": 20, "ejectionRate": 0.2})
-        waited = decide(None, wait, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+        waited = decide(None, wait, sample(), bases, options, NOW)
         self.assertEqual(waited["throughputBrake"]["reasons"], ["queue-wait"])
-        unknown = decide(None, obs(mergeThroughputFresh=False), sample(), {"devin": 4}, cfg(intervalS=60), NOW)
-        self.assertEqual(self.lane(unknown, "devin")["lastReason"], "hold:merge-throughput-unknown")
+        self.assertEqual(self.lane(waited, "devin")["effective"], 5)
+        missing = decide(None, obs(mergeThroughputFresh=False), sample(), bases, options, NOW)
+        self.assertFalse(missing["throughputBrake"]["known"])
+        self.assertEqual(self.lane(missing, "devin")["effective"], 5)
+
+        # Genuine API capacity pressure must still reduce worker concurrency.
+        limited = decide(None, obs(githubRemaining=599, mergeThroughput=deficit["mergeThroughput"]),
+                         sample(), bases, options, NOW)
+        self.assertEqual((self.lane(limited, "devin")["effective"], self.lane(limited, "devin")["lastReason"]),
+                         (2, "github-budget-low"))
     def test_idle_decay_and_ceilings(self):
         bases = {"devin": 4}
         seen = obs(eligiblePoolByProvider={"devin": 0}, runningByProvider={"devin": 0},
