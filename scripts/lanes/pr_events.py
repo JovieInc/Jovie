@@ -61,7 +61,9 @@ STALE_DRAFT_S = 48 * 3600
 # A non-lane agent draft this old that is also stalled (idle past STALE_DRAFT_S, or already
 # conflicting/red) needs repair, unless a dependency it names is still open. Age and
 # retry exhaustion never authorize closing unfinished work (JOV-INV-011).
-AGENT_DRAFT_S = 7 * 24 * 3600
+# 3 days (was 7): with the 48h idle / red / conflict guard this is the abandonment floor Tim asked
+# the lanes to reclaim at (2026-10-10); 14 stalled agent drafts sat under the 7-day floor.
+AGENT_DRAFT_S = 3 * 24 * 3600
 # A PR updated this recently is between events (CI starting, enroll pending), not an orphan.
 ORPHAN_GRACE_S = 30 * 60
 EXHAUSTED = "exhausted"
