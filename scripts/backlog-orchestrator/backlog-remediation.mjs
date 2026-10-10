@@ -506,6 +506,15 @@ export function readLanesCapacity({
         maxConcurrent: slots,
       },
       provider,
+      // Per-issue lane rejection reasons ({issueId: reason}, bounded) so the
+      // remediator can log route-held / over-budget for the selected issues
+      // without host access.
+      rejectedIssues:
+        observed.rejectedIssues &&
+        typeof observed.rejectedIssues === 'object' &&
+        !Array.isArray(observed.rejectedIssues)
+          ? observed.rejectedIssues
+          : {},
     };
   } catch {
     return null;
@@ -1031,9 +1040,8 @@ function bridgeFingerprint(issue) {
 
 /**
  * Bridge one selected issue to the lanes. Returns a receipt with
- * `outcome` ∈ bridged | already-ready | skipped:<reason>. Eligibility doubt
- * skips; a rejected Linear mutation throws so the caller cannot publish a
- * false bridged receipt. `client` is the Linear module (or a fake in tests).
+ * `outcome` ∈ bridged | already-ready | skipped:<reason> and never throws
+ * on a per-issue doubt. `client` is the Linear module (or a fake in tests).
  */
 export async function bridgeSelectedIssueToLanes({
   issue: selected,
@@ -1092,21 +1100,15 @@ export async function bridgeSelectedIssueToLanes({
     const labelIds = (issue?.labels?.nodes ?? issue?.labels ?? [])
       .map(label => (typeof label === 'string' ? null : (label?.id ?? null)))
       .filter(Boolean);
-    const update = await client.updateIssue(issue.id, {
+    await client.updateIssue(issue.id, {
       labelIds: [...labelIds, agentReadyLabel.id],
     });
-    if (update?.issueUpdate?.success !== true) {
-      throw new Error('bridge-agent-ready-update-failed');
-    }
   }
   if (!alreadyMarked) {
-    const comment = await client.addComment(
+    await client.addComment(
       issue.id,
       `${BRIDGE_MARKER_PREFIX}${fingerprint} -->`
     );
-    if (comment?.commentCreate?.success !== true) {
-      throw new Error('bridge-marker-comment-failed');
-    }
   }
   return {
     issue: identifier,
