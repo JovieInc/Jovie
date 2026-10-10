@@ -49,6 +49,39 @@ describe('useSidebarKeyboardShortcut', () => {
     expect(onToggle).toHaveBeenCalledOnce();
   });
 
+  it.each([{ repeat: true }, { isComposing: true }])(
+    'ignores unstable key input %j',
+    flags => {
+      renderHook(() => useSidebarKeyboardShortcut(onToggle));
+      act(() => {
+        dispatchKeyDown({ key: '[', ...flags });
+        dispatchKeyDown({ key: 'b', metaKey: true, ...flags });
+      });
+      expect(onToggle).not.toHaveBeenCalled();
+    }
+  );
+
+  it('leaves modified editor commands and modal input alone', () => {
+    renderHook(() => useSidebarKeyboardShortcut(onToggle));
+    const editor = document.createElement('textarea');
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    const button = document.createElement('button');
+    dialog.append(button);
+    document.body.append(editor, dialog);
+    act(() => {
+      dispatchKeyDown({ key: 'b', metaKey: true, target: editor });
+      dispatchKeyDown({ key: '[', target: button });
+      const event = new KeyboardEvent('keydown', {
+        key: '[',
+        cancelable: true,
+      });
+      event.preventDefault();
+      globalThis.dispatchEvent(event);
+    });
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
   it('fires handler on Ctrl+B', () => {
     renderHook(() => useSidebarKeyboardShortcut(onToggle));
 
@@ -58,6 +91,15 @@ describe('useSidebarKeyboardShortcut', () => {
 
     expect(onToggle).toHaveBeenCalledOnce();
   });
+
+  it.each([{ altKey: true }, { shiftKey: true }])(
+    'leaves other modified commands alone %j',
+    flags => {
+      renderHook(() => useSidebarKeyboardShortcut(onToggle));
+      act(() => dispatchKeyDown({ key: 'b', metaKey: true, ...flags }));
+      expect(onToggle).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not fire handler without modifier key', () => {
     renderHook(() => useSidebarKeyboardShortcut(onToggle));

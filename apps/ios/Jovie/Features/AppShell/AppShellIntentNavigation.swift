@@ -103,7 +103,7 @@ enum MobileSignedInLinkRoute: String, Equatable, Sendable {
     return nil
   }
 
-  private static func normalizedRoutePath(_ url: URL) -> String {
+  fileprivate static func normalizedRoutePath(_ url: URL) -> String {
     if url.scheme?.lowercased() == "ie.jov.jovie", let host = url.host {
       return normalizedPath("/\(host)\(url.path)")
     }
@@ -116,6 +116,40 @@ enum MobileSignedInLinkRoute: String, Equatable, Sendable {
       return String(lowered.dropLast())
     }
     return lowered
+  }
+}
+
+/// Intentional web-only boundaries (JOV-7632). These `/app/*` workspaces have
+/// no iOS surface, so the AASA lists them as `NOT` exclusions and iOS keeps
+/// them in Safari. This type is the paired in-app guard: if such a URL still
+/// arrives (stale AASA cache, custom scheme, older build), we hand the user
+/// back to the web page instead of stranding them on an unrelated surface.
+/// Keep in sync with `IOS_WEB_ONLY_APP_PATH_PREFIXES` in
+/// `apps/web/lib/ios/apple-app-site-association.ts`. Merch checkout
+/// (`/<handle>/merch/<cardId>`) is outside `/app/*` and never enters the app.
+enum MobileWebOnlyRouteBoundary {
+  /// Canonical `/app/*` path prefixes that are intentionally web-only.
+  static let pathPrefixes = [
+    "/app/youtube",
+    "/app/insights",
+    "/app/jovie-work",
+    "/app/dashboard/release-plan",
+    "/app/dashboard/insights",
+  ]
+
+  static func isWebOnly(_ url: URL) -> Bool {
+    let path = MobileSignedInLinkRoute.normalizedRoutePath(url)
+    return pathPrefixes.contains { path == $0 || path.hasPrefix($0 + "/") }
+  }
+
+  /// The web page to send the user to when a web-only URL reaches the app.
+  static func webFallbackURL(for url: URL, webBaseURL: URL) -> URL {
+    var components = URLComponents(url: webBaseURL, resolvingAgainstBaseURL: false)
+    components?.path = MobileSignedInLinkRoute.normalizedRoutePath(url)
+    components?.queryItems = URLComponents(
+      url: url, resolvingAgainstBaseURL: false
+    )?.queryItems
+    return components?.url ?? webBaseURL
   }
 }
 

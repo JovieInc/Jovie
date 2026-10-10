@@ -20,7 +20,7 @@ interface AiCrawlerIntelligenceCardProps {
 }
 
 const ROW_CLASS =
-  'flex min-h-12 w-full items-center gap-3 rounded-xl border border-subtle bg-surface-1 px-3 py-2';
+  'flex min-h-12 w-full items-center gap-3 rounded-xl border border-subtle px-3 py-2';
 const CRAWLER_READ_DISCLOSURE = getAeoMeasurementDisclosure('crawler_read');
 
 function RowSkeleton({ className }: { readonly className?: string }) {
@@ -154,7 +154,7 @@ export function AiCrawlerIntelligenceCard({
         className
       )}
       data-testid='ai-crawler-intelligence-card'
-      aria-label='View AI crawler read details'
+      aria-label='View AI Crawler Read Details'
     >
       {rowContent}
       <ChevronRight

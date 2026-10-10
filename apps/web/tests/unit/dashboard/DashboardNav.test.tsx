@@ -73,6 +73,7 @@ describe('DashboardNav', () => {
   it('renders the canonical navigation in exact order and no forbidden primary rows', () => {
     const { container, getByRole, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
+      appFlags: { PROFILES_WORKSPACE: true },
     });
 
     expect(
@@ -101,7 +102,10 @@ describe('DashboardNav', () => {
       navChildren: <button type='button'>Search</button>,
     });
 
-    const inbox = getByRole('link', { name: 'Inbox' });
+    const inbox = document.querySelector('[data-navigation-item-id="inbox"]');
+    expect(inbox).toBeInstanceOf(HTMLElement);
+    if (!(inbox instanceof HTMLElement)) return;
+    expect(inbox).toHaveAccessibleName('Home');
     const search = getByRole('button', { name: 'Search' });
     const newChat = getByRole('link', { name: 'New Chat' });
 
@@ -111,11 +115,14 @@ describe('DashboardNav', () => {
     expect(
       search.compareDocumentPosition(newChat) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(search.parentElement).toHaveClass('h-9', 'shrink-0');
+    expect(search.closest('[data-sidebar-search-slot]')).toHaveClass(
+      'h-9',
+      'shrink-0'
+    );
   });
 
-  it('keeps the canonical navigation visible without rollout state', () => {
-    const { container } = renderDashboardNav({
+  it('hides Identity when PROFILES_WORKSPACE is off so the rail cannot 404', () => {
+    const { container, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
     });
 
@@ -124,7 +131,15 @@ describe('DashboardNav', () => {
         link.textContent?.trim(),
         link.getAttribute('href'),
       ])
-    ).toEqual(CANONICAL_NAV);
+    ).toEqual([
+      ['Home', APP_ROUTES.DASHBOARD],
+      ['Work', APP_ROUTES.LIBRARY],
+      ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
+    ]);
+    expect(queryByRole('link', { name: 'Identity' })).toBeNull();
+    expect(
+      container.querySelector(`a[href="${APP_ROUTES.PRESENCE}"]`)
+    ).toBeNull();
   });
 
   it('keeps the Inbox attention center visible when it is settled empty', () => {
@@ -135,37 +150,40 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('link', { name: 'Inbox' })).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-navigation-item-id="inbox"]')
+    ).toHaveAccessibleName('Home');
     expect(getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
   });
 
   it('gives Home sole current-page ownership at the shell root', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
-    const { getByRole } = renderDashboardNav({
+    renderDashboardNav({
       renderFn: fastRender,
       overrides: {
         inboxNavigation: { state: 'empty', pendingCount: 0 },
       },
     });
 
-    expect(getByRole('link', { name: 'Home' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
-    expect(getByRole('link', { name: 'Inbox' })).not.toHaveAttribute(
-      'aria-current'
-    );
+    expect(
+      document.querySelector('[data-navigation-item-id="home"]')
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      document.querySelector('[data-navigation-item-id="inbox"]')
+    ).not.toHaveAttribute('aria-current');
   });
 
   it('keeps Inbox visible when availability is unknown', () => {
-    const { getByRole } = renderDashboardNav({
+    renderDashboardNav({
       renderFn: fastRender,
       overrides: {
         inboxNavigation: { state: 'unknown', pendingCount: null },
       },
     });
 
-    expect(getByRole('link', { name: 'Inbox' })).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-navigation-item-id="inbox"]')
+    ).toHaveAccessibleName('Home');
   });
 
   it('keeps the exact customer IA invariant for admin users', () => {
@@ -228,6 +246,7 @@ describe('DashboardNav', () => {
     } as DashboardData['creatorProfiles'][number];
     const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
+      appFlags: { PROFILES_WORKSPACE: true },
       overrides: {
         selectedProfile,
         creatorProfiles: [
@@ -268,6 +287,15 @@ describe('DashboardNav', () => {
     mockUseSearchParams.mockReturnValue(new URLSearchParams('tab=audience'));
     const audience = renderDashboardNav({ renderFn: fastRender });
     expect(audience.getByRole('link', { name: 'Audience' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    audience.unmount();
+
+    mockUsePathname.mockReturnValue(APP_ROUTES.INSIGHTS);
+    mockUseSearchParams.mockReturnValue(new URLSearchParams());
+    const insights = renderDashboardNav({ renderFn: fastRender });
+    expect(insights.getByRole('link', { name: 'Audience' })).toHaveAttribute(
       'aria-current',
       'page'
     );
@@ -374,16 +402,23 @@ describe('DashboardNav', () => {
   it('handles collapsed state without changing the canonical rows', () => {
     const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
+      appFlags: { PROFILES_WORKSPACE: true },
       sidebarProps: { defaultOpen: false },
+      navChildren: <button type='button'>Search fixture</button>,
     });
 
     expect(primaryLinks(container)).toHaveLength(4);
-    // JOV-4522: the search/inbox pill stages out (max-height + opacity +
-    // travel) rather than popping to display:none at frame one.
-    expect(getByRole('link', { name: 'New Chat' }).parentElement).toHaveClass(
-      'group-data-[collapsible=icon]:max-h-0',
-      'group-data-[collapsible=icon]:opacity-0'
+    // JOV-8017: New Chat retains command ownership in the icon rail.
+    // The composed Storybook spec verifies its painted geometry through motion.
+    expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.CHAT
     );
+    const secondary = container.querySelector(
+      '[data-sidebar-search-divider]'
+    )?.parentElement;
+    expect(secondary).toHaveAttribute('inert');
+    expect(secondary).toHaveAttribute('aria-hidden', 'true');
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,
       enabled: false,

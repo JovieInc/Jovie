@@ -182,6 +182,8 @@ export const presets = {
 
 /** Fixed content budgets shared by real rows, loading rows, and virtualization. */
 export const TABLE_ROW_MODES = {
+  /** Linear-scale single-line rows: people, records, and other dense lists. */
+  dense: { rowHeight: 32, contentHeight: 24 },
   compact: { rowHeight: 40, contentHeight: 32 },
   'two-line': { rowHeight: 56, contentHeight: 48 },
   description: { rowHeight: 72, contentHeight: 64 },

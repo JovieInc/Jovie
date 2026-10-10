@@ -7,17 +7,20 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
   RightDrawer: ({
     children,
     ariaLabel,
+    id,
     className,
     onKeyDown,
     'data-testid': testId,
   }: {
     readonly children: ReactNode;
     readonly ariaLabel?: string;
+    readonly id?: string;
     readonly className?: string;
     readonly onKeyDown?: (event: KeyboardEvent) => void;
     readonly 'data-testid'?: string;
   }) => (
     <aside
+      id={id}
       data-testid={testId ?? 'right-drawer'}
       aria-label={ariaLabel}
       className={className}
@@ -34,13 +37,19 @@ describe('EntitySidebarShell', () => {
     const onClose = vi.fn();
 
     render(
-      <EntitySidebarShell isOpen ariaLabel='Entity details' onClose={onClose}>
+      <EntitySidebarShell
+        id='profile-rail'
+        isOpen
+        ariaLabel='Entity details'
+        onClose={onClose}
+      >
         <div>Body content</div>
       </EntitySidebarShell>
     );
 
     const drawer = screen.getByTestId('right-drawer');
     expect(drawer).toHaveAttribute('data-keyboard-handler', 'present');
+    expect(drawer).toHaveAttribute('id', 'profile-rail');
 
     fireEvent.keyDown(drawer, { key: 'Escape' });
 

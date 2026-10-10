@@ -9,6 +9,7 @@ import { HomepageEditorialChangelog } from '@/components/homepage/HomepageEditor
 import { HomepageIdentityClose } from '@/components/homepage/HomepageIdentityClose';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { HomepageIdentitySections } from '@/components/homepage/HomepageIdentitySections';
+import { HomepageLogoStrip } from '@/components/homepage/HomepageLogoStrip';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
@@ -164,14 +165,16 @@ function HomepageStoryStack() {
   );
 }
 
-// Canonical Pen v3 body (dark launch): presence, structure, and the close,
-// on the shared page background. The live story stack is unchanged while off.
+// Canonical Pen v3 body: the permission-gated logo strip, presence,
+// structure, and the close, on the shared page background. The live
+// story stack is unchanged while off.
 function HomepageIdentityStoryStack() {
   return (
     <div
       className='homepage-identity-stack'
       data-testid='homepage-identity-story-stack'
     >
+      <HomepageLogoStrip />
       <HomepageIdentitySections />
       <HomepageIdentityClose />
     </div>

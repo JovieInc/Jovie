@@ -106,7 +106,7 @@ const creatorRoutes = [
     kind: 'redirect',
     surface: 'creator',
     authRole: 'user',
-    acceptedDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn`],
+    acceptedDestinations: [`${APP_ROUTES.SETTINGS_PROFILE}?tab=earn`],
     requiresUserButton: true,
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
   },
@@ -188,10 +188,7 @@ const settingsRoutes = [
     kind: 'redirect',
     surface: 'settings',
     authRole: 'admin',
-    acceptedDestinations: [
-      APP_ROUTES.ADMIN_OPS,
-      APP_ROUTES.SETTINGS_ARTIST_PROFILE,
-    ],
+    acceptedDestinations: [APP_ROUTES.ADMIN_OPS, APP_ROUTES.SETTINGS_PROFILE],
     requiresUserButton: true,
     performanceBudgetMs: SETTINGS_DEFAULT_BUDGET_MS,
   },
@@ -206,7 +203,7 @@ const settingsRoutes = [
     performanceBudgetMs: SETTINGS_DEFAULT_BUDGET_MS,
   },
   {
-    path: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    path: APP_ROUTES.SETTINGS_PROFILE,
     name: 'Settings Artist Profile',
     kind: 'render',
     surface: 'settings',
@@ -318,7 +315,7 @@ const aliasRoutes = [
     surface: 'alias',
     authRole: 'user',
     acceptedDestinations: [
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn`,
+      `${APP_ROUTES.SETTINGS_PROFILE}?tab=earn`,
       APP_ROUTES.EARNINGS,
     ],
   },

@@ -211,6 +211,7 @@ apps/desktop/*
 apps/desktop/src/*
 !apps/desktop/src/session-work-state.ts
 !apps/desktop/src/system-b-tokens.ts
+!apps/desktop/src/auth-handoff-window.ts
 !apps/desktop/src/desktop-auth-security.ts
 !apps/desktop/src/desktop-auth-handback.ts
 !apps/desktop/src/desktop-auth-loopback.ts

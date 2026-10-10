@@ -144,6 +144,24 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('keeps canonical profile settings and retained aliases under screen ownership', () => {
+    for (const path of [
+      'apps/web/app/app/(shell)/settings/profile/page.tsx',
+      'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
+      'apps/web/app/app/(shell)/tipping/page.tsx',
+    ]) {
+      const classified = classifyScreenPath(path);
+      assert.equal(classified.kind, 'registered');
+      assert.equal(classified.entry?.id, 'web.settings-artist-profile');
+      assert.deepEqual(classified.entry?.viewports, ['desktop', 'mobile']);
+    }
+    const admin = classifyScreenPath(
+      'apps/web/app/app/(shell)/settings/admin/page.tsx'
+    );
+    assert.equal(admin.kind, 'registered');
+    assert.equal(admin.entry?.id, 'web.settings-admin-redirect');
+    assert.deepEqual(admin.entry?.viewports, ['desktop', 'mobile']);
+  });
   it('registers the money route and layout for both viewports', () => {
     for (const path of [
       'apps/web/app/app/money/page.tsx',
@@ -163,6 +181,15 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       assert.equal(entry?.id, 'web.admin-chat-playground');
       assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
     }
+  });
+  it('registers the admin share studio for both viewports', () => {
+    const entry = classifyScreenPath(
+      'apps/web/app/app/(shell)/admin/share-studio/page.tsx'
+    ).entry;
+
+    assert.equal(entry?.id, 'web.admin-share-studio');
+    assert.equal(entry?.owner, 'admin-share-studio');
+    assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
   });
   it('registers typed screen ownership across web, macOS Electron, and iOS', () => {
     assert.deepEqual(validateScreenRegistry(), []);
@@ -331,23 +358,16 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
-  it('registers public SmartLink release and track pages', () => {
-    assert.equal(
-      kindOf('apps/web/app/[username]/[slug]/page.tsx'),
-      'registered'
-    );
-    assert.equal(
-      kindOf('apps/web/app/[username]/[slug]/[trackSlug]/page.tsx'),
-      'registered'
-    );
+  it('registers public SmartLink alias, release, and track pages', () => {
+    const sources = [
+      'apps/web/app/[username]/[...slug]/page.tsx',
+      'apps/web/app/[username]/[slug]/page.tsx',
+      'apps/web/app/[username]/[slug]/[trackSlug]/page.tsx',
+    ];
+    for (const source of sources) assert.equal(kindOf(source), 'registered');
+
     const result = evaluateChangedScreens({
-      changedFiles: [
-        { path: 'apps/web/app/[username]/[slug]/page.tsx', status: 'M' },
-        {
-          path: 'apps/web/app/[username]/[slug]/[trackSlug]/page.tsx',
-          status: 'M',
-        },
-      ],
+      changedFiles: sources.map(path => ({ path, status: 'M' })),
       headSha: HEAD,
       proofs: [],
     });
@@ -456,6 +476,27 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(result.receipt.schema, SCREEN_CERT_SCHEMA);
     const rows = result.receipt.changedScreens.map(i => [i.id, i.verdict]);
     assert.deepEqual(rows, [['web.homepage', 'evidence-required']]);
+    for (const name of ['costs', 'features']) {
+      const changedFiles = [`apps/web/app/app/(shell)/admin/${name}/page.tsx`];
+      const registered = runScreenCertification({
+        headSha: HEAD,
+        changedFiles,
+        registrationOnly: true,
+      });
+      assert.equal(registered.ok, true, registered.receipt.issues.join('\n'));
+      assert.equal(registered.receipt.certified, false);
+      assert.deepEqual(
+        registered.receipt.changedScreens.map(item => [item.id, item.verdict]),
+        [[`web.admin-${name}`, 'evidence-required']]
+      );
+      // Registration cannot stand in for authenticated, exact-head browser proof.
+      const certification = runScreenCertification({
+        headSha: HEAD,
+        changedFiles,
+      });
+      assert.equal(certification.ok, false);
+      assert.equal(certification.receipt.certified, false);
+    }
   });
 
   it('rejects caller-authored proof that did not pass through the trusted resolver', () => {
@@ -889,6 +930,82 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         `route ${route} is bound to more than one screen id`
       );
       seenRoutes.add(route);
+    }
+  });
+
+  it('keeps the JOV-8170 public-screens batch producer bindings synchronized', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    // These screens were registered but uncovered (no rendered producer).
+    // Two bind to already-captured marketing routes; the rest share one
+    // multi-screen proof spec whose entries must match these bindings.
+    assert.equal(SCREEN_MARKETING_ROUTES['web.marketing-renders'], '/renders');
+    assert.equal(
+      SCREEN_MARKETING_ROUTES['web.profile-admission'],
+      '/renders/profile-admission'
+    );
+    const batchScreens = [
+      'web.root-document',
+      'web.root-layout',
+      'web.legal-shell',
+      'web.legal-privacy',
+      'web.legal-terms',
+      'web.legal-cookies',
+      'web.legal-dmca',
+      'web.playlists-index',
+      'web.brand',
+      'web.report',
+      'web.start',
+      'web.marketing-solutions',
+      'web.public-profile-about',
+    ];
+    const spec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/public-screens-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    for (const screenId of batchScreens) {
+      const route = SCREEN_PROOF_ROUTES[screenId];
+      assert.ok(route, `${screenId} must be bound to a proof route`);
+      const suffix = screenId.slice(screenId.indexOf('.') + 1);
+      assert.equal(
+        screenProofArtifactName(screenId),
+        `${PRODUCER.artifact}-${suffix}`
+      );
+      assert.match(
+        spec,
+        new RegExp(
+          `screenId: '${screenId.replace(/\./g, '\\.')}', route: '${route.replace(/[/.?]/g, '\\$&')}'`
+        ),
+        `${screenId} must be captured by public-screens-proof.spec.ts`
+      );
+      assert.match(
+        workflow,
+        new RegExp(`\\b${screenId.replace(/\./g, '\\.')}\\b`)
+      );
+      assert.match(
+        workflow,
+        new RegExp(`name: ${screenProofArtifactName(screenId)}\\b`),
+        `${screenId} must upload its own proof artifact`
+      );
+      assert.match(
+        workflow,
+        new RegExp(
+          `${suffix}-artifact-id: \\$\\{\\{ steps\\.${suffix}-proof\\.outputs\\.artifact-id \\}\\}`
+        ),
+        `${screenId} must expose its artifact id as a job output`
+      );
+      assert.match(
+        workflow,
+        new RegExp(
+          `"${screenId.replace(/\./g, '\\.')}\\|\\$\\{\\{ needs\\.generate\\.outputs\\.${suffix}-artifact-id \\}\\}"`
+        ),
+        `${screenId} must be certified from its own artifact in the certify job`
+      );
     }
   });
 

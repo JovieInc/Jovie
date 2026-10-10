@@ -1,12 +1,16 @@
 /**
- * Official Elixir Symphony backlog remediation (JOV-5492).
- * Feed only POST /api/v1/refresh. Homemade admission and JOV-5466 wrappers are forbidden.
+ * Official Symphony backlog remediation (JOV-5492).
+ * Capacity evidence reads the shipping lanes' own measured state (the lanes
+ * doctor writes LANES_STATE/doctor.json every tick; JOV-8000 retired the
+ * Elixir :4041 API). Homemade admission and JOV-5466 wrappers are forbidden.
  */
 
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-
+import { readFileSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { classifyAdmissionDisposition } from './admission-disposition.mjs';
+import { preAdmissionDecision } from './admission-policy.mjs';
 import { classifyBacklogReduction } from './backlog-reduction.mjs';
 import {
   admissionTargetsCollide,
@@ -19,9 +23,14 @@ export const WORKPAD_PREFIX = '<!-- symphony-backlog-remediation/v1 -->';
 export const WORKPAD_SUFFIX = '<!--/symphony-backlog-remediation-->';
 export const WORKPAD_HEADING = '## Codex Workpad';
 const LEGACY_WORKPAD_HEADING = '## Symphony backlog remediation';
+// Retired with symphony-elixir (JOV-8000): the Elixir HTTP API is gone. The
+// constants stay exported for legacy readers/tests; live capacity now flows
+// from readLanesCapacity below.
 export const OFFICIAL_SYMPHONY_REFRESH_URL =
   'http://127.0.0.1:4041/api/v1/refresh';
 export const OFFICIAL_SYMPHONY_STATE_URL = 'http://127.0.0.1:4041/api/v1/state';
+export const LANES_STATE_DIR =
+  process.env.LANES_STATE || join(homedir(), '.local/state/jovie-lanes');
 export const DEFAULT_WORKPAD_ISSUE = 'JOV-5492';
 export const CLEAN_STREAK_REQUIRED = 3;
 export const MAX_CLONE_LATENCY_MS = 15_000;
@@ -147,23 +156,67 @@ function isOpenPullRequest(pullRequest) {
 }
 
 function isConflictingPullRequest(pullRequest) {
-  return ['CONFLICTING', 'DIRTY', 'BEHIND'].includes(
-    String(pullRequest?.mergeStateStatus || '').toUpperCase()
+  // BEHIND is not a conflict: the base moved and a branch update resolves
+  // it automatically (the queue's update-branch / auto-rebase); counting it
+  // as a conflict mislabels an auto-fixable stale row as a hard merge
+  // conflict. A conflict is `mergeable === 'CONFLICTING'` (gh computes
+  // MERGEABLE/CONFLICTING/UNKNOWN) OR `mergeStateStatus === 'DIRTY'` — both
+  // require human/model reconciliation.
+  return (
+    String(pullRequest?.mergeable ?? '').toUpperCase() === 'CONFLICTING' ||
+    ['CONFLICTING', 'DIRTY'].includes(
+      String(pullRequest?.mergeStateStatus || '').toUpperCase()
+    )
   );
 }
 
-function isErroredPullRequest(pullRequest) {
-  const rollup = pullRequest?.statusCheckRollup;
-  const status = String(
-    typeof rollup === 'string'
-      ? rollup
-      : rollup?.state || pullRequest?.reviewDecision || ''
-  ).toUpperCase();
-  return (
-    status === 'FAILURE' ||
-    status === 'ERROR' ||
-    pullRequest?.mergeStateStatus === 'UNSTABLE'
+/**
+ * Error rate definition (Symphony Owner decision, JOV-8000 follow-up 9):
+ * a PR is errored when its check-rollup STATE is FAILURE or ERROR — a
+ * failing required check on its head. mergeStateStatus UNSTABLE alone is
+ * NOT that (UNSTABLE means a non-required check failed; a failing
+ * REQUIRED check shows BLOCKED), so the rollup state is the signal and
+ * UNSTABLE without a FAILURE/ERROR rollup does not count. The dead
+ * reviewDecision fallback is removed.
+ */
+export function isErroredPullRequest(pullRequest) {
+  const rollup = /** @type {Record<string, any>} */ (
+    pullRequest?.statusCheckRollup
   );
+  const status = String(rollup?.state ?? '').toUpperCase();
+  return status === 'FAILURE' || status === 'ERROR';
+}
+
+/**
+ * Mergeability is unknown when gh reported UNKNOWN for either signal, or
+ * when the row is UNMEASURED (the /pulls LIST payload never carries
+ * mergeable/mergeable_state, so a row with neither signal set is
+ * unmeasured, not clean): never counted as conflicting, clean, or errored —
+ * measured by measureMergeability in the caller and failing the gate
+ * closed above a 20% unknown share.
+ */
+export function mergeabilityUnknown(pullRequest) {
+  const mergeable = pullRequest?.mergeable;
+  const mergeStateStatus = pullRequest?.mergeStateStatus;
+  // unmeasured: neither signal present
+  if (mergeable === undefined && mergeStateStatus === undefined) return true;
+  return (
+    String(mergeable ?? '').toUpperCase() === 'UNKNOWN' ||
+    String(mergeStateStatus ?? '').toUpperCase() === 'UNKNOWN'
+  );
+}
+
+const RATE_EXCLUDED_LABELS = new Set(['queue-poison', 'hold']);
+
+function rateExcludedByLabel(pullRequest) {
+  // `gated` stays COUNTED: the repo defines it as "Force manual production
+  // promotion (bypass fast lane)" — a promotion mode, not a parked row.
+  const labels = (pullRequest?.labels ?? []).map(label =>
+    String(
+      typeof label === 'string' ? label : /** @type {any} */ (label?.name ?? '')
+    ).toLowerCase()
+  );
+  return labels.some(name => RATE_EXCLUDED_LABELS.has(name));
 }
 
 export function inventoryBacklog(
@@ -177,8 +230,17 @@ export function inventoryBacklog(
     unique.set(id, issue);
   }
   const prs = Array.isArray(pullRequests) ? pullRequests : [];
-  const byIssue = new Map();
+  // Defense in depth (JOV-8000 follow-up 10): one entry per PR number even
+  // if duplicate rows reach this function — an issue's PR count must never
+  // double or split from a duplicated row.
+  const byNumber = new Map();
   for (const pullRequest of prs) {
+    if (!Number.isInteger(pullRequest?.number)) continue;
+    if (!byNumber.has(pullRequest.number))
+      byNumber.set(pullRequest.number, pullRequest);
+  }
+  const byIssue = new Map();
+  for (const pullRequest of byNumber.values()) {
     for (const id of pullRequestIssueIds(pullRequest)) {
       const list = byIssue.get(id) || [];
       list.push(pullRequest);
@@ -383,6 +445,82 @@ export function readHostPressure(procRoot) {
   }
 }
 
+/**
+ * Measured shipping-lanes capacity (JOV-8000): the lanes doctor rewrites
+ * LANES_STATE/doctor.json every tick with live seat occupancy
+ * (observed.capacityByProvider) and measured codex account attribution
+ * (observed.codexAttribution). Returns null when the report is missing,
+ * malformed, or older than CAPACITY_MAX_AGE_MS so callers fail closed.
+ */
+export function readLanesCapacity({
+  lanesStateDir = LANES_STATE_DIR,
+  nowMs = Date.now(),
+  maxAgeMs = CAPACITY_MAX_AGE_MS,
+} = {}) {
+  try {
+    const path = join(lanesStateDir, 'doctor.json');
+    const observedAtMs = statSync(path).mtimeMs;
+    if (
+      !Number.isFinite(observedAtMs) ||
+      observedAtMs > nowMs + 60_000 ||
+      nowMs - observedAtMs > maxAgeMs
+    ) {
+      return null;
+    }
+    const report = JSON.parse(readFileSync(path, 'utf8'));
+    const observed = report?.observed;
+    if (!report || typeof report !== 'object' || !observed) return null;
+    const lanes = observed.capacityByProvider;
+    if (!lanes || typeof lanes !== 'object' || Array.isArray(lanes))
+      return null;
+    let running = 0;
+    let slots = 0;
+    for (const row of Object.values(lanes)) {
+      if (!row || typeof row !== 'object') return null;
+      if (!nonNegativeInteger(row.running)) return null;
+      if (!nonNegativeInteger(row.slots)) return null;
+      running += row.running;
+      slots += row.slots;
+    }
+    if (slots <= 0) return null;
+    const attribution = observed.codexAttribution;
+    const provider =
+      attribution &&
+      typeof attribution === 'object' &&
+      nonNegativeInteger(attribution.count)
+        ? {
+            accounts: attribution.count,
+            ready: nonNegativeInteger(attribution.eligibleByCooldown)
+              ? attribution.eligibleByCooldown
+              : 0,
+          }
+        : null;
+    return {
+      source: 'lanes-doctor-report',
+      observedAt: new Date(observedAtMs).toISOString(),
+      workers: {
+        running,
+        // The lanes carry retries through the failure ledger, not a retrying
+        // seat pool; zero is the measured absence, not assumed slack.
+        retrying: 0,
+        maxConcurrent: slots,
+      },
+      provider,
+      // Per-issue lane rejection reasons ({issueId: reason}, bounded) so the
+      // remediator can log route-held / over-budget for the selected issues
+      // without host access.
+      rejectedIssues:
+        observed.rejectedIssues &&
+        typeof observed.rejectedIssues === 'object' &&
+        !Array.isArray(observed.rejectedIssues)
+          ? observed.rejectedIssues
+          : {},
+    };
+  } catch {
+    return null;
+  }
+}
+
 function hostPressureClass(host) {
   if (
     !host ||
@@ -426,20 +564,102 @@ function hostPressureClass(host) {
   return 'normal';
 }
 
-function pullRequestRates(pullRequests) {
+/**
+ * The capacity-rate population (JOV-8000 follow-up 9): open rows, deduped by
+ * number upstream, excluding drafts and label-quarantined rows
+ * (queue-poison, hold) — an intentionally parked PR is not fleet pressure.
+ * Returns the auditable rates: PR-number lists for conflicting/errored/
+ * unknown and the excluded breakdown so the receipt can be checked against
+ * the live fleet. Unknown rows are never counted as conflicting, clean, or
+ * errored; the caller re-polls them once and fails the gate closed above a
+ * 20% unknown share.
+ */
+export function pullRequestRates(pullRequests) {
   const open = (Array.isArray(pullRequests) ? pullRequests : []).filter(
     isOpenPullRequest
   );
-  const total = open.length;
-  const conflicting = open.filter(isConflictingPullRequest).length;
-  const errored = open.filter(isErroredPullRequest).length;
+  const population = open.filter(
+    row => row?.isDraft !== true && !rateExcludedByLabel(row)
+  );
+  const excludedDraft = open
+    .filter(row => row?.isDraft === true)
+    .map(row => row?.number);
+  const excludedQuarantined = open
+    .filter(row => row?.isDraft !== true && rateExcludedByLabel(row))
+    .map(row => row?.number);
+  const conflictingPullRequests = population
+    .filter(isConflictingPullRequest)
+    .map(row => row?.number);
+  const erroredPullRequests = population
+    .filter(isErroredPullRequest)
+    .map(row => row?.number);
+  const unknownPullRequests = population
+    .filter(mergeabilityUnknown)
+    .map(row => row?.number);
+  const total = population.length;
   return {
     total,
-    conflicting,
-    errored,
-    conflictRate: total === 0 ? 0 : conflicting / total,
-    errorRate: total === 0 ? 0 : errored / total,
+    conflicting: conflictingPullRequests.length,
+    errored: erroredPullRequests.length,
+    unknown: unknownPullRequests.length,
+    conflictRate: total === 0 ? 0 : conflictingPullRequests.length / total,
+    errorRate: total === 0 ? 0 : erroredPullRequests.length / total,
+    unknownRate: total === 0 ? 0 : unknownPullRequests.length / total,
+    conflictingPullRequests,
+    erroredPullRequests,
+    unknownPullRequests,
+    excluded: { draft: excludedDraft, quarantined: excludedQuarantined },
   };
+}
+
+/**
+ * Name every absent capacity sub-signal instead of one generic verdict, so a
+ * red remediate receipt points at the exact input that failed (the lanes
+ * doctor report, the codex account evidence, or the fleet-gate queue
+ * signals) rather than "missing-malformed-or-stale" with no pointer.
+ */
+export function capacityEvidenceGaps(signals, nowMs = Date.now()) {
+  const gaps = [];
+  if (signals?.schema !== CAPACITY_SCHEMA) gaps.push('schema');
+  if (
+    !Number.isFinite(Date.parse(signals?.observedAt || '')) ||
+    !freshTimestamp(signals?.observedAt, nowMs, CAPACITY_MAX_AGE_MS)
+  )
+    gaps.push('observedAt');
+  const workers = signals?.workers;
+  if (
+    !workers ||
+    !nonNegativeInteger(workers.running) ||
+    !nonNegativeInteger(workers.retrying) ||
+    !Number.isInteger(workers.maxConcurrent) ||
+    workers.maxConcurrent <= 0
+  )
+    gaps.push('workers');
+  const provider = signals?.provider;
+  if (
+    !provider ||
+    !nonNegativeInteger(provider.accounts) ||
+    !nonNegativeInteger(provider.ready)
+  )
+    gaps.push('provider');
+  if (!finiteNumber(signals?.cloneLatencyMs)) gaps.push('cloneLatencyMs');
+  const ci = signals?.ci;
+  if (
+    !ci ||
+    typeof ci.saturating !== 'boolean' ||
+    !nonNegativeInteger(ci.running) ||
+    !nonNegativeInteger(ci.queued)
+  )
+    gaps.push('ci');
+  const mergeQueue = signals?.mergeQueue;
+  if (
+    !mergeQueue ||
+    !['healthy', 'degraded', 'blocked'].includes(mergeQueue.health) ||
+    !nonNegativeInteger(mergeQueue.entries)
+  )
+    gaps.push('mergeQueue');
+  if (!Array.isArray(signals?.pullRequests)) gaps.push('pullRequests');
+  return gaps;
 }
 
 export function evaluateRuntimeCapacity(signals, options = {}) {
@@ -457,6 +677,12 @@ export function evaluateRuntimeCapacity(signals, options = {}) {
   const ci = signals?.ci;
   const mergeQueue = signals?.mergeQueue;
   const rates = pullRequestRates(signals?.pullRequests || []);
+  // The error gate needs each population row's check-rollup state
+  // (JOV-8000 follow-up 10): a missing rollup fetch is NEVER zero errored —
+  // the orchestrator fetches the population's rollups separately and passes
+  // prRollups:false when that fetch failed, failing the gate closed with
+  // the named cause instead of silently passing the error gate.
+  const prRollups = signals?.prRollups !== false;
   const required =
     signals?.schema === CAPACITY_SCHEMA &&
     freshTimestamp(signals?.observedAt, nowMs, CAPACITY_MAX_AGE_MS) &&
@@ -478,10 +704,14 @@ export function evaluateRuntimeCapacity(signals, options = {}) {
     nonNegativeInteger(mergeQueue.entries) &&
     Array.isArray(signals.pullRequests);
   if (!required) {
+    const gaps = capacityEvidenceGaps(signals, nowMs);
     return {
       allowed: false,
       cohortSize: 0,
-      reason: 'capacity-evidence-missing-malformed-or-stale',
+      reason: gaps.length
+        ? `capacity-evidence-missing-malformed-or-stale:${gaps.join(',')}`
+        : 'capacity-evidence-missing-malformed-or-stale',
+      gaps,
       pressure: 'unknown',
       cleanStreak: 0,
     };
@@ -501,13 +731,17 @@ export function evaluateRuntimeCapacity(signals, options = {}) {
               ? 'ci-saturating'
               : rates.conflictRate > HIGH_CONFLICT_RATE
                 ? 'pr-conflict-rate-high'
-                : rates.errorRate > HIGH_ERROR_RATE
-                  ? 'pr-error-rate-high'
-                  : mergeQueue.health === 'blocked'
-                    ? 'merge-queue-blocked'
-                    : remaining === 0
-                      ? 'workers-saturated'
-                      : null;
+                : !prRollups
+                  ? 'pr-check-rollup-unavailable'
+                  : rates.errorRate > HIGH_ERROR_RATE
+                    ? 'pr-error-rate-high'
+                    : rates.unknownRate > 0.2
+                      ? 'pr-mergeability-unknown'
+                      : mergeQueue.health === 'blocked'
+                        ? 'merge-queue-blocked'
+                        : remaining === 0
+                          ? 'workers-saturated'
+                          : null;
   if (hardStopReason) {
     return {
       allowed: false,
@@ -595,9 +829,13 @@ export function selectRemediationCohort(classifications, capacity) {
 
 export function assertOfficialSymphonyFeed(url) {
   const target = String(url || '');
+  if (!target) return target;
   if (target !== OFFICIAL_SYMPHONY_REFRESH_URL) {
     throw new Error('homemade-symphony-admission-forbidden');
   }
+  // JOV-8000: the retired Elixir endpoint is no longer a permitted feed
+  // target — only an explicit legacy caller may still address it, and any
+  // homemade wrapper marker is forbidden on every path.
   if (
     HOMEMADE_WRAPPER_MARKERS.some(marker =>
       target.toLowerCase().includes(marker.toLowerCase())
@@ -608,12 +846,24 @@ export function assertOfficialSymphonyFeed(url) {
   return target;
 }
 
-/** @param {{ url?: string, fetchImpl?: (input: string, init?: RequestInit) => Promise<{ ok?: boolean, status?: number, json: () => Promise<unknown> }> }} [args] */
+/**
+ * The retired Elixir :4041 refresh endpoint is gone (JOV-8000). The shipping
+ * lanes are event-driven — workers re-exec on finish and the minute timer
+ * restarts idle lanes — so an admitted cohort needs no HTTP wake. The receipt
+ * records the cohort as observed; fabricating a POST would fail remediate.
+ */
 export async function feedOfficialSymphony({
   url = OFFICIAL_SYMPHONY_REFRESH_URL,
   fetchImpl = globalThis.fetch,
 } = {}) {
   const target = assertOfficialSymphonyFeed(url);
+  if (!target) {
+    return {
+      status: 'event-driven',
+      url: null,
+      operations: ['minute-timer', 'worker-reexec'],
+    };
+  }
   const response = await fetchImpl(target, {
     method: 'POST',
     signal: AbortSignal.timeout(5000),
@@ -660,7 +910,7 @@ export function buildRemediationWorkpad(receipt) {
     `Observed: ${receipt.observedAt}`,
     `Main: \`${receipt.inventory?.mainSha || 'unknown'}\``,
     `Capacity: ${receipt.capacity?.reason || 'unknown'} (cohort ${receipt.capacity?.cohortSize ?? 0})`,
-    `Feed: official Elixir Symphony \`${OFFICIAL_SYMPHONY_REFRESH_URL}\``,
+    `Feed: shipping lanes (event-driven tick; no HTTP refresh)`,
     '',
     '### Selected',
     selected.length === 0
@@ -740,8 +990,8 @@ export function buildRemediationReceipt({
     })),
     counts,
     feed: {
-      owner: 'official-elixir-symphony',
-      refreshUrl: OFFICIAL_SYMPHONY_REFRESH_URL,
+      owner: 'shipping-lanes',
+      refreshUrl: null,
       homemadeWrappers: 'forbidden',
     },
   };
@@ -753,6 +1003,180 @@ export function buildRemediationReceipt({
   });
   const complete = { ...receipt, fingerprint };
   return { ...complete, workpad: buildRemediationWorkpad(complete) };
+}
+
+// Selected-to-lanes bridge (Symphony Owner, 2026-10-10): a selected issue
+// previously only produced a workpad comment — nothing a lane could lease.
+// The bridge converts a selected issue into a leasable one by adding the
+// shared `agent-ready` label (the pool lane_runner.py drains) once the
+// freshly re-fetched issue still qualifies. One fetch + at most one write
+// per selected issue (Linear-budget friendly). Every doubt skips with a
+// named reason. Kill-switch env flag BRIDGE_ENABLED defaults ON.
+const BRIDGE_MARKER_PREFIX = '<!-- symphony-backlog-remediation/bridge v1 fp=';
+const BRIDGE_EXCLUDED_LABELS = new Set([
+  'symphony',
+  'no-symphony',
+  'protected',
+]);
+
+function bridgeFingerprint(issue) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        issue?.id,
+        issue?.identifier,
+        issue?.state?.name ?? issue?.state,
+        (issue?.labels?.nodes ?? issue?.labels ?? [])
+          .map(label =>
+            String(typeof label === 'string' ? label : (label?.name ?? ''))
+          )
+          .sort(),
+        issue?.updatedAt ?? null,
+      ])
+    )
+    .digest('hex')
+    .slice(0, 24);
+}
+
+/**
+ * Bridge one selected issue to the lanes. Returns a receipt with
+ * `outcome` ∈ bridged | already-ready | skipped:<reason> and never throws
+ * on a per-issue doubt. `client` is the Linear module (or a fake in tests).
+ */
+export async function bridgeSelectedIssueToLanes({
+  issue: selected,
+  client,
+  agentReadyLabel,
+  inventory,
+}) {
+  const identifier = selected?.identifier;
+  if (!identifier) return { outcome: 'skipped:no-identifier' };
+  const issue = await client.fetchIssue(identifier);
+  if (!issue?.id) return { issue: identifier, outcome: 'skipped:not-found' };
+  const state = String(issue?.state?.name ?? issue?.state ?? '');
+  if (state !== 'Todo') {
+    return {
+      issue: identifier,
+      outcome: `skipped:state-${state || 'unknown'}`,
+    };
+  }
+  if (issue?.assignee) {
+    return { issue: identifier, outcome: 'skipped:assigned' };
+  }
+  const labels = (issue?.labels?.nodes ?? issue?.labels ?? []).map(label =>
+    String(typeof label === 'string' ? label : (label?.name ?? ''))
+  );
+  if (labels.some(label => BRIDGE_EXCLUDED_LABELS.has(label))) {
+    return { issue: identifier, outcome: 'skipped:protected-label' };
+  }
+  const preAdmission = preAdmissionDecision(issue);
+  if (!preAdmission.allowed) {
+    return {
+      issue: identifier,
+      outcome: `skipped:${preAdmission.reason?.code ?? 'pre-admission'}`,
+    };
+  }
+  if ((inventory?.[identifier]?.openPullRequests ?? []).length > 0) {
+    return { issue: identifier, outcome: 'skipped:existing-open-pr' };
+  }
+  if (!agentReadyLabel?.id) {
+    return {
+      issue: identifier,
+      outcome: 'skipped:agent-ready-label-unavailable',
+    };
+  }
+  const fingerprint = bridgeFingerprint(issue);
+  const existingComments = issue?.comments?.nodes ?? issue?.comments ?? [];
+  const alreadyMarked = existingComments.some(comment =>
+    String(
+      typeof comment === 'string' ? comment : (comment?.body ?? '')
+    ).includes(BRIDGE_MARKER_PREFIX)
+  );
+  const alreadyReady = labels.includes('agent-ready');
+  if (alreadyReady && alreadyMarked) {
+    return { issue: identifier, outcome: 'already-ready', fingerprint };
+  }
+  if (!alreadyReady) {
+    const labelIds = (issue?.labels?.nodes ?? issue?.labels ?? [])
+      .map(label => (typeof label === 'string' ? null : (label?.id ?? null)))
+      .filter(Boolean);
+    await client.updateIssue(issue.id, {
+      labelIds: [...labelIds, agentReadyLabel.id],
+    });
+  }
+  if (!alreadyMarked) {
+    await client.addComment(
+      issue.id,
+      `${BRIDGE_MARKER_PREFIX}${fingerprint} -->`
+    );
+  }
+  return {
+    issue: identifier,
+    outcome: alreadyReady ? 'already-ready' : 'bridged',
+    fingerprint,
+  };
+}
+
+/**
+ * Bridge every selected issue in the remediation cohort to the lanes.
+ * `options.client` = Linear module; `options.enabled` defaults true
+ * (kill-switch: JOVIE_BRIDGE_LANES=0|false|off disables). Returns the
+ * `result.bridge` receipt: one row per selected issue, zero Linear calls on
+ * a dry run or an empty cohort.
+ */
+export async function bridgeSelectedToLanes({
+  cohort,
+  client,
+  inventory = {},
+  enabled = true,
+  env = process.env,
+  teamId = null,
+}) {
+  const disabledByEnv = ['0', 'false', 'off'].includes(
+    String(env.JOVIE_BRIDGE_LANES ?? '').toLowerCase()
+  );
+  if (!enabled || disabledByEnv) {
+    return {
+      schema: 'symphony-bridge-lanes/v1',
+      enabled: false,
+      bridged: [],
+      skipped: [],
+      calls: 0,
+    };
+  }
+  const selected = Array.isArray(cohort?.selected) ? cohort.selected : [];
+  if (selected.length === 0) {
+    return {
+      schema: 'symphony-bridge-lanes/v1',
+      enabled: true,
+      bridged: [],
+      skipped: [],
+      calls: 0,
+    };
+  }
+  const agentReadyLabel = teamId
+    ? await client.fetchTeamLabel(teamId, 'agent-ready')
+    : null;
+  const bridged = [];
+  const skipped = [];
+  for (const item of selected) {
+    const receipt = await bridgeSelectedIssueToLanes({
+      issue: item,
+      client,
+      agentReadyLabel,
+      inventory,
+    });
+    if (receipt.outcome === 'bridged' || receipt.outcome === 'already-ready')
+      bridged.push(receipt);
+    else skipped.push(receipt);
+  }
+  return {
+    schema: 'symphony-bridge-lanes/v1',
+    enabled: true,
+    bridged,
+    skipped,
+    calls: bridged.length + skipped.length,
+  };
 }
 
 export async function upsertRemediationWorkpad({

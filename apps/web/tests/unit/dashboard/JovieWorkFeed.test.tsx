@@ -18,6 +18,31 @@ describe('JovieWorkFeed', () => {
     refetchMock.mockReset();
   });
 
+  it('binds completed-only inbox reads to the selected profile and requested range', () => {
+    useJovieWorkFeedQueryMock.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    render(
+      <JovieWorkFeed
+        profileId='artist-profile'
+        range='30d'
+        completedOnly
+        showHeader={false}
+      />
+    );
+    expect(useJovieWorkFeedQueryMock).toHaveBeenCalledWith({
+      profileId: 'artist-profile',
+      range: '30d',
+      completedOnly: true,
+    });
+    expect(screen.queryByText('Jovie Did This')).not.toBeInTheDocument();
+    expect(screen.getByTestId('jovie-work-feed')).toBeVisible();
+  });
+
   it('renders autonomous work items with phase badges', () => {
     useJovieWorkFeedQueryMock.mockReturnValue({
       data: [

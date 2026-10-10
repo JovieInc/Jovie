@@ -1,5 +1,5 @@
 {
-  "$comment": "Initial client JS ratchet for /app routes (gzip -9 KB). Measured 2026-09-27 on main + shell skeleton split. Target from docs/performance/route-budgets.json is 250 KB; lower these as routes get lighter. Enforced by scripts/route-js-budget.mjs in the merge-queue build. 2026-10-02: /app/admin/hud 990 -> 992 after UnifiedTable took the shared column-priority layout; the merge-group build measured 991 KB.",
+  "$comment": "Initial client JS ratchet for /app routes (gzip -9 KB). Measured 2026-09-27 on main + shell skeleton split. Target from docs/performance/route-budgets.json is 250 KB; lower these as routes get lighter. Enforced by scripts/route-js-budget.mjs in the merge-queue build. 2026-10-02: /app/admin/hud 990 -> 992 after UnifiedTable took the shared column-priority layout; the merge-group build measured 991 KB. 2026-10-04: /app/admin/people 1055 -> 1057 and /app/admin/hud 992 -> 994 after the shared nav learned to hide Identity when the Profiles workspace is off (#20180); merge-group builds measured 1056 and 993 KB. 2026-10-05: restored /app/admin/people 1057 -> 1055 and /app/admin/hud 994 -> 992 after preserving the command palette lazy boundary (#20721); combined head 60a29588989b05173ceef98b577ed353f0013e59 measured 1047 and 973 KB.",
   "defaultMaxGzipKb": 900,
   "routes": {
     "/app/chat/[id]": 1385,
@@ -9,7 +9,7 @@
     "/app/library": 1215,
     "/app/dashboard/releases": 1080,
     "/app/admin/people": 1055,
-    "/app/settings/artist-profile": 1035,
+    "/app/settings/profile": 1035,
     "/app/admin/system": 1030,
     "/app/admin/hud": 992,
     "/app/presence": 950,

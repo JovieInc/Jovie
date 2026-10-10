@@ -26,6 +26,7 @@ import { FACTORY_STAGES } from '../../data/marketing/factory/spine';
 import { MARKETING_PEN_CONTRACT_IDS } from '../../data/marketing/penContracts';
 import { listProductTruthClaims } from '../../data/product-truth/claims';
 import { getMarketingExportImage } from '../../lib/screenshots/registry';
+import { generatedFactoryMedia } from './generated-media';
 import { artifactOf, type StageContext } from './stage-kit';
 
 const PEN_CONTRACT_BY_RECIPE: Readonly<Record<string, string>> = {
@@ -55,11 +56,33 @@ export function buildFactoryPageRecord(
   const captures = artifactOf(ctx, 'asset').assets.filter(asset =>
     asset.id.startsWith(CAPTURE_PREFIX)
   );
+  const generated = generatedFactoryMedia(ctx);
   const recipeId = artifactOf(ctx, 'layout').recipeId;
+  const layoutSections = artifactOf(ctx, 'layout').sections;
   const sections = artifactOf(ctx, 'narrative').sections;
   const rendererKeys = assignSolutionsSectionKeys(
     sections.map(section => section.sectionId)
   );
+  const layoutIssues: string[] = [];
+  if (layoutSections.length !== sections.length) {
+    layoutIssues.push(
+      `layout has ${layoutSections.length} sections but narrative has ${sections.length}`
+    );
+  }
+  sections.forEach((section, index) => {
+    const selected = layoutSections[index];
+    if (!selected) return;
+    if (selected.sectionInstanceId !== section.sectionInstanceId) {
+      layoutIssues.push(
+        `layout section ${index} instance ${selected.sectionInstanceId ?? '(missing)'} does not match narrative instance ${section.sectionInstanceId}`
+      );
+    }
+    if (selected.sectionId !== section.sectionId) {
+      layoutIssues.push(
+        `layout section ${index} id ${selected.sectionId} does not match narrative section ${section.sectionId}`
+      );
+    }
+  });
   const unrendered = sections
     .filter((_, index) => rendererKeys[index] === null)
     .map(section => `no solutions renderer for ${section.sectionId}`);
@@ -78,11 +101,15 @@ export function buildFactoryPageRecord(
     composition: {
       recipeId,
       penContractId: PEN_CONTRACT_BY_RECIPE[recipeId],
-      sections: sections.map((section, index) => ({
-        renderer: rendererKeys[index] ?? section.sectionInstanceId,
-        instanceId: section.sectionInstanceId,
-        sectionId: section.sectionId,
-      })),
+      sections: sections.map((section, index) => {
+        const selected = layoutSections[index];
+        return {
+          renderer: rendererKeys[index] ?? section.sectionInstanceId,
+          instanceId: section.sectionInstanceId,
+          sectionId: section.sectionId,
+          ...(selected?.variantId ? { variantId: selected.variantId } : {}),
+        };
+      }),
     },
     copy: Object.fromEntries(
       slots.map(slot => [
@@ -90,19 +117,22 @@ export function buildFactoryPageRecord(
         { text: slot.text },
       ])
     ),
-    media: Object.fromEntries(
-      captures.map(asset => {
-        const scenarioId = asset.id.slice(CAPTURE_PREFIX.length);
-        return [
-          refs.get(asset.id)?.sectionInstanceId ?? asset.id,
-          {
-            kind: 'screenshot-registry',
-            id: scenarioId,
-            alt: getMarketingExportImage(scenarioId).alt,
-          },
-        ];
-      })
-    ),
+    media: {
+      ...generated.media,
+      ...Object.fromEntries(
+        captures.map(asset => {
+          const scenarioId = asset.id.slice(CAPTURE_PREFIX.length);
+          return [
+            refs.get(asset.id)?.sectionInstanceId ?? asset.id,
+            {
+              kind: 'screenshot-registry',
+              id: scenarioId,
+              alt: getMarketingExportImage(scenarioId).alt,
+            },
+          ];
+        })
+      ),
+    },
     heroVariant: HERO_DECISION_TABLE.find(
       contract => contract.penId === artifactOf(ctx, 'hero-variant').variantId
     )?.variant,
@@ -133,14 +163,18 @@ export function buildFactoryPageRecord(
         ...parsed.error.issues.map(
           issue => `${issue.path.join('.') || 'record'}: ${issue.message}`
         ),
+        ...layoutIssues,
         ...unrendered,
+        ...generated.issues,
       ],
     };
   }
   // Same checks as assertRenderableSolutionsRecord, the build gate.
   const claims = listProductTruthClaims();
   const issues = [
+    ...layoutIssues,
     ...unrendered,
+    ...generated.issues,
     ...findUnresolvedRecordClaims(parsed.data, claims).map(
       id => `unknown claim ${id}`
     ),

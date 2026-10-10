@@ -10,6 +10,7 @@
  * - Pixel forwarding retry: every other invocation (~30 min)
  * - Schedule + send release notifications: every invocation (15 min)
  * - Redis write/read operability canary: hourly
+ * - Daily acquisition-canary receipt freshness alarm: hourly
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -21,6 +22,15 @@ import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { describeAcquisitionBlock } from '@/lib/acquisition/eligibility';
 import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
+import {
+  getAuthSignupOnboardingCanaryStatus,
+  getPublicProfileCanaryStatus,
+} from '@/lib/admin/ops-queries';
+import { runBillingSyncRemediation } from '@/lib/billing/sync-remediation';
+import {
+  assertCanaryReceiptsFresh,
+  CanaryReceiptFreshnessError,
+} from '@/lib/canaries/receipt-freshness';
 import { reconcileOrphanedAcceptedActions } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
@@ -92,10 +102,16 @@ async function runSubJob(
     await captureError(`Frequent cron: ${name} failed`, error, {
       route: '/api/cron/frequent',
       subjob: name,
+      fingerprint:
+        error instanceof CanaryReceiptFreshnessError
+          ? 'scheduled-acquisition-canary-stale'
+          : undefined,
       error_class:
         error instanceof RedisOperabilityError
           ? `redis_operability_${error.kind}`
-          : undefined,
+          : error instanceof CanaryReceiptFreshnessError
+            ? 'canary_receipt_stale'
+            : undefined,
     });
     return { success: false, error: msg };
   }
@@ -119,6 +135,15 @@ export async function GET(request: Request) {
     return { latencyMs: Date.now() - pingStart };
   });
 
+  // 15-minute detector. Database only; it does not call /api/billing/health.
+  results.billingSyncRemediation = await runSubJob(
+    'billingSyncRemediation',
+    async () => {
+      const remediation = await runBillingSyncRemediation();
+      return { ...remediation };
+    }
+  );
+
   // 1.5 Redis write/read canary — hourly. PING can remain green after a hard
   // command quota is exhausted, so only a real ephemeral write/read proves the
   // auth-routing store is usable. GETDEL consumes the canary and DEL provides
@@ -128,6 +153,23 @@ export async function GET(request: Request) {
       ? await runSubJob('redisOperability', async () => ({
           ...(await probeRedisOperability()),
         }))
+      : { success: true, skipped: true };
+
+  // JOV-7895: reuse the hourly detector slot; two Redis reads, no new cron.
+  // Missing, stale or unreadable reports fail loud through the existing Sentry
+  // error path even when acquisition/outreach is disabled.
+  results.canaryReceiptFreshness =
+    minute < 15
+      ? await runSubJob('canaryReceiptFreshness', async () => {
+          const [auth, profile] = await Promise.all([
+            getAuthSignupOnboardingCanaryStatus(),
+            getPublicProfileCanaryStatus(),
+          ]);
+          return assertCanaryReceiptsFresh(
+            { 'auth-signup-onboarding': auth, 'public-profile': profile },
+            new Date()
+          );
+        })
       : { success: true, skipped: true };
 
   // 2. Process campaigns — every invocation (15 min)

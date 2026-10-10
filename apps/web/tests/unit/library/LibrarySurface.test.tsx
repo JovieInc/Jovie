@@ -11,7 +11,10 @@ import {
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
+import {
+  LibrarySurface,
+  resolveLibraryReviewStep,
+} from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { LIBRARY_VIEW_MODE_STORAGE_KEY } from '@/app/app/(shell)/library/library-grid-preferences';
 import { LIBRARY_SAVED_VIEW_STORAGE_KEY } from '@/app/app/(shell)/library/library-saved-views';
@@ -26,6 +29,10 @@ import {
   ShellSidebarOverrideProvider,
   useShellSidebarOverride,
 } from '@/contexts/ShellSidebarOverrideContext';
+import {
+  type LibraryPostReleaseBundle,
+  withInspectorScope,
+} from '@/lib/library/post-release-types';
 
 Element.prototype.scrollIntoView = vi.fn();
 
@@ -78,7 +85,7 @@ const feedbackMocks = vi.hoisted(() => ({
 
 const audioMock = vi.hoisted(() => {
   const basePlaybackState = {
-    activeTrackId: null,
+    activeTrackId: null as string | null,
     isPlaying: false,
     playbackStatus: 'idle',
     lastErrorReason: null,
@@ -127,7 +134,7 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: libraryMutationMocks.captureError,
 }));
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useReleaseMutations', () => ({
   useSyncReleasesFromSpotifyMutation: () => ({
     isPending: false,
     mutate: libraryMutationMocks.syncSpotify,
@@ -285,6 +292,41 @@ function expectDesktop32Control(
 }
 
 describe('LibrarySurface', () => {
+  it('renders stored child assets under a visible album with dependency guides and working selection', async () => {
+    window.localStorage.setItem(LIBRARY_VIEW_MODE_STORAGE_KEY, 'list');
+    const album = buildAsset({
+      id: 'album',
+      title: 'Album',
+      releaseType: 'album',
+    });
+    const child = buildAsset({
+      id: 'video-child',
+      title: 'Album Video',
+      itemKind: 'video',
+      linkedReleaseId: 'album',
+      source: { provider: 'youtube', canonicalId: 'video-child' },
+      catalogType: 'media',
+    });
+    renderLibrary([child, album]);
+    const row = await screen.findByTestId('library-release-row-video-child');
+    expect(within(row).getByTestId('table-dependency-guide')).toHaveAttribute(
+      'data-last',
+      'true'
+    );
+    expect(within(row).getByText('Part of Album')).toHaveClass('sr-only');
+    const rows = within(screen.getByRole('table'))
+      .getAllByRole('row')
+      .filter(element => element.hasAttribute('data-testid'));
+    expect(rows.map(element => element.getAttribute('data-testid'))).toEqual([
+      'library-release-row-album',
+      'library-release-row-video-child',
+    ]);
+    fireEvent.click(row);
+    expect(
+      await screen.findByRole('heading', { name: 'Album Video' })
+    ).toBeInTheDocument();
+  });
+
   it('disables YouTube import when the creator profile is unavailable', async () => {
     const user = userEvent.setup();
     const onImportYouTube = vi.fn();
@@ -403,10 +445,9 @@ describe('LibrarySurface', () => {
       expect(source).not.toMatch(localRecipePattern);
     }
 
-    // Release/approval badge accents live in their semantic helpers
-    // (lib/library/{release,approval}-status.ts) — guarded for distinctness
-    // in library-system-b-compliance.test.ts and approval-status.test.ts.
-    expect(source).toContain('releaseStatusClasses');
+    // Status renders as the shared glyph everywhere; the approval editor in
+    // Details keeps its semantic accent helper.
+    expect(source).toContain('LibraryStatusGlyph');
     expect(source).toContain('libraryApprovalStatusClasses');
     expect(source).toContain('PageToolbarTabButton');
     expect(source).toContain("variant={active ? 'secondary' : 'tertiary'}");
@@ -453,7 +494,9 @@ describe('LibrarySurface', () => {
       ),
     ].map(match => match[0]);
 
-    expect(statusPillClasses).toHaveLength(4);
+    // Status is a glyph on tiles, rows, table and inspector; only the
+    // approval editor in Details still renders as a word pill.
+    expect(statusPillClasses).toHaveLength(1);
     for (const className of statusPillClasses ?? []) {
       expect(className).toContain('truncate');
       expect(className).toContain('rounded-full');
@@ -518,6 +561,21 @@ describe('LibrarySurface', () => {
     );
   });
 
+  it('exposes the YouTube ledger directly from every Work state', () => {
+    const emptyLibrary = renderLibrary([]);
+
+    expect(
+      screen.getByRole('link', { name: 'YouTube Ledger' })
+    ).toHaveAttribute('href', APP_ROUTES.YOUTUBE_REVIVAL);
+
+    emptyLibrary.unmount();
+    renderLibrary([buildAsset()]);
+
+    expect(
+      screen.getByRole('link', { name: 'YouTube Ledger' })
+    ).toHaveAttribute('href', APP_ROUTES.YOUTUBE_REVIVAL);
+  });
+
   it('uses the canonical Spotify sync owner for an empty connected library', () => {
     renderLibrary([], {
       profileId: 'profile-1',
@@ -576,20 +634,33 @@ describe('LibrarySurface', () => {
     ).toBeEnabled();
   });
 
-  it('defaults to grid view on first load', () => {
+  it('defaults to a dense title-first table on first load', () => {
     window.localStorage.removeItem(LIBRARY_VIEW_MODE_STORAGE_KEY);
     renderLibrary([buildAsset()]);
 
-    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByRole('radio', { name: 'Table View' })).toBeChecked();
+    const row = screen.getByTestId('library-catalog-row-release-1');
     expect(
-      screen.getByRole('button', { name: /View Take Me Over/u })
-    ).toBeInTheDocument();
+      row.closest('table')?.style.getPropertyValue('--table-row-height')
+    ).toBe('32px');
+    expect(screen.queryByTestId('library-grid-density-toggle')).toBeNull();
     expect(
-      screen.getByTestId('library-grid-density-toggle')
+      screen.getByTestId('library-status-glyph-release-1')
     ).toBeInTheDocument();
+    for (const metric of ['bpm', 'key', 'energy', 'rating']) {
+      expect(
+        screen.queryByTestId(`library-catalog-${metric}-release-1`)
+      ).toBeNull();
+    }
+    fireEvent.click(row);
+    const inspector = screen.getByTestId('library-asset-drawer');
+    expect(inspector).toHaveAttribute('aria-hidden', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'More Columns' }));
     expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toBeInTheDocument();
+      screen.getByTestId('library-catalog-bpm-release-1')
+    ).toHaveTextContent('—');
+    expect(row).toHaveAttribute('aria-selected', 'true');
+    expect(inspector).toHaveAttribute('aria-hidden', 'false');
   });
 
   it('shows the card-size toggle in grid view and persists density preference', () => {
@@ -699,49 +770,36 @@ describe('LibrarySurface', () => {
     expect(portraitCard?.className).toContain('aspect-[9/16]');
   });
 
-  it('keeps grid-card status chrome off the media frame', () => {
-    const { container } = renderLibrary([
+  it('keeps a tile to artwork, title, one status glyph and one meta line', () => {
+    renderLibrary([
       buildAsset({
         status: 'draft',
         approvalStatus: 'needs_review',
+        providerCount: 3,
       }),
     ]);
     clickGridView();
-
-    const redFixture = document.createElement('article');
-    redFixture.innerHTML = [
-      '<div class="system-b-library-card-artwork">',
-      '<span class="system-b-library-card-status">Draft</span>',
-      '</div>',
-    ].join('');
-    expect(
-      redFixture.querySelector(
-        '.system-b-library-card-artwork .system-b-library-card-status'
-      )
-    ).not.toBeNull();
 
     const cardButton = screen.getByRole('button', {
       name: /View Take Me Over/u,
     });
     const artwork = cardButton.querySelector('.system-b-library-card-artwork');
-    const statusStack = screen.getByTestId(
-      'library-card-status-stack-release-1'
-    );
+    const glyph = screen.getByTestId('library-status-glyph-release-1');
 
-    expect(artwork?.querySelector('.system-b-library-card-status')).toBeNull();
-    expect(statusStack).toContainElement(
-      screen.getByTestId('library-release-status-release-1')
+    // Only playback belongs on the artwork; status sits beside the title.
+    expect(artwork).not.toContainElement(glyph);
+    expect(cardButton).toContainElement(glyph);
+    expect(within(cardButton).getAllByRole('img')).toHaveLength(1);
+    expect(screen.getByTestId('library-card-meta-release-1')).toHaveTextContent(
+      /^Single · 2026$/u
     );
-    expect(statusStack).toContainElement(
-      screen.getByTestId('library-approval-status-release-1')
-    );
-    expect(statusStack).toHaveClass('min-h-11');
-    expect(container.querySelector('.system-b-library-card')).toContainElement(
-      statusStack
-    );
+    // No stacked word pills, provider counts or asset-kind pills on tiles.
+    expect(within(cardButton).queryByText('Draft')).toBeNull();
+    expect(within(cardButton).queryByText('Artwork')).toBeNull();
+    expect(within(cardButton).queryByText('3')).toBeNull();
   });
 
-  it('surfaces Approval Status on list rows, grid cards, and filter chips (#10384)', async () => {
+  it('folds release and approval into one glyph on rows, tiles and filters (#10384)', async () => {
     renderLibrary([
       buildAsset({
         status: 'released',
@@ -761,49 +819,34 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    // List view includes the Approval column cell for every row.
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-2')
-    ).toHaveTextContent('Needs Review');
-    expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveTextContent('Released');
+    const expectGlyphs = () => {
+      expect(
+        screen.getByTestId('library-status-glyph-release-1')
+      ).toHaveAccessibleName('Released · Not approved');
+      expect(
+        screen.getByTestId('library-status-glyph-release-1')
+      ).toHaveAttribute('data-status-glyph', 'done');
+      expect(
+        screen.getByTestId('library-status-glyph-release-2')
+      ).toHaveAccessibleName('Released · Needs review');
+      expect(
+        screen.getByTestId('library-status-glyph-release-2')
+      ).toHaveAttribute('data-status-glyph', 'in_review');
+      expect(
+        screen.getByTestId('library-status-glyph-release-3')
+      ).toHaveAccessibleName('Draft · Approved');
+    };
 
+    expectGlyphs();
     clickGridView();
+    expectGlyphs();
 
-    // Grid cards surface both axes with explicit labels so Release "Draft"
-    // never collides with Approval "Draft" (#10384 / JOV-3333).
-    expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveTextContent('Released');
-    expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveAccessibleName('Release Status: Released');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-2')
-    ).toHaveTextContent('Needs Review');
-
-    // Filter rail exposes Approval Status as a first-class chip group (#10384).
+    // Filter rail still exposes both axes as first-class chip groups.
     fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
     const rail = screen.getByTestId('library-filter-panel');
     expect(screen.getByRole('group', { name: 'Work Filters' })).toBe(rail);
     expect(within(rail).getByText('Approval Status')).toBeInTheDocument();
     expect(within(rail).getByText('Release Status')).toBeInTheDocument();
-    expect(
-      within(rail).getByRole('button', { name: /Needs Review/u })
-    ).toBeInTheDocument();
 
     fireEvent.click(
       within(rail).getByRole('button', { name: /Needs Review/u })
@@ -811,18 +854,14 @@ describe('LibrarySurface', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByTestId('library-approval-status-release-2')
+        screen.getByTestId('library-status-glyph-release-2')
       ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId('library-approval-status-release-1')
-      ).toBeNull();
-      expect(
-        screen.queryByTestId('library-approval-status-release-3')
-      ).toBeNull();
+      expect(screen.queryByTestId('library-status-glyph-release-1')).toBeNull();
+      expect(screen.queryByTestId('library-status-glyph-release-3')).toBeNull();
     });
   });
 
-  it('disambiguates Release Draft from Approval Draft when both axes are draft (#10384)', () => {
+  it('says Draft once when release and approval are both draft (#10384)', () => {
     renderLibrary([
       buildAsset({
         status: 'draft',
@@ -830,21 +869,22 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
+    const row = screen.getByTestId('library-release-row-release-1');
+    expect(within(row).getAllByTestId(/^library-status-glyph-/u)).toHaveLength(
+      1
+    );
     expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveAccessibleName('Release Status: Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
+      screen.getByTestId('library-status-glyph-release-1')
+    ).toHaveAccessibleName('Draft');
 
     clickGridView();
 
     expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveAccessibleName('Release Status: Draft');
+      screen.getByTestId('library-status-glyph-release-1')
+    ).toHaveAccessibleName('Draft');
     expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
+      screen.getByTestId('library-status-glyph-release-1')
+    ).toHaveAttribute('data-status-glyph', 'todo');
   });
 
   it('filters Release Draft and Approval Draft independently in the filter rail (#10384)', async () => {
@@ -890,14 +930,12 @@ describe('LibrarySurface', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByTestId('library-release-status-release-a')
+        screen.getByTestId('library-status-glyph-release-a')
       ).toBeInTheDocument();
       expect(
-        screen.getByTestId('library-release-status-release-c')
+        screen.getByTestId('library-status-glyph-release-c')
       ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId('library-release-status-release-b')
-      ).toBeNull();
+      expect(screen.queryByTestId('library-status-glyph-release-b')).toBeNull();
     });
 
     fireEvent.click(
@@ -912,18 +950,16 @@ describe('LibrarySurface', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByTestId('library-approval-status-release-b')
+        screen.getByTestId('library-status-glyph-release-b')
       ).toBeInTheDocument();
       expect(
-        screen.getByTestId('library-approval-status-release-c')
+        screen.getByTestId('library-status-glyph-release-c')
       ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId('library-approval-status-release-a')
-      ).toBeNull();
+      expect(screen.queryByTestId('library-status-glyph-release-a')).toBeNull();
     });
   });
 
-  it('renders Archived approval status on list and grid badges (#10384)', () => {
+  it('marks archived work with the canceled glyph on rows and tiles (#10384)', () => {
     renderLibrary([
       buildAsset({
         status: 'released',
@@ -931,18 +967,13 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Archived');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Archived');
+    const glyph = () => screen.getByTestId('library-status-glyph-release-1');
+    expect(glyph()).toHaveAccessibleName('Archived');
+    expect(glyph()).toHaveAttribute('data-status-glyph', 'canceled');
 
     clickGridView();
 
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Archived');
+    expect(glyph()).toHaveAccessibleName('Archived');
   });
 
   it('keeps Approval Status once in the detail rail editor only', () => {
@@ -953,10 +984,10 @@ describe('LibrarySurface', () => {
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
 
     const drawer = within(screen.getByTestId('library-asset-drawer'));
-    // Hero shows release status only — no duplicate approval pill.
+    // Hero shows the same glyph as the tile, with its words beside it.
     expect(
-      drawer.getByTestId('library-release-status-release-1')
-    ).toHaveTextContent('Released');
+      drawer.getByTestId('library-status-glyph-release-1')
+    ).toHaveTextContent('Released · Not approved');
     expect(
       drawer.queryByTestId('library-approval-status-release-1')
     ).not.toBeInTheDocument();
@@ -987,10 +1018,7 @@ describe('LibrarySurface', () => {
 
     expect(screen.getByTestId('library-surface')).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Take Me Over' })).toBeDefined();
-    expect(screen.getByText('Tim White')).toBeDefined();
-    expect(screen.getAllByText('Artwork').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Preview').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Lyrics').length).toBeGreaterThan(0);
+    expect(screen.getByText('Single · 2026')).toBeDefined();
 
     fireEvent.click(screen.getByRole('button', { name: /View Take Me Over/u }));
 
@@ -1020,7 +1048,7 @@ describe('LibrarySurface', () => {
     ).toBeGreaterThan(0);
     fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
     expect(drawer.getByText('Apr 28')).toHaveAttribute('title', 'Apr 28, 2026');
-    expect(drawer.getByText('68/100')).toBeDefined();
+    expect(drawer.queryByText('68/100')).not.toBeInTheDocument();
     expect(drawer.getByText('Progressive House')).toBeDefined();
 
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -1059,9 +1087,11 @@ describe('LibrarySurface', () => {
     const drawer = within(screen.getByTestId('library-asset-drawer'));
 
     await user.click(drawer.getByRole('button', { name: 'More actions' }));
-    await user.hover(screen.getByRole('menuitem', { name: 'Copy' }));
-    fireEvent.click(
-      await screen.findByRole('menuitem', { name: 'Share Link' })
+    const search = screen.getByRole('textbox', { name: 'Search actions' });
+    expect(search).toHaveFocus();
+    await user.type(search, 'share link');
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Copy › Share Link' })
     );
 
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
@@ -1233,10 +1263,13 @@ describe('LibrarySurface', () => {
     });
   });
 
-  it('renders merch assets with prices and the shared detail drawer', () => {
+  it('renders merch without private source metadata or share requests', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
     renderLibrary([
       buildAsset({
         id: 'merch-card-1',
+        source: { provider: 'merch', canonicalId: 'internal-card-123' },
         title: 'Never Say A Word Hoodie',
         artworkUrl: 'https://cdn.example.com/hoodie.png',
         smartLinkPath: '/app/library?view=merch',
@@ -1261,7 +1294,7 @@ describe('LibrarySurface', () => {
     expect(
       screen.getByRole('heading', { name: 'Never Say A Word Hoodie' })
     ).toBeInTheDocument();
-    expect(screen.getByText('$68.00')).toBeInTheDocument();
+    expect(screen.getByText('Hoodie · $68.00')).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -1270,7 +1303,7 @@ describe('LibrarySurface', () => {
     );
 
     const drawer = within(screen.getByTestId('library-asset-drawer'));
-    expect(drawer.getAllByText('Merch').length).toBeGreaterThan(0);
+    expect(drawer.getAllByText(/Hoodie/u).length).toBeGreaterThan(0);
     expect(
       drawer.getByText('Black hoodie with Never Say A Word cover art.')
     ).toBeInTheDocument();
@@ -1280,6 +1313,12 @@ describe('LibrarySurface', () => {
       drawer.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
     expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+    expect(drawer.queryByTestId('library-asset-share-merch-card-1')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
+    expect(drawer.queryByText('Source')).toBeNull();
+    expect(drawer.queryByText(/internal-card-123/)).toBeNull();
   });
 
   it('renders the library right rail with the shared compact entity anatomy', () => {
@@ -1309,6 +1348,189 @@ describe('LibrarySurface', () => {
     expect(
       tabs.queryByRole('tab', { name: 'Presence' })
     ).not.toBeInTheDocument();
+  });
+
+  it('states what the selected work is and what is public without conflating visibility', () => {
+    renderLibrary([
+      buildAsset({
+        profileVisibility: 'hidden',
+        source: { provider: 'discography', canonicalId: 'catalog-release-1' },
+        share: {
+          assetId: 'release-1',
+          visibility: 'private',
+          shareSlug: 'take-me-over',
+          accessToken: 'token-1',
+          shareUrl: 'https://jov.ie/p/token-1',
+          tokenRevokedAt: null,
+        },
+      }),
+    ]);
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    const presentation = within(
+      drawer.getByTestId('work-inspector-presentation')
+    );
+    const about = within(drawer.getByTestId('work-inspector-about'));
+
+    expect(
+      drawer.getByRole('link', { name: 'Open Full View' })
+    ).toHaveAttribute('href', '/tim/take-me-over');
+    expect(presentation.getByText('Released')).toBeInTheDocument();
+    expect(presentation.getByText('Not public')).toBeInTheDocument();
+    expect(presentation.getByText('Hidden from profile')).toBeInTheDocument();
+    expect(presentation.getByText('Listen')).toBeInTheDocument();
+    expect(presentation.getByText('Spotify')).toBeInTheDocument();
+    expect(about.getByText('Single')).toBeInTheDocument();
+    expect(
+      about.getByText('Discography · catalog-release-1')
+    ).toBeInTheDocument();
+    expect(about.queryByText('68/100')).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])(
+    'updates Activity after dismissing the last finding (downloads=%s)',
+    async hasDownload => {
+      const collision = withInspectorScope({
+        id: 'collision-1',
+        kind: 'collision',
+        title: 'Wrong artist match',
+        subjectType: 'release',
+        subjectId: 'release-1',
+        issueType: 'wrong_artist',
+        platform: 'Spotify',
+        currentUrl: null,
+        expectedUrl: null,
+        actionMode: 'direct_update',
+        status: 'open',
+        collisionDisposition: null,
+        draftRequest: null,
+      });
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ finding: { ...collision, status: 'dismissed' } }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      renderLibrary([buildAsset()], {
+        profileId: 'profile-1',
+        postReleaseBundle: {
+          findings: [collision],
+          rightsholders: [],
+          stats: [],
+          downloads: hasDownload
+            ? [
+                {
+                  id: 'download-1',
+                  releaseId: 'release-1',
+                  title: 'Radio edit',
+                  fileName: 'radio-edit.wav',
+                },
+              ]
+            : [],
+        },
+      });
+      fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+      const drawer = within(screen.getByTestId('library-asset-drawer'));
+      expect(drawer.getByText('Activity')).toBeInTheDocument();
+      fireEvent.click(drawer.getByRole('button', { name: 'Not This Artist' }));
+      await waitFor(() =>
+        expect(drawer.queryByText('Wrong artist match')).toBeNull()
+      );
+      expect(Boolean(drawer.queryByText('Activity'))).toBe(hasDownload);
+      fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+      fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
+      expect(drawer.queryByText('Wrong artist match')).toBeNull();
+      expect(Boolean(drawer.queryByText('Activity'))).toBe(hasDownload);
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/library/post-release',
+        expect.objectContaining({ method: 'PATCH' })
+      );
+    }
+  );
+
+  it('resets to scoped Overview data synchronously when selection changes', () => {
+    const postReleaseBundle: LibraryPostReleaseBundle = {
+      downloads: [
+        {
+          id: 'download-a',
+          releaseId: 'release-a',
+          title: 'A stems',
+          fileName: 'a.zip',
+        },
+        {
+          id: 'download-b-1',
+          releaseId: 'release-b',
+          title: 'B stems one',
+          fileName: 'b-one.zip',
+        },
+        {
+          id: 'download-b-2',
+          releaseId: 'release-b',
+          title: 'B stems two',
+          fileName: 'b-two.zip',
+        },
+      ],
+      findings: [],
+      rightsholders: [],
+      stats: [],
+    };
+
+    renderLibrary(
+      [
+        buildAsset({ id: 'release-a', title: 'Release A' }),
+        buildAsset({ id: 'release-b', title: 'Release B' }),
+      ],
+      { postReleaseBundle }
+    );
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-a'));
+    let drawer = within(screen.getByTestId('library-asset-drawer'));
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+    expect(drawer.getAllByTestId(/^library-file-download:/)).toHaveLength(1);
+    expect(drawer.getByText('a.zip')).toBeInTheDocument();
+    expect(drawer.queryByText('b-one.zip')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-b'));
+    drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(drawer.getByTestId('library-asset-entity-header')).toHaveTextContent(
+      'Release B'
+    );
+    expect(drawer.queryByText('a.zip')).not.toBeInTheDocument();
+
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+    expect(drawer.getAllByTestId(/^library-file-download:/)).toHaveLength(2);
+    expect(drawer.getByText('b-one.zip')).toBeInTheDocument();
+    expect(drawer.getByText('b-two.zip')).toBeInTheDocument();
+    expect(drawer.queryByText('a.zip')).not.toBeInTheDocument();
+  });
+
+  it('opens the Files tab for the selected work from Share Privately', () => {
+    renderLibrary([
+      buildAsset({
+        id: 'release-a',
+        title: 'Release A',
+        profileVisibility: 'hidden',
+      }),
+    ]);
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-a'));
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+
+    fireEvent.click(drawer.getByRole('button', { name: 'Share Privately' }));
+
+    expect(drawer.getByRole('tab', { name: 'Files' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
   });
 
   it('uses shell focus tokens for library cards and drawer actions', () => {
@@ -1444,10 +1666,12 @@ describe('LibrarySurface', () => {
     expect(window.localStorage.getItem('jovie:library-view-mode')).toBe('list');
   });
 
-  it('renders the full dense Tracks-catalog column set in table mode (JOV-4846)', () => {
+  it('reveals the full labeled catalog only when More Columns is requested', () => {
     renderLibrary([buildAsset()]);
 
     fireEvent.click(screen.getByRole('radio', { name: 'Table View' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'More Columns' }));
 
     // Full experiment column set: status · artwork · title · artist · type ·
     // BPM · key · energy · rating · length · waveform · DSP providers.
@@ -1472,8 +1696,8 @@ describe('LibrarySurface', () => {
 
     // Production data populates the real fields.
     expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveTextContent('Released');
+      screen.getByTestId('library-status-glyph-release-1')
+    ).toHaveAccessibleName('Released · Not approved');
     expect(
       screen.getByTestId('library-catalog-length-release-1')
     ).toHaveTextContent('3:32');
@@ -1663,6 +1887,233 @@ describe('LibrarySurface', () => {
         name: 'More actions',
       })
     ).toBeInTheDocument();
+  });
+
+  it.each(['inside', 'outside'] as const)(
+    'closes the inspector on Escape with focus %s and returns focus to the opener',
+    focusLocation => {
+      renderLibrary([buildAsset()]);
+
+      const row = screen.getByTestId('library-release-row-release-1');
+      row.focus();
+      fireEvent.click(row);
+      const drawer = screen.getByTestId('library-asset-drawer');
+      expect(drawer).toHaveAttribute('aria-hidden', 'false');
+
+      const focused =
+        focusLocation === 'inside'
+          ? within(drawer).getByRole('tab', { name: 'Files' })
+          : screen.getByRole('button', { name: /^Show filters/i });
+      focused.focus();
+      expect(focused).toHaveFocus();
+      fireEvent.keyDown(focused, { key: 'Escape' });
+
+      expect(drawer).toHaveAttribute('aria-hidden', 'true');
+      expect(row).toHaveFocus();
+    }
+  );
+
+  it('preserves the opener while changing assets with focus inside the inspector', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Another release' }),
+    ]);
+    const opener = screen.getByTestId('library-release-row-release-1');
+    const next = screen.getByTestId('library-release-row-release-2');
+    opener.focus();
+    fireEvent.click(opener);
+    const drawer = screen.getByTestId('library-asset-drawer');
+    const files = within(drawer).getByRole('tab', { name: 'Files' });
+    files.focus();
+    expect(files).toHaveFocus();
+
+    fireEvent.click(next);
+    expect(
+      within(drawer).getAllByText('Another release').length
+    ).toBeGreaterThan(0);
+    fireEvent.keyDown(files, { key: 'Escape' });
+    expect(drawer).toHaveAttribute('aria-hidden', 'true');
+    expect(opener).toHaveFocus();
+
+    next.focus();
+    fireEvent.click(next);
+    within(drawer).getByRole('tab', { name: 'Files' }).focus();
+    fireEvent.keyDown(drawer, { key: 'Escape' });
+    expect(next).toHaveFocus();
+  });
+
+  it('gives two-line list rows the two-line row budget so the artist line is not clipped', () => {
+    renderLibrary([buildAsset()]);
+    fireEvent.click(screen.getByRole('radio', { name: 'List View' }));
+
+    const table = screen
+      .getByTestId('library-release-row-release-1')
+      .closest('table');
+    expect(table?.style.getPropertyValue('--table-row-height')).toBe('56px');
+  });
+
+  it('gives each tile one meta line: type then year, or type then price', () => {
+    renderLibrary([
+      buildAsset({ releaseType: 'album', trackCount: 9 }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Undated',
+        releaseType: 'ep',
+        releaseDate: null,
+      }),
+    ]);
+    clickGridView();
+
+    expect(screen.getByTestId('library-card-meta-release-1')).toHaveTextContent(
+      /^Album · 2026$/u
+    );
+    expect(screen.getByTestId('library-card-meta-release-2')).toHaveTextContent(
+      /^Ep$/u
+    );
+  });
+
+  it('reviews tiles from the keyboard: J/K move, Space plays, Enter inspects, Esc closes', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Second Song' }),
+      buildAsset({ id: 'release-3', title: 'Third Song' }),
+    ]);
+    clickGridView();
+    const tile = (title: string) =>
+      screen.getByRole('button', { name: `View ${title}` });
+
+    fireEvent.keyDown(document.body, { key: 'j' });
+    expect(tile('Take Me Over')).toHaveFocus();
+    fireEvent.keyDown(tile('Take Me Over'), { key: 'j' });
+    expect(tile('Second Song')).toHaveFocus();
+    fireEvent.keyDown(tile('Second Song'), { key: 'ArrowRight' });
+    expect(tile('Third Song')).toHaveFocus();
+    fireEvent.keyDown(tile('Third Song'), { key: 'k' });
+    expect(tile('Second Song')).toHaveFocus();
+
+    const space = fireEvent.keyDown(tile('Second Song'), { key: ' ' });
+    expect(space).toBe(false);
+    expect(audioMock.toggleTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'release-2', title: 'Second Song' })
+    );
+    expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+
+    // Enter on the page inspects the cursor; the inspector then follows J/K.
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    const drawer = screen.getByTestId('library-asset-drawer');
+    expect(drawer).toHaveAttribute('aria-hidden', 'false');
+    expect(
+      within(drawer).getByTestId('library-asset-entity-header')
+    ).toHaveTextContent('Second Song');
+    fireEvent.keyDown(tile('Second Song'), { key: 'j' });
+    expect(
+      within(drawer).getByTestId('library-asset-entity-header')
+    ).toHaveTextContent('Third Song');
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(drawer).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it.each(['Space', 'ArrowRight'] as const)(
+    'reviews the focused tile after Tab navigation: %s',
+    async key => {
+      const user = userEvent.setup();
+      renderLibrary([
+        buildAsset(),
+        buildAsset({ id: 'release-2', title: 'Second Song' }),
+        buildAsset({ id: 'release-3', title: 'Third Song' }),
+      ]);
+      clickGridView();
+      const first = screen.getByRole('button', { name: 'View Take Me Over' });
+      const second = screen.getByRole('button', { name: 'View Second Song' });
+
+      fireEvent.keyDown(document.body, { key: 'j' });
+      expect(first).toHaveFocus();
+      for (let tab = 0; tab < 4 && document.activeElement !== second; tab++) {
+        await user.tab();
+      }
+      expect(second).toHaveFocus();
+      expect(first.closest('[data-library-item-id]')).toHaveClass(
+        'system-b-library-card--selected'
+      );
+
+      await user.keyboard(key === 'Space' ? ' ' : '{ArrowRight}');
+      if (key === 'Space') {
+        expect(audioMock.toggleTrack).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'release-2', title: 'Second Song' })
+        );
+        expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
+          'aria-hidden',
+          'true'
+        );
+      } else {
+        expect(
+          screen.getByRole('button', { name: 'View Third Song' })
+        ).toHaveFocus();
+      }
+    }
+  );
+
+  it('lets list rows play on Space and carries selection with the arrow keys', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Second Song' }),
+    ]);
+
+    const first = screen.getByTestId('library-release-row-release-1');
+    const second = screen.getByTestId('library-release-row-release-2');
+    fireEvent.click(first);
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    fireEvent.keyDown(first, { key: 'ArrowDown' });
+    expect(second).toHaveFocus();
+    expect(second).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(second, { key: ' ' });
+    expect(audioMock.toggleTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'release-2' })
+    );
+    expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+  });
+
+  it('keeps J/K working after a toolbar click without stealing its arrows', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Second Song' }),
+    ]);
+    clickGridView();
+    const gridToggle = screen.getByRole('radio', { name: 'Grid View' });
+    gridToggle.focus();
+
+    // Arrows stay with the view toggle's own radio group.
+    fireEvent.keyDown(gridToggle, { key: 'ArrowLeft' });
+    expect(document.activeElement).toHaveAttribute('type', 'radio');
+
+    clickGridView();
+    gridToggle.focus();
+    fireEvent.keyDown(gridToggle, { key: 'j' });
+    expect(
+      screen.getByRole('button', { name: 'View Take Me Over' })
+    ).toHaveFocus();
+  });
+
+  it('leaves typing, menus and sliders alone', () => {
+    renderLibrary([buildAsset()]);
+    clickGridView();
+    const input = document.createElement('input');
+    document.body.append(input);
+
+    fireEvent.keyDown(input, { key: 'j' });
+    expect(
+      screen.getByRole('button', { name: 'View Take Me Over' })
+    ).not.toHaveFocus();
+    input.remove();
   });
 
   it('does not render route filtering as a second shell search surface', () => {
@@ -1855,13 +2306,32 @@ describe('LibrarySurface', () => {
     ).toBeNull();
   });
 
-  it('labels the grid-card provider count badge', () => {
-    renderLibrary([buildAsset({ providerCount: 3 })]);
+  it('shows a scrub strip on the tile that owns the player and seeks it', () => {
+    audioMock.playbackState = {
+      ...audioMock.basePlaybackState,
+      activeTrackId: 'release-1',
+      isPlaying: true,
+      playbackStatus: 'playing',
+      currentTime: 10,
+      duration: 30,
+    };
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Other Song' }),
+    ]);
     clickGridView();
 
-    expect(screen.getByRole('img', { name: '3 Providers' })).toHaveTextContent(
-      '3'
-    );
+    expect(screen.queryByTestId('library-card-scrub-release-2')).toBeNull();
+    const scrub = within(
+      screen.getByTestId('library-card-scrub-release-1')
+    ).getByRole('slider', { name: 'Scrub Take Me Over' });
+    expect(scrub).toHaveAttribute('aria-valuenow', '10');
+
+    fireEvent.keyDown(scrub, { key: 'End' });
+    expect(audioMock.seek).toHaveBeenCalledWith(30);
+    expect(
+      screen.getByRole('button', { name: 'Pause Preview for Take Me Over' })
+    ).toBeInTheDocument();
   });
 
   it('stacks duplicate release versions into one row (JOV-3089)', () => {
@@ -2145,5 +2615,62 @@ describe('LibrarySurface', () => {
     });
     expect(trigger).toHaveFocus();
     expect(globalThis.scrollY).toBe(320);
+  });
+});
+
+describe('resolveLibraryReviewStep', () => {
+  const page = document.body;
+
+  it('moves one item on J/K and one row of tiles on up/down in the grid', () => {
+    expect(resolveLibraryReviewStep('j', page, 5)).toEqual({
+      kind: 'move',
+      delta: 1,
+    });
+    expect(resolveLibraryReviewStep('k', page, 5)).toEqual({
+      kind: 'move',
+      delta: -1,
+    });
+    expect(resolveLibraryReviewStep('ArrowDown', page, 5)).toEqual({
+      kind: 'move',
+      delta: 5,
+    });
+    expect(resolveLibraryReviewStep('ArrowUp', page, 5)).toEqual({
+      kind: 'move',
+      delta: -5,
+    });
+    expect(resolveLibraryReviewStep('ArrowLeft', page, 5)).toEqual({
+      kind: 'move',
+      delta: -1,
+    });
+    // Lists and tables move one row and leave left/right to scrolling.
+    expect(resolveLibraryReviewStep('ArrowDown', page, null)).toEqual({
+      kind: 'move',
+      delta: 1,
+    });
+    expect(resolveLibraryReviewStep('ArrowRight', page, null)).toBeNull();
+    expect(resolveLibraryReviewStep('End', page, null)).toEqual({
+      kind: 'edge',
+      to: 'last',
+    });
+  });
+
+  it('plays on Space and inspects on Enter without stealing native controls', () => {
+    const tile = document.createElement('button');
+    tile.dataset.libraryItemFocus = '';
+    const control = document.createElement('button');
+    const slider = document.createElement('div');
+    slider.setAttribute('role', 'slider');
+    const input = document.createElement('input');
+
+    expect(resolveLibraryReviewStep(' ', page, 4)).toEqual({ kind: 'play' });
+    expect(resolveLibraryReviewStep(' ', tile, 4)).toEqual({ kind: 'play' });
+    expect(resolveLibraryReviewStep(' ', control, 4)).toBeNull();
+    expect(resolveLibraryReviewStep('Enter', page, 4)).toEqual({
+      kind: 'open',
+    });
+    expect(resolveLibraryReviewStep('Enter', tile, 4)).toBeNull();
+    expect(resolveLibraryReviewStep('j', slider, 4)).toBeNull();
+    expect(resolveLibraryReviewStep('j', input, 4)).toBeNull();
+    expect(resolveLibraryReviewStep('ArrowLeft', input, 4)).toBeNull();
   });
 });

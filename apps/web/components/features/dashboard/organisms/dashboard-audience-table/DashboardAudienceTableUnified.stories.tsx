@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { DashboardStoryProviders } from '@/.storybook/dashboard-fixtures';
+import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { DashboardAudienceTableUnified } from './DashboardAudienceTableUnified';
 import { DEFAULT_AUDIENCE_FILTERS } from './types';
 
@@ -8,6 +10,15 @@ const meta: Meta<typeof DashboardAudienceTableUnified> = {
   parameters: {
     layout: 'fullscreen',
   },
+  decorators: [
+    Story => (
+      <DashboardStoryProviders>
+        <TableMetaProvider>
+          <Story />
+        </TableMetaProvider>
+      </DashboardStoryProviders>
+    ),
+  ],
 };
 
 export default meta;

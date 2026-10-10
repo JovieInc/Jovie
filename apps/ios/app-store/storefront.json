@@ -1,0 +1,93 @@
+{
+  "schema": "ios-app-store-storefront/v1",
+  "issue": "JOV-4481",
+  "locale": "en-US",
+  "device": {
+    "simulator": "iPhone 17 Pro Max",
+    "displayType": "6.9-inch iPhone",
+    "width": 1320,
+    "height": 2868
+  },
+  "pen": {
+    "file": "Jovie Homepage Profiles Claim — review copy 2026-10-01.pen",
+    "section": "App Store / iOS screenshots (STAGING)",
+    "status": "bound",
+    "sectionNodeId": "kH5Zr",
+    "frames": {
+      "chat": {
+        "frame": "XC4ox",
+        "headline": "DVed2",
+        "capture": "Ynw5J"
+      },
+      "audience": {
+        "frame": "ckgFv",
+        "headline": "Q6xZD",
+        "capture": "Upx1i"
+      },
+      "calendar": {
+        "frame": "YfiIo",
+        "headline": "j6fQn",
+        "capture": "Ofsbw"
+      },
+      "work": {
+        "frame": "J7yfE9",
+        "headline": "a82Ali",
+        "capture": "eNClk"
+      },
+      "identity": {
+        "frame": "K6oMB",
+        "headline": "tOpc7",
+        "capture": "YBpij"
+      }
+    }
+  },
+  "layout": {
+    "canvas": "canvas",
+    "marginX": 110,
+    "headlineTop": 260,
+    "headlineSize": 96,
+    "deviceTop": 600,
+    "deviceWidth": 1220,
+    "bezel": 20,
+    "deviceRadius": 168,
+    "pinnedHeader": 0.115
+  },
+  "contentCheck": {
+    "top": 0.15,
+    "bottom": 0.85,
+    "minDensity": 0.002
+  },
+  "screens": [
+    {
+      "id": "chat",
+      "launchArgument": "-ui-testing-storefront-chat",
+      "headline": "Make merch.",
+      "accent": "ion"
+    },
+    {
+      "id": "audience",
+      "launchArgument": "-ui-testing-audience",
+      "headline": "Capture fans.",
+      "accent": "ultra",
+      "scroll": 0.135
+    },
+    {
+      "id": "work",
+      "launchArgument": "-ui-testing-storefront-releases",
+      "headline": "Drive streams.",
+      "accent": "pulse"
+    },
+    {
+      "id": "calendar",
+      "launchArgument": "-ui-testing-calendar",
+      "headline": "Plan shows.",
+      "accent": "orange"
+    },
+    {
+      "id": "identity",
+      "launchArgument": "-ui-testing-storefront-identity",
+      "headline": "Share one link.",
+      "accent": "ion"
+    }
+  ]
+}

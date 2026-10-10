@@ -77,6 +77,46 @@ export type DesignReferenceSection = z.infer<
   typeof DesignReferenceSectionSchema
 >;
 
+const Tag = z.string().trim().min(1).max(60);
+
+/**
+ * Retrieval tags (JOV-7081). `surfaces` names the Jovie surfaces a reference
+ * informs (homepage, golden-path, profile, app-shell, ...), which can differ
+ * from the page the reference was captured from.
+ */
+export const DesignReferenceTagsSchema = z
+  .object({
+    surfaces: z.array(Tag).max(12),
+    mood: z.array(Tag).max(12),
+    technique: z.array(Tag).max(12),
+    palette: z.array(Tag).max(12),
+    motion: z.array(Tag).max(12),
+  })
+  .strict();
+
+export type DesignReferenceTags = z.infer<typeof DesignReferenceTagsSchema>;
+
+const PerceptualHash = z.string().regex(/^[0-9a-f]{64}$/u);
+
+/**
+ * The captured pixels live outside git (third-party material is inspiration,
+ * never a shipped asset); the corpus keeps the content digest and the
+ * perceptual hashes the anti-copy guard compares against.
+ */
+export const DesignReferenceMediaSchema = z
+  .object({
+    file: z.string().trim().min(1).max(200),
+    sha256: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
+    /** 256-bit dHash of the whole capture. */
+    dhash: PerceptualHash,
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    capturedVia: z.enum(['playwright', 'image-fetch', 'file']),
+  })
+  .strict();
+
+export type DesignReferenceMedia = z.infer<typeof DesignReferenceMediaSchema>;
+
 export const DesignReferenceSchema = z
   .object({
     id: z.string().trim().min(1).max(120),
@@ -85,6 +125,8 @@ export const DesignReferenceSchema = z
     sections: z.array(DesignReferenceSectionSchema).min(1),
     notes: z.union([z.string().trim().max(4000), z.null()]),
     ingestedAt: z.string().datetime(),
+    tags: DesignReferenceTagsSchema.optional(),
+    media: DesignReferenceMediaSchema.optional(),
   })
   .strict();
 

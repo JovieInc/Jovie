@@ -12,6 +12,7 @@ import {
   EXHAUSTED_LABEL,
   readVercelReadonlyToken,
   runRemediationSweep,
+  SUMMER_CONFIG_REPO,
   SUMMER_HEALTH_URL,
   VERCEL_PROJECTS,
   VERCEL_TEAM_ID,
@@ -31,7 +32,20 @@ async function gh(args) {
   return stdout;
 }
 
-function normalizePull(node) {
+function reviewerName(review) {
+  return (
+    review?.login ??
+    review?.slug ??
+    review?.name ??
+    review?.author?.login ??
+    null
+  );
+}
+
+export function normalizePull(node) {
+  const reviewers = [...(node.reviewRequests ?? []), ...(node.reviews ?? [])]
+    .map(reviewerName)
+    .filter(name => typeof name === 'string' && name.length > 0);
   return {
     number: node.number,
     isDraft: node.isDraft === true,
@@ -43,6 +57,7 @@ function normalizePull(node) {
       .filter(name => typeof name === 'string'),
     reviewRequestCount: node.reviewRequests?.length ?? 0,
     reviewCount: node.reviews?.length ?? 0,
+    reviewers: [...new Set(reviewers)].sort(),
   };
 }
 
@@ -87,6 +102,109 @@ export async function loadOpenPullRequests(
         .at(-1) ?? null;
   }
   return pulls;
+}
+
+export async function loadSummerConfigPullRequests(repo = SUMMER_CONFIG_REPO) {
+  // statusCheckRollup resolves through StatusContext nodes that need commit
+  // statuses read on the cross-repo app installation. When that grant is
+  // missing, GitHub rejects the whole listing (the JOV-7871 failure that
+  // recurred Oct 6-8 despite permission-statuses: read — the app
+  // installation itself lacks the permission, which only a repository
+  // settings grant can fix). Degrade to a rollup-free listing hydrated with
+  // per-PR check reads so vercel and domains modes still run; a PR whose
+  // checks cannot be read is reported as a named warning instead of
+  // silently passing.
+  /** @type {any[]} */
+  let nodes;
+  let rollupComplete = true;
+  try {
+    nodes = JSON.parse(
+      await gh([
+        'pr',
+        'list',
+        '--repo',
+        repo,
+        '--state',
+        'open',
+        '--limit',
+        '500',
+        '--json',
+        'number,isDraft,url,headRefOid,autoMergeRequest,statusCheckRollup',
+      ])
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/not accessible by integration|Resource not accessible/i.test(message))
+      throw error;
+    console.error(`statusCheckRollup unavailable on ${repo}: ${message}`);
+    if (process.env.GITHUB_ACTIONS === 'true')
+      console.log(
+        `::warning::${repo} statusCheckRollup is unreadable with this token (the app installation lacks commit statuses read); degrading to per-PR check reads. Durable fix: grant the Jovie bot app commit statuses read on ${repo} (repository settings — Tim-gated).`
+      );
+    rollupComplete = false;
+    nodes = JSON.parse(
+      await gh([
+        'pr',
+        'list',
+        '--repo',
+        repo,
+        '--state',
+        'open',
+        '--limit',
+        '500',
+        '--json',
+        'number,isDraft,url,headRefOid,autoMergeRequest',
+      ])
+    );
+  }
+  if (nodes.length >= 500) {
+    throw new Error(`${repo} open pull request list hit the 500 cap`);
+  }
+  if (!rollupComplete) {
+    for (const node of nodes) {
+      try {
+        const combined = JSON.parse(
+          await gh([
+            'api',
+            `repos/${repo}/pulls/${node.number}`,
+            '--jq',
+            '.mergeable_state',
+          ])
+        );
+        // Rollup shape with a single state check; terminalPullFailures reads
+        // state through check.state. The GitHub combined states that mean the
+        // PR cannot merge green map onto terminal conclusions; SUCCESS,
+        // CLEAN, and HAS_HOOKS stay quiet. The REST combined state cannot
+        // name individual failed check runs, so the issue reason stays coarse.
+        const terminal = {
+          blocked: 'FAILURE',
+          dirty: 'FAILURE',
+          draft: null,
+          clean: null,
+          has_hooks: null,
+          unknown: null,
+          unstable: null,
+        }[String(combined).toLowerCase()];
+        node.statusCheckRollup = [
+          {
+            __typename: 'CheckRun',
+            name: `mergeable_state:${combined}`,
+            ...(terminal ? { state: terminal } : { conclusion: 'SUCCESS' }),
+            startedAt: null,
+          },
+        ];
+      } catch (error) {
+        console.error(
+          `per-PR check read failed for ${repo}#${node.number}: ${error?.message ?? error}`
+        );
+        if (process.env.GITHUB_ACTIONS === 'true')
+          console.log(
+            `::warning::${repo}#${node.number} checks unreadable; skipping its red-check judgment`
+          );
+      }
+    }
+  }
+  return nodes;
 }
 
 export async function loadSummerHealth(fetchImpl = fetch) {
@@ -192,6 +310,7 @@ async function main() {
     loadPulls: () =>
       loadOpenPullRequests(process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie'),
     loadHealth: () => loadSummerHealth(),
+    loadSummerPulls: () => loadSummerConfigPullRequests(),
     loadDeployments: () => loadVercelDeployments({ token: token?.token }),
     loadDomains: () => loadDomainRecords(),
     vercelTokenPresent: Boolean(token),

@@ -35,7 +35,7 @@
 - `marketing-o-mark-32` — The marketing O-mark is visibly 32px and control-aligned.
 - `semantic-accent-only` — Accent color communicates semantic state or a named data category, never decoration.
 - `decorative-icons-unboxed` — Decorative icons and emoji have no border, ring, circle, or badge plate.
-- `single-component-family` — One canonical component family owns a concept; supported states are variants consumed as instances.
+- `single-component-family` — One canonical component family owns a concept across customer and operator targets, including state, motion, focus and interaction logic; target adapters supply authorized data, destinations and permissions. Separate implementations require a documented behavior the owner cannot express. Supported states are variants consumed as instances.
 - `founder-review-canonical-only` — Founder review contains canonical masters and intentional variants, without receipts, duplicates, or filler.
 - `pen-source-identity-boundary` — Pen is proposal/review evidence until source identity and required persistence receipts pass.
 - `logo-visible-bounds-normalization` — Logos normalize visible non-transparent ink through the shared asset registry, never route-local crop or scale CSS.
@@ -58,7 +58,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (275 contract tokens; 535 total in CSS)
+## Design Tokens (275 contract tokens; 536 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -80,7 +80,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--ds-marketing-route-title-tracking`: -0.022em
 - `--ds-marketing-route-title-weight`: 620
 - `--ds-marketing-title-leading`: 1.08
-- `--ds-marketing-title-size`: clamp( var(--text-4xl), 4.6vw, calc(var(--text-5xl) + var(--space-4)) )
+- `--ds-marketing-title-size`: clamp( var(--text-4xl), 4.6vw, calc(var(--text-5xl) + var(--space-2)) )
 - `--ds-marketing-title-tracking`: 0
 - `--ds-motion-cinematic-duration`: 420ms
 - `--ds-motion-cinematic-easing`: cubic-bezier(0.22, 1, 0.36, 1)
@@ -437,9 +437,9 @@ These are the production review surfaces. Match their token usage and component 
 - **Dashboard Releases** (`dashboard-releases`) — Canonical authenticated releases workspace and current dashboard review/capture surface. — family: `features/dashboard/organisms/release-provider-matrix`
 - **Dashboard Audience** (`dashboard-audience`) — Canonical authenticated audience CRM workspace mirrored by the public /demo/audience route. — family: `features/dashboard/organisms`
 - **Dashboard Insights** (`dashboard-insights`) — Canonical insights workspace rendered through the shared InsightsPanelView. — family: `features/dashboard/insights`
-- **Dashboard Earnings** (`dashboard-earnings`) — Canonical pay and earnings workspace rendered inside the artist profile settings route and mirrored by the demo showcase. — family: `features/dashboard/dashboard-pay`
-- **Settings Artist Profile** (`settings-artist-profile`) — Canonical artist profile settings surface mirrored by the demo showcase route. — family: `features/dashboard/organisms/settings-profile-section`
-- **Settings Links** (`settings-links`) — Canonical links manager workspace rendered from the artist profile settings route and mirrored by the demo showcase. — family: `features/dashboard/organisms/grouped-links`
+- **Dashboard Earnings** (`dashboard-earnings`) — Canonical pay and earnings workspace rendered inside the profile settings route and mirrored by the demo showcase. — family: `features/dashboard/dashboard-pay`
+- **Settings Profile** (`settings-artist-profile`) — Canonical profile settings surface mirrored by the demo showcase route. — family: `features/dashboard/organisms/settings-profile-section`
+- **Settings Links** (`settings-links`) — Canonical links manager workspace rendered from the profile settings route and mirrored by the demo showcase. — family: `features/dashboard/organisms/grouped-links`
 
 ## ESLint Design Guardrails (6 rules)
 

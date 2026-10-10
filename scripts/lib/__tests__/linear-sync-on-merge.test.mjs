@@ -1,6 +1,16 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { formatDeprecationObservation } from '../deprecation-observation.mjs';
 import {
   COMMISSIONING_PARENT_ALLOWLIST,
   extractMergeIssueRef,
@@ -8,6 +18,7 @@ import {
   listOpenPullRequests,
   parentHoldReason,
   pullRequestLinksIssue,
+  recordValidationReceipt,
   syncLinearIssueOnMerge,
 } from '../linear-sync-on-merge.mjs';
 import {
@@ -16,6 +27,7 @@ import {
   intercept,
   json,
   MAIN,
+  NO_UI_MATRIX,
   REPO,
   receiptComment,
 } from './fixtures/validation-world.mjs';
@@ -96,6 +108,7 @@ function mergeEvent(fetchImpl, number, identifier = 'JOV-1', env = {}) {
     },
     fetchImpl,
     harnessManifest: HARNESS_MANIFEST,
+    assuranceMatrix: NO_UI_MATRIX,
     log: () => {},
   });
 }
@@ -105,11 +118,40 @@ function sweep(fetchImpl) {
     env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
     fetchImpl,
     harnessManifest: HARNESS_MANIFEST,
+    assuranceMatrix: NO_UI_MATRIX,
     log: () => {},
   });
 }
 
 describe('linear sync on merge', () => {
+  it('enters the validation lifecycle for a Summer-bound bot merge', async () => {
+    const body = '<!-- summer-issue-bind -->\nJOV-1\ntaskKey:abc';
+    expect(
+      extractMergeIssueRef({
+        body,
+        headRef: 'bot/coverage-audit-37652202419-1',
+      })
+    ).toEqual({ identifier: 'JOV-1', issueId: 'JOV-1' });
+    expect(
+      pullRequestLinksIssue(
+        { body, title: 'Coverage report', headRef: 'bot/report' },
+        { identifier: 'JOV-1', issueId: 'uuid-1' }
+      )
+    ).toBe(true);
+    expect(
+      extractMergeIssueRef({ body: 'Related: JOV-1', headRef: 'bot/report' })
+    ).toEqual({ identifier: '', issueId: '' });
+    expect(
+      extractMergeIssueRef({
+        body: '<!-- summer-issue-bind -->\nJOV-12',
+        headRef: 'bot/report',
+      })
+    ).toEqual({ identifier: 'JOV-12', issueId: 'JOV-12' });
+    const { world, fetchImpl } = createWorld();
+    const result = await mergeEvent(fetchImpl, 101, 'JOV-1', { PR_BODY: body });
+    expect(result.identifier).toBe('JOV-1');
+    expect(world.updates.length).toBeGreaterThan(0);
+  });
   it('reads the JOV-6586 branch the way the merge workflow did', () => {
     expect(
       extractMergeIssueRef({
@@ -226,6 +268,33 @@ describe('linear sync on merge', () => {
     expect(world.updates).toEqual(['JOV-1:Merging', 'JOV-1:Done']);
   });
 
+  it('recovers a missed merge from In Progress while preserving unmerged and unlinked writers', async () => {
+    const { world, fetchImpl } = createWorld({ served: MAIN[0].slice(0, 7) });
+    world.issues['JOV-1'].state = 'In Progress';
+    world.issues['JOV-2'] = {
+      ...world.issues['JOV-1'],
+      id: 'uuid-2',
+      identifier: 'JOV-2',
+      attachments: [],
+    };
+    world.issues['JOV-3'] = {
+      ...world.issues['JOV-1'],
+      id: 'uuid-3',
+      identifier: 'JOV-3',
+      attachments: ['https://github.com/JovieInc/Jovie/pull/102'],
+    };
+    world.pulls[102] = {
+      ...world.pulls[101],
+      mergedAt: null,
+      headRef: 'codex/jov-3-active',
+    };
+    await sweep(fetchImpl);
+    expect(world.issues['JOV-1'].state).toBe('Merging');
+    expect(world.issues['JOV-2'].state).toBe('In Progress');
+    expect(world.issues['JOV-3'].state).toBe('In Progress');
+    expect(world.updates).toEqual(['JOV-1:Merging']);
+  });
+
   it('moves the real escaped-defect merge path to Validating and never Done', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].labels = ['escaped-defect'];
@@ -322,9 +391,65 @@ describe('linear sync on merge', () => {
     );
   });
 
+  it('fails a sweep on a scan error and keeps per-issue failures in the message', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    world.issues['JOV-1'].attachments = [`https://github.com/${REPO}/pull/999`];
+    const failing = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=open')
+        ? { ok: false, status: 503, json: async () => ({}) }
+        : null
+    );
+    await expect(sweep(failing)).rejects.toThrow(
+      /open pull request scan failed, so issues were left in place; JOV-1: GitHub HTTP 404/
+    );
+    expect(world.updates).toEqual([]);
+  });
+
+  it('stops a sweep at the Linear rate limit, oldest issue first, and defers the rest', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    world.issues['JOV-1'].updatedAt = '2026-10-03T13:00:00Z';
+    world.issues['JOV-2'] = {
+      ...structuredClone(world.issues['JOV-1']),
+      id: 'uuid-2',
+      identifier: 'JOV-2',
+      updatedAt: '2026-10-03T09:00:00Z',
+    };
+    const asked = [];
+    const limited = intercept(fetchImpl, async (_url, body) => {
+      if (!body?.query?.includes('IssueLifecycle(')) return null;
+      asked.push(body.variables.issueId);
+      return {
+        ok: false,
+        status: 400,
+        json: async () => ({
+          errors: [
+            {
+              message: 'Rate limit exceeded',
+              extensions: { code: 'RATELIMITED' },
+            },
+          ],
+        }),
+      };
+    });
+    await expect(sweep(limited)).rejects.toThrow(
+      /JOV-2: Linear rate limited \(HTTP 400\); 1 issue\(s\) deferred to the next sweep/
+    );
+    expect(asked).toEqual(['JOV-2']);
+  });
+
   it('surfaces Linear HTTP and GraphQL errors, and skips unknown issues', async () => {
     for (const [response, error] of [
       [{ ok: false, status: 500, json: async () => ({}) }, /Linear HTTP 500/],
+      [
+        {
+          ok: false,
+          status: 400,
+          json: async () => ({ errors: [{ message: 'Query too complex' }] }),
+        },
+        /Linear HTTP 400: Query too complex/,
+      ],
       [
         json({ errors: [{ message: 'rate limited' }, 'x'] }),
         /rate limited; Linear request failed/,
@@ -354,12 +479,27 @@ describe('linear sync on merge', () => {
     );
   });
 
-  it('loads the harness manifest from the workspace; a missing one is unknown risk', async () => {
-    for (const [workspace, expected] of [
-      [resolve(import.meta.dirname, '../../..'), 'Done'],
-      ['/nonexistent-workspace', 'Validating'],
-    ]) {
+  it('loads the harness manifest and assurance matrix from the workspace; missing ones are unknown', async () => {
+    const repoRoot = resolve(import.meta.dirname, '../../..');
+    /** @type {[string, string[], string, string][]} */
+    const cases = [
+      [repoRoot, ['docs/README.md'], 'Done', ''],
+      [
+        repoRoot,
+        ['apps/web/components/atoms/RailToggleButton.tsx'],
+        'Validating',
+        'screen-audit',
+      ],
+      [
+        '/nonexistent-workspace',
+        ['docs/README.md'],
+        'Validating',
+        'human-certification',
+      ],
+    ];
+    for (const [workspace, files, expected, missing] of cases) {
       const { world, fetchImpl } = createWorld();
+      world.pulls[101].files = files;
       await syncLinearIssueOnMerge({
         env: {
           ...BASE_ENV,
@@ -372,6 +512,11 @@ describe('linear sync on merge', () => {
         log: () => {},
       });
       expect(world.issues['JOV-1'].state).toBe(expected);
+      if (missing) {
+        expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
+          `Next missing receipt: ${missing}.`
+        );
+      }
     }
   });
 
@@ -388,6 +533,52 @@ describe('linear sync on merge', () => {
     });
     expect(listed.complete).toBe(false);
     expect(listed.pulls[0].draft).toBe(true);
+  });
+
+  it('records an owner receipt through the CLI and refuses what it cannot record', async () => {
+    const args = [
+      '--issue',
+      'JOV-1',
+      '--kind',
+      'outcome',
+      '--status',
+      'pass',
+      '--sha',
+      MAIN[2],
+      '--evidence',
+      'https://example.test/outcome/1',
+    ];
+    const respond = data => async () => json({ data });
+    const env = { LINEAR_API_KEY: 'k' };
+    const body = await recordValidationReceipt(args, {
+      env,
+      fetchImpl: respond({
+        issue: { id: 'uuid-1' },
+        commentCreate: { success: true },
+      }),
+    });
+    expect(body).toContain('validation-receipt:v1');
+    await expect(recordValidationReceipt(args, { env: {} })).rejects.toThrow(
+      /LINEAR_API_KEY is required/
+    );
+    await expect(
+      recordValidationReceipt(args, {
+        env,
+        fetchImpl: respond({ issue: null }),
+      })
+    ).rejects.toThrow(/Could not resolve JOV-1/);
+    await expect(
+      recordValidationReceipt(args, {
+        env,
+        fetchImpl: respond({
+          issue: { id: 'uuid-1' },
+          commentCreate: { success: false },
+        }),
+      })
+    ).rejects.toThrow(/refused the validation receipt/);
+    await expect(
+      recordValidationReceipt(['--issue', 'JOV-1'], { env })
+    ).rejects.toThrow(/kind must be/);
   });
 
   it('delegates every lifecycle event to the script with its dependencies', () => {
@@ -421,4 +612,67 @@ describe('linear sync on merge', () => {
       }
     }
   });
+});
+
+it('loads every transitive dependency from the workflow sparse checkout', () => {
+  const repository = resolve(import.meta.dirname, '../../..');
+  const workflow = readFileSync(
+    join(repository, '.github/workflows/linear-sync-on-merge.yml'),
+    'utf8'
+  );
+  const sparse = workflow.match(/sparse-checkout: \|\n((?: {12}.+\n)+)/);
+  if (!sparse) throw new Error('workflow must declare its sparse checkout');
+  const paths = sparse[1]
+    .trim()
+    .split('\n')
+    .map(path => path.trim());
+  const root = mkdtempSync(join(tmpdir(), 'linear-sync-checkout-'));
+  try {
+    for (const path of paths) {
+      const target = join(root, path);
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(join(repository, path), target);
+    }
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `globalThis.fetch = () => { throw new Error('unexpected network call'); };
+         const entry = await import(process.argv[1]);
+         if (typeof entry.syncLinearIssueOnMerge !== 'function') process.exit(1);`,
+        pathToFileURL(join(root, 'scripts/lib/linear-sync-on-merge.mjs')).href,
+      ],
+      { cwd: root, encoding: 'utf8', env: {}, timeout: 10_000 }
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it('a recurring warning retains the remediation hold after a previous green observation', async () => {
+  const { world, fetchImpl } = createWorld();
+  const issue = world.issues['JOV-1'];
+  issue.title = '[deprecation-ec4e6e5b9ffb] Resolve warning';
+  issue.labels = ['remediation:deprecation-ec4e6e5b9ffb'];
+  issue.comments = ['green', 'red'].map((status, index) => ({
+    body: formatDeprecationObservation({
+      schema: 'jovie.deprecation-observation/v1',
+      issue: 'JOV-1',
+      fingerprint: 'deprecation-ec4e6e5b9ffb',
+      status,
+      headSha: MAIN[2],
+      runUrl: `https://github.com/JovieInc/Jovie/actions/runs/${123 + index}`,
+      observedAt: `2026-10-07T${12 + index}:00:00Z`,
+    }),
+    createdAt: `2026-10-07T${12 + index}:00:00Z`,
+  }));
+  const result = await mergeEvent(fetchImpl, 101);
+  expect(result.action).toBe('hold');
+  expect(result.comment).toContain(
+    'Fingerprinted remediation issues stay open'
+  );
+  expect(world.updates).toEqual([]);
 });

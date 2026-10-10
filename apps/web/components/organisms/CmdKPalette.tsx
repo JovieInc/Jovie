@@ -13,7 +13,7 @@
  *     `onAdditionalSelect`
  */
 
-import { Dialog, DialogContent } from '@jovie/ui';
+import { Button, Dialog, DialogContent } from '@jovie/ui';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -35,13 +35,15 @@ import { rankPaletteReleases } from '@/lib/commands/palette-ranking';
 import {
   type Command,
   commandsForSurface,
+  isCommandVisible,
   type NavCommand,
   type SkillCommand,
 } from '@/lib/commands/registry';
+import { useAppFlag } from '@/lib/flags/client';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useChatCapabilitiesQuery } from '@/lib/queries/useChatCapabilitiesQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
-import { cn } from '@/lib/utils';
+import { isFormElement } from '@/lib/utils/keyboard';
 import {
   artistResultToEntityRef,
   type ReleaseLikeRow,
@@ -79,9 +81,18 @@ interface CmdKPaletteProps {
 }
 
 function useCmdkData(profileId: string, query: string, open: boolean) {
+  const youtubeWorkspaceNav = useAppFlag('YOUTUBE_WORKSPACE_NAV');
+  const jovieWorkNav = useAppFlag('JOVIE_WORK_NAV');
+  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const commands = useMemo<readonly Command[]>(
-    () => commandsForSurface('cmdk'),
-    []
+    () =>
+      commandsForSurface('cmdk', { youtubeWorkspaceNav, jovieWorkNav }).filter(
+        command =>
+          isCommandVisible(command, {
+            PROFILES_WORKSPACE: profilesWorkspaceEnabled,
+          })
+      ),
+    [youtubeWorkspaceNav, jovieWorkNav, profilesWorkspaceEnabled]
   );
   const { data: chatCapabilities } = useChatCapabilitiesQuery({
     profileId,
@@ -100,7 +111,8 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
     [commands]
   );
 
-  const { data: releaseData } = useReleasesQuery(profileId, { enabled: open });
+  const releases = useReleasesQuery(profileId, { enabled: open });
+  const releaseData = releases.data;
   const releaseEntities = useMemo<EntityRef[]>(
     () =>
       rankPaletteReleases(
@@ -130,7 +142,7 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
     [artistSearch.results]
   );
 
-  return useMemo(
+  const sections = useMemo(
     () =>
       buildRegistrySections(
         query,
@@ -141,6 +153,25 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
       ),
     [query, skills, navs, releaseEntities, artistEntities]
   );
+
+  const hasArtistQuery = query.trim().length > 0;
+  const isSearching =
+    releases.isLoading ||
+    releases.isFetching ||
+    (hasArtistQuery &&
+      (artistSearch.query.trim() !== query.trim() ||
+        artistSearch.isPending ||
+        artistSearch.state === 'loading'));
+  const hasSearchError =
+    releases.isError || (hasArtistQuery && artistSearch.state === 'error');
+  const retrySearch = () => {
+    if (releases.isError) void releases.refetch();
+    if (hasArtistQuery && artistSearch.state === 'error') {
+      artistSearch.searchImmediate(query);
+    }
+  };
+
+  return { sections, isSearching, hasSearchError, retrySearch };
 }
 
 export function CmdKPalette({
@@ -171,7 +202,14 @@ export function CmdKPalette({
     if (presentation === 'dialog' && open) inputRef.current?.focus();
   }, [open, presentation]);
 
-  const registrySections = useCmdkData(profileId, query, open);
+  const {
+    sections: registrySections,
+    isSearching,
+    hasSearchError,
+    retrySearch,
+  } = useCmdkData(profileId, query, open);
+  const pendingMessage =
+    query.trim().length > 0 ? 'Searching…' : 'Loading results…';
   const filteredAdditional = useMemo(
     () => filterAdditionalSections(query, additionalSectionsAfter),
     [query, additionalSectionsAfter]
@@ -288,52 +326,104 @@ export function CmdKPalette({
     [flatItems, additionalIds, onAdditionalSelect, handleClose, router]
   );
 
+  const focusSearchInput = useCallback(() => {
+    const input = document.getElementById(`${generatedListId}-input`);
+    if (input instanceof HTMLInputElement && document.activeElement !== input) {
+      input.focus();
+    }
+  }, [generatedListId]);
+
   const handleKeyboardCommand = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.isComposing) return;
+    (e: KeyboardEvent, focusedIndex?: number) => {
+      if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
       if (
         (e.metaKey || e.ctrlKey) &&
+        !(e.metaKey && e.ctrlKey) &&
         !e.altKey &&
-        !e.shiftKey &&
-        (e.key === '1' || e.key === '2' || e.key === '3')
+        !e.shiftKey
       ) {
-        const nextIndex = Number(e.key) - 1;
-        if (nextIndex < flatItems.length) {
+        if (e.key.toLowerCase() === 'k') {
+          if (e.repeat) return;
           e.preventDefault();
-          setSelectedIndex(nextIndex);
+          handleClose();
+          return;
         }
-        return;
+        if (e.key === '1' || e.key === '2' || e.key === '3') {
+          const nextIndex = Number(e.key) - 1;
+          if (nextIndex < flatItems.length) {
+            e.preventDefault();
+            setSelectedIndex(nextIndex);
+            focusSearchInput();
+          }
+          return;
+        }
       }
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (e.repeat && (e.key === 'Enter' || e.key === 'Escape')) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex(prev =>
-          flatItems.length === 0 ? 0 : Math.min(prev + 1, flatItems.length - 1)
+          flatItems.length === 0
+            ? 0
+            : Math.min((focusedIndex ?? prev) + 1, flatItems.length - 1)
         );
+        focusSearchInput();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedIndex(prev => Math.max(prev - 1, 0));
+        setSelectedIndex(prev => Math.max((focusedIndex ?? prev) - 1, 0));
+        focusSearchInput();
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (activeIndex !== null) commitIndex(activeIndex);
+        const index = focusedIndex ?? activeIndex;
+        if (index !== null) commitIndex(index);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         handleClose();
       }
     },
-    [activeIndex, commitIndex, flatItems.length, handleClose]
+    [activeIndex, commitIndex, flatItems.length, focusSearchInput, handleClose]
   );
   const handleKeyboardCommandRef = useRef(handleKeyboardCommand);
   useEffect(() => {
     handleKeyboardCommandRef.current = handleKeyboardCommand;
   }, [handleKeyboardCommand]);
 
-  // Keyboard nav: arrow up/down/enter/escape with IME guard.
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // The context-mounted header delegates directly. Global handling belongs
+  // to this palette's dialog input or result composite. Escape also dismisses
+  // Search from non-form controls; editors retain their own Escape handling.
   useEffect(() => {
     if (!open) return;
-    globalThis.addEventListener('keydown', handleKeyboardCommand);
-    return () =>
-      globalThis.removeEventListener('keydown', handleKeyboardCommand);
-  }, [handleKeyboardCommand, open]);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.target === inputRef.current) {
+        handleKeyboardCommand(event);
+        return;
+      }
+      const target = event.target;
+      if (event.key === 'Escape' && !isFormElement(target)) {
+        handleKeyboardCommand(event);
+        return;
+      }
+      if (
+        !(target instanceof HTMLElement) ||
+        !resultsRef.current?.contains(target) ||
+        isFormElement(target)
+      ) {
+        return;
+      }
+      if (target.getAttribute('role') === 'option') {
+        const index = flatItems.findIndex(
+          (_, rowIndex) => target.id === `${generatedListId}-row-${rowIndex}`
+        );
+        if (index >= 0) handleKeyboardCommand(event, index);
+      } else if (target === resultsRef.current) {
+        handleKeyboardCommand(event);
+      }
+    };
+    globalThis.addEventListener('keydown', onKeyDown);
+    return () => globalThis.removeEventListener('keydown', onKeyDown);
+  }, [flatItems, generatedListId, handleKeyboardCommand, open]);
 
   const dialogInput = (
     <div className='flex h-full min-w-0 flex-1 items-center gap-2'>
@@ -343,6 +433,7 @@ export function CmdKPalette({
       />
       <input
         ref={inputRef}
+        id={`${generatedListId}-input`}
         type='search'
         value={query}
         onChange={e => {
@@ -407,9 +498,35 @@ export function CmdKPalette({
         Type to search all matching items.
       </p>
       <div
+        role='status'
+        aria-live='polite'
+        className='flex h-10 shrink-0 items-center gap-2 px-4 text-sm text-secondary-token'
+      >
+        {hasSearchError ? (
+          <>
+            <span>Some results could not load.</span>
+            <Button
+              variant='ghost'
+              size='sm'
+              disabled={isSearching}
+              onClick={() => {
+                focusSearchInput();
+                retrySearch();
+              }}
+            >
+              Retry Search
+            </Button>
+          </>
+        ) : isSearching ? (
+          pendingMessage
+        ) : null}
+      </div>
+      <div
+        ref={resultsRef}
         className='min-h-0 flex-1 overflow-y-auto pb-2 pt-1.5'
         role='listbox'
         aria-label='Command Palette Results'
+        aria-busy={isSearching}
         id={generatedListId}
       >
         <PaletteList
@@ -417,7 +534,7 @@ export function CmdKPalette({
           selectedIndex={activeIndex ?? -1}
           setSelectedIndex={setSelectedIndex}
           commitIndex={commitIndex}
-          emptyHint='No matches.'
+          emptyHint={isSearching || hasSearchError ? null : 'No matches.'}
           variant='cmdk'
           showIndexedShortcuts
           listId={generatedListId}
@@ -445,23 +562,7 @@ export function CmdKPalette({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        // JOV-2982: full-viewport search takeover (not a centered card).
-        // Overrides DialogContent centered defaults via tailwind-merge.
-        className={cn(
-          'left-0 top-0 h-dvh w-full max-w-none [translate:0_0]',
-          'grid gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none',
-          'bg-(--app-shell-content-surface)',
-          'sm:max-w-none',
-          // Full-page: fade only (no zoom — zoom reads as a modal card)
-          'data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100'
-        )}
-        hideClose
-        overlayProps={{
-          className: 'bg-(--app-shell-content-surface)',
-        }}
-        testId='cmdk-full-page'
-      >
+      <DialogContent variant='fullscreen' hideClose testId='cmdk-full-page'>
         <DialogPrimitive.Title className='sr-only'>
           Command palette
         </DialogPrimitive.Title>

@@ -325,11 +325,49 @@ class FakeLinear:
 
 class AdmissionTest(unittest.TestCase):
     def setUp(self):
+        # Keep default-time helpers on the same clock as the simulated hold window.
+        clock = mock.patch.object(design_gate.time, "time", return_value=NOW)
+        clock.start()
+        self.addCleanup(clock.stop)
         self.lane = load_lane()
+        # Keep default-time helpers on the same clock as the simulated hold window.
+        clock = mock.patch.object(design_gate.time, "time", return_value=NOW)
+        clock.start()
+        self.addCleanup(clock.stop)
 
     def task(self, identifier, title, description, priority, labels):
         return self.lane.Issue(f"id-{identifier}", identifier, title, description, priority,
                                "2026-09-01T00:00:00Z", list(labels))
+
+    def test_designated_buildable_issue_precedes_another_due_brief(self):
+        target = self.task("JOV-7896", "Repair account claim conversion", "body", 2,
+                           ["agent-ready", "dispatch-next", "devin"])
+        held = self.task("JOV-4258", "Homepage hero", "no brief", 1, ["ws:ui-ia"])
+        linear = FakeLinear([target, held])
+        picked = design_gate.pick_build_issue([held, target], {}, pick=self.lane.pick_issue,
+                                             linear=linear, provider="devin", now=NOW)
+        self.assertIs(picked, target)
+        self.assertEqual(linear.calls, [])
+        target.labels.remove("dispatch-next")
+        self.assertIs(design_gate.pick_build_issue([held, target], {}, pick=self.lane.pick_issue,
+                         linear=linear, provider="devin", now=NOW), held)
+
+    def test_designation_preserves_whole_pool_duplicate_admission(self):
+        canonical = self.task("JOV-1", "Repair account claim conversion", "body", 2, [])
+        target = self.task("JOV-7896", canonical.title, "body", 2, ["agent-ready", "dispatch-next"])
+        target.created_at = "2026-09-02T00:00:00Z"
+        self.assertIs(design_gate.pick_build_issue([canonical, target], {}, pick=self.lane.pick_issue,
+                      provider="devin", now=NOW), canonical)
+
+    def test_designation_does_not_bypass_design_or_worker_admission(self):
+        target = self.task("JOV-7896", "Homepage hero", "no brief", 2,
+                           ["agent-ready", "dispatch-next", "ws:ui-ia"])
+        other = self.task("JOV-4258", "Homepage banner", "no brief", 1, ["ws:ui-ia"])
+        picked = design_gate.pick_build_issue([target, other], {}, pick=self.lane.pick_issue,
+                                             provider="hyperagent", now=NOW)
+        self.assertIsNone(picked)
+        self.assertIs(design_gate.pick_build_issue([target, other], {"JOV-7896": 3},
+                      pick=self.lane.pick_issue, provider="devin", now=NOW), other)
 
     def test_a_held_issue_gets_its_brief_run_on_the_next_claim(self):
         build = self.task("JOV-2", "Tab indicator collapses JOV-2", "body", 1, [])
@@ -403,6 +441,23 @@ class AdmissionTest(unittest.TestCase):
         self.assertFalse(design_gate.ensure_brief_auto(
             linear, linear.refresh(held), late, now=NOW + design_gate.HOLD_LIMIT_S))
         self.assertEqual(linear.descriptions[held.id].count('"orderId"'), 1)
+
+    def test_auto_admitted_hold_precedes_ordinary_work_until_build_claim(self):
+        held_at = design_gate.held_marker(NOW - design_gate.HOLD_LIMIT_S)
+        auto = self.task("JOV-2", "Homepage hero", held_at, 4,
+                         ["needs-design-brief", "ws:ui-ia"])
+        ordinary = self.task("JOV-1", "Urgent tab repair", "body", 1, [])
+        due = self.task("JOV-3", "Homepage footer", "no brief", 1, ["ws:ui-ia"])
+        linear = FakeLinear([auto, ordinary, due])
+
+        picked = design_gate.pick_build_issue(
+            [ordinary, due, auto], {}, pick=self.lane.pick_issue, linear=linear,
+            provider="devin", now=NOW)
+
+        self.assertIs(picked, auto)
+        self.assertFalse(design_gate.wants_brief(picked, now=NOW))
+        self.assertIn(design_gate.BRIEF_AUTO_LABEL, linear.labels[auto.id])
+        self.assertIn("held 24h", linear.comments[-1][1])
 
 
 class FounderOrderTest(unittest.TestCase):
@@ -507,6 +562,18 @@ class BriefLaneTest(unittest.TestCase):
             prompt = (host.state / "runs" / f"{second['runId']}.prompt.md").read_text()
             self.assertIn("Frontier retry", prompt)
             self.assertEqual(design_gate.build_admission(linear.refresh(gated))["reason"], "brief-auto")
+
+
+class DesignLoopPromptTest(unittest.TestCase):
+    def test_ui_issues_get_the_design_loop_and_other_work_does_not(self):
+        lane = load_lane()
+        ui = lane.Issue("id-JOV-5", "JOV-5", "Homepage hero", "brief", 1, "2026-09-01T00:00:00Z", ["ws:ui-ia"])
+        plain = lane.Issue("id-JOV-6", "JOV-6", "Fix cron retry", "body", 1, "2026-09-01T00:00:00Z", [])
+        ui_prompt = lane.render_prompt(ui, "devin/jov-5", "ctx", provider="devin")
+        self.assertIn("Design loop (UI issue)", ui_prompt)
+        self.assertIn("pnpm design:conformance:gate", ui_prompt)
+        self.assertIn("founder taste card after landing", ui_prompt)
+        self.assertNotIn("Design loop", lane.render_prompt(plain, "devin/jov-6", "ctx", provider="devin"))
 
 
 class DoctorCensusTest(unittest.TestCase):

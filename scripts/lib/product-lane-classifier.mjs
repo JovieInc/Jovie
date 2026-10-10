@@ -139,7 +139,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'web-product',
     'web',
     ['web'],
-    /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|skills\/jovie\/(SKILL\.md|README\.md|LICENSE)$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
+    /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|brand|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|skills\/jovie\/(SKILL\.md|README\.md|LICENSE)$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
   ],
   [
     'operations-tooling',
@@ -365,13 +365,182 @@ export function classifyPackageJsonChange(beforeSource, afterSource) {
   );
 }
 
+// The desktop lane is the only product the lockfile can reach that needs a
+// hosted macOS runner, and that runner's pickup is the slowest step in a
+// merge group (8-68 min on 2026-10-10 against a 7 min build). Walk the
+// pnpm-lock v9 graph the desktop and macOS importers can reach; a lockfile
+// change that leaves that subgraph byte-identical cannot change what the
+// Mac lane builds, so it stays a web-only shared change. Anything the walk
+// cannot resolve fails closed onto the full lockfile rule.
+const LOCKFILE_RULE = RULES.find(([id]) => id === 'shared-js-lockfile');
+const MAC_IMPORTERS = ['apps/desktop', 'apps/macos'];
+const LOCK_DEPENDENCY_SECTIONS = new Set([
+  'dependencies',
+  'devDependencies',
+  'optionalDependencies',
+]);
+
+function unquoteLockKey(value) {
+  return value.replace(/^'(.*)'$/, '$1');
+}
+
+/** Top-level `name:` sections → their body lines; entries at indent 2 → body text. */
+function parseLockSections(source) {
+  const sections = new Map();
+  let current = null;
+  for (const line of source.split(/\r?\n/)) {
+    const top = /^([A-Za-z]+):\s*$/.exec(line);
+    if (top) {
+      current = [];
+      sections.set(top[1], current);
+      continue;
+    }
+    if (current && line.length > 0) current.push(line);
+  }
+  return sections;
+}
+
+function parseLockEntries(lines) {
+  const entries = new Map();
+  let key = null;
+  let body = [];
+  const flush = () => {
+    if (key !== null) entries.set(key, body.join('\n'));
+  };
+  for (const line of lines) {
+    const entry = /^ {2}(\S.*?):(?:\s*\{\})?\s*$/.exec(line);
+    if (entry && !line.startsWith('   ')) {
+      flush();
+      key = unquoteLockKey(entry[1]);
+      body = [];
+    } else if (key !== null) {
+      body.push(line);
+    }
+  }
+  flush();
+  return entries;
+}
+
+/** Importer body → [name, version] pairs across the dependency sections. */
+function importerDependencies(body) {
+  const pairs = [];
+  let section = null;
+  let name = null;
+  for (const line of body.split('\n')) {
+    const header = /^ {4}([A-Za-z]+):\s*$/.exec(line);
+    if (header) {
+      section = LOCK_DEPENDENCY_SECTIONS.has(header[1]) ? header[1] : null;
+      continue;
+    }
+    const dependency = /^ {6}(\S.*?):\s*$/.exec(line);
+    if (dependency) {
+      name = section ? unquoteLockKey(dependency[1]) : null;
+      continue;
+    }
+    const version = /^ {8}version:\s*(.+?)\s*$/.exec(line);
+    if (version && name) pairs.push([name, unquoteLockKey(version[1])]);
+  }
+  return pairs;
+}
+
+/** Snapshot body → `name@version` keys it depends on. */
+function snapshotDependencies(body) {
+  const keys = [];
+  let inSection = false;
+  for (const line of body.split('\n')) {
+    const header = /^ {4}([A-Za-z]+):\s*$/.exec(line);
+    if (header) {
+      inSection = LOCK_DEPENDENCY_SECTIONS.has(header[1]);
+      continue;
+    }
+    const item = /^ {6}(\S.*?):\s*(\S.*?)\s*$/.exec(line);
+    if (item && inSection)
+      keys.push(snapshotKey(unquoteLockKey(item[1]), unquoteLockKey(item[2])));
+  }
+  return keys;
+}
+
+/** `alias: real-name@1.2.3` resolves to the aliased package's own snapshot. */
+function snapshotKey(name, version) {
+  return /^[0-9]/.test(version) ? `${name}@${version}` : version;
+}
+
+function resolveLinkImporter(importer, target) {
+  const segments = importer === '.' ? [] : importer.split('/');
+  for (const part of target.split('/')) {
+    if (part === '..') segments.pop();
+    else if (part !== '.' && part !== '') segments.push(part);
+  }
+  return segments.length === 0 ? '.' : segments.join('/');
+}
+
+/** Canonical text of everything the Mac importers can reach, or null when unresolved. */
+export function macLockfileGraph(source) {
+  const sections = parseLockSections(source);
+  if (!sections.has('importers') || !sections.has('snapshots')) return null;
+  const importers = parseLockEntries(sections.get('importers'));
+  const snapshots = parseLockEntries(sections.get('snapshots'));
+  const packages = parseLockEntries(sections.get('packages') ?? []);
+  const reached = new Map();
+  const seenImporters = new Set();
+  const pendingImporters = MAC_IMPORTERS.filter(name => importers.has(name));
+  const pendingKeys = [];
+  while (pendingImporters.length > 0) {
+    const importer = pendingImporters.shift();
+    if (seenImporters.has(importer)) continue;
+    seenImporters.add(importer);
+    const body = importers.get(importer);
+    if (body === undefined) return null;
+    reached.set(`importer ${importer}`, body);
+    for (const [name, version] of importerDependencies(body)) {
+      if (version.startsWith('link:'))
+        pendingImporters.push(
+          resolveLinkImporter(importer, version.slice('link:'.length))
+        );
+      else pendingKeys.push(snapshotKey(name, version));
+    }
+  }
+  while (pendingKeys.length > 0) {
+    const key = pendingKeys.shift();
+    const snapshotKey = `snapshot ${key}`;
+    if (reached.has(snapshotKey)) continue;
+    const body = snapshots.get(key);
+    if (body === undefined) return null;
+    reached.set(snapshotKey, body);
+    const packageKey = key.includes('(') ? key.slice(0, key.indexOf('(')) : key;
+    reached.set(`package ${packageKey}`, packages.get(packageKey) ?? '');
+    pendingKeys.push(...snapshotDependencies(body));
+  }
+  return [...reached.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([key, body]) => `${key}\n${body}`)
+    .join('\n');
+}
+
+export function classifyLockfileChange(beforeSource, afterSource) {
+  const [id, category, products] = LOCKFILE_RULE;
+  const full = [id, category, [...products]];
+  if (typeof beforeSource !== 'string' || typeof afterSource !== 'string')
+    return full;
+  const before = macLockfileGraph(beforeSource);
+  const after = macLockfileGraph(afterSource);
+  if (before === null || after === null || before !== after) return full;
+  return ['shared-js-lockfile-web-only', 'shared-contract', ['web']];
+}
+
 /**
  * @param {string[]} paths
- * @param {{ packageJsonBefore?: string, packageJsonAfter?: string, qualificationProfile?: 'full' | 'content-only' }} [options]
+ * @param {{ packageJsonBefore?: string, packageJsonAfter?: string, lockfileBefore?: string, lockfileAfter?: string, qualificationProfile?: 'full' | 'content-only' }} [options]
  */
 export function classifyProductLanes(
   paths,
-  { packageJsonBefore, packageJsonAfter, qualificationProfile = 'full' } = {}
+  {
+    packageJsonBefore,
+    packageJsonAfter,
+    lockfileBefore,
+    lockfileAfter,
+    qualificationProfile = 'full',
+  } = {}
 ) {
   const changedPaths = [
     ...new Set(paths.map(normalizePath).filter(Boolean)),
@@ -383,7 +552,9 @@ export function classifyProductLanes(
     const rule =
       path === 'package.json'
         ? classifyPackageJsonChange(packageJsonBefore, packageJsonAfter)
-        : RULES.find(([, , , pattern]) => pattern.test(path));
+        : path === 'pnpm-lock.yaml'
+          ? classifyLockfileChange(lockfileBefore, lockfileAfter)
+          : RULES.find(([, , , pattern]) => pattern.test(path));
     if (!rule) {
       unmappedPaths.push(path);
       continue;
@@ -465,13 +636,17 @@ export function classifyProductLanes(
   };
 }
 
-function readPackageJsonAtRef(ref, cwd) {
-  return execFileSync('git', ['show', `${ref}:package.json`], {
+function readFileAtRef(ref, path, cwd) {
+  return execFileSync('git', ['show', `${ref}:${path}`], {
     cwd,
     encoding: 'utf8',
-    maxBuffer: 5 * 1024 * 1024,
+    maxBuffer: 64 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+}
+
+function readPackageJsonAtRef(ref, cwd) {
+  return readFileAtRef(ref, 'package.json', cwd);
 }
 
 export function evaluateProductLaneResults(receipt, results) {
@@ -573,9 +748,23 @@ export function runProductLaneClassifier(
       );
     }
   }
+  let lockfileBefore;
+  let lockfileAfter;
+  if (files.map(normalizePath).includes('pnpm-lock.yaml')) {
+    try {
+      lockfileBefore = readFileAtRef(args['base-ref'], 'pnpm-lock.yaml', cwd);
+      lockfileAfter = readFileAtRef(args['head-ref'], 'pnpm-lock.yaml', cwd);
+    } catch (error) {
+      console.warn(
+        `::warning::Could not inspect pnpm-lock.yaml change; selecting the Mac lane: ${error.message}`
+      );
+    }
+  }
   const receipt = classifyProductLanes(files, {
     packageJsonBefore,
     packageJsonAfter,
+    lockfileBefore,
+    lockfileAfter,
     qualificationProfile: args['qualification-profile'] ?? 'full',
   });
   const json = `${JSON.stringify(receipt, null, 2)}\n`;

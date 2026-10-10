@@ -337,6 +337,22 @@ struct JovieApp: App {
   }
 }
 
+enum PushNotificationDeepLink {
+  /// The server embeds the campaign CTA in `payload.url`
+  /// (apps/web/lib/notifications/push.ts). Only http(s) links are honored —
+  /// pushed custom schemes are never trusted.
+  static func url(from userInfo: [AnyHashable: Any]) -> URL? {
+    guard
+      let raw = userInfo["url"] as? String,
+      let url = URL(string: raw),
+      let scheme = url.scheme?.lowercased(),
+      scheme == "http" || scheme == "https",
+      url.host != nil
+    else { return nil }
+    return url
+  }
+}
+
 final class JovieAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
   func application(
     _: UIApplication,
@@ -371,6 +387,23 @@ final class JovieAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
     withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
   ) {
     completionHandler([.banner, .list, .sound, .badge])
+  }
+
+  func userNotificationCenter(
+    _: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    defer { completionHandler() }
+    guard
+      response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+      let url = PushNotificationDeepLink.url(
+        from: response.notification.request.content.userInfo
+      )
+    else { return }
+    // No associated-domains entitlement: http(s) CTAs hand off to the system
+    // browser instead of looping back through the auth-only URL inbox.
+    UIApplication.shared.open(url)
   }
 
   func application(

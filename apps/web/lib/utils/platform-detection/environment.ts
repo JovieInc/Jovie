@@ -30,7 +30,7 @@ const PREVIEW_HOSTNAMES = new Set([
  * Dynamically get the base URL for the current browser origin.
  *
  * For profile-related URLs (profile links, QR codes, vCards, etc.), use
- * PROFILE_URL from '@/constants/domains' instead - it always returns the
+ * BASE_URL from '@/constants/domains' instead - it always returns the
  * canonical production URL (jov.ie) regardless of the current environment.
  *
  * Use getBaseUrl() only when you need the current origin for same-origin

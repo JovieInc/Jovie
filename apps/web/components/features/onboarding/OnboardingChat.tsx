@@ -99,6 +99,10 @@ import {
  */
 
 interface OnboardingChatProps {
+  readonly initialMessages?: UIMessage[];
+  readonly conversationId?: string | null;
+  readonly interactionDisabled?: boolean;
+  readonly onBusyChange?: (busy: boolean) => void;
   /** ID for a homepage-captured starter prompt stored in localStorage. */
   readonly intentId?: string;
   /** Turnstile token from the widget. Required on first message. */
@@ -134,16 +138,19 @@ interface OnboardingChatProps {
 class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
   private readonly turnstileState: { token: string | null };
 
-  constructor() {
+  constructor(conversationId: string | null) {
     const turnstileState = { token: null as string | null };
     super({
       api: '/api/chat',
-      body: { mode: 'onboarding' as const },
+      body: {
+        mode: 'onboarding' as const,
+        ...(conversationId ? { onboardingConversationId: conversationId } : {}),
+      },
       prepareSendMessagesRequest: ({ messages, body }) => ({
         body: {
           ...body,
           mode: 'onboarding' as const,
-          messages,
+          messages: messages.slice(-50),
           ...(turnstileState.token
             ? { turnstileToken: turnstileState.token }
             : {}),
@@ -607,6 +614,7 @@ interface OnboardingMessageRegionProps {
   readonly shouldDockComposer: boolean;
   readonly entryMode: OnboardingEntryMode;
   readonly entryProfile: StartEntryProfile | null;
+  readonly onTryAnotherName: () => void;
   readonly composerPickerOpen: boolean;
 }
 
@@ -615,6 +623,7 @@ function OnboardingMessageRegion({
   displayMessages,
   entryMode,
   entryProfile,
+  onTryAnotherName,
   hasConversationStarted,
   isBusy,
   isStreaming,
@@ -656,6 +665,7 @@ function OnboardingMessageRegion({
             <OnboardingChatEmptyIntro
               mode={entryMode}
               entryProfile={entryProfile}
+              onTryAnotherName={onTryAnotherName}
             />
           </div>
         }
@@ -712,6 +722,10 @@ export function OnboardingChat({
   turnstilePanelVisible = false,
   turnstileStatus,
   turnstileToken,
+  initialMessages = [],
+  conversationId = null,
+  interactionDisabled = false,
+  onBusyChange,
 }: OnboardingChatProps) {
   const initialStarterPrompt = starterHandoff?.prompt ?? '';
   const hasInitialStarterPrompt = initialStarterPrompt.length > 0;
@@ -728,7 +742,7 @@ export function OnboardingChat({
   });
   const latestInputRef = useRef(initialDraft);
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const [hasSentFirst, setHasSentFirst] = useState(false);
+  const [hasSentFirst, setHasSentFirst] = useState(initialMessages.length > 0);
   const [verificationRequested, setVerificationRequested] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
@@ -736,7 +750,9 @@ export function OnboardingChat({
   const [selectedArtist, setSelectedArtist] =
     useState<OnboardingArtistSelection | null>(null);
   const chipTray = useChipTray();
-  const completedUserTurnsRef = useRef(0);
+  const completedUserTurnsRef = useRef(
+    initialMessages.filter(message => message.role === 'user').length
+  );
   const hasTrackedChatStartedRef = useRef(false);
   const hasTrackedChatCompletedRef = useRef(false);
   const lastAttemptedMessageRef = useRef<string | null>(null);
@@ -758,6 +774,10 @@ export function OnboardingChat({
     setInput(nextInput);
   }, []);
 
+  const focusComposer = useCallback(() => {
+    composerInputRef.current?.focus();
+  }, []);
+
   useEffect(() => {
     setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
   }, []);
@@ -770,13 +790,17 @@ export function OnboardingChat({
 
   // AI SDK's useChat captures its transport when the Chat instance is created.
   // Keep it stable and update its request state before any passive send effect.
-  const transport = useMemo(() => new OnboardingChatTransport(), []);
+  const transport = useMemo(
+    () => new OnboardingChatTransport(conversationId),
+    [conversationId]
+  );
   useLayoutEffect(() => {
     transport.setTurnstileToken(turnstileToken);
   }, [transport, turnstileToken]);
 
   const { messages, sendMessage, setMessages, status, stop } = useChat({
-    id: 'onboarding',
+    id: conversationId ?? 'onboarding',
+    messages: initialMessages,
     transport,
     onError: error => {
       const type = getErrorType(error);
@@ -805,8 +829,23 @@ export function OnboardingChat({
   });
 
   const isSubmitted = status === 'submitted';
+  useEffect(
+    () => () => {
+      stop();
+    },
+    [stop]
+  );
+  useEffect(
+    () => () => {
+      onBusyChange?.(false);
+    },
+    [onBusyChange]
+  );
   const isStreaming = status === 'streaming';
-  const isBusy = isSubmitted || isStreaming;
+  const isBusy = isSubmitted || isStreaming || interactionDisabled;
+  useEffect(() => {
+    onBusyChange?.(isSubmitted || isStreaming);
+  }, [isSubmitted, isStreaming, onBusyChange]);
   useLayoutEffect(() => {
     if (!chatError) return;
     composerInputRef.current?.focus({ preventScroll: true });
@@ -1178,6 +1217,7 @@ export function OnboardingChat({
             displayMessages={displayMessages}
             entryMode={entryMode}
             entryProfile={entryProfile}
+            onTryAnotherName={focusComposer}
             hasConversationStarted={hasConversationStarted}
             isBusy={isBusy}
             isStreaming={isStreaming}

@@ -94,6 +94,13 @@ class ClassifierFixtureTest(unittest.TestCase):
     def test_lockfile_only_and_main_red_and_events(self):
         lock = pr(mergeStateStatus="DIRTY", conflictFiles=["pnpm-lock.yaml"])
         self.assertEqual(remediation.classify_blocker(lock)["subtype"], "lockfile-only")
+        generated = pr(mergeStateStatus="DIRTY", conflictFiles=[".github/workflow-topology.gen.yml"])
+        self.assertEqual(remediation.classify_blocker(generated)["subtype"], "generated-only")
+        self.assertEqual(remediation.plan_ladder(remediation.classify_blocker(generated), {}, providers(), 0, "h")["action"],
+                         "resolve-lockfile")
+        mixed = pr(mergeStateStatus="DIRTY",
+                   conflictFiles=[".github/workflow-topology.gen.yml", "src/a.ts"])
+        self.assertEqual(remediation.classify_blocker(mixed)["subtype"], "semantic")
         overlap = pr(statusCheckRollup=[{"name": "CI", "status": "COMPLETED", "conclusion": "FAILURE"}])
         main = [{"name": "CI", "conclusion": "FAILURE"}]
         self.assertEqual(remediation.classify_blocker(overlap, main_rollup=main)["subtype"], "main-red")
@@ -226,14 +233,23 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertIsNone(remediation.non_pr_event("workflow_run", {"workflow_run": {
             "event": "pull_request", "conclusion": "failure", "pull_requests": [{"number": 1}]}}))
 
-    def test_registry_keeps_hyperagent_disabled(self):
+    def test_registry_hyperagent_is_a_remote_only_regular_lane(self):
+        # JOV-7706: Hyperagent is enabled, on a deliberate auto-mode agent id, but it cannot
+        # continue a local worktree, so handoff and escalation never pick it.
         catalog = json_providers()
-        self.assertFalse(catalog["hyperagent"]["enabled"])
+        hyperagent = catalog["hyperagent"]
+        self.assertTrue(hyperagent.get("enabled", True))
+        self.assertIs(hyperagent["repairs"], False)
+        self.assertEqual(hyperagent["agentId"], "cmtj3n2q901i407adklzzq01t")
+        self.assertEqual(hyperagent["agentName"], "GLM 5.3 Developer")
         self.assertFalse(catalog["grok"]["enabled"])
         self.assertFalse(catalog["kimi"]["enabled"])
-        chosen = remediation.route_lane(catalog, healthy=lambda name, spec: True)
-        self.assertNotEqual(chosen["lane"], "hyperagent")
-        self.assertNotIn("hyperagent", {spec and name for name, spec in catalog.items() if not spec.get("enabled", True)} & {chosen["lane"]})
+        for skip in ([], ["devin"], ["devin", "codex"], ["devin", "codex", "claude"]):
+            chosen = remediation.route_lane(catalog, exclude=set(skip), healthy=lambda name, spec: True)
+            self.assertNotEqual((chosen or {}).get("lane"), "hyperagent")
+        top = remediation.select_escalation_lane(catalog, {"devin", "codex", "claude"},
+                                                 healthy=lambda name, spec: True)
+        self.assertNotEqual(top["lane"], "hyperagent")
 
     def test_ha_ci_remediator_poke_is_gone(self):
         needle = "ha-" + "ci-remediator-poke"
@@ -413,12 +429,17 @@ class LabeledEventTest(unittest.TestCase):
             linear_issue("JOV-7", "musicfetch-quota", title="Renew MusicFetch", description="renew MusicFetch"),
         ]
         calls = []
+        states = {node["id"]: {"id": "todo", "name": "Todo"} for node in nodes}
 
         class Linear:
             def gql(self, query, variables):
                 calls.append(query)
                 if "issues(" in query:
-                    return {"issues": {"nodes": nodes}}
+                    return {"issues": {"nodes": nodes, "pageInfo": {"hasNextPage": False, "endCursor": None}}}
+                if query.startswith("query") and "issue(" in query:
+                    return {"issue": {"id": variables["id"], "state": states[variables["id"]]}}
+                if query.startswith("mutation") and "issueUpdate" in query:
+                    states[variables["id"]] = {"id": variables["s"], "name": "In Progress"}
                 return {"issueUpdate": {"success": True}, "issueAddLabel": {"success": True}}
 
             def comment(self, issue_id, body):
@@ -437,6 +458,9 @@ class LabeledEventTest(unittest.TestCase):
             self.assertEqual(stored["events"]["musicfetch-quota"]["route"], "JOV-7323")
             self.assertIn("Do not renew MusicFetch", stored["events"]["musicfetch-quota"]["dossier"])
             self.assertNotEqual(stored["events"]["billing-health-public"]["lane"], "devin")
+            # Planning remains one shared bulk inventory read. Targeted start
+            # and acknowledgement readbacks belong to worker admission.
+            self.assertFalse(any(isinstance(query, str) and "issue(id:" in query for query in calls))
             lane_name = stored["events"]["musicfetch-quota"]["lane"]
             for fingerprint, row in stored["events"].items():
                 if fingerprint != "musicfetch-quota" and row.get("lane") == lane_name:
@@ -454,7 +478,7 @@ class LabeledEventTest(unittest.TestCase):
         self.assertEqual(len(reads), 2)
         self.assertIn('"JOV"', reads[0])
         self.assertIn('"LYB"', reads[0])
-        self.assertFalse(any(isinstance(query, str) and "issue(id:" in query for query in calls))
+        self.assertEqual(sum(isinstance(query, str) and "issue(id:" in query for query in calls), 2)
 
     def test_closed_label_is_history_and_titles_do_not_match(self):
         """JOV-7544's title uses the colon form. Match the label, including across JOV and LYB."""
@@ -529,6 +553,80 @@ class LabeledEventTest(unittest.TestCase):
 def json_providers():
     import json
     return json.loads((ROOT / "scripts/lanes/providers.json").read_text())
+
+
+class CompleteEventInventoryTest(unittest.TestCase):
+    def setUp(self):
+        self.runner = sys.modules.get("lane_runner") or load("lane_runner")
+
+    def fetch(self, pages):
+        from unittest.mock import patch
+        calls = []
+        class Linear:
+            def gql(self, query, variables):
+                calls.append(variables["after"])
+                result = pages[len(calls) - 1]
+                if isinstance(result, Exception):
+                    raise result
+                return result
+        with patch.object(self.runner, "shared", side_effect=lambda key, ttl, fetch: fetch()) as cache:
+            result = self.runner.fetch_labeled_events(Linear())
+            self.assertEqual(cache.call_args.args[0], "remediation-events-v2")
+        return result, calls
+
+    def test_reads_beyond_first_hundred_without_duplicate_ids(self):
+        first = [{"id": str(i)} for i in range(100)]
+        result, calls = self.fetch([
+            {"issues": {"nodes": first, "pageInfo": {"hasNextPage": True, "endCursor": "next"}}},
+            {"issues": {"nodes": [first[-1], {"id": "100"}], "pageInfo": {"hasNextPage": False}}},
+        ])
+        self.assertEqual(len(result), 101)
+        self.assertEqual(calls, [None, "next"])
+
+    def test_incomplete_inventory_never_returns_partial_rows(self):
+        for pages in (
+            [{"issues": {"nodes": [{"id": "1"}]}}],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True}}}],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": "a"}}}, RuntimeError("read failed")],
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": "a"}}}] * 2,
+            [{"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": str(i)}}}
+             for i in range(remediation.EVENT_INVENTORY_PAGES)],
+        ):
+            with self.subTest(pages=len(pages)), self.assertRaises(RuntimeError):
+                self.fetch(pages)
+
+    def test_cache_fences_old_partial_inventory_and_only_persists_complete_reads(self):
+        import json
+        import tempfile
+        from unittest.mock import patch
+        calls = []
+        class Linear:
+            def gql(self, query, variables):
+                calls.append(variables["after"])
+                return {"issues": {"nodes": [{"id": "new"}], "pageInfo": {"hasNextPage": False}}}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "cache-fixture"}), \
+                patch.object(self.runner, "SHARED_CACHE_DIR", Path(tmp)):
+            (Path(tmp) / "remediation-events.json").write_text(json.dumps({"at": __import__('time').time(), "value": [{"id": "old"}]}))
+            self.assertEqual(self.runner.fetch_labeled_events(Linear()), [{"id": "new"}])
+            self.assertEqual(self.runner.fetch_labeled_events(Linear()), [{"id": "new"}])
+            self.assertEqual(calls, [None])
+            self.assertTrue((Path(tmp) / "remediation-events-v2.json").exists())
+
+    def test_incomplete_read_cannot_plan_events_or_write_state(self):
+        import tempfile
+        from unittest.mock import patch
+        class Linear:
+            def gql(self, query, variables):
+                return {"issues": {"nodes": [{"id": "partial"}]}}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(self.runner, "shared", side_effect=lambda key, ttl, fetch: fetch()), \
+                patch.object(self.runner, "_apply_event_plan") as apply:
+            host = type("Host", (), {"state": Path(tmp)})()
+            with self.assertRaises(RuntimeError):
+                self.runner.claim_remediation_events(host, Linear())
+            apply.assert_not_called()
+            self.assertEqual(list(Path(tmp).iterdir()), [])
 
 
 if __name__ == "__main__":

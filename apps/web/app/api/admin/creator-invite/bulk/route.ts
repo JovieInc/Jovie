@@ -5,6 +5,10 @@ import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
+  COLD_CLAIM_INVITE_CLOSED_MESSAGE,
+  isColdClaimInviteSendOpen,
+} from '@/lib/outbound/cold-claim-invites';
+import {
   getOvieOperatorEntitlements,
   requireOvieApiAccess,
 } from '@/lib/ovie/privacy-lock/access';
@@ -66,6 +70,17 @@ export async function POST(request: Request) {
       maxPerHour,
       dryRun,
     } = parsed.data;
+
+    // A dry run previews without sending; a real send is closed (JOV-7858).
+    if (!dryRun && !isColdClaimInviteSendOpen()) {
+      return NextResponse.json(
+        {
+          error: COLD_CLAIM_INVITE_CLOSED_MESSAGE,
+          code: 'COLD_OUTBOUND_CLOSED',
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
 
     const effectiveLimit = calculateEffectiveLimit(limit, maxPerHour);
 

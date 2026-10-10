@@ -2,7 +2,7 @@
 // use funnel (JOV-7753). Pure functions only: capture and judge live in
 // capture.mjs / judge.mjs so this module stays unit-testable.
 
-export const RUBRIC_VERSION = 'funnel-judge-rubric-v1';
+export const RUBRIC_VERSION = 'funnel-judge-rubric-v2';
 
 export const EMOTIONS = /** @type {const} */ ([
   'curious',
@@ -67,7 +67,7 @@ WOULD CONTINUE: an honest yes/no for a busy person who did not ask for this. A b
 WOULD PAY $199/month: answer only from what the flow has shown so far, not from what the product might do.`;
 
 /** JSON schema handed to `claude -p --json-schema` for each persona run. */
-export function buildJudgeSchema(stepIds) {
+export function buildJudgeSchema(stepIds, objectionCount = 0) {
   const stepSchema = {
     type: 'object',
     properties: {
@@ -95,7 +95,7 @@ export function buildJudgeSchema(stepIds) {
       'quote',
     ],
   };
-  return {
+  const schema = {
     type: 'object',
     properties: {
       steps: { type: 'array', items: stepSchema },
@@ -104,15 +104,28 @@ export function buildJudgeSchema(stepIds) {
     },
     required: ['steps', 'wouldPay', 'payReason'],
   };
+  if (objectionCount > 0) {
+    schema.properties.objections = {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          index: { type: 'integer', minimum: 1, maximum: objectionCount },
+          answered: { type: 'boolean' },
+          stepId: { type: 'string', enum: ['', ...stepIds] },
+          note: { type: 'string' },
+        },
+        required: ['index', 'answered', 'stepId', 'note'],
+      },
+    };
+    schema.required.push('objections');
+  }
+  return schema;
 }
 
-/**
- * @param {{ id: string, name: string, brief: string }} persona
- * @param {Array<{ id: string, label: string, context: string, images: string[], text?: string, uncaptured?: string }>} steps
- * @param {'full' | 'emotional'} focus
- */
-export function buildJudgePrompt(persona, steps, focus = 'full') {
-  const stepBlocks = steps
+/** @param {Array<{ id: string, label: string, context: string, images: string[], text?: string, uncaptured?: string }>} steps */
+function renderStepBlocks(steps) {
+  return steps
     .map((step, index) => {
       const lines = [
         `STEP ${index + 1} (${step.id}): ${step.label}`,
@@ -128,6 +141,28 @@ export function buildJudgePrompt(persona, steps, focus = 'full') {
       return lines.join('\n');
     })
     .join('\n\n');
+}
+
+/**
+ * @param {{ id: string, name: string, brief: string }} persona
+ * @param {Array<{ id: string, label: string, context: string, images: string[], text?: string, uncaptured?: string }>} steps
+ * @param {'full' | 'emotional'} focus
+ */
+export function buildJudgePrompt(
+  persona,
+  steps,
+  focus = 'full',
+  objections = []
+) {
+  const stepBlocks = renderStepBlocks(steps);
+  const objectionBlock =
+    objections.length > 0
+      ? `\n\nObjections you already carry (from real reviews by people like you):\n${objections
+          .map((item, index) => `${index + 1}. ${item.objection}`)
+          .join(
+            '\n'
+          )}\nFor each objection, say whether the flow you were shown answered it, at which stepId (empty if none), and why. Only what is on screen counts as an answer.`
+      : '';
 
   const focusLine =
     focus === 'emotional'
@@ -144,14 +179,14 @@ ${SCORE_ANCHORS}
 
 ${stepBlocks}
 
-Return one entry per step, in order, using the exact stepId values. "quote" is one blunt first-person sentence ${persona.name} would say about that step.`;
+Return one entry per step, in order, using the exact stepId values. "quote" is one blunt first-person sentence ${persona.name} would say about that step.${objectionBlock}`;
 }
 
 /**
  * Coerce a judge's structured output into the receipt shape. Throws on a
  * malformed or incomplete result so a broken judge can never read as a pass.
  */
-export function parseJudgeOutput(raw, stepIds) {
+export function parseJudgeOutput(raw, stepIds, objectionCount = 0) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.steps)) {
     throw new Error('judge output missing steps[]');
   }
@@ -181,16 +216,145 @@ export function parseJudgeOutput(raw, stepIds) {
       quote: String(step.quote ?? ''),
     };
   });
+  const objections = [];
+  for (let index = 1; index <= objectionCount; index++) {
+    const row = Array.isArray(raw.objections)
+      ? raw.objections.find(item => item?.index === index)
+      : null;
+    if (!row) throw new Error(`judge output missing objection ${index}`);
+    objections.push({
+      index,
+      answered: row.answered === true,
+      stepId: stepIds.includes(row.stepId) ? row.stepId : null,
+      note: String(row.note ?? ''),
+    });
+  }
   return {
     steps,
     wouldPay: raw.wouldPay === true,
     payReason: String(raw.payReason ?? ''),
+    ...(objectionCount > 0 ? { objections } : {}),
   };
+}
+
+/**
+ * Mined VOC objections per persona id (scripts/voc/persona-objections.json,
+ * jovie.voc-persona-objections/v1). Unknown or missing personas get none.
+ */
+export function objectionsFor(voc, personaId) {
+  const rows = voc?.personas?.[personaId];
+  return Array.isArray(rows)
+    ? rows.filter(row => typeof row?.objection === 'string' && row.objection)
+    : [];
+}
+
+/**
+ * Coherence judge: persona judges score each step on its own, so a funnel can
+ * pass step by step while the story breaks between steps (the DM promises one
+ * thing and the landing shows another, the name or price changes, a CTA leads
+ * somewhere unexpected). One extra judge reads the whole sequence and scores
+ * every hand-off.
+ */
+export const COHERENCE_ANCHORS = `Score each hand-off from one step to the next (apply literally):
+  0-2: the next step contradicts the previous one (different person, name, price, product or promise) or the CTA lands somewhere unrelated.
+  3-4: the next step ignores what the previous one promised or asked; the visitor has to re-orient.
+  5-6: no contradiction, but the promise is only loosely carried forward (generic copy, a new tone, a lost name or photo).
+  7-8: the next step visibly delivers what the previous one promised, with the same identity, voice and offer.
+  9-10: seamless; each step pays off the last and sets up the next.
+A "blocker" break is a factual contradiction (name, handle, photo, price, plan, claim status) or a dead end. Everything else is a "minor" break.`;
+
+export const COHERENCE_SEVERITIES = /** @type {const} */ (['blocker', 'minor']);
+
+/** JSON schema for the single coherence run: one transition per consecutive step pair. */
+export function buildCoherenceSchema(stepIds) {
+  return {
+    type: 'object',
+    properties: {
+      transitions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            fromStepId: { type: 'string', enum: stepIds },
+            toStepId: { type: 'string', enum: stepIds },
+            score: { type: 'number', minimum: 0, maximum: 10 },
+            breaks: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  severity: { type: 'string', enum: [...COHERENCE_SEVERITIES] },
+                  detail: { type: 'string' },
+                },
+                required: ['severity', 'detail'],
+              },
+            },
+          },
+          required: ['fromStepId', 'toStepId', 'score', 'breaks'],
+        },
+      },
+      story: { type: 'string' },
+    },
+    required: ['transitions', 'story'],
+  };
+}
+
+/** @param {Array<{ id: string, label: string, context: string, images: string[], text?: string, uncaptured?: string }>} steps */
+export function buildCoherencePrompt(steps) {
+  return `You are a conversion editor reviewing a real product funnel for Jovie as one continuous story, in order. Read every screenshot file listed (use the Read tool on each path) before scoring. Desktop and mobile captures are the same step; judge the worse of the two. Judge only what is literally on screen.
+
+Your only job is coherence between consecutive steps: does each step deliver what the previous one promised, keep the same person, name, photo, handle, price and offer, keep one voice, and make the previous step's call to action land where it said it would? Do not score how good a single step is in isolation.
+
+${COHERENCE_ANCHORS}
+
+${renderStepBlocks(steps)}
+
+Return one transition per consecutive pair, in order, using the exact stepId values. "story" is one sentence on whether the funnel reads as one story.`;
+}
+
+/** Throws on malformed output so a broken coherence judge can never read as a pass. */
+export function parseCoherenceOutput(raw, stepIds) {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.transitions)) {
+    throw new Error('coherence output missing transitions[]');
+  }
+  const transitions = [];
+  for (let index = 1; index < stepIds.length; index++) {
+    const fromStepId = stepIds[index - 1];
+    const toStepId = stepIds[index];
+    const row = raw.transitions.find(
+      item => item?.fromStepId === fromStepId && item?.toStepId === toStepId
+    );
+    if (!row) {
+      throw new Error(`coherence output missing ${fromStepId}→${toStepId}`);
+    }
+    if (typeof row.score !== 'number' || row.score < 0 || row.score > 10) {
+      throw new Error(`${fromStepId}→${toStepId}: score out of range`);
+    }
+    const breaks = Array.isArray(row.breaks) ? row.breaks : [];
+    for (const item of breaks) {
+      if (!COHERENCE_SEVERITIES.includes(item?.severity)) {
+        throw new Error(
+          `${fromStepId}→${toStepId}: unknown severity ${item?.severity}`
+        );
+      }
+    }
+    transitions.push({
+      fromStepId,
+      toStepId,
+      score: row.score,
+      breaks: breaks.map(item => ({
+        severity: item.severity,
+        detail: String(item.detail ?? ''),
+      })),
+    });
+  }
+  return { transitions, story: String(raw.story ?? '') };
 }
 
 export const PASS_BAR = {
   minStepAverage: 7,
   minWouldPay: 4,
+  minCoherence: 7,
   maxMobileLcpMs: 2500,
   maxCls: 0,
 };
@@ -236,9 +400,16 @@ export function aggregateSteps(verdicts, stepIds) {
  *   verdicts: Array<{ personaId: string, judge: string, steps: Array<any>, wouldPay: boolean }>,
  *   primaryJudge: string,
  *   metrics: Array<{ stepId: string, viewport: string, lcpMs?: number | null, cls?: number | null, a11yBlockers?: number, uncaptured?: string }>,
+ *   coherence?: { transitions: Array<{ fromStepId: string, toStepId: string, score: number, breaks: Array<{ severity: string, detail: string }> }> } | null,
  * }} input
  */
-export function evaluatePassBar({ stepIds, verdicts, primaryJudge, metrics }) {
+export function evaluatePassBar({
+  stepIds,
+  verdicts,
+  primaryJudge,
+  metrics,
+  coherence = null,
+}) {
   /** @type {string[]} */
   const failures = [];
   const aggregates = aggregateSteps(verdicts, stepIds);
@@ -297,7 +468,30 @@ export function evaluatePassBar({ stepIds, verdicts, primaryJudge, metrics }) {
     }
   }
 
-  return { pass: failures.length === 0, failures, aggregates, payers };
+  if (stepIds.length > 1 && !coherence) {
+    failures.push('coherence not judged');
+  }
+  for (const transition of coherence?.transitions ?? []) {
+    const where = `${transition.fromStepId}→${transition.toStepId}`;
+    if (transition.score < PASS_BAR.minCoherence) {
+      failures.push(
+        `${where} coherence ${transition.score} (< ${PASS_BAR.minCoherence})`
+      );
+    }
+    for (const item of transition.breaks) {
+      if (item.severity === 'blocker') {
+        failures.push(`${where} contradiction: ${item.detail}`);
+      }
+    }
+  }
+
+  return {
+    pass: failures.length === 0,
+    failures,
+    aggregates,
+    payers,
+    coherence: coherence?.transitions ?? null,
+  };
 }
 
 /** The worst step is the lowest mean of value, clarity and positivity. */
@@ -339,6 +533,9 @@ export function trendLine(receipt) {
     pass: receipt.result.pass,
     payers: receipt.result.payers,
     worst: worstStep(receipt.result.aggregates),
+    coherence: receipt.result.coherence?.length
+      ? Math.min(...receipt.result.coherence.map(row => row.score))
+      : null,
     steps: Object.fromEntries(
       receipt.result.aggregates.map(row => [
         row.stepId,

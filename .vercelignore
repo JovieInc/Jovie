@@ -81,6 +81,7 @@ apps/docs/scripts/*.test.mjs
 !apps/web/scripts/ensure-sharp-runtime-traces.mjs
 !apps/web/scripts/resolve-package-json.mjs
 !apps/web/scripts/stage-runtime-data.mjs
+!apps/web/scripts/fix-standalone-loopback-hostname.mjs
 
 # Source-deploy fallback still needs these runtime directories from apps/web.
 !apps/web/scripts/

@@ -104,7 +104,7 @@ export function LibraryPageClient({
   const rulesDeepLink = searchParams.get('rules');
   useEffect(() => {
     if (rulesDeepLink !== '1') return;
-    router.replace(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?rules=1`);
+    router.replace(`${APP_ROUTES.SETTINGS_PROFILE}?rules=1`);
   }, [router, rulesDeepLink]);
 
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {

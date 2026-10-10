@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   buildCertificationDecisionDigest,
@@ -6,6 +8,7 @@ import {
 import {
   FIXTURE_NOW,
   FIXTURE_SHA,
+  fixtureInventory,
   fixturePacket,
   fixtureReceipt,
   fixtureRow,
@@ -18,6 +21,63 @@ import {
 } from './normalize';
 
 describe('normalizeKernelCertificationRow', () => {
+  it('runs real admission fixtures in a browser bundle with identical evidence digests', () => {
+    const entry = fileURLToPath(new URL('./fixtures.ts', import.meta.url));
+    const browserScript = `
+      import { build } from 'vite';
+      const result = await build({
+        configFile: false,
+        logLevel: 'silent',
+        resolve: { alias: { '@': process.cwd() } },
+        build: {
+          write: false,
+          minify: false,
+          lib: { entry: ${JSON.stringify(entry)}, formats: ['es'] },
+        },
+      });
+      const output = Array.isArray(result) ? result[0].output : result.output;
+      const chunk = output.find(item => item.type === 'chunk' && item.isEntry);
+      if (!chunk) throw new Error('Browser fixture entry was not emitted');
+      try {
+        const fixtures = await import('data:text/javascript;base64,' + Buffer.from(chunk.code).toString('base64'));
+        process.stdout.write(JSON.stringify(fixtures.fixtureInventory()));
+      } catch (error) {
+        process.stderr.write(error.message);
+        process.exit(1);
+      }
+    `;
+    const browserInventory = JSON.parse(
+      execFileSync(
+        process.execPath,
+        ['--input-type=module', '--eval', browserScript],
+        { cwd: process.cwd(), encoding: 'utf8', timeout: 30000 }
+      )
+    );
+    expect(browserInventory).toEqual(fixtureInventory());
+    expect(
+      browserInventory.rows.map((row: { state: string }) => row.state)
+    ).toEqual(['review_ready', 'working', 'founder_locked']);
+  });
+
+  it.each([
+    [
+      'Flow signup',
+      'sha256:4eef1a42d11113be250cd5f076f3d9ec0a28914e0d06212cb898093924d65832',
+    ],
+    [
+      'L’été · 東京 🎵',
+      'sha256:b268dd194303ea0cd162eb47a1a2df013128f76b115891adbb1652b79b32ece3',
+    ],
+  ])(
+    'preserves the existing Node SHA-256 evidence digest for %s',
+    (title, digest) => {
+      const packet = fixturePacket('signup', {
+        subject: { id: 'signup', kind: 'flow', title },
+      });
+      expect(buildCertificationDecisionDigest(packet)).toBe(digest);
+    }
+  );
+
   it('projects a review-ready packet into a decidable row bound to the kernel digest', () => {
     const packet = fixturePacket('signup');
     const row = fixtureRow('signup');
@@ -171,6 +231,12 @@ describe('normalizeKernelCertificationRow', () => {
       available: false,
       reason: 'A founder decision already exists for this evidence.',
       evidenceDigest: digest,
+      currentDecision: {
+        kind: 'approved',
+        decidedAt: '2026-09-27T07:30:00.000Z',
+        reviewer: 'founder@example.test',
+        notes: null,
+      },
     });
     expect(row.history).toContainEqual({
       at: '2026-09-27T07:30:00.000Z',
@@ -243,6 +309,7 @@ describe('normalizeKernelCertificationRow', () => {
       available: false,
       reason: 'The packet does not use the current kernel contract.',
       evidenceDigest: null,
+      currentDecision: null,
     });
   });
 

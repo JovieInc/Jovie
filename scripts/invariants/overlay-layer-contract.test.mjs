@@ -17,6 +17,7 @@ import {
   toIdentities,
   validateLayerOrder,
   validateOverlayLayerContract,
+  validateOverlayLayerPolicy,
   validatePrimitiveBindings,
 } from './overlay-layer-contract.mjs';
 import { readInvariantRegistry } from './registry.mjs';
@@ -34,6 +35,24 @@ function scanFixture(name) {
 }
 
 describe('JOV-INV-039 overlay-layer-contract', () => {
+  it('rejects increased menu depth or truncation in the existing contract', () => {
+    for (const mutation of [
+      { maxSubmenuDepth: 2 },
+      { overflow: 'truncate' },
+      { maxRootActions: 20 },
+    ]) {
+      const registry = structuredClone(readInvariantRegistry());
+      const policy = registry.invariants.find(
+        item => item.id === OVERLAY_LAYER_INVARIANT_ID
+      ).policy.value;
+      Object.assign(policy.menuHierarchy, mutation);
+      assert.ok(
+        validateOverlayLayerPolicy(registry).some(error =>
+          error.includes('menuHierarchy')
+        )
+      );
+    }
+  });
   it('keeps the overlay collision check class and layer order', () => {
     assert.equal(OVERLAY_LAYER_INVARIANT_ID, 'JOV-INV-039');
     assert.equal(OVERLAY_LAYER_CHECK_CLASS, 'overlay-collision');

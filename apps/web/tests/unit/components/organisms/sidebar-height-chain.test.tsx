@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import { Sidebar, SidebarProvider } from '@/components/organisms/sidebar';
 
 const webRoot = path.resolve(__dirname, '../../../..');
 
@@ -10,28 +13,26 @@ const webRoot = path.resolve(__dirname, '../../../..');
  */
 describe('sidebar full-height flex chain (JOV-3960)', () => {
   it('keeps peer + shell mount on an explicit h-full chain', () => {
-    const sidebarSource = readFileSync(
-      path.join(webRoot, 'components/organisms/sidebar/sidebar.tsx'),
-      'utf8'
+    const { container } = render(
+      <SidebarProvider defaultOpen>
+        <AppShellFrame
+          sidebar={<Sidebar collapsible='icon'>Navigation</Sidebar>}
+          main={<div>Work content</div>}
+        />
+      </SidebarProvider>
     );
-    const frameSource = readFileSync(
-      path.join(webRoot, 'components/organisms/AppShellFrame.tsx'),
-      'utf8'
+    const rail = container.querySelector<HTMLElement>('#shell-left-rail');
+    const mount = container.querySelector<HTMLElement>(
+      '[data-app-shell-sidebar-mount]'
     );
+    expect(rail).toHaveClass('group', 'peer', 'h-full', 'min-h-0', 'shrink-0');
+    expect(mount).toHaveClass('h-full', 'min-h-0', 'flex-col');
+    expect(mount).toContainElement(rail);
     const unifiedSource = readFileSync(
       path.join(webRoot, 'components/organisms/UnifiedSidebar.tsx'),
       'utf8'
     );
 
-    expect(sidebarSource).toMatch(
-      /group peer max-lg:hidden h-full min-h-0 shrink-0/
-    );
-    expect(frameSource).toMatch(
-      /data-testid='app-shell-sidebar-mount'[\s\S]*?h-full min-h-0/
-    );
-    expect(frameSource).toMatch(
-      /data-testid='app-shell-sidebar-mount'[\s\S]*?flex-col/
-    );
     expect(unifiedSource).toContain(
       "SidebarGroupContent className='flex min-h-0 flex-1 flex-col'"
     );

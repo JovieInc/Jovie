@@ -1,0 +1,32 @@
+{
+  "at": "2026-10-10T13:35:57.655Z",
+  "ciP95Seconds": {
+    "pull_request": null,
+    "merge_group": 1548
+  },
+  "queueWaitP95Seconds": null,
+  "queueEjectionRate": null,
+  "leadTimeP95Seconds": {
+    "devin": 15878,
+    "codex": 51580,
+    "other": 25516
+  },
+  "remediationP95Seconds": {
+    "prRedToGreen": null,
+    "mainRedToGreen": null,
+    "productionPromoteHold": null
+  },
+  "productionLagP95Seconds": null,
+  "throughput": {
+    "mergesPerDay": 42.857142857142854,
+    "verifiedPerDay": 0,
+    "wowGrowth": null,
+    "growthTrend": "unknown"
+  },
+  "regressions": [
+    "ci_walltime.merge_group.p95",
+    "lead_time.codex.p95",
+    "throughput.verified_per_day"
+  ],
+  "flatStall": false
+}

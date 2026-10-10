@@ -479,7 +479,7 @@ jobs:
       # Both checks are dependency-free (node: built-ins only) and read the
       # checked-out manifests/lockfile directly; the full dependency install only
       # added ~40s of setup before the actual check ran.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
       - name: Verify workflow references
@@ -533,6 +533,10 @@ jobs:
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
       run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}
+      # 'mac' when a self-hosted Mac runner heartbeat is fresh, else 'hosted'.
+      # Hosted macOS is one small org-wide pool; LogYourBody's queue filled it
+      # on 2026-10-10 and Jovie's Mac job waited the full 60-minute budget.
+      mac_runner_class: ${{ steps.mac-route.outputs.runner_class || 'hosted' }}
       run_web: ${{ steps.detect.outputs.run_web || 'false' }}
       run_operations: ${{ steps.detect.outputs.run_operations || 'false' }}
       run_cross_product: ${{ steps.detect.outputs.run_cross_product || 'false' }}
@@ -611,6 +615,44 @@ jobs:
           else
             echo "No brand-scrub paths changed."
           fi
+      # Same contract as ios-ci.yml's mac-runner-route: a fresh, idle self-hosted
+      # Mac heartbeat routes the Mac lane to the jovie-mac runners (tw-mac-001,
+      # tims-macbook-air); stale, busy or unknown evidence keeps hosted macOS.
+      - name: Query Mac runner heartbeat
+        id: mac-heartbeat
+        if: ${{ vars.JOVIE_MAC_RUNNER != 'off' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml
+          HEARTBEAT_MAX_AGE_SECONDS: '1500'
+          HEARTBEAT_API_TIMEOUT_SECONDS: '5'
+          HEARTBEAT_POLL_ATTEMPTS: '1'
+          HEARTBEAT_POLL_INTERVAL_SECONDS: '1'
+        run: |
+          set -uo pipefail
+          helper='.github/scripts/await-runner-heartbeat.sh'
+          if [ -x "$helper" ]; then
+            timeout 60s "$helper" || true
+          fi
+          exit 0
+
+      - name: Select Mac runner route
+        id: mac-route
+        env:
+          HEARTBEAT_HEALTH: ${{ steps.mac-heartbeat.outputs.health }}
+          HEARTBEAT_EVIDENCE: ${{ steps.mac-heartbeat.outputs.evidence }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner_class='hosted'
+          if [ "$HEARTBEAT_HEALTH" = 'up' ]; then
+            runner_class='mac'
+          fi
+          echo "runner_class=$runner_class" >> "$GITHUB_OUTPUT"
+          echo "::notice::Mac lane runner route: $runner_class — ${HEARTBEAT_EVIDENCE:-not probed}"
+
       - name: Detect path changes for all job types
         id: detect
         shell: bash
@@ -1128,6 +1170,71 @@ jobs:
             echo 'current_queue_state=LEGACY_EXACT_REF_BOOTSTRAP'
           } >> "$GITHUB_OUTPUT"
 
+  # A rebuilt group gets a new queue ref for the same PR, but CI keys
+  # merge_group concurrency by head SHA, so the superseded run kept every lane
+  # busy: 2,312 of 3,468 group runs on 2026-10-03 were still running after
+  # their PR had a newer group (~11.5k wall-min). This watchdog lists the PR's
+  # queue refs over git (no REST quota) and cancels this run only after two
+  # consecutive reads show its own ref gone AND a successor ref for the same
+  # PR present. A merged or failed-and-removed group leaves no successor, so
+  # its run keeps its real conclusion; an unreadable listing is not evidence.
+  ci-merge-group-watchdog:
+    name: Merge Group Supersession Watchdog
+    if: ${{ github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    # Outlives check_response_timeout_minutes (60); exits as soon as the
+    # group leaves the queue.
+    timeout-minutes: 70
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel this run once a newer group supersedes it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUEUE_REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          POLL_SECONDS: '30'
+          MAX_SECONDS: '3900'
+        run: |
+          set -uo pipefail
+          if [[ ! "$QUEUE_REF" =~ ^refs/heads/gh-readonly-queue/main/pr-([1-9][0-9]*)-[0-9a-f]{40}$ ]]; then
+            echo "::notice::$QUEUE_REF is not a main queue ref; watchdog idle."
+            exit 0
+          fi
+          prefix="refs/heads/gh-readonly-queue/main/pr-${BASH_REMATCH[1]}-"
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          list_refs() {
+            GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+            GIT_CONFIG_VALUE_0="$auth" \
+            GIT_TERMINAL_PROMPT=0 \
+              git ls-remote "https://github.com/$REPOSITORY" "${prefix}*"
+          }
+          misses=0
+          while (( SECONDS < MAX_SECONDS )); do
+            if refs="$(list_refs)"; then
+              names="$(awk '{print $2}' <<<"$refs")"
+              if grep -qxF "$QUEUE_REF" <<<"$names"; then
+                misses=0
+              elif grep -q . <<<"$names"; then
+                misses=$((misses + 1))
+                if (( misses >= 2 )); then
+                  echo "::notice::$QUEUE_REF was superseded by $(head -n1 <<<"$names"); cancelling run $RUN_ID."
+                  gh run cancel "$RUN_ID" --repo "$REPOSITORY" || echo "::warning::cancel request failed"
+                  exit 0
+                fi
+              else
+                echo "::notice::$QUEUE_REF left the queue without a successor; keeping this run's conclusion."
+                exit 0
+              fi
+            else
+              misses=0
+            fi
+            sleep "$POLL_SECONDS"
+          done
+          echo "::notice::watchdog budget elapsed with $QUEUE_REF still queued."
+
   ci-risk-classifier:
     # Dependency-free so fork PRs classify without waiting on a trusted job or
     # secret. On main, only an unproven exact SHA executes the fallback lane.
@@ -1163,7 +1270,7 @@ jobs:
           filter: blob:none
       # This gate is dependency-free. Restoring the full pnpm cache can exceed
       # the three-minute latency ratchet before classification even starts.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: Collect changed files
@@ -1452,7 +1559,7 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: Validate snapshot inventory and workflow contract
@@ -3344,6 +3451,7 @@ jobs:
                   tests/e2e/storybook-overlay-collisions.spec.ts \
                   tests/e2e/storybook-spotify-connect.spec.ts \
                   tests/e2e/storybook-ovie-privacy-boundary.spec.ts \
+                  tests/e2e/storybook-onboarding-recovery.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
@@ -3435,8 +3543,16 @@ jobs:
       # same PR. Direct-main and manual runs keep exact, non-canceling groups.
       group: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || format('ci-macos-{0}-{1}', github.run_id, github.run_attempt) }}
       cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}
-    runs-on: macos-26
-    timeout-minutes: 45
+    # Self-hosted jovie-mac runners when their heartbeat is fresh; hosted
+    # macos-15 (not macos-26: MenuMonitor targets macOS 14 / swift-tools 5.10
+    # and the Electron package needs no Xcode 26) otherwise. Hosted macOS
+    # pickup waited 8-68 min per merge group on 2026-10-10 because the org-wide
+    # pool was full, and three queued Mac jobs idled a 15-deep ALLGREEN queue.
+    runs-on: ${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
+    # The laptops are extra capacity, never the only capacity. A self-hosted
+    # run finishes in ~5 min; a laptop that sleeps mid-job must release the
+    # merge group quickly so the rebuilt group re-routes to hosted macOS.
+    timeout-minutes: ${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && 25 || 45 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -3470,6 +3586,12 @@ jobs:
             --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Test and package exact Mac head
+        env:
+          # The staging package is unsigned by design. Hosted runners have no
+          # signing identity; a self-hosted Mac has the owner's Developer ID in
+          # its keychain and electron-builder would try to codesign with it
+          # headless and fail (2026-10-10, tw-mac-001).
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           set -euo pipefail
           swift test --package-path apps/macos/MenuMonitor --enable-code-coverage
@@ -3504,6 +3626,11 @@ jobs:
             [ -f "$artifact" ] || { echo "::error::Missing Mac artifact: $artifact"; exit 1; }
           done
       - name: Upload exact Mac staging package
+        # Retention-only artifact (no workflow downloads it). A self-hosted
+        # laptop uploads the ~460 MB package at ~20 KB/s and would time the
+        # job out, so only hosted runners keep it; the artifact set is still
+        # verified on every runner above.
+        if: ${{ runner.environment == 'github-hosted' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: desktop-staging-${{ github.sha }}
@@ -3574,12 +3701,12 @@ jobs:
   ci-product-lane-receipt:
     name: Product Lane Receipt
     needs:
-      [ci-path-changes, ci-merge-group-admission, ci-fast, ci-blog-content, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos, ci-cross-product-integration]
+      [ci-path-changes, ci-merge-group-admission, ci-risk-classifier, ci-fast, ci-blog-content, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos, ci-cross-product-integration]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
       needs.ci-path-changes.outputs.is_noop_merge_group != 'true' &&
-      needs.ci-merge-group-admission.result == 'success' &&
+      (github.event_name != 'merge_group' || needs.ci-merge-group-admission.result == 'success') &&
       (github.event_name != 'merge_group' || needs.ci-merge-group-admission.outputs.admitted == 'true') &&
       (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
@@ -3610,8 +3737,14 @@ jobs:
           RUN_OPERATIONS: ${{ needs.ci-path-changes.outputs.run_operations }}
           RUN_CROSS: ${{ needs.ci-path-changes.outputs.run_cross_product }}
           BLOG_CONTENT_ONLY: ${{ needs.ci-path-changes.outputs.blog_content_only }}
+          RISK_LEVEL: ${{ needs.ci-risk-classifier.outputs.risk_level }}
+          RISK_SMOKE: ${{ needs.ci-risk-classifier.outputs.requires_smoke }}
+          RISK_PREVIEW: ${{ needs.ci-risk-classifier.outputs.requires_preview }}
+          RISK_BLOCKS: ${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}
+          RISK_RULES: ${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}
         run: |
           set -euo pipefail
+          RISK_LEVEL="${RISK_LEVEL:-unknown}" RISK_SMOKE="${RISK_SMOKE:-true}" RISK_PREVIEW="${RISK_PREVIEW:-true}" RISK_BLOCKS="${RISK_BLOCKS:-true}"
           lane_result() { [ "$1" = true ] && printf '%s' "$2" || printf skipped; }
           root="$RUNNER_TEMP/product-lane-receipt"
           if [[ "$GITHUB_EVENT_NAME" == merge_group && "$BLOG_CONTENT_ONLY" == true ]]; then
@@ -3627,7 +3760,9 @@ jobs:
             --argjson cross "[\"$(lane_result "$RUN_CROSS" "$CROSS")\"]" \
             --arg receipt "product-lane-final-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" \
             --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-            '{lanes: {ios: $ios, mac: $mac, web: $web, operations: $operations, "cross-product": $cross}, receiptArtifact: $receipt, run: $run}' \
+            --arg risk_level "$RISK_LEVEL" --arg rules "$RISK_RULES" \
+            --argjson requires_smoke "$RISK_SMOKE" --argjson requires_preview "$RISK_PREVIEW" --argjson blocks_unattended "$RISK_BLOCKS" \
+            '{lanes: {ios: $ios, mac: $mac, web: $web, operations: $operations, "cross-product": $cross}, receiptArtifact: $receipt, run: $run, riskReceipt: {schema: "jovie-ci-risk-receipt/v1", sha: env.GITHUB_SHA, run_id: env.GITHUB_RUN_ID, run_attempt: env.GITHUB_RUN_ATTEMPT, risk_level: $risk_level, requires_smoke: $requires_smoke, requires_preview: $requires_preview, blocks_unattended: $blocks_unattended, matched_rule_ids: ($rules | split(",") | map(select(length > 0)))}}' \
             > "$root/results.json"
           node scripts/lib/product-lane-finalize.mjs \
             "$root/receipt.json" "$root/results.json" \
@@ -5307,6 +5442,16 @@ jobs:
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
 
+      - name: Annotate quarantined unit lane
+        # Fail-open lane: surface the tracking Linear issue on the check run so
+        # a quarantined failure is never an unexplained neutral result.
+        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true' && matrix.shard == '7/14'
+        run: |
+          URLS="${{ steps.quarantine.outputs.unit_issue_urls }}"
+          for url in $URLS; do
+            echo "::notice title=Quarantined unit test (non-blocking)::This lane runs quarantined tests fail-open — failures are tracked by ${url}"
+          done
+
       - name: Run Ovie route and private-boundary coverage
         # One deterministic app suite, never repeated across the web shards
         # (cost preloaded on 1/14 by CI_RESERVED_MS in the duration sequencer).
@@ -5360,6 +5505,9 @@ jobs:
           retention-days: 14
 
       - name: Upload test results to Codecov
+        # Advisory reporting: bootstrap/TLS failures precede fail_ci_if_error.
+        # Unit execution, preserved JUnit evidence, and coverage remain required.
+        continue-on-error: true
         # Queue evidence must not consume external service credentials.
         if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui' }}
         uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
@@ -5632,7 +5780,7 @@ jobs:
 
       - name: Setup Node for the changed-behavior ratchet
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
 
@@ -6839,6 +6987,16 @@ jobs:
           RETRIES=$(jq -r '.retryBudget.quarantineE2eRetries // 2' apps/web/tests/quarantine.json)
           cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --retries="$RETRIES" ${{ steps.quarantine.outputs.quarantined_specs }}
 
+      - name: Annotate quarantined E2E lane
+        # Fail-open lane: surface the tracking Linear issue on the check run so
+        # a quarantined failure is never an unexplained neutral result.
+        if: always() && matrix.shard == 1 && steps.quarantine.outputs.has_quarantine == 'true'
+        run: |
+          URLS="${{ steps.quarantine.outputs.e2e_issue_urls }}"
+          for url in $URLS; do
+            echo "::notice title=Quarantined E2E spec (non-blocking)::This lane runs quarantined specs fail-open — failures are tracked by ${url}"
+          done
+
       - name: Upload Playwright Test Results on Failure
         if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
@@ -7965,6 +8123,28 @@ jobs:
           retention-days: 3
 
   # Homepage smoke is a blocking probe of the immutable production deployment.
+
+  security-gate:
+    name: security-gate
+    # Source PRs run this script from source-validation.yml. ci.yml has no
+    # pull_request trigger; the same-repo clause is here for that event.
+    if: >-
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Report-only security gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
+        run: node scripts/security/security-gate.mjs
 
   main-release-ready:
     name: Main Release Ready

@@ -8,6 +8,7 @@ import {
   latestOpinionatedReviewsByReviewer,
 } from './merge-group-member-policy.mjs';
 import { evaluatePreLandChangelogAdmission } from './pre-land-changelog.mjs';
+import { classifyProductLanes } from './product-lane-classifier.mjs';
 
 export const SOURCE_ADMISSION_SCHEMA = 'jovie-source-admission/v1';
 const SHA = /^[0-9a-f]{40}$/;
@@ -137,6 +138,11 @@ export function evaluateSourceAdmission({
   if (pr.draft) blockers.push('draft');
   if (pr.base.ref !== 'main') blockers.push('wrong-base');
   if (pr.mergeable === false) blockers.push('conflict');
+  try {
+    classifyProductLanes(files.map(file => file.filename));
+  } catch {
+    blockers.push('unmapped-product-paths');
+  }
   blockers.push(
     ...evaluateLinearReferencePolicy({
       title: pr.title,

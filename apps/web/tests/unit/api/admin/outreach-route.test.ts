@@ -18,6 +18,7 @@ const mockLt = vi.hoisted(() => vi.fn(() => 'lt-clause'));
 const mockNe = vi.hoisted(() => vi.fn(() => 'ne-clause'));
 const mockOr = vi.hoisted(() => vi.fn(() => 'or-clause'));
 const mockSql = vi.hoisted(() => vi.fn(() => 'sql-clause'));
+const mockReadOutboundLedger = vi.hoisted(() => vi.fn());
 
 const {
   mockDb,
@@ -62,6 +63,11 @@ const {
     mockUpdateReturning,
   };
 });
+
+const mockEligibility = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/acquisition/eligibility.server', () => ({
+  getAcquisitionEligibility: mockEligibility,
+}));
 
 vi.mock('drizzle-orm', () => ({
   and: mockAnd,
@@ -163,7 +169,61 @@ vi.mock('@/lib/error-tracking', () => ({
   getSafeErrorMessage: () => 'safe-error',
 }));
 
+vi.mock('@/lib/outbound/ledger.server', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/outbound/ledger.server')>()),
+  readOutboundLedger: mockReadOutboundLedger,
+}));
+
 import { GET, POST } from '@/app/api/admin/outreach/route';
+import {
+  draftOutboundCopy,
+  outboundCopyEvidenceKey,
+  outboundCopyRevision,
+  outboundTargetEvidenceKey,
+  outboundTargetRevision,
+} from '@/lib/outbound/approval';
+import { outboundTargetFromLead } from '@/lib/outbound/ledger.server';
+
+/** Tim's approval of a claimed lead and its default email copy. */
+function approvedLedger(lead: {
+  id: string;
+  linktreeHandle: string;
+  displayName: string;
+  contactEmail: string;
+  claimToken: string;
+}) {
+  const target = outboundTargetFromLead(lead as never);
+  const targetRevision = outboundTargetRevision(target);
+  const copy = draftOutboundCopy({
+    channel: 'email',
+    displayName: target.displayName,
+    claimUrl: target.claimUrl ?? '',
+    dmCopy: null,
+  });
+  return new Map([
+    [
+      lead.id,
+      [
+        {
+          evidenceKey: outboundTargetEvidenceKey(lead.id),
+          evidenceRevision: targetRevision,
+          decision: 'yes',
+          snapshot: {},
+          actorUserId: 'tim',
+          createdAt: new Date('2026-10-04T00:00:00Z'),
+        },
+        {
+          evidenceKey: outboundCopyEvidenceKey(lead.id),
+          evidenceRevision: outboundCopyRevision(targetRevision, copy),
+          decision: 'yes',
+          snapshot: { targetRevision, ...copy },
+          actorUserId: 'tim',
+          createdAt: new Date('2026-10-04T00:01:00Z'),
+        },
+      ],
+    ],
+  ]);
+}
 
 describe('GET /api/admin/outreach', () => {
   beforeEach(() => {
@@ -183,6 +243,13 @@ describe('GET /api/admin/outreach', () => {
     mockGetAppUrl.mockReset();
     mockParseJsonBody.mockReset();
     mockPushLeadToInstantly.mockReset();
+    mockEligibility.mockResolvedValue({
+      eligible: true,
+      verdict: 'ELIGIBLE',
+      firstBlocker: null,
+    });
+    mockReadOutboundLedger.mockReset();
+    mockReadOutboundLedger.mockResolvedValue(new Map());
     mockGetCurrentUserEntitlements.mockResolvedValue({
       isAuthenticated: true,
       isAdmin: true,
@@ -272,159 +339,81 @@ describe('GET /api/admin/outreach', () => {
     );
   });
 
-  it('queues pending email outreach only when explicitly triggered', async () => {
-    mockSelect
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue([
-              {
-                dailySendCap: 10,
-                maxPerHour: 5,
-              },
-            ]),
-          })),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 0 }]),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 0 }]),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'lead-1',
-                  linktreeHandle: 'artist',
-                  displayName: 'Artist',
-                  contactEmail: 'artist@example.com',
-                  claimToken: 'claim-token',
-                  priorityScore: 88,
-                },
-              ]),
-            })),
-          })),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue([]),
-          })),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 0 }]),
-        })),
-      }));
-
-    mockPushLeadToInstantly.mockResolvedValue('instantly-123');
-
-    const response = await POST(
-      new Request('http://localhost/api/admin/outreach', {
-        method: 'POST',
-        body: JSON.stringify({ limit: 1 }),
-      }) as never
-    );
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(mockParseJsonBody).toHaveBeenCalled();
-    expect(mockOr).toHaveBeenCalledWith('eq-clause', 'eq-clause');
-    expect(mockUpdate).toHaveBeenCalledTimes(2);
-    expect(mockPushLeadToInstantly).toHaveBeenCalledWith(
-      expect.objectContaining({
-        email: 'artist@example.com',
-        claimLink: 'https://app.jovie.test/claim/token',
-        priorityScore: 88,
-      })
-    );
-    expect(data).toEqual({
-      ok: true,
-      attempted: 1,
-      queued: 1,
-      failed: 0,
-      dismissed: 0,
-      remainingPending: 0,
-    });
-  });
-
-  it('skips leads already claimed by another queue request', async () => {
-    mockSelect
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue([
-              {
-                dailySendCap: 10,
-                maxPerHour: 5,
-              },
-            ]),
-          })),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 0 }]),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 0 }]),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  id: 'lead-1',
-                  linktreeHandle: 'artist',
-                  displayName: 'Artist',
-                  contactEmail: 'artist@example.com',
-                  claimToken: 'claim-token',
-                  priorityScore: 88,
-                },
-              ]),
-            })),
-          })),
-        })),
-      }))
-      .mockImplementationOnce(() => ({
+  it.each([1, 100])(
+    'refuses explicitly triggered reviewed outreach with limit %s',
+    async limit => {
+      mockSelect.mockImplementation(() => ({
         from: vi.fn(() => ({
           where: vi.fn().mockResolvedValue([{ total: 1 }]),
         })),
       }));
+      mockPushLeadToInstantly.mockResolvedValue('would-send-if-called');
+      mockReadOutboundLedger.mockResolvedValue(
+        approvedLedger({
+          id: 'lead-1',
+          linktreeHandle: 'artist',
+          displayName: 'Artist',
+          contactEmail: 'artist@example.invalid',
+          claimToken: 'claim-token',
+        })
+      );
 
-    mockUpdateReturning.mockResolvedValueOnce([]);
+      const response = await POST(
+        new Request('http://localhost/api/admin/outreach', {
+          method: 'POST',
+          body: JSON.stringify({ limit }),
+        }) as never
+      );
+      const data = await response.json();
 
+      expect(response.status).toBe(200);
+      expect(mockParseJsonBody).toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+      expect(mockReadOutboundLedger).not.toHaveBeenCalled();
+      expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+      expect(mockInsert).not.toHaveBeenCalled();
+      expect(data).toMatchObject({
+        ok: true,
+        attempted: 0,
+        queued: 0,
+        failed: 0,
+        dismissed: 0,
+        unapproved: 0,
+        remainingPending: 1,
+        policyBlocked: {
+          reason: 'audience_delivery_disabled',
+          dispatchAllowed: false,
+          retryable: false,
+          queueDisposition: 'do_not_enqueue_or_retry',
+        },
+      });
+    }
+  );
+
+  it('refuses a manual send while ACQUISITION_ELIGIBLE is false', async () => {
+    mockEligibility.mockResolvedValue({
+      eligible: false,
+      verdict: 'BLOCKED',
+      firstBlocker: {
+        id: 'payment_entitlement',
+        label: 'Golden Path',
+        status: 'red',
+        owner: 'billing',
+        nextAction: 'Fix the Golden Path lane.',
+      },
+    });
     const response = await POST(
       new Request('http://localhost/api/admin/outreach', {
         method: 'POST',
         body: JSON.stringify({ limit: 1 }),
       }) as never
     );
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
-    expect(data).toEqual({
-      ok: true,
-      attempted: 0,
-      queued: 0,
-      failed: 0,
-      dismissed: 0,
-      remainingPending: 1,
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'ACQUISITION_NOT_ELIGIBLE',
+      firstBlocker: 'payment_entitlement',
     });
+    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
   });
 });

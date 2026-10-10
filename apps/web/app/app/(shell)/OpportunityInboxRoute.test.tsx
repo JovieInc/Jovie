@@ -160,6 +160,23 @@ describe('OpportunityInboxRoute', () => {
     expect(mocks.loadOpportunityInboxData).toHaveBeenLastCalledWith('customer');
   });
 
+  it('does not restore a previous profile card after a same-owner profile switch', async () => {
+    const view = render(await OpportunityInboxRoute());
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    mocks.getDashboardShellData.mockResolvedValue({
+      dashboardLoadError: null,
+      selectedProfile: { id: 'profile-2', username: 'other-artist' },
+    });
+    mocks.loadOpportunityInboxData.mockResolvedValue({
+      ...BASE_INBOX,
+      cards: [{ id: 'profile-2-card' }],
+    });
+    view.rerender(await OpportunityInboxRoute());
+    act(() => mocks.pendingFailure?.());
+    expect(screen.queryByText('card-1')).not.toBeInTheDocument();
+    expect(screen.getByText('profile-2-card')).toBeInTheDocument();
+  });
+
   it('preserves pending mutation recovery for the same identity during a route refresh', async () => {
     const view = render(await OpportunityInboxRoute());
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));

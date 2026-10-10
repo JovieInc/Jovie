@@ -10,6 +10,7 @@ import {
   HERO_CODE_BINDING_BY_VARIANT,
   selectHeroDecision,
 } from '../../data/marketing/factory/heroDecision';
+import { solutionsFactoryVariantIssue } from '../../data/marketing/factory/pageRecord';
 import {
   buildPersuasionPlan,
   persuasionJobToken,
@@ -26,6 +27,7 @@ import {
 import { auditMarketingNarrativePlan } from '../../data/marketing/generation';
 import { listProductTruthClaims } from '../../data/product-truth/claims';
 import {
+  admissibleProofRegistry,
   createProofPageContext,
   type ProofKind,
   selectProof,
@@ -259,6 +261,12 @@ function narrativeStage(ctx: StageContext): Promise<StageResult> {
   );
 }
 
+/**
+ * Copy directions written and judged per attempt (JOV-7765). Copy is the
+ * stage a visual rejection reworks, so it is where competing directions pay.
+ */
+export const FACTORY_COPY_DIRECTIONS = 3;
+
 function copyStage(ctx: StageContext): Promise<StageResult> {
   const truth = artifactOf(ctx, 'truth');
   const narrative = artifactOf(ctx, 'narrative');
@@ -340,7 +348,8 @@ function copyStage(ctx: StageContext): Promise<StageResult> {
           rubricVersion: RUBRIC_VERSION,
         })),
       };
-    }
+    },
+    { directions: FACTORY_COPY_DIRECTIONS }
   );
 }
 
@@ -383,6 +392,17 @@ async function layoutStage(ctx: StageContext): Promise<StageResult> {
     !composition.shadowRequired,
     'an essential story job has no certified section; resolve its section request before copy'
   );
+  for (const section of composition.sections) {
+    const issue =
+      ctx.brief.family === 'solutions'
+        ? solutionsFactoryVariantIssue(section.sectionId, section.variantId)
+        : `factory has no renderer contract for family ${ctx.brief.family}`;
+    checks.check(
+      `family-renderer:${section.sectionInstanceId}`,
+      issue === null,
+      issue ?? 'selected variant has a concrete family renderer'
+    );
+  }
   return result(checks, composition, {
     notes: { shadowRequired: composition.shadowRequired ?? false },
   });
@@ -434,6 +454,14 @@ async function proofStage(ctx: StageContext): Promise<StageResult> {
     requests: [],
   };
   const proofRequests: unknown[] = [];
+  // A measured Jovie outcome is never backed by a market fact (JOV-7750):
+  // without dogfood or pilot evidence it becomes a ProofRequest instead.
+  const measuredClaimIds = new Set(
+    listProductTruthClaims()
+      .filter(claim => claim.source === 'measured')
+      .map(claim => claim.id)
+  );
+  const admissibleProof = admissibleProofRegistry(measuredClaimIds);
   for (const need of ctx.brief.proof) {
     checks.check(
       `proof-claim:${need.claimId}`,
@@ -449,14 +477,17 @@ async function proofStage(ctx: StageContext): Promise<StageResult> {
     const sectionId = narrative.find(
       section => section.sectionInstanceId === need.sectionInstanceId
     )?.sectionId;
-    const selected = selectProof({
-      id: sectionId ?? need.sectionInstanceId,
-      claimId: need.claimId,
-      page,
-      kind: need.kind,
-      fallbackKinds: need.fallbackKinds,
-      audience: ctx.brief.brief.targetAudience,
-    });
+    const selected = selectProof(
+      {
+        id: sectionId ?? need.sectionInstanceId,
+        claimId: need.claimId,
+        page,
+        kind: need.kind,
+        fallbackKinds: need.fallbackKinds,
+        audience: ctx.brief.brief.targetAudience,
+      },
+      admissibleProof
+    );
     const kind = SPINE_PROOF_KIND[selected.kind];
     if (
       !checks.check(
@@ -473,7 +504,7 @@ async function proofStage(ctx: StageContext): Promise<StageResult> {
       artifact.requests.push({
         sectionInstanceId: need.sectionInstanceId,
         kind,
-        reason: `${selected.suggestedLane}: no valid ${selected.kind} proof for ${selected.claimId}`,
+        reason: `${selected.suggestedLane} (${selected.generator} generator): no valid ${selected.kind} proof for ${selected.claimId}`,
       });
     } else {
       artifact.items.push({

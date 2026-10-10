@@ -15,8 +15,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { deprecationCheckGreen } from './deprecation-observation.mjs';
 import { GREEN_MARKER } from './remediation-signal.mjs';
-import { LIFECYCLE_STATES } from './validation-lifecycle.mjs';
+import {
+  formatValidationReceipt,
+  LIFECYCLE_STATES,
+} from './validation-lifecycle.mjs';
 import {
   createProductionFacts,
   fetchWithRetry,
@@ -85,11 +89,17 @@ export function extractMergeIssueRef(input = {}) {
   const identifierMarker =
     /linear-issue-identifier:\s*([A-Za-z0-9-]+)/i.exec(body)?.[1] ?? '';
   const idMarker = /linear-issue-id:\s*([A-Za-z0-9-]+)/i.exec(body)?.[1] ?? '';
+  const summerIdentifier =
+    /<!--\s*summer-issue-bind\s*-->\s*(JOV-\d+)(?![A-Za-z0-9-])/i.exec(
+      body
+    )?.[1] ?? '';
   const identifier = IDENTIFIER_RE.test(identifierMarker)
     ? identifierMarker.toUpperCase()
     : IDENTIFIER_RE.test(idMarker)
       ? idMarker.toUpperCase()
-      : linearIdentifierFromText(input.headRef);
+      : summerIdentifier
+        ? summerIdentifier.toUpperCase()
+        : linearIdentifierFromText(input.headRef);
   const issueId =
     idMarker && !IDENTIFIER_RE.test(idMarker) ? idMarker : identifier;
   return { identifier, issueId };
@@ -185,6 +195,8 @@ export function pullRequestLinksIssue(pull, issue) {
   ].map(match => match[1].toUpperCase());
   if (issueId && idMarkers.includes(issueId)) return true;
   if (identifier && identifierMarkers.includes(identifier)) return true;
+  if (identifier && extractMergeIssueRef({ body }).identifier === identifier)
+    return true;
   return idMarkers.some(marker => marker.toUpperCase() === identifier);
 }
 
@@ -418,33 +430,67 @@ export function lifecycleHolds(input) {
  * @returns {Promise<Record<string, any>>}
  */
 async function linearGraphql(fetchImpl, apiKey, query, variables) {
-  const response = await fetchWithRetry(fetchImpl, LINEAR_API, {
-    method: 'POST',
-    headers: {
-      Authorization: apiKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  if (!response.ok) {
-    throw new Error(`Linear HTTP ${response.status}`);
-  }
-  const payload =
-    /** @type {{ errors?: unknown, data?: Record<string, any> }} */ (
-      await response.json()
+  // Bounded retry for transient Linear upstream failures (JOV-8012): a
+  // 503/502/504 from Linear used to fail the whole sweep even though the
+  // next scheduled run converged. Retry the transport statuses and the
+  // shared-key rate limit with backoff; persistent errors still throw.
+  const maxAttempts = 4;
+  /** @type {Error | null} */
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetchWithRetry(fetchImpl, LINEAR_API, {
+      method: 'POST',
+      headers: {
+        Authorization: apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+    if (response.ok) {
+      const payload =
+        /** @type {{ errors?: unknown, data?: Record<string, any> }} */ (
+          await response.json()
+        );
+      if (Array.isArray(payload.errors) && payload.errors.length > 0) {
+        throw new Error(
+          payload.errors
+            .map(error =>
+              error && typeof error === 'object' && 'message' in error
+                ? String(error.message)
+                : 'Linear request failed'
+            )
+            .join('; ')
+        );
+      }
+      return payload.data ?? {};
+    }
+    // Linear answers a spent rate limit with HTTP 400 and RATELIMITED. The
+    // lifecycle key is shared with Summer and agents, so name it plainly.
+    /** @type {any} */
+    const body = await response.json().catch(() => null);
+    const errors = Array.isArray(body?.errors) ? body.errors : [];
+    const limited = errors.some(
+      (/** @type {any} */ error) => error?.extensions?.code === 'RATELIMITED'
     );
-  if (Array.isArray(payload.errors) && payload.errors.length > 0) {
-    throw new Error(
-      payload.errors
-        .map(error =>
-          error && typeof error === 'object' && 'message' in error
-            ? String(error.message)
-            : 'Linear request failed'
-        )
-        .join('; ')
+    const detail = errors
+      .map((/** @type {any} */ error) => String(error?.message ?? ''))
+      .filter(Boolean)
+      .join('; ');
+    lastError = Object.assign(
+      new Error(
+        limited
+          ? `Linear rate limited (HTTP ${response.status})`
+          : `Linear HTTP ${response.status}${detail ? `: ${detail}` : ''}`
+      ),
+      { rateLimited: limited }
     );
+    const retryable = response.status === 429 || response.status >= 500;
+    if (!retryable || attempt === maxAttempts) throw lastError;
+    // Exponential backoff, bounded for the 15-minute sweep budget.
+    const delayMs = Math.min(4_000, 2 ** (attempt - 1) * 250);
+    await new Promise(resolve => setTimeout(resolve, delayMs));
   }
-  return payload.data ?? {};
+  throw lastError ?? new Error('Linear request failed');
 }
 
 /**
@@ -524,7 +570,7 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
     after: $after
     filter: { team: { key: { eq: "JOV" } }, state: { name: { in: $states } } }
   ) {
-    nodes { identifier }
+    nodes { identifier updatedAt state { name } attachments(first: 50) { nodes { url } } }
     pageInfo { hasNextPage endCursor }
   }
 }`;
@@ -532,6 +578,7 @@ const SWEEP_QUERY = `query LifecycleSweep($states: [String!]!, $after: String) {
 const MAX_COMMENT_PAGES = 10;
 const MAX_SWEEP_PAGES = 10;
 const CI_HARNESS_MANIFEST = '.github/ci-harness/manifest.json';
+const ASSURANCE_MATRIX = 'scripts/invariants/assurance-matrix.json';
 
 /**
  * Read the issue with every comment in server order. The escaped-defect
@@ -622,6 +669,7 @@ async function readLifecycleIssue(fetchImpl, apiKey, lookupId) {
  *   readonly facts: ReturnType<typeof createProductionFacts>,
  *   readonly openPulls: { pulls: readonly object[], complete: boolean },
  *   readonly harnessManifest: unknown,
+ *   readonly assuranceMatrix: unknown,
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly eventPull?: { number: number },
  *   readonly dryRun?: boolean,
@@ -640,9 +688,11 @@ export async function reconcileIssueLifecycle(ctx) {
     );
     return { action: 'skip', identifier: '', target: null, comment: '' };
   }
-  const checkGreen = (issue.commentRecords ?? []).some(comment =>
-    String(comment?.body ?? '').includes(GREEN_MARKER)
-  );
+  const checkGreen =
+    deprecationCheckGreen(issue) ??
+    (issue.commentRecords ?? []).some(comment =>
+      String(comment?.body ?? '').includes(GREEN_MARKER)
+    );
   const { holds } = lifecycleHolds({
     issue,
     pullRequests: ctx.openPulls.pulls,
@@ -661,6 +711,7 @@ export async function reconcileIssueLifecycle(ctx) {
     repository: ctx.repository,
     facts: ctx.facts,
     harnessManifest: ctx.harnessManifest,
+    assuranceMatrix: ctx.assuranceMatrix,
     eventPull: ctx.eventPull,
     dryRun: ctx.dryRun,
     log: ctx.log,
@@ -689,19 +740,37 @@ export async function reconcileIssueLifecycle(ctx) {
             { issueId, body }
           )
         ).commentCreate?.success === true,
+      readDescription: async issueId => {
+        const data = await linear(
+          `query IssueLifecycleDescription($issueId: String!) {
+        issue(id: $issueId) { description }
+      }`,
+          { issueId }
+        );
+        if (!data.issue) throw new Error(`Could not re-read ${issueId}`);
+        return String(data.issue.description ?? '');
+      },
+      setDescription: async (issueId, description) =>
+        (
+          await linear(
+            `mutation SetLifecycleDescription($issueId: String!, $description: String!) {
+        issueUpdate(id: $issueId, input: { description: $description }) { success }
+      }`,
+            { issueId, description }
+          )
+        ).issueUpdate?.success === true,
     },
   });
 }
 
 /**
  * @param {string} root
+ * @param {string} path
  * @returns {unknown}
  */
-function loadHarnessManifest(root) {
+function loadJson(root, path) {
   try {
-    return JSON.parse(
-      readFileSync(resolvePath(root, CI_HARNESS_MANIFEST), 'utf8')
-    );
+    return JSON.parse(readFileSync(resolvePath(root, path), 'utf8'));
   } catch {
     return null;
   }
@@ -718,6 +787,7 @@ function loadHarnessManifest(root) {
  *   readonly log?: (message: string) => void,
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly harnessManifest?: unknown,
+ *   readonly assuranceMatrix?: unknown,
  * }} [options]
  */
 export async function syncLinearIssueOnMerge(options = {}) {
@@ -758,9 +828,11 @@ export async function syncLinearIssueOnMerge(options = {}) {
     repository,
     versionUrl: env.PRODUCTION_VERSION_URL,
   });
+  const root = env.GITHUB_WORKSPACE ?? process.cwd();
   const harnessManifest =
-    options.harnessManifest ??
-    loadHarnessManifest(env.GITHUB_WORKSPACE ?? process.cwd());
+    options.harnessManifest ?? loadJson(root, CI_HARNESS_MANIFEST);
+  const assuranceMatrix =
+    options.assuranceMatrix ?? loadJson(root, ASSURANCE_MATRIX);
   let openPulls = { pulls: /** @type {object[]} */ ([]), complete: true };
   try {
     openPulls = await listOpenPullRequests({ fetchImpl, token, repository });
@@ -772,10 +844,14 @@ export async function syncLinearIssueOnMerge(options = {}) {
 
   const lookups = [];
   if (sweep) {
+    /** @type {{ identifier: string, updatedAt: string }[]} */
+    const found = [];
     let after = null;
     for (let page = 0; page < MAX_SWEEP_PAGES; page += 1) {
       const data = await linearGraphql(fetchImpl, apiKey, SWEEP_QUERY, {
         states: [
+          'In Progress',
+          'In Review',
           LIFECYCLE_STATES.merging,
           LIFECYCLE_STATES.validating,
           LIFECYCLE_STATES.rework,
@@ -783,11 +859,37 @@ export async function syncLinearIssueOnMerge(options = {}) {
         after,
       });
       for (const node of data.issues?.nodes ?? []) {
-        if (typeof node?.identifier === 'string') lookups.push(node.identifier);
+        // A missed merge event can strand linked work before Merging. Scan
+        // that delivery evidence, without pulling unrelated active writers
+        // into the lifecycle or interpreting age/status as completion.
+        if (
+          ['In Progress', 'In Review'].includes(node.state?.name) &&
+          !(node.attachments?.nodes ?? []).some(attachment =>
+            String(attachment.url ?? '')
+              .toLowerCase()
+              .startsWith(
+                `https://github.com/${repository}/pull/`.toLowerCase()
+              )
+          )
+        )
+          continue;
+        if (typeof node?.identifier === 'string') {
+          found.push({
+            identifier: node.identifier,
+            updatedAt: String(node.updatedAt ?? ''),
+          });
+        }
       }
       if (data.issues?.pageInfo?.hasNextPage !== true) break;
       after = data.issues.pageInfo.endCursor;
     }
+    // Least recently touched first: when a budget runs out mid-sweep, the
+    // next sweep starts where this one could not reach.
+    found.sort(
+      (left, right) =>
+        (Date.parse(left.updatedAt) || 0) - (Date.parse(right.updatedAt) || 0)
+    );
+    lookups.push(...found.map(entry => entry.identifier));
   } else {
     lookups.push(ref.issueId || ref.identifier);
   }
@@ -795,7 +897,7 @@ export async function syncLinearIssueOnMerge(options = {}) {
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
   const results = [];
   const failures = [];
-  for (const lookupId of lookups) {
+  for (const [index, lookupId] of lookups.entries()) {
     try {
       results.push(
         await reconcileIssueLifecycle({
@@ -807,6 +909,7 @@ export async function syncLinearIssueOnMerge(options = {}) {
           facts,
           openPulls,
           harnessManifest,
+          assuranceMatrix,
           allowlist: options.allowlist,
           eventPull,
           dryRun: env.LIFECYCLE_DRY_RUN === '1',
@@ -817,6 +920,15 @@ export async function syncLinearIssueOnMerge(options = {}) {
       const message = error instanceof Error ? error.message : String(error);
       failures.push(`${lookupId}: ${message}`);
       log(`Lifecycle evaluation failed for ${lookupId}: ${message}`);
+      if (/** @type {{ rateLimited?: boolean }} */ (error)?.rateLimited) {
+        const deferred = lookups.length - index - 1;
+        if (deferred > 0) {
+          failures.push(
+            `${deferred} issue(s) deferred to the next sweep by the Linear rate limit`
+          );
+        }
+        break;
+      }
     }
   }
   const reasons = [...failures];
@@ -837,11 +949,62 @@ export async function syncLinearIssueOnMerge(options = {}) {
   };
 }
 
+/**
+ * Record an owner receipt: `receipt --issue JOV-1 --kind outcome --status pass
+ * --sha <full sha> --evidence <url> [--note <text>]`. A founder-taste
+ * rejection carries the founder's note into Rework.
+ *
+ * @param {readonly string[]} args
+ * @param {{ fetchImpl?: HttpFetch, env?: NodeJS.ProcessEnv }} [options]
+ */
+export async function recordValidationReceipt(args, options = {}) {
+  const value = (/** @type {string} */ name) => {
+    const index = args.indexOf(name);
+    return index === -1 ? '' : String(args[index + 1] ?? '');
+  };
+  const body = formatValidationReceipt({
+    issue: value('--issue').toUpperCase(),
+    kind: value('--kind'),
+    status: /** @type {'pass' | 'fail'} */ (value('--status')),
+    sha: value('--sha'),
+    evidence: value('--evidence'),
+    note: value('--note'),
+  });
+  const env = options.env ?? process.env;
+  const apiKey = env.LINEAR_API_KEY ?? '';
+  if (!apiKey)
+    throw new Error('LINEAR_API_KEY is required to record a receipt');
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const data = await linearGraphql(fetchImpl, apiKey, ISSUE_STATE_QUERY, {
+    issueId: value('--issue').toUpperCase(),
+  });
+  if (typeof data.issue?.id !== 'string') {
+    throw new Error(`Could not resolve ${value('--issue')}`);
+  }
+  const created = await linearGraphql(
+    fetchImpl,
+    apiKey,
+    `mutation AddValidationReceipt($issueId: String!, $body: String!) {
+      commentCreate(input: { issueId: $issueId, body: $body }) { success }
+    }`,
+    { issueId: data.issue.id, body }
+  );
+  if (created.commentCreate?.success !== true) {
+    throw new Error('Linear refused the validation receipt');
+  }
+  return body;
+}
+
 const isDirectRun =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isDirectRun) {
-  syncLinearIssueOnMerge().catch(error => {
+  const [command, ...rest] = process.argv.slice(2);
+  const run =
+    command === 'receipt'
+      ? recordValidationReceipt(rest).then(body => console.log(body))
+      : syncLinearIssueOnMerge();
+  run.catch(error => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
     process.exitCode = 1;

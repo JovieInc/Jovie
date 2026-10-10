@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import {
-  applyRemediationDecision,
+  applyRemediationDecisionWithRetry,
   decideAuthSmokeSignal,
   decideLoginSignal,
   decideMonitorSignal,
@@ -83,7 +83,7 @@ const gated = gateSteadyGreen(
   previous,
   env.REMEDIATION_GATE_STEADY_GREEN
 );
-const result = await applyRemediationDecision(gated, {
+const result = await applyRemediationDecisionWithRetry(gated, {
   fingerprint: gated.fingerprint || env.REMEDIATION_FINGERPRINT,
   source: env.REMEDIATION_SOURCE,
   runUrl: env.REMEDIATION_RUN_URL,

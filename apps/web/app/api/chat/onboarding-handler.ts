@@ -13,7 +13,9 @@ import {
   isGatewayBudgetExceededError,
   resolveChatStreamErrorMessage,
 } from '@/lib/ai/gateway-errors';
+import { getAppUserByBetterAuthId } from '@/lib/auth/app-user';
 import { auth } from '@/lib/auth/better-auth';
+import { checkUserStatus } from '@/lib/auth/status-checker';
 import {
   confirmSelectedArtist,
   decideFallbackTurn,
@@ -49,6 +51,7 @@ import { publicEnv } from '@/lib/env-public';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { checkGateForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
+import { findOnboardingConversation } from '@/lib/onboarding/conversation.server';
 import {
   encodeSessionCookie,
   ONBOARDING_SESSION_COOKIE_NAME,
@@ -105,6 +108,7 @@ const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
 const onboardingPayloadSchema = z.object({
   mode: z.literal('onboarding'),
   turnstileToken: z.string().max(2048).optional(),
+  onboardingConversationId: z.string().uuid().optional(),
   /**
    * UIMessage[] from the AI SDK client. Validated for shape elsewhere (message
    * role + parts structure); we only enforce length caps here.
@@ -129,6 +133,7 @@ const IMPLICIT_ONBOARDING_ENVELOPE_KEYS = new Set([
   'id',
   'trigger',
   'messageId',
+  'onboardingConversationId',
 ]);
 
 /**
@@ -261,9 +266,25 @@ export async function tryHandleAnonymousOnboardingChat(
   // A verified Better Auth identity has its own spend quota. The /start
   // envelope remains onboarding-shaped after OTP, so routing by body alone
   // would keep charging the shared anonymous IP/ASN pools.
-  const signedInSession = await auth.api
-    .getSession({ headers: req.headers, query: { disableCookieCache: true } })
-    .catch(() => null);
+  let signedInSession: Awaited<ReturnType<typeof auth.api.getSession>>;
+  try {
+    signedInSession = await auth.api.getSession({
+      headers: req.headers,
+      query: { disableCookieCache: true },
+    });
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { context: 'onboarding_session_resolution' },
+    });
+    return NextResponse.json(
+      {
+        error: 'Your session could not be verified. Try again.',
+        errorCode: 'ONBOARDING_SESSION_UNAVAILABLE',
+        requestId,
+      },
+      { status: 503, headers: { 'x-request-id': requestId } }
+    );
+  }
 
   const corsHeaders = createAuthenticatedCorsHeaders(
     req.headers.get('origin'),
@@ -307,17 +328,63 @@ export async function tryHandleAnonymousOnboardingChat(
   // --- Session cookie: read existing or mint a new one ---
   const incomingCookieHeader = req.headers.get('cookie') || '';
   const cookieMap = parseCookieHeader(incomingCookieHeader);
-  const existingSessionId = verifySessionCookie(
+  const cookieSessionId = verifySessionCookie(
     cookieMap.get(ONBOARDING_SESSION_COOKIE_NAME)
   );
+  let ownedConversation: Awaited<
+    ReturnType<typeof findOnboardingConversation>
+  > = null;
+  try {
+    if (signedInSession) {
+      const appUser = await getAppUserByBetterAuthId(signedInSession.user.id);
+      if (
+        appUser &&
+        checkUserStatus(appUser.userStatus, appUser.deletedAt).isBlocked
+      ) {
+        return NextResponse.json(
+          {
+            error: 'This account cannot continue onboarding',
+            errorCode: 'ACCOUNT_UNAVAILABLE',
+            requestId,
+          },
+          { status: 403, headers: corsHeaders }
+        );
+      }
+      if (appUser) {
+        const conversation = await findOnboardingConversation({
+          userId: appUser.id,
+          sessionId: null,
+        });
+        if (conversation?.owned) ownedConversation = conversation;
+      }
+    }
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { context: 'onboarding_owner_resolution' },
+    });
+    return NextResponse.json(
+      {
+        error: 'Your conversation could not be restored',
+        errorCode: 'ONBOARDING_CHAT_PERSISTENCE_FAILED',
+        requestId,
+      },
+      { status: 503, headers: corsHeaders }
+    );
+  }
+  // Claimed transcripts retain their session identifier after the anonymous
+  // cookie is cleared. Only the verified account owner can use that identifier.
+  const existingSessionId = ownedConversation?.sessionId ?? cookieSessionId;
 
-  let sessionId: string;
+  const sessionId = existingSessionId ?? randomUUID();
   let mintedSessionCookie: string | null = null;
-  if (existingSessionId) {
-    sessionId = existingSessionId;
-  } else {
-    sessionId = randomUUID();
-    // Sign the new sessionId. encodeSessionCookie throws if SESSION_SECRET is
+  if (
+    !existingSessionId ||
+    (ownedConversation && cookieSessionId !== sessionId)
+  ) {
+    // A genuine owned turn restores the signed cookie needed by the existing
+    // claim/handoff route. Reading history alone must not claim or redirect.
+    // This identifier came from verified ownership, never a client locator.
+    // encodeSessionCookie throws if SESSION_SECRET is
     // missing/short — surface that as a 503 (not 500) so observability can tell
     // an ops-config gap from a true crash.
     try {
@@ -503,9 +570,25 @@ export async function tryHandleAnonymousOnboardingChat(
 
   let conversationId: string;
   try {
+    if (parsed.data.onboardingConversationId) {
+      const currentConversation =
+        ownedConversation ??
+        (await findOnboardingConversation({ userId: null, sessionId }));
+      if (currentConversation?.id !== parsed.data.onboardingConversationId) {
+        return NextResponse.json(
+          {
+            error: 'Your onboarding conversation changed. Reload to continue.',
+            errorCode: 'ONBOARDING_CONTEXT_CHANGED',
+            requestId,
+          },
+          { status: 409, headers: corsHeaders }
+        );
+      }
+    }
     conversationId = await reserveAnonymousOnboardingConversation({
       sessionId,
       latestUserMessage,
+      ownedConversationId: ownedConversation?.id,
     });
   } catch (error) {
     Sentry.captureException(error, {
@@ -910,23 +993,27 @@ async function loadPersistedTranscript(
 async function reserveAnonymousOnboardingConversation({
   sessionId,
   latestUserMessage,
+  ownedConversationId,
 }: {
   readonly sessionId: string;
   readonly latestUserMessage: LatestUserMessage;
+  readonly ownedConversationId?: string;
 }): Promise<string> {
   const now = new Date();
-  const [existingConversation] = await db
-    .select({ id: chatConversations.id })
-    .from(chatConversations)
-    .where(
-      and(
-        eq(chatConversations.sessionId, sessionId),
-        isNull(chatConversations.userId),
-        isNull(chatConversations.creatorProfileId)
-      )
-    )
-    .orderBy(desc(chatConversations.updatedAt))
-    .limit(1);
+  const [existingConversation] = ownedConversationId
+    ? [{ id: ownedConversationId }]
+    : await db
+        .select({ id: chatConversations.id })
+        .from(chatConversations)
+        .where(
+          and(
+            eq(chatConversations.sessionId, sessionId),
+            isNull(chatConversations.userId),
+            isNull(chatConversations.creatorProfileId)
+          )
+        )
+        .orderBy(desc(chatConversations.updatedAt))
+        .limit(1);
 
   const conversationId =
     existingConversation?.id ??

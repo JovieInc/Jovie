@@ -349,6 +349,13 @@ export const FactoryRenderSchema = z.object({
   cls: z.number().min(0),
   lcpMs: z.number().min(0),
   captures: z.array(FactoryRenderCaptureSchema).optional(),
+  /** Exact candidate bytes measured for this attempt; absent on legacy runs. */
+  preview: z
+    .object({
+      path: z.string().min(1),
+      digest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+    })
+    .optional(),
 });
 
 export const FactorySeoAgentSchema = z.object({

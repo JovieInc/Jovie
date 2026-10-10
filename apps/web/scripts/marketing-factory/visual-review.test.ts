@@ -1,10 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+import type { ArtDirection } from '@/lib/agent-os/design-reference-corpus/refs-context';
 import type {
   JudgeScore,
   RouteJudges,
   StageJudge,
 } from '../design-ci-judge-dispatch';
 import { loadFactoryBrief } from './brief';
+import { captureBytesDigest } from './capture-integrity';
+import { capturePng } from './capture-integrity.fixtures';
 import { dryProviders, fixtureTransport, liveProviders } from './providers';
 import { fixtureCaptures } from './render-measurer';
 import {
@@ -17,10 +23,40 @@ import {
 } from './visual-review';
 
 const PRODUCER = 'anthropic/claude-opus-5.5';
+const ONE_LIGHT: ArtDirection = {
+  schema: 'jovie.art-direction/v1',
+  id: 'one-light',
+  title: 'One Light',
+  status: 'active',
+  surfaces: ['marketing'],
+  thesis: 'One light finds one focal element.',
+  referenceIds: ['raycast-com'],
+  principles: {
+    light: ['One source sets every highlight.'],
+    composition: ['One focal element per fold.'],
+    type: ['One dominant step, then a compressed tail.'],
+    motion: ['The light moves, not the layout.'],
+    color: ['One accent hue per section.'],
+  },
+  tokenMap: [{ principle: 'near-black', jovie: '--color-bg-surface-0' }],
+  antiGoals: [],
+  decidedBy: 'test',
+  updatedAt: '2026-10-03T00:00:00.000Z',
+};
 const DIGEST = `sha256:${'c'.repeat(64)}`;
+const captureDir = mkdtempSync(join(tmpdir(), 'visual-review-bytes-'));
+afterAll(() => rmSync(captureDir, { recursive: true, force: true }));
 const captures = fixtureCaptures('/solutions/founders', {
   cls: 0,
   lcpMs: 1200,
+}).map(capture => {
+  const path = join(captureDir, `${capture.viewport}.png`);
+  const bytes = capturePng(capture.width, capture.height);
+  writeFileSync(path, bytes);
+  return {
+    ...capture,
+    screenshot: { path, digest: captureBytesDigest(bytes) },
+  };
 });
 const request = {
   pageId: 'solutions-founders',
@@ -150,6 +186,60 @@ describe('runVisualReview', () => {
       reason: 'visual review at 390 undecided: judge-error',
     });
   });
+
+  it('fails on a reference copy before any judge is paid', async () => {
+    const pair = judges(0.9);
+    const findCopies = vi.fn(async () => [
+      {
+        image: captures[0].screenshot.path,
+        referenceId: 'raycast-com',
+        region: { left: 0, top: 0, width: 1440, height: 900 },
+        distance: 12,
+      },
+    ]);
+    const review = await runVisualReview(request, pair, {
+      references: [],
+      direction: null,
+      findCopies,
+    });
+
+    expect(review).toMatchObject({
+      status: 'reviewed',
+      verdict: 'fail',
+      judgeModel: 'design-refs/anti-copy',
+    });
+    expect(review.status === 'reviewed' && review.findings[0]).toMatch(
+      /^ref-copy: .* 12 bits from reference raycast-com$/u
+    );
+    expect(pair.cheap.run).not.toHaveBeenCalled();
+    expect(admit(review)).not.toEqual([]);
+  });
+
+  it('adds the active direction to the judge rubric when no ref is copied', async () => {
+    const pair = judges(0.9);
+    await runVisualReview(request, pair, {
+      references: [],
+      direction: ONE_LIGHT,
+      findCopies: async () => [],
+    });
+
+    const [input] = vi.mocked(pair.cheap.run).mock.calls[0] as unknown as [
+      { row: { policyFingerprintSource: { direction?: string } } },
+    ];
+    expect(input.row.policyFingerprintSource.direction).toContain('One Light:');
+    expect(
+      JSON.stringify(input.row.policyFingerprintSource).length
+    ).toBeLessThan(4_000);
+  });
+
+  it('keeps the base rubric without a direction', async () => {
+    const pair = judges(0.9);
+    await runVisualReview(request, pair);
+    const [input] = vi.mocked(pair.cheap.run).mock.calls[0] as unknown as [
+      { row: { policyFingerprintSource: { direction?: string } } },
+    ];
+    expect(input.row.policyFingerprintSource.direction).toBeUndefined();
+  });
 });
 
 describe('visual taste admission', () => {
@@ -217,12 +307,17 @@ describe('visual taste admission', () => {
 });
 
 describe('liveVisualJudges', () => {
+  const loader = async () => ({
+    evaluateArt: vi.fn(),
+    subscriptionVisionTransport: () => vi.fn(),
+  });
+
   it('seats no judge when nothing is reachable', async () => {
-    const loader = vi.fn();
-    const pair = await liveVisualJudges(null, PRODUCER, loader);
+    const unused = vi.fn();
+    const pair = await liveVisualJudges(null, PRODUCER, new Set(), unused);
 
     expect(pair.cheap.id).toBeNull();
-    expect(loader).not.toHaveBeenCalled();
+    expect(unused).not.toHaveBeenCalled();
     await expect(pair.cheap.run({} as never)).rejects.toThrow(/no reachable/);
   });
 
@@ -235,6 +330,7 @@ describe('liveVisualJudges', () => {
       const pair = await liveVisualJudges(
         fixtureTransport(),
         producer,
+        new Set(),
         async () => ({
           evaluateArt: vi.fn(),
           subscriptionVisionTransport: () => vi.fn(),
@@ -260,6 +356,18 @@ describe('liveVisualJudges', () => {
       ).resolves.toMatchObject({ status: 'reviewed', verdict: 'pass' });
     }
   );
+
+  it('never seats a judge that failed calibration', async () => {
+    const pair = await liveVisualJudges(
+      fixtureTransport(),
+      PRODUCER,
+      new Set(['openai/gpt-5.6-luna']),
+      loader
+    );
+
+    expect(pair.cheap.id).not.toBe('openai/gpt-5.6-luna');
+    expect(pair.flagship.id).not.toBe('openai/gpt-5.6-luna');
+  });
 });
 
 describe('providers.reviewVisual', () => {

@@ -25,15 +25,15 @@
     "tailwindcss": "^4.3.3",
     "autoprefixer": "^10.6.1",
     "@statsig/statsig-node-core": "^0.23.1",
-    "workflow": "4.8.10"
+    "workflow": "4.8.12"
   },
   "devDependencies": {
     "@types/node": "^26.6.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
-    "@vitest/coverage-v8": "5.0.2",
+    "@vitest/coverage-v8": "5.0.3",
     "typescript": "^6.0.3",
-    "vitest": "5.0.2",
+    "vitest": "5.0.3",
     "babel-plugin-react-compiler": "19.1.0-rc.3"
   }
 }

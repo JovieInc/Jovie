@@ -31,9 +31,9 @@ upsert_status_comment() {
 }
 read_state() {
   gh_retry api graphql \
-    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id number state isDraft headRefOid body labels(first:100){nodes{name}} autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id state position}}}}' \
+    -f query='query($owner:String!,$name:String!,$number:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$number){id number state isDraft headRefOid body labels(first:100){nodes{name}} autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id state position}}}}' \
     -f owner="${REPO%%/*}" -f name="${REPO#*/}" -F number="$PR_NUMBER" \
-    --jq '.data.repository.pullRequest | {id, number, state, draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), body: (.body // ""), labels: [.labels.nodes[].name], autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true and .mergeQueueEntry != null), mergeQueueEntry}'
+    --jq 'if type != "object" or (has("errors") and .errors != []) or (.data.repository.pullRequest | type) != "object" then error("promotion state response incomplete") else . as $response | .data.repository.pullRequest | {id, number, state, draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), body: (.body // ""), labels: [.labels.nodes[].name], autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true and .mergeQueueEntry != null), mergeQueueEntry, viewerLogin: $response.data.viewer.login} end'
 }
 blocker_body() {
   jq -nc \
@@ -42,49 +42,71 @@ blocker_body() {
     --arg phase "$1" --arg reason "$2" --argjson attempted "$3" \
     --argjson verified "$4" --argjson state "$5" \
     '{issueId:$issueId, prNumber:$prNumber, headSha:$headSha, writerLogin:$writerLogin, phase:$phase, reason:$reason, compensation:{attempted:$attempted, verified:$verified, state:$state}}' \
-    | node "$PROMOTION_LIB" render-blocker
+    | node "$PROMOTION_LIB" blocker
 }
 compensate_to_draft() {
-  local state pr_id
+  local state pr_id attempted=false
   # Re-read before EVERY risky effect. Never compensate another writer's head,
   # and never replay an uncertain dequeue/ready/disable response.
   for operation in disable-auto dequeue draft; do
-    state="$(read_state 2>/dev/null)" || { printf 'null'; return 1; }
+    state="$(read_state 2>/dev/null)" || { jq -n --argjson attempted "$attempted" '{compensationAttempted:$attempted}'; return 1; }
+    if jq -e --arg head "$EXPECTED_HEAD" '.head == $head and .state == "MERGED"' <<<"$state" >/dev/null; then
+      jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"
+      return 3
+    fi
     if ! jq -e --arg head "$EXPECTED_HEAD" '.head == $head and .state == "OPEN"' <<<"$state" >/dev/null; then
-      printf '%s' "$state"; return 1
+      jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"; return 1
     fi
     case "$operation" in
       disable-auto)
         if [[ "$(jq -r '.autoMerge' <<<"$state")" == "true" ]]; then
-          gh pr merge "$PR_NUMBER" -R "$REPO" --disable-auto >/dev/null 2>&1 || { printf '%s' "$state"; return 1; }
+          attempted=true
+          gh pr merge "$PR_NUMBER" -R "$REPO" --disable-auto >/dev/null 2>&1 || { jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"; return 1; }
         fi ;;
       dequeue)
         if [[ "$(jq -r '.queued' <<<"$state")" == "true" ]]; then
           pr_id="$(jq -r '.id // ""' <<<"$state")"
-          [[ -n "$pr_id" ]] || { printf '%s' "$state"; return 1; }
+          [[ -n "$pr_id" ]] || { jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"; return 1; }
+          attempted=true
           gh api graphql -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
-            -f id="$pr_id" >/dev/null 2>&1 || { printf '%s' "$state"; return 1; }
+            -f id="$pr_id" >/dev/null 2>&1 || { jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"; return 1; }
         fi ;;
       draft)
         if [[ "$(jq -r '.draft' <<<"$state")" != "true" ]]; then
-          gh pr ready "$PR_NUMBER" -R "$REPO" --undo >/dev/null 2>&1 || { printf '%s' "$state"; return 1; }
+          attempted=true
+          gh pr ready "$PR_NUMBER" -R "$REPO" --undo >/dev/null 2>&1 || { jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"; return 1; }
         fi ;;
     esac
   done
-  state="$(read_state 2>/dev/null)" || { printf 'null'; return 1; }
-  printf '%s' "$state"
-  jq -e --arg head "$EXPECTED_HEAD" '.head == $head and (.state != "OPEN" or (.draft == true and .autoMerge == false and .queued == false))' <<<"$state" >/dev/null
+  state="$(read_state 2>/dev/null)" || { jq -n --argjson attempted "$attempted" '{compensationAttempted:$attempted}'; return 1; }
+  jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"
+  jq -e --arg head "$EXPECTED_HEAD" '.head == $head and .state == "OPEN" and .draft == true and .autoMerge == false and .queued == false' <<<"$state" >/dev/null
 }
 emit_blocker_and_exit() {
   local phase="$1" reason="$2" should_compensate="${3:-0}"
-  local attempted=false verified=false state="null" body
+  local attempted=false verified=false state="${4:-null}" body blocker
   [[ "$should_compensate" == "1" ]] && attempted=true
   if [[ "$should_compensate" == "1" && "$DRY_RUN" != "1" ]] && state="$(compensate_to_draft)"; then
     verified=true
+  elif [[ "$should_compensate" == "1" && "$DRY_RUN" != "1" ]]; then
+    # An ambiguous mutation may have raced a merge. Read once, never replay it.
+    # Preserve the failed attempt even if the source is now terminal.
+    local observed
+    if observed="$(read_state 2>/dev/null)"; then
+      observed="$(jq --argjson prior "${state:-null}" '. + {compensationAttempted: (if ($prior | type) == "object" and ($prior | has("compensationAttempted")) then $prior.compensationAttempted else true end)}' <<<"$observed")"
+      state="$observed"
+    fi
   fi
-  body="$(blocker_body "$phase" "$reason" "$attempted" "$verified" "${state:-null}")"
+  attempted="$(jq -r --argjson fallback "$attempted" 'if type == "object" and has("compensationAttempted") then .compensationAttempted else $fallback end' <<<"${state:-null}")"
+  blocker="$(blocker_body "$phase" "$reason" "$attempted" "$verified" "${state:-null}")"
+  printf '%s\n' "$blocker"
+  body="$(node "$PROMOTION_LIB" render-blocker <<<"$blocker")"
   upsert_status_comment "$body" || true
-  echo "writer promotion blocked: $reason" >&2
+  if [[ "$(jq -r '.sourceDisposition' <<<"$blocker")" == "merged" ]]; then
+    echo "source merged; acceptance blocked: $reason; owner=$WRITER_LOGIN" >&2
+  else
+    echo "writer promotion blocked: $reason" >&2
+  fi
   exit 2
 }
 decision_for() {
@@ -98,7 +120,9 @@ decision_for() {
 before="$(read_state)" || emit_blocker_and_exit "precondition" "state-read-failed" 0
 live_head="$(jq -r '.head // ""' <<<"$before")"
 [[ "$live_head" == "$EXPECTED_HEAD" ]] || emit_blocker_and_exit "precondition" "head-mismatch:${live_head:-missing}" 0
-viewer_login="$(gh_retry api user --jq '.login' 2>/dev/null)" || emit_blocker_and_exit "precondition" "writer-identity-unreadable" 0
+# Bind the writer to the authenticated principal in this same fresh state read.
+# Installation actors support GraphQL viewer; /user is a different token contract.
+viewer_login="$(jq -er '.viewerLogin | select(type == "string") | select(test("^[A-Za-z0-9][A-Za-z0-9-]*(\\[bot\\])?$")) | select(contains("\n") | not)' <<<"$before")" || emit_blocker_and_exit "precondition" "writer-identity-unreadable" 0
 if [[ "$(normalize_login "$viewer_login")" != "$(normalize_login "$WRITER_LOGIN")" ]]; then
   emit_blocker_and_exit "precondition" "writer-token-mismatch:${viewer_login:-unknown}" 0
 fi
@@ -109,10 +133,13 @@ set -e
 decision="$(decision_for "$receipt" "$before")"
 action="$(jq -r '.action' <<<"$decision")"
 reason="$(jq -r '.reason' <<<"$decision")"
+if [[ "$action" == "merged-proof-blocked" ]]; then
+  emit_blocker_and_exit "proof" "$(jq -r '.proofReason' <<<"$decision")" 0 "$before"
+fi
 if [[ "$receipt_rc" -ne 0 || "$action" == "block" ]]; then
-  current_ready="$(jq -r '.draft == false or .autoMerge == true or .queued == true' <<<"$before")"
+  current_ready="$(jq -r '.state == "OPEN" and (.draft == false or .autoMerge == true or .queued == true)' <<<"$before")"
   [[ "$current_ready" == "true" ]] && compensate=1 || compensate=0
-  emit_blocker_and_exit "proof" "$reason" "$compensate"
+  emit_blocker_and_exit "proof" "$reason" "$compensate" "$before"
 fi
 # A ready-but-unenrolled PR may be a prior ambiguous request. Reconcile through
 # the durable native-intent path instead of drafting it on each restart.

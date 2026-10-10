@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "c8f21e6b30a961274109217859deaf8a58f2f3b141d2620d21540a584c63596a"
+    "bodySha256": "25164713a8fc910f61d565914dab8132b9fb0b8de38f55876df58ebd672e3364"
   },
   {
     "file": ".claude/rules/db.md",
@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "5185704c5856833e67430de606dcb0eba86b1a05f7ac655a984cc363c9d54597"
+    "bodySha256": "7f3b0dba3ee3214064fe9d7d78c2374d1de1193497df38338aba883fece617b2"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -68,7 +68,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "6330d61625978df2b2d670131ab2ee57329f02c418ae37547c73f08a10bf58c0"
+    "bodySha256": "236b84e3b2ed38cb4fdf1723abff6bd04165cbc5fc669f21940f4c9759c89714"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -132,7 +132,7 @@
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
-    "bodySha256": "d245600f007db0c988105dbd46a78564d41af5b842b73ab62215e7fb3c1311e7"
+    "bodySha256": "a157147142eb239b02e83595ee04895dcae9bf6767612fa02b64651d87236c3e"
   },
   {
     "file": ".claude/rules/testing.md",

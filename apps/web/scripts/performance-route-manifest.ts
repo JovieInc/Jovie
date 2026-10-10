@@ -537,11 +537,9 @@ const HOME_ROUTE = {
   warmupStrategy: 'public-route',
   measureMode: 'interactive-shell',
   readySelectors: {
-    // The primary CTA is now the chat-intake composer (not a /signup link).
-    // Sign-in is behind a modal triggered from the header. The input id is
-    // stable from HomepageIntent (`INPUT_ID = 'homepage-intent-input'`).
+    // HomepageIdentityHero renders the primary claim form with this input id.
     shell: ['#home-hero-heading'],
-    content: ['#home-hero-heading', 'input#homepage-intent-input'],
+    content: ['#home-hero-heading', 'input#homepage-claim-handle'],
   },
   timings: [
     { metric: 'first-contentful-paint', budget: 2000 },
@@ -1448,7 +1446,7 @@ const CREATOR_SHELL_ROUTES = [
     measureMode: 'redirect',
     readySelectors: {
       content: ['section#artist-profile'],
-      redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn`],
+      redirectDestinations: [`${APP_ROUTES.SETTINGS_PROFILE}?tab=earn`],
     },
     timings: [
       { metric: 'redirect-complete', budget: 700 },
@@ -1496,7 +1494,7 @@ const CREATOR_SHELL_ROUTES = [
       content: ['[data-testid="profiles-workspace"]', 'section#artist-profile'],
       redirectDestinations: [
         APP_ROUTES.PRESENCE,
-        `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
+        `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`,
       ],
     },
     timings: [
@@ -1926,7 +1924,7 @@ const CREATOR_ALIAS_ROUTES = [
     measureMode: 'redirect',
     readySelectors: {
       content: ['section#artist-profile'],
-      redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn`],
+      redirectDestinations: [`${APP_ROUTES.SETTINGS_PROFILE}?tab=earn`],
     },
     timings: [
       { metric: 'redirect-complete', budget: 100 },

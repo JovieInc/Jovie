@@ -44,6 +44,9 @@ describe('RightDrawer', () => {
 
     const aside = screen.getByLabelText('Details drawer');
     expect(aside).toHaveAttribute('aria-hidden', 'true');
+    // Pre-hydration on small screens the closed rail must not hold layout
+    // space that the mobile overlay later releases (CLS on /hud?fs=1).
+    expect(aside).toHaveClass('max-lg:hidden');
 
     rerender(
       <RightDrawer isOpen={true} width={360} ariaLabel='Details drawer'>
@@ -52,6 +55,7 @@ describe('RightDrawer', () => {
     );
 
     expect(aside).toHaveAttribute('aria-hidden', 'false');
+    expect(aside).not.toHaveClass('max-lg:hidden');
     expect(aside).toHaveStyle({ width: '360px' });
     expect(aside).not.toHaveClass('border-l');
     expect(aside).not.toHaveClass('bg-surface-0');
@@ -62,6 +66,54 @@ describe('RightDrawer', () => {
       'shadow-(--app-shell-drawer-shadow)'
     );
     expect(aside).toHaveClass('outline-none', 'focus:outline-none');
+  });
+
+  it('keeps the inspector content width stable through interrupted closes', () => {
+    const { rerender } = render(
+      <RightDrawer isOpen width={360} ariaLabel='Stable inspector'>
+        <button type='button'>Long inspector action</button>
+      </RightDrawer>
+    );
+    const action = screen.getByRole('button', {
+      name: 'Long inspector action',
+    });
+    const inner = action.closest('aside')?.firstElementChild as HTMLElement;
+    expect(inner.style.width).toBe('358px');
+    action.focus();
+    rerender(
+      <RightDrawer isOpen={false} width={360} ariaLabel='Stable inspector'>
+        <button type='button'>Long inspector action</button>
+      </RightDrawer>
+    );
+    expect(inner.style.width).toBe('358px');
+    rerender(
+      <RightDrawer isOpen width={360} ariaLabel='Stable inspector'>
+        <button type='button'>Long inspector action</button>
+      </RightDrawer>
+    );
+    expect(screen.getByRole('button', { name: 'Long inspector action' })).toBe(
+      action
+    );
+    expect(inner.style.width).toBe('358px');
+  });
+
+  it('returns focus from a closing desktop inspector to its rail toggle', () => {
+    const fixture = (isOpen: boolean) => (
+      <>
+        <button type='button' data-rail-toggle='right'>
+          Toggle inspector
+        </button>
+        <RightDrawer isOpen={isOpen} width={360} ariaLabel='Focus inspector'>
+          <button type='button'>Inside inspector</button>
+        </RightDrawer>
+      </>
+    );
+    const { rerender } = render(fixture(true));
+    screen.getByRole('button', { name: 'Inside inspector' }).focus();
+    rerender(fixture(false));
+    expect(
+      screen.getByRole('button', { name: 'Toggle inspector' })
+    ).toHaveFocus();
   });
 
   it('handles Escape while open even when focus remains outside the drawer', () => {
@@ -209,9 +261,11 @@ describe('RightDrawer', () => {
     );
 
     const mobileAside = screen.getByLabelText('Responsive drawer');
+    expect(mobileAside.parentElement).toBe(document.body);
     expect(mobileAside).toHaveClass(
       'fixed',
       'inset-0',
+      'z-sheet',
       'translate-x-full',
       'bg-(--app-shell-content-surface)',
       'outline-none',
@@ -236,7 +290,7 @@ describe('RightDrawer', () => {
     const desktopAside = screen.getByLabelText('Responsive drawer');
     // Shared shell rail-motion allocation contract (JOV-4522).
     expect(desktopAside).toHaveClass(
-      'transition-[flex-basis,width,opacity,transform]',
+      'transition-shell-rail-allocation',
       'opacity-100'
     );
     expect(desktopAside).not.toHaveClass('lg:border');
@@ -611,7 +665,7 @@ describe('RightDrawer', () => {
     const first = screen.getByRole('button', { name: 'First action' });
     const last = screen.getByRole('button', { name: 'Last action' });
 
-    await waitFor(() => expect(background.inert).toBe(true));
+    await waitFor(() => expect(background.closest('[inert]')).not.toBeNull());
     expect(document.body.style.overflow).toBe('hidden');
 
     last.focus();
@@ -631,7 +685,7 @@ describe('RightDrawer', () => {
       </>
     );
 
-    await waitFor(() => expect(background.inert).toBeFalsy());
+    await waitFor(() => expect(background.closest('[inert]')).toBeNull());
     expect(document.body.style.overflow).toBe('');
   });
 

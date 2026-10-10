@@ -423,7 +423,7 @@ function buildProfileCompletion(
       id: 'name',
       label: 'Add Your Artist Name',
       description: 'A clear name helps fans recognize and trust your profile.',
-      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+      href: APP_ROUTES.SETTINGS_PROFILE,
     });
   }
 
@@ -432,7 +432,7 @@ function buildProfileCompletion(
       id: 'avatar',
       label: 'Add A Profile Photo',
       description: 'A recognizable photo makes your page feel personal.',
-      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+      href: APP_ROUTES.SETTINGS_PROFILE,
     });
   }
 
@@ -441,7 +441,7 @@ function buildProfileCompletion(
       id: 'email',
       label: 'Add Your Account Email',
       description: 'Email keeps your account recoverable and mission-critical.',
-      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+      href: APP_ROUTES.SETTINGS_PROFILE,
     });
   }
 
