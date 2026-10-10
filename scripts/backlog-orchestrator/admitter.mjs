@@ -578,14 +578,23 @@ export function evaluateFleetGate(
         )
       );
     } else if (controllerStatus !== 'green') {
+      // JOV-8000 follow-up 29: parked (the retired-endpoint capacity shape,
+      // gem-priority-gate.py's observe_controller) is the controller-failure
+      // family — the same mapping the canonical python receipt writer uses.
+      // The JS projection previously mapped parked to CONTROLLER_UNKNOWN,
+      // which no promotion set admits, binding capacity merge-queue-blocked
+      // while the receipt itself said hold-intake — a split-brain between the
+      // two derivations of the same signals.
       reasons.push(
         typedReason(
-          controllerStatus === 'failed'
+          ['failed', 'parked'].includes(controllerStatus)
             ? FLEET_GATE_REASON.CONTROLLER_FAILURE
             : FLEET_GATE_REASON.CONTROLLER_UNKNOWN,
           'controller',
           'warning',
-          'Controller is not green; isolated draft work remains permitted.'
+          controllerStatus === 'parked'
+            ? 'Symphony controller endpoint is retired (parked); promotion continues in hold-intake.'
+            : 'Controller is not green; isolated draft work remains permitted.'
         )
       );
     }
@@ -737,14 +746,25 @@ export function evaluateFleetGate(
           ];
   const holdIntakeAllowed =
     state === FLEET_GATE_STATE.AMBER &&
+    reviewAdmission.allowed &&
     controllerFresh &&
-    controllerStatus === 'green' &&
+    ['failed', 'parked', 'green'].includes(controllerStatus) &&
     mainStatus === 'green' &&
     productionStatus === 'green' &&
-    productionUnbound &&
     ['clear', 'resolved'].includes(integrityStatus) &&
-    reasons.length === 1 &&
-    reasons[0]?.code === FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND;
+    // JOV-8000 follow-up 29: the bounded hold-intake reason set matches the
+    // canonical python writer (gem-priority-gate.py): {controller-failure,
+    // production-deployment-unbound}. A parked or crashed controller with
+    // production green (bound or lagging one deploy) is exactly the capacity
+    // shape hold-intake exists for — the JS previously required a green
+    // controller and a single unbound reason, binding BLOCKED while the
+    // receipt itself said hold-intake (the 38025443068 split-brain).
+    reasons.every(reason =>
+      [
+        FLEET_GATE_REASON.CONTROLLER_FAILURE,
+        FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND,
+      ].includes(reason.code)
+    );
   const controllerRepairReasonCodes = new Set(
     reasons.map(reason => reason.code)
   );
