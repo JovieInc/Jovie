@@ -85,8 +85,10 @@ export function ComposerSendButton({
           !isInteractive && 'cursor-not-allowed'
         )}
       >
-        <button
+        <Button
           type='button'
+          variant='primary'
+          size='icon'
           onMouseDown={onMouseDown}
           onClick={
             showStop
@@ -114,7 +116,7 @@ export function ComposerSendButton({
               {icon}
             </motion.span>
           </AnimatePresence>
-        </button>
+        </Button>
       </span>
     </SimpleTooltip>
   );

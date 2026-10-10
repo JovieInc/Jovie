@@ -30,6 +30,7 @@ const linkVariants = cva(
           'visited:text-(--color-link-visited) visited:decoration-(--color-link-visited)',
           'active:text-(--color-accent) active:decoration-(--color-accent) data-[state=active]:text-(--color-accent) data-[state=active]:decoration-(--color-accent)',
         ],
+        compact: '',
       },
     },
     defaultVariants: {
@@ -44,6 +45,11 @@ const linkVariants = cva(
  */
 const LINK_DISABLED_CLASSES =
   'pointer-events-none text-(--color-text-disabled-token) opacity-[var(--state-disabled-opacity)]';
+
+const LINK_TOUCH_TARGET_CLASSES =
+  'relative before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
+
+const LINK_COMPACT_CLASSES = 'btn-linear-login focus-ring-themed';
 
 export interface LinkProps
   extends React.AnchorHTMLAttributes<HTMLAnchorElement>,
@@ -70,6 +76,8 @@ export interface LinkProps
    * preview is unavailable. Does not replace the native :visited selector.
    */
   readonly visited?: boolean;
+  /** Keeps compact link visuals while expanding the pointer target to 44px. */
+  readonly touchTarget?: boolean;
 }
 
 function getLinkDataState({
@@ -96,6 +104,7 @@ const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
       active = false,
       disabled = false,
       visited = false,
+      touchTarget = false,
       onClick,
       ...props
     },
@@ -118,7 +127,10 @@ const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
           onClick?.(event);
         }}
         className={cn(
-          linkVariants({ variant, className }),
+          variant === 'compact'
+            ? cn(LINK_COMPACT_CLASSES, className)
+            : linkVariants({ variant, className }),
+          touchTarget && LINK_TOUCH_TARGET_CLASSES,
           disabled && LINK_DISABLED_CLASSES
         )}
         {...props}

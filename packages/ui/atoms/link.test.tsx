@@ -30,6 +30,29 @@ describe('Link', () => {
     expect(link.className).toContain('visited:text-(--color-link-visited)');
   });
 
+  it('expands a compact link hit target without changing its face geometry', () => {
+    render(
+      <Link
+        href='/signin'
+        variant='compact'
+        touchTarget
+        className='compact-link-face'
+      >
+        Sign in
+      </Link>
+    );
+
+    const link = screen.getByRole('link', { name: 'Sign in' });
+    expect(link).toHaveClass('compact-link-face');
+    expect(link).toHaveClass('btn-linear-login', 'focus-ring-themed');
+    expect(link.className).not.toContain('text-app');
+    expect(link.className).toContain('before:h-full');
+    expect(link.className).toContain('before:min-h-11');
+    expect(link.className).toContain('before:w-full');
+    expect(link.className).toContain('before:min-w-11');
+    expect(link.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
+  });
+
   it('marks visited preview state', () => {
     render(
       <Link href='/visited' visited data-testid='visited-link'>
