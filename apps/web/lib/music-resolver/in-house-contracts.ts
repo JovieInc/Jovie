@@ -34,6 +34,36 @@ export interface InHouseResolution {
   readonly confidence: number;
   readonly provenance: Readonly<Record<string, string>>;
   readonly candidateCount: number;
+  readonly artistMetadata?: ResolvedArtistMetadata;
+}
+
+/** Core MusicBrainz facts; tags, ratings, images and biographies are excluded. */
+export interface ResolvedArtistMetadata {
+  readonly source: 'musicbrainz';
+  readonly sourceUrl: string;
+  readonly disambiguation: string | null;
+  readonly aliases: readonly string[];
+  readonly type: string | null;
+  readonly country: string | null;
+  readonly area: string | null;
+  readonly origin: string | null;
+  readonly isnis: readonly string[];
+  readonly ipis: readonly string[];
+  readonly wikidataIds: readonly string[];
+  readonly externalLinks: readonly {
+    readonly provider: string | null;
+    readonly url: string;
+    readonly relationship: string;
+    readonly provenance: 'musicbrainz_url_rel';
+  }[];
+  readonly releaseGroups: readonly {
+    readonly mbid: string;
+    readonly title: string;
+    readonly primaryType: string | null;
+    readonly firstReleaseDate: string | null;
+  }[];
+  /** Embedded MusicBrainz collections are capped at 25; a full browse may be needed. */
+  readonly releaseGroupsComplete: boolean;
 }
 
 export type InHouseQuery =
@@ -99,6 +129,7 @@ export interface ArtistCandidate {
   readonly url: string;
   readonly mbid: string | null;
   readonly links: readonly ResolvedDspLink[];
+  readonly metadata?: ResolvedArtistMetadata;
 }
 
 export interface InHouseSources {
@@ -106,13 +137,21 @@ export interface InHouseSources {
     isrc: string,
     territory: string
   ): Promise<readonly CatalogTrack[]>;
-  trackByUrl(url: string): Promise<CatalogTrack | null>;
-  searchTracks(artist: string, title: string): Promise<readonly CatalogTrack[]>;
-  albumByUpc(upc: string): Promise<CatalogAlbum | null>;
-  albumByUrl(url: string): Promise<CatalogAlbum | null>;
-  searchAlbums(artist: string, title: string): Promise<readonly CatalogAlbum[]>;
+  trackByUrl(url: string, territory?: string): Promise<CatalogTrack | null>;
+  searchTracks(
+    artist: string,
+    title: string,
+    territory?: string
+  ): Promise<readonly CatalogTrack[]>;
+  albumByUpc(upc: string, territory?: string): Promise<CatalogAlbum | null>;
+  albumByUrl(url: string, territory?: string): Promise<CatalogAlbum | null>;
+  searchAlbums(
+    artist: string,
+    title: string,
+    territory?: string
+  ): Promise<readonly CatalogAlbum[]>;
   artistCandidates(name: string): Promise<readonly ArtistCandidate[]>;
-  artistByUrl(url: string): Promise<ArtistCandidate | null>;
+  artistByUrl(url: string): Promise<readonly ArtistCandidate[]>;
   artistByMbid(mbid: string): Promise<ArtistCandidate | null>;
   urlRelsForIsrc(isrc: string): Promise<readonly ResolvedDspLink[]>;
 }
