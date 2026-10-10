@@ -1,0 +1,5 @@
+[PR #20922](https://github.com/JovieInc/Jovie/pull/20922) is green. Pushed `6822d5bf30` to the same branch, fixing the two mock signatures.
+
+All required checks pass, including Source Validation and PR Ready. Hosted coverage ran 9,018 passing tests with **100% changed-line coverage**. The broad local run hit two unrelated UI timeouts; hosted coverage passed.
+
+Gbrain receipt written and readback verified: `engineering/jovie-web-test-typecheck-mock-signatures-2026-10-07`.
