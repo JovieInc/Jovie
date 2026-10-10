@@ -1,0 +1,9 @@
+Opened draft [PR #20940](https://github.com/JovieInc/Jovie/pull/20940) and pushed commit `4288e96d41`.
+
+- Updated TypeBadge, StatusBadge, DueChip, and activity meta casing/tracking. Shortcut keys remain unchanged.
+- Passed 317 tests, 100% changed-line coverage, typecheck, Biome, design conformance, invariants, copy, and bug-to-test checks.
+- Verified release metadata populated; due metadata empty/populated; activity idle/running/danger states at mobile and desktop sizes in both themes. Heights and hover/focus geometry stayed stable.
+
+Worktree is clean. No scope deviations; hosted CI remains in progress. The PR stays draft and unmerged.
+
+GBrain receipt `engineering/jov-5295-shell-metadata-casing` was written and readback verified.
