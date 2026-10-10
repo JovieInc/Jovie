@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 
@@ -412,6 +412,85 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         receipt["alreadyAdmittedCohort"]["newIntakeAllowed"] = True
         with self.assertRaisesRegex(PROJECT.AdmissionProjectionError, "bypasses closure intake"):
             PROJECT.project_fleet_admission_receipt(receipt)
+
+    def test_parked_hold_intake_survives_projection_and_drain_validation(self):
+        receipt = evaluate_receipt(controller={"status": "parked", "retired": True})
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        projected = PROJECT.project_fleet_admission_receipt(receipt)
+        self.assertEqual(projected["signals"]["controller"]["status"], "parked")
+        self.assertTrue(projected["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(projected["alreadyAdmittedCohort"]["newIntakeAllowed"])
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 4)
+        self.assertFalse(projected["promotionAdmission"]["allowed"])
+        self.assertFalse(projected["isolatedPromotionAdmission"]["allowed"])
+        accepted = subprocess.run(
+            [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+            input=json.dumps(projected), capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
+    def test_parked_hold_intake_consumers_reject_unhealthy_or_unknown_signals(self):
+        for signal, values in (
+            ("main", ("red", "unknown", None)),
+            ("production", ("red", "unknown", None)),
+            ("integrity", ("active", "invalid", "unknown", None)),
+            ("controller", ("unknown", "recovering", "invalid", None)),
+        ):
+            for status in values:
+                with self.subTest(signal=signal, status=status):
+                    receipt = evaluate_receipt(controller={"status": "parked", "retired": True})
+                    receipt["signals"][signal]["status"] = status
+                    self.assert_hold_intake_rejected(receipt)
+
+    def test_parked_hold_intake_consumers_still_require_exact_main_review(self):
+        for field, value in (("allowed", False), ("headSha", "b" * 40),
+                             ("authority", "untrusted"), ("reviewer", "untrusted"),
+                             ("scope", "other"), ("required", False),
+                             ("reviewId", None), ("observedAt", None)):
+            with self.subTest(field=field):
+                receipt = evaluate_receipt(controller={"status": "parked", "retired": True})
+                receipt["reviewAdmission"][field] = value
+                self.assert_hold_intake_rejected(receipt)
+
+    def test_parked_hold_intake_rejects_missing_stale_or_invalid_review(self):
+        stale = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        for review in (None, {}, {**signals()["independentReview"], "observedAt": stale},
+                       {**signals()["independentReview"], "headSha": "b" * 40}):
+            with self.subTest(review=review):
+                receipt = evaluate_receipt(
+                    controller={"status": "parked", "retired": True}, independentReview=review,
+                )
+                self.assertNotEqual(receipt["promotionMode"], "hold-intake")
+                self.assertFalse(receipt["reviewAdmission"]["allowed"])
+
+    def test_parked_remote_mutation_rejects_missing_stale_or_invalid_capacity(self):
+        stale = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        for evidence in (None, {}, {**capacity_evidence(), "observedAt": stale},
+                         {**capacity_evidence(), "acceptedEvidence": []}):
+            with self.subTest(evidence=evidence):
+                receipt = evaluate_receipt(
+                    controller={"status": "parked", "retired": True}, concurrencyEvidence=evidence,
+                )
+                self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+
+    def test_parked_does_not_change_real_failure_or_unknown_admission(self):
+        for status in ("failed", "unknown"):
+            with self.subTest(status=status):
+                receipt = evaluate_receipt(controller={"status": status})
+                projected = PROJECT.project_fleet_admission_receipt(receipt)
+                self.assertFalse(projected["promotionAdmission"]["allowed"])
+                if status == "failed":
+                    self.assertFalse(projected["workAdmission"]["newIssueLeaseAllowed"])
+                    self.assertFalse(projected["alreadyAdmittedCohort"]["newIntakeAllowed"])
+                    self.assertEqual(receipt["workAdmission"]["activities"], ["tests", "review"])
+                else:
+                    self.assertEqual(projected["promotionMode"], "blocked")
+                    rejected = subprocess.run(
+                        [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+                        input=json.dumps(projected), capture_output=True, text=True, check=False,
+                    )
+                    self.assertNotEqual(rejected.returncode, 0)
 
     def test_queue_empty_feed_projects_only_when_hold_intake_evidence_is_complete(self):
         closure = {
@@ -817,6 +896,41 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         )
 
 class LargeAdmissionDrainLaunchTests(unittest.TestCase):
+    def test_parked_drain_requires_fresh_well_formed_receipt(self):
+        receipt = PROJECT.project_fleet_admission_receipt(
+            evaluate_receipt(controller={"status": "parked", "retired": True})
+        )
+        stale = {**receipt, "observedAt": (datetime.now(timezone.utc) - timedelta(minutes=11)).isoformat()}
+        invalid_time = {**receipt, "observedAt": "not-a-timestamp"}
+        future = {**receipt, "observedAt": (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat()}
+        cases = [("fresh", receipt, 0), ("stale", stale, 2),
+                 ("invalid-time", invalid_time, 2), ("future", future, 2),
+                 ("missing", None, 2), ("invalid-json", "not-json", 2)]
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_gh = pathlib.Path(tmp) / "gh"
+            fake_gh.write_text(
+                "#!/usr/bin/env bash\n[[ \"$1 $2\" == \"pr list\" ]] && echo '[]' && exit 0\nexit 2\n"
+            )
+            fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+            for name, value, expected in cases:
+                encoded = "" if value is None else base64.b64encode(
+                    (value if isinstance(value, str) else json.dumps(value)).encode()
+                ).decode()
+                with self.subTest(case=name):
+                    result = subprocess.run(
+                        ["bash", str(DRAIN)], cwd=str(ROOT),
+                        env={**os.environ, "PATH": f"{tmp}:{os.environ.get('PATH', '')}",
+                             "DRAIN_EXPECT_GH": str(fake_gh), "DRAIN_MUTATION_AUTHORIZATION": "test-fixture",
+                             "MERGE_QUEUE_BACKEND": "test-label-fixture", "DRY_RUN": "1",
+                             "DRAIN_PROMOTION_MODE": "hold-intake", "DRAIN_FLEET_GATE_B64": encoded},
+                        capture_output=True, text=True, check=False,
+                    )
+                    self.assertEqual(result.returncode, expected, result.stderr)
+                    if expected:
+                        self.assertNotIn("queue depth:", result.stdout)
+                    else:
+                        self.assertIn("queue depth:", result.stdout)
+
     def test_projected_large_receipt_launches_the_drain_path(self):
         receipt = inject_inventories(
             evaluate_receipt(production={"status": "red", "deployedSha": SHA})
