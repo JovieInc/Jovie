@@ -64,6 +64,123 @@ describe('team production health contract', () => {
   });
 });
 
+describe('fleet gate production signal follows the same-run receipt (JOV-8000 follow-up 30)', () => {
+  it('re-derives hold-intake from the receipt production signal even when the live fetch would miss', async () => {
+    // The 38027107786 split-brain: the persisted receipt said
+    // hold-intake (main green via ancestor fallback, production green
+    // unbound, controller parked, fresh review), but the remediator's
+    // fleetGateForTeam re-fetched production live from the remediate step
+    // and, on a flaky runner egress or a 5s timeout miss, read unknown —
+    // re-deriving {controller-failure, production-unknown} and binding
+    // capacity merge-queue-blocked while the receipt said hold-intake.
+    // The production signal now comes from the SAME-RUN receipt; the live
+    // fetch is only the fail-closed fallback when the receipt carries no
+    // production signal.
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'fleet-gate-receipt-'));
+    const receiptPath = resolve(tempDir, 'latest.json');
+    const mainSha = 'a3eeefdd4dc681d1c9b5b4385720d661f5129137';
+    const now = new Date().toISOString();
+    await writeFile(
+      receiptPath,
+      JSON.stringify({
+        schema: 'jovie-fleet-gate/v1',
+        observedAt: now,
+        signals: {
+          main: { status: 'green', sha: mainSha },
+          production: {
+            status: 'green',
+            deployedSha: 'b3eeefdd4dc681d1c9b5b4385720d661f5129138',
+          },
+          controller: {
+            status: 'parked',
+            retired: true,
+            error: 'controller-endpoint-retired: Connection refused',
+          },
+          integrity: { status: 'clear' },
+          queue: {
+            repository: 'JovieInc/Jovie',
+            status: 'known',
+            eligiblePrs: 6,
+            greenReadyPrs: 1,
+            target: 15,
+            laneCapacity: {
+              schema: 'jovie-lane-capacity/v2',
+              observedAt: now,
+              repositories: {
+                'JovieInc/Jovie': { ready: 1, budget: 15 },
+              },
+              defaultLaneBudget: 4,
+              lanes: {},
+              sharedResources: {},
+            },
+          },
+          closureHealth: {
+            schema: 'jovie-closure-health/v1',
+            status: 'healthy',
+            authority: 'Summer',
+            newIssueIntakeAllowed: true,
+            promotionContinues: true,
+            remediationContinues: true,
+            reasons: [],
+          },
+          independentReview: {
+            schema: 'jovie-independent-review/v1',
+            status: 'passed',
+            authority: 'Gem',
+            reviewer: 'Gem',
+            reviewId: `main-release-ready:${mainSha}:${now}`,
+            headSha: mainSha,
+            scope: 'exact-main-head',
+            observedAt: now,
+          },
+          concurrencyEvidence: {
+            schema: 'gem-concurrency-evidence/v1',
+            source: 'execution-proven-useful-turns',
+            target: 4,
+            approved: true,
+            severeIncidents: 0,
+            observedAt: now,
+            acceptedEvidence: [],
+          },
+        },
+      })
+    );
+    const previousReceipt = process.env.JOVIE_FLEET_GATE_RECEIPT;
+    process.env.JOVIE_FLEET_GATE_RECEIPT = receiptPath;
+    try {
+      const { fleetGateForTeam } = await import(
+        resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+      );
+      const team = {
+        key: 'JOV',
+        healthUrl: 'https://jov.ie/api/health',
+        healthKind: 'json-status',
+      };
+      // A live fetch from this test would fail or hit the sandbox network —
+      // the assertion is that it is never consulted while the receipt
+      // carries the production signal.
+      const fleetGate = await fleetGateForTeam(team, now);
+      assert.equal(fleetGate.state, 'AMBER');
+      assert.equal(
+        fleetGate.promotionMode,
+        (await import(resolve(ORCHESTRATOR_DIR, 'admitter.mjs')))
+          .FLEET_PROMOTION_MODE.HOLD_INTAKE
+      );
+      const codes = fleetGate.reasons.map(reason => reason.code);
+      assert.ok(codes.includes('controller-failure'));
+      assert.ok(
+        codes.every(code =>
+          ['controller-failure', 'production-deployment-unbound'].includes(code)
+        )
+      );
+    } finally {
+      if (previousReceipt === undefined)
+        delete process.env.JOVIE_FLEET_GATE_RECEIPT;
+      else process.env.JOVIE_FLEET_GATE_RECEIPT = previousReceipt;
+    }
+  });
+});
+
 describe('remediation cooldown recovery', () => {
   it('defers a shared Linear cooldown for the scheduled retry clock', async () => {
     const executable = resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs');
@@ -2777,10 +2894,11 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.match(source, /sha: receipt\?\.signals\?\.main\?\.sha/);
-    assert.match(
-      source,
-      /deployedSha: receipt\?\.signals\?\.production\?\.deployedSha/
-    );
+    // JOV-8000 follow-up 30: the production signal rides the same-run
+    // receipt (receiptProduction) with the live fetch as the fail-closed
+    // fallback — the deployedSha binding source is unchanged.
+    assert.match(source, /receiptProduction\?\.deployedSha/);
+    assert.match(source, /: await teamProductionStatus\(team\)/);
   });
 
   it('keeps isolated leasing open when independent review is missing; promotion stays frozen', async () => {

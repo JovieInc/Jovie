@@ -473,10 +473,25 @@ function loadFleetGateReceipt(team) {
   }
 }
 
-async function fleetGateForTeam(team, now = new Date().toISOString()) {
-  const productionStatus = await teamProductionStatus(team);
+export async function fleetGateForTeam(team, now = new Date().toISOString()) {
   const receipt = loadFleetGateReceipt(team);
   const receiptMain = receipt?.signals?.main?.status;
+  // JOV-8000 follow-up 30: the production signal comes from the SAME-RUN
+  // persisted receipt (the canonical python writer's own observation, with
+  // its deployedSha binding and fetch evidence) — not a second live fetch
+  // from the remediate step. The live re-fetch re-observed production
+  // seconds after the receipt was written and, on a flaky runner egress or
+  // a 5s timeout miss, returned unknown where the receipt said green —
+  // re-deriving {controller-failure, production-unknown} and binding
+  // capacity merge-queue-blocked while the receipt said hold-intake (the
+  // 38027107786 split-brain). Fail closed: when the receipt is missing or
+  // carries no production signal, fall back to the live fetch as before.
+  const receiptProduction = receipt?.signals?.production;
+  const productionStatus =
+    typeof receiptProduction?.status === 'string' &&
+    ['green', 'red', 'unknown'].includes(receiptProduction.status)
+      ? receiptProduction.status
+      : await teamProductionStatus(team);
   return admitter.evaluateFleetGate(
     {
       main: {
@@ -490,7 +505,7 @@ async function fleetGateForTeam(team, now = new Date().toISOString()) {
       },
       production: {
         status: productionStatus,
-        deployedSha: receipt?.signals?.production?.deployedSha,
+        deployedSha: receiptProduction?.deployedSha,
       },
       controller: {
         status: receipt?.signals?.controller?.status || 'unknown',
