@@ -40,6 +40,7 @@ export default defineConfig({
     '**/smartlink-track-screen-proof.spec.ts',
     '**/tasks-screen-proof.spec.ts',
     '**/contacts-screen-proof.spec.ts',
+    '**/public-screens-proof.spec.ts',
     '**/public-export-serving.spec.ts',
   ],
   fullyParallel: false, // Run sequentially for deterministic screenshots
