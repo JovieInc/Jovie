@@ -285,7 +285,7 @@ export default function DownloadPage() {
                     </div>
                     <h2
                       data-wrap='editorial-title'
-                      className='mt-5 max-w-xs text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
+                      className='mt-5 text-pretty text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-4xl'
                     >
                       {platform.title}
                     </h2>
