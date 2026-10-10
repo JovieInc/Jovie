@@ -24,6 +24,11 @@ on:
         required: false
         default: false
         type: boolean
+      full_runtime_proof:
+        description: Require high-risk migration, observability, and OAuth proof.
+        required: false
+        default: true
+        type: boolean
     outputs:
       staging_eligible:
         description: Whether this generation remained exact-main through staging mutation.
@@ -755,7 +760,7 @@ jobs:
   migrate-production:
     name: Migrate production database
     needs: [production-head]
-    if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
+    if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && inputs.full_runtime_proof && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -823,7 +828,7 @@ jobs:
   promote-production:
     name: Promote to Production
     needs: [production-head, migrate-production]
-    if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' && needs.migrate-production.result == 'success' }}
+    if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' && ((inputs.full_runtime_proof && needs.migrate-production.result == 'success') || (!inputs.full_runtime_proof && needs.migrate-production.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -1182,12 +1187,12 @@ jobs:
           retention-days: 30
 
       - name: Setup Playwright for exact-build performance gate
-        if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
+        if: ${{ inputs.full_runtime_proof && steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
         uses: ./.github/actions/setup-playwright
 
       - name: Prove canonical navigation budgets on exact staged build
         id: performance-gate
-        if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
+        if: ${{ inputs.full_runtime_proof && steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
         timeout-minutes: 20
         env:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
@@ -1294,7 +1299,7 @@ jobs:
 
       - name: Recheck main immediately before production promotion
         id: final-current
-        if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.performance-gate.outcome == 'success' }}
+        if: ${{ steps.mutation-head.outputs.is_current == 'true' && ((inputs.full_runtime_proof && steps.performance-gate.outcome == 'success') || (!inputs.full_runtime_proof && steps.performance-gate.outcome == 'skipped')) }}
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
@@ -1712,7 +1717,7 @@ jobs:
   sentry-error-gate:
     name: Sentry Error Gate (production)
     needs: [promote-production]
-    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
+    if: ${{ always() && inputs.full_runtime_proof && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -1744,7 +1749,7 @@ jobs:
   production-oauth-gate:
     name: Production OAuth Gate (observational)
     needs: [promote-production]
-    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
+    if: ${{ always() && inputs.full_runtime_proof && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -2164,8 +2169,20 @@ jobs:
           PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.production_deployment_id }}
           PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.promote-production.outputs.production_deployment_url_b64 }}
           PREVIOUS_PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.previous_production_deployment_id }}
+          FULL_RUNTIME_PROOF: ${{ inputs.full_runtime_proof }}
         run: |
           set -euo pipefail
+          FULL_RUNTIME_PROOF="${FULL_RUNTIME_PROOF:-true}"
+          sentry_status="${{ needs.sentry-error-gate.outputs.gate_status }}"
+          oauth_status="${{ needs.production-oauth-gate.outputs.gate_status }}"
+          migration_result="${{ needs.migrate-production.result }}"
+          sentry_result="${{ needs.sentry-error-gate.result }}"
+          oauth_result="${{ needs.production-oauth-gate.result }}"
+          if [ "$FULL_RUNTIME_PROOF" != true ]; then
+            [ "$migration_result" = skipped ] && [ "$sentry_result" = skipped ] && [ "$oauth_result" = skipped ] && [ "${{ needs.rollback-production.result }}" = skipped ] || { echo "::error::Low/medium lane ran unrelated high-risk gates."; exit 1; }
+            sentry_status=not-required oauth_status=not-required
+            migration_result=success sentry_result=success oauth_result=success
+          fi
           {
             echo "released=false"
             echo "superseded_before_promotion=false"
@@ -2174,8 +2191,8 @@ jobs:
             echo "previous_production_deployment_id=$PREVIOUS_PRODUCTION_DEPLOYMENT_ID"
             echo "schema_drift=${{ needs.migrate-production.outputs.schema_drift == 'true' }}"
             echo "failure_subtype=${{ needs.promote-production.outputs.failure_subtype }}"
-            echo "sentry_gate_status=${{ needs.sentry-error-gate.outputs.gate_status }}"
-            echo "oauth_gate_status=${{ needs.production-oauth-gate.outputs.gate_status }}"
+            echo "sentry_gate_status=$sentry_status"
+            echo "oauth_gate_status=$oauth_status"
           } >> "$GITHUB_OUTPUT"
 
           if [ "${{ needs.release-head.result }}" != "success" ]; then
@@ -2232,7 +2249,7 @@ jobs:
               if [ "${{ inputs.staging_verified }}" != "true" ] ||
                 [ "${{ needs.production-head.result }}" != "success" ] ||
                 [ "${{ needs.production-head.outputs.is_current }}" != "true" ] ||
-                [ "${{ needs.migrate-production.result }}" != "success" ]; then
+                { [ "$FULL_RUNTIME_PROOF" = true ] && [ "${{ needs.migrate-production.result }}" != "success" ]; }; then
                 echo "::error::Production-mutation supersession cannot mask failed release work."
                 exit 1
               fi
@@ -2242,9 +2259,7 @@ jobs:
             fi
           fi
 
-          sentry_status="${{ needs.sentry-error-gate.outputs.gate_status }}"
-          oauth_status="${{ needs.production-oauth-gate.outputs.gate_status }}"
-          if [ "$sentry_status" = "failed" ] || [ "$oauth_status" = "failed" ]; then
+          if [ "$FULL_RUNTIME_PROOF" = true ] && { [ "$sentry_status" = "failed" ] || [ "$oauth_status" = "failed" ]; }; then
             if [ "${{ needs.rollback-production.result }}" != "success" ] ||
               [ "${{ needs.rollback-production.outputs.rolled_back }}" != "true" ]; then
               echo "::error::A production gate failed and centralized rollback did not complete exactly."
@@ -2253,10 +2268,10 @@ jobs:
             echo "::error::A production gate failed; the exact previous deployment was restored."
             exit 1
           fi
-          if [ "${{ needs.sentry-error-gate.result }}" != "success" ] ||
+          if [ "$FULL_RUNTIME_PROOF" = true ] && { [ "${{ needs.sentry-error-gate.result }}" != "success" ] ||
             [ "$sentry_status" != "passed" ] ||
             [ "${{ needs.production-oauth-gate.result }}" != "success" ] ||
-            [ "$oauth_status" != "passed" ]; then
+            [ "$oauth_status" != "passed" ]; }; then
             if [ "${{ needs.rollback-production.result }}" != "skipped" ]; then
               echo "::error::An uncertain production gate result must never trigger rollback."
               exit 1
@@ -2279,10 +2294,13 @@ jobs:
             "production-head:${{ needs.production-head.result }}" \
             "promote-production:${{ needs.promote-production.result }}" \
             "production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}" \
-            "sentry-error-gate:${{ needs.sentry-error-gate.result }}" \
-            "production-oauth-gate:${{ needs.production-oauth-gate.result }}"; do
+            "sentry-error-gate:$sentry_result" \
+            "production-oauth-gate:$oauth_result"; do
             name="${gate%%:*}"
             result="${gate#*:}"
+            if [ "$FULL_RUNTIME_PROOF" != true ] && [ "$name" = "migrate-production" ]; then
+              result="$migration_result"
+            fi
             if [ "$result" != "success" ]; then
               echo "::error::$name did not complete successfully ($result)."
               exit 1

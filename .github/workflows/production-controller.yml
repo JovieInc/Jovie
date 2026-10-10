@@ -367,6 +367,11 @@ jobs:
       web_evidence_sha: ${{ steps.authorize.outputs.web_evidence_sha }}
       lane_receipt_artifact_id: ${{ steps.authorize.outputs.lane_receipt_artifact_id }}
       staging_verified: ${{ steps.authorize.outputs.staging_verified }}
+      release_lane: ${{ steps.authorize.outputs.release_lane }}
+      release_policy_version: ${{ steps.authorize.outputs.release_policy_version }}
+      release_unattended_allowed: ${{ steps.authorize.outputs.release_unattended_allowed }}
+      release_certification_required: ${{ steps.authorize.outputs.release_certification_required }}
+      release_requires_smoke: ${{ steps.authorize.outputs.release_requires_smoke }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -702,7 +707,14 @@ jobs:
               echo "::notice::Live production $deployed_sha is unbound from current main $EXPECTED_SHA with sealed lanes $selected_lanes; forcing Web/Promote so skip-promote cannot occupy the bind."
             fi
 
-            if [ "$run_web" = true ]; then
+            node scripts/lib/release-risk-policy.mjs plan \
+              --release "$receipt_dir/release.json" --range "$lane_range_json" \
+              --merge-at "$(git show -s --format=%cI "$EXPECTED_SHA")" \
+              --out "$RUNNER_TEMP/release-risk-receipt.json" --github-output "$GITHUB_OUTPUT"
+            release_lane="$(jq -r '.selectedLane' "$RUNNER_TEMP/release-risk-receipt.json")"
+            jq '{policyVersion, selectedLane, riskInputs, requiredProof, latency}' "$RUNNER_TEMP/release-risk-receipt.json" >> "$GITHUB_STEP_SUMMARY"
+
+            if [ "$run_web" = true ] && [ "$release_lane" != not_applicable ]; then
               staging_receipt_sha="$web_evidence_sha"
               staging_deployment_id=""
               if [[ ! "$staging_receipt_sha" =~ ^[0-9a-f]{40}$ ]]; then
@@ -842,6 +854,7 @@ jobs:
           path: |
             ${{ runner.temp }}/production-lane-range.json
             ${{ runner.temp }}/fleet-admission.json
+            ${{ runner.temp }}/release-risk-receipt.json
           if-no-files-found: error
           retention-days: 30
 
@@ -869,7 +882,7 @@ jobs:
   production-release:
     name: Production Release
     needs: [authorize-production]
-    if: ${{ always() && needs.authorize-production.result == 'success' && needs.authorize-production.outputs.authorized == 'true' && needs.authorize-production.outputs.run_web == 'true' }}
+    if: ${{ always() && needs.authorize-production.result == 'success' && needs.authorize-production.outputs.authorized == 'true' && needs.authorize-production.outputs.run_web == 'true' && needs.authorize-production.outputs.release_lane != 'not_applicable' && needs.authorize-production.outputs.release_unattended_allowed == 'true' }}
     uses: ./.github/workflows/production-release.yml
     permissions:
       contents: read
@@ -880,6 +893,7 @@ jobs:
       expected_sha: ${{ needs.authorize-production.outputs.expected_sha }}
       release_mode: production
       staging_verified: ${{ needs.authorize-production.outputs.staging_verified == 'true' }}
+      full_runtime_proof: ${{ needs.authorize-production.outputs.release_lane == 'high' }}
     secrets: inherit
   ci-public-profile-smoke:
     name: Post-Deploy Smoke (Production)
@@ -946,7 +960,7 @@ jobs:
   ci-post-deploy-auth-smoke:
     name: Post-Deploy Auth Smoke (Production)
     needs: [authorize-production, production-release]
-    if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' }}
+    if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' && needs.authorize-production.outputs.release_requires_smoke == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -1058,7 +1072,7 @@ jobs:
     name: Lighthouse CI (Production)
     needs: [authorize-production, production-release]
     # Run after successful deploy (tests homepage + /tim profile)
-    if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' }}
+    if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' && needs.authorize-production.outputs.release_lane == 'high' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -1189,6 +1203,7 @@ jobs:
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
           RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
+          RELEASE_LANE: ${{ needs.authorize-production.outputs.release_lane }}
         run: |
           set -euo pipefail
           {
@@ -1201,7 +1216,7 @@ jobs:
           }
           if [ "$current_sha" != "$EXPECTED_SHA" ]; then
             echo "::warning::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; exact production bind will be proven before marker preservation."
-            if [ "$RUN_WEB" != true ]; then
+            if [ "$RELEASE_LANE" != not_applicable ] && [ "$RUN_WEB" != true ]; then
               node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha" --allow-in-flight-supersede
             fi
             echo "is_current=false" >> "$GITHUB_OUTPUT"
@@ -1212,18 +1227,18 @@ jobs:
           fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.run_web == 'true' }}
+        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.release_lane != 'not_applicable' && needs.authorize-production.outputs.release_unattended_allowed == 'true' }}
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.run_web == 'true' }}
+        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.release_lane != 'not_applicable' && needs.authorize-production.outputs.release_unattended_allowed == 'true' }}
 
       - name: Require exact deployment and every post-deploy probe
         id: verify
-        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.run_web == 'true' }}
+        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.release_lane != 'not_applicable' && needs.authorize-production.outputs.release_unattended_allowed == 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1235,12 +1250,15 @@ jobs:
           PRODUCTION_ALIAS_RETRY_SECONDS: '5'
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          RELEASE_LANE: ${{ needs.authorize-production.outputs.release_lane }}
+          RELEASE_REQUIRES_SMOKE: ${{ needs.authorize-production.outputs.release_requires_smoke }}
           # The JOV-INV-033 rescan reads the immutable deployment URL, which
           # sits behind deployment protection; without the bypass it follows
           # the SSO redirect and reports every marker as missing.
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
+          RELEASE_LANE="${RELEASE_LANE:-high}" RELEASE_REQUIRES_SMOKE="${RELEASE_REQUIRES_SMOKE:-true}"
           {
             echo "canonical_verified=false"
             echo "canonical_deployment_id="
@@ -1280,7 +1298,7 @@ jobs:
           fi
           for probe in \
             "Post-Deploy Smoke:${{ needs.ci-public-profile-smoke.result }}" \
-            "Lighthouse CI:${{ needs.lighthouse-ci.result }}"; do
+            "Lighthouse CI:$([ "$RELEASE_LANE" = high ] && echo '${{ needs.lighthouse-ci.result }}' || echo success)"; do
             name="${probe%%:*}"
             result="${probe#*:}"
             if [ "$result" != "success" ]; then
@@ -1288,13 +1306,13 @@ jobs:
               exit 1
             fi
           done
-          if [ "${{ needs.ci-post-deploy-auth-smoke.result }}" != "success" ]; then
+          if [ "$RELEASE_REQUIRES_SMOKE" = true ] && [ "${{ needs.ci-post-deploy-auth-smoke.result }}" != "success" ]; then
             echo "::error::Authenticated smoke lane did not resolve cleanly."
             exit 1
           fi
           auth_smoke_status="${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}"
-          if [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" != "true" ] ||
-            [ "$auth_smoke_status" != "passed" ]; then
+          if [ "$RELEASE_REQUIRES_SMOKE" = true ] && { [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" != "true" ] ||
+            [ "$auth_smoke_status" != "passed" ]; }; then
             echo "::error::Authenticated Better Auth OTP smoke did not produce passing test evidence."
             exit 1
           fi
@@ -1336,11 +1354,21 @@ jobs:
           SELECTED_LANES: ${{ needs.authorize-production.outputs.selected_lanes }}
           DEPLOYED_SHA: ${{ needs.authorize-production.outputs.deployed_sha }}
           WEB_EVIDENCE_SHA: ${{ needs.authorize-production.outputs.web_evidence_sha }}
+          RELEASE_LANE: ${{ needs.authorize-production.outputs.release_lane }}
+          CERTIFICATION_REQUIRED: ${{ needs.authorize-production.outputs.release_certification_required }}
         shell: bash
         run: |
           set -euo pipefail
           echo "verified=false" >> "$GITHUB_OUTPUT"
           superseded_after_public_bind=false
+          RELEASE_LANE="${RELEASE_LANE:-high}" CERTIFICATION_REQUIRED="${CERTIFICATION_REQUIRED:-false}"
+          AUTH_SMOKE_STATUS="${AUTH_SMOKE_STATUS:-not-required}"
+          node "$GITHUB_WORKSPACE/scripts/lib/release-risk-policy.mjs" measure --receipt "$RUNNER_TEMP/release-lineage/release-risk-receipt.json" --terminal-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --out "$RUNNER_TEMP/release-risk-receipt.json"
+          if [ "$CERTIFICATION_REQUIRED" = true ]; then
+            jq -e '.certificationPacket' "$RUNNER_TEMP/release-risk-receipt.json" > "$RUNNER_TEMP/ovi-release-certification-packet.json"
+            echo "::notice::Production promotion awaits the exact Ovi certification packet for $EXPECTED_SHA."
+            exit 0
+          fi
 
           # API uncertainty fails before finalization. If main advanced after
           # successful promotion, preserve a marker only from the exact public
@@ -1353,7 +1381,9 @@ jobs:
             exit 1
           fi
           if [ "$boundary_sha" != "$EXPECTED_SHA" ]; then
-            if [ "$RUN_WEB" = true ] &&
+            if [ "$RELEASE_LANE" = not_applicable ]; then
+              echo "::notice::Not-applicable lineage $EXPECTED_SHA finalized without production mutation."
+            elif [ "$RUN_WEB" = true ] &&
               [ "${{ steps.verify.outcome }}" = "success" ] &&
               [ "${{ steps.verify.outputs.canonical_verified }}" = "true" ] &&
               [ "${{ steps.verify.outputs.canonical_deployment_id }}" = "$DEPLOYMENT_ID" ] &&
@@ -1370,8 +1400,10 @@ jobs:
             exit 1
           fi
 
-          if [ "$RUN_WEB" != true ]; then
-            node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"
+          if [ "$RELEASE_LANE" = not_applicable ]; then
+            if [ "$RUN_WEB" != true ]; then
+              node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"
+            fi
             for result in \
               "${{ needs.production-release.result }}" \
               "${{ needs.ci-public-profile-smoke.result }}" \
@@ -1386,9 +1418,10 @@ jobs:
               --arg web_evidence_sha "$WEB_EVIDENCE_SHA" \
               --arg controller_run "${{ github.run_id }}" \
               --arg controller_attempt "${{ github.run_attempt }}" \
-              --arg terminal_reason "skipped_no_web" \
+              --arg terminal_reason "not_applicable" \
               --slurpfile fleet "$RUNNER_TEMP/release-lineage/fleet-admission.json" \
-              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable", terminalReason: $terminal_reason, fleetAdmission: $fleet[0].scopedAdmission}' \
+              --slurpfile releasePolicy "$RUNNER_TEMP/release-risk-receipt.json" \
+              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable", terminalReason: $terminal_reason, fleetAdmission: $fleet[0].scopedAdmission, releasePolicy: $releasePolicy[0]}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             echo "verified=true" >> "$GITHUB_OUTPUT"
             echo "Web release skipped by the sealed product-lane receipt."
@@ -1399,8 +1432,8 @@ jobs:
             [ "${{ steps.verify.outputs.canonical_verified }}" = "true" ] &&
             [ "${{ steps.verify.outputs.canonical_deployment_id }}" = "$DEPLOYMENT_ID" ] &&
             [ "${{ steps.verify.outputs.canonical_sha }}" = "$EXPECTED_SHA" ] &&
-            [ "${{ needs.production-release.outputs.sentry_gate_status }}" = "passed" ] &&
-            [ "${{ needs.production-release.outputs.oauth_gate_status }}" = "passed" ]; then
+            [ "${{ needs.production-release.outputs.sentry_gate_status }}" = "$([ "$RELEASE_LANE" = high ] && echo passed || echo not-required)" ] &&
+            [ "${{ needs.production-release.outputs.oauth_gate_status }}" = "$([ "$RELEASE_LANE" = high ] && echo passed || echo not-required)" ]; then
             test -n "$DEPLOYMENT_ID" || {
               echo "::error::Cannot write verified marker without an exact deployment ID."
               exit 1
@@ -1422,7 +1455,8 @@ jobs:
               --arg lanes "$SELECTED_LANES" \
               --arg terminal_reason "$terminal_reason" \
               --slurpfile fleet "$RUNNER_TEMP/release-lineage/fleet-admission.json" \
-              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke, terminalReason: $terminal_reason, fleetAdmission: $fleet[0].scopedAdmission}' \
+              --slurpfile releasePolicy "$RUNNER_TEMP/release-risk-receipt.json" \
+              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke, terminalReason: $terminal_reason, fleetAdmission: $fleet[0].scopedAdmission, releasePolicy: $releasePolicy[0]}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             test -s "$RUNNER_TEMP/production-generation-verified.json" || {
               echo "::error::Verified marker write-through produced an empty file."
@@ -1439,7 +1473,18 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ needs.authorize-production.outputs.marker_recovery == 'true' && format('production-generation-verified-recovery-{0}', needs.authorize-production.outputs.expected_sha) || format('production-generation-verified-{0}', needs.authorize-production.outputs.expected_sha) }}
-          path: ${{ runner.temp }}/production-generation-verified.json
+          path: |
+            ${{ runner.temp }}/production-generation-verified.json
+            ${{ runner.temp }}/release-risk-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Preserve one Ovi certification packet
+        if: ${{ needs.authorize-production.outputs.release_certification_required == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ovi-release-certification-${{ needs.authorize-production.outputs.expected_sha }}
+          path: ${{ runner.temp }}/ovi-release-certification-packet.json
           if-no-files-found: error
           retention-days: 30
 
