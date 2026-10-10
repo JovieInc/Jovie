@@ -22,9 +22,9 @@
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
     "@vercel/blob": "2.8.1",
-    "ai": "7.0.133",
+    "ai": "7.0.136",
     "braintrust": "3.37.1",
-    "eve": "0.71.3",
+    "eve": "0.72.1",
     "just-bash": "3.6.0",
     "microsandbox": "0.7.7",
     "zod": "4.6.5"
@@ -38,7 +38,7 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "eve@0.71.3": "patches/eve@0.71.3.patch"
+      "eve@0.72.1": "patches/eve@0.72.1.patch"
     },
     "overrides": {
       "fast-uri": "3.1.8",

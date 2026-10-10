@@ -479,7 +479,7 @@ jobs:
       # Both checks are dependency-free (node: built-ins only) and read the
       # checked-out manifests/lockfile directly; the full dependency install only
       # added ~40s of setup before the actual check ran.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
       - name: Verify workflow references
@@ -533,6 +533,10 @@ jobs:
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
       run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}
+      # 'mac' when a self-hosted Mac runner heartbeat is fresh, else 'hosted'.
+      # Hosted macOS is one small org-wide pool; LogYourBody's queue filled it
+      # on 2026-10-10 and Jovie's Mac job waited the full 60-minute budget.
+      mac_runner_class: ${{ steps.mac-route.outputs.runner_class || 'hosted' }}
       run_web: ${{ steps.detect.outputs.run_web || 'false' }}
       run_operations: ${{ steps.detect.outputs.run_operations || 'false' }}
       run_cross_product: ${{ steps.detect.outputs.run_cross_product || 'false' }}
@@ -611,6 +615,44 @@ jobs:
           else
             echo "No brand-scrub paths changed."
           fi
+      # Same contract as ios-ci.yml's mac-runner-route: a fresh, idle self-hosted
+      # Mac heartbeat routes the Mac lane to the jovie-mac runners (tw-mac-001,
+      # tims-macbook-air); stale, busy or unknown evidence keeps hosted macOS.
+      - name: Query Mac runner heartbeat
+        id: mac-heartbeat
+        if: ${{ vars.JOVIE_MAC_RUNNER != 'off' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml
+          HEARTBEAT_MAX_AGE_SECONDS: '1500'
+          HEARTBEAT_API_TIMEOUT_SECONDS: '5'
+          HEARTBEAT_POLL_ATTEMPTS: '1'
+          HEARTBEAT_POLL_INTERVAL_SECONDS: '1'
+        run: |
+          set -uo pipefail
+          helper='.github/scripts/await-runner-heartbeat.sh'
+          if [ -x "$helper" ]; then
+            timeout 60s "$helper" || true
+          fi
+          exit 0
+
+      - name: Select Mac runner route
+        id: mac-route
+        env:
+          HEARTBEAT_HEALTH: ${{ steps.mac-heartbeat.outputs.health }}
+          HEARTBEAT_EVIDENCE: ${{ steps.mac-heartbeat.outputs.evidence }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner_class='hosted'
+          if [ "$HEARTBEAT_HEALTH" = 'up' ]; then
+            runner_class='mac'
+          fi
+          echo "runner_class=$runner_class" >> "$GITHUB_OUTPUT"
+          echo "::notice::Mac lane runner route: $runner_class — ${HEARTBEAT_EVIDENCE:-not probed}"
+
       - name: Detect path changes for all job types
         id: detect
         shell: bash
@@ -1228,7 +1270,7 @@ jobs:
           filter: blob:none
       # This gate is dependency-free. Restoring the full pnpm cache can exceed
       # the three-minute latency ratchet before classification even starts.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: Collect changed files
@@ -1517,7 +1559,7 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: Validate snapshot inventory and workflow contract
@@ -3501,8 +3543,16 @@ jobs:
       # same PR. Direct-main and manual runs keep exact, non-canceling groups.
       group: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || format('ci-macos-{0}-{1}', github.run_id, github.run_attempt) }}
       cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}
-    runs-on: macos-26
-    timeout-minutes: 45
+    # Self-hosted jovie-mac runners when their heartbeat is fresh; hosted
+    # macos-15 (not macos-26: MenuMonitor targets macOS 14 / swift-tools 5.10
+    # and the Electron package needs no Xcode 26) otherwise. Hosted macOS
+    # pickup waited 8-68 min per merge group on 2026-10-10 because the org-wide
+    # pool was full, and three queued Mac jobs idled a 15-deep ALLGREEN queue.
+    runs-on: ${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
+    # The laptops are extra capacity, never the only capacity. A self-hosted
+    # run finishes in ~5 min; a laptop that sleeps mid-job must release the
+    # merge group quickly so the rebuilt group re-routes to hosted macOS.
+    timeout-minutes: ${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && 25 || 45 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -3536,6 +3586,12 @@ jobs:
             --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Test and package exact Mac head
+        env:
+          # The staging package is unsigned by design. Hosted runners have no
+          # signing identity; a self-hosted Mac has the owner's Developer ID in
+          # its keychain and electron-builder would try to codesign with it
+          # headless and fail (2026-10-10, tw-mac-001).
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           set -euo pipefail
           swift test --package-path apps/macos/MenuMonitor --enable-code-coverage
@@ -3570,6 +3626,11 @@ jobs:
             [ -f "$artifact" ] || { echo "::error::Missing Mac artifact: $artifact"; exit 1; }
           done
       - name: Upload exact Mac staging package
+        # Retention-only artifact (no workflow downloads it). A self-hosted
+        # laptop uploads the ~460 MB package at ~20 KB/s and would time the
+        # job out, so only hosted runners keep it; the artifact set is still
+        # verified on every runner above.
+        if: ${{ runner.environment == 'github-hosted' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-staging-${{ github.sha }}
@@ -5719,7 +5780,7 @@ jobs:
 
       - name: Setup Node for the changed-behavior ratchet
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
 

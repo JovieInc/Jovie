@@ -26,6 +26,7 @@ import random
 import re
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -2459,23 +2460,27 @@ def terminal_gate(pr: dict, verified: dict, sensitive: bool = False) -> dict | N
     return None
 
 
-def gate_deferral(host: Host, pr: dict) -> str | None:
+def gate_disposition(pr: dict, held: dict, attempts: dict) -> str | None:
     """Existing hold/repair ownership is not a new adoption or verification permit."""
     labels = {label.lower() for label in pr_events.label_names(pr)}
     if labels & (pr_events.HOLD_LABELS | {pr_events.PREFIX + pr_events.EXHAUSTED}):
         return "existing-pr-hold"
-    held = held_path(host)
-    entry = (json.loads(held.read_text()) if held.exists() else {}).get(str(pr["number"]), {})
+    entry = held.get(str(pr["number"]), {})
     if entry.get("sha") == pr["headRefOid"]:
         return "existing-gate-hold"
-    path = host.state / "fix-attempts.json"
-    attempt = (json.loads(path.read_text()) if path.exists() else {}).get(str(pr["number"]), {})
+    attempt = attempts.get(str(pr["number"]), {})
     final_push = attempt.get("pushed") and attempt.get("pushedHead") == pr["headRefOid"] \
         and attempt.get("sha") != pr["headRefOid"] and attempt.get("endedAt")
     if pr_events.in_flight(attempt, pr, time.time()) or (
             pr_events.spent(attempt, pr["headRefOid"], MAX_FIX_ATTEMPTS) and not final_push):
         return "existing-fix-disposition"
     return None
+
+
+def gate_deferral(host: Host, pr: dict) -> str | None:
+    held, attempts = held_path(host), host.state / "fix-attempts.json"
+    return gate_disposition(pr, json.loads(held.read_text()) if held.exists() else {},
+                            json.loads(attempts.read_text()) if attempts.exists() else {})
 
 
 def require_gate_authority(host: Host, pr: dict, stage: str, sensitive: bool) -> dict:
@@ -2858,10 +2863,15 @@ def requeue_verified(host: Host, prs: list[dict] | None, *, defer=None) -> dict 
 
 # ---------------------------------------------------------------- cross-host claims
 
+_CLAIM_OBSERVATIONS: dict = {}  # This worker's existing remote claim reads, never new census calls.
+
+
 def claimed_elsewhere(number: int, sha: str, kind: str, now: float | None = None, *, timeout: float = 600) -> bool:
     """True when another host recorded a live claim for this exact head and kind on the PR.
     Local state files are per host; the PR's comments are the truth every host can see."""
-    return pr_events.claim_active(number, sha, sh, now, kind=kind, exclude_host=HOST, timeout=timeout)
+    active = pr_events.claim_active(number, sha, sh, now, kind=kind, exclude_host=HOST, timeout=timeout)
+    _CLAIM_OBSERVATIONS[(number, sha, kind)] = {"active": active, "at": time.time()}
+    return active
 
 
 def post_claim(number: int, sha: str, kind: str) -> None:
@@ -2939,6 +2949,11 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
     for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
         if pr.get("isInMergeQueue") is True:
             continue  # Native landing owns this head; cached absence still needs a fresh claim read.
+        if (pr.get("headRefName") or "").startswith("dependabot/"):
+            # Dependabot Auto-Merge owns version bumps (recreate on conflict, ignore on a real
+            # regression). ~100 fix runs went to dependabot branches in the week to 2026-10-10
+            # and none of them could change what a bump breaks.
+            continue
         # A held PR is Tim's/Summer's call: fixing it re-arms auto-merge and re-enqueues it
         # (#17541, 2026-09-28). The event path already skips holds via pr_events.in_scope.
         if pr_events.preservation_reason(pr, attempts.get(str(pr["number"]), {}), MAX_FIX_ATTEMPTS,
@@ -3911,16 +3926,26 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
 
 
-REPAIR_TARGET_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
-isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
+REPAIR_AUTHORITY_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
+isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}"""
+REPAIR_CENSUS_FIELDS = """totalCount checkRunCount statusContextCount
+checkRunCountsByState{count state} statusContextCountsByState{count state}"""
+REPAIR_TARGET_FIELDS = REPAIR_AUTHORITY_FIELDS + """
 commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$cursor){
-totalCount checkRunCount statusContextCount checkRunCountsByState{count state} statusContextCountsByState{count state}
+""" + REPAIR_CENSUS_FIELDS + """
 pageInfo{hasNextPage endCursor} nodes{__typename
 ... on CheckRun{id name status conclusion detailsUrl startedAt completedAt}
 ... on StatusContext{id context state targetUrl}}}}}}}"""
 REPAIR_CHECK_PAGES = 6  # At most 600 contexts; incomplete authority still refuses repair.
 REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){"
                        "pullRequest(number:$number){" + REPAIR_TARGET_FIELDS + "}}}")
+REPAIR_CENSUS_QUERY = ("query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){"
+                       "pullRequest(number:$number){" + REPAIR_AUTHORITY_FIELDS +
+                       " commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){" +
+                       REPAIR_CENSUS_FIELDS + "}}}}}}}}")
+REPAIR_NEGATIVE_RUN_STATES = {"SUCCESS", "CANCELLED", "NEUTRAL", "SKIPPED", "STALE", "ACTION_REQUIRED"}
+REPAIR_RUN_STATES = REPAIR_NEGATIVE_RUN_STATES | RED | {"COMPLETED", "IN_PROGRESS", "PENDING", "QUEUED", "WAITING"}
+REPAIR_STATUS_STATES = {"SUCCESS", "ERROR", "FAILURE", "EXPECTED", "PENDING"}
 
 
 def repair_checks_census(contexts: dict) -> tuple:
@@ -3946,6 +3971,104 @@ def repair_checks_census(contexts: dict) -> tuple:
     return (*counts, *states)
 
 
+
+def repair_negative_census_snapshot(pr: dict, live: dict) -> tuple:
+    """Strict negative predicate evidence; never a detailed PR or execution authority."""
+    fields = ("number", "state", "headRefOid", "headRefName", "isInMergeQueue", "isCrossRepository",
+              "isDraft", "mergeStateStatus", "reviewDecision", "title", "body", "url", "updatedAt", "labels")
+    authority = {key: live[key] for key in fields}
+    if (type(live["number"]) is not int or live["number"] != pr["number"] or live["state"] != "OPEN"
+            or not isinstance(live["headRefOid"], str) or not re.fullmatch(r"[0-9a-f]{40}", live["headRefOid"])
+            or any(live[key] != pr[key] for key in ("headRefOid", "headRefName"))
+            or any(not isinstance(live[key], str) or not live[key].strip()
+                   for key in ("headRefName", "mergeStateStatus", "updatedAt"))
+            or any(type(live[key]) is not bool or live[key]
+                   for key in ("isInMergeQueue", "isCrossRepository", "isDraft"))
+            or live["reviewDecision"] not in (None, "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED")
+            or any(not isinstance(live[key], str) for key in ("title", "body"))
+            or live["url"] != f"https://github.com/{REPO_SLUG}/pull/{pr['number']}"):
+        raise ValueError("negative-census-authority-invalid")
+    labels = live["labels"]
+    names = [row["name"] for row in labels["nodes"]]
+    if (labels["pageInfo"]["hasNextPage"] is not False or len(names) > 100
+            or any(not isinstance(name, str) or not name.strip() for name in names)
+            or len(set(names)) != len(names)):
+        raise ValueError("negative-census-labels-incomplete")
+    commits = live["commits"]["nodes"]
+    if not isinstance(commits, list) or len(commits) != 1 or commits[0]["commit"]["oid"] != live["headRefOid"]:
+        raise ValueError("negative-census-commit-mismatch")
+    contexts = commits[0]["commit"]["statusCheckRollup"]["contexts"]
+    census = repair_checks_census(contexts)
+    for key, allowed in (("checkRunCountsByState", REPAIR_RUN_STATES),
+                         ("statusContextCountsByState", REPAIR_STATUS_STATES)):
+        if any(row["state"] not in allowed for row in contexts[key]):
+            raise ValueError("negative-census-state-unknown")
+    if (any(state not in REPAIR_NEGATIVE_RUN_STATES for state in census[3])
+            or any(state in {"EXPECTED", "PENDING"} for state in census[4])):
+        raise ValueError("negative-census-predicate-unproved")
+    authority["dependencyMetadataDigest"] = dependency_diff.metadata_digest(live)
+    return authority, census
+
+
+def repair_overflow_diagnostic(pr: dict, live: dict, contexts: dict, started: float) -> dict | None:
+    """One no-node recheck of a consistent prefix; stdout, claims and detail authority stay untouched."""
+    authority, census = repair_negative_census_snapshot(pr, live)
+    info, rows = contexts["pageInfo"], contexts["nodes"]
+    if (info.get("hasNextPage") is not True or not isinstance(info.get("endCursor"), str)
+            or not info["endCursor"].strip() or not isinstance(rows, list) or len(rows) != 100):
+        return None
+    seen, groups = set(), ({}, {})
+    for row in rows:
+        key, kind = row["id"], row["__typename"]
+        if not isinstance(key, str) or not key.strip() or key in seen:
+            return None
+        seen.add(key)
+        if kind == "CheckRun":
+            if (row["status"] != "COMPLETED" or row["conclusion"] not in REPAIR_NEGATIVE_RUN_STATES
+                    or not isinstance(row["name"], str) or not row["name"].strip()):
+                return None
+            index, state = 0, row["conclusion"]
+        elif kind == "StatusContext":
+            if (row["state"] not in REPAIR_STATUS_STATES - {"EXPECTED", "PENDING"}
+                    or not isinstance(row["context"], str) or not row["context"].strip()):
+                return None
+            index, state = 1, row["state"]
+        else:
+            return None
+        groups[index][state] = groups[index].get(state, 0) + 1
+    if any(sum(group.values()) > census[index + 1] or any(
+            count > census[index + 3].get(state, 0) for state, count in group.items())
+            for index, group in enumerate(groups)):
+        return None
+    before = time.monotonic()
+    if (any(type(clock) not in (int, float) or not math.isfinite(clock) or clock < 0
+            for clock in (started, before)) or not 0 <= before - started <= 30):
+        return None
+    owner, name = REPO_SLUG.split("/")
+    viewed = sh(["gh", "api", "graphql", "-f", f"query={REPAIR_CENSUS_QUERY}",
+                 "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={pr['number']}"], timeout=30)
+    data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
+    if not isinstance(data, dict) or data.get("errors"):
+        return None
+    current = data["data"]["repository"]["pullRequest"]
+    if isinstance(current, dict) and current.get("state") in {"MERGED", "CLOSED"}:
+        return repair_target_node(pr, current)
+    final = time.monotonic()
+    if (type(final) not in (int, float) or not math.isfinite(final)
+            or not 0 <= final - before or not 0 <= final - started <= 30
+            or repair_negative_census_snapshot(pr, current) != (authority, census)):
+        return None
+    print(json.dumps({"schema": "jovie.repair-check-overflow-negative/v1", "predicateComplete": True,
+        "contextsComplete": False, "repairAuthorized": False, "number": pr["number"],
+        "headSha": live["headRefOid"], "branch": live["headRefName"], "observedAt": now_iso(),
+        "totalCount": census[0], "sampleCount": len(rows),
+        "authorityDigest": hashlib.sha256(json.dumps(authority, sort_keys=True).encode()).hexdigest(),
+        "census": {"totalCount": census[0], "checkRunCount": census[1], "statusContextCount": census[2],
+                   "checkRunCountsByState": census[3], "statusContextCountsByState": census[4]}}),
+        file=sys.stderr, flush=True)
+    return None
+
+
 def reconcile_fix_target(pr: dict) -> dict | None:
     """Bounded fresh pages bind complete checks to one unchanged ownership/head snapshot."""
     try:
@@ -3953,6 +4076,7 @@ def reconcile_fix_target(pr: dict) -> dict | None:
         number = pr["number"]
         if type(number) is not int or number <= 0:
             return None
+        started = time.monotonic()
         cursor, cursors, seen, checks, anchor, census = None, set(), set(), [], None, None
         for page in range(REPAIR_CHECK_PAGES):
             args = ["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
@@ -3988,6 +4112,9 @@ def reconcile_fix_target(pr: dict) -> dict | None:
             if anchor is not None and ownership != anchor:
                 return None  # Never splice checks across a head, queue, review or hold transition.
             anchor = ownership
+            # A truncated/false page flag must not hide an over-budget global census.
+            if page == 0 and type(contexts.get("totalCount")) is int and contexts["totalCount"] > 100 * REPAIR_CHECK_PAGES:
+                return repair_overflow_diagnostic(pr, live, contexts, started)
             if page or info["hasNextPage"]:
                 current_census = repair_checks_census(contexts)
                 if current_census[0] > 100 * REPAIR_CHECK_PAGES or (census is not None and current_census != census):
@@ -4779,13 +4906,22 @@ def open_prs_summary() -> list[dict]:
     if prs is None:
         _SUMMARY["readable"] = False
         return []
+    source_at = now
+    if os.environ.get("LANES_EXECUTION_BACKEND") != "local-test":
+        try:
+            cached = maintenance_json(SHARED_CACHE_DIR / "open-prs-labels-v2.json")
+            # shared() releases its lock before returning. A later cache refill
+            # can certify these rows only if the exact returned value still agrees.
+            source_at = cached["at"] if cached["value"] == prs else None
+        except (OSError, ValueError, KeyError, TypeError):
+            source_at = None
     for pr in prs:
         rollup = pr.get("rollup")
         pr["statusCheckRollup"] = [] if rollup is None else [{
             "name": "rollup", "synthetic": True,
             "status": "COMPLETED" if rollup in ("SUCCESS", "FAILURE", "ERROR") else "PENDING",
             "conclusion": {"SUCCESS": "SUCCESS", "FAILURE": "FAILURE", "ERROR": "FAILURE"}.get(rollup)}]
-    _SUMMARY.update(at=now, prs=prs, readable=True)
+    _SUMMARY.update(at=now, sourceAt=source_at, prs=prs, readable=True)
     return prs
 
 
@@ -5273,6 +5409,180 @@ def worker(host: Host, name: str) -> int:
         if not slot.handle.closed: slot.release()
 
 
+MAINTENANCE_MISSING = object()
+
+
+def maintenance_json(path, *, dir_fd=None, limit=1024 * 1024, missing=MAINTENANCE_MISSING):
+    """Bounded optional local evidence: refuse special files and symlinks."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=dir_fd)
+    except FileNotFoundError:
+        return missing
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
+            raise ValueError("maintenance-state-not-bounded-regular-file")
+        with os.fdopen(fd, "rb", closefd=False) as handle:
+            raw = handle.read(limit + 1)
+        if len(raw) > limit:
+            raise ValueError("maintenance-state-too-large")
+        return json.loads(raw)
+    finally:
+        os.close(fd)
+
+
+def maintenance_preserved(state: Path) -> set[int]:
+    """Bound the optional directory scan; never follow a checkout symlink."""
+    preserved, deadline = set(), time.monotonic() + 0.1
+    try:
+        root = os.open(state / "worktrees", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except FileNotFoundError:
+        return preserved
+    try:
+        with os.scandir(root) as entries:
+            for index, entry in enumerate(entries):
+                if index >= 256 or time.monotonic() > deadline:
+                    raise ValueError("maintenance-preserved-scan-budget")
+                if entry.is_symlink():
+                    raise ValueError("maintenance-preserved-symlink")
+                if not entry.is_dir(follow_symlinks=False):
+                    continue
+                directory = os.open(entry.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root)
+                try:
+                    marker = maintenance_json(disk_guard.PRESERVED_REPAIR, dir_fd=directory, limit=16384)
+                finally:
+                    os.close(directory)
+                if marker is MAINTENANCE_MISSING:
+                    continue
+                if not isinstance(marker, dict):
+                    raise ValueError("maintenance-preserved-marker-not-object")
+                target = marker.get("pr")
+                match = re.search(r"-PR(\d+)-", entry.name)
+                if match:
+                    preserved.add(int(match.group(1)))
+                if type(target) is int and target > 0:
+                    preserved.add(target)
+                elif not match and not (isinstance(marker, dict) and marker.get("issue")):
+                    raise ValueError("maintenance-preserved-target-unknown")
+        return preserved
+    finally:
+        os.close(root)
+
+
+def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates: list[dict],
+                              events: list[dict], selected: set[int]) -> None:
+    """Under claim.lock: a pre-claim demand hint from the scan already performed.
+
+    No API, lease, attempt charge or model call. Actual admission still refreshes
+    the exact target and enforces remote ownership, provider and integrity gates.
+    Unknown is never an empty pool. A selected unit is running, not pending work.
+    """
+    now, pending_count = time.time(), None
+    source_at = _SUMMARY.get("sourceAt")
+    try:
+        if not _SUMMARY["readable"] or type(source_at) not in (int, float) \
+                or not 0 <= now - source_at <= SUMMARY_TTL_S:
+            raise ValueError("maintenance-inventory-unknown")
+        snapshots = {}
+        for filename in ("fix-attempts.json", "held.json", "verified.json", "requeue.json", "synced.json"):
+            path = host.state / filename
+            row = maintenance_json(path, missing={})
+            if not isinstance(row, dict):
+                raise ValueError("maintenance-state-not-object")
+            snapshots[filename] = row
+        attempts, held = snapshots["fix-attempts.json"], snapshots["held.json"]
+        providers = load_providers()
+        order, disabled = pr_events.cost_order(providers), pr_events.disabled_lanes(providers)
+        if name not in order:
+            raise ValueError("maintenance-provider-disabled")
+        # A preserved checkout needs its existing reconciliation/qualification path.
+        # Withhold it from this cheap demand hint; never touch or qualify that work.
+        preserved = maintenance_preserved(host.state)
+        eligible = set()
+        rows = {pr["number"]: pr for pr in best_per_issue([*prs, *candidates, *events])}
+        current = {pr["number"]: pr for pr in _SUMMARY["prs"]}
+        event_rows = {pr["number"]: pr for pr in events}
+        adopt_numbers = {pr["number"] for pr in prs}
+        for number, candidate in rows.items():
+            pr = current.get(number)
+            if not pr or pr.get("headRefOid") != candidate.get("headRefOid") \
+                    or not isinstance(pr.get("headRefName"), str) or not pr["headRefName"] \
+                    or any(type(pr.get(key)) is not bool for key in ("isDraft", "isCrossRepository", "isInMergeQueue")) \
+                    or not isinstance(pr.get("labels"), list) or not isinstance(pr.get("statusCheckRollup"), list):
+                raise ValueError("maintenance-current-metadata-unknown")
+            remote_active = any(key[:2] == (number, pr["headRefOid"]) and row.get("active")
+                                and 0 <= now - row["at"] <= SUMMARY_TTL_S
+                                for key, row in _CLAIM_OBSERVATIONS.items())
+            if number in selected or number in preserved or remote_active or not pr_events.in_scope(pr, "red", disabled) \
+                    or pr.get("isInMergeQueue") or (pr.get("headRefName") or "").startswith("dependabot/"):
+                continue
+            attempt = attempts.get(str(number), {})
+            entry = held.get(str(number), {})
+            if not isinstance(attempt, dict) or not isinstance(entry, dict) \
+                    or type(attempt.get("count", 0)) is not int or attempt.get("count", 0) < 0 \
+                    or (attempt and (not isinstance(attempt.get("sha"), str) or not attempt["sha"])) \
+                    or ("at" in attempt and (type(attempt["at"]) not in (int, float) or not math.isfinite(attempt["at"]) or attempt["at"] <= 0)):
+                raise ValueError("maintenance-disposition-unknown")
+            if ("pushed" in attempt and type(attempt["pushed"]) is not bool) or (
+                    "pushedHead" in attempt and (not isinstance(attempt["pushedHead"], str) or not attempt["pushedHead"].strip())):
+                raise ValueError("maintenance-generation-unknown")
+            ended = attempt.get("endedAt")
+            if ended is not None and not (
+                    (type(ended) in (int, float) and math.isfinite(ended) and 0 < ended <= now)
+                    or (isinstance(ended, str) and (ended_at := pr_events.iso_ts(ended)) is not None and 0 < ended_at <= now)):
+                raise ValueError("maintenance-ended-lease-unknown")
+            if entry and (not isinstance(entry.get("sha"), str) or not entry["sha"]
+                          or not isinstance(entry.get("evidence"), list)
+                          or any(not isinstance(item, str) for item in entry["evidence"])
+                          or ("at" in entry and (type(entry["at"]) not in (int, float)
+                                                 or not math.isfinite(entry["at"]) or entry["at"] <= 0))):
+                raise ValueError("maintenance-hold-unknown")
+            if pr_events.preservation_reason(pr, attempt, MAX_FIX_ATTEMPTS, held=entry, now=now, allow_reentry=True) \
+                    or pr_events.in_flight(attempt, pr, now):
+                continue
+            kinds = [kind for kind in event_rows.get(number, {}).get("eventKinds", [])
+                     if kind in pr_events.FIX_KINDS and pr_events.PREFIX + kind in pr_events.label_names(pr)]
+            event_work = kinds and pr_events.needs_work(THIS, {**pr, "eventKinds": kinds}) \
+                and pr_events.fixable_hold(entry, pr["headRefOid"])
+            if set(kinds) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
+                    and pr_events.POISON_LABEL not in pr_events.label_names(pr) \
+                    and str(number) not in snapshots["synced.json"]:
+                event_work = False  # Existing no-model sync must precede this repair.
+            if provider_may_run(name, "fix") and pr_events.may_take(name, pr, attempt, order, now) \
+                    and (red_pr([pr], attempts, held) or event_work):
+                eligible.add(number)
+            elif number in adopt_numbers and provider_may_run(name, "adopt") and unverified_pr(
+                    [pr], snapshots["verified.json"], snapshots["requeue.json"]) \
+                    and not gate_disposition(pr, held, attempts):
+                eligible.add(number)
+        if eligible:
+            pending_count = len(eligible)
+        elif _SUMMARY["readable"] and 0 <= now - _SUMMARY["at"] <= SUMMARY_TTL_S \
+                and not _SUMMARY["prs"] and not rows:
+            # A complete empty repository inventory proves no PR maintenance.
+            pending_count = 0
+    except Exception:
+        pass  # Optional observation must not interrupt an already selected unit.
+    path = host.state / "maintenance-demand.json"
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        # All worker writers already hold claim.lock. A second blocking lock or
+        # unbounded read here could hold up the selected repair.
+        data = maintenance_json(path, limit=65536, missing={})
+        if not isinstance(data, dict) or not isinstance(data.get("lanes", {}), dict):
+            raise ValueError("maintenance-publication-not-object")
+        data["schema"] = "symphony-lanes-maintenance-demand/v1"
+        data.setdefault("lanes", {})[name] = {"observedAt": source_at if type(source_at) in (int, float) else now,
+                                             "pending": pending_count,
+                                             "semantics": "pre-claim demand; fresh admission required"}
+        temporary.write_text(json.dumps(data))
+        os.replace(temporary, path)
+    except Exception:
+        pass  # Observation failure never prevents an already authorized repair.
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
     """Release ownership on every exceptional exit, including notification failures."""
     try:
@@ -5316,6 +5626,12 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
                          or claim_red_pr(host, name, candidates)) or None
         adopt = None if red or not local or not provider_may_run(name, "adopt") \
             else claim_adoptable_pr(host, name, prs, candidates)
+        if local:
+            selected = {red["number"]} if red else {adopt.pr["number"]} if adopt else set()
+            try:
+                record_maintenance_demand(host, name, prs, candidates, events, selected)
+            except Exception:
+                pass  # Demand telemetry cannot prevent this selected repair.
         labeled = None if red or adopt or not local else claim_labeled_event(host, name, linear)
         issue = labeled
         if local:
@@ -5738,6 +6054,62 @@ def selftest_env(scratch: Path) -> dict:
     return {**env, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
 
 
+# The installed packages mesh-runtime-bundle.mjs compiles against (exact pins checked there).
+MESH_DEPENDENCY_PINS = ("apps/desktop/node_modules/esbuild/package.json",
+                        "packages/agent-transport-contracts/node_modules/zod/package.json")
+
+
+def mesh_dependency_root(host: Host) -> Path | None:
+    """The host repo when it is installed; otherwise the newest ready worktree-pool slot that
+    is. The Mac lanes repo is a bare source checkout with no node_modules, so every release
+    since 2026-10-09 was refused ("mesh runtime dependency closure failed") and no lane fix
+    reached that host. Pool slots are installed from origin/main, the same lock the staging
+    bundle carries."""
+    def installed(root: Path) -> bool:
+        return all((root / pin).is_file() for pin in MESH_DEPENDENCY_PINS)
+    if installed(host.repo):
+        return host.repo
+    try:
+        slots = worktree_pool.ready_slots(worktree_pool.pool_dir(host.repo))
+    except (OSError, subprocess.CalledProcessError):
+        slots = []
+    return next((slot for slot in slots if installed(slot)), None)
+
+
+def prove_staging(host: Host, staging: Path) -> str | None:
+    """Compile the mesh runtime and run the release self-test inside a staged tree. Returns the
+    refusal reason, or None when the tree may be activated. Writes only under `staging`."""
+    # The self-test must never touch this host's live state: point it at a scratch dir.
+    scratch = staging / ".selftest-state"
+    scratch.mkdir(exist_ok=True)
+    # Raw ports import workspace TypeScript/Zod. Compile from the immutable
+    # archive with the host repo's existing identical pins before activation;
+    # no dependency installation or running-worker mutation is permitted.
+    dependency_root = mesh_dependency_root(host) or host.repo
+    try:
+        runtime = lifecycle.run(["node", str(staging / "scripts/lanes/mesh-runtime-bundle.mjs"),
+                                 str(staging.resolve()), str(dependency_root.resolve())],
+                                cwd=staging, capture_output=True, text=True, timeout=60,
+                                env=worktree_pool.node_env(staging))
+    except subprocess.TimeoutExpired:
+        return "mesh runtime closure timeout"
+    if runtime.returncode != 0:
+        print(runtime.stderr[-2000:], file=sys.stderr)
+        return "mesh runtime dependency closure failed"
+    # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
+    # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
+    try:
+        test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+                              cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
+                              env=selftest_env(scratch))
+    except subprocess.TimeoutExpired:
+        return f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s"
+    if test.returncode != 0:
+        print(test.stderr[-2000:], file=sys.stderr)
+        return "release tests failed"
+    return None
+
+
 def install_release(host: Host) -> int:
     if sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo).returncode:
         raise RuntimeError("release-source-fetch-failed")
@@ -5760,38 +6132,32 @@ def install_release(host: Host) -> int:
         archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
         lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
-        # The self-test must never touch this host's live state: point it at a scratch dir.
-        scratch = staging / ".selftest-state"
-        scratch.mkdir(exist_ok=True)
-        # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
-        # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
         def refuse(why: str) -> int:
             refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
             return 1
-        # Raw ports import workspace TypeScript/Zod. Compile from the immutable
-        # archive with the host repo's existing identical pins before activation;
-        # no dependency installation or running-worker mutation is permitted.
+        # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
+        # refused every release for a day because the *installed* installer chose a bare
+        # dependency root; the fix was on main but could never run. An older staged tree
+        # without the subcommand is proven by this copy, as before.
         try:
-            runtime = lifecycle.run(["node", str(staging / "scripts/lanes/mesh-runtime-bundle.mjs"),
-                                     str(staging.resolve()), str(host.repo.resolve())],
-                                    cwd=staging, capture_output=True, text=True, timeout=60,
-                                    env=worktree_pool.node_env(staging))
-        except subprocess.TimeoutExpired:
-            refuse("mesh runtime closure timeout")
-            raise
-        if runtime.returncode != 0:
-            print("lane update refused: mesh runtime dependency closure unavailable", file=sys.stderr)
-            return refuse("mesh runtime dependency closure failed")
-        try:
-            test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
-                                  cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
-                                  env=selftest_env(scratch))
+            proof = lifecycle.run([sys.executable, str(staging / "scripts/lanes/lane_runner.py"),
+                                   "prove-staging", str(staging)],
+                                  cwd=staging, capture_output=True, text=True,
+                                  timeout=60 + UPDATE_TEST_TIMEOUT_S,
+                                  # The staged installer must see this host, not the process defaults.
+                                  env={**os.environ, "LANES_STATE": str(host.state), "LANES_REPO": str(host.repo)})
         except subprocess.TimeoutExpired:
             refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
             raise
-        if test.returncode != 0:
-            print(f"lane update refused: release tests failed\n{test.stderr[-2000:]}", file=sys.stderr)
-            return refuse("release tests failed")
+        if proof.returncode == 2 and "invalid choice" in proof.stderr:
+            why = prove_staging(host, staging)
+        else:
+            why = None if proof.returncode == 0 else (proof.stdout.strip().splitlines() or ["staging proof failed"])[-1]
+            if why and proof.stderr:
+                print(proof.stderr[-2000:], file=sys.stderr)
+        if why:
+            print(f"lane update refused: {why}", file=sys.stderr)
+            return refuse(why)
         (staging / "scripts/lanes/.tree").write_text(bundle["objects"]["scripts/lanes"])
         (staging / "scripts/lanes/.bundle").write_text(tree)
         (staging / "scripts/lanes/.release.json").write_text(json.dumps(bundle, sort_keys=True))
@@ -5861,6 +6227,8 @@ def guarded_main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
     sub.add_parser("update")
+    prove = sub.add_parser("prove-staging", help="prove a staged release tree with this tree's own installer")
+    prove.add_argument("staging")
     gate = sub.add_parser("gate-command", help="run one gate command while retaining inherited locks")
     gate.add_argument("--timeout", type=float, required=True)
     gate.add_argument("--result-fd", type=int)
@@ -5930,6 +6298,12 @@ def guarded_main(argv: list[str] | None = None) -> int:
     host = Host()
     if args.command == "update":
         return update(host)
+    if args.command == "prove-staging":
+        why = prove_staging(host, Path(args.staging))
+        if why:
+            print(why)
+            return 1
+        return 0
     if args.command == "worker":
         return worker(host, args.provider)
     return dispatch(host)
