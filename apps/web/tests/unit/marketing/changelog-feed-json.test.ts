@@ -24,10 +24,18 @@ const RELEASE_FIXTURE = {
 };
 
 Object.assign(RELEASE_FIXTURE, {
-  customerOutcomes: Object.fromEntries(
-    Object.values(RELEASE_FIXTURE.sections)
-      .flat()
-      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  customerOutcomes: Object.entries(RELEASE_FIXTURE.sections).flatMap(
+    ([section, entries]) =>
+      entries.map((summary, index) => ({
+        storyId: `${section}-${index}`,
+        entryId: `customer-update:${section}-${index}`,
+        slug: `update-${section}-${index}`,
+        aliases: [],
+        summary,
+        section,
+        availability: 'unverified',
+        prerequisites: [],
+      }))
   ),
 });
 
@@ -59,12 +67,15 @@ describe('changelog customer feeds (RSS + JSON share the web page object)', () =
 
     const [reviewItem, macItem] = body.items;
     expect(reviewItem).toMatchObject({
-      url: 'https://jov.ie/changelog/26.8.0',
+      id: 'https://jov.ie/changelog#update-added-0',
+      url: 'https://jov.ie/changelog#update-added-0',
       title: 'Review qualified brand deals',
       date_published: '2026-08-14T00:00:00Z',
-      _jovie: { tertiary: 'August 14, 2026 · v26.8.0' },
+      _jovie: {
+        entry_id: 'customer-update:added-0',
+        tertiary: 'August 14, 2026 · v26.8.0',
+      },
     });
-    expect(reviewItem.id).toContain('26.8.0');
     expect(reviewItem.content_text).toBe('Open your Inbox.');
     expect(reviewItem.content_text).not.toMatch(/\*\*|`/);
 
@@ -90,8 +101,10 @@ describe('changelog customer feeds (RSS + JSON share the web page object)', () =
     );
     expect(body).toContain('<summary>August 14, 2026 · v26.8.0</summary>');
     expect(body).toContain(
-      '<link href="https://jov.ie/changelog/26.8.0" rel="alternate"/>'
+      '<link href="https://jov.ie/changelog#update-added-0" rel="alternate"/>'
     );
-    expect(atomEntryId('26.8.0')).toBe('https://jov.ie/changelog#v26.8.0');
+    expect(atomEntryId({ slug: 'update-added-0' })).toBe(
+      'https://jov.ie/changelog#update-added-0'
+    );
   });
 });

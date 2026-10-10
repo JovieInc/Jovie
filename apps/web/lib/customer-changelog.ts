@@ -8,6 +8,7 @@
  */
 
 import { z } from 'zod';
+import { APP_ROUTES } from '@/constants/routes';
 import { isCustomerCopy } from './changelog-filter-rules';
 import {
   type ChangelogRelease,
@@ -62,8 +63,10 @@ export const CustomerChangelogMediaSchema = z
   .nullable();
 
 export const CustomerChangelogEntrySchema = z.object({
+  id: z.string().min(1),
   title: z.string().min(1),
   slug: z.string().min(1),
+  aliases: z.array(z.string().min(1)),
   date: z.string(),
   summary: z.string(),
   category: z.enum(CUSTOMER_CHANGELOG_CATEGORIES),
@@ -88,6 +91,21 @@ export const CustomerChangelogEntrySchema = z.object({
 export type CustomerChangelogEntry = z.infer<
   typeof CustomerChangelogEntrySchema
 >;
+
+export const CustomerChangelogTombstoneSchema = z.object({
+  id: z.string().min(1),
+  slug: z.string().min(1),
+  aliases: z.array(z.string().min(1)),
+});
+
+export type CustomerChangelogTombstone = z.infer<
+  typeof CustomerChangelogTombstoneSchema
+>;
+
+export type CustomerChangelogProjection = {
+  readonly entries: readonly CustomerChangelogEntry[];
+  readonly tombstones: readonly CustomerChangelogTombstone[];
+};
 
 export type CustomerChangelogMonthGroup = {
   readonly monthKey: string;
@@ -192,19 +210,6 @@ export function splitCustomerChangelogOutcome(entry: string): {
   return { title: text, explanation: '' };
 }
 
-function slugify(title: string, version: string, index: number): string {
-  const base =
-    title
-      .toLowerCase()
-      .replaceAll(/[^a-z0-9]+/g, '-')
-      .replaceAll(/^-+|-+$/g, '')
-      .slice(0, 48) || 'update';
-  const versionSlug = isDailyChangelogKey(version)
-    ? version
-    : `v${version.replaceAll('.', '-')}`;
-  return `${base}-${versionSlug}-${index}`;
-}
-
 function inferCapabilities(text: string): string[] {
   return uniqueHints(
     text,
@@ -260,18 +265,67 @@ export function formatCustomerChangelogTertiary(
 export function projectCustomerChangelog(
   releases: readonly ChangelogRelease[]
 ): CustomerChangelogEntry[] {
+  return [...projectCustomerChangelogArchive(releases).entries];
+}
+
+function publicationQueueKey(section: keyof ChangelogSection, summary: string) {
+  return `${section}\u0000${summary}`;
+}
+
+function assertUniqueCustomerPermalinks(
+  entries: readonly CustomerChangelogEntry[],
+  tombstones: readonly CustomerChangelogTombstone[]
+): void {
+  const identities = new Set<string>();
+  const fragments = new Map<string, string>();
+
+  for (const item of [...entries, ...tombstones]) {
+    if (identities.has(item.id)) {
+      throw new Error(`Customer changelog identity collision: ${item.id}`);
+    }
+    identities.add(item.id);
+    for (const fragment of [item.slug, ...item.aliases]) {
+      const owner = fragments.get(fragment);
+      if (owner) {
+        throw new Error(
+          `Customer changelog permalink collision: ${fragment} (${owner}, ${item.id})`
+        );
+      }
+      fragments.set(fragment, item.id);
+    }
+  }
+}
+
+export function projectCustomerChangelogArchive(
+  releases: readonly ChangelogRelease[]
+): CustomerChangelogProjection {
   const entries: CustomerChangelogEntry[] = [];
+  const tombstones: CustomerChangelogTombstone[] = [];
 
   for (const release of releases) {
-    let index = 0;
+    const publications = release.customerOutcomes ?? [];
+    const queues = new Map<
+      string,
+      NonNullable<ChangelogRelease['customerOutcomes']>
+    >();
+    for (const publication of publications) {
+      const key = publicationQueueKey(publication.section, publication.summary);
+      const queue = queues.get(key) ?? [];
+      queue.push(publication);
+      queues.set(key, queue);
+    }
+    const projected = new Set<string>();
+
     for (const section of SECTION_ORDER) {
       for (const bullet of release.sections[section]) {
-        const publication = release.customerOutcomes?.[bullet];
+        const publication = queues
+          .get(publicationQueueKey(section, bullet))
+          ?.shift();
         // The technical release log is not a customer-publication authority.
         if (!publication || !isCustomerCopy(bullet)) {
-          index += 1;
           continue;
         }
+        projected.add(publication.entryId);
         const { title: rawTitle, explanation: rawExplanation } =
           splitCustomerChangelogOutcome(bullet);
         const titleParts = extractCustomerChangelogTechnical(rawTitle);
@@ -289,8 +343,10 @@ export function projectCustomerChangelog(
 
         entries.push(
           CustomerChangelogEntrySchema.parse({
+            id: publication.entryId,
             title,
-            slug: slugify(title, release.version, index),
+            slug: publication.slug,
+            aliases: publication.aliases,
             date: release.date,
             summary,
             category: SECTION_CATEGORY[section],
@@ -307,12 +363,61 @@ export function projectCustomerChangelog(
             prominence: SECTION_PROMINENCE[section],
           })
         );
-        index += 1;
       }
+    }
+
+    for (const publication of publications) {
+      if (projected.has(publication.entryId)) continue;
+      tombstones.push(
+        CustomerChangelogTombstoneSchema.parse({
+          id: publication.entryId,
+          slug: publication.slug,
+          aliases: publication.aliases,
+        })
+      );
     }
   }
 
-  return entries;
+  assertUniqueCustomerPermalinks(entries, tombstones);
+  return { entries, tombstones };
+}
+
+function normalizeCustomerFragment(fragment: string): string {
+  const value = fragment.startsWith('#') ? fragment.slice(1) : fragment;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+export function resolveCustomerChangelogFragment(
+  projection: CustomerChangelogProjection,
+  fragment: string
+):
+  | { readonly status: 'published'; readonly entry: CustomerChangelogEntry }
+  | {
+      readonly status: 'unpublished';
+      readonly tombstone: CustomerChangelogTombstone;
+    }
+  | { readonly status: 'not-found' } {
+  const normalized = normalizeCustomerFragment(fragment);
+  const entry = projection.entries.find(item =>
+    [item.slug, ...item.aliases].includes(normalized)
+  );
+  if (entry) return { status: 'published', entry };
+  const tombstone = projection.tombstones.find(item =>
+    [item.slug, ...item.aliases].includes(normalized)
+  );
+  return tombstone
+    ? { status: 'unpublished', tombstone }
+    : { status: 'not-found' };
+}
+
+export function customerChangelogEntryPath(
+  entry: Pick<CustomerChangelogEntry, 'slug'>
+): string {
+  return `${APP_ROUTES.CHANGELOG}#${encodeURIComponent(entry.slug)}`;
 }
 
 export function groupCustomerChangelogByMonth(

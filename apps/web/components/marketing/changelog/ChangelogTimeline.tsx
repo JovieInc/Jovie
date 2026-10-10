@@ -10,6 +10,7 @@ import type {
   ChangelogInlineNode,
   ChangelogRelease,
   ChangelogSection,
+  CustomerChangelogPublication,
 } from '@/lib/changelog-parser';
 import {
   changelogAnchorId,
@@ -153,15 +154,23 @@ function ReleaseSectionBlock({
   sectionKey,
   entries,
   releaseVersion,
+  publications = [],
 }: {
   readonly sectionKey: keyof ChangelogSection;
   readonly entries: readonly string[];
   readonly releaseVersion: string;
+  readonly publications?: readonly CustomerChangelogPublication[];
 }) {
   const meta = SECTION_META[sectionKey];
   const Icon = meta.icon;
   const headingId = `changelog-${releaseVersion}-${meta.headingId}`;
   const seenEntryKeys = new Map<string, number>();
+  const publicationQueues = new Map<string, CustomerChangelogPublication[]>();
+  for (const publication of publications) {
+    const queue = publicationQueues.get(publication.summary) ?? [];
+    queue.push(publication);
+    publicationQueues.set(publication.summary, queue);
+  }
 
   return (
     <section aria-labelledby={headingId}>
@@ -180,6 +189,7 @@ function ReleaseSectionBlock({
       </div>
       <ul>
         {entries.map(entry => {
+          const publication = publicationQueues.get(entry)?.shift();
           const entryBaseKey = `${releaseVersion}-${sectionKey}-${entry}`;
           const seenCount = seenEntryKeys.get(entryBaseKey) ?? 0;
           seenEntryKeys.set(entryBaseKey, seenCount + 1);
@@ -190,8 +200,18 @@ function ReleaseSectionBlock({
           return (
             <li
               key={itemKey}
+              id={publication?.slug}
+              data-changelog-entry-id={publication?.entryId}
               className='flex items-start gap-4 border-t border-subtle py-5'
             >
+              {publication?.aliases.map(alias => (
+                <span
+                  key={alias}
+                  id={alias}
+                  aria-hidden='true'
+                  className='h-0 scroll-mt-24'
+                />
+              ))}
               <Icon
                 aria-hidden='true'
                 className={`size-4 shrink-0 ${meta.iconClass}`}
@@ -305,6 +325,9 @@ export function ChangelogTimeline({
                     sectionKey={key}
                     entries={entries}
                     releaseVersion={release.version}
+                    publications={release.customerOutcomes?.filter(
+                      publication => publication.section === key
+                    )}
                   />
                 );
               })}

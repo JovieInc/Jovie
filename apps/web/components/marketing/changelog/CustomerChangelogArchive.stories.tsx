@@ -9,6 +9,8 @@ const BOUNDED_MONTHS: readonly CustomerChangelogMonthGroup[] = [
     label: 'August 2026',
     entries: [
       {
+        id: 'customer-update:brand-deals',
+        aliases: [],
         title: 'Review qualified brand deals in your Inbox',
         slug: 'review-qualified-brand-deals-v26-8-1-0',
         date: '2026-08-16',
@@ -32,6 +34,8 @@ const BOUNDED_MONTHS: readonly CustomerChangelogMonthGroup[] = [
     label: 'July 2026',
     entries: [
       {
+        id: 'customer-update:sign-out',
+        aliases: [],
         title: 'Sign-out stays available when the store is missing',
         slug: 'sign-out-stays-available-v26-7-0-0',
         date: '2026-07-21',

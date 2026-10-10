@@ -1,0 +1,35 @@
+{
+  "schema": "customer-changelog-permalink-migrations/v1",
+  "entries": [
+    {
+      "releaseKey": "2026-10-02",
+      "storyId": "fan-updates",
+      "entryId": "customer-update:fan-updates",
+      "slug": "update-fan-updates",
+      "aliases": ["get-updates-from-an-artist-2026-10-02-1"],
+      "sourceIds": [
+        "JovieInc/Jovie#18988@1ff39e1e88a19422220cc8326ffee86ad9dee5fc"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-02",
+      "storyId": "help-center",
+      "entryId": "customer-update:help-center",
+      "slug": "update-help-center",
+      "aliases": ["help-is-easier-to-find-2026-10-02-2"],
+      "sourceIds": [
+        "JovieInc/Jovie#18817@b4cc23f883483f64414bd1262df688934743d3d5"
+      ]
+    },
+    {
+      "releaseKey": "2026-10-02",
+      "storyId": "profile-link-claim",
+      "entryId": "customer-update:profile-link-claim",
+      "slug": "update-profile-link-claim",
+      "aliases": ["choose-your-jovie-link-2026-10-02-0"],
+      "sourceIds": [
+        "JovieInc/Jovie#19295@08e545f609fc991a4be355612177273b63206b67"
+      ]
+    }
+  ]
+}

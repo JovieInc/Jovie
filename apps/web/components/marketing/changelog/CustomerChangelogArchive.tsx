@@ -14,6 +14,8 @@ import {
   type CustomerChangelogCategory,
   type CustomerChangelogEntry,
   type CustomerChangelogMonthGroup,
+  type CustomerChangelogTombstone,
+  customerChangelogEntryPath,
   formatCustomerChangelogDate,
   formatCustomerChangelogTertiary,
 } from '@/lib/customer-changelog';
@@ -97,7 +99,47 @@ const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
 
 export interface CustomerChangelogArchiveProps {
   readonly months: readonly CustomerChangelogMonthGroup[];
+  readonly tombstones?: readonly CustomerChangelogTombstone[];
   readonly technicalReleases?: readonly { version: string; date: string }[];
+}
+
+function PermalinkAnchors({
+  entry,
+  includeCanonical = false,
+}: {
+  readonly entry: Pick<CustomerChangelogEntry, 'slug' | 'aliases'>;
+  readonly includeCanonical?: boolean;
+}) {
+  const fragments = includeCanonical
+    ? [entry.slug, ...entry.aliases]
+    : entry.aliases;
+  return fragments.map(fragment => (
+    <span
+      key={fragment}
+      id={fragment}
+      aria-hidden='true'
+      className='block h-0 scroll-mt-24'
+    />
+  ));
+}
+
+function TombstoneNotices({
+  tombstones,
+}: {
+  readonly tombstones: readonly CustomerChangelogTombstone[];
+}) {
+  return tombstones.flatMap(tombstone =>
+    [tombstone.slug, ...tombstone.aliases].map(fragment => (
+      <p
+        key={fragment}
+        id={fragment}
+        role='status'
+        className='hidden scroll-mt-24 text-secondary-token target:block'
+      >
+        This update is no longer published.
+      </p>
+    ))
+  );
 }
 
 function TechnicalReleaseNav({
@@ -239,8 +281,10 @@ function EntryRow({ entry }: { readonly entry: CustomerChangelogEntry }) {
       id={entry.slug}
       tabIndex={-1}
       className='changelog-entry'
+      data-changelog-entry-id={entry.id}
       data-changelog-prominence={entry.prominence}
     >
+      <PermalinkAnchors entry={entry} />
       <p className='changelog-entry__date'>
         {formatCustomerChangelogDate(entry.date)}
       </p>
@@ -328,7 +372,7 @@ function MonthSection({
       </h2>
       <div>
         {group.entries.map(entry => (
-          <EntryRow key={entry.slug} entry={entry} />
+          <EntryRow key={entry.id} entry={entry} />
         ))}
       </div>
     </section>
@@ -390,9 +434,9 @@ function ArchiveJumpNav({
           </div>
           <ul className='changelog-archive-nav__links'>
             {group.entries.map(entry => (
-              <li key={entry.slug}>
+              <li key={entry.id}>
                 <Link
-                  href={`#${entry.slug}`}
+                  href={customerChangelogEntryPath(entry)}
                   className='changelog-archive-nav__link'
                 >
                   <span className='changelog-archive-nav__link-date'>
@@ -423,6 +467,7 @@ function ArchiveJumpNav({
  */
 export function CustomerChangelogArchive({
   months,
+  tombstones = [],
   technicalReleases = [],
 }: CustomerChangelogArchiveProps) {
   const [visibleMonthCount, setVisibleMonthCount] =
@@ -474,6 +519,8 @@ export function CustomerChangelogArchive({
       const anchor = (event.target as Element | null)?.closest?.('a[href]');
       const href = anchor?.getAttribute('href') ?? '';
       if (href.startsWith('#')) revealFragment(href);
+      else if (href.startsWith(`${APP_ROUTES.CHANGELOG}#`))
+        revealFragment(href.slice(APP_ROUTES.CHANGELOG.length));
     };
     document.addEventListener('click', onClick, true);
     globalThis.addEventListener('hashchange', onHashChange);
@@ -504,6 +551,7 @@ export function CustomerChangelogArchive({
   if (months.length === 0) {
     return (
       <div data-reduced-motion='static'>
+        <TombstoneNotices tombstones={tombstones} />
         <p className='text-secondary-token'>No updates yet. Check back soon!</p>
         <details className='mb-6'>
           <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
@@ -521,6 +569,7 @@ export function CustomerChangelogArchive({
 
   return (
     <div data-reduced-motion='static'>
+      <TombstoneNotices tombstones={tombstones} />
       <CategoryFilterToolbar
         active={activeCategory}
         onChange={handleCategoryChange}

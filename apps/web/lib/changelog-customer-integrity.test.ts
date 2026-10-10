@@ -16,7 +16,16 @@ function publication(availability?: unknown, text = copy) {
     deployments: [{ sha, id: 'dpl_test' }],
     runtimeEvidence: [{ passed: true, status: 200, sha256: 'b'.repeat(64) }],
     stories: [
-      { summary: text, section: 'Added', sourceIds: [source], availability },
+      {
+        id: 'artist-news',
+        entryId: 'customer-update:artist-news',
+        slug: 'update-artist-news',
+        aliases: [],
+        summary: text,
+        section: 'Added',
+        sourceIds: [source],
+        availability,
+      },
     ],
   };
 }

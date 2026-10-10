@@ -23,11 +23,6 @@ function release(
       ...sections,
     },
   };
-  value.customerOutcomes = Object.fromEntries(
-    Object.values(value.sections)
-      .flat()
-      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
-  );
   return value;
 }
 
