@@ -1,0 +1,17 @@
+## Handoff
+
+Draft PR: [#20853 — JOV-7973](https://github.com/JovieInc/Jovie/pull/20853)  
+Commit: `bb8ddb410ba25fec4c5b48d2d56d66f65a3de7ea`
+
+- Changed [production-release.yml](/home/timwhite/.local/state/jovie-lanes/worktrees/20261007T032032Z-JOV-7973-codex-993cc2/.github/workflows/production-release.yml) to use `vercel deploy --no-wait`, preserving the accepted deployment ID while the existing exact-ID inspection owns readiness.
+- Updated [deploy-workflow.test.ts](/home/timwhite/.local/state/jovie-lanes/worktrees/20261007T032032Z-JOV-7973-codex-993cc2/apps/web/tests/unit/ci/deploy-workflow.test.ts) with a regression contract covering that ordering.
+
+Verified:
+
+- Regression test demonstrated red before the workflow fix.
+- Related tests: 135/135 passed.
+- Biome, actionlint, CI harness, bug-to-test policy, and 18/18 typecheck tasks passed.
+- Commit and publication secret scans passed.
+- Remote branch matches the local head; PR remains draft as required.
+
+Concerns: none. Deviation: GBrain returned no context, so repository and production-run evidence were used. Hosted draft-PR checks started successfully and remain under the independent gate.
