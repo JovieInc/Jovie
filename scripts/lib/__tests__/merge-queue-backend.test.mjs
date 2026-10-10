@@ -712,7 +712,7 @@ describe('native live preflight', () => {
   }
   function aggregateProof() {
     return {
-      schema: 'jovie-native-bypass-aggregate/v1',
+      schema: 'jovie-native-bypass-aggregate/v2',
       observedAt: new Date().toISOString(),
       response: { data: {
         viewer: { login: CANONICAL_NATIVE_MUTATION_ACTOR },
@@ -720,6 +720,28 @@ describe('native live preflight', () => {
           id: 'RRS_native_ruleset', databaseId: RULESET_ID,
           name: 'Main Branch Protection', enforcement: 'ACTIVE',
           updatedAt: '2026-10-04T13:22:46Z',
+          source: { __typename: 'Repository', nameWithOwner: REPOSITORY },
+          target: 'BRANCH', conditions: {
+            refName: structuredClone(VALID_RULESET.conditions.ref_name),
+            organizationProperty: null, repositoryId: null,
+            repositoryName: null, repositoryProperty: null,
+          },
+          rules: { totalCount: 2, pageInfo: {
+            hasNextPage: false, hasPreviousPage: false,
+          }, nodes: [
+            { type: 'REQUIRED_STATUS_CHECKS', parameters: {
+              __typename: 'RequiredStatusChecksParameters',
+              strictRequiredStatusChecksPolicy: false,
+              requiredStatusChecks: VALID_RULESET.rules[0].parameters.required_status_checks
+                .map(check => ({ ...check, integrationId: null })),
+            } },
+            { type: 'MERGE_QUEUE', parameters: {
+              __typename: 'MergeQueueParameters',
+              checkResponseTimeoutMinutes: 60, groupingStrategy: 'ALLGREEN',
+              maxEntriesToBuild: 10, maxEntriesToMerge: 5, mergeMethod: 'SQUASH',
+              minEntriesToMerge: 5, minEntriesToMergeWaitMinutes: 10,
+            } },
+          ] },
           bypassActors: { totalCount: 0, pageInfo: {
             hasNextPage: false, hasPreviousPage: false,
           } },
@@ -735,6 +757,40 @@ describe('native live preflight', () => {
       bypassActorAggregate: proof,
     };
   }
+  it.each([
+    ['2026-10-04T06:22:46.241-07:00', '2026-10-04T13:22:46.241Z'],
+    ['2026-10-04T18:52:46.241+05:30', '2026-10-04T13:22:46.241Z'],
+    ['2026-10-04T06:22:46.241123-07:00', '2026-10-04T13:22:46.241123Z'],
+    ['2026-10-04T13:22:46.2410+00:00', '2026-10-04T13:22:46.241Z'],
+  ])('accepts exact version timestamps with equivalent representations (%s)', (rest, graphql) => {
+    const input = aggregateInput();
+    input.bypassActorAggregate.schema = 'jovie-native-bypass-aggregate/v1';
+    input.ruleset.updated_at = rest;
+    input.bypassActorAggregate.response.data.repository.ruleset.updatedAt = graphql;
+    const original = structuredClone(input);
+    expect(validateNativePreflightEvidence(input).ok).toBe(true);
+    expect(input).toEqual(original);
+    expect(Object.hasOwn(input.ruleset, 'bypass_actors')).toBe(false);
+  });
+  it.each([
+    ['2026-10-04T13:22:46.241001Z', '2026-10-04T13:22:46.241002Z'],
+    ['2026-10-04T13:22:46.241Z', '2026-10-04T13:22:47.241Z'],
+    ['2026-02-30T13:22:46Z', '2026-03-02T13:22:46Z'],
+    ['2026-10-04T13:22:46', '2026-10-04T13:22:46Z'],
+    ['2026-10-04T13:22:46.241+25:00', '2026-10-04T13:22:46.241Z'],
+  ])('rejects inequivalent or invalid exact version timestamps before mutation (%s)', async (rest, graphql) => {
+    const input = aggregateInput();
+    input.ruleset.updated_at = rest;
+    input.bypassActorAggregate.response.data.repository.ruleset.updatedAt = graphql;
+    expect(validateNativePreflightEvidence(input).ok).toBe(false);
+    const runner = createNativeRunner({
+      ruleset: input.ruleset,
+      bypassAggregatePayload: input.bypassActorAggregate.response,
+      states: [prState()],
+    });
+    await expect(enroll(runner)).rejects.toMatchObject({ code: 'native_preflight_failed' });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
   it('accepts bound aggregate zero without fabricating a REST actor list', () => {
     const input = aggregateInput();
     const original = structuredClone(input.ruleset);
@@ -747,6 +803,96 @@ describe('native live preflight', () => {
     });
     expect(input.ruleset).toEqual(original);
     expect(Object.hasOwn(input.ruleset, 'bypass_actors')).toBe(false);
+  });
+  it('proves policy and global zero together despite the captured timestamp precision difference', async () => {
+    const input = aggregateInput();
+    input.ruleset.updated_at = '2026-10-04T13:22:46.241Z';
+    const original = structuredClone(input);
+    const result = validateNativePreflightEvidence(input);
+    expect(result.ok).toBe(true);
+    expect(result.evidence.bypassActorEvidence).toMatchObject({
+      binding: 'same-response-admission-policy',
+      updatedAt: '2026-10-04T13:22:46.241Z',
+      graphqlUpdatedAt: '2026-10-04T13:22:46Z',
+    });
+    expect(input).toEqual(original);
+    const runner = createNativeRunner({ ruleset: input.ruleset,
+      bypassAggregatePayload: input.bypassActorAggregate.response,
+      states: [prState(), prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY })] });
+    await expect(enroll(runner)).resolves.toMatchObject({ changed: true });
+    expect(invokedEnrollment(runner)).toBe(true);
+    input.bypassActorAggregate.schema = 'jovie-native-bypass-aggregate/v1';
+    expect(validateNativePreflightEvidence(input).ok).toBe(false);
+  });
+  it.each([
+    ['omitted policy', live => { delete live.rules; }],
+    ['partial rules', live => { live.rules.pageInfo.hasNextPage = true; }],
+    ['rule count mismatch', live => { live.rules.totalCount = 3; }],
+    ['null rule', live => { live.rules.nodes[0] = null; }],
+    ['duplicate critical rule', live => { live.rules.nodes.push(live.rules.nodes[0]); live.rules.totalCount++; }],
+    ['different inventory', live => { live.rules.nodes.push({ type: 'DELETION' }); live.rules.totalCount++; }],
+    ['different source', live => { live.source.nameWithOwner = 'another/repository'; }],
+    ['different target', live => { live.target = 'TAG'; }],
+    ['omitted condition', live => { delete live.conditions.repositoryId; }],
+    ['additional condition', live => { live.conditions.repositoryName = {}; }],
+    ['excluded ref', live => { live.conditions.refName.exclude.push('refs/heads/main'); }],
+    ['different ref', live => { live.conditions.refName.include = ['refs/heads/other']; }],
+    ['strict checks', live => { live.rules.nodes[0].parameters.strictRequiredStatusChecksPolicy = true; }],
+    ['missing check', live => { live.rules.nodes[0].parameters.requiredStatusChecks.pop(); }],
+    ['omitted integration field', live => { delete live.rules.nodes[0].parameters.requiredStatusChecks[0].integrationId; }],
+    ['undefined integration field', live => { live.rules.nodes[0].parameters.requiredStatusChecks[0].integrationId = undefined; }],
+    ['malformed integration', live => { live.rules.nodes[0].parameters.requiredStatusChecks[0].integrationId = '123'; }],
+    ['different integration', live => { live.rules.nodes[0].parameters.requiredStatusChecks[0].integrationId = 123; }],
+    ['seconds mistaken for minutes', live => { live.rules.nodes[1].parameters.checkResponseTimeoutMinutes = 3600; }],
+    ['different grouping', live => { live.rules.nodes[1].parameters.groupingStrategy = 'HEADGREEN'; }],
+    ['different build concurrency', live => { live.rules.nodes[1].parameters.maxEntriesToBuild = 3; }],
+    ['different max group', live => { live.rules.nodes[1].parameters.maxEntriesToMerge = 2; }],
+    ['different method', live => { live.rules.nodes[1].parameters.mergeMethod = 'MERGE'; }],
+    ['different minimum group', live => { live.rules.nodes[1].parameters.minEntriesToMerge = 1; }],
+    ['different minimum wait', live => { live.rules.nodes[1].parameters.minEntriesToMergeWaitMinutes = 0; }],
+  ])('rejects incomplete or disagreeing same-response policy before mutation: %s', async (_, change) => {
+    const input = aggregateInput();
+    input.ruleset.updated_at = '2026-10-04T13:22:46.241Z';
+    change(input.bypassActorAggregate.response.data.repository.ruleset);
+    expect(validateNativePreflightEvidence(input).ok).toBe(false);
+    const runner = createNativeRunner({ ruleset: input.ruleset,
+      bypassAggregatePayload: input.bypassActorAggregate.response, states: [prState()] });
+    await expect(enroll(runner)).rejects.toMatchObject({ code: 'native_preflight_failed' });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+  it('does not overwrite invalid projected policy with valid external queue configuration', () => {
+    const input = aggregateInput();
+    input.liveQueueConfiguration = VALID_LIVE_QUEUE_CONFIGURATION;
+    input.ruleset.rules[1].parameters.merge_method = 'MERGE';
+    input.bypassActorAggregate.response.data.repository.ruleset.rules.nodes[1].parameters.mergeMethod = 'MERGE';
+    expect(validateNativePreflightEvidence(input).ok).toBe(false);
+  });
+  it.each([null, '1', true, 1.5, -1, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects matching malformed pending cohort values before mutation: %s', async value => {
+      for (const [field, restField] of [
+        ['minEntriesToMerge', 'min_entries_to_merge'],
+        ['minEntriesToMergeWaitMinutes', 'min_entries_to_merge_wait_minutes'],
+      ]) {
+        const input = aggregateInput();
+        input.ruleset.rules[1].parameters[restField] = value;
+        input.bypassActorAggregate.response.data.repository.ruleset.rules.nodes[1].parameters[field] = value;
+        const runner = createNativeRunner({ ruleset: input.ruleset,
+          bypassAggregatePayload: input.bypassActorAggregate.response, states: [prState()] });
+        expect(validateNativePreflightEvidence(input).ok).toBe(false);
+        await expect(enroll(runner)).rejects.toMatchObject({ code: 'native_preflight_failed' });
+        expect(invokedNativeMutation(runner)).toBe(false);
+      }
+    }
+  );
+  it('retains the legacy exact-version proof without requiring v2 policy fields', () => {
+    const input = aggregateInput();
+    input.bypassActorAggregate.schema = 'jovie-native-bypass-aggregate/v1';
+    const live = input.bypassActorAggregate.response.data.repository.ruleset;
+    delete live.rules;
+    delete live.conditions;
+    delete live.source;
+    delete live.target;
+    expect(validateNativePreflightEvidence(input).ok).toBe(true);
   });
   it('acquires bound aggregate zero through the same preflight runner', async () => {
     const runner = createNativeRunner({
