@@ -1,0 +1,8 @@
+Opened draft PR [#20920](https://github.com/JovieInc/Jovie/pull/20920) against `main`.
+
+- Reapplied #20000’s certification ledger work while preserving current-main loader and header-action changes.
+- Added authoritative server-decision and draft-state regression coverage.
+- Verified Biome, ESLint, component gate, 118 focused tests, and all 18 typecheck targets.
+- Commit: `456e1c1130173913fab394e2f4c12f7cfbcc6ed5`
+- Hosted CI is running; PR remains draft and unmerged.
+- Deviations: `gbrain-unavailable`; Linear credentials were unavailable for an independent issue-state readback. Required PR markers are present.
