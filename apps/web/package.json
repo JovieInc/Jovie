@@ -300,7 +300,7 @@
     "lucide-react": "^1.52.0",
     "mdast-util-to-string": "^4.0.0",
     "motion": "^13.5.1",
-    "next": "16.3.8",
+    "next": "16.4.0",
     "next-themes": "^0.4.6",
     "nuqs": "^2.10.2",
     "passkit-generator": "3.6.1",
