@@ -1,0 +1,17 @@
+## Handoff
+
+- Changed Symphony doctor to use the canonical GitHub read floor and emit one global `github-quota` alert instead of provider-specific derivative alerts.
+- Preserved fail-closed admission and independent malformed/incomplete inventory alerts.
+- Added regression coverage.
+
+Verified:
+
+- 87 doctor tests passed.
+- 9 GitHub-budget tests passed.
+- Repository typecheck: 18/18 packages.
+- Commit hooks and source-admission policy passed.
+- Biome found no applicable Python files.
+
+Published commit `1a225b4cae` in draft PR [#20938](https://github.com/JovieInc/Jovie/pull/20938), targeting `main`. Remote readback confirmed the exact head, draft state, title, and Linear markers.
+
+Concerns/deviations: gbrain was unavailable. No additional worktrees were created.
