@@ -1,0 +1,19 @@
+Opened draft PR [#20922](https://github.com/JovieInc/Jovie/pull/20922) against `main`.
+
+Changes:
+
+- Restored consent and quiet-hour outreach gates from conflicted PR #20462.
+- Added append-only migration `0136_tan_gladiator`.
+- Updated creator-generic outreach copy.
+- Corrected consent-aware versus legacy route predicates.
+- Preserved current exact-revision approval behavior.
+
+Verification:
+
+- 29 targeted tests passed.
+- Full typecheck: 18/18 tasks passed.
+- Biome, ESLint, migration validation/guard, and secret scans passed.
+- PR is draft and `MERGEABLE`; remote CI is running.
+- Commit: `66c222adf5efdc4b96a10522375567767815be0a`
+
+GBrain was unavailable as noted in the task. No additional worktrees were created.
