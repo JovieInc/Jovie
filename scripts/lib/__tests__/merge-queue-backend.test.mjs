@@ -141,6 +141,7 @@ function createNativeRunner({
   workflow = VALID_WORKFLOW,
   branchProtectionRef = VALID_BRANCH_PROTECTION_REF,
   liveQueueConfiguration = VALID_LIVE_QUEUE_CONFIGURATION,
+  bypassAggregatePayload = null,
   states = [],
   membershipPayload = null,
   listPages = null,
@@ -166,6 +167,9 @@ function createNativeRunner({
     const query = queryText(args);
     if (query.includes('MergeQueueNativeMutationActor')) {
       return ok(viewerPayload);
+    }
+    if (query.includes('MergeQueueBypassActorAggregate')) {
+      return ok(bypassAggregatePayload);
     }
     if (query.includes('MergeQueueBranchProtection')) {
       return ok({ data: { repository: { ref: branchProtectionRef } } });
@@ -694,6 +698,179 @@ describe('queue workflow mutation safety', () => {
 });
 
 describe('native live preflight', () => {
+  function aggregateRuleset() {
+    const ruleset = {
+      ...structuredClone(VALID_RULESET),
+      node_id: 'RRS_native_ruleset',
+      name: 'Main Branch Protection',
+      source_type: 'Repository',
+      source: REPOSITORY,
+      updated_at: '2026-10-04T13:22:46Z',
+    };
+    delete ruleset.bypass_actors;
+    return ruleset;
+  }
+  function aggregateProof() {
+    return {
+      schema: 'jovie-native-bypass-aggregate/v1',
+      observedAt: new Date().toISOString(),
+      response: { data: {
+        viewer: { login: CANONICAL_NATIVE_MUTATION_ACTOR },
+        repository: { nameWithOwner: REPOSITORY, ruleset: {
+          id: 'RRS_native_ruleset', databaseId: RULESET_ID,
+          name: 'Main Branch Protection', enforcement: 'ACTIVE',
+          updatedAt: '2026-10-04T13:22:46Z',
+          bypassActors: { totalCount: 0, pageInfo: {
+            hasNextPage: false, hasPreviousPage: false,
+          } },
+        } },
+      } },
+    };
+  }
+  function aggregateInput(proof = aggregateProof(), ruleset = aggregateRuleset()) {
+    return {
+      ruleset, repository: VALID_REPOSITORY, repositorySlug: REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      bypassActorAggregate: proof,
+    };
+  }
+  it('accepts bound aggregate zero without fabricating a REST actor list', () => {
+    const input = aggregateInput();
+    const original = structuredClone(input.ruleset);
+    const result = validateNativePreflightEvidence(input);
+    expect(result.ok).toBe(true);
+    expect(result.evidence).toMatchObject({
+      bypassActorsVisible: false,
+      bypassActorEvidence: { kind: 'graphql-aggregate', totalCount: 0,
+        actor: CANONICAL_NATIVE_MUTATION_ACTOR },
+    });
+    expect(input.ruleset).toEqual(original);
+    expect(Object.hasOwn(input.ruleset, 'bypass_actors')).toBe(false);
+  });
+  it('acquires bound aggregate zero through the same preflight runner', async () => {
+    const runner = createNativeRunner({
+      ruleset: aggregateRuleset(), bypassAggregatePayload: aggregateProof().response,
+    });
+    await expect(preflightMergeQueue({ backend: 'native', runner })).resolves.toMatchObject({
+      ready: true, bypassActorsVisible: false,
+      bypassActorEvidence: { kind: 'graphql-aggregate', totalCount: 0 },
+    });
+    const call = runner.mock.calls.find(([args]) => queryText(args).includes('MergeQueueBypassActorAggregate'));
+    expect(call[0]).toContain('rulesetId=10512119');
+    expect(call[0][call[0].indexOf('rulesetId=10512119') - 1]).toBe('-F');
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+  it('enrolls an exact-head candidate with freshly bound aggregate zero', async () => {
+    const runner = createNativeRunner({
+      ruleset: aggregateRuleset(), bypassAggregatePayload: aggregateProof().response,
+      states: [prState(), prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY })],
+    });
+    await expect(enroll(runner)).resolves.toMatchObject({
+      changed: true, mutationActor: CANONICAL_NATIVE_MUTATION_ACTOR,
+      state: { headRefOid: HEAD, isInMergeQueue: true },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+  });
+  it('rejects an aggregate that expires during candidate reads before mutation', async () => {
+    const realNow = Date.now.bind(Date);
+    const clock = vi.spyOn(Date, 'now');
+    const base = createNativeRunner({
+      ruleset: aggregateRuleset(), bypassAggregatePayload: aggregateProof().response,
+      states: [prState()],
+    });
+    const runner = vi.fn(async args => {
+      const result = await base(args);
+      if (queryText(args).includes('MergeQueueEjectionHistory')) {
+        clock.mockReturnValue(realNow() + 61_000);
+      }
+      return result;
+    });
+    try {
+      await expect(enroll(runner)).rejects.toMatchObject({ code: 'native_preflight_failed' });
+      expect(invokedNativeMutation(runner)).toBe(false);
+      expect(base.mock.calls.some(([args]) => queryText(args).includes('MergeQueueEjectionHistory'))).toBe(true);
+    } finally { clock.mockRestore(); }
+  });
+  it('preserves aggregate transport denial without an alternate reader or legacy opt-in fallback', async () => {
+    const base = createNativeRunner({ ruleset: aggregateRuleset(), states: [prState()] });
+    const runner = vi.fn(async args => queryText(args).includes('MergeQueueBypassActorAggregate')
+      ? { code: 1, stdout: '', stderr: 'Resource not accessible by integration' }
+      : base(args));
+    await expect(enroll(runner, { allowUnavailableBypassActors: true })).rejects.toMatchObject({ code: 'gh_command_failed' });
+    expect(invokedNativeMutation(runner)).toBe(false);
+    expect(runner.mock.calls.filter(([args]) => queryText(args).includes('MergeQueueBypassActorAggregate'))).toHaveLength(1);
+  });
+  it.each([undefined, null, '0', -1, 0.5, 1])('rejects invalid aggregate count %s before mutation', async count => {
+    const proof = aggregateProof();
+    Object.assign(proof.response.data.repository.ruleset.bypassActors, {
+      totalCount: count,
+    });
+    expect(validateNativePreflightEvidence(aggregateInput(proof)).ok).toBe(false);
+    const runner = createNativeRunner({
+      ruleset: aggregateRuleset(), bypassAggregatePayload: proof.response,
+      states: [prState()],
+    });
+    await expect(enroll(runner)).rejects.toMatchObject({ code: 'native_preflight_failed' });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+  it.each([
+    ['wrong actor', p => { p.response.data.viewer.login = 'other[bot]'; }],
+    ['wrong repository', p => { p.response.data.repository.nameWithOwner = 'Other/Jovie'; }],
+    ['wrong ruleset', p => { p.response.data.repository.ruleset.databaseId = 1; }],
+    ['wrong node', p => { p.response.data.repository.ruleset.id = 'other'; }],
+    ['wrong name', p => { p.response.data.repository.ruleset.name = 'other'; }],
+    ['inactive', p => { p.response.data.repository.ruleset.enforcement = 'DISABLED'; }],
+    ['changed version', p => { p.response.data.repository.ruleset.updatedAt = '2026-10-05T00:00:00Z'; }],
+    ['partial repository', p => { p.response.data.repository = null; }],
+    ['partial viewer', p => { delete p.response.data.viewer; }],
+    ['partial ruleset', p => { p.response.data.repository.ruleset = null; }],
+    ['partial connection', p => { p.response.data.repository.ruleset.bypassActors = null; }],
+    ['partial page', p => { delete p.response.data.repository.ruleset.bypassActors.pageInfo; }],
+    ['more pages', p => { p.response.data.repository.ruleset.bypassActors.pageInfo.hasNextPage = true; }],
+    ['previous pages', p => { p.response.data.repository.ruleset.bypassActors.pageInfo.hasPreviousPage = true; }],
+    ['nonnumeric page', p => { p.response.data.repository.ruleset.bypassActors.pageInfo.hasNextPage = 'false'; }],
+    ['GraphQL error', p => { p.response.errors = [{ message: 'denied' }]; }],
+    ['malformed errors', p => { p.response.errors = {}; }],
+    ['partial data', p => { delete p.response.data; }],
+  ])('rejects %s even alongside otherwise complete zero evidence', async (_name, corrupt) => {
+    const proof = aggregateProof(); corrupt(proof);
+    expect(validateNativePreflightEvidence(aggregateInput(proof)).ok).toBe(false);
+    const runner = createNativeRunner({
+      ruleset: aggregateRuleset(), bypassAggregatePayload: proof.response,
+      states: [prState()],
+    });
+    await expect(enroll(runner)).rejects.toBeDefined();
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+  it.each(['wrong-schema', 'stale', 'future', 'missing-time', 'invalid-time'])('rejects %s aggregate provenance', kind => {
+    const proof = aggregateProof();
+    if (kind === 'wrong-schema') proof.schema = 'other';
+    if (kind === 'stale') proof.observedAt = new Date(Date.now() - 60_001).toISOString();
+    if (kind === 'future') proof.observedAt = new Date(Date.now() + 60_000).toISOString();
+    if (kind === 'missing-time') delete proof.observedAt;
+    if (kind === 'invalid-time') proof.observedAt = 'invalid';
+    expect(validateNativePreflightEvidence(aggregateInput(proof)).ok).toBe(false);
+  });
+  it.each(['node_id', 'updated_at', 'source', 'source_type', 'name'])('rejects missing REST %s identity binding', field => {
+    const ruleset = aggregateRuleset(); delete ruleset[field];
+    expect(validateNativePreflightEvidence(aggregateInput(aggregateProof(), ruleset)).ok).toBe(false);
+  });
+  it.each([null, {}, [{ actor_id: 1 }], undefined])('rejects a present malformed or nonempty REST field despite aggregate zero', bypass_actors => {
+    const ruleset = { ...aggregateRuleset(), bypass_actors };
+    expect(validateNativePreflightEvidence(aggregateInput(aggregateProof(), ruleset)).ok).toBe(false);
+  });
+  it('rejects contradictory aggregate evidence beside a visible empty REST list', () => {
+    const proof = aggregateProof(); proof.response.data.repository.ruleset.bypassActors.totalCount = 1;
+    expect(validateNativePreflightEvidence(aggregateInput(proof, { ...aggregateRuleset(), bypass_actors: [] })).ok).toBe(false);
+  });
+  it('preserves required checks and branch security with aggregate zero', () => {
+    const ruleset = aggregateRuleset();
+    ruleset.rules = ruleset.rules.filter(rule => rule.type !== 'required_status_checks');
+    expect(validateNativePreflightEvidence(aggregateInput(aggregateProof(), ruleset)).ok).toBe(false);
+    const wrongBranch = aggregateRuleset(); wrongBranch.conditions.ref_name.include = ['refs/heads/other'];
+    expect(validateNativePreflightEvidence(aggregateInput(aggregateProof(), wrongBranch)).ok).toBe(false);
+  });
   it('accepts an exact ref with no classic branch-protection rule', () => {
     const result = validateNativePreflightEvidence({
       ruleset: VALID_RULESET,
@@ -1093,7 +1270,7 @@ describe('native live preflight', () => {
     expect(result.errors).toContain('ruleset bypass_actors must be an array');
   });
 
-  it('allows unavailable bypass actors only for an explicit controller preflight', () => {
+  it('does not let the retired controller opt-in replace zero-bypass proof', () => {
     const result = validateNativePreflightEvidence({
       ruleset: { ...structuredClone(VALID_RULESET), bypass_actors: undefined },
       repository: VALID_REPOSITORY,
@@ -1101,7 +1278,7 @@ describe('native live preflight', () => {
       branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
       allowUnavailableBypassActors: true,
     });
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
     expect(result.evidence.bypassActorsVisible).toBe(false);
   });
 
@@ -1137,7 +1314,7 @@ describe('native live preflight', () => {
     );
   });
 
-  it('keeps direct preflight strict while an explicit controller can proceed', async () => {
+  it('keeps direct and legacy controller preflight strict without aggregate proof', async () => {
     const ruleset = structuredClone(VALID_RULESET);
     delete ruleset.bypass_actors;
     await expect(
@@ -1154,10 +1331,7 @@ describe('native live preflight', () => {
         runner: createNativeRunner({ ruleset }),
         allowUnavailableBypassActors: true,
       })
-    ).resolves.toMatchObject({
-      ready: true,
-      bypassActorsVisible: false,
-    });
+    ).rejects.toMatchObject({ code: 'native_preflight_failed' });
   });
 
   it('does not trust retired CLI authorization for bypass visibility or mutation', async () => {
