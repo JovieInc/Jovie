@@ -21,7 +21,7 @@ def cfg(**over):
 def obs(**over):
     base = {"doctorFresh": True, "eligiblePoolByProvider": {"devin": 8, "codex": 6},
             "newIssueBudgetByProvider": {"devin": {"reason": "within-budget"}, "codex": {"reason": "within-budget"}},
-            "maintenanceQueueByProvider": {}, "runningByProvider": {"devin": 4, "codex": 3}, "unhealthy": [],
+            "maintenanceQueueByProvider": {"devin": 0, "codex": 0}, "runningByProvider": {"devin": 4, "codex": 3}, "unhealthy": [],
             "cooling": [], "cooldownAt": {}, "rateBankAt": {}, "codexUnleasedAvailable": 2,
             "productiveRunRate": {"devin": 0.8, "codex": 0.8}, "starts": {"devin": 10, "codex": 10}, "alerts": [],
             "gateWaitMedianS24h": 100, "githubRemaining": 4000, "linearRemaining": 2000, "linearLimit": 2500,
@@ -63,6 +63,20 @@ class AutoscaleTest(unittest.TestCase):
         if reason:
             self.assertEqual(self.lane(state, name)["lastReason"], reason); token = reason.split(":", 1)[-1]; self.assertIn(token, self.lane(state, name)["blockers"])
         return state
+    def test_optional_maintenance_file_reads_are_bounded_regular_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "maintenance-demand.json"
+            os.mkfifo(path)
+            self.assertIsNone(A._read_json(path, max_bytes=65536))
+            path.unlink()
+            other = Path(tmp) / "other.json"
+            other.write_text('{}')
+            path.symlink_to(other)
+            self.assertIsNone(A._read_json(path, max_bytes=65536))
+            path.unlink()
+            path.write_text(' ' * 65537)
+            self.assertIsNone(A._read_json(path, max_bytes=65536))
+
     def test_mode_defaults_and_kill_switch(self):
         self.assertEqual((A.DEFAULT_INTERVAL_S, A.LANE_COOLDOWN_S, A.UP_STREAK_REQUIRED, A.IDLE_STREAK_REQUIRED,
                           A.HOST_COOLDOWN_S, A.streak_ticks(1800), A.streak_ticks(60)), (1800, 1800, 30, 30, 120, 30, 1))
@@ -109,11 +123,66 @@ class AutoscaleTest(unittest.TestCase):
         self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "codex")["effective"], self.lane(state, "devin")["lastReason"]), (5, 3, "sustained-demand"))
         ranked = decide(None, obs(eligiblePoolByProvider={"devin": 1, "codex": 9}), sample(), both, cfg(intervalS=60), NOW)
         self.assertEqual((self.lane(ranked, "codex")["effective"], self.lane(ranked, "devin")["effective"]), (4, 4))
+    def test_wip_hold_keeps_maintenance_capacity_and_can_grow(self):
+        for hold in ("over-budget", "terminal-pr-backlog"):
+            with self.subTest(hold=hold):
+                seen = obs(newIssueBudgetByProvider={"devin": {"reason": hold}},
+                           maintenanceQueueByProvider={"devin": 4},
+                           eligiblePoolByProvider={"devin": 50}, runningByProvider={"devin": 4})
+                state = decide(None, seen, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+                self.assertEqual(self.lane(state, "devin")["effective"], 5)
+                self.assertEqual(self.lane(state, "devin")["lastReason"], "sustained-demand")
+                self.assertEqual(A._demand("devin", seen), 4, "held new work is not repair demand")
+
+    def test_missing_maintenance_sample_is_not_known_idle_under_wip_hold(self):
+        seen = obs(newIssueBudgetByProvider={"devin": {"reason": "over-budget"}},
+                   maintenanceQueueByProvider={}, runningByProvider={"devin": 0})
+        self.assertIsNone(A._demand("devin", seen))
+        state, _ = ticks(35, None, seen, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+        self.assertEqual(self.lane(state, "devin")["effective"], 4)
+
+    def test_maintenance_demand_preserves_real_safety_limits(self):
+        repair = obs(newIssueBudgetByProvider={"devin": {"reason": "over-budget"}},
+                     maintenanceQueueByProvider={"devin": 8}, runningByProvider={"devin": 4})
+        for over, expected in (({"githubRemaining": 599}, "github-budget-low"),
+                               ({"linearRemaining": 0}, "linear-ratelimited"),
+                               ({"cooldownAt": {"devin": NOW}}, "rate-limited"),
+                               ({"disk": {"admitted": False, "freePct": 4}}, "host-pressure")):
+            state = decide(None, {**repair, **over}, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+            self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (2, expected))
+        for over, expected in (({"unhealthy": ["devin"]}, "hold:unhealthy"),
+                               ({"cooling": ["devin"]}, "hold:cooling"),
+                               ({"githubRemaining": None}, "hold:github-unknown"),
+                               ({"newIssueBudgetByProvider": {"devin": {"reason": "provider-disabled"}}}, "hold:provider-disabled")):
+            state = decide(None, {**repair, **over}, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+            self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (4, expected))
+
+    def test_worker_maintenance_sample_expiry_and_observe_apply(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "doctor.json").write_text(json.dumps({"observed": {"now": NOW, "eligiblePoolByProvider": {"devin": 0},
+                "newIssueBudgetByProvider": {"devin": {"reason": "over-budget"}}}}))
+            census = {"schema": "symphony-lanes-maintenance-demand/v1", "lanes": {"devin": {"observedAt": NOW - 60, "pending": 3}}}
+            path = root / "maintenance-demand.json"
+            path.write_text(json.dumps(census))
+            self.assertEqual(A._demand("devin", A.collect(root, {}, NOW)), 3)
+            for stamp, count in ((NOW - 121, 3), (NOW + 1, 3), (NOW, True), (NOW, -1), (NOW, None)):
+                census["lanes"]["devin"] = {"observedAt": stamp, "pending": count}
+                path.write_text(json.dumps(census))
+                self.assertIsNone(A._demand("devin", A.collect(root, {}, NOW)))
+            seen = obs(newIssueBudgetByProvider={"devin": {"reason": "over-budget"}}, maintenanceQueueByProvider={"devin": 3})
+            state = decide(None, seen, sample(), {"devin": 4}, cfg(mode="observe", intervalS=60), NOW)
+            A.write_state(root, state)
+            with env(SYMPHONY_AUTOSCALE="observe"):
+                self.assertEqual(A.effective_slots(root, "devin", 4, NOW), 4)
+            with env(SYMPHONY_AUTOSCALE="apply"):
+                self.assertEqual(A.effective_slots(root, "devin", 4, NOW), 5)
+
     def test_increase_blockers_budgets_and_decreases(self):
         self.held("devin", obs(newIssueBudgetByProvider={"devin": {"reason": "over-budget"}, "codex": {"reason": "within-budget"}},
-                               maintenanceQueueByProvider={"devin": 4}), bases={"devin": 4}, reason="hold:over-budget")
+                               maintenanceQueueByProvider={"devin": 0}), bases={"devin": 4}, reason="hold:over-budget")
         self.held("codex", obs(newIssueBudgetByProvider={"devin": {"reason": "within-budget"}, "codex": {"reason": "terminal-pr-backlog"}},
-                               eligiblePoolByProvider={"devin": 1, "codex": 40}, maintenanceQueueByProvider={"codex": 3}),
+                               eligiblePoolByProvider={"devin": 1, "codex": 40}, maintenanceQueueByProvider={"codex": 0}),
                   bases={"codex": 3}, reason="hold:terminal-pr-backlog")
         for reason, seen, host in (
                 ("hold:zero-demand", obs(eligiblePoolByProvider={"devin": 0, "codex": 0}), None),
