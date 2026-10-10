@@ -3822,6 +3822,11 @@ class FixRedTest(unittest.TestCase):
                          "an external head is re-entry evidence, not part of the dead generation")
         self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 1}})["number"], 5)
 
+    def test_red_pr_leaves_dependabot_bumps_to_dependabot_auto_merge(self):
+        bump = {**self.pr(), "headRefName": "dependabot/npm_and_yarn/dev-patch-8cf5366741"}
+        self.assertIsNone(lane.red_pr([bump], {}), "a fix run cannot change what a version bump breaks")
+        self.assertEqual(lane.red_pr([bump, self.pr(number=6)], {})["number"], 6)
+
     def test_red_pr_never_takes_a_held_pr(self):
         held = {**self.pr(), "labels": [{"name": "Hold"}]}
         self.assertIsNone(lane.red_pr([held], {}), "fixing a held PR re-arms auto-merge and re-enqueues it")
@@ -4406,6 +4411,28 @@ class UpdateTest(unittest.TestCase):
             env = lane.selftest_env(Path("/scratch"))
         self.assertFalse(set(knobs) & set(env))
         self.assertEqual((env["PATH"], env["LANES_SELFTEST"], env["LANES_STATE"]), ("/bin", "1", "/scratch"))
+
+    def test_mesh_dependency_root_falls_back_to_an_installed_pool_slot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp).resolve()
+            repo, pool = tmp / "repo", tmp / "pool"
+            repo.mkdir()
+            slot = pool / "slot-a"
+            for pin in lane.MESH_DEPENDENCY_PINS:
+                (slot / pin).parent.mkdir(parents=True)
+                (slot / pin).write_text("{}")
+            (pool / "slot-a.ready").write_text("")
+            (pool / "slot-b").mkdir()  # ready but not installed: skipped
+            (pool / "slot-b.ready").write_text("")
+            host = lane.Host(state=tmp / "state", repo=repo)
+            with patch.object(lane.worktree_pool, "pool_dir", return_value=pool):
+                self.assertEqual(lane.mesh_dependency_root(host), slot)
+                for pin in lane.MESH_DEPENDENCY_PINS:
+                    (repo / pin).parent.mkdir(parents=True)
+                    (repo / pin).write_text("{}")
+                self.assertEqual(lane.mesh_dependency_root(host), repo, "an installed host repo wins")
+            with patch.object(lane.worktree_pool, "pool_dir", return_value=tmp / "missing"):
+                self.assertIsNone(lane.mesh_dependency_root(lane.Host(state=tmp / "state", repo=tmp / "bare")))
 
     def test_update_installs_tested_release_and_only_moves_the_symlink(self):
         with tempfile.TemporaryDirectory() as tmp:
