@@ -82,6 +82,11 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.demo-video': '/demo/video',
   'web.demovideo': '/demovideo',
   'web.waitlist-invite': '/waitlist/invite',
+  // JOV-8170: both routes are active MARKETING_ROUTE_MANIFEST entries already
+  // captured every run; the screens were registered but never bound, so the
+  // nightly audit could never see their evidence.
+  'web.marketing-renders': '/renders',
+  'web.profile-admission': '/renders/profile-admission',
 });
 export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.public-profile': '/unfazed',
@@ -120,6 +125,30 @@ export const SCREEN_PROOF_ROUTES = Object.freeze({
   // — see apps/web/lib/screen-cert/app-shell-fixture-gate.ts.
   'web.tasks': '/app/tasks',
   'web.contacts': '/app/contacts',
+  // JOV-8170: anonymous public screens share one multi-screen producer —
+  // tests/product-screenshots/public-screens-proof.spec.ts captures every
+  // route below in a single run, then the workflow emits and uploads one
+  // `screen-browser-proof-<suffix>` artifact per screen. web.root-document
+  // and web.root-layout both register apps/web/app/layout.tsx, which every
+  // route renders; '/' is their concrete producer route. web.legal-shell
+  // registers only the (dynamic)/legal layout, so its producer route is any
+  // legal page. /unfazed/about rides the same reserved capture profile and
+  // noop-DB fallback as the web.public-profile producer.
+  'web.root-document': '/',
+  'web.root-layout': '/',
+  'web.legal-shell': '/legal/privacy',
+  'web.legal-privacy': '/legal/privacy',
+  'web.legal-terms': '/legal/terms',
+  'web.legal-cookies': '/legal/cookies',
+  'web.legal-dmca': '/legal/dmca',
+  'web.playlists-index': '/playlists',
+  'web.brand': '/brand',
+  'web.report': '/report',
+  'web.start': '/start',
+  // /solutions/* registers the whole (marketing)/solutions directory;
+  // /solutions/artists is the family's declared concrete health-check path.
+  'web.marketing-solutions': '/solutions/artists',
+  'web.public-profile-about': '/unfazed/about',
 });
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
 export const EXCLUDED_OWNERS = Object.freeze([

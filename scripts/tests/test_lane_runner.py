@@ -2012,7 +2012,217 @@ class AttributionAndThroughputTest(unittest.TestCase):
                          {"autonomous-created": 1, "manual-codex-app-created": 1})
 
 
+class MaintenanceDemandTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+        self.providers = {"devin": {"slots": 4}, "codex": {"slots": 3}}
+        self.now = time.time()
+        claims = patch.object(lane, "_CLAIM_OBSERVATIONS", {})
+        claims.start()
+        self.addCleanup(claims.stop)
+
+    def pr(self, number=7, **over):
+        row = {"number": number, "headRefOid": f"h{number}", "headRefName": f"devin/jov-{number}-20261010",
+               "isDraft": False, "isInMergeQueue": False, "isCrossRepository": False, "labels": [],
+               "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "FAILURE"}]}
+        row.update(over)
+        return row
+
+    def census(self, rows, *, selected=None, readable=True, source_at=None, provider="devin", current=None):
+        summary = {"at": self.now, "sourceAt": self.now if source_at is None else source_at,
+                   "readable": readable, "prs": rows if current is None else current}
+        with patch.object(lane, "_SUMMARY", summary), patch.object(lane, "load_providers", return_value=self.providers), \
+                patch.object(lane, "sh", side_effect=AssertionError("census must not call an API")), \
+                patch.object(lane, "claimed_elsewhere", side_effect=AssertionError("no per-PR remote reads")), \
+                patch.object(lane, "preserved_run", side_effect=AssertionError("no per-PR recovery qualification")):
+            lane.record_maintenance_demand(self.host, provider, rows, rows, rows, selected or set())
+        return json.loads((self.host.state / "maintenance-demand.json").read_text())["lanes"][provider]
+
+    def test_positive_demand_is_deduplicated_and_selected_work_is_excluded(self):
+        self.assertEqual(self.census([self.pr(), self.pr()])["pending"], 1)
+        self.assertIsNone(self.census([self.pr()], selected={7})["pending"])
+        self.assertEqual(self.census([])["pending"], 0)
+
+    def test_missing_test_is_repair_demand_but_not_adoption_permission(self):
+        held = {"7": lane.pr_events.held_record("h7", ["code-change-without-test"])}
+        (self.host.state / "held.json").write_text(json.dumps(held))
+        self.assertEqual(self.census([self.pr()])["pending"], 1)
+        self.assertEqual(lane.gate_disposition(self.pr(isDraft=True), held, {}), "existing-gate-hold")
+
+    def test_native_resource_ownership_and_integrity_dispositions_are_not_demand(self):
+        for change in ({"labels": [{"name": "hold"}]}, {"isInMergeQueue": True},
+                       {"isCrossRepository": True}, {"headRefName": "dependabot/npm/bump"}):
+            with self.subTest(change=change):
+                self.assertIsNone(self.census([self.pr(**change)])["pending"])
+        for record in ({"sha": "h7", "count": 1, "at": self.now},
+                       {"sha": "h7", "count": lane.MAX_FIX_ATTEMPTS, "at": self.now, "endedAt": "ended"}):
+            (self.host.state / "fix-attempts.json").write_text(json.dumps({"7": record}))
+            self.assertIsNone(self.census([self.pr()])["pending"])
+        (self.host.state / "fix-attempts.json").unlink()
+        (self.host.state / "held.json").write_text(json.dumps({"7": lane.pr_events.held_record("h7", ["diff-too-large:100"])}))
+        self.assertIsNone(self.census([self.pr()])["pending"])
+
+    def test_unreadable_stale_and_corrupt_samples_are_unknown(self):
+        self.assertIsNone(self.census([self.pr()], readable=False)["pending"])
+        self.assertIsNone(self.census([self.pr()], source_at=self.now - 61)["pending"])
+        (self.host.state / "held.json").write_text("[]")
+        self.assertIsNone(self.census([self.pr()])["pending"])
+
+    def test_preserved_target_is_withheld_without_touching_the_checkout(self):
+        path = self.host.state / "worktrees/20261010T172237Z-PR7-codex-fix-f5bb6d"
+        path.mkdir(parents=True)
+        marker = path / lane.disk_guard.PRESERVED_REPAIR
+        raw = json.dumps({"pr": 7, "runId": path.name})
+        marker.write_text(raw)
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        self.assertEqual(marker.read_text(), raw)
+
+    def test_current_metadata_overrules_stale_candidates_at_the_same_head(self):
+        for change in ({"labels": [{"name": "hold"}]}, {"isInMergeQueue": True},
+                       {"statusCheckRollup": [{"status": "IN_PROGRESS", "conclusion": None}]}):
+            with self.subTest(change=change):
+                self.assertIsNone(self.census([self.pr()], current=[self.pr(**change)])["pending"])
+        for key in ("isDraft", "isCrossRepository", "isInMergeQueue", "headRefName", "labels", "statusCheckRollup"):
+            row = self.pr()
+            del row[key]
+            with self.subTest(missing=key):
+                self.assertIsNone(self.census([row])["pending"])
+
+    def test_malformed_accounting_and_disabled_or_claimed_work_is_unknown(self):
+        path = self.host.state / "fix-attempts.json"
+        for record in ({"sha": "h7", "count": -999}, {"count": 1},
+                       {"sha": "h7", "count": True}, {"sha": "h7", "at": "bad"},
+                       {"sha": "h7", "count": 1, "at": self.now, "endedAt": True},
+                       {"sha": "h7", "count": 1, "at": self.now, "endedAt": {}},
+                       {"sha": "oldhead", "count": 2, "at": self.now - 60, "endedAt": self.now - 1,
+                        "pushed": True, "pushedHead": True},
+                       {"sha": "oldhead", "count": 2, "at": self.now - 60, "endedAt": self.now - 1,
+                        "pushed": True, "pushedHead": None}):
+            path.write_text(json.dumps({"7": record}))
+            self.assertIsNone(self.census([self.pr()])["pending"])
+        path.unlink()
+        lane._CLAIM_OBSERVATIONS[(7, "h7", "fix")] = {"active": True, "at": self.now}
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        lane._CLAIM_OBSERVATIONS.clear()
+        self.providers["devin"]["enabled"] = False
+        self.assertIsNone(self.census([self.pr()])["pending"])
+
+    def test_green_review_event_is_pending_only_while_current_label_remains(self):
+        row = self.pr(eventKinds=["review"], labels=[{"name": lane.pr_events.PREFIX + "review"}],
+                      statusCheckRollup=[{"status": "COMPLETED", "conclusion": "SUCCESS"}])
+        self.assertEqual(self.census([row])["pending"], 1)
+        self.assertIsNone(self.census([row], current=[{**row, "labels": []}])["pending"])
+
+    def test_null_preserved_marker_and_malformed_hold_are_unknown(self):
+        directory = self.host.state / "worktrees/run-PR7-codex-fix"
+        directory.mkdir(parents=True)
+        marker = directory / lane.disk_guard.PRESERVED_REPAIR
+        marker.write_text("null")
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        marker.unlink()
+        (self.host.state / "held.json").write_text(json.dumps({"7": {
+            "sha": "h7", "evidence": "diff-too-large:100", "next_action": "bug-intake"}}))
+        self.assertIsNone(self.census([self.pr()])["pending"])
+
+    def test_dequeued_only_event_waits_for_existing_sync(self):
+        row = self.pr(eventKinds=["dequeued"], labels=[{"name": lane.pr_events.PREFIX + "dequeued"}],
+                      mergeStateStatus="CLEAN", statusCheckRollup=[{"status": "COMPLETED", "conclusion": "SUCCESS"}])
+        self.assertIsNone(self.census([row])["pending"])
+        (self.host.state / "synced.json").write_text(json.dumps({"7": "existing-sync"}))
+        self.assertEqual(self.census([row])["pending"], 1)
+
+    def test_conflicting_preserved_marker_withholds_both_targets(self):
+        path = self.host.state / "worktrees/run-PR7-codex-fix"
+        path.mkdir(parents=True)
+        (path / lane.disk_guard.PRESERVED_REPAIR).write_text(json.dumps({"pr": 8}))
+        self.assertIsNone(self.census([self.pr(), self.pr(8)])["pending"])
+
+    def test_observation_refuses_special_symlink_and_oversized_evidence(self):
+        directory = self.host.state / "worktrees/run-PR8-codex-fix"
+        directory.mkdir(parents=True)
+        marker = directory / lane.disk_guard.PRESERVED_REPAIR
+        os.mkfifo(marker)
+        try:
+            self.assertIsNone(self.census([self.pr()], selected={7})["pending"])
+        finally:
+            marker.unlink()
+        target = self.host.state / "elsewhere.json"
+        target.write_text('{"pr": 8}')
+        marker.symlink_to(target)
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        marker.unlink()
+        marker.write_text(" " * 16385)
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        marker.unlink()
+        attempts = self.host.state / "fix-attempts.json"
+        os.mkfifo(attempts)
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        attempts.unlink()
+        demand = self.host.state / "maintenance-demand.json"
+        demand.unlink()
+        os.mkfifo(demand)
+        self.census_without_publication([self.pr()])
+        self.assertTrue(demand.exists())
+
+    def census_without_publication(self, rows):
+        with patch.object(lane, "_SUMMARY", {"at": self.now, "sourceAt": self.now, "readable": True, "prs": rows}), \
+                patch.object(lane, "load_providers", return_value=self.providers):
+            lane.record_maintenance_demand(self.host, "devin", rows, rows, [], set())
+
+    def test_summary_timestamp_cannot_certify_different_cache_rows(self):
+        cache = self.host.state / "open-prs-labels-v2.json"
+        old = self.pr(rollup="FAILURE")
+        newer = self.pr(rollup="FAILURE", labels=[{"name": "hold"}])
+        summary = {"at": 0, "prs": [], "readable": False}
+        with patch.object(lane, "_SUMMARY", summary), patch.object(lane, "SHARED_CACHE_DIR", self.host.state), \
+                patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "mesh"}):
+            for rows, expected in (([newer], None), ([old], self.now - 40)):
+                cache.write_text(json.dumps({"at": self.now - 40, "value": rows}))
+                summary["at"] = 0
+                with patch.object(lane, "shared", return_value=[dict(old)]):
+                    lane.open_prs_summary()
+                self.assertEqual(summary["sourceAt"], expected)
+
+    def test_marker_scan_has_an_entry_budget_and_does_not_refresh_inventory_age(self):
+        for number in range(257):
+            (self.host.state / "worktrees" / str(number)).mkdir(parents=True)
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        shutil.rmtree(self.host.state / "worktrees")
+        row = self.census([self.pr()], source_at=self.now - 40)
+        self.assertEqual(row["observedAt"], self.now - 40)
+
+    def test_implementation_only_provider_never_counts_adoption_only_work(self):
+        self.assertIsNone(self.census([self.pr(isDraft=True, statusCheckRollup=[])], provider="codex")["pending"])
+
+
 class WorkerTest(unittest.TestCase):
+    def test_eligible_repair_precedes_held_new_intake(self):
+        self.linear.issues = [issue("JOV-3")]
+        with patch.object(lane, "claim_red_pr", return_value={"number": 21175}), \
+                patch.object(lane, "fix_red_pr") as repair, \
+                patch.object(lane, "read_new_issue_budget", return_value={"allowed": False, "reason": "over-budget"}) as budget, \
+                patch.object(lane, "run_issue") as new_work:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        repair.assert_called_once()
+        budget.assert_not_called()
+        new_work.assert_not_called()
+        self.assertEqual(self.linear.moves, [])
+
+    def test_optional_observation_failure_does_not_interrupt_selected_repair(self):
+        with patch.object(lane, "claim_red_pr", return_value={"number": 7}), \
+                patch.object(lane, "record_maintenance_demand", side_effect=RuntimeError("malformed unrelated state")), \
+                patch.object(lane, "fix_red_pr") as repair, patch.object(lane, "read_new_issue_budget") as budget:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        repair.assert_called_once()
+        budget.assert_not_called()
+        contender = lane.Locked(self.host.state / "claim.lock", blocking=False)
+        try:
+            self.assertTrue(contender.held)
+        finally:
+            contender.release()
+
     def test_blocked_last_overlap_candidate_never_runs_or_claims_the_issue(self):
         self.linear.issues[0].description = "Edit `scripts/lanes/lane_runner.py`."
         existing = {"number": 1, "files": ["scripts/lanes/lane_runner.py"], "isDraft": False}
@@ -4434,6 +4644,26 @@ class UpdateTest(unittest.TestCase):
             with patch.object(lane.worktree_pool, "pool_dir", return_value=tmp / "missing"):
                 self.assertIsNone(lane.mesh_dependency_root(lane.Host(state=tmp / "state", repo=tmp / "bare")))
 
+    def test_prove_staging_names_the_refusal_and_the_cli_reports_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp).resolve()
+            staging = tmp / "staging"
+            (staging / "scripts/lanes").mkdir(parents=True)  # no mesh-runtime-bundle.mjs: node fails
+            host = lane.Host(state=tmp / "state", repo=tmp / "repo")
+            (tmp / "repo").mkdir()
+            with patch.object(lane.worktree_pool, "pool_dir", return_value=tmp / "no-pool"):
+                self.assertEqual(lane.prove_staging(host, staging), "mesh runtime dependency closure failed")
+            self.assertTrue((staging / ".selftest-state").is_dir(), "scratch state lives under staging only")
+            with patch.object(lane, "load_github_env"), patch.object(lane, "Host", return_value=host), \
+                    patch.object(lane, "prove_staging", return_value="release tests failed") as proved, \
+                    patch("sys.stdout", new_callable=io.StringIO) as out:
+                self.assertEqual(lane.guarded_main(["prove-staging", str(staging)]), 1)
+            self.assertEqual(out.getvalue().strip(), "release tests failed")
+            self.assertEqual(proved.call_args.args[1], staging)
+            with patch.object(lane, "load_github_env"), patch.object(lane, "Host", return_value=host), \
+                    patch.object(lane, "prove_staging", return_value=None):
+                self.assertEqual(lane.guarded_main(["prove-staging", str(staging)]), 0)
+
     def test_update_installs_tested_release_and_only_moves_the_symlink(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp).resolve()  # macOS /var -> /private/var must match .resolve() below
@@ -5334,6 +5564,260 @@ class RepairCheckPaginationTest(unittest.TestCase):
         live, command = self.read([self.page(), terminal])
         self.assertEqual(live["state"], "MERGED")
         self.assertEqual(command.call_count, 2)
+
+
+class RepairCheckOverflowDiagnosticTest(unittest.TestCase):
+    contexts = RepairCheckPaginationTest.contexts
+
+    def target(self):
+        return {"number": 5, "headRefName": "devin/jov-1-20260926t0900", "headRefOid": "a" * 40,
+                "isDraft": False, "isCrossRepository": False, "isInMergeQueue": False,
+                "state": "OPEN", "labels": [], "statusCheckRollup": []}
+
+    def pages(self, total=607):
+        page = repair_target_page(self.target(), title="fix(lanes): reader", body="private body",
+                                  url="https://github.com/JovieInc/Jovie/pull/5",
+                                  updatedAt="2026-10-10T12:00:00Z")
+        self.contexts(page).update(totalCount=total, checkRunCount=total, statusContextCount=0,
+            checkRunCountsByState=[{"state": "SUCCESS", "count": total}], statusContextCountsByState=[],
+            pageInfo={"hasNextPage": True, "endCursor": "opaque-prefix"}, nodes=[
+                {"__typename": "CheckRun", "id": f"check-{index}", "name": f"required-{index}",
+                 "status": "COMPLETED", "conclusion": "SUCCESS"} for index in range(100)])
+        final = json.loads(json.dumps(page))
+        self.contexts(final).pop("nodes")
+        self.contexts(final).pop("pageInfo")
+        return page, final
+
+    def read(self, pages, *, clock=100, target=None):
+        responses = [page if isinstance(page, (BaseException, SimpleNamespace)) else SimpleNamespace(
+            returncode=0, stdout=json.dumps(page), stderr="") for page in pages]
+        stderr = io.StringIO()
+        clock_args = {"side_effect": clock} if isinstance(clock, list) else {"return_value": clock}
+        with patch.object(lane, "sh", side_effect=responses) as command, \
+                patch.object(lane.time, "monotonic", **clock_args), patch("sys.stderr", stderr):
+            result = lane.reconcile_fix_target(target or self.target())
+        receipts = [json.loads(line) for line in stderr.getvalue().splitlines()]
+        return result, command, receipts
+
+    def test_oversized_negative_census_is_diagnostic_not_detailed_repair_authority(self):
+        for total in (601, 607, 610, 100000):
+            with self.subTest(total=total):
+                live, command, receipts = self.read(self.pages(total))
+                self.assertIsNone(live)
+                self.assertEqual(command.call_count, 2)
+                self.assertTrue(all(call.kwargs["timeout"] == 30 for call in command.call_args_list))
+                self.assertNotIn("cursor=opaque-prefix", command.call_args_list[1].args[0])
+                query = next(arg for arg in command.call_args_list[1].args[0] if arg.startswith("query="))
+                self.assertNotIn("nodes{__typename", query)
+                self.assertEqual(len(receipts), 1)
+                receipt = receipts[0]
+                self.assertEqual(receipt["schema"], "jovie.repair-check-overflow-negative/v1")
+                self.assertIs(receipt["predicateComplete"], True)
+                self.assertIs(receipt["contextsComplete"], False)
+                self.assertIs(receipt["repairAuthorized"], False)
+                self.assertEqual(receipt["totalCount"], total)
+                self.assertEqual(receipt["headSha"], self.target()["headRefOid"])
+                self.assertEqual(receipt["sampleCount"], 100)
+                self.assertNotIn("statusCheckRollup", receipt)
+                self.assertNotIn("private body", json.dumps(receipt))
+
+    def test_positive_or_pending_overflow_refuses_before_an_extra_read(self):
+        for state in ("FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "IN_PROGRESS", "PENDING",
+                      "QUEUED", "WAITING", "COMPLETED", "REQUESTED", "UNKNOWN"):
+            first, _ = self.pages()
+            self.contexts(first)["checkRunCountsByState"] = [
+                {"state": "SUCCESS", "count": 606}, {"state": state, "count": 1}]
+            with self.subTest(state=state):
+                live, command, receipts = self.read([first])
+                self.assertIsNone(live)
+                self.assertEqual(command.call_count, 1)
+                self.assertEqual(receipts, [])
+        for state in ("PENDING", "EXPECTED"):
+            first, _ = self.pages()
+            self.contexts(first).update(checkRunCount=606, statusContextCount=1,
+                checkRunCountsByState=[{"state": "SUCCESS", "count": 606}],
+                statusContextCountsByState=[{"state": state, "count": 1}])
+            self.assertEqual(self.read([first])[2], [])
+
+    def test_contradictory_or_malformed_prefix_cannot_be_rescued_by_second_census(self):
+        faults = ("failure", "timeout", "startup", "pending", "requested", "unconcluded", "unknown-conclusion",
+                  "unknown-type", "null-row", "missing-id", "blank-id", "duplicate-id", "blank-name",
+                  "short", "long", "empty", "false-next", "missing-next", "blank-cursor", "missing-cursor",
+                  "sample-bucket-exceeds-total", "sample-type-exceeds-total", "unknown-zero-bucket")
+        for fault in faults:
+            first, final = self.pages()
+            connection = self.contexts(first); rows = connection["nodes"]
+            if fault in ("failure", "timeout", "startup"):
+                rows[0]["conclusion"] = {"failure": "FAILURE", "timeout": "TIMED_OUT", "startup": "STARTUP_FAILURE"}[fault]
+            if fault in ("pending", "requested"): rows[0].update(status=fault.upper(), conclusion=None)
+            if fault == "unconcluded": rows[0]["conclusion"] = None
+            if fault == "unknown-conclusion": rows[0]["conclusion"] = "FUTURE"
+            if fault == "unknown-type": rows[0]["__typename"] = "FutureContext"
+            if fault == "null-row": rows[0] = None
+            if fault == "missing-id": rows[0].pop("id")
+            if fault == "blank-id": rows[0]["id"] = " "
+            if fault == "duplicate-id": rows[1]["id"] = rows[0]["id"]
+            if fault == "blank-name": rows[0]["name"] = " "
+            if fault == "short": rows.pop()
+            if fault == "long": rows.append({**rows[-1], "id": "extra"})
+            if fault == "empty": connection["nodes"] = []
+            if fault == "false-next": connection["pageInfo"]["hasNextPage"] = False
+            if fault == "missing-next": connection["pageInfo"].pop("hasNextPage")
+            if fault == "blank-cursor": connection["pageInfo"]["endCursor"] = " "
+            if fault == "missing-cursor": connection["pageInfo"].pop("endCursor")
+            if fault == "sample-bucket-exceeds-total":
+                connection["checkRunCountsByState"] = [{"state": "SUCCESS", "count": 99}, {"state": "CANCELLED", "count": 508}]
+            if fault == "sample-type-exceeds-total":
+                connection.update(checkRunCount=99, statusContextCount=508,
+                    checkRunCountsByState=[{"state": "SUCCESS", "count": 99}],
+                    statusContextCountsByState=[{"state": "SUCCESS", "count": 508}])
+            if fault == "unknown-zero-bucket": connection["checkRunCountsByState"].append({"state": "FUTURE", "count": 0})
+            with self.subTest(fault=fault):
+                live, command, receipts = self.read([first, final])
+                self.assertIsNone(live)
+                self.assertEqual(command.call_count, 1)
+                self.assertEqual(receipts, [])
+
+    def test_cancelled_and_legacy_failure_keep_their_separate_policies(self):
+        first, _ = self.pages()
+        rows = self.contexts(first)["nodes"]
+        rows[0]["conclusion"] = "CANCELLED"
+        rows[1] = {"__typename": "StatusContext", "id": "legacy-error", "context": "legacy", "state": "ERROR"}
+        rows[2] = {"__typename": "StatusContext", "id": "legacy-failure", "context": "legacy-2", "state": "FAILURE"}
+        self.contexts(first).update(checkRunCount=605, statusContextCount=2,
+            checkRunCountsByState=[{"state": "SUCCESS", "count": 604}, {"state": "CANCELLED", "count": 1}],
+            statusContextCountsByState=[{"state": "ERROR", "count": 1}, {"state": "FAILURE", "count": 1}])
+        final = json.loads(json.dumps(first));self.contexts(final).pop("nodes");self.contexts(final).pop("pageInfo")
+        live, command, receipts = self.read([first, final])
+        self.assertIsNone(live)
+        self.assertEqual(command.call_count, 2)
+        self.assertEqual(len(receipts), 1)
+        self.assertEqual(receipts[0]["census"]["checkRunCountsByState"]["CANCELLED"], 1)
+
+    def test_second_read_moving_authority_census_or_transport_cannot_emit_negative(self):
+        for fault in ("head", "branch", "queue", "draft", "cross-repo", "review", "conflict", "labels",
+                      "metadata", "counts", "unknown-state", "partial", "null-rollup", "wrong-commit", "transport"):
+            first, final = self.pages()
+            node = final["data"]["repository"]["pullRequest"]
+            if fault == "head": node["headRefOid"] = "b" * 40
+            if fault == "branch": node["headRefName"] = "other-branch"
+            if fault == "queue": node["isInMergeQueue"] = True
+            if fault == "draft": node["isDraft"] = True
+            if fault == "cross-repo": node["isCrossRepository"] = True
+            if fault == "review": node["reviewDecision"] = "CHANGES_REQUESTED"
+            if fault == "conflict": node["mergeStateStatus"] = "DIRTY"
+            if fault == "labels": node["labels"]["nodes"] = [{"name": "hold"}]
+            if fault == "metadata": node["body"] = "new dependency contract"
+            if fault == "counts": self.contexts(final)["totalCount"] += 1
+            if fault == "unknown-state": self.contexts(final)["checkRunCountsByState"] = [{"state": "FUTURE", "count": 607}]
+            if fault == "partial": final["errors"] = [{"message": "private read failure"}]
+            if fault == "null-rollup": node["commits"]["nodes"][0]["commit"]["statusCheckRollup"] = None
+            if fault == "wrong-commit": node["commits"]["nodes"][0]["commit"]["oid"] = "b" * 40
+            if fault == "transport": final = subprocess.TimeoutExpired("gh", 30)
+            with self.subTest(fault=fault):
+                live, command, receipts = self.read([first, final])
+                self.assertIsNone(live)
+                self.assertEqual(command.call_count, 2)
+                self.assertEqual(receipts, [])
+
+    def test_nonfinite_clock_cannot_emit_or_extend_overflow_reads(self):
+        for clock in (float("nan"), float("inf"), -1, True):
+            with self.subTest(clock=clock):
+                live, command, receipts = self.read(self.pages(), clock=clock)
+                self.assertIsNone(live)
+                self.assertEqual(command.call_count, 1)
+                self.assertEqual(receipts, [])
+
+    def test_elapsed_or_rollback_clock_refuses_without_fallback(self):
+        for clock, calls in (([100, 99], 1), ([100, 131], 1), ([100, 100, 99], 2),
+                             ([100, 100, 131], 2), ([100, 100, float("nan")], 2)):
+            with self.subTest(clock=clock):
+                live, command, receipts = self.read(self.pages(), clock=clock)
+                self.assertIsNone(live)
+                self.assertEqual(command.call_count, calls)
+                self.assertEqual(receipts, [])
+
+    def test_diagnostic_never_charges_polling_event_or_execution_entry(self):
+        for positive in (False, True):
+            for boundary in ("polling", "event", "execution"):
+                with self.subTest(positive=positive, boundary=boundary), tempfile.TemporaryDirectory() as tmp:
+                    host = lane.Host(state=Path(tmp), repo=Path(tmp))
+                    candidate = {**self.target(), "mergeStateStatus": "BLOCKED", "reviewDecision": None,
+                        "eventKinds": ["review"], "statusCheckRollup": [
+                            {"name": "ci", "status": "COMPLETED", "conclusion": "FAILURE"}]}
+                    first, final = self.pages()
+                    if positive:
+                        self.contexts(first)["checkRunCountsByState"] = [
+                            {"state": "SUCCESS", "count": 606}, {"state": "FAILURE", "count": 1}]
+                    responses = [SimpleNamespace(returncode=0, stdout=json.dumps(page), stderr="")
+                                 for page in (first, final)]
+                    with patch.object(lane, "sh", side_effect=responses) as command, \
+                            patch.object(lane.time, "monotonic", return_value=100), patch("sys.stderr", io.StringIO()), \
+                            patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                            patch.object(lane.pr_events, "cost_order", return_value=["codex"]), \
+                            patch.object(lane.pr_events, "may_take", return_value=True), \
+                            patch.object(lane, "claimed_elsewhere", return_value=False), \
+                            patch.object(lane.pr_events, "charge_reentry") as charge, \
+                            patch.object(lane, "post_claim") as post, \
+                            patch.object(lane.execution_attempt, "claim") as execution, \
+                            patch.object(lane, "run_agent") as provider:
+                        if boundary == "polling":
+                            self.assertIsNone(lane.claim_red_pr(host, "codex", [candidate]))
+                        elif boundary == "event":
+                            self.assertIsNone(lane.pr_events.claim_event_pr(host, lane.THIS, "codex", [candidate]))
+                        else:
+                            with self.assertRaises(lane.RepairStopped) as stopped:
+                                lane.require_fix_target(candidate, "before-install", repair=True)
+                            self.assertEqual(str(stopped.exception), "target-state-unavailable")
+                        self.assertEqual(command.call_count, 1 if positive else 2)
+                        charge.assert_not_called();post.assert_not_called()
+                        execution.assert_not_called();provider.assert_not_called()
+                    self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_other_repair_causes_and_native_hold_input_are_preserved(self):
+        for cause in ("conflict", "review", "gate", "dequeued", "stale"):
+            first, final = self.pages()
+            for page in (first, final):
+                node = page["data"]["repository"]["pullRequest"]
+                node["labels"]["nodes"] = [{"name": "jovie-queue-failure-hold/v1"}]
+                if cause == "conflict": node["mergeStateStatus"] = "DIRTY"
+                if cause == "review": node["reviewDecision"] = "CHANGES_REQUESTED"
+            before = json.dumps((first, final), sort_keys=True)
+            target = self.target()
+            target.update(eventKinds=[cause], gateEvidence=["existing same-head local gate hold"],
+                          queueFailure="original unclassified native failure")
+            with self.subTest(cause=cause):
+                live, command, receipts = self.read([first, final], target=target)
+                self.assertIsNone(live)
+                self.assertEqual(command.call_count, 2)
+                self.assertEqual(len(receipts), 1)
+                self.assertEqual(json.dumps((first, final), sort_keys=True), before)
+                self.assertEqual(target["eventKinds"], [cause])
+                self.assertEqual(target["queueFailure"], "original unclassified native failure")
+
+    def test_quota_floor_and_read_errors_get_no_inline_retry(self):
+        for failure in (SimpleNamespace(returncode=75, stdout="", stderr="github-budget-floor"),
+                        SimpleNamespace(returncode=0, stdout="not json", stderr=""),
+                        OSError("private read failure")):
+            first, _ = self.pages()
+            with self.subTest(failure=type(failure).__name__):
+                live, command, receipts = self.read([first, failure])
+                self.assertIsNone(live)
+                self.assertEqual(command.call_count, 2)
+                self.assertEqual(receipts, [])
+                live, command, receipts = self.read([failure])
+                self.assertIsNone(live)
+                self.assertEqual(command.call_count, 1)
+                self.assertEqual(receipts, [])
+
+    def test_second_read_terminal_evidence_still_cancels_work(self):
+        for state in ("MERGED", "CLOSED"):
+            first, _ = self.pages()
+            terminal = {"data": {"repository": {"pullRequest": {"number": 5, "state": state}}}}
+            live, command, receipts = self.read([first, terminal])
+            self.assertEqual(live["state"], state)
+            self.assertEqual(command.call_count, 2)
+            self.assertEqual(receipts, [])
 
 
 class RepairQueueAuthorityTest(unittest.TestCase):
