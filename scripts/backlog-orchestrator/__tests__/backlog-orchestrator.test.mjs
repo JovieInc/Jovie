@@ -2428,6 +2428,62 @@ describe('deterministic Symphony admission boundary', () => {
     });
   }
 
+  it('maps a parked controller into hold-intake with production green (JOV-8000 follow-up 29)', () => {
+    // The 38025443068 split-brain: the canonical python receipt said
+    // hold-intake ({controller-failure, production-deployment-unbound})
+    // while this JS projection mapped parked to controller-unknown and
+    // required a green controller for hold-intake — binding BLOCKED.
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        controller: {
+          status: 'parked',
+          retired: true,
+          error: 'controller-endpoint-retired: Connection refused',
+        },
+        production: {
+          status: 'green',
+          deployedSha: 'b3eeefdd4dc681d1c9b5b4385720d661f5129138',
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
+    const codes = fleetGate.reasons.map(reason => reason.code);
+    assert.ok(codes.includes('controller-failure'));
+    assert.ok(
+      codes.every(code =>
+        ['controller-failure', 'production-deployment-unbound'].includes(code)
+      )
+    );
+  });
+
+  it('maps a crashed controller with green bound production into hold-intake (JOV-8000 follow-up 29)', () => {
+    // The crashed shape also rides the python hold-intake set: {controller-failure}
+    // alone with main/production green and bound.
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        controller: { status: 'failed' },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
+    const codes = fleetGate.reasons.map(reason => reason.code);
+    assert.ok(codes.includes('controller-failure'));
+    assert.ok(
+      codes.every(code =>
+        ['controller-failure', 'production-deployment-unbound'].includes(code)
+      )
+    );
+  });
+
   it('leaves per-lane backpressure to the candidate preflight', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
@@ -2637,7 +2693,13 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
-  it('preserves the cohort for one controller repair when production is unbound', () => {
+  it('aligns the unbound-production failed-controller shape to the canonical hold-intake (JOV-8000 follow-up 29)', () => {
+    // The canonical python writer (gem-priority-gate.py) yields hold-intake
+    // for {controller-failure, production-deployment-unbound} — the JS
+    // projection previously re-derived controller-repair-only for the same
+    // signals, the split-brain behind the 38025443068 capacity bind. The
+    // controller-repair admission projection remains for shapes where
+    // hold-intake does not apply.
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
         production: { status: 'green', deployedSha: 'bda0d88' },
@@ -2647,11 +2709,17 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.equal(fleetGate.state, 'AMBER');
-    assert.equal(fleetGate.promotionMode, 'controller-repair-only');
-    assert.equal(fleetGate.alreadyAdmittedCohort.preserve, true);
-    assert.equal(fleetGate.alreadyAdmittedCohort.newIntakeAllowed, false);
-    assert.equal(fleetGate.controllerRepairAdmission.allowed, true);
-    assert.equal(fleetGate.controllerRepairAdmission.maxConcurrent, 1);
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
+    const codes = fleetGate.reasons.map(reason => reason.code);
+    assert.ok(codes.includes('controller-failure'));
+    assert.ok(
+      codes.every(code =>
+        ['controller-failure', 'production-deployment-unbound'].includes(code)
+      )
+    );
   });
 
   it('admits only one controller repair through the second fleet consumer', () => {
@@ -2660,26 +2728,18 @@ describe('deterministic Symphony admission boundary', () => {
       { now: '2026-08-09T05:01:00.000Z' }
     );
 
+    // JOV-8000 follow-up 29: the failed-controller/green-bound-production
+    // shape aligns to the canonical writer's hold-intake ({controller-failure}
+    // alone); the one-repair admission projection no longer rides this shape.
     assert.equal(fleetGate.state, 'AMBER');
-    assert.equal(fleetGate.promotionMode, 'controller-repair-only');
-    assert.deepEqual(fleetGate.alreadyAdmittedCohort, {
-      preserve: true,
-      newIntakeAllowed: false,
-      semantics: 'preserve-cohort-and-admit-one-controller-repair',
-    });
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
     assert.equal(fleetGate.promotionAdmission.allowed, false);
     assert.equal(fleetGate.isolatedPromotionAdmission.allowed, false);
-    assert.deepEqual(fleetGate.controllerRepairAdmission, {
-      allowed: true,
-      condition: 'controller-failure',
-      mainSha: fleetEvidence().main.sha,
-      deployedSha: fleetEvidence().production.deployedSha,
-      scope: 'trusted-comment-exact-repository-pr-head-main-path-set',
-      maxConcurrent: 1,
-      deploymentsAllowed: false,
-      runtimeActivationAllowed: false,
-      authority: 'canonical-merge-queue-controller',
-    });
+    const codes = fleetGate.reasons.map(reason => reason.code);
+    assert.deepEqual(codes, ['controller-failure']);
   });
 
   it('denies controller repair when closure observation is unknown', () => {
@@ -2699,8 +2759,14 @@ describe('deterministic Symphony admission boundary', () => {
       { now: '2026-08-09T05:01:00.000Z' }
     );
 
-    assert.equal(fleetGate.promotionMode, 'blocked');
-    assert.equal(fleetGate.controllerRepairAdmission.allowed, false);
+    // JOV-8000 follow-up 29: closure debt no longer binds this shape blocked
+    // through the controller-repair path — hold-intake (the canonical
+    // semantics for the reason pair) keeps promotion of already-green PRs
+    // alive while Summer's closure observation is unknown.
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
     assert.equal(fleetGate.promotionAdmission.allowed, false);
   });
 
