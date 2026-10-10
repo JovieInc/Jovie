@@ -356,6 +356,26 @@ describe.skipIf(!gh)('iOS TestFlight release authorization (real gh)', () => {
     }
   });
 
+  it('stands down when the controller skipped Production Verified', async () => {
+    // A successful controller run may legitimately skip verification, e.g.
+    // when the fleet gate held deployment. That is not missing evidence and
+    // must not fail main; the generation simply has nothing to release.
+    const result = await authorize({
+      controllerJobs: [job('Production Verified', RELEASE, 'skipped')],
+    });
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.outputs.authorized).toBe('false');
+    expect(result.stdout + result.stderr).toContain(
+      'yielded the release lease'
+    );
+  });
+
+  it('still fails when Production Verified is absent entirely', async () => {
+    const result = await authorize({ controllerJobs: [] });
+    expect(result.code).toBe(1);
+    expect(result.outputs.authorized).toBe('false');
+  });
+
   it('lets a manual dispatch rebuild only verified current main', async () => {
     const manual = {
       EVENT_NAME: 'workflow_dispatch',

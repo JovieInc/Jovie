@@ -71,6 +71,7 @@ beforeAll(async () => {
 describe('DesktopAuthPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    openDesktopAuthUrlMock.mockReset().mockResolvedValue({ ok: true });
     searchParamsState.value =
       'auth_url=%2Fauth%2Fstart%3Fclient%3Delectron%26intent%3Dsign_in%26return_to%3D%252Fapp%252Fsettings%26code_challenge%3DabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ%26code_challenge_method%3DS256';
   });
@@ -319,7 +320,12 @@ describe('DesktopAuthPage', () => {
     const status = screen.getByRole('status');
     continueButton.focus();
     expect(continueButton).toHaveFocus();
-    expect(actions).toHaveClass('gap-3');
+    expect(
+      screen.getByRole('button', { name: 'Cancel Sign-in' }).parentElement
+    ).toBe(
+      screen.getByRole('button', { name: 'Other Sign-in Options' })
+        .parentElement
+    );
     expect(actions.querySelectorAll('button')).toHaveLength(3);
     expect(
       actions.querySelector('[data-auth-action="cancel"]')

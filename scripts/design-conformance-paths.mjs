@@ -13,6 +13,7 @@ const DESIGN_GOVERNANCE_PATHS = new Set([
   'scripts/lib/oklch.mjs',
   'scripts/oklch-palette-guard.mjs',
   'scripts/oklch-palette-guard.test.mjs',
+  'apps/web/data/designSystem/componentRegistry.ts',
   'apps/web/design/oklch-palette.json',
   'scripts/shared-ui-visual-arbitrary-audit.mjs',
   'scripts/shared-ui-visual-arbitrary-audit.test.mjs',

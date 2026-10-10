@@ -6,11 +6,11 @@
   },
   "conservative": {
     "armed": true,
-    "count": 668,
+    "count": 666,
     "perFamily": {
       "marketing": 86,
       "web-shell": 264,
-      "web-other": 307,
+      "web-other": 305,
       "packages/ui": 11
     },
     "perUtility": {
@@ -31,7 +31,7 @@
       "pr-2.5": 3,
       "pr-3.5": 2,
       "pt-2.5": 8,
-      "px-2.5": 231,
+      "px-2.5": 229,
       "px-3.5": 43,
       "py-2.5": 120,
       "py-3.5": 29,
@@ -41,11 +41,11 @@
   },
   "strict": {
     "armed": false,
-    "count": 2320,
+    "count": 2310,
     "perFamily": {
       "marketing": 258,
-      "web-shell": 873,
-      "web-other": 1129,
+      "web-shell": 866,
+      "web-other": 1126,
       "packages/ui": 60
     }
   }

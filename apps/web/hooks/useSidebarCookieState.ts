@@ -56,7 +56,9 @@ export function useSidebarCookieState({
     (value: boolean | ((value: boolean) => boolean)) => {
       const nextOpen =
         typeof value === 'function' ? value(openRef.current) : value;
-
+      // Track the requested state before React commits. Consecutive inputs
+      // in one batch must compose, including controlled/sidebar IPC inputs.
+      openRef.current = nextOpen;
       persistSidebarCookie(nextOpen);
       setOpenInternal(nextOpen);
       onOpenChange?.(nextOpen);

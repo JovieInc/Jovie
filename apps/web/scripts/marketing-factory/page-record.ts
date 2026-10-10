@@ -26,6 +26,7 @@ import { FACTORY_STAGES } from '../../data/marketing/factory/spine';
 import { MARKETING_PEN_CONTRACT_IDS } from '../../data/marketing/penContracts';
 import { listProductTruthClaims } from '../../data/product-truth/claims';
 import { getMarketingExportImage } from '../../lib/screenshots/registry';
+import { generatedFactoryMedia } from './generated-media';
 import { artifactOf, type StageContext } from './stage-kit';
 
 const PEN_CONTRACT_BY_RECIPE: Readonly<Record<string, string>> = {
@@ -55,6 +56,7 @@ export function buildFactoryPageRecord(
   const captures = artifactOf(ctx, 'asset').assets.filter(asset =>
     asset.id.startsWith(CAPTURE_PREFIX)
   );
+  const generated = generatedFactoryMedia(ctx);
   const recipeId = artifactOf(ctx, 'layout').recipeId;
   const layoutSections = artifactOf(ctx, 'layout').sections;
   const sections = artifactOf(ctx, 'narrative').sections;
@@ -115,19 +117,22 @@ export function buildFactoryPageRecord(
         { text: slot.text },
       ])
     ),
-    media: Object.fromEntries(
-      captures.map(asset => {
-        const scenarioId = asset.id.slice(CAPTURE_PREFIX.length);
-        return [
-          refs.get(asset.id)?.sectionInstanceId ?? asset.id,
-          {
-            kind: 'screenshot-registry',
-            id: scenarioId,
-            alt: getMarketingExportImage(scenarioId).alt,
-          },
-        ];
-      })
-    ),
+    media: {
+      ...generated.media,
+      ...Object.fromEntries(
+        captures.map(asset => {
+          const scenarioId = asset.id.slice(CAPTURE_PREFIX.length);
+          return [
+            refs.get(asset.id)?.sectionInstanceId ?? asset.id,
+            {
+              kind: 'screenshot-registry',
+              id: scenarioId,
+              alt: getMarketingExportImage(scenarioId).alt,
+            },
+          ];
+        })
+      ),
+    },
     heroVariant: HERO_DECISION_TABLE.find(
       contract => contract.penId === artifactOf(ctx, 'hero-variant').variantId
     )?.variant,
@@ -160,6 +165,7 @@ export function buildFactoryPageRecord(
         ),
         ...layoutIssues,
         ...unrendered,
+        ...generated.issues,
       ],
     };
   }
@@ -168,6 +174,7 @@ export function buildFactoryPageRecord(
   const issues = [
     ...layoutIssues,
     ...unrendered,
+    ...generated.issues,
     ...findUnresolvedRecordClaims(parsed.data, claims).map(
       id => `unknown claim ${id}`
     ),

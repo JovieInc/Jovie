@@ -85,7 +85,13 @@ export default defineConfig({
       enabled: true,
       provider: playwright({
         launchOptions: {
-          args: [`${STORYBOOK_VITEST_OWNER_ARG}${storybookVitestOwnerToken}`],
+          args: [
+            `${STORYBOOK_VITEST_OWNER_ARG}${storybookVitestOwnerToken}`,
+            // CI runners give Chromium a small /dev/shm; renderer memory
+            // exhaustion there drops the page mid-shard ("Browser connection
+            // was closed"). Use /tmp-backed shared memory instead.
+            '--disable-dev-shm-usage',
+          ],
         },
       }),
       headless: true,

@@ -26,7 +26,15 @@ export const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+    const {
+      isMobile,
+      state,
+      openMobile,
+      setOpenMobile,
+      isPreview,
+      isFloating,
+      open: pinned,
+    } = useSidebar();
     // Shared rail lifecycle: certification samples data-rail-phase to prove
     // opening/closing resolve toward the latest requested state (JOV-4522).
     const railPhase = useRailMotionPhase(state === 'open');
@@ -59,6 +67,7 @@ export const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar='sidebar'
             data-mobile='true'
+            id={isMobile ? 'shell-left-rail' : undefined}
             className='w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground'
             hideClose
             style={
@@ -81,16 +90,41 @@ export const Sidebar = React.forwardRef<
             size and footer `mt-auto` has nothing to push against (JOV-3960). */}
         <div
           ref={ref}
-          className='group peer max-lg:hidden h-full min-h-0 shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:z-10'
+          style={{
+            width: pinned
+              ? 'var(--sidebar-width)'
+              : collapsible === 'icon'
+                ? 52
+                : 0,
+          }}
+          data-rail-preview-region='left'
+          data-rail-preview={isPreview || undefined}
+          data-rail-pinned={pinned}
+          className={cn(
+            'group peer relative max-lg:hidden h-full min-h-0 shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:z-10',
+            SHELL_RAIL_ALLOCATION
+          )}
+          id={!isMobile ? 'shell-left-rail' : undefined}
           data-state={state}
           data-rail-phase={railPhase}
           data-collapsible={state === 'closed' ? collapsible : ''}
           data-variant={variant}
           data-side={side}
+          aria-hidden={
+            isMobile ||
+            (state === 'closed' && collapsible === 'offcanvas') ||
+            undefined
+          }
+          inert={
+            isMobile ||
+            (state === 'closed' && collapsible === 'offcanvas') ||
+            undefined
+          }
         >
           <div
             className={cn(
-              'relative h-full w-(--sidebar-width) overflow-hidden',
+              'h-full w-(--sidebar-width) overflow-hidden',
+              isFloating ? 'absolute top-0 left-0 z-30 shadow-xl' : 'relative',
               SHELL_RAIL_ALLOCATION,
               'group-data-[collapsible=offcanvas]:w-0',
               state === 'closed' &&

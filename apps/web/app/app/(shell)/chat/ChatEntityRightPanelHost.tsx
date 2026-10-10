@@ -1134,8 +1134,7 @@ export function ChatEntityRightPanelHost({
   profileContext,
   threadTitle,
 }: Readonly<ChatEntityRightPanelHostProps>) {
-  const { open: openPreviewPanel, isOpen: isPreviewPanelOpen } =
-    usePreviewPanelState();
+  const { open: openPreviewPanel } = usePreviewPanelState();
   const { target, contextTargets, close, dismissContext } =
     useChatEntityPanel();
   // Nullable so the host also renders outside a QueryClientProvider (tests).
@@ -1198,23 +1197,22 @@ export function ChatEntityRightPanelHost({
       }
     }
 
-    // Only render the profile preview when the preview panel is actually open.
-    // A closed RightDrawer collapses to zero width *inside* a host wrapper, so
-    // keeping this mounted registers a non-null right panel and leaves a ghost
-    // reserved rail width in the app shell (gh-12134).
+    // Keep the profile drawer mounted so its initial opening and interrupted
+    // exit retain content, focus and scroll. The shared frame collapses its
+    // padding for a closed profile-only rail, eliminating ghost allocation.
     // Host class is a full-height flex column (no card chrome) so the LIVE
     // phone preview stays clipped to the rail below the shell header (JOV-3958).
-    const liveProfilePreview =
-      enablePreviewPanel && isPreviewPanelOpen ? (
-        <ErrorBoundary fallback={null}>
-          <div
-            className='system-b-chat-profile-preview-card'
-            data-testid='chat-profile-preview-rail'
-          >
-            <ProfileContactSidebar />
-          </div>
-        </ErrorBoundary>
-      ) : null;
+    const liveProfilePreview = enablePreviewPanel ? (
+      <ErrorBoundary fallback={null}>
+        <div
+          className='system-b-chat-profile-preview-card'
+          data-testid='chat-profile-preview-rail'
+          data-shell-profile-only={contextCards ? undefined : 'true'}
+        >
+          <ProfileContactSidebar />
+        </div>
+      </ErrorBoundary>
+    ) : null;
 
     if (contextCards && entityPanel) {
       return (
@@ -1284,7 +1282,6 @@ export function ChatEntityRightPanelHost({
     enableChatEntityPanels,
     enablePreviewPanel,
     handleOpenProfilePreview,
-    isPreviewPanelOpen,
     profileId,
     profileSpotifyArtistId,
     profileContext,

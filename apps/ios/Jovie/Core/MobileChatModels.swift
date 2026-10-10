@@ -224,13 +224,35 @@ enum MobileChatStorefrontFixture {
 
   static var assistantReply: String {
     """
-    Here are three designs from your tour artwork. Pick one to save it to Work.
     <tool_call><name>createMerch</name><parameters></parameters></tool_call>
     <tool_result><name>createMerch</name><state>success</state><json>\(merchOptionsJSON)</json></tool_result>
     """
   }
 
+  static let openingUserProse = "What should I sell on tour?"
+
+  static let openingReply =
+    "Tees and hoodies. I can draft them from your tour art."
+
   static let `default`: [MobileChatTimelineItem] = [
+    MobileChatTimelineItem(
+      id: "msg_storefront_opening_user",
+      role: .user,
+      content: openingUserProse,
+      status: .completed,
+      clientTurnId: "turn_storefront_opening",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
+    MobileChatTimelineItem(
+      id: "msg_storefront_opening_reply",
+      role: .assistant,
+      content: openingReply,
+      status: .completed,
+      clientTurnId: "turn_storefront_opening",
+      requiresWebHandoff: false,
+      handoffURL: nil
+    ),
     MobileChatTimelineItem(
       id: "msg_storefront_user",
       role: .user,

@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "postal-mime": "3.0.1"
+    "postal-mime": "4.0.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260929.1",

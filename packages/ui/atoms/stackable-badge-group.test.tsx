@@ -76,6 +76,25 @@ describe('StackableBadgeGroup', () => {
     expect(trigger.className).toContain('before:min-w-11');
   });
 
+  it('keeps the overflow control inside the fixed slot height', () => {
+    const { rerender } = render(
+      <StackableBadgeGroup items={ITEMS} maxVisible={2} />
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Show 2 more badges' });
+    // The Button `sm` size contract enforces `min-h-7` (28px), which would
+    // protrude past the h-5 dense slot. The group must clear the visible
+    // minimum while keeping the invisible 44px hit target.
+    expect(trigger).toHaveClass('min-h-0', 'h-5');
+    expect(trigger).not.toHaveClass('min-h-7');
+
+    rerender(
+      <StackableBadgeGroup items={ITEMS} maxVisible={2} density='standard' />
+    );
+    expect(trigger).toHaveClass('min-h-0', 'h-6');
+    expect(trigger).not.toHaveClass('min-h-7');
+  });
+
   it('does not render a disclosure when every item is visible', () => {
     render(<StackableBadgeGroup items={ITEMS} maxVisible={4} />);
     expect(

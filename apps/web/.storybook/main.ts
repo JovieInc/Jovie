@@ -185,6 +185,12 @@ const config: StorybookConfig = {
           replacement: require.resolve('./markdown-document-mock.ts'),
         },
         {
+          // lib/recent-releases reads CHANGELOG.md through node:fs for the
+          // homepage Recently Shipped section; serve fixture releases instead.
+          find: '@/lib/recent-releases',
+          replacement: require.resolve('./recent-releases-mock.ts'),
+        },
+        {
           find: '@/lib/releases/release-matrix-loader',
           replacement: require.resolve('./composer-catalog-actions-mock.ts'),
         },
@@ -199,6 +205,10 @@ const config: StorybookConfig = {
         {
           find: '@/app/app/(shell)/dashboard/releases/task-actions',
           replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
+          find: '@/lib/leads/reporting',
+          replacement: require.resolve('./leads-reporting-mock.ts'),
         },
         {
           find: '@/app/app/(shell)/dashboard/releases/actions',
@@ -410,9 +420,13 @@ const config: StorybookConfig = {
     // Re-resolve through Vite so optimizeDeps + needsInterop still apply.
     // Do NOT return bare 'react' (already-resolved) or absolute CJS paths
     // (raw /@fs without default-export interop).
+    let isProductionBuild = false;
     const rewriteNextReactPlugin = {
       name: 'jovie-storybook-rewrite-next-react',
       enforce: 'pre' as const,
+      configResolved(resolved: { command: string }) {
+        isProductionBuild = resolved.command === 'build';
+      },
       async resolveId(
         this: {
           resolve: (
@@ -460,6 +474,19 @@ const config: StorybookConfig = {
 
         if (!bare) return null;
 
+        // Production's native resolver does not carry nested skipSelf calls
+        // across plugins. Next's bare -> compiled alias and this compiled ->
+        // bare rewrite otherwise recurse indefinitely. Resolve to a terminal
+        // workspace entry; keep the existing named-client interop module.
+        // Dev still needs bare resolution for optimizeDeps CJS interop.
+        if (isProductionBuild) {
+          return {
+            id:
+              bare === 'react-dom/client'
+                ? '\0jovie-react-dom-client'
+                : require.resolve(bare),
+          };
+        }
         return this.resolve(bare, importer, { skipSelf: true });
       },
     };

@@ -89,6 +89,19 @@ jobs:
       hud-isolated-artifact-id: ${{ steps.hud-isolated-proof.outputs.artifact-id }}
       tasks-artifact-id: ${{ steps.tasks-proof.outputs.artifact-id }}
       contacts-artifact-id: ${{ steps.contacts-proof.outputs.artifact-id }}
+      root-document-artifact-id: ${{ steps.root-document-proof.outputs.artifact-id }}
+      root-layout-artifact-id: ${{ steps.root-layout-proof.outputs.artifact-id }}
+      legal-shell-artifact-id: ${{ steps.legal-shell-proof.outputs.artifact-id }}
+      legal-privacy-artifact-id: ${{ steps.legal-privacy-proof.outputs.artifact-id }}
+      legal-terms-artifact-id: ${{ steps.legal-terms-proof.outputs.artifact-id }}
+      legal-cookies-artifact-id: ${{ steps.legal-cookies-proof.outputs.artifact-id }}
+      legal-dmca-artifact-id: ${{ steps.legal-dmca-proof.outputs.artifact-id }}
+      playlists-index-artifact-id: ${{ steps.playlists-index-proof.outputs.artifact-id }}
+      brand-artifact-id: ${{ steps.brand-proof.outputs.artifact-id }}
+      report-artifact-id: ${{ steps.report-proof.outputs.artifact-id }}
+      start-artifact-id: ${{ steps.start-proof.outputs.artifact-id }}
+      marketing-solutions-artifact-id: ${{ steps.marketing-solutions-proof.outputs.artifact-id }}
+      public-profile-about-artifact-id: ${{ steps.public-profile-about-proof.outputs.artifact-id }}
       catalog-changed: ${{ steps.diff.outputs.changed }}
     defaults:
       run:
@@ -643,6 +656,259 @@ jobs:
           public-images: true
           diagnostic-paths: true
 
+      # JOV-8170: one spec captures every anonymous public inventory screen in
+      # a single run; the bind step then emits one unverified candidate proof
+      # per screen and each upload step below gives it its own trusted
+      # `screen-browser-proof-<suffix>` artifact, matching the per-screen
+      # artifact-name contract the resolver enforces.
+      - name: Capture public screens proof
+        timeout-minutes: 30
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/public-screens-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_ROOT: test-results
+
+      - name: Bind public screen proofs to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          for SCREEN in \
+            web.root-document \
+            web.root-layout \
+            web.legal-shell \
+            web.legal-privacy \
+            web.legal-terms \
+            web.legal-cookies \
+            web.legal-dmca \
+            web.playlists-index \
+            web.brand \
+            web.report \
+            web.start \
+            web.marketing-solutions \
+            web.public-profile-about; do
+            SUFFIX="${SCREEN#*.}"
+            node scripts/invariants/screen-proof-emit.mjs \
+              --screen="$SCREEN" \
+              --head-sha="$GITHUB_SHA" \
+              --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+              --bundle="apps/web/test-results/screen-browser-proof-$SUFFIX" \
+              --measurements="apps/web/test-results/screen-browser-proof-$SUFFIX-measurements.json" \
+              --out="apps/web/test-results/screen-browser-proof-$SUFFIX/screen-proof.json" \
+              --artifact-root="$GITHUB_WORKSPACE" \
+              --producer-run-id="$GITHUB_RUN_ID" \
+              --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+              --producer-job-id="$PRODUCER_JOB_ID" \
+              --environment=local-production-build
+          done
+
+      - name: Upload root-document screen proof
+        id: root-document-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-root-document
+          path: |
+            apps/web/test-results/screen-browser-proof-root-document/screen-proof.json
+            apps/web/test-results/screen-browser-proof-root-document/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-root-document/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload root-layout screen proof
+        id: root-layout-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-root-layout
+          path: |
+            apps/web/test-results/screen-browser-proof-root-layout/screen-proof.json
+            apps/web/test-results/screen-browser-proof-root-layout/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-root-layout/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload legal-shell screen proof
+        id: legal-shell-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-legal-shell
+          path: |
+            apps/web/test-results/screen-browser-proof-legal-shell/screen-proof.json
+            apps/web/test-results/screen-browser-proof-legal-shell/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-legal-shell/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload legal-privacy screen proof
+        id: legal-privacy-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-legal-privacy
+          path: |
+            apps/web/test-results/screen-browser-proof-legal-privacy/screen-proof.json
+            apps/web/test-results/screen-browser-proof-legal-privacy/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-legal-privacy/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload legal-terms screen proof
+        id: legal-terms-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-legal-terms
+          path: |
+            apps/web/test-results/screen-browser-proof-legal-terms/screen-proof.json
+            apps/web/test-results/screen-browser-proof-legal-terms/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-legal-terms/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload legal-cookies screen proof
+        id: legal-cookies-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-legal-cookies
+          path: |
+            apps/web/test-results/screen-browser-proof-legal-cookies/screen-proof.json
+            apps/web/test-results/screen-browser-proof-legal-cookies/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-legal-cookies/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload legal-dmca screen proof
+        id: legal-dmca-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-legal-dmca
+          path: |
+            apps/web/test-results/screen-browser-proof-legal-dmca/screen-proof.json
+            apps/web/test-results/screen-browser-proof-legal-dmca/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-legal-dmca/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload playlists-index screen proof
+        id: playlists-index-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-playlists-index
+          path: |
+            apps/web/test-results/screen-browser-proof-playlists-index/screen-proof.json
+            apps/web/test-results/screen-browser-proof-playlists-index/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-playlists-index/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload brand screen proof
+        id: brand-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-brand
+          path: |
+            apps/web/test-results/screen-browser-proof-brand/screen-proof.json
+            apps/web/test-results/screen-browser-proof-brand/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-brand/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload report screen proof
+        id: report-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-report
+          path: |
+            apps/web/test-results/screen-browser-proof-report/screen-proof.json
+            apps/web/test-results/screen-browser-proof-report/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-report/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload start screen proof
+        id: start-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-start
+          path: |
+            apps/web/test-results/screen-browser-proof-start/screen-proof.json
+            apps/web/test-results/screen-browser-proof-start/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-start/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload marketing-solutions screen proof
+        id: marketing-solutions-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-marketing-solutions
+          path: |
+            apps/web/test-results/screen-browser-proof-marketing-solutions/screen-proof.json
+            apps/web/test-results/screen-browser-proof-marketing-solutions/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-marketing-solutions/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload public-profile-about screen proof
+        id: public-profile-about-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-public-profile-about
+          path: |
+            apps/web/test-results/screen-browser-proof-public-profile-about/screen-proof.json
+            apps/web/test-results/screen-browser-proof-public-profile-about/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-public-profile-about/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
       # Keep this readback before catalog.spec.ts refreshes canonical screenshots.
       - name: Verify public screenshot exports from production build
         timeout-minutes: 5
@@ -724,7 +990,8 @@ jobs:
   publish:
     name: Publish Screenshot Catalog
     needs: generate
-    if: ${{ needs.generate.result == 'success' && needs.generate.outputs.catalog-changed == 'true' }}
+    # Captures from a dispatch on any other ref describe unmerged source.
+    if: ${{ github.ref == 'refs/heads/main' && needs.generate.result == 'success' && needs.generate.outputs.catalog-changed == 'true' }}
     # Publishing generated assets is deliberately non-authoritative. The
     # repository's normal commit/push gates still block unsafe publication,
     # while a publication failure cannot retroactively invalidate the trusted
@@ -879,7 +1146,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
 
@@ -929,6 +1196,30 @@ jobs:
             --artifact-id=${{ needs.generate.outputs.contacts-artifact-id }} \
             --screen-id=web.contacts \
             --receipt-out=.artifacts/screen-certification/contacts.json || STATUS=$?
+          # JOV-8170: the public-screens producer emits one artifact per screen;
+          # certify each independently so one screen's failure cannot suppress
+          # another's receipt or verdict.
+          for ENTRY in \
+            "web.root-document|${{ needs.generate.outputs.root-document-artifact-id }}" \
+            "web.root-layout|${{ needs.generate.outputs.root-layout-artifact-id }}" \
+            "web.legal-shell|${{ needs.generate.outputs.legal-shell-artifact-id }}" \
+            "web.legal-privacy|${{ needs.generate.outputs.legal-privacy-artifact-id }}" \
+            "web.legal-terms|${{ needs.generate.outputs.legal-terms-artifact-id }}" \
+            "web.legal-cookies|${{ needs.generate.outputs.legal-cookies-artifact-id }}" \
+            "web.legal-dmca|${{ needs.generate.outputs.legal-dmca-artifact-id }}" \
+            "web.playlists-index|${{ needs.generate.outputs.playlists-index-artifact-id }}" \
+            "web.brand|${{ needs.generate.outputs.brand-artifact-id }}" \
+            "web.report|${{ needs.generate.outputs.report-artifact-id }}" \
+            "web.start|${{ needs.generate.outputs.start-artifact-id }}" \
+            "web.marketing-solutions|${{ needs.generate.outputs.marketing-solutions-artifact-id }}" \
+            "web.public-profile-about|${{ needs.generate.outputs.public-profile-about-artifact-id }}"; do
+            SCREEN="${ENTRY%%|*}"
+            ARTIFACT_ID="${ENTRY##*|}"
+            node scripts/invariants/screen-certification.mjs \
+              --artifact-id="$ARTIFACT_ID" \
+              --screen-id="$SCREEN" \
+              --receipt-out=".artifacts/screen-certification/${SCREEN#*.}.json" || STATUS=$?
+          done
           exit "$STATUS"
 
       - name: Upload screen certification receipts

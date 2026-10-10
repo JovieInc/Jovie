@@ -36,6 +36,7 @@ interface DrawerSectionHeadingSlotProps {
   readonly onToggle: () => void;
   readonly contentId: string;
   readonly testId?: string;
+  readonly surface: 'plain' | 'card';
 }
 
 function DrawerSectionHeadingSlot({
@@ -45,6 +46,7 @@ function DrawerSectionHeadingSlot({
   onToggle,
   contentId,
   testId,
+  surface,
 }: DrawerSectionHeadingSlotProps) {
   if (!title) {
     return null;
@@ -57,7 +59,7 @@ function DrawerSectionHeadingSlot({
         onToggle={onToggle}
         aria-controls={contentId}
         data-testid={testId}
-        className='min-w-0 flex-1'
+        className={cn('min-w-0 flex-1', surface === 'plain' && 'px-0')}
       >
         {title}
       </CollapsibleSectionHeading>
@@ -174,6 +176,7 @@ export function DrawerSection({
       onToggle={handleToggle}
       contentId={contentId}
       testId={headingTestId}
+      surface={surface}
     />
   );
   const isContentHidden = isCollapsible && !resolvedIsOpen;

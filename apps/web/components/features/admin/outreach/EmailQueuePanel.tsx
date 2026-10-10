@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/app/outreach-admin-table-normalization.test.ts
+// @coverage-via apps/web/tests/unit/admin/email-queue-policy.test.tsx
 
 import { Button, Input, Switch } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
@@ -9,6 +9,10 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { TableEmptyState } from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTablePagination } from '@/features/admin/table/AdminTablePagination';
+import {
+  type BlockedEffectReceipt,
+  denyAudienceEffect,
+} from '@/lib/outbound/audience-effect-policy';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { OutreachStatusBadge } from './OutreachStatusBadge';
@@ -37,7 +41,10 @@ interface QueueOutreachResponse {
   queued: number;
   failed: number;
   remainingPending: number;
+  policyBlocked?: BlockedEffectReceipt;
 }
+
+const OUTREACH_POLICY = denyAudienceEffect('audience.campaign.enroll');
 
 interface QueueOutreachErrorResponse {
   error?: string;
@@ -206,6 +213,12 @@ export function EmailQueuePanel() {
 
       const data = rawData as QueueOutreachResponse;
 
+      if (data.policyBlocked) {
+        setQueueError('Audience delivery is disabled. No emails were queued.');
+        await fetchQueue();
+        return;
+      }
+
       setQueueMessage(
         `Queued ${data.queued} lead${data.queued === 1 ? '' : 's'} for outreach. ${data.remainingPending} still pending.`
       );
@@ -231,15 +244,17 @@ export function EmailQueuePanel() {
         <ContentSectionHeader
           title='Campaign emails'
           subtitle={
-            campaignsEnabled
-              ? 'Outreach emails and drip campaigns are active'
-              : 'All outreach emails and drip campaigns are paused'
+            !OUTREACH_POLICY.dispatchAllowed
+              ? 'Audience delivery is disabled. Draft review remains available.'
+              : campaignsEnabled
+                ? 'Outreach emails and drip campaigns are active'
+                : 'All outreach emails and drip campaigns are paused'
           }
           actions={
             <Switch
               checked={campaignsEnabled}
               onCheckedChange={toggleCampaignsEnabled}
-              disabled={togglingCampaigns}
+              disabled={togglingCampaigns || !OUTREACH_POLICY.dispatchAllowed}
               aria-label='Toggle Campaign Emails'
             />
           }
@@ -251,7 +266,7 @@ export function EmailQueuePanel() {
       <ContentSurfaceCard className='overflow-hidden'>
         <ContentSectionHeader
           title='Email queue'
-          subtitle='Approve leads first, then explicitly queue the next batch when you are ready to send.'
+          subtitle='Review leads and drafts here. Audience delivery is currently disabled.'
           actions={
             <div className='flex items-center gap-2'>
               <Input
@@ -260,7 +275,7 @@ export function EmailQueuePanel() {
                 max={100}
                 value={queueLimit}
                 onChange={event => setQueueLimit(event.target.value)}
-                disabled={queueing}
+                disabled={queueing || !OUTREACH_POLICY.dispatchAllowed}
                 className='h-8 w-20'
                 aria-label='Queue Outreach Count'
               />
@@ -269,7 +284,12 @@ export function EmailQueuePanel() {
                 onClick={() => {
                   queuePendingEmails();
                 }}
-                disabled={queueing || loading || pendingTotal === 0}
+                disabled={
+                  queueing ||
+                  loading ||
+                  pendingTotal === 0 ||
+                  !OUTREACH_POLICY.dispatchAllowed
+                }
               >
                 {queueing ? 'Queueing...' : 'Queue Next Batch'}
               </Button>

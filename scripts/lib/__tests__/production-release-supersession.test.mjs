@@ -16,6 +16,12 @@ import {
   STRUCTURAL_DEFAULT_CONCURRENCY,
   selectLanes,
 } from '../../ci-fast-lanes.mjs';
+import {
+  realGhVersion,
+  resolveRealGh,
+  runWithRealGh,
+  storedZip,
+} from '../real-gh-harness.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
@@ -180,6 +186,7 @@ function runScript(script, fixture, env = {}) {
       ...process.env,
       ...env,
       GITHUB_OUTPUT: fixture.output,
+      GITHUB_WORKSPACE: REPO_ROOT,
       PATH: `${fixture.bin}${delimiter}${process.env.PATH || ''}`,
       RUNNER_TEMP: fixture.root,
     },
@@ -351,6 +358,10 @@ function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
   writeFileSync(
     join(fixture.root, 'release-lineage/fleet-admission.json'),
     JSON.stringify({ scopedAdmission: { revision: EXPECTED_SHA } })
+  );
+  writeFileSync(
+    join(fixture.root, 'release-lineage/release-risk-receipt.json'),
+    '{"latency":{"mergeAt":"2026-10-03T00:00:00Z","targetP95Seconds":1800},"ovie":{},"certificationPacket":null}'
   );
   stubCommand(
     fixture.bin,
@@ -882,6 +893,379 @@ esac
     expect(diverged.stagingAlias).toBe('dpl_staging_preview');
     expect(diverged.stagingRestored).toBe(false);
     expect(diverged.outputs.promotion_sha).toBe(NEWER_SHA);
+  });
+});
+
+describe('controller exact risk artifact discovery', () => {
+  const runId = 37739744218;
+  const attempt = 2;
+  const artifactName = `ci-risk-classification-${runId}-${attempt}`;
+  const risk = {
+    schemaVersion: 1,
+    riskLevel: 'high',
+    requiresSmoke: true,
+    requiresPreview: true,
+    blocksUnattendedAutoMerge: true,
+  };
+  const run = {
+    id: runId,
+    run_attempt: attempt,
+    run_started_at: '2026-10-08T06:40:00Z',
+    path: '.github/workflows/ci.yml',
+    head_sha: EXPECTED_SHA,
+    event: 'merge_group',
+    status: 'completed',
+    conclusion: 'success',
+  };
+  const artifact = {
+    id: 44,
+    name: artifactName,
+    archive_download_url:
+      'http://github.localhost/repos/JovieInc/Jovie/actions/artifacts/44/zip',
+    expired: false,
+    workflow_run: { id: runId, head_sha: EXPECTED_SHA },
+  };
+  const unrelated = Array.from({ length: 43 }, (_, index) => ({
+    ...artifact,
+    id: index,
+    name: `unrelated-${index}`,
+  }));
+  const script = getStepRunScript(
+    getJobBlock(CONTROLLER_WORKFLOW, 'fleet-promotion'),
+    'Resolve exact CI risk lane'
+  );
+
+  function discover(
+    { runs = [run], artifacts = [...unrelated, artifact], direct = false } = {},
+    candidate = script
+  ) {
+    const fixture = makeFixture('risk-discovery-');
+    const data = join(fixture.root, 'fixture.json');
+    const calls = join(fixture.root, 'calls.jsonl');
+    writeFileSync(
+      data,
+      JSON.stringify({ runs, artifacts, risk, direct, runId, artifactName })
+    );
+    // Emulate the installed gh CLI's page boundary and incompatible flag rule.
+    // jq is the real executable; run/head/attempt filtering is the actual shell.
+    stubCommand(
+      fixture.bin,
+      'gh',
+      `#!${process.execPath}
+const fs = require('node:fs');
+const cp = require('node:child_process');
+const args = process.argv.slice(2);
+const f = JSON.parse(fs.readFileSync(process.env.RISK_FIXTURE, 'utf8'));
+fs.appendFileSync(process.env.RISK_CALLS, JSON.stringify(args) + '\\n');
+if (args.includes('--slurp') && args.includes('--jq')) process.exit(2);
+if (args[0] === 'api') {
+  const endpoint = args.find(a => a.startsWith('repos/'));
+  if (endpoint.endsWith('/artifacts')) {
+    const pages = [ { artifacts: f.artifacts.slice(0, 30) }, { artifacts: f.artifacts.slice(30) } ];
+    const result = args.includes('--paginate') ? pages : args.includes('--slurp') ? [pages[0]] : pages[0];
+    if (args.includes('--jq')) process.stdout.write(cp.execFileSync('jq', ['-r', args[args.indexOf('--jq') + 1]], { input: JSON.stringify(result), encoding: 'utf8' }));
+    else process.stdout.write(JSON.stringify(result));
+  } else {
+    const query = args[args.indexOf('--jq') + 1];
+    process.stdout.write(cp.execFileSync('jq', ['-r', query], { input: JSON.stringify({ workflow_runs: f.runs }), encoding: 'utf8' }));
+  }
+} else if (args[0] === 'run' && args[1] === 'download') {
+  const name = args[args.indexOf('--name') + 1];
+  if (!(f.direct && args[2] === '900') && !(args[2] === String(f.runId) && name === f.artifactName)) process.exit(1);
+  const root = args[args.indexOf('--dir') + 1];
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(root + '/ci-risk-classification.json', JSON.stringify(f.risk));
+} else process.exit(2);
+`
+    );
+    const result = runScript(candidate, fixture, {
+      REPO: 'JovieInc/Jovie',
+      SOURCE_RUN_ID: '900',
+      SOURCE_RUN_ATTEMPT: '1',
+      SOURCE_SHA: EXPECTED_SHA,
+      RISK_FIXTURE: data,
+      RISK_CALLS: calls,
+    });
+    return {
+      result,
+      outputs: parseOutputs(fixture.output),
+      calls: readFileSync(calls, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line)),
+      downloaded: existsSync(
+        join(fixture.root, 'ci-risk/ci-risk-classification.json')
+      )
+        ? JSON.parse(
+            readFileSync(
+              join(fixture.root, 'ci-risk/ci-risk-classification.json'),
+              'utf8'
+            )
+          )
+        : null,
+    };
+  }
+
+  const realGh = resolveRealGh();
+  if (!realGh && process.env.CI)
+    throw new Error('Risk discovery CI requires the real gh CLI.');
+
+  it.skipIf(!realGh)(
+    'follows a real gh Link header beyond the first 100 artifacts and downloads unchanged HIGH policy',
+    async () => {
+      const fixture = makeFixture('risk-real-gh-');
+      const endpoint = `repos/JovieInc/Jovie/actions/runs/${runId}/artifacts`;
+      const realUnrelated = Array.from({ length: 143 }, (_, id) => ({
+        ...artifact,
+        id,
+        name: `unrelated-${id}`,
+      }));
+      const proof = await runWithRealGh({
+        gh: realGh,
+        script,
+        env: {
+          REPO: 'JovieInc/Jovie',
+          SOURCE_RUN_ID: '900',
+          SOURCE_RUN_ATTEMPT: '1',
+          SOURCE_SHA: EXPECTED_SHA,
+          GH_REPO: 'JovieInc/Jovie',
+          RUNNER_TEMP: fixture.root,
+          GITHUB_OUTPUT: fixture.output,
+        },
+        route: path => {
+          if (
+            path.startsWith('repos/JovieInc/Jovie/actions/runs/900/artifacts')
+          )
+            return { body: { artifacts: [] } };
+          if (path.startsWith('repos/JovieInc/Jovie/actions/runs?'))
+            return { body: { workflow_runs: [run] } };
+          if (path === `${endpoint}?per_page=100`)
+            return {
+              body: {
+                total_count: 144,
+                artifacts: realUnrelated.slice(0, 100),
+              },
+              headers: {
+                link: `<http://github.localhost/${endpoint}?per_page=100&page=2>; rel="next"`,
+              },
+            };
+          if (path === `${endpoint}?per_page=100&page=2`)
+            return {
+              body: {
+                total_count: 144,
+                artifacts: [...realUnrelated.slice(100), artifact],
+              },
+            };
+          if (path === 'repos/JovieInc/Jovie/actions/artifacts/44/zip')
+            return {
+              body: storedZip({
+                'ci-risk-classification.json': JSON.stringify(risk),
+              }),
+            };
+          return null;
+        },
+      });
+      expect(realGhVersion(realGh)).toMatch(/^gh version /);
+      expect(proof.code, proof.stderr).toBe(0);
+      expect(proof.requests, JSON.stringify(proof)).toContain(
+        `GET ${endpoint}?per_page=100&page=2`
+      );
+      expect(
+        parseOutputs(fixture.output).risk_lane,
+        JSON.stringify(proof)
+      ).toBe('high');
+      expect(
+        JSON.parse(
+          readFileSync(
+            join(fixture.root, 'ci-risk/ci-risk-classification.json'),
+            'utf8'
+          )
+        )
+      ).toEqual(risk);
+    }
+  );
+
+  it.skipIf(!realGh)(
+    'proves the actual gh parser rejects slurp combined with jq before any request',
+    async () => {
+      const proof = await runWithRealGh({
+        gh: realGh,
+        script:
+          'gh api --paginate --slurp repos/JovieInc/Jovie/actions/runs/123/artifacts --jq ".artifacts"',
+        route: () => {
+          throw new Error('Unsupported flags must not reach the network');
+        },
+      });
+      expect(proof.code).not.toBe(0);
+      expect(proof.stderr).toContain('--jq');
+      expect(proof.requests).toEqual([]);
+    }
+  );
+
+  it('discovers the exact unexpired receipt beyond page one and retains HIGH-risk policy', () => {
+    const proof = discover();
+    expect(proof.result.status, proof.result.stderr).toBe(0);
+    expect(proof.outputs.risk_lane).toBe('high');
+    expect(proof.downloaded).toEqual(risk);
+    expect(proof.calls.find(args => args.includes('--slurp'))).toEqual([
+      'api',
+      '--paginate',
+      '--slurp',
+      `repos/JovieInc/Jovie/actions/runs/${runId}/artifacts`,
+    ]);
+    const firstPageOnly = discover(
+      {},
+      script.replace('gh api --paginate --slurp', 'gh api --slurp')
+    );
+    expect(firstPageOnly.result.status, firstPageOnly.result.stderr).toBe(0);
+    expect(firstPageOnly.outputs.risk_lane).toBe('unknown');
+  });
+
+  it('keeps the existing direct exact-run download', () => {
+    const proof = discover({ direct: true });
+    expect(proof.result.status, proof.result.stderr).toBe(0);
+    expect(proof.outputs.risk_lane).toBe('high');
+    expect(proof.calls).toHaveLength(1);
+    expect(proof.downloaded).toEqual(risk);
+  });
+
+  it.each([
+    ['absent', []],
+    ['expired', [{ ...artifact, expired: true }]],
+    [
+      'stale attempt',
+      [{ ...artifact, name: `ci-risk-classification-${runId}-1` }],
+    ],
+    [
+      'future attempt',
+      [{ ...artifact, name: `ci-risk-classification-${runId}-99` }],
+    ],
+    ['prefix lookalike', [{ ...artifact, name: `${artifactName}-copy` }]],
+    [
+      'wrong run',
+      [
+        {
+          ...artifact,
+          workflow_run: { ...artifact.workflow_run, id: runId + 1 },
+        },
+      ],
+    ],
+    [
+      'wrong head',
+      [
+        {
+          ...artifact,
+          workflow_run: { ...artifact.workflow_run, head_sha: NEWER_SHA },
+        },
+      ],
+    ],
+    ['missing lineage', [{ ...artifact, workflow_run: null }]],
+    ['ambiguous', [artifact, { ...artifact, id: 45 }]],
+  ])('fails closed for %s risk artifacts', (_, artifacts) => {
+    const proof = discover({ artifacts });
+    expect(proof.result.status, proof.result.stderr).toBe(0);
+    expect(proof.outputs.risk_lane).toBe('unknown');
+    expect(proof.downloaded).toBeNull();
+  });
+
+  it.each([
+    ['wrong head', { head_sha: NEWER_SHA }],
+    ['wrong workflow', { path: '.github/workflows/not-ci.yml' }],
+    ['wrong event', { event: 'push' }],
+    ['failed', { conclusion: 'failure' }],
+    ['unfinished', { status: 'in_progress' }],
+    ['invalid attempt', { run_attempt: 0 }],
+  ])('does not consume a %s proof run', (_, fields) => {
+    const proof = discover({ runs: [{ ...run, ...fields }] });
+    expect(proof.result.status, proof.result.stderr).toBe(0);
+    expect(proof.outputs.risk_lane).toBe('unknown');
+    expect(proof.downloaded).toBeNull();
+  });
+
+  it('does not prefer an old higher attempt over the current successful run', () => {
+    const proof = discover({
+      runs: [
+        {
+          ...run,
+          id: 10,
+          run_attempt: 99,
+          run_started_at: '2026-10-01T06:00:00Z',
+        },
+        run,
+      ],
+    });
+    expect(proof.result.status, proof.result.stderr).toBe(0);
+    expect(proof.outputs.risk_lane).toBe('high');
+    expect(proof.downloaded.requiresSmoke).toBe(true);
+    expect(proof.downloaded.requiresPreview).toBe(true);
+    expect(proof.downloaded.blocksUnattendedAutoMerge).toBe(true);
+  });
+});
+
+describe('controller merge-queue read resilience', () => {
+  function runCoalesce(queueFailures) {
+    const fixture = makeFixture('coalesce-');
+    const attempts = join(fixture.root, 'queue-attempts');
+    stubCommand(
+      fixture.bin,
+      'gh',
+      `#!/bin/sh
+case "$*" in
+  *graphql*)
+    n=0
+    [ -f "$STUB_QUEUE_ATTEMPTS" ] && n="$(cat "$STUB_QUEUE_ATTEMPTS")"
+    n=$((n + 1))
+    printf '%s' "$n" > "$STUB_QUEUE_ATTEMPTS"
+    if [ "$n" -le "$STUB_QUEUE_FAILURES" ]; then
+      echo "gh: API rate limit already exceeded for site ID installation." >&2
+      exit 1
+    fi
+    printf '{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[]}}}}}\\n'
+    ;;
+  *) printf '%s\\n' "$STUB_MAIN_SHA" ;;
+esac
+`
+    );
+    const script = getStepRunScript(
+      getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+      'Evaluate event-driven supersession'
+    );
+    const result = runScript(script, fixture, {
+      COALESCE_MAX_SECONDS: '150',
+      COALESCE_PER_GENERATION_SECONDS: '30',
+      EXPECTED_SHA,
+      FIXED_WINDOW_SECONDS_REPLACED: '60',
+      GH_API_RETRY_ATTEMPTS: '3',
+      GH_API_RETRY_SECONDS: '0',
+      GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+      PRODUCTION_STARVATION_SECONDS: '5400',
+      REPOSITORY: 'JovieInc/Jovie',
+      STUB_MAIN_SHA: EXPECTED_SHA,
+      STUB_QUEUE_ATTEMPTS: attempts,
+      STUB_QUEUE_FAILURES: String(queueFailures),
+    });
+    return {
+      attempts: existsSync(attempts)
+        ? Number(readFileSync(attempts, 'utf8'))
+        : 0,
+      outputs: parseOutputs(fixture.output),
+      result,
+    };
+  }
+
+  it('recovers from a transient API failure and proceeds on an empty queue', () => {
+    const run = runCoalesce(1);
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.attempts).toBe(2);
+    expect(run.outputs.is_current).toBe('true');
+    expect(run.outputs.decision).toBe('proceed');
+  });
+
+  it('still fails closed when the merge queue stays unreadable', () => {
+    const run = runCoalesce(9);
+    expect(run.result.status).toBe(1);
+    expect(run.attempts).toBe(3);
+    expect(run.result.stdout).toContain('Could not read the main merge queue');
   });
 });
 

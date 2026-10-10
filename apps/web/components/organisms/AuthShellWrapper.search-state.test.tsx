@@ -95,7 +95,7 @@ vi.mock('@/components/shell/ArtistProfileRailToggle', () => ({
   ArtistProfileRailToggle: () => null,
 }));
 vi.mock('@/components/organisms/AuthShell', () => ({ AuthShell: ShellFrame }));
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
   useChatConversationsQuery: () => ({ data: [] }),
 }));
 vi.mock('@/lib/queries/useReleasesQuery', () => ({

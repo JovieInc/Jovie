@@ -95,6 +95,29 @@ class ExecutionAttemptTest(unittest.TestCase):
         terminal = self.finish(self.ident, self.claim(now=102), "failed_known", detail, 103)
         self.assertEqual((terminal["retryDecision"], terminal["terminalState"]), ("quarantine", "quarantined"))
         self.assertEqual(len(terminal["diagnosis"]["attempts"]), 2)
+    def test_unreadable_target_keeps_attempt_spend_fence_and_repeated_failure_bounds(self):
+        detail = {"failureClass": "target_state_unavailable", "failureFingerprint": "target-read",
+                  "confidence": "unknown", "dependencies": ["codex", "github-target-state"]}
+        first = self.claim()
+        attempt.boundary(self.path, self.ident, first["fencingToken"], {"spend": 1, "mutations": 1}, 100.5, coordination=LOCAL)
+        ended = self.finish(self.ident, first, "failed_known", detail, 101)
+        self.assertEqual((ended["retryDecision"], ended["terminalState"]), ("retry", None))
+        with self.assertRaisesRegex(RuntimeError, "stale-fencing-token"):
+            attempt.boundary(self.path, self.ident, first["fencingToken"], {}, 101.5, coordination=LOCAL)
+        second = self.claim(now=102)
+        self.assertEqual(second["attempt"], 2)
+        self.assertEqual(second["remainingBudgets"]["attempts"], 0)
+        self.assertEqual(second["remainingBudgets"]["spend"], 1)
+        self.assertNotEqual(first["fencingToken"], second["fencingToken"])
+        with self.assertRaisesRegex(RuntimeError, "stale-fencing-token"):
+            attempt.boundary(self.path, self.ident, first["fencingToken"], {}, 102.5, coordination=LOCAL)
+        attempt.boundary(self.path, self.ident, second["fencingToken"], {"spend": 1, "mutations": 1}, 102.5, coordination=LOCAL)
+        terminal = self.finish(self.ident, second, "failed_known", detail, 103)
+        self.assertEqual((terminal["retryDecision"], terminal["terminalState"]), ("quarantine", "quarantined"))
+        self.assertEqual(terminal["remainingBudgets"]["spend"], 0)
+        self.assertEqual(terminal["remainingBudgets"]["mutations"], 0)
+        self.assertEqual(self.claim(now=104)["reason"], "generation_terminal")
+
     def test_deterministic_unknown_and_new_revision_fail_closed(self):
         deterministic = {"failureClass": "deterministic_code", "failureFingerprint": "assert:x", "costs": {}, "dependencies": []}
         self.assertEqual(self.finish(self.ident, self.claim(), "failed_known", deterministic, 101)["terminalState"], "failed_known")
@@ -110,6 +133,23 @@ class ExecutionAttemptTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "execution-budget-exhausted"): attempt.boundary(self.path, self.ident, fence, {"spend": .01}, 102, coordination=LOCAL)
         self.finish(self.ident, claimed, "succeeded", {"costs": {}, "dependencies": []}, 103)
         with self.assertRaisesRegex(RuntimeError, "stale-fencing-token"): attempt.boundary(self.path, self.ident, fence, {}, 104, coordination=LOCAL)
+    def test_zero_cost_policy_admits_only_zero_boundaries_and_keeps_terminal_fence(self):
+        claimed = self.claim(policy=policy(attempts=1, spend=0, mutations=0))
+        self.assertTrue(claimed["admitted"])
+        fence = claimed["fencingToken"]
+        self.assertTrue(attempt.boundary(self.path, self.ident, fence, {}, 101, coordination=LOCAL)["admitted"])
+        for cost in ({"spend": .01}, {"mutations": 1}):
+            with self.subTest(cost=cost), self.assertRaisesRegex(RuntimeError, "execution-budget-exhausted"):
+                attempt.boundary(self.path, self.ident, fence, cost, 102, coordination=LOCAL)
+        self.assertEqual(self.claim(now=103)["reason"], "duplicate_active")
+        self.finish(self.ident, claimed, "succeeded", {"costs": {}, "dependencies": []}, 104)
+        self.assertEqual(self.claim(now=105)["reason"], "generation_terminal")
+        self.assertEqual(len([r for r in attempt._rows(self.path) if r['event'] == 'attempt_started']), 1)
+    def test_fully_spent_positive_caps_still_stop_the_next_attempt(self):
+        claimed = self.claim(policy=policy(spend=1))
+        attempt.boundary(self.path, self.ident, claimed["fencingToken"], {"spend": 1}, 101, coordination=LOCAL)
+        self.finish(self.ident, claimed, "failed_known", {"failureClass": "provider_outage"}, 102)
+        self.assertEqual(self.claim(now=103, policy=policy(spend=1))["reason"], "spend_budget_exhausted")
 class GithubCoordinationBoundaryTest(unittest.TestCase):
     def setUp(self):
         self.coord = {"kind": "github-status", "repository": "Fixture/Repo", "sha": "a" * 40}

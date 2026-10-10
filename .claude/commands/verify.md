@@ -163,16 +163,20 @@ const [x, setX] = useState(0);
 if (condition) setX(1); // This causes loop!
 ```
 
-## 7. CodeRabbit AI Review
+## 7. Internal Review Evidence
 
-Run a CodeRabbit code review on your changes to catch issues that static analysis misses:
+Follow the canonical review policy in `.claude/rules/code-style.md`. Inspect the
+exact scoped diff before commit, then record the existing internal PR review's
+event-head comment/run receipt, verified reviewed-diff/head binding, and actionable
+findings' dispositions. The
+JOV-7400 workflow runs `node .github/scripts/internal-pr-review.mjs` on PR open
+or synchronize; it is advisory, not a required check.
 
-Use the `/coderabbit:review` skill to run the review. Address any findings before proceeding:
-- **Critical/High**: Must fix before completing the task
-- **Medium**: Fix if straightforward, otherwise document why not
-- **Low/Style**: Apply if they improve the code, skip if they don't
-
-If CodeRabbit flags something you've already considered, reply explaining your reasoning rather than blindly changing the code.
+Review correctness, regression coverage, and migration/security risks. Resolve
+actual actionable findings or document evidence showing why they do not apply.
+Report missing or incomplete review accurately; availability, latency, quota,
+or billing must not hold shipping. Required qualification, CI, security, and
+merge-queue gates still apply. CodeRabbit is optional supplementary evidence.
 
 ## 8. Run Affected Tests
 
@@ -235,7 +239,7 @@ Create a verification summary in your response:
 - Server/Client Boundaries: clean
 - Database Drivers: consistent
 - Hook Usage: no issues detected
-- CodeRabbit: no critical findings
+- Internal review: exact head, receipt/outcome, actionable findings resolved
 - Tests: X/X passing
 - [Other checks that passed]
 

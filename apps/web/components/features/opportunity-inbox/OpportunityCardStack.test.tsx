@@ -57,6 +57,33 @@ const YOUTUBE_THUMBNAIL_CARD = {
 };
 
 describe('OpportunityCardStack', () => {
+  it('blocks queue shortcuts and visible decisions while a revision is pending', async () => {
+    const user = userEvent.setup();
+    const onAccept = vi.fn();
+    const onReject = vi.fn();
+    const onOpen = vi.fn();
+    render(
+      <OpportunityCardStack
+        cards={CARDS}
+        pendingReviseId='card-1'
+        onAccept={onAccept}
+        onReject={onReject}
+        onOpen={onOpen}
+      />
+    );
+    const control = screen.getByRole('button', {
+      name: 'Review Current Opportunity',
+    });
+    expect(control).toBeDisabled();
+    fireEvent.keyDown(control, { key: 'ArrowRight' });
+    fireEvent.keyDown(control, { key: 'ArrowLeft' });
+    await user.click(control);
+    expect(screen.getByRole('button', { name: 'Review pitch' })).toBeDisabled();
+    expect(onAccept).not.toHaveBeenCalled();
+    expect(onReject).not.toHaveBeenCalled();
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
   it('keeps stack-level keyboard commands direct and predictable', async () => {
     const user = userEvent.setup();
     const onAccept = vi.fn();
