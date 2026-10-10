@@ -2123,7 +2123,7 @@ describe('entrypoint contract', () => {
         '# argv: api graphql -f query=<gql>  OR  api repos/... — graphql must be exactly 4 args',
         'if [ "$1" != "api" ]; then exit 1; fi',
         '  # log argv SOH-separated (one record per arg, records end with a blank line)',
-        String.raw`  for a in "$@"; do printf '%s\x01' "$a" >> "$FAKE_DIR/argv-log"; done; printf '\n' >> "$FAKE_DIR/argv-log"`,
+        String.raw`  for a in "$@"; do printf '%s\001' "$a" >> "$FAKE_DIR/argv-log"; done; printf '\n' >> "$FAKE_DIR/argv-log"`,
         '  case "$2" in',
         '    graphql)',
         '      # strict argv shape: $3 must be -f and $4 must start query= (else the call is malformed)',
@@ -2996,6 +2996,7 @@ describe('entrypoint contract', () => {
       isDraft: false,
       labels: [],
       headSha: head(i + 1),
+      mergeable: /** @type {string | null} */ (null),
     }));
     const { measureMergeability } = await import(
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
