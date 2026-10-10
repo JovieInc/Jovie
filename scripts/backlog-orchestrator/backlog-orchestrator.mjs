@@ -2049,7 +2049,6 @@ async function runRemediate(isDryRun) {
   // with retries and a hard deadline; merge-queue rows (still null after
   // retries with a gh-readonly-queue pr-<N>- ref) count as known and not
   // conflicting. The receipt carries the full evidence.
-  /** @type {Record<string, any> | null} */
   let mergeabilityEvidence = null;
   if (Array.isArray(pullRequests)) {
     mergeabilityEvidence = await measureMergeability(
@@ -2101,6 +2100,15 @@ async function runRemediate(isDryRun) {
       schema: backlogRemediation.CAPACITY_SCHEMA,
       observedAt: new Date().toISOString(),
       workers,
+      // Worker evidence provenance for the capacity line + receipt (the
+      // lanes doctor report vs the legacy 4041 feed) — a workers-saturated
+      // stop names its source and freshness.
+      workersSource: lanes
+        ? 'lanes-doctor-report'
+        : workers
+          ? 'legacy-4041'
+          : null,
+      workersObservedAt: lanes?.observedAt ?? null,
       host: backlogRemediation.readHostPressure('/proc'),
       provider: provider
         ? { accounts: provider.accounts, ready: provider.ready }
@@ -2208,14 +2216,13 @@ async function runRemediate(isDryRun) {
         .filter(row => row?.identifier)
         .map(row => [row.identifier, { openPullRequests: [] }])
     );
-    /** @type {Record<string, any>} */ (result).bridge =
-      await backlogRemediation.bridgeSelectedToLanes({
-        cohort: receipt.cohort,
-        client: linear,
-        inventory: bridgeInventory,
-        teamId: team.id,
-        env: process.env,
-      });
+    result.bridge = await backlogRemediation.bridgeSelectedToLanes({
+      cohort: receipt.cohort,
+      client: linear,
+      inventory: bridgeInventory,
+      teamId: team.id,
+      env: process.env,
+    });
     // Surface lane rejection reasons for the selected issues next to the
     // bridge receipt, so route-held:frontier / over-budget is visible without
     // host access (the lanes doctor carries observed.rejectedIssues).
@@ -2261,7 +2268,7 @@ async function runRemediate(isDryRun) {
   if (ratesSummary) {
     const mm = mergeabilityEvidence ?? {};
     console.log(
-      `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')} mm.queueSource=${mm.queueSource ?? 'none'} mm.errors=${(mm.errors ?? []).length}`
+      `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')} mm.queueSource=${mm.queueSource ?? 'none'} mm.errors=${(mm.errors ?? []).length} workers.running=${workers?.running ?? 'n/a'} workers.max=${workers?.maxConcurrent ?? 'n/a'} workers.source=${lanes ? 'lanes-doctor-report' : workers ? 'legacy-4041' : 'none'} workers.observedAt=${lanes?.observedAt ?? 'n/a'}`
     );
   }
 }
