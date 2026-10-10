@@ -431,13 +431,13 @@ describe('fleet gate receipt source order (JOV-8000 follow-up 33)', () => {
           },
           { now }
         );
-        assert.equal(gate.promotionMode, 'hold-intake');
         const health =
           gate.promotionMode === admitter.FLEET_PROMOTION_MODE.BLOCKED
             ? 'blocked'
             : gate.state === admitter.FLEET_GATE_STATE.GREEN
               ? 'healthy'
               : 'degraded';
+        assert.equal(gate.promotionMode, 'hold-intake');
         assert.equal(health, 'degraded');
         const capacity = evaluateRuntimeCapacity(
           {
