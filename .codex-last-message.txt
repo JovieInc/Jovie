@@ -1,0 +1,8 @@
+NOT-SHIPPABLE: clean `origin/main` reproduces both bundle-budget failures:
+
+- People: **1056 KB / 1055 KB**
+- HUD: **993 KB / 992 KB**
+
+No source fixes or push. Local merge `7b6977eecc` is preserved. The affected gate was stopped after confirming the main-side blocker.
+
+Tracked by [JOV-7850](https://linear.app/jovie/issue/JOV-7850). GBrain write/readback verified: `operations/pr-20921-main-bundle-budget-blocker-2026-10-07`.
