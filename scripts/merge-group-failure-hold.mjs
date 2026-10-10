@@ -385,7 +385,26 @@ function parseTrustedAdmissionRecoveryStatus(status, repository) {
   };
 }
 
-/** Recovery never replaces a source failure or revives cleared merge intent. */
+/** A trusted hold-removal event restores only its exact current source intent. */
+export function ownerHoldReleaseIntent({ eventName, event } = {}) {
+  const pr = event?.pull_request;
+  const releasedAt = Date.parse(pr?.updated_at);
+  if (
+    eventName !== 'pull_request_target' ||
+    event?.action !== 'unlabeled' ||
+    event?.label?.name !== 'hold' ||
+    pr?.state !== 'open' ||
+    pr?.draft !== false ||
+    !Number.isSafeInteger(pr?.number) ||
+    pr.number <= 0 ||
+    !/^[0-9a-f]{40}$/.test(pr?.head?.sha ?? '') ||
+    !Number.isFinite(releasedAt)
+  )
+    return null;
+  return { prNumber: pr.number, headSha: pr.head.sha, releasedAt };
+}
+
+/** Recovery never replaces a source failure; owner hold release is not a CI retry. */
 export function reenrollmentDisposition({
   failure,
   statuses,
@@ -394,6 +413,9 @@ export function reenrollmentDisposition({
   lastRemoval,
   headCommittedAt,
   autoMergeEnabled,
+  headSha,
+  lastRemovalReason,
+  ownerHoldRelease,
 }) {
   const removedAt = Date.parse(lastRemoval);
   const committedAt = Date.parse(headCommittedAt);
@@ -404,6 +426,24 @@ export function reenrollmentDisposition({
   )
     return failure;
   const blocked = reason => ({ ...failure, action: 'block', reason });
+  if (
+    Number.isFinite(removedAt) &&
+    Number.isFinite(committedAt) &&
+    lastRemovalReason === 'manual' &&
+    ownerHoldRelease &&
+    failure.reason === 'no-revision-failure' &&
+    Array.isArray(failure.failures) &&
+    failure.failures.length === 0 &&
+    ownerHoldRelease?.prNumber === prNumber &&
+    /^[0-9a-f]{40}$/.test(headSha ?? '') &&
+    ownerHoldRelease.headSha === headSha &&
+    Number.isFinite(ownerHoldRelease.releasedAt) &&
+    ownerHoldRelease.releasedAt >= removedAt &&
+    !statuses
+      .map(status => parseTrustedRetryStatus(status, repository))
+      .find(Boolean)
+  )
+    return { ...failure, reason: 'owner-hold-release', removalAt: removedAt };
   if (!autoMergeEnabled || !Number.isFinite(removedAt))
     return blocked('removed-without-recovery-intent');
   const recoveries = statuses

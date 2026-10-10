@@ -25,7 +25,9 @@ import {
   classifyMergeGroupFailure,
   enqueueWasRejected,
   FAILURE_HOLD_CONTEXT,
+  FAILURE_RETRY_CONTEXT,
   failureReceiptStatus,
+  ownerHoldReleaseIntent,
   parseMergeQueueBranch,
   reenrollmentDisposition,
   retryReleasedDescription,
@@ -45,6 +47,216 @@ const classify = (conclusion, failedSteps = []) =>
   classifyMergeGroupFailure({ conclusion, failedSteps });
 const disposition = statuses =>
   revisionFailureDisposition({ repository: REPOSITORY, statuses });
+
+it('restores only a current exact-head owner hold release, never an unchanged CI retry', () => {
+  const event = {
+    action: 'unlabeled',
+    label: { name: 'hold' },
+    pull_request: {
+      number: 20977,
+      state: 'open',
+      draft: false,
+      head: { sha: SOURCE },
+      updated_at: '2026-10-08T05:05:12Z',
+    },
+  };
+  const intent = ownerHoldReleaseIntent({
+    eventName: 'pull_request_target',
+    event,
+  });
+  const input = {
+    failure: { action: 'allow', reason: 'no-revision-failure', failures: [] },
+    statuses: [],
+    repository: REPOSITORY,
+    prNumber: 20977,
+    headSha: SOURCE,
+    lastRemoval: '2026-10-08T04:06:26Z',
+    lastRemovalReason: 'manual',
+    headCommittedAt: '2026-10-08T03:47:30Z',
+    autoMergeEnabled: false,
+    ownerHoldRelease: intent,
+  };
+  expect(reenrollmentDisposition(input)).toMatchObject({
+    action: 'allow',
+    reason: 'owner-hold-release',
+  });
+  for (const change of [
+    { ownerHoldRelease: null },
+    { headSha: NEW_SOURCE },
+    { headSha: 'bad' },
+    { prNumber: 42 },
+    { lastRemovalReason: 'ci_failure' },
+    { lastRemovalReason: undefined },
+    { lastRemoval: 'bad' },
+    { headCommittedAt: undefined },
+    { lastRemoval: '2026-10-08T05:06:00Z' },
+    { failure: { action: 'allow', reason: 'base-moved', failures: [123] } },
+    {
+      statuses: [
+        {
+          context: FAILURE_RETRY_CONTEXT,
+          state: 'success',
+          creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+          description: 'spent:run=123;try=1',
+          target_url: RUN_URL,
+        },
+      ],
+    },
+  ])
+    expect(reenrollmentDisposition({ ...input, ...change }).action).toBe(
+      'block'
+    );
+  for (const failure of [
+    { action: 'block', reason: 'source-failure' },
+    { action: 'retry-once', reason: 'existing-recovery' },
+  ])
+    expect(reenrollmentDisposition({ ...input, failure })).toBe(failure);
+  for (const change of [
+    { eventName: 'workflow_run' },
+    { event: { ...event, action: 'labeled' } },
+    { event: { ...event, label: { name: 'queue-poison' } } },
+    {
+      event: { ...event, pull_request: { ...event.pull_request, draft: true } },
+    },
+    {
+      event: {
+        ...event,
+        pull_request: { ...event.pull_request, updated_at: 'bad' },
+      },
+    },
+    {
+      event: {
+        ...event,
+        pull_request: { ...event.pull_request, head: { sha: 'bad' } },
+      },
+    },
+  ])
+    expect(
+      ownerHoldReleaseIntent({
+        eventName: 'pull_request_target',
+        event,
+        ...change,
+      })
+    ).toBeNull();
+});
+
+it('executes the maintained owner-release fence against late failure and removal races', async () => {
+  const workflow = readFileSync(
+    resolve(
+      import.meta.dirname,
+      '../../../.github/workflows/merge-queue-green-enroll.yml'
+    ),
+    'utf8'
+  );
+  const body = workflow.match(
+    /const ownerReleaseStillCurrent = async \(\) => \{([\s\S]*?)\n              \};/
+  )?.[1];
+  expect(body).toBeTruthy();
+  const { revisionFailureDisposition, reenrollmentDisposition } = await import(
+    '../../merge-group-failure-hold.mjs'
+  );
+  const removedAt = '2026-10-08T04:06:26Z';
+  const pr = {
+    id: 'PR_20977',
+    number: 20977,
+    headRefOid: SOURCE,
+    commits: { nodes: [{ commit: { committedDate: '2026-10-08T03:47:30Z' } }] },
+    timelineItems: { nodes: [{ createdAt: removedAt, reason: 'manual' }] },
+  };
+  const release = {
+    prNumber: 20977,
+    headSha: SOURCE,
+    releasedAt: Date.parse('2026-10-08T05:05:12Z'),
+  };
+  const failure = {
+    reason: 'owner-hold-release',
+    removalAt: Date.parse(removedAt),
+  };
+  const evaluate = new Function(
+    'readCurrent',
+    'eligible',
+    'github',
+    'failurePolicy',
+    'owner',
+    'repo',
+    'currentMainSha',
+    'ownerHoldRelease',
+    'pr',
+    'failure',
+    `return (async () => {${body}})()`
+  );
+  const check = async (fresh = pr, statuses = [], afterStatuses) => {
+    let current = fresh;
+    const paginate = vi.fn(async () => {
+      if (afterStatuses !== undefined) current = afterStatuses;
+      return statuses;
+    });
+    const value = await evaluate(
+      async () => current,
+      candidate => candidate?.headRefOid === SOURCE && !candidate.held,
+      { paginate, rest: { repos: { listCommitStatusesForRef: 'statuses' } } },
+      { revisionFailureDisposition, reenrollmentDisposition },
+      'JovieInc',
+      'Jovie',
+      BASE,
+      release,
+      pr,
+      failure
+    );
+    return { value, paginate };
+  };
+  expect((await check()).value).toBe(true);
+  for (const fresh of [
+    null,
+    { ...pr, headRefOid: NEW_SOURCE },
+    { ...pr, held: true },
+    { ...pr, id: 'other' },
+    {
+      ...pr,
+      timelineItems: {
+        nodes: [{ createdAt: '2026-10-08T05:06:00Z', reason: 'manual' }],
+      },
+    },
+    {
+      ...pr,
+      timelineItems: {
+        nodes: [{ createdAt: removedAt, reason: 'ci_failure' }],
+      },
+    },
+  ])
+    expect((await check(fresh)).value).toBe(false);
+  const lateHold = {
+    context: FAILURE_HOLD_CONTEXT,
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    description: 'class=deterministic-source;n=1;run=123;try=1',
+    target_url: RUN_URL,
+  };
+  expect((await check(pr, [lateHold])).value).toBe(false);
+  for (const raced of [
+    { ...pr, held: true },
+    { ...pr, headRefOid: NEW_SOURCE },
+    {
+      ...pr,
+      timelineItems: {
+        nodes: [{ createdAt: '2026-10-08T05:06:00Z', reason: 'manual' }],
+      },
+    },
+    {
+      ...pr,
+      timelineItems: {
+        nodes: [{ createdAt: removedAt, reason: 'ci_failure' }],
+      },
+    },
+  ])
+    expect((await check(pr, [], raced)).value).toBe(false);
+  expect((await check({ ...pr, held: true })).paginate).not.toHaveBeenCalled();
+  expect(
+    workflow.indexOf(
+      "if (failure.reason === 'owner-hold-release' && !await ownerReleaseStillCurrent()) continue;"
+    )
+  ).toBeLessThan(workflow.indexOf('enqueueAttempted = true;'));
+});
 it('scopes admission recovery receipts to the exact repository, PR and source revision', () => {
   const receipt = {
     schema: ADMISSION_RECOVERY_SCHEMA,

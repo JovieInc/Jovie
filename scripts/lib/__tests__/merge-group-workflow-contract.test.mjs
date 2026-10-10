@@ -4463,7 +4463,7 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     expect(ENROLL).toContain("failure.action === 'block'");
     expect(ENROLL).toContain("failure.action === 'retry-once'");
     expect(ENROLL).toContain(
-      "if (removedUnchangedHead && failure.action !== 'retry-once') continue;"
+      "if (removedUnchangedHead && failure.action !== 'retry-once' && failure.reason !== 'owner-hold-release') continue;"
     );
     for (const runtimePath of [
       'scripts/merge-group-failure-hold.mjs',

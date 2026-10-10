@@ -238,7 +238,7 @@ jobs:
                       labels(first: 100) { pageInfo { hasNextPage } nodes { name } }
                       commits(last: 1) { nodes { commit { committedDate } } }
                       timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
-                        nodes { ... on RemovedFromMergeQueueEvent { createdAt } }
+                        nodes { ... on RemovedFromMergeQueueEvent { createdAt reason } }
                       }
                     }
                   }
@@ -283,19 +283,45 @@ jobs:
               // consume the one typed non-deterministic retry.
               const lastRemoval = pr.timelineItems.nodes[0]?.createdAt;
               const headCommittedAt = pr.commits.nodes[0]?.commit.committedDate;
+              const ownerHoldRelease = failurePolicy.ownerHoldReleaseIntent({
+                eventName: context.eventName, event: context.payload,
+              });
               failure = failurePolicy.reenrollmentDisposition({
                 failure, statuses, repository: `${owner}/${repo}`, prNumber: pr.number, lastRemoval, headCommittedAt,
                 autoMergeEnabled: Number.isFinite(Date.parse(pr.autoMergeRequest?.enabledAt)),
+                headSha: pr.headRefOid, lastRemovalReason: pr.timelineItems.nodes[0]?.reason,
+                ownerHoldRelease,
               });
               if (failure.action === 'block') continue;
               const removedUnchangedHead = lastRemoval &&
                 (!headCommittedAt || headCommittedAt <= lastRemoval);
-              if (removedUnchangedHead && failure.action !== 'retry-once') continue;
+              if (removedUnchangedHead && failure.action !== 'retry-once' && failure.reason !== 'owner-hold-release') continue;
               if (process.env.DRY_RUN === 'true') {
                 core.notice(`[dry run] would enqueue #${pr.number}`);
                 continue;
               }
               const admissionRecovery = failure.reason === 'bounded-admission-recovery';
+              const ownerReleaseStillCurrent = async () => {
+                const observed = await readCurrent();
+                if (!eligible(observed) || observed.id !== pr.id) return false;
+                const freshStatuses = await github.paginate(github.rest.repos.listCommitStatusesForRef,
+                  { owner, repo, ref: observed.headRefOid, per_page: 100 });
+                // Fence mutations during status pagination before expected-head enqueue.
+                const fresh = await readCurrent();
+                if (!eligible(fresh) || fresh.id !== pr.id || fresh.number !== pr.number ||
+                    fresh.headRefOid !== observed.headRefOid) return false;
+                const disposition = failurePolicy.reenrollmentDisposition({
+                  failure: failurePolicy.revisionFailureDisposition({ statuses: freshStatuses,
+                    repository: `${owner}/${repo}`, currentMainSha }),
+                  statuses: freshStatuses, repository: `${owner}/${repo}`, prNumber: fresh.number,
+                  lastRemoval: fresh.timelineItems.nodes[0]?.createdAt,
+                  headCommittedAt: fresh.commits.nodes[0]?.commit.committedDate,
+                  autoMergeEnabled: Number.isFinite(Date.parse(fresh.autoMergeRequest?.enabledAt)),
+                  headSha: fresh.headRefOid, lastRemovalReason: fresh.timelineItems.nodes[0]?.reason,
+                  ownerHoldRelease,
+                });
+                return disposition.reason === 'owner-hold-release' && disposition.removalAt === failure.removalAt;
+              };
               const recoveryStillCurrent = async () => {
                 const fresh = await readCurrent();
                 if (!eligible(fresh) || fresh.id !== pr.id || fresh.number !== pr.number) return false;
@@ -328,6 +354,7 @@ jobs:
                 // The reservation write is another await. A stale recovery keeps
                 // that reservation spent and never reaches enqueue or a refund.
                 if (admissionRecovery && !await recoveryStillCurrent()) continue;
+                if (failure.reason === 'owner-hold-release' && !await ownerReleaseStillCurrent()) continue;
                 enqueueAttempted = true;
                 const r = await github.graphql(`
                   mutation($id: ID!, $oid: GitObjectID!) {
