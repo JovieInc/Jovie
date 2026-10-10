@@ -975,6 +975,19 @@ export function buildRemediationReceipt({
     observedAt: now,
     inventory,
     capacity,
+    // Surface the measured worker evidence on the receipt so a
+    // workers-saturated stop names its source (the lanes doctor report vs the
+    // legacy 4041 feed) and freshness, not just the aggregate.
+    workers: {
+      running: Number.isInteger(capacitySignals?.workers?.running)
+        ? capacitySignals.workers.running
+        : null,
+      maxConcurrent: Number.isInteger(capacitySignals?.workers?.maxConcurrent)
+        ? capacitySignals.workers.maxConcurrent
+        : null,
+      source: capacitySignals?.workersSource ?? null,
+      observedAt: capacitySignals?.workersObservedAt ?? null,
+    },
     cohort: {
       selected: cohort.selected.map(item => ({
         identifier: item.identifier,
