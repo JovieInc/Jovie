@@ -5,6 +5,7 @@ import { MarketingContainer, MarketingHeroPhoto } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+import './ai-page.css';
 
 export const revalidate = false;
 
@@ -38,7 +39,7 @@ export default function AiPage() {
             </p>
             <h1
               data-wrap='editorial-title'
-              className='text-4xl font-semibold leading-tight tracking-tight sm:text-5xl'
+              className='ai-hero-title text-4xl font-semibold leading-tight tracking-tight sm:text-5xl'
             >
               {/* ui-casing-allow: marketing display headline */}
               The AI operating system behind every Jovie profile
