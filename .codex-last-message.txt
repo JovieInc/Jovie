@@ -1,0 +1,20 @@
+Implemented and opened draft PR [#20930](https://github.com/JovieInc/Jovie/pull/20930) at commit `75d129bd10`.
+
+- Quarantined the outdated guide as `stale`.
+- Cleared its verification date, human-verifier claim, and visual proof references.
+- Added `searchable: false`, removing it from navigation, search, sitemap, related guides, `llms.txt`, and the docs index.
+- Verified `/support` on the exact PR head; the current labels and UI differ from the old certified proof.
+
+Changed file: [page.mdx](/home/timwhite/.local/state/jovie-lanes/worktrees/20261007T183706Z-JOV-6844-codex-f3cc16/apps/docs/app/docs/manage-jovie/contact-support/contact-support-or-report-incorrect-data/page.mdx:10)
+
+Verification passed:
+
+- Metadata validator and 75 docs tests
+- Production docs build: 66 routes, 31 Pagefind pages
+- Both affected-article simulations
+- Exact-head `/support` Playwright route proof
+- Design conformance, invariants, copy gate, and diff checks
+
+GitHub coverage, security, size, parity, and policy checks are green. Source Validation and Migration Guard remain actively pending without failures. The PR remains draft as required.
+
+The Linear connector requires reauthentication, so JOV-6844 could not be explicitly transitioned to In Review from this session.
