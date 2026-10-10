@@ -1114,6 +1114,55 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
   });
 });
 
+describe('capacity workers observability (JOV-8000 follow-up 40)', () => {
+  it('carries measured worker running/max/source/observedAt onto the receipt', () => {
+    const built = buildRemediationReceipt({
+      issues: [],
+      pullRequests: [],
+      mainSha: MAIN,
+      capacitySignals: healthySignals({
+        workers: { running: 2, retrying: 0, maxConcurrent: 4 },
+        workersSource: 'lanes-doctor-report',
+        workersObservedAt: '2026-10-10T15:00:00.000Z',
+      }),
+      previousCleanStreak: CLEAN_STREAK_REQUIRED,
+      now: NOW,
+    });
+    assert.deepEqual(built.workers, {
+      running: 2,
+      maxConcurrent: 4,
+      source: 'lanes-doctor-report',
+      observedAt: '2026-10-10T15:00:00.000Z',
+    });
+  });
+
+  it('a fresh doctor report with running==maxConcurrent still yields workers-saturated and the counts on the line', () => {
+    const gate = evaluateRuntimeCapacity(
+      healthySignals({
+        workers: { running: 4, retrying: 0, maxConcurrent: 4 },
+        workersSource: 'lanes-doctor-report',
+        workersObservedAt: NOW,
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(gate.allowed, false);
+    assert.equal(gate.reason, 'workers-saturated');
+    assert.equal(gate.remaining, 0);
+  });
+
+  it('a stale/absent workers signal fails closed as capacity-evidence missing (workers)', () => {
+    const missing = evaluateRuntimeCapacity(
+      { schema: CAPACITY_SCHEMA, observedAt: NOW },
+      { now: NOW }
+    );
+    assert.match(
+      missing.reason,
+      /capacity-evidence-missing-malformed-or-stale/
+    );
+    assert.ok(missing.gaps.includes('workers'));
+  });
+});
+
 describe('selected-to-lanes bridge (JOV-8000 follow-up 38)', () => {
   const AGENT_READY = { id: 'label-agent-ready', name: 'agent-ready' };
   const TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
