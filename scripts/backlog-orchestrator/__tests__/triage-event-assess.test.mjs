@@ -7,6 +7,7 @@ import {
   escalationBlockOf,
   parseTriageEvent,
   assessTriageSweep as sweepWithRealClient,
+  triageSweepThrottle,
 } from '../triage-event-assess.mjs';
 
 /** Partial clients are deliberate test doubles; production uses the full Linear module.
@@ -525,6 +526,40 @@ test('does not mutate an issue that left Triage before the job ran', async () =>
   assert.equal(receipt.disposition, 'stale-event');
   assert.equal(receipt.wakeSymphony, false);
   assert.equal(writes, 0);
+});
+
+test('triageSweepThrottle skips only a fresh successful sweep and fails open', () => {
+  const nowMs = Date.parse('2026-10-10T17:00:00.000Z');
+  // a successful sweep 45 minutes ago -> run again
+  assert.deepEqual(
+    triageSweepThrottle({ lastOkAt: '2026-10-10T16:15:00.000Z', nowMs }),
+    { skip: false, reason: 'interval-elapsed' }
+  );
+  // a successful sweep 10 minutes ago -> skip
+  const skipped = triageSweepThrottle({
+    lastOkAt: '2026-10-10T16:50:00.000Z',
+    nowMs,
+  });
+  assert.equal(skipped.skip, true);
+  assert.match(skipped.reason, /^swept-10m-ago$/);
+  // exactly at the 30-minute floor -> run (not < the floor)
+  assert.equal(
+    triageSweepThrottle({ lastOkAt: '2026-10-10T16:30:00.000Z', nowMs }).skip,
+    false
+  );
+  // missing / unparseable / future timestamps never skip (fail open)
+  assert.deepEqual(triageSweepThrottle({ lastOkAt: undefined, nowMs }), {
+    skip: false,
+    reason: 'no-prior-ok',
+  });
+  assert.deepEqual(triageSweepThrottle({ lastOkAt: 'garbage', nowMs }), {
+    skip: false,
+    reason: 'no-prior-ok',
+  });
+  assert.deepEqual(
+    triageSweepThrottle({ lastOkAt: '2026-10-10T18:00:00.000Z', nowMs }),
+    { skip: false, reason: 'clock-skew' }
+  );
 });
 
 test('records an urgent unowned assessment without waking Symphony', async () => {
