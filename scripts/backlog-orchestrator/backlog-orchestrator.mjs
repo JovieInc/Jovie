@@ -1795,8 +1795,9 @@ export async function measureMergeability(
     await Promise.all(batch.map(row => measureRow(row)));
   }
 
-  // Merge-queue awareness: only rows STILL unknown after the retries —
-  // stale queue refs exist, so a queue ref alone never marks a row.
+  // Merge-queue awareness: only rows STILL unknown after the retries,
+  // and only queue refs that name the row's current head sha — leaked
+  // stale refs (~70 on main) never mark a row.
   const stillNull = population.filter(
     row =>
       String(row?.mergeable ?? '').toUpperCase() === 'UNKNOWN' ||
@@ -1812,20 +1813,34 @@ export async function measureMergeability(
         env
       );
       const refs = /** @type {Record<string, any>[]} */ (JSON.parse(refsBody));
-      const queuePrNumbers = new Set(
-        (Array.isArray(refs) ? refs : [])
-          .map(ref => /pr-([0-9]+)-/.exec(String(ref?.ref ?? '')))
-          .filter(Boolean)
-          .map(match => Number(/** @type {RegExpExecArray} */ (match)[1]))
-          .filter(number => Number.isInteger(number))
-      );
+      // JOV-8000 follow-up 35: leaked queue refs never get deleted
+      // (~70 stale `gh-readonly-queue/main/pr-<N>-<sha>` refs observed),
+      // so a bare pr-<N> name match can mark an old open PR as in-queue
+      // and hide a real conflict. A queue ref is live evidence only when
+      // it names the row's CURRENT head sha (the ref embeds the head at
+      // enqueue time) — a head that moved since enqueue is stale, and a
+      // row whose head was never measured cannot bind.
+      const queueHeadsByPr = new Map();
+      for (const ref of Array.isArray(refs) ? refs : []) {
+        const match = /pr-([0-9]+)-([0-9a-f]{40})/.exec(String(ref?.ref ?? ''));
+        if (!match) continue;
+        const number = Number(match[1]);
+        const heads = queueHeadsByPr.get(number) || new Set();
+        heads.add(match[2]);
+        queueHeadsByPr.set(number, heads);
+      }
       for (const row of stillNull) {
-        if (queuePrNumbers.has(Number(row?.number))) {
-          // In the merge queue: mergeable stays uncomputed by design —
-          // known and not conflicting, staying in the denominator. A
-          // stale 'UNKNOWN' mergeStateStatus from the retried GETs is
-          // replaced too: the queue's synthetic merge group is the
-          // authority, not the lazily-computed per-PR state.
+        const queuedHeads = queueHeadsByPr.get(Number(row?.number));
+        if (
+          queuedHeads &&
+          typeof row?.headSha === 'string' &&
+          queuedHeads.has(row.headSha)
+        ) {
+          // In the merge queue at the current head: mergeable stays
+          // uncomputed by design — known and not conflicting, staying in
+          // the denominator. A stale 'UNKNOWN' mergeStateStatus from the
+          // retried GETs is replaced too: the queue's synthetic merge
+          // group is the authority, not the lazily-computed per-PR state.
           row.mergeable = 'MERGEABLE';
           row.mergeStateStatus = 'HAS_HOOKS';
           row.inMergeQueue = true;
