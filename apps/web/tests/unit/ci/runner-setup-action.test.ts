@@ -329,12 +329,18 @@ describe('self-hosted runner setup action', () => {
       expect(kept(dir, file), dir).toBe(true);
   });
 
-  it('skips non-bundled onnxruntime downloads in both install phases', () => {
+  it('skips non-bundled onnxruntime downloads in every install phase', () => {
+    // The merge-group consumer reinstalls from the frozen lockfile when its
+    // prepared workspace was evicted from the Actions cache, so it skips too.
     expect(
       actionSteps
         .filter(step => step.env?.ONNXRUNTIME_NODE_INSTALL === 'skip')
         .map(step => step.name)
-    ).toEqual(['Warm pnpm store', 'Install dependencies']);
+    ).toEqual([
+      'Warm pnpm store',
+      'Install dependencies',
+      'Require prepared merge-group workspace',
+    ]);
   });
 
   it('disables package cache teardown only for the exact Mac product lane', () => {
@@ -1311,8 +1317,9 @@ describe('baked runner prerequisite contract', () => {
     expect(playwrightAction).toContain(
       'node .github/runner-image/verify-prerequisites.mjs --component playwright'
     );
+    // Version resolve, cache restore and browser download all skip on a warm image.
     expect(playwrightAction.match(/playwright_warm != 'true'/g)).toHaveLength(
-      2
+      3
     );
     expect(playwrightAction).toContain('PLAYWRIGHT_BROWSERS_PATH=');
   });
