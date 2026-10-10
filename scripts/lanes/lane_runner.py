@@ -2939,6 +2939,11 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
     for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
         if pr.get("isInMergeQueue") is True:
             continue  # Native landing owns this head; cached absence still needs a fresh claim read.
+        if (pr.get("headRefName") or "").startswith("dependabot/"):
+            # Dependabot Auto-Merge owns version bumps (recreate on conflict, ignore on a real
+            # regression). ~100 fix runs went to dependabot branches in the week to 2026-10-10
+            # and none of them could change what a bump breaks.
+            continue
         # A held PR is Tim's/Summer's call: fixing it re-arms auto-merge and re-enqueues it
         # (#17541, 2026-09-28). The event path already skips holds via pr_events.in_scope.
         if pr_events.preservation_reason(pr, attempts.get(str(pr["number"]), {}), MAX_FIX_ATTEMPTS,
@@ -3911,16 +3916,26 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
 
 
-REPAIR_TARGET_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
-isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}
+REPAIR_AUTHORITY_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
+isCrossRepository isInMergeQueue labels(first:100){pageInfo{hasNextPage} nodes{name}}"""
+REPAIR_CENSUS_FIELDS = """totalCount checkRunCount statusContextCount
+checkRunCountsByState{count state} statusContextCountsByState{count state}"""
+REPAIR_TARGET_FIELDS = REPAIR_AUTHORITY_FIELDS + """
 commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$cursor){
-totalCount checkRunCount statusContextCount checkRunCountsByState{count state} statusContextCountsByState{count state}
+""" + REPAIR_CENSUS_FIELDS + """
 pageInfo{hasNextPage endCursor} nodes{__typename
 ... on CheckRun{id name status conclusion detailsUrl startedAt completedAt}
 ... on StatusContext{id context state targetUrl}}}}}}}"""
 REPAIR_CHECK_PAGES = 6  # At most 600 contexts; incomplete authority still refuses repair.
 REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){"
                        "pullRequest(number:$number){" + REPAIR_TARGET_FIELDS + "}}}")
+REPAIR_CENSUS_QUERY = ("query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){"
+                       "pullRequest(number:$number){" + REPAIR_AUTHORITY_FIELDS +
+                       " commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){" +
+                       REPAIR_CENSUS_FIELDS + "}}}}}}}}")
+REPAIR_NEGATIVE_RUN_STATES = {"SUCCESS", "CANCELLED", "NEUTRAL", "SKIPPED", "STALE", "ACTION_REQUIRED"}
+REPAIR_RUN_STATES = REPAIR_NEGATIVE_RUN_STATES | RED | {"COMPLETED", "IN_PROGRESS", "PENDING", "QUEUED", "WAITING"}
+REPAIR_STATUS_STATES = {"SUCCESS", "ERROR", "FAILURE", "EXPECTED", "PENDING"}
 
 
 def repair_checks_census(contexts: dict) -> tuple:
@@ -3946,6 +3961,104 @@ def repair_checks_census(contexts: dict) -> tuple:
     return (*counts, *states)
 
 
+
+def repair_negative_census_snapshot(pr: dict, live: dict) -> tuple:
+    """Strict negative predicate evidence; never a detailed PR or execution authority."""
+    fields = ("number", "state", "headRefOid", "headRefName", "isInMergeQueue", "isCrossRepository",
+              "isDraft", "mergeStateStatus", "reviewDecision", "title", "body", "url", "updatedAt", "labels")
+    authority = {key: live[key] for key in fields}
+    if (type(live["number"]) is not int or live["number"] != pr["number"] or live["state"] != "OPEN"
+            or not isinstance(live["headRefOid"], str) or not re.fullmatch(r"[0-9a-f]{40}", live["headRefOid"])
+            or any(live[key] != pr[key] for key in ("headRefOid", "headRefName"))
+            or any(not isinstance(live[key], str) or not live[key].strip()
+                   for key in ("headRefName", "mergeStateStatus", "updatedAt"))
+            or any(type(live[key]) is not bool or live[key]
+                   for key in ("isInMergeQueue", "isCrossRepository", "isDraft"))
+            or live["reviewDecision"] not in (None, "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED")
+            or any(not isinstance(live[key], str) for key in ("title", "body"))
+            or live["url"] != f"https://github.com/{REPO_SLUG}/pull/{pr['number']}"):
+        raise ValueError("negative-census-authority-invalid")
+    labels = live["labels"]
+    names = [row["name"] for row in labels["nodes"]]
+    if (labels["pageInfo"]["hasNextPage"] is not False or len(names) > 100
+            or any(not isinstance(name, str) or not name.strip() for name in names)
+            or len(set(names)) != len(names)):
+        raise ValueError("negative-census-labels-incomplete")
+    commits = live["commits"]["nodes"]
+    if not isinstance(commits, list) or len(commits) != 1 or commits[0]["commit"]["oid"] != live["headRefOid"]:
+        raise ValueError("negative-census-commit-mismatch")
+    contexts = commits[0]["commit"]["statusCheckRollup"]["contexts"]
+    census = repair_checks_census(contexts)
+    for key, allowed in (("checkRunCountsByState", REPAIR_RUN_STATES),
+                         ("statusContextCountsByState", REPAIR_STATUS_STATES)):
+        if any(row["state"] not in allowed for row in contexts[key]):
+            raise ValueError("negative-census-state-unknown")
+    if (any(state not in REPAIR_NEGATIVE_RUN_STATES for state in census[3])
+            or any(state in {"EXPECTED", "PENDING"} for state in census[4])):
+        raise ValueError("negative-census-predicate-unproved")
+    authority["dependencyMetadataDigest"] = dependency_diff.metadata_digest(live)
+    return authority, census
+
+
+def repair_overflow_diagnostic(pr: dict, live: dict, contexts: dict, started: float) -> dict | None:
+    """One no-node recheck of a consistent prefix; stdout, claims and detail authority stay untouched."""
+    authority, census = repair_negative_census_snapshot(pr, live)
+    info, rows = contexts["pageInfo"], contexts["nodes"]
+    if (info.get("hasNextPage") is not True or not isinstance(info.get("endCursor"), str)
+            or not info["endCursor"].strip() or not isinstance(rows, list) or len(rows) != 100):
+        return None
+    seen, groups = set(), ({}, {})
+    for row in rows:
+        key, kind = row["id"], row["__typename"]
+        if not isinstance(key, str) or not key.strip() or key in seen:
+            return None
+        seen.add(key)
+        if kind == "CheckRun":
+            if (row["status"] != "COMPLETED" or row["conclusion"] not in REPAIR_NEGATIVE_RUN_STATES
+                    or not isinstance(row["name"], str) or not row["name"].strip()):
+                return None
+            index, state = 0, row["conclusion"]
+        elif kind == "StatusContext":
+            if (row["state"] not in REPAIR_STATUS_STATES - {"EXPECTED", "PENDING"}
+                    or not isinstance(row["context"], str) or not row["context"].strip()):
+                return None
+            index, state = 1, row["state"]
+        else:
+            return None
+        groups[index][state] = groups[index].get(state, 0) + 1
+    if any(sum(group.values()) > census[index + 1] or any(
+            count > census[index + 3].get(state, 0) for state, count in group.items())
+            for index, group in enumerate(groups)):
+        return None
+    before = time.monotonic()
+    if (any(type(clock) not in (int, float) or not math.isfinite(clock) or clock < 0
+            for clock in (started, before)) or not 0 <= before - started <= 30):
+        return None
+    owner, name = REPO_SLUG.split("/")
+    viewed = sh(["gh", "api", "graphql", "-f", f"query={REPAIR_CENSUS_QUERY}",
+                 "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={pr['number']}"], timeout=30)
+    data = json.loads(viewed.stdout) if viewed.returncode == 0 else None
+    if not isinstance(data, dict) or data.get("errors"):
+        return None
+    current = data["data"]["repository"]["pullRequest"]
+    if isinstance(current, dict) and current.get("state") in {"MERGED", "CLOSED"}:
+        return repair_target_node(pr, current)
+    final = time.monotonic()
+    if (type(final) not in (int, float) or not math.isfinite(final)
+            or not 0 <= final - before or not 0 <= final - started <= 30
+            or repair_negative_census_snapshot(pr, current) != (authority, census)):
+        return None
+    print(json.dumps({"schema": "jovie.repair-check-overflow-negative/v1", "predicateComplete": True,
+        "contextsComplete": False, "repairAuthorized": False, "number": pr["number"],
+        "headSha": live["headRefOid"], "branch": live["headRefName"], "observedAt": now_iso(),
+        "totalCount": census[0], "sampleCount": len(rows),
+        "authorityDigest": hashlib.sha256(json.dumps(authority, sort_keys=True).encode()).hexdigest(),
+        "census": {"totalCount": census[0], "checkRunCount": census[1], "statusContextCount": census[2],
+                   "checkRunCountsByState": census[3], "statusContextCountsByState": census[4]}}),
+        file=sys.stderr, flush=True)
+    return None
+
+
 def reconcile_fix_target(pr: dict) -> dict | None:
     """Bounded fresh pages bind complete checks to one unchanged ownership/head snapshot."""
     try:
@@ -3953,6 +4066,7 @@ def reconcile_fix_target(pr: dict) -> dict | None:
         number = pr["number"]
         if type(number) is not int or number <= 0:
             return None
+        started = time.monotonic()
         cursor, cursors, seen, checks, anchor, census = None, set(), set(), [], None, None
         for page in range(REPAIR_CHECK_PAGES):
             args = ["gh", "api", "graphql", "-f", f"query={REPAIR_TARGET_QUERY}",
@@ -3988,6 +4102,9 @@ def reconcile_fix_target(pr: dict) -> dict | None:
             if anchor is not None and ownership != anchor:
                 return None  # Never splice checks across a head, queue, review or hold transition.
             anchor = ownership
+            # A truncated/false page flag must not hide an over-budget global census.
+            if page == 0 and type(contexts.get("totalCount")) is int and contexts["totalCount"] > 100 * REPAIR_CHECK_PAGES:
+                return repair_overflow_diagnostic(pr, live, contexts, started)
             if page or info["hasNextPage"]:
                 current_census = repair_checks_census(contexts)
                 if current_census[0] > 100 * REPAIR_CHECK_PAGES or (census is not None and current_census != census):
@@ -5738,6 +5855,62 @@ def selftest_env(scratch: Path) -> dict:
     return {**env, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
 
 
+# The installed packages mesh-runtime-bundle.mjs compiles against (exact pins checked there).
+MESH_DEPENDENCY_PINS = ("apps/desktop/node_modules/esbuild/package.json",
+                        "packages/agent-transport-contracts/node_modules/zod/package.json")
+
+
+def mesh_dependency_root(host: Host) -> Path | None:
+    """The host repo when it is installed; otherwise the newest ready worktree-pool slot that
+    is. The Mac lanes repo is a bare source checkout with no node_modules, so every release
+    since 2026-10-09 was refused ("mesh runtime dependency closure failed") and no lane fix
+    reached that host. Pool slots are installed from origin/main, the same lock the staging
+    bundle carries."""
+    def installed(root: Path) -> bool:
+        return all((root / pin).is_file() for pin in MESH_DEPENDENCY_PINS)
+    if installed(host.repo):
+        return host.repo
+    try:
+        slots = worktree_pool.ready_slots(worktree_pool.pool_dir(host.repo))
+    except (OSError, subprocess.CalledProcessError):
+        slots = []
+    return next((slot for slot in slots if installed(slot)), None)
+
+
+def prove_staging(host: Host, staging: Path) -> str | None:
+    """Compile the mesh runtime and run the release self-test inside a staged tree. Returns the
+    refusal reason, or None when the tree may be activated. Writes only under `staging`."""
+    # The self-test must never touch this host's live state: point it at a scratch dir.
+    scratch = staging / ".selftest-state"
+    scratch.mkdir(exist_ok=True)
+    # Raw ports import workspace TypeScript/Zod. Compile from the immutable
+    # archive with the host repo's existing identical pins before activation;
+    # no dependency installation or running-worker mutation is permitted.
+    dependency_root = mesh_dependency_root(host) or host.repo
+    try:
+        runtime = lifecycle.run(["node", str(staging / "scripts/lanes/mesh-runtime-bundle.mjs"),
+                                 str(staging.resolve()), str(dependency_root.resolve())],
+                                cwd=staging, capture_output=True, text=True, timeout=60,
+                                env=worktree_pool.node_env(staging))
+    except subprocess.TimeoutExpired:
+        return "mesh runtime closure timeout"
+    if runtime.returncode != 0:
+        print(runtime.stderr[-2000:], file=sys.stderr)
+        return "mesh runtime dependency closure failed"
+    # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
+    # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
+    try:
+        test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+                              cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
+                              env=selftest_env(scratch))
+    except subprocess.TimeoutExpired:
+        return f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s"
+    if test.returncode != 0:
+        print(test.stderr[-2000:], file=sys.stderr)
+        return "release tests failed"
+    return None
+
+
 def install_release(host: Host) -> int:
     if sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo).returncode:
         raise RuntimeError("release-source-fetch-failed")
@@ -5760,38 +5933,32 @@ def install_release(host: Host) -> int:
         archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
         lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
-        # The self-test must never touch this host's live state: point it at a scratch dir.
-        scratch = staging / ".selftest-state"
-        scratch.mkdir(exist_ok=True)
-        # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
-        # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
         def refuse(why: str) -> int:
             refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
             return 1
-        # Raw ports import workspace TypeScript/Zod. Compile from the immutable
-        # archive with the host repo's existing identical pins before activation;
-        # no dependency installation or running-worker mutation is permitted.
+        # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
+        # refused every release for a day because the *installed* installer chose a bare
+        # dependency root; the fix was on main but could never run. An older staged tree
+        # without the subcommand is proven by this copy, as before.
         try:
-            runtime = lifecycle.run(["node", str(staging / "scripts/lanes/mesh-runtime-bundle.mjs"),
-                                     str(staging.resolve()), str(host.repo.resolve())],
-                                    cwd=staging, capture_output=True, text=True, timeout=60,
-                                    env=worktree_pool.node_env(staging))
-        except subprocess.TimeoutExpired:
-            refuse("mesh runtime closure timeout")
-            raise
-        if runtime.returncode != 0:
-            print("lane update refused: mesh runtime dependency closure unavailable", file=sys.stderr)
-            return refuse("mesh runtime dependency closure failed")
-        try:
-            test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
-                                  cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
-                                  env=selftest_env(scratch))
+            proof = lifecycle.run([sys.executable, str(staging / "scripts/lanes/lane_runner.py"),
+                                   "prove-staging", str(staging)],
+                                  cwd=staging, capture_output=True, text=True,
+                                  timeout=60 + UPDATE_TEST_TIMEOUT_S,
+                                  # The staged installer must see this host, not the process defaults.
+                                  env={**os.environ, "LANES_STATE": str(host.state), "LANES_REPO": str(host.repo)})
         except subprocess.TimeoutExpired:
             refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
             raise
-        if test.returncode != 0:
-            print(f"lane update refused: release tests failed\n{test.stderr[-2000:]}", file=sys.stderr)
-            return refuse("release tests failed")
+        if proof.returncode == 2 and "invalid choice" in proof.stderr:
+            why = prove_staging(host, staging)
+        else:
+            why = None if proof.returncode == 0 else (proof.stdout.strip().splitlines() or ["staging proof failed"])[-1]
+            if why and proof.stderr:
+                print(proof.stderr[-2000:], file=sys.stderr)
+        if why:
+            print(f"lane update refused: {why}", file=sys.stderr)
+            return refuse(why)
         (staging / "scripts/lanes/.tree").write_text(bundle["objects"]["scripts/lanes"])
         (staging / "scripts/lanes/.bundle").write_text(tree)
         (staging / "scripts/lanes/.release.json").write_text(json.dumps(bundle, sort_keys=True))
@@ -5861,6 +6028,8 @@ def guarded_main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
     sub.add_parser("update")
+    prove = sub.add_parser("prove-staging", help="prove a staged release tree with this tree's own installer")
+    prove.add_argument("staging")
     gate = sub.add_parser("gate-command", help="run one gate command while retaining inherited locks")
     gate.add_argument("--timeout", type=float, required=True)
     gate.add_argument("--result-fd", type=int)
@@ -5930,6 +6099,12 @@ def guarded_main(argv: list[str] | None = None) -> int:
     host = Host()
     if args.command == "update":
         return update(host)
+    if args.command == "prove-staging":
+        why = prove_staging(host, Path(args.staging))
+        if why:
+            print(why)
+            return 1
+        return 0
     if args.command == "worker":
         return worker(host, args.provider)
     return dispatch(host)

@@ -1683,22 +1683,24 @@ async function readOfficialSymphonyWorkers(maxConcurrent) {
  * request that triggers GitHub's mergeable computation — mapping
  * mergeable true/false/null to MERGEABLE/CONFLICTING/UNKNOWN and
  * mergeable_state (uppercased) to mergeStateStatus, refreshing
- * headSha. Rows still null get up to 3 re-GETs (2s/4s/8s backoff);
- * the whole phase has a 20s hard deadline (the remediate step's 90s
- * budget already spends ~60s). Fallback: a null-mergeable row with a
- * known mergeable_state is measured — dirty means conflicting; clean,
- * unstable, blocked, behind or has_hooks mean known and not
- * conflicting. Merge-queue awareness: one call to
- * `repos/.../git/matching-refs/heads/gh-readonly-queue/main/` — a row
- * still null with a `pr-<N>-` queue ref is in the merge queue: known
- * and not conflicting, staying in the denominator (stale queue refs
- * exist, so this applies only to still-null rows; a failed refs call
- * leaves the row unknown). Leftovers stay unknown and nothing throws
- * — the gate fails closed on the unknown share.
+ * headSha. The merge queue is read ONCE up front (GraphQL
+ * mergeQueue(branch:"main") entries, head-bound to the row's headSha;
+ * the leaked gh-readonly-queue refs survive only as a head-bound
+ * fallback) — an in-queue row is known and not conflicting with no
+ * per-PR retries. The remaining rows poll in ROUNDS: round 0 sends one
+ * GET per PR through a 4-wide pool, then later rounds re-poll only the
+ * still-null rows after 2s, 4s and 8s; a failed GET is retried in the
+ * next round. The whole phase has a 20s hard deadline (the remediate
+ * step's 90s budget already spends ~60s). Fallback: a null-mergeable
+ * row with a known mergeable_state is measured — dirty means
+ * conflicting; clean, unstable, blocked, behind or has_hooks mean
+ * known and not conflicting. Leftovers stay unknown and nothing throws
+ * — the gate fails closed on the unknown share. The receipt carries
+ * deadlineHit/elapsedMs/unpolled so a starved phase is auditable.
  * @param {Record<string, any>[]} pullRequests
  * @param {NodeJS.ProcessEnv} env
  * @param {{ sleep?: (ms: number) => Promise<void>, now?: () => number }} [timing]
- * @returns {Promise<{measured: number, polls: number, inMergeQueue: number[], stillUnknown: number[], errors: string[]}>}
+ * @returns {Promise<{measured: number, polls: number, inMergeQueue: number[], stillUnknown: number[], unpolled: number[], deadlineHit: boolean, elapsedMs: number, errors: string[]}>}
  */
 export async function measureMergeability(
   pullRequests,
@@ -1712,15 +1714,101 @@ export async function measureMergeability(
     timing.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
   const now = timing.now ?? (() => Date.now());
   const population = pullRequests.filter(isRatePopulationRow);
+  const startMs = now();
   const backoffMs = [2000, 4000, 8000];
-  const deadline = now() + 20_000;
+  const deadline = startMs + 20_000;
   const evidence = {
     measured: 0,
     polls: 0,
     inMergeQueue: [],
     stillUnknown: [],
+    unpolled: [],
+    deadlineHit: false,
+    elapsedMs: 0,
     errors: [],
   };
+
+  /** @param {Record<string, any>} row */
+  const rowIsUnknown = row =>
+    String(row?.mergeable ?? '').toUpperCase() === 'UNKNOWN' ||
+    String(row?.mergeable ?? '') === '' ||
+    row?.mergeable === undefined ||
+    String(row?.mergeStateStatus ?? '').toUpperCase() === 'UNKNOWN' ||
+    row?.mergeStateStatus === undefined;
+
+  /** Mark a row as in-queue (the head binding is the caller's job). */
+  const markInQueue = row => {
+    // In the merge queue: mergeable stays uncomputed by design — known
+    // and not conflicting, staying in the denominator. The queue's
+    // synthetic merge group is the authority, not the lazily-computed
+    // per-PR state.
+    row.mergeable = 'MERGEABLE';
+    row.mergeStateStatus = 'HAS_HOOKS';
+    row.inMergeQueue = true;
+    evidence.inMergeQueue.push(Number(row?.number));
+  };
+
+  // (A) Merge-queue awareness FIRST, before any per-PR retry: an entry
+  // whose headRefOid matches the row's headSha is in-queue — known and
+  // not conflicting, no retries spent. GraphQL is authoritative; the
+  // leaked gh-readonly-queue refs survive only as a head-bound fallback
+  // (a GraphQL failure leaves behavior otherwise unchanged).
+  const queueHeadsByPr = new Map();
+  try {
+    const graphqlBody = await execGhApi(
+      'graphql -f query={repository(owner:"JovieInc",name:"Jovie"){mergeQueue(branch:"main"){entries(first:100){nodes{pullRequest{number headRefOid}}}}}}',
+      env
+    );
+    const parsed = JSON.parse(graphqlBody);
+    // A non-GraphQL response (an old gh, a proxy error page, a bare "[]")
+    // never stands in for the queue read — force the refs fallback.
+    const nodes = parsed?.data?.repository?.mergeQueue?.entries?.nodes;
+    if (!Array.isArray(nodes)) {
+      throw new Error('mergeability-graphql:unexpected-response');
+    }
+    for (const node of nodes) {
+      const number = Number(node?.pullRequest?.number);
+      const head = String(node?.pullRequest?.headRefOid ?? '');
+      if (!Number.isInteger(number) || !/^[0-9a-f]{40}$/.test(head)) continue;
+      const heads = queueHeadsByPr.get(number) || new Set();
+      heads.add(head);
+      queueHeadsByPr.set(number, heads);
+    }
+  } catch {
+    // GraphQL unavailable/failed — fall through to the refs fallback.
+    try {
+      const refsBody = await execGhApi(
+        'repos/JovieInc/Jovie/git/matching-refs/heads/gh-readonly-queue/main/',
+        env
+      );
+      const refs = /** @type {Record<string, any>[]} */ (JSON.parse(refsBody));
+      // JOV-8000 follow-up 35: leaked queue refs never get deleted (~70
+      // stale refs), so a bare pr-<N> name match can mark an old open PR
+      // as in-queue and hide a real conflict. A queue ref is live evidence
+      // only when it names the row's CURRENT head sha (the ref embeds the
+      // head at enqueue time).
+      for (const ref of Array.isArray(refs) ? refs : []) {
+        const match = /pr-([0-9]+)-([0-9a-f]{40})/.exec(String(ref?.ref ?? ''));
+        if (!match) continue;
+        const number = Number(match[1]);
+        const heads = queueHeadsByPr.get(number) || new Set();
+        heads.add(match[2]);
+        queueHeadsByPr.set(number, heads);
+      }
+    } catch {
+      // A failed refs call leaves the rows unknown — fail closed.
+    }
+  }
+  for (const row of population) {
+    const queuedHeads = queueHeadsByPr.get(Number(row?.number));
+    if (
+      queuedHeads &&
+      typeof row?.headSha === 'string' &&
+      queuedHeads.has(row.headSha)
+    ) {
+      markInQueue(row);
+    }
+  }
 
   /**
    * Apply a per-PR GET result to a row; returns true when the row is
@@ -1759,90 +1847,74 @@ export async function measureMergeability(
     return true;
   };
 
-  /** @param {Record<string, any>} row */
-  const measureRow = async row => {
-    const maxGetAttempts = 1 + backoffMs.length;
-    for (let attempt = 0; attempt < maxGetAttempts; attempt += 1) {
-      if (now() > deadline) return;
-      if (attempt > 0) {
-        const wait = backoffMs[attempt - 1];
-        if (now() + wait > deadline) return;
-        await sleep(wait);
-        if (now() > deadline) return;
-      }
-      try {
-        const body = await execGhApi(
-          `repos/JovieInc/Jovie/pulls/${row.number}`,
-          env
+  // (B)+(C) Poll in rounds: round 0 sends one GET per row through a
+  // 4-wide pool; later rounds re-poll only the still-unknown rows after
+  // the 2s/4s/8s backoff. A failed GET no longer gives up — the row
+  // rejoins the next round (evidence.errors keeps the named cause).
+  const pending = population.filter(row => rowIsUnknown(row));
+  const getOnce = async row => {
+    if (now() > deadline) return;
+    try {
+      const body = await execGhApi(
+        `repos/JovieInc/Jovie/pulls/${row.number}`,
+        env
+      );
+      evidence.polls += 1;
+      const detail = /** @type {Record<string, any>} */ (JSON.parse(body));
+      applyDetail(row, detail);
+    } catch (error) {
+      if (evidence.errors.length < 5) {
+        evidence.errors.push(
+          `pulls/${row.number}:${describeExecFailure(error, 'api')}`
         );
-        evidence.polls += 1;
-        const detail = /** @type {Record<string, any>} */ (JSON.parse(body));
-        if (applyDetail(row, detail)) return;
-      } catch (error) {
-        if (evidence.errors.length < 5) {
-          evidence.errors.push(
-            `pulls/${row.number}:${describeExecFailure(error, 'api')}`
-          );
-        }
-        return;
       }
     }
   };
-
-  for (let i = 0; i < population.length; i += 4) {
-    if (now() > deadline) break;
-    const batch = population.slice(i, i + 4);
-    await Promise.all(batch.map(row => measureRow(row)));
-  }
-
-  // Merge-queue awareness: only rows STILL unknown after the retries —
-  // stale queue refs exist, so a queue ref alone never marks a row.
-  const stillNull = population.filter(
-    row =>
-      String(row?.mergeable ?? '').toUpperCase() === 'UNKNOWN' ||
-      String(row?.mergeable ?? '') === '' ||
-      row?.mergeable === undefined ||
-      String(row?.mergeStateStatus ?? '').toUpperCase() === 'UNKNOWN' ||
-      row?.mergeStateStatus === undefined
-  );
-  if (stillNull.length > 0) {
-    try {
-      const refsBody = await execGhApi(
-        'repos/JovieInc/Jovie/git/matching-refs/heads/gh-readonly-queue/main/',
-        env
-      );
-      const refs = /** @type {Record<string, any>[]} */ (JSON.parse(refsBody));
-      const queuePrNumbers = new Set(
-        (Array.isArray(refs) ? refs : [])
-          .map(ref => /pr-([0-9]+)-/.exec(String(ref?.ref ?? '')))
-          .filter(Boolean)
-          .map(match => Number(/** @type {RegExpExecArray} */ (match)[1]))
-          .filter(number => Number.isInteger(number))
-      );
-      for (const row of stillNull) {
-        if (queuePrNumbers.has(Number(row?.number))) {
-          // In the merge queue: mergeable stays uncomputed by design —
-          // known and not conflicting, staying in the denominator. A
-          // stale 'UNKNOWN' mergeStateStatus from the retried GETs is
-          // replaced too: the queue's synthetic merge group is the
-          // authority, not the lazily-computed per-PR state.
-          row.mergeable = 'MERGEABLE';
-          row.mergeStateStatus = 'HAS_HOOKS';
-          row.inMergeQueue = true;
-          evidence.inMergeQueue.push(Number(row?.number));
-        }
+  for (
+    let round = 0;
+    round <= backoffMs.length && pending.length > 0;
+    round += 1
+  ) {
+    if (now() > deadline) {
+      evidence.deadlineHit = true;
+      break;
+    }
+    if (round > 0) {
+      const wait = backoffMs[round - 1];
+      if (now() + wait > deadline) {
+        evidence.deadlineHit = true;
+        break;
       }
-    } catch {
-      // A failed refs call leaves the rows unknown — fail closed.
+      await sleep(wait);
+      if (now() > deadline) {
+        evidence.deadlineHit = true;
+        break;
+      }
+    }
+    const roundRows = pending.splice(0, pending.length);
+    for (let i = 0; i < roundRows.length; i += 4) {
+      if (now() > deadline) {
+        evidence.deadlineHit = true;
+        // Rows not reached this round rejoin pending so unpolled is exact.
+        pending.push(...roundRows.slice(i));
+        break;
+      }
+      const batch = roundRows.slice(i, i + 4);
+      await Promise.all(batch.map(row => getOnce(row)));
+    }
+    for (const row of roundRows) {
+      if (rowIsUnknown(row) && !pending.includes(row)) pending.push(row);
     }
   }
-
-  evidence.measured = population.filter(
-    row => !backlogRemediation.mergeabilityUnknown(row ?? {})
-  ).length;
-  evidence.stillUnknown = population
-    .filter(row => backlogRemediation.mergeabilityUnknown(row ?? {}))
+  evidence.unpolled = pending
+    .filter(row => rowIsUnknown(row))
     .map(row => row?.number);
+
+  evidence.measured = population.filter(row => !rowIsUnknown(row)).length;
+  evidence.stillUnknown = population
+    .filter(row => rowIsUnknown(row))
+    .map(row => row?.number);
+  evidence.elapsedMs = Math.max(0, now() - startMs);
   return evidence;
 }
 
@@ -2067,6 +2139,11 @@ async function runRemediate(isDryRun) {
         },
     feed: receipt.feed,
     workpadUpsert: null,
+    // JOV-8000 follow-up 36: the mergeability evidence also rides the
+    // printed result top-level (it already sits inside
+    // capacitySignals.mergeabilityEvidence) so the deadline/starvation
+    // fields are one property away from the receipt reader.
+    mergeabilityEvidence,
   };
   if (!isDryRun) {
     result.workpadUpsert = await backlogRemediation.upsertRemediationWorkpad({
@@ -2105,8 +2182,9 @@ async function runRemediate(isDryRun) {
     ? backlogRemediation.pullRequestRates(pullRequests)
     : null;
   if (ratesSummary) {
+    const mm = /** @type {Record<string, any>} */ (mergeabilityEvidence ?? {});
     console.log(
-      `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'}`
+      `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')}`
     );
   }
 }
