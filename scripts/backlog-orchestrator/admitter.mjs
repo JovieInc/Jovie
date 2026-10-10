@@ -884,6 +884,105 @@ export function evaluateFleetGate(
   };
 }
 
+/**
+ * Project the persisted canonical fleet-gate receipt (gem-priority-gate.py's
+ * own evaluation, atomically written and readback-verified) into the gate
+ * shape callers consume.
+ *
+ * JOV-8000 follow-up 32: the JS re-derivation of promotion semantics from
+ * receipt signals is a SECOND implementation of the canonical writer's
+ * policy, and every divergence between them binds merge-queue-blocked while
+ * the printed receipt says hold-intake — four split-brains in 48h (fu29
+ * controller mapping, fu30 production re-fetch, fu31 lane-capacity reasons,
+ * and the 38031492172 residual). The persisted receipt IS the authority:
+ * adopt its typed promotionMode/state/workAdmission verbatim when the receipt
+ * is fresh (same controller window the re-derivation enforced) and carries
+ * the required typed fields; return null otherwise so callers fall back to
+ * re-derivation, which fails closed on stale or malformed evidence.
+ */
+export function projectPersistedFleetGate(
+  receipt,
+  {
+    now = new Date().toISOString(),
+    maxAgeMs = CONTROLLER_RECEIPT_MAX_AGE_MS,
+  } = {}
+) {
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(nowMs)) return null;
+  if (receipt?.schema !== FLEET_GATE_SCHEMA) return null;
+  if (!isFreshTimestamp(receipt?.observedAt, nowMs, maxAgeMs)) return null;
+  const state = receipt?.state;
+  if (!Object.values(FLEET_GATE_STATE).includes(state)) return null;
+  const promotionMode = receipt?.promotionMode;
+  if (!Object.values(FLEET_PROMOTION_MODE).includes(promotionMode)) return null;
+  const reasons = receipt?.reasons;
+  if (
+    !Array.isArray(reasons) ||
+    !reasons.every(
+      reason =>
+        reason &&
+        typeof reason === 'object' &&
+        typeof reason.code === 'string' &&
+        typeof reason.severity === 'string'
+    )
+  )
+    return null;
+  const workAdmission = receipt?.workAdmission;
+  if (
+    !workAdmission ||
+    typeof workAdmission.allowed !== 'boolean' ||
+    !Array.isArray(workAdmission.activities)
+  )
+    return null;
+  const concurrency = receipt?.concurrency?.gem;
+  if (!concurrency || !Number.isInteger(concurrency.maxConcurrent)) return null;
+  const queue = receipt?.signals?.queue;
+  const greenReadyPrs = queue?.greenReadyPrs ?? queue?.eligiblePrs;
+  const queueTarget = queue?.target;
+  const queueShapeValid =
+    queue?.status === 'known' &&
+    Number.isInteger(greenReadyPrs) &&
+    greenReadyPrs >= 0 &&
+    Number.isInteger(queueTarget) &&
+    queueTarget > 0;
+  // Lane-capacity scoping is admission evidence, not a promotion verdict —
+  // project it with the same consistency rules the re-derivation applies so
+  // admissionPreflight's lane check keeps its fail-closed semantics.
+  const scopedLaneCapacity = queueShapeValid
+    ? scopedLaneCapacityForQueue(queue, greenReadyPrs, queueTarget)
+    : null;
+  const laneCapacityReason = queueShapeValid
+    ? laneCapacityReasonForQueue(queue, greenReadyPrs, queueTarget)
+    : null;
+  return {
+    schema: FLEET_GATE_SCHEMA,
+    observedAt: receipt.observedAt,
+    evaluatedAt: receipt.observedAt,
+    projectedFromPersistedReceipt: true,
+    state,
+    promotionMode,
+    alreadyAdmittedCohort:
+      receipt.alreadyAdmittedCohort ??
+      alreadyAdmittedCohortSemantics(promotionMode),
+    reasons,
+    reviewAdmission: receipt.reviewAdmission ?? null,
+    closureAdmission: receipt.closureAdmission ?? null,
+    workAdmission: {
+      allowed: workAdmission.allowed,
+      activities: workAdmission.activities,
+      newIssueLeaseAllowed: workAdmission.newIssueLeaseAllowed === true,
+      newImplementationAllowed: workAdmission.newImplementationAllowed === true,
+    },
+    promotionAdmission: receipt.promotionAdmission ?? null,
+    isolatedPromotionAdmission: receipt.isolatedPromotionAdmission ?? null,
+    controllerRepairAdmission: receipt.controllerRepairAdmission ?? null,
+    ownership: receipt.ownership ?? null,
+    concurrency: receipt.concurrency,
+    laneCapacity: scopedLaneCapacity,
+    laneCapacityError: laneCapacityReason ? laneCapacityReason.detail : null,
+  };
+}
+
 const PLAN_LABELS = new Set(['plan-approved', 'approved-plan']);
 const ADMISSION_LABELS = new Set([
   'admission-approved',
