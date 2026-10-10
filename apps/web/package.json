@@ -265,7 +265,7 @@
     "@statsig/statsig-node-core": "^0.23.1",
     "@tanstack/react-pacer": "^0.24.1",
     "@tanstack/react-query": "^5.104.1",
-    "@tanstack/react-table": "^9.2.6",
+    "@tanstack/react-table": "^9.2.8",
     "@tanstack/react-virtual": "^3.14.13",
     "@tiptap/core": "3.31.4",
     "@tiptap/extension-placeholder": "3.31.4",
