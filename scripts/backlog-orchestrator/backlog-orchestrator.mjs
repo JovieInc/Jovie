@@ -2183,6 +2183,7 @@ async function runRemediate(isDryRun) {
         },
     feed: receipt.feed,
     workpadUpsert: null,
+    bridge: null,
     // JOV-8000 follow-up 36: the mergeability evidence also rides the
     // printed result top-level (it already sits inside
     // capacitySignals.mergeabilityEvidence) so the deadline/starvation
@@ -2196,6 +2197,24 @@ async function runRemediate(isDryRun) {
         TEAM_FILE_CONFIG.remediation?.workpadIssue ||
         backlogRemediation.DEFAULT_WORKPAD_ISSUE,
       receipt,
+    });
+    // Selected-to-lanes bridge (Symphony Owner, 2026-10-10): convert each
+    // selected issue into a leasable one (add the shared agent-ready label +
+    // a one-time bridge marker) so a lane's claim-scan picks it up. Runs only
+    // in the mutating path, after the workpad upsert; the kill-switch env
+    // JOVIE_BRIDGE_LANES=0|false|off disables it. Linear-budget friendly: one
+    // fetch + at most one write per selected issue.
+    const bridgeInventory = Object.fromEntries(
+      (receipt.matrix ?? [])
+        .filter(row => row?.identifier)
+        .map(row => [row.identifier, { openPullRequests: [] }])
+    );
+    result.bridge = await backlogRemediation.bridgeSelectedToLanes({
+      cohort: receipt.cohort,
+      client: linear,
+      inventory: bridgeInventory,
+      teamId: team.id,
+      env: process.env,
     });
     if (receipt.cohort.selected.length > 0) {
       // JOV-8000: the lanes pick up admitted work on their own event-driven

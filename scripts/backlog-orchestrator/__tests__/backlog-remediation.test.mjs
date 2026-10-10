@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 
 import {
   assertOfficialSymphonyFeed,
+  bridgeSelectedIssueToLanes,
+  bridgeSelectedToLanes,
   buildRemediationReceipt,
   CAPACITY_MAX_AGE_MS,
   CAPACITY_SCHEMA,
@@ -1084,5 +1086,253 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
       retrying: 0,
       maxConcurrent: 3,
     });
+  });
+});
+
+describe('selected-to-lanes bridge (JOV-8000 follow-up 38)', () => {
+  const AGENT_READY = { id: 'label-agent-ready', name: 'agent-ready' };
+  const TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
+
+  function selectedIssue(overrides = {}) {
+    return {
+      id: 'id-JOV-100',
+      identifier: 'JOV-100',
+      title: 'Repair one controller edge',
+      description: SAFE_DESCRIPTION,
+      createdAt: '2026-08-20T00:00:00.000Z',
+      updatedAt: '2026-08-30T00:00:00.000Z',
+      priority: 3,
+      state: { name: 'Todo' },
+      assignee: null,
+      labels: { nodes: [{ id: 'label-bug', name: 'bug' }] },
+      comments: { nodes: [] },
+      ...overrides,
+    };
+  }
+
+  function fakeClient(
+    issue,
+    calls = { updates: [], comments: [], fetches: 0 }
+  ) {
+    return {
+      calls,
+      async fetchIssue() {
+        calls.fetches += 1;
+        return issue;
+      },
+      async fetchTeamLabel(_team, name) {
+        return name === 'agent-ready' ? AGENT_READY : null;
+      },
+      async updateIssue(id, input) {
+        calls.updates.push({ id, input });
+        return { issueUpdate: { success: true } };
+      },
+      async addComment(id, body) {
+        calls.comments.push({ id, body });
+        return { commentCreate: { success: true } };
+      },
+    };
+  }
+
+  it('bridges a clean selected Todo issue: one updateIssue, labels preserved, one marker comment', async () => {
+    const issue = selectedIssue();
+    const client = fakeClient(issue);
+    const receipt = await bridgeSelectedIssueToLanes({
+      issue,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.equal(receipt.outcome, 'bridged');
+    assert.equal(client.calls.updates.length, 1);
+    // existing label ids preserved, agent-ready appended
+    assert.deepEqual(client.calls.updates[0].input.labelIds.sort(), [
+      'label-agent-ready',
+      'label-bug',
+    ]);
+    assert.equal(client.calls.comments.length, 1);
+    assert.match(
+      client.calls.comments[0].body,
+      /<!-- symphony-backlog-remediation\/bridge v1 fp=[0-9a-f]{24} -->/
+    );
+  });
+
+  it('no write when agent-ready already exists', async () => {
+    const issue = selectedIssue({
+      labels: { nodes: [{ id: 'label-agent-ready', name: 'agent-ready' }] },
+    });
+    const client = fakeClient(issue);
+    const receipt = await bridgeSelectedIssueToLanes({
+      issue,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.equal(receipt.outcome, 'already-ready');
+    assert.equal(client.calls.updates.length, 0);
+    // marker still posted once
+    assert.equal(client.calls.comments.length, 1);
+  });
+
+  it('skips with a named reason when assigned, wrong state, or protected', async () => {
+    // assigned
+    const assigned = selectedIssue({
+      assignee: { id: 'tim', name: 'Tim White' },
+    });
+    let client = fakeClient(assigned);
+    let receipt = await bridgeSelectedIssueToLanes({
+      issue: assigned,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.equal(receipt.outcome, 'skipped:assigned');
+    assert.equal(client.calls.updates.length, 0);
+    // wrong state
+    const inProgress = selectedIssue({ state: { name: 'In Progress' } });
+    client = fakeClient(inProgress);
+    receipt = await bridgeSelectedIssueToLanes({
+      issue: inProgress,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.match(receipt.outcome, /^skipped:state-/);
+    assert.equal(client.calls.updates.length, 0);
+    // protected label
+    const protectedIssue = selectedIssue({
+      labels: { nodes: [{ id: 'l', name: 'protected' }] },
+    });
+    client = fakeClient(protectedIssue);
+    receipt = await bridgeSelectedIssueToLanes({
+      issue: protectedIssue,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.equal(receipt.outcome, 'skipped:protected-label');
+    assert.equal(client.calls.updates.length, 0);
+    assert.equal(client.calls.comments.length, 0);
+  });
+
+  it('skips when a protected-policy label trips pre-admission (e.g. no-symphony)', async () => {
+    const noSymphony = selectedIssue({
+      labels: { nodes: [{ id: 'l2', name: 'no-symphony' }] },
+    });
+    const client = fakeClient(noSymphony);
+    const receipt = await bridgeSelectedIssueToLanes({
+      issue: noSymphony,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.equal(receipt.outcome, 'skipped:protected-label');
+    assert.equal(client.calls.updates.length, 0);
+  });
+
+  it('skips when the issue already has an open PR', async () => {
+    const client = fakeClient(selectedIssue());
+    const receipt = await bridgeSelectedIssueToLanes({
+      issue: selectedIssue(),
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: { 'JOV-100': { openPullRequests: [555] } },
+    });
+    assert.equal(receipt.outcome, 'skipped:existing-open-pr');
+    assert.equal(client.calls.updates.length, 0);
+  });
+
+  it('fails closed when Linear rejects the agent-ready label update', async () => {
+    const client = fakeClient(selectedIssue());
+    client.updateIssue = async (id, input) => {
+      client.calls.updates.push({ id, input });
+      return { issueUpdate: { success: false } };
+    };
+    await assert.rejects(
+      bridgeSelectedIssueToLanes({
+        issue: selectedIssue(),
+        client,
+        agentReadyLabel: AGENT_READY,
+        inventory: {},
+      }),
+      /bridge-agent-ready-update-failed/
+    );
+    assert.equal(client.calls.comments.length, 0);
+  });
+
+  it('fails closed when Linear rejects the bridge marker comment', async () => {
+    const issue = selectedIssue({
+      labels: { nodes: [{ id: 'label-agent-ready', name: 'agent-ready' }] },
+    });
+    const client = fakeClient(issue);
+    client.addComment = async (id, body) => {
+      client.calls.comments.push({ id, body });
+      return { commentCreate: { success: false } };
+    };
+    await assert.rejects(
+      bridgeSelectedIssueToLanes({
+        issue,
+        client,
+        agentReadyLabel: AGENT_READY,
+        inventory: {},
+      }),
+      /bridge-marker-comment-failed/
+    );
+    assert.equal(client.calls.updates.length, 0);
+  });
+
+  it('an empty cohort makes zero Linear calls', async () => {
+    let touched = 0;
+    const client = {
+      async fetchIssue() {
+        touched += 1;
+      },
+      async fetchTeamLabel() {
+        touched += 1;
+      },
+    };
+    const receipt = await bridgeSelectedToLanes({
+      cohort: { selected: [] },
+      client,
+      teamId: TEAM_ID,
+    });
+    assert.equal(receipt.enabled, true);
+    assert.equal(receipt.calls, 0);
+    assert.deepEqual(receipt.bridged, []);
+    assert.equal(touched, 0);
+  });
+
+  it('the kill-switch env flag disables the bridge with zero calls', async () => {
+    let touched = 0;
+    const client = {
+      async fetchIssue() {
+        touched += 1;
+      },
+      async fetchTeamLabel() {
+        touched += 1;
+      },
+    };
+    const receipt = await bridgeSelectedToLanes({
+      cohort: { selected: [selectedIssue()] },
+      client,
+      teamId: TEAM_ID,
+      env: { JOVIE_BRIDGE_LANES: '0' },
+    });
+    assert.equal(receipt.enabled, false);
+    assert.equal(touched, 0);
+  });
+
+  it('bridges the selected set end-to-end and records per-issue receipts', async () => {
+    const client = fakeClient(selectedIssue());
+    const receipt = await bridgeSelectedToLanes({
+      cohort: { selected: [selectedIssue()] },
+      client,
+      teamId: TEAM_ID,
+      inventory: {},
+      env: {},
+    });
+    assert.equal(receipt.schema, 'symphony-bridge-lanes/v1');
+    assert.equal(receipt.bridged.length, 1);
+    assert.equal(receipt.bridged[0].outcome, 'bridged');
   });
 });
