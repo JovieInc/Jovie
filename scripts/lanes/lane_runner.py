@@ -487,6 +487,9 @@ class Host:
     def slots(self, provider: str, default: int) -> int:
         return autoscale.effective_slots(self.state, provider, self.base_slots(provider, default))
 
+    def intake_slots(self, provider: str, default: int) -> int:
+        return autoscale.intake_slots(self.state, provider, self.base_slots(provider, default))
+
 
 def load_providers(path: Path = HERE / "providers.json") -> dict:
     return json.loads(path.read_text())
@@ -1231,14 +1234,80 @@ def _write_state_json(path: Path, payload: dict) -> None:
     os.replace(tmp, path)
 
 
+def _budget_dimensions(headers) -> dict:
+    return {name: {"remaining": _header_number(headers, fields[0]),
+                   "limit": _header_number(headers, fields[1]), "reset": _header_number(headers, fields[2])}
+            for name, fields in zip(("requests", "complexity"), LINEAR_BUDGET_HEADERS)}
+
+
 def _budget_numbers(headers) -> dict:
-    for remaining_name, limit_name, reset_name in LINEAR_BUDGET_HEADERS:
-        remaining, limit, reset = (_header_number(headers, remaining_name),
-                                   _header_number(headers, limit_name),
-                                   _header_number(headers, reset_name))
-        if remaining is not None or limit is not None or reset is not None:
-            return {"remaining": remaining, "limit": limit, "reset": reset}
+    for row in _budget_dimensions(headers).values():
+        if any(value is not None for value in row.values()):
+            return row
     return {"remaining": None, "limit": None, "reset": None}
+
+
+def _linear_operation_family(query: str) -> str:
+    if query.lstrip().startswith("mutation"):
+        return "mutation"
+    if 'state:{name:{eq:"Todo"}}' in query:
+        return "todo-inventory"
+    if 'state:{name:{eq:"In Progress"}}' in query:
+        return "active-ownership"
+    if "issue(id:" in query:
+        return "exact-issue"
+    if "issues(" in query:
+        return "issue-inventory"
+    return "metadata"
+
+
+def record_linear_usage(key: str, family: str, outcome: str, headers=None, *, attempted=True) -> None:
+    """Bounded local attempt counters; quota observations are not consumed cost."""
+    handle = None
+    try:
+        state = lane_state_dir()
+        if state is None:
+            return
+        state.mkdir(parents=True, exist_ok=True)
+        handle = open(state / "linear-usage.lock", "a")
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        path, now = state / "linear-usage.json", time.time()
+        data = maintenance_json(path, limit=1048576, missing={})
+        if not isinstance(data, dict) or data.get("schema", "jovie-linear-usage/v1") != "jovie-linear-usage/v1":
+            return
+        windows = data.setdefault("windows", {})
+        if not isinstance(windows, dict):
+            return
+        hour = int(now // 3600)
+        windows = {name: row for name, row in windows.items() if name in {str(hour), str(hour - 1)}}
+        data["windows"] = windows
+        window = windows.setdefault(str(hour), {})
+        scope = _linear_scope_id(key)
+        if scope not in window and len(window) >= 16:
+            return
+        producer = window.setdefault(scope, {}).setdefault("lane-runner", {})
+        if family not in {"mutation", "todo-inventory", "active-ownership", "exact-issue", "issue-inventory", "metadata"}:
+            return
+        row = producer.setdefault(family, {"httpAttempts": 0, "cooldownSkips": 0, "successes": 0,
+                                          "errors": 0, "rateLimited": 0, "complexityConsumed": None})
+        for count in ("httpAttempts", "cooldownSkips", "successes", "errors", "rateLimited"):
+            if type(row.get(count)) is not int or row[count] < 0:
+                return
+        row["httpAttempts" if attempted else "cooldownSkips"] += 1
+        if attempted:
+            row["successes" if outcome == "success" else "errors"] += 1
+        if outcome == "rate-limited":
+            row["rateLimited"] += 1
+        row.update(observedAt=now, quotaObservations=_budget_dimensions(headers),
+                   complexityCostCoverage="unknown; remaining includes other consumers")
+        data.update(schema="jovie-linear-usage/v1", observedAt=now,
+                    coverage="this transport only; HTTP attempts, not server-accepted requests")
+        _write_state_json(path, data)
+    except Exception:
+        pass  # Telemetry cannot prevent an already admitted action.
+    finally:
+        if handle is not None:
+            handle.close()
 
 
 def _linear_budget_view(payload: dict) -> dict:
@@ -1274,6 +1343,13 @@ def record_linear_budget(headers, *, rate_limited: bool) -> None:
             "rateLimitedAt": now_iso() if rate_limited else previous.get("rateLimitedAt"),
             "observedAt": now_iso(),
         }
+        dimensions = {}
+        for name, values in _budget_dimensions(headers).items():
+            if any(value is not None for value in values.values()):
+                dimensions[name] = {**values, "observedAt": now_iso()}
+            else:
+                dimensions[name] = (previous.get("dimensions") or {}).get(name)
+        payload["dimensions"] = dimensions
         _write_state_json(path, payload)
         _stamp_doctor_budget(state, payload)
     except Exception:
@@ -1544,37 +1620,47 @@ class Linear:
         self.key = key
 
     def gql(self, query: str, variables: dict) -> dict:
+        family = _linear_operation_family(query)
         cooling = linear_cooldown_until(self.key)
         if cooling is not None:
+            record_linear_usage(self.key, family, "cooldown", attempted=False)
             raise LinearRateLimited(cooling)
         request = urllib.request.Request(
-            LINEAR_API_URL,
-            data=json.dumps({"query": query, "variables": variables}).encode(),
-            headers={"Content-Type": "application/json", "Authorization": self.key},
-        )
+            LINEAR_API_URL, data=json.dumps({"query": query, "variables": variables}).encode(),
+            headers={"Content-Type": "application/json", "Authorization": self.key})
+        outcome, headers = "transport-error", None
         try:
-            response = urllib.request.urlopen(request, timeout=30)
-        except urllib.error.HTTPError as error:
-            raw = b""
             try:
-                raw = error.read()
-            except Exception:
-                raw = b""
-            if error.code == 429 or _body_is_rate_limited(error.code, raw):
-                record_linear_budget(getattr(error, "headers", None), rate_limited=True)
-                raise LinearRateLimited(publish_linear_cooldown(self.key, getattr(error, "headers", None))) from None
-            raise
-        with response as handle:
-            raw = handle.read()
-            headers = getattr(handle, "headers", None)
-        payload = json.loads(raw.decode() or "{}")
-        if _data_is_rate_limited(payload):
-            record_linear_budget(headers, rate_limited=True)
-            raise LinearRateLimited(publish_linear_cooldown(self.key, headers))
-        record_linear_budget(headers, rate_limited=False)
-        if payload.get("errors"):
-            raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
-        return payload["data"]
+                response = urllib.request.urlopen(request, timeout=30)
+            except urllib.error.HTTPError as error:
+                headers, raw = getattr(error, "headers", None), b""
+                try:
+                    raw = error.read()
+                except Exception:
+                    pass
+                if error.code == 429 or _body_is_rate_limited(error.code, raw):
+                    outcome = "rate-limited"
+                    record_linear_budget(headers, rate_limited=True)
+                    raise LinearRateLimited(publish_linear_cooldown(self.key, headers)) from None
+                outcome = "http-error"
+                record_linear_budget(headers, rate_limited=False)
+                raise
+            with response as handle:
+                raw, headers = handle.read(), getattr(handle, "headers", None)
+            payload = json.loads(raw.decode() or "{}")
+            if _data_is_rate_limited(payload):
+                outcome = "rate-limited"
+                record_linear_budget(headers, rate_limited=True)
+                raise LinearRateLimited(publish_linear_cooldown(self.key, headers))
+            record_linear_budget(headers, rate_limited=False)
+            if payload.get("errors"):
+                outcome = "graphql-error"
+                raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
+            data = payload["data"]
+            outcome = "success"
+            return data
+        finally:
+            record_linear_usage(self.key, family, outcome, headers)
 
     def _bounded_lane_nodes(self, query: str, variables: dict) -> list[dict]:
         """Retain the request cap, but never treat a truncated inventory as complete."""
@@ -1601,29 +1687,171 @@ class Linear:
             cursors.add(after)
         raise LaneInventoryUnknown("lane-inventory-page-limit")
 
-    def _paginated_lane_issues(self, label: str) -> list[dict]:
-        """Complete Todo inventory within 500 rows, only on a claim-scan cache fill."""
-        nodes = self._bounded_lane_nodes(
+    def _todo_catalog(self, label: str) -> list[str]:
+        labels = {SHARED_LABEL, label}
+        for provider, spec in load_providers().items():
+            if not spec.get("enabled", True):
+                continue
+            slots = os.environ.get(f"LANES_SLOTS_{provider.upper()}", spec.get("slots", 1))
+            if str(slots).isdigit() and int(slots) > 0 and isinstance(spec.get("label"), str):
+                labels.add(spec["label"])
+        if any(not isinstance(value, str) or not value.strip() for value in labels):
+            raise LaneInventoryUnknown("lane-catalog-malformed")
+        return sorted(labels)
+
+    def _todo_scope(self) -> str:
+        return _linear_scope_id(self.key)
+
+    def _todo_envelope_valid(self, value, labels: list[str]) -> bool:
+        if not isinstance(value, dict) or value.get("schema") != "jovie-linear-todo-snapshot/v1" or (
+                value.get("scope") != self._todo_scope() or value.get("catalog") != labels):
+            raise LaneInventoryUnknown("lane-snapshot-binding-invalid")
+        started, completed, now = value.get("sourceStartedAt"), value.get("completedAt"), time.time()
+        if any(type(stamp) not in (int, float) or not math.isfinite(stamp) for stamp in (started, completed, now)):
+            raise LaneInventoryUnknown("lane-snapshot-clock-invalid")
+        if started > completed or completed > now:
+            raise LaneInventoryUnknown("lane-snapshot-clock-reversed")
+        if now - started >= CLAIM_SCAN_TTL_S:
+            return False
+        if value.get("overflow") is True:
+            if value.get("complete") is not False or "rows" in value:
+                raise LaneInventoryUnknown("lane-snapshot-overflow-invalid")
+            return True
+        rows = value.get("rows")
+        if value.get("complete") is not True or not isinstance(rows, list):
+            raise LaneInventoryUnknown("lane-snapshot-coverage-unknown")
+        ids = set()
+        for row in rows:
+            if not isinstance(row, dict) or any(not isinstance(row.get(key), str) or not row[key]
+                    for key in ("id", "identifier", "title", "created_at")) or (
+                    type(row.get("priority")) is not int or not 0 <= row["priority"] <= 4
+                    or not isinstance(row.get("description"), str)
+                    or not isinstance(row.get("labels"), list)
+                    or any(not isinstance(name, str) or not name for name in row["labels"])):
+                raise LaneInventoryUnknown("lane-snapshot-row-invalid")
+            if row["id"] in ids or not set(row["labels"]).intersection(labels):
+                raise LaneInventoryUnknown("lane-snapshot-membership-invalid")
+            ids.add(row["id"])
+        revision = hashlib.sha256(json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        if value.get("revision") != revision:
+            raise LaneInventoryUnknown("lane-snapshot-revision-invalid")
+        return True
+
+    def _snapshot_budget_admitted(self, pages: int) -> bool:
+        state = lane_state_dir()
+        if state is None:
+            return False
+        try:
+            budget = maintenance_json(state / "api-budget.json", limit=65536, missing={})
+            dimensions = budget.get("dimensions") if isinstance(budget, dict) else None
+            if not isinstance(dimensions, dict):
+                return False
+            for name in ("requests", "complexity"):
+                row = dimensions.get(name)
+                if not isinstance(row, dict):
+                    return False
+                remaining, limit = row.get("remaining"), row.get("limit")
+                at = autoscale._epoch(row.get("observedAt"))
+                if any(type(value) not in (int, float) or not math.isfinite(value) for value in (remaining, limit, at)) or (
+                        limit <= 0 or not 0 <= remaining <= limit or not 0 <= time.time() - at <= CLAIM_SCAN_TTL_S):
+                    return False
+                # Protect both quota dimensions; unknown operation complexity is
+                # never inferred from another consumer's remaining-counter delta.
+                if remaining / limit < autoscale.LINEAR_INCREASE_RATIO or (
+                        name == "requests" and remaining - pages < math.ceil(limit * autoscale.LINEAR_INCREASE_RATIO)):
+                    return False
+            return True
+        except (OSError, ValueError, TypeError):
+            return False
+
+    def _todo_snapshot(self, labels: list[str], pages: int, *, overflow=False) -> dict:
+        started, rows, cursors, after = time.time(), {}, set(), None
+        for page_index in range(pages):
+            if not 0 <= time.time() - started < CLAIM_SCAN_TTL_S:
+                raise LaneInventoryUnknown("lane-inventory-scan-expired")
+            if not self._snapshot_budget_admitted(pages - page_index):
+                raise LaneInventoryUnknown("linear-refresh-reserve-held")
+            data = self.gql(
                 'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
                 'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
                 'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
                 'nodes{id identifier title description priority createdAt '
-                'labels{nodes{name}}}}}', {"labels": [label, SHARED_LABEL]})
-        return [{"id": n["id"], "identifier": n["identifier"], "title": n["title"],
-                 "description": n.get("description") or "", "priority": n.get("priority") or 0,
-                 "created_at": n["createdAt"], "labels": [l["name"] for l in n["labels"]["nodes"]]}
-                for n in nodes]
+                'labels(first:50){pageInfo{hasNextPage} nodes{name}}}}}', {"labels": labels, "after": after})
+            if not 0 <= time.time() - started < CLAIM_SCAN_TTL_S:
+                raise LaneInventoryUnknown("lane-inventory-scan-expired")
+            edge = data.get("issues") if isinstance(data, dict) else None
+            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list) or len(edge["nodes"]) > 100:
+                raise LaneInventoryUnknown("lane-inventory-unreadable")
+            for node in edge["nodes"]:
+                if not isinstance(node, dict):
+                    raise LaneInventoryUnknown("lane-inventory-malformed")
+                label_edge = node.get("labels")
+                if not isinstance(label_edge, dict) or not isinstance(label_edge.get("nodes"), list) or (
+                        len(label_edge["nodes"]) > 50 or not isinstance(label_edge.get("pageInfo"), dict)
+                        or label_edge["pageInfo"].get("hasNextPage") is not False):
+                    raise LaneInventoryUnknown("lane-label-coverage-unknown")
+                names = label_edge["nodes"]
+                if any(not isinstance(item, dict) or not isinstance(item.get("name"), str) or not item["name"] for item in names):
+                    raise LaneInventoryUnknown("lane-label-malformed")
+                row = {"id": node.get("id"), "identifier": node.get("identifier"), "title": node.get("title"),
+                       "description": node.get("description") or "", "priority": node.get("priority") or 0,
+                       "created_at": node.get("createdAt"), "labels": sorted({item["name"] for item in names})}
+                ident = row["id"]
+                if not isinstance(ident, str) or not ident:
+                    raise LaneInventoryUnknown("lane-inventory-malformed")
+                if ident in rows and rows[ident] != row:
+                    raise LaneInventoryUnknown("lane-inventory-conflicting-revision")
+                rows[ident] = row
+            page = edge.get("pageInfo")
+            if not isinstance(page, dict) or type(page.get("hasNextPage")) is not bool:
+                raise LaneInventoryUnknown("lane-inventory-coverage-unknown")
+            if not page["hasNextPage"]:
+                ordered = sorted(rows.values(), key=lambda row: row["id"])
+                result = {"schema": "jovie-linear-todo-snapshot/v1", "scope": self._todo_scope(),
+                          "catalog": labels, "sourceStartedAt": started, "completedAt": time.time(),
+                          "complete": True, "rows": ordered,
+                          "revision": hashlib.sha256(json.dumps(ordered, sort_keys=True, separators=(",", ":")).encode()).hexdigest()}
+                if not self._todo_envelope_valid(result, labels):
+                    raise LaneInventoryUnknown("lane-inventory-scan-expired")
+                return result
+            after = page.get("endCursor")
+            if not isinstance(after, str) or not after or after in cursors:
+                raise LaneInventoryUnknown("lane-inventory-cursor-invalid")
+            cursors.add(after)
+        if overflow:
+            return {"schema": "jovie-linear-todo-snapshot/v1", "scope": self._todo_scope(), "catalog": labels,
+                    "sourceStartedAt": started, "completedAt": time.time(), "complete": False, "overflow": True}
+        raise LaneInventoryUnknown("lane-inventory-page-limit")
+
+    def _paginated_lane_issues(self, label: str) -> list[dict]:
+        """Structural union overflow alone falls back to the unchanged per-pool bound."""
+        labels = sorted({label, SHARED_LABEL})
+        return self._todo_snapshot(labels, LANE_ISSUE_PAGES)["rows"]
 
     def lane_issues(self, label: str) -> list[Issue]:
-        """Todo issues carrying the lane's own label or the shared pool label.
+        """One complete, credential/catalog-bound Todo snapshot per host per minute.
 
-        The 500-issue read (JOV-7514) runs only as the shared claim-scan fill. A hit
-        within CLAIM_SCAN_TTL_S returns the stored pool and does not paginate."""
-        rows = shared(f"claim-lane-issues-v2-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
-                      lambda: self._paginated_lane_issues(label)) or []
-        return [Issue(row["id"], row["identifier"], row["title"], row.get("description") or "",
-                      row.get("priority") or 0, row["created_at"], list(row.get("labels") or []))
-                for row in rows]
+        This is candidate observation only. Consequential state, mutation readbacks,
+        holds and ownership remain freshly checked at the ordinary claim boundary."""
+        catalog = self._todo_catalog(label)
+        binding = hashlib.sha256(json.dumps([self._todo_scope(), catalog], separators=(",", ":")).encode()).hexdigest()
+        value = shared(f"claim-todo-union-v1-{binding}", CLAIM_SCAN_TTL_S,
+                       lambda: self._todo_snapshot(catalog, LANE_ISSUE_PAGES * max(1, len(catalog) - 1), overflow=len(catalog) > 2),
+                       validate=lambda envelope: self._todo_envelope_valid(envelope, catalog))
+        if value is None:
+            raise LaneInventoryUnknown("lane-snapshot-unavailable")
+        if value.get("overflow") is True:
+            scoped = sorted({label, SHARED_LABEL})
+            value = shared(f"claim-todo-fallback-v1-{binding}-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
+                           lambda: self._todo_snapshot(scoped, LANE_ISSUE_PAGES),
+                           validate=lambda envelope: self._todo_envelope_valid(envelope, scoped))
+            if value is None:
+                raise LaneInventoryUnknown("lane-snapshot-unavailable")
+        rows = [row for row in value["rows"] if label in row["labels"] or SHARED_LABEL in row["labels"]]
+        if len(rows) > 100 * LANE_ISSUE_PAGES:
+            raise LaneInventoryUnknown("lane-inventory-page-limit")
+        return [Issue(row["id"], row["identifier"], row["title"], row["description"],
+                      row["priority"], row["created_at"], list(row["labels"])) for row in rows]
 
     def active_lane_issues(self, labels: list[str]) -> list[Issue]:
         """In Progress work claimed from a lane pool, for cross-host overlap admission."""
@@ -3294,6 +3522,7 @@ def fetch_labeled_events(linear) -> list:
 
 EVENT_DELIVERY_SCHEMA = "jovie.event-delivery/v1"
 EVENT_DELIVERY_ATTEMPTS = 3
+EVENT_DELIVERY_PENDING_CAP = 256
 EVENT_DELIVERY_STALE_S = 3600
 
 
@@ -3394,6 +3623,7 @@ def _recover_event_preparation(host: Host, journal: dict) -> None:
 
 def _queue_event_delivery(data: dict, plan: dict, issues: list, accepted: set[str], now: float) -> None:
     snapshots = {issue["id"]: issue for issue in issues}
+    additions = {}
     for kind in ("reopens", "comments", "labels"):
         for payload in plan.get(kind) or []:
             target = payload.get("id")
@@ -3409,11 +3639,16 @@ def _queue_event_delivery(data: dict, plan: dict, issues: list, accepted: set[st
                       "generation": sorted(event.get("noted") or [])}
             key = _event_digest(intent)
             if key not in data["actions"]:
-                data["actions"][key] = {**intent, "key": key, "createdAt": now, "nextAt": now,
+                additions[key] = {**intent, "key": key, "createdAt": now, "nextAt": now,
                     "expectedState": (issue.get("state") or {}).get("name"),
                     "deadline": now + EVENT_DELIVERY_STALE_S, "attempts": 0, "status": "pending",
                     "expectedEvent": _event_digest(event), "history": [],
                     "commentId": str(uuid.uuid5(uuid.NAMESPACE_URL, "jovie-event:" + key))}
+
+    unresolved = sum(row.get("status") not in {"acknowledged", "superseded"} for row in data["actions"].values())
+    if unresolved + len(additions) > EVENT_DELIVERY_PENDING_CAP:
+        raise RuntimeError("event-delivery-capacity-held")
+    data["actions"].update(additions)
 
 
 def _event_delivery_readback(linear, row: dict) -> tuple[bool, dict]:
@@ -3576,7 +3811,15 @@ def claim_remediation_events(host: Host, linear) -> dict:
                     merged[fingerprint] = row
                     accepted.add(fingerprint)
                     pairs[fingerprint] = {"before": previous.get(fingerprint), "after": row}
-            _queue_event_delivery(journal, plan, issues, accepted, time.time())
+            queue_held = False
+            try:
+                _queue_event_delivery(journal, plan, issues, accepted, time.time())
+            except RuntimeError as error:
+                if str(error) != "event-delivery-capacity-held":
+                    raise
+                # Decline new generations, then still drain an already accepted
+                # intent. Backpressure must not make a full queue self-deadlock.
+                queue_held, merged, pairs = True, previous, {}
             # Pair the original plan (including attempt timestamps) with its
             # actions before either file can expose a new owner generation.
             journal["prepared"] = {"id": _event_digest(pairs), "rows": pairs}
@@ -3591,6 +3834,7 @@ def claim_remediation_events(host: Host, linear) -> dict:
         finally:
             lock.release()
         delivery = _apply_event_plan(linear, plan, host, journal, time.time())
+        delivery["deliveryCapacityHeld"] = queue_held
     finally:
         delivery_lock.release()
     summary = remediation.events_summary({"events": plan["events"]})
@@ -4866,13 +5110,14 @@ def _cache_token(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()[:20]
 
 
-def shared(key: str, ttl: float, fetch):
+def shared(key: str, ttl: float, fetch, *, validate=None):
     """One GitHub read per `ttl` for every worker on the host. Workers are short-lived processes
     (re-exec after each unit, respawned every dispatch tick), so an in-process cache never
     hits; 7 workers re-listing every open PR spent the bot's whole 5000-point GraphQL hour
     (2026-09-28). A failed read (None) is never cached. Off in tests."""
     if os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
-        return fetch()
+        value = fetch()
+        return value if value is None or validate is None or validate(value) else None
     path = SHARED_CACHE_DIR / f"{key}.json"
     SHARED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     # Independent idle workers can miss the same expired cache simultaneously.
@@ -4882,11 +5127,13 @@ def shared(key: str, ttl: float, fetch):
         fcntl.flock(lock, fcntl.LOCK_EX)
         try:
             cached = json.loads(path.read_text())
-            if 0 <= time.time() - cached["at"] < ttl:
+            if 0 <= time.time() - cached["at"] < ttl and (validate is None or validate(cached["value"])):
                 return cached["value"]
         except (OSError, ValueError, KeyError, TypeError):
             pass
         value = fetch()
+        if value is not None and validate is not None and not validate(value):
+            return None
         if value is not None:
             tmp = path.with_suffix(f".{os.getpid()}.tmp")
             tmp.write_text(json.dumps({"at": time.time(), "value": value}))
@@ -5402,21 +5649,66 @@ def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> No
         lock.release()
 
 
+def occupied_worker_slots(host: Host) -> dict[str, int] | None:
+    """Count the same held seats, including workers outside a reduced cap."""
+    counts = {}
+    try:
+        paths = list((host.state / "slots").iterdir())
+        if len(paths) > 4096:
+            return None
+        for path in paths:
+            match = re.fullmatch(r"([a-z][a-z0-9_-]*)\.[0-9]+\.lock", path.name)
+            if not match:
+                continue
+            fd = os.open(path, os.O_RDWR | os.O_NONBLOCK | os.O_NOFOLLOW)
+            try:
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    return None
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    provider = match.group(1)
+                    counts[provider] = counts.get(provider, 0) + 1
+                else:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+        return counts
+    except OSError:
+        return None
+
+
 def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
-    if not spec.get("enabled", True):
-        return 0  # a lane turned off in a newer release stops at its next re-exec
+    limit = host.slots(name, spec.get("slots", 1))
+    if not spec.get("enabled", True) or limit <= 0:
+        return 0
+    intake_limit = host.intake_slots(name, spec.get("slots", 1))
     slot = None
-    for index in range(host.slots(name, spec.get("slots", 1))):
-        lock = Locked(host.state / "slots" / f"{name}.{index}.lock", blocking=False)
-        if lock.held:
-            slot = lock
-            break
-        lock.release()
+    # One ledger and one serialized count/acquire, even while old occupied seats
+    # finish naturally after a cap reduction. Work classes never add capacities.
+    admission = Locked(host.state / "slots" / "admission.lock", blocking=True)
+    try:
+        occupied = occupied_worker_slots(host)
+        ceiling = autoscale.host_ceiling(host.state)
+        if occupied is None or occupied.get(name, 0) >= limit or (
+                ceiling is not None and sum(occupied.values()) >= ceiling):
+            return 0
+        for index in range(limit):
+            maintenance_only = index >= intake_limit
+            if maintenance_only and spec.get("repairs") is False:
+                continue
+            lock = Locked(host.state / "slots" / f"{name}.{index}.lock", blocking=False)
+            if lock.held:
+                slot = lock
+                break
+            lock.release()
+    finally:
+        admission.release()
     if slot is None:
         return 0
     try:
-        return worker_with_slot(host, name, spec, slot)
+        return worker_with_slot(host, name, spec, slot, maintenance_only=maintenance_only)
     finally:
         if not slot.handle.closed: slot.release()
 
@@ -5595,7 +5887,7 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
         temporary.unlink(missing_ok=True)
 
 
-def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
+def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, maintenance_only=False) -> int:
     """Release ownership on every exceptional exit, including notification failures."""
     try:
         report = disk_guard.check(host, sweep=True)
@@ -5607,7 +5899,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         record_idle_exit(host, name, "disk-unobservable")
         slot.release()
         return 1
-    linear = Linear(host.linear_env)
+    linear = None
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
     requeue_verified(host, lane_prs(name))
@@ -5621,7 +5913,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
     # The claim lock serializes the scan, so the shared cache fill happens once. A rate
     # limit skips the API for every worker until the cooldown file expires.
     red = adopt = issue = route_decision = None
-    rate_limited = False
+    rate_limited = inventory_unknown = False
     try:
         # Finish before starting: PRs a GitHub event queued, red PRs (any open PR in the repo),
         # then ungated lane drafts, then new issues.
@@ -5636,8 +5928,6 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         owned_numbers = {pr["number"] for pr in lane_owned}
         prs = lane_owned + [pr for pr in candidates if pr.get("isDraft") and pr["number"] not in owned_numbers]
         events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS) if local else []
-        if local:
-            escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
         red = local and (pr_events.claim_event_pr(host, THIS, name, events)
                          or claim_escalation_pr(host, name, candidates)
                          or claim_red_pr(host, name, candidates)) or None
@@ -5649,17 +5939,23 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
                 record_maintenance_demand(host, name, prs, candidates, events, selected)
             except Exception:
                 pass  # Demand telemetry cannot prevent this selected repair.
-        labeled = None if red or adopt or not local else claim_labeled_event(host, name, linear)
+        # Existing-PR admission uses fresh GitHub/attempt authority. Do not make
+        # its selection or execution depend on credentials or optional Linear work.
+        if not (red or adopt) and not maintenance_only:
+            linear = Linear(host.linear_env)
+            if local:
+                escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
+        labeled = None if red or adopt or not local or maintenance_only else claim_labeled_event(host, name, linear)
         issue = labeled
-        if local:
+        if local and linear is not None:
             sweep_lane_prs(host, name, linear)
         if local and not (red or adopt or labeled):
             publish_exhausted_repairs(host, name, candidates)
         # JOV-7514 budgets stay on configured base slots. Scaling the cap with the
         # autoscaled count would admit more parked PRs as capacity rises.
-        budget = None if red or adopt or labeled else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
+        budget = None if red or adopt or labeled or maintenance_only else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
-        in_flight = None if red or adopt or blocked or labeled else in_flight_issues()
+        in_flight = None if red or adopt or blocked or labeled or maintenance_only else in_flight_issues()
         overlap_blocked = False
         overlap_unreadable = False
         overlap_prediction = None
@@ -5698,14 +5994,17 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
                 break
         if red is None and adopt is None and issue is None:
             pr_events.cleanup_one_event(host, THIS, events)
+    except LaneInventoryUnknown:
+        issue = None
+        inventory_unknown = red is None and adopt is None
     except LinearRateLimited:
         # A repair already chosen can proceed without another Linear read. An idle scan stops.
         issue = None
         rate_limited = red is None and adopt is None
     finally:
         claim.release()
-    if rate_limited:
-        record_idle_exit(host, name, "linear-rate-limited")
+    if rate_limited or inventory_unknown:
+        record_idle_exit(host, name, "linear-rate-limited" if rate_limited else "linear-inventory-unknown")
         slot.release()
         return 0
     if red is not None or adopt is not None or issue is not None:
@@ -5720,7 +6019,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         slot.release()
         return reexec(host, name)
     if issue is None:
-        record_idle_exit(host, name, budget["reason"] if blocked else
+        record_idle_exit(host, name, "maintenance-only-idle" if maintenance_only else budget["reason"] if blocked else
                          "in-flight-unknown" if in_flight is None else
                          "file-overlap-inventory-unavailable" if overlap_unreadable else
                          "file-overlap-blocked" if overlap_blocked else "none-eligible")
@@ -6125,6 +6424,8 @@ def prove_staging(host: Host, staging: Path) -> str | None:
         print(test.stderr[-2000:], file=sys.stderr)
         return "release tests failed"
     return None
+
+
 
 
 def install_release(host: Host) -> int:
