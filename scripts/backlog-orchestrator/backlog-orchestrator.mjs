@@ -1532,13 +1532,15 @@ async function ghPullRequestInventory(state, env) {
  * runner's gh). Any non-transient failure throws with the exact gh cause
  * named.
  */
-async function execGhApi(path, env) {
-  // `gh api` takes NO --repo/-R flag (that is a `gh pr` flag — passing it
-  // makes gh exit 1 with its full usage help, whose -F description line
-  // "Add a string parameter in key=value format" is what the Gem runner's
-  // stderr showed). The repository lives inside the endpoint path itself;
-  // the argv is exactly ['api', <full endpoint path+query>].
-  const args = ['api', path];
+/**
+ * Shared gh CLI executor with the transient-gateway retry. Callers pass the
+ * full argv (e.g. ['api', <path>] for REST, ['api', 'graphql', '-f', q] for
+ * GraphQL) — never a fused 'graphql -f query=...' endpoint string, which gh
+ * reads as one invalid endpoint and fails. `timeoutMs` caps each attempt;
+ * the mergeability phase passes its remaining budget so a slow call can
+ * never overrun the 20s phase deadline.
+ */
+async function execGhArgs(args, label, describeAs, env, timeoutMs = 45_000) {
   const maxAttempts = 3;
   let lastError = null;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -1547,7 +1549,7 @@ async function execGhApi(path, env) {
     }
     try {
       const { stdout } = await execFileAsync('gh', args, {
-        timeout: 45_000,
+        timeout: Math.max(1, timeoutMs),
         maxBuffer: 32 * 1024 * 1024,
         env,
       });
@@ -1560,9 +1562,47 @@ async function execGhApi(path, env) {
       if (!transient) break;
     }
   }
-  throw new Error(
-    `gh-api-pr-inventory:${describeExecFailure(lastError, `api ${path}`)}`
+  throw new Error(`${label}:${describeExecFailure(lastError, describeAs)}`);
+}
+
+async function execGhApi(path, env, timeoutMs) {
+  // `gh api` takes NO --repo/-R flag (that is a `gh pr` flag — passing it
+  // makes gh exit 1 with its full usage help, whose -F description line
+  // "Add a string parameter in key=value format" is what the Gem runner's
+  // stderr showed). The repository lives inside the endpoint path itself;
+  // the argv is exactly ['api', <full endpoint path+query>].
+  return execGhArgs(
+    ['api', path],
+    'gh-api-pr-inventory',
+    `api ${path}`,
+    env,
+    timeoutMs
   );
+}
+
+/**
+ * GraphQL read: `gh api graphql -f query=<gql>` as separate argv elements.
+ * A response carrying errors[] is a failure (the query itself was rejected),
+ * thrown as mergeability-graphql:errors:<msg> so the caller fails closed.
+ */
+async function execGhGraphql(query, env, timeoutMs) {
+  const body = await execGhArgs(
+    ['api', 'graphql', '-f', `query=${query}`],
+    'gh-api-graphql',
+    'api graphql',
+    env,
+    timeoutMs
+  );
+  const parsed = JSON.parse(body);
+  const errors = parsed?.errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    throw new Error(
+      `mergeability-graphql:errors:${errors
+        .map(e => String(e?.message || e).slice(0, 200))
+        .join(';')}`.slice(0, 400)
+    );
+  }
+  return parsed;
 }
 
 export async function collectGitHubPullRequests(env = process.env) {
@@ -1684,23 +1724,29 @@ async function readOfficialSymphonyWorkers(maxConcurrent) {
  * mergeable true/false/null to MERGEABLE/CONFLICTING/UNKNOWN and
  * mergeable_state (uppercased) to mergeStateStatus, refreshing
  * headSha. The merge queue is read ONCE up front (GraphQL
- * mergeQueue(branch:"main") entries, head-bound to the row's headSha;
- * the leaked gh-readonly-queue refs survive only as a head-bound
- * fallback) — an in-queue row is known and not conflicting with no
- * per-PR retries. The remaining rows poll in ROUNDS: round 0 sends one
- * GET per PR through a 4-wide pool, then later rounds re-poll only the
- * still-null rows after 2s, 4s and 8s; a failed GET is retried in the
- * next round. The whole phase has a 20s hard deadline (the remediate
- * step's 90s budget already spends ~60s). Fallback: a null-mergeable
- * row with a known mergeable_state is measured — dirty means
- * conflicting; clean, unstable, blocked, behind or has_hooks mean
- * known and not conflicting. Leftovers stay unknown and nothing throws
- * — the gate fails closed on the unknown share. The receipt carries
- * deadlineHit/elapsedMs/unpolled so a starved phase is auditable.
+ * mergeQueue(branch:"main") entries via a real `gh api graphql -f
+ * query=...` argv — never a fused endpoint string) and is the ONLY
+ * queue proof: an entry whose headRefOid matches the row's headSha is
+ * in-queue, known and not conflicting, with no per-PR retries. The
+ * leaked gh-readonly-queue refs carry the merge group's BASE sha (the
+ * main tip), not the PR head, so they are dropped as evidence. A
+ * GraphQL failure is named in evidence.errors (mergequeue:<cause>) and
+ * queueSource 'none', and rows stay unknown (fail closed). The
+ * remaining rows poll in ROUNDS: round 0 sends one GET per PR through
+ * a 4-wide pool, then later rounds re-poll only the still-null rows
+ * after 2s, 4s and 8s; a failed GET is retried in the next round. Each
+ * call's timeout is capped at the remaining phase budget under the 20s
+ * hard deadline. Fallback: a null-mergeable row with a known
+ * mergeable_state is measured — dirty means conflicting; clean,
+ * unstable, blocked, behind or has_hooks mean known and not
+ * conflicting. Leftovers stay unknown and nothing throws — the gate
+ * fails closed on the unknown share. The receipt carries
+ * deadlineHit/elapsedMs/unpolled (unknown AND never polled) /
+ * queueSource so a starved or queue-blind phase is auditable.
  * @param {Record<string, any>[]} pullRequests
  * @param {NodeJS.ProcessEnv} env
  * @param {{ sleep?: (ms: number) => Promise<void>, now?: () => number }} [timing]
- * @returns {Promise<{measured: number, polls: number, inMergeQueue: number[], stillUnknown: number[], unpolled: number[], deadlineHit: boolean, elapsedMs: number, errors: string[]}>}
+ * @returns {Promise<{measured: number, polls: number, inMergeQueue: number[], stillUnknown: number[], unpolled: number[], deadlineHit: boolean, elapsedMs: number, queueSource: string, errors: string[]}>}
  */
 export async function measureMergeability(
   pullRequests,
@@ -1725,6 +1771,7 @@ export async function measureMergeability(
     unpolled: [],
     deadlineHit: false,
     elapsedMs: 0,
+    queueSource: 'none',
     errors: [],
   };
 
@@ -1750,19 +1797,23 @@ export async function measureMergeability(
 
   // (A) Merge-queue awareness FIRST, before any per-PR retry: an entry
   // whose headRefOid matches the row's headSha is in-queue — known and
-  // not conflicting, no retries spent. GraphQL is authoritative; the
-  // leaked gh-readonly-queue refs survive only as a head-bound fallback
-  // (a GraphQL failure leaves behavior otherwise unchanged).
+  // not conflicting, no retries spent. GraphQL is the ONLY queue proof:
+  // the leaked gh-readonly-queue refs carry the merge group's BASE sha
+  // (the main tip), not the PR head, so a head-bound ref match can never
+  // pass and refs only exist for groups currently building — they are
+  // dropped as evidence. A GraphQL failure is named in evidence.errors
+  // (mergequeue:<cause>) and queueSource 'none'; rows stay unknown (fail
+  // closed).
+  evidence.queueSource = 'none';
   const queueHeadsByPr = new Map();
   try {
-    const graphqlBody = await execGhApi(
-      'graphql -f query={repository(owner:"JovieInc",name:"Jovie"){mergeQueue(branch:"main"){entries(first:100){nodes{pullRequest{number headRefOid}}}}}}',
-      env
+    const parsed = await execGhGraphql(
+      '{repository(owner:"JovieInc",name:"Jovie"){mergeQueue(branch:"main"){entries(first:100){nodes{pullRequest{number headRefOid}} pageInfo{hasNextPage}}}}}',
+      env,
+      Math.max(1, deadline - now())
     );
-    const parsed = JSON.parse(graphqlBody);
-    // A non-GraphQL response (an old gh, a proxy error page, a bare "[]")
-    // never stands in for the queue read — force the refs fallback.
-    const nodes = parsed?.data?.repository?.mergeQueue?.entries?.nodes;
+    const entries = parsed?.data?.repository?.mergeQueue?.entries;
+    const nodes = entries?.nodes;
     if (!Array.isArray(nodes)) {
       throw new Error('mergeability-graphql:unexpected-response');
     }
@@ -1774,30 +1825,15 @@ export async function measureMergeability(
       heads.add(head);
       queueHeadsByPr.set(number, heads);
     }
-  } catch {
-    // GraphQL unavailable/failed — fall through to the refs fallback.
-    try {
-      const refsBody = await execGhApi(
-        'repos/JovieInc/Jovie/git/matching-refs/heads/gh-readonly-queue/main/',
-        env
-      );
-      const refs = /** @type {Record<string, any>[]} */ (JSON.parse(refsBody));
-      // JOV-8000 follow-up 35: leaked queue refs never get deleted (~70
-      // stale refs), so a bare pr-<N> name match can mark an old open PR
-      // as in-queue and hide a real conflict. A queue ref is live evidence
-      // only when it names the row's CURRENT head sha (the ref embeds the
-      // head at enqueue time).
-      for (const ref of Array.isArray(refs) ? refs : []) {
-        const match = /pr-([0-9]+)-([0-9a-f]{40})/.exec(String(ref?.ref ?? ''));
-        if (!match) continue;
-        const number = Number(match[1]);
-        const heads = queueHeadsByPr.get(number) || new Set();
-        heads.add(match[2]);
-        queueHeadsByPr.set(number, heads);
-      }
-    } catch {
-      // A failed refs call leaves the rows unknown — fail closed.
+    if (entries?.pageInfo?.hasNextPage === true) {
+      evidence.errors.unshift('mergequeue:truncated-at-100');
     }
+    evidence.queueSource = 'graphql';
+  } catch (queueError) {
+    evidence.errors.unshift(
+      `mergequeue:${String(queueError?.message || queueError).slice(0, 300)}`
+    );
+    evidence.queueSource = 'none';
   }
   for (const row of population) {
     const queuedHeads = queueHeadsByPr.get(Number(row?.number));
@@ -1851,13 +1887,18 @@ export async function measureMergeability(
   // 4-wide pool; later rounds re-poll only the still-unknown rows after
   // the 2s/4s/8s backoff. A failed GET no longer gives up — the row
   // rejoins the next round (evidence.errors keeps the named cause).
+  // (D) A row is `unpolled` only when it is still unknown AND never got a
+  // per-PR GET (deadline-cut before round 0 reached it) — a polled-null
+  // row is stillUnknown but NOT unpolled.
   const pending = population.filter(row => rowIsUnknown(row));
+  const polled = new Set();
   const getOnce = async row => {
     if (now() > deadline) return;
     try {
       const body = await execGhApi(
         `repos/JovieInc/Jovie/pulls/${row.number}`,
-        env
+        env,
+        Math.max(1, deadline - now())
       );
       evidence.polls += 1;
       const detail = /** @type {Record<string, any>} */ (JSON.parse(body));
@@ -1868,6 +1909,8 @@ export async function measureMergeability(
           `pulls/${row.number}:${describeExecFailure(error, 'api')}`
         );
       }
+    } finally {
+      polled.add(row);
     }
   };
   for (
@@ -1907,7 +1950,7 @@ export async function measureMergeability(
     }
   }
   evidence.unpolled = pending
-    .filter(row => rowIsUnknown(row))
+    .filter(row => rowIsUnknown(row) && !polled.has(row))
     .map(row => row?.number);
 
   evidence.measured = population.filter(row => !rowIsUnknown(row)).length;
@@ -2006,6 +2049,7 @@ async function runRemediate(isDryRun) {
   // with retries and a hard deadline; merge-queue rows (still null after
   // retries with a gh-readonly-queue pr-<N>- ref) count as known and not
   // conflicting. The receipt carries the full evidence.
+  /** @type {Awaited<ReturnType<typeof measureMergeability>> | null} */
   let mergeabilityEvidence = null;
   if (Array.isArray(pullRequests)) {
     mergeabilityEvidence = await measureMergeability(
@@ -2182,9 +2226,12 @@ async function runRemediate(isDryRun) {
     ? backlogRemediation.pullRequestRates(pullRequests)
     : null;
   if (ratesSummary) {
-    const mm = /** @type {Record<string, any>} */ (mergeabilityEvidence ?? {});
+    const mm =
+      /** @type {Partial<NonNullable<typeof mergeabilityEvidence>>} */ (
+        mergeabilityEvidence ?? {}
+      );
     console.log(
-      `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')}`
+      `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')} mm.queueSource=${mm.queueSource ?? 'none'} mm.errors=${(mm.errors ?? []).length}`
     );
   }
 }
