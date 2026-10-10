@@ -191,9 +191,11 @@ def disabled_lanes(providers: dict | None = None) -> set[str]:
     return set(providers) - set(cost_order(providers))
 
 
-def in_scope(pr: dict, kind: str, disabled: set[str]) -> bool:
-    """The lanes own lane branches (drafts included) and every other open non-draft PR in the
-    repo; `green` only readies lane drafts; `orphan` is only a disabled lane's draft."""
+def in_scope(pr: dict, kind: str, disabled: set[str], now: float | None = None) -> bool:
+    """The lanes own lane branches (drafts included), every other open non-draft PR in the
+    repo, and abandoned agent drafts (Tim, 2026-10-10: Symphony reclaims abandoned drafts and
+    finishes, greens and promotes them); `green` readies lane drafts and reclaimed drafts;
+    `orphan` is only a disabled lane's draft."""
     if pr.get("isCrossRepository") or str(pr.get("state", "OPEN")).upper() != "OPEN":
         return False
     if {label.lower() for label in label_names(pr)} & HOLD_LABELS:
@@ -201,9 +203,10 @@ def in_scope(pr: dict, kind: str, disabled: set[str]) -> bool:
     lane_branch = LANE_BRANCH.match(pr.get("headRefName") or "")
     if kind == "orphan":
         return bool(lane_branch) and lane_branch.group("lane") in disabled
+    reclaimed = abandoned_agent_draft(pr, time.time() if now is None else now)
     if kind == "green":
-        return bool(lane_branch) and bool(pr.get("isDraft"))
-    return bool(lane_branch) or not pr.get("isDraft")
+        return (bool(lane_branch) and bool(pr.get("isDraft"))) or reclaimed
+    return bool(lane_branch) or not pr.get("isDraft") or reclaimed
 
 
 def agent_owned(pr: dict) -> bool:
@@ -1508,11 +1511,14 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
                     continue
                 else:
                     counts["staleAgentDrafts"] += 1
+                    if stalled_agent_draft:
+                        # Reclaimed: the lanes finish it like a stale lane draft (Tim, 2026-10-10).
+                        wanted.append("stale")
             else:
                 counts["staleOtherDrafts"] += 1
         scope_kind = {"green": "green"}
         for kind in wanted:
-            if PREFIX + kind not in labels and in_scope(pr, scope_kind.get(kind, "red"), disabled):
+            if PREFIX + kind not in labels and in_scope(pr, scope_kind.get(kind, "red"), disabled, now):
                 plan["label"].append((number, kind))
                 labels.add(PREFIX + kind)
         if pr.get("isDraft") or pr.get("isCrossRepository") or pr.get("isInMergeQueue"):

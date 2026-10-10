@@ -1028,18 +1028,36 @@ class GapTest(unittest.TestCase):
         ]
         plan = events.reconcile_plan(prs, {}, set(), 2, now, deps={22: [9]})
         self.assertEqual(plan["close"], [])
-        self.assertEqual(plan["label"], [], "non-lane drafts stay with their qualified writer")
+        # Tim, 2026-10-10: Symphony reclaims abandoned agent drafts and finishes them. The
+        # conflicting one is repaired and finished; the idle one is finished; the young one
+        # and the dependency-held one stay with their writer; a human branch is never touched.
+        self.assertEqual(plan["label"], [(20, "conflict"), (20, "stale"), (21, "stale")])
         self.assertEqual(plan["depHolds"], [(22, [9])])
         counts = plan["counts"]
         self.assertEqual((counts["staleAgentDrafts"], counts["staleOtherDrafts"]), (4, 1))
         states = {row["pr"]: row["state"] for row in plan["dispositions"]}
-        self.assertEqual(states[20], "repair")
+        self.assertEqual(states[20], "advancing", "a reclaimed draft carries a fix label the lanes act on")
         self.assertEqual(states[22], "hold:dependency")
         self.assertEqual(states[24], "draft")
-        # A landed dependency releases repair; it never grants retirement authority.
+        # A landed dependency releases the draft to the lanes; it never grants retirement authority.
         landed = events.reconcile_plan(prs, {}, set(), 2, now, deps={})
         self.assertEqual(landed["close"], [])
-        self.assertEqual(next(row for row in landed["dispositions"] if row["pr"] == 22)["state"], "repair")
+        self.assertEqual(next(row for row in landed["dispositions"] if row["pr"] == 22)["state"], "advancing")
+        self.assertIn((22, "stale"), landed["label"])
+
+    def test_reclaimed_abandoned_drafts_are_in_scope_for_repair_and_promotion(self):
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        ancient, old, recent = "2033-05-01T00:00:00Z", "2033-05-15T00:00:00Z", "2033-05-18T00:00:00Z"
+        abandoned = pr(30, branch="codex/homepage-material", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=old)
+        self.assertTrue(events.in_scope(abandoned, "red", set(), now))
+        self.assertTrue(events.in_scope(abandoned, "green", set(), now), "a reclaimed draft is readied when CLEAN")
+        self.assertFalse(events.in_scope(abandoned, "orphan", set(), now))
+        moving = pr(31, branch="codex/homepage-material", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=recent)
+        self.assertFalse(events.in_scope(moving, "red", set(), now), "a draft still being pushed stays with its writer")
+        held = pr(32, branch="codex/held", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=old, labels=["hold"])
+        self.assertFalse(events.in_scope(held, "red", set(), now))
+        human = pr(33, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old)
+        self.assertFalse(events.in_scope(human, "red", set(), now))
 
     def test_explicit_duplicate_plan_still_respects_holds_queue_and_forks(self):
         old = "2033-05-01T00:00:00Z"

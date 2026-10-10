@@ -199,8 +199,12 @@ Gaps closed after the first week (no PR may sit unowned):
 - Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
   drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
   etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
-  drafts receive `repair`, or `hold:dependency` while a named dependency is open.
-  A landed dependency releases repair; it never grants authority to discard the branch.
+  drafts are reclaimed (Tim, 2026-10-10): the sweep labels them `lane-fix-stale` (plus
+  `conflict`/`red` as applicable), workers finish them with the stale-draft prompt, the
+  gate adopts them like lane drafts, and `ready_green` marks a CLEAN one ready with native
+  merge intent. `hold:dependency` applies while a named dependency is open; a landed
+  dependency releases the draft to the lanes. `hold` and human branches are never reclaimed,
+  and nothing here grants authority to discard the branch.
   JOV-INV-011 requires an explicit `duplicate` label before automatic retirement; age and
   exhaustion never close a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
   carrying `lane-fix-exhausted` or `queue-poison` for more than 48h (measured from the label's
