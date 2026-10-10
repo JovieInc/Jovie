@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const MARKER_FILE = 'production-generation-verified.json';
 const RECOVERY_FILE = 'production-generation-recovery.json';
+const RELEASE_RISK_FILE = 'release-risk-receipt.json';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const CONTROLLER_PATH = '.github/workflows/production-controller.yml';
 const MARKER_RECOVERY_PATH = '.github/workflows/production-marker-recovery.yml';
@@ -947,7 +948,12 @@ function normalizeArtifacts(payload, expectedName) {
   }));
 }
 
-function downloadJsonArtifact(repo, artifactId, expectedFile) {
+function downloadJsonArtifact(
+  repo,
+  artifactId,
+  expectedFile,
+  optionalFiles = []
+) {
   const directory = mkdtempSync(join(tmpdir(), 'jovie-production-marker-'));
   const archive = join(directory, 'artifact.zip');
   try {
@@ -958,9 +964,15 @@ function downloadJsonArtifact(repo, artifactId, expectedFile) {
     );
     writeFileSync(archive, body);
     const entries = run('unzip', ['-Z1', archive]).split('\n').filter(Boolean);
-    if (entries.length !== 1 || entries[0] !== expectedFile) {
+    const allowedEntries = new Set([expectedFile, ...optionalFiles]);
+    const uniqueEntries = new Set(entries);
+    if (
+      entries.filter(entry => entry === expectedFile).length !== 1 ||
+      uniqueEntries.size !== entries.length ||
+      entries.some(entry => !allowedEntries.has(entry))
+    ) {
       throw new Error(
-        `Artifact ${artifactId} does not contain exactly ${expectedFile}`
+        `Artifact ${artifactId} does not contain one ${expectedFile} with only allowed companion files`
       );
     }
     return JSON.parse(run('unzip', ['-p', archive, expectedFile]));
@@ -1052,7 +1064,8 @@ function inspectOnline(args) {
     marker.payload = downloadJsonArtifact(
       repo,
       marker.artifact.id,
-      MARKER_FILE
+      MARKER_FILE,
+      [RELEASE_RISK_FILE]
     );
   }
   for (const marker of evidence.markers) {
