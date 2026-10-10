@@ -2953,7 +2953,7 @@ jobs:
 
       - name: Download Neon DB connection artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -3659,7 +3659,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: product-lane-intake-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/product-lane-receipt
@@ -3911,7 +3911,7 @@ jobs:
       - name: Download build artifact
         id: download
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download
@@ -4006,7 +4006,7 @@ jobs:
       - name: Download Neon DB connection artifact
         # Reuse the shared ephemeral branch from neon-db instead of DATABASE_URL_MAIN.
         # Screenshot/UI-only PRs still need seeded profile fixtures for Playwright.
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -4077,7 +4077,7 @@ jobs:
       - name: Download build artifact
         id: download-build
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download
@@ -4219,7 +4219,7 @@ jobs:
       - name: Download Neon DB connection artifact
         # Reuse the shared ephemeral branch from neon-db instead of DATABASE_URL_MAIN.
         # Screenshot/UI-only PRs still need seeded profile fixtures for shard-0 Playwright.
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -4300,7 +4300,7 @@ jobs:
       - name: Download build artifact
         id: download-build
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download
@@ -4507,7 +4507,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         id: download-build
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download
@@ -4634,7 +4634,7 @@ jobs:
         # Reuse the shared ephemeral branch from neon-db to avoid parallel endpoint limits.
         # neon-db is dispatch-only; merge-group runs fall back to DATABASE_URL_MAIN.
         if: needs.ci-path-changes.outputs.run_neon == 'true' && needs.neon-db.result == 'success'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -4669,7 +4669,7 @@ jobs:
       - name: Download build artifact
         id: download-build
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download
@@ -4768,7 +4768,7 @@ jobs:
 
       - name: Download Neon DB connection artifact
         if: needs.ci-path-changes.outputs.run_neon == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -4802,7 +4802,7 @@ jobs:
       - name: Download build artifact
         id: download-build
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download
@@ -4902,7 +4902,7 @@ jobs:
 
       - name: Download Neon DB connection artifact
         if: needs.ci-path-changes.outputs.run_neon == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -4936,7 +4936,7 @@ jobs:
       - name: Download build artifact
         id: download-build
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download
@@ -5043,7 +5043,7 @@ jobs:
 
       - name: Download Neon DB connection artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -5117,7 +5117,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         with:
           reuse_merge_group_workspace: 'true'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: product-lane-intake-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/blog-content-qualification
@@ -5749,7 +5749,7 @@ jobs:
 
       - name: Download exact-head coverage shard reports
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true' && steps.coverage-plan.outputs.applicable == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: exact-head-coverage-${{ github.run_id }}-*
           path: ${{ runner.temp }}/exact-head-coverage
@@ -5828,7 +5828,7 @@ jobs:
         # second branch (avoids duplicate Neon branches and flaky third-party
         # action downloads on this job).
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -5863,7 +5863,7 @@ jobs:
       - name: Download build artifact
         id: download
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download
@@ -5969,7 +5969,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Download Neon DB connection artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -6003,7 +6003,7 @@ jobs:
       - name: Download build artifact
         id: download
         if: env.DATABASE_URL != ''
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download
@@ -6136,7 +6136,7 @@ jobs:
 
       - name: Download Neon DB connection artifact
         if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result == 'success'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -6176,7 +6176,7 @@ jobs:
 
       - name: Download build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download
@@ -6321,7 +6321,7 @@ jobs:
 
       - name: Download Neon DB connection artifact
         if: needs.neon-db.result == 'success'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -6714,7 +6714,7 @@ jobs:
 
       - name: Download Neon DB connection artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -6792,7 +6792,7 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Download Neon DB connection artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -7906,7 +7906,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Download Neon DB connection artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/neon-db-connection
@@ -7938,7 +7938,7 @@ jobs:
       - name: Download build artifact from ci-build
         id: download-build
         if: ${{ needs.ci-path-changes.outputs.run_build == 'true' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download

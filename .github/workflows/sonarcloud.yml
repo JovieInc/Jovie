@@ -51,7 +51,7 @@ jobs:
 
       - name: Download exact changed-evidence web coverage
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' && github.event_name == 'workflow_run' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v6.0.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v6.0.0
         with:
           name: coverage-audit-${{ github.event.workflow_run.id }}
           path: .
