@@ -652,6 +652,7 @@ export async function runDspInteraction(page: Page) {
   });
 
   const exercisedProviders = new Set<string>();
+  const exercisedDspProviders = new Set<string>();
   const exerciseVisibleDspActions = async () => {
     const visibleActionCount = await visibleActions.count();
     for (let index = 0; index < visibleActionCount; index += 1) {
@@ -662,13 +663,20 @@ export async function runDspInteraction(page: Page) {
         'DSP action is missing its canonical provider key'
       ).toBeTruthy();
       if (!provider || exercisedProviders.has(provider)) continue;
-      const registryEntry = getRegistryEntry(provider);
-      expect(
-        registryEntry,
-        `Unknown DSP provider key: ${provider}`
-      ).toBeDefined();
-      expect(registryEntry?.showOnListenPage).toBe(true);
       exercisedProviders.add(provider);
+      const registryEntry = getRegistryEntry(provider);
+      if (registryEntry) {
+        expect(registryEntry.showOnListenPage).toBe(true);
+        exercisedDspProviders.add(provider);
+      } else {
+        // Generic platform links (`link_<slug>` keys from
+        // getCanonicalProfileDSPs) render through the same provider control
+        // but are not registry DSPs — still verify their handoff safety.
+        expect(
+          provider.startsWith('link_'),
+          `Unknown DSP provider key: ${provider}`
+        ).toBe(true);
+      }
 
       const href = await action.getAttribute('href');
       if (href) {
@@ -740,7 +748,7 @@ export async function runDspInteraction(page: Page) {
   for (
     let rotation = 0;
     rotation < 4 &&
-    ![...exercisedProviders].some(provider => provider !== 'spotify');
+    ![...exercisedDspProviders].some(provider => provider !== 'spotify');
     rotation += 1
   ) {
     const dialSelect = dialSelects.first();
@@ -764,7 +772,7 @@ export async function runDspInteraction(page: Page) {
   }
 
   expect(
-    [...exercisedProviders].some(provider => provider !== 'spotify'),
+    [...exercisedDspProviders].some(provider => provider !== 'spotify'),
     'DSP admission must exercise at least one non-Spotify provider'
   ).toBe(true);
   return true;
