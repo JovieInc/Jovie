@@ -1,0 +1,5 @@
+[PR #20878](https://github.com/JovieInc/Jovie/pull/20878) is green. Pushed `6ae0c2c24a` to the same branch after merging main, preserving both sides’ dependency updates, and regenerating the lockfile.
+
+All 19 hosted checks passed, including all four required gates. Locally: 1,147 tests and 18 typechecks passed; UI line coverage was 90.07%. Worktree is clean.
+
+GBrain write/readback verified: `coordination/jovie-pr-20878-radix-tabs-conflict-recovery-2026-10-07`.
