@@ -226,7 +226,7 @@ class GithubCoordinationBoundaryTest(unittest.TestCase):
                                    ("failed_known", "failure")]:
             with self.subTest(terminal=terminal), patch.object(attempt, "_gh", return_value={} ) as transport:
                 event = attempt._github_append(self.coord, self.ident, self.row(terminalState=terminal), 7)
-                self.assertEqual(transport.call_count, 1)
+                self.assertEqual(transport.call_count, 2)
                 body = transport.call_args.args[3]
                 self.assertEqual(body["state"], expected)
                 packed = body["target_url"].split("#jovie-execution=", 1)[1]
@@ -281,7 +281,7 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
         self.current = {"number": 7, "state": "open", "merged": False, "head": {"sha": self.sha, "ref": self.branch}, "labels": []}
         self.statuses.append({"id": 80, "context": "Fork PR Gate", "state": "success", "creator": self.creator})
         self.checks = [{"id": 100 + i, "name": name, "head_sha": self.sha, "status": "completed", "conclusion": "success", "app": {"slug": "github-actions"}} for i, name in enumerate(sorted(attempt.RECONCILE_CHECKS))]
-        self.comments, self.posts = [], []
+        self.comments, self.posts, self.refs = [], [], {}
         self.flush()
         self.transport = patch.object(attempt, "_gh", side_effect=self.gh); self.transport.start(); self.addCleanup(self.transport.stop)
     def flush(self):
@@ -298,7 +298,10 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
         status["target_url"] = status["target_url"].split("#", 1)[0] + "#jovie-execution=" + attempt._pack(row)
     def gh(self, coord, method, endpoint, body=None):
         if method == "POST":
-            self.assertIn("/statuses/", endpoint, "reconciliation must not claim a new attempt/ref")
+            if endpoint.endswith("/git/refs"):
+                if body["ref"] in self.refs: return None
+                self.refs[body["ref"]] = {"ref": body["ref"], "object": {"sha": body["sha"]}}; return self.refs[body["ref"]]
+            self.assertIn("/statuses/", endpoint)
             self.posts.append(body)
             self.statuses.append({**body, "id": max(item["id"] for item in self.statuses) + 1, "creator": dict(self.creator)})
             return {}
@@ -306,6 +309,7 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
         if "/statuses?" in endpoint: return [copy.deepcopy(self.statuses)]
         if "/check-runs?" in endpoint: return [{"total_count": len(self.checks), "check_runs": copy.deepcopy(self.checks)}]
         if "/comments?" in endpoint: return [copy.deepcopy(self.comments)]
+        if "/git/ref/" in endpoint: return [copy.deepcopy(self.refs.get("refs/" + endpoint.split("/git/ref/", 1)[1], {}))]
         self.fail(f"unexpected endpoint: {endpoint}")
     def reconcile(self, number=0):
         return attempt.reconcile_completed_failure(self.path, self.identities[number], self.pr, coordination=self.coord, state=self.state, now=self.now)
@@ -326,7 +330,11 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
             self.assertEqual(result["failureFingerprint"], f"failure-{number}")
             self.assertEqual(len(result["proof"]["excludedContexts"]), 2)
             self.assertTrue(self.reconcile(number)["alreadyReconciled"])
-        self.assertEqual(len(self.posts), 2)
+        self.assertEqual(len(self.posts), 4)
+        self.assertEqual(len(self.refs), 6)
+        self.assertEqual(sum(ref.endswith("/attempt-2") for ref in self.refs), 2)
+        self.assertEqual([body["state"] for body in self.posts], ["pending", "success", "pending", "success"])
+        self.assertFalse(any(attempt._unpack(body["target_url"].split("#jovie-execution=", 1)[1])["event"] == "attempt_started" for body in self.posts))
         self.assertEqual(self.statuses[:len(original)], original)
         self.assertTrue(self.path.read_bytes().startswith(prefix))
         self.assertEqual(before, ((self.state / "fix-attempts.json").read_bytes(), (self.state / "runs/ledger.jsonl").read_bytes()))
@@ -452,7 +460,7 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
         result = json.loads(output.getvalue())
         self.assertEqual(result["at"], self.now)
         self.assertEqual(result["result"], "failed_known")
-        self.assertEqual(len(self.posts), 1)
+        self.assertEqual(len(self.posts), 2)
     def test_cli_reports_blocked_operation_with_nonzero_exit(self):
         request = {"command": "reconcile", "path": str(self.path), "ident": self.identities[0], "pr": self.pr, "coordination": LOCAL}
         output = io.StringIO()
@@ -460,5 +468,69 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
             runpy.run_path(str(MODULE), run_name="__main__")
         self.assertEqual(exited.exception.code, 2)
         self.assertIn("live-coordination-required", json.loads(output.getvalue())["error"])
+    def test_remote_worker_winning_next_slot_prevents_any_success_append(self):
+        ref = attempt._completion_ref(self.identities[0], 2)
+        self.refs[ref] = {"ref": ref, "object": {"sha": self.sha}}
+        self.blocked("next-slot-already-reserved")
+    def test_remote_claim_racing_final_append_cannot_acquire_sealed_slot(self):
+        real, races = self.gh, []
+        def raced(coord, method, endpoint, body=None):
+            if method == "POST" and body.get("state") == "success":
+                # The real claim protocol must acquire attempt-2 before publishing
+                # attempt_started. Even an old remote worker uses this same ref.
+                row = {**self.identities[0], "schema": attempt.SCHEMA, "event": "attempt_started", "attempt": 2}
+                races.append(attempt._github_append(self.coord, self.identities[0], row, 999))
+            return real(coord, method, endpoint, body)
+        with patch.object(attempt, "_gh", side_effect=raced): self.assertTrue(self.reconcile()["reconciled"])
+        self.assertEqual(races, [None])
+        self.assertEqual([body["state"] for body in self.posts], ["pending", "success"])
+    def test_proof_is_refreshed_after_remote_fence_before_success(self):
+        real = self.gh
+        def changed(coord, method, endpoint, body=None):
+            result = real(coord, method, endpoint, body)
+            if method == "POST" and body.get("state") == "pending": self.checks[0]["conclusion"] = "failure"
+            return result
+        with patch.object(attempt, "_gh", side_effect=changed), self.assertRaisesRegex(RuntimeError, "current-check-unresolved"): self.reconcile()
+        self.assertEqual([body["state"] for body in self.posts], ["pending"])
+        self.checks[0]["conclusion"] = "success"
+        self.assertTrue(self.reconcile()["reconciled"], "trusted pending seal can resume after current proof recovers")
+        self.assertEqual([body["state"] for body in self.posts], ["pending", "success"])
+    def test_lost_remote_seal_binding_remains_pending_and_blocks_success(self):
+        real = self.gh
+        def removed(coord, method, endpoint, body=None):
+            result = real(coord, method, endpoint, body)
+            if method == "POST" and body.get("state") == "pending": self.refs.clear()
+            return result
+        with patch.object(attempt, "_gh", side_effect=removed), self.assertRaisesRegex(RuntimeError, "remote-fence-unverified"): self.reconcile()
+        self.assertEqual([body["state"] for body in self.posts], ["pending"])
+    def test_real_budget_exhausted_claim_after_pending_seal_is_a_no_write_stop(self):
+        real, races = self.gh, []
+        def raced(coord, method, endpoint, body=None):
+            if method == "POST" and body.get("state") == "success":
+                races.append(attempt.claim(self.state / "remote.jsonl", self.identities[0], owner("remote"), policy(), {}, now=self.now, coordination=self.coord))
+            return real(coord, method, endpoint, body)
+        with patch.object(attempt, "_gh", side_effect=raced): self.assertTrue(self.reconcile()["reconciled"])
+        self.assertEqual(races[0]["reason"], "generation_completion_fenced")
+        self.assertEqual([body["state"] for body in self.posts], ["pending", "success"])
+    def test_unseen_pending_seal_fences_real_budget_decision_append(self):
+        real, races = self.gh, []
+        def raced(coord, method, endpoint, body=None):
+            if method == "POST" and body.get("state") == "pending":
+                try: attempt.claim(self.state / "remote.jsonl", self.identities[0], owner("remote"), policy(), {}, now=self.now, coordination=self.coord)
+                except RuntimeError as error: races.append(str(error))
+            return real(coord, method, endpoint, body)
+        with patch.object(attempt, "_gh", side_effect=raced): self.assertTrue(self.reconcile()["reconciled"])
+        self.assertEqual(races, ["execution-coordinator-contention"])
+        self.assertEqual([body["state"] for body in self.posts], ["pending", "success"])
+    def test_real_budget_decision_winning_remote_append_remains_failure(self):
+        real, triggered = self.gh, []
+        def raced(coord, method, endpoint, body=None):
+            if method == "POST" and str(body.get("ref", "")).endswith("/attempt-2") and not triggered:
+                triggered.append(True)
+                result = attempt.claim(self.state / "remote.jsonl", self.identities[0], owner("remote"), policy(), {}, now=self.now, coordination=self.coord)
+                self.assertEqual(result["reason"], "wallSeconds_budget_exhausted")
+            return real(coord, method, endpoint, body)
+        with patch.object(attempt, "_gh", side_effect=raced), self.assertRaisesRegex(RuntimeError, "unsupported-history"): self.reconcile()
+        self.assertEqual([body["state"] for body in self.posts], ["failure"])
 
 if __name__ == "__main__": unittest.main()

@@ -79,9 +79,6 @@ def _github_rows(coordination: dict, ident: dict) -> tuple[list[dict], int | Non
 def _github_append(coordination: dict, ident: dict, row: dict, head: int | None) -> str | None:
     candidate = {**row, "_remote": {"prevStatusId": head, "eventId": uuid.uuid4().hex}}
     repository, sha = coordination["repository"], coordination["sha"]
-    if row["event"] == "attempt_started":
-        ref = f"refs/jovie-execution/{ident['identityDigest']}/attempt-{row['attempt']}"
-        if _gh(coordination, "POST", f"repos/{repository}/git/refs", {"ref": ref, "sha": sha}) is None: return None
     target = (coordination.get("targetUrl") or f"https://github.com/{repository}/commit/{sha}").split("#", 1)[0]
     target = f"{target}#jovie-execution={_pack(candidate)}"
     if len(target) > 2000: raise RuntimeError("execution-coordinator-receipt-too-large")
@@ -89,6 +86,13 @@ def _github_append(coordination: dict, ident: dict, row: dict, head: int | None)
     state = "success" if terminal in ("succeeded", "no_op_stale", "superseded") else "failure" if terminal else "pending"
     body = {"state": state, "context": f"jovie-execution/{ident['identityDigest']}", "target_url": target,
             "description": f"execution {candidate['event']} attempt={candidate.get('attempt', 0)} {ident['identityDigest'][:12]}"}
+    # Serialize ALL dispositions, including budget decisions, against this exact
+    # predecessor. The next-attempt ref alone only fences attempt_started.
+    append_ref = f"refs/jovie-execution/{ident['identityDigest']}/append-{head if head is not None else 'root'}"
+    if _gh(coordination, "POST", f"repos/{repository}/git/refs", {"ref": append_ref, "sha": sha}) is None: return None
+    if row["event"] == "attempt_started":
+        ref = f"refs/jovie-execution/{ident['identityDigest']}/attempt-{row['attempt']}"
+        if _gh(coordination, "POST", f"repos/{repository}/git/refs", {"ref": ref, "sha": sha}) is None: return None
     _gh(coordination, "POST", f"repos/{repository}/statuses/{sha}", body)
     return candidate["_remote"]["eventId"]
 def _locked(path: Path, ident: dict, coordination: dict | None, fn):
@@ -131,6 +135,9 @@ def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now
     if any(not _number(policy.get(key)) or policy[key] < 0 for key in required) or any(policy[key] <= 0 for key in required[:3] + ("leaseSeconds",)): raise ValueError("execution-policy-malformed")
     def decide(all_rows):
         rows = _for(all_rows, ident)
+        if any(row.get("event") == "completion_fenced" for row in rows):
+            terminal = next((row.get("terminalState") for row in reversed(rows) if row.get("terminalState") in TERMINAL), None)
+            return {"admitted": False, "reason": "generation_terminal" if terminal else "generation_completion_fenced", "terminalState": terminal}, []
         terminal = next((row for row in reversed(rows) if row.get("terminalState") in TERMINAL), None)
         if terminal: return {"admitted": False, "reason": "generation_terminal", "terminalState": terminal["terminalState"]}, []
         starts = [row for row in rows if row["event"] == "attempt_started"]
@@ -264,10 +271,17 @@ def _completed_chain(rows: list[dict], ident: dict, journal: list[dict], pr: int
             ended = _timestamp(receipt.get("endedAt", ""))
             if ended > now or abs(ended - row["at"]) > 2: raise RuntimeError("reconciliation-ended-time-mismatch")
             finishes[fence] = row; receipts.append(receipt)
+        elif event == "completion_fenced":
+            if (not finishes or row.get("sealedAttempt") != len(starts) + 1 or row.get("result") != "failed_known"
+                or row.get("terminalState") is not None or row.get("fencingToken") != next(reversed(finishes))
+                or row.get("endedReceiptDigest") != digest(receipts[-1])
+                or any(previous.get("event") == "completion_fenced" for previous in rows[:rows.index(row)])):
+                raise RuntimeError("reconciliation-completion-fence-mismatch")
         elif event == "disposition_reconciled":
             if (row is not rows[-1] or not finishes or row.get("terminalState") != "no_op_stale" or row.get("result") != "failed_known"
                 or row.get("reconciliationOutcome") != "source_intent_stale_after_recovery"
-                or row.get("fencingToken") != next(reversed(finishes)) or row.get("endedReceiptDigest") != digest(receipts[-1])):
+                or row.get("fencingToken") != next(reversed(finishes)) or row.get("endedReceiptDigest") != digest(receipts[-1])
+                or not any(previous.get("event") == "completion_fenced" for previous in rows)):
                 raise RuntimeError("reconciliation-prior-disposition-mismatch")
         else: raise RuntimeError("reconciliation-unsupported-history")
     if not starts or starts.keys() != finishes.keys(): raise RuntimeError("reconciliation-live-or-unfinished-attempt")
@@ -355,11 +369,24 @@ def _reconciliation_proof(coord: dict, ident: dict, rows: list[dict], pr: int, s
             raise RuntimeError("reconciliation-current-claim-active")
     return {"headSha": sha, "pr": pr, "branch": branch, "bankDigest": digest(bank), "endedReceiptDigests": [digest(item) for item in completed],
             "excludedContexts": sorted(excluded), "statusIds": sorted(item["id"] for item in latest.values()), "checkIds": sorted(item["id"] for item in checks)}
+def _completion_ref(ident: dict, sealed_attempt: int) -> str:
+    # This is the same atomic ref namespace that attempt_started must acquire.
+    # Sealing the next slot blocks old as well as new workers; it is not a claim,
+    # an attempt-start event, a charged retry, or permission to call a provider.
+    return f"refs/jovie-execution/{ident['identityDigest']}/attempt-{sealed_attempt}"
+def _verify_completion_fence(coord: dict, ident: dict, row: dict):
+    ref = _completion_ref(ident, row["sealedAttempt"])
+    observed = _gh(coord, "GET", f"repos/{coord['repository']}/git/ref/{ref.removeprefix('refs/')}")
+    if (not isinstance(observed, list) or len(observed) != 1 or observed[0].get("ref") != ref
+        or observed[0].get("object", {}).get("sha") != coord["sha"]):
+        raise RuntimeError("reconciliation-remote-fence-unverified")
 def reconcile_completed_failure(path: Path, ident: dict, pr: int, *, coordination: dict, state: Path | None = None, now: float | None = None) -> dict:
     """Append a stale-intent disposition after authoritative recovery; never retry or rewrite failure.
 
     The maintained per-head bank mutex fences local repair claims. Each CAS retry
     re-reads current GitHub state and each identity's own ended-run journal.
+    Activation must drain/update old writers on every participating host: legacy
+    budget-decision writers do not honor the shared append-ref protocol.
     """
     if coordination.get("kind") != "github-status" or not isinstance(pr, int) or isinstance(pr, bool) or pr <= 0:
         raise ValueError("reconciliation-live-coordination-required")
@@ -371,15 +398,36 @@ def reconcile_completed_failure(path: Path, ident: dict, pr: int, *, coordinatio
     with open(bank_path.with_suffix(".json.lock"), "a+") as lock:
         try: fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error: raise RuntimeError("reconciliation-bank-lock-busy") from error
+        def fence(rows):
+            proof = _reconciliation_proof(coordination, ident, rows, pr, state, json.loads(bank_path.read_text()), now)
+            sealed = next((row for row in rows if row.get("event") == "completion_fenced"), None)
+            if sealed:
+                _verify_completion_fence(coordination, ident, sealed)
+                return {"fenced": True}, []
+            ended = rows[-1]
+            next_attempt = ended["attempt"] + 1
+            ref = _completion_ref(ident, next_attempt)
+            if _gh(coordination, "POST", f"repos/{coordination['repository']}/git/refs", {"ref": ref, "sha": coordination["sha"]}) is None:
+                # A worker or another reconciler won, possibly without publishing
+                # its receipt yet. Never infer ownership from an equal ref SHA.
+                raise RuntimeError("reconciliation-next-slot-already-reserved")
+            row = {**ident, "schema": SCHEMA, "event": "completion_fenced", "at": now, "attempt": ended["attempt"], "fencingToken": ended["fencingToken"],
+                   "sealedAttempt": next_attempt, "result": "failed_known", "terminalState": None, "remainingBudgets": ended["remainingBudgets"],
+                   "endedReceiptDigest": next(digest(item) for item in [json.loads(line) for line in (state / "runs/ledger.jsonl").read_text().splitlines()] if item.get("execution") == _plain(ended)),
+                   "evidenceDigest": digest(proof)}
+            return {"fenced": True}, [row]
+        _locked(Path(path), ident, coordination, fence)
         def decide(rows):
             proof = _reconciliation_proof(coordination, ident, rows, pr, state, json.loads(bank_path.read_text()), now)
+            sealed = next(row for row in rows if row.get("event") == "completion_fenced")
+            _verify_completion_fence(coordination, ident, sealed)
             if rows[-1].get("event") == "disposition_reconciled":
                 return {"reconciled": True, "alreadyReconciled": True, "result": "failed_known", "terminalState": "no_op_stale", "proof": proof}, []
-            ended = rows[-1]
+            ended = next(row for row in reversed(rows) if row.get("event") == "attempt_finished")
             row = {**ident, "schema": SCHEMA, "event": "disposition_reconciled", "at": now, "attempt": ended["attempt"], "fencingToken": ended["fencingToken"],
                    "result": ended["result"], "terminalState": "no_op_stale", "retryDecision": "stop", "reconciliationOutcome": "source_intent_stale_after_recovery",
                    "failureClass": ended["failureClass"], "failureFingerprint": ended.get("failureFingerprint"), "remainingBudgets": ended["remainingBudgets"],
-                   "endedReceiptDigest": next(digest(item) for item in [json.loads(line) for line in (state / "runs/ledger.jsonl").read_text().splitlines()] if item.get("execution") == _plain(ended)),
+                   "endedReceiptDigest": sealed["endedReceiptDigest"],
                    "evidenceDigest": digest(proof), "bankDigest": proof["bankDigest"]}
             return {"reconciled": True, **row, "proof": proof}, [row]
         return _locked(Path(path), ident, coordination, decide)
