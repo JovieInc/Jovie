@@ -2699,7 +2699,7 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertIn("queue-controller-red-over-10m", later["reasons"])
         self.assertEqual(later["controller"], failed)
 
-    def test_fresh_green_symphony_clears_persisted_controller_failure_episode(self):
+    def test_fresh_green_or_parked_symphony_clears_persisted_controller_failure_episode(self):
         failed = {"status": "failed", "kind": "symphony"}
         first_failure = MODULE.evaluate_closure_health(
             snapshot(controller=failed), previous=None, now=NOW
@@ -2713,29 +2713,53 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertIn("queue-controller-red-over-10m", persisted_failure["reasons"])
 
         now = NOW + timedelta(minutes=12)
-        green = {
-            "status": "green",
-            "kind": "symphony",
-            "source": "live",
-            "observedAt": MODULE.isoformat(now),
-        }
-        with mock.patch.object(
-            MODULE,
-            "_run_graphql_snapshot",
-            return_value={"prs": [], "mainOid": "a" * 40, "latestMergeAt": None},
-        ), mock.patch.object(MODULE, "observe_promotion_evidence", return_value=[]):
-            result = MODULE.observe_closure_health(
-                "JovieInc/Jovie",
-                previous=persisted_failure,
-                now=now,
-                controller_observation=green,
-            )
+        for status in ("green", "parked"):
+            controller = {
+                "status": status,
+                "kind": "symphony",
+                "source": "live",
+                "observedAt": MODULE.isoformat(now),
+                **({"retired": True} if status == "parked" else {}),
+            }
+            with self.subTest(status=status), mock.patch.object(
+                MODULE,
+                "_run_graphql_snapshot",
+                return_value={"prs": [], "mainOid": "a" * 40, "latestMergeAt": None},
+            ) as snapshot_read, mock.patch.object(MODULE, "observe_promotion_evidence", return_value=[]):
+                result = MODULE.observe_closure_health(
+                    "JovieInc/Jovie", previous=persisted_failure, now=now,
+                    controller_observation=controller,
+                )
 
-        self.assertEqual(result["status"], "healthy")
-        self.assertTrue(result["newIssueIntakeAllowed"])
-        self.assertEqual(result["controller"], green)
-        self.assertNotIn("controller", result["episodes"])
-        self.assertNotIn("queue-controller-red-over-10m", result["reasons"])
+            snapshot_read.assert_called_once()
+            self.assertEqual(result["status"], "healthy")
+            self.assertTrue(result["newIssueIntakeAllowed"])
+            self.assertEqual(result["controller"], controller)
+            self.assertNotIn("controller", result["episodes"])
+            self.assertNotIn("queue-controller-red-over-10m", result["reasons"])
+
+    def test_parked_evaluation_does_not_start_a_controller_failure_episode(self):
+        controller = {"status": "parked", "retired": True}
+        first = MODULE.evaluate_closure_health(snapshot(controller=controller), None, NOW)
+        later = MODULE.evaluate_closure_health(
+            snapshot(controller=controller), first, NOW + timedelta(minutes=11)
+        )
+        for result in (first, later):
+            self.assertEqual(result["status"], "healthy")
+            self.assertTrue(result["newIssueIntakeAllowed"])
+            self.assertNotIn("controller", result["episodes"])
+            self.assertEqual(result["controller"], controller)
+
+    def test_parked_controller_does_not_bypass_missing_closure_evidence(self):
+        with mock.patch.object(MODULE, "_run_graphql_snapshot", side_effect=ValueError("snapshot missing")) as snapshot_read:
+            result = MODULE.observe_closure_health(
+                "JovieInc/Jovie", previous=None, now=NOW,
+                controller_observation={"status": "parked", "retired": True},
+            )
+        snapshot_read.assert_called_once()
+        self.assertEqual(result["status"], "red")
+        self.assertFalse(result["newIssueIntakeAllowed"])
+        self.assertEqual(result["reasons"], ["closure-observation-unknown"])
 
 
 if __name__ == "__main__":

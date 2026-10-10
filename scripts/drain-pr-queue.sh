@@ -368,7 +368,7 @@ case "$DRAIN_PROMOTION_MODE" in
         (.reasons | type == "array" and length > 0) and
         all(.reasons[]; .code | IN("controller-failure", "production-deployment-unbound")) and
         (.signals.integrity.status | IN("clear", "resolved")) and
-        (.signals.controller.status | IN("green", "failed")) and
+        (.signals.controller.status | IN("green", "failed", "parked")) and
         .reviewAdmission.allowed == true and
         .reviewAdmission.required == true and
         .reviewAdmission.authority == "Gem" and
