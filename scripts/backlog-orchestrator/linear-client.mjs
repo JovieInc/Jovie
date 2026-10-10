@@ -75,10 +75,25 @@ function redactBody(value) {
 }
 
 function responseMetadata(response, attempt, extra = {}) {
+  const rateLimitRemaining = {};
+  for (const name of [
+    'x-ratelimit-requests-remaining',
+    'x-ratelimit-complexity-remaining',
+    'x-ratelimit-requests-reset',
+    'x-ratelimit-complexity-reset',
+  ]) {
+    const raw = response?.headers?.get?.(name);
+    // Only record a header that is actually present — an absent header reads
+    // null, and Number(null) === 0 would fabricate a real counter.
+    if (typeof raw !== 'string' || raw.trim() === '') continue;
+    const value = Number(raw);
+    if (Number.isFinite(value) && value >= 0) rateLimitRemaining[name] = value;
+  }
   return {
     status: Number.isFinite(response?.status) ? response.status : undefined,
     contentType: response?.headers?.get?.('content-type') || undefined,
     attempt,
+    ...(Object.keys(rateLimitRemaining).length ? { rateLimitRemaining } : {}),
     ...extra,
   };
 }
@@ -118,10 +133,11 @@ export function activeLinearCooldown(error, nowMs = Date.now()) {
   let current = error;
   let rateLimited = false;
   let resetAt = 0;
+  let rateLimitRemaining;
   while (current && typeof current === 'object' && !seen.has(current)) {
     seen.add(current);
     const record =
-      /** @type {{ code?: string, resetAt?: number, metadata?: { resetAt?: number }, cause?: unknown }} */ (
+      /** @type {{ code?: string, resetAt?: number, metadata?: { resetAt?: number, rateLimitRemaining?: Record<string, number> }, rateLimitRemaining?: Record<string, number>, cause?: unknown }} */ (
         current
       );
     if (record.code === 'RATE_LIMITED') rateLimited = true;
@@ -129,10 +145,21 @@ export function activeLinearCooldown(error, nowMs = Date.now()) {
       if (typeof candidate === 'number' && Number.isSafeInteger(candidate))
         resetAt = Math.max(resetAt, candidate);
     }
+    // Surface Linear's quota counters (x-ratelimit-*-remaining) when the
+    // transport captured them, so the deferred-retry log line shows the
+    // actual budget, not just 'rate limited'.
+    const remaining =
+      record.rateLimitRemaining ?? record.metadata?.rateLimitRemaining;
+    if (!rateLimitRemaining && remaining && typeof remaining === 'object')
+      rateLimitRemaining = remaining;
     current = record.cause;
   }
   if (!rateLimited || resetAt <= nowMs) return null;
-  return { resetAt, retryAt: new Date(resetAt).toISOString() };
+  return {
+    resetAt,
+    retryAt: new Date(resetAt).toISOString(),
+    ...(rateLimitRemaining ? { rateLimitRemaining } : {}),
+  };
 }
 
 function paginationCoverage({
@@ -367,6 +394,10 @@ const RATE_LIMIT_RESET_HEADERS = [
   'x-ratelimit-requests-reset',
   'x-ratelimit-complexity-reset',
 ];
+const RATE_LIMIT_REMAINING_HEADERS = [
+  'x-ratelimit-requests-remaining',
+  'x-ratelimit-complexity-remaining',
+];
 
 /**
  * True only when a 400/429 response body marks the failure as shared-budget
@@ -403,9 +434,17 @@ function rateLimitHints(response, nowMs = Date.now()) {
     const epochMs = value < 1e11 ? value * 1000 : value;
     if (resetAt === null || epochMs > resetAt) resetAt = epochMs;
   }
+  const remaining = {};
+  for (const name of RATE_LIMIT_REMAINING_HEADERS) {
+    const value = Number(get(name));
+    if (Number.isFinite(value) && value >= 0) remaining[name] = value;
+  }
   return {
     retryAfterMs: resetAt === null ? null : Math.max(0, resetAt - nowMs),
     resetAt,
+    // Surface Linear's own quota counters so the remediator's log line can
+    // show remaining/reset instead of just 'rate limited'.
+    rateLimitRemaining: Object.keys(remaining).length ? remaining : undefined,
   };
 }
 
