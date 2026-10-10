@@ -2,12 +2,13 @@
 /** One signed Linear delivery -> one current JOV Triage assessment. No admission writer. */
 
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { classifyDeterministic } from './classifier.mjs';
 import { classifyIntakeReadiness } from './intake-readiness.mjs';
 import * as linear from './linear-client.mjs';
 import { reconcileIssues } from './reconcile.mjs';
+import * as runtimeState from './runtime-state.mjs';
 import {
   requestSummerAssessment,
   validJevTriageAssessment,
@@ -212,6 +213,52 @@ const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 const BACKLOG_STATE_ID = '1551ed21-7743-4573-82d8-8949410d3b8d';
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Sweep throttle (2026-10-10): the fleet-gate-refresh workflow invokes
+// `--sweep` under `if: always()` on every 5-minute tick AND every main push
+// (~300/day) on the shared Linear credential, which was the main consumer
+// behind the remediator deferring RATE_LIMITED. The sweep is a catch-up
+// backstop, not the primary signal (signed deliveries drive the real-time
+// path), so a 30-minute floor prunes the redundant runs. The last
+// successful sweep timestamp persists in the same out-of-tree cache the
+// remediator uses (runtime-state.resolveCacheFile) so the throttle survives
+// across workflow runs.
+const SWEEP_MIN_INTERVAL_MS = 30 * 60 * 1000;
+const SWEEP_THROTTLE_KEY = 'lastTriageSweepOkAt';
+
+function readSweepCache(cacheFile) {
+  try {
+    const parsed = JSON.parse(readFileSync(cacheFile, 'utf8'));
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSweepCache(cacheFile, cache) {
+  runtimeState.ensureParentDir(cacheFile);
+  writeFileSync(cacheFile, JSON.stringify(cache, null, 2));
+}
+
+/**
+ * Decide whether the catch-up sweep should run. Returns `{ skip, reason }` —
+ * skip=true when the last successful sweep is fresher than the 30-minute
+ * floor. A missing/unparseable timestamp never skips (fail open to running:
+ * the sweep is the backstop for missed webhooks, so doubt means run).
+ */
+export function triageSweepThrottle({ lastOkAt, nowMs }) {
+  const parsed = Date.parse(String(lastOkAt ?? ''));
+  if (!Number.isFinite(parsed)) return { skip: false, reason: 'no-prior-ok' };
+  const ageMs = nowMs - parsed;
+  if (ageMs < 0) return { skip: false, reason: 'clock-skew' };
+  if (ageMs < SWEEP_MIN_INTERVAL_MS) {
+    return {
+      skip: true,
+      reason: `swept-${Math.round(ageMs / 60000)}m-ago`,
+    };
+  }
+  return { skip: false, reason: 'interval-elapsed' };
+}
 
 /** Recover missed/ambiguous webhook deliveries through the same exact-issue writer. */
 export async function assessTriageSweep(
@@ -440,16 +487,43 @@ export async function assessTriageEvent(
   };
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+async function runCli() {
   const eventPath = process.argv
     .find(arg => arg.startsWith('--event-file='))
     ?.slice('--event-file='.length);
   if (!eventPath && !process.argv.includes('--sweep'))
     throw new Error('missing-event-file');
-  const receipt = process.argv.includes('--sweep')
+  const isSweep = process.argv.includes('--sweep');
+  // Throttle the catch-up sweep (2026-10-10): the workflow invokes `--sweep`
+  // under `if: always()` on every 5-minute tick + every main push on the
+  // shared Linear credential, which was the main consumer behind the
+  // remediator deferring RATE_LIMITED. Skip when the last successful sweep
+  // is fresher than the 30-minute floor; log the skip so the receipt trail
+  // shows the throttle, and persist the timestamp only after a clean run.
+  let sweepCacheFile = null;
+  if (isSweep) {
+    sweepCacheFile = runtimeState.assertsOutsideGitTree(
+      runtimeState.resolveCacheFile({})
+    );
+    const throttle = triageSweepThrottle({
+      lastOkAt: readSweepCache(sweepCacheFile)[SWEEP_THROTTLE_KEY],
+      nowMs: Date.now(),
+    });
+    if (throttle.skip) {
+      console.log(`triage-sweep skipped reason=${throttle.reason}`);
+      process.exitCode = 0;
+      return;
+    }
+  }
+  const receipt = isSweep
     ? await assessTriageSweep()
     : await assessTriageEvent(JSON.parse(readFileSync(eventPath, 'utf8')));
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
+  if (isSweep && sweepCacheFile && Number(receipt?.failed ?? 0) === 0) {
+    const cache = readSweepCache(sweepCacheFile);
+    cache[SWEEP_THROTTLE_KEY] = new Date().toISOString();
+    writeSweepCache(sweepCacheFile, cache);
+  }
   if ('failed' in receipt) {
     // Named rows, never an anonymous exit. The exit rule keeps its full
     // strength for every failure the sweep itself owns: failed > 0 exits 1,
@@ -483,4 +557,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     if (Number(receipt.failed ?? 0) > 0 || blockedWithoutEscalation > 0)
       process.exitCode = 1;
   }
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  await runCli();
 }
