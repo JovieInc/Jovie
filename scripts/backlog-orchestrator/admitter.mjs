@@ -654,7 +654,7 @@ export function evaluateFleetGate(
     // and unbound production stays hold-intake. Drain classifies PRs itself.
   }
 
-  let state = redReasons.length
+  const state = redReasons.length
     ? FLEET_GATE_STATE.RED
     : reasons.length
       ? FLEET_GATE_STATE.AMBER
@@ -679,10 +679,19 @@ export function evaluateFleetGate(
   const laneCapacityReason = queueShapeValid
     ? laneCapacityReasonForQueue(evidence?.queue, greenReadyPrs, queueTarget)
     : null;
-  if (!redReasons.length && laneCapacityReason) {
-    reasons.push(laneCapacityReason);
-    state = FLEET_GATE_STATE.AMBER;
-  }
+  // JOV-8000 follow-up 31: lane-capacity evidence scopes NEW WORK ADMISSION
+  // only (queueRepositoryCapacityAvailable below vetoes new leases when the
+  // receipt is present and contradictory) — it is never a promotion reason.
+  // The canonical python writer (gem-priority-gate.py) keeps it out of
+  // `reasons`, so pushing it here forced AMBER and poisoned the bounded
+  // hold-intake reason set ({controller-failure,
+  // production-deployment-unbound}), binding promotionMode=BLOCKED — and the
+  // remediator's capacity reason merge-queue-blocked — while the persisted
+  // receipt printed hold-intake (the 38028777358 split-brain class). The
+  // failure detail stays observable on the receipt as laneCapacityError.
+  const laneCapacityError = laneCapacityReason
+    ? laneCapacityReason.detail
+    : null;
   const queueRepository = repositoryName(evidence?.queue?.repository);
   const queueRepositoryCapacity = queueRepository
     ? scopedLaneCapacity?.repositories?.[queueRepository]
@@ -871,6 +880,7 @@ export function evaluateFleetGate(
       symphonyImplementation: 'event-driven-backpressure',
     },
     laneCapacity: scopedLaneCapacity,
+    laneCapacityError,
   };
 }
 
