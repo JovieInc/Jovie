@@ -36,7 +36,6 @@ import {
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
-import { cn } from '@/lib/utils';
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
@@ -466,7 +465,8 @@ export default function LaunchPage() {
                 <p className='system-b-launch-kicker'>Launch</p>
                 <h1
                   id='hero-heading'
-                  className={cn('system-b-launch-hero-title', 'line-clamp-2')}
+                  data-wrap='editorial-title'
+                  className='system-b-launch-hero-title'
                 >
                   {/* ui-casing-allow: marketing display headline */}
                   Your entire music career. One intelligent link.

@@ -5,10 +5,6 @@
   "/card|mobile|orphaned-line": 1,
   "/download|desktop|orphaned-line": 2,
   "/download|mobile|orphaned-line": 1,
-  "/launch|desktop|clipped-heading": 1,
-  "/launch|desktop|orphaned-line": 1,
-  "/launch|mobile|clipped-heading": 1,
-  "/launch|mobile|orphaned-line": 1,
   "/waitlist/invite|mobile|orphaned-line": 1,
   "/youtube-thumbnails|mobile|clipped-heading": 1
 }

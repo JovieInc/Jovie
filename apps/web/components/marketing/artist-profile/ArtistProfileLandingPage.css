@@ -400,7 +400,9 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-launch-hero-title) {
-  max-width: 11ch;
+  /* JOV-8167: wide enough for two balanced lines, never clamped. */
+  max-width: 24ch;
+  text-wrap: balance;
   margin: var(--space-5) 0 0;
   color: var(--system-b-text-primary);
   font-size: clamp(
@@ -1243,7 +1245,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
   }
 
   :where(.system-b-launch-hero-title) {
-    max-width: 10ch;
+    max-width: 13ch;
   }
 
   :where(.system-b-launch-profile-stage) {
