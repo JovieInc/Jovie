@@ -827,6 +827,42 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(hoisted.dbOnConflictDoUpdateMock).not.toHaveBeenCalled();
   });
 
+  it('uses safe unavailable copy when insufficient funds arrive mid-stream', async () => {
+    const error = Object.assign(
+      new Error('A positive credit balance is required to use AI Gateway.'),
+      {
+        name: 'GatewayInternalServerError',
+        statusCode: 402,
+      }
+    );
+    hoisted.executeChatTurnMock.mockResolvedValue({
+      streamResult: {
+        toUIMessageStreamResponse: ({
+          headers,
+          onError,
+        }: {
+          headers: Record<string, string>;
+          onError: (error: unknown) => string;
+        }) => new Response(onError({ error }), { status: 200, headers }),
+      },
+      selectedModel: 'test-model',
+      systemPrompt: '',
+      toolNames: [],
+      modelMessages: [],
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const result = await tryHandleAnonymousOnboardingChat(
+      makeRequest({ mode: 'onboarding', messages: [userMessage('hi')] }),
+      'req-insufficient-funds-stream'
+    );
+    expect(await result?.text()).toBe(
+      'Jovie AI is currently unavailable. Please try again later.'
+    );
+    expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+  }, 15_000);
+
   it('does not persist an assistant reply when the model stream fails', async () => {
     let finishPromise: PromiseLike<void> | void = undefined;
     hoisted.executeChatTurnMock.mockImplementation(async options => {

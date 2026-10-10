@@ -2,7 +2,9 @@ import type { UIMessage } from 'ai';
 
 import {
   GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
+  GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE,
   isGatewayBudgetExceededError,
+  isGatewayInsufficientFundsError,
 } from '@/lib/ai/gateway-errors';
 import {
   isRecoverableToolErrorCode,
@@ -111,7 +113,10 @@ export function getErrorType(error: Error): ChatErrorType {
     return 'server';
   }
 
-  if (isGatewayBudgetExceededError(error)) {
+  if (
+    isGatewayInsufficientFundsError(error) ||
+    isGatewayBudgetExceededError(error)
+  ) {
     return 'server';
   }
 
@@ -340,6 +345,10 @@ export function getPreferredErrorMessage(
   type: ChatErrorType,
   metadata: ErrorMetadata
 ): string {
+  if (isGatewayInsufficientFundsError(error)) {
+    return GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE;
+  }
+
   if (isGatewayBudgetExceededError(error)) {
     return GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE;
   }

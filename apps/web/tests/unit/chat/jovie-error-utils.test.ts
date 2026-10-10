@@ -180,3 +180,27 @@ describe('tool failure chat pause suppression', () => {
     );
   });
 });
+
+describe('insufficient-funds presentation', () => {
+  it.each([
+    Object.assign(
+      new Error('A positive credit balance is required to use AI Gateway.'),
+      { name: 'GatewayInternalServerError', statusCode: 402 }
+    ),
+    new Error(
+      JSON.stringify({
+        errorCode: 'AI_UNAVAILABLE',
+        error: 'A positive credit balance is required to use AI Gateway.',
+      })
+    ),
+  ])(
+    'presents a server failure without leaking provider finance details',
+    error => {
+      const type = getErrorType(error);
+      expect(type).toBe('server');
+      expect(
+        getPreferredErrorMessage(error, type, extractErrorMetadata(error))
+      ).toBe('Jovie AI is currently unavailable. Please try again later.');
+    }
+  );
+});

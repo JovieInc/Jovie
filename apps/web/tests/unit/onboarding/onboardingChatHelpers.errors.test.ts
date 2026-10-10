@@ -176,3 +176,27 @@ describe('getOnboardingErrorMessage', () => {
     ).toBe(GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE);
   });
 });
+
+describe('insufficient-funds onboarding presentation', () => {
+  it('preserves safe unavailable messaging for a serialized API response', () => {
+    const error = serializeApiError(503, {
+      errorCode: 'AI_UNAVAILABLE',
+      error: 'A positive credit balance is required to use AI Gateway.',
+    });
+    expect(
+      getOnboardingErrorMessage(error.message, error.errorCode, error.type)
+    ).toBe('Jovie AI is currently unavailable. Please try again later.');
+  });
+
+  it.each([
+    'A positive credit balance is required to use AI Gateway.',
+    'Jovie AI is currently unavailable. Please try again later.',
+  ])(
+    'handles a streamed text error without requiring an error code',
+    message => {
+      expect(getOnboardingErrorMessage(message, undefined, 'server')).toBe(
+        'Jovie AI is currently unavailable. Please try again later.'
+      );
+    }
+  );
+});

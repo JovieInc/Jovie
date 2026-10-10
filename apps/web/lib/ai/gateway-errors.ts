@@ -4,6 +4,8 @@
  * Budget-exceeded is a hard wall on the gateway API key. Chat must not
  * surface the raw GatewayInternalServerError to users: retry the vetted
  * rotation chain, then show a calm fallback and a distinct alert.
+ * Insufficient account funds affect every model on the same Gateway account:
+ * fail fast instead of rotating (JOV-7953).
  */
 
 import { CHAT_MODEL_ROTATION_CHAIN } from '@/lib/constants/ai-models';
@@ -12,6 +14,12 @@ export const GATEWAY_BUDGET_EXCEEDED_ERROR_CODE = 'GATEWAY_BUDGET_EXCEEDED';
 
 export const GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE =
   'Jovie is temporarily unavailable. Please try again in a moment.';
+
+// This public support code must not reveal the Gateway account funding state.
+export const GATEWAY_INSUFFICIENT_FUNDS_ERROR_CODE = 'AI_UNAVAILABLE';
+
+export const GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE =
+  'Jovie AI is currently unavailable. Please try again later.';
 
 export const CHAT_STREAM_FAILED_ERROR_CODE = 'CHAT_STREAM_FAILED';
 
@@ -41,7 +49,7 @@ export interface ChatStreamFailure {
 
 function readErrorString(
   error: unknown,
-  key: 'name' | 'message' | 'code'
+  key: 'name' | 'message' | 'code' | 'type' | 'errorCode'
 ): string {
   if (typeof error === 'string' && key === 'message') {
     return error;
@@ -87,7 +95,82 @@ export function isGatewayBudgetExceededError(error: unknown): boolean {
   return false;
 }
 
+/** SDK causes, retry wrappers, stream events and serialized transport bodies. */
+function* walkGatewayErrorDetails(error: unknown): Generator<unknown> {
+  const pending = [error];
+  const seen = new Set<unknown>();
+  while (pending.length > 0) {
+    const candidate = pending.pop();
+    if (candidate == null || seen.has(candidate)) continue;
+    seen.add(candidate);
+    yield candidate;
+    if (typeof candidate === 'string') {
+      const serialized = candidate.trim().replace(/^Error:\s*/, '');
+      if (!serialized.startsWith('{') && !serialized.startsWith('[')) continue;
+      try {
+        pending.push(JSON.parse(serialized));
+      } catch {
+        // Plain provider messages and malformed bodies are still classifiable.
+      }
+    } else if (Array.isArray(candidate)) {
+      pending.push(...candidate);
+    } else if (typeof candidate === 'object') {
+      const record = candidate as Record<string, unknown>;
+      for (const key of [
+        'cause',
+        'error',
+        'lastError',
+        'errors',
+        'responseBody',
+        'response',
+        'data',
+        'message',
+      ]) {
+        pending.push(record[key]);
+      }
+    }
+  }
+}
+
+export function isGatewayInsufficientFundsError(error: unknown): boolean {
+  for (const candidate of walkGatewayErrorDetails(error)) {
+    if (
+      readErrorString(candidate, 'code') ===
+        GATEWAY_INSUFFICIENT_FUNDS_ERROR_CODE ||
+      readErrorString(candidate, 'errorCode') ===
+        GATEWAY_INSUFFICIENT_FUNDS_ERROR_CODE ||
+      readErrorString(candidate, 'name') === 'GatewayInsufficientFundsError' ||
+      readErrorString(candidate, 'type') === 'insufficient_funds' ||
+      readErrorString(candidate, 'code') === 'insufficient_funds'
+    ) {
+      return true;
+    }
+    const message = readErrorString(candidate, 'message');
+    if (
+      message === GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE ||
+      /\binsufficient[_ ]funds\b|\bpositive credit balance\b/i.test(message)
+    ) {
+      return true;
+    }
+    if (
+      candidate &&
+      typeof candidate === 'object' &&
+      (candidate as Record<string, unknown>).statusCode === 402 &&
+      /^Gateway.*Error$/.test(readErrorString(candidate, 'name')) &&
+      !isGatewayBudgetExceededError(candidate)
+    ) {
+      // The SDK maps unknown Gateway types (including insufficient_funds) to
+      // GatewayInternalServerError. A Gateway 402 is not a transient 500.
+      return true;
+    }
+  }
+  return false;
+}
+
 export function isRetryableGatewayProviderError(error: unknown): boolean {
+  if (isGatewayInsufficientFundsError(error)) {
+    return false;
+  }
   if (isGatewayBudgetExceededError(error)) {
     return true;
   }
@@ -111,6 +194,14 @@ export function isRetryableGatewayProviderError(error: unknown): boolean {
 }
 
 export function toUserFacingGatewayError(error: unknown): Error {
+  if (isGatewayInsufficientFundsError(error)) {
+    return Object.assign(new Error(GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE), {
+      name: 'GatewayInsufficientFundsError',
+      code: GATEWAY_INSUFFICIENT_FUNDS_ERROR_CODE,
+      isRetryable: false,
+      cause: error,
+    });
+  }
   if (isGatewayBudgetExceededError(error)) {
     return Object.assign(new Error(GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE), {
       name: 'GatewayBudgetExceededError',
@@ -122,6 +213,13 @@ export function toUserFacingGatewayError(error: unknown): Error {
 }
 
 export function classifyChatStreamFailure(error: unknown): ChatStreamFailure {
+  if (isGatewayInsufficientFundsError(error)) {
+    return {
+      errorCode: GATEWAY_INSUFFICIENT_FUNDS_ERROR_CODE,
+      userMessage: GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE,
+      errorMessage: GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE,
+    };
+  }
   if (isGatewayBudgetExceededError(error)) {
     return {
       errorCode: GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
