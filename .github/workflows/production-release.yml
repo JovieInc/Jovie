@@ -1179,7 +1179,7 @@ jobs:
 
       - name: Preserve production input and artifact provenance
         if: ${{ always() && steps.mutation-head.outputs.is_current == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: production-input-provenance-${{ inputs.expected_sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/production-input-provenance/*.json
@@ -1650,7 +1650,7 @@ jobs:
 
       - name: Upload exact staging deployment receipt
         if: ${{ steps.receipt.outputs.deployed == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: staging-deployment-${{ inputs.expected_sha }}
           path: ${{ runner.temp }}/staging-deployment-receipt.json

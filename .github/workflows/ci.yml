@@ -211,7 +211,7 @@ jobs:
 
       - name: Upload runner image proof
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: runner-image-proof-${{ github.sha }}
           path: runner-image-evidence/
@@ -336,7 +336,7 @@ jobs:
         run: node .github/scripts/dependency-parity-evidence.mjs compare
       - name: Preserve combined dependency evidence
         if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dependency-digest-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.event.merge_group.head_sha }}
           path: |
@@ -1049,7 +1049,7 @@ jobs:
 
       - name: Preserve intake product-lane receipt
         if: ${{ github.event_name != 'workflow_dispatch' && steps.detect.outputs.is_noop_merge_group != 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: product-lane-intake-${{ github.sha }}-${{ github.run_attempt }}
           path: |
@@ -1327,7 +1327,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload CI risk artifact
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ci-risk-classification-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-harness/ci-risk-classification.json
@@ -1474,7 +1474,7 @@ jobs:
         run: node scripts/golden-path-lock.mjs merge-gate
       - name: Upload golden-path lock helper coverage
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: golden-path-lock-coverage
           path: |
@@ -1794,7 +1794,7 @@ jobs:
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ci-fast-lanes-typecheck-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-fast-lanes.json
@@ -2237,7 +2237,7 @@ jobs:
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ci-fast-lanes-remaining-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -2606,7 +2606,7 @@ jobs:
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ci-fast-lanes-web-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -2797,7 +2797,7 @@ jobs:
 
       - name: Upload database certification evidence
         if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_neon == 'true')) }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: database-certification-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-report.db-integration.junit.xml
@@ -2859,7 +2859,7 @@ jobs:
 
       - name: Upload Neon DB connection artifact
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-artifact/connection.json
@@ -3570,7 +3570,7 @@ jobs:
             [ -f "$artifact" ] || { echo "::error::Missing Mac artifact: $artifact"; exit 1; }
           done
       - name: Upload exact Mac staging package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-staging-${{ github.sha }}
           path: |
@@ -3709,7 +3709,7 @@ jobs:
           cat "$root/final.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve final product-lane receipt
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: product-lane-final-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/product-lane-receipt/final.*
@@ -3838,7 +3838,7 @@ jobs:
         # the only signal consumers trust, and merge-group PR Ready fails closed
         # when a selected artifact was not published.
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build.tar
@@ -4576,7 +4576,7 @@ jobs:
 
       - name: Upload dashboard Lighthouse artifacts
         if: always() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lighthouse-dashboard-pr-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/.lighthouseci/dashboard-pr/
@@ -4737,7 +4737,7 @@ jobs:
 
       - name: Upload onboarding Lighthouse artifacts
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lighthouse-onboarding-pr-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/.lighthouseci/onboarding-pr/
@@ -4870,7 +4870,7 @@ jobs:
 
       - name: Upload admin Lighthouse artifacts
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lighthouse-admin-pr-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/.lighthouseci/admin-pr/
@@ -5004,7 +5004,7 @@ jobs:
 
       - name: Upload chat Lighthouse artifacts
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lighthouse-chat-pr-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/.lighthouseci/chat-pr/
@@ -5186,7 +5186,7 @@ jobs:
           cat "$root/qualification-receipt.json" >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve blog qualification receipt
         if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: blog-content-qualification-${{ github.sha }}-${{ github.run_attempt }}
           path: |
@@ -5405,7 +5405,7 @@ jobs:
           always() && !cancelled() &&
           matrix.shard == '1/14' &&
           hashFiles('apps/ovie/coverage/coverage-summary.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ovie-coverage-${{ github.sha }}-${{ github.run_attempt }}
           path: apps/ovie/coverage/
@@ -5424,7 +5424,7 @@ jobs:
         # Successful retries are evidence too; cancellation cannot certify a
         # completed execution. Keep the existing artifact identity for readers.
         if: ${{ always() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard != 'packages/ui' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
           path: apps/web/test-report.*.junit.xml
@@ -5436,7 +5436,7 @@ jobs:
       - name: Preserve retried-then-passed unit tests
         if: ${{ !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unit-flaky-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
           path: apps/web/test-report.*.flaky.json
@@ -5606,7 +5606,7 @@ jobs:
 
       - name: Upload exact-head coverage shard report
         if: steps.coverage-shard.outputs.applicable == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: exact-head-coverage-${{ github.run_id }}-${{ matrix.shard }}
           path: exact-head-coverage/coverage-final.${{ matrix.shard }}.json
@@ -7675,7 +7675,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload CI harness artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ci-harness-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-harness/ci-harness.v1.json
@@ -8287,7 +8287,7 @@ jobs:
             "$root/source/final.json" > "$root/release.json"
       - name: Preserve sealed product-lane release routing
         if: ${{ steps.ready.outputs.release_authorized == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: product-lane-release-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/product-lane-release/release.json

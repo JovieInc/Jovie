@@ -44,7 +44,7 @@ jobs:
             echo "trusted_default_sha=$(jq -r .trustedDefaultBranchSha <<<"$result")"
           } >>"$GITHUB_OUTPUT"
           jq . "$receipt" >>"$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: pr-preparation-plan-${{ github.run_id }}-${{ github.run_attempt }}
@@ -84,7 +84,7 @@ jobs:
             --mode dry-run --confirmation '' \
             --pr "$PR_NUMBER" --receipt "$RUNNER_TEMP/pr-$PR_NUMBER.json" \
             --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: pr-preparation-dry-run-${{ matrix.number }}-${{ github.run_id }}-${{ github.run_attempt }}

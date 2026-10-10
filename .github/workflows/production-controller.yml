@@ -848,7 +848,7 @@ jobs:
 
       - name: Preserve cumulative production lane evidence
         if: ${{ steps.authorize.outputs.authorized == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: production-lane-range-${{ steps.authorize.outputs.expected_sha }}-${{ github.run_attempt }}
           path: |
@@ -872,7 +872,7 @@ jobs:
 
       - name: Consume the one-shot production marker recovery lease
         if: ${{ steps.authorize.outputs.marker_recovery == 'true' && steps.authorize.outputs.authorized == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: production-generation-recovery-${{ steps.authorize.outputs.expected_sha }}
           path: ${{ runner.temp }}/production-generation-recovery.json
@@ -1470,7 +1470,7 @@ jobs:
 
       - name: Preserve exact verified-generation marker
         if: ${{ steps.finalize.outputs.verified == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ needs.authorize-production.outputs.marker_recovery == 'true' && format('production-generation-verified-recovery-{0}', needs.authorize-production.outputs.expected_sha) || format('production-generation-verified-{0}', needs.authorize-production.outputs.expected_sha) }}
           path: |
@@ -1481,7 +1481,7 @@ jobs:
 
       - name: Preserve one Ovi certification packet
         if: ${{ needs.authorize-production.outputs.release_certification_required == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ovi-release-certification-${{ needs.authorize-production.outputs.expected_sha }}
           path: ${{ runner.temp }}/ovi-release-certification-packet.json
@@ -1647,7 +1647,7 @@ jobs:
             --body-file "$RUNNER_TEMP/customer-changelog/pr.md"
       - name: Retain publication, exclusion and no-change receipt
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: customer-changelog-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/customer-changelog/plan.json
