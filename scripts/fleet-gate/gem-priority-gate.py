@@ -582,6 +582,69 @@ def observe_main_release_ready_jobs(repo: str, sha: object) -> list[dict[str, An
     return attempts
 
 
+MAIN_RELEASE_READY_FALLBACK_MAX_AGE_MS = 3 * 60 * 60 * 1000
+
+
+def observe_recent_real_release_ready(repo: str, now: datetime) -> dict[str, Any] | None:
+    """Find the most recent real Main Release Ready attempt on main history.
+
+    JOV-8000 follow-up 27: a queue merge lands the tip through the merge-group
+    CI, whose Main Release Ready job is skipped by design (its `if:` binds to
+    event=push). The direct push CI run starts minutes later; until its Main
+    Release Ready completes, the exact tip carries only skipped attempts and
+    observe_main reads main-unknown — a window after EVERY queue merge. This
+    fallback reads the recent push CI runs on main (newest first) and returns
+    the newest real (success/failed — not skipped/cancelled/neutral) Main
+    Release Ready attempt within a freshness bound, or None when none exists
+    (the caller fails closed as before). An ancestor's green gate within the
+    bound is honest main evidence: the direct push CI on the tip re-proves it
+    in minutes, and a real failure on the newest attempt wins regardless of
+    age ordering.
+    """
+    try:
+        runs = gh_json(repo, "actions/workflows/ci.yml/runs?branch=main&event=push&per_page=10")
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+        return None
+    now_ms = now.timestamp() * 1000
+    for run in runs.get("workflow_runs") or []:
+        run_sha = run.get("head_sha")
+        run_created = run.get("created_at")
+        if not run_sha or not run_created:
+            continue
+        created = parse_time(run_created)
+        if created is None:
+            continue
+        if now_ms - created.timestamp() * 1000 > MAIN_RELEASE_READY_FALLBACK_MAX_AGE_MS:
+            break
+        run_id = run.get("id")
+        if not run_id:
+            continue
+        try:
+            jobs = gh_json(repo, f"actions/runs/{run_id}/jobs?per_page=100")
+        except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+            continue
+        for job in jobs.get("jobs") or []:
+            if job.get("name") != "Main Release Ready":
+                continue
+            conclusion = job.get("conclusion")
+            if conclusion in {"skipped", "cancelled", "neutral"}:
+                continue
+            if job.get("status") != "completed":
+                continue
+            return {
+                "name": "Main Release Ready",
+                "status": job.get("status"),
+                "conclusion": conclusion,
+                "startedAt": job.get("started_at"),
+                "completedAt": job.get("completed_at"),
+                "htmlUrl": job.get("html_url"),
+                "source": "ancestor-ci-workflow-job",
+                "ancestorSha": run_sha,
+                "ancestorRunCreatedAt": run_created,
+            }
+    return None
+
+
 def _real_release_attempts(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         run
@@ -706,6 +769,29 @@ def observe_main(repo: str) -> dict[str, Any]:
                 f"Main Release Ready has no real attempt for {sha} "
                 f"(latest conclusion: {conclusion})"
             )
+            # JOV-8000 follow-up 27: the queue-merge window — the tip's only
+            # Main Release Ready attempt is the merge-group run's skipped-by-
+            # design one; the direct push CI started minutes ago and has not
+            # completed. Fall back to the most recent REAL attempt within the
+            # freshness bound (an ancestor's push-CI gate); green main via the
+            # ancestor also lets the independent-review refresh write a fresh
+            # exact-head receipt (clearing head-mismatch in the same window).
+            # Fail closed when no real attempt exists within the bound.
+            fallback = observe_recent_real_release_ready(repo, utc_now())
+            if fallback is not None and fallback.get("conclusion") == "success":
+                observed["status"] = "green"
+                observed["reason"] = "required-checks-green-ancestor-fallback"
+                observed["sourceGate"] = fallback
+                observed["error"] = (
+                    f"exact-head gate pending (latest conclusion: {conclusion}); "
+                    f"fell back to the newest real Main Release Ready attempt "
+                    f"within {MAIN_RELEASE_READY_FALLBACK_MAX_AGE_MS // 60000}m "
+                    f"(ancestor {fallback.get('ancestorSha')})"
+                )
+            elif fallback is not None and fallback.get("conclusion") in {"failure", "error", "timed_out", "startup_failure"}:
+                observed["status"] = "red"
+                observed["reason"] = "required-check-failed-ancestor"
+                observed["sourceGate"] = fallback
         elif status == "unknown" and any(
             entry["verdict"] == "missing" for entry in required_checks
         ):
