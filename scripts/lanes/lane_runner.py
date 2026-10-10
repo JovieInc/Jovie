@@ -3918,7 +3918,7 @@ totalCount checkRunCount statusContextCount checkRunCountsByState{count state} s
 pageInfo{hasNextPage endCursor} nodes{__typename
 ... on CheckRun{id name status conclusion detailsUrl startedAt completedAt}
 ... on StatusContext{id context state targetUrl}}}}}}}"""
-REPAIR_CHECK_PAGES = 5  # At most 500 contexts; incomplete authority still refuses repair.
+REPAIR_CHECK_PAGES = 6  # At most 600 contexts; incomplete authority still refuses repair.
 REPAIR_TARGET_QUERY = ("query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){"
                        "pullRequest(number:$number){" + REPAIR_TARGET_FIELDS + "}}}")
 

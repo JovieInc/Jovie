@@ -5159,6 +5159,50 @@ class RepairCheckPaginationTest(unittest.TestCase):
         self.assertIn("cursor=page-1", command.call_args_list[1].args[0])
         self.assertTrue(all(call.kwargs["timeout"] == 30 for call in command.call_args_list))
 
+    def test_complete_sixth_page_failure_selects_repair(self):
+        for total in (503, 506):
+            with self.subTest(total=total):
+                pages = [self.page(start, min(100, total - start), more=start + 100 < total,
+                                   cursor=f"page-{start // 100 + 1}")
+                         for start in range(0, total, 100)]
+                self.contexts(pages[-1])["nodes"][-1]["conclusion"] = "FAILURE"
+                live, command = self.read(pages)
+                self.assertIsNotNone(live, "a complete 503/506-context read must not stop at 500")
+                self.assertEqual(len(live["statusCheckRollup"]), total)
+                self.assertEqual(lane.red_pr([live], {})["number"], self.target()["number"])
+                self.assertEqual(command.call_count, 6)
+                for call in command.call_args_list:
+                    self.assertIn("owner=JovieInc", call.args[0])
+                    self.assertIn("name=Jovie", call.args[0])
+                    self.assertEqual(call.kwargs["timeout"], 30)
+
+    def test_complete_cancelled_only_inventory_does_not_manufacture_source_failure(self):
+        for total in (503, 506):
+            with self.subTest(total=total):
+                pages = [self.page(start, min(100, total - start), more=start + 100 < total,
+                                   cursor=f"page-{start // 100 + 1}")
+                         for start in range(0, total, 100)]
+                self.contexts(pages[0])["nodes"][0]["conclusion"] = "CANCELLED"
+                for index, context in enumerate(("jovie-queue-failure-hold/v1", "jovie-queue-failure-retry/v1",
+                                                 "jovie-queue-admission-recovery/v1")):
+                    self.contexts(pages[-1])["nodes"][index] = {
+                        "__typename": "StatusContext", "id": f"native-{index}",
+                        "context": context, "state": "SUCCESS"}
+                live, command = self.read(pages)
+                self.assertIsNotNone(live)
+                self.assertEqual(len(live["statusCheckRollup"]), total)
+                self.assertEqual(command.call_count, 6)
+                self.assertIsNone(lane.red_pr([live], {}))
+
+    def test_six_page_resource_ceiling_refuses_601_contexts_after_one_read(self):
+        self.assertEqual(lane.REPAIR_CHECK_PAGES, 6)
+        page = self.page()
+        self.contexts(page).update(totalCount=601, checkRunCount=601,
+            checkRunCountsByState=[{"state": "SUCCESS", "count": 601}])
+        live, command = self.read([page], census=False)
+        self.assertIsNone(live)
+        self.assertEqual(command.call_count, 1)
+
     def test_dependency_metadata_transition_cannot_splice_paginated_authority(self):
         for field in ["title", "body"]:
             first, second = self.page(), self.page(100, 1, more=False)
@@ -5252,11 +5296,11 @@ class RepairCheckPaginationTest(unittest.TestCase):
                  for index in range(lane.REPAIR_CHECK_PAGES)]
         live, command = self.read(pages)
         self.assertIsNone(live)
-        self.assertEqual(command.call_count, 5)
+        self.assertEqual(command.call_count, 6)
         self.contexts(pages[-1])["pageInfo"]["hasNextPage"] = False
         live, command = self.read(pages)
-        self.assertEqual(len(live["statusCheckRollup"]), 500)
-        self.assertEqual(command.call_count, 5)
+        self.assertEqual(len(live["statusCheckRollup"]), 600)
+        self.assertEqual(command.call_count, 6)
 
     def test_positive_terminal_evidence_on_later_page_still_cancels_work(self):
         terminal = {"data": {"repository": {"pullRequest": {"number": 5, "state": "MERGED"}}}}
