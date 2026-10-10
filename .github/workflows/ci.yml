@@ -3583,6 +3583,12 @@ jobs:
             --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Test and package exact Mac head
+        env:
+          # The staging package is unsigned by design. Hosted runners have no
+          # signing identity; a self-hosted Mac has the owner's Developer ID in
+          # its keychain and electron-builder would try to codesign with it
+          # headless and fail (2026-10-10, tw-mac-001).
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           set -euo pipefail
           swift test --package-path apps/macos/MenuMonitor --enable-code-coverage
