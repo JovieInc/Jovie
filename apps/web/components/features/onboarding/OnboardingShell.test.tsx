@@ -187,6 +187,18 @@ describe('OnboardingShell status', () => {
     expect(session).toHaveClass('flex', 'flex-col', 'min-h-0', 'flex-1');
   });
 
+  it('keeps the compact sign-in face inside the canonical 44px hit target (JOV-4411)', () => {
+    render(<OnboardingShell sessionLabel='pending' />);
+
+    const signIn = screen.getByRole('link', { name: 'Sign in' });
+    expect(signIn).toHaveAttribute('data-variant', 'link');
+    expect(signIn).toHaveAttribute('data-appearance', 'compact');
+    expect(signIn).toHaveClass('btn-linear-login', 'focus-ring-themed');
+    expect(signIn.className).toContain('before:min-h-11');
+    expect(signIn.className).toContain('before:min-w-11');
+    expect(signIn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
+  });
+
   it('reports a failed chat start without verification jargon or error codes', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 

@@ -6,6 +6,7 @@ import {
   ComposerAttachButton,
   ComposerMicButton,
   type ComposerMicButtonProps,
+  ComposerSendButton,
 } from './ChatComposerToolbar';
 
 function MicButton(overrides: Partial<ComposerMicButtonProps> = {}) {
@@ -134,4 +135,36 @@ describe('ComposerAttachButton', () => {
       screen.getByRole('button', { name: 'Attachment options' })
     ).toBeDisabled();
   });
+});
+
+describe('ComposerSendButton', () => {
+  it.each([
+    ['disabled', false, false, undefined],
+    ['enabled', true, false, undefined],
+    ['streaming stop', false, true, vi.fn()],
+  ] as const)(
+    'keeps the 36px %s face inside the canonical 44px hit target (JOV-4411)',
+    (_state, canSend, isStreaming, onStop) => {
+      render(
+        <TooltipProvider>
+          <ComposerSendButton
+            canSend={canSend}
+            isStreaming={isStreaming}
+            reducedMotion
+            onMouseDown={vi.fn()}
+            onSend={vi.fn()}
+            onStop={onStop}
+          />
+        </TooltipProvider>
+      );
+
+      const send = screen.getByRole('button');
+      expect(send).toHaveAttribute('data-variant', 'primary');
+      expect(send).toHaveAttribute('data-size', 'icon');
+      expect(send).toHaveClass('h-9', 'w-9');
+      expect(send.className).toContain('before:h-11');
+      expect(send.className).toContain('before:w-11');
+      expect(send.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
+    }
+  );
 });
