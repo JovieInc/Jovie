@@ -181,6 +181,382 @@ describe('fleet gate production signal follows the same-run receipt (JOV-8000 fo
   });
 });
 
+describe('fleet gate receipt source order (JOV-8000 follow-up 33)', () => {
+  // The 38031492172 residual: Refresh printed hold-intake
+  // ([controller-failure; production-deployment-unbound]) while the
+  // remediator read an OLDER blocked latest.json off the Gem host — a second
+  // host writer running older gate code overwrote it between the steps. In
+  // Actions the remediator now prefers the same-run receipt at
+  // ${RUNNER_TEMP}/jovie-fleet-gate.json (evaluate-fleet-gate.sh:29).
+  const team = {
+    key: 'JOV',
+    healthUrl: 'https://jov.ie/api/health',
+    healthKind: 'json-status',
+  };
+  const mainSha = 'a3eeefdd4dc681d1c9b5b4385720d661f5129137';
+
+  function receiptJson({ observedAt, promotionMode, reasonCodes }) {
+    return {
+      schema: 'jovie-fleet-gate/v1',
+      observedAt,
+      state: promotionMode === 'blocked' ? 'AMBER' : 'AMBER',
+      promotionMode,
+      reasons: reasonCodes.map(code => ({
+        code,
+        layer: 'promotion',
+        severity: 'warning',
+        detail: code,
+      })),
+      signals: {
+        main: { status: 'green', sha: mainSha },
+        production: {
+          status: 'green',
+          deployedSha: 'b3eeefdd4dc681d1c9b5b4385720d661f5129138',
+        },
+        controller: {
+          status: 'parked',
+          retired: true,
+          error: 'controller-endpoint-retired: Connection refused',
+        },
+        integrity: { status: 'clear' },
+        queue: {
+          repository: 'JovieInc/Jovie',
+          status: 'known',
+          eligiblePrs: 6,
+          greenReadyPrs: 1,
+          target: 15,
+          laneCapacity: {
+            schema: 'jovie-lane-capacity/v2',
+            observedAt,
+            repositories: { 'JovieInc/Jovie': { ready: 1, budget: 15 } },
+            defaultLaneBudget: 4,
+            lanes: {},
+            sharedResources: {},
+          },
+        },
+        closureHealth: {
+          schema: 'jovie-closure-health/v1',
+          status: 'healthy',
+          authority: 'Summer',
+          newIssueIntakeAllowed: true,
+          promotionContinues: true,
+          remediationContinues: true,
+          reasons: [],
+        },
+        independentReview: {
+          schema: 'jovie-independent-review/v1',
+          status: 'passed',
+          authority: 'Gem',
+          reviewer: 'Gem',
+          reviewId: `main-release-ready:${mainSha}:${observedAt}`,
+          headSha: mainSha,
+          scope: 'exact-main-head',
+          observedAt,
+        },
+        concurrencyEvidence: {
+          schema: 'gem-concurrency-evidence/v1',
+          source: 'execution-proven-useful-turns',
+          target: 4,
+          approved: true,
+          severeIncidents: 0,
+          observedAt,
+          acceptedEvidence: [],
+        },
+      },
+      workAdmission: {
+        allowed: true,
+        activities: ['approved-issue-lease'],
+        newIssueLeaseAllowed: true,
+        newImplementationAllowed: true,
+      },
+      concurrency: {
+        gem: { maxConcurrent: 0, evidenceAccepted: false },
+      },
+    };
+  }
+
+  async function withReceipts({ hostReceipt, sameRunReceipt }, fn) {
+    const workspace = await mkdtemp(resolve(tmpdir(), 'fg-gem-workspace-'));
+    const runDir = await mkdtemp(resolve(tmpdir(), 'fg-same-run-'));
+    const hostDir = resolve(workspace, 'state/gem-priority-gate');
+    await mkdir(hostDir, { recursive: true });
+    const hostPath = resolve(hostDir, 'latest.json');
+    const sameRunPath = resolve(runDir, 'jovie-fleet-gate.json');
+    if (hostReceipt) await writeFile(hostPath, JSON.stringify(hostReceipt));
+    if (sameRunReceipt)
+      await writeFile(sameRunPath, JSON.stringify(sameRunReceipt));
+    // No JOVIE_FLEET_GATE_RECEIPT override: the loader must prefer the
+    // same-run file and fall back to GEM_WORKSPACE/state/.../latest.json.
+    const env = {
+      GITHUB_ACTIONS: 'true',
+      RUNNER_TEMP: runDir,
+      GEM_WORKSPACE: workspace,
+    };
+    try {
+      const orchestrator = await import(
+        resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+      );
+      await fn({ orchestrator, hostPath, sameRunPath, env });
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+      await rm(runDir, { recursive: true, force: true });
+    }
+  }
+
+  it('prefers a fresh same-run receipt over an older blocked host receipt (source=same-run, hold-intake)', async () => {
+    const now = new Date().toISOString();
+    const old = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    await withReceipts(
+      {
+        hostReceipt: receiptJson({
+          observedAt: old,
+          promotionMode: 'blocked',
+          reasonCodes: [
+            'controller-failure',
+            'main-unknown',
+            'production-not-green',
+            'independent-review-head-mismatch',
+          ],
+        }),
+        sameRunReceipt: receiptJson({
+          observedAt: now,
+          promotionMode: 'hold-intake',
+          reasonCodes: ['controller-failure', 'production-deployment-unbound'],
+        }),
+      },
+      async ({ orchestrator, hostPath, env }) => {
+        const loaded = orchestrator.loadFleetGateReceipt(team, { now, env });
+        assert.equal(loaded.source, 'same-run');
+        assert.equal(loaded.receipt.promotionMode, 'hold-intake');
+        assert.ok(hostPath); // host receipt exists but was not chosen
+      }
+    );
+  });
+
+  it('falls back to the host receipt when the same-run file is missing, malformed, or stale (blocked stays blocked)', async () => {
+    const now = new Date().toISOString();
+    const stale = new Date(Date.now() - 11 * 60 * 1000).toISOString();
+    const blockedHost = receiptJson({
+      observedAt: now,
+      promotionMode: 'blocked',
+      reasonCodes: ['controller-failure', 'main-unknown'],
+    });
+    for (const variant of ['missing', 'malformed', 'stale']) {
+      await withReceipts(
+        {
+          hostReceipt: blockedHost,
+          sameRunReceipt:
+            variant === 'stale'
+              ? receiptJson({
+                  observedAt: stale,
+                  promotionMode: 'hold-intake',
+                  reasonCodes: [
+                    'controller-failure',
+                    'production-deployment-unbound',
+                  ],
+                })
+              : null,
+        },
+        async ({ orchestrator, sameRunPath, env }) => {
+          if (variant === 'malformed')
+            await writeFile(sameRunPath, '{not json');
+          const loaded = orchestrator.loadFleetGateReceipt(team, {
+            now,
+            env,
+          });
+          assert.equal(loaded.source, 'host-persisted', variant);
+          assert.equal(loaded.receipt.promotionMode, 'blocked');
+        }
+      );
+    }
+  });
+
+  it('adopts a blocked same-run receipt as blocked (never less restrictive)', async () => {
+    const now = new Date().toISOString();
+    await withReceipts(
+      {
+        hostReceipt: receiptJson({
+          observedAt: now,
+          promotionMode: 'hold-intake',
+          reasonCodes: ['controller-failure', 'production-deployment-unbound'],
+        }),
+        sameRunReceipt: receiptJson({
+          observedAt: now,
+          promotionMode: 'blocked',
+          reasonCodes: [
+            'controller-failure',
+            'independent-review-receipt-stale',
+          ],
+        }),
+      },
+      async ({ orchestrator, env }) => {
+        const loaded = orchestrator.loadFleetGateReceipt(team, { now, env });
+        assert.equal(loaded.source, 'same-run');
+        assert.equal(loaded.receipt.promotionMode, 'blocked');
+      }
+    );
+  });
+
+  it('hold-intake receipt derives degraded health, and capacity admits a cohort of 1 at 0.125/0.125/0', async () => {
+    const now = new Date().toISOString();
+    await withReceipts(
+      {
+        hostReceipt: null,
+        sameRunReceipt: receiptJson({
+          observedAt: now,
+          promotionMode: 'hold-intake',
+          reasonCodes: ['controller-failure', 'production-deployment-unbound'],
+        }),
+      },
+      async ({ orchestrator, env }) => {
+        const loaded = orchestrator.loadFleetGateReceipt(team, { now, env });
+        assert.equal(loaded.source, 'same-run');
+        // Replay run 38031492172's exact rate shape through the real
+        // capacity gate: conflictRate=0.125 (#20251), errorRate=0.125
+        // (#21118), unknownRate=0, health from the derived hold-intake mode.
+        const { evaluateRuntimeCapacity, CAPACITY_SCHEMA } = await import(
+          resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+        );
+        const gate = admitter.evaluateFleetGate(
+          {
+            main: loaded.receipt.signals.main,
+            production: loaded.receipt.signals.production,
+            controller: loaded.receipt.signals.controller,
+            integrity: loaded.receipt.signals.integrity,
+            queue: loaded.receipt.signals.queue,
+            closureHealth: loaded.receipt.signals.closureHealth,
+            concurrencyEvidence: loaded.receipt.signals.concurrencyEvidence,
+            independentReview: loaded.receipt.signals.independentReview,
+            observedAt: loaded.receipt.observedAt,
+          },
+          { now }
+        );
+        assert.equal(gate.promotionMode, 'hold-intake');
+        const health =
+          gate.promotionMode === admitter.FLEET_PROMOTION_MODE.BLOCKED
+            ? 'blocked'
+            : gate.state === admitter.FLEET_GATE_STATE.GREEN
+              ? 'healthy'
+              : 'degraded';
+        assert.equal(health, 'degraded');
+        const capacity = evaluateRuntimeCapacity(
+          {
+            schema: CAPACITY_SCHEMA,
+            observedAt: now,
+            workers: { running: 2, retrying: 0, maxConcurrent: 4 },
+            host: {
+              loadAvg1: 0.5,
+              cpuCount: 8,
+              availableMemoryBytes: 64 * 1024 ** 3,
+              cpuSomeAvg10: 0,
+              memoryFullAvg10: 0,
+              ioFullAvg10: 0,
+            },
+            provider: { accounts: 2, ready: 2 },
+            cloneLatencyMs: 1000,
+            ci: { saturating: false, running: 1, queued: 6 },
+            pullRequests: [
+              { number: 20251, isDraft: false, mergeable: 'CONFLICTING' },
+              {
+                number: 21118,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'FAILURE' },
+              },
+              {
+                number: 3,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+              {
+                number: 4,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+              {
+                number: 5,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+              {
+                number: 6,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+              {
+                number: 7,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+              {
+                number: 8,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+            ],
+            mergeQueue: { health, entries: 6 },
+          },
+          { now, previousCleanStreak: 0, previousCohortSize: 0 }
+        );
+        assert.equal(capacity.allowed, true);
+        assert.equal(capacity.cohortSize, 1);
+      }
+    );
+  });
+
+  it('emits the split-brain warning and keeps the derived mode when the receipt mode disagrees', async () => {
+    const now = new Date().toISOString();
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'fg-split-'));
+    const receiptPath = resolve(tempDir, 'latest.json');
+    // Receipt claims hold-intake, but its signals derive blocked (stale
+    // review inside an otherwise fresh wrapper): the derivation wins and the
+    // mismatch must be named.
+    const receipt = receiptJson({
+      observedAt: now,
+      promotionMode: 'hold-intake',
+      reasonCodes: ['controller-failure', 'production-deployment-unbound'],
+    });
+    receipt.signals.independentReview.observedAt = new Date(
+      Date.now() - 60 * 60 * 1000
+    ).toISOString();
+    await writeFile(receiptPath, JSON.stringify(receipt));
+    const previousReceipt = process.env.JOVIE_FLEET_GATE_RECEIPT;
+    process.env.JOVIE_FLEET_GATE_RECEIPT = receiptPath;
+    const logs = [];
+    const originalLog = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+    try {
+      const orchestrator = await import(
+        resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+      );
+      const gate = await orchestrator.fleetGateForTeam(team, now);
+      assert.equal(gate.promotionMode, 'blocked');
+      assert.equal(gate.fleetGateEvidence.receiptPromotionMode, 'hold-intake');
+      assert.equal(gate.fleetGateEvidence.derivedPromotionMode, 'blocked');
+      assert.ok(
+        logs.some(line => line.includes('::warning::fleet-gate.split-brain')),
+        'split-brain warning emitted'
+      );
+      assert.ok(
+        logs.some(line => line.startsWith('capacity.fleet-gate source=')),
+        'evidence line emitted'
+      );
+    } finally {
+      console.log = originalLog;
+      if (previousReceipt === undefined)
+        delete process.env.JOVIE_FLEET_GATE_RECEIPT;
+      else process.env.JOVIE_FLEET_GATE_RECEIPT = previousReceipt;
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('remediation cooldown recovery', () => {
   it('defers a shared Linear cooldown for the scheduled retry clock', async () => {
     const executable = resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs');
