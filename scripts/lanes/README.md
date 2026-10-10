@@ -198,7 +198,7 @@ Gaps closed after the first week (no PR may sit unowned):
   a repair attempt or new authority.
 - Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
   drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
-  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
+  etc.) on a 3-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
   drafts are reclaimed (Tim, 2026-10-10): the sweep labels them `lane-fix-stale` (plus
   `conflict`/`red` as applicable), workers finish them with the stale-draft prompt, the
   gate adopts them like lane drafts, and `ready_green` marks a CLEAN one ready with native

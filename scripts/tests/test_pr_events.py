@@ -1005,23 +1005,23 @@ class GapTest(unittest.TestCase):
                          "a stale agent-owned draft (tim/wip) is counted separately from a human's")
 
     def test_stalled_agent_drafts_are_repaired_or_held_on_a_live_dependency(self):
-        """JOV-7079 canary: an old non-lane agent draft cannot sit forever. Past the 7d SLO
+        """JOV-7079 canary: an old non-lane agent draft cannot sit forever. Past the 3d SLO
         and stalled it enters repair unless a dependency it names is still open."""
         now = events.iso_ts("2033-05-18T03:00:00Z")
         old, recent = "2033-05-15T00:00:00Z", "2033-05-18T00:00:00Z"
         ancient = "2033-05-01T00:00:00Z"
         prs = [
-            # abandoned: >7d old, DIRTY, no open dependency -> close
+            # abandoned: >3d old, DIRTY, no open dependency -> close
             self.node(20, isDraft=True, headRefName="codex/homepage-material", mergeStateStatus="DIRTY",
                       createdAt=ancient, updatedAt=recent),
-            # abandoned: >7d old and idle >48h, CLEAN but unshipped -> close
+            # abandoned: >3d old and idle >48h, CLEAN but unshipped -> close
             self.node(21, isDraft=True, headRefName="devin/leftover", mergeStateStatus="BLOCKED",
                       createdAt=ancient, updatedAt=old),
-            # held: >7d old and stalled, but the dependency it names is still open
+            # held: >3d old and stalled, but the dependency it names is still open
             self.node(22, isDraft=True, headRefName="codex/stacked-child", createdAt=ancient,
                       updatedAt=old),
-            # young agent draft idle >48h is counted, not closed (its writer may still move it)
-            self.node(23, isDraft=True, headRefName="codex/fresh-wip", createdAt=old, updatedAt=old),
+            # young agent draft (2d) idle >48h is counted, not reclaimed (its writer may still move it)
+            self.node(23, isDraft=True, headRefName="codex/fresh-wip", createdAt="2033-05-16T00:00:00Z", updatedAt=old),
             # a human's own branch is never the lanes' to close
             self.node(24, isDraft=True, headRefName="feature/personal-wip", createdAt=ancient,
                       updatedAt=ancient),
@@ -1106,7 +1106,7 @@ class GapTest(unittest.TestCase):
 
     def test_stale_draft_disposition_names_the_real_next_step(self):
         """JOV-7132: a draft idle past the 48h SLO is not "inside the SLO". Non-agent
-        branches are never closed by the sweep; young agent drafts close at the 7d SLO."""
+        branches are never closed by the sweep; an agent draft past the 3d floor is reclaimed."""
         now = events.iso_ts("2033-05-18T03:00:00Z")
         prs = [
             self.node(30, isDraft=True, headRefName="feat/jov-6507-thing",
@@ -1119,7 +1119,8 @@ class GapTest(unittest.TestCase):
         self.assertEqual(rows[30]["state"], "draft")
         self.assertEqual(rows[30]["reason"], "past the 48h stale SLO")
         self.assertIn("never closes non-agent drafts", rows[30]["next"])
-        self.assertEqual(rows[31]["next"], "repair unfinished work; closure requires an explicit duplicate label")
+        self.assertEqual(rows[31]["next"], "a lane works the labeled event")
+        self.assertIn((31, "stale"), plan["label"])
 
     def test_reconcile_applies_the_plan_on_its_own_cadence(self):
         page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [
