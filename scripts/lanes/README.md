@@ -57,8 +57,10 @@ running worker. Production deploys are a separate track: only a red main stops s
 New-issue admission reports three separate counts: raw Todo candidates, candidates
 passing the issue predicate, and new issues after the owning lane's PR budget.
 Worker and doctor share the same budget decision: each dated lane branch counts
-once while non-green, with a cap of configured base slots × 2. Manual branches and
-disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
+once toward the active cap while non-green and advanceable, with a cap of
+configured base slots × 2. Held, repair-exhausted, and escalating PRs count
+separately toward the terminal cap of configured base slots × 4. Manual branches
+and disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
 malformed or truncation-ambiguous inventory stays unknown and cannot admit new
 issues. Maintenance claims still run first and do not depend on that budget read.
 HUD labels this count as new issues; it is not total company demand or a claim of
