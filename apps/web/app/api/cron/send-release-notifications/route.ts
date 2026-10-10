@@ -16,6 +16,10 @@ import {
 } from '@/lib/notifications/release-eligibility';
 import { sendNotification } from '@/lib/notifications/service';
 import { buildReleaseDaySmsBody } from '@/lib/notifications/templates/release-day-sms';
+import {
+  type BlockedEffectReceipt,
+  denyAudienceEffect,
+} from '@/lib/outbound/audience-effect-policy';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import type { SenderContext } from '@/types/notifications';
@@ -723,7 +727,20 @@ export async function sendPendingNotifications(): Promise<{
   failed: number;
   skipped: number;
   processed: number;
+  policyBlocked?: BlockedEffectReceipt;
 }> {
+  const policy = denyAudienceEffect('audience.bulk.send');
+  if (!policy.dispatchAllowed) {
+    // Refuse stored jobs, recovery and retries before reading recipients or
+    // mutating queue rows. Consent and entitlements cannot grant dispatch.
+    return {
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      processed: 0,
+      policyBlocked: policy,
+    };
+  }
   const now = new Date();
   const sendingTimeoutThreshold = new Date(now.getTime() - SENDING_TIMEOUT_MS);
 
@@ -847,6 +864,19 @@ export async function GET(request: Request) {
 
   try {
     const result = await sendPendingNotifications();
+
+    if (result.policyBlocked) {
+      return NextResponse.json(
+        {
+          success: true,
+          message:
+            'Audience delivery is disabled; no release notifications were attempted',
+          ...result,
+          timestamp: new Date().toISOString(),
+        },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
 
     if (result.processed === 0) {
       return createEmptyResponse(new Date());
