@@ -1,5 +1,5 @@
 name: Sentry error-rate gate
-description: Compare production Sentry error rates before and after a deployment.
+description: Compare production Sentry error rates around an explicit observation window.
 
 inputs:
   sentry-auth-token:
@@ -13,7 +13,7 @@ inputs:
     required: false
     default: '5'
   baseline_window_minutes:
-    description: Minutes of pre-deploy history to use as baseline.
+    description: Minutes of history before the observation window to use as reference.
     required: false
     default: '30'
   threshold_multiplier:
@@ -75,7 +75,8 @@ runs:
           echo "::error::Sentry gate inputs are outside safe bounds."
           exit 1
         }
-        project_response="$(curl --fail --silent --show-error \
+        source .github/scripts/sentry-read-json.sh
+        project_response="$(sentry_read_json \
           -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
           "https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/")"
         project_id="$(jq -r '.id // empty | tostring' <<<"$project_response")"
@@ -84,10 +85,12 @@ runs:
           exit 1
         }
         echo "project_id=$project_id" >> "$GITHUB_OUTPUT"
-        echo "gate_start_epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
+        # Query complete minute buckets without silently accepting partial data.
+        gate_start_epoch=$(date +%s)
+        echo "gate_start_epoch=$((gate_start_epoch / 60 * 60))" >> "$GITHUB_OUTPUT"
         echo "candidate_release=$expected_sha" >> "$GITHUB_OUTPUT"
 
-    - name: Query baseline error rate (pre-deploy)
+    - name: Query reference error rate (pre-observation)
       id: baseline
       shell: bash
       env:
@@ -112,7 +115,8 @@ runs:
         # Count only production error events. Sentry's Discover dataset also
         # contains transactions and preview traffic; without this filter normal
         # request volume or preview failures can trigger a false rollback.
-        STATS_RESPONSE=$(curl --fail --silent --show-error --get \
+        source .github/scripts/sentry-read-json.sh
+        STATS_RESPONSE=$(sentry_read_json --get \
           -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
           --data-urlencode "project=$SENTRY_PROJECT_ID" \
           --data-urlencode "field=count()" \
@@ -122,16 +126,7 @@ runs:
           --data-urlencode "interval=1m" \
           "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/")
 
-        jq -e '
-          type == "object" and
-          (.data | type == "array") and
-          all(.data[];
-            type == "array" and length >= 2 and
-            (.[1] | type == "array") and
-            all(.[1][]; (.count | type == "number"))
-          )
-        ' >/dev/null <<<"$STATS_RESPONSE"
-        ERROR_COUNT=$(jq -r '[.data[]?[1][]?.count] | add // 0' <<<"$STATS_RESPONSE")
+        ERROR_COUNT=$(sentry_error_count "$STATS_RESPONSE" "$START_EPOCH" "$END_EPOCH")
         [[ "$ERROR_COUNT" =~ ^[0-9]+$ ]] || {
           echo "::error::Sentry baseline count is not a non-negative integer."
           exit 1
@@ -167,7 +162,8 @@ runs:
 
         echo "Post-deploy window: $START_ISO to $END_ISO ($SOAK_MINUTES min)"
 
-        STATS_RESPONSE=$(curl --fail --silent --show-error --get \
+        source .github/scripts/sentry-read-json.sh
+        STATS_RESPONSE=$(sentry_read_json --get \
           -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
           --data-urlencode "project=$SENTRY_PROJECT_ID" \
           --data-urlencode "field=count()" \
@@ -177,16 +173,7 @@ runs:
           --data-urlencode "interval=1m" \
           "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/")
 
-        jq -e '
-          type == "object" and
-          (.data | type == "array") and
-          all(.data[];
-            type == "array" and length >= 2 and
-            (.[1] | type == "array") and
-            all(.[1][]; (.count | type == "number"))
-          )
-        ' >/dev/null <<<"$STATS_RESPONSE"
-        ERROR_COUNT=$(jq -r '[.data[]?[1][]?.count] | add // 0' <<<"$STATS_RESPONSE")
+        ERROR_COUNT=$(sentry_error_count "$STATS_RESPONSE" "$START_EPOCH" "$END_EPOCH")
         [[ "$ERROR_COUNT" =~ ^[0-9]+$ ]] || {
           echo "::error::Sentry post-deploy count is not a non-negative integer."
           exit 1
@@ -212,7 +199,8 @@ runs:
         START_ISO=$(date -u -d "@$START_EPOCH" '+%Y-%m-%dT%H:%M:%S')
         END_ISO=$(date -u -d "@$END_EPOCH" '+%Y-%m-%dT%H:%M:%S')
 
-        STATS_RESPONSE=$(curl --fail --silent --show-error --get \
+        source .github/scripts/sentry-read-json.sh
+        STATS_RESPONSE=$(sentry_read_json --get \
           -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
           --data-urlencode "project=$SENTRY_PROJECT_ID" \
           --data-urlencode "field=count()" \
@@ -222,16 +210,7 @@ runs:
           --data-urlencode "interval=1m" \
           "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/")
 
-        jq -e '
-          type == "object" and
-          (.data | type == "array") and
-          all(.data[];
-            type == "array" and length >= 2 and
-            (.[1] | type == "array") and
-            all(.[1][]; (.count | type == "number"))
-          )
-        ' >/dev/null <<<"$STATS_RESPONSE"
-        ERROR_COUNT=$(jq -r '[.data[]?[1][]?.count] | add // 0' <<<"$STATS_RESPONSE")
+        ERROR_COUNT=$(sentry_error_count "$STATS_RESPONSE" "$START_EPOCH" "$END_EPOCH")
         [[ "$ERROR_COUNT" =~ ^[0-9]+$ ]] || {
           echo "::error::Sentry candidate-release count is not a non-negative integer."
           exit 1

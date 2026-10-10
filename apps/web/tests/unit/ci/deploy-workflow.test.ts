@@ -90,6 +90,10 @@ const sentryGateActionPath = resolve(
   repoRoot,
   '.github/actions/sentry-error-gate/action.yml'
 );
+const sentryReadHelperPath = resolve(
+  repoRoot,
+  '.github/scripts/sentry-read-json.sh'
+);
 const costAnomalyWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/cost-anomaly-gate.yml'
@@ -153,7 +157,7 @@ function getStepBlock(workflow: string, stepName: string): string {
 function getSentryStatsRequests(action: string): string[] {
   return (
     action.match(
-      /STATS_RESPONSE=\$\(curl[\s\S]*?"https:\/\/sentry\.io\/api\/0\/organizations\/\$SENTRY_ORG\/events-stats\/"\)/g
+      /STATS_RESPONSE=\$\(sentry_read_json[\s\S]*?"https:\/\/sentry\.io\/api\/0\/organizations\/\$SENTRY_ORG\/events-stats\/"\)/g
     ) ?? []
   );
 }
@@ -4604,6 +4608,24 @@ describe('production promotion exact-artifact contract', () => {
     const sentryJob = getJobBlock(reusable, 'sentry-error-gate');
     const sentryAction = readFileSync(sentryGateActionPath, 'utf8');
 
+    // The action delegates transport to the shared helper. Keep the strict
+    // failure/deadline/retry contract as well as the production query checks.
+    const sentryReadHelper = readFileSync(sentryReadHelperPath, 'utf8');
+    expect(sentryAction).toContain(
+      'source .github/scripts/sentry-read-json.sh'
+    );
+    expect(sentryReadHelper).toContain('curl --fail --silent --show-error');
+    expect(sentryReadHelper).toContain('--connect-timeout 5 --max-time 15');
+    expect(sentryReadHelper).toContain(
+      '--retry 2 --retry-delay 1 --retry-max-time 40'
+    );
+    expect(sentryReadHelper).toContain(
+      'timeout --signal=TERM --kill-after=1s 55s'
+    );
+    expect(sentryReadHelper).not.toContain('--retry-all-errors');
+    expect(sentryAction).toContain('echo "gate_status=error"');
+    expect(sentryAction).toContain('refusing automatic rollback');
+
     expect(sentryJob).toContain('runs-on: ubuntu-latest');
     expect(sentryJob).toContain('name: Production – jovie');
     expect(sentryJob).toContain('ref: ${{ inputs.expected_sha }}');
@@ -4643,7 +4665,7 @@ describe('production promotion exact-artifact contract', () => {
     const exactProductionErrorQuery =
       '--data-urlencode "query=event.type:error environment:vercel-production"';
     for (const request of statsRequests.slice(0, 2)) {
-      expect(request).toContain('curl --fail --silent --show-error --get');
+      expect(request).toContain('sentry_read_json --get');
       expect(request.match(/--data-urlencode "query=[^"]+"/g)).toEqual([
         exactProductionErrorQuery,
       ]);
