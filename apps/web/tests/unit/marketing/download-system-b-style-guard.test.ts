@@ -84,12 +84,17 @@ describe('download page System B source contract', () => {
 
   it('lets platform titles wrap without stranding a single word', () => {
     const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
-    const heading = source.match(
-      /<h2\s+data-wrap='editorial-title'\s+className='([^']*)'\s*>\s*\{platform\.title\}/
-    );
+    const headings = [
+      ...source.matchAll(
+        /<h2\s+data-wrap='editorial-title'\s+className='([^']*)'/g
+      ),
+    ];
 
-    expect(heading?.[1]).toContain('text-pretty');
-    expect(heading?.[1]).not.toMatch(/max-w-xs/);
+    expect(headings.length).toBeGreaterThan(0);
+    for (const heading of headings) {
+      expect(heading[1]).toContain('text-pretty');
+      expect(heading[1]).not.toMatch(/max-w-xs/);
+    }
   });
 
   it('removes the page-scoped system-b-download CSS block', () => {
