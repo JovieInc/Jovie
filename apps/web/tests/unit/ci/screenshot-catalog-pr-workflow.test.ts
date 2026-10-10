@@ -30,7 +30,7 @@ describe('PR screenshot catalog integrity enforcement', () => {
     expect(enforcement).not.toContain('continue-on-error');
     expect(upload).toContain('if: always()');
     expect(upload).toContain(
-      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
+      'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
     );
     expect(upload).toContain('path: repo-health-receipt.json');
     expect(upload).toContain('if-no-files-found: error');
