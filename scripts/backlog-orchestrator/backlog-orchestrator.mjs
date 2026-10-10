@@ -2049,7 +2049,6 @@ async function runRemediate(isDryRun) {
   // with retries and a hard deadline; merge-queue rows (still null after
   // retries with a gh-readonly-queue pr-<N>- ref) count as known and not
   // conflicting. The receipt carries the full evidence.
-  /** @type {Awaited<ReturnType<typeof measureMergeability>> | null} */
   let mergeabilityEvidence = null;
   if (Array.isArray(pullRequests)) {
     mergeabilityEvidence = await measureMergeability(
@@ -2197,6 +2196,24 @@ async function runRemediate(isDryRun) {
         backlogRemediation.DEFAULT_WORKPAD_ISSUE,
       receipt,
     });
+    // Selected-to-lanes bridge (Symphony Owner, 2026-10-10): convert each
+    // selected issue into a leasable one (add the shared agent-ready label +
+    // a one-time bridge marker) so a lane's claim-scan picks it up. Runs only
+    // in the mutating path, after the workpad upsert; the kill-switch env
+    // JOVIE_BRIDGE_LANES=0|false|off disables it. Linear-budget friendly: one
+    // fetch + at most one write per selected issue.
+    const bridgeInventory = Object.fromEntries(
+      (receipt.matrix ?? [])
+        .filter(row => row?.identifier)
+        .map(row => [row.identifier, { openPullRequests: [] }])
+    );
+    result.bridge = await backlogRemediation.bridgeSelectedToLanes({
+      cohort: receipt.cohort,
+      client: linear,
+      inventory: bridgeInventory,
+      teamId: team.id,
+      env: process.env,
+    });
     if (receipt.cohort.selected.length > 0) {
       // JOV-8000: the lanes pick up admitted work on their own event-driven
       // tick — there is no HTTP refresh endpoint to POST anymore. Passing no
@@ -2226,10 +2243,7 @@ async function runRemediate(isDryRun) {
     ? backlogRemediation.pullRequestRates(pullRequests)
     : null;
   if (ratesSummary) {
-    const mm =
-      /** @type {Partial<NonNullable<typeof mergeabilityEvidence>>} */ (
-        mergeabilityEvidence ?? {}
-      );
+    const mm = mergeabilityEvidence ?? {};
     console.log(
       `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')} mm.queueSource=${mm.queueSource ?? 'none'} mm.errors=${(mm.errors ?? []).length}`
     );
