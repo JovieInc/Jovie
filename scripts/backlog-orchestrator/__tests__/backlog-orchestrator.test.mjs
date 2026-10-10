@@ -2655,13 +2655,18 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.equal(fleetGate.laneCapacity, null);
-    assert.equal(fleetGate.state, 'AMBER');
+    // JOV-8000 follow-up 31: lane-capacity evidence is admission-scoped, not
+    // a promotion reason — the canonical python writer keeps it out of
+    // `reasons`, so the gate stays GREEN and the failure detail is carried
+    // on laneCapacityError for observability.
+    assert.equal(fleetGate.state, 'GREEN');
     assert.equal(
       fleetGate.reasons.some(
         reason => reason.code === 'queue-lane-capacity-invalid'
       ),
-      true
+      false
     );
+    assert.ok(fleetGate.laneCapacityError);
     // A contradictory receipt vetoes new leases even below backpressure.
     assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
 
@@ -2699,12 +2704,98 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(staleSchema.laneCapacity, null);
     assert.equal(
       staleSchema.reasons.some(
-        reason =>
-          reason.code === 'queue-lane-capacity-invalid' &&
-          reason.detail.includes('jovie-lane-capacity/v1')
+        reason => reason.code === 'queue-lane-capacity-invalid'
       ),
-      true
+      false
     );
+    assert.ok(staleSchema.laneCapacityError.includes('jovie-lane-capacity/v1'));
+  });
+
+  it('keeps hold-intake when a contradictory lane-capacity receipt rides a parked-controller receipt (JOV-8000 follow-up 31)', () => {
+    // Replay of the 38028777358 shape: the persisted receipt printed
+    // mode=hold-intake with reasons [controller-failure,
+    // production-deployment-unbound], yet the remediator re-derived
+    // promotionMode=blocked because this JS projection pushed
+    // queue-lane-capacity-invalid into the promotion reason set (which the
+    // canonical python writer never does) and the bounded hold-intake set
+    // rejected it — binding capacity merge-queue-blocked with selected=0
+    // for ~30h while main and production were green.
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        controller: {
+          status: 'parked',
+          retired: true,
+          error: 'controller-endpoint-retired: Connection refused',
+        },
+        production: {
+          status: 'green',
+          deployedSha: 'b3eeefdd4dc681d1c9b5b4385720d661f5129138',
+        },
+        queue: {
+          repository: 'JovieInc/Jovie',
+          status: 'known',
+          eligiblePrs: 6,
+          greenReadyPrs: 1,
+          target: 15,
+          // Present-and-contradictory: ready disagrees with greenReadyPrs.
+          laneCapacity: laneCapacity(0, 15),
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
+    assert.deepEqual(fleetGate.reasons.map(reason => reason.code).sort(), [
+      'controller-failure',
+      'production-deployment-unbound',
+    ]);
+    // The contradictory receipt still vetoes new leases (fail closed).
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.ok(fleetGate.laneCapacityError);
+  });
+
+  it('keeps hold-intake when the queue snapshot carries no lane-capacity receipt (JOV-8000 follow-up 31)', () => {
+    // Same replay class with the absent-receipt variant: python normalizes a
+    // missing lane-capacity receipt as an observation gap that must not
+    // freeze promotion; the JS previously turned it into a promotion blocker.
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        controller: {
+          status: 'parked',
+          retired: true,
+          error: 'controller-endpoint-retired: Connection refused',
+        },
+        production: {
+          status: 'green',
+          deployedSha: 'b3eeefdd4dc681d1c9b5b4385720d661f5129138',
+        },
+        queue: {
+          repository: 'JovieInc/Jovie',
+          status: 'known',
+          eligiblePrs: 6,
+          greenReadyPrs: 1,
+          target: 15,
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
+    assert.deepEqual(fleetGate.reasons.map(reason => reason.code).sort(), [
+      'controller-failure',
+      'production-deployment-unbound',
+    ]);
+    // An absent receipt must not freeze a below-target lane (JOV-5340).
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
+    assert.ok(fleetGate.laneCapacityError);
   });
 
   it('blocks a new lease when Summer closure health is red while promotion stays live', () => {
