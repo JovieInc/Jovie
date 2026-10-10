@@ -1,0 +1,14 @@
+STATUS: BLOCKED
+
+The one-line root-cause fix is prepared in [package.json](/home/timwhite/.local/state/jovie-lanes/worktrees/20261009T221553Z-PR21118-codex-fix-ada7c8/package.json:30): align `pnpm.overrides.vite` from `8.3.1` to `8.3.4`.
+
+Evidence:
+
+- Pre-fix lockfile preflight failed on the Vite override mismatch.
+- Post-fix `node scripts/lockfile-specifier-preflight.mjs` passes.
+- JSON validation and `git diff --check` pass.
+- Existing regression coverage explicitly tests root override drift.
+
+The change remains uncommitted. The managed sandbox blocks GitHub network access, so I cannot perform the required fresh `gh api graphql` guard immediately before install or push. Elevated access was denied pending explicit approval.
+
+Please approve elevated network access for the required GraphQL read, dependency install, and eventual push. I’ll then verify with pinned Node/pnpm, commit through normal hooks, and push to the same branch.
