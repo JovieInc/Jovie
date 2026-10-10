@@ -58,7 +58,7 @@ describe('ArtistNotificationsPage', () => {
     );
     expect(
       heroSection.getByRole('heading', {
-        name: segmentedAccessibleName('Reach Every Fan.', 'Automatically.'),
+        name: segmentedAccessibleName('Reach Every Fan.', 'On Autopilot.'),
       })
     ).toBeInTheDocument();
     expect(
@@ -86,7 +86,7 @@ describe('ArtistNotificationsPage', () => {
     );
     expect(
       reactivationSection.getByRole('heading', {
-        name: 'Notify them automatically.',
+        name: 'Notify every fan automatically.',
       })
     ).toBeInTheDocument();
     expect(
