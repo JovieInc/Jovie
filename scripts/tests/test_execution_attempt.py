@@ -6,6 +6,10 @@ import sys
 import tempfile
 import threading
 import unittest
+import copy
+import io
+import runpy
+from datetime import datetime, timezone
 from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -246,5 +250,215 @@ class GithubCoordinationBoundaryTest(unittest.TestCase):
                 attempt._locked(path, self.ident, self.coord, lambda _: ({"admitted": True}, [self.row()]))
             self.assertEqual(append.call_count, 4)
             self.assertFalse(path.exists())
+
+class CompletedFailureReconciliationTest(unittest.TestCase):
+    """Exercise the production GitHub adapter with ended journals, not caller proof flags."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        self.state = Path(self.tmp.name); (self.state / "runs").mkdir()
+        self.path = self.state / "execution.jsonl"
+        self.sha, self.branch, self.pr, self.now = "a" * 40, "codex/jov-6225-focus", 7, 20000
+        self.coord = {"kind": "github-status", "repository": "JovieInc/Jovie", "sha": self.sha}
+        self.creator = {"login": "jovie-bot[bot]", "type": "Bot", "id": 12}
+        self.identities, self.statuses, self.journal = [], [], []
+        for number in range(2):
+            ident = attempt.identity("pr-remediation", {"repository": "JovieInc/Jovie", "pr": self.pr, "failure": number}, {"headSha": self.sha})
+            self.identities.append(ident)
+            local = self.state / f"worker-{number}.jsonl"
+            who = {"owner": attempt.socket.gethostname().split(".")[0], "runtime": "symphony-lanes", "provider": "devin", "model": "swe-2-medium", "tool": "fix_red_pr", "accountPool": "devin"}
+            start = attempt.claim(local, ident, who, policy(wallSeconds=10800, leaseSeconds=6300, mutations=4),
+                                  {"triggerId": f"run-{number}", "correlationId": "pr-7", "causationId": self.sha}, 100 + number * 20, LOCAL)
+            attempt.boundary(local, ident, start["fencingToken"], {"spend": 1, "mutations": 1}, 101 + number * 20, LOCAL)
+            ended = attempt.finish(local, ident, start["fencingToken"], "failed_known",
+                                   {"failureClass": "repair_incomplete", "failureFingerprint": f"failure-{number}", "evidenceDigest": f"proof-{number}", "mutationsPerformed": [], "dependencies": ["devin"]}, 110 + number * 20, LOCAL)
+            previous = None
+            for row in attempt._rows(local):
+                status = self.add_status(ident, row, previous); previous = status["id"]
+            self.journal.append({"schema": "jovie-lane-run/v1", "runId": f"run-{number}", "provider": "devin", "kind": "fix-red", "pr": self.pr,
+                                 "branch": self.branch, "headBefore": self.sha, "headAfter": self.sha, "requestSource": {"head": self.sha},
+                                 "endedAt": datetime.fromtimestamp(ended["at"], timezone.utc).isoformat(), "verdict": "fix-no-change", "execution": ended})
+        self.bank = {"7": {"sha": self.sha, "count": 2, "endedAt": 130, "pushed": False, "repairRunId": "run-1", "repairBranch": self.branch, "repairHeadBefore": self.sha, "repairVerdict": "fix-no-change"}}
+        self.current = {"number": 7, "state": "open", "merged": False, "head": {"sha": self.sha, "ref": self.branch}, "labels": []}
+        self.statuses.append({"id": 80, "context": "Fork PR Gate", "state": "success", "creator": self.creator})
+        self.checks = [{"id": 100 + i, "name": name, "head_sha": self.sha, "status": "completed", "conclusion": "success", "app": {"slug": "github-actions"}} for i, name in enumerate(sorted(attempt.RECONCILE_CHECKS))]
+        self.comments, self.posts = [], []
+        self.flush()
+        self.transport = patch.object(attempt, "_gh", side_effect=self.gh); self.transport.start(); self.addCleanup(self.transport.stop)
+    def flush(self):
+        (self.state / "fix-attempts.json").write_text(json.dumps(self.bank))
+        (self.state / "runs/ledger.jsonl").write_text("".join(json.dumps(row) + "\n" for row in self.journal))
+    def add_status(self, ident, row, previous=None):
+        number = max((item["id"] for item in self.statuses), default=0) + 1
+        packed = {**row, "_remote": {"prevStatusId": previous, "eventId": f"fixture-{number}"}}
+        status = {"id": number, "context": f"jovie-execution/{ident['identityDigest']}", "state": "pending", "creator": dict(self.creator), "target_url": f"https://github.com/JovieInc/Jovie/commit/{self.sha}#jovie-execution={attempt._pack(packed)}"}
+        self.statuses.append(status); return status
+    def rewrite(self, index, change):
+        status = self.statuses[index]
+        row = attempt._unpack(status["target_url"].split("#jovie-execution=", 1)[1]); change(row)
+        status["target_url"] = status["target_url"].split("#", 1)[0] + "#jovie-execution=" + attempt._pack(row)
+    def gh(self, coord, method, endpoint, body=None):
+        if method == "POST":
+            self.assertIn("/statuses/", endpoint, "reconciliation must not claim a new attempt/ref")
+            self.posts.append(body)
+            self.statuses.append({**body, "id": max(item["id"] for item in self.statuses) + 1, "creator": dict(self.creator)})
+            return {}
+        if "/pulls/" in endpoint: return [copy.deepcopy(self.current)]
+        if "/statuses?" in endpoint: return [copy.deepcopy(self.statuses)]
+        if "/check-runs?" in endpoint: return [{"total_count": len(self.checks), "check_runs": copy.deepcopy(self.checks)}]
+        if "/comments?" in endpoint: return [copy.deepcopy(self.comments)]
+        self.fail(f"unexpected endpoint: {endpoint}")
+    def reconcile(self, number=0):
+        return attempt.reconcile_completed_failure(self.path, self.identities[number], self.pr, coordination=self.coord, state=self.state, now=self.now)
+    def blocked(self, error):
+        before = (self.state / "fix-attempts.json").read_bytes(), (self.state / "runs/ledger.jsonl").read_bytes()
+        with self.assertRaisesRegex((RuntimeError, ValueError, KeyError), error): self.reconcile()
+        self.assertEqual(self.posts, [])
+        self.assertEqual(before, ((self.state / "fix-attempts.json").read_bytes(), (self.state / "runs/ledger.jsonl").read_bytes()))
+    def test_both_completed_identities_append_once_without_forging_worker_success_or_reset(self):
+        original = copy.deepcopy(self.statuses)
+        before = (self.state / "fix-attempts.json").read_bytes(), (self.state / "runs/ledger.jsonl").read_bytes()
+        self.path.write_text(json.dumps({**self.identities[0], "schema": attempt.SCHEMA, "event": "audit"}) + "\n")
+        prefix = self.path.read_bytes()
+        for number in range(2):
+            result = self.reconcile(number)
+            self.assertEqual((result["result"], result["terminalState"], result["retryDecision"]), ("failed_known", "no_op_stale", "stop"))
+            self.assertEqual(result["remainingBudgets"], self.journal[number]["execution"]["remainingBudgets"])
+            self.assertEqual(result["failureFingerprint"], f"failure-{number}")
+            self.assertEqual(len(result["proof"]["excludedContexts"]), 2)
+            self.assertTrue(self.reconcile(number)["alreadyReconciled"])
+        self.assertEqual(len(self.posts), 2)
+        self.assertEqual(self.statuses[:len(original)], original)
+        self.assertTrue(self.path.read_bytes().startswith(prefix))
+        self.assertEqual(before, ((self.state / "fix-attempts.json").read_bytes(), (self.state / "runs/ledger.jsonl").read_bytes()))
+        self.assertEqual(attempt.claim(self.path, self.identities[0], owner(), policy(), {}, now=self.now, coordination=self.coord)["reason"], "generation_terminal")
+    def test_latest_bank_run_cannot_certify_the_other_identity(self):
+        self.journal.pop(0); self.flush(); self.blocked("own-ended-receipt-missing")
+    def test_duplicate_ended_receipts_are_ambiguous(self):
+        self.journal.append(copy.deepcopy(self.journal[0])); self.flush(); self.blocked("own-ended-receipt-missing-or-ambiguous")
+    def test_server_creator_is_required_and_embedded_creator_cannot_spoof_it(self):
+        self.rewrite(0, lambda row: row.update(creator=self.creator))
+        self.statuses[0]["creator"] = {"login": "someone", "type": "User"}
+        self.blocked("untrusted-status-creator")
+    def test_missing_server_creator_fails_closed(self):
+        self.statuses[1].pop("creator"); self.blocked("untrusted-status-creator")
+    def test_complete_original_owner_is_required_for_every_excluded_context(self):
+        self.rewrite(3, lambda row: row["owner"].pop("model")); self.blocked("owner-or-trigger-mismatch")
+    def test_foreign_host_owner_is_not_adopted(self):
+        self.rewrite(0, lambda row: row["owner"].update(owner="another-host")); self.blocked("owner-or-trigger-mismatch")
+    def test_wrong_pr_trigger_is_rejected(self):
+        self.rewrite(0, lambda row: row["trigger"].update(correlationId="pr-8")); self.blocked("owner-or-trigger-mismatch")
+    def test_journal_provider_branch_generation_fence_or_outcome_mismatch_blocks(self):
+        baseline = copy.deepcopy(self.journal)
+        changes = [lambda r: r.update(provider="other"), lambda r: r.update(branch="another-branch"), lambda r: r.update(headBefore="b" * 40),
+                   lambda r: r["execution"].update(fencingToken="other"), lambda r: r.update(headAfter="b" * 40), lambda r: r.update(verdict="fix-pushed")]
+        for change in changes:
+            with self.subTest(change=change):
+                self.journal = copy.deepcopy(baseline); change(self.journal[0]); self.flush(); self.blocked("own-ended-receipt-mismatch")
+    def test_ended_timestamp_matches_own_finish_with_producer_second_precision(self):
+        self.journal[0]["endedAt"] = datetime.fromtimestamp(109.2, timezone.utc).isoformat(); self.flush()
+        self.assertTrue(self.reconcile()["reconciled"])
+    def test_wrong_or_future_ended_time_is_not_proof(self):
+        self.journal[0]["endedAt"] = datetime.fromtimestamp(self.now + 1, timezone.utc).isoformat(); self.flush(); self.blocked("ended-time-mismatch")
+    def test_live_attempt_blocks_even_if_its_old_lease_expired(self):
+        self.statuses.pop(5); self.blocked("live-or-unfinished-attempt")
+    def test_forked_or_orphan_history_is_not_canonical_exclusion(self):
+        row = attempt._unpack(self.statuses[0]["target_url"].split("#jovie-execution=", 1)[1])
+        self.add_status(self.identities[0], row); self.blocked("ambiguous-history")
+    def test_orphan_receipt_is_rejected(self):
+        self.rewrite(2, lambda row: row["_remote"].update(prevStatusId=999)); self.blocked("orphan-history")
+    def test_unknown_or_terminal_failure_does_not_turn_green(self):
+        self.rewrite(2, lambda row: row.update(result="failed_unknown")); self.blocked("not-ended-retryable-failure")
+    def test_actual_mutation_cannot_be_declared_stale(self):
+        self.rewrite(2, lambda row: row.update(mutationsPerformed=["push"])); self.blocked("not-ended-retryable-failure")
+    def test_new_head_or_closed_pr_cannot_consume_old_recovery(self):
+        self.current["head"]["sha"] = "b" * 40; self.blocked("pr-changed-or-held")
+    def test_changed_bank_count_owner_or_head_cannot_reset_attempt_budget(self):
+        baseline = copy.deepcopy(self.bank)
+        for field, value in [("count", 1), ("pushed", True), ("sha", "b" * 40), ("repairBranch", "other"), ("endedAt", None), ("repairHeadBefore", "b" * 40)]:
+            with self.subTest(field=field):
+                self.bank = copy.deepcopy(baseline); self.bank["7"][field] = value; self.flush(); self.blocked("bank-binding-mismatch")
+    def test_bank_latest_run_must_also_have_its_own_ended_proof(self):
+        self.bank["7"]["repairRunId"] = "other-run"; self.flush(); self.blocked("bank-ended-run-mismatch")
+    def test_current_source_failure_or_pending_check_is_truthfully_blocked(self):
+        for conclusion, status in [("failure", "completed"), (None, "in_progress")]:
+            with self.subTest(conclusion=conclusion):
+                self.checks[0].update(conclusion=conclusion, status=status); self.blocked("current-check-unresolved")
+    def test_latest_check_failure_supersedes_older_green(self):
+        self.checks.append({**self.checks[0], "id": 999, "conclusion": "failure"}); self.blocked("current-check-unresolved")
+    def test_same_display_name_cannot_hide_independent_app_or_suite_failure(self):
+        for status, conclusion in [("in_progress", None), ("completed", "failure")]:
+            with self.subTest(status=status):
+                baseline = self.checks[:len(attempt.RECONCILE_CHECKS)]
+                self.checks = baseline + [
+                    {"id": 800, "name": "Independent Review", "head_sha": self.sha, "status": status, "conclusion": conclusion, "app": {"id": 1, "slug": "review-a"}, "check_suite": {"id": 10}},
+                    {"id": 900, "name": "Independent Review", "head_sha": self.sha, "status": "completed", "conclusion": "success", "app": {"id": 2, "slug": "review-b"}, "check_suite": {"id": 11}}]
+                self.blocked("current-check-unresolved")
+    def test_missing_required_check_and_untrusted_app_block(self):
+        removed = self.checks.pop(); self.blocked("required-check-missing")
+        self.checks.append(removed); self.checks[0]["app"] = {"slug": "another-app"}; self.blocked("required-check-unverified")
+    def test_independent_runtime_pending_status_is_never_excluded(self):
+        self.statuses.append({"id": 900, "context": "Visual Review", "state": "pending"}); self.blocked("current-status-unresolved")
+    def test_active_remote_claim_and_hold_are_preserved(self):
+        self.comments.append({"body": f"🤖 lane claim kind=fix sha={self.sha} host=mac at={datetime.fromtimestamp(self.now - 1, timezone.utc).isoformat()}"})
+        self.blocked("current-claim-active")
+        self.comments.clear(); (self.state / "held.json").write_text('{"7":{"reason":"human"}}'); self.blocked("held-disposition")
+    def test_unreadable_api_and_incomplete_checks_publish_nothing(self):
+        with patch.object(attempt, "_gh", side_effect=RuntimeError("protected-reserve-denied")): self.blocked("protected-reserve-denied")
+        real = self.gh
+        def truncated(coord, method, endpoint, body=None):
+            result = real(coord, method, endpoint, body)
+            if "/check-runs?" in endpoint: result[0]["total_count"] += 1
+            return result
+        with patch.object(attempt, "_gh", side_effect=truncated): self.blocked("checks-incomplete")
+    def test_normal_bank_mutex_cannot_be_bypassed(self):
+        with open(self.state / "fix-attempts.json.lock", "a+") as lock:
+            attempt.fcntl.flock(lock, attempt.fcntl.LOCK_EX | attempt.fcntl.LOCK_NB)
+            self.blocked("bank-lock-busy")
+    def test_stale_cas_snapshot_is_rejected_without_append(self):
+        with patch.object(attempt, "_github_rows", return_value=([], None)): self.blocked("canonical-history-changed")
+    def test_no_local_only_or_caller_asserted_proof_can_authorize_reconciliation(self):
+        self.coord["kind"] = "local-test"; self.blocked("live-coordination-required")
+    def test_revoked_branch_is_not_reauthorized_by_green_source(self):
+        (self.state / "runs/publication-revocations.jsonl").write_text(json.dumps({"schema": "jovie-publication-revocation/v1", "branch": self.branch}) + "\n")
+        self.blocked("publication-revoked")
+    def test_foreign_generation_invalid_identity_and_future_event_block(self):
+        ident = self.identities[0]
+        self.identities[0] = {**ident, "identityDigest": "other"}; self.blocked("identity-invalid")
+        self.identities[0] = ident
+        self.rewrite(0, lambda row: row.update(at=self.now + 1)); self.blocked("event-time-invalid")
+    def test_boundary_after_finish_and_wrong_attempt_are_not_ended_evidence(self):
+        self.rewrite(1, lambda row: row.update(fencingToken="missing")); self.blocked("unbound-boundary")
+    def test_independent_execution_context_is_not_a_stale_remediation(self):
+        ident = attempt.identity("runtime-acceptance", {"pr": 7}, {"headSha": self.sha})
+        self.add_status(ident, {**ident, "schema": attempt.SCHEMA, "event": "attempt_started", "at": 100})
+        self.blocked("independent-execution-unresolved")
+    def test_altered_prior_disposition_does_not_gain_idempotent_success(self):
+        self.reconcile(); self.posts.clear()
+        self.rewrite(len(self.statuses) - 1, lambda row: row.update(endedReceiptDigest="wrong"))
+        self.blocked("prior-disposition-mismatch")
+    def test_missing_required_fork_receipt_and_wrong_check_head_block(self):
+        fork = self.statuses.pop(); self.blocked("fork-gate-unverified")
+        self.statuses.append(fork); self.checks[0]["head_sha"] = "b" * 40; self.blocked("check-head-mismatch")
+    def test_cli_uses_maintained_journal_and_clock_instead_of_json_authority(self):
+        request = {"command": "reconcile", "path": str(self.path), "ident": self.identities[0], "pr": self.pr, "coordination": self.coord,
+                   "state": "/caller-replacement-state", "now": 1}
+        output = io.StringIO()
+        def transport(args, **kwargs):
+            body = json.loads(kwargs["input"]) if kwargs.get("input") else None
+            return subprocess.CompletedProcess(args, 0, json.dumps(self.gh(self.coord, args[3], args[4], body)), "")
+        with patch.dict(attempt.os.environ, {"LANES_STATE": str(self.state)}), patch.object(attempt.time, "time", return_value=self.now), \
+             patch.object(attempt.lifecycle, "run", side_effect=transport), patch.object(sys, "stdin", io.StringIO(json.dumps(request))), patch.object(sys, "stdout", output):
+            runpy.run_path(str(MODULE), run_name="__main__")
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["at"], self.now)
+        self.assertEqual(result["result"], "failed_known")
+        self.assertEqual(len(self.posts), 1)
+    def test_cli_reports_blocked_operation_with_nonzero_exit(self):
+        request = {"command": "reconcile", "path": str(self.path), "ident": self.identities[0], "pr": self.pr, "coordination": LOCAL}
+        output = io.StringIO()
+        with patch.object(sys, "stdin", io.StringIO(json.dumps(request))), patch.object(sys, "stdout", output), self.assertRaises(SystemExit) as exited:
+            runpy.run_path(str(MODULE), run_name="__main__")
+        self.assertEqual(exited.exception.code, 2)
+        self.assertIn("live-coordination-required", json.loads(output.getvalue())["error"])
 
 if __name__ == "__main__": unittest.main()
