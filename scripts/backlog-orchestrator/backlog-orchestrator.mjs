@@ -2049,6 +2049,7 @@ async function runRemediate(isDryRun) {
   // with retries and a hard deadline; merge-queue rows (still null after
   // retries with a gh-readonly-queue pr-<N>- ref) count as known and not
   // conflicting. The receipt carries the full evidence.
+  /** @type {Record<string, any> | null} */
   let mergeabilityEvidence = null;
   if (Array.isArray(pullRequests)) {
     mergeabilityEvidence = await measureMergeability(
@@ -2207,13 +2208,14 @@ async function runRemediate(isDryRun) {
         .filter(row => row?.identifier)
         .map(row => [row.identifier, { openPullRequests: [] }])
     );
-    result.bridge = await backlogRemediation.bridgeSelectedToLanes({
-      cohort: receipt.cohort,
-      client: linear,
-      inventory: bridgeInventory,
-      teamId: team.id,
-      env: process.env,
-    });
+    /** @type {Record<string, any>} */ (result).bridge =
+      await backlogRemediation.bridgeSelectedToLanes({
+        cohort: receipt.cohort,
+        client: linear,
+        inventory: bridgeInventory,
+        teamId: team.id,
+        env: process.env,
+      });
     // Surface lane rejection reasons for the selected issues next to the
     // bridge receipt, so route-held:frontier / over-budget is visible without
     // host access (the lanes doctor carries observed.rejectedIssues).
