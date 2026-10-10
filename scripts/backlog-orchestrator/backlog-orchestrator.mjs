@@ -475,6 +475,15 @@ function loadFleetGateReceipt(team) {
 
 export async function fleetGateForTeam(team, now = new Date().toISOString()) {
   const receipt = loadFleetGateReceipt(team);
+  // JOV-8000 follow-up 32: adopt the persisted receipt's own typed verdict
+  // when it is fresh — the canonical python writer already evaluated these
+  // exact signals, and re-deriving promotion semantics in JS is a second
+  // implementation that kept drifting (fu29/fu30/fu31 and the 38031492172
+  // residual all printed hold-intake while the re-derivation bound BLOCKED).
+  // Stale or malformed receipts fall through to re-derivation, which fails
+  // closed on the stale evidence.
+  const projected = admitter.projectPersistedFleetGate(receipt, { now });
+  if (projected) return projected;
   const receiptMain = receipt?.signals?.main?.status;
   // JOV-8000 follow-up 30: the production signal comes from the SAME-RUN
   // persisted receipt (the canonical python writer's own observation, with
