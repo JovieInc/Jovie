@@ -1,0 +1,12 @@
+{
+ "schema": "jovie-preserved-repair/v1",
+ "runId": "20261008T121933Z-PR20999-devin-fix-c08e2d",
+ "pr": 20999,
+ "issue": null,
+ "reason": [
+  "target-state-unavailable"
+ ],
+ "branch": "dependabot/npm_and_yarn/workflow-5.0.0",
+ "headBefore": "7e1f5755a1b5fa09b0a965739bb43821e5dcb469",
+ "at": "2026-10-08T12:57:58Z"
+}

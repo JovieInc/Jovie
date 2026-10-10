@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { importNextConfig } from '../../lib/next-config-import';
 
 interface RewriteCondition {
   readonly type: string;
@@ -34,7 +35,7 @@ function flattenRewrites(
 }
 
 async function getHudRewrite(): Promise<RewriteRule> {
-  const nextConfigModule = await import('../../../next.config.js');
+  const nextConfigModule = await importNextConfig();
   const nextConfig = nextConfigModule.default ?? nextConfigModule;
   const rewrites = flattenRewrites(await nextConfig.rewrites());
   const hudRewrite = rewrites.find(rewrite => rewrite.source === '/hud');

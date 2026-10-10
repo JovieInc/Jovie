@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { metadata } from '@/app/(marketing)/artist-profiles/page';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { importNextConfig } from '../../lib/next-config-import';
 
 type RedirectRule = {
   source: string;
@@ -16,7 +17,7 @@ type RedirectRule = {
 
 describe('artist profile marketing routes', () => {
   it('301 redirects the singular alias to the canonical lander', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as RedirectRule[];
     const response = await unstable_getResponseFromNextConfig({

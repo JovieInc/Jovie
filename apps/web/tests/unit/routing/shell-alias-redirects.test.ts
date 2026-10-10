@@ -26,6 +26,7 @@ import DashboardTippingPage from '@/app/app/(shell)/dashboard/tipping/page';
 import DashboardTourDatesPage from '@/app/app/(shell)/dashboard/tour-dates/page';
 import CanonicalProfilePage from '@/app/app/(shell)/profile/page';
 import CanonicalTippingPage from '@/app/app/(shell)/tipping/page';
+import { importNextConfig } from '../../lib/next-config-import';
 
 beforeEach(() => {
   redirectMock.mockClear();
@@ -33,7 +34,7 @@ beforeEach(() => {
 
 describe('shell alias redirects', () => {
   it('redirects the legacy appearance alias to Account without a page stub', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as RedirectRule[];
 
@@ -49,7 +50,7 @@ describe('shell alias redirects', () => {
   });
 
   it('redirects the releases alias before rendering the authenticated shell', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as RedirectRule[];
 
@@ -63,7 +64,7 @@ describe('shell alias redirects', () => {
   });
 
   it('keeps contacts and tour aliases out of static redirects', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as RedirectRule[];
 

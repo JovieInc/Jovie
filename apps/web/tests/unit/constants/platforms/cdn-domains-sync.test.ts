@@ -8,6 +8,7 @@ import {
   PLATFORM_CDN_DOMAINS,
 } from '@/constants/platforms/cdn-domains';
 import { ALL_PLATFORMS } from '@/constants/platforms/data';
+import { requireNextConfig } from '../../../lib/next-config-import';
 
 describe('CDN domain registry', () => {
   describe('platform coverage', () => {
@@ -131,7 +132,7 @@ describe('CDN domain registry', () => {
 
   describe('next.config.js sync', () => {
     it('remotePatterns covers all canonical domains', () => {
-      const nextConfig = require('../../../../next.config.js');
+      const nextConfig = requireNextConfig();
       const remoteHostnames = new Set(
         nextConfig.images.remotePatterns.map(
           (p: { hostname: string }) => p.hostname

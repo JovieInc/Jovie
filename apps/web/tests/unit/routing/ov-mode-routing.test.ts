@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { importNextConfig } from '../../lib/next-config-import';
 
 interface RouteRule {
   readonly source: string;
@@ -53,7 +54,7 @@ describe('OV mode routing', () => {
   });
 
   it('redirects all legacy admin URLs to the matching OV URL', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as RouteRule[];
 
@@ -65,7 +66,7 @@ describe('OV mode routing', () => {
   });
 
   it('aliases every OV path to the existing admin implementation tree', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const rewrites = flattenRewrites(await nextConfig.rewrites());
 
@@ -76,7 +77,7 @@ describe('OV mode routing', () => {
   });
 
   it('rewrites /hud and wiki into the OV app shell except token kiosk mode', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const grouped = (await nextConfig.rewrites()) as {
       readonly beforeFiles?: readonly RouteRule[];

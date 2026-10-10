@@ -30,6 +30,7 @@ import { buildProfileAeoFaqStructuredData } from '@/lib/profile/aeo-content';
 import { generateProfileStructuredData } from '@/lib/seo/structured-data';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { CreatorProfile } from '@/types/db';
+import { importNextConfig } from '../../lib/next-config-import';
 
 // --- Mock data used across tests ---
 
@@ -929,7 +930,7 @@ describe('Public Profile Page Logic', () => {
 
 describe('profile mode route redirects', () => {
   it('keeps the canonical profile admission URL source-backed and database-independent', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as RedirectRule[];
 
@@ -963,7 +964,7 @@ describe('profile mode route redirects', () => {
   });
 
   it('does not shadow smart-link slugs with config-level redirects', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as RedirectRule[];
     const profileRedirects = redirects.filter(rule =>
@@ -974,7 +975,7 @@ describe('profile mode route redirects', () => {
   });
 
   it('routes legacy aliases through the collision-safe resolver after filesystem matches', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
 
@@ -1001,7 +1002,7 @@ describe('profile mode route redirects', () => {
   });
 
   it('server-renders bounded query modes through the private ISR route', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
     const queryModeRewrite = afterFiles.find(
@@ -1037,7 +1038,7 @@ describe('profile mode route redirects', () => {
   });
 
   it('keeps unknown and profile query values on the canonical root renderer', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
     const queryModeRewrite = afterFiles.find(
@@ -1056,7 +1057,7 @@ describe('profile mode route redirects', () => {
   });
 
   it('bounds cacheable attribution variants to Jovie-issued source values', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
     const sourcePattern = new RegExp(afterFiles[0]?.has?.[0]?.value ?? '');

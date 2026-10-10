@@ -6,6 +6,7 @@ import { MARKETING_CUSTOMERS_FLYOUT } from '@/data/marketingNavigation';
 import { getPublicProfileCandidate } from '@/lib/routing/proxy-routing';
 import { classifySurface } from '@/lib/seo/page-certification';
 import { isReservedUsername } from '@/lib/validation/username-core';
+import { importNextConfig } from '../../lib/next-config-import';
 
 describe('/solutions/artists artist solution route (JOV-5861)', () => {
   it('binds the route to the artist-lp recipe in the manifest', () => {
@@ -45,7 +46,7 @@ describe('/solutions/artists artist solution route (JOV-5861)', () => {
 
 describe('bare /solutions root (JOV-7230)', () => {
   it('redirects /solutions to the shipped /solutions/artists page', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfigModule = await importNextConfig();
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as {
       source: string;
