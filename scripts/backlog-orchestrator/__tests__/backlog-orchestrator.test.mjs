@@ -2798,6 +2798,145 @@ describe('deterministic Symphony admission boundary', () => {
     assert.ok(fleetGate.laneCapacityError);
   });
 
+  it('adopts the persisted receipt verdict verbatim when fresh (JOV-8000 follow-up 32)', () => {
+    // Replay of the 38031492172 residual: the canonical writer persisted
+    // promotionMode=hold-intake with the bounded reason set, yet the JS
+    // re-derivation of the same signals still bound merge-queue-blocked —
+    // the fourth split-brain from maintaining two implementations of the
+    // same policy. The fresh persisted receipt is the authority.
+    const now = '2026-10-10T06:39:00.000Z';
+    const projected = admitter.projectPersistedFleetGate(
+      {
+        schema: 'jovie-fleet-gate/v1',
+        observedAt: '2026-10-10T06:37:59.000Z',
+        state: 'AMBER',
+        promotionMode: 'hold-intake',
+        reasons: [
+          {
+            code: 'controller-failure',
+            layer: 'controller',
+            severity: 'warning',
+            detail: 'parked',
+          },
+          {
+            code: 'production-deployment-unbound',
+            layer: 'promotion',
+            severity: 'warning',
+            detail: 'unbound',
+          },
+        ],
+        signals: {
+          queue: {
+            repository: 'JovieInc/Jovie',
+            status: 'known',
+            eligiblePrs: 6,
+            greenReadyPrs: 1,
+            target: 15,
+            laneCapacity: laneCapacity(1, 15),
+          },
+        },
+        workAdmission: {
+          allowed: true,
+          activities: ['approved-issue-lease'],
+          newIssueLeaseAllowed: true,
+          newImplementationAllowed: true,
+        },
+        concurrency: {
+          gem: {
+            maxConcurrent: 0,
+            evidenceAccepted: false,
+            reason: 'capacity-evidence-unproven-dispatch-closed',
+          },
+        },
+      },
+      { now }
+    );
+    assert.ok(projected);
+    assert.equal(projected.state, 'AMBER');
+    assert.equal(
+      projected.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
+    assert.deepEqual(projected.reasons.map(reason => reason.code).sort(), [
+      'controller-failure',
+      'production-deployment-unbound',
+    ]);
+    assert.equal(projected.projectedFromPersistedReceipt, true);
+    // The remediator's mergeQueue mapping must no longer read blocked.
+    const mergeQueueHealth =
+      projected.promotionMode === admitter.FLEET_PROMOTION_MODE.BLOCKED
+        ? 'blocked'
+        : projected.state === admitter.FLEET_GATE_STATE.GREEN
+          ? 'healthy'
+          : 'degraded';
+    assert.equal(mergeQueueHealth, 'degraded');
+    // capacity_accepted=false on the receipt is preserved, not laundered.
+    assert.equal(projected.concurrency.gem.maxConcurrent, 0);
+  });
+
+  it('refuses a stale or malformed persisted receipt so re-derivation fails closed (JOV-8000 follow-up 32)', () => {
+    const now = '2026-10-10T06:39:00.000Z';
+    const valid = {
+      schema: 'jovie-fleet-gate/v1',
+      observedAt: '2026-10-10T06:37:59.000Z',
+      state: 'AMBER',
+      promotionMode: 'hold-intake',
+      reasons: [],
+      signals: {},
+      workAdmission: { allowed: true, activities: [] },
+      concurrency: { gem: { maxConcurrent: 0 } },
+    };
+    // Stale past the controller window: NOT adopted.
+    assert.equal(
+      admitter.projectPersistedFleetGate(
+        { ...valid, observedAt: '2026-10-10T06:20:00.000Z' },
+        { now }
+      ),
+      null
+    );
+    // Future-dated: NOT adopted.
+    assert.equal(
+      admitter.projectPersistedFleetGate(
+        { ...valid, observedAt: '2026-10-10T07:00:00.000Z' },
+        { now }
+      ),
+      null
+    );
+    // Wrong schema: NOT adopted.
+    assert.equal(
+      admitter.projectPersistedFleetGate(
+        { ...valid, schema: 'jovie-fleet-gate/v0' },
+        { now }
+      ),
+      null
+    );
+    // Unknown promotionMode: NOT adopted.
+    assert.equal(
+      admitter.projectPersistedFleetGate(
+        { ...valid, promotionMode: 'yolo' },
+        { now }
+      ),
+      null
+    );
+    // Untyped workAdmission: NOT adopted.
+    assert.equal(
+      admitter.projectPersistedFleetGate(
+        { ...valid, workAdmission: { allowed: 'yes' } },
+        { now }
+      ),
+      null
+    );
+    // Missing concurrency: NOT adopted.
+    assert.equal(
+      admitter.projectPersistedFleetGate(
+        { ...valid, concurrency: undefined },
+        { now }
+      ),
+      null
+    );
+    assert.equal(admitter.projectPersistedFleetGate(null, { now }), null);
+  });
+
   it('blocks a new lease when Summer closure health is red while promotion stays live', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
