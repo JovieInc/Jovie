@@ -1,0 +1,9 @@
+Opened draft PR [#20928](https://github.com/JovieInc/Jovie/pull/20928) at commit `2b9d36062c`.
+
+- Quarantined [page.mdx](/home/timwhite/.local/state/jovie-lanes/worktrees/20261007T183634Z-JOV-6875-codex-9127cd/apps/docs/app/docs/manage-jovie/troubleshooting/fix-wrong-artist-or-catalog/page.mdx:9) as `stale`.
+- Cleared verification metadata and active visual-proof references.
+- Confirmed current `/support`, contact, “Suggested,” and “Not me” behavior.
+- Passed metadata validation, affected-article simulations, 75 docs tests, 42 web tests, and 4 contact tests.
+- Biome excludes MDX, so it processed zero files; the docs validator covered the article contract.
+- Linear moved to `In Review`. Draft CI is running.
+- No human certification was asserted; quarantine satisfies the acceptance path.
