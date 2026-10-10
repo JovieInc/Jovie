@@ -286,6 +286,10 @@ def _row(base, effective, running, changed, reason, blockers, ceiling, up=0, idl
 def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, config: dict, now: float) -> dict:
     """Pure AIMD step. Returns the next ``symphony-lanes-autoscale/v1`` receipt."""
     previous, config, sample = _obj(previous), config or {}, host_sample or {}; prev_lanes, prev_host = _obj(previous.get("lanes")), _obj(previous.get("host"))
+    if config.get("mode") == "apply" and previous.get("mode") != "apply":
+        # Only an apply receipt records live capacity. Start other modes at the
+        # configured base, then evaluate the same real safety limits below.
+        prev_lanes, prev_host = {}, {}
     history = [row for row in (previous.get("history") or []) if isinstance(row, dict)]
     interval, need = _pint(config.get("intervalS")) or DEFAULT_INTERVAL_S, 0; need, host_last = streak_ticks(interval), _num(prev_host.get("lastChangeAt"))
     cpu = _int(sample.get("cpuCount")) or 1; cpu = cpu if cpu > 0 else 1; enabled = [base for base in bases.values() if _int(base) is not None and base > 0]
@@ -380,7 +384,7 @@ def effective_slots(state_dir: Path, name: str, base: int, now: float | None = N
     if base <= 0 or mode() != "apply":
         return base
     now, state = time.time() if now is None else now, _read_json(Path(state_dir) / "autoscale.json"); observed = _num(_obj(state).get("observedAt"))
-    if not _valid_state(state) or observed is None or now - observed > STALE_S or now < observed:
+    if not _valid_state(state) or state.get("mode") != "apply" or observed is None or now - observed > STALE_S or now < observed:
         return base
     row = state["lanes"].get(name); effective, floor, ceiling = _int(_obj(row).get("effective")), _int(_obj(row).get("floor")), _int(_obj(row).get("ceiling"))
     if not isinstance(row, dict) or effective is None:
