@@ -3868,8 +3868,9 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         if pr.get("queueFailure"):
             problem += ["What failed in the merge group:", pr["queueFailure"], ""]
     if "stale" in pr.get("eventKinds", ()):
-        problem += ["This lane draft has had no activity for 48 hours. Finish it: resolve what the gate",
-                    "held, make its checks green and push. If it cannot ship, end with NOT-SHIPPABLE.", ""]
+        problem += ["This draft has had no activity for 48 hours and the lanes now own it. Finish it:",
+                    "read its title, body and diff for the intent, resolve what the gate held or what is",
+                    "incomplete, make its checks green and push. If it cannot ship, end with NOT-SHIPPABLE.", ""]
     dossier = pr.get("dossier")
     return "\n".join([
         *([dossier, ""] if dossier else []),
@@ -4978,13 +4979,23 @@ def with_checks(pr: dict) -> dict:
         return pr
 
 
+def reclaimable_drafts() -> list[dict]:
+    """Abandoned agent drafts the lanes reclaim (Tim, 2026-10-10): non-lane agent branches past
+    the 7-day SLO that are idle 48h, red or conflicting, and not held. Same-repo only."""
+    now = time.time()
+    return [pr for pr in open_prs_summary() if not pr.get("isCrossRepository")
+            and pr_events.abandoned_agent_draft(pr, now)
+            and not {label["name"].lower() for label in pr.get("labels", [])} & pr_events.HOLD_LABELS]
+
+
 def fix_candidates(name: str) -> list[dict]:
-    """Lane PRs (all lanes) plus every other open non-draft PR, de-duplicated by number.
+    """Lane PRs (all lanes), every other open non-draft PR and reclaimed abandoned drafts,
+    de-duplicated by number.
 
     Cached with the rest of the claim scan: N idle workers share one read per minute."""
     def fetch():
         seen, merged = set(), []
-        for pr in lane_prs(name) + repo_prs():
+        for pr in lane_prs(name) + repo_prs() + reclaimable_drafts():
             if pr["number"] not in seen:
                 seen.add(pr["number"])
                 merged.append(pr)
@@ -5293,7 +5304,8 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
         # recognized Hyperagent digest branches or admit another enabled lane's draft.
         owned = LANE_BRANCH.match(live.get("headRefName", "")) if live is not None else None
         in_scope = live is not None and (not live.get("isDraft") or
-                                        bool(owned and owned.group("lane") in {name, *disabled}))
+                                        bool(owned and owned.group("lane") in {name, *disabled}) or
+                                        pr_events.abandoned_agent_draft(live, now))
         if entry is not None and in_scope \
                 and red_pr([live], attempts, {str(pr["number"]): entry}) is not None:
             pr = live
@@ -5616,7 +5628,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         # A remote-only lane (Hyperagent) cannot repair a local checkout: it only claims issues,
         # and the local lanes repair its PRs like any orphan (`repairs: false`).
         local = spec.get("repairs") is not False
-        prs = lane_prs(name) if local else []
+        # Reclaimed abandoned drafts are gated and readied like this lane's own drafts.
+        prs = lane_prs(name) + reclaimable_drafts() if local else []
         candidates = fix_candidates(name) if local else []
         events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS) if local else []
         if local:

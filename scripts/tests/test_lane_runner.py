@@ -1524,6 +1524,8 @@ class ClaimScanCacheTest(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.saved = (lane.SHARED_CACHE_DIR, os.environ.pop("LANES_EXECUTION_BACKEND", None), lane.sh,
                       lane.lane_prs, lane.repo_prs)
+        self.saved_reclaimable = lane.reclaimable_drafts
+        self.addCleanup(lambda: setattr(lane, "reclaimable_drafts", self.saved_reclaimable))
         lane.SHARED_CACHE_DIR = Path(self.tmp.name)
         self.summary = dict(lane._SUMMARY)
         lane._SUMMARY.update(at=0.0, prs=[], readable=False)
@@ -1557,6 +1559,7 @@ class ClaimScanCacheTest(unittest.TestCase):
         lane.lane_prs = lambda name, providers=None, fields="": self.counts.__setitem__("fix", self.counts["fix"] + 1) or [
             {"number": 1, "headRefName": "devin/jov-1-20260901", "isDraft": False}]
         lane.repo_prs = lambda: []
+        lane.reclaimable_drafts = lambda: []
 
         def fake_sh(args, cwd=None, timeout=600, env=None, log=None):
             if "--search" in args:
@@ -4031,6 +4034,25 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 2}})["number"], 5,
                          "an external head is re-entry evidence, not part of the dead generation")
         self.assertEqual(lane.red_pr([self.pr(sha="h2")], {"5": {"sha": "h1", "count": 1}})["number"], 5)
+
+    def test_fix_candidates_include_reclaimed_abandoned_drafts(self):
+        # Tim, 2026-10-10: Symphony reclaims abandoned drafts. A 7d-old codex draft idle 48h is a
+        # candidate; a moving one, a held one and a human branch are not.
+        now = time.time()
+        ancient = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 10 * 86400))
+        old = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 3 * 86400))
+        fresh = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 3600))
+        def draft(number, branch, updated, labels=()):
+            return {"number": number, "headRefName": branch, "headRefOid": f"h{number}", "isDraft": True,
+                    "mergeStateStatus": "BLOCKED", "createdAt": ancient, "updatedAt": updated,
+                    "isCrossRepository": False, "labels": [{"name": name} for name in labels], "statusCheckRollup": []}
+        inventory = [draft(40, "codex/homepage-material", old), draft(41, "codex/moving", fresh),
+                     draft(42, "codex/held", old, labels=["hold"]), draft(43, "feature/mine", old)]
+        with patch.object(lane, "open_prs_summary", return_value=inventory), \
+                patch.object(lane, "lane_prs", return_value=[]), patch.object(lane, "repo_prs", return_value=[]), \
+                patch.object(lane, "shared", side_effect=lambda key, ttl, fetch: fetch()):
+            self.assertEqual([pr["number"] for pr in lane.reclaimable_drafts()], [40])
+            self.assertEqual([pr["number"] for pr in lane.fix_candidates("codex")], [40])
 
     def test_red_pr_leaves_dependabot_bumps_to_dependabot_auto_merge(self):
         bump = {**self.pr(), "headRefName": "dependabot/npm_and_yarn/dev-patch-8cf5366741"}
