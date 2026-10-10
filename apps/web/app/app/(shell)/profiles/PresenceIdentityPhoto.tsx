@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 interface PresenceIdentityPhotoProps {
   readonly subject: PresenceIdentitySubject;
   readonly artistName: string;
-  readonly size?: 'lg' | 'xl';
+  readonly size?: 'sm' | 'lg' | 'xl';
   readonly showSource?: boolean;
   readonly className?: string;
 }
@@ -54,7 +54,13 @@ export function PresenceIdentityPhoto({
   const photo = getPresenceIdentityPhoto(subject);
   const entityName = getPresenceEntityName(subject, artistName);
   const platformLabel = getPresencePlatformLabel(subject);
-  const alt = identityPhotoAlt(entityName, platformLabel, photo);
+  const alt = identityPhotoAlt(
+    entityName,
+    platformLabel,
+    size === 'sm' && photo.kind === 'generic'
+      ? { ...photo, kind: 'missing', url: null }
+      : photo
+  );
   const showVerified = photo.verified && photo.kind === 'profile';
 
   return (
@@ -69,14 +75,17 @@ export function PresenceIdentityPhoto({
       data-photo-freshness={photo.freshness}
     >
       <Avatar
-        src={photo.url}
+        key={`${photo.url ?? 'missing'}:${photo.observedAt ?? ''}`}
+        src={size !== 'sm' || photo.kind === 'profile' ? photo.url : null}
         alt={alt}
         name={entityName}
         size={size}
-        shape={photo.kind === 'generic' ? 'artwork' : 'person'}
+        shape={size === 'sm' || photo.kind !== 'generic' ? 'person' : 'artwork'}
         verified={false}
       />
-      <ProviderBadge platform={subject.platform} label={platformLabel} />
+      {size !== 'sm' ? (
+        <ProviderBadge platform={subject.platform} label={platformLabel} />
+      ) : null}
       {showSource ? (
         <span className='sr-only'>
           {identityPhotoSourceLabel(photo)}
