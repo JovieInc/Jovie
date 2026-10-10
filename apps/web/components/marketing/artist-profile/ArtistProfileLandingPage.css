@@ -399,8 +399,13 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
   text-transform: uppercase;
 }
 
-:where(.system-b-launch-hero-title) {
-  /* JOV-8167: wide enough for two balanced lines, never clamped. */
+.system-b-launch-hero-title {
+  /* JOV-8167: wide enough for balanced lines, never clamped. Plain class
+     (not :where) so it beats the zero-specificity h1 two-line fallback. */
+  display: block;
+  max-block-size: none;
+  overflow: visible;
+  -webkit-line-clamp: unset;
   max-width: 24ch;
   text-wrap: balance;
   margin: var(--space-5) 0 0;
@@ -1244,7 +1249,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
     gap: var(--space-6);
   }
 
-  :where(.system-b-launch-hero-title) {
+  .system-b-launch-hero-title {
     max-width: 13ch;
   }
 
