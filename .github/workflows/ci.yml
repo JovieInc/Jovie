@@ -3501,7 +3501,12 @@ jobs:
       # same PR. Direct-main and manual runs keep exact, non-canceling groups.
       group: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || format('ci-macos-{0}-{1}', github.run_id, github.run_attempt) }}
       cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}
-    runs-on: macos-26
+    # macos-15, not macos-26: MenuMonitor targets macOS 14 / swift-tools 5.10 and
+    # needs no Xcode 26. Hosted macos-26 pickup waited 8-68 min per merge group on
+    # 2026-10-10 (03:42Z group: 4068 s wait for a 440 s build) and three queued
+    # Mac jobs idled a 15-deep ALLGREEN queue. Re-evaluate when the package needs
+    # a newer SDK.
+    runs-on: macos-15
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
