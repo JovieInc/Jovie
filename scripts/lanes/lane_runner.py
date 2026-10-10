@@ -2939,6 +2939,11 @@ def red_pr(prs: list[dict], attempts: dict, held: dict | None = None) -> dict | 
     for pr in sorted(best_per_issue(prs), key=lambda item: item["number"]):
         if pr.get("isInMergeQueue") is True:
             continue  # Native landing owns this head; cached absence still needs a fresh claim read.
+        if (pr.get("headRefName") or "").startswith("dependabot/"):
+            # Dependabot Auto-Merge owns version bumps (recreate on conflict, ignore on a real
+            # regression). ~100 fix runs went to dependabot branches in the week to 2026-10-10
+            # and none of them could change what a bump breaks.
+            continue
         # A held PR is Tim's/Summer's call: fixing it re-arms auto-merge and re-enqueues it
         # (#17541, 2026-09-28). The event path already skips holds via pr_events.in_scope.
         if pr_events.preservation_reason(pr, attempts.get(str(pr["number"]), {}), MAX_FIX_ATTEMPTS,
@@ -5738,6 +5743,28 @@ def selftest_env(scratch: Path) -> dict:
     return {**env, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
 
 
+# The installed packages mesh-runtime-bundle.mjs compiles against (exact pins checked there).
+MESH_DEPENDENCY_PINS = ("apps/desktop/node_modules/esbuild/package.json",
+                        "packages/agent-transport-contracts/node_modules/zod/package.json")
+
+
+def mesh_dependency_root(host: Host) -> Path | None:
+    """The host repo when it is installed; otherwise the newest ready worktree-pool slot that
+    is. The Mac lanes repo is a bare source checkout with no node_modules, so every release
+    since 2026-10-09 was refused ("mesh runtime dependency closure failed") and no lane fix
+    reached that host. Pool slots are installed from origin/main, the same lock the staging
+    bundle carries."""
+    def installed(root: Path) -> bool:
+        return all((root / pin).is_file() for pin in MESH_DEPENDENCY_PINS)
+    if installed(host.repo):
+        return host.repo
+    try:
+        slots = worktree_pool.ready_slots(worktree_pool.pool_dir(host.repo))
+    except (OSError, subprocess.CalledProcessError):
+        slots = []
+    return next((slot for slot in slots if installed(slot)), None)
+
+
 def install_release(host: Host) -> int:
     if sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo).returncode:
         raise RuntimeError("release-source-fetch-failed")
@@ -5771,9 +5798,10 @@ def install_release(host: Host) -> int:
         # Raw ports import workspace TypeScript/Zod. Compile from the immutable
         # archive with the host repo's existing identical pins before activation;
         # no dependency installation or running-worker mutation is permitted.
+        dependency_root = mesh_dependency_root(host) or host.repo
         try:
             runtime = lifecycle.run(["node", str(staging / "scripts/lanes/mesh-runtime-bundle.mjs"),
-                                     str(staging.resolve()), str(host.repo.resolve())],
+                                     str(staging.resolve()), str(dependency_root.resolve())],
                                     cwd=staging, capture_output=True, text=True, timeout=60,
                                     env=worktree_pool.node_env(staging))
         except subprocess.TimeoutExpired:
