@@ -1,0 +1,11 @@
+Implemented and opened draft PR [#20929](https://github.com/JovieInc/Jovie/pull/20929).
+
+- Marked [connect-music-accounts/page.mdx](/home/timwhite/.local/state/jovie-lanes/worktrees/20261007T183706Z-JOV-6823-codex-e92ddb/apps/docs/app/docs/jovie-essentials/connect-music-accounts/page.mdx:12) `stale`, unverified, non-searchable, with visual-proof claims cleared.
+- Confirmed quarantine from navigation, search, sitemap, and related guides.
+- Found the guide’s Settings claim conflicts with current Spotify/YouTube connector behavior.
+- Commit: `14cb07ccee0d7b2db92f4d7dc512cc2d7cd055ec`
+- Metadata validator, affected-article simulation, 29 docs tests, and 134 product behavior tests passed.
+- Completed CI lanes are green; umbrella Source Validation remains in progress with no reported failure.
+- PR remains draft and was not merged or marked ready.
+
+Deviations: GBrain and Linear API access were unavailable; the PR retains all required Linear markers.
