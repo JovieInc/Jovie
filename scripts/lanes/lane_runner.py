@@ -146,8 +146,13 @@ WORKTREE_INSTALL = ["pnpm", "install", "--frozen-lockfile", "--prefer-offline",
 # urgent-first admission while guaranteeing that a sustained P1 stream cannot
 # starve older work forever.
 PRIORITY_AGING_S = 24 * 3600
-# Generated files do not count toward the reviewable-size cap.
-GENERATED = re.compile(r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)")
+# Generated files do not count toward the reviewable-size cap or require a
+# synthetic test change. Keep report exemptions explicit so hand-authored JSON
+# under reports/ still receives the normal code-change gate.
+GENERATED = re.compile(
+    r"(^|/)(drizzle/migrations/meta/|pnpm-lock\.yaml$|__snapshots__/|\.snap$)"
+    r"|^apps/web/reports/(?:test-coverage-snapshot\.json|nightly-agent/last-run\.json)$"
+)
 # Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
 TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/(?:tests?|__tests__|[^/]*Tests)/|(^|/)test_[^/]+\.py$)")
 DOC_FILE = re.compile(r"(\.mdx?c?$|^docs/|^canon/|\.txt$)")

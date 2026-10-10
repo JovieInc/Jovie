@@ -839,6 +839,18 @@ class GateTest(unittest.TestCase):
                    self.change("apps/web/lib/profile/catalog.test.ts", 180)]
         self.assertEqual(lane.gate_rules(changes), [])
 
+    def test_generated_report_evidence_does_not_require_a_synthetic_test(self):
+        for path in [
+            "apps/web/reports/test-coverage-snapshot.json",
+            "apps/web/reports/nightly-agent/last-run.json",
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(lane.gate_rules([self.change(path, 5000)]), [])
+        self.assertEqual(
+            lane.gate_rules([self.change("apps/web/reports/manual.json")]),
+            ["code-change-without-test"],
+        )
+
     def test_sensitive_diff_uses_the_smaller_review_cap(self):
         changes = [self.change("apps/web/lib/a.ts", 400), self.change("apps/web/lib/a.test.ts", 101)]
         self.assertIn("diff-too-large:501", lane.gate_rules(changes, lane.SENSITIVE_REVIEWABLE_LINES))
