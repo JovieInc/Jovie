@@ -74,6 +74,21 @@ describe('server instrumentation guard', () => {
     expect(Sentry.captureRequestError).toHaveBeenCalledWith(error);
   });
 
+  it('skips request-error capture for serialized Artist Presence plan gates', async () => {
+    process.env.CI = 'false';
+    process.env.NODE_ENV = 'production';
+    process.env.NEXT_RUNTIME = 'nodejs';
+    delete process.env.NEXT_PUBLIC_E2E_MODE;
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+
+    const Sentry = await import('@sentry/nextjs');
+    const { onRequestError } = await import('@/instrumentation');
+
+    await onRequestError(new Error('Tasks requires an Artist Presence plan.'));
+
+    expect(Sentry.captureRequestError).not.toHaveBeenCalled();
+  });
+
   it('skips request-error capture for the JOV-5228 UpstashError JSON bag', async () => {
     process.env.CI = 'false';
     process.env.NODE_ENV = 'production';

@@ -320,7 +320,7 @@ export default function CheckoutSuccessPage() {
     successSubtitle = CHECKOUT_RECOVERY_COPY.subtitle;
   } else if (isOnboardingUpgrade) {
     successSubtitle = isArtistVisibilitySuccess
-      ? "You're all set. Artist Visibility is ready to start."
+      ? ARTIST_VISIBILITY_ACTIVATION_COPY.ready
       : "You're all set. Here's what you just unlocked.";
   } else if (isArtistVisibilitySuccess) {
     successSubtitle = ARTIST_VISIBILITY_ACTIVATION_COPY.next;

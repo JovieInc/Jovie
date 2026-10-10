@@ -2,7 +2,7 @@
  * Payment Recovered Email Template
  *
  * Sent to users when their subscription payment succeeds after previous failures.
- * Confirms their Pro access has been restored.
+ * Confirms access to their named plan has been restored.
  */
 
 import { APP_NAME } from '@/constants/app';
@@ -17,15 +17,17 @@ export interface PaymentRecoveredTemplateData {
   amountPaid: number;
   /** Currency code (e.g., 'usd') */
   currency: string;
-  /** Plan name (e.g., 'Pro Monthly') */
+  /** Canonical plan name shown consistently throughout the email. */
   planName: string;
 }
 
 /**
  * Generate the email subject line
  */
-export function getPaymentRecoveredSubject(): string {
-  return `Payment received - Your ${APP_NAME} Pro access is restored`;
+export function getPaymentRecoveredSubject(
+  data: Pick<PaymentRecoveredTemplateData, 'planName'>
+): string {
+  return `Payment received - Your ${APP_NAME} ${data.planName} access is restored`;
 }
 
 /**
@@ -50,7 +52,7 @@ Your ${planName} access has been fully restored. All your ${planName} features a
 
 Continue to your dashboard: ${dashboardUrl}
 
-Thanks for being a ${APP_NAME} Pro member!
+Thanks for being a ${APP_NAME} ${planName} member!
 
 The ${APP_NAME} Team
 `;
@@ -66,6 +68,7 @@ export function getPaymentRecoveredHtml(
   const dashboardUrl = getAppUrl('/');
   const amount = formatAmount(amountPaid, currency);
   const safeName = escapeHtml(userName);
+  const safePlanName = escapeHtml(planName);
 
   return `<!DOCTYPE html>
 <html>
@@ -99,12 +102,12 @@ export function getPaymentRecoveredHtml(
     </p>
 
     <p style="margin: 0 0 16px 0;">
-      Great news! Your payment of <strong>${amount}</strong> for <strong>${escapeHtml(planName)}</strong> was successful.
+      Great news! Your payment of <strong>${amount}</strong> for <strong>${safePlanName}</strong> was successful.
     </p>
 
     <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 24px 0;">
       <p style="margin: 0 0 8px 0; font-weight: 600; color: #166534;">
-        Your Pro access is fully restored:
+        Your ${safePlanName} access is fully restored:
       </p>
       <ul style="margin: 0; padding-left: 20px; color: #15803d;">
         <li>Branding removed from your profile</li>
@@ -121,7 +124,7 @@ export function getPaymentRecoveredHtml(
     </div>
 
     <p style="margin: 24px 0 0 0; color: #6b7280; text-align: center;">
-      Thanks for being a ${APP_NAME} Pro member!
+      Thanks for being a ${APP_NAME} ${safePlanName} member!
     </p>
 
   </div>

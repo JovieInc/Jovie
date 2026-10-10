@@ -31,7 +31,8 @@ export const CHECKOUT_RECOVERY_COPY = {
 } as const;
 
 export const ARTIST_VISIBILITY_ACTIVATION_COPY = {
-  status: 'Artist Visibility is starting',
+  status: `${ARTIST_VISIBILITY_OFFER.pro.displayName} is starting`,
+  ready: `You're all set. ${ARTIST_VISIBILITY_OFFER.pro.displayName} is ready to start.`,
   next: 'We will monitor your presence, surface issues, wait for your approval, then fix.',
 } as const;
 
@@ -150,7 +151,7 @@ export function getPaidSuccessPrimaryLabel(input: {
   if (input.isOnboardingUpgrade) return 'Explore your dashboard';
   if (input.needsProfile) return 'Claim your link';
   return isArtistVisibilityPlan(input.plan)
-    ? 'Open Artist Visibility'
+    ? `Open ${ARTIST_VISIBILITY_OFFER.pro.displayName}`
     : 'Go to chat';
 }
 

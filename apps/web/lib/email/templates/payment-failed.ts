@@ -19,7 +19,7 @@ export interface PaymentFailedTemplateData {
   currency: string;
   /** Number of payment attempts so far */
   attemptCount: number;
-  /** Plan name (e.g., 'Pro Monthly') */
+  /** Canonical plan name shown consistently throughout the email. */
   planName: string;
   /** Invoice ID for reference */
   invoiceId: string;
@@ -42,7 +42,7 @@ export function buildBillingUrl(): string {
 export function getPaymentFailedSubject(
   data: PaymentFailedTemplateData
 ): string {
-  const { attemptCount } = data;
+  const { attemptCount, planName } = data;
 
   if (attemptCount === 1) {
     return `Action needed: Your ${APP_NAME} payment didn't go through`;
@@ -52,7 +52,7 @@ export function getPaymentFailedSubject(
     return `Second notice: Update your payment method for ${APP_NAME}`;
   }
 
-  return `Final notice: Your ${APP_NAME} Pro access expires soon`;
+  return `Final notice: Your ${APP_NAME} ${planName} access expires soon`;
 }
 
 /**
@@ -72,8 +72,7 @@ export function getPaymentFailedText(data: PaymentFailedTemplateData): string {
 
   let urgencyMessage = '';
   if (attemptCount >= 3 || (daysRemaining && daysRemaining <= 3)) {
-    urgencyMessage =
-      '\n\nFinal notice: Your Pro access will be cancelled if payment is not received soon.';
+    urgencyMessage = `\n\nFinal notice: Your ${planName} access will be cancelled if payment is not received soon.`;
   }
 
   const daysMessage = daysRemaining
@@ -115,13 +114,14 @@ export function getPaymentFailedHtml(data: PaymentFailedTemplateData): string {
   const billingUrl = buildBillingUrl();
   const amount = formatAmount(amountDue, currency);
   const safeName = escapeHtml(userName);
+  const safePlanName = escapeHtml(planName);
 
   const urgencyBanner =
     attemptCount >= 3 || (daysRemaining && daysRemaining <= 3)
       ? `
     <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin: 16px 0;">
       <p style="color: #991b1b; margin: 0; font-weight: 600;">
-        ⚠️ Final Notice: Your Pro access will be cancelled if payment is not received soon.
+        ⚠️ Final Notice: Your ${safePlanName} access will be cancelled if payment is not received soon.
       </p>
     </div>
   `
@@ -159,13 +159,13 @@ export function getPaymentFailedHtml(data: PaymentFailedTemplateData): string {
     </p>
 
     <p style="margin: 0 0 16px 0;">
-      We tried to charge <strong>${amount}</strong> for your <strong>${escapeHtml(planName)}</strong> subscription, but the payment didn't go through.
+      We tried to charge <strong>${amount}</strong> for your <strong>${safePlanName}</strong> subscription, but the payment didn't go through.
     </p>
 
     ${daysMessage}
 
     <p style="margin: 0 0 24px 0;">
-      Please update your payment method to keep your ${planName} features:
+      Please update your payment method to keep your ${safePlanName} features:
     </p>
 
     <div style="text-align: center; margin: 24px 0;">

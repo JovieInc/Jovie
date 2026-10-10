@@ -265,7 +265,7 @@ describe('CheckoutSuccessPage — unlock tiles', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
-  it('shows Artist Visibility activation instead of legacy Pro unlock tiles', async () => {
+  it('shows Artist Presence activation instead of legacy Pro unlock tiles', async () => {
     setSearchParams('session_id=cs_test&plan_id=pro');
     mockValidatedSessionPlan('pro');
     mockBilling('pro');
@@ -275,6 +275,7 @@ describe('CheckoutSuccessPage — unlock tiles', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Monitor')).toBeInTheDocument();
     expect(screen.getByText('Approve')).toBeInTheDocument();
+    expect(screen.getByText('Artist Presence is starting')).toBeInTheDocument();
     expect(screen.queryByText('Release Notifications')).not.toBeInTheDocument();
     expect(screen.queryByText('Contact Export')).not.toBeInTheDocument();
   });
@@ -311,11 +312,11 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
-  it('primary Pro CTA routes to Artist Visibility', () => {
+  it('primary paid CTA uses the canonical plan name', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(
-      screen.getByRole('link', { name: /open artist visibility/i })
+      screen.getByRole('link', { name: /open artist presence/i })
     ).toHaveAttribute('href', '/app/presence');
   });
 
@@ -331,7 +332,7 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
       await screen.findByRole('link', { name: /claim your link/i })
     ).toHaveAttribute('href', '/start');
     expect(
-      screen.queryByRole('link', { name: /open artist visibility/i })
+      screen.queryByRole('link', { name: /open artist presence/i })
     ).not.toBeInTheDocument();
   });
 

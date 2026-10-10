@@ -3,6 +3,7 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from '@sentry/nextjs';
+import { ENTITLEMENT_DENIAL_MESSAGE_PATTERN } from '@/lib/entitlements/plan-gate-errors';
 import {
   createBeforeSendHook,
   getBaseServerConfig,
@@ -111,8 +112,7 @@ Sentry.init({
     // an upgrade CTA; chat tools return locked results. Not application bugs
     // (JOV-3861 / JOVIE-WEB-JW).
     /^TasksUpgradeRequiredError/,
-    /Tasks requires a Pro plan/,
-    /Release plans require a Pro plan/,
+    ENTITLEMENT_DENIAL_MESSAGE_PATTERN,
     /TimeoutError: page\.waitForFunction/i,
     /TimeoutError: locator\.waitFor/i,
     /toHaveURL/,

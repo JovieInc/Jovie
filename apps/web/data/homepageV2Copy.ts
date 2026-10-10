@@ -5,6 +5,8 @@ import {
   ARTIST_PROFILE_SPEC_TILES,
   type ArtistProfileFeatureTile,
 } from '@/data/artistProfileFeatures';
+import { PRO_TRIAL_DURATION_DAYS } from '@/lib/billing/offer-truth';
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 // Footer CTA label tracks the prelaunch waitlist gate. Mirrors the hero
@@ -13,6 +15,7 @@ import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 const FOOTER_CTA_LABEL = FEATURE_FLAGS.WAITLIST_ENABLED
   ? 'Get started'
   : 'Start free trial';
+const PAID_OFFER_NAME = ARTIST_VISIBILITY_OFFER.pro.displayName;
 
 function requireTile<T extends { readonly id: string }>(
   tiles: readonly T[],
@@ -111,7 +114,7 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
       'Plan launches, create assets, draft pitches, and promote every update from one AI workspace.',
     primaryCtaLabel: 'Start Free',
     secondaryCtaLabel: 'Explore Artist Profiles',
-    microproof: 'Start free. 14-day Pro trial. No credit card required.',
+    microproof: `Start free. ${PRO_TRIAL_DURATION_DAYS}-day ${PAID_OFFER_NAME} trial. No credit card required.`,
   },
   systemOverview: {
     headline: 'What Jovie Handles for You.',
@@ -160,7 +163,7 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
   },
   pricing: {
     headline: 'Free to start.',
-    body: 'Jovie profiles are free forever. Pro has limited access.',
+    body: `Jovie profiles are free forever. ${PAID_OFFER_NAME} has limited access.`,
     supportLine: 'Profiles stay free. Paid plans open from the waitlist.',
     ctaLabel: 'See Pricing',
     href: APP_ROUTES.PRICING,

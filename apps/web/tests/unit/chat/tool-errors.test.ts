@@ -25,7 +25,7 @@ describe('tool-errors', () => {
   it('normalizes legacy tool failure payloads with inferred codes', () => {
     const normalized = normalizeToolFailureOutput('generateAlbumArt', {
       success: false,
-      error: 'Album art generation requires a Pro plan.',
+      error: 'Album art generation requires an Artist Presence plan.',
       retryable: false,
     });
 

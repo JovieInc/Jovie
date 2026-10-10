@@ -5,6 +5,7 @@ import {
   getReleaseTaskSummary,
   getReleaseTasks,
 } from '@/app/app/(shell)/dashboard/releases/task-actions';
+import { isEntitlementDenialError } from '@/lib/entitlements/plan-gate-errors';
 import { queryKeys, STANDARD_CACHE } from '@/lib/queries';
 
 /** Never auto-retry expected plan gates (JOV-3861 retry-loop fix). */
@@ -12,22 +13,7 @@ function shouldRetryReleaseTaskQuery(
   failureCount: number,
   error: unknown
 ): boolean {
-  if (error instanceof Error) {
-    if (error.name === 'TasksUpgradeRequiredError') {
-      return false;
-    }
-    const code = (error as { code?: unknown }).code;
-    if (code === 'TASKS_WORKSPACE_LOCKED' || code === 'RELEASE_PLAN_LOCKED') {
-      return false;
-    }
-    const message = error.message.toLowerCase();
-    if (
-      message.includes('requires a pro plan') ||
-      message.includes('require a pro plan')
-    ) {
-      return false;
-    }
-  }
+  if (isEntitlementDenialError(error)) return false;
   return failureCount < 3;
 }
 

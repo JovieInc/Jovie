@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  ARTIST_VISIBILITY_ACTIVATION_COPY,
   getPaidSuccessPrimaryHref,
   getPaidSuccessPrimaryLabel,
   resolveCheckoutSuccessView,
@@ -48,5 +49,20 @@ describe('resolveCheckoutSuccessView', () => {
     };
     expect(getPaidSuccessPrimaryHref(input)).toBe(APP_ROUTES.START);
     expect(getPaidSuccessPrimaryLabel(input)).toBe('Claim your link');
+  });
+
+  it('uses the canonical plan name throughout the Artist Presence success copy', () => {
+    expect(ARTIST_VISIBILITY_ACTIVATION_COPY.status).toBe(
+      'Artist Presence is starting'
+    );
+    expect(ARTIST_VISIBILITY_ACTIVATION_COPY.ready).toContain(
+      'Artist Presence is ready to start'
+    );
+    expect(
+      getPaidSuccessPrimaryLabel({
+        plan: 'pro',
+        isOnboardingUpgrade: false,
+      })
+    ).toBe('Open Artist Presence');
   });
 });

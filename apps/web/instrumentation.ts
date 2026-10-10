@@ -1,3 +1,5 @@
+import { isEntitlementDenialError } from '@/lib/entitlements/plan-gate-errors';
+
 // Track instrumentation lifecycle for cold start detection
 const INSTRUMENTATION_START_TIME = Date.now();
 let firstValidationAttemptTime: number | null = null;
@@ -299,24 +301,6 @@ export async function register() {
   }
 }
 
-function isExpectedEntitlementRequestError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  if (error.name === 'TasksUpgradeRequiredError') {
-    return true;
-  }
-  const code = (error as { code?: unknown }).code;
-  if (code === 'TASKS_WORKSPACE_LOCKED' || code === 'RELEASE_PLAN_LOCKED') {
-    return true;
-  }
-  const message = error.message.toLowerCase();
-  return (
-    message.includes('requires a pro plan') ||
-    message.includes('require a pro plan')
-  );
-}
-
 export async function onRequestError(...args: unknown[]) {
   if (shouldSkipServerObservability()) {
     return;
@@ -324,7 +308,7 @@ export async function onRequestError(...args: unknown[]) {
 
   // Server-action entitlement gates can surface as request errors on page
   // paths (e.g. POST /app/chat). They are upgrade CTAs, not fatal bugs.
-  if (isExpectedEntitlementRequestError(args[0])) {
+  if (isEntitlementDenialError(args[0])) {
     return;
   }
 

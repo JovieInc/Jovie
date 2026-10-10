@@ -1,3 +1,11 @@
+import {
+  asEntitlementDenialCode,
+  ENTITLEMENT_DENIAL_CODES,
+  type EntitlementDenialCode,
+  isEntitlementDenialError,
+  isEntitlementDenialMessage,
+} from '@/lib/entitlements/plan-gate-errors';
+
 /** Stable codes persisted on tool failure payloads and shown in chat UI. */
 export const TOOL_ERROR_CODES = {
   FEATURE_DISABLED: 'FEATURE_DISABLED',
@@ -10,14 +18,11 @@ export const TOOL_ERROR_CODES = {
   TOOL_EXECUTION_FAILED: 'TOOL_EXECUTION_FAILED',
 } as const;
 
-/** Entitlement gate codes thrown by tasks-gate and similar plan locks. */
-export const ENTITLEMENT_DENIAL_CODES = {
-  TASKS_WORKSPACE_LOCKED: 'TASKS_WORKSPACE_LOCKED',
-  RELEASE_PLAN_LOCKED: 'RELEASE_PLAN_LOCKED',
-} as const;
-
-export type EntitlementDenialCode =
-  (typeof ENTITLEMENT_DENIAL_CODES)[keyof typeof ENTITLEMENT_DENIAL_CODES];
+export {
+  ENTITLEMENT_DENIAL_CODES,
+  type EntitlementDenialCode,
+  isEntitlementDenialError,
+};
 
 export type ToolErrorCode =
   (typeof TOOL_ERROR_CODES)[keyof typeof TOOL_ERROR_CODES];
@@ -113,46 +118,6 @@ function asToolErrorCode(value: unknown): ToolErrorCode | undefined {
     : undefined;
 }
 
-function asEntitlementDenialCode(
-  value: unknown
-): EntitlementDenialCode | undefined {
-  if (typeof value !== 'string') return undefined;
-  return Object.values(ENTITLEMENT_DENIAL_CODES).includes(
-    value as EntitlementDenialCode
-  )
-    ? (value as EntitlementDenialCode)
-    : undefined;
-}
-
-/**
- * True when the thrown value is an expected plan/entitlement gate denial
- * (e.g. TasksUpgradeRequiredError) — never a Sentry-worthy failure.
- */
-export function isEntitlementDenialError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    if (error !== null && typeof error === 'object' && 'code' in error) {
-      return (
-        asEntitlementDenialCode((error as { code?: unknown }).code) != null
-      );
-    }
-    return false;
-  }
-
-  if (error.name === 'TasksUpgradeRequiredError') {
-    return true;
-  }
-
-  if (asEntitlementDenialCode((error as { code?: unknown }).code) != null) {
-    return true;
-  }
-
-  const message = error.message.toLowerCase();
-  return (
-    message.includes('requires a pro plan') ||
-    message.includes('requires the pro plan')
-  );
-}
-
 function inferErrorCodeFromMessage(message: string): ToolErrorCode {
   const normalized = message.toLowerCase();
 
@@ -163,8 +128,7 @@ function inferErrorCodeFromMessage(message: string): ToolErrorCode {
     return TOOL_ERROR_CODES.TOOL_UNPROVISIONED;
   }
   if (
-    normalized.includes('requires a pro plan') ||
-    normalized.includes('requires the pro plan') ||
+    isEntitlementDenialMessage(normalized) ||
     normalized.includes('paid plan') ||
     normalized.includes('upgrade')
   ) {

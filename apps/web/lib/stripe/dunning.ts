@@ -237,7 +237,7 @@ export async function sendPaymentRecoveredEmail(
     const provider = getEmailProvider();
     const result = await provider.sendEmail({
       to: email,
-      subject: getPaymentRecoveredSubject(),
+      subject: getPaymentRecoveredSubject(templateData),
       text: getPaymentRecoveredText(templateData),
       html: getPaymentRecoveredHtml(templateData),
     });

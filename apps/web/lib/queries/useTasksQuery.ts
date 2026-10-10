@@ -7,6 +7,7 @@ import {
   getTaskStats,
   getTasks,
 } from '@/app/app/(shell)/dashboard/tasks/task-actions';
+import { isEntitlementDenialError } from '@/lib/entitlements/plan-gate-errors';
 import { queryKeys, STANDARD_CACHE } from '@/lib/queries';
 import type { TaskFilters } from '@/lib/tasks/types';
 
@@ -24,21 +25,7 @@ function shouldRetryTaskQuery(failureCount: number, error: unknown): boolean {
 }
 
 function isTasksUpgradeQueryError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  if (error.name === 'TasksUpgradeRequiredError') {
-    return true;
-  }
-  const code = (error as { code?: unknown }).code;
-  if (code === 'TASKS_WORKSPACE_LOCKED' || code === 'RELEASE_PLAN_LOCKED') {
-    return true;
-  }
-  const message = error.message.toLowerCase();
-  return (
-    message.includes('requires a pro plan') ||
-    message.includes('require a pro plan')
-  );
+  return isEntitlementDenialError(error);
 }
 
 export function useTasksQuery(
