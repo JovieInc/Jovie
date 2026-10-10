@@ -75,6 +75,14 @@ updates:
       # (#18529), which fails the structural pin test.
       - dependency-name: 'vercel'
         versions: ['>=56.4']
+      # Pinned at 2.5.14 (2026-10-10): 2.5.15 crashes ("Biome encountered an
+      # unexpected error") on a file outside the project root, which the
+      # structural Biome contract probes (scripts/lib/__tests__/biome-*.test.mjs)
+      # write to os.tmpdir(). The dev-patch group PR #21118 carried that bump
+      # and failed six merge groups in a row. Re-evaluate at 2.5.16: run those
+      # two probe files locally against the new binary, then drop this ignore.
+      - dependency-name: '@biomejs/biome'
+        versions: ['2.5.15']
 
   # Isolated Eve pilot manifest (JOV-5214). This directory entry exists so
   # SECURITY advisories are tracked for the standalone install; version
