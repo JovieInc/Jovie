@@ -3617,6 +3617,11 @@ jobs:
             [ -f "$artifact" ] || { echo "::error::Missing Mac artifact: $artifact"; exit 1; }
           done
       - name: Upload exact Mac staging package
+        # Retention-only artifact (no workflow downloads it). A self-hosted
+        # laptop uploads the ~460 MB package at ~20 KB/s and would time the
+        # job out, so only hosted runners keep it; the artifact set is still
+        # verified on every runner above.
+        if: ${{ runner.environment == 'github-hosted' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: desktop-staging-${{ github.sha }}
