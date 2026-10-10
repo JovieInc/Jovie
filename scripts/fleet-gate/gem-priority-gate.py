@@ -764,19 +764,26 @@ def observe_main(repo: str) -> dict[str, Any]:
             "generationVerified": marker.get("verified") is True,
             "marker": marker,
         }
-        if status == "unknown" and conclusion in NO_VERDICT_CONCLUSIONS:
+        if status == "unknown" and (
+            conclusion in NO_VERDICT_CONCLUSIONS
+            or any(entry["verdict"] in {"missing", "pending", "no-verdict"} for entry in required_checks)
+        ):
+            # JOV-8000 follow-up 27+28: the queue-merge window — the tip's
+            # Main Release Ready attempts are the merge-group run's skipped-
+            # by-design one and/or the just-started direct push CI's PENDING
+            # one (the follow-up-27 fix only covered the skipped shape; the
+            # 38019846033 run bound through the pending window minutes after
+            # it landed). Fall back to the most recent REAL attempt within
+            # the freshness bound (an ancestor's push-CI gate); green main
+            # via the ancestor also lets the independent-review refresh
+            # write a fresh exact-head receipt (clearing head-mismatch in
+            # the same window). Fail closed when no real attempt exists
+            # within the bound.
             observed["error"] = (
-                f"Main Release Ready has no real attempt for {sha} "
-                f"(latest conclusion: {conclusion})"
+                f"Main Release Ready has no completed real attempt for {sha} "
+                f"(latest conclusion: {conclusion}; unresolved: "
+                f"{', '.join(sorted({entry['verdict'] for entry in required_checks if entry['verdict'] in {'missing', 'pending', 'no-verdict'}}))})"
             )
-            # JOV-8000 follow-up 27: the queue-merge window — the tip's only
-            # Main Release Ready attempt is the merge-group run's skipped-by-
-            # design one; the direct push CI started minutes ago and has not
-            # completed. Fall back to the most recent REAL attempt within the
-            # freshness bound (an ancestor's push-CI gate); green main via the
-            # ancestor also lets the independent-review refresh write a fresh
-            # exact-head receipt (clearing head-mismatch in the same window).
-            # Fail closed when no real attempt exists within the bound.
             fallback = observe_recent_real_release_ready(repo, utc_now())
             if fallback is not None and fallback.get("conclusion") == "success":
                 observed["status"] = "green"
