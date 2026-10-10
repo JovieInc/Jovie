@@ -1012,7 +1012,9 @@ describe('merge_group workflow contract', () => {
     );
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
-    expect(macos).toContain('runs-on: macos-26');
+    // GA image: macos-26 pickup waited 8-68 min per merge group (2026-10-10).
+    expect(macos).toContain('runs-on: macos-15');
+    expect(macos).not.toContain('runs-on: macos-26');
     expect(macos).toContain(
       "format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number)"
     );
