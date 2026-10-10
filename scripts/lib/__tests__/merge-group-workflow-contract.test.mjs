@@ -916,7 +916,7 @@ describe('merge_group workflow contract', () => {
       'unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}'
     );
     expect(unitTests).toContain(
-      'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1'
+      'uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2'
     );
     expect(unitTests).toContain('path: apps/web/test-report.*.junit.xml');
     expect(unitTests).toContain('if-no-files-found: warn');
