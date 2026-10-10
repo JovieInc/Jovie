@@ -1,0 +1,6 @@
+The `ship` workflow paused because gstack v1.91.68.0 is available (installed: v0.14.5.0). Choose:
+
+- A) Upgrade now
+- B) Upgrade now and enable automatic updates
+- C) Not now
+- D) Disable update reminders
