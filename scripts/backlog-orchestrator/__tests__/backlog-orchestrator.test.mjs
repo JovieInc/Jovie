@@ -2714,15 +2714,17 @@ describe('entrypoint contract', () => {
       tempDir,
       [21, 22, 23, 24, 25].map(number => ({ number, head: head(number) }))
     );
-    const rows = Array.from({ length: 25 }, (_, i) => ({
-      number: i + 1,
-      title: 'a',
-      body: 'x',
-      state: 'OPEN',
-      isDraft: false,
-      labels: [],
-      headSha: head(i + 1),
-    }));
+    const rows = /** @type {Array<Record<string, any>>} */ (
+      Array.from({ length: 25 }, (_, i) => ({
+        number: i + 1,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: head(i + 1),
+      }))
+    );
     const { measureMergeability } = await import(
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
     );

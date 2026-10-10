@@ -2182,7 +2182,7 @@ async function runRemediate(isDryRun) {
     ? backlogRemediation.pullRequestRates(pullRequests)
     : null;
   if (ratesSummary) {
-    const mm = mergeabilityEvidence ?? {};
+    const mm = /** @type {Record<string, any>} */ (mergeabilityEvidence ?? {});
     console.log(
       `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')}`
     );
