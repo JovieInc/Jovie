@@ -86,6 +86,21 @@ export async function getAppFlagValue(
     readonly userId?: string | null;
   }
 ): Promise<boolean> {
+  // These are positive enable gates: an explicit environment false is an
+  // operator stop for every audience, including staff and personal previews.
+  // Read it before any dogfood shortcut. A true value still permits a personal
+  // opt-out; an unset/unavailable value retains the existing default fallback.
+  let envOverride: boolean | undefined;
+  try {
+    const envOverrides = await getFlagOverrideMap();
+    envOverride = envOverrides[flagName];
+  } catch {
+    // Retain registry/default behavior when the override store is unavailable.
+  }
+  if (envOverride === false) {
+    return false;
+  }
+
   if (await shouldHonorPersonalOverrides(options?.userId ?? null)) {
     const overrides = await getRequestFlagOverrides();
     const overrideValue = getAppFlagOverrideValue(flagName, overrides);
@@ -100,18 +115,9 @@ export async function getAppFlagValue(
     }
   }
 
-  // Per-environment override (admin Features page / dev bar "publish to env").
-  // Cached via `unstable_cache` + `revalidateTag`, so this is read-free on the
-  // hot path. Wrapped defensively: the override layer must never break flag
-  // resolution. An unset cell falls through to the registry/Statsig default.
-  try {
-    const envOverrides = await getFlagOverrideMap();
-    const envOverride = envOverrides[flagName];
-    if (envOverride !== undefined) {
-      return envOverride;
-    }
-  } catch {
-    // Ignore — fall through to the registry default.
+  // Positive environment enablement follows the personal opt-out above.
+  if (envOverride !== undefined) {
+    return envOverride;
   }
 
   // The mock release planner is a local demo. Keep it available in dev and

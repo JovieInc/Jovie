@@ -30,7 +30,10 @@ import {
   selectAdditionalMonitoredSurfaceIds,
   selectCanonicalProfileSurfaces,
 } from '@/lib/profile-surfaces/contracts';
-import { resolveIdentityPhoto } from '@/lib/profile-surfaces/presence-identity';
+import {
+  findSurfaceDspMatch,
+  resolveIdentityPhoto,
+} from '@/lib/profile-surfaces/presence-identity';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
 import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
 
@@ -305,10 +308,6 @@ export async function loadProfilesWorkspaceData(input: {
         inArray(dspArtistMatches.status, ['confirmed', 'auto_confirmed'])
       )
     );
-  const dspMatchByPlatform = new Map(
-    dspMatches.map(match => [match.providerId, match] as const)
-  );
-
   const surfaceRows: ProfileWorkspaceSurfaceRow[] = surfaces.map(surface => {
     const rank = rankFor(surface.id, latestRun?.id);
     const preference = preferenceBySurface.get(surface.id);
@@ -323,14 +322,7 @@ export async function loadProfilesWorkspaceData(input: {
             : 'locked';
     const qualificationStatus =
       surface.qualificationStatus as ProfileQualificationStatus;
-    const dspMatch =
-      dspMatchByPlatform.get(surface.platform) ??
-      dspMatches.find(
-        match =>
-          match.externalArtistUrl === surface.url ||
-          (match.externalArtistId &&
-            match.externalArtistId === surface.externalId)
-      );
+    const dspMatch = findSurfaceDspMatch(surface, dspMatches);
     const observedAt =
       surface.lastObservedAt?.toISOString() ??
       dspMatch?.updatedAt?.toISOString() ??
@@ -351,13 +343,13 @@ export async function loadProfilesWorkspaceData(input: {
       kind: surface.kind as ProfileSurfaceKind,
       platform: surface.platform,
       label:
-        surface.displayName ||
         dspMatch?.externalArtistName ||
+        surface.displayName ||
         getDspDisplayName(surface.platform) ||
         surface.platform
           .replaceAll('_', ' ')
           .replaceAll(/\b\w/g, letter => letter.toUpperCase()),
-      handle: surface.handle,
+      handle: surface.handle === surface.displayName ? null : surface.handle,
       url: surface.url,
       trackedUrl,
       qualificationStatus,

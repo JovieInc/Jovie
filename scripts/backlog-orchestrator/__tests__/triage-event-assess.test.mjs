@@ -1,9 +1,16 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 import {
   assessTriageEvent as assessWithRealClient,
+  escalationBlockOf,
   parseTriageEvent,
+  runCli,
+  assessTriageSweep as sweepWithRealClient,
+  triageSweepThrottle,
 } from '../triage-event-assess.mjs';
 
 /** Partial clients are deliberate test doubles; production uses the full Linear module.
@@ -14,6 +21,11 @@ import {
  */
 function assessTriageEvent(event, client, summer) {
   return assessWithRealClient(event, client, summer);
+}
+
+/** @param {any} client @param {any} [summer] @param {any} [options] @returns {Promise<any>} */
+function assessTriageSweep(client, summer, options) {
+  return sweepWithRealClient(client, summer, options);
 }
 
 const ISSUE_ID = '68b3e8de-588e-46ba-8209-84329d154627';
@@ -49,6 +61,7 @@ function issue(overrides = {}) {
     description: '## Scope\nFix the issue.\n## Acceptance\nVerified behavior.',
     updatedAt: '2026-09-24T00:00:00.000Z',
     priority: 2,
+    assignee: null,
     state: { id: TRIAGE_ID, name: 'Triage', type: 'triage' },
     labels: { nodes: [] },
     comments: { nodes: [] },
@@ -57,6 +70,425 @@ function issue(overrides = {}) {
     ...overrides,
   };
 }
+
+function jev(overrides = {}) {
+  return {
+    schema: 'summer.jev-triage/v1',
+    model: 'typesafe-ai/jev',
+    status: 'decided',
+    destination: 'Todo',
+    priority: 2,
+    category: 'bug',
+    confidence: 0.98,
+    reason: 'bounded regression repair',
+    assessmentKey: 'assessment-1',
+    ...overrides,
+  };
+}
+
+function jevWorld(overrides = {}) {
+  let current = issue(overrides);
+  const writes = [];
+  const client = {
+    fetchIssue: async () => structuredClone(current),
+    fetchTeamLabel: async () => ({ id: 'ready-id', name: 'agent-ready' }),
+    addComment: async (_id, body) => {
+      current.comments.nodes.push({ body });
+      writes.push('comment');
+      return { success: true };
+    },
+    updateIssue: async (_id, input) => {
+      current = {
+        ...current,
+        state: {
+          id: input.stateId,
+          type: 'unstarted',
+          name:
+            input.stateId === 'c6c00506-dc9f-4910-8ff7-3874dd77174c'
+              ? 'Todo'
+              : 'Backlog',
+        },
+        priority: input.priority,
+        labels: {
+          nodes: input.labelIds?.map(id => ({ id })) ?? current.labels.nodes,
+        },
+      };
+      writes.push('update');
+      return { success: true };
+    },
+  };
+  return {
+    client,
+    writes,
+    receipt: assessment => async () => ({
+      ...(await summer('existing-intake-reconcile')()),
+      assessment,
+    }),
+  };
+}
+
+test('applies Jev Todo with priority and preserved labels, verifies readback, then wakes existing admission', async () => {
+  const world = jevWorld({
+    labels: { nodes: [{ id: 'existing-id', name: 'bug' }] },
+  });
+  const result = await assessTriageEvent(
+    event(),
+    world.client,
+    world.receipt(jev())
+  );
+  assert.equal(result.disposition, 'Todo');
+  assert.equal(result.verified.state, 'Todo');
+  assert.equal(result.wakeSymphony, true);
+  assert.deepEqual(
+    (await world.client.fetchIssue()).labels.nodes.map(row => row.id),
+    ['existing-id', 'ready-id']
+  );
+  const replay = await assessTriageEvent(
+    event(),
+    world.client,
+    world.receipt(jev())
+  );
+  assert.equal(replay.disposition, 'stale-event');
+  assert.deepEqual(world.writes, ['comment', 'update']);
+});
+
+test('sorts Jev Backlog and incomplete Todo without creating an implementation lease', async () => {
+  for (const [overrides, assessment, destination] of [
+    [{}, jev({ destination: 'Backlog', priority: 4 }), 'Backlog'],
+    [{ description: 'not scoped' }, jev(), 'Todo'],
+  ]) {
+    const world = jevWorld(overrides);
+    const result = await assessTriageEvent(
+      event(),
+      world.client,
+      world.receipt(assessment)
+    );
+    assert.equal(result.disposition, destination);
+    assert.equal(result.wakeSymphony, false);
+    assert.equal((await world.client.fetchIssue()).labels.nodes.length, 0);
+  }
+});
+
+test('holds ambiguity, interrupted provider work, urgent downgrade and actual owners without writes', async () => {
+  for (const [overrides, assessment] of [
+    [{}, jev({ status: 'ambiguous', destination: null, priority: null })],
+    [{}, jev({ status: 'unavailable', destination: null, priority: null })],
+    [{ priority: 1 }, jev()],
+    [{ assignee: { id: 'owner', name: 'Live writer' } }, jev()],
+  ]) {
+    const world = jevWorld(overrides);
+    const result = await assessTriageEvent(
+      event(),
+      world.client,
+      world.receipt(assessment)
+    );
+    assert.equal(result.wakeSymphony, false);
+    assert.equal(result.mutations, 0);
+    assert.deepEqual(world.writes, []);
+  }
+});
+
+test('an unavailable Jev provider is a named provider-blocked escalation, not a red sweep', async () => {
+  const world = jevWorld();
+  const result = await assessTriageEvent(
+    event(),
+    world.client,
+    world.receipt(
+      jev({
+        status: 'unavailable',
+        reason: 'provider-unavailable',
+        destination: null,
+        priority: null,
+      })
+    )
+  );
+  assert.equal(result.disposition, 'unavailable');
+  assert.equal(result.requiresImmediateInvestigation, false);
+  assert.equal(result.escalation.status, 'provider-block');
+  assert.equal(result.escalation.code, 'provider-unavailable');
+  assert.equal(result.escalation.requestedModel, 'typesafe-ai/jev');
+  assert.equal(result.mutations, 0);
+  assert.deepEqual(world.writes, []);
+});
+
+test('fails closed on invalid Jev response, missing readiness label and ownership race', async () => {
+  const invalid = jevWorld();
+  await assert.rejects(
+    assessTriageEvent(
+      event(),
+      invalid.client,
+      invalid.receipt(jev({ destination: 'Done' }))
+    ),
+    /invalid-jev/
+  );
+  const missing = jevWorld();
+  missing.client.fetchTeamLabel = async () => null;
+  await assert.rejects(
+    assessTriageEvent(event(), missing.client, missing.receipt(jev())),
+    /label-unavailable/
+  );
+  const raced = jevWorld();
+  const original = raced.client.fetchIssue;
+  let reads = 0;
+  raced.client.fetchIssue = async () => {
+    const snapshot = await original();
+    if (++reads >= 3)
+      snapshot.assignee = { id: 'new-owner', name: 'Live writer' };
+    return snapshot;
+  };
+  await assert.rejects(
+    assessTriageEvent(event(), raced.client, raced.receipt(jev())),
+    /ownership-changed/
+  );
+  assert.deepEqual(raced.writes, []);
+});
+
+test('requires authoritative mutation, comment and disposition readback before waking', async () => {
+  for (const failure of ['comment', 'mutation', 'readback']) {
+    const world = jevWorld();
+    if (failure === 'comment')
+      world.client.addComment = async () => ({ success: false });
+    else
+      world.client.updateIssue = async () => ({
+        success: failure !== 'mutation',
+      });
+    await assert.rejects(
+      assessTriageEvent(event(), world.client, world.receipt(jev())),
+      /jev-triage-(comment|mutation|readback)-failed/
+    );
+  }
+});
+
+test('catch-up recovers missed deliveries oldest first and preserves partial failures', async () => {
+  const first = issue({ updatedAt: '2026-09-23T00:00:00.000Z' });
+  const second = issue({ identifier: 'JOV-6501' });
+  const calls = [];
+  const receipt = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [second, first],
+      fetchIssue: async id => (id === first.identifier ? first : second),
+    },
+    async delivery => {
+      calls.push(delivery.identifier);
+      if (delivery.identifier === first.identifier)
+        throw new Error('provider-unavailable');
+      return { decision: 'urgent-investigation-required' };
+    }
+  );
+  assert.deepEqual(calls, ['JOV-6500', 'JOV-6501']);
+  assert.equal(receipt.failed, 1);
+  assert.equal(receipt.assessed, 2);
+  assert.equal(receipt.deferred, 0);
+  assert.equal(receipt.wakeSymphony, false);
+  assert.equal(receipt.results[0].error, 'provider-unavailable');
+});
+
+test('catch-up is bounded and reports deferred work rather than dropping it', async () => {
+  const client = { fetchTeamTriageIssues: async () => [issue(), issue()] };
+  const limited = await assessTriageSweep(client, undefined, { maxIssues: 0 });
+  assert.equal(limited.assessed, 0);
+  assert.equal(limited.deferred, 2);
+  const expired = await assessTriageSweep(client, undefined, {
+    now: (() => {
+      let value = 0;
+      return () => value++ * 60_000;
+    })(),
+  });
+  assert.equal(expired.assessed, 0);
+  assert.equal(expired.deferred, 2);
+  await assert.rejects(
+    assessTriageSweep({
+      fetchTeamTriageIssues: async () => {
+        throw new Error('inventory-unavailable');
+      },
+    }),
+    /inventory-unavailable/
+  );
+});
+
+test('the sweep CLI names failing and blocked rows instead of an anonymous exit', async () => {
+  // The workflow step consumes the module's CLI (--sweep); the exit rule
+  // keeps its full strength for every failure the sweep owns (failed > 0,
+  // or a blocked row with no provider-blocked escalation), and each
+  // failing/blocked/provider-blocked row is annotated by name.
+  const source = readFileSync(
+    new URL('../triage-event-assess.mjs', import.meta.url),
+    'utf8'
+  );
+  assert.match(source, /blockedWithoutEscalation > 0/);
+  assert.match(source, /::error title=Triage assessment failed::/);
+  assert.match(
+    source,
+    /::warning title=Urgent Triage investigation required::/
+  );
+  assert.match(source, /::warning title=Triage escalation provider-blocked::/);
+});
+
+test('a Summer provider-blocked escalation is named and counted without failing the sweep', async () => {
+  const blocked = issue({ identifier: 'JOV-8015', priority: 1 });
+  const urgent = issue({ identifier: 'JOV-6500', priority: 1 });
+  const escalated = {
+    ...(await summer('existing-intake-reconcile')()),
+    escalation: {
+      status: 'provider-block',
+      code: 'reason-lane-model-capacity-cost-binding-unverified',
+      requestedModel: 'openai/gpt-6.1-sol',
+      owner: 'Gem reason lane',
+    },
+  };
+  const receipt = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [blocked, urgent],
+      fetchIssue: async id => (id === blocked.identifier ? blocked : urgent),
+    },
+    async delivery =>
+      delivery.identifier === blocked.identifier
+        ? escalated
+        : summer('urgent-investigation-required')()
+  );
+  assert.equal(receipt.providerBlocked, 1);
+  assert.equal(receipt.blocked, 1);
+  assert.equal(receipt.failed, 0);
+  const escalatedRow = receipt.results.find(
+    result => result.issue === 'JOV-8015'
+  );
+  assert.equal(escalatedRow.escalation.status, 'provider-block');
+  assert.equal(
+    escalatedRow.escalation.code,
+    'reason-lane-model-capacity-cost-binding-unverified'
+  );
+
+  assert.equal(escalationBlockOf(escalated).code, escalated.escalation.code);
+  assert.equal(
+    escalationBlockOf(await summer('urgent-investigation-required')()),
+    null
+  );
+  assert.equal(escalationBlockOf(null), null);
+  assert.equal(
+    escalationBlockOf({
+      escalation: { status: 'provider-unavailable', code: 'other' },
+    }),
+    null
+  );
+
+  // Live receipts carry the escalation at other depths: inside the Jev
+  // assessment (ambiguous rows) and in a list. Every location matches.
+  const inAssessment = {
+    ...(await summer('existing-intake-reconcile')()),
+    assessment: {
+      schema: 'summer.jev-triage/v1',
+      model: 'typesafe-ai/jev',
+      status: 'ambiguous',
+      destination: null,
+      priority: null,
+      category: 'operations',
+      confidence: 0.4,
+      reason: 'ambiguous-or-serious',
+      assessmentKey: 'key-1',
+      escalation: {
+        status: 'provider-block',
+        code: 'reason-lane-model-capacity-cost-binding-unverified',
+        requestedModel: 'anthropic/claude-opus-5.5',
+        owner: 'Gem reason lane',
+      },
+    },
+  };
+  assert.equal(
+    escalationBlockOf(inAssessment).requestedModel,
+    'anthropic/claude-opus-5.5'
+  );
+  const inList = {
+    ...(await summer('urgent-investigation-required')()),
+    escalations: [
+      { status: 'provider-block', code: 'reason-lane-capacity-unverified' },
+    ],
+  };
+  assert.equal(
+    escalationBlockOf(inList).code,
+    'reason-lane-capacity-unverified'
+  );
+
+  // An ambiguous Jev assessment carrying the escalation is provider-blocked:
+  // the row carries the escalation and does not count as blocked.
+  const ambiguousReceipt = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [blocked],
+      fetchIssue: async () => blocked,
+    },
+    async () => inAssessment
+  );
+  assert.equal(ambiguousReceipt.providerBlocked, 1);
+  assert.equal(ambiguousReceipt.blocked, 0);
+  assert.equal(ambiguousReceipt.failed, 0);
+
+  // An urgent-investigation row carrying the escalation is provider-blocked
+  // too, not blocked.
+  const urgentEscalated = {
+    ...(await summer('urgent-investigation-required')()),
+    escalation: {
+      status: 'provider-block',
+      code: 'reason-lane-model-capacity-cost-binding-unverified',
+    },
+  };
+  const urgentReceipt = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [urgent],
+      fetchIssue: async () => urgent,
+    },
+    async () => urgentEscalated
+  );
+  assert.equal(urgentReceipt.providerBlocked, 1);
+  assert.equal(urgentReceipt.blocked, 0);
+});
+
+test('a transient Summer 5xx is retried once and a repeated 5xx fails the row', async () => {
+  const target = issue({ identifier: 'JOV-6500' });
+  let calls = 0;
+  const flaky = async () => {
+    calls += 1;
+    if (calls === 1) throw new Error('summer-triage-assessment-http-503');
+    return summer('urgent-investigation-required')();
+  };
+  const recovered = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [target],
+      fetchIssue: async () => target,
+    },
+    flaky
+  );
+  assert.equal(recovered.failed, 0);
+  assert.equal(calls, 2);
+
+  calls = 0;
+  const persistent = async () => {
+    calls += 1;
+    throw new Error('summer-triage-assessment-http-503');
+  };
+  const failing = await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [target],
+      fetchIssue: async () => target,
+    },
+    persistent
+  );
+  assert.equal(failing.failed, 1);
+  assert.equal(failing.results[0].error, 'summer-triage-assessment-http-503');
+  assert.equal(calls, 2);
+
+  calls = 0;
+  const badRequest = async () => {
+    calls += 1;
+    throw new Error('summer-triage-assessment-http-400');
+  };
+  await assessTriageSweep(
+    {
+      fetchTeamTriageIssues: async () => [target],
+      fetchIssue: async () => target,
+    },
+    badRequest
+  );
+  assert.equal(calls, 1);
+});
 
 test('rejects untrusted or malformed repository dispatch before Linear access', () => {
   assert.throws(
@@ -97,6 +529,71 @@ test('does not mutate an issue that left Triage before the job ran', async () =>
   assert.equal(receipt.disposition, 'stale-event');
   assert.equal(receipt.wakeSymphony, false);
   assert.equal(writes, 0);
+});
+
+test('triageSweepThrottle skips only a fresh successful sweep and fails open', () => {
+  const nowMs = Date.parse('2026-10-10T17:00:00.000Z');
+  // a successful sweep 45 minutes ago -> run again
+  assert.deepEqual(
+    triageSweepThrottle({ lastOkAt: '2026-10-10T16:15:00.000Z', nowMs }),
+    { skip: false, reason: 'interval-elapsed' }
+  );
+  // a successful sweep 10 minutes ago -> skip
+  const skipped = triageSweepThrottle({
+    lastOkAt: '2026-10-10T16:50:00.000Z',
+    nowMs,
+  });
+  assert.equal(skipped.skip, true);
+  assert.match(skipped.reason, /^swept-10m-ago$/);
+  // exactly at the 30-minute floor -> run (not < the floor)
+  assert.equal(
+    triageSweepThrottle({ lastOkAt: '2026-10-10T16:30:00.000Z', nowMs }).skip,
+    false
+  );
+  // missing / unparseable / future timestamps never skip (fail open)
+  assert.deepEqual(triageSweepThrottle({ lastOkAt: undefined, nowMs }), {
+    skip: false,
+    reason: 'no-prior-ok',
+  });
+  assert.deepEqual(triageSweepThrottle({ lastOkAt: 'garbage', nowMs }), {
+    skip: false,
+    reason: 'no-prior-ok',
+  });
+  assert.deepEqual(
+    triageSweepThrottle({ lastOkAt: '2026-10-10T18:00:00.000Z', nowMs }),
+    { skip: false, reason: 'clock-skew' }
+  );
+});
+
+test('the sweep CLI skips a fresh successful sweep without Linear access', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'triage-sweep-throttle-'));
+  const cacheFile = join(directory, 'cache.json');
+  const previousArgv = process.argv;
+  const previousCacheFile = process.env.JOVIE_ORCHESTRATOR_CACHE;
+  const previousExitCode = process.exitCode;
+  const logs = [];
+  t.mock.method(console, 'log', message => logs.push(String(message)));
+  try {
+    writeFileSync(
+      cacheFile,
+      JSON.stringify({ lastTriageSweepOkAt: new Date().toISOString() })
+    );
+    process.argv = [process.execPath, 'triage-event-assess.mjs', '--sweep'];
+    process.env.JOVIE_ORCHESTRATOR_CACHE = cacheFile;
+
+    await runCli();
+
+    assert.equal(process.exitCode, 0);
+    assert.equal(logs.length, 1);
+    assert.match(logs[0], /^triage-sweep skipped reason=swept-0m-ago$/);
+  } finally {
+    process.argv = previousArgv;
+    process.exitCode = previousExitCode;
+    if (previousCacheFile === undefined)
+      delete process.env.JOVIE_ORCHESTRATOR_CACHE;
+    else process.env.JOVIE_ORCHESTRATOR_CACHE = previousCacheFile;
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('records an urgent unowned assessment without waking Symphony', async () => {

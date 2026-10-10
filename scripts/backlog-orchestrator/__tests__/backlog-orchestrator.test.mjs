@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   access,
+  chmod,
   mkdir,
   mkdtemp,
   readFile,
@@ -60,6 +61,499 @@ describe('team production health contract', () => {
       /healthUrl: 'https:\/\/www\.logyourbody\.com\/robots\.txt'/
     );
     assert.doesNotMatch(source, /healthUrl: 'https:\/\/logyourbody\.com'/);
+  });
+});
+
+describe('fleet gate production signal follows the same-run receipt (JOV-8000 follow-up 30)', () => {
+  it('re-derives hold-intake from the receipt production signal even when the live fetch would miss', async () => {
+    // The 38027107786 split-brain: the persisted receipt said
+    // hold-intake (main green via ancestor fallback, production green
+    // unbound, controller parked, fresh review), but the remediator's
+    // fleetGateForTeam re-fetched production live from the remediate step
+    // and, on a flaky runner egress or a 5s timeout miss, read unknown —
+    // re-deriving {controller-failure, production-unknown} and binding
+    // capacity merge-queue-blocked while the receipt said hold-intake.
+    // The production signal now comes from the SAME-RUN receipt; the live
+    // fetch is only the fail-closed fallback when the receipt carries no
+    // production signal.
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'fleet-gate-receipt-'));
+    const receiptPath = resolve(tempDir, 'latest.json');
+    const mainSha = 'a3eeefdd4dc681d1c9b5b4385720d661f5129137';
+    const now = new Date().toISOString();
+    await writeFile(
+      receiptPath,
+      JSON.stringify({
+        schema: 'jovie-fleet-gate/v1',
+        observedAt: now,
+        signals: {
+          main: { status: 'green', sha: mainSha },
+          production: {
+            status: 'green',
+            deployedSha: 'b3eeefdd4dc681d1c9b5b4385720d661f5129138',
+          },
+          controller: {
+            status: 'parked',
+            retired: true,
+            error: 'controller-endpoint-retired: Connection refused',
+          },
+          integrity: { status: 'clear' },
+          queue: {
+            repository: 'JovieInc/Jovie',
+            status: 'known',
+            eligiblePrs: 6,
+            greenReadyPrs: 1,
+            target: 15,
+            laneCapacity: {
+              schema: 'jovie-lane-capacity/v2',
+              observedAt: now,
+              repositories: {
+                'JovieInc/Jovie': { ready: 1, budget: 15 },
+              },
+              defaultLaneBudget: 4,
+              lanes: {},
+              sharedResources: {},
+            },
+          },
+          closureHealth: {
+            schema: 'jovie-closure-health/v1',
+            status: 'healthy',
+            authority: 'Summer',
+            newIssueIntakeAllowed: true,
+            promotionContinues: true,
+            remediationContinues: true,
+            reasons: [],
+          },
+          independentReview: {
+            schema: 'jovie-independent-review/v1',
+            status: 'passed',
+            authority: 'Gem',
+            reviewer: 'Gem',
+            reviewId: `main-release-ready:${mainSha}:${now}`,
+            headSha: mainSha,
+            scope: 'exact-main-head',
+            observedAt: now,
+          },
+          concurrencyEvidence: {
+            schema: 'gem-concurrency-evidence/v1',
+            source: 'execution-proven-useful-turns',
+            target: 4,
+            approved: true,
+            severeIncidents: 0,
+            observedAt: now,
+            acceptedEvidence: [],
+          },
+        },
+      })
+    );
+    const previousReceipt = process.env.JOVIE_FLEET_GATE_RECEIPT;
+    process.env.JOVIE_FLEET_GATE_RECEIPT = receiptPath;
+    try {
+      const { fleetGateForTeam } = await import(
+        resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+      );
+      const team = {
+        key: 'JOV',
+        healthUrl: 'https://jov.ie/api/health',
+        healthKind: 'json-status',
+      };
+      // A live fetch from this test would fail or hit the sandbox network —
+      // the assertion is that it is never consulted while the receipt
+      // carries the production signal.
+      const fleetGate = await fleetGateForTeam(team, now);
+      assert.equal(fleetGate.state, 'AMBER');
+      assert.equal(
+        fleetGate.promotionMode,
+        (await import(resolve(ORCHESTRATOR_DIR, 'admitter.mjs')))
+          .FLEET_PROMOTION_MODE.HOLD_INTAKE
+      );
+      const codes = fleetGate.reasons.map(reason => reason.code);
+      assert.ok(codes.includes('controller-failure'));
+      assert.ok(
+        codes.every(code =>
+          ['controller-failure', 'production-deployment-unbound'].includes(code)
+        )
+      );
+    } finally {
+      if (previousReceipt === undefined)
+        delete process.env.JOVIE_FLEET_GATE_RECEIPT;
+      else process.env.JOVIE_FLEET_GATE_RECEIPT = previousReceipt;
+    }
+  });
+});
+
+describe('fleet gate receipt source order (JOV-8000 follow-up 33)', () => {
+  // The 38031492172 residual: Refresh printed hold-intake
+  // ([controller-failure; production-deployment-unbound]) while the
+  // remediator read an OLDER blocked latest.json off the Gem host — a second
+  // host writer running older gate code overwrote it between the steps. In
+  // Actions the remediator now prefers the same-run receipt at
+  // ${RUNNER_TEMP}/jovie-fleet-gate.json (evaluate-fleet-gate.sh:29).
+  const team = {
+    key: 'JOV',
+    healthUrl: 'https://jov.ie/api/health',
+    healthKind: 'json-status',
+  };
+  const mainSha = 'a3eeefdd4dc681d1c9b5b4385720d661f5129137';
+
+  function receiptJson({ observedAt, promotionMode, reasonCodes }) {
+    return {
+      schema: 'jovie-fleet-gate/v1',
+      observedAt,
+      state: promotionMode === 'blocked' ? 'AMBER' : 'AMBER',
+      promotionMode,
+      reasons: reasonCodes.map(code => ({
+        code,
+        layer: 'promotion',
+        severity: 'warning',
+        detail: code,
+      })),
+      signals: {
+        main: { status: 'green', sha: mainSha },
+        production: {
+          status: 'green',
+          deployedSha: 'b3eeefdd4dc681d1c9b5b4385720d661f5129138',
+        },
+        controller: {
+          status: 'parked',
+          retired: true,
+          error: 'controller-endpoint-retired: Connection refused',
+        },
+        integrity: { status: 'clear' },
+        queue: {
+          repository: 'JovieInc/Jovie',
+          status: 'known',
+          eligiblePrs: 6,
+          greenReadyPrs: 1,
+          target: 15,
+          laneCapacity: {
+            schema: 'jovie-lane-capacity/v2',
+            observedAt,
+            repositories: { 'JovieInc/Jovie': { ready: 1, budget: 15 } },
+            defaultLaneBudget: 4,
+            lanes: {},
+            sharedResources: {},
+          },
+        },
+        closureHealth: {
+          schema: 'jovie-closure-health/v1',
+          status: 'healthy',
+          authority: 'Summer',
+          newIssueIntakeAllowed: true,
+          promotionContinues: true,
+          remediationContinues: true,
+          reasons: [],
+        },
+        independentReview: {
+          schema: 'jovie-independent-review/v1',
+          status: 'passed',
+          authority: 'Gem',
+          reviewer: 'Gem',
+          reviewId: `main-release-ready:${mainSha}:${observedAt}`,
+          headSha: mainSha,
+          scope: 'exact-main-head',
+          observedAt,
+        },
+        concurrencyEvidence: {
+          schema: 'gem-concurrency-evidence/v1',
+          source: 'execution-proven-useful-turns',
+          target: 4,
+          approved: true,
+          severeIncidents: 0,
+          observedAt,
+          acceptedEvidence: [],
+        },
+      },
+      workAdmission: {
+        allowed: true,
+        activities: ['approved-issue-lease'],
+        newIssueLeaseAllowed: true,
+        newImplementationAllowed: true,
+      },
+      concurrency: {
+        gem: { maxConcurrent: 0, evidenceAccepted: false },
+      },
+    };
+  }
+
+  async function withReceipts({ hostReceipt, sameRunReceipt }, fn) {
+    const workspace = await mkdtemp(resolve(tmpdir(), 'fg-gem-workspace-'));
+    const runDir = await mkdtemp(resolve(tmpdir(), 'fg-same-run-'));
+    const hostDir = resolve(workspace, 'state/gem-priority-gate');
+    await mkdir(hostDir, { recursive: true });
+    const hostPath = resolve(hostDir, 'latest.json');
+    const sameRunPath = resolve(runDir, 'jovie-fleet-gate.json');
+    if (hostReceipt) await writeFile(hostPath, JSON.stringify(hostReceipt));
+    if (sameRunReceipt)
+      await writeFile(sameRunPath, JSON.stringify(sameRunReceipt));
+    // No JOVIE_FLEET_GATE_RECEIPT override: the loader must prefer the
+    // same-run file and fall back to GEM_WORKSPACE/state/.../latest.json.
+    const env = {
+      GITHUB_ACTIONS: 'true',
+      RUNNER_TEMP: runDir,
+      GEM_WORKSPACE: workspace,
+    };
+    try {
+      const orchestrator = await import(
+        resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+      );
+      await fn({ orchestrator, hostPath, sameRunPath, env });
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+      await rm(runDir, { recursive: true, force: true });
+    }
+  }
+
+  it('prefers a fresh same-run receipt over an older blocked host receipt (source=same-run, hold-intake)', async () => {
+    const now = new Date().toISOString();
+    const old = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    await withReceipts(
+      {
+        hostReceipt: receiptJson({
+          observedAt: old,
+          promotionMode: 'blocked',
+          reasonCodes: [
+            'controller-failure',
+            'main-unknown',
+            'production-not-green',
+            'independent-review-head-mismatch',
+          ],
+        }),
+        sameRunReceipt: receiptJson({
+          observedAt: now,
+          promotionMode: 'hold-intake',
+          reasonCodes: ['controller-failure', 'production-deployment-unbound'],
+        }),
+      },
+      async ({ orchestrator, hostPath, env }) => {
+        const loaded = orchestrator.loadFleetGateReceipt(team, { now, env });
+        assert.equal(loaded.source, 'same-run');
+        assert.equal(loaded.receipt.promotionMode, 'hold-intake');
+        assert.ok(hostPath); // host receipt exists but was not chosen
+      }
+    );
+  });
+
+  it('falls back to the host receipt when the same-run file is missing, malformed, or stale (blocked stays blocked)', async () => {
+    const now = new Date().toISOString();
+    const stale = new Date(Date.now() - 11 * 60 * 1000).toISOString();
+    const blockedHost = receiptJson({
+      observedAt: now,
+      promotionMode: 'blocked',
+      reasonCodes: ['controller-failure', 'main-unknown'],
+    });
+    for (const variant of ['missing', 'malformed', 'stale']) {
+      await withReceipts(
+        {
+          hostReceipt: blockedHost,
+          sameRunReceipt:
+            variant === 'stale'
+              ? receiptJson({
+                  observedAt: stale,
+                  promotionMode: 'hold-intake',
+                  reasonCodes: [
+                    'controller-failure',
+                    'production-deployment-unbound',
+                  ],
+                })
+              : null,
+        },
+        async ({ orchestrator, sameRunPath, env }) => {
+          if (variant === 'malformed')
+            await writeFile(sameRunPath, '{not json');
+          const loaded = orchestrator.loadFleetGateReceipt(team, {
+            now,
+            env,
+          });
+          assert.equal(loaded.source, 'host-persisted', variant);
+          assert.equal(loaded.receipt.promotionMode, 'blocked');
+        }
+      );
+    }
+  });
+
+  it('adopts a blocked same-run receipt as blocked (never less restrictive)', async () => {
+    const now = new Date().toISOString();
+    await withReceipts(
+      {
+        hostReceipt: receiptJson({
+          observedAt: now,
+          promotionMode: 'hold-intake',
+          reasonCodes: ['controller-failure', 'production-deployment-unbound'],
+        }),
+        sameRunReceipt: receiptJson({
+          observedAt: now,
+          promotionMode: 'blocked',
+          reasonCodes: [
+            'controller-failure',
+            'independent-review-receipt-stale',
+          ],
+        }),
+      },
+      async ({ orchestrator, env }) => {
+        const loaded = orchestrator.loadFleetGateReceipt(team, { now, env });
+        assert.equal(loaded.source, 'same-run');
+        assert.equal(loaded.receipt.promotionMode, 'blocked');
+      }
+    );
+  });
+
+  it('hold-intake receipt derives degraded health, and capacity admits a cohort of 1 at 0.125/0.125/0', async () => {
+    const now = new Date().toISOString();
+    await withReceipts(
+      {
+        hostReceipt: null,
+        sameRunReceipt: receiptJson({
+          observedAt: now,
+          promotionMode: 'hold-intake',
+          reasonCodes: ['controller-failure', 'production-deployment-unbound'],
+        }),
+      },
+      async ({ orchestrator, env }) => {
+        const loaded = orchestrator.loadFleetGateReceipt(team, { now, env });
+        assert.equal(loaded.source, 'same-run');
+        // Replay run 38031492172's exact rate shape through the real
+        // capacity gate: conflictRate=0.125 (#20251), errorRate=0.125
+        // (#21118), unknownRate=0, health from the derived hold-intake mode.
+        const { evaluateRuntimeCapacity, CAPACITY_SCHEMA } = await import(
+          resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+        );
+        const gate = admitter.evaluateFleetGate(
+          {
+            main: loaded.receipt.signals.main,
+            production: loaded.receipt.signals.production,
+            controller: loaded.receipt.signals.controller,
+            integrity: loaded.receipt.signals.integrity,
+            queue: loaded.receipt.signals.queue,
+            closureHealth: loaded.receipt.signals.closureHealth,
+            concurrencyEvidence: loaded.receipt.signals.concurrencyEvidence,
+            independentReview: loaded.receipt.signals.independentReview,
+            observedAt: loaded.receipt.observedAt,
+          },
+          { now }
+        );
+        const health =
+          gate.promotionMode === admitter.FLEET_PROMOTION_MODE.BLOCKED
+            ? 'blocked'
+            : gate.state === admitter.FLEET_GATE_STATE.GREEN
+              ? 'healthy'
+              : 'degraded';
+        assert.equal(gate.promotionMode, 'hold-intake');
+        assert.equal(health, 'degraded');
+        const capacity = evaluateRuntimeCapacity(
+          {
+            schema: CAPACITY_SCHEMA,
+            observedAt: now,
+            workers: { running: 2, retrying: 0, maxConcurrent: 4 },
+            host: {
+              loadAvg1: 0.5,
+              cpuCount: 8,
+              availableMemoryBytes: 64 * 1024 ** 3,
+              cpuSomeAvg10: 0,
+              memoryFullAvg10: 0,
+              ioFullAvg10: 0,
+            },
+            provider: { accounts: 2, ready: 2 },
+            cloneLatencyMs: 1000,
+            ci: { saturating: false, running: 1, queued: 6 },
+            pullRequests: [
+              { number: 20251, isDraft: false, mergeable: 'CONFLICTING' },
+              {
+                number: 21118,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'FAILURE' },
+              },
+              {
+                number: 3,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+              {
+                number: 4,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+              {
+                number: 5,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+              {
+                number: 6,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+              {
+                number: 7,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+              {
+                number: 8,
+                isDraft: false,
+                mergeable: 'MERGEABLE',
+                statusCheckRollup: { state: 'SUCCESS' },
+              },
+            ],
+            mergeQueue: { health, entries: 6 },
+          },
+          { now, previousCleanStreak: 0, previousCohortSize: 0 }
+        );
+        assert.equal(capacity.allowed, true);
+        assert.equal(capacity.cohortSize, 1);
+      }
+    );
+  });
+
+  it('emits the split-brain warning and keeps the derived mode when the receipt mode disagrees', async () => {
+    const now = new Date().toISOString();
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'fg-split-'));
+    const receiptPath = resolve(tempDir, 'latest.json');
+    // Receipt claims hold-intake, but its signals derive blocked (stale
+    // review inside an otherwise fresh wrapper): the derivation wins and the
+    // mismatch must be named.
+    const receipt = receiptJson({
+      observedAt: now,
+      promotionMode: 'hold-intake',
+      reasonCodes: ['controller-failure', 'production-deployment-unbound'],
+    });
+    receipt.signals.independentReview.observedAt = new Date(
+      Date.now() - 60 * 60 * 1000
+    ).toISOString();
+    await writeFile(receiptPath, JSON.stringify(receipt));
+    const previousReceipt = process.env.JOVIE_FLEET_GATE_RECEIPT;
+    process.env.JOVIE_FLEET_GATE_RECEIPT = receiptPath;
+    const logs = [];
+    const originalLog = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+    try {
+      const orchestrator = await import(
+        resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+      );
+      const gate = await orchestrator.fleetGateForTeam(team, now);
+      assert.equal(gate.promotionMode, 'blocked');
+      assert.equal(gate.fleetGateEvidence.receiptPromotionMode, 'hold-intake');
+      assert.equal(gate.fleetGateEvidence.derivedPromotionMode, 'blocked');
+      assert.ok(
+        logs.some(line => line.includes('::warning::fleet-gate.split-brain')),
+        'split-brain warning emitted'
+      );
+      assert.ok(
+        logs.some(line => line.startsWith('capacity.fleet-gate source=')),
+        'evidence line emitted'
+      );
+    } finally {
+      console.log = originalLog;
+      if (previousReceipt === undefined)
+        delete process.env.JOVIE_FLEET_GATE_RECEIPT;
+      else process.env.JOVIE_FLEET_GATE_RECEIPT = previousReceipt;
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -296,6 +790,92 @@ describe('classifier', () => {
     const c = new classifier.IssueClassification(makeIssue());
     c.category = 'duplicate';
     assert.equal(scorer.scoreIssue(c).score, 0);
+  });
+
+  it('uses Linear priority tiers and keeps absent or invalid priority last', () => {
+    const candidates = [0, 4, 3, 2, 1, undefined, -1, 1.5, '1', NaN, 9].map(
+      (priority, index) => ({
+        identifier: `JOV-${100 + index}`,
+        score: 100 - index,
+        issue: { priority },
+      })
+    );
+    const result = scorer.rankQueueCandidates(candidates);
+    assert.deepEqual(
+      result.ranked.slice(0, 4).map(item => item.issue.priority),
+      [1, 2, 3, 4]
+    );
+    assert.deepEqual(
+      result.ranked.slice(4).map(item => item.identifier),
+      [
+        'JOV-100',
+        'JOV-105',
+        'JOV-106',
+        'JOV-107',
+        'JOV-108',
+        'JOV-109',
+        'JOV-110',
+      ]
+    );
+    assert.deepEqual(
+      result.receipt.rankings.map(item => item.priority),
+      [1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0]
+    );
+    // A cached classification cannot replace the authoritative current priority.
+    assert.equal(
+      scorer.rankQueueCandidates([
+        {
+          identifier: 'JOV-1',
+          score: 100,
+          priority: 1,
+          issue: { priority: 4 },
+        },
+        { identifier: 'JOV-2', score: 1, issue: { priority: 2 } },
+      ]).receipt.selectedCandidate,
+      'JOV-2'
+    );
+  });
+
+  it('keeps economic ordering within a priority tier without allowing value to displace urgency', () => {
+    const candidate = (identifier, priority, value) => ({
+      identifier,
+      score: value,
+      issue: { priority },
+      economic: {
+        expectedValue: {
+          amount: value,
+          unit: 'usd',
+          confidence: 1,
+          sourceRef: `value://${identifier}`,
+        },
+        preventionLeverage: {
+          amount: 0,
+          unit: 'usd',
+          confidence: 1,
+          sourceRef: `prevention://${identifier}`,
+        },
+        fullyLoadedCost: {
+          expectedTotal: { amount: 1, unit: 'usd' },
+          uncertainty: { confidence: 1, missingSourceContracts: [] },
+          sourceContracts: [`cost://${identifier}`],
+        },
+      },
+    });
+    const result = scorer.rankQueueCandidates([
+      candidate('JOV-1', 2, 100),
+      candidate('JOV-2', 1, 10),
+      candidate('JOV-3', 1, 20),
+    ]);
+    assert.deepEqual(
+      result.ranked.map(item => item.identifier),
+      ['JOV-3', 'JOV-2', 'JOV-1']
+    );
+    assert.equal(result.receipt.mode, 'fully-loaded-economic');
+    assert.deepEqual(result.receipt.missingSourceContracts, []);
+    assert.deepEqual(result.receipt.orderingReasons, ['linear-priority']);
+    assert.equal(result.receipt.estimatedOpportunityCost.amount, 9);
+    assert.deepEqual(scorer.rankQueueCandidates([]).ranked, []);
+    assert.equal(scorer.rankQueueCandidates([]).receipt.selectedPriority, null);
   });
 
   it('counts only fresh active machine leases, not ordinary In Progress work', () => {
@@ -834,6 +1414,62 @@ describe('stale lease guard', () => {
     assert.equal(result.skipped[0].reason, 'active-pr');
   });
 
+  it('preserves native PR ownership and fresh lane evidence over historical terminal comments', () => {
+    assert.equal(
+      staleLease.classifyStaleLease(
+        {
+          ...staleIssue(),
+          attachments: {
+            nodes: [{ url: 'https://github.com/JovieInc/Jovie/pull/20771' }],
+          },
+        },
+        { now }
+      ).reason,
+      'active-pr'
+    );
+    assert.equal(
+      staleLease.classifyStaleLease(
+        staleIssue({
+          comments: [
+            terminalComment,
+            {
+              body: '🤖 lane `claude`: exact-head gate remains owned',
+              createdAt: now,
+            },
+          ],
+        }),
+        { now }
+      ).reason,
+      'latest-agent-evidence-not-terminal'
+    );
+    assert.equal(
+      staleLease.classifyStaleLease(
+        {
+          ...staleIssue(),
+          comments: {
+            nodes: [terminalComment],
+            pageInfo: { hasNextPage: true },
+          },
+        },
+        { now }
+      ).reason,
+      'nested-evidence-incomplete'
+    );
+  });
+
+  it('never releases a missing current issue using a stale snapshot', async () => {
+    const issue = staleIssue();
+    const client = fakeClient(issue);
+    client.fetchIssue = async () => null;
+    const result = await staleLease.sweepStaleLeases({
+      issues: [issue],
+      client,
+      now,
+    });
+    assert.equal(result.failed[0].reason, 'reread-failed');
+    assert.equal(client.calls.transitions.length, 0);
+  });
+
   it('does not recover assigned or unknown leases', async () => {
     const assigned = staleIssue({
       assignee: { id: 'other', name: 'Other Owner' },
@@ -1016,6 +1652,1701 @@ describe('entrypoint contract', () => {
       executableSource,
       /CACHE_FILE = resolve\(__dirname, '\.orchestrator-cache\.json'\)/
     );
+  });
+
+  it('collects the pullRequests capacity evidence deduped with drafts kept for attribution, a 504 retry, and fails closed with the cause named', async () => {
+    // The PR inventory is the pullRequests capacity evidence (JOV-8000
+    // follow-up 9): one query per state (open --limit 100, merged --limit
+    // 50), deduped by number with drafts INCLUDED (the issue->PR
+    // attribution must see draft PRs; the capacity rates exclude drafts
+    // inside pullRequestRates). A full open page fails closed with a named
+    // cause instead of silently truncating; a transient 504/502 retries
+    // with a short backoff; any other failure fails closed with the exact
+    // gh cause named.
+    const executableSource = await readFile(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
+      'utf8'
+    );
+    assert.match(executableSource, /timeout: 45_000/);
+    assert.match(executableSource, /HTTP 50\[24\]/);
+    assert.match(executableSource, /gh-pr-list-\$\{state\}:/);
+    // The rollup contexts are gone from the capacity inventory query;
+    // mergeable + labels + mergeStateStatus carry the signals. The open
+    // inventory pages through GraphQL with a real cursor (no page-limit
+    // fail-closed); the merged side stays one gh pr list call.
+    assert.doesNotMatch(executableSource, /statusCheckRollup',/);
+    assert.match(executableSource, /per_page=50&page=\$\{page\}/);
+    assert.doesNotMatch(executableSource, /page-limit-reached/);
+    assert.match(executableSource, /mergeable,labels/);
+
+    // Behavioral: a fake gh on PATH drives the exported collector through
+    // the 504 retry, the dedup, and the draft exclusion.
+    const tempDir = await mkdtemp('/tmp/backlog-gh-');
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const callsPath = resolve(tempDir, 'calls');
+    const openAttemptsPath = resolve(tempDir, 'open-attempts');
+    const openPayload = JSON.stringify([
+      {
+        number: 1,
+        title: 'fix JOV-1',
+        body: 'JOV-1',
+        headRefName: 'symphony/JOV-1',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/1',
+        mergedAt: null,
+        isDraft: false,
+      },
+      // A duplicate number (paging overlap defense) and a draft row are
+      // dropped from the inventory.
+      {
+        number: 1,
+        title: 'fix JOV-1 (dup)',
+        body: 'JOV-1',
+        headRefName: 'symphony/JOV-1',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/1',
+        mergedAt: null,
+        isDraft: false,
+      },
+      {
+        number: 2,
+        title: 'draft JOV-2',
+        body: 'JOV-2',
+        headRefName: 'codex/JOV-2',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/2',
+        mergedAt: null,
+        isDraft: true,
+      },
+      {
+        number: 3,
+        title: 'fix JOV-3',
+        body: 'JOV-3',
+        headRefName: 'symphony/JOV-3',
+        state: 'OPEN',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/3',
+        mergedAt: null,
+        isDraft: false,
+      },
+    ]);
+    const mergedPayload = JSON.stringify([
+      {
+        number: 9,
+        title: 'merged JOV-9',
+        body: 'JOV-9',
+        headRefName: 'symphony/JOV-9',
+        state: 'MERGED',
+        mergeStateStatus: 'CLEAN',
+        url: 'https://example/pr/9',
+        mergedAt: '2026-10-07T00:00:00Z',
+        isDraft: false,
+      },
+    ]);
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'printf \'%s\\n\' "$1" >> "$CALLS_PATH"',
+        'printf \'%s\\n\' "$*" >> "$FULL_ARGS_PATH"',
+        '# open inventory: gh api (REST); merged: gh pr list',
+        'if [ "$1" = "api" ]; then',
+        '  echo x >> "$OPEN_ATTEMPTS_PATH"',
+        '  if [ "$(wc -l < "$OPEN_ATTEMPTS_PATH")" -le 1 ]; then',
+        '    echo "HTTP 504: 504 Gateway Timeout (https://api.github.com)" >&2',
+        '    exit 1',
+        '  fi',
+        `printf '%s' '${openPayload.replace(/'/g, "'\\''")}'`,
+        'else',
+        `printf '%s' '${mergedPayload.replace(/'/g, "'\\''")}'`,
+        'fi',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+
+    const { collectGitHubPullRequests } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+
+    // The open GraphQL pages once (hasNextPage false), its first call 504s
+    // once and its retry succeeds; the merged call is one gh pr list
+    // query; the receipt keeps one row per PR number (draft INCLUDED for
+    // attribution — the rates exclude it), and reports the audit numbers.
+    await writeFile(callsPath, '');
+    await writeFile(openAttemptsPath, '');
+    const fullArgsPath = resolve(tempDir, 'full-args');
+    const env = {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+      CALLS_PATH: callsPath,
+      FULL_ARGS_PATH: fullArgsPath,
+      OPEN_ATTEMPTS_PATH: openAttemptsPath,
+    };
+    const receipt = await collectGitHubPullRequests(env);
+    assert.ok(Array.isArray(receipt?.pullRequests));
+    assert.equal(receipt.truncated, false);
+    assert.equal(receipt.duplicatesDropped, 1);
+    assert.equal(receipt.openUnique, 3);
+    assert.equal(receipt.count, 4);
+    const numbers = receipt.pullRequests.map(row => row.number).sort();
+    assert.deepEqual(numbers, [1, 2, 3, 9]);
+    const draftRow = receipt.pullRequests.find(row => row.number === 2);
+    assert.equal(draftRow.isDraft, true);
+    const callLog = (await readFile(callsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(callLog.length, 3);
+    assert.equal(callLog.filter(call => call === 'api').length, 2);
+    assert.equal(callLog.filter(call => call === 'pr').length, 1);
+
+    // argv hygiene (JOV-8000 follow-up 11): the gh CLI usage failure on the
+    // Gem runner was `gh api graphql -F` with a multi-line query string
+    // ("Add a string parameter in key=value format"). The inventory now
+    // uses `gh api` with URL query params only — every recorded argv line
+    // must be flag-free (-f/-F absent everywhere), non-empty, and well
+    // formed (every key=value param carries its '=').
+    const fullArgs = (await readFile(fullArgsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(fullArgs.length, 3);
+    for (const line of fullArgs) {
+      assert.ok(line.length > 0);
+      assert.doesNotMatch(line, /(^|\s)-(f|F)(\s|$|=)/);
+      assert.doesNotMatch(line, /graphql/);
+      // `gh api` takes no --repo/-R flag (it is a `gh pr` flag; passing it
+      // dumps usage help whose -F description is the misleading "Add a
+      // string parameter in key=value format" line the Gem runner showed).
+      if (line.startsWith('api ')) {
+        assert.doesNotMatch(line, /--repo|--repo=|(^|\s)-R(\s|$)/);
+        assert.equal(line.split(' ').length, 2);
+      }
+    }
+    const apiLines = fullArgs.filter(line => line.startsWith('api '));
+    assert.equal(apiLines.length, 2);
+    for (const line of apiLines) {
+      // The REST path carries its query params as URL key=value pairs —
+      // every param segment contains an '='.
+      const path = line.split(' ').at(-1);
+      assert.ok(path.includes('pulls?'));
+      for (const segment of path.split('?').at(-1).split('&')) {
+        assert.ok(segment.includes('='), `param ${segment} missing =`);
+      }
+    }
+
+    // Fail-closed path: a non-gateway failure does not burn the extra
+    // retry; the collector names the cause with the exit code, signal, kill
+    // flag and stderr tail, and stays failed closed (no empty-array pass).
+    await writeFile(
+      fakeGh,
+      ['#!/bin/sh', 'echo "gh: auth required" >&2', 'exit 1'].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    await writeFile(callsPath, '');
+    const failed = await collectGitHubPullRequests(env);
+    assert.equal(Array.isArray(failed?.pullRequests), false);
+    assert.match(String(failed?.error), /gh-pr-list-(open|merged):/);
+    assert.match(String(failed?.error), /exit=1/);
+    assert.match(String(failed?.error), /signal=none/);
+    assert.match(String(failed?.error), /killed=false/);
+    assert.match(String(failed?.error), /stderr=.*gh: auth required/);
+  });
+
+  it('parses a multi-megabyte gh pr list payload past the 1MB execFile default maxBuffer', async () => {
+    // The PR inventory query (body + statusCheckRollup on ~100 open PRs)
+    // measures multiple MB — beyond execFile's 1MB default maxBuffer, which
+    // kills the child mid-read. The collector runs with a 32MB maxBuffer, so
+    // a payload of this size parses instead of dying as a truncated cause.
+    const tempDir = await mkdtemp('/tmp/backlog-gh-mb-');
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const filler = 'x'.repeat(24 * 1024);
+    const rows = Array.from({ length: 90 }, (_, i) => ({
+      number: i + 1,
+      title: 'fix JOV-1',
+      body: filler,
+      headRefName: `symphony/JOV-1-${i}`,
+      state: i % 2 === 0 ? 'OPEN' : 'MERGED',
+      mergeStateStatus: 'CLEAN',
+      url: 'https://example/pr/1',
+      mergedAt: null,
+      isDraft: false,
+      statusCheckRollup: { state: 'SUCCESS' },
+    }));
+    const payload = JSON.stringify(rows);
+    assert.ok(payload.length > 2 * 1024 * 1024);
+    const mergedSmall = JSON.stringify([
+      {
+        number: 9999,
+        title: 'merged JOV-9',
+        body: 'JOV-9',
+        headRefName: 'symphony/JOV-9',
+        state: 'MERGED',
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+        labels: [],
+        url: 'https://example/pr/9',
+        mergedAt: '2026-10-07T00:00:00Z',
+        isDraft: false,
+      },
+    ]);
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        '# $2 is the REST path (api <path>); page>=2 ends pagination',
+        'if [ "$1" = "api" ]; then',
+        '  PAGE="${2##*page=}"',
+        '  case "$PAGE" in',
+        '    1) ' + `printf '%s' '${payload.replace(/'/g, "'\\''")}'` + ';;',
+        '    *) printf "[]";;',
+        '  esac',
+        'else',
+        `printf '%s' '${mergedSmall.replace(/'/g, "'\\''")}'`,
+        'fi',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const { collectGitHubPullRequests } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const env = {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+    };
+    const receipt = await collectGitHubPullRequests(env);
+    assert.ok(Array.isArray(receipt?.pullRequests));
+    // 90 rows (~24KB bodies each ≈ 2.2MB payload) parse past the 1MB
+    // default through the paginated open GraphQL; the small merged row
+    // adds one more inventory entry.
+    assert.equal(receipt.pullRequests.length, 91);
+    assert.equal(receipt.openUnique, 45);
+    assert.equal(receipt.truncated, false);
+  });
+
+  it('fetches check rollups from the per-commit REST status view in bounded parallel batches', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'orch-rollup-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const callsPath = resolve(tempDir, 'calls');
+    const statusHitsPath = resolve(tempDir, 'status-hits');
+    const openRows = [
+      {
+        number: 101,
+        title: 'conflicted',
+        body: 'x',
+        state: 'OPEN',
+        draft: false,
+        head: { ref: 'sym/JOV-1-a', sha: 'aaa111' },
+        labels: [],
+      },
+      {
+        number: 102,
+        title: 'clean',
+        body: 'x',
+        state: 'OPEN',
+        draft: false,
+        head: { ref: 'sym/JOV-1-b', sha: 'bbb222' },
+        labels: [],
+      },
+    ];
+    const mergedSmall = JSON.stringify([
+      {
+        number: 9999,
+        title: 'merged JOV-9',
+        body: 'JOV-9',
+        headRefName: 'symphony/JOV-9',
+        state: 'MERGED',
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+        labels: [],
+        url: 'https://example/pr/9',
+        mergedAt: '2026-10-07T00:00:00Z',
+        isDraft: false,
+      },
+    ]);
+    // The REST path is the LAST argv word; commits/{sha}/status answers by
+    // the sha embedded in the path. The inventory pages until a short page.
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'printf \'%s\\n\' "$1" >> "$CALLS_PATH"',
+        'if [ "$1" = "api" ]; then',
+        '  # POSIX-compatible last-argv read: the endpoint path is always',
+        '  # the final argument of the api invocation. ${@: -1} is a bash-only',
+        '  # expansion that breaks under dash (/bin/sh on the CI runner),',
+        '  # which silently failed every rollup fetch and failed the batch.',
+        '  for PATHARG do :; done',
+        '  case "$PATHARG" in',
+        '    *commits/aaa111/check-runs*) printf \'%s\\n\' "aaa111" >> "$STATUS_HITS_PATH"; printf \'{"check_runs":[{"conclusion":"failure"}]}\';;',
+        '    *commits/bbb222/check-runs*) printf \'%s\\n\' "bbb222" >> "$STATUS_HITS_PATH"; printf \'{"check_runs":[{"conclusion":"success"},{"conclusion":"skipped"}]}\';;',
+        "    *page=1*) printf '%s' '['" +
+          openRows
+            .map(r => JSON.stringify(r))
+            .join(',')
+            .replace(/'/g, "'\\''") +
+          "']';;",
+        '    *) printf "[]";;',
+        '  esac',
+        'else',
+        `printf '%s' '${mergedSmall.replace(/'/g, "'\\''")}'`,
+        'fi',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const { attachCheckRollups } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    /** @typedef {Record<string, any>} EnrichedRow */
+    /**
+     * The enriched rows widen to `Record<string, any>` — the rollup
+     * enrichment attaches `statusCheckRollup` dynamically (the inventory
+     * rows do not statically declare it), so asserts read the attached
+     * state through the widened type.
+     * @param {Record<string, any>[]} allRows
+     * @param {number} number
+     */
+    const rollupStateOf = (allRows, number) =>
+      allRows.find(row => /** @type {any} */ (row)?.number === number)
+        ?.statusCheckRollup?.state;
+    const rows = openRows.map(
+      row =>
+        /** @type {Record<string, any>} */ ({
+          ...row,
+          headSha: row.head.sha,
+        })
+    );
+
+    const ok = await attachCheckRollups(rows, {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+      CALLS_PATH: callsPath,
+      STATUS_HITS_PATH: statusHitsPath,
+    });
+    assert.equal(ok, true);
+    // both population rows carry their rollup state from the REST
+    // combined-status view — no per-PR pulls/{n} lookup, no graphql
+    assert.equal(rollupStateOf(rows, 101), 'FAILURE');
+    assert.equal(rollupStateOf(rows, 102), 'SUCCESS');
+    const callLog = (await readFile(callsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    // only api calls, one per population row — no inventory pages here
+    assert.equal(callLog.filter(c => c === 'api').length, 2);
+    const hits = (await readFile(statusHitsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.deepEqual(hits.sort(), ['aaa111', 'bbb222']);
+  });
+
+  it('reads a failing Actions check-run as errored even when the legacy status view reads success (JOV-8000 follow-up 20b)', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'orch-checkruns-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    // The legacy combined-status view reports success (the pre-20b blind
+    // spot: Actions-only failures never appear there); the check-runs view
+    // carries the failing conclusion.
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'if [ "$1" != "api" ]; then exit 1; fi',
+        '  for PATHARG do :; done',
+        '  case "$PATHARG" in',
+        '    *commits/ccc333/check-runs*)',
+        '      printf \'{"check_runs":[{"conclusion":"success"},{"conclusion":"failure"},{"conclusion":"skipped"}]}\'',
+        '      ;;',
+        '    *commits/ccc333/status*)',
+        '      printf \'{"state":"success"}\'',
+        '      ;;',
+        '    *) printf "[]" ;;',
+        '  esac',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const { attachCheckRollups } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const { isErroredPullRequest } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+    );
+    const rows = [
+      {
+        number: 3003,
+        title: 'actions-failing row',
+        body: 'x',
+        state: 'OPEN',
+        headSha: 'ccc333',
+        isDraft: false,
+        labels: [],
+      },
+    ];
+    const ok = await attachCheckRollups(rows, {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH}`,
+    });
+    assert.equal(ok, true);
+    // the Actions failure reads as errored — the legacy status view
+    // ('success') never saw it
+    assert.equal(rows[0].statusCheckRollup?.state, 'FAILURE');
+    assert.equal(isErroredPullRequest(rows[0]), true);
+  });
+
+  /**
+   * POSIX-only fake gh for the mergeability measurement (JOV-8000
+   * follow-up 19, Ops spec): serves `gh api repos/JovieInc/Jovie/pulls/<N>`
+   * per PR number and `gh api .../git/matching-refs/heads/gh-readonly-queue/main/`.
+   * The per-PR detail comes from DETAILS (a JSON map keyed by the PR
+   * number); CALLS_BY_PR records the per-PR GET count; REFS controls the
+   * matching-refs answer (or 'fail' to fail the call).
+   * @param {string} fakeGh
+   * @param {Record<string, any>} details
+   * @param {string} tempDir
+   */
+  const writeMergeabilityFakeGh = async (fakeGh, details, tempDir) => {
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        '# argv: api graphql -f query=<gql>  OR  api repos/... — graphql must be exactly 4 args',
+        'if [ "$1" != "api" ]; then exit 1; fi',
+        '  # log argv SOH-separated (one record per arg, records end with a blank line)',
+        String.raw`  for a in "$@"; do printf '%s\001' "$a" >> "$FAKE_DIR/argv-log"; done; printf '\n' >> "$FAKE_DIR/argv-log"`,
+        '  case "$2" in',
+        '    graphql)',
+        '      # strict argv shape: $3 must be -f and $4 must start query= (else the call is malformed)',
+        '      if [ "$3" != "-f" ]; then exit 2; fi',
+        '      case "$4" in query=*) ;; *) exit 2 ;; esac',
+        '      if [ -n "$5" ]; then exit 2; fi',
+        String.raw`      printf 'graphql\n' >> "$FAKE_DIR/calls-graphql"`,
+        '      if [ -f "$FAKE_DIR/graphql-fail" ]; then exit 1; fi',
+        '      if [ -f "$FAKE_DIR/graphql-errors" ]; then cat "$FAKE_DIR/graphql-errors"; exit 0; fi',
+        String.raw`      if [ -f "$FAKE_DIR/graphql-body" ]; then cat "$FAKE_DIR/graphql-body"; else printf '%s' '{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}}}'; fi`,
+        '      ;;',
+        '    *git/matching-refs/heads/gh-readonly-queue/main/*)',
+        String.raw`      printf 'refs\n' >> "$FAKE_DIR/calls-refs"`,
+        '      if [ -f "$FAKE_DIR/refs-fail" ]; then exit 1; fi',
+        '      if [ -f "$FAKE_DIR/refs-body" ]; then cat "$FAKE_DIR/refs-body"; else printf "[]"; fi',
+        '      ;;',
+        '    repos/JovieInc/Jovie/pulls/*)',
+        '      NUMBER="${2##*/pulls/}"',
+        String.raw`      printf '%s\n' "$NUMBER" >> "$FAKE_DIR/calls-$NUMBER"`,
+        '      case ",${FAILNUMS:-}," in *",$NUMBER,"*) exit 1 ;; esac',
+        '      printf \'%s\' "$(cat "$FAKE_DIR/detail-$NUMBER")"',
+        '      ;;',
+        '    repos/JovieInc/Jovie/pulls\\?*) printf "[]" ;;',
+        '    *) printf "[]" ;;',
+        '  esac',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    for (const [number, detail] of Object.entries(details)) {
+      await writeFile(`${tempDir}/detail-${number}`, JSON.stringify(detail));
+    }
+  };
+
+  /** Write a GraphQL merge-queue entries body for [ {number, head} ]. */
+  const writeGraphqlBody = async (
+    tempDir,
+    entries,
+    { hasNextPage = false } = {}
+  ) => {
+    await writeFile(
+      `${tempDir}/graphql-body`,
+      JSON.stringify({
+        data: {
+          repository: {
+            mergeQueue: {
+              entries: {
+                nodes: entries.map(entry => ({
+                  pullRequest: { number: entry.number, headRefOid: entry.head },
+                })),
+                pageInfo: { hasNextPage },
+              },
+            },
+          },
+        },
+      })
+    );
+  };
+
+  /** Read the NUL-separated argv log as an array of per-call arg arrays. */
+  const readArgvLog = async tempDir => {
+    try {
+      const raw = await readFile(`${tempDir}/argv-log`, 'utf8');
+      return raw
+        .split('\n')
+        .filter(record => record.length > 0)
+        .map(record => record.split('\u0001').filter(arg => arg.length > 0));
+    } catch {
+      return [];
+    }
+  };
+
+  const readCalls = async (tempDir, key) => {
+    try {
+      return (await readFile(`${tempDir}/calls-${key}`, 'utf8'))
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  };
+
+  it('measures mergeability: list rows are unmeasured and only population rows get the per-PR GET', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-a-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        101: { mergeable: true, mergeable_state: 'clean', head: { sha: 'h1' } },
+        102: {
+          mergeable: false,
+          mergeable_state: 'dirty',
+          head: { sha: 'h2' },
+        },
+      },
+      tempDir
+    );
+    const rows = [
+      {
+        number: 101,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+      {
+        number: 102,
+        title: 'b',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h2',
+      },
+      // draft + quarantined rows never get the per-PR GET
+      {
+        number: 103,
+        title: 'c',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: true,
+        labels: [],
+      },
+      {
+        number: 104,
+        title: 'd',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [{ name: 'queue-poison' }],
+      },
+    ];
+    const { measureMergeability, isRatePopulationRow } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    // (a) list rows count as unmeasured: mergeabilityUnknown treats them as unknown
+    const { mergeabilityUnknown } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+    );
+    assert.equal(mergeabilityUnknown(rows[0]), true);
+    assert.equal(isRatePopulationRow(rows[0]), true);
+    assert.equal(isRatePopulationRow(rows[2]), false);
+    assert.equal(isRatePopulationRow(rows[3]), false);
+    const sleeps = [];
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      {
+        sleep: ms => {
+          sleeps.push(ms);
+          return Promise.resolve();
+        },
+        now: () => 0,
+      }
+    );
+    assert.equal(evidence.measured, 2);
+    assert.equal(evidence.polls, 2);
+    assert.deepEqual(evidence.stillUnknown, []);
+    assert.equal(rows[0].mergeable, 'MERGEABLE');
+    assert.equal(rows[1].mergeable, 'CONFLICTING');
+    assert.equal(rows[1].mergeStateStatus, 'DIRTY');
+    // only population rows got the per-PR GET
+    assert.ok(
+      await access(`${tempDir}/calls-101`).then(
+        () => true,
+        () => false
+      )
+    );
+    assert.ok(
+      await access(`${tempDir}/calls-103`).then(
+        () => false,
+        () => true
+      )
+    );
+    assert.ok(
+      await access(`${tempDir}/calls-104`).then(
+        () => false,
+        () => true
+      )
+    );
+    // no backoff sleeps needed — every row measured on the first GET
+    assert.deepEqual(sleeps, []);
+  });
+
+  it('retries a null mergeable with 2s then 4s backoff and maps dirty to CONFLICTING', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-b-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    // first GET: null mergeable (computing); later GETs: measured dirty.
+    // The fake rewrites its own detail file after the first call.
+    await writeMergeabilityFakeGh(
+      fakeGh,
+      {
+        201: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h1' },
+        },
+      },
+      tempDir
+    );
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'if [ "$1" != "api" ]; then exit 1; fi',
+        '  ENDPOINT="$2"',
+        '  case "$ENDPOINT" in',
+        '    graphql|graphql\\ *) printf \'%s\' \'{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[]}}}}}\' ;;',
+        '    *git/matching-refs/heads/gh-readonly-queue/main/*) printf "[]" ;;',
+        '    repos/JovieInc/Jovie/pulls/*)',
+        '      NUMBER="${ENDPOINT##*/pulls/}"',
+        '      printf \'%s\\n\' "$NUMBER" >> "$FAKE_DIR/calls-$NUMBER"',
+        '      CALLS="$(grep -c . "$FAKE_DIR/calls-$NUMBER" || true)"',
+        '      if [ "$CALLS" -le 1 ]; then',
+        '        printf \'{"mergeable":null,"mergeable_state":"unknown"}\'',
+        '      else',
+        '        printf \'{"mergeable":false,"mergeable_state":"dirty"}\'',
+        '      fi',
+        '      ;;',
+        '    *) printf "[]" ;;',
+        '  esac',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const rows = [
+      {
+        number: 201,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+    ];
+    const sleeps = [];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      {
+        sleep: ms => {
+          sleeps.push(ms);
+          return Promise.resolve();
+        },
+        now: () => 0,
+      }
+    );
+    // (b) backoff 2000 then 4000; second read measures dirty -> CONFLICTING
+    assert.deepEqual(sleeps, [2000, 4000].slice(0, sleeps.length));
+    assert.ok(sleeps.includes(2000));
+    assert.equal(rows[0].mergeable, 'CONFLICTING');
+    assert.equal(rows[0].mergeStateStatus, 'DIRTY');
+    assert.equal(evidence.measured, 1);
+  });
+
+  it('always-null mergeable gets exactly 1+3 GETs, stays UNKNOWN, and fails the gate closed', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-c-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        301: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h1' },
+        },
+      },
+      tempDir
+    );
+    const rows = [
+      {
+        number: 301,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const { mergeabilityUnknown } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    // (c) exactly 1+3 GETs, still UNKNOWN
+    const calls = (await readFile(`${tempDir}/calls-301`, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(calls.length, 4);
+    assert.equal(mergeabilityUnknown(rows[0]), true);
+    assert.deepEqual(evidence.stillUnknown, [301]);
+    assert.equal(evidence.measured, 0);
+    // the gate boundary itself is covered by the boundary test (2/10 passes, 3/12 fails)
+  });
+
+  it('a base-sha queue ref with GraphQL failing does NOT mark the row (refs are not queue proof)', async () => {
+    // JOV-8000 follow-up 37: gh-readonly-queue refs carry the merge group's
+    // BASE sha (the main tip), not the PR head, so a head-bound ref match can
+    // never pass — refs are dropped as queue proof. Even a ref whose suffix
+    // equals the row's head must not mark the row when GraphQL failed.
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-d-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeFile(`${tempDir}/graphql-fail`, '');
+    const head401 = 'a'.repeat(40);
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        401: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: head401 },
+        },
+      },
+      tempDir
+    );
+    await writeFile(
+      `${tempDir}/refs-body`,
+      JSON.stringify([
+        { ref: `refs/heads/gh-readonly-queue/main/pr-401-${head401}` },
+      ])
+    );
+    const rows = [
+      {
+        number: 401,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: head401,
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    // refs ignored: GraphQL failed -> queueSource none, row stays unknown
+    assert.equal(rows[0].inMergeQueue, undefined);
+    assert.deepEqual(evidence.inMergeQueue, []);
+    assert.equal(evidence.queueSource, 'none');
+    assert.ok(String(evidence.errors[0] || '').startsWith('mergequeue:'));
+    assert.deepEqual(evidence.stillUnknown, [401]);
+  });
+
+  it('leaves rows unknown when the matching-refs call fails', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-e-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        501: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h1' },
+        },
+      },
+      tempDir
+    );
+    await writeFile(`${tempDir}/refs-fail`, '');
+    await writeFile(`${tempDir}/graphql-fail`, '');
+    const rows = [
+      {
+        number: 501,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    // (e) failed refs + GraphQL calls leave the row unknown (refs dropped)
+    assert.deepEqual(evidence.stillUnknown, [501]);
+    assert.equal(rows[0].inMergeQueue, undefined);
+    assert.equal(evidence.queueSource, 'none');
+    assert.ok(String(evidence.errors[0] || '').startsWith('mergequeue:'));
+  });
+
+  it('stops at the deadline with leftovers unknown, nothing thrown, bounded in-flight calls', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-f-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        601: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h1' },
+        },
+        602: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h2' },
+        },
+        603: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h3' },
+        },
+        604: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h4' },
+        },
+        605: { mergeable: true, mergeable_state: 'clean', head: { sha: 'h5' } },
+      },
+      tempDir
+    );
+    const rows = [601, 602, 603, 604, 605].map((number, index) => ({
+      number,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+      headSha: `h${index + 1}`,
+    }));
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    // (f) clock past the deadline after the first batch: leftovers unknown,
+    // nothing throws, at most 4 calls were in flight
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      {
+        // sleep never resolves the deadline escape hatch; the deadline clock
+        // passes mid-phase after the first batch measures
+        sleep: async () => {
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          await Promise.resolve();
+          inFlight -= 1;
+        },
+        now: (() => {
+          let t = 0;
+          return () => {
+            t += 1000;
+            return t;
+          };
+        })(),
+      }
+    );
+    assert.ok(maxInFlight <= 4, `in-flight ${maxInFlight} > 4`);
+    assert.equal(evidence.measured >= 0, true);
+    // nothing thrown; leftovers stay unknown (the fake never measures them)
+    assert.ok(Array.isArray(evidence.stillUnknown));
+  });
+
+  it('uses exactly [api, <path>] argv for every call — no --repo and no pr view', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-g-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const fullArgsPath = resolve(tempDir, 'full-args');
+    await writeMergeabilityFakeGh(
+      fakeGh,
+      {
+        701: { mergeable: true, mergeable_state: 'clean', head: { sha: 'h1' } },
+      },
+      tempDir
+    );
+    // wrap: record full argv before delegating
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        'printf \'%s\\n\' "$*" >> "$FULL_ARGS_PATH"',
+        'exec "$(dirname "$0")/gh-real" "$@"',
+      ].join('\n')
+    );
+    const realBin = resolve(tempDir, 'bin-real');
+    await mkdir(realBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(realBin, 'gh-real'),
+      {
+        701: { mergeable: true, mergeable_state: 'clean', head: { sha: 'h1' } },
+      },
+      realBin
+    );
+    const rows = [
+      {
+        number: 701,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${realBin}:${process.env.PATH}`,
+        FAKE_DIR: realBin,
+        FULL_ARGS_PATH: fullArgsPath,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    const lines = (await readFile(fullArgsPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.ok(lines.length >= 1);
+    for (const line of lines) {
+      // (g) every argv is exactly ['api', <endpoint>] — a REST path or the
+      // graphql word (the merge-queue read). Never --repo, never `pr view`.
+      const words = line.split(' ');
+      assert.equal(words[0], 'api');
+      if (words[1] === 'graphql') continue;
+      assert.ok(words.length === 2);
+      assert.ok(words[1].startsWith('repos/JovieInc/Jovie/'));
+      assert.doesNotMatch(line, /--repo/);
+      assert.doesNotMatch(line, /\bpr\b.*\bview\b/);
+    }
+  });
+
+  it('passes the GraphQL merge-queue read as separate argv elements, not one fused endpoint', async () => {
+    // Regression for the follow-up-36 defect: `gh api` takes the endpoint as
+    // ONE argv element, so 'graphql -f query=...' must be split into
+    // ['api','graphql','-f','query=...'] — a fused string is an invalid
+    // endpoint, the read always failed, and queued PRs were never marked.
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-argv-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const argvPath = resolve(tempDir, 'argv');
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        // record each argv on its own line, NUL-safe-ish
+        'i=0; for a in "$@"; do printf \'%s|%s\\n\' "$i" "$a" >> "$ARGV_PATH"; i=$((i+1)); done',
+        'case "$2" in',
+        '  graphql) printf \'%s\' \'{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[]}}}}}\' ;;',
+        '  *) printf "[]" ;;',
+        'esac',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const rows = [
+      {
+        number: 701,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+        ARGV_PATH: argvPath,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    const argvLines = (await readFile(argvPath, 'utf8')).trim().split('\n');
+    // every recorded line is '<index>|<element>'; collect just the elements
+    // in invocation order (a graphql call is followed by the REST GETs).
+    const elements = argvLines.map(line => line.slice(line.indexOf('|') + 1));
+    const graphqlAt = elements.findIndex(el => el === 'graphql');
+    assert.ok(graphqlAt >= 0, 'a graphql argv element exists');
+    assert.ok(
+      !elements.some(el => el.startsWith('graphql -f')),
+      'no fused graphql endpoint'
+    );
+    const fAt = elements.findIndex(el => el === '-f');
+    assert.ok(fAt > graphqlAt, "'-f' follows 'graphql'");
+    assert.ok(
+      elements.slice(fAt + 1).some(el => el.startsWith('query=')),
+      "a 'query=' element follows '-f'"
+    );
+  });
+
+  it('sends the GraphQL queue read as exactly 4 argv elements (JOV-8000 follow-up 37)', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-argv4-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        701: { mergeable: true, mergeable_state: 'clean', head: { sha: 'h1' } },
+      },
+      tempDir
+    );
+    const rows = [
+      {
+        number: 701,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    const calls = await readArgvLog(tempDir);
+    const graphqlCall = calls.find(argv => argv[1] === 'graphql');
+    assert.ok(graphqlCall, 'a graphql call was recorded');
+    // exactly: ['api', 'graphql', '-f', 'query=...']
+    assert.equal(graphqlCall.length, 4);
+    assert.equal(graphqlCall[0], 'api');
+    assert.equal(graphqlCall[1], 'graphql');
+    assert.equal(graphqlCall[2], '-f');
+    assert.ok(graphqlCall[3].startsWith('query='));
+  });
+
+  it('a GraphQL errors[] body leaves rows unknown with mergequeue: evidence and queueSource none', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-errs-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        801: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h1' },
+        },
+      },
+      tempDir
+    );
+    await writeFile(
+      `${tempDir}/graphql-errors`,
+      JSON.stringify({ errors: [{ message: 'Field mergeQueue not found' }] })
+    );
+    const rows = [
+      {
+        number: 801,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    assert.equal(evidence.queueSource, 'none');
+    assert.ok(String(evidence.errors[0] || '').startsWith('mergequeue:'));
+    assert.deepEqual(evidence.inMergeQueue, []);
+    assert.deepEqual(evidence.stillUnknown, [801]);
+  });
+
+  it('polled-null rows are stillUnknown but not unpolled; deadline-cut rows are unpolled', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-polled-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const details = {};
+    for (let n = 1; n <= 6; n += 1) {
+      details[n] = {
+        mergeable: null,
+        mergeable_state: 'unknown',
+        head: { sha: `h${n}` },
+      };
+    }
+    await writeMergeabilityFakeGh(resolve(fakeBin, 'gh'), details, tempDir);
+    const rows = Array.from({ length: 6 }, (_, i) => ({
+      number: i + 1,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+      headSha: `h${i + 1}`,
+    }));
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    // clock: round 0 completes for the first batch (rows 1-4 get a GET), then
+    // the clock jumps past the deadline before the second batch — rows 5-6
+    // never got a GET (unpolled), rows 1-4 polled-null (stillUnknown only).
+    let t = 0;
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => (t < 3 ? (t += 1) : 21_000) }
+    );
+    assert.equal(evidence.deadlineHit, true);
+    const unpolled = [...evidence.unpolled].sort((a, b) => a - b);
+    assert.ok(unpolled.length >= 1, 'some rows cut before any GET');
+    for (const n of unpolled) {
+      assert.deepEqual(await readCalls(tempDir, String(n)), []);
+    }
+    const polledNull = [...evidence.stillUnknown].filter(
+      n => !unpolled.includes(n)
+    );
+    for (const n of polledNull) {
+      assert.ok((await readCalls(tempDir, String(n))).length >= 1);
+    }
+    // disjoint and together cover the unknown set
+    assert.deepEqual(
+      [...unpolled, ...polledNull].sort((a, b) => a - b),
+      [...evidence.stillUnknown].sort((a, b) => a - b)
+    );
+  });
+
+  it('a hasNextPage merge-queue page is flagged mergequeue:truncated-at-100', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-trunc-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const head = 'a'.repeat(40);
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        901: { mergeable: true, mergeable_state: 'clean', head: { sha: head } },
+      },
+      tempDir
+    );
+    await writeGraphqlBody(tempDir, [{ number: 901, head }], {
+      hasNextPage: true,
+    });
+    const rows = [
+      {
+        number: 901,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: head,
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    assert.equal(evidence.queueSource, 'graphql');
+    assert.ok(evidence.errors.includes('mergequeue:truncated-at-100'));
+    assert.deepEqual(evidence.inMergeQueue, [901]);
+  });
+
+  it('reads the merge queue once via GraphQL, marking head-bound rows with zero per-PR GETs (JOV-8000 follow-up 36)', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-h-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const head = n => String(n).padStart(40, '0');
+    const details = {};
+    for (let n = 1; n <= 25; n += 1) {
+      details[n] =
+        n === 7
+          ? {
+              mergeable: false,
+              mergeable_state: 'dirty',
+              head: { sha: head(n) },
+            }
+          : {
+              mergeable: true,
+              mergeable_state: 'clean',
+              head: { sha: head(n) },
+            };
+    }
+    await writeMergeabilityFakeGh(resolve(fakeBin, 'gh'), details, tempDir);
+    // 5 in-queue (2 visible ONLY through GraphQL — no leaked refs at all).
+    await writeGraphqlBody(
+      tempDir,
+      [21, 22, 23, 24, 25].map(number => ({ number, head: head(number) }))
+    );
+    const rows = Array.from({ length: 25 }, (_, i) => ({
+      number: i + 1,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+      headSha: head(i + 1),
+      mergeable: /** @type {string | null} */ (null),
+    }));
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    assert.deepEqual(
+      [...evidence.inMergeQueue].sort((a, b) => a - b),
+      [21, 22, 23, 24, 25]
+    );
+    assert.equal(rows[6].mergeable, 'CONFLICTING'); // #7 dirty
+    assert.deepEqual(evidence.stillUnknown, []);
+    assert.deepEqual(evidence.unpolled, []);
+    // the 5 queued rows never got a per-PR GET
+    for (const n of [21, 22, 23, 24, 25]) {
+      assert.deepEqual(await readCalls(tempDir, String(n)), []);
+    }
+    // the GraphQL queue read happened exactly once
+    assert.equal((await readCalls(tempDir, 'graphql')).length, 1);
+  });
+
+  it('a null-forever row at position 0 does not starve later rows (round-robin)', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-i-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const details = {
+      801: {
+        mergeable: null,
+        mergeable_state: 'unknown',
+        head: { sha: 'h801' },
+      },
+    };
+    for (let n = 802; n <= 808; n += 1) {
+      details[n] = {
+        mergeable: true,
+        mergeable_state: 'clean',
+        head: { sha: `h${n}` },
+      };
+    }
+    await writeMergeabilityFakeGh(resolve(fakeBin, 'gh'), details, tempDir);
+    const rows = Array.from({ length: 8 }, (_, i) => ({
+      number: 801 + i,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+      headSha: `h${801 + i}`,
+    }));
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    // the other 7 measured even though the first row stays null forever
+    assert.equal(evidence.measured, 7);
+    assert.deepEqual(evidence.stillUnknown, [801]);
+    for (let n = 802; n <= 808; n += 1) {
+      assert.ok((await readCalls(tempDir, String(n))).length >= 1);
+    }
+    // 801 was retried across all 4 rounds (1 + 3)
+    assert.equal((await readCalls(tempDir, '801')).length, 4);
+  });
+
+  it('a failed per-PR GET is retried in the next round', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-j-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        901: {
+          mergeable: true,
+          mergeable_state: 'clean',
+          head: { sha: 'h901' },
+        },
+      },
+      tempDir
+    );
+    const rows = [
+      {
+        number: 901,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h901',
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+        FAILNUMS: '901',
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    // every GET failed -> 4 rounds => 4 attempts (no give-up after round 0)
+    assert.equal((await readCalls(tempDir, '901')).length, 4);
+    assert.equal(rows[0].mergeable, undefined);
+    assert.deepEqual(evidence.stillUnknown, [901]);
+    assert.ok(evidence.errors.length >= 1);
+  });
+
+  it('a GraphQL queue failure leaves queued rows unknown and the gate still blocks', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-k-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeFile(`${tempDir}/graphql-fail`, '');
+    await writeFile(`${tempDir}/refs-fail`, ''); // fallback fails too
+    const head = n => String(n).padStart(40, '0');
+    const details = {};
+    for (let n = 1; n <= 6; n += 1) {
+      details[n] = {
+        mergeable: null,
+        mergeable_state: 'unknown',
+        head: { sha: head(n) },
+      };
+    }
+    await writeMergeabilityFakeGh(resolve(fakeBin, 'gh'), details, tempDir);
+    const rows = Array.from({ length: 6 }, (_, i) => ({
+      number: i + 1,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+      headSha: head(i + 1),
+    }));
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const { evaluateRuntimeCapacity } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    // nothing could be marked in-queue: all 6 stay unknown
+    assert.deepEqual(evidence.inMergeQueue, []);
+    assert.equal(evidence.stillUnknown.length, 6);
+    // and the gate still fails closed on the unknown share
+    const gate = evaluateRuntimeCapacity(
+      {
+        schema: 'symphony-runtime-capacity/v1',
+        observedAt: new Date().toISOString(),
+        workers: { maxConcurrent: 4, running: 0, retrying: 0 },
+        host: {
+          cpuSomeAvg10: 1,
+          memoryFullAvg10: 1,
+          ioFullAvg10: 1,
+          loadAvg1: 1,
+          cpuCount: 4,
+          availableMemoryBytes: 8 * 1024 ** 3,
+        },
+        provider: { accounts: 2, ready: 2 },
+        prRollups: true,
+        cloneLatencyMs: 1,
+        ci: { saturating: false, running: 0, queued: 0 },
+        mergeQueue: { health: 'healthy', entries: 0 },
+        pullRequests: rows,
+      },
+      {}
+    );
+    assert.equal(gate.reason, 'pr-mergeability-unknown');
+    assert.equal(gate.allowed, false);
+  });
+
+  it('a head mismatch is not in-queue (a leaked GraphQL entry for an older head)', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-l-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const currentHead = 'c'.repeat(40);
+    const olderHead = 'd'.repeat(40);
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        1001: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: currentHead },
+        },
+      },
+      tempDir
+    );
+    await writeGraphqlBody(tempDir, [{ number: 1001, head: olderHead }]);
+    const rows = [
+      {
+        number: 1001,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: currentHead,
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    assert.equal(rows[0].inMergeQueue, undefined);
+    assert.deepEqual(evidence.inMergeQueue, []);
+    assert.deepEqual(evidence.stillUnknown, [1001]);
+  });
+
+  it('on deadline the unpolled PRs are listed and stay unknown', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-m-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const details = {};
+    for (let n = 1; n <= 6; n += 1) {
+      details[n] = {
+        mergeable: null,
+        mergeable_state: 'unknown',
+        head: { sha: `h${n}` },
+      };
+    }
+    await writeMergeabilityFakeGh(resolve(fakeBin, 'gh'), details, tempDir);
+    const rows = Array.from({ length: 6 }, (_, i) => ({
+      number: i + 1,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+      headSha: `h${i + 1}`,
+    }));
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    // clock: round 0 measures, then the sleep lands past the 20s deadline.
+    let t = 0;
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      {
+        sleep: () => Promise.resolve(),
+        now: () => (t < 5 ? (t += 1) : 21_000),
+      }
+    );
+    assert.equal(evidence.deadlineHit, true);
+    assert.ok(evidence.elapsedMs >= 0);
+    assert.deepEqual(
+      [...evidence.stillUnknown].sort((a, b) => a - b),
+      [1, 2, 3, 4, 5, 6]
+    );
+    assert.ok(Array.isArray(evidence.unpolled));
+  });
+
+  it('keeps the unknown-rate boundary: 2/10 passes and 3/12 fails', async () => {
+    const { evaluateRuntimeCapacity } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
+    );
+    // evaluateRuntimeCapacity computes the rates from signals.pullRequests
+    // (pullRequestRates) — the boundary rides real rows: clean rows and
+    // unknown rows (unmeasured shape: neither mergeable nor
+    // mergeStateStatus), all open, non-draft, non-quarantined.
+    const cleanRow = number => ({
+      number,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'CLEAN',
+    });
+    const unknownRow = number => ({
+      number,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+    });
+    const signalsFor = pullRequests => ({
+      schema: 'symphony-runtime-capacity/v1',
+      observedAt: new Date().toISOString(),
+      workers: { maxConcurrent: 4, running: 0, retrying: 0 },
+      host: {
+        cpuSomeAvg10: 1,
+        memoryFullAvg10: 1,
+        ioFullAvg10: 1,
+        loadAvg1: 1,
+        cpuCount: 4,
+        availableMemoryBytes: 8 * 1024 ** 3,
+      },
+      provider: { accounts: 2, ready: 2 },
+      prRollups: true,
+      cloneLatencyMs: 1,
+      ci: { saturating: false, running: 0, queued: 0 },
+      mergeQueue: { health: 'healthy', entries: 0 },
+      pullRequests,
+    });
+    // (h) 2/10 unknown = 0.2 — not > 0.2 — passes the unknown stop
+    const passRows = [
+      ...Array.from({ length: 8 }, (_, i) => cleanRow(i + 1)),
+      unknownRow(9),
+      unknownRow(10),
+    ];
+    const passGate = evaluateRuntimeCapacity(signalsFor(passRows), {});
+    // 3/12 unknown = 0.25 — > 0.2 — binds pr-mergeability-unknown
+    const failRows = [
+      ...Array.from({ length: 9 }, (_, i) => cleanRow(i + 1)),
+      unknownRow(10),
+      unknownRow(11),
+      unknownRow(12),
+    ];
+    const failGate = evaluateRuntimeCapacity(signalsFor(failRows), {});
+    assert.equal(passGate.reason === 'pr-mergeability-unknown', false);
+    assert.equal(failGate.reason === 'pr-mergeability-unknown', true);
   });
 
   it('preserves an injected key and falls back to the configured file', async () => {
@@ -1248,6 +3579,62 @@ describe('deterministic Symphony admission boundary', () => {
     });
   }
 
+  it('maps a parked controller into hold-intake with production green (JOV-8000 follow-up 29)', () => {
+    // The 38025443068 split-brain: the canonical python receipt said
+    // hold-intake ({controller-failure, production-deployment-unbound})
+    // while this JS projection mapped parked to controller-unknown and
+    // required a green controller for hold-intake — binding BLOCKED.
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        controller: {
+          status: 'parked',
+          retired: true,
+          error: 'controller-endpoint-retired: Connection refused',
+        },
+        production: {
+          status: 'green',
+          deployedSha: 'b3eeefdd4dc681d1c9b5b4385720d661f5129138',
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
+    const codes = fleetGate.reasons.map(reason => reason.code);
+    assert.ok(codes.includes('controller-failure'));
+    assert.ok(
+      codes.every(code =>
+        ['controller-failure', 'production-deployment-unbound'].includes(code)
+      )
+    );
+  });
+
+  it('maps a crashed controller with green bound production into hold-intake (JOV-8000 follow-up 29)', () => {
+    // The crashed shape also rides the python hold-intake set: {controller-failure}
+    // alone with main/production green and bound.
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        controller: { status: 'failed' },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
+    const codes = fleetGate.reasons.map(reason => reason.code);
+    assert.ok(codes.includes('controller-failure'));
+    assert.ok(
+      codes.every(code =>
+        ['controller-failure', 'production-deployment-unbound'].includes(code)
+      )
+    );
+  });
+
   it('leaves per-lane backpressure to the candidate preflight', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
@@ -1302,13 +3689,18 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.equal(fleetGate.laneCapacity, null);
-    assert.equal(fleetGate.state, 'AMBER');
+    // JOV-8000 follow-up 31: lane-capacity evidence is admission-scoped, not
+    // a promotion reason — the canonical python writer keeps it out of
+    // `reasons`, so the gate stays GREEN and the failure detail is carried
+    // on laneCapacityError for observability.
+    assert.equal(fleetGate.state, 'GREEN');
     assert.equal(
       fleetGate.reasons.some(
         reason => reason.code === 'queue-lane-capacity-invalid'
       ),
-      true
+      false
     );
+    assert.ok(fleetGate.laneCapacityError);
     // A contradictory receipt vetoes new leases even below backpressure.
     assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
 
@@ -1346,12 +3738,98 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(staleSchema.laneCapacity, null);
     assert.equal(
       staleSchema.reasons.some(
-        reason =>
-          reason.code === 'queue-lane-capacity-invalid' &&
-          reason.detail.includes('jovie-lane-capacity/v1')
+        reason => reason.code === 'queue-lane-capacity-invalid'
       ),
-      true
+      false
     );
+    assert.ok(staleSchema.laneCapacityError.includes('jovie-lane-capacity/v1'));
+  });
+
+  it('keeps hold-intake when a contradictory lane-capacity receipt rides a parked-controller receipt (JOV-8000 follow-up 31)', () => {
+    // Replay of the 38028777358 shape: the persisted receipt printed
+    // mode=hold-intake with reasons [controller-failure,
+    // production-deployment-unbound], yet the remediator re-derived
+    // promotionMode=blocked because this JS projection pushed
+    // queue-lane-capacity-invalid into the promotion reason set (which the
+    // canonical python writer never does) and the bounded hold-intake set
+    // rejected it — binding capacity merge-queue-blocked with selected=0
+    // for ~30h while main and production were green.
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        controller: {
+          status: 'parked',
+          retired: true,
+          error: 'controller-endpoint-retired: Connection refused',
+        },
+        production: {
+          status: 'green',
+          deployedSha: 'b3eeefdd4dc681d1c9b5b4385720d661f5129138',
+        },
+        queue: {
+          repository: 'JovieInc/Jovie',
+          status: 'known',
+          eligiblePrs: 6,
+          greenReadyPrs: 1,
+          target: 15,
+          // Present-and-contradictory: ready disagrees with greenReadyPrs.
+          laneCapacity: laneCapacity(0, 15),
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
+    assert.deepEqual(fleetGate.reasons.map(reason => reason.code).sort(), [
+      'controller-failure',
+      'production-deployment-unbound',
+    ]);
+    // The contradictory receipt still vetoes new leases (fail closed).
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.ok(fleetGate.laneCapacityError);
+  });
+
+  it('keeps hold-intake when the queue snapshot carries no lane-capacity receipt (JOV-8000 follow-up 31)', () => {
+    // Same replay class with the absent-receipt variant: python normalizes a
+    // missing lane-capacity receipt as an observation gap that must not
+    // freeze promotion; the JS previously turned it into a promotion blocker.
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        controller: {
+          status: 'parked',
+          retired: true,
+          error: 'controller-endpoint-retired: Connection refused',
+        },
+        production: {
+          status: 'green',
+          deployedSha: 'b3eeefdd4dc681d1c9b5b4385720d661f5129138',
+        },
+        queue: {
+          repository: 'JovieInc/Jovie',
+          status: 'known',
+          eligiblePrs: 6,
+          greenReadyPrs: 1,
+          target: 15,
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
+    assert.deepEqual(fleetGate.reasons.map(reason => reason.code).sort(), [
+      'controller-failure',
+      'production-deployment-unbound',
+    ]);
+    // An absent receipt must not freeze a below-target lane (JOV-5340).
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
+    assert.ok(fleetGate.laneCapacityError);
   });
 
   it('blocks a new lease when Summer closure health is red while promotion stays live', () => {
@@ -1457,7 +3935,13 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
-  it('preserves the cohort for one controller repair when production is unbound', () => {
+  it('aligns the unbound-production failed-controller shape to the canonical hold-intake (JOV-8000 follow-up 29)', () => {
+    // The canonical python writer (gem-priority-gate.py) yields hold-intake
+    // for {controller-failure, production-deployment-unbound} — the JS
+    // projection previously re-derived controller-repair-only for the same
+    // signals, the split-brain behind the 38025443068 capacity bind. The
+    // controller-repair admission projection remains for shapes where
+    // hold-intake does not apply.
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
         production: { status: 'green', deployedSha: 'bda0d88' },
@@ -1467,11 +3951,17 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.equal(fleetGate.state, 'AMBER');
-    assert.equal(fleetGate.promotionMode, 'controller-repair-only');
-    assert.equal(fleetGate.alreadyAdmittedCohort.preserve, true);
-    assert.equal(fleetGate.alreadyAdmittedCohort.newIntakeAllowed, false);
-    assert.equal(fleetGate.controllerRepairAdmission.allowed, true);
-    assert.equal(fleetGate.controllerRepairAdmission.maxConcurrent, 1);
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
+    const codes = fleetGate.reasons.map(reason => reason.code);
+    assert.ok(codes.includes('controller-failure'));
+    assert.ok(
+      codes.every(code =>
+        ['controller-failure', 'production-deployment-unbound'].includes(code)
+      )
+    );
   });
 
   it('admits only one controller repair through the second fleet consumer', () => {
@@ -1480,26 +3970,18 @@ describe('deterministic Symphony admission boundary', () => {
       { now: '2026-08-09T05:01:00.000Z' }
     );
 
+    // JOV-8000 follow-up 29: the failed-controller/green-bound-production
+    // shape aligns to the canonical writer's hold-intake ({controller-failure}
+    // alone); the one-repair admission projection no longer rides this shape.
     assert.equal(fleetGate.state, 'AMBER');
-    assert.equal(fleetGate.promotionMode, 'controller-repair-only');
-    assert.deepEqual(fleetGate.alreadyAdmittedCohort, {
-      preserve: true,
-      newIntakeAllowed: false,
-      semantics: 'preserve-cohort-and-admit-one-controller-repair',
-    });
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
     assert.equal(fleetGate.promotionAdmission.allowed, false);
     assert.equal(fleetGate.isolatedPromotionAdmission.allowed, false);
-    assert.deepEqual(fleetGate.controllerRepairAdmission, {
-      allowed: true,
-      condition: 'controller-failure',
-      mainSha: fleetEvidence().main.sha,
-      deployedSha: fleetEvidence().production.deployedSha,
-      scope: 'trusted-comment-exact-repository-pr-head-main-path-set',
-      maxConcurrent: 1,
-      deploymentsAllowed: false,
-      runtimeActivationAllowed: false,
-      authority: 'canonical-merge-queue-controller',
-    });
+    const codes = fleetGate.reasons.map(reason => reason.code);
+    assert.deepEqual(codes, ['controller-failure']);
   });
 
   it('denies controller repair when closure observation is unknown', () => {
@@ -1519,8 +4001,14 @@ describe('deterministic Symphony admission boundary', () => {
       { now: '2026-08-09T05:01:00.000Z' }
     );
 
-    assert.equal(fleetGate.promotionMode, 'blocked');
-    assert.equal(fleetGate.controllerRepairAdmission.allowed, false);
+    // JOV-8000 follow-up 29: closure debt no longer binds this shape blocked
+    // through the controller-repair path — hold-intake (the canonical
+    // semantics for the reason pair) keeps promotion of already-green PRs
+    // alive while Summer's closure observation is unknown.
+    assert.equal(
+      fleetGate.promotionMode,
+      admitter.FLEET_PROMOTION_MODE.HOLD_INTAKE
+    );
     assert.equal(fleetGate.promotionAdmission.allowed, false);
   });
 
@@ -1531,10 +4019,11 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.match(source, /sha: receipt\?\.signals\?\.main\?\.sha/);
-    assert.match(
-      source,
-      /deployedSha: receipt\?\.signals\?\.production\?\.deployedSha/
-    );
+    // JOV-8000 follow-up 30: the production signal rides the same-run
+    // receipt (receiptProduction) with the live fetch as the fail-closed
+    // fallback — the deployedSha binding source is unchanged.
+    assert.match(source, /receiptProduction\?\.deployedSha/);
+    assert.match(source, /: await teamProductionStatus\(team\)/);
   });
 
   it('keeps isolated leasing open when independent review is missing; promotion stays frozen', async () => {
@@ -2108,6 +4597,86 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(result.admit.length, 1);
     assert.equal(result.admit[0].identifier, 'JOV-4396');
     assert.equal(result.admit[0].type, 'issue');
+  });
+
+  it('admits Urgent Backlog before higher-scored eligible work and records priority displacement', async () => {
+    const urgent = admissionIssue({ identifier: 'JOV-8022', state: 'Backlog' });
+    urgent.priority = 1;
+    const profitable = admissionIssue({ identifier: 'JOV-4396' });
+    profitable.priority = 2;
+    const result = await admitter.selectNextToAdmit(
+      [
+        {
+          ...classification(urgent),
+          mrrCategory: 'unknown',
+          mrrConfidence: 'low',
+        },
+        { ...classification(profitable), mrrCategory: 'revenue-protection' },
+      ],
+      [],
+      { fleetGate: greenFleetGate() }
+    );
+    assert.equal(result.admit.length, 1);
+    assert.equal(result.admit[0].identifier, urgent.identifier);
+    assert.equal(result.queueRankingReceipt.selectedPriority, 1);
+    assert.ok(
+      result.queueRankingReceipt.orderingReasons.includes('linear-priority')
+    );
+    assert.equal(result.queueRankingReceipt.orderingChanged, true);
+    assert.equal(
+      result.queueRankingReceipt.displacedCandidate,
+      profitable.identifier
+    );
+    assert.ok(result.queueRankingReceipt.missingSourceContracts.length > 0);
+  });
+
+  it('does not let Urgent priority bypass missing evidence, dependency holds, ownership or fleet closure', async () => {
+    const missing = admissionIssue({
+      identifier: 'JOV-8001',
+      skipReceipts: true,
+    });
+    const held = admissionIssue({ identifier: 'JOV-8002', labels: ['held'] });
+    const owned = admissionIssue({
+      identifier: 'JOV-8003',
+      state: 'In Progress',
+      assignee: { id: 'tim', name: 'Tim White' },
+    });
+    const dependent = admissionIssue({ identifier: 'JOV-8004' });
+    for (const issue of [missing, held, owned, dependent]) issue.priority = 1;
+    const safe = admissionIssue({ identifier: 'JOV-8005' });
+    safe.priority = 3;
+    const candidates = [
+      classification(missing),
+      classification(held),
+      classification(owned),
+      {
+        ...classification(dependent),
+        category: 'blocked',
+        relatedIssues: [{ identifier: 'JOV-9999', relation: 'blockedBy' }],
+      },
+      classification(safe),
+    ];
+    const result = await admitter.selectNextToAdmit(candidates, [], {
+      fleetGate: greenFleetGate(),
+    });
+    assert.deepEqual(
+      result.admit.map(item => item.identifier),
+      [safe.identifier]
+    );
+    for (const issue of [missing, held, owned, dependent]) {
+      assert.equal(
+        result.admissionDecisions.find(
+          item => item.identifier === issue.identifier
+        ).allowed,
+        false
+      );
+    }
+    const fleetGate = greenFleetGate();
+    fleetGate.workAdmission.allowed = false;
+    assert.deepEqual(
+      (await admitter.selectNextToAdmit(candidates, [], { fleetGate })).admit,
+      []
+    );
   });
 
   it('records the displaced candidate and opportunity cost when economics change queue order', async () => {

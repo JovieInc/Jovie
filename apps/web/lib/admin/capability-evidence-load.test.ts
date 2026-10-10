@@ -105,7 +105,7 @@ describe('loadCapabilityEvidence', () => {
     const [condition] = mocks.where.mock.calls[0]!;
     const query = new PgDialect().sqlToQuery(condition);
 
-    expect(query.sql).toMatch(/current_date - \$\d+::integer/);
+    expect(query.sql).toMatch(/current_date - \$\d+::int/);
     expect(query.params[0]).toBe(7);
   });
 

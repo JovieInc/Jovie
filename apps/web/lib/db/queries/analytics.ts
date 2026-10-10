@@ -679,7 +679,7 @@ export async function getCanonicalCustomerProfileExposure(
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(
       and(
-        drizzleSql`${dailyProfileViews.viewDate} >= (current_date - ${windowDays}::integer)::text::date`,
+        drizzleSql`${dailyProfileViews.viewDate} >= current_date - ${windowDays}::int`,
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, true),
         drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`

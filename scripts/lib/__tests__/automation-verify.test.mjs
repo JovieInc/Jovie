@@ -187,6 +187,179 @@ describe('merge evidence coverage selection', () => {
   });
 });
 
+describe('Devin Free expiry coverage selection', () => {
+  const inputs = [
+    'scripts/lanes/devin_free_policy.py',
+    'scripts/tests/test_devin_free_policy.py',
+  ];
+  it('runs the required free-only failure and cutoff suite with branch coverage', () => {
+    const plan = buildAffectedTestPlan(inputs, { isFileAvailable: () => true });
+    expect(plan.lanePythonCoverage).toBe(true);
+    const commands = buildSelectedTestCommands(plan, '1');
+    const command = commands.find(
+      ([binary, args]) =>
+        binary === 'env' &&
+        Array.isArray(args) &&
+        args.some(arg => arg.includes('coverage run --branch'))
+    );
+    expect(command).toBeDefined();
+    if (!command || !Array.isArray(command[1])) {
+      throw new Error(
+        'Expected Devin Free structural Python command arguments'
+      );
+    }
+    expect(command[1].join(' ')).toContain(
+      'scripts/tests/test_devin_free_policy.py'
+    );
+    expect(command[1].join(' ')).toContain(
+      '*/scripts/lanes/devin_free_policy.py" --fail-under=85'
+    );
+  });
+  it('fails closed with missing tests and preserves unknown mixed-peer fallback', () => {
+    const missing = buildAffectedTestPlan(inputs, {
+      isFileAvailable: file => file !== inputs[1],
+    });
+    expect(missing.mode).toBe('full');
+    expect(missing.fallbackReason).toBe(
+      'Devin Free expiry coverage proof is unavailable'
+    );
+    const mixed = buildAffectedTestPlan(
+      [...inputs, 'scripts/lanes/unknown-new.py'],
+      { isFileAvailable: () => true }
+    );
+    expect(mixed.mode).toBe('full');
+    expect(mixed.lanePythonCoverage).toBe(true);
+  });
+});
+
+describe('Codex subscription capacity coverage selection', () => {
+  const inputs = [
+    'scripts/lanes/codex_lane.py',
+    'scripts/tests/test_codex_lane.py',
+  ];
+  it('runs the required subscription metadata and storage-failure suite with branch coverage', () => {
+    const plan = buildAffectedTestPlan(inputs, { isFileAvailable: () => true });
+    expect(plan.lanePythonCoverage).toBe(true);
+    const commands = buildSelectedTestCommands(plan, '1');
+    const command = commands.find(
+      ([binary, args]) =>
+        binary === 'env' &&
+        Array.isArray(args) &&
+        args.some(arg => arg.includes('coverage run --branch'))
+    );
+    expect(command).toBeDefined();
+    if (!command || !Array.isArray(command[1])) {
+      throw new Error(
+        'Expected Codex subscription structural Python command arguments'
+      );
+    }
+    expect(command[1].join(' ')).toContain('scripts/tests/test_codex_lane.py');
+    expect(command[1].join(' ')).toContain(
+      '*/scripts/lanes/codex_lane.py" --fail-under=85'
+    );
+  });
+  it('fails closed with missing tests and preserves unknown mixed-peer fallback', () => {
+    const missing = buildAffectedTestPlan(inputs, {
+      isFileAvailable: file => file !== inputs[1],
+    });
+    expect(missing.mode).toBe('full');
+    expect(missing.fallbackReason).toBe(
+      'Codex subscription capacity coverage proof is unavailable'
+    );
+    const mixed = buildAffectedTestPlan(
+      [...inputs, 'scripts/lanes/unknown-new.py'],
+      { isFileAvailable: () => true }
+    );
+    expect(mixed.mode).toBe('full');
+    expect(mixed.lanePythonCoverage).toBe(true);
+  });
+  const closure = [
+    ...inputs,
+    'scripts/ci-fast-lanes.mjs',
+    'scripts/run-affected-tests.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+    'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  ];
+  it('qualifies the complete source closure with canonical Python coverage and both plumbing suites', () => {
+    const plan = buildAffectedTestPlan(closure, {
+      isFileAvailable: () => true,
+    });
+    expect(plan.mode).toBe('selected');
+    expect(plan.lanePythonCoverage).toBe(true);
+    expect(plan.scriptVitestTests).toEqual(SERVICE_CENSUS_SELECTOR_TESTS);
+    expect(buildSelectedTestCommands(plan, '1')).toContainEqual([
+      'env',
+      ['CI=true', 'bash', '-c', STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]],
+    ]);
+  });
+  it.each(closure)(
+    'fails closed when qualification file %s is unavailable',
+    missing => {
+      const plan = buildAffectedTestPlan(closure, {
+        isFileAvailable: file => file !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.lanePythonCoverage).toBe(true);
+    }
+  );
+  it('retains the full fallback for extra peers outside the reviewed closure', () => {
+    const plan = buildAffectedTestPlan(
+      [...closure, 'scripts/other-control.mjs'],
+      { isFileAvailable: () => true }
+    );
+    expect(plan.mode).toBe('full');
+    expect(plan.lanePythonCoverage).toBe(true);
+  });
+});
+
+describe('dependency gate qualification plumbing', () => {
+  const files = [
+    'scripts/lanes/dependency_diff.py',
+    'scripts/lanes/lane_runner.py',
+    'scripts/tests/test_lane_runner.py',
+    'scripts/ci-fast-lanes.mjs',
+    'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+    'scripts/run-affected-tests.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+  ];
+  it('retains full structural coverage and both plumbing suites for the exact source closure', () => {
+    const plan = buildAffectedTestPlan(files);
+    expect(plan.mode).toBe('selected');
+    expect(plan.lanePythonCoverage).toBe(true);
+    expect(plan.scriptVitestTests).toEqual(SERVICE_CENSUS_SELECTOR_TESTS);
+    expect(buildSelectedTestCommands(plan, '1')).toContainEqual([
+      'env',
+      ['CI=true', 'bash', '-c', STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]],
+    ]);
+    expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]).toContain(
+      '*/scripts/lanes/dependency_diff.py" --fail-under=95'
+    );
+  });
+  it.each(files)(
+    'fails closed when qualification file %s is unreadable',
+    missing => {
+      const plan = buildAffectedTestPlan(files, {
+        isFileAvailable: file => file !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.lanePythonCoverage).toBe(true);
+      expect(plan.fallbackReason).toBe(
+        'dependency gate qualification proof is unavailable'
+      );
+    }
+  );
+  it.each([
+    'apps/web/lib/unrelated.ts',
+    'scripts/lanes/unknown.py',
+    'package.json',
+    'docs/unrelated.md',
+  ])('retains the full fallback for mixed peer %s', peer => {
+    const plan = buildAffectedTestPlan([...files, peer]);
+    expect(plan.mode).toBe('full');
+    expect(plan.lanePythonCoverage).toBe(true);
+  });
+});
+
 describe('service census qualification plumbing', () => {
   it('qualifies the complete eight-file source shape with Python coverage and both selector suites', () => {
     const plan = buildAffectedTestPlan(SERVICE_CENSUS_QUALIFICATION_INPUTS);
