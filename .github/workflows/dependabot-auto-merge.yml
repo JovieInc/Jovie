@@ -132,6 +132,9 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: read
+          # Action-version bumps edit .github/workflows/*, so recording merge
+          # intent (gh pr merge --auto) is refused without workflows write.
+          permission-workflows: write
 
       - name: Record exact native merge intent
         if: steps.policy.outputs.decision == 'queue'

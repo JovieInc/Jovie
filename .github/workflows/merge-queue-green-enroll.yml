@@ -149,6 +149,10 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
+          # enqueuePullRequest builds the merge queue's squash commit, so
+          # GitHub refuses it for PRs that touch .github/workflows/* unless
+          # the token carries workflows write (the app already grants it).
+          permission-workflows: write
 
       - name: Enqueue CLEAN PRs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -458,6 +462,9 @@ jobs:
           permission-contents: read
           permission-pull-requests: write
           permission-statuses: write
+          # Rearm calls gh pr merge --auto (enablePullRequestAutoMerge); the
+          # same workflows-permission refusal applies to workflow-touching PRs.
+          permission-workflows: write
 
       - name: Rearm green victims of this merge group
         env:

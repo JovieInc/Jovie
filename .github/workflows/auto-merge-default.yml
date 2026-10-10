@@ -112,6 +112,10 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: read
+          # enablePullRequestAutoMerge is refused on PRs that touch
+          # .github/workflows/* unless the token carries workflows write;
+          # the Jovie Bot app already holds it, so the mint just claims it.
+          permission-workflows: write
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -191,6 +195,10 @@ jobs:
           permission-issues: write
           permission-pull-requests: write
           permission-statuses: read
+          # Same workflows-permission gap as the enable job: the
+          # --enable-missing sweep calls enablePullRequestAutoMerge and is
+          # refused on PRs that touch .github/workflows/* without it.
+          permission-workflows: write
       - name: Triage stuck PRs
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
