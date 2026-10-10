@@ -5628,9 +5628,13 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked) -> int:
         # A remote-only lane (Hyperagent) cannot repair a local checkout: it only claims issues,
         # and the local lanes repair its PRs like any orphan (`repairs: false`).
         local = spec.get("repairs") is not False
-        # Reclaimed abandoned drafts are gated and readied like this lane's own drafts.
-        prs = lane_prs(name) + reclaimable_drafts() if local else []
         candidates = fix_candidates(name) if local else []
+        # Reclaimed abandoned drafts (the only non-lane drafts among the fix candidates) are
+        # gated and readied like this lane's own drafts. Derived from the one cached scan so
+        # no extra inventory read happens per worker pass.
+        lane_owned = lane_prs(name) if local else []
+        owned_numbers = {pr["number"] for pr in lane_owned}
+        prs = lane_owned + [pr for pr in candidates if pr.get("isDraft") and pr["number"] not in owned_numbers]
         events = pr_events.queued_prs(THIS, pr_events.FIX_KINDS) if local else []
         if local:
             escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
