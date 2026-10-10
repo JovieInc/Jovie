@@ -2049,6 +2049,7 @@ async function runRemediate(isDryRun) {
   // with retries and a hard deadline; merge-queue rows (still null after
   // retries with a gh-readonly-queue pr-<N>- ref) count as known and not
   // conflicting. The receipt carries the full evidence.
+  /** @type {Awaited<ReturnType<typeof measureMergeability>> | null} */
   let mergeabilityEvidence = null;
   if (Array.isArray(pullRequests)) {
     mergeabilityEvidence = await measureMergeability(
@@ -2182,6 +2183,7 @@ async function runRemediate(isDryRun) {
         },
     feed: receipt.feed,
     workpadUpsert: null,
+    bridge: null,
     // JOV-8000 follow-up 36: the mergeability evidence also rides the
     // printed result top-level (it already sits inside
     // capacitySignals.mergeabilityEvidence) so the deadline/starvation
@@ -2243,7 +2245,10 @@ async function runRemediate(isDryRun) {
     ? backlogRemediation.pullRequestRates(pullRequests)
     : null;
   if (ratesSummary) {
-    const mm = mergeabilityEvidence ?? {};
+    const mm =
+      /** @type {Partial<NonNullable<typeof mergeabilityEvidence>>} */ (
+        mergeabilityEvidence ?? {}
+      );
     console.log(
       `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')} mm.queueSource=${mm.queueSource ?? 'none'} mm.errors=${(mm.errors ?? []).length}`
     );

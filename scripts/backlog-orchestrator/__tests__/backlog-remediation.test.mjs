@@ -1242,6 +1242,45 @@ describe('selected-to-lanes bridge (JOV-8000 follow-up 38)', () => {
     assert.equal(client.calls.updates.length, 0);
   });
 
+  it('fails closed when Linear rejects the agent-ready label update', async () => {
+    const client = fakeClient(selectedIssue());
+    client.updateIssue = async (id, input) => {
+      client.calls.updates.push({ id, input });
+      return { issueUpdate: { success: false } };
+    };
+    await assert.rejects(
+      bridgeSelectedIssueToLanes({
+        issue: selectedIssue(),
+        client,
+        agentReadyLabel: AGENT_READY,
+        inventory: {},
+      }),
+      /bridge-agent-ready-update-failed/
+    );
+    assert.equal(client.calls.comments.length, 0);
+  });
+
+  it('fails closed when Linear rejects the bridge marker comment', async () => {
+    const issue = selectedIssue({
+      labels: { nodes: [{ id: 'label-agent-ready', name: 'agent-ready' }] },
+    });
+    const client = fakeClient(issue);
+    client.addComment = async (id, body) => {
+      client.calls.comments.push({ id, body });
+      return { commentCreate: { success: false } };
+    };
+    await assert.rejects(
+      bridgeSelectedIssueToLanes({
+        issue,
+        client,
+        agentReadyLabel: AGENT_READY,
+        inventory: {},
+      }),
+      /bridge-marker-comment-failed/
+    );
+    assert.equal(client.calls.updates.length, 0);
+  });
+
   it('an empty cohort makes zero Linear calls', async () => {
     let touched = 0;
     const client = {
