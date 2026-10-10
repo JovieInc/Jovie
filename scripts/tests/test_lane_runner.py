@@ -2012,7 +2012,217 @@ class AttributionAndThroughputTest(unittest.TestCase):
                          {"autonomous-created": 1, "manual-codex-app-created": 1})
 
 
+class MaintenanceDemandTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+        self.providers = {"devin": {"slots": 4}, "codex": {"slots": 3}}
+        self.now = time.time()
+        claims = patch.object(lane, "_CLAIM_OBSERVATIONS", {})
+        claims.start()
+        self.addCleanup(claims.stop)
+
+    def pr(self, number=7, **over):
+        row = {"number": number, "headRefOid": f"h{number}", "headRefName": f"devin/jov-{number}-20261010",
+               "isDraft": False, "isInMergeQueue": False, "isCrossRepository": False, "labels": [],
+               "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "FAILURE"}]}
+        row.update(over)
+        return row
+
+    def census(self, rows, *, selected=None, readable=True, source_at=None, provider="devin", current=None):
+        summary = {"at": self.now, "sourceAt": self.now if source_at is None else source_at,
+                   "readable": readable, "prs": rows if current is None else current}
+        with patch.object(lane, "_SUMMARY", summary), patch.object(lane, "load_providers", return_value=self.providers), \
+                patch.object(lane, "sh", side_effect=AssertionError("census must not call an API")), \
+                patch.object(lane, "claimed_elsewhere", side_effect=AssertionError("no per-PR remote reads")), \
+                patch.object(lane, "preserved_run", side_effect=AssertionError("no per-PR recovery qualification")):
+            lane.record_maintenance_demand(self.host, provider, rows, rows, rows, selected or set())
+        return json.loads((self.host.state / "maintenance-demand.json").read_text())["lanes"][provider]
+
+    def test_positive_demand_is_deduplicated_and_selected_work_is_excluded(self):
+        self.assertEqual(self.census([self.pr(), self.pr()])["pending"], 1)
+        self.assertIsNone(self.census([self.pr()], selected={7})["pending"])
+        self.assertEqual(self.census([])["pending"], 0)
+
+    def test_missing_test_is_repair_demand_but_not_adoption_permission(self):
+        held = {"7": lane.pr_events.held_record("h7", ["code-change-without-test"])}
+        (self.host.state / "held.json").write_text(json.dumps(held))
+        self.assertEqual(self.census([self.pr()])["pending"], 1)
+        self.assertEqual(lane.gate_disposition(self.pr(isDraft=True), held, {}), "existing-gate-hold")
+
+    def test_native_resource_ownership_and_integrity_dispositions_are_not_demand(self):
+        for change in ({"labels": [{"name": "hold"}]}, {"isInMergeQueue": True},
+                       {"isCrossRepository": True}, {"headRefName": "dependabot/npm/bump"}):
+            with self.subTest(change=change):
+                self.assertIsNone(self.census([self.pr(**change)])["pending"])
+        for record in ({"sha": "h7", "count": 1, "at": self.now},
+                       {"sha": "h7", "count": lane.MAX_FIX_ATTEMPTS, "at": self.now, "endedAt": "ended"}):
+            (self.host.state / "fix-attempts.json").write_text(json.dumps({"7": record}))
+            self.assertIsNone(self.census([self.pr()])["pending"])
+        (self.host.state / "fix-attempts.json").unlink()
+        (self.host.state / "held.json").write_text(json.dumps({"7": lane.pr_events.held_record("h7", ["diff-too-large:100"])}))
+        self.assertIsNone(self.census([self.pr()])["pending"])
+
+    def test_unreadable_stale_and_corrupt_samples_are_unknown(self):
+        self.assertIsNone(self.census([self.pr()], readable=False)["pending"])
+        self.assertIsNone(self.census([self.pr()], source_at=self.now - 61)["pending"])
+        (self.host.state / "held.json").write_text("[]")
+        self.assertIsNone(self.census([self.pr()])["pending"])
+
+    def test_preserved_target_is_withheld_without_touching_the_checkout(self):
+        path = self.host.state / "worktrees/20261010T172237Z-PR7-codex-fix-f5bb6d"
+        path.mkdir(parents=True)
+        marker = path / lane.disk_guard.PRESERVED_REPAIR
+        raw = json.dumps({"pr": 7, "runId": path.name})
+        marker.write_text(raw)
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        self.assertEqual(marker.read_text(), raw)
+
+    def test_current_metadata_overrules_stale_candidates_at_the_same_head(self):
+        for change in ({"labels": [{"name": "hold"}]}, {"isInMergeQueue": True},
+                       {"statusCheckRollup": [{"status": "IN_PROGRESS", "conclusion": None}]}):
+            with self.subTest(change=change):
+                self.assertIsNone(self.census([self.pr()], current=[self.pr(**change)])["pending"])
+        for key in ("isDraft", "isCrossRepository", "isInMergeQueue", "headRefName", "labels", "statusCheckRollup"):
+            row = self.pr()
+            del row[key]
+            with self.subTest(missing=key):
+                self.assertIsNone(self.census([row])["pending"])
+
+    def test_malformed_accounting_and_disabled_or_claimed_work_is_unknown(self):
+        path = self.host.state / "fix-attempts.json"
+        for record in ({"sha": "h7", "count": -999}, {"count": 1},
+                       {"sha": "h7", "count": True}, {"sha": "h7", "at": "bad"},
+                       {"sha": "h7", "count": 1, "at": self.now, "endedAt": True},
+                       {"sha": "h7", "count": 1, "at": self.now, "endedAt": {}},
+                       {"sha": "oldhead", "count": 2, "at": self.now - 60, "endedAt": self.now - 1,
+                        "pushed": True, "pushedHead": True},
+                       {"sha": "oldhead", "count": 2, "at": self.now - 60, "endedAt": self.now - 1,
+                        "pushed": True, "pushedHead": None}):
+            path.write_text(json.dumps({"7": record}))
+            self.assertIsNone(self.census([self.pr()])["pending"])
+        path.unlink()
+        lane._CLAIM_OBSERVATIONS[(7, "h7", "fix")] = {"active": True, "at": self.now}
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        lane._CLAIM_OBSERVATIONS.clear()
+        self.providers["devin"]["enabled"] = False
+        self.assertIsNone(self.census([self.pr()])["pending"])
+
+    def test_green_review_event_is_pending_only_while_current_label_remains(self):
+        row = self.pr(eventKinds=["review"], labels=[{"name": lane.pr_events.PREFIX + "review"}],
+                      statusCheckRollup=[{"status": "COMPLETED", "conclusion": "SUCCESS"}])
+        self.assertEqual(self.census([row])["pending"], 1)
+        self.assertIsNone(self.census([row], current=[{**row, "labels": []}])["pending"])
+
+    def test_null_preserved_marker_and_malformed_hold_are_unknown(self):
+        directory = self.host.state / "worktrees/run-PR7-codex-fix"
+        directory.mkdir(parents=True)
+        marker = directory / lane.disk_guard.PRESERVED_REPAIR
+        marker.write_text("null")
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        marker.unlink()
+        (self.host.state / "held.json").write_text(json.dumps({"7": {
+            "sha": "h7", "evidence": "diff-too-large:100", "next_action": "bug-intake"}}))
+        self.assertIsNone(self.census([self.pr()])["pending"])
+
+    def test_dequeued_only_event_waits_for_existing_sync(self):
+        row = self.pr(eventKinds=["dequeued"], labels=[{"name": lane.pr_events.PREFIX + "dequeued"}],
+                      mergeStateStatus="CLEAN", statusCheckRollup=[{"status": "COMPLETED", "conclusion": "SUCCESS"}])
+        self.assertIsNone(self.census([row])["pending"])
+        (self.host.state / "synced.json").write_text(json.dumps({"7": "existing-sync"}))
+        self.assertEqual(self.census([row])["pending"], 1)
+
+    def test_conflicting_preserved_marker_withholds_both_targets(self):
+        path = self.host.state / "worktrees/run-PR7-codex-fix"
+        path.mkdir(parents=True)
+        (path / lane.disk_guard.PRESERVED_REPAIR).write_text(json.dumps({"pr": 8}))
+        self.assertIsNone(self.census([self.pr(), self.pr(8)])["pending"])
+
+    def test_observation_refuses_special_symlink_and_oversized_evidence(self):
+        directory = self.host.state / "worktrees/run-PR8-codex-fix"
+        directory.mkdir(parents=True)
+        marker = directory / lane.disk_guard.PRESERVED_REPAIR
+        os.mkfifo(marker)
+        try:
+            self.assertIsNone(self.census([self.pr()], selected={7})["pending"])
+        finally:
+            marker.unlink()
+        target = self.host.state / "elsewhere.json"
+        target.write_text('{"pr": 8}')
+        marker.symlink_to(target)
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        marker.unlink()
+        marker.write_text(" " * 16385)
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        marker.unlink()
+        attempts = self.host.state / "fix-attempts.json"
+        os.mkfifo(attempts)
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        attempts.unlink()
+        demand = self.host.state / "maintenance-demand.json"
+        demand.unlink()
+        os.mkfifo(demand)
+        self.census_without_publication([self.pr()])
+        self.assertTrue(demand.exists())
+
+    def census_without_publication(self, rows):
+        with patch.object(lane, "_SUMMARY", {"at": self.now, "sourceAt": self.now, "readable": True, "prs": rows}), \
+                patch.object(lane, "load_providers", return_value=self.providers):
+            lane.record_maintenance_demand(self.host, "devin", rows, rows, [], set())
+
+    def test_summary_timestamp_cannot_certify_different_cache_rows(self):
+        cache = self.host.state / "open-prs-labels-v2.json"
+        old = self.pr(rollup="FAILURE")
+        newer = self.pr(rollup="FAILURE", labels=[{"name": "hold"}])
+        summary = {"at": 0, "prs": [], "readable": False}
+        with patch.object(lane, "_SUMMARY", summary), patch.object(lane, "SHARED_CACHE_DIR", self.host.state), \
+                patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "mesh"}):
+            for rows, expected in (([newer], None), ([old], self.now - 40)):
+                cache.write_text(json.dumps({"at": self.now - 40, "value": rows}))
+                summary["at"] = 0
+                with patch.object(lane, "shared", return_value=[dict(old)]):
+                    lane.open_prs_summary()
+                self.assertEqual(summary["sourceAt"], expected)
+
+    def test_marker_scan_has_an_entry_budget_and_does_not_refresh_inventory_age(self):
+        for number in range(257):
+            (self.host.state / "worktrees" / str(number)).mkdir(parents=True)
+        self.assertIsNone(self.census([self.pr()])["pending"])
+        shutil.rmtree(self.host.state / "worktrees")
+        row = self.census([self.pr()], source_at=self.now - 40)
+        self.assertEqual(row["observedAt"], self.now - 40)
+
+    def test_implementation_only_provider_never_counts_adoption_only_work(self):
+        self.assertIsNone(self.census([self.pr(isDraft=True, statusCheckRollup=[])], provider="codex")["pending"])
+
+
 class WorkerTest(unittest.TestCase):
+    def test_eligible_repair_precedes_held_new_intake(self):
+        self.linear.issues = [issue("JOV-3")]
+        with patch.object(lane, "claim_red_pr", return_value={"number": 21175}), \
+                patch.object(lane, "fix_red_pr") as repair, \
+                patch.object(lane, "read_new_issue_budget", return_value={"allowed": False, "reason": "over-budget"}) as budget, \
+                patch.object(lane, "run_issue") as new_work:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        repair.assert_called_once()
+        budget.assert_not_called()
+        new_work.assert_not_called()
+        self.assertEqual(self.linear.moves, [])
+
+    def test_optional_observation_failure_does_not_interrupt_selected_repair(self):
+        with patch.object(lane, "claim_red_pr", return_value={"number": 7}), \
+                patch.object(lane, "record_maintenance_demand", side_effect=RuntimeError("malformed unrelated state")), \
+                patch.object(lane, "fix_red_pr") as repair, patch.object(lane, "read_new_issue_budget") as budget:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        repair.assert_called_once()
+        budget.assert_not_called()
+        contender = lane.Locked(self.host.state / "claim.lock", blocking=False)
+        try:
+            self.assertTrue(contender.held)
+        finally:
+            contender.release()
+
     def test_blocked_last_overlap_candidate_never_runs_or_claims_the_issue(self):
         self.linear.issues[0].description = "Edit `scripts/lanes/lane_runner.py`."
         existing = {"number": 1, "files": ["scripts/lanes/lane_runner.py"], "isDraft": False}
