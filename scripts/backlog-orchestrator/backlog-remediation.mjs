@@ -321,15 +321,6 @@ function outcomeFromInventory(issue, inventoryRow) {
  * linear-issue-id attribution — this guard covers the live handoff blockers
  * that classifier never saw.
  */
-
-/**
- * Selection-time guard mirroring the bridge handoff (Symphony Owner,
- * 2026-10-10): an issue the bridge can't hand off (assigned, not Todo, or
- * carrying a symphony/no-symphony/protected label) must never take the one
- * cohort slot — the next eligible issue should get it. Returns the exclusion
- * reason or null. The bridge reuses this same predicate so selection and
- * handoff stay in sync.
- */
 export function selectionHandoffExclusion(issue) {
   const state = String(issue?.state?.name ?? issue?.state ?? '');
   if (state !== 'Todo') return 'not-todo';
