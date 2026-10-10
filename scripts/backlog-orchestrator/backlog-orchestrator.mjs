@@ -87,6 +87,16 @@ const FLEET_GATE_RECEIPT_FILE =
     'state/gem-priority-gate/latest.json'
   );
 
+// JOV-8000 follow-up 33: the Refresh step's same-run receipt lands at
+// ${RUNNER_TEMP}/jovie-fleet-gate.json (evaluate-fleet-gate.sh:29). A second
+// host writer running older gate code can overwrite the persisted
+// latest.json between Refresh and Remediate (the 38031492172 residual:
+// receipt printed hold-intake while the remediator read an older blocked
+// receipt off the host). In Actions, prefer the same-run file.
+function sameRunFleetGateReceiptPath(env) {
+  return resolve(env.RUNNER_TEMP || '/tmp', 'jovie-fleet-gate.json');
+}
+
 const TEAM_CONFIGS = Object.freeze([
   Object.freeze({
     key: 'JOV',
@@ -459,10 +469,9 @@ async function teamProductionStatus(team) {
   }
 }
 
-function loadFleetGateReceipt(team) {
-  if (team.key !== 'JOV') return null;
+function readFleetGateReceiptFile(path) {
   try {
-    const receipt = JSON.parse(readFileSync(FLEET_GATE_RECEIPT_FILE, 'utf8'));
+    const receipt = JSON.parse(readFileSync(path, 'utf8'));
     return receipt?.schema === admitter.FLEET_GATE_SCHEMA &&
       receipt?.signals &&
       typeof receipt.signals === 'object'
@@ -473,8 +482,67 @@ function loadFleetGateReceipt(team) {
   }
 }
 
+// JOV-8000 follow-up 33: receipt source order for the remediator.
+// (1) JOVIE_FLEET_GATE_RECEIPT when set (explicit override, tests included).
+// (2) In GitHub Actions, the SAME-RUN receipt the Refresh step just wrote to
+//     ${RUNNER_TEMP}/jovie-fleet-gate.json — adopted only when it is the
+//     typed fleet-gate schema, bound to an exact 40-hex main sha, and no
+//     older than the controller receipt window; a missing, malformed, or
+//     stale same-run file is ignored (fail closed to the host receipt).
+// (3) The persisted host receipt (latest.json), which a second host writer
+//     running older gate code can overwrite between Refresh and Remediate
+//     (the 38031492172 residual: Refresh printed hold-intake while the
+//     remediator read an older blocked latest.json off the host).
+export function loadFleetGateReceipt(
+  team,
+  { now = new Date().toISOString(), env = process.env } = {}
+) {
+  if (team.key !== 'JOV') return null;
+  const hostPath =
+    env.JOVIE_FLEET_GATE_RECEIPT ||
+    (env.GEM_WORKSPACE
+      ? resolve(env.GEM_WORKSPACE, 'state/gem-priority-gate/latest.json')
+      : FLEET_GATE_RECEIPT_FILE);
+  if (env.GITHUB_ACTIONS === 'true' && !env.JOVIE_FLEET_GATE_RECEIPT) {
+    const nowMs = Date.parse(now);
+    const sameRunPath = sameRunFleetGateReceiptPath(env);
+    const sameRun = readFleetGateReceiptFile(sameRunPath);
+    const mainSha = sameRun?.signals?.main?.sha;
+    const observedMs = Date.parse(sameRun?.observedAt || '');
+    if (
+      sameRun &&
+      typeof mainSha === 'string' &&
+      /^[0-9a-f]{40}$/.test(mainSha) &&
+      Number.isFinite(observedMs) &&
+      observedMs <= nowMs &&
+      nowMs - observedMs <= admitter.CONTROLLER_RECEIPT_MAX_AGE_MS
+    ) {
+      return {
+        receipt: sameRun,
+        source: 'same-run',
+        path: sameRunPath,
+        observedAt: sameRun.observedAt,
+      };
+    }
+  }
+  const receipt = readFleetGateReceiptFile(hostPath);
+  return receipt
+    ? {
+        receipt,
+        source:
+          env.JOVIE_FLEET_GATE_RECEIPT &&
+          env.JOVIE_FLEET_GATE_RECEIPT !== FLEET_GATE_RECEIPT_FILE
+            ? 'override'
+            : 'host-persisted',
+        path: hostPath,
+        observedAt: receipt.observedAt ?? null,
+      }
+    : null;
+}
+
 export async function fleetGateForTeam(team, now = new Date().toISOString()) {
-  const receipt = loadFleetGateReceipt(team);
+  const loaded = loadFleetGateReceipt(team, { now });
+  const receipt = loaded?.receipt ?? null;
   const receiptMain = receipt?.signals?.main?.status;
   // JOV-8000 follow-up 30: the production signal comes from the SAME-RUN
   // persisted receipt (the canonical python writer's own observation, with
@@ -492,7 +560,7 @@ export async function fleetGateForTeam(team, now = new Date().toISOString()) {
     ['green', 'red', 'unknown'].includes(receiptProduction.status)
       ? receiptProduction.status
       : await teamProductionStatus(team);
-  return admitter.evaluateFleetGate(
+  const fleetGate = admitter.evaluateFleetGate(
     {
       main: {
         status:
@@ -519,6 +587,34 @@ export async function fleetGateForTeam(team, now = new Date().toISOString()) {
     },
     { now }
   );
+  // JOV-8000 follow-up 33: make the receipt-vs-derivation split-brain
+  // observable instead of silent. The derived mode stays authoritative
+  // (never less restrictive); a mismatch means the receipt file and the
+  // derivation disagree and a human should look at the receipt source.
+  const receiptPromotionMode =
+    typeof receipt?.promotionMode === 'string' ? receipt.promotionMode : null;
+  const derivedPromotionMode = fleetGate.promotionMode;
+  const fleetGateEvidence = {
+    source: loaded?.source ?? null,
+    path: loaded?.path ?? null,
+    observedAt: loaded?.observedAt ?? null,
+    receiptPromotionMode,
+    derivedPromotionMode,
+    reasons: fleetGate.reasons.map(reason => reason.code),
+  };
+  console.log(
+    `capacity.fleet-gate source=${fleetGateEvidence.source ?? 'none'} receipt_mode=${receiptPromotionMode ?? 'none'} derived_mode=${derivedPromotionMode} reasons=[${fleetGateEvidence.reasons.join(';')}]`
+  );
+  if (
+    receiptPromotionMode &&
+    derivedPromotionMode &&
+    receiptPromotionMode !== derivedPromotionMode
+  ) {
+    console.log(
+      `::warning::fleet-gate.split-brain receipt promotionMode=${receiptPromotionMode} but derived=${derivedPromotionMode} (source=${fleetGateEvidence.source ?? 'none'}); keeping the derived mode`
+    );
+  }
+  return { ...fleetGate, fleetGateEvidence };
 }
 
 async function recoverStaleLeases(team, isDryRun) {
@@ -1859,7 +1955,8 @@ async function runRemediate(isDryRun) {
     : true;
   const cloneLatencyMs = await measureCloneLatencyMs();
   const fleetGate = await fleetGateForTeam(team);
-  const rawReceipt = loadFleetGateReceipt(team);
+  const loadedReceipt = loadFleetGateReceipt(team);
+  const rawReceipt = loadedReceipt?.receipt ?? null;
   const queue = rawReceipt?.signals?.queue;
   // JOV-8000: the Elixir :4041 state API is retired. The shipping lanes'
   // doctor report is the measured capacity source; the legacy read survives
@@ -1929,6 +2026,10 @@ async function runRemediate(isDryRun) {
     mode: isDryRun ? 'dry-run' : 'mutating',
     workpad: undefined,
     workpadBody: receipt.workpad,
+    // JOV-8000 follow-up 33: which receipt the capacity verdict derived from
+    // (same-run file vs host-persisted latest.json) and whether the
+    // receipt's own printed promotionMode matched the derived one.
+    fleetGateEvidence: fleetGate.fleetGateEvidence ?? null,
     // The pullRequests capacity evidence keeps failing closed inside the
     // capacity verdict; the exact gh failure and the inventory audit
     // numbers are surfaced here so a capacity-evidence gap names its
