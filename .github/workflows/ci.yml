@@ -479,7 +479,7 @@ jobs:
       # Both checks are dependency-free (node: built-ins only) and read the
       # checked-out manifests/lockfile directly; the full dependency install only
       # added ~40s of setup before the actual check ran.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
       - name: Verify workflow references
@@ -1228,7 +1228,7 @@ jobs:
           filter: blob:none
       # This gate is dependency-free. Restoring the full pnpm cache can exceed
       # the three-minute latency ratchet before classification even starts.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: Collect changed files
@@ -1517,7 +1517,7 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: Validate snapshot inventory and workflow contract
@@ -3409,6 +3409,7 @@ jobs:
                   tests/e2e/storybook-overlay-collisions.spec.ts \
                   tests/e2e/storybook-spotify-connect.spec.ts \
                   tests/e2e/storybook-ovie-privacy-boundary.spec.ts \
+                  tests/e2e/storybook-onboarding-recovery.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
@@ -3500,7 +3501,12 @@ jobs:
       # same PR. Direct-main and manual runs keep exact, non-canceling groups.
       group: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || format('ci-macos-{0}-{1}', github.run_id, github.run_attempt) }}
       cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}
-    runs-on: macos-26
+    # macos-15, not macos-26: MenuMonitor targets macOS 14 / swift-tools 5.10 and
+    # needs no Xcode 26. Hosted macos-26 pickup waited 8-68 min per merge group on
+    # 2026-10-10 (03:42Z group: 4068 s wait for a 440 s build) and three queued
+    # Mac jobs idled a 15-deep ALLGREEN queue. Re-evaluate when the package needs
+    # a newer SDK.
+    runs-on: macos-15
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3639,7 +3645,7 @@ jobs:
   ci-product-lane-receipt:
     name: Product Lane Receipt
     needs:
-      [ci-path-changes, ci-merge-group-admission, ci-fast, ci-blog-content, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos, ci-cross-product-integration]
+      [ci-path-changes, ci-merge-group-admission, ci-risk-classifier, ci-fast, ci-blog-content, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos, ci-cross-product-integration]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -3675,8 +3681,14 @@ jobs:
           RUN_OPERATIONS: ${{ needs.ci-path-changes.outputs.run_operations }}
           RUN_CROSS: ${{ needs.ci-path-changes.outputs.run_cross_product }}
           BLOG_CONTENT_ONLY: ${{ needs.ci-path-changes.outputs.blog_content_only }}
+          RISK_LEVEL: ${{ needs.ci-risk-classifier.outputs.risk_level }}
+          RISK_SMOKE: ${{ needs.ci-risk-classifier.outputs.requires_smoke }}
+          RISK_PREVIEW: ${{ needs.ci-risk-classifier.outputs.requires_preview }}
+          RISK_BLOCKS: ${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}
+          RISK_RULES: ${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}
         run: |
           set -euo pipefail
+          RISK_LEVEL="${RISK_LEVEL:-unknown}" RISK_SMOKE="${RISK_SMOKE:-true}" RISK_PREVIEW="${RISK_PREVIEW:-true}" RISK_BLOCKS="${RISK_BLOCKS:-true}"
           lane_result() { [ "$1" = true ] && printf '%s' "$2" || printf skipped; }
           root="$RUNNER_TEMP/product-lane-receipt"
           if [[ "$GITHUB_EVENT_NAME" == merge_group && "$BLOG_CONTENT_ONLY" == true ]]; then
@@ -3692,7 +3704,9 @@ jobs:
             --argjson cross "[\"$(lane_result "$RUN_CROSS" "$CROSS")\"]" \
             --arg receipt "product-lane-final-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" \
             --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-            '{lanes: {ios: $ios, mac: $mac, web: $web, operations: $operations, "cross-product": $cross}, receiptArtifact: $receipt, run: $run}' \
+            --arg risk_level "$RISK_LEVEL" --arg rules "$RISK_RULES" \
+            --argjson requires_smoke "$RISK_SMOKE" --argjson requires_preview "$RISK_PREVIEW" --argjson blocks_unattended "$RISK_BLOCKS" \
+            '{lanes: {ios: $ios, mac: $mac, web: $web, operations: $operations, "cross-product": $cross}, receiptArtifact: $receipt, run: $run, riskReceipt: {schema: "jovie-ci-risk-receipt/v1", sha: env.GITHUB_SHA, run_id: env.GITHUB_RUN_ID, run_attempt: env.GITHUB_RUN_ATTEMPT, risk_level: $risk_level, requires_smoke: $requires_smoke, requires_preview: $requires_preview, blocks_unattended: $blocks_unattended, matched_rule_ids: ($rules | split(",") | map(select(length > 0)))}}' \
             > "$root/results.json"
           node scripts/lib/product-lane-finalize.mjs \
             "$root/receipt.json" "$root/results.json" \
@@ -5710,7 +5724,7 @@ jobs:
 
       - name: Setup Node for the changed-behavior ratchet
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
 
@@ -8053,6 +8067,28 @@ jobs:
           retention-days: 3
 
   # Homepage smoke is a blocking probe of the immutable production deployment.
+
+  security-gate:
+    name: security-gate
+    # Source PRs run this script from source-validation.yml. ci.yml has no
+    # pull_request trigger; the same-repo clause is here for that event.
+    if: >-
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Report-only security gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
+        run: node scripts/security/security-gate.mjs
 
   main-release-ready:
     name: Main Release Ready

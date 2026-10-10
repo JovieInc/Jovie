@@ -145,7 +145,7 @@ export const LibraryCatalogArtworkCell = memo(
       <LibraryMediaThumbnail
         asset={asset}
         size='row'
-        className='system-b-library-artwork-shell block h-9 w-9'
+        className='system-b-library-artwork-shell block h-6 w-6'
       />
     );
   }
@@ -364,11 +364,11 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     id: 'artwork',
     header: 'Artwork',
     cell: ({ row }) => <LibraryCatalogArtworkCell asset={row.original} />,
-    size: 56,
-    minSize: 56,
+    size: 40,
+    minSize: 40,
     enableSorting: false,
-    // The art names itself; a visible header would widen the column past 56.
-    meta: { className: 'px-2', minWidth: 56, headerVisibility: 'sr-only' },
+    // 24px art plus the canonical cell padding; the title names the item.
+    meta: { className: 'px-2', minWidth: 40, headerVisibility: 'sr-only' },
   }),
   libraryCatalogColumnHelper.accessor('title', {
     id: 'title',
@@ -377,7 +377,10 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       // Fluid cell: no min-content width, so the auto-layout table shrinks
       // this column and long titles truncate instead of pushing trailing
       // columns out of the container.
-      <span className='system-b-library-release-title system-b-library-fluid-cell block truncate'>
+      <span
+        title={row.original.title}
+        className='system-b-library-release-title system-b-library-fluid-cell block truncate'
+      >
         {row.original.title}
       </span>
     ),
@@ -390,7 +393,10 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     id: 'artist',
     header: 'Artist',
     cell: ({ row }) => (
-      <span className='system-b-library-meta-text block truncate text-tertiary-token'>
+      <span
+        title={row.original.artist}
+        className='system-b-library-meta-text system-b-library-fluid-cell block truncate text-tertiary-token'
+      >
         {row.original.artist}
       </span>
     ),
@@ -401,14 +407,16 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 5,
       minWidth: 160,
-      compact: asset => asset.artist,
     },
   }),
   libraryCatalogColumnHelper.display({
     id: 'type',
     header: 'Type',
     cell: ({ row }) => (
-      <span className='system-b-library-meta-text truncate text-tertiary-token'>
+      <span
+        title={formatLibraryItemType(row.original)}
+        className='system-b-library-meta-text system-b-library-fluid-cell block truncate text-tertiary-token'
+      >
         {formatLibraryItemType(row.original)}
       </span>
     ),
@@ -418,7 +426,6 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'pl-2 pr-3',
       priority: 6,
       minWidth: 120,
-      compact: asset => formatLibraryItemType(asset),
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -487,10 +494,6 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 5,
       minWidth: 80,
-      compact: asset =>
-        asset.totalDurationMs ? (
-          <LibraryCatalogLengthCell asset={asset} />
-        ) : null,
     },
   }),
   libraryCatalogColumnHelper.display({
@@ -512,10 +515,15 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       className: 'px-2',
       priority: 5,
       minWidth: 120,
-      compact: asset =>
-        asset.providers.length > 0 ? (
-          <LibraryCatalogProvidersCell asset={asset} />
-        ) : null,
     },
   }),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
+
+/** Keep the default scan useful; technical fields stay an explicit choice. */
+export const LIBRARY_CATALOG_DEFAULT_COLUMNS =
+  LIBRARY_CATALOG_TABLE_COLUMNS.filter(
+    column =>
+      !['bpm', 'key', 'energy', 'rating', 'waveform', 'providers'].includes(
+        column.id ?? ''
+      )
+  );

@@ -195,6 +195,11 @@
   max-height: calc(100dvh - var(--space-4));
 }
 
+/* Canonical allocation transition shared by sidebar, inspector, and drawers. */
+@utility transition-shell-rail-allocation {
+  transition-property: flex-basis, width, border-width, opacity, transform;
+}
+
 @utility scale-press {
   scale: var(--scale-press);
 }
@@ -283,4 +288,34 @@
   /* Accent token — enables bg-accent-subtle, text-accent, border-accent */
   --color-accent: var(--color-accent);
   --color-accent-subtle: var(--color-accent-subtle);
+}
+
+/* Inspector widths resolve against the main surface, independently of their
+   interrupted width transition. Desktop-only usage preserves mobile fixed sheets. */
+@utility shell-inspector-host {
+  container-type: inline-size;
+}
+
+/* Keep geometry in one utility. With two Tailwind compilation contexts, a
+   later base .relative/.h-0 utility can otherwise override an earlier lg
+   variant. The inspector must never enter the route's flex allocation. */
+@utility shell-inspector-overlay {
+  position: relative;
+  height: 0;
+  width: 0;
+  overflow: visible;
+  @media (min-width: 1024px) {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 0;
+    overflow: hidden;
+    padding: var(--space-1-5);
+    border-radius: var(--app-shell-radius);
+  }
 }

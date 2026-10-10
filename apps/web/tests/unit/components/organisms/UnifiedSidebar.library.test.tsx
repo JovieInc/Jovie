@@ -7,7 +7,8 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { SidebarProvider } from '@/components/organisms/sidebar';
+import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
+import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
@@ -157,6 +158,13 @@ function LibrarySidebarOverride({
   return null;
 }
 
+function BrowserHeaderToggle() {
+  const { state } = useSidebar();
+  return !electronRuntimeMock.isElectronRuntime && state === 'closed' ? (
+    <SidebarCollapseButton />
+  ) : null;
+}
+
 function renderUnifiedSidebar({
   overrideContent,
   pathname = APP_ROUTES.LIBRARY,
@@ -164,6 +172,7 @@ function renderUnifiedSidebar({
   isAdmin = false,
   variant,
   data,
+  sidebarDefaultOpen = true,
 }: {
   readonly overrideContent?: ReactNode;
   readonly pathname?: string;
@@ -171,6 +180,7 @@ function renderUnifiedSidebar({
   readonly isAdmin?: boolean;
   readonly variant?: 'jovie' | 'ov';
   readonly data?: Partial<DashboardData>;
+  readonly sidebarDefaultOpen?: boolean;
 } = {}) {
   unifiedPathnameMock.mockReturnValue(pathname);
   const queryClient = new QueryClient({
@@ -182,14 +192,19 @@ function renderUnifiedSidebar({
       <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
         <DashboardDataProvider value={{ ...dashboardData, isAdmin, ...data }}>
           <TooltipProvider>
-            <SidebarProvider>
+            <SidebarProvider defaultOpen={sidebarDefaultOpen}>
               <ShellSidebarOverrideProvider>
                 {overrideContent ? (
                   <LibrarySidebarOverride>
                     {overrideContent}
                   </LibrarySidebarOverride>
                 ) : null}
-                <UnifiedSidebar section={section} variant={variant} />
+                <UnifiedSidebar
+                  section={section}
+                  variant={variant}
+                  headerOwnsCollapsedToggle
+                />
+                <BrowserHeaderToggle />
               </ShellSidebarOverrideProvider>
             </SidebarProvider>
           </TooltipProvider>
@@ -201,6 +216,7 @@ function renderUnifiedSidebar({
 
 describe('UnifiedSidebar library route', () => {
   afterEach(() => {
+    document.cookie = 'sidebar:state=; path=/; max-age=0';
     electronRuntimeMock.isElectronRuntime = true;
     document.documentElement.removeAttribute('data-desktop-runtime');
     signOutMock.mockReset();
@@ -209,6 +225,18 @@ describe('UnifiedSidebar library route', () => {
     resetDashboardNavTestMocks();
     unifiedPathnameMock.mockReset();
     unifiedPathnameMock.mockReturnValue(APP_ROUTES.CHAT);
+  });
+
+  it('has one accessible browser toggle with the real sidebar when restored collapsed', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+    renderUnifiedSidebar({ sidebarDefaultOpen: false });
+    expect(
+      screen.getAllByRole('button', { name: 'Expand sidebar' })
+    ).toHaveLength(1);
+    const sidebarToggle = document.querySelector(
+      '[data-shell-rail-motion="left"] [data-rail-toggle="left"]'
+    );
+    expect(sidebarToggle?.closest('[inert]')).not.toBeNull();
   });
 
   it('keeps the standard dashboard navigation on the library route', () => {
@@ -447,7 +475,7 @@ describe('UnifiedSidebar library route', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps the collapse toggle reachable while the brand row stages out (JOV-4522)', () => {
+  it('stages browser header chrome without dropping the expanded toggle (JOV-4522)', () => {
     electronRuntimeMock.isElectronRuntime = false;
 
     renderUnifiedSidebar({
@@ -455,14 +483,15 @@ describe('UnifiedSidebar library route', () => {
       section: 'dashboard',
     });
 
-    // In the 52px icon rail the brand cluster and header actions collapse on
-    // max-width while the toggle moves first and centers — before this the
-    // fixed-width chrome pushed it past the clipped rail edge.
+    // The wrapper stages the in-sidebar control out when the main header
+    // takes ownership in compact mode; the expanded control stays mounted.
     const toggle = screen.getByRole('button', { name: 'Collapse sidebar' });
-    expect(toggle.className).toContain(
+    expect(toggle.parentElement?.className).toContain(
       'group-data-[collapsible=icon]:order-first'
     );
-    expect(toggle.className).toContain('group-data-[collapsible=icon]:mx-auto');
+    expect(toggle.parentElement?.className).toContain(
+      'group-data-[collapsible=icon]:mx-auto'
+    );
 
     const brandRow = toggle.closest('[data-sidebar-brand-row]');
     expect(brandRow).not.toBeNull();
@@ -477,6 +506,40 @@ describe('UnifiedSidebar library route', () => {
       'group-data-[collapsible=icon]:hidden'
     );
   });
+
+  it.each([
+    {
+      section: 'dashboard' as const,
+      variant: 'jovie' as const,
+      pathname: APP_ROUTES.DASHBOARD,
+    },
+    { section: 'ov' as const, variant: 'ov' as const, pathname: APP_ROUTES.OV },
+  ])(
+    'keeps the canonical $variant logo exposed when restored collapsed',
+    ({ section, variant, pathname }) => {
+      electronRuntimeMock.isElectronRuntime = false;
+      const { container } = renderUnifiedSidebar({
+        section,
+        variant,
+        pathname,
+        isAdmin: true,
+        sidebarDefaultOpen: false,
+      });
+      const logos = container.querySelectorAll(
+        `[data-brand-variant="${variant}"]`
+      );
+      expect(logos).toHaveLength(1);
+      expect(
+        logos[0].parentElement?.closest('[inert], [aria-hidden="true"]')
+      ).toBeNull();
+      expect(
+        screen.getByRole('button', { name: 'Switch Workspace' })
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByRole('button', { name: 'Expand sidebar' })
+      ).toHaveLength(1);
+    }
+  );
 
   it('turns the logo into a workspace selector for admins', () => {
     renderUnifiedSidebar({
@@ -562,10 +625,19 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('button', { name: 'Search Sidebar' })
     ).not.toBeInTheDocument();
-    expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Account' })).toContainElement(
+      screen.getByTestId('user-button')
+    );
+    expect(userButtonPropsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ showUserInfo: true, profileHref: undefined })
+    );
     expect(
-      screen.getByRole('button', { name: 'Sign Out' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Sign Out' })
+    ).not.toBeInTheDocument();
+    for (const link of operatorLinks) {
+      expect(link).toHaveAttribute('data-navigation-item-id');
+      expect(link).toHaveClass('grid', 'rounded-lg');
+    }
     expect(
       container.querySelector('[data-sidebar-dock="true"]')
     ).toContainElement(screen.getByTestId('sidebar-whats-new'));

@@ -1,6 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { FileAudio2, Paperclip } from 'lucide-react';
-import { type ComponentProps, type ReactNode, useState } from 'react';
+import {
+  type ComponentProps,
+  type ReactNode,
+  useCallback,
+  useState,
+} from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CHAT_COMPOSER_UPLOAD_AUDIO_HINT,
@@ -37,12 +42,20 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
 }));
 
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
-  useArtistSearchQuery: () => ({
-    results: [],
-    state: 'idle',
-    search: vi.fn(),
-    clear: vi.fn(),
-  }),
+  useArtistSearchQuery: () => {
+    const [query, setQuery] = useState('');
+    const clear = useCallback(() => setQuery(''), []);
+    return {
+      results: [],
+      state: 'idle',
+      error: null,
+      query,
+      isPending: false,
+      search: setQuery,
+      searchImmediate: setQuery,
+      clear,
+    };
+  },
 }));
 
 vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({

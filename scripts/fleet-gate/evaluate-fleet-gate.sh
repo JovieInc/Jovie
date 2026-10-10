@@ -258,4 +258,36 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
 fi
 
 echo "Fleet gate evaluated (state=$state consumer=$consumer consumer_rc=$gate_rc work_allowed=$work_out new_issue_intake_allowed=$new_issue_intake_allowed deployment_allowed=$deployment_allowed mode=$mode promotion_mode=$promotion_mode receipt_age_seconds=${receipt_age_seconds:-unknown} capacity_accepted=$capacity_accepted capacity_max_concurrent=$capacity_max_concurrent)."
+
+# JOV-8000 follow-up 26: machine-readable promotion diagnostics right after the
+# summary line. The persisted receipt lives only on the Gem host (auth-gated for
+# every remote reader), so promotionMode=blocked previously surfaced with NO
+# reasons and NO signal detail in the step log — a 15-hour diagnosis loop. These
+# lines make the step log self-sufficient: the promotion mode with its reason
+# codes, then each signal that feeds promotionMode with its status and a
+# redacted first-200-char error excerpt. Logging only: zero behavior change.
+promotion_reasons="$(jq -r '[.reasons[]? | .code] | join(";")' "$receipt" 2>/dev/null)"
+echo "fleet-gate.promotion mode=$promotion_mode reasons=[$promotion_reasons]"
+emit_gate_signal() {
+  local name="$1"
+  local jq_filter="$2"
+  local status error
+  status="$(jq -r "$jq_filter | .status // \"unknown\"" "$receipt" 2>/dev/null || true)"
+  error="$(jq -r "$jq_filter | .error // \"\"" "$receipt" 2>/dev/null || true)"
+  # Redact token-like and secret-shaped strings before any log write.
+  error="$(
+    printf '%s' "$error" \
+    | sed -E 's/(gh[pousr]_[A-Za-z0-9]{8,})/[REDACTED]/g; s/(github_pat_[A-Za-z0-9_]{8,})/[REDACTED]/g; s/(Bearer[[:space:]]+[A-Za-z0-9._-]{8,})/[REDACTED]/g; s/([A-Fa-f0-9]{40,})/[REDACTED]/g' \
+    | head -c 200
+  )"
+  echo "fleet-gate.signal $name status=${status:-unknown} error=$error"
+}
+emit_gate_signal controller '.signals.controller'
+emit_gate_signal production '.signals.production'
+emit_gate_signal main '.signals.main'
+emit_gate_signal integrity '.signals.integrity'
+emit_gate_signal queue '.signals.queue'
+emit_gate_signal closure-health '.signals.closureHealth'
+emit_gate_signal concurrency '.signals.concurrency.gem'
+emit_gate_signal independent-review '.signals.independentReview'
 exit 0

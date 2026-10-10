@@ -337,6 +337,7 @@ const LEGACY_SOURCES = new Set<string>([
 ]);
 
 const ALIAS_SOURCES = new Set<string>([
+  'apps/web/app/app/(shell)/jovie-work/page.tsx',
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
   'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx',
@@ -422,6 +423,10 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
   'apps/web/app/app/(shell)/contact/page.tsx': {
     conceptId: '/app/settings/contacts',
     redirectTo: '/app/settings/contacts',
+  },
+  'apps/web/app/app/(shell)/jovie-work/page.tsx': {
+    conceptId: '/app',
+    redirectTo: '/app?view=done',
   },
   'apps/web/app/app/(shell)/feature-flags/page.tsx': {
     conceptId: '/app/admin/features',

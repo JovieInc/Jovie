@@ -26,6 +26,50 @@ const AudiencePanelContext = createContext<AudiencePanelContextValue | null>(
   null
 );
 
+/**
+ * Controlled provider for surfaces that own panel state elsewhere — e.g. the
+ * contacts workspace, which encodes it in the `panel` URL param so opening a
+ * panel is always an explicit, deep-linkable action (JOV-5836).
+ */
+export function ControlledAudiencePanelProvider({
+  children,
+  mode,
+  onModeChange,
+}: {
+  readonly children: ReactNode;
+  readonly mode: AudiencePanelMode | null;
+  readonly onModeChange: (mode: AudiencePanelMode | null) => void;
+}) {
+  const toggle = useCallback(
+    (panel: AudiencePanelMode) => {
+      onModeChange(mode === panel ? null : panel);
+    },
+    [mode, onModeChange]
+  );
+
+  const open = useCallback(
+    (panel: AudiencePanelMode) => {
+      onModeChange(panel);
+    },
+    [onModeChange]
+  );
+
+  const close = useCallback(() => {
+    onModeChange(null);
+  }, [onModeChange]);
+
+  const value = useMemo(
+    () => ({ mode, toggle, open, close }),
+    [mode, toggle, open, close]
+  );
+
+  return (
+    <AudiencePanelContext.Provider value={value}>
+      {children}
+    </AudiencePanelContext.Provider>
+  );
+}
+
 export function AudiencePanelProvider({
   children,
   initialMode = null,

@@ -1,4 +1,8 @@
+import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  chmodSync,
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -7,7 +11,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Lets a test make one directory vanish mid-walk, the way parallel CI
@@ -493,4 +498,118 @@ describe('Markdown examples are not top-map links', () => {
     );
     expect(links.map(link => link.target)).toEqual(['docs/guide.md']);
   });
+});
+
+const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+
+it('gardening commits and pushes with no runner Git identity, without changing local configuration', () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'jovie-gardening-identity-'));
+  try {
+    const root = join(temporary, 'repo');
+    const remote = join(temporary, 'remote.git');
+    const bin = join(temporary, 'bin');
+    for (const path of ['scripts/lib', 'docs/doc-gardening', '.claude/rules']) {
+      mkdirSync(join(root, path), { recursive: true });
+    }
+    mkdirSync(bin);
+    for (const path of [
+      'scripts/doc-gardening-agent.mjs',
+      'scripts/lib/doc-freshness.mjs',
+      'scripts/lib/doc-review.mjs',
+    ]) {
+      copyFileSync(join(sourceRoot, path), join(root, path));
+    }
+    writeFileSync(join(root, 'CLAUDE.md'), '# Fixture\n');
+    writeFileSync(join(root, '.claude/rules/one.md'), '# Rule\n');
+    writeFileSync(
+      join(root, 'docs/doc-gardening/SEED-STALE.md'),
+      '<!-- doc-freshness:rules:0 -->\n'
+    );
+    writeFileSync(
+      join(root, 'docs/doc-freshness-registry.json'),
+      JSON.stringify({
+        agentsMap: { path: 'CLAUDE.md', maxLines: 120 },
+        crossLinkScopes: ['CLAUDE.md'],
+        computers: {
+          rules: { type: 'globCount', pattern: '.claude/rules/*.md' },
+        },
+        freshnessMarkers: [
+          {
+            id: 'rules',
+            files: ['docs/doc-gardening/SEED-STALE.md'],
+            computer: 'rules',
+            gardeningOnly: true,
+          },
+        ],
+      })
+    );
+    // Only GitHub is an inert recorder. Commit and push use real Git and a local bare remote.
+    writeFileSync(
+      join(bin, 'gh'),
+      '#!/bin/sh\ncase "$1 $2" in\n  "auth status") exit 0 ;;\n  "pr create") printf "%s\\n" "$@" > "$GARDENING_PR_ARGS"; printf "https://example.invalid/local-gardening-proof\\n" ;;\n  *) exit 1 ;;\nesac\n'
+    );
+    chmodSync(join(bin, 'gh'), 0o755);
+    const env = {
+      PATH: `${bin}:${process.env.PATH}`,
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'user.useConfigOnly',
+      GIT_CONFIG_VALUE_0: 'true',
+      GARDENING_PR_ARGS: join(temporary, 'pr-args'),
+    };
+    const git = (...args) =>
+      execFileSync('git', args, {
+        cwd: root,
+        env,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim();
+    git('init', '-b', 'main');
+    execFileSync('git', ['init', '--bare', remote], { env, stdio: 'ignore' });
+    git('remote', 'add', 'origin', remote);
+    git('add', '.');
+    git(
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '-m',
+      'fixture'
+    );
+    const beforeConfig = git('config', '--local', '--list');
+    const result = spawnSync(
+      process.execPath,
+      [join(root, 'scripts/doc-gardening-agent.mjs')],
+      { cwd: root, env, encoding: 'utf8' }
+    );
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(
+      git('show', 'HEAD:docs/doc-gardening/SEED-STALE.md'),
+      '<!-- doc-freshness:rules:1 -->'
+    );
+    assert.match(
+      git('log', '-1', '--format=%an <%ae>'),
+      /^jovie-bot\[bot\] <jovie-bot\[bot\]@users\.noreply\.github\.com>$/
+    );
+    const branch = git('branch', '--show-current');
+    const pushed = execFileSync(
+      'git',
+      ['--git-dir', remote, 'rev-parse', `refs/heads/${branch}`],
+      { env, encoding: 'utf8' }
+    ).trim();
+    assert.equal(pushed, git('rev-parse', 'HEAD'));
+    const afterConfig = git('config', '--local', '--list')
+      .split('\n')
+      .filter(line => !line.startsWith(`branch.${branch}.`))
+      .join('\n');
+    assert.equal(afterConfig, beforeConfig);
+    const prArgs = readFileSync(join(temporary, 'pr-args'), 'utf8');
+    assert.match(prArgs, /--draft\n/);
+    assert.match(prArgs, /--head\n/);
+    assert.equal(git('status', '--porcelain'), '');
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
 });

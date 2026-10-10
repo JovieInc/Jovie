@@ -292,6 +292,41 @@ function expectDesktop32Control(
 }
 
 describe('LibrarySurface', () => {
+  it('renders stored child assets under a visible album with dependency guides and working selection', async () => {
+    window.localStorage.setItem(LIBRARY_VIEW_MODE_STORAGE_KEY, 'list');
+    const album = buildAsset({
+      id: 'album',
+      title: 'Album',
+      releaseType: 'album',
+    });
+    const child = buildAsset({
+      id: 'video-child',
+      title: 'Album Video',
+      itemKind: 'video',
+      linkedReleaseId: 'album',
+      source: { provider: 'youtube', canonicalId: 'video-child' },
+      catalogType: 'media',
+    });
+    renderLibrary([child, album]);
+    const row = await screen.findByTestId('library-release-row-video-child');
+    expect(within(row).getByTestId('table-dependency-guide')).toHaveAttribute(
+      'data-last',
+      'true'
+    );
+    expect(within(row).getByText('Part of Album')).toHaveClass('sr-only');
+    const rows = within(screen.getByRole('table'))
+      .getAllByRole('row')
+      .filter(element => element.hasAttribute('data-testid'));
+    expect(rows.map(element => element.getAttribute('data-testid'))).toEqual([
+      'library-release-row-album',
+      'library-release-row-video-child',
+    ]);
+    fireEvent.click(row);
+    expect(
+      await screen.findByRole('heading', { name: 'Album Video' })
+    ).toBeInTheDocument();
+  });
+
   it('disables YouTube import when the creator profile is unavailable', async () => {
     const user = userEvent.setup();
     const onImportYouTube = vi.fn();
@@ -599,20 +634,33 @@ describe('LibrarySurface', () => {
     ).toBeEnabled();
   });
 
-  it('defaults to grid view on first load', () => {
+  it('defaults to a dense title-first table on first load', () => {
     window.localStorage.removeItem(LIBRARY_VIEW_MODE_STORAGE_KEY);
     renderLibrary([buildAsset()]);
 
-    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByRole('radio', { name: 'Table View' })).toBeChecked();
+    const row = screen.getByTestId('library-catalog-row-release-1');
     expect(
-      screen.getByRole('button', { name: /View Take Me Over/u })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('library-grid-density-toggle')
-    ).toBeInTheDocument();
+      row.closest('table')?.style.getPropertyValue('--table-row-height')
+    ).toBe('32px');
+    expect(screen.queryByTestId('library-grid-density-toggle')).toBeNull();
     expect(
       screen.getByTestId('library-status-glyph-release-1')
     ).toBeInTheDocument();
+    for (const metric of ['bpm', 'key', 'energy', 'rating']) {
+      expect(
+        screen.queryByTestId(`library-catalog-${metric}-release-1`)
+      ).toBeNull();
+    }
+    fireEvent.click(row);
+    const inspector = screen.getByTestId('library-asset-drawer');
+    expect(inspector).toHaveAttribute('aria-hidden', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'More Columns' }));
+    expect(
+      screen.getByTestId('library-catalog-bpm-release-1')
+    ).toHaveTextContent('—');
+    expect(row).toHaveAttribute('aria-selected', 'true');
+    expect(inspector).toHaveAttribute('aria-hidden', 'false');
   });
 
   it('shows the card-size toggle in grid view and persists density preference', () => {
@@ -1039,9 +1087,11 @@ describe('LibrarySurface', () => {
     const drawer = within(screen.getByTestId('library-asset-drawer'));
 
     await user.click(drawer.getByRole('button', { name: 'More actions' }));
-    await user.hover(screen.getByRole('menuitem', { name: 'Copy' }));
-    fireEvent.click(
-      await screen.findByRole('menuitem', { name: 'Share Link' })
+    const search = screen.getByRole('textbox', { name: 'Search actions' });
+    expect(search).toHaveFocus();
+    await user.type(search, 'share link');
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Copy › Share Link' })
     );
 
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
@@ -1616,10 +1666,12 @@ describe('LibrarySurface', () => {
     expect(window.localStorage.getItem('jovie:library-view-mode')).toBe('list');
   });
 
-  it('renders the full dense Tracks-catalog column set in table mode (JOV-4846)', () => {
+  it('reveals the full labeled catalog only when More Columns is requested', () => {
     renderLibrary([buildAsset()]);
 
     fireEvent.click(screen.getByRole('radio', { name: 'Table View' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'More Columns' }));
 
     // Full experiment column set: status · artwork · title · artist · type ·
     // BPM · key · energy · rating · length · waveform · DSP providers.
@@ -1964,6 +2016,46 @@ describe('LibrarySurface', () => {
     fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(drawer).toHaveAttribute('aria-hidden', 'true');
   });
+
+  it.each(['Space', 'ArrowRight'] as const)(
+    'reviews the focused tile after Tab navigation: %s',
+    async key => {
+      const user = userEvent.setup();
+      renderLibrary([
+        buildAsset(),
+        buildAsset({ id: 'release-2', title: 'Second Song' }),
+        buildAsset({ id: 'release-3', title: 'Third Song' }),
+      ]);
+      clickGridView();
+      const first = screen.getByRole('button', { name: 'View Take Me Over' });
+      const second = screen.getByRole('button', { name: 'View Second Song' });
+
+      fireEvent.keyDown(document.body, { key: 'j' });
+      expect(first).toHaveFocus();
+      for (let tab = 0; tab < 4 && document.activeElement !== second; tab++) {
+        await user.tab();
+      }
+      expect(second).toHaveFocus();
+      expect(first.closest('[data-library-item-id]')).toHaveClass(
+        'system-b-library-card--selected'
+      );
+
+      await user.keyboard(key === 'Space' ? ' ' : '{ArrowRight}');
+      if (key === 'Space') {
+        expect(audioMock.toggleTrack).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'release-2', title: 'Second Song' })
+        );
+        expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
+          'aria-hidden',
+          'true'
+        );
+      } else {
+        expect(
+          screen.getByRole('button', { name: 'View Third Song' })
+        ).toHaveFocus();
+      }
+    }
+  );
 
   it('lets list rows play on Space and carries selection with the arrow keys', () => {
     renderLibrary([

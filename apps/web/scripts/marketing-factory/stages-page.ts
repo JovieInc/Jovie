@@ -5,13 +5,14 @@
  */
 
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   statSync,
 } from 'node:fs';
-import { extname, join, relative } from 'node:path';
+import { dirname, extname, join, relative } from 'node:path';
 import { modelFamily } from '@jovie/copy';
 import {
   decideMedium,
@@ -33,7 +34,9 @@ import {
   resolveCapture,
 } from '../marketing-media/capture-adapter';
 import { generateMarketingImage } from '../marketing-media/generate-image';
+import { sidecarPathFor } from '../marketing-media/provenance';
 import { captureBytesDigest, verifyRenderBytes } from './capture-integrity';
+import { materializeGeneratedFactoryMedia } from './generated-media';
 import { buildFactoryPageRecord } from './page-record';
 import { digestOf, writeImmutableJson } from './receipts';
 import { evaluateRenderCaptures } from './render-measurer';
@@ -197,8 +200,10 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
       request: {
         prompt: [
           `${ctx.brief.icp}: ${ref.sectionInstanceId}`,
-          ...ctx.feedback.filter(line =>
-            line.startsWith(`asset-art:${ref.id}`)
+          ...ctx.feedback.filter(
+            line =>
+              line.startsWith(`asset-art:${ref.id}`) ||
+              visualFeedbackStage(line) === 'asset'
           ),
         ].join('\n'),
         recipeId: ref.source as never,
@@ -214,7 +219,13 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
         generate: request => ctx.providers.generateAsset(request),
       },
       assetId: assetIdFor(ref.id),
-      outDir: join(ctx.runDir, 'assets'),
+      outDir: (() => {
+        const root = join(ctx.runDir, 'assets');
+        mkdirSync(root, { recursive: true });
+        return mkdtempSync(
+          join(root, `iteration-${ctx.iteration ?? 0}-attempt-${ctx.attempt}-`)
+        );
+      })(),
       artGate: ctx.providers.artGate,
       now: () => ctx.providers.now(),
     });
@@ -229,7 +240,6 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
       checks.check(`asset-generation:${ref.id}`, false, generated.reason);
       continue;
     }
-    provenance[ref.id] = relative(ctx.runDir, generated.sidecarPath);
     // Provenance (sidecar, C2PA when c2patool exists) is always written; the
     // asset ships only when a cross-family art judge passes it.
     if (
@@ -239,12 +249,23 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
         generated.sidecar.artEvaluation?.notes.join('; ') ?? 'art judge failed'
       )
     ) {
+      provenance[ref.id] = relative(ctx.runDir, generated.sidecarPath);
       continue;
     }
+    // Bind the byte hash into the receipt's path as well as the provenance.
+    // Keep the provider output and every prior attempt intact.
+    const assetPath = join(
+      dirname(generated.assetPath),
+      `${assetIdFor(ref.id)}.${generated.sidecar.sha256}.png`
+    );
+    copyFileSync(generated.assetPath, assetPath);
+    const sidecarPath = sidecarPathFor(assetPath);
+    writeImmutableJson(sidecarPath, { ...generated.sidecar, assetPath });
+    provenance[ref.id] = relative(ctx.runDir, sidecarPath);
     assets.push({
       id: ref.id,
       refIds: [ref.id],
-      path: relative(ctx.runDir, generated.assetPath),
+      path: relative(ctx.runDir, assetPath),
       mime: generated.mime,
       bytes: statSync(generated.assetPath).size,
       width: generated.width,
@@ -272,15 +293,43 @@ async function renderStage(ctx: StageContext): Promise<StageResult> {
   // No asset passes unrendered: each must reach the record the page renders.
   const carried = new Set(
     Object.values(
-      (record as { media?: Record<string, { id: string }> }).media ?? {}
-    ).map(media => `capture:${media.id}`)
+      (record as { media?: Record<string, { kind: string; id: string }> })
+        .media ?? {}
+    )
+      .filter(media => media.kind === 'screenshot-registry')
+      .map(media => `capture:${media.id}`)
   );
+  for (const [instance, media] of Object.entries(
+    (record as { media?: Record<string, { kind: string }> }).media ?? {}
+  )) {
+    if (media.kind !== 'generated') continue;
+    for (const ref of artifactOf(ctx, 'ref-sourcing').refs) {
+      if (
+        ref.sectionInstanceId === instance &&
+        ref.id.startsWith('generate:')
+      ) {
+        carried.add(ref.id);
+      }
+    }
+  }
   for (const asset of artifactOf(ctx, 'asset').assets) {
     checks.check(
       `render-asset:${asset.id}`,
       carried.has(asset.id),
       'the page record has no media field for this asset, so the page cannot render it'
     );
+  }
+  if (checks.failed.length > 0) {
+    return result(checks, null, { notes: { record } });
+  }
+  const mediaIssues = await materializeGeneratedFactoryMedia(ctx);
+  checks.check(
+    'render-generated-media',
+    mediaIssues.length === 0,
+    mediaIssues.join('; ')
+  );
+  if (checks.failed.length > 0) {
+    return result(checks, null, { notes: { record } });
   }
   // The candidate the local build previews (FACTORY_PREVIEW_RECORD).
   const renderDir = join(ctx.runDir, 'render');
@@ -443,6 +492,14 @@ export type VisualDimension = 'copy' | 'imagery' | 'layout';
 export const VISUAL_DIMENSION_STAGE: Readonly<
   Record<VisualDimension, FactoryStage>
 > = { copy: 'copy', imagery: 'asset', layout: 'layout' };
+
+/** Route already-tagged visual findings; generic stage feedback stays local. */
+export function visualFeedbackStage(finding: string): FactoryStage | undefined {
+  const tag = /^\[([a-z]+)\]/iu.exec(finding)?.[1]?.toLowerCase();
+  return Object.entries(VISUAL_DIMENSION_STAGE).find(
+    ([dimension]) => dimension === tag
+  )?.[1];
+}
 
 const DIMENSION_CUES: readonly [VisualDimension, RegExp][] = [
   // An explicit `[dimension]` tag from the judge wins.
@@ -651,6 +708,16 @@ async function publishStage(ctx: StageContext): Promise<StageResult> {
     (record as { status?: string }).status === 'shadow',
     'publish only writes shadow records until the ramp ships'
   );
+  if (checks.failed.length === 0) {
+    // A resumed publication may run after the public preview export was
+    // cleaned. Revalidate and restore the admitted bytes before writing URLs.
+    const mediaIssues = await materializeGeneratedFactoryMedia(ctx);
+    checks.check(
+      'publish-generated-media',
+      mediaIssues.length === 0,
+      mediaIssues.join('; ')
+    );
+  }
   return result(
     checks,
     { pageId: ctx.pageId, rampState: 'shadow', batchId: null },

@@ -55,6 +55,73 @@ const basicItems: CommonDropdownItem[] = [
 ];
 
 describe('CommonDropdown', () => {
+  it('flattens deep menus into a searchable chooser while preserving disabled policy', async () => {
+    const choose = vi.fn();
+    const blocked = vi.fn();
+    render(
+      <CommonDropdown
+        open
+        items={[
+          {
+            type: 'submenu',
+            id: 'share',
+            label: 'Share',
+            items: [
+              {
+                type: 'submenu',
+                id: 'export',
+                label: 'Export',
+                items: [
+                  { type: 'action', id: 'csv', label: 'CSV', onClick: choose },
+                ],
+              },
+            ],
+          },
+          {
+            type: 'submenu',
+            id: 'private',
+            label: 'Private',
+            disabled: true,
+            items: [
+              {
+                type: 'action',
+                id: 'blocked',
+                label: 'Export',
+                onClick: blocked,
+              },
+            ],
+          },
+        ]}
+      />
+    );
+    expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+    const disabled = screen.getByRole('menuitem', { name: 'Private › Export' });
+    expect(disabled).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(disabled);
+    expect(blocked).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Share › Export › CSV' })
+    );
+    expect(choose).toHaveBeenCalledOnce();
+  });
+  it('offers search for every action in a large group without dropping the last action', async () => {
+    const user = userEvent.setup();
+    const lastAction = vi.fn();
+    const items: CommonDropdownItem[] = Array.from(
+      { length: 13 },
+      (_, index) => ({
+        type: 'action',
+        id: `action-${index}`,
+        label: `Action ${index}`,
+        onClick: index === 12 ? lastAction : vi.fn(),
+      })
+    );
+    render(<CommonDropdown items={items} open />);
+    const search = screen.getByPlaceholderText('Search...');
+    await user.type(search, 'Action 12');
+    await user.click(screen.getByRole('menuitem', { name: 'Action 12' }));
+    expect(lastAction).toHaveBeenCalledOnce();
+  });
   describe('Far-edge placement (deliberate-red regression)', () => {
     it('keeps dropdown and context surfaces inside the viewport collision gutter', () => {
       const dropdown = render(
@@ -1068,7 +1135,7 @@ describe('CommonDropdown', () => {
   });
 
   describe('Submenus', () => {
-    it('renders nested submenu triggers', () => {
+    it('projects nested menus to searchable leaf actions', () => {
       const items: CommonDropdownItem[] = [
         {
           type: 'submenu',
@@ -1095,7 +1162,7 @@ describe('CommonDropdown', () => {
       render(<CommonDropdown items={items} open={true} />);
 
       expect(
-        screen.getByRole('menuitem', { name: 'Share' })
+        screen.getByRole('menuitem', { name: 'Share › Social › Copy Link' })
       ).toBeInTheDocument();
     });
 
@@ -1275,7 +1342,7 @@ describe('CommonDropdown', () => {
       });
     });
 
-    it('keeps only one nested sibling submenu open at a time', async () => {
+    it('switches between deep menu branches without creating nested overlays', async () => {
       const items: CommonDropdownItem[] = [
         {
           type: 'submenu',
@@ -1321,30 +1388,27 @@ describe('CommonDropdown', () => {
       const user = userEvent.setup({ delay: null });
       render(<CommonDropdown items={items} open={true} />);
 
-      screen.getByRole('menuitem', { name: 'Share' }).focus();
-      await user.keyboard('{ArrowRight}');
-      await waitFor(() => {
-        expect(screen.getByText('Tracked Links')).toBeInTheDocument();
-      });
-      screen.getByRole('menuitem', { name: 'Tracked Links' }).focus();
-      await user.keyboard('{ArrowRight}');
-      await waitFor(() => {
-        expect(screen.getByText('Facebook')).toBeInTheDocument();
-      });
-      screen.getByRole('menuitem', { name: 'Facebook' }).focus();
-      await user.keyboard('{ArrowRight}');
-
-      await waitFor(() => {
-        expect(screen.getByText('Facebook Post')).toBeInTheDocument();
-      });
-
-      screen.getByRole('menuitem', { name: 'Reddit' }).focus();
-      await user.keyboard('{ArrowRight}');
-
-      await waitFor(() => {
-        expect(screen.getByText('Reddit Post')).toBeInTheDocument();
-        expect(screen.queryByText('Facebook Post')).not.toBeInTheDocument();
-      });
+      const search = screen.getByPlaceholderText('Search...');
+      await user.type(search, 'Facebook Post');
+      expect(
+        screen.getByRole('menuitem', {
+          name: 'Share › Tracked Links › Facebook › Facebook Post',
+        })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('menuitem', { name: /Reddit Post/ })
+      ).not.toBeInTheDocument();
+      await user.clear(search);
+      await user.type(search, 'Reddit Post');
+      expect(
+        screen.getByRole('menuitem', {
+          name: 'Share › Tracked Links › Reddit › Reddit Post',
+        })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('menuitem', { name: /Facebook Post/ })
+      ).not.toBeInTheDocument();
+      expect(screen.getAllByRole('menu')).toHaveLength(1);
     });
 
     it('inherits submenu min-width from the trigger row when no override is provided', async () => {

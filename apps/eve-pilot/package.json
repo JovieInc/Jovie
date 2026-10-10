@@ -21,12 +21,12 @@
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
-    "@vercel/blob": "2.8.0",
-    "ai": "7.0.122",
-    "braintrust": "3.36.0",
-    "eve": "0.70.0",
+    "@vercel/blob": "2.8.1",
+    "ai": "7.0.133",
+    "braintrust": "3.37.1",
+    "eve": "0.72.1",
     "just-bash": "3.6.0",
-    "microsandbox": "0.7.6",
+    "microsandbox": "0.7.7",
     "zod": "4.6.5"
   },
   "devDependencies": {
@@ -38,7 +38,17 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "eve@0.70.0": "patches/eve@0.70.0.patch"
+      "eve@0.72.1": "patches/eve@0.72.1.patch"
+    },
+    "overrides": {
+      "fast-uri": "3.1.8",
+      "proxy-addr": "2.0.8",
+      "source-map-js": "1.2.2",
+      "brace-expansion@^1.1.7": "1.1.21",
+      "brace-expansion@^5.0.0": "5.0.12",
+      "smol-toml": "1.9.0",
+      "undici@^6.0.0": "6.28.1",
+      "undici@^7.0.0": "7.29.1"
     }
   }
 }

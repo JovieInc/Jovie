@@ -1,3 +1,4 @@
+import '@/styles/system-b-app.css';
 import { TooltipProvider } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
@@ -64,4 +65,39 @@ export const VideoEvidence: Story = {
 
 export const DecisionPending: Story = {
   args: { pendingDecision: 'approved' },
+};
+
+/** Existing public capture, presented as a component fixture, not certification. */
+export const PublicScreenshotRef: Story = {
+  args: {
+    row: fixtureRow('contact-page', {
+      packet: fixturePacket('contact-page', {
+        visualProof: [
+          fixtureReceipt(
+            'visual_proof',
+            'contact-image',
+            'passed',
+            '/product-screenshots/tim-white-profile-contact-phone.png'
+          ),
+        ],
+      }),
+    }),
+  },
+};
+
+export const MissingScreenshot: Story = {
+  args: {
+    row: fixtureRow('missing-proof', {
+      packet: fixturePacket('missing-proof', {
+        visualProof: [
+          fixtureReceipt(
+            'visual_proof',
+            'missing-image',
+            'passed',
+            '/missing-certification-proof.png'
+          ),
+        ],
+      }),
+    }),
+  },
 };

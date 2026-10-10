@@ -135,10 +135,22 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntitySidebarShell: ({
     children,
     'data-testid': testId,
+    id,
+    onClose,
   }: {
     children: React.ReactNode;
+    id?: string;
+    onClose?: () => void;
     'data-testid'?: string;
-  }) => <aside data-testid={testId}>{children}</aside>,
+  }) => (
+    <aside
+      id={id}
+      data-testid={testId}
+      data-close-handler={onClose ? 'present' : 'none'}
+    >
+      {children}
+    </aside>
+  ),
   DrawerTabbedCard: ({
     children,
     tabs,
@@ -421,6 +433,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
 
   it('does not expose content readiness while the profile rail is a skeleton', () => {
     mockState.previewReady = false;
+
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -433,6 +446,9 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
       </QueryClientProvider>
     );
 
+    const rail = screen.getByTestId('profile-contact-sidebar-skeleton');
+    expect(rail).toHaveAttribute('id', 'shell-artist-profile-rail');
+    expect(rail).toHaveAttribute('data-close-handler', 'present');
     expect(
       screen.getByTestId('profile-contact-sidebar-skeleton')
     ).toBeInTheDocument();

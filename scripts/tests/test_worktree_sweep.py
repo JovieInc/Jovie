@@ -8,6 +8,7 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import fcntl
 import json
 import os
 import subprocess
@@ -72,6 +73,61 @@ class SweepTest(unittest.TestCase):
 
     def remote_branches(self):
         return git(self.remote, "for-each-ref", "--format=%(refname:short)", "refs/heads/backup").split()
+
+    def test_existing_drain_starts_no_cleanup_commands(self):
+        state = self.base / "state"
+        state.mkdir()
+        (state / "lifecycle-drain.json").write_text("unreadable request body")
+        with patch.object(sweeper, "live_paths") as inventory:
+            report = self.sweep(state=state)
+        inventory.assert_not_called()
+        self.assertTrue(report["drained"])
+        self.assertEqual(report["removed"], [])
+
+    def test_drain_finishes_dirty_retirement_without_starting_next_unit(self):
+        first = self.worktree("first")
+        second = self.worktree("second")
+        (first / "a.txt").write_text("keep this edit\n")
+        state = self.base / "state"
+        commands = []
+        with sweeper.lifecycle.Guard(state):
+            def run(args, **kw):
+                commands.append(args)
+                if "remove" in args:
+                    (state / "lifecycle-drain.json").write_text("{}")
+                    # The in-flight retirement retains ownership through removal.
+                    with (state / "lifecycle.lock").open("a") as observer:
+                        with self.assertRaises(BlockingIOError):
+                            fcntl.flock(observer, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return no_processes(args, **kw)
+            report = self.sweep(state=state, run=run)
+            with (state / "lifecycle.lock").open("a") as observer:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(observer, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with (state / "lifecycle.lock").open("a") as observer:
+            fcntl.flock(observer, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.assertTrue(report["drained"])
+        self.assertFalse(first.exists())
+        self.assertTrue(second.exists())
+        self.assertEqual(git(self.remote, "show", "backup/mac/first-20261003:a.txt"),
+                         "keep this edit")
+        self.assertEqual(len(report["removed"]), 1)
+        self.assertFalse(any("prune" in args for args in commands))
+        self.assertFalse(any(str(second) in args for args in commands))
+
+    def test_drain_during_repository_listing_starts_no_retirement(self):
+        first = self.worktree("first")
+        state = self.base / "state"
+        state.mkdir()
+        def run(args, **kw):
+            result = no_processes(args, **kw)
+            if "worktree" in args and "list" in args:
+                (state / "lifecycle-drain.json").write_text("{}")
+            return result
+        report = self.sweep(state=state, run=run)
+        self.assertTrue(report["drained"])
+        self.assertTrue(first.exists())
+        self.assertEqual(report["removed"], [])
 
     def test_clean_pushed_idle_worktree_is_removed_without_backup(self):
         path = self.worktree("clean")
@@ -229,6 +285,29 @@ class SpawnTest(unittest.TestCase):
 
 
 class HostWiringTest(unittest.TestCase):
+    def test_drain_during_first_lookup_skips_later_repositories_and_cleanup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state"
+            repos = [Path(tmp) / "first", Path(tmp) / "second"]
+            def lookup(repo, run):
+                self.assertEqual(repo, repos[0])
+                (state / "lifecycle-drain.json").write_text("{}")
+                return {"closed-branch"}
+            with patch.object(sweeper, "default_repos", return_value=repos), \
+                    patch.object(sweeper, "closed_branches", side_effect=lookup) as closed, \
+                    patch.object(sweeper, "live_paths") as inventory, \
+                    patch.object(sweeper, "retire") as retire:
+                self.assertEqual(sweeper.main(["--state", str(state), "--repo", tmp]), 0)
+            closed.assert_called_once()
+            inventory.assert_not_called()
+            retire.assert_not_called()
+            saved = json.loads((state / "worktree-sweep.json").read_text())
+            self.assertTrue(saved["drained"])
+            self.assertEqual(saved["removed"], [])
+            self.assertTrue((state / "lifecycle-drain.json").exists())
+            with (state / "lifecycle.lock").open("a") as observer:
+                fcntl.flock(observer, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
     def test_closed_branches_reads_one_rest_page_for_github_remotes(self):
         calls = []
 

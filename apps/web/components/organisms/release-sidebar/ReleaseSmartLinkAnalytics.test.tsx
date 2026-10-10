@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import type { Release } from './types';
 
@@ -21,7 +21,7 @@ const mockRelease: Release = {
 
 describe('ReleaseSmartLinkAnalytics', () => {
   it('renders the production profile host in the smart link, never a loopback URL', () => {
-    const profileHost = new URL(PROFILE_URL).host;
+    const profileHost = new URL(BASE_URL).host;
 
     render(
       <ReleaseSmartLinkAnalytics

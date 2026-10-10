@@ -211,10 +211,9 @@ def _additive_reason(obs: dict, sample: dict) -> str | None:
     alerts, gate = set(obs.get("alerts") or []), _num(obs.get("gateWaitMedianS24h"))
     if "failed-runs" in alerts or "gate-timeouts" in alerts or (gate is not None and gate > GATE_WAIT_DECREASE):
         return "gate-pressure"
-    if _obj(obs.get("throughputBrake")).get("sustained"):
-        return "merge-throughput"
     return None
 def _throughput_brake(previous: dict, obs: dict, now: float, interval: int) -> dict:
+    """Legacy doctor receipt: observe queue trouble; never use it for slot admission."""
     signal = _obj(obs.get("mergeThroughput")); depth = _count(signal.get("queueDepth")); wait = _num(signal.get("queueWaitP50Minutes"))
     merged, opened, ejections = _num(signal.get("mergedPerHour")), _num(signal.get("openedPerHour")), _num(signal.get("ejectionRate"))
     known = bool(obs.get("mergeThroughputFresh")) and depth is not None and merged is not None and opened is not None and (depth == 0 or wait is not None)
@@ -239,8 +238,6 @@ def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
     disk, free = _obj(obs.get("disk")), _num(_obj(obs.get("disk")).get("freePct"))
     starts, rate = _int(_obj(obs.get("starts")).get(name)), _obj(obs.get("productiveRunRate")).get(name)
     pairs = (
-        (not _obj(obs.get("throughputBrake")).get("known"), "merge-throughput-unknown"),
-        (bool(_obj(obs.get("throughputBrake")).get("active")), "merge-throughput"),
         (reason in ("over-budget", "terminal-pr-backlog"), reason),
         (demand is None or demand <= 0, "unknown-demand" if demand is None else "zero-demand"),
         (name in set(obs.get("unhealthy") or []), "unhealthy"),
@@ -291,15 +288,10 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             effective, reason, blockers, up, idle = max(MIN_SLOTS, math.ceil(current / 2)), multi, [multi], 0, 0
         elif additive:
             up = idle = 0
-            floor = idle_floor(base) if additive == "merge-throughput" else MIN_SLOTS
-            ready = host_ready and (additive != "merge-throughput" or lane_ready)
-            if ready and current > floor:
+            if host_ready and current > MIN_SLOTS:
                 effective, reason, blockers = current - 1, additive, [additive]
-            elif additive == "merge-throughput" and current <= floor:
-                reason, blockers = "hold:throughput-floor", ["throughput-floor"]
             else:
-                cooldown = "lane-cooldown" if additive == "merge-throughput" and not lane_ready else "host-cooldown"
-                reason, blockers = "hold:" + cooldown, [additive, cooldown]
+                reason, blockers = "hold:host-cooldown", [additive, "host-cooldown"]
         else:
             floor = idle_floor(base); idle_signal = demand == 0 and running is not None and running <= current - 2
             idle = min(need, idle + 1) if idle_signal else 0
@@ -341,9 +333,9 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             row.update(lastReason="hold:host-ceiling", blockers=["host-ceiling"])
     for name, row in rows.items():
         base = row["base"]
-        if base > 0 and row["effective"] > base and (unknown or not brake["known"]):
-            token = unknown if fresh and unknown else "merge-throughput-unknown"
-            row.update(effective=base, lastReason="hold:" + token, blockers=[token], upStreak=0)
+        if base > 0 and row["effective"] > base and unknown:
+            # API-budget uncertainty stays fail-safe; queue metrics are only diagnostic.
+            row.update(effective=base, lastReason="hold:" + unknown, blockers=[unknown], upStreak=0)
         before = _int(_obj(prev_lanes.get(name)).get("effective")); before = base if before is None else before
         if row["effective"] != before:
             row["lastChangeAt"], host_last = now, now

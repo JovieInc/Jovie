@@ -1012,7 +1012,9 @@ describe('merge_group workflow contract', () => {
     );
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
-    expect(macos).toContain('runs-on: macos-26');
+    // GA image: macos-26 pickup waited 8-68 min per merge group (2026-10-10).
+    expect(macos).toContain('runs-on: macos-15');
+    expect(macos).not.toContain('runs-on: macos-26');
     expect(macos).toContain(
       "format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number)"
     );
@@ -2007,9 +2009,32 @@ ${selectedGateScript}`,
         '--arg',
         'run',
         runUrl,
+        '--arg',
+        'risk_level',
+        'medium',
+        '--arg',
+        'rules',
+        'api-write',
+        '--argjson',
+        'requires_smoke',
+        'true',
+        '--argjson',
+        'requires_preview',
+        'false',
+        '--argjson',
+        'blocks_unattended',
+        'false',
         query,
       ],
-      { encoding: 'utf8' }
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_SHA: 'a'.repeat(40),
+          GITHUB_RUN_ID: '7',
+          GITHUB_RUN_ATTEMPT: '1',
+        },
+      }
     );
     expect(
       result.status,
@@ -2021,6 +2046,7 @@ ${selectedGateScript}`,
       lanes: {
         web: ['success', 'success', 'success'],
       },
+      riskReceipt: { risk_level: 'medium', requires_smoke: true },
     });
   });
 

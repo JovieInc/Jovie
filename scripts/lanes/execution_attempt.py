@@ -3,9 +3,12 @@
 from __future__ import annotations
 import base64, fcntl, hashlib, json, math, os, re, subprocess, time, uuid, zlib
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 SCHEMA, GITHUB_LEDGER_ANCHOR = "jovie-execution-attempt/v1", "cd29469b1fa2c433135f23bbfca273e674934676"
 TERMINAL = frozenset({"succeeded", "no_op_stale", "canceled", "failed_known", "failed_unknown", "budget_exhausted", "quarantined", "superseded", "dead_lettered"})
-RETRYABLE = frozenset({"provider_outage", "flaky_infra", "repair_incomplete"})
+RETRYABLE = frozenset({"provider_outage", "flaky_infra", "repair_incomplete", "target_state_unavailable"})
 def digest(value) -> str: return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 def identity(domain: str, work: dict, generation) -> dict:
     work_key, generation = f"{domain}:{digest(work)}", digest(generation)
@@ -30,7 +33,7 @@ def _gh(coordination: dict, method: str, endpoint: str, body=None):
     # one per call); requiring GH_TOKEN here crashed every fix run once the shim landed.
     args = ["gh", "api", "-X", method, endpoint]
     args += ["--paginate", "--slurp"] if method == "GET" else ["--input", "-"]
-    ran = subprocess.run(args, input=None if body is None else json.dumps(body), capture_output=True, text=True,
+    ran = lifecycle.run(args, input=None if body is None else json.dumps(body), capture_output=True, text=True,
                          env={**os.environ, "GH_TOKEN": token} if token else None, timeout=30)
     if ran.returncode:
         if body and body.get("ref") and "422" in ran.stderr: return None
@@ -123,7 +126,12 @@ def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now
             expired["diagnosis"] = _diagnosis([*rows, expired], "failed_unknown")
             return {"admitted": False, "reason": "expired_attempt_reconciled", "terminalState": "failed_unknown"}, [expired]
         used = _usage(rows, now)
-        exhausted = next((key for key in ("attempts", "concurrency", "wallSeconds", "spend", "mutations") if used[key] >= policy[key]), None)
+        # Zero-cost work can claim a zero-spend/mutation policy. Its first
+        # positive boundary still fails closed; positive exhausted caps retain
+        # their existing stop semantics. This never grants a provider route.
+        exhausted = next((key for key in ("attempts", "concurrency", "wallSeconds", "spend", "mutations")
+                          if used[key] >= policy[key] and not
+                          (key in {"spend", "mutations"} and used[key] == policy[key] == 0)), None)
         if exhausted:
             row = {**ident, "schema": SCHEMA, "event": "decision", "at": now, "terminalState": "budget_exhausted", "retryDecision": "stop",
                    "reason": f"{exhausted}_budget_exhausted", "diagnosis": _diagnosis(rows, "budget_exhausted")}
@@ -157,7 +165,11 @@ def boundary(path: Path, ident: dict, fence: str, reservation: dict, now: float 
     def decide(all_rows):
         rows = _for(all_rows, ident)
         start = next((row for row in reversed(rows) if row.get("fencingToken") == fence and row["event"] == "attempt_started"), None)
-        if not start or start["leaseExpiresAt"] <= now or any(row.get("terminalState") in TERMINAL for row in rows): raise RuntimeError("stale-fencing-token")
+        if (not start or start["leaseExpiresAt"] <= now
+                or any(row.get("terminalState") in TERMINAL
+                       or (row["event"] == "attempt_finished" and row.get("fencingToken") == fence)
+                       for row in rows)):
+            raise RuntimeError("stale-fencing-token")
         used, policy = _usage(rows, now), start["policy"]
         if used["wallSeconds"] >= policy["wallSeconds"] or any(used[key] + reservation[key] > policy[key] for key in ("spend", "mutations")): raise RuntimeError("execution-budget-exhausted")
         row = {**ident, "schema": SCHEMA, "event": "boundary_admitted", "at": now, "attempt": start["attempt"], "fencingToken": fence, "reservation": reservation}
