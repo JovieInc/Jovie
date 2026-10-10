@@ -2464,6 +2464,7 @@ def evaluate_closure_health(
     )
     observer_unknown = not repository_valid or not shape_valid or controller_status not in {
         "green",
+        "parked",
         "failed",
         "recovering",
         "unknown",
@@ -2521,7 +2522,7 @@ def evaluate_closure_health(
         and isinstance(item.get("number"), int)
     )
     active = {
-        "controller": controller_status != "green",
+        "controller": controller_status not in {"green", "parked"},
         "emptyNativeQueue": bool(
             shape_valid and green_ready_prs > 0 and native_queue_count == 0
         ),
@@ -2782,7 +2783,7 @@ def observe_closure_health(
         if (
             not isinstance(controller_observation, dict)
             or not isinstance(controller_observation.get("status"), str)
-            or controller_observation.get("status") not in {"green", "failed"}
+            or controller_observation.get("status") not in {"green", "failed", "parked"}
         ):
             raise ValueError("Symphony controller observation is missing or malformed")
         observed = _run_graphql_snapshot(repo, deadline)
