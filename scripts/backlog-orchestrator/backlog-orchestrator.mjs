@@ -1532,13 +1532,44 @@ async function ghPullRequestInventory(state, env) {
  * runner's gh). Any non-transient failure throws with the exact gh cause
  * named.
  */
+/**
+ * Parse the `-f key=value` / `-F key=value` flags out of a `graphql ...`
+ * endpoint string into separate argv elements. `gh api graphql` wants
+ * `['graphql', '-f', 'query=<gql>']`, not one fused 'graphql -f query=...'
+ * endpoint (which gh reads as an invalid endpoint and fails).
+ */
+function graphqlQueryArgs(path) {
+  const rest = String(path).slice('graphql '.length).trim();
+  const args = [];
+  // split on whitespace that precedes a -f/-F flag; the query value itself
+  // may contain spaces and must stay one argv element.
+  const flagSplit = rest.split(/\s+(?=-[fF]\s)/);
+  for (const piece of flagSplit) {
+    const match = /^(-[fF])\s+(.*)$/.exec(piece);
+    if (match) {
+      args.push(match[1], match[2]);
+    } else if (piece) {
+      args.push(piece);
+    }
+  }
+  return args;
+}
+
 async function execGhApi(path, env) {
   // `gh api` takes NO --repo/-R flag (that is a `gh pr` flag — passing it
   // makes gh exit 1 with its full usage help, whose -F description line
   // "Add a string parameter in key=value format" is what the Gem runner's
   // stderr showed). The repository lives inside the endpoint path itself;
   // the argv is exactly ['api', <full endpoint path+query>].
-  const args = ['api', path];
+  // A GraphQL call is the one exception: the endpoint is the bare word
+  // `graphql` and the query rides a SEPARATE `-f query=< gql >` argv
+  // element — passing 'graphql -f query=...' as ONE element makes gh treat
+  // the whole string as the endpoint and fail (never valid). Split on the
+  // first space only when the caller hands us that form.
+  const args =
+    typeof path === 'string' && path.startsWith('graphql ')
+      ? ['api', 'graphql', ...graphqlQueryArgs(path)]
+      : ['api', path];
   const maxAttempts = 3;
   let lastError = null;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -2182,7 +2213,7 @@ async function runRemediate(isDryRun) {
     ? backlogRemediation.pullRequestRates(pullRequests)
     : null;
   if (ratesSummary) {
-    const mm = /** @type {Record<string, any>} */ (mergeabilityEvidence ?? {});
+    const mm = mergeabilityEvidence ?? {};
     console.log(
       `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')}`
     );
