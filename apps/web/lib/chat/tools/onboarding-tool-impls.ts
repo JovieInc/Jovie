@@ -15,11 +15,16 @@ import {
   normalizeArtistMetrics,
 } from '@/lib/onboarding/canonical-metrics';
 import {
+  buildSpotifyEnrichedFacts,
+  spotifyEnrichmentSubjectId,
+} from '@/lib/onboarding/enrichment-facts';
+import {
   type HandleAvailabilityResult,
   normalizeHandleCandidate,
   toHandleAvailabilityResult,
 } from '@/lib/onboarding/handle-availability';
 import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
+import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { buildSpotifyArtistUrl, getSpotifyArtist } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
 
@@ -244,6 +249,8 @@ export interface NextStepCardPayload {
 export interface ConfirmSpotifyArtistOutput {
   readonly action: 'spotify_artist_confirmed';
   readonly spotifyArtistId: string;
+  readonly subjectId: string | null;
+  readonly enrichedFacts: readonly EnrichedFact[];
   readonly artist: {
     readonly id: string;
     readonly name: string;
@@ -305,6 +312,21 @@ export async function buildConfirmSpotifyArtistOutput(
   }
 
   if (artist) {
+    if (artist.id !== spotifyArtistId) {
+      logger.warn('Onboarding enrichment provenance rejected', {
+        reason: 'conflicting_identity',
+      });
+      return {
+        action: 'spotify_artist_confirmed',
+        spotifyArtistId,
+        subjectId: spotifyEnrichmentSubjectId(spotifyArtistId),
+        enrichedFacts: [],
+        artist: null,
+        metrics: null,
+        summary:
+          'Spotify artist selected; matching profile data is unavailable right now.',
+      };
+    }
     const metrics = normalizeArtistMetrics(
       {
         followersObject: artist.followers,
@@ -322,6 +344,21 @@ export async function buildConfirmSpotifyArtistOutput(
     return {
       action: 'spotify_artist_confirmed' as const,
       spotifyArtistId,
+      subjectId: spotifyEnrichmentSubjectId(spotifyArtistId),
+      enrichedFacts: buildSpotifyEnrichedFacts(
+        {
+          spotifyArtistId,
+          returnedArtistId: artist.id,
+          displayName: artist.name,
+          metrics,
+        },
+        {
+          onFailure: reason =>
+            logger.warn('Onboarding enrichment provenance rejected', {
+              reason,
+            }),
+        }
+      ),
       artist: {
         id: artist.id,
         name: artist.name,
@@ -340,6 +377,8 @@ export async function buildConfirmSpotifyArtistOutput(
   return {
     action: 'spotify_artist_confirmed' as const,
     spotifyArtistId,
+    subjectId: spotifyEnrichmentSubjectId(spotifyArtistId),
+    enrichedFacts: [],
     artist: null,
     metrics: null,
     summary: 'Spotify artist selected.',
@@ -361,6 +400,13 @@ export function echoConfirmedArtist(
   return {
     action: 'spotify_artist_confirmed',
     spotifyArtistId: state.spotifyArtistId,
+    subjectId: spotifyEnrichmentSubjectId(state.spotifyArtistId),
+    enrichedFacts: buildSpotifyEnrichedFacts({
+      spotifyArtistId: state.spotifyArtistId,
+      returnedArtistId: state.spotifyArtistId,
+      displayName: state.spotifyArtistName,
+      metrics,
+    }),
     artist: state.spotifyArtistName
       ? {
           id: state.spotifyArtistId,
