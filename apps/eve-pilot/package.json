@@ -22,7 +22,7 @@
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
     "@vercel/blob": "2.8.1",
-    "ai": "7.0.133",
+    "ai": "7.0.136",
     "braintrust": "3.37.1",
     "eve": "0.71.3",
     "just-bash": "3.6.0",
