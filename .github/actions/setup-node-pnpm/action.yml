@@ -123,13 +123,27 @@ runs:
           pnpm install --frozen-lockfile
         fi
 
+    # The repo's Actions cache runs over its 10 GB cap on dependabot days (12.3 GB
+    # on 2026-10-10: one 1.25 GB store, one 580 MB workspace and one 260 MB
+    # browser cache per distinct lockfile), so a producer's workspace can be
+    # evicted before a slow consumer restores it. That ejected #21141 and #21097
+    # from the queue. Rebuild the same tree from the frozen lockfile instead of
+    # failing the group; `prepare` then `validate` keep the receipt contract.
     - name: Require prepared merge-group workspace
       if: github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true'
       shell: bash
+      env:
+        ONNXRUNTIME_NODE_INSTALL: skip
       run: |
-        if [[ "${{ runner.environment }}" != 'github-hosted' || "${{ steps.node-modules-cache.outputs.cache-hit }}" != 'true' ]]; then
+        if [[ "${{ runner.environment }}" != 'github-hosted' ]]; then
           echo "::error::Prepared merge-group dependency workspace was not restored."
           exit 1
+        fi
+        if [[ "${{ steps.node-modules-cache.outputs.cache-hit }}" != 'true' ]]; then
+          echo "::warning::Prepared merge-group dependency workspace was not restored (cache evicted); installing the frozen lockfile instead."
+          pnpm fetch --frozen-lockfile
+          pnpm install --frozen-lockfile
+          node scripts/lib/ci-dependency-workspace.mjs prepare
         fi
         node scripts/lib/ci-dependency-workspace.mjs validate
 
