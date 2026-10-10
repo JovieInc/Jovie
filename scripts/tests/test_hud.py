@@ -332,6 +332,11 @@ class LedgerSchemaTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         state = Path(tmp.name)
+        # A temporary ledger has its own process snapshot. Real host workers
+        # must not make fixture assertions depend on whether Gem is shipping.
+        worker_snapshot = mock.patch.object(hud, "running_workers", return_value=[])
+        self.worker_snapshot = worker_snapshot.start()
+        self.addCleanup(worker_snapshot.stop)
         (state / "runs").mkdir()
         stamp = hud.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         with open(state / "runs" / "ledger.jsonl", "w") as handle:
@@ -352,6 +357,27 @@ class LedgerSchemaTest(unittest.TestCase):
         text = "\n".join(plain(row) for row in hud.render(model(local=local), 160, 45))
         self.assertIn("running / 3 (devin 0/0 · codex 0/3)", text)
         self.assertNotIn("running / 7", text)
+
+    def test_temporary_ledger_uses_its_process_snapshot(self):
+        host = self.host_with_ledger([])
+        local = hud.local_model(host)
+        self.assertEqual(local["workers"], [])
+        self.worker_snapshot.assert_called_once_with(host.state)
+
+    def test_dispatcher_slot_override_retains_an_explicit_busy_worker(self):
+        host = self.host_with_ledger([])
+        feed = {"at": hud.utcnow().isoformat(), "observed": {"capacityByProvider": {
+            "devin": {"slots": 0, "base": 0}, "codex": {"slots": 3, "base": 3}}}}
+        (host.state / "doctor.json").write_text(json.dumps(feed))
+        worker = {"pid": 123, "provider": "codex", "run": {
+            "runId": "fixture", "provider": "codex", "kind": "fix", "target": "PR1",
+            "startedAt": hud.utcnow().isoformat(), "phase": "agent"}}
+        self.worker_snapshot.return_value = [worker]
+        with mock.patch.object(hud.lane, "load_providers", return_value={"devin": {"slots": 4}, "codex": {"slots": 3}}):
+            local = hud.local_model(host)
+        self.assertEqual(local["workers"], [worker])
+        text = "\n".join(plain(row) for row in hud.render(model(local=local), 160, 45))
+        self.assertIn("running / 3 (devin 0/0 · codex 1/3)", text)
 
     def test_missing_and_null_verdicts_become_unclassified_not_a_crash(self):
         host = self.host_with_ledger([
