@@ -1012,9 +1012,19 @@ describe('merge_group workflow contract', () => {
     );
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
-    // GA image: macos-26 pickup waited 8-68 min per merge group (2026-10-10).
-    expect(macos).toContain('runs-on: macos-15');
+    // Self-hosted jovie-mac when the heartbeat is fresh; hosted GA image
+    // otherwise (macos-26 pickup waited 8-68 min per merge group, 2026-10-10).
+    expect(macos).toContain(
+      `runs-on: \${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+    );
     expect(macos).not.toContain('runs-on: macos-26');
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    expect(pathChanges).toContain(
+      "mac_runner_class: ${{ steps.mac-route.outputs.runner_class || 'hosted' }}"
+    );
+    expect(pathChanges).toContain(
+      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
+    );
     expect(macos).toContain(
       "format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number)"
     );
