@@ -5765,6 +5765,40 @@ def mesh_dependency_root(host: Host) -> Path | None:
     return next((slot for slot in slots if installed(slot)), None)
 
 
+def prove_staging(host: Host, staging: Path) -> str | None:
+    """Compile the mesh runtime and run the release self-test inside a staged tree. Returns the
+    refusal reason, or None when the tree may be activated. Writes only under `staging`."""
+    # The self-test must never touch this host's live state: point it at a scratch dir.
+    scratch = staging / ".selftest-state"
+    scratch.mkdir(exist_ok=True)
+    # Raw ports import workspace TypeScript/Zod. Compile from the immutable
+    # archive with the host repo's existing identical pins before activation;
+    # no dependency installation or running-worker mutation is permitted.
+    dependency_root = mesh_dependency_root(host) or host.repo
+    try:
+        runtime = lifecycle.run(["node", str(staging / "scripts/lanes/mesh-runtime-bundle.mjs"),
+                                 str(staging.resolve()), str(dependency_root.resolve())],
+                                cwd=staging, capture_output=True, text=True, timeout=60,
+                                env=worktree_pool.node_env(staging))
+    except subprocess.TimeoutExpired:
+        return "mesh runtime closure timeout"
+    if runtime.returncode != 0:
+        print(runtime.stderr[-2000:], file=sys.stderr)
+        return "mesh runtime dependency closure failed"
+    # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
+    # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
+    try:
+        test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+                              cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
+                              env=selftest_env(scratch))
+    except subprocess.TimeoutExpired:
+        return f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s"
+    if test.returncode != 0:
+        print(test.stderr[-2000:], file=sys.stderr)
+        return "release tests failed"
+    return None
+
+
 def install_release(host: Host) -> int:
     if sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo).returncode:
         raise RuntimeError("release-source-fetch-failed")
@@ -5787,39 +5821,32 @@ def install_release(host: Host) -> int:
         archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
         lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
-        # The self-test must never touch this host's live state: point it at a scratch dir.
-        scratch = staging / ".selftest-state"
-        scratch.mkdir(exist_ok=True)
-        # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
-        # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
         def refuse(why: str) -> int:
             refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
             return 1
-        # Raw ports import workspace TypeScript/Zod. Compile from the immutable
-        # archive with the host repo's existing identical pins before activation;
-        # no dependency installation or running-worker mutation is permitted.
-        dependency_root = mesh_dependency_root(host) or host.repo
+        # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
+        # refused every release for a day because the *installed* installer chose a bare
+        # dependency root; the fix was on main but could never run. An older staged tree
+        # without the subcommand is proven by this copy, as before.
         try:
-            runtime = lifecycle.run(["node", str(staging / "scripts/lanes/mesh-runtime-bundle.mjs"),
-                                     str(staging.resolve()), str(dependency_root.resolve())],
-                                    cwd=staging, capture_output=True, text=True, timeout=60,
-                                    env=worktree_pool.node_env(staging))
-        except subprocess.TimeoutExpired:
-            refuse("mesh runtime closure timeout")
-            raise
-        if runtime.returncode != 0:
-            print("lane update refused: mesh runtime dependency closure unavailable", file=sys.stderr)
-            return refuse("mesh runtime dependency closure failed")
-        try:
-            test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
-                                  cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
-                                  env=selftest_env(scratch))
+            proof = lifecycle.run([sys.executable, str(staging / "scripts/lanes/lane_runner.py"),
+                                   "prove-staging", str(staging)],
+                                  cwd=staging, capture_output=True, text=True,
+                                  timeout=60 + UPDATE_TEST_TIMEOUT_S,
+                                  # The staged installer must see this host, not the process defaults.
+                                  env={**os.environ, "LANES_STATE": str(host.state), "LANES_REPO": str(host.repo)})
         except subprocess.TimeoutExpired:
             refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
             raise
-        if test.returncode != 0:
-            print(f"lane update refused: release tests failed\n{test.stderr[-2000:]}", file=sys.stderr)
-            return refuse("release tests failed")
+        if proof.returncode == 2 and "invalid choice" in proof.stderr:
+            why = prove_staging(host, staging)
+        else:
+            why = None if proof.returncode == 0 else (proof.stdout.strip().splitlines() or ["staging proof failed"])[-1]
+            if why and proof.stderr:
+                print(proof.stderr[-2000:], file=sys.stderr)
+        if why:
+            print(f"lane update refused: {why}", file=sys.stderr)
+            return refuse(why)
         (staging / "scripts/lanes/.tree").write_text(bundle["objects"]["scripts/lanes"])
         (staging / "scripts/lanes/.bundle").write_text(tree)
         (staging / "scripts/lanes/.release.json").write_text(json.dumps(bundle, sort_keys=True))
@@ -5889,6 +5916,8 @@ def guarded_main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
     sub.add_parser("update")
+    prove = sub.add_parser("prove-staging", help="prove a staged release tree with this tree's own installer")
+    prove.add_argument("staging")
     gate = sub.add_parser("gate-command", help="run one gate command while retaining inherited locks")
     gate.add_argument("--timeout", type=float, required=True)
     gate.add_argument("--result-fd", type=int)
@@ -5958,6 +5987,12 @@ def guarded_main(argv: list[str] | None = None) -> int:
     host = Host()
     if args.command == "update":
         return update(host)
+    if args.command == "prove-staging":
+        why = prove_staging(host, Path(args.staging))
+        if why:
+            print(why)
+            return 1
+        return 0
     if args.command == "worker":
         return worker(host, args.provider)
     return dispatch(host)

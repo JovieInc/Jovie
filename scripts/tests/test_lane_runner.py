@@ -4434,6 +4434,26 @@ class UpdateTest(unittest.TestCase):
             with patch.object(lane.worktree_pool, "pool_dir", return_value=tmp / "missing"):
                 self.assertIsNone(lane.mesh_dependency_root(lane.Host(state=tmp / "state", repo=tmp / "bare")))
 
+    def test_prove_staging_names_the_refusal_and_the_cli_reports_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp).resolve()
+            staging = tmp / "staging"
+            (staging / "scripts/lanes").mkdir(parents=True)  # no mesh-runtime-bundle.mjs: node fails
+            host = lane.Host(state=tmp / "state", repo=tmp / "repo")
+            (tmp / "repo").mkdir()
+            with patch.object(lane.worktree_pool, "pool_dir", return_value=tmp / "no-pool"):
+                self.assertEqual(lane.prove_staging(host, staging), "mesh runtime dependency closure failed")
+            self.assertTrue((staging / ".selftest-state").is_dir(), "scratch state lives under staging only")
+            with patch.object(lane, "load_github_env"), patch.object(lane, "Host", return_value=host), \
+                    patch.object(lane, "prove_staging", return_value="release tests failed") as proved, \
+                    patch("sys.stdout", new_callable=io.StringIO) as out:
+                self.assertEqual(lane.guarded_main(["prove-staging", str(staging)]), 1)
+            self.assertEqual(out.getvalue().strip(), "release tests failed")
+            self.assertEqual(proved.call_args.args[1], staging)
+            with patch.object(lane, "load_github_env"), patch.object(lane, "Host", return_value=host), \
+                    patch.object(lane, "prove_staging", return_value=None):
+                self.assertEqual(lane.guarded_main(["prove-staging", str(staging)]), 0)
+
     def test_update_installs_tested_release_and_only_moves_the_symlink(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp).resolve()  # macOS /var -> /private/var must match .resolve() below
