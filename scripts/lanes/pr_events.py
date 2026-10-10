@@ -382,14 +382,14 @@ def queue_ejections(number: int, now: float, sh=run, *, head: str) -> int | None
     if not head:
         return None
     owner, name = REPO.split("/")
-    cursor, seen, count = None, set(), 0
+    cursor, seen, count, past_head = None, set(), 0, False
     for _ in range(100):
         before = f",before:{json.dumps(cursor)}" if cursor is not None else ""
         query = (f'{{repository(owner:"{owner}",name:"{name}"){{pullRequest(number:{number}){{'
                  'headRefOid state timelineItems(last:100' + before +
                  ',itemTypes:[PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){'
                  'pageInfo{hasPreviousPage startCursor} nodes{__typename '
-                 '... on PullRequestCommit{commit{oid}} '
+                 '... on PullRequestCommit{commit{oid parents(first:2){totalCount}}} '
                  '... on HeadRefForcePushedEvent{afterCommit{oid}} '
                  '... on RemovedFromMergeQueueEvent{createdAt reason}}}}}}')
         listed = sh(["gh", "api", "graphql", "-f", f"query={query}"])
@@ -405,8 +405,16 @@ def queue_ejections(number: int, now: float, sh=run, *, head: str) -> int | None
                 return None
             for item in reversed(timeline["nodes"]):
                 kind = item.get("__typename")
-                if kind == "PullRequestCommit" and (item.get("commit") or {}).get("oid") == head:
-                    return count
+                if kind == "PullRequestCommit":
+                    commit = item.get("commit") or {}
+                    # A sync with main (`update-branch`, a two-parent merge) is not a repair: the
+                    # same defect re-enters the queue under a new head. Count through it so the
+                    # second ejection still poisons (2026-10-10: #21118 looped six groups).
+                    if ((commit.get("parents") or {}).get("totalCount") or 1) > 1:
+                        past_head = past_head or commit.get("oid") == head
+                        continue
+                    if commit.get("oid") == head or past_head:
+                        return count
                 if kind == "HeadRefForcePushedEvent" and (item.get("afterCommit") or {}).get("oid") == head:
                     return count
                 if kind == "RemovedFromMergeQueueEvent":

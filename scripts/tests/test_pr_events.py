@@ -541,6 +541,23 @@ class RelayTest(unittest.TestCase):
         self.assertIsNone(events.queue_ejections(7, NOW, repeated, head="h7"))
         self.assertEqual(len(repeated.calls), 2)
 
+    def test_a_sync_with_main_does_not_reset_the_ejection_count(self):
+        # 2026-10-10: #21118 was ejected, update-branch merged main (new head), re-enrolled and
+        # ejected again, six times. A two-parent merge is not a repair, so both ejections count
+        # and the second one poisons; a real (single-parent) commit still starts a new revision.
+        removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        def commit(oid, parents):
+            return {"__typename": "PullRequestCommit", "commit": {"oid": oid, "parents": {"totalCount": parents}}}
+        def page(nodes):
+            return {"data": {"repository": {"pullRequest": {"headRefOid": "sync2", "state": "OPEN", "timelineItems": {
+                "nodes": nodes, "pageInfo": {"hasPreviousPage": False, "startCursor": None}}}}}}
+        looped = page([commit("fix", 1), removal, commit("sync1", 2), removal, commit("sync2", 2), removal])
+        self.assertEqual(events.queue_ejections(7, NOW, Shell({("gh", "api", "graphql"): looped}), head="sync2"), 3)
+        repaired = page([commit("old", 1), removal, removal, commit("fix", 1), commit("sync2", 2), removal])
+        self.assertEqual(events.queue_ejections(7, NOW, Shell({("gh", "api", "graphql"): repaired}), head="sync2"), 1)
+        legacy = page([{"__typename": "PullRequestCommit", "commit": {"oid": "sync2"}}, removal])  # no parents: a plain boundary
+        self.assertEqual(events.queue_ejections(7, NOW, Shell({("gh", "api", "graphql"): legacy}), head="sync2"), 1)
+
     def test_poison_mutation_rechecks_live_head_and_hold_after_history_reads(self):
         removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
         page = {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", "timelineItems": {

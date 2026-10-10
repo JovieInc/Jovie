@@ -91,6 +91,23 @@ async function applyJevAssessment(issue, assessment, client) {
       mutations: 0,
       wakeSymphony: false,
     };
+  if (assessment.status === 'unavailable')
+    // The model provider is down, not the issue. Name the row as a
+    // provider-blocked escalation so the sweep stays green (2026-10-10:
+    // Fleet Gate Refresh went red on every main push for 26 such rows).
+    return {
+      disposition: assessment.status,
+      reason: assessment.reason,
+      mutations: 0,
+      wakeSymphony: false,
+      requiresImmediateInvestigation: false,
+      escalation: {
+        status: 'provider-block',
+        code: assessment.reason || 'provider-unavailable',
+        owner: null,
+        requestedModel: assessment.model ?? null,
+      },
+    };
   if (assessment.status !== 'decided')
     return {
       disposition: assessment.status,

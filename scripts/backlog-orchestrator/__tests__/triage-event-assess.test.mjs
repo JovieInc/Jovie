@@ -184,6 +184,29 @@ test('holds ambiguity, interrupted provider work, urgent downgrade and actual ow
   }
 });
 
+test('an unavailable Jev provider is a named provider-blocked escalation, not a red sweep', async () => {
+  const world = jevWorld();
+  const result = await assessTriageEvent(
+    event(),
+    world.client,
+    world.receipt(
+      jev({
+        status: 'unavailable',
+        reason: 'provider-unavailable',
+        destination: null,
+        priority: null,
+      })
+    )
+  );
+  assert.equal(result.disposition, 'unavailable');
+  assert.equal(result.requiresImmediateInvestigation, false);
+  assert.equal(result.escalation.status, 'provider-block');
+  assert.equal(result.escalation.code, 'provider-unavailable');
+  assert.equal(result.escalation.requestedModel, 'typesafe-ai/jev');
+  assert.equal(result.mutations, 0);
+  assert.deepEqual(world.writes, []);
+});
+
 test('fails closed on invalid Jev response, missing readiness label and ownership race', async () => {
   const invalid = jevWorld();
   await assert.rejects(
