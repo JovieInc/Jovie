@@ -24,7 +24,26 @@ describe('production-blocked debug routes', () => {
   });
 
   it('keeps the product screenshot capture inventory exact', () => {
-    expect(PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS).toEqual(['/exp/shell-v1']);
+    expect(PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS).toEqual([
+      '/demo',
+      '/demo/audience',
+      '/demo/showcase/analytics',
+      '/demo/showcase/earnings',
+      '/demo/showcase/links',
+      '/demo/showcase/release-tracked-links',
+      '/demo/showcase/releases',
+      '/demo/showcase/settings',
+      '/exp/shell-v1',
+    ]);
+  });
+
+  it('lets screenshot capture reach the shell-material /demo routes only', () => {
+    const options = { allowProductScreenshotCaptureRoutes: true };
+    expect(isProductionBlockedDebugPath('/demo/audience', options)).toBe(false);
+    expect(isProductionBlockedDebugPath('/demo/onboarding', options)).toBe(
+      true
+    );
+    expect(isProductionBlockedDebugPath('/demo/audience')).toBe(true);
   });
 
   it.each([
