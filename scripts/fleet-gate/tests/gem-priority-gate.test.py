@@ -159,7 +159,7 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
         self.assertEqual(observed["sourceGate"]["conclusion"], "skipped")
-        self.assertIn("no real attempt", observed["error"])
+        self.assertIn("no completed real attempt", observed["error"])
 
     def test_observe_main_falls_back_to_recent_real_release_attempt(self):
         """JOV-8000 follow-up 27: the queue-merge window. A merge-group run
@@ -229,6 +229,73 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["sourceGate"]["ancestorSha"], "b" * 40)
         self.assertIn("fell back to the newest real Main Release Ready attempt", observed["error"])
 
+    def test_observe_main_falls_back_when_exact_gate_is_pending_not_skipped(self):
+        """JOV-8000 follow-up 28 — the 38019846033 shape: minutes after a queue
+        merge (and minutes after the follow-up-27 fix itself landed), the tip's
+        direct push CI has STARTED — its Main Release Ready is PENDING, not
+        skipped. The follow-up-27 fallback only fired for the skipped shape and
+        the gate bound main-unknown through the pending window. The unified
+        fallback fires for pending/missing/no-verdict too: a fresh real
+        ancestor SUCCESS grades main green (named, with the ancestor sha)."""
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "in_progress",
+                            "conclusion": None,
+                            "started_at": "2026-10-10T03:14:20Z",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 424244,
+                            "head_sha": "c" * 40,
+                            "created_at": "2026-10-10T02:45:58Z",
+                        }
+                    ]
+                }
+            if endpoint == "actions/runs/424244/jobs?per_page=100":
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-10-10T02:53:00Z",
+                            "completed_at": "2026-10-10T02:54:00Z",
+                            "html_url": "https://example.test/job/424244",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        now = MODULE.datetime(2026, 10, 10, 3, 15, tzinfo=MODULE.UTC)
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            with mock.patch.object(MODULE, "utc_now", return_value=now):
+                observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["reason"], "required-checks-green-ancestor-fallback")
+        self.assertEqual(
+            observed["sourceGate"]["source"], "ancestor-ci-workflow-job"
+        )
+        self.assertEqual(observed["sourceGate"]["ancestorSha"], "c" * 40)
+        self.assertIn("fell back to the newest real Main Release Ready attempt", observed["error"])
+
     def test_observe_main_ancestor_fallback_fails_closed_when_bound_exceeded(self):
         """No real attempt within the freshness bound: main stays unknown."""
 
@@ -280,7 +347,7 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                 observed = MODULE.observe_main("JovieInc/Jovie")
 
         self.assertEqual(observed["status"], "unknown")
-        self.assertIn("no real attempt", observed["error"])
+        self.assertIn("no completed real attempt", observed["error"])
 
     def test_observe_main_failure_is_still_red(self):
         def github_response(_repo: str, endpoint: str):
@@ -449,6 +516,10 @@ def _main_fixture(
         if endpoint.startswith(f"commits/{sha}/check-runs?"):
             return {"check_runs": check_runs}
         if endpoint.startswith("actions/runs?"):
+            return {"workflow_runs": []}
+        if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+            # JOV-8000 follow-up 28: the ancestor-fallback history query —
+            # empty by default so pending/missing fixtures fail closed.
             return {"workflow_runs": []}
         if endpoint.startswith("actions/artifacts?"):
             return {"artifacts": artifacts or []}
