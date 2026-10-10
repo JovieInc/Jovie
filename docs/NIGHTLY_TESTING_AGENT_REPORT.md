@@ -3,12 +3,12 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38004759895)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38062023927)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-10-09T23:51:28.911Z
+Generated: 2026-10-10T15:23:48.113Z
 Workflow conclusion: failure
 
 ## Evidence warnings
@@ -22,7 +22,7 @@ Workflow conclusion: failure
 | unit | 7599 | 7582 | 2 | 0 | 15 |
 | unit | 8163 | 8122 | 0 | 0 | 41 |
 | unit | 8013 | 7972 | 0 | 0 | 41 |
-| unit | 10412 | 10405 | 0 | 0 | 7 |
+| unit | 10415 | 10408 | 0 | 0 | 7 |
 
 ## Selected Targets
 
@@ -46,5 +46,5 @@ Workflow conclusion: failure
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-aEzYj7/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-6wzZoI/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-Al1bMF/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-XMUzrY/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
