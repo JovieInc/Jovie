@@ -71,7 +71,7 @@ const PLATFORM_ROWS = [
   {
     icon: Laptop,
     label: 'Mac',
-    title: 'Native desktop workspace',
+    title: 'Native desktop\u00a0workspace',
     body: 'Open Jovie from your Dock, keep your release workflow out of browser noise, and stay current with automatic updates.',
     action: 'Download for Mac',
     href: DOWNLOAD_URL,
