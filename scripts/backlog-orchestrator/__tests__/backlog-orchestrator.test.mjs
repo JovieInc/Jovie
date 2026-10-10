@@ -2120,27 +2120,33 @@ describe('entrypoint contract', () => {
       fakeGh,
       [
         '#!/bin/sh',
-        '# argv: api <endpoint> — the endpoint is the 2nd argv word (graphql is literal)',
+        '# argv: api graphql -f query=<gql>  OR  api repos/... — graphql must be exactly 4 args',
         'if [ "$1" != "api" ]; then exit 1; fi',
-        '  ENDPOINT="$2"',
-        '  case "$ENDPOINT" in',
-        '    graphql|graphql\\ *)',
-        '      printf \'graphql\\n\' >> "$FAKE_DIR/calls-graphql"',
+        '  # log argv SOH-separated (one record per arg, records end with a blank line)',
+        String.raw`  for a in "$@"; do printf '%s\001' "$a" >> "$FAKE_DIR/argv-log"; done; printf '\n' >> "$FAKE_DIR/argv-log"`,
+        '  case "$2" in',
+        '    graphql)',
+        '      # strict argv shape: $3 must be -f and $4 must start query= (else the call is malformed)',
+        '      if [ "$3" != "-f" ]; then exit 2; fi',
+        '      case "$4" in query=*) ;; *) exit 2 ;; esac',
+        '      if [ -n "$5" ]; then exit 2; fi',
+        String.raw`      printf 'graphql\n' >> "$FAKE_DIR/calls-graphql"`,
         '      if [ -f "$FAKE_DIR/graphql-fail" ]; then exit 1; fi',
-        '      if [ -f "$FAKE_DIR/graphql-body" ]; then cat "$FAKE_DIR/graphql-body"; else printf \'%s\' \'{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[]}}}}}\'; fi',
+        '      if [ -f "$FAKE_DIR/graphql-errors" ]; then cat "$FAKE_DIR/graphql-errors"; exit 0; fi',
+        String.raw`      if [ -f "$FAKE_DIR/graphql-body" ]; then cat "$FAKE_DIR/graphql-body"; else printf '%s' '{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}}}'; fi`,
         '      ;;',
         '    *git/matching-refs/heads/gh-readonly-queue/main/*)',
-        '      printf \'refs\\n\' >> "$FAKE_DIR/calls-refs"',
+        String.raw`      printf 'refs\n' >> "$FAKE_DIR/calls-refs"`,
         '      if [ -f "$FAKE_DIR/refs-fail" ]; then exit 1; fi',
         '      if [ -f "$FAKE_DIR/refs-body" ]; then cat "$FAKE_DIR/refs-body"; else printf "[]"; fi',
         '      ;;',
         '    repos/JovieInc/Jovie/pulls/*)',
-        '      NUMBER="${ENDPOINT##*/pulls/}"',
-        '      printf \'%s\\n\' "$NUMBER" >> "$FAKE_DIR/calls-$NUMBER"',
+        '      NUMBER="${2##*/pulls/}"',
+        String.raw`      printf '%s\n' "$NUMBER" >> "$FAKE_DIR/calls-$NUMBER"`,
         '      case ",${FAILNUMS:-}," in *",$NUMBER,"*) exit 1 ;; esac',
         '      printf \'%s\' "$(cat "$FAKE_DIR/detail-$NUMBER")"',
         '      ;;',
-        '    repos/JovieInc/Jovie/pulls\?*) printf "[]" ;;',
+        '    repos/JovieInc/Jovie/pulls\\?*) printf "[]" ;;',
         '    *) printf "[]" ;;',
         '  esac',
       ].join('\n')
@@ -2152,7 +2158,11 @@ describe('entrypoint contract', () => {
   };
 
   /** Write a GraphQL merge-queue entries body for [ {number, head} ]. */
-  const writeGraphqlBody = async (tempDir, entries) => {
+  const writeGraphqlBody = async (
+    tempDir,
+    entries,
+    { hasNextPage = false } = {}
+  ) => {
     await writeFile(
       `${tempDir}/graphql-body`,
       JSON.stringify({
@@ -2163,12 +2173,26 @@ describe('entrypoint contract', () => {
                 nodes: entries.map(entry => ({
                   pullRequest: { number: entry.number, headRefOid: entry.head },
                 })),
+                pageInfo: { hasNextPage },
               },
             },
           },
         },
       })
     );
+  };
+
+  /** Read the NUL-separated argv log as an array of per-call arg arrays. */
+  const readArgvLog = async tempDir => {
+    try {
+      const raw = await readFile(`${tempDir}/argv-log`, 'utf8');
+      return raw
+        .split('\n')
+        .filter(record => record.length > 0)
+        .map(record => record.split('\u0001').filter(arg => arg.length > 0));
+    } catch {
+      return [];
+    }
   };
 
   const readCalls = async (tempDir, key) => {
@@ -2424,14 +2448,16 @@ describe('entrypoint contract', () => {
     // the gate boundary itself is covered by the boundary test (2/10 passes, 3/12 fails)
   });
 
-  it('marks a still-null row with a merge-queue ref as inMergeQueue and not conflicting', async () => {
+  it('a base-sha queue ref with GraphQL failing does NOT mark the row (refs are not queue proof)', async () => {
+    // JOV-8000 follow-up 37: gh-readonly-queue refs carry the merge group's
+    // BASE sha (the main tip), not the PR head, so a head-bound ref match can
+    // never pass — refs are dropped as queue proof. Even a ref whose suffix
+    // equals the row's head must not mark the row when GraphQL failed.
     const tempDir = await mkdtemp(resolve('/tmp/', 'mm-d-'));
     const fakeBin = resolve(tempDir, 'bin');
     await mkdir(fakeBin, { recursive: true });
-    // GraphQL fails -> the head-bound refs fallback runs.
     await writeFile(`${tempDir}/graphql-fail`, '');
     const head401 = 'a'.repeat(40);
-    const staleHead401 = 'b'.repeat(40);
     await writeMergeabilityFakeGh(
       resolve(fakeBin, 'gh'),
       {
@@ -2446,12 +2472,7 @@ describe('entrypoint contract', () => {
     await writeFile(
       `${tempDir}/refs-body`,
       JSON.stringify([
-        // Live: names the row's current head.
         { ref: `refs/heads/gh-readonly-queue/main/pr-401-${head401}` },
-        // Leaked: an older head of the same PR — must NOT mark.
-        { ref: `refs/heads/gh-readonly-queue/main/pr-401-${staleHead401}` },
-        // Leaked: a PR not in the population.
-        { ref: 'refs/heads/gh-readonly-queue/main/pr-10350-stale' },
       ])
     );
     const rows = [
@@ -2468,9 +2489,6 @@ describe('entrypoint contract', () => {
     const { measureMergeability } = await import(
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
     );
-    const { mergeabilityUnknown } = await import(
-      resolve(ORCHESTRATOR_DIR, 'backlog-remediation.mjs')
-    );
     const evidence = await measureMergeability(
       rows,
       {
@@ -2480,16 +2498,12 @@ describe('entrypoint contract', () => {
       },
       { sleep: () => Promise.resolve(), now: () => 0 }
     );
-    // (d) head-bound queue ref -> inMergeQueue, known, not conflicting,
-    // and the row never spent a per-PR GET (marked before the rounds).
-    assert.equal(rows[0].inMergeQueue, true);
-    assert.equal(mergeabilityUnknown(rows[0]), false);
-    assert.deepEqual(evidence.inMergeQueue, [401]);
-    assert.equal(evidence.measured, 1);
-    assert.equal(evidence.polls, 0);
-    assert.deepEqual(await readCalls(tempDir, '401'), []);
-    // a stale ref (pr-10350) never marks an unqueued row
-    assert.ok(!('inMergeQueue' in rows.find(() => true) && false));
+    // refs ignored: GraphQL failed -> queueSource none, row stays unknown
+    assert.equal(rows[0].inMergeQueue, undefined);
+    assert.deepEqual(evidence.inMergeQueue, []);
+    assert.equal(evidence.queueSource, 'none');
+    assert.ok(String(evidence.errors[0] || '').startsWith('mergequeue:'));
+    assert.deepEqual(evidence.stillUnknown, [401]);
   });
 
   it('leaves rows unknown when the matching-refs call fails', async () => {
@@ -2532,9 +2546,11 @@ describe('entrypoint contract', () => {
       },
       { sleep: () => Promise.resolve(), now: () => 0 }
     );
-    // (e) failed refs call leaves the row unknown
+    // (e) failed refs + GraphQL calls leave the row unknown (refs dropped)
     assert.deepEqual(evidence.stillUnknown, [501]);
     assert.equal(rows[0].inMergeQueue, undefined);
+    assert.equal(evidence.queueSource, 'none');
+    assert.ok(String(evidence.errors[0] || '').startsWith('mergequeue:'));
   });
 
   it('stops at the deadline with leftovers unknown, nothing thrown, bounded in-flight calls', async () => {
@@ -2688,6 +2704,264 @@ describe('entrypoint contract', () => {
     }
   });
 
+  it('passes the GraphQL merge-queue read as separate argv elements, not one fused endpoint', async () => {
+    // Regression for the follow-up-36 defect: `gh api` takes the endpoint as
+    // ONE argv element, so 'graphql -f query=...' must be split into
+    // ['api','graphql','-f','query=...'] — a fused string is an invalid
+    // endpoint, the read always failed, and queued PRs were never marked.
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-argv-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const argvPath = resolve(tempDir, 'argv');
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        // record each argv on its own line, NUL-safe-ish
+        'i=0; for a in "$@"; do printf \'%s|%s\\n\' "$i" "$a" >> "$ARGV_PATH"; i=$((i+1)); done',
+        'case "$2" in',
+        '  graphql) printf \'%s\' \'{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[]}}}}}\' ;;',
+        '  *) printf "[]" ;;',
+        'esac',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const rows = [
+      {
+        number: 701,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+        ARGV_PATH: argvPath,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    const argvLines = (await readFile(argvPath, 'utf8')).trim().split('\n');
+    // every recorded line is '<index>|<element>'; collect just the elements
+    // in invocation order (a graphql call is followed by the REST GETs).
+    const elements = argvLines.map(line => line.slice(line.indexOf('|') + 1));
+    const graphqlAt = elements.findIndex(el => el === 'graphql');
+    assert.ok(graphqlAt >= 0, 'a graphql argv element exists');
+    assert.ok(
+      !elements.some(el => el.startsWith('graphql -f')),
+      'no fused graphql endpoint'
+    );
+    const fAt = elements.findIndex(el => el === '-f');
+    assert.ok(fAt > graphqlAt, "'-f' follows 'graphql'");
+    assert.ok(
+      elements.slice(fAt + 1).some(el => el.startsWith('query=')),
+      "a 'query=' element follows '-f'"
+    );
+  });
+
+  it('sends the GraphQL queue read as exactly 4 argv elements (JOV-8000 follow-up 37)', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-argv4-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        701: { mergeable: true, mergeable_state: 'clean', head: { sha: 'h1' } },
+      },
+      tempDir
+    );
+    const rows = [
+      {
+        number: 701,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    const calls = await readArgvLog(tempDir);
+    const graphqlCall = calls.find(argv => argv[1] === 'graphql');
+    assert.ok(graphqlCall, 'a graphql call was recorded');
+    // exactly: ['api', 'graphql', '-f', 'query=...']
+    assert.equal(graphqlCall.length, 4);
+    assert.equal(graphqlCall[0], 'api');
+    assert.equal(graphqlCall[1], 'graphql');
+    assert.equal(graphqlCall[2], '-f');
+    assert.ok(graphqlCall[3].startsWith('query='));
+  });
+
+  it('a GraphQL errors[] body leaves rows unknown with mergequeue: evidence and queueSource none', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-errs-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        801: {
+          mergeable: null,
+          mergeable_state: 'unknown',
+          head: { sha: 'h1' },
+        },
+      },
+      tempDir
+    );
+    await writeFile(
+      `${tempDir}/graphql-errors`,
+      JSON.stringify({ errors: [{ message: 'Field mergeQueue not found' }] })
+    );
+    const rows = [
+      {
+        number: 801,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    assert.equal(evidence.queueSource, 'none');
+    assert.ok(String(evidence.errors[0] || '').startsWith('mergequeue:'));
+    assert.deepEqual(evidence.inMergeQueue, []);
+    assert.deepEqual(evidence.stillUnknown, [801]);
+  });
+
+  it('polled-null rows are stillUnknown but not unpolled; deadline-cut rows are unpolled', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-polled-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const details = {};
+    for (let n = 1; n <= 6; n += 1) {
+      details[n] = {
+        mergeable: null,
+        mergeable_state: 'unknown',
+        head: { sha: `h${n}` },
+      };
+    }
+    await writeMergeabilityFakeGh(resolve(fakeBin, 'gh'), details, tempDir);
+    const rows = Array.from({ length: 6 }, (_, i) => ({
+      number: i + 1,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+      headSha: `h${i + 1}`,
+    }));
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    // clock: round 0 completes for the first batch (rows 1-4 get a GET), then
+    // the clock jumps past the deadline before the second batch — rows 5-6
+    // never got a GET (unpolled), rows 1-4 polled-null (stillUnknown only).
+    let t = 0;
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => (t < 3 ? (t += 1) : 21_000) }
+    );
+    assert.equal(evidence.deadlineHit, true);
+    const unpolled = [...evidence.unpolled].sort((a, b) => a - b);
+    assert.ok(unpolled.length >= 1, 'some rows cut before any GET');
+    for (const n of unpolled) {
+      assert.deepEqual(await readCalls(tempDir, String(n)), []);
+    }
+    const polledNull = [...evidence.stillUnknown].filter(
+      n => !unpolled.includes(n)
+    );
+    for (const n of polledNull) {
+      assert.ok((await readCalls(tempDir, String(n))).length >= 1);
+    }
+    // disjoint and together cover the unknown set
+    assert.deepEqual(
+      [...unpolled, ...polledNull].sort((a, b) => a - b),
+      [...evidence.stillUnknown].sort((a, b) => a - b)
+    );
+  });
+
+  it('a hasNextPage merge-queue page is flagged mergequeue:truncated-at-100', async () => {
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-trunc-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const head = 'a'.repeat(40);
+    await writeMergeabilityFakeGh(
+      resolve(fakeBin, 'gh'),
+      {
+        901: { mergeable: true, mergeable_state: 'clean', head: { sha: head } },
+      },
+      tempDir
+    );
+    await writeGraphqlBody(tempDir, [{ number: 901, head }], {
+      hasNextPage: true,
+    });
+    const rows = [
+      {
+        number: 901,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: head,
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const evidence = await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    assert.equal(evidence.queueSource, 'graphql');
+    assert.ok(evidence.errors.includes('mergequeue:truncated-at-100'));
+    assert.deepEqual(evidence.inMergeQueue, [901]);
+  });
+
   it('reads the merge queue once via GraphQL, marking head-bound rows with zero per-PR GETs (JOV-8000 follow-up 36)', async () => {
     const tempDir = await mkdtemp(resolve('/tmp/', 'mm-h-'));
     const fakeBin = resolve(tempDir, 'bin');
@@ -2714,17 +2988,16 @@ describe('entrypoint contract', () => {
       tempDir,
       [21, 22, 23, 24, 25].map(number => ({ number, head: head(number) }))
     );
-    const rows = /** @type {Array<Record<string, any>>} */ (
-      Array.from({ length: 25 }, (_, i) => ({
-        number: i + 1,
-        title: 'a',
-        body: 'x',
-        state: 'OPEN',
-        isDraft: false,
-        labels: [],
-        headSha: head(i + 1),
-      }))
-    );
+    const rows = Array.from({ length: 25 }, (_, i) => ({
+      number: i + 1,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+      headSha: head(i + 1),
+      mergeable: /** @type {string | null} */ (null),
+    }));
     const { measureMergeability } = await import(
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
     );
