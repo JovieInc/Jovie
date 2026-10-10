@@ -436,7 +436,9 @@ function rateLimitHints(response, nowMs = Date.now()) {
   }
   const remaining = {};
   for (const name of RATE_LIMIT_REMAINING_HEADERS) {
-    const value = Number(get(name));
+    const raw = get(name);
+    if (typeof raw !== 'string' || raw.trim() === '') continue;
+    const value = Number(raw);
     if (Number.isFinite(value) && value >= 0) remaining[name] = value;
   }
   return {

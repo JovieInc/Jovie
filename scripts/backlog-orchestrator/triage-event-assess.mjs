@@ -487,7 +487,7 @@ export async function assessTriageEvent(
   };
 }
 
-async function runCli() {
+export async function runCli() {
   const eventPath = process.argv
     .find(arg => arg.startsWith('--event-file='))
     ?.slice('--event-file='.length);
@@ -519,7 +519,12 @@ async function runCli() {
     ? await assessTriageSweep()
     : await assessTriageEvent(JSON.parse(readFileSync(eventPath, 'utf8')));
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
-  if (isSweep && sweepCacheFile && Number(receipt?.failed ?? 0) === 0) {
+  if (
+    isSweep &&
+    sweepCacheFile &&
+    'failed' in receipt &&
+    Number(receipt.failed ?? 0) === 0
+  ) {
     const cache = readSweepCache(sweepCacheFile);
     cache[SWEEP_THROTTLE_KEY] = new Date().toISOString();
     writeSweepCache(sweepCacheFile, cache);
