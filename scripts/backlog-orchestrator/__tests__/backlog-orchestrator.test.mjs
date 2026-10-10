@@ -2688,6 +2688,71 @@ describe('entrypoint contract', () => {
     }
   });
 
+  it('passes the GraphQL merge-queue read as separate argv elements, not one fused endpoint', async () => {
+    // Regression for the follow-up-36 defect: `gh api` takes the endpoint as
+    // ONE argv element, so 'graphql -f query=...' must be split into
+    // ['api','graphql','-f','query=...'] — a fused string is an invalid
+    // endpoint, the read always failed, and queued PRs were never marked.
+    const tempDir = await mkdtemp(resolve('/tmp/', 'mm-argv-'));
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeGh = resolve(fakeBin, 'gh');
+    const argvPath = resolve(tempDir, 'argv');
+    await writeFile(
+      fakeGh,
+      [
+        '#!/bin/sh',
+        // record each argv on its own line, NUL-safe-ish
+        'i=0; for a in "$@"; do printf \'%s|%s\\n\' "$i" "$a" >> "$ARGV_PATH"; i=$((i+1)); done',
+        'case "$2" in',
+        '  graphql) printf \'%s\' \'{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[]}}}}}\' ;;',
+        '  *) printf "[]" ;;',
+        'esac',
+      ].join('\n')
+    );
+    await chmod(fakeGh, 0o755);
+    const rows = [
+      {
+        number: 701,
+        title: 'a',
+        body: 'x',
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        headSha: 'h1',
+      },
+    ];
+    const { measureMergeability } = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    await measureMergeability(
+      rows,
+      {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        FAKE_DIR: tempDir,
+        ARGV_PATH: argvPath,
+      },
+      { sleep: () => Promise.resolve(), now: () => 0 }
+    );
+    const argvLines = (await readFile(argvPath, 'utf8')).trim().split('\n');
+    // every recorded line is '<index>|<element>'; collect just the elements
+    // in invocation order (a graphql call is followed by the REST GETs).
+    const elements = argvLines.map(line => line.slice(line.indexOf('|') + 1));
+    const graphqlAt = elements.findIndex(el => el === 'graphql');
+    assert.ok(graphqlAt >= 0, 'a graphql argv element exists');
+    assert.ok(
+      !elements.some(el => el.startsWith('graphql -f')),
+      'no fused graphql endpoint'
+    );
+    const fAt = elements.findIndex(el => el === '-f');
+    assert.ok(fAt > graphqlAt, "'-f' follows 'graphql'");
+    assert.ok(
+      elements.slice(fAt + 1).some(el => el.startsWith('query=')),
+      "a 'query=' element follows '-f'"
+    );
+  });
+
   it('reads the merge queue once via GraphQL, marking head-bound rows with zero per-PR GETs (JOV-8000 follow-up 36)', async () => {
     const tempDir = await mkdtemp(resolve('/tmp/', 'mm-h-'));
     const fakeBin = resolve(tempDir, 'bin');
@@ -2714,17 +2779,15 @@ describe('entrypoint contract', () => {
       tempDir,
       [21, 22, 23, 24, 25].map(number => ({ number, head: head(number) }))
     );
-    const rows = /** @type {Array<Record<string, any>>} */ (
-      Array.from({ length: 25 }, (_, i) => ({
-        number: i + 1,
-        title: 'a',
-        body: 'x',
-        state: 'OPEN',
-        isDraft: false,
-        labels: [],
-        headSha: head(i + 1),
-      }))
-    );
+    const rows = Array.from({ length: 25 }, (_, i) => ({
+      number: i + 1,
+      title: 'a',
+      body: 'x',
+      state: 'OPEN',
+      isDraft: false,
+      labels: [],
+      headSha: head(i + 1),
+    }));
     const { measureMergeability } = await import(
       resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
     );
