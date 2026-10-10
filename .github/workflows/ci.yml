@@ -3549,7 +3549,10 @@ jobs:
     # pickup waited 8-68 min per merge group on 2026-10-10 because the org-wide
     # pool was full, and three queued Mac jobs idled a 15-deep ALLGREEN queue.
     runs-on: ${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
-    timeout-minutes: 45
+    # The laptops are extra capacity, never the only capacity. A self-hosted
+    # run finishes in ~5 min; a laptop that sleeps mid-job must release the
+    # merge group quickly so the rebuilt group re-routes to hosted macOS.
+    timeout-minutes: ${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && 25 || 45 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -3583,6 +3586,12 @@ jobs:
             --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Test and package exact Mac head
+        env:
+          # The staging package is unsigned by design. Hosted runners have no
+          # signing identity; a self-hosted Mac has the owner's Developer ID in
+          # its keychain and electron-builder would try to codesign with it
+          # headless and fail (2026-10-10, tw-mac-001).
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           set -euo pipefail
           swift test --package-path apps/macos/MenuMonitor --enable-code-coverage
@@ -3617,6 +3626,11 @@ jobs:
             [ -f "$artifact" ] || { echo "::error::Missing Mac artifact: $artifact"; exit 1; }
           done
       - name: Upload exact Mac staging package
+        # Retention-only artifact (no workflow downloads it). A self-hosted
+        # laptop uploads the ~460 MB package at ~20 KB/s and would time the
+        # job out, so only hosted runners keep it; the artifact set is still
+        # verified on every runner above.
+        if: ${{ runner.environment == 'github-hosted' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: desktop-staging-${{ github.sha }}
