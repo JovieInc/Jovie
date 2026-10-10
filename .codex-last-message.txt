@@ -1,0 +1,20 @@
+## Handoff
+
+Draft PR opened: [#20921](https://github.com/JovieInc/Jovie/pull/20921)
+
+- Restored referral settings, APIs, navigation, registries, and documentation on current `main`.
+- Added regression coverage for routes, page states, clipboard behavior, and screen certification.
+- Commit: `efdf4d51e49e2ad9f815d3701671217bf6b8fcbb`
+- PR is draft, mergeable, and targets `main`.
+- JOV-7989 transitioned to **In Review**.
+
+Verified:
+
+- Biome and ESLint passed.
+- 103 focused Vitest tests passed.
+- 86 invariant/pruning tests passed.
+- Typechecking passed across 18 packages.
+- Server-boundary, screen-registration, and documentation freshness checks passed.
+- Push and publication hooks passed.
+
+Concern: `design:drift-ledger:check` has seven pre-existing failures reproduced on clean `origin/main`; repair is tracked in [JOV-7992](https://linear.app/jovie/issue/JOV-7992/repair-stale-design-drift-ledger-baseline-on-main). Hosted PR checks were still running at handoff. GBrain was unavailable, so repository evidence was used as instructed.
