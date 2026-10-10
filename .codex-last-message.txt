@@ -1,0 +1,8 @@
+**NOT-SHIPPABLE: unrelated `main` and infrastructure failures.**
+
+- [Profile browser](https://github.com/JovieInc/Jovie/actions/runs/37612174480/job/112762484771) rejects `link_instagram`; the relevant code is unchanged from `origin/main`.
+- [Visual certification](https://github.com/JovieInc/Jovie/actions/runs/37612174480/job/112762484661) fails screenshot capture in an unchanged standalone fixture.
+
+Merged `origin/main` locally as `11e2d4cbeb`. Started the affected gate, then stopped during typecheck under your stop condition. No source fixes or push; remote head remains unchanged, OPEN and outside the queue.
+
+Gbrain receipt saved and readback verified: `jovie-pr-20678-merge-group-blockers-2026-10-07`.
