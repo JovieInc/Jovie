@@ -15,9 +15,9 @@ overrides:
   undici@^7.0.0: 7.29.1
 
 patchedDependencies:
-  eve@0.71.3:
-    hash: vgeeehthhccalc4vunvllmlgj4
-    path: patches/eve@0.71.3.patch
+  eve@0.72.1:
+    hash: prxir4aduj6i3ougmnnxgc6ada
+    path: patches/eve@0.72.1.patch
 
 importers:
 
@@ -36,8 +36,8 @@ importers:
         specifier: 3.37.1
         version: 3.37.1(zod@4.6.5)
       eve:
-        specifier: 0.71.3
-        version: 0.71.3(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.136(zod@4.6.5))(braintrust@3.37.1(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.7)
+        specifier: 0.72.1
+        version: 0.72.1(patch_hash=prxir4aduj6i3ougmnnxgc6ada)(@opentelemetry/api@1.9.1)(ai@7.0.136(zod@4.6.5))(braintrust@3.37.1(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.7)
       just-bash:
         specifier: 3.6.0
         version: 3.6.0
@@ -1869,13 +1869,13 @@ packages:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
 
-  eve@0.71.3:
-    resolution: {integrity: sha512-n0IdHqthlSTZvWjRtyaai0dQQB6K441JUbBbk9N63zsZrVkOkaJrLxh0hY9AfPb+TlJINOlhd/BcIQIHgf5w4g==}
+  eve@0.72.1:
+    resolution: {integrity: sha512-D72hUlYoJVwsmS7JMcHLDmMgYozHujNy5VvWiEpXmhia8TnzT0do7hcM1A4SXjVhoZRiVRgKo8LZGBx8LH4gTw==}
     engines: {node: '>=24'}
     hasBin: true
     peerDependencies:
       '@opentelemetry/api': ^1.0.0
-      ai: ^7.0.105
+      ai: ^7.0.128
       braintrust: ^3.0.0
       chat: ^4.41.0
       dd-trace: ^6.13.0
@@ -4863,7 +4863,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.71.3(patch_hash=vgeeehthhccalc4vunvllmlgj4)(@opentelemetry/api@1.9.1)(ai@7.0.136(zod@4.6.5))(braintrust@3.37.1(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.7):
+  eve@0.72.1(patch_hash=prxir4aduj6i3ougmnnxgc6ada)(@opentelemetry/api@1.9.1)(ai@7.0.136(zod@4.6.5))(braintrust@3.37.1(zod@4.6.5))(just-bash@3.6.0)(microsandbox@0.7.7):
     dependencies:
       ai: 7.0.136(zod@4.6.5)
       nitro: 3.0.260903-beta
