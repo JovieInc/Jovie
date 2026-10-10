@@ -11,6 +11,7 @@ import { findDerivedSpotifyMetricKeys } from './derived-metrics';
 import { dspKeyForUrl } from './dsp-presence';
 import { ALLMUSIC_SUBMISSION_PROVIDER_ID } from './fixes';
 import { TIM_WHITE_VISIBILITY_AUDIT_INPUT } from './fixtures/tim-white';
+import { renderVisibilityAuditMarkdown } from './render-markdown';
 import type { VisibilityAuditInput } from './types';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -25,6 +26,29 @@ function withInput(
 }
 
 describe('visibility audit', () => {
+  it.each([
+    { cited: [], expected: '0%' },
+    { cited: [false, false], expected: '0%' },
+    { cited: [true, false], expected: '50%' },
+    { cited: [true, true, false], expected: '66.7%' },
+  ])('renders citation share as $expected', ({ cited, expected }) => {
+    const question = buildCanonicalQuestions('Tim White')[0]!.question;
+    const report = assembleVisibilityAudit(
+      withInput({
+        citationChecks: cited.map(value => ({
+          engine: 'chatgpt',
+          question,
+          cited: value,
+          matchedUrl: value ? 'https://jov.ie/tim' : null,
+          checkedAt: '2026-10-04T03:00:00Z',
+        })),
+      })
+    );
+    expect(renderVisibilityAuditMarkdown(report)).toContain(
+      `Share of citation: ${expected}.`
+    );
+  });
+
   it('builds the Tim /tim sample from verified profile evidence only', () => {
     const report = assembleVisibilityAudit(TIM_WHITE_VISIBILITY_AUDIT_INPUT);
     expect(report.profilePath).toBe('/tim');
@@ -71,6 +95,16 @@ describe('visibility audit', () => {
     ).toBe(true);
     expect(report.searchOwnership.instruction).toContain('SerpAPI');
     expect(report.catalog.policy).toContain('Spotify Developer Policy III.13');
+
+    const markdown = renderVisibilityAuditMarkdown(report);
+    expect(markdown).toContain('MusicFetch is not called');
+    expect(markdown).toContain('SerpAPI requests: 0');
+    expect(markdown).toContain('Spotify Developer Policy III.13');
+    const committed = readFileSync(
+      path.resolve(HERE, '../../../../docs/examples/visibility-audit/tim.md'),
+      'utf8'
+    );
+    expect(committed).toBe(markdown);
   });
 
   it('resolves MBID to Wikidata QID to ISNI from stored identity links', () => {

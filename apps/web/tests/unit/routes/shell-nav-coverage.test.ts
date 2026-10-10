@@ -55,6 +55,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Internal admin wiki article reached from the /hud/wiki/:path* rewrite into the OV app shell',
   '/app/ov/screenshots':
     'Internal screenshot QA utility retained for direct admin access outside founder navigation',
+  [APP_ROUTES.ADMIN_VISIBILITY_AUDIT]:
+    'Internal visibility-audit sample retained for direct admin access outside founder navigation',
   '/app/ov/system':
     'Internal system diagnostics retained for direct admin access outside founder navigation',
   '/app/ov/agent-runs/[id]':
