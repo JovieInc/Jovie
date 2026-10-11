@@ -4666,7 +4666,8 @@ class FixRedTest(unittest.TestCase):
 
     def test_fix_candidates_include_reclaimed_abandoned_drafts(self):
         # Tim, 2026-10-10: Symphony reclaims abandoned drafts. A 7d-old codex draft idle 48h is a
-        # candidate; a moving one, a held one and a human branch are not.
+        # candidate; a moving one and a held one are not. Tim, 2026-10-11: a founder-account
+        # writer branch is reclaimed too (agent sessions publish as Tim); a fork is not.
         now = time.time()
         ancient = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 10 * 86400))
         old = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 3 * 86400))
@@ -4676,12 +4677,13 @@ class FixRedTest(unittest.TestCase):
                     "mergeStateStatus": "BLOCKED", "createdAt": ancient, "updatedAt": updated,
                     "isCrossRepository": False, "labels": [{"name": name} for name in labels], "statusCheckRollup": []}
         inventory = [draft(40, "codex/homepage-material", old), draft(41, "codex/moving", fresh),
-                     draft(42, "codex/held", old, labels=["hold"]), draft(43, "feature/mine", old)]
+                     draft(42, "codex/held", old, labels=["hold"]), draft(43, "feature/mine", old),
+                     {**draft(44, "feature/fork", old), "isCrossRepository": True}]
         with patch.object(lane, "open_prs_summary", return_value=inventory), \
                 patch.object(lane, "lane_prs", return_value=[]), patch.object(lane, "repo_prs", return_value=[]), \
                 patch.object(lane, "shared", side_effect=lambda key, ttl, fetch: fetch()):
-            self.assertEqual([pr["number"] for pr in lane.reclaimable_drafts()], [40])
-            self.assertEqual([pr["number"] for pr in lane.fix_candidates("codex")], [40])
+            self.assertEqual([pr["number"] for pr in lane.reclaimable_drafts()], [40, 43])
+            self.assertEqual([pr["number"] for pr in lane.fix_candidates("codex")], [40, 43])
 
     def test_red_pr_leaves_dependabot_bumps_to_dependabot_auto_merge(self):
         bump = {**self.pr(), "headRefName": "dependabot/npm_and_yarn/dev-patch-8cf5366741"}
