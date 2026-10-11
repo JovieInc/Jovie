@@ -241,9 +241,13 @@ describe('Tooltip', () => {
       expect(content.className).toContain(
         'rounded-(--system-b-radius-overlay)'
       );
-      expect(content.className).toContain('whitespace-nowrap');
+      expect(content.className).toContain('whitespace-normal');
+      expect(content.className).not.toContain('whitespace-nowrap');
       expect(content.className).not.toContain('rounded-full');
-      expect(content.className).not.toContain('max-w-56');
+      expect(content.className).toContain('max-w-56');
+      expect(content.style.maxWidth).toContain(
+        '--radix-tooltip-content-available-width'
+      );
     });
 
     it('uses the shared rounded rectangle for wrapped content', () => {

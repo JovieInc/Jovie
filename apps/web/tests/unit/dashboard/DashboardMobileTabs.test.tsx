@@ -46,7 +46,7 @@ vi.mock('@/lib/tracking/navigation-telemetry', () => ({
     mockTrackNavigationImpressions(...args),
 }));
 
-const EXPANDED_LABELS = ['Home', 'Work', 'Audience'] as const;
+const EXPANDED_LABELS = ['Inbox', 'Work', 'Audience'] as const;
 
 describe('DashboardMobileTabs', () => {
   beforeEach(() => {
@@ -61,7 +61,7 @@ describe('DashboardMobileTabs', () => {
     mockTrackNavigationImpressions.mockReset();
   });
 
-  it('keeps Home, Work, and Audience direct while Identity is flag-gated off', () => {
+  it('keeps Inbox, Work, and Audience direct while Identity is flag-gated off', () => {
     render(<DashboardMobileTabs />);
 
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
@@ -70,7 +70,7 @@ describe('DashboardMobileTabs', () => {
     const directLinks = within(tabs).getAllByRole('link');
 
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
-      'Home',
+      'Inbox',
       'Work',
       'Audience',
     ]);
@@ -212,7 +212,7 @@ describe('DashboardMobileTabs', () => {
     const menu = within(dialog).getByRole('navigation', {
       name: 'Expanded Navigation Menu',
     });
-    const first = within(menu).getByRole('link', { name: 'Home' });
+    const first = within(menu).getByRole('link', { name: 'Inbox' });
     const last = within(dialog).getByRole('button', { name: 'Sign out' });
     const background = screen.getByText('Background action');
 
@@ -237,11 +237,11 @@ describe('DashboardMobileTabs', () => {
     await waitFor(() => expect(more).toHaveFocus());
   });
 
-  it('marks Home active only at the shell root', () => {
+  it('marks Inbox active only at the shell root', () => {
     const chat = render(<DashboardMobileTabs />);
     const chatTabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
     expect(
-      within(chatTabs).getByRole('link', { name: 'Home' })
+      within(chatTabs).getByRole('link', { name: 'Inbox' })
     ).not.toHaveAttribute('aria-current');
     chat.unmount();
 
@@ -251,7 +251,7 @@ describe('DashboardMobileTabs', () => {
       name: 'Dashboard Tabs',
     });
     expect(
-      within(homeTabs).getByRole('link', { name: 'Home' })
+      within(homeTabs).getByRole('link', { name: 'Inbox' })
     ).toHaveAttribute('aria-current', 'page');
   });
 
@@ -266,7 +266,7 @@ describe('DashboardMobileTabs', () => {
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
     const directLinks = within(tabs).getAllByRole('link');
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
-      'Home',
+      'Inbox',
       'Work',
       'Audience',
     ]);

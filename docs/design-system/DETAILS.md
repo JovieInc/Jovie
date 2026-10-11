@@ -1100,3 +1100,7 @@ the JSX-comment form for a text child).
 | 2026-09-29 | **EVENT: Focused task actions follow the recommended next step.** | Tim review on JOV-6709. Alternate completion paths form one progressively disclosed peer group; routine cancellation is a separate quiet exit. This specializes JOV-6942 hierarchy rules without creating a whole-app control cap. |
 
 | 2026-09-14 | BlogCard editorial titles: full live-text titles, no truncation or global fixed height, per-row subgrid tracks (`data-wrap="editorial-title"`) | Founder decision, PR #17852. Only BlogCard is exempt from heading bounds via the explicit marker + both required subgrid tracks; all other heading bounds remain enforced. |
+
+## Shell
+
+EVENT: icon/emoji glyphs are transparent at rest. A hover background must be circular, with equal dimensions and full rounding, owned by `IconGlyphFrame`. Keep an interactive parent's focus ring, hit target, accessible name, tooltip, and selected/pressed semantics. Do not put a rounded-square plate behind the glyph. Semantic status badges, avatars, and complete text actions keep their existing contracts. This applies to Jovie, Ovie, and generated marketing previews. EVENT: tooltips share the canonical compact surface, viewport-safe full wrapping, and 300ms discovery/300ms warm-up timing. Default nested providers reuse the app timing scope; explicit isolated notices and fixtures retain their own timing. History titles use single-line ellipsis with reserved date/action tracks; tooltips preserve the full clean display title.

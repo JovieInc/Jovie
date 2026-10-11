@@ -1,5 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Button } from './button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from './dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './dropdown-menu';
 import { Kbd } from './kbd';
 import {
   Tooltip,
@@ -376,5 +388,67 @@ export const AccessibilityFeatures: Story = {
         </Tooltip>
       </div>
     </div>
+  ),
+};
+
+/** Nested app wrappers share one warm-up window, including long labels. */
+export const SharedWarmup: Story = {
+  render: () => (
+    <TooltipProvider delayDuration={300} skipDelayDuration={300}>
+      <div className='flex items-center gap-6'>
+        {['First action', 'Second action'].map(label => (
+          <TooltipProvider key={label}>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button aria-label={label}>{label}</Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {label}: the complete release campaign title with audience
+                insights, distribution timelines, touring updates and every
+                important detail preserved.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ))}
+      </div>
+    </TooltipProvider>
+  ),
+};
+
+/** Full labels remain accessible inside the shared menu and dialog layers. */
+export const NestedLayers: Story = {
+  render: () => (
+    <Dialog defaultOpen>
+      <DialogContent>
+        <DialogTitle>Release details</DialogTitle>
+        <DialogDescription>
+          Choose an available release action.
+        </DialogDescription>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button>Release actions</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <Tooltip>
+              <TooltipTrigger>
+                <DropdownMenuItem>Review release</DropdownMenuItem>
+              </TooltipTrigger>
+              <TooltipContent side='right'>
+                Review the full release campaign and every audience detail
+                before publishing.
+              </TooltipContent>
+            </Tooltip>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button aria-disabled='true'>Publish unavailable</Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            Complete the release details before publishing.
+          </TooltipContent>
+        </Tooltip>
+      </DialogContent>
+    </Dialog>
   ),
 };

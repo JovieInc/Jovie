@@ -56,18 +56,18 @@ export const chatNavItem: NavItem = {
 };
 
 export const homeNavItem: NavItem = {
-  name: 'Home',
+  name: 'Inbox',
   href: APP_ROUTES.DASHBOARD,
   id: 'home',
   icon: Home,
   iconName: 'Home',
   tier: 'core',
-  description: 'Open your Jovie home',
+  description: 'Review attention, approvals, and replies',
 };
 
 export const libraryNavItem: NavItem = {
   name: PRODUCT_ONTOLOGY.work.label,
-  href: APP_ROUTES.LIBRARY,
+  href: PRODUCT_ONTOLOGY.work.canonicalRoute,
   id: 'library',
   icon: Layers,
   iconName: 'Layers',
@@ -87,13 +87,13 @@ export const contactsNavItem: NavItem = {
 
 export const presenceNavItem: NavItem = {
   name: PRODUCT_ONTOLOGY.identity.label,
-  href: APP_ROUTES.PRESENCE,
+  href: PRODUCT_ONTOLOGY.identity.canonicalRoute,
   id: 'presence',
   icon: User,
   iconName: 'User',
   tier: 'core',
   description: PRODUCT_ONTOLOGY.identity.definition,
-  requiredFlag: 'PROFILES_WORKSPACE',
+  requiredFlag: PRODUCT_ONTOLOGY.identity.requiredFlag,
 };
 
 /** Drop destinations whose required flag is off. Missing values stay hidden. */

@@ -56,7 +56,7 @@ describe('DashboardNav route warming', () => {
   it.each([false, true])(
     'leaves home attention to the brand row and retains destinations with INBOX_HOME=%s',
     inboxHome => {
-      const label = inboxHome ? 'Inbox' : 'Home';
+      const label = 'Inbox';
       const destinations = () =>
         screen.getAllByRole('link').map(link => ({
           label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
@@ -112,7 +112,7 @@ describe('DashboardNav route warming', () => {
         'true'
       );
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Home' });
+    const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
     expect(homeLinks).toHaveLength(2);
     for (const link of homeLinks) {
       expect(link).toHaveAttribute('data-prefetch', 'true');
@@ -140,7 +140,9 @@ describe('DashboardNav route warming', () => {
     expect(newChat).toHaveAttribute('aria-busy', 'true');
     expect(newChat).toHaveAttribute('data-navigation-item-id', 'chat');
     expect(newChat).toHaveAttribute('data-navigation-pending', 'true');
-    expect(newChat).toHaveClass('size-6', 'rounded-full', 'opacity-70');
+    expect(newChat).toHaveClass('rounded-lg');
+    expect(newChat).toHaveTextContent('New Chat');
+    expect(newChat).not.toHaveClass('bg-foreground');
     expect(screen.getByTestId('authenticated-route-content')).toHaveTextContent(
       'Current route'
     );
@@ -236,7 +238,7 @@ describe('DashboardNav route warming', () => {
       },
     });
     expect(
-      pending.getByRole('link', { name: 'Home — App Update Available' })
+      pending.getByRole('link', { name: 'Inbox — App Update Available' })
     ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(
       pending.getByRole('status', { name: '3 pending items' })
@@ -255,7 +257,7 @@ describe('DashboardNav route warming', () => {
       },
     });
     const updateLink = updateOnly.getByRole('link', {
-      name: 'Home — App Update Available',
+      name: 'Inbox — App Update Available',
     });
     expect(updateLink).toHaveAttribute('data-inbox-attention', 'available');
     expect(
@@ -273,7 +275,7 @@ describe('DashboardNav route warming', () => {
     const link = caughtUp.container.querySelector(
       '[data-navigation-item-id="inbox"]'
     );
-    expect(link).toHaveAccessibleName('Home');
+    expect(link).toHaveAccessibleName('Inbox');
     if (!(link instanceof HTMLElement)) return;
     expect(link).toHaveAttribute('data-inbox-attention', 'empty');
     expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();
@@ -292,14 +294,15 @@ describe('DashboardNav route warming', () => {
   // JOV-6181: the rail's New Chat affordance must never carry the terminal
   // label fade — on the compact create treatment it sheared the trailing "t"
   // ("Chat" -> "Cha") with rail space free. The canonical rail renders the
-  // action icon-only inside the search slot; this walks the real production
+  // action on the shared navigation grid; this walks the real production
   // tree so any future labelled New Chat row stays unmasked.
   it('keeps the New Chat affordance unmasked in the production rail', () => {
     const { container } = renderDashboardNav({ renderFn: render });
 
     const newChatAction = screen.getByRole('link', { name: 'New Chat' });
     expect(newChatAction).toBeInTheDocument();
-    expect(newChatAction).toHaveAttribute('aria-label', 'New Chat');
+    expect(newChatAction).toHaveAccessibleName('New Chat');
+    expect(newChatAction).toHaveTextContent('New Chat');
 
     const nav = container.querySelector('nav');
     expect(nav).not.toBeNull();
@@ -308,6 +311,16 @@ describe('DashboardNav route warming', () => {
         expect(el.className).not.toContain('mask-image');
       }
     }
+  });
+
+  it('retains the New action while its label stages with collapsed navigation', () => {
+    renderDashboardNav({ renderFn: render });
+    const action = screen.getByRole('link', { name: 'New Chat' });
+    expect(action).not.toHaveAttribute('aria-hidden', 'true');
+    expect(action.querySelector('span')).toHaveClass(
+      'group-data-[collapsible=icon]:opacity-0'
+    );
+    expect(action).not.toHaveClass('group-data-[collapsible=icon]:hidden');
   });
 
   it('retains New Chat while secondary commands leave collapsed keyboard and AX navigation', () => {

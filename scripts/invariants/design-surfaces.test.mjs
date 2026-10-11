@@ -27,6 +27,7 @@ import {
   validateDesignSurfaces,
   validateDesignSurfacesContract,
 } from './design-surfaces.mjs';
+import { scanProductReferenceCopy } from './product-reference-coherence.mjs';
 import { readInvariantRegistry } from './registry.mjs';
 
 const canonical = readInvariantRegistry();
@@ -104,6 +105,58 @@ function syntheticUnresolvedVisualState() {
 }
 
 describe('founder design invariants (JOV-INV-038)', () => {
+  it('deliberate red: rejects retired creator labels in UI and prompts without banning technical Library', () => {
+    for (const path of [
+      'apps/web/components/onboarding/Welcome.tsx',
+      'apps/web/lib/chat/system-prompt.ts',
+    ]) {
+      const stale = "const copy = 'Open Library';";
+      assert.ok(
+        validateDesignSurfaces(repoRoot, { files: { [path]: stale } }).some(
+          error => error.includes('retired creator navigation label Library')
+        )
+      );
+    }
+    assert.deepEqual(
+      scanProductReferenceCopy(
+        'apps/web/lib/chat/tools.ts',
+        "const toolId = 'surfaceLibraryOpportunities'; const text = 'We find your profiles on streaming platforms';"
+      ),
+      []
+    );
+    assert.deepEqual(
+      scanProductReferenceCopy(
+        'apps/web/app/app/admin/presence/page.tsx',
+        "const copy = 'Open Presence';"
+      ),
+      []
+    );
+  });
+
+  it('deliberate red: rejects a current label with a stale destination or missing feature gate', () => {
+    const path =
+      'apps/web/components/features/dashboard/dashboard-nav/config.ts';
+    const source = readFileSync(
+      new URL(`../../${path}`, import.meta.url),
+      'utf8'
+    );
+    for (const bad of [
+      source.replace(
+        'href: PRODUCT_ONTOLOGY.identity.canonicalRoute',
+        'href: APP_ROUTES.PROFILES'
+      ),
+      source.replace(
+        'requiredFlag: PRODUCT_ONTOLOGY.identity.requiredFlag',
+        "requiredFlag: 'MERCH_MVP'"
+      ),
+    ]) {
+      assert.ok(
+        validateDesignSurfaces(repoRoot, { files: { [path]: bad } }).some(
+          error => error.includes('must consume PRODUCT_ONTOLOGY.identity')
+        )
+      );
+    }
+  });
   it('accepts the canonical design-invariants contract', () => {
     assert.deepEqual(validateDesignSurfacesContract(canonical), []);
   });

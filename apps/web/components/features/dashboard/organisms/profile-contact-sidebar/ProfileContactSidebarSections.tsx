@@ -13,11 +13,13 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { DrawerHero } from '@/components/shell/DrawerHero';
 import { APP_ROUTES } from '@/constants/routes';
+import { getProductProjection, PRODUCT_ONTOLOGY } from '@/data/productOntology';
+import { useAppFlag } from '@/lib/flags/client';
 import { ProfileSmartLinkAnalytics } from './ProfileSmartLinkAnalytics';
 
 /**
  * Read-only profile summary for the explicitly opened chat rail. Profile
- * editing and public-profile monitoring live in the Presence workspace; chat
+ * editing and public-profile monitoring live in the Identity workspace; chat
  * only needs a compact identity, share link, and a single clear hand-off.
  */
 export function ProfileBentoView({
@@ -28,11 +30,20 @@ export function ProfileBentoView({
 }: Readonly<{
   previewData: PreviewPanelData;
   profileUrl: string;
-  onManageConnections?: () => void;
+  onManageConnections?: (destination: string) => void;
   /** Legacy callback retained while the editing rail is retired from chat. */
   onEditProfile?: () => void;
 }>) {
   const title = previewData.displayName || `@${previewData.username}`;
+  const identityEnabled = useAppFlag(PRODUCT_ONTOLOGY.identity.requiredFlag);
+  const identity = getProductProjection({
+    PROFILES_WORKSPACE: identityEnabled,
+  }).features.find(feature => feature.featureId === 'identity');
+  const destination =
+    identity?.destination ?? `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`;
+  const actionLabel = identity
+    ? `Manage In ${identity.label}`
+    : 'Manage Profile';
 
   return (
     <div
@@ -72,13 +83,13 @@ export function ProfileBentoView({
           variant='secondary'
           size='sm'
           className='w-full'
-          onClick={onManageConnections}
+          onClick={() => onManageConnections(destination)}
         >
-          Manage In Presence
+          {actionLabel}
         </Button>
       ) : (
         <Button asChild variant='secondary' size='sm' className='w-full'>
-          <Link href={APP_ROUTES.PRESENCE}>Manage In Presence</Link>
+          <Link href={destination}>{actionLabel}</Link>
         </Button>
       )}
     </div>

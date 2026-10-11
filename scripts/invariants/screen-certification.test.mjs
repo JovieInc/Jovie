@@ -14,6 +14,7 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { crc32 } from 'node:zlib';
+import { readProductReferenceOwner } from './product-reference-coherence.mjs';
 import { readInvariantRegistry } from './registry.mjs';
 import {
   classifyScreenPath,
@@ -144,6 +145,56 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('rejects stale product names, versions, destinations, locales, and disabled-feature screenshot claims', () => {
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.presence');
+    const current = readProductReferenceOwner().getProductProjection({
+      PROFILES_WORKSPACE: true,
+    });
+    const proof = { ...validExternalProof(screen), productReferences: current };
+    const errors = candidate =>
+      evaluateScreenProof(candidate, { screen, headSha: HEAD }).filter(
+        error => !error.includes('trusted external browser producer')
+      );
+    assert.deepEqual(errors(proof), []);
+    assert.ok(
+      errors(validExternalProof(screen)).some(error =>
+        error.includes('product reference snapshot')
+      )
+    );
+    for (const mutate of [
+      snapshot => {
+        snapshot.version = 0;
+      },
+      snapshot => {
+        snapshot.locale = 'fr';
+      },
+      snapshot => {
+        snapshot.features[0].label = 'Presence';
+      },
+      snapshot => {
+        snapshot.features[0].destination = '/app/profiles';
+      },
+      snapshot => {
+        snapshot.flags.PROFILES_WORKSPACE = false;
+      },
+      snapshot => {
+        delete snapshot.flags.PROFILES_WORKSPACE;
+      },
+      snapshot => {
+        snapshot.features = [];
+      },
+    ]) {
+      const productReferences = structuredClone(current);
+      mutate(productReferences);
+      assert.ok(errors({ ...proof, productReferences }).length > 0);
+    }
+    assert.ok(
+      evaluateScreenProof(proof, { screen, headSha: HEAD }).some(error =>
+        error.includes('trusted external browser producer')
+      ),
+      'coherent labels do not grant artifact trust'
+    );
+  });
   it('keeps canonical profile settings and retained aliases under screen ownership', () => {
     for (const path of [
       'apps/web/app/app/(shell)/settings/profile/page.tsx',
