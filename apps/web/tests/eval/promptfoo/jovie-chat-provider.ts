@@ -28,6 +28,7 @@ import {
   PROMPT_LEAK_CANARY,
 } from '@/lib/chat/prompt-disclosure-guard';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
+import { checkOnboardingPromptContract } from '@/lib/chat/prompts/onboarding-contract';
 import {
   canUseLightModel,
   executeChatTurn,
@@ -7796,89 +7797,7 @@ function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
       index: quotedIndex >= 0 ? quotedIndex : prompt.indexOf(name),
     };
   });
-  const toolOrderValid = toolOrder.every((item, index) => {
-    if (item.index < 0) return false;
-    const previous = toolOrder[index - 1];
-    return !previous || previous.index < item.index;
-  });
-  const promptFacts = {
-    identifiesUnauthenticatedVisitor: textIncludesAll(prompt, [
-      'musician just landed',
-      'visitor is unauthenticated',
-      'no account yet',
-    ]),
-    preservesFirstBubblePrivacyDisclosure: textIncludesAll(prompt, [
-      'FIRST chat bubble',
-      'conversation is remembered',
-      'help personalize',
-    ]),
-    keepsOnboardingVoiceConstraints: textIncludesAll(prompt, [
-      'Sharp friend over iMessage',
-      'Use normal sentence case',
-      'capitalize proper nouns',
-      'NO emoji',
-      'NO customer-service polite',
-    ]),
-    requiresShortConcreteReplies: textIncludesAll(prompt, [
-      'Short messages',
-      'No bullet lists',
-      'no markdown',
-      'concrete numbered plan',
-    ]),
-    enforcesOneQuestionPerTurn: textIncludesAll(prompt, [
-      'One question per turn',
-      'Never two',
-      'Never "first, then, then"',
-    ]),
-    requiresSpotifyIdentityBeforeSetup: textIncludesAll(prompt, [
-      'Get their Spotify identity',
-      'searchSpotifyArtist',
-      'confirmSpotifyArtist',
-    ]),
-    requiresDataObservationAfterSpotifyConfirmation: textIncludesAll(prompt, [
-      'confirmSpotifyArtist',
-      'MUST make an observation',
-      'BEFORE asking the next question',
-      'wow moment',
-    ]),
-    gatesAccessThroughNextStepDecision: textIncludesAll(prompt, [
-      'proposeNextStep',
-      'instant_access',
-      'waitlist',
-      'needs_more_info',
-    ]),
-    blocksCheckoutUntilInstantAccess: textIncludesAll(prompt, [
-      'If instant_access',
-      'proposeCheckout',
-      'Never promise instant access',
-    ]),
-    keepsPricingLate: textIncludesAll(prompt, [
-      'Pricing',
-      'reveal LATE',
-      'Do NOT lead with pricing',
-      'Quote only these facts',
-      '14-day Pro trial. No credit card.',
-    ]),
-    forbidsInventedStatsAndPrematureLiveClaims: textIncludesAll(prompt, [
-      'Never invent stats',
-      'customer counts',
-      'testimonials',
-      'Never claim a profile is "live"',
-    ]),
-    recordsSignalsSilently: textIncludesAll(prompt, [
-      'recordInterviewSignal',
-      'every signal',
-      'Silent, no UI',
-      'objection',
-    ]),
-    redirectsGeneralSupportIntoIntake: textIncludesAll(prompt, [
-      'access-intake flow',
-      'redirect to the intake',
-      'By your second assistant reply',
-      'searchSpotifyArtist',
-    ]),
-    preservesToolSequence: toolOrderValid,
-  };
+  const promptFacts = checkOnboardingPromptContract(prompt);
 
   return {
     target: 'onboarding-system-prompt-contract',
@@ -7899,7 +7818,7 @@ function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
       .filter(([, passed]) => !passed)
       .map(([name]) => name),
     toolOrder,
-    toolOrderValid,
+    toolPrerequisitesValid: promptFacts.preservesToolPrerequisites,
     promptLeakPatterns: promptLeakPatterns(prompt),
     toolCalls: [],
     toolResults: [],

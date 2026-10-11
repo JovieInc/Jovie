@@ -367,7 +367,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_design_gate.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_hud.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_continuity_clock.py scripts/tests/test_execution_attempt.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_worktree_sweep.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_worktree_pool.py scripts/tests/test_gh_app_token.py scripts/tests/test_service_census.py -q',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_design_gate.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_hud.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_continuity_clock.py scripts/tests/test_execution_attempt.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_worktree_sweep.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_worktree_pool.py scripts/tests/test_gh_app_token.py scripts/tests/test_service_census.py scripts/tests/test_epics.py -q',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hyperagent_lane.py" --fail-under=95',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/devin_free_policy.py" --fail-under=85',
@@ -375,6 +375,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/codex_lane.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_sweep.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/service_census.py" --fail-under=85',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/epics.py" --fail-under=90',
 
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/execution_attempt.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/merge_evidence.py" --fail-under=85',
@@ -440,6 +441,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/inbound-loop/inbound-loop.test.mjs',
   'scripts/merge-queue-green-enroll.test.mjs',
   'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
+  'scripts/hold-contract.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
   'scripts/publish-coverage-report.test.mjs',
   'scripts/lib/__tests__/canonical-json.test.mjs',
@@ -484,6 +486,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
   'scripts/lib/__tests__/mesh-native-terminal.test.mjs',
   'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs',
+  'scripts/lib/__tests__/mesh-current-wire.test.mjs',
   'scripts/lib/__tests__/blog-content-ci.test.mjs',
   'scripts/lib/__tests__/blog-publish-latency.test.mjs',
   'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
@@ -563,6 +566,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/typecheck-singleflight-diagnostics.test.mjs',
   'scripts/lib/__tests__/typecheck-singleflight.test.mjs',
   'scripts/lib/__tests__/typecheck-performance.test.mjs',
+  'scripts/lib/__tests__/unstack-merged-parent.test.mjs',
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
@@ -573,6 +577,8 @@ export const MESH_NATIVE_TERMINAL_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-native-terminal.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-native-terminal.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-native-terminal-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90';
 export const MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-runtime-bundle.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-runtime-bundle.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-runtime-bundle-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
+export const MESH_CURRENT_WIRE_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-current-wire.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-current-wire.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-current-wire-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
 // Keep scanner-heavy script contracts outside V8 instrumentation; cover the
 // document helpers with the same behavior test in a small separate process.
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
@@ -2170,6 +2176,7 @@ export async function runStructural(opts = {}) {
     MESH_HOST_ACK_COVERAGE_COMMAND,
     MESH_NATIVE_TERMINAL_COVERAGE_COMMAND,
     MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND,
+    MESH_CURRENT_WIRE_COVERAGE_COMMAND,
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
     // merge-group-workflow-contract runs in ci:control:test's Vitest run.
