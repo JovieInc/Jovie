@@ -5,7 +5,7 @@ import {
   type Request,
 } from '@playwright/test';
 import { isValidDspUrl } from '@/lib/dsp';
-import { getRegistryEntry } from '@/lib/dsp-registry';
+import { DSP_REGISTRY, getRegistryEntry } from '@/lib/dsp-registry';
 import type {
   PublicInteractionSpec,
   ResolvedPublicSurfaceSpec,
@@ -590,8 +590,13 @@ async function runArtworkMenuInteraction(page: Page) {
 }
 
 export async function runDspInteraction(page: Page) {
+  // Generic platform links use link_ keys (toGenericPlatformLink), even when
+  // ActionDial renders them through the shared provider button. Audit music
+  // actions separately; unknown music keys must still fail the registry check.
+  const dspActionSelector =
+    '[data-dsp-provider]:not([data-dsp-provider^="link_"])';
   const visibleActions = page
-    .locator('[data-dsp-provider]')
+    .locator(dspActionSelector)
     .filter({ visible: true });
 
   const actionCount = await visibleActions.count();
@@ -656,119 +661,114 @@ export async function runDspInteraction(page: Page) {
   });
 
   const exercisedProviders = new Set<string>();
-  const exerciseVisibleDspActions = async () => {
-    const visibleActionCount = await visibleActions.count();
-    for (let index = 0; index < visibleActionCount; index += 1) {
-      const action = visibleActions.nth(index);
-      const provider = await action.getAttribute('data-dsp-provider');
+  const auditAction = async (action: Locator) => {
+    const provider = await action.getAttribute('data-dsp-provider');
+    expect(
+      provider,
+      'DSP action is missing its canonical provider key'
+    ).toBeTruthy();
+    if (!provider) return;
+    // Generic platform links (`link_<slug>`) are rendered on the listen
+    // surface but are intentionally absent from the DSP registry.
+    if (!provider.startsWith('link_')) {
+      const registryEntry = getRegistryEntry(provider);
       expect(
-        provider,
-        'DSP action is missing its canonical provider key'
-      ).toBeTruthy();
-      if (!provider || exercisedProviders.has(provider)) continue;
-      // Generic platform links (`link_<slug>`) are rendered on the listen
-      // surface but are intentionally absent from the DSP registry.
-      if (!provider.startsWith('link_')) {
-        const registryEntry = getRegistryEntry(provider);
-        expect(
-          registryEntry,
-          `Unknown DSP provider key: ${provider}`
-        ).toBeDefined();
-        expect(registryEntry?.showOnListenPage).toBe(true);
-      }
-      exercisedProviders.add(provider);
+        registryEntry,
+        `Unknown DSP provider key: ${provider}`
+      ).toBeDefined();
+      expect(registryEntry?.showOnListenPage).toBe(true);
+    }
+    exercisedProviders.add(provider);
 
-      const href = await action.getAttribute('href');
-      if (href) {
-        assertSafeHandoff(
-          provider,
-          href,
-          await action.getAttribute('target'),
-          await action.getAttribute('rel')
-        );
-        continue;
-      }
-
-      await expect(action).toBeEnabled();
-      await page.evaluate(() => {
-        Object.assign(globalThis, { __publicSurfaceDspHandoff: null });
-      });
-      await action.click();
-      await expect
-        .poll(
-          () =>
-            page.evaluate(
-              () =>
-                (
-                  globalThis as typeof globalThis & {
-                    __publicSurfaceDspHandoff?: unknown;
-                  }
-                ).__publicSurfaceDspHandoff ?? null
-            ),
-          {
-            message: `${provider} control did not initiate a handoff`,
-            timeout: 5_000,
-          }
-        )
-        .not.toBeNull();
-      const handoff = await page.evaluate(
-        () =>
-          (
-            globalThis as typeof globalThis & {
-              __publicSurfaceDspHandoff: {
-                url: string;
-                target: string | null;
-                features: string | null;
-              };
-            }
-          ).__publicSurfaceDspHandoff
-      );
-      expect(
-        handoff.target,
-        'programmatic DSP handoff must open in an isolated browsing context'
-      ).toBe('_blank');
+    const href = await action.getAttribute('href');
+    if (href) {
       assertSafeHandoff(
         provider,
-        handoff.url,
-        handoff.target,
-        handoff.features
+        href,
+        await action.getAttribute('target'),
+        await action.getAttribute('rel')
       );
-      await expect(action).toBeEnabled({ timeout: 2_000 });
+      return;
     }
+
+    await expect(action).toBeEnabled();
+    await page.evaluate(() => {
+      Object.assign(globalThis, { __publicSurfaceDspHandoff: null });
+    });
+    await action.click();
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              (
+                globalThis as typeof globalThis & {
+                  __publicSurfaceDspHandoff?: unknown;
+                }
+              ).__publicSurfaceDspHandoff ?? null
+          ),
+        {
+          message: `${provider} control did not initiate a handoff`,
+          timeout: 5_000,
+        }
+      )
+      .not.toBeNull();
+    const handoff = await page.evaluate(
+      () =>
+        (
+          globalThis as typeof globalThis & {
+            __publicSurfaceDspHandoff: {
+              url: string;
+              target: string | null;
+              features: string | null;
+            };
+          }
+        ).__publicSurfaceDspHandoff
+    );
+    expect(
+      handoff.target,
+      'programmatic DSP handoff must open in an isolated browsing context'
+    ).toBe('_blank');
+    assertSafeHandoff(provider, handoff.url, handoff.target, handoff.features);
+    await expect(action).toBeEnabled({ timeout: 2_000 });
   };
 
-  await exerciseVisibleDspActions();
+  for (let index = 0; index < actionCount; index += 1) {
+    await auditAction(visibleActions.nth(index));
+  }
 
-  // The streaming ActionDial renders only the selected provider's action, so
-  // a Spotify-default selection hides every other DSP. Rotate the dial's
-  // selection buttons until a non-Spotify action is visible, then exercise it.
-  const dialSelects = page
-    .locator('button[data-dial-offset]')
-    .filter({ visible: true });
-  for (
-    let rotation = 0;
-    rotation < 4 &&
-    ![...exercisedProviders].some(provider => provider !== 'spotify');
-    rotation += 1
-  ) {
-    const dialSelect = dialSelects.first();
-    if (!(await dialSelect.isVisible().catch(() => false))) {
-      break;
+  // Dials expose one handoff at a time. Select every available service rather
+  // than mistaking the initially selected Spotify action for the full fixture.
+  const dials = page
+    .getByTestId('action-dial')
+    .filter({ has: page.locator(dspActionSelector) });
+  for (let index = 0; index < (await dials.count()); index += 1) {
+    const dial = dials.nth(index);
+    const action = dial.locator(dspActionSelector).filter({ visible: true });
+    const initialProvider = await action.getAttribute('data-dsp-provider');
+    const visited = new Set<string | null>();
+    while (true) {
+      const provider = await action.getAttribute('data-dsp-provider');
+      if (visited.has(provider)) {
+        expect(provider, 'DSP dial must return to its initial selection').toBe(
+          initialProvider
+        );
+        break;
+      }
+      visited.add(provider);
+      expect(
+        visited.size,
+        'DSP dial must finish a bounded provider cycle'
+      ).toBeLessThanOrEqual(DSP_REGISTRY.length);
+      await auditAction(action);
+      const nextService = dial.locator('[data-dial-offset="1"]');
+      if ((await nextService.count()) === 0) break;
+      await nextService.click();
+      await expect(action).not.toHaveAttribute(
+        'data-dsp-provider',
+        provider ?? ''
+      );
     }
-    const previousProvider = await visibleActions
-      .first()
-      .getAttribute('data-dsp-provider');
-    await dialSelect.click();
-    try {
-      await expect
-        .poll(() => visibleActions.first().getAttribute('data-dsp-provider'), {
-          timeout: 5_000,
-        })
-        .not.toBe(previousProvider);
-    } catch {
-      break;
-    }
-    await exerciseVisibleDspActions();
   }
 
   expect(
