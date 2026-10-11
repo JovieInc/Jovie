@@ -2,6 +2,7 @@
 
 import { IconButton } from '@jovie/ui';
 import { Sparkles, X } from 'lucide-react';
+import Image from 'next/image';
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { useRailFocusReturn } from '@/components/shell/useRailFocusReturn';
 import {
@@ -68,6 +69,7 @@ export async function loadDailyWhatsNew(
           url: prompt.changelogUrl,
           highlights: [],
           dogfood: [],
+          hero: prompt.hero,
         },
         unseenCount: prompt.materialCount,
         href: prompt.changelogUrl,
@@ -117,6 +119,9 @@ export function WhatsNewBannerView({
   regionRef: providedRegionRef,
 }: WhatsNewBannerViewProps) {
   const { entry, unseenCount, href } = unseen;
+  const hero = entry.hero;
+  const heroKey = hero ? `${hero.postId}:${hero.src}` : null;
+  const [failedHero, setFailedHero] = useState<string | null>(null);
   const eyebrow =
     unseenCount > 1 ? `What's New · ${unseenCount} updates` : "What's New";
 
@@ -146,36 +151,62 @@ export function WhatsNewBannerView({
       data-electron-no-drag='true'
       className='w-full min-w-0 px-2 py-1 animate-in fade-in-0 slide-in-from-bottom-2 duration-subtle ease-subtle motion-reduce:animate-none'
     >
-      <div className='relative rounded-xl border border-subtle bg-surface-1 py-3 pl-3 pr-9 shadow-card'>
-        <p className='flex items-center gap-1.5 text-2xs font-caption text-tertiary-token'>
-          <Sparkles aria-hidden='true' className='size-3' />
-          {eyebrow}
-        </p>
-        <p className='mt-1 truncate text-xs font-medium text-primary-token'>
-          {entry.title}
-        </p>
-        <p className='mt-0.5 line-clamp-1 text-xs text-secondary-token'>
-          {entry.summary}
-        </p>
-        <a
-          href={href}
-          target='_blank'
-          rel='noopener noreferrer'
-          onClick={onOpen}
-          data-testid='whats-new-banner-link'
-          className='mt-2 inline-flex text-xs font-medium text-primary-token underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
-        >
-          See What&apos;s New
-        </a>
-        <IconButton
-          size='sm'
-          ariaLabel="Dismiss What's New"
-          data-testid='whats-new-banner-dismiss'
-          onClick={onDismiss}
-          className='absolute right-2 top-2'
-        >
-          <X aria-hidden='true' className='size-3.5' />
-        </IconButton>
+      <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-card'>
+        {hero ? (
+          <div
+            aria-hidden='true'
+            data-testid='whats-new-banner-hero'
+            className='relative h-24 w-full bg-surface-2'
+          >
+            {failedHero !== heroKey ? (
+              <Image
+                key={heroKey}
+                data-testid='whats-new-banner-hero-image'
+                src={hero.src}
+                alt={hero.alt}
+                aria-hidden='true'
+                fill
+                sizes='244px'
+                style={{
+                  objectFit: hero.objectFit,
+                  objectPosition: hero.objectPosition,
+                }}
+                onError={() => setFailedHero(heroKey)}
+              />
+            ) : null}
+          </div>
+        ) : null}
+        <div className='relative py-3 pl-3 pr-9'>
+          <p className='flex items-center gap-1.5 text-2xs font-caption text-tertiary-token'>
+            <Sparkles aria-hidden='true' className='size-3' />
+            {eyebrow}
+          </p>
+          <p className='mt-1 truncate text-xs font-medium text-primary-token'>
+            {entry.title}
+          </p>
+          <p className='mt-0.5 line-clamp-1 text-xs text-secondary-token'>
+            {entry.summary}
+          </p>
+          <a
+            href={href}
+            target='_blank'
+            rel='noopener noreferrer'
+            onClick={onOpen}
+            data-testid='whats-new-banner-link'
+            className='mt-2 inline-flex text-xs font-medium text-primary-token underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+          >
+            See What&apos;s New
+          </a>
+          <IconButton
+            size='sm'
+            ariaLabel="Dismiss What's New"
+            data-testid='whats-new-banner-dismiss'
+            onClick={onDismiss}
+            className='absolute right-2 top-2'
+          >
+            <X aria-hidden='true' className='size-3.5' />
+          </IconButton>
+        </div>
       </div>
     </aside>
   );

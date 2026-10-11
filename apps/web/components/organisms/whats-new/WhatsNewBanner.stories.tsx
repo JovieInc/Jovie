@@ -2,6 +2,7 @@ import { Button, Input } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
+import { resolveCustomerChangelogHero } from '@/lib/customer-changelog-hero';
 import { WHATS_NEW_DAILY_PATH } from '@/lib/release-communications/prompt';
 import { WhatsNewBanner, WhatsNewBannerView } from './WhatsNewBanner';
 
@@ -112,4 +113,15 @@ function ActualContainerFixture() {
 /** Actual loading/dismissal owner, independent of shell IS_E2E suppression. */
 export const ActualContainer: Story = {
   render: () => <ActualContainerFixture />,
+};
+
+/** The source post's own media contract, with no consumer-selected artwork. */
+export const PublishedPostHero: Story = {
+  args: {
+    unseen: {
+      entry: { ...ENTRY, hero: resolveCustomerChangelogHero(ENTRY.id) },
+      unseenCount: 1,
+      href: ENTRY.url,
+    },
+  },
 };

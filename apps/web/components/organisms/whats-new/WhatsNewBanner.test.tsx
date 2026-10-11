@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolveCustomerChangelogHero } from '@/lib/customer-changelog-hero';
 import type { WhatsNewFeed } from '@/lib/whats-new';
 import {
+  loadDailyWhatsNew,
   loadUnseenWhatsNew,
   WHATS_NEW_LAST_SEEN_KEY,
   WhatsNewBanner,
@@ -312,5 +314,102 @@ describe('WhatsNewBanner', () => {
     ).toBe(true);
     // Daily dismissal is server-side; the feed last-seen key stays empty.
     expect(localStorage.getItem(WHATS_NEW_LAST_SEEN_KEY)).toBeNull();
+  });
+});
+
+describe('published post hero consumer', () => {
+  const hero = resolveCustomerChangelogHero('26.9.2');
+  const unseen = {
+    entry: { ...FEED.entries[0], hero },
+    unseenCount: 2,
+    href: FEED.changelogUrl,
+  };
+  it('inherits the daily prompt hero without confusing the published key and dismissal UUID', async () => {
+    const dailyHero = resolveCustomerChangelogHero('2026-10-02');
+    const prompt = {
+      contractVersion: 'release-communications/v1',
+      postId: 'daily-record-uuid',
+      localDate: dailyHero.postId,
+      title: 'Published update',
+      summary: 'New today',
+      materialCount: 1,
+      changelogUrl: `https://jov.ie/changelog/${dailyHero.postId}`,
+      hero: dailyHero,
+    };
+    const result = await loadDailyWhatsNew(
+      vi.fn().mockResolvedValue(jsonResponse({ prompt }))
+    );
+    expect(result?.unseen.entry.hero).toEqual(dailyHero);
+    expect(result?.postId).toBe('daily-record-uuid');
+    expect(result?.unseen.href).toBe(prompt.changelogUrl);
+  });
+  it('reserves the decorative cover through loading and failure while keeping link focus and aggregate navigation', () => {
+    const onDismiss = vi.fn();
+    render(
+      <WhatsNewBannerView
+        unseen={unseen}
+        onOpen={vi.fn()}
+        onDismiss={onDismiss}
+      />
+    );
+    const frame = screen.getByTestId('whats-new-banner-hero');
+    const image = screen.getByTestId('whats-new-banner-hero-image');
+    expect(decodeURIComponent(image.getAttribute('src') ?? '')).toContain(
+      hero.src
+    );
+    expect(image).toHaveAttribute('alt', '');
+    expect(image).toHaveAttribute('aria-hidden', 'true');
+    expect(image).toHaveStyle({
+      objectFit: hero.objectFit,
+      objectPosition: hero.objectPosition,
+    });
+    expect(frame).toHaveClass('h-24', 'w-full');
+    const link = screen.getByRole('link', { name: "See What's New" });
+    link.focus();
+    fireEvent.load(image);
+    expect(screen.getByTestId('whats-new-banner-hero')).toBe(frame);
+    fireEvent.error(image);
+    expect(screen.queryByTestId('whats-new-banner-hero-image')).toBeNull();
+    expect(screen.getByTestId('whats-new-banner-hero')).toBe(frame);
+    expect(link).toHaveFocus();
+    expect(link).toHaveAttribute('href', FEED.changelogUrl);
+    fireEvent.keyDown(link, { key: 'Escape' });
+    expect(onDismiss).toHaveBeenCalledOnce();
+  });
+  it('keeps legacy missing-media posts readable and resets a failed image for the next published post', () => {
+    const { rerender } = render(
+      <WhatsNewBannerView
+        unseen={unseen}
+        onOpen={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    fireEvent.error(screen.getByTestId('whats-new-banner-hero-image'));
+    rerender(
+      <WhatsNewBannerView
+        unseen={{ ...unseen, entry: FEED.entries[0] }}
+        onOpen={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId('whats-new-banner-hero')).toBeNull();
+    expect(screen.getByText(FEED.entries[0].title)).toBeInTheDocument();
+    expect(screen.getByRole('link')).toHaveAttribute('href', FEED.changelogUrl);
+    rerender(
+      <WhatsNewBannerView
+        unseen={{
+          ...unseen,
+          entry: {
+            ...FEED.entries[1],
+            hero: resolveCustomerChangelogHero(FEED.entries[1].id),
+          },
+        }}
+        onOpen={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByTestId('whats-new-banner-hero-image')
+    ).toBeInTheDocument();
   });
 });
