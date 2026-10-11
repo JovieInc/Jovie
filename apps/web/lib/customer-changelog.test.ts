@@ -5,7 +5,10 @@ import {
   extractCustomerChangelogTechnical,
   formatCustomerChangelogTertiary,
   groupCustomerChangelogByMonth,
+  isCustomerChangelogPostUrl,
+  parseCustomerChangelogHero,
   projectCustomerChangelog,
+  resolveCustomerChangelogHero,
   splitCustomerChangelogOutcome,
 } from './customer-changelog';
 
@@ -211,5 +214,29 @@ describe('customer changelog projection', () => {
     expect(formatCustomerChangelogTertiary('2026-08-16', '26.8.1')).toBe(
       'August 16, 2026 · v26.8.1'
     );
+  });
+});
+
+describe('published version hero authority', () => {
+  it('preserves the existing decorative centered cover for the resolved post', () => {
+    const hero = resolveCustomerChangelogHero('2026-10-02');
+    expect(hero).toEqual({
+      postId: '2026-10-02',
+      kind: 'image',
+      src: '/images/hero/changelog-version.webp',
+      alt: '',
+      objectFit: 'cover',
+      objectPosition: 'center',
+    });
+    expect(parseCustomerChangelogHero(hero, '2026-10-02')).toEqual(hero);
+    expect(parseCustomerChangelogHero(hero, '2026-10-01')).toBeNull();
+  });
+  it.each([
+    'javascript:alert(1)',
+    '/changelog/x',
+    'https://jov.ie/changelog/x?old=1',
+    'https://jov.ie/changelog/y',
+  ])('rejects an invalid or mismatched post URL %s', url => {
+    expect(isCustomerChangelogPostUrl(url, 'x')).toBe(false);
   });
 });

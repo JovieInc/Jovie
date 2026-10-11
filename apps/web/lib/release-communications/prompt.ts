@@ -1,4 +1,10 @@
 import {
+  type CustomerChangelogHero,
+  isCustomerChangelogPostUrl,
+  parseCustomerChangelogHero,
+} from '../customer-changelog';
+import type { WhatsNewEntry } from '../whats-new';
+import {
   type DailyPost,
   RELEASE_COMMUNICATIONS_CONTRACT_VERSION,
   type VerifiedMergeEvent,
@@ -21,6 +27,7 @@ export interface DailyWhatsNewPrompt {
   readonly summary: string;
   /** Number of material user-facing entries in the post. */
   readonly materialCount: number;
+  readonly hero?: CustomerChangelogHero | null;
   readonly changelogUrl: string;
 }
 
@@ -35,6 +42,7 @@ export interface DailyWhatsNewPrompt {
 export function resolveDailyWhatsNewPrompt(input: {
   readonly post: DailyPost | null;
   readonly dismissed: boolean;
+  readonly publishedUpdate?: WhatsNewEntry | null;
   readonly changelogUrl: string;
 }): DailyWhatsNewPrompt | null {
   const { post, dismissed, changelogUrl } = input;
@@ -44,6 +52,14 @@ export function resolveDailyWhatsNewPrompt(input: {
   const lead = material[0];
   if (!lead) return null;
 
+  const published = input.publishedUpdate;
+  const matchesPublished =
+    published?.id === post.localDate &&
+    published.title === lead.title &&
+    isCustomerChangelogPostUrl(published.url, published.id);
+  const hero = matchesPublished
+    ? parseCustomerChangelogHero(published.hero, post.localDate)
+    : null;
   const summary = lead.body?.trim().slice(0, SUMMARY_MAX_LENGTH) ?? '';
   return {
     contractVersion: RELEASE_COMMUNICATIONS_CONTRACT_VERSION,
@@ -54,7 +70,8 @@ export function resolveDailyWhatsNewPrompt(input: {
       summary ||
       (material.length > 1 ? `${material.length} updates` : 'New today'),
     materialCount: material.length,
-    changelogUrl,
+    hero,
+    changelogUrl: matchesPublished ? published.url : changelogUrl,
   };
 }
 
@@ -77,6 +94,12 @@ export function parseDailyWhatsNewPrompt(
   return {
     contractVersion: RELEASE_COMMUNICATIONS_CONTRACT_VERSION,
     postId: record.postId,
+    hero:
+      typeof record.localDate === 'string' &&
+      typeof record.changelogUrl === 'string' &&
+      isCustomerChangelogPostUrl(record.changelogUrl, record.localDate)
+        ? parseCustomerChangelogHero(record.hero, record.localDate)
+        : null,
     localDate: typeof record.localDate === 'string' ? record.localDate : '',
     title: record.title,
     summary: typeof record.summary === 'string' ? record.summary : '',

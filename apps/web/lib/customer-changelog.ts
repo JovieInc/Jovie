@@ -61,6 +61,61 @@ export const CustomerChangelogMediaSchema = z
   })
   .nullable();
 
+/** The existing version-post hero authority; consumers inherit, never select. */
+const CHANGELOG_POST_HERO = {
+  kind: 'image',
+  src: '/images/hero/changelog-version.webp',
+  alt: '',
+  objectFit: 'cover',
+  objectPosition: 'center',
+} as const;
+
+export const CustomerChangelogHeroSchema =
+  CustomerChangelogMediaSchema.unwrap().extend({
+    postId: z.string().min(1),
+    kind: z.literal('image'),
+    objectFit: z.literal('cover'),
+    objectPosition: z.literal('center'),
+  });
+export type CustomerChangelogHero = z.infer<typeof CustomerChangelogHeroSchema>;
+
+/** Call only for a known published release (the post route already resolves it). */
+export function resolveCustomerChangelogHero(
+  postId: string
+): CustomerChangelogHero {
+  return { postId, ...CHANGELOG_POST_HERO };
+}
+
+export function isCustomerChangelogPostUrl(
+  url: string,
+  postId: string
+): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      ['https:', 'http:'].includes(parsed.protocol) &&
+      parsed.pathname === `/changelog/${encodeURIComponent(postId)}` &&
+      !parsed.search &&
+      !parsed.hash
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Untrusted/legacy media must not erase the update or invent a replacement. */
+export function parseCustomerChangelogHero(
+  value: unknown,
+  postId: string
+): CustomerChangelogHero | null {
+  const result = CustomerChangelogHeroSchema.safeParse(value);
+  if (!result.success || result.data.postId !== postId) return null;
+  const expected = resolveCustomerChangelogHero(postId);
+  return result.data.src === expected.src && result.data.alt === expected.alt
+    ? result.data
+    : null;
+}
+
 export const CustomerChangelogEntrySchema = z.object({
   title: z.string().min(1),
   slug: z.string().min(1),
