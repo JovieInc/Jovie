@@ -2,7 +2,7 @@
 # Auto-Ready green-source drafts
 #
 # Event-driven undraft for open main drafts whose required source checks are
-# SUCCESS and mergeability is CLEAN. This restores the July wake that died
+# SUCCESS and mergeability is CLEAN (or UNSTABLE with only advisory noise). This restores the July wake that died
 # when auto-ready-agent-drafts.yml became workflow_dispatch-only.
 #
 # This controller never enables native auto-merge and never enrolls the merge
@@ -17,6 +17,7 @@
 #   TARGET_PR                 optional exact PR number
 #   TARGET_HEAD               optional exact 40-character head SHA
 #   MISSED_COHORT             extra already-green drafts to consider (default 0)
+#   RUN_OFFSET                cohort rotation offset (workflow run number)
 set -euo pipefail
 
 # shellcheck source=./scripts/lib/gh-retry.sh
@@ -27,6 +28,7 @@ DRY_RUN="${DRY_RUN:-0}"
 TARGET_PR="${TARGET_PR:-}"
 TARGET_HEAD="${TARGET_HEAD:-}"
 MISSED_COHORT="${MISSED_COHORT:-0}"
+RUN_OFFSET="${RUN_OFFSET:-0}"
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 CLASSIFY_LIB="$SCRIPT_DIR/lib/auto-ready-green-drafts.mjs"
 READY_MARKER="auto-ready-green-source"
@@ -150,6 +152,13 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
     echo "    ~ could not read live PR state for #$n; leaving PR unchanged"
     return 0
   fi
+  # State-only screen first: a ready, held, conflicting or non-main PR (most
+  # wakes) is rejected without spending a second API read on its checks.
+  verdict="$(classify_live "$n" "$before" '[]' "$expected_head")"
+  if [[ "$(jq -r '.reason' <<<"$verdict")" != checks:* ]]; then
+    echo "    ~ green-source $(jq -r '.reason' <<<"$verdict"); leaving PR unchanged"
+    return 0
+  fi
   if ! checks="$(read_checks "$n")"; then
     echo "    ~ required check status unavailable for #$n; leaving PR unchanged"
     return 0
@@ -210,7 +219,10 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
     upsert_status_comment "$n" "🤖 Auto-ready green-source: the exact head reached terminal state=${state_after} during verification. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     return 0
   fi
-  if [[ "$draft_after" == "false" && "$head_after" == "$live_head" && -z "$held_after" && "$merge_after" == "CLEAN" ]]; then
+  # Mergeability was proven on this exact head before mutation. Leaving draft
+  # wakes new (often advisory) checks, so a transient BLOCKED/UNSTABLE here is
+  # expected and must not trigger a re-draft loop.
+  if [[ "$draft_after" == "false" && "$head_after" == "$live_head" && -z "$held_after" ]]; then
     echo "    ✓ marked #$n ready; Auto-Enroll owns queue admission"
     upsert_status_comment "$n" "🤖 Auto-ready green-source: marked ready after PR Ready + required checks SUCCESS and mergeable CLEAN. Auto-Enroll / jovie-bot own queue admission. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     return 0
@@ -225,15 +237,17 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
 }
 
 resolve_head_pr() {  # resolve_head_pr <sha>
+  # One REST read of the PRs that own this exact commit, instead of listing
+  # every open PR per event (the shared API budget is the bottleneck).
   local sha="$1"
-  gh_retry pr list -R "$REPO" --state open --limit 200 \
-    --json number,isDraft,headRefOid,baseRefName \
-    | jq -r --arg head "$sha" '
+  [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || return 1
+  gh_retry api "repos/${REPO}/commits/${sha}/pulls" --jq "
       .[]
-      | select(.baseRefName == "main")
-      | select(((.headRefOid // "") | ascii_downcase) == $head)
+      | select(.state == \"open\")
+      | select(.base.ref == \"main\")
+      | select(((.head.sha // \"\") | ascii_downcase) == \"${sha}\")
       | .number
-    '
+    "
 }
 
 echo "=== AUTO-READY GREEN-SOURCE: event-driven undraft (no queue enroll) ==="
@@ -275,37 +289,19 @@ elif [[ -n "$TARGET_HEAD" ]]; then
 fi
 
 if [[ "$MISSED_COHORT" =~ ^[1-9][0-9]*$ ]]; then
-  echo "=== MISSED COHORT: up to $MISSED_COHORT already-green drafts ==="
+  echo "=== MISSED COHORT: up to $MISSED_COHORT already-green drafts (offset $RUN_OFFSET) ==="
   SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-    --json number,isDraft,labels,headRefName,headRefOid,baseRefName,mergeable,mergeStateStatus --jq '
-    [ .[] | select(.isDraft == true) | select(.baseRefName == "main") | {
-      n: .number,
-      mergeable: .mergeable,
-      mergeStateStatus: .mergeStateStatus,
-      L: [.labels[].name]
-    } ]')"
-  considered=0
-  while read -r pr; do
-    [[ -z "$pr" ]] && continue
-    n="$(jq -r '.n' <<<"$pr")"
-    if [[ "$considered" -ge "$MISSED_COHORT" ]]; then
-      break
-    fi
+    --json number,isDraft,labels,title,headRefName,baseRefName,mergeable,mergeStateStatus)"
+  mapfile -t cohort < <(node "$CLASSIFY_LIB" cohort "$MISSED_COHORT" "$RUN_OFFSET" "${TARGET_PR:-0}" <<<"$SNAP")
+  for n in "${cohort[@]}"; do
+    [[ -z "$n" ]] && continue
     echo "  missed candidate #$n"
     missed_status=0
     undraft_if_eligible "$n" || missed_status=$?
     if [[ "$missed_status" -eq 2 ]]; then
       exit 2
     fi
-    considered=$((considered + 1))
-  done < <(echo "$SNAP" | jq -c --arg hold_re "$HOLD_LABEL_RE" --arg protected "$PROTECTED_PRS" --argjson skip "${TARGET_PR:-0}" '
-    .[]
-    | select(.n != $skip)
-    | select(($protected | split(",") | index(.n | tostring)) | not)
-    | select([.L[] | select(test($hold_re))] | length == 0)
-    | select(.mergeable == "MERGEABLE")
-    | select(.mergeStateStatus == "CLEAN")
-  ')
+  done
 fi
 
 echo "=== done (DRY_RUN=$DRY_RUN) ==="

@@ -391,6 +391,7 @@ function enableMissingAutoMerge(
   command = gh,
   readStatuses = listCommitStatuses
 ) {
+  const failures = [];
   for (const pr of prs) {
     if (pr.isDraft || pr.isCrossRepository || pr.autoMergeRequest) continue;
     if (!/^[a-f0-9]{40}$/.test(pr.headRefOid ?? '')) continue;
@@ -400,20 +401,35 @@ function enableMissingAutoMerge(
       console.log(`[dry-run] would enable auto-merge on PR #${pr.number}`);
       continue;
     }
-    command([
-      'pr',
-      'merge',
-      String(pr.number),
-      '--repo',
-      repo,
-      '--auto',
-      '--squash',
-      ...(pr.customerNotesReadyHead
-        ? ['--match-head-commit', pr.customerNotesReadyHead]
-        : []),
-    ]);
+    // One PR GitHub refuses (e.g. a workflow-file head) must not abort the
+    // sweep for every other PR; the caller reports failures after the pass.
+    try {
+      command([
+        'pr',
+        'merge',
+        String(pr.number),
+        '--repo',
+        repo,
+        '--auto',
+        '--squash',
+        ...(pr.customerNotesReadyHead
+          ? ['--match-head-commit', pr.customerNotesReadyHead]
+          : []),
+      ]);
+    } catch (err) {
+      const detail = String(err?.stderr || err?.message || err)
+        .trim()
+        .split('\n')
+        .pop();
+      console.log(
+        `::warning::PR #${pr.number}: enabling auto-merge failed: ${detail}`
+      );
+      failures.push(pr.number);
+      continue;
+    }
     console.log(`PR #${pr.number}: enabled auto-merge (squash).`);
   }
+  return failures;
 }
 
 function main() {
@@ -421,6 +437,7 @@ function main() {
   const cutoffMs = Date.now() - opts.thresholdHours * 3600 * 1000;
 
   const openPrs = listOpenPrs(opts.repo);
+  let enableFailures = [];
   if (opts.enableMissing) {
     finishCustomerNotes(
       opts.repo,
@@ -428,7 +445,7 @@ function main() {
       opts.dryRun,
       gh
     );
-    enableMissingAutoMerge(
+    enableFailures = enableMissingAutoMerge(
       opts.repo,
       opts.pr ? openPrs.filter(pr => pr.number === opts.pr) : openPrs,
       opts.dryRun
@@ -479,6 +496,12 @@ function main() {
     upsertTrackingIssue(opts.repo, stuck, opts.dryRun);
   }
   console.log(`Triage complete. Stuck PRs: ${stuck.length}.`);
+  if (enableFailures.length > 0) {
+    console.error(
+      `Auto-merge enable failed for: ${enableFailures.map(n => `#${n}`).join(', ')}`
+    );
+    process.exitCode = 1;
+  }
 }
 
 if (require.main === module) {

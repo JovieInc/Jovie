@@ -20,7 +20,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lifecycle  # noqa: E402
@@ -238,18 +238,38 @@ def stale_agent_drafts(prs: list[dict], now: float) -> list[dict]:
     return [pr for pr in prs if abandoned_agent_draft(pr, now)]
 
 
+def last_activity(pr: dict) -> float | None:
+    """When the writer last moved the PR: its head commit time. `updatedAt` also moves on bot
+    and keepalive comments (a bare issue-id comment every ~15 min kept drafts "active" for
+    days), so it is only the fallback for rows read without the commit date."""
+    committed = iso_ts(pr.get("lastCommitAt"))
+    return committed if committed is not None else iso_ts(pr.get("updatedAt"))
+
+
 def abandoned_agent_draft(pr: dict, now: float) -> bool:
-    """A draft the lanes do not gate (not a lane branch) on an agent-owned prefix, old enough
-    that age alone is the governor signal, and demonstrably stalled: idle past the stale SLO
-    or already conflicting/red. A recently pushed draft still in motion is left alone."""
+    """A draft the lanes do not gate (not a lane branch), old enough that age alone is the
+    governor signal, and demonstrably stalled: no commit past the stale SLO or already
+    conflicting/red. A recently pushed draft still in motion is left alone.
+
+    Any same-repo writer counts (Tim, 2026-10-11: no PR sits as a draft without an owner
+    moving it to merge). Agent sessions also publish as the founder on `feat/`, `tables/`,
+    `brand/`, `docs/` branches, so a branch prefix cannot tell a live writer from an
+    abandoned one; only the commit clock can. `hold` stays the explicit opt-out, and
+    reclaiming only repairs and readies: closure still needs an agent branch and an explicit
+    duplicate label (JOV-INV-011)."""
     branch = pr.get("headRefName") or ""
-    if not pr.get("isDraft") or LANE_BRANCH.match(branch) or not AGENT_BRANCH.match(branch):
+    if not pr.get("isDraft") or LANE_BRANCH.match(branch) or pr.get("isCrossRepository"):
+        return False
+    # A stacked draft belongs to its parent's stack: it either waits on an open parent or,
+    # once the parent squash-merged, on the unstack controller. A lane rebasing it onto main
+    # would re-add the parent's commits (memory: lanes unstack stacked PRs).
+    if (pr.get("baseRefName") or "main") != "main":
         return False
     created = iso_ts(pr.get("createdAt"))
     if created is None or now - created <= AGENT_DRAFT_S:
         return False
-    updated = iso_ts(pr.get("updatedAt"))
-    idle = now - updated if updated is not None else AGENT_DRAFT_S
+    moved = last_activity(pr)
+    idle = now - moved if moved is not None else AGENT_DRAFT_S
     return idle > STALE_DRAFT_S or pr.get("mergeStateStatus") == "DIRTY" \
         or pr.get("rollup") in ("FAILURE", "ERROR")
 
@@ -279,7 +299,7 @@ def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int,
     rows = []
     for pr in prs:
         number, labels = pr["number"], label_names(pr)
-        updated = iso_ts(pr.get("updatedAt"))
+        updated = last_activity(pr)
         created = iso_ts(pr.get("createdAt"))
         idle_s = now - updated if updated is not None else 0
         holds = ({label.lower() for label in labels} & HOLD_LABELS) or (
@@ -340,7 +360,7 @@ def add_label(number: int, kind: str, sh=run) -> bool:
                "-f", f"labels[]={PREFIX}{kind}"]).returncode == 0
 
 
-def claim_active(number: int, sha: str | None, sh=run, now: float | None = None, *, kind: str = "fix",
+def claim_active(number: int, sha: str | None, sh=run, now: float | None = None, *, kind: str | tuple = "fix",
                  exclude_host: str | None = None, timeout: float = 30) -> bool:
     """Whether an unexpired lane claim owns this exact head; unreadable evidence blocks.
 
@@ -350,7 +370,12 @@ def claim_active(number: int, sha: str | None, sh=run, now: float | None = None,
     if not isinstance(sha, str) or not sha.strip():
         return True
     now = time.time() if now is None else now
-    listed = sh(["gh", "api", f"repos/{REPO}/issues/{number}/comments?per_page=100&sort=created&direction=desc",
+    kinds = {kind} if isinstance(kind, str) else set(kind)
+    # The per-issue comments endpoint ignores sort/direction: it pages oldest first, so a PR
+    # past 100 comments hid every newer claim (2026-10-11: #20979 at 114). Only comments
+    # inside the claim TTL can be live, so `since` bounds the read to exactly those.
+    since = datetime.fromtimestamp(now - CLAIM_TTL_S, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    listed = sh(["gh", "api", "--paginate", f"repos/{REPO}/issues/{number}/comments?per_page=100&since={since}",
                  "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"], timeout=timeout)
     if listed.returncode != 0:
         return True
@@ -360,7 +385,7 @@ def claim_active(number: int, sha: str | None, sh=run, now: float | None = None,
             age = now - datetime.fromisoformat(fields.get("at", "").replace("Z", "+00:00")).timestamp()
         except ValueError:
             continue
-        if fields.get("sha") == sha and fields.get("kind") == kind \
+        if fields.get("sha") == sha and fields.get("kind") in kinds \
                 and fields.get("host") != exclude_host and age < CLAIM_TTL_S:
             return True
     return False
@@ -901,14 +926,19 @@ def terminal_reason(pr: dict, record: dict, max_attempts: int, *, allow_reentry:
 
 
 def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict | None = None,
-                        now: float | None = None, allow_reentry: bool = False) -> str | None:
-    """One guard for the existing claim, event and maintenance paths; no new retry authority."""
+                        now: float | None = None, allow_reentry: bool = False,
+                        terminal_ok: bool = False) -> str | None:
+    """One guard for the existing claim, event and maintenance paths; no new retry authority.
+
+    `terminal_ok` is only for deterministic main syncs of a terminal generation: a merge of
+    main creates the new head that is that generation's material-change exit. Holds, active
+    repairs and diff-policy holds still refuse."""
     labels = {label.lower() for label in label_names(pr)}
     if not isinstance(pr.get("headRefOid"), str) or not pr["headRefOid"].strip():
         return "head-unavailable"
     if holds := labels & HOLD_LABELS:
         return sorted(holds)[0]
-    if reason := terminal_reason(pr, record, max_attempts, allow_reentry=allow_reentry):
+    if not terminal_ok and (reason := terminal_reason(pr, record, max_attempts, allow_reentry=allow_reentry)):
         return reason
     # A different remote head is material evidence, not revocation of a local
     # writer's live lease. Wait for that attempt to end before recording re-entry.
@@ -920,9 +950,10 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
     return None
 
 
-def maintenance_hold(host, lane, pr: dict, now: float) -> str | None:
+def maintenance_hold(host, lane, pr: dict, now: float, *, terminal_ok: bool = False) -> str | None:
     reason = preservation_reason(pr, read_state(host, "fix-attempts.json").get(str(pr["number"]), {}),
-                                 lane.MAX_FIX_ATTEMPTS, held=read_state(host, "held.json").get(str(pr["number"])), now=now)
+                                 lane.MAX_FIX_ATTEMPTS, held=read_state(host, "held.json").get(str(pr["number"])), now=now,
+                                 terminal_ok=terminal_ok)
     if reason:
         return reason
     return "repair-active" if lane.claimed_elsewhere(pr["number"], pr.get("headRefOid"), "fix") else None
@@ -1367,12 +1398,14 @@ def requeue_parked(lane, linear, pr: dict, since: float, open_prs: list[dict], *
     return True
 
 
-def sync_main(host, lane, pr: dict, now: float) -> str:
+def sync_main(host, lane, pr: dict, now: float, *, terminal_ok: bool = False) -> str:
     """No-model first answer to a merge-queue removal: GitHub merges main into the branch
     (exact head, no force), so the PR gets a new head, fresh CI and a fresh enroll. The queue
     never takes a rejected head twice (JOV-INV-022), so this is the one sanctioned re-enqueue.
-    Once per PR per stuck episode; a second removal goes to a model with the queue's log."""
-    if reason := maintenance_hold(host, lane, pr, now):
+    Once per PR per stuck episode; a second removal goes to a model with the queue's log.
+    The escalation ladder passes `terminal_ok`: its update-branch rung exists for exhausted
+    heads, so their own exhaustion must not refuse it (it always did before 2026-10-11)."""
+    if reason := maintenance_hold(host, lane, pr, now, terminal_ok=terminal_ok):
         return f"held:{reason}"
     revoked = lane.publication_revocation(host, pr.get("headRefName"))
     if revoked:
@@ -1400,7 +1433,7 @@ pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor}
 baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue autoMergeRequest{enabledAt}
 isCrossRepository createdAt updatedAt
 labels(first:100){totalCount nodes{name}} files(first:100){totalCount nodes{path additions deletions changeType}}
-commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
+commits(last:1){nodes{commit{committedDate statusCheckRollup{state}}}}}}}}"""
 
 
 def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
@@ -1425,6 +1458,7 @@ def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
         for node in page["nodes"]:
             commits = node.pop("commits", {}).get("nodes") or [{}]
             node["rollup"] = ((commits[0].get("commit") or {}).get("statusCheckRollup") or {}).get("state")
+            node["lastCommitAt"] = (commits[0].get("commit") or {}).get("committedDate")
             labels = node.get("labels") or {}
             node["labels"] = labels.get("nodes") or []
             node["labelsComplete"] = isinstance(labels.get("totalCount"), int) and labels["totalCount"] == len(node["labels"])
@@ -1501,7 +1535,9 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
             wanted.append("green")
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
         stalled_agent_draft = abandoned_agent_draft(pr, now)
-        if pr.get("isDraft") and (age > STALE_DRAFT_S or stalled_agent_draft):
+        moved = last_activity(pr)
+        draft_idle = now - moved if moved is not None else 0
+        if pr.get("isDraft") and (draft_idle > STALE_DRAFT_S or stalled_agent_draft):
             if found:
                 counts["staleLaneDrafts"] += 1
                 group = lane_groups.get(found.group("issue"), [pr])
@@ -1511,12 +1547,12 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
                     plan["close"].append((number, f"superseded by #{best['number']} for the same issue"))
                     continue
                 wanted.append("stale")
-            elif agent_owned(pr):
+            elif agent_owned(pr) or stalled_agent_draft:
                 waiting_on = (deps or {}).get(number) if stalled_agent_draft else None
                 if waiting_on:
                     counts["staleAgentDrafts"] += 1
                     plan["depHolds"].append((number, waiting_on))
-                elif stalled_agent_draft and duplicate_authorized(pr):
+                elif stalled_agent_draft and agent_owned(pr) and duplicate_authorized(pr):
                     opened = iso_ts(pr.get("createdAt"))
                     days = int((now - opened) // 86400) if opened is not None else int(age // 86400)
                     plan["close"].append((number, f"abandoned agent draft: open {days}d with no "

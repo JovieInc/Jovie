@@ -29,6 +29,7 @@ import socket
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -1595,13 +1596,23 @@ def linear_cooldown_until(key: str, now: float | None = None) -> float | None:
     root = linear_cooldown_root()
     now = time.time() if now is None else now
     now_ms = int(now * 1000)
+    scope_id = _linear_scope_id(key)
     latest = 0
     if root is not None:
-        scope = root / _linear_scope_id(key)
+        scope = root / scope_id
         latest = max(latest, _scan_scope(scope, now_ms), _legacy_file_reset_ms(root, key, now_ms))
     for legacy in _legacy_cooldown_roots(root):
-        latest = max(latest, _scan_scope(legacy / _linear_scope_id(key), now_ms),
+        latest = max(latest, _scan_scope(legacy / scope_id, now_ms),
                      _legacy_file_reset_ms(legacy, key, now_ms))
+    # Fallbacks written when the shared dir rejected a publish (JOV-7577).
+    latest = max(latest, _scan_scope(_tmp_cooldown_root() / scope_id, now_ms))
+    local = _PROCESS_LINEAR_COOLDOWNS.get(scope_id)
+    if local is not None:
+        local_ms = int(local * 1000)
+        if local_ms > now_ms:
+            latest = max(latest, local_ms)
+        else:
+            del _PROCESS_LINEAR_COOLDOWNS[scope_id]
     if latest <= now_ms:
         return None
     return latest / 1000
@@ -1622,6 +1633,60 @@ def _chmod_private(path: Path, mode: int) -> None:
         os.chmod(path, mode)
     except OSError:
         pass
+
+
+# Cooldowns this process failed to persist to the shared dir, keyed by scope hash.
+# An unwritable canonical dir used to mean every sibling process re-hit Linear;
+# the in-process and tmp fallbacks keep the backoff alive until a write succeeds.
+_PROCESS_LINEAR_COOLDOWNS: dict[str, float] = {}
+_COOLDOWN_UNWRITABLE_EVENT_FIRED = False
+
+
+def _tmp_cooldown_root() -> Path:
+    uid = os.getuid() if hasattr(os, "getuid") else "shared"
+    return Path(tempfile.gettempdir()) / f"jovie-linear-cooldown-{uid}"
+
+
+def _tmp_fallback_publish(scope_id: str, reset_s: float) -> None:
+    """Best-effort record under tmp so sibling processes still back off."""
+    try:
+        scope = _tmp_cooldown_root() / scope_id
+        scope.mkdir(parents=True, exist_ok=True)
+        _chmod_private(scope, 0o700)
+        reset_ms = int(reset_s * 1000)
+        record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
+        record.write_text(json.dumps({"schema": 1, "resetAt": reset_ms}))
+        _chmod_private(record, 0o600)
+    except OSError:
+        pass
+
+
+def _emit_cooldown_unwritable_event(root: Path, error: Exception) -> None:
+    """One remediation intake per process; Linear is cooled down, so file via gh."""
+    global _COOLDOWN_UNWRITABLE_EVENT_FIRED
+    if _COOLDOWN_UNWRITABLE_EVENT_FIRED:
+        return
+    _COOLDOWN_UNWRITABLE_EVENT_FIRED = True
+    try:
+        pr_events.upsert_intake(remediation.remediation_event(
+            source="lanes",
+            fingerprint="linear-cooldown-unwritable",
+            subject={"cooldown_root": str(root)},
+            evidence={"excerpt": f"shared Linear cooldown write failed: {type(error).__name__}: {error}"},
+            ws="ci",
+            first_seen=remediation.now_iso()))
+    except Exception:
+        pass
+
+
+def _cooldown_write_failed(root: Path, scope_id: str, reset_s: float, error: Exception) -> None:
+    print(json.dumps({"schema": "jovie.linear-cooldown-write-failure/v1",
+                      "fingerprint": "linear-cooldown-unwritable", "root": str(root),
+                      "error": f"{type(error).__name__}: {error}"}),
+          file=sys.stderr, flush=True)
+    _PROCESS_LINEAR_COOLDOWNS[scope_id] = max(reset_s, _PROCESS_LINEAR_COOLDOWNS.get(scope_id, 0))
+    _tmp_fallback_publish(scope_id, reset_s)
+    _emit_cooldown_unwritable_event(root, error)
 
 
 def publish_linear_cooldown(key: str, headers, now: float | None = None) -> float:
@@ -1653,8 +1718,8 @@ def publish_linear_cooldown(key: str, headers, now: float | None = None) -> floa
                 _chmod_private(record, 0o600)
             finally:
                 fcntl.flock(handle, fcntl.LOCK_UN)
-    except Exception:
-        return reset_s
+    except Exception as error:
+        _cooldown_write_failed(root, scope.name, reset_s, error)
     return reset_s
 
 
@@ -2124,10 +2189,14 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     import signal
     free_guard = devin_free_policy.command_guard(cmd, timeout)
     if free_guard:
-        existing_guard = guard
+        # The free-policy proof ticks every second; the ownership guard keeps its own cadence.
+        # Running it at 1 Hz made a Devin repair read its multi-page GraphQL target up to 787
+        # times, and any one racing read stopped the run as reconcile-unavailable (2026-10-11).
+        existing_guard, existing_interval, next_existing = guard, guard_interval, [0.0]
         def guard():
-            if existing_guard:
+            if existing_guard and time.monotonic() >= next_existing[0]:
                 existing_guard()
+                next_existing[0] = time.monotonic() + existing_interval
             free_guard()
         guard_interval = min(guard_interval, 1)
     if guard:
@@ -2745,11 +2814,13 @@ def require_gate_authority(host: Host, pr: dict, stage: str, sensitive: bool) ->
     return live
 
 
+GATE_OWNER_KINDS = ("fix", "gate")  # Either foreign owner defers a gate on that head.
+
+
 def require_gate_command_authority(host: Host, pr: dict, worktree: Path, stage: str, sensitive: bool) -> None:
     """Waiting for a seat is not permission to run checks for stale authority."""
     try:
-        if any(claimed_elsewhere(pr["number"], pr["headRefOid"], kind, timeout=30)
-               for kind in ("fix", "gate")):
+        if claimed_elsewhere(pr["number"], pr["headRefOid"], GATE_OWNER_KINDS, timeout=30):
             raise RepairStopped("gate-owner-active-or-unavailable", None, stage)
         live = require_gate_authority(host, pr, stage, sensitive)
         head = sh(["git", "rev-parse", "HEAD"], cwd=worktree, timeout=30)
@@ -3387,6 +3458,7 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         return
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
+    observed = json.loads(json.dumps(attempts))
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
     providers = load_providers()
     cooled = {name for name in providers if cooling(host, name)}
@@ -3406,7 +3478,7 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         plan = remediation.plan_ladder(classified, record, providers, now, pr["headRefOid"],
                                        healthy=healthy, cooled=cooled)
         if plan["action"] == "update-branch":
-            outcome = pr_events.sync_main(host, THIS, pr, now)
+            outcome = pr_events.sync_main(host, THIS, pr, now, terminal_ok=True)
             record = remediation.append_rung(record, rung="update-branch", lane=None, cls=classified["cls"],
                                              at=now, head=pr["headRefOid"], kind="deterministic",
                                              ok=outcome == "synced")
@@ -3450,8 +3522,16 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         elif plan.get("action") == "surface":
             _surface_exhausted(host, pr, record, classified, plan.get("reason") or classified["cls"],
                                linear, attempts, data)
+
+    def merge(current: dict) -> None:
+        # Repairs end outside claim.lock (end_local_fix_attempt), so a whole-file rewrite of
+        # this pass's snapshot could drop their endedAt/pushed/verdict. Write only the rows
+        # this pass changed, and only where nobody changed them since it read them.
+        for key, value in attempts.items():
+            if value != observed.get(key) and current.get(key) == observed.get(key):
+                current[key] = value
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(attempts))
+    update_json(path, merge)
     save_escalation(host, data)
 
 
@@ -3481,16 +3561,104 @@ def _legacy_terminal(host: Host, pr: dict, record: dict, held: dict, linear, att
         pass
 
 
+TERMINAL_REVISIT_S = 24 * 3600
+TERMINAL_REVISITS_PER_PASS = 3
+TERMINAL_LABELS = frozenset({pr_events.PREFIX + pr_events.EXHAUSTED, pr_events.POISON_LABEL})
+
+
+def terminal_prs(prs: list[dict], attempts: dict, held: dict) -> list[dict]:
+    """Open PRs parked on a terminal generation whose only exit is a new head: an escalated
+    spent head, or an exhausted/poisoned label on a head no repair has moved since."""
+    parked = []
+    for pr in prs:
+        head, record = pr.get("headRefOid"), attempts.get(str(pr.get("number"))) or {}
+        labels = {label.lower() for label in pr_events.label_names(pr)}
+        if not isinstance(head, str) or not head or not isinstance(record, dict) \
+                or labels & pr_events.HOLD_LABELS or pr.get("isInMergeQueue") is not False \
+                or pr.get("isCrossRepository") is not False \
+                or not pr_events.fixable_hold(held.get(str(pr["number"])), head):
+            continue  # holds, queued heads, forks and diff-policy holds have other owners
+        spent = pr_events.spent(record, head, MAX_FIX_ATTEMPTS)
+        unchanged = not record.get("count") or pr_events.same_generation(record, head)
+        if (record.get("escalated") and spent) or (labels & TERMINAL_LABELS and unchanged):
+            parked.append(pr)
+    return parked
+
+
+def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) -> list[int]:
+    """The material-change exit for terminal generations, fired without a human (2026-10-11).
+
+    A terminal head waits for "a new PR head", which nothing produced: 26 PRs sat exhausted,
+    poisoned or escalated for days. Main moving is new evidence, so at most once per PR per
+    TERMINAL_REVISIT_S, and only when main moved since the last revisit, the PR gets a
+    deterministic no-model sync: GitHub merges main into it (exact expected head), or a
+    Dependabot bump asks Dependabot to recreate itself on main. The new head is ordinary
+    re-entry: a new bounded generation with its own attempts and the queue's failure log.
+    Conflicted (DIRTY) non-Dependabot heads cannot merge main without a model and stay with
+    the escalation ladder. No attempt or rung is refunded or reset.
+    """
+    now = time.time() if now is None else now
+    attempts = read_json(host.state / "fix-attempts.json")
+    held = read_json(held_path(host))
+    path = host.state / "terminal-revisits.json"
+    visits = read_json(path)
+    due = []
+    for pr in sorted(terminal_prs(prs, attempts, held), key=lambda item: item["number"]):
+        last = visits.get(str(pr["number"])) if isinstance(visits.get(str(pr["number"])), dict) else {}
+        dependabot = (pr.get("headRefName") or "").startswith("dependabot/")
+        if pr.get("mergeStateStatus") == "DIRTY" and not dependabot:
+            continue
+        if type(last.get("at")) in (int, float) and now - last["at"] < TERMINAL_REVISIT_S:
+            continue
+        due.append((pr, last, dependabot))
+    if not due:
+        return []
+    listed = sh(["git", "ls-remote", "origin", "refs/heads/main"], cwd=host.repo, timeout=60)
+    main = (listed.stdout or "").split()[0] if listed.returncode == 0 and (listed.stdout or "").split() else None
+    if not main:
+        return []  # without main's head, "main moved" is unproven
+    acted = []
+    for pr, last, dependabot in due:
+        if len(acted) >= TERMINAL_REVISITS_PER_PASS:
+            break
+        if last.get("main") == main or publication_revocation(host, pr.get("headRefName")) \
+                or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+            continue
+        if dependabot:
+            action = "dependabot-recreate"
+            result = sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG,
+                         "--body", "@dependabot recreate"])
+            ok = result.returncode == 0
+        else:
+            action = "update-branch"
+            ok = pr_events.sync_main(host, THIS, pr, now, terminal_ok=True) == "synced"
+        visit = {"at": now, "head": pr["headRefOid"], "main": main, "action": action, "ok": ok}
+        update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
+        pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "terminal-revisit", "origin": AUTONOMOUS_ORIGIN,
+                                "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+                                "pr": pr["number"], "headBefore": pr["headRefOid"], "main": main,
+                                "action": action, "verdict": "revisited" if ok else "revisit-failed",
+                                "endedAt": now_iso()})
+        acted.append(pr["number"])
+    return acted
+
+
+RERUN_RUNS_LIMIT = 5
+
+
 def _rerun_failed(pr: dict):
+    """Rerun the failed jobs of every distinct run behind a red check (bounded). An outage
+    can cancel jobs in several workflows; rerunning only the first left the rest red."""
+    runs = []
     for check in pr.get("statusCheckRollup") or []:
-        if check.get("conclusion") not in RED:
+        if str(check.get("conclusion") or "").upper() not in RED | {"CANCELLED"}:
             continue
         found = re.search(r"/runs/(\d+)", check.get("detailsUrl") or "")
-        if not found:
-            continue
-        result = sh(["gh", "run", "rerun", found.group(1), "--failed", "--repo", REPO_SLUG])
-        return result.returncode == 0
-    return False
+        if found and found.group(1) not in runs:
+            runs.append(found.group(1))
+    results = [sh(["gh", "run", "rerun", run, "--failed", "--repo", REPO_SLUG]).returncode == 0
+               for run in runs[:RERUN_RUNS_LIMIT]]
+    return bool(results) and any(results)
 
 
 def arm_ready_prs(host: Host, prs: list[dict]) -> None:
@@ -4509,6 +4677,10 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
     update_json(host.state / "fix-attempts.json", finish)
 
 
+# Consecutive unreadable target snapshots the in-run guard tolerates (~90s at its 30s cadence).
+AGENT_GUARD_UNREADABLE_LIMIT = 3
+
+
 class RepairStopped(RuntimeError):
     def __init__(self, reason: str, live: dict | None, stage: str):
         super().__init__(reason)
@@ -4774,6 +4946,47 @@ def retire_completed_repair(host: Host, worktree: Path, receipt: dict) -> bool:
     return False
 
 
+def retire_published_preserved(host: Host, number: int) -> list[str]:
+    """Under the PR's repair lock: free this PR's preserved checkouts that hold nothing to recover.
+
+    A cancelled or unreadable-target run preserves its checkout as evidence. Once that
+    checkout is idle, has no source change and every commit is on origin, the evidence is
+    already published; keeping it only turns each later repair into a recovery handoff
+    (preserved-head-superseded / preserved-target-needs-reconciliation). On 2026-10-11 that
+    spent 29 repair attempts and the top escalation rung of 3 PRs on no work. Anything
+    unpublished, dirty, busy or unreadable stays preserved for the existing recovery path.
+    """
+    retired = []
+    for marker_path in sorted((host.state / "worktrees").glob(f"*/{disk_guard.PRESERVED_REPAIR}")):
+        path = marker_path.parent
+        try:
+            marker = json.loads(marker_path.read_text())
+        except (OSError, ValueError):
+            continue
+        if not isinstance(marker, dict) or marker.get("issue") is not None:
+            continue
+        named = RUN_TARGET.search(path.name)
+        if marker.get("pr") != number and not (
+                marker.get("pr") is None and named and named.group(1) == str(number)):
+            continue
+        try:
+            if worktree_busy(path):
+                continue
+            status = sh(["git", "status", "--porcelain", "--untracked-files=all", *disk_guard.SOURCE_PATHSPEC],
+                        cwd=path, timeout=30)
+            unpushed = sh(["git", "rev-list", "--count", "HEAD", "--not", "--remotes=origin"],
+                          cwd=path, timeout=30)
+            if status.returncode or status.stdout.strip() or unpushed.returncode or unpushed.stdout.strip() != "0":
+                continue
+            marker_path.unlink()
+            remove_worktree(host, path)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if not path.exists():
+            retired.append(path.name)
+    return retired
+
+
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
     try:
@@ -4831,6 +5044,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     try:
         if not branch_held:
             raise RecoveryHandoff("repair-owner-active", worktree)
+        if retired := retire_published_preserved(host, pr["number"]):
+            receipt["retiredPreserved"] = retired
         preserved = preserved_run(host, pr=pr["number"])
         if preserved:
             ident = qualify_preserved_pr(host, pr, preserved)
@@ -4873,9 +5088,26 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         receipt.update(worktree=str(worktree), resumedFrom=prior["runId"])
     with open(runs / f"{run_id}.log", "w") as log:
         try:
+            unreadable = [0]  # consecutive unavailable reads while the agent runs
+
             def verify_target(target, stage, *, worktree=None):
                 receipt["targetStateReads"] += 1
-                live = require_fix_target(target, stage, worktree=worktree, repair=True)
+                try:
+                    live = require_fix_target(target, stage, worktree=worktree, repair=True)
+                except RepairStopped as error:
+                    # Mid-run, one unreadable snapshot (a check finishing between pages, a
+                    # 502) is not evidence the target changed; it stopped 20 runs in 48h.
+                    # Positive evidence still stops at once, every boundary around the run
+                    # stays a strict single read, and a sustained outage still stops it.
+                    if stage != "agent-running" or error.live is not None:
+                        raise
+                    unreadable[0] += 1
+                    receipt["targetUnreadableMidRun"] = receipt.get("targetUnreadableMidRun", 0) + 1
+                    if unreadable[0] >= AGENT_GUARD_UNREADABLE_LIMIT:
+                        raise
+                    require_publishable(host, pr["headRefName"], stage)
+                    return None
+                unreadable[0] = 0
                 require_publishable(host, live.get("headRefName") or pr["headRefName"], stage)
                 return live
             require_disk(host, "repair-checkout")
@@ -5261,8 +5493,8 @@ def with_checks(pr: dict) -> dict:
 
 
 def reclaimable_drafts() -> list[dict]:
-    """Abandoned agent drafts the lanes reclaim (Tim, 2026-10-10): non-lane agent branches past
-    the 7-day SLO that are idle 48h, red or conflicting, and not held. Same-repo only."""
+    """Abandoned drafts the lanes reclaim (Tim, 2026-10-10/11): any same-repo non-lane draft
+    past the age floor with no commit for 48h, red or conflicting, and not held."""
     now = time.time()
     return [pr for pr in open_prs_summary() if not pr.get("isCrossRepository")
             and pr_events.abandoned_agent_draft(pr, now)
@@ -5550,8 +5782,11 @@ def claim_adoptable_pr(host: Host, name: str, prs: list[dict], repair_candidates
             try:
                 latest = json.loads(path.read_text()) if path.exists() else {}
                 sensitive = SENSITIVE_PR_LABEL in {label["name"].lower() for label in pr.get("labels", [])}
+                # Admission must refuse exactly what the gate command later refuses: a
+                # foreign live fix claim deferred 141 adopt runs in 48h, each posting
+                # another gate claim on the PR (2026-10-11, #20979/#20820).
                 if not terminal_gate(pr, latest, sensitive) and not gate_deferral(host, pr) \
-                        and not claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
+                        and not claimed_elsewhere(pr["number"], pr["headRefOid"], GATE_OWNER_KINDS):
                     post_claim(pr["number"], pr["headRefOid"], "gate")
                     return reservation
             except BaseException:
@@ -6000,6 +6235,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             sweep_lane_prs(host, name, linear)
         if local and not (red or adopt or labeled):
             publish_exhausted_repairs(host, name, candidates)
+            try:
+                revisit_terminal_prs(host, candidates)
+            except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+                pass  # The exit is retried next idle pass; it never blocks new work.
         # JOV-7514 budgets stay on configured base slots. Scaling the cap with the
         # autoscaled count would admit more parked PRs as capacity rises.
         budget = None if red or adopt or labeled or maintenance_only else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))

@@ -176,7 +176,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - check_suite
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:green-source
@@ -236,7 +235,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers:
       - Agent Pipeline
-      - Auto-Ready Agent Drafts
       - iOS CI
       - Lane Fix Relay
       - Merge Queue Green Enroll
@@ -777,7 +775,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:rearm-green-victims
-    jobCount: 4
+    jobCount: 5
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true
