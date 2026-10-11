@@ -882,9 +882,10 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - push
       - workflow_dispatch
     terminalReceipt: job:publish
-    jobCount: 3
+    jobCount: 4
   - name: Observability Report (Linear)
     path: .github/workflows/observability-issue.yml
     active: true
