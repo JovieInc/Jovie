@@ -702,12 +702,32 @@ const recipeSource = (
 });
 
 const RECIPE_RESOLUTIONS = {
-  homepage: recipeSource(
-    'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx',
-    'HomepageV2Route',
-    MARKETING_PEN_CONTRACT_IDS.recipe.homepage,
-    'penContractId={MARKETING_PEN_CONTRACT_IDS.recipe.homepage}'
-  ),
+  homepage: {
+    source: 'apps/web/app/(home)/page.tsx',
+    sourceBacked: true,
+    resolvedSource: 'apps/web/app/(home)/page.tsx',
+    exportName: 'HomePage',
+    // oPZHQ remains the legacy HomepageV2Route contract. Do not transfer its
+    // native identity to the selected identity assembly without owner proof.
+    penRootId: null,
+    penRootIds: [],
+    penIdentityReason:
+      'The selected / identity assembly has no verified native mapping. The legacy HomepageV2Route contract is not its Pen owner; native reference resolution remains with the existing certification owner.',
+    rootProofs: [
+      {
+        source: 'apps/web/app/(home)/page.tsx',
+        binding: '<HomepageQueryProvider>',
+        occurrences: 1,
+        kind: 'source',
+      },
+      {
+        source: 'apps/web/app/(home)/page.tsx',
+        binding: '<HomepageIdentityStoryStack />',
+        occurrences: 1,
+        kind: 'source',
+      },
+    ],
+  },
   pricing: unresolved(
     'Route and canonical story do not share one complete recipe body.'
   ),

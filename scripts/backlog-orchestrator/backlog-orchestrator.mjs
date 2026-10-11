@@ -2271,6 +2271,18 @@ async function runRemediate(isDryRun) {
     console.log(
       `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')} mm.queueSource=${mm.queueSource ?? 'none'} mm.errors=${(mm.errors ?? []).length} workers.running=${workers?.running ?? 'n/a'} workers.max=${workers?.maxConcurrent ?? 'n/a'} workers.source=${lanes ? 'lanes-doctor-report' : workers ? 'legacy-4041' : 'none'} workers.observedAt=${lanes?.observedAt ?? 'n/a'}`
     );
+    // Per-reason exclusion counts (JOV-8000 follow-up 42): near-misses are
+    // diagnosable from the log without reading the full matrix.
+    const reasonCounts = {};
+    for (const row of receipt.matrix ?? []) {
+      const code = row?.reasonCode ?? row?.reason ?? 'none';
+      reasonCounts[code] = (reasonCounts[code] ?? 0) + 1;
+    }
+    const reasonLine = Object.entries(reasonCounts)
+      .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+      .map(([code, count]) => `${code}=${count}`)
+      .join(' ');
+    console.log(`capacity.exclusions ${reasonLine}`);
   }
 }
 

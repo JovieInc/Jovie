@@ -176,7 +176,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - check_suite
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:green-source
@@ -236,7 +235,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers:
       - Agent Pipeline
-      - Auto-Ready Agent Drafts
       - iOS CI
       - Lane Fix Relay
       - Merge Queue Green Enroll
@@ -617,7 +615,7 @@ nodes:
       - workflow_call
       - workflow_dispatch
     terminalReceipt: job:graphics
-    jobCount: 1
+    jobCount: 2
   - name: iOS CI
     path: .github/workflows/ios-ci.yml
     active: true
@@ -777,7 +775,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:rearm-green-victims
-    jobCount: 4
+    jobCount: 5
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true
@@ -884,9 +882,10 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - push
       - workflow_dispatch
     terminalReceipt: job:publish
-    jobCount: 3
+    jobCount: 4
   - name: Observability Report (Linear)
     path: .github/workflows/observability-issue.yml
     active: true
@@ -1460,6 +1459,18 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:audit
+    jobCount: 1
+  - name: Unstack Merged Parent
+    path: .github/workflows/unstack-merged-parent.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_dispatch
+    terminalReceipt: job:unstack
     jobCount: 1
   - name: Vercel Preview Cleanup
     path: .github/workflows/vercel-preview-cleanup.yml
