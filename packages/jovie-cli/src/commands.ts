@@ -167,7 +167,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     path: ['creator', 'lookup'],
     tool: 'lookup_creator',
     summary:
-      'Resolve a creator to their existing Jovie profile or extract public fields. Accepts a profile URL or platform:handle (youtube, instagram, tiktok, linktree). Never creates a profile.',
+      'Resolve a creator to their existing Jovie profile, or extract public fields from a YouTube channel. Accepts a profile URL or platform:handle (youtube, instagram, tiktok, linktree); Instagram, TikTok, and Linktree only resolve existing profiles. Never creates a profile.',
     arg: {
       name: 'url-or-handle',
       description:
@@ -204,7 +204,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     path: ['docs', 'llms'],
     tool: 'get_docs',
     summary:
-      'Fetch the Jovie agent guide (llms.txt; full=true for llms-full.txt).',
+      'Fetch the Jovie agent guide (llms.txt, or llms-full.txt with full).',
     acceptsFull: true,
     readOnly: true,
     run: (input, options) => fetchSiteLlms(input.full === true, options),
