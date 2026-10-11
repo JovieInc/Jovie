@@ -4734,8 +4734,8 @@ def retire_completed_repair(host: Host, worktree: Path, receipt: dict) -> bool:
         return False
     try:
         require_idle_worktree(worktree)
-        status = sh(["git", "status", "--porcelain", "--untracked-files=all", "--", ".",
-                     f":(exclude){disk_guard.PRESERVED_REPAIR}"], cwd=worktree, timeout=30)
+        status = sh(["git", "status", "--porcelain", "--untracked-files=all", *disk_guard.SOURCE_PATHSPEC],
+                    cwd=worktree, timeout=30)
         head = sh(["git", "rev-parse", "HEAD"], cwd=worktree, timeout=30)
         if status.returncode or status.stdout.strip() or head.returncode or head.stdout.strip() != receipt["headAfter"]:
             return False
@@ -6300,7 +6300,7 @@ def remove_worktree(host: Host, worktree: Path) -> None:
         record_worktree_disposition(host, worktree, "preserved", busy)
         preserve_repair(worktree, {"runId": worktree.name, "reasons": [f"cleanup-not-idle:{busy}"]})
         return
-    status = sh(["git", "status", "--porcelain"], cwd=worktree)
+    status = sh(["git", "status", "--porcelain", *disk_guard.SOURCE_PATHSPEC], cwd=worktree)
     if status.returncode or status.stdout.strip():
         record_worktree_disposition(host, worktree, "preserved", "source-unverified")
         preserve_repair(worktree, {"runId": worktree.name, "reasons": ["cleanup-source-unverified"]})

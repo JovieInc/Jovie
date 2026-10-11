@@ -430,7 +430,7 @@ def cleanup(lane, binding: Binding, worktree: Path, branch: str | None, receipt:
     """Unpublished or uncommitted work is preserved; a clean, pushed checkout is removed."""
     if not worktree.exists():
         return
-    status = lane.sh(["git", "status", "--porcelain"], cwd=worktree)
+    status = lane.sh(["git", "status", "--porcelain", *lane.disk_guard.SOURCE_PATHSPEC], cwd=worktree)
     unpushed = lane.sh(["git", "rev-list", "--count", "HEAD", "--not", "--remotes=origin"], cwd=worktree)
     if (receipt.get("verdict") == "disk-held" or status.returncode or status.stdout.strip()
             or unpushed.returncode or unpushed.stdout.strip() != "0"):

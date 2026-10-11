@@ -287,5 +287,20 @@ class CheckTest(unittest.TestCase):
             self.assertFalse(report["admitted"])
 
 
+
+class HarnessArtifactTest(unittest.TestCase):
+    def test_harness_files_are_not_uncommitted_source(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+            subprocess.run(["git", "init", "-q", str(repo)], check=True, env=env)
+            for name in guard.HARNESS_ARTIFACTS:
+                (repo / name).write_text("harness\n")
+            with patch.dict(os.environ, env, clear=True):
+                self.assertTrue(guard.is_clean(repo, subprocess.run), "only harness artifacts: clean")
+                (repo / "unsaved.py").write_text("work\n")
+                self.assertFalse(guard.is_clean(repo, subprocess.run), "a real untracked file is work")
+
 if __name__ == "__main__":
     unittest.main()
