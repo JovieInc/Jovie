@@ -133,16 +133,77 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # Self-hosted Macs are primary; hosted macOS is the fallback when the
+  # heartbeat is stale, so a sleeping Mac or a saturated org pool never
+  # blocks a release. Same contract as ios-ci.yml's route.
+  mac-runner-route:
+    name: Mac Runner Route
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      runner_class: ${{ steps.route.outputs.runner_class }}
+    steps:
+      - name: Checkout trusted runner routing policy
+        if: ${{ vars.JOVIE_MAC_RUNNER != 'off' }}
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          sparse-checkout: |
+            .github/scripts/await-runner-heartbeat.sh
+            .github/scripts/query-runner-heartbeat.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Query Mac runner heartbeat
+        id: heartbeat
+        if: ${{ vars.JOVIE_MAC_RUNNER != 'off' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml
+          HEARTBEAT_MAX_AGE_SECONDS: '1500'
+          HEARTBEAT_API_TIMEOUT_SECONDS: '5'
+          HEARTBEAT_POLL_ATTEMPTS: '1'
+          HEARTBEAT_POLL_INTERVAL_SECONDS: '1'
+        run: |
+          set -uo pipefail
+          helper='.github/scripts/await-runner-heartbeat.sh'
+          if [ -x "$helper" ]; then
+            timeout 60s "$helper" || true
+          fi
+          exit 0
+
+      - name: Select Mac runner route
+        id: route
+        env:
+          HEARTBEAT_HEALTH: ${{ steps.heartbeat.outputs.health }}
+          HEARTBEAT_EVIDENCE: ${{ steps.heartbeat.outputs.evidence }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner_class='hosted'
+          if [ "$HEARTBEAT_HEALTH" = 'up' ]; then
+            runner_class='mac'
+          fi
+          echo "runner_class=$runner_class" >> "$GITHUB_OUTPUT"
+          echo "::notice::CLI chaos Mac route: $runner_class — ${HEARTBEAT_EVIDENCE:-not probed}"
+
   chaos-matrix:
     name: CLI chaos gate (${{ matrix.os }}, Node ${{ matrix.node }})
-    needs: chaos-tarball
+    needs: [chaos-tarball, mac-runner-route]
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         # The engines floor, the next major, and the Node 22 line that still runs.
         node: ['22.13.0', '24.21.0', '26']
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os == 'macos-latest' && needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || matrix.os }}
     timeout-minutes: 20
     permissions:
       contents: read
