@@ -11,7 +11,8 @@ run happens inside a seat a provider worker already holds. Jovie-only holds (new
 budget, hotspots, file overlap, routing) do not apply; each binding has its own concurrency
 and open-PR intake budget. Linear and GitHub reads go through lane_runner.shared(), on the
 same TTLs as the Jovie claim scan. The binding's own CI is the gate: the harness opens a
-draft PR and moves the issue to In Review; it never runs Jovie's gate against another repo.
+ready PR and moves the issue to In Review; the repo's required checks and native merge queue
+land it. It never runs Jovie's gate against another repo.
 """
 from __future__ import annotations
 
@@ -331,7 +332,7 @@ def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context
 
 
 def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=None) -> dict:
-    """One agent run in a binding worktree, then push and (for an issue) a draft PR."""
+    """One agent run in a binding worktree, then push and (for an issue) a ready PR."""
     subject = issue.identifier if issue is not None else f"{binding.key}-PR{pr['number']}"
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{subject}-{name}-{uuid.uuid4().hex[:6]}"
     branch = pr["headRefName"] if pr is not None else f"{name}/{issue.identifier.lower()}-{run_id[:15].lower()}"
@@ -391,19 +392,19 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
 
 
 def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=None, pr=None) -> dict:
-    """Push the agent's commits (never forced) and, for an issue, open its one draft PR."""
+    """Push the agent's commits (never forced) and, for an issue, open its one ready PR.
+
+    Ready, never draft: the repo's native merge-queue enrollment skips drafts, and every
+    lane PR must land on its own once the required checks pass."""
     if pr is not None:
-        head = git("rev-parse", "HEAD")
-        if head == pr["headRefOid"]:
-            return {"verdict": "no-change", "reasons": ["repair-made-no-commit"]}
-        if lane.sh(["git", "merge-base", "--is-ancestor", pr["headRefOid"], head], cwd=worktree).returncode:
-            return {"verdict": "failed", "reasons": ["repair-rewrote-history"]}
-        git("push", "-q", "origin", f"HEAD:refs/heads/{branch}")
-        return {"verdict": "pushed", "headSha": head}
+        result = _publish_repair(lane, branch, worktree, git, pr)
+        if pr.get("isDraft") and lane.sh(["gh", "pr", "ready", str(pr["number"]), "--repo", binding.slug]).returncode:
+            result.setdefault("reasons", []).append("pr-ready-failed")
+        return result
     if git("rev-list", "--count", "origin/main..HEAD") in ("", "0"):
         return {"verdict": "no-change", "reasons": ["no-commits"]}
     git("push", "-q", "-u", "origin", branch)
-    created = lane.sh(["gh", "pr", "create", "--repo", binding.slug, "--draft", "--base", "main", "--head", branch,
+    created = lane.sh(["gh", "pr", "create", "--repo", binding.slug, "--base", "main", "--head", branch,
                        "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
                        "--body", f"Refs {issue.identifier}.\n\n<!-- linear-issue-id:{issue.id} -->\n"
                                  f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
@@ -413,6 +414,16 @@ def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=N
     if not url:
         return {"verdict": "failed", "reasons": ["pr-create-failed"], "headSha": git("rev-parse", "HEAD")}
     return {"verdict": "pr-opened", "prUrl": url[0], "headSha": git("rev-parse", "HEAD")}
+
+
+def _publish_repair(lane, branch: str, worktree: Path, git, pr: dict) -> dict:
+    head = git("rev-parse", "HEAD")
+    if head == pr["headRefOid"]:
+        return {"verdict": "no-change", "reasons": ["repair-made-no-commit"]}
+    if lane.sh(["git", "merge-base", "--is-ancestor", pr["headRefOid"], head], cwd=worktree).returncode:
+        return {"verdict": "failed", "reasons": ["repair-rewrote-history"]}
+    git("push", "-q", "origin", f"HEAD:refs/heads/{branch}")
+    return {"verdict": "pushed", "headSha": head}
 
 
 def cleanup(lane, binding: Binding, worktree: Path, branch: str | None, receipt: dict) -> None:
@@ -435,8 +446,8 @@ def finish_issue(lane, host, binding: Binding, name: str, linear, issue, receipt
     verdict = receipt.get("verdict")
     if verdict == "pr-opened":
         linear.move(issue.id, binding.review_state)
-        linear.comment(issue.id, f"🤖 lane `{name}` opened draft PR {receipt.get('prUrl')}; "
-                                 f"{binding.slug} required checks gate merge.")
+        linear.comment(issue.id, f"🤖 lane `{name}` opened PR {receipt.get('prUrl')}; "
+                                 f"{binding.slug} required checks and merge queue land it.")
         return
     if verdict == "disk-held":
         linear.move(issue.id, "Todo")
