@@ -68,6 +68,46 @@ describe('buildEmailSignature', () => {
     expect(html).not.toContain('NoLabel');
   });
 
+  it('renders hosted PNG icons for mapped platforms', () => {
+    const { html } = buildEmailSignature({
+      name: 'A',
+      handle: 'a',
+      socials: [
+        {
+          label: 'Instagram',
+          url: 'https://instagram.com/a',
+          platform: 'instagram',
+        },
+        { label: 'Spotify', url: 'https://open.spotify.com/artist/a' },
+      ],
+    });
+    expect(html).toContain(
+      '/email-signature/social-icons/generated/v1/instagram.png'
+    );
+    // Spotify is detected from the URL host when no platform is provided.
+    expect(html).toContain(
+      '/email-signature/social-icons/generated/v1/spotify.png'
+    );
+    expect(html).toContain('alt="Instagram"');
+    // Icon rail uses a nested presentation table, not the text separator.
+    expect(html).not.toContain('&nbsp;·&nbsp;');
+  });
+
+  it('keeps labeled text links for unmapped platforms', () => {
+    const { html } = buildEmailSignature({
+      name: 'A',
+      handle: 'a',
+      socials: [
+        { label: 'Instagram', url: 'https://instagram.com/a' },
+        { label: 'My Site', url: 'https://example.com/a' },
+      ],
+    });
+    expect(html).toContain(
+      '/email-signature/social-icons/generated/v1/instagram.png'
+    );
+    expect(html).toContain('>My Site</a>');
+  });
+
   it('omits the Jovie footer when hideJovieBranding=true', () => {
     const { html, text } = buildEmailSignature({
       name: 'A',

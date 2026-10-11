@@ -133,6 +133,7 @@ export function AdminCreatorProfilesUnified({
             socials: signatureProfile.socialLinks?.map(link => ({
               label: link.displayText ?? link.platform,
               url: link.url,
+              platform: link.platform,
             })),
           })
         : null,

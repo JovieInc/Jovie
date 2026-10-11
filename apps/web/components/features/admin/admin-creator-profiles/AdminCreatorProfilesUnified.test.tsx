@@ -1,10 +1,21 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
+import type { EmailSignatureInput } from '@/lib/email-signature/build-signature';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
+
+const signatureDialogInput = vi.fn();
+
+vi.mock('@/features/dashboard/molecules/EmailSignatureDialog', () => ({
+  EmailSignatureDialog: ({ input }: { input: EmailSignatureInput | null }) => {
+    signatureDialogInput(input);
+    return null;
+  },
+}));
 
 vi.mock('next/navigation', async importOriginal => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
@@ -96,4 +107,48 @@ describe('creator query isolation', () => {
       client.clear();
     }
   );
+});
+
+describe('email signature dialog', () => {
+  it('passes each social link platform into the signature input', async () => {
+    const user = userEvent.setup({ delay: null });
+    const withSocial: AdminCreatorProfileRow = {
+      ...ari,
+      socialLinks: [
+        {
+          id: 'link-1',
+          platform: 'instagram',
+          platformType: 'social',
+          url: 'https://instagram.com/ari',
+          displayText: null,
+        },
+      ],
+    };
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    render(view(client, '', [withSocial]));
+
+    await user.click(
+      await screen.findByRole('button', { name: 'More actions' })
+    );
+    await user.click(
+      await screen.findByRole('menuitem', { name: 'Email Signature…' })
+    );
+
+    expect(await screen.findByText('Ari Lane')).toBeVisible();
+    const inputs = signatureDialogInput.mock.calls.map(([input]) => input);
+    const latest = inputs.at(-1);
+    expect(latest?.socials).toEqual([
+      {
+        label: 'instagram',
+        url: 'https://instagram.com/ari',
+        platform: 'instagram',
+      },
+    ]);
+    client.clear();
+  });
 });
