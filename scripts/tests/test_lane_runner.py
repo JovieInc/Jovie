@@ -8476,7 +8476,7 @@ class RepositoryBindingTest(unittest.TestCase):
         self.assertEqual(receipt["repository"], "JovieInc/LogYourBody")
         create = next(args for args in calls if args[:3] == ["gh", "pr", "create"])
         self.assertEqual(create[create.index("--repo") + 1], "JovieInc/LogYourBody")
-        self.assertIn("--draft", create)
+        self.assertNotIn("--draft", create)  # LYB's native merge queue skips drafts
         self.assertIn("(LYB-7)", create[create.index("--title") + 1])
         pushed = subprocess.run(["git", "ls-remote", str(root / "origin.git"), receipt["branch"]], env=env,
                                 capture_output=True, text=True).stdout
@@ -8484,6 +8484,22 @@ class RepositoryBindingTest(unittest.TestCase):
         self.assertTrue(receipt["branch"].startswith("codex/lyb-7-"))
         self.assertFalse(Path(receipt["worktree"]).exists())
         self.assertFalse(any("pre-push-gate" in " ".join(map(str, args)) for args in calls))
+
+    def test_repair_leaves_a_draft_lyb_lane_pr_ready(self):
+        pr = {"number": 41, "headRefName": "codex/lyb-9-20261011t000000", "headRefOid": "b" * 40, "isDraft": True}
+        for head, verdict in (("c" * 40, "pushed"), ("b" * 40, "no-change")):
+            with self.subTest(verdict=verdict):
+                git = Mock(return_value=head)
+                ok = SimpleNamespace(returncode=0, stdout="", stderr="")
+                with patch.object(lane, "sh", return_value=ok) as sh:
+                    result = lane.bindings.publish(lane, self.binding, pr["headRefName"], Path("wt"), git, pr=pr)
+                self.assertEqual(result["verdict"], verdict)
+                self.assertIn(["gh", "pr", "ready", "41", "--repo", "JovieInc/LogYourBody"],
+                              [call.args[0] for call in sh.call_args_list])
+        with patch.object(lane, "sh") as sh:
+            lane.bindings.publish(lane, self.binding, pr["headRefName"], Path("wt"), Mock(return_value="b" * 40),
+                                  pr={**pr, "isDraft": False})
+        sh.assert_not_called()
 
     def test_lyb_remediation_event_never_runs_in_the_jovie_repo(self):
         lane.save_escalation(self.host, {"events": {"red-checks": {
