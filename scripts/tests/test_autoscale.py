@@ -25,20 +25,29 @@ def obs(**over):
             "cooling": [], "cooldownAt": {}, "rateBankAt": {}, "codexUnleasedAvailable": 2,
             "productiveRunRate": {"devin": 0.8, "codex": 0.8}, "starts": {"devin": 10, "codex": 10}, "alerts": [],
             "gateWaitMedianS24h": 100, "githubRemaining": 4000, "linearRemaining": 2000, "linearLimit": 2500,
-            "linearRateLimitedAt": None, "mergeThroughputFresh": True,
+            "linearRateLimitedAt": None, "linearBudgetFresh": True, "mergeThroughputFresh": True,
             "mergeThroughput": {"queueDepth": 4, "queueWaitP50Minutes": 5, "mergedPerHour": 30,
                                 "openedPerHour": 20, "ejectionRate": 0.1},
             "disk": {"admitted": True, "freePct": 40}}
-    base.update(over); return base
+    base.update(over)
+    if "linearDimensions" not in over:
+        base["linearDimensions"] = {"requests": {"remaining": base["linearRemaining"], "limit": base["linearLimit"], "observedAt": NOW},
+                                    "complexity": {"remaining": 1000000, "limit": 2000000, "observedAt": NOW}}
+    return base
 def sample(**over):
     base = {"cpuCount": 16, "load1": 1.0, "memAvailableBytes": 16 * GIB,
             "psi": {"cpuSomeAvg10": 1.0, "memoryFullAvg10": 0.0, "ioFullAvg10": 0.0}}
     base.update(over); return base
 def decide(previous, seen, host, bases, options, now):
     return A.decide(previous, seen, host, bases, options, now)
+def budget_at(seen, now):
+    return {**seen, "linearDimensions": {name: {**row, "observedAt": now}
+            for name, row in seen.get("linearDimensions", {}).items()}}
 def ticks(count, previous, seen, host, bases, options, now, step=60):
     for _ in range(count):
-        previous = decide(previous, seen, host, bases, options, now); now += step
+        # Each healthy minute fixture represents a fresh budget observation.
+        fresh = budget_at(seen, now)
+        previous = decide(previous, fresh, host, bases, options, now); now += step
     return previous, now - step
 def pr_row(number, terminal=False):
     return {"number": number, "headRefName": f"codex/jov-{number}-20261002", "isDraft": True,
@@ -113,12 +122,13 @@ class AutoscaleTest(unittest.TestCase):
                 self.assertEqual(lane.Host(state=state).slots("devin", 4), 4); self.assertEqual(A.effective_slots(state, "devin", 4, NOW), 4)
     def test_activation_ignores_hypothetical_targets_and_rechecks_real_limits(self):
         old = decide(None, obs(linearRemaining=0), sample(), {"devin": 4}, cfg(mode="observe"), NOW)
-        self.assertEqual(old["lanes"]["devin"]["effective"], 2)
+        self.assertEqual(old["lanes"]["devin"]["effective"], 4)
+        self.assertEqual(old["lanes"]["devin"]["intakeEffective"], 0)
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
             A.write_state(Path(tmp), old)
             self.assertEqual(A.effective_slots(Path(tmp), "devin", 4, NOW), 4)
         for seen, expected, reason in ((obs(maintenanceQueueByProvider={}, newIssueBudgetByProvider={"devin": {"reason": "over-budget"}}), 4, "over-budget"),
-                                       (obs(linearRemaining=0), 2, "linear-ratelimited"),
+                                       (obs(linearRemaining=0), 4, "zero-demand"),
                                        (obs(disk={"admitted": False, "freePct": 3}), 2, "host-pressure")):
             with self.subTest(reason=reason):
                 state = decide(old, seen, sample(), {"devin": 4}, cfg(mode="apply"), NOW + 60)
@@ -142,17 +152,18 @@ class AutoscaleTest(unittest.TestCase):
                 self.assertEqual(state["history"][0], {"at": "prior"})
                 limited = decide(old, obs(linearRemaining=0), sample(),
                                  {"devin": 4}, cfg(mode="apply"), NOW)
-                self.assertEqual(limited["lanes"]["devin"]["effective"], 2)
+                self.assertEqual(limited["lanes"]["devin"]["effective"], 4)
+                self.assertEqual(limited["lanes"]["devin"]["intakeEffective"], 0)
 
     def test_cadence_streaks_and_one_lane(self):
         bases, seen, host, options = {"devin": 4}, obs(runningByProvider={"devin": 4}), sample(), cfg(); state, when = ticks(29, None, seen, host, bases, options, NOW)
         self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"], self.lane(state, "devin")["upStreak"]),
                          (4, "hold:up-streak", 29))
-        state = decide(state, seen, host, bases, options, when + 60)
+        state = decide(state, budget_at(seen, when + 60), host, bases, options, when + 60)
         self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"], self.lane(state, "devin")["upStreak"]),
                          (5, "sustained-demand", 0))
         seen, host = obs(runningByProvider={"devin": 4}), sample(); state, when = ticks(29, None, seen, host, bases, options, NOW); state = decide(state, obs(unhealthy=["devin"], runningByProvider={"devin": 4}), host, bases, options, when + 60); self.assertEqual((self.lane(state, "devin")["upStreak"], self.lane(state, "devin")["effective"]), (0, 4)); state, when = ticks(29, state, seen, host, bases, options, when + 120); self.assertEqual(self.lane(state, "devin")["effective"], 4)
-        held = decide(state, seen, host, bases, options, when + 60); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (5, "sustained-demand")); both = {"devin": 4, "codex": 3}; state = decide(None, obs(), host, both, cfg(intervalS=60), NOW)
+        held = decide(state, budget_at(seen, when + 60), host, bases, options, when + 60); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (5, "sustained-demand")); both = {"devin": 4, "codex": 3}; state = decide(None, obs(), host, both, cfg(intervalS=60), NOW)
         self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "codex")["effective"], self.lane(state, "devin")["lastReason"]), (5, 3, "sustained-demand"))
         ranked = decide(None, obs(eligiblePoolByProvider={"devin": 1, "codex": 9}), sample(), both, cfg(intervalS=60), NOW)
         self.assertEqual((self.lane(ranked, "codex")["effective"], self.lane(ranked, "devin")["effective"]), (4, 4))
@@ -178,7 +189,6 @@ class AutoscaleTest(unittest.TestCase):
         repair = obs(newIssueBudgetByProvider={"devin": {"reason": "over-budget"}},
                      maintenanceQueueByProvider={"devin": 8}, runningByProvider={"devin": 4})
         for over, expected in (({"githubRemaining": 599}, "github-budget-low"),
-                               ({"linearRemaining": 0}, "linear-ratelimited"),
                                ({"cooldownAt": {"devin": NOW}}, "rate-limited"),
                                ({"disk": {"admitted": False, "freePct": 4}}, "host-pressure")):
             state = decide(None, {**repair, **over}, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
@@ -214,6 +224,225 @@ class AutoscaleTest(unittest.TestCase):
                 A.write_state(root, applied)
                 self.assertEqual(A.effective_slots(root, "devin", 4, NOW), 5)
 
+    def test_linear_pressure_limits_intake_without_reducing_maintenance(self):
+        blocked = ({"linearRemaining": 0}, {"linearRemaining": 624},
+                   {"linearRateLimitedAt": NOW}, {"linearRemaining": None},
+                   {"linearLimit": None}, {"linearLimit": 0}, {"linearRemaining": True},
+                   {"linearBudgetFresh": False}, {"linearBudgetObservedAt": NOW - 601},
+                   {"linearBudgetObservedAt": NOW + 1}, {"linearRateLimitedAt": "bad"})
+        for change in blocked:
+            with self.subTest(change=change):
+                seen = obs(maintenanceQueueByProvider={"devin": 8},
+                           eligiblePoolByProvider={"devin": 1000}, runningByProvider={"devin": 4}, **change)
+                state = decide(None, seen, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+                row = self.lane(state, "devin")
+                self.assertEqual((row["effective"], row["intakeEffective"]), (5, 0))
+                self.assertEqual(A._demand("devin", seen, NOW), 8)
+                self.assertTrue(row["intakeBlockers"])
+                for maintenance in (None, True, -1):
+                    unknown = {**seen, "maintenanceQueueByProvider": {"devin": maintenance}}
+                    self.assertIsNone(A._demand("devin", unknown, NOW))
+                    self.assertEqual(decide(None, unknown, sample(), {"devin": 4},
+                                            cfg(intervalS=60), NOW)["lanes"]["devin"]["effective"], 4)
+        healthy = decide(None, obs(runningByProvider={"devin": 4}), sample(),
+                         {"devin": 4}, cfg(intervalS=60), NOW)
+        self.assertEqual(healthy["lanes"]["devin"]["intakeEffective"], 5)
+        # The resource capability does not introduce a WIP veto for labeled events.
+        wip = decide(None, obs(newIssueBudgetByProvider={"devin": {"reason": "over-budget"}},
+                              maintenanceQueueByProvider={"devin": 8}, runningByProvider={"devin": 4}),
+                     sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+        self.assertEqual(wip["lanes"]["devin"]["intakeEffective"], 5)
+
+    def test_both_linear_dimensions_are_independent_fresh_intake_gates(self):
+        seen = obs(maintenanceQueueByProvider={"devin": 8}, runningByProvider={"devin": 4})
+        for dimension in ("requests", "complexity"):
+            for alteration in ({"remaining": 0}, {"remaining": None}, {"remaining": True},
+                               {"remaining": -1}, {"remaining": 2000001}, {"limit": None},
+                               {"limit": 0}, {"observedAt": NOW - 601}, {"observedAt": NOW + 1},
+                               {"observedAt": True}, {"observedAt": float("nan")}, {"observedAt": 10 ** 400}):
+                with self.subTest(dimension=dimension, alteration=alteration):
+                    dimensions = {name: dict(row) for name, row in seen["linearDimensions"].items()}
+                    dimensions[dimension].update(alteration)
+                    state = decide(None, {**seen, "linearDimensions": dimensions}, sample(),
+                                   {"devin": 4}, cfg(intervalS=60), NOW)
+                    self.assertEqual((state["lanes"]["devin"]["effective"], state["lanes"]["devin"]["intakeEffective"]), (5, 0))
+        legacy = decide(None, {**seen, "linearDimensions": {}}, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+        self.assertEqual((legacy["lanes"]["devin"]["effective"], legacy["lanes"]["devin"]["intakeEffective"]), (5, 0))
+        boundary = {name: {**row, "remaining": row["limit"] // 4} for name, row in seen["linearDimensions"].items()}
+        allowed = decide(None, {**seen, "linearDimensions": boundary}, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+        self.assertEqual(allowed["lanes"]["devin"]["intakeEffective"], 5)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "doctor.json").write_text(json.dumps({"observed": {"now": NOW}}))
+            receipt = {"remaining": 2000, "limit": 2500, "observedAt": A._iso(NOW), "dimensions": {
+                "requests": {"remaining": "2000", "limit": "2500", "observedAt": A._iso(NOW)},
+                "complexity": {"remaining": "1000000", "limit": "2000000", "observedAt": A._iso(NOW - 601)}}}
+            (root / "api-budget.json").write_text(json.dumps(receipt))
+            collected = A.collect(root, {}, NOW)
+            self.assertEqual(collected["linearDimensions"]["requests"]["remaining"], 2000)
+            self.assertEqual(A._linear_intake_reason(collected, NOW), "linear-complexity-unknown")
+            receipt["dimensions"]["complexity"]["observedAt"] = A._iso(NOW)
+            (root / "api-budget.json").write_text(json.dumps(receipt))
+            self.assertIsNone(A._linear_intake_reason(A.collect(root, {}, NOW), NOW))
+            receipt.pop("dimensions")
+            (root / "api-budget.json").write_text(json.dumps(receipt))
+            self.assertEqual(A._linear_intake_reason(A.collect(root, {}, NOW), NOW), "linear-requests-unknown")
+
+    def test_legacy_linear_collapse_recovers_only_qualified_maintenance(self):
+        prior = {"mode": "apply", "host": {"lastChangeAt": NOW}, "lanes": {
+            name: {"effective": 1, "lastChangeAt": NOW, "lastReason": "linear-ratelimited"}
+            for name in ("codex", "devin")}}
+        seen = obs(linearRemaining=0, linearRateLimitedAt=NOW,
+                   maintenanceQueueByProvider={"codex": 8, "devin": 8},
+                   runningByProvider={"codex": 0, "devin": 0}, codexUnleasedAvailable=3)
+        state = decide(prior, seen, sample(), {"codex": 3, "devin": 2}, cfg(hostMax=5), NOW + 1)
+        self.assertEqual([row["effective"] for row in state["lanes"].values()], [3, 2])
+        self.assertEqual([row["intakeEffective"] for row in state["lanes"].values()], [0, 0])
+        self.assertTrue(all(row["lastReason"] == "maintenance-recovery" for row in state["lanes"].values()))
+        self.assertFalse(any(row["recoveryPending"] for row in state["lanes"].values()))
+        for change in ({"doctorFresh": False}, {"githubRemaining": None}, {"githubRemaining": 1499},
+                       {"cooling": ["codex", "devin"]}, {"unhealthy": ["codex", "devin"]},
+                       {"rateBankAt": {"codex": NOW, "devin": NOW}},
+                       {"runningByProvider": {}}, {"maintenanceQueueByProvider": {}},
+                       {"maintenanceQueueByProvider": {"codex": True, "devin": -1}}):
+            with self.subTest(change=change):
+                held = decide(prior, {**seen, **change}, sample(), {"codex": 3, "devin": 2}, cfg(hostMax=5), NOW + 1)
+                self.assertTrue(all(row["effective"] <= 1 for row in held["lanes"].values()))
+                self.assertTrue(all(row["recoveryPending"] for row in held["lanes"].values()))
+        for unavailable in (None, True, -1, "3"):
+            account_unknown = decide(prior, {**seen, "codexUnleasedAvailable": unavailable}, sample(),
+                                     {"codex": 3, "devin": 2}, cfg(hostMax=5), NOW + 1)
+            self.assertEqual(account_unknown["lanes"]["codex"]["effective"], 1)
+            self.assertTrue(account_unknown["lanes"]["codex"]["recoveryPending"])
+        account = decide(prior, {**seen, "codexUnleasedAvailable": 0}, sample(),
+                         {"codex": 3, "devin": 2}, cfg(hostMax=5), NOW + 1)
+        self.assertEqual(account["lanes"]["codex"]["effective"], 0)
+        self.assertTrue(account["lanes"]["codex"]["recoveryPending"])
+        disabled = decide(prior, seen, sample(), {"codex": 0, "devin": 2}, cfg(hostMax=5), NOW + 1)
+        self.assertEqual(disabled["lanes"]["codex"]["effective"], 0)
+        # Real pressure recovery keeps the host cooldown; a legacy Linear-only timestamp does not.
+        pressure_prior = {"mode": "apply", "host": {"lastChangeAt": NOW}, "lanes": {
+            "devin": {"effective": 1, "recoveryPending": True, "lastReason": "host-pressure"}}}
+        held = decide(pressure_prior, seen, sample(), {"devin": 2}, cfg(), NOW + 60)
+        self.assertEqual(held["lanes"]["devin"]["effective"], 1)
+        later = decide(held, seen, sample(), {"devin": 2}, cfg(), NOW + 121)
+        self.assertEqual(later["lanes"]["devin"]["effective"], 2)
+
+    def test_simultaneous_linear_and_host_pressure_precedes_recovery(self):
+        seen = obs(linearRemaining=0, linearRateLimitedAt=NOW,
+                   maintenanceQueueByProvider={"devin": 8}, runningByProvider={"devin": 4})
+        prior = {"mode": "apply", "lanes": {"devin": {"effective": 4, "lastReason": "linear-ratelimited"}}}
+        for host in (sample(memAvailableBytes=3 * GIB),
+                     sample(psi={"cpuSomeAvg10": 40, "memoryFullAvg10": 0, "ioFullAvg10": 0}),
+                     sample(psi={"cpuSomeAvg10": 0, "memoryFullAvg10": 5, "ioFullAvg10": 0}),
+                     sample(psi={"cpuSomeAvg10": 0, "memoryFullAvg10": 0, "ioFullAvg10": 20})):
+            with self.subTest(host=host):
+                state = decide(prior, seen, host, {"devin": 4}, cfg(intervalS=60), NOW)
+                row = self.lane(state, "devin")
+                self.assertEqual((row["effective"], row["lastReason"], row["intakeEffective"]), (2, "host-pressure", 0))
+        collapsed = {"mode": "apply", "lanes": {"devin": {"effective": 1, "lastReason": "linear-ratelimited"}}}
+        for host in (sample(memAvailableBytes=None), sample(load1=None),
+                     sample(psi={"cpuSomeAvg10": None, "memoryFullAvg10": 0, "ioFullAvg10": 0})):
+            state = decide(collapsed, seen, host, {"devin": 4}, cfg(intervalS=60), NOW)
+            self.assertEqual(state["lanes"]["devin"]["effective"], 1)
+            self.assertTrue(state["lanes"]["devin"]["recoveryPending"])
+        disk = decide(collapsed, {**seen, "disk": {"admitted": False, "freePct": 4}}, sample(),
+                      {"devin": 4}, cfg(intervalS=60), NOW)
+        self.assertEqual((disk["lanes"]["devin"]["effective"], disk["lanes"]["devin"]["lastReason"]), (1, "host-pressure"))
+
+    def test_hard_aggregate_ceiling_applies_below_configured_bases(self):
+        for cap in (1, 2, 4):
+            with self.subTest(cap=cap):
+                state = decide(None, obs(), sample(), {"codex": 3, "devin": 2}, cfg(hostMax=cap), NOW)
+                self.assertEqual(sum(row["effective"] for row in state["lanes"].values()), cap)
+                self.assertTrue(all(0 <= row["intakeEffective"] <= row["effective"] <= row["ceiling"]
+                                    for row in state["lanes"].values()))
+                with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
+                    A.write_state(Path(tmp), state)
+                    self.assertEqual(A.host_ceiling(Path(tmp), NOW), cap)
+                    self.assertEqual(sum(A.effective_slots(Path(tmp), name, base, NOW)
+                                         for name, base in (("codex", 3), ("devin", 2))), cap)
+        cpu = decide(None, obs(), sample(cpuCount=1), {"codex": 3, "devin": 2}, cfg(hostMax=10), NOW)
+        self.assertEqual(sum(row["effective"] for row in cpu["lanes"].values()), 1)
+        self.assertIn(0, [row["effective"] for row in cpu["lanes"].values()])
+        for unknown_cpu in (None, True, 0, -1, "16"):
+            denied = decide(None, obs(), sample(cpuCount=unknown_cpu), {"codex": 3, "devin": 2}, cfg(), NOW)
+            self.assertEqual(denied["host"]["ceiling"], 0)
+            self.assertTrue(all(row["effective"] == row["intakeEffective"] == 0 for row in denied["lanes"].values()))
+        prior = {"mode": "apply", "lanes": {name: {"effective": 1, "lastReason": "linear-ratelimited"}
+                 for name in ("codex", "devin")}}
+        seen = obs(linearRemaining=0, maintenanceQueueByProvider={"codex": 8, "devin": 8},
+                   runningByProvider={"codex": 1, "devin": 1}, codexUnleasedAvailable=3)
+        limited = decide(prior, seen, sample(), {"codex": 3, "devin": 2}, cfg(hostMax=2), NOW)
+        self.assertEqual(sum(row["effective"] for row in limited["lanes"].values()), 2)
+        self.assertTrue(all(row["recoveryPending"] for row in limited["lanes"].values()))
+        recovered = decide(limited, seen, sample(), {"codex": 3, "devin": 2}, cfg(hostMax=5), NOW + 121)
+        self.assertEqual([row["effective"] for row in recovered["lanes"].values()], [3, 2])
+
+    def test_intake_and_host_readers_refuse_stale_malformed_or_hypothetical_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
+            root = Path(tmp)
+            self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 0)
+            self.assertIsNone(A.host_ceiling(root, NOW))
+            state = decide(None, obs(runningByProvider={"devin": 4}), sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+            A.write_state(root, state)
+            (root / "api-budget.json").write_text(json.dumps({
+                "remaining": 2000, "limit": 2500, "observedAt": NOW, "rateLimitedAt": None,
+                "dimensions": state["apiBudget"]["linearDimensions"]}))
+            self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 5)
+            self.assertEqual(A.host_ceiling(root, NOW), 8)
+            self.assertEqual(A.intake_slots(root, "devin", 0, NOW), 0)
+            for change in ({"mode": "observe"}, {"mode": None}, {"observedAt": NOW - 601},
+                           {"observedAt": NOW + 1}, {"observedAt": True}, {"observedAt": float("nan")},
+                           {"schema": "other"}, {"apiBudget": {}}):
+                altered = {**state, **change}
+                A.write_state(root, altered)
+                self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 0)
+                if "apiBudget" not in change:
+                    self.assertIsNone(A.host_ceiling(root, NOW))
+            for bad in (None, True, -1, "2"):
+                altered = {**state, "lanes": {"devin": {**state["lanes"]["devin"], "intakeEffective": bad}}}
+                A.write_state(root, altered)
+                self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 0)
+            altered = {**state, "lanes": {"devin": {**state["lanes"]["devin"], "intakeEffective": 100}}}
+            A.write_state(root, altered)
+            self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 5)
+            old_budget = {**state, "apiBudget": {**state["apiBudget"], "linearBudgetObservedAt": NOW - 590}}
+            A.write_state(root, old_budget)
+            self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 5)
+            self.assertEqual(A.intake_slots(root, "devin", 4, NOW + 11), 0)
+            with env(SYMPHONY_AUTOSCALE="off"):
+                self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 4)
+                self.assertIsNone(A.host_ceiling(root, NOW))
+
+    def test_off_and_observe_intake_uses_native_dimensions_without_hypothetical_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            native = {"remaining": 2000, "limit": 2500, "observedAt": NOW, "rateLimitedAt": None,
+                      "dimensions": obs()["linearDimensions"]}
+            A.write_state(root, {"schema": A.SCHEMA, "mode": "observe", "observedAt": NOW,
+                                "lanes": {"devin": {"effective": 100, "intakeEffective": 100}},
+                                "host": {"ceiling": 100}})
+            for mode in ("off", "observe"):
+                with env(SYMPHONY_AUTOSCALE=mode):
+                    self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 0)
+                    (root / "api-budget.json").write_text(json.dumps(native))
+                    self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 4)
+                    self.assertIsNone(A.host_ceiling(root, NOW))
+                    self.assertEqual(A.intake_slots(root, "devin", 0, NOW), 0)
+                    for dimension in ("requests", "complexity"):
+                        for change in ({"remaining": 0}, {"observedAt": NOW - 601}, {"observedAt": None}):
+                            altered = {**native, "dimensions": {name: dict(row) for name, row in native["dimensions"].items()}}
+                            altered["dimensions"][dimension].update(change)
+                            (root / "api-budget.json").write_text(json.dumps(altered))
+                            self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 0)
+                    for bad in ("bad", True, -1, float("nan"), {"nested": "malformed"}):
+                        (root / "api-budget.json").write_text(json.dumps({**native, "rateLimitedAt": bad}))
+                        self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 0)
+                    (root / "api-budget.json").write_text(json.dumps({**native, "dimensions": {}}))
+                    self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 0)
+                    (root / "api-budget.json").unlink()
+
     def test_increase_blockers_budgets_and_decreases(self):
         self.held("devin", obs(newIssueBudgetByProvider={"devin": {"reason": "over-budget"}, "codex": {"reason": "within-budget"}},
                                maintenanceQueueByProvider={"devin": 0}), bases={"devin": 4}, reason="hold:over-budget")
@@ -229,7 +458,7 @@ class AutoscaleTest(unittest.TestCase):
                 ("hold:disk-low", obs(disk={"admitted": True, "freePct": 15}), None),
                 ("hold:disk-low", obs(disk={"admitted": True, "freePct": 12}), None),
                 ("hold:github-budget", obs(githubRemaining=1499), None),
-                ("hold:linear-budget", obs(linearRemaining=500, linearLimit=2500), None),
+                ("hold:zero-demand", obs(linearRemaining=500, linearLimit=2500), None),
                 ("hold:high-load", obs(), sample(load1=12.8)),
                 ("hold:high-load", obs(), sample(load1=None)),
                 ("hold:psi-high", obs(), sample(psi={"cpuSomeAvg10": 25, "memoryFullAvg10": 0, "ioFullAvg10": 0}))):
@@ -243,14 +472,13 @@ class AutoscaleTest(unittest.TestCase):
         self.held("devin", obs(runningByProvider={"devin": 4}), sample(memAvailableBytes=6 * GIB), {"devin": 4},
                   "hold:host-cooldown", previous=cooled)
         previous = {"mode": "apply", "lanes": {"devin": {"effective": 6, "upStreak": 30}}}
-        for key, field in (("github", "githubRemaining"), ("linear", "linearRemaining")):
+        for key, field in (("github", "githubRemaining"),):
             seen = obs(runningByProvider={"devin": 6}); seen[field] = None; state = decide(previous, seen, sample(), {"devin": 4}, cfg(intervalS=60), NOW); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (4, f"hold:{key}-unknown"))
         parked = [pr_row(i, terminal=True) for i in range(1, 8)] + [pr_row(8)]; budget = lane.new_issue_budget("codex", 3, parked); self.assertEqual(budget["reason"], "within-budget"); self.assertEqual((budget["used"], budget["cap"], budget["terminal"], budget["terminalCap"]), (1, 6, 7, 12)); blocked = lane.new_issue_budget("codex", 3, [pr_row(i, terminal=True) for i in range(1, 13)])
         self.assertEqual((blocked["reason"], blocked["terminalCap"], blocked["allowed"]), ("terminal-pr-backlog", 12, False)); hot = {"mode": "apply", "lanes": {"devin": {"effective": 4, "lastChangeAt": NOW}}, "host": {"lastChangeAt": NOW}}
         for reason, seen, host in (
                 ("rate-limited", obs(rateBankAt={"devin": NOW - 100}), sample()),
                 ("github-budget-low", obs(githubRemaining=599), sample()),
-                ("linear-ratelimited", obs(linearRateLimitedAt=NOW - 100), sample()),
                 ("host-pressure", obs(disk={"admitted": False, "freePct": 40}), sample()),
                 ("host-pressure", obs(disk={"admitted": True, "freePct": 5}), sample()),
                 ("host-pressure", obs(), sample(memAvailableBytes=3 * GIB)),
@@ -313,9 +541,9 @@ class AutoscaleTest(unittest.TestCase):
         bases = {"devin": 4}
         seen = obs(eligiblePoolByProvider={"devin": 0}, runningByProvider={"devin": 0},
                    newIssueBudgetByProvider={"devin": {"reason": "within-budget"}})
-        host, options = sample(), cfg(); state, when = ticks(29, None, seen, host, bases, options, NOW); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["idleStreak"]), (4, 29)); state = decide(state, seen, host, bases, options, when + 60); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (3, "idle-decay")); decayed = when + 60
+        host, options = sample(), cfg(); state, when = ticks(29, None, seen, host, bases, options, NOW); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["idleStreak"]), (4, 29)); state = decide(state, budget_at(seen, when + 60), host, bases, options, when + 60); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (3, "idle-decay")); decayed = when + 60
         cooled = {"mode": "apply", "lanes": {"devin": {"effective": 3, "idleStreak": 29, "lastChangeAt": decayed}}, "host": {"lastChangeAt": decayed}}; held = decide(cooled, seen, host, bases, options, decayed + 60); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (3, "hold:lane-cooldown")); state, when = ticks(29, state, seen, host, bases, options, decayed + 60); self.assertEqual(self.lane(state, "devin")["effective"], 3)
-        state = decide(state, seen, host, bases, options, when + 60); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (2, "idle-decay")); state, _ = ticks(30, state, seen, host, bases, options, when + 120); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (2, "hold:idle-floor"))
+        state = decide(state, budget_at(seen, when + 60), host, bases, options, when + 60); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (2, "idle-decay")); state, _ = ticks(30, state, seen, host, bases, options, when + 120); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (2, "hold:idle-floor"))
         codex = obs(eligiblePoolByProvider={"codex": 0}, runningByProvider={"codex": 0},
                     newIssueBudgetByProvider={"codex": {"reason": "within-budget"}})
         state, when = ticks(30, None, codex, host, {"codex": 3}, options, NOW); self.assertEqual(self.lane(state, "codex")["effective"], 2); state, _ = ticks(40, state, codex, host, {"codex": 3}, options, when + 60); self.assertEqual((self.lane(state, "codex")["effective"], self.lane(state, "codex")["lastReason"]), (2, "hold:idle-floor")); codex_obs = obs(runningByProvider={"codex": 3}, codexUnleasedAvailable=1, eligiblePoolByProvider={"codex": 8})
@@ -325,8 +553,8 @@ class AutoscaleTest(unittest.TestCase):
         self.assertEqual(self.lane(named, "codex")["effective"], 3); unknown = decide(None, obs(codexUnleasedAvailable=None, runningByProvider={"codex": 3}), host, {"codex": 3}, cfg(intervalS=60), NOW); self.assertEqual(self.lane(unknown, "codex")["effective"], 3); self.assertLessEqual(self.lane(unknown, "codex")["ceiling"], 3); both = {"devin": 4, "codex": 3}; state = decide(None, obs(), host, both, cfg(intervalS=60, hostMax=8), NOW)
         self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "codex")["effective"]), (5, 3)); later = decide(state, obs(), host, both, cfg(intervalS=60, hostMax=8), NOW + 120); self.assertEqual((self.lane(later, "devin")["effective"], self.lane(later, "codex")["effective"]), (5, 3)); small = decide(None, obs(), sample(cpuCount=2), both, cfg(intervalS=60), NOW)
         self.assertEqual((self.lane(small, "devin")["effective"], self.lane(small, "codex")["effective"], self.lane(small, "devin")["lastReason"]),
-                         (4, 3, "hold:host-ceiling"))
-        self.assertGreaterEqual(small["host"]["ceiling"], 7)
+                         (1, 1, "hold:host-ceiling"))
+        self.assertEqual(small["host"]["ceiling"], 2)
     def test_fail_safe_collect_and_linear_capture(self):
         state = decide({"mode": "apply", "lanes": {"devin": {"effective": 8}, "claude": {"effective": 2}}}, obs(doctorFresh=False), sample(),
                        {"devin": 4, "claude": 0}, cfg(intervalS=60), NOW)
@@ -356,7 +584,7 @@ class AutoscaleTest(unittest.TestCase):
                               collected["linearRemaining"], collected["linearLimit"], collected["linearRateLimitedAt"], collected["rateBankAt"]["codex"]), (4, 0.9, ["gate-timeouts"], 2000, 2500, None, NOW - 100))
             self.assertTrue(collected["mergeThroughputFresh"]); self.assertEqual(collected["mergeThroughput"], {"queueDepth": 30, "queueWaitP50Minutes": 38, "mergedPerHour": 6, "openedPerHour": 31, "ejectionRate": 0.55})
             alien = {"schema": 1, "remaining": 2400, "limit": 2500, "reset": 1730000000000, "rateLimitedAt": None, "observedAt": "2026-10-02T23:51:00Z"}; (root / "api-budget.json").write_text(json.dumps(alien)); seen = A.collect(root, {"disk": {"admitted": True, "freePct": 40}}, NOW); self.assertEqual((seen["linearRemaining"], seen["linearLimit"], seen["linearRateLimitedAt"]), (2400, 2500, None)); self.assertIsNone(A._budget_unknown(seen)); kept = decide({"mode": "apply", "lanes": {"devin": {"effective": 6}}}, obs(linearRemaining=seen["linearRemaining"], linearLimit=seen["linearLimit"], linearRateLimitedAt=seen["linearRateLimitedAt"]), sample(), {"devin": 4}, cfg(intervalS=60), NOW); self.assertEqual((self.lane(kept, "devin")["effective"], self.lane(kept, "devin")["lastReason"]), (6, "hold:not-saturated"))
-            quiet = {**alien, "remaining": 0, "rateLimitedAt": A._iso(NOW - 30), "observedAt": A._iso(NOW)}; (root / "api-budget.json").write_text(json.dumps(quiet)); hit = A.collect(root, {"disk": {"admitted": True, "freePct": 40}}, NOW); self.assertEqual((hit["linearRemaining"], hit["linearLimit"]), (0, 2500)); self.assertAlmostEqual(hit["linearRateLimitedAt"], NOW - 30, delta=1); self.assertIsNone(A._budget_unknown(hit)); down = decide({"mode": "apply", "lanes": {"devin": {"effective": 6}}, "host": {"lastChangeAt": NOW}}, obs(linearRemaining=hit["linearRemaining"], linearLimit=hit["linearLimit"], linearRateLimitedAt=hit["linearRateLimitedAt"]), sample(), {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(down, "devin")["effective"], self.lane(down, "devin")["lastReason"]), (3, "linear-ratelimited"))
+            quiet = {**alien, "remaining": 0, "rateLimitedAt": A._iso(NOW - 30), "observedAt": A._iso(NOW)}; (root / "api-budget.json").write_text(json.dumps(quiet)); hit = A.collect(root, {"disk": {"admitted": True, "freePct": 40}}, NOW); self.assertEqual((hit["linearRemaining"], hit["linearLimit"]), (0, 2500)); self.assertAlmostEqual(hit["linearRateLimitedAt"], NOW - 30, delta=1); self.assertIsNone(A._budget_unknown(hit)); down = decide({"mode": "apply", "lanes": {"devin": {"effective": 6}}, "host": {"lastChangeAt": NOW}}, obs(linearRemaining=hit["linearRemaining"], linearLimit=hit["linearLimit"], linearRateLimitedAt=hit["linearRateLimitedAt"]), sample(), {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(down, "devin")["effective"], self.lane(down, "devin")["lastReason"]), (6, "hold:zero-demand")); self.assertEqual(self.lane(down, "devin")["intakeEffective"], 0)
             (root / "api-budget.json").write_text(json.dumps({"linearRemaining": 1800, "linearLimit": 2500, "linearRateLimitedAt": NOW - 100})); legacy = A.collect(root, {}, NOW); self.assertEqual((legacy["linearRemaining"], legacy["linearLimit"]), (1800, 2500)); self.assertAlmostEqual(legacy["linearRateLimitedAt"], NOW - 100, delta=1)
             self.assertIn("devin", collected["cooling"]); self.assertGreater(NOW - collected["cooldownAt"]["devin"], A.MULTIPLICATIVE_WINDOW_S)
             (root / "doctor.json").write_text("{")
@@ -429,6 +657,7 @@ class AutoscaleTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
             root = Path(tmp); (root / "linear.env").write_text("LINEAR_API_KEY=test\n"); host = lane.Host(state=root / "state", repo=root, linear_env=root / "linear.env")
             with patch.object(lane.autoscale, "effective_slots", return_value=9), \
+                    patch.object(lane.autoscale, "intake_slots", return_value=9), \
                     patch.object(lane.disk_guard, "check", return_value={"admitted": True, "freePct": 40}), \
                     patch.object(lane, "lane_prs", return_value=[]), patch.object(lane, "fix_candidates", return_value=[]), \
                     patch.object(lane.pr_events, "queued_prs", return_value=[]), patch.object(lane.pr_events, "claim_event_pr", return_value=None), \
