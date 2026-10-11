@@ -42,3 +42,18 @@ it('runs main-only with only actions: write', () => {
   expect(wf).toContain("github.ref == 'refs/heads/main'");
   expect(wf).toMatch(/^permissions:\n {2}actions: write\n\n/m);
 });
+
+it('keeps only the newest evidence cache of each quota-saving family', () => {
+  const evidence = [
+    'linear-sync-github-v1-0123456789abcdef',
+    'linear-sync-github-v1-fedcba9876543210',
+    'flaky-run-evidence-d89ae2dafd610782',
+    'flaky-run-evidence-38177037625',
+  ].map((key, i) => ({
+    id: 100 + i,
+    key,
+    ref: 'refs/heads/main',
+    created_at: `2026-10-11T0${i % 2 ? 2 : 1}:00:00Z`,
+  }));
+  expect(ids(evidence).sort((a, b) => a - b)).toEqual([100, 102]);
+});
