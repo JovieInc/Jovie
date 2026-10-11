@@ -19,10 +19,21 @@ const workflow = readFileSync(
 );
 
 function assertPublishWorkflowContract(source: string): void {
-  expect(source).toMatch(/^on:\n  workflow_dispatch:\s*$/m);
-  expect(source).not.toMatch(
-    /^\s+(push|pull_request|schedule|workflow_run|repository_dispatch):/m
+  // Automatic publication is main-only; pull requests never gain authority.
+  expect(source).toContain(
+    'on:\n  push:\n    branches: [main]\n    paths:\n      - packages/jovie-cli/src/**\n'
   );
+  expect(source).toMatch(/^  workflow_dispatch:\s*$/m);
+  expect(source.match(/^  push:$/gm)).toHaveLength(1);
+  expect(source).not.toMatch(
+    /^\s+(pull_request|pull_request_target|schedule|workflow_run|repository_dispatch):/m
+  );
+  // Publish exactly the chaos-tested commit and its resolved version.
+  expect(source).toContain('ref: ${{ needs.chaos-tarball.outputs.sha }}');
+  expect(source).toContain(
+    'CLI_RELEASE_VERSION: ${{ needs.chaos-tarball.outputs.version }}'
+  );
+  expect(source).toContain(': nextReleaseVersion(canonical, published));');
   expect(source).toMatch(/permissions:\n  contents: read/);
   expect(source).toMatch(/id-token: write/);
   expect(source).toMatch(/runs-on: ubuntu-latest/);
@@ -47,10 +58,12 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain('test "$GITHUB_REF" = refs/heads/main');
   expect(source).toContain('git rev-parse origin/main');
   expect(
-    source.match(/test "\$checked_out_sha" = "\$current_main_sha"/g)
+    source.match(
+      /git merge-base --is-ancestor "\$checked_out_sha" "\$current_main_sha"/g
+    )
   ).toHaveLength(2);
   expect(source).toContain(
-    'Checkout drifted from current origin/main immediately before publication.'
+    'Checkout left origin/main immediately before publication.'
   );
   expect(source).toContain(
     "readFileSync('VERSION', 'utf8'), process.env.CLI_RELEASE_VERSION"
@@ -119,17 +132,28 @@ function assertPublishWorkflowContract(source: string): void {
   );
 }
 
-describe('manual npm provenance workflow', () => {
+describe('npm provenance workflow', () => {
   it('locks the release workflow to the exact, tested, unpublished main package', () => {
     assertPublishWorkflowContract(workflow);
   });
 
   it.each([
     [
-      'automatic trigger',
+      'pull request trigger',
       workflow.replace(
         '  workflow_dispatch:\n',
-        '  workflow_dispatch:\n  push:\n'
+        '  pull_request:\n  workflow_dispatch:\n'
+      ),
+    ],
+    [
+      'push trigger beyond main',
+      workflow.replace('    branches: [main]\n', ''),
+    ],
+    [
+      'publishing an untested commit',
+      workflow.replace(
+        'ref: ${{ needs.chaos-tarball.outputs.sha }}',
+        'ref: main'
       ),
     ],
     [
@@ -147,7 +171,7 @@ describe('manual npm provenance workflow', () => {
     [
       'final current-main publication recheck',
       workflow.replace(
-        '          test "$checked_out_sha" = "$current_main_sha" || {\n            echo "::error::Checkout drifted from current origin/main immediately before publication."\n            exit 1\n          }\n          npm publish',
+        '          git merge-base --is-ancestor "$checked_out_sha" "$current_main_sha" || {\n            echo "::error::Checkout left origin/main immediately before publication."\n            exit 1\n          }\n          npm publish',
         '          npm publish'
       ),
     ],

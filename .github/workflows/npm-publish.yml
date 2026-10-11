@@ -1,12 +1,20 @@
 name: Publish @jovie/cli to npm
 
-# Publication is a deliberate operator action. Keep this workflow manual-only;
-# a main push or pull request must never acquire npm publish authority.
+# Every main push that changes shipped CLI bytes publishes the next unpublished
+# patch, behind the same chaos matrix, tested-bytes identity and provenance
+# gates as a manual release. Pull requests never acquire publish authority.
 on:
+  push:
+    branches: [main]
+    paths:
+      - packages/jovie-cli/src/**
+      - packages/jovie-cli/package.json
+      - packages/jovie-cli/README.md
+      - packages/jovie-cli/LICENSE
   workflow_dispatch:
     inputs:
       release_version:
-        description: Optional stable CLI YY.M.PATCH release; blank uses the desktop VERSION.
+        description: Optional stable CLI YY.M.PATCH release; blank publishes the next unpublished patch.
         type: string
         required: false
         default: ''
@@ -35,6 +43,8 @@ jobs:
       contents: read
     outputs:
       integrity: ${{ steps.pack.outputs.integrity }}
+      sha: ${{ steps.pack.outputs.sha }}
+      version: ${{ steps.pack.outputs.version }}
     steps:
       - name: Check out exact main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -64,16 +74,34 @@ jobs:
         shell: bash
         env:
           CLI_RELEASE_VERSION: ${{ inputs.release_version }}
+          PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only }}
         run: |
           set -euo pipefail
-          release_version="$(node --input-type=module <<'NODE'
+          # A blank selection (every push) takes the next unpublished patch;
+          # MCP-only resumes an existing release, so it keeps the VERSION default.
+          packument="$RUNNER_TEMP/jovie-cli-packument.json"
+          packument_status="$(curl --silent --show-error \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --retry 2 \
+            --output "$packument" \
+            --write-out '%{http_code}' \
+            https://registry.npmjs.org/@jovie%2Fcli)"
+          test "$packument_status" = 200 || {
+            echo "::error::Could not read published @jovie/cli versions (HTTP $packument_status)."
+            exit 1
+          }
+          release_version="$(PACKUMENT="$packument" node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
-          import { resolveReleaseVersion } from './packages/jovie-cli/scripts/pack-manifest.ts';
-          process.stdout.write(resolveReleaseVersion(
-            readFileSync('VERSION', 'utf8'), process.env.CLI_RELEASE_VERSION
-          ));
+          import { nextReleaseVersion, resolveReleaseVersion } from './packages/jovie-cli/scripts/pack-manifest.ts';
+          const canonical = readFileSync('VERSION', 'utf8');
+          const published = Object.keys(JSON.parse(readFileSync(process.env.PACKUMENT, 'utf8')).versions ?? {});
+          process.stdout.write(process.env.CLI_RELEASE_VERSION || process.env.PUBLISH_MCP_ONLY === 'true'
+            ? resolveReleaseVersion(canonical, process.env.CLI_RELEASE_VERSION)
+            : nextReleaseVersion(canonical, published));
           NODE
           )"
+          printf 'version=%s\nsha=%s\n' "$release_version" "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           staging_dir="$RUNNER_TEMP/jovie-cli-publish"
           pack_dir="$RUNNER_TEMP/jovie-cli-chaos"
           mkdir -p "$staging_dir" "$pack_dir"
@@ -156,10 +184,10 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Check out exact main
+      - name: Check out the chaos-tested main commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ needs.chaos-tarball.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -183,7 +211,7 @@ jobs:
           PACKAGE_NAME: '@jovie/cli'
           REGISTRY_URL: https://registry.npmjs.org
           PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only }}
-          CLI_RELEASE_VERSION: ${{ inputs.release_version }}
+          CLI_RELEASE_VERSION: ${{ needs.chaos-tarball.outputs.version }}
         run: |
           set -euo pipefail
 
@@ -196,12 +224,14 @@ jobs:
             exit 1
           }
 
-          git fetch --no-tags --depth=1 origin main
+          # Main may advance during the chaos matrix; the tested commit must
+          # still be on main, and a later push publishes the newer bytes.
+          git fetch --no-tags origin main
           checked_out_sha="$(git rev-parse HEAD)"
           current_main_sha="$(git rev-parse origin/main)"
           [[ "$checked_out_sha" =~ ^[0-9a-f]{40}$ ]]
-          test "$checked_out_sha" = "$current_main_sha" || {
-            echo "::error::Checkout is not the exact current origin/main commit."
+          git merge-base --is-ancestor "$checked_out_sha" "$current_main_sha" || {
+            echo "::error::Checkout is not a commit on origin/main."
             exit 1
           }
 
@@ -373,12 +403,12 @@ jobs:
           test "$(node --input-type=module -e \
             'const fs = await import("node:fs"); const p = JSON.parse(fs.readFileSync(process.env.PACKAGE_DIR + "/package.json", "utf8")); process.stdout.write(p.version)')" \
             = "$RELEASE_VERSION"
-          git fetch --no-tags --depth=1 origin main
+          git fetch --no-tags origin main
           checked_out_sha="$(git rev-parse HEAD)"
           current_main_sha="$(git rev-parse origin/main)"
           [[ "$checked_out_sha" =~ ^[0-9a-f]{40}$ ]]
-          test "$checked_out_sha" = "$current_main_sha" || {
-            echo "::error::Checkout drifted from current origin/main immediately before publication."
+          git merge-base --is-ancestor "$checked_out_sha" "$current_main_sha" || {
+            echo "::error::Checkout left origin/main immediately before publication."
             exit 1
           }
           npm publish --provenance --access public "$PACKAGE_DIR"

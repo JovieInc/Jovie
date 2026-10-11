@@ -882,6 +882,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - push
       - workflow_dispatch
     terminalReceipt: job:publish
     jobCount: 3

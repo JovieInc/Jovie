@@ -16,6 +16,29 @@ export function resolveReleaseVersion(
   return version;
 }
 
+/**
+ * Automatic releases: the canonical VERSION when unpublished, otherwise one
+ * patch above the highest stable release, so main never stalls on a taken
+ * version and never publishes below the desktop stamp.
+ */
+export function nextReleaseVersion(
+  canonicalVersion: string,
+  publishedVersions: readonly string[]
+): string {
+  const parts = (version: string) => version.split('.').map(Number);
+  const compare = (a: string, b: string) => {
+    const [x, y] = [parts(a), parts(b)];
+    return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+  };
+  const canonical = resolveReleaseVersion(canonicalVersion);
+  if (!publishedVersions.includes(canonical)) return canonical;
+  const highest = publishedVersions
+    .filter(version => /^[1-9]\d\.(1[0-2]|[1-9])\.(0|[1-9]\d*)$/.test(version))
+    .reduce((max, version) => (compare(version, max) > 0 ? version : max));
+  const [year, month, patch] = parts(highest);
+  return resolveReleaseVersion(`${year}.${month}.${patch + 1}`);
+}
+
 export function createReleaseManifest(
   manifestText: string,
   releaseVersion: string
