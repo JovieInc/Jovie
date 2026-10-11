@@ -343,7 +343,12 @@ async function execute(
     throw new UsageError('Mesh options are only supported by mesh commands.');
   if (positionals.length === 1 && first === 'skill') return SKILL_MD;
   if (positionals.length === 1 && first === 'init') {
-    return installSkill(dependencies.homeDir ?? homedir(), values.dir);
+    const result = installSkill(dependencies.homeDir ?? homedir(), values.dir);
+    if (!result.installed.length)
+      throw new UsageError(
+        'No supported agent found (~/.claude, ~/.codex, ~/.openclaw, ~/.hermes). Pass --dir <skills directory>.'
+      );
+    return result;
   }
 
   const command = findCommand(positionals);

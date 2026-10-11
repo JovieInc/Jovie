@@ -15,6 +15,15 @@ issue intake, never repair of its existing PRs; a per-PR lease keeps two seats o
 same TTLs as the Jovie claim scan. The binding's own CI is the gate: the harness opens a
 ready PR and moves the issue to In Review; the repo's required checks and native merge queue
 land it. It never runs Jovie's gate against another repo.
+
+PR maintenance (Tim 2026-10-11: every open PR lands on its own) covers every open same-repo PR
+in a binding's repo, not only lane-authored ones, and never reads Linear. Each pass first takes
+the cheap, idempotent steps (`maintain`): enqueue a green ready PR the native queue dropped or
+never took, re-enqueue a GITHUB_TOKEN queue entry with the host's token (merge-group events a
+GITHUB_TOKEN causes start no CI, so such an entry only times out), ready a green draft idle past
+the draft SLO, and ask Dependabot to rebase its conflicting bumps. Then one agent run repairs
+the oldest PR that is conflicting, red on the repo's own required checks, rejected by the merge
+queue twice at one head (the poison guard: no third enqueue), or has changes requested.
 """
 from __future__ import annotations
 
@@ -39,8 +48,36 @@ TODO_ALL_QUERY = (
     'filter:{team:{key:{eq:$team}},state:{name:{eq:"Todo"}}}){'
     'pageInfo{hasNextPage endCursor} '
     'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}')
-LIGHT_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,mergeStateStatus"
 REPAIR_STATES = frozenset({"BEHIND", "DIRTY"})
+# Every open PR of a binding repo with what maintenance needs, 50 per GraphQL page (cost 2).
+OPEN_PRS_QUERY = (
+    'query($owner:String!,$name:String!,$after:String){repository(owner:$owner,name:$name){'
+    'pullRequests(states:OPEN,first:50,after:$after,orderBy:{field:CREATED_AT,direction:ASC}){'
+    'pageInfo{hasNextPage endCursor} nodes{id number title url isDraft isCrossRepository headRefName '
+    'headRefOid mergeStateStatus reviewDecision body author{login} labels(first:20){nodes{name}} '
+    'mergeQueueEntry{state enqueuer{login}} commits(last:1){nodes{commit{committedDate '
+    'statusCheckRollup{state contexts(first:80){nodes{__typename ... on CheckRun{name status conclusion} '
+    '... on StatusContext{context state}}}}}}} timelineItems(last:6,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT]){'
+    'nodes{... on RemovedFromMergeQueueEvent{createdAt reason}}}}}}}')
+OPEN_PR_PAGES = 8                   # 400 open PRs; more reads as unreadable, never as a partial list
+REQUIRED_TTL_S = 3600               # branch rules change rarely
+GREEN = frozenset({"SUCCESS", "NEUTRAL", "SKIPPED"})
+RED_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR", "ACTION_REQUIRED"})
+ENQUEUE_STATES = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
+DRAFT_STATES = ENQUEUE_STATES | {"DRAFT"}
+POISON_FAILURES = 2                 # failed merge groups at one head before enqueue stops
+MANUAL_QUIET_S = 2 * 3600           # someone dequeued it by hand: leave it this long
+REPAIR_IDLE_S = 2 * 3600            # a session that pushed within this window still owns its PR
+DRAFT_SLO_S = 48 * 3600
+ATTEMPT_RESET_S = 24 * 3600         # repair attempts at one head may retry after a day
+ACTION_RETRY_S = 3600
+MAX_ACTIONS = 10                    # GitHub writes per maintenance pass
+TOKEN_ENQUEUER = re.compile(r"^github-actions(\[bot\])?$")
+DEPENDENCY = re.compile(r"(?i)\b(?:depends on|blocked by|waits? (?:on|for)|stacked on)\s+#(\d+)"
+                        r"|#(\d+)\s+(?:must|has to|needs to)\s+(?:be merged|merge|land)")
+ENQUEUE_MUTATION = ('mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,'
+                    'expectedHeadOid:$head}){mergeQueueEntry{position}}}')
+DEQUEUE_MUTATION = 'mutation($id:ID!){dequeuePullRequest(input:{id:$id}){mergeQueueEntry{id}}}'
 
 
 @dataclass(frozen=True)
@@ -130,26 +167,90 @@ def todo_issues(lane, linear, binding: Binding) -> list:
                        r["created_at"], list(r["labels"])) for r in rows]
 
 
+def required_checks(lane, binding: Binding) -> list[str] | None:
+    """The repo's own required status checks on main (its gate), cached per repo."""
+    def fetch():
+        ran = lane.sh(["gh", "api", f"repos/{binding.slug}/rules/branches/main"])
+        if ran.returncode:
+            return None
+        try:
+            rules = json.loads(ran.stdout or "[]")
+            return sorted({check["context"] for rule in rules if rule.get("type") == "required_status_checks"
+                           for check in rule["parameters"]["required_status_checks"]})
+        except (ValueError, KeyError, TypeError):
+            return None
+    return lane.shared(f"binding-required-v1-{lane._cache_token(binding.slug)}", REQUIRED_TTL_S, fetch)
+
+
+def gate_state(checks: list[dict], required: list[str], rollup: str | None) -> str:
+    """green | red | pending on the repo's required checks (the aggregate rollup when none)."""
+    if not required:
+        return {"SUCCESS": "green", "FAILURE": "red", "ERROR": "red"}.get(rollup or "", "pending")
+    latest = {check.get("name"): (check.get("conclusion") or check.get("state") or "").upper()
+              for check in checks}
+    states = [latest.get(name, "") for name in required]
+    if any(state in RED_STATES for state in states):
+        return "red"
+    return "green" if all(state in GREEN for state in states) else "pending"
+
+
+
+def pr_row(node: dict, required: list[str]) -> dict:
+    """One PR in the shape the binding pass uses (the old `gh pr list` fields plus maintenance facts)."""
+    commit = (((node.get("commits") or {}).get("nodes") or [{}])[-1] or {}).get("commit") or {}
+    rollup = commit.get("statusCheckRollup") or {}
+    checks = []
+    for item in (rollup.get("contexts") or {}).get("nodes") or []:
+        if item.get("__typename") == "StatusContext":
+            checks.append({"name": item.get("context"), "state": item.get("state")})
+        elif item.get("name"):
+            checks.append({"name": item["name"], "status": item.get("status"), "conclusion": item.get("conclusion")})
+    entry = node.get("mergeQueueEntry")
+    return {
+        "id": node.get("id"), "number": node["number"], "title": node.get("title") or "", "url": node.get("url"),
+        "isDraft": bool(node.get("isDraft")), "crossRepository": bool(node.get("isCrossRepository")),
+        "headRefName": node.get("headRefName") or "", "headRefOid": node.get("headRefOid") or "",
+        "mergeStateStatus": node.get("mergeStateStatus"), "reviewDecision": node.get("reviewDecision"),
+        "author": (node.get("author") or {}).get("login") or "",
+        "labels": sorted(label["name"].lower() for label in (node.get("labels") or {}).get("nodes") or []),
+        "committedAt": commit.get("committedDate") or "",
+        "queue": {"state": entry.get("state"), "enqueuer": (entry.get("enqueuer") or {}).get("login") or ""}
+        if entry else None,
+        "removals": [{"reason": (item.get("reason") or "").lower(), "at": item.get("createdAt") or ""}
+                     for item in (node.get("timelineItems") or {}).get("nodes") or [] if item],
+        "dependsOn": sorted({int(n) for pair in DEPENDENCY.findall(node.get("body") or "") for n in pair if n}),
+        "statusCheckRollup": checks,
+        "gate": gate_state(checks, required, rollup.get("state")),
+    }
+
+
 def open_prs(lane, binding: Binding) -> list[dict] | None:
-    """Every open PR in the binding's repo; lane-branch PRs also carry their check rollup.
-    One cached fill per host per TTL, keyed per repo. None when GitHub cannot be read."""
-    pattern = binding.branch_pattern()
+    """Every open PR in the binding's repo with its required-check gate, queue entry and queue
+    removals, in a few GraphQL pages. One cached fill per host per TTL, keyed per repo. None
+    when GitHub cannot be read."""
+    owner, name = binding.slug.split("/", 1)
 
     def fetch():
-        listed = lane.sh(["gh", "pr", "list", "--repo", binding.slug, "--state", "open",
-                          "--limit", "200", "--json", LIGHT_FIELDS])
-        if listed.returncode:
+        required = required_checks(lane, binding)
+        if required is None:
             return None
-        prs = json.loads(listed.stdout or "[]")
-        for pr in prs:
-            if pattern.match(pr.get("headRefName") or ""):
-                viewed = lane.sh(["gh", "pr", "view", str(pr["number"]), "--repo", binding.slug,
-                                  "--json", "statusCheckRollup"])
-                if viewed.returncode:
-                    return None
-                pr["statusCheckRollup"] = json.loads(viewed.stdout or "{}").get("statusCheckRollup") or []
-        return prs
-    return lane.shared(f"binding-open-prs-v1-{lane._cache_token(binding.slug)}", lane.SUMMARY_TTL_S, fetch)
+        nodes, after = [], None
+        for _ in range(OPEN_PR_PAGES):
+            args = ["gh", "api", "graphql", "-f", f"query={OPEN_PRS_QUERY}", "-F", f"owner={owner}",
+                    "-F", f"name={name}", *(["-f", f"after={after}"] if after else [])]
+            listed = lane.sh(args)
+            if listed.returncode:
+                return None
+            try:
+                page = json.loads(listed.stdout or "{}")["data"]["repository"]["pullRequests"]
+                nodes.extend(page["nodes"])
+            except (ValueError, KeyError, TypeError):
+                return None
+            if not page["pageInfo"]["hasNextPage"]:
+                return [pr_row(node, required) for node in nodes if node]
+            after = page["pageInfo"]["endCursor"]
+        return None
+    return lane.shared(f"binding-open-prs-v2-{lane._cache_token(binding.slug)}", lane.SUMMARY_TTL_S, fetch)
 
 
 def in_flight(binding: Binding, prs: list[dict]) -> frozenset[str]:
@@ -168,8 +269,55 @@ def lane_owned(binding: Binding, prs: list[dict], lanes=None) -> list[dict]:
 
 
 def is_red(lane, pr: dict) -> bool:
+    """Red on the repo's required checks; any red check when the gate is unknown."""
+    if pr.get("gate"):
+        return pr["gate"] == "red"
     return any((check.get("conclusion") or check.get("state") or "").upper() in lane.RED
                for check in pr.get("statusCheckRollup") or [])
+
+
+def _age(stamp: str, now: float) -> float:
+    try:
+        return now - datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
+    except (AttributeError, ValueError):
+        return float("inf")  # unknown age never holds work back
+
+
+def queue_failures(pr: dict) -> int:
+    """Merge groups that failed at the current head (removals since its commit)."""
+    since = pr.get("committedAt") or ""
+    return sum(1 for item in pr.get("removals") or ()
+               if item.get("reason") == "failed_checks" and item.get("at", "") >= since)
+
+
+def _waits_on_open_pr(pr: dict, open_numbers: set) -> bool:
+    return any(number in open_numbers and number != pr["number"] for number in pr.get("dependsOn") or ())
+
+
+def _is_dependabot(pr: dict) -> bool:
+    return pr.get("author", "").startswith("dependabot") or pr.get("headRefName", "").startswith("dependabot/")
+
+
+def repair_reasons(lane, binding: Binding, pr: dict) -> list[str]:
+    """Why an agent should repair this PR; empty when the queue, a person or a cheap step owns it."""
+    if pr.get("crossRepository") or pr.get("queue") or set(pr.get("labels") or ()) & set(binding.excluded):
+        return []
+    reasons = []
+    if pr.get("mergeStateStatus") in REPAIR_STATES and not _is_dependabot(pr):  # Dependabot rebases its own
+        reasons.append("conflict" if pr["mergeStateStatus"] == "DIRTY" else "behind")
+    if is_red(lane, pr):
+        reasons.append("red-checks")
+    if queue_failures(pr) >= POISON_FAILURES:
+        reasons.append("merge-group-failed")
+    if pr.get("reviewDecision") == "CHANGES_REQUESTED":
+        reasons.append("changes-requested")
+    return reasons
+
+
+def _attempt_count(value, now: float) -> int:
+    if isinstance(value, dict):
+        return 0 if now - float(value.get("at") or 0) > ATTEMPT_RESET_S else int(value.get("count") or 0)
+    return int(value or 0)
 
 
 # ---------------------------------------------------------------- admission
@@ -184,9 +332,12 @@ def refusal(lane, binding: Binding, issue, failures: dict, now: float, flying: f
     missing = sorted(set(binding.labels) - labels)
     if missing:
         return f"{binding.key}:missing-label:{','.join(missing)}"
-    excluded = sorted((set(binding.excluded) | lane.HARD_EXCLUDED_LABELS) & labels)
+    excluded = sorted(set(binding.excluded) & labels)
     if excluded:
         return f"{binding.key}:excluded-label:{excluded[0]}"
+    shared_rule = lane.label_rejection(issue, provider)
+    if shared_rule:
+        return f"{binding.key}:{shared_rule}"
     if lane.issue_hits_red_line(issue):
         return f"{binding.key}:sensitive-text"
     if lane.issue_is_sensitive(issue) and provider != lane.SENSITIVE_PROVIDER:
@@ -225,16 +376,109 @@ def running_issue_runs(lane, host, binding: Binding) -> int:
     return count
 
 
-def repair_candidate(lane, binding: Binding, prs: list[dict], attempts: dict, busy=lambda pr: False) -> dict | None:
-    """The oldest lane PR that is red or behind/conflicting at a head not yet tried twice
-    and not under repair in another seat (`busy`)."""
-    for pr in sorted(lane_owned(binding, prs, lane.load_providers()), key=lambda row: row["number"]):
-        if not (is_red(lane, pr) or pr.get("mergeStateStatus") in REPAIR_STATES):
+def repair_candidate(lane, binding: Binding, prs: list[dict], attempts: dict, busy=lambda pr: False,
+                     now: float | None = None) -> dict | None:
+    """The PR an agent repairs next: lane PRs first, then ready before draft, oldest first. Any
+    open same-repo PR qualifies (`repair_reasons`); another author's PR only once its head has
+    been idle REPAIR_IDLE_S. At most MAX_FIX_ATTEMPTS per head per day, never one another seat
+    is repairing (`busy`)."""
+    now = time.time() if now is None else now
+    owned = {pr["number"] for pr in lane_owned(binding, prs, lane.load_providers())}
+    for pr in sorted(prs, key=lambda row: (row["number"] not in owned, bool(row.get("isDraft")), row["number"])):
+        reasons = repair_reasons(lane, binding, pr)
+        if not reasons or (pr["number"] not in owned and _age(pr.get("committedAt") or "", now) < REPAIR_IDLE_S):
             continue
-        if attempts.get(f"{binding.key}#{pr['number']}:{pr['headRefOid']}", 0) < lane.MAX_FIX_ATTEMPTS \
-                and not busy(pr):
-            return pr
+        if _attempt_count(attempts.get(f"{binding.key}#{pr['number']}:{pr['headRefOid']}"), now) \
+                < lane.MAX_FIX_ATTEMPTS and not busy(pr):
+            return {**pr, "repairReasons": reasons}
     return None
+
+
+# ---------------------------------------------------------------- cheap maintenance
+
+def maintenance_actions(binding: Binding, prs: list[dict], now: float) -> list[tuple[str, dict]]:
+    """The idempotent GitHub steps this snapshot calls for, as (kind, pr):
+    `requeue` a green GITHUB_TOKEN queue entry with this host's token, `enqueue` a green ready PR
+    out of the queue (never past the poison guard or within MANUAL_QUIET_S of a manual dequeue),
+    `ready` a green draft idle past the draft SLO, `rebase` a conflicting Dependabot bump."""
+    open_numbers = {pr["number"] for pr in prs}
+    actions = []
+    for pr in sorted(prs, key=lambda row: row["number"]):
+        if pr.get("crossRepository") or not pr.get("id") or set(pr.get("labels") or ()) & set(binding.excluded):
+            continue
+        green, state, queue = pr.get("gate") == "green", pr.get("mergeStateStatus"), pr.get("queue")
+        if queue:
+            if green and TOKEN_ENQUEUER.match(queue.get("enqueuer") or "") \
+                    and queue.get("state") in ("QUEUED", "AWAITING_CHECKS"):
+                actions.append(("requeue", pr))
+            continue
+        if _is_dependabot(pr) and state == "DIRTY":
+            actions.append(("rebase", pr))
+            continue
+        if not green or _waits_on_open_pr(pr, open_numbers) or queue_failures(pr) >= POISON_FAILURES:
+            continue
+        if pr.get("isDraft"):
+            if state in DRAFT_STATES and _age(pr.get("committedAt") or "", now) >= DRAFT_SLO_S:
+                actions.append(("ready", pr))
+            continue
+        last = (pr.get("removals") or [{}])[-1]
+        if state in ENQUEUE_STATES and not (last.get("reason") == "manual"
+                                             and _age(last.get("at") or "", now) < MANUAL_QUIET_S):
+            actions.append(("enqueue", pr))
+    return actions
+
+
+def _enqueue(lane, pr: dict) -> bool:
+    return lane.sh(["gh", "api", "graphql", "-f", f"query={ENQUEUE_MUTATION}", "-f", f"id={pr['id']}",
+                    "-f", f"head={pr['headRefOid']}"]).returncode == 0
+
+
+def _apply(lane, binding: Binding, kind: str, pr: dict) -> bool:
+    number = str(pr["number"])
+    if kind == "enqueue":
+        return _enqueue(lane, pr)
+    if kind == "requeue":
+        return lane.sh(["gh", "api", "graphql", "-f", f"query={DEQUEUE_MUTATION}", "-f",
+                        f"id={pr['id']}"]).returncode == 0 and _enqueue(lane, pr)
+    if kind == "ready":
+        if lane.sh(["gh", "pr", "ready", number, "--repo", binding.slug]).returncode:
+            return False
+        lane.sh(["gh", "pr", "comment", number, "--repo", binding.slug, "--body",
+                 "Lanes readied this draft: required checks are green on this head and it has been "
+                 "idle past the 48h draft SLO. The native merge queue lands it."])
+        return True
+    if kind == "rebase":
+        return lane.sh(["gh", "pr", "comment", number, "--repo", binding.slug, "--body",
+                        "@dependabot rebase"]).returncode == 0
+    return False
+
+
+def maintain(lane, host, binding: Binding, prs: list[dict], now: float | None = None) -> dict:
+    """Apply `maintenance_actions` once per (kind, PR, head, queue removals); a failed write
+    retries after ACTION_RETRY_S. Returns counts per kind for the status record."""
+    now = time.time() if now is None else now
+    path = host.state / "bindings" / binding.key / "maintenance.json"
+    done = lane.read_json(path)
+    applied: dict[str, int] = {}
+    writes = 0
+    for kind, pr in maintenance_actions(binding, prs, now):
+        key = f"{kind}:{pr['number']}:{pr['headRefOid']}:{len(pr.get('removals') or ())}"
+        prior = done.get(key) or {}
+        if prior.get("ok") or now - float(prior.get("at") or 0) < ACTION_RETRY_S:
+            continue
+        if writes >= MAX_ACTIONS:
+            break
+        writes += 1
+        ok = _apply(lane, binding, kind, pr)
+        done[key] = {"at": now, "ok": ok}
+        applied[kind if ok else f"{kind}-failed"] = applied.get(kind if ok else f"{kind}-failed", 0) + 1
+    if writes:
+        def merge(data: dict) -> None:
+            data.update(done)
+            for key in [key for key, row in data.items() if now - float(row.get("at") or 0) > 14 * 86400]:
+                del data[key]
+        lane.update_json(path, merge)
+    return applied
 
 
 def record_status(lane, host, binding: Binding, **fields) -> None:
@@ -325,6 +569,10 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
         if prs is None:
             record_status(lane, host, binding, worker=name, outcome="github-unreadable")
             return None
+        try:  # a maintenance fault never holds back repair or intake
+            maintained = maintain(lane, host, binding, prs)
+        except Exception as error:
+            maintained = {"error": f"{type(error).__name__}: {error}"[:200]}
         attempts_path = host.state / "bindings" / binding.key / "fix-attempts.json"
         attempts = lane.read_json(attempts_path)
         pr = repair_candidate(lane, binding, prs, attempts, busy)
@@ -333,8 +581,11 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
             other.release()
         if pr is not None:
             key = f"{binding.key}#{pr['number']}:{pr['headRefOid']}"
-            lane.update_json(attempts_path, lambda data: data.update({key: data.get(key, 0) + 1}))
-            record_status(lane, host, binding, worker=name, outcome="repair", pr=pr["number"])
+            stamp = time.time()
+            lane.update_json(attempts_path, lambda data: data.update(
+                {key: {"count": _attempt_count(data.get(key), stamp) + 1, "at": stamp}}))
+            record_status(lane, host, binding, worker=name, outcome="repair", pr=pr["number"],
+                          reasons=pr.get("repairReasons") or [], maintained=maintained)
         elif not maintenance_only:
             budget = intake_refusal(binding, prs, running_issue_runs(lane, host, binding))
             linear = lane.Linear(host.linear_env)
@@ -352,7 +603,10 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
             outcome = budget or ("claimed" if issue else "claim-raced" if eligible else "none-eligible")
             record_status(lane, host, binding, worker=name, outcome=outcome, pool=len(pool),
                           eligible=len(eligible), claimed=issue.identifier if issue else None,
-                          refusals={key: value for key, value in refused.items() if value})
+                          refusals={key: value for key, value in refused.items() if value},
+                          maintained=maintained)
+        else:
+            record_status(lane, host, binding, worker=name, outcome="no-repair", maintained=maintained)
     finally:
         claim.release()
     if pr is not None:
@@ -365,8 +619,12 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
         return None
     try:
         lane.notify_issue_claim(linear, issue, name, spec)
-        receipt = run(lane, host, binding, name, spec, issue=issue)
-        finish_issue(lane, host, binding, name, linear, issue, receipt)
+        if lane.epics.is_epic(issue):  # decomposed in the binding's own team and repo
+            receipt = lane.epics.run_epic(lane, host, name, spec, linear, issue, binding.repo)
+        else:
+            receipt = run(lane, host, binding, name, spec, issue=issue)
+        if receipt.get("verdict") not in lane.epics.SETTLED_VERDICTS:
+            finish_issue(lane, host, binding, name, linear, issue, receipt)
     finally:
         lease.release()
     return receipt.get("verdict")
@@ -394,13 +652,26 @@ def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context
                           for check in pr.get("statusCheckRollup") or []
                           if (check.get("conclusion") or check.get("state") or "").upper()
                           in {"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"}})
+        reasons = pr.get("repairReasons") or []
+        extra = []
+        if "merge-group-failed" in reasons:
+            extra.append("- The merge queue rejected this exact head twice (failed merge-group CI). Find the "
+                         "failed run with `gh run list --repo " + binding.slug + " --event merge_group`, "
+                         "reproduce against origin/main merged in, and fix the cause in this branch.")
+        if "changes-requested" in reasons:
+            extra.append(f"- A review requested changes. Read `gh pr view {pr['number']} --repo {binding.slug} "
+                         "--comments` and the inline review comments, and address each one.")
         return "\n".join([
             f"# Repair PR #{pr['number']} in {binding.slug}: {pr.get('title') or ''}", "",
             f"Branch `{branch}` at {pr['headRefOid']} is checked out. Merge state: "
-            f"{pr.get('mergeStateStatus') or 'unknown'}. Failing checks: {', '.join(failing) or 'none'}.", "",
+            f"{pr.get('mergeStateStatus') or 'unknown'}. Failing checks: {', '.join(failing) or 'none'}. "
+            f"Repair reasons: {', '.join(reasons) or 'red or behind'}.", "",
             "## Contract",
             "- Merge origin/main into this branch first (no rebase), resolving conflicts.",
             "- Then fix what the failing checks report. Read their logs with `gh run view --log-failed`.",
+            *extra,
+            "- Keep the PR's intent. If origin/main already contains this change, commit nothing and end",
+            "  with `NOT-SHIPPABLE: superseded by <commit or PR>`.",
             *common])
     return "\n".join([
         f"# {issue.title} ({issue.identifier})", "", issue.description or "(no description)", "", "---",

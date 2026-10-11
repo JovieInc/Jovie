@@ -418,6 +418,12 @@ describe('jovie CLI', () => {
       join(dir, 'jovie/SKILL.md'),
     ]);
 
+    const noAgents = createOutput();
+    await expect(
+      runCli(['init'], { homeDir: dir, stderr: noAgents.output })
+    ).resolves.toBe(2);
+    expect(noAgents.read()).toContain('No supported agent found');
+
     const stderr = createOutput();
     await expect(
       runCli(['mcp', '--base-url', 'ftp://x'], {

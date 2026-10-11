@@ -67,6 +67,10 @@ GENERATED_RESOLVERS = {
 DIFF_POLICY = frozenset({"secret-file", "diff-too-large", "lockfile-without-manifest"})
 STALE_LABELS = frozenset({"lane-fix-exhausted", "queue-poison", "lane-fix-escalating"})
 FLAKY_CONCLUSIONS = frozenset({"CANCELLED", "TIMED_OUT", "STARTUP_FAILURE", "CANCELED"})
+# Summary checks that only restate their underlying jobs. Their own FAILURE carries no cause
+# of its own, so they never decide whether a failure is infrastructure (2026-10-11: a runner
+# outage cancelled jobs, PR Ready failed, and the PR went to a model that had nothing to fix).
+AGGREGATE_CHECKS = frozenset({"pr ready", "ci summary", "rollup"})
 RED_CONCLUSIONS = FLAKY_CONCLUSIONS | {"FAILURE"}
 PENDING_STATUS = frozenset({"IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED"})
 INFRA_TEXT = re.compile(
@@ -168,6 +172,11 @@ def _conclusion(check: dict) -> str:
 
 def _failing(pr: dict) -> list[dict]:
     return [check for check in _checks(pr) if _conclusion(check) in RED_CONCLUSIONS]
+
+
+def _aggregate(check: dict) -> bool:
+    return bool(check.get("synthetic")) or str(check.get("name") or check.get("context") or "").strip().lower() \
+        in AGGREGATE_CHECKS
 
 
 def _pending(pr: dict) -> list[dict]:
@@ -313,8 +322,14 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     failing = _failing(pr)
     flaky = [check for check in failing if _conclusion(check) in FLAKY_CONCLUSIONS
              or INFRA_TEXT.search(str(check.get("excerpt") or check.get("name") or ""))]
+    underlying = [check for check in failing if not _aggregate(check)]
     if overlap:
         return blocker("flaky-infra", "main-red", [f"main is red on {', '.join(overlap)}"], "wait")
+    if underlying and all(check in flaky for check in underlying):
+        # Every real failure is a cancellation/timeout/runner fault; a red summary over
+        # them is the same outage, so rerun instead of spending a model attempt.
+        return blocker("flaky-infra", "infra",
+                       [f"{check.get('name')}: {_conclusion(check)}" for check in underlying], "rerun")
     if failing and len(flaky) == len(failing):
         return blocker("flaky-infra", "infra",
                        [f"{check.get('name')}: {_conclusion(check)}" for check in flaky], "rerun")
