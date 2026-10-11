@@ -446,6 +446,15 @@ describe('full browser matrix setup routing', () => {
       'PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS'
     );
   });
+
+  it('provides the standalone server the secrets its claim routes require', () => {
+    const start = (matrixJob?.steps ?? []).find(step =>
+      /Start standalone E2E server/.test(step.name ?? '')
+    );
+    // Pending-claim and lead-attribution cookies throw without this key,
+    // which 500s the token-backed claim surface (JOV-8070).
+    expect(start?.env?.URL_ENCRYPTION_KEY).toBeTruthy();
+  });
 });
 
 describe('baked runner prerequisite contract', () => {

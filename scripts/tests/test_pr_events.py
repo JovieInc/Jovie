@@ -628,6 +628,24 @@ class RelayTest(unittest.TestCase):
         self.assertEqual((sentry["source"], sentry["ws"]), ("sentry", "reliability"))
         self.assertIsNone(events.remediation.event_from_sentry({}))
 
+    def test_schedule_failure_fingerprint_ignores_head_sha(self):
+        """JOV-8044: a recurring scheduled red must dedupe to one intake event.
+
+        head_sha moves every scheduled run; including it filed a new issue per
+        failure instead of reopening the canonical one."""
+        base = {"name": "CI Duration Ratchet", "event": "schedule", "conclusion": "failure",
+                "head_branch": "main", "pull_requests": [],
+                "html_url": "https://example.test/run/1", "updated_at": "2026-10-08T00:00:00Z"}
+        first = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**base, "head_sha": "sha-a"}})
+        second = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**base, "head_sha": "sha-b"}})
+        self.assertEqual(first["fingerprint"], second["fingerprint"])
+        self.assertEqual(first["ws"], "ci")
+        push = {"name": "CI", "event": "push", "conclusion": "failure", "head_branch": "main",
+                "pull_requests": [], "html_url": "https://example.test/run/2"}
+        push_a = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**push, "head_sha": "sha-a"}})
+        push_b = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**push, "head_sha": "sha-b"}})
+        self.assertNotEqual(push_a["fingerprint"], push_b["fingerprint"])
+
     def test_push_event_runs_the_conflict_read(self):
         shell = Shell({("gh", "pr", "list"): []})
         self.assertEqual(events.relay("push", {}, shell, set()), [])
