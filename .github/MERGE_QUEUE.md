@@ -141,10 +141,19 @@ queued, and cancelled checks do not imply a terminal source failure.
 ## Retired admission automation
 
 `merge-queue-autoenroll.yml`, its heartbeat dispatch, and its fleet gate are
-retired. Since 2026-09-26, `merge-queue-green-enroll.yml` enqueues CLEAN,
-non-draft, unlabeled-hold PRs on green checks so production holds never stall
-merging; required checks on the merge group remain the only gate. The Queue-Deferred Release workflow and its automatic
-label writer are also retired. Do not re-enable those paths to finish a PR.
+retired. Since 2026-09-26, `merge-queue-green-enroll.yml` enqueues
+required-green, non-draft, unlabeled-hold PRs on green checks so production
+holds never stall merging; required checks on the merge group remain the only
+gate. Required-green means `mergeStateStatus` CLEAN, HAS_HOOKS or UNSTABLE
+(UNSTABLE only adds a pending or red non-required context, such as a lane
+`jovie-execution/*` receipt). An UNKNOWN read right after main moves is
+re-read twice before the wake is dropped. An unchanged head removed from the
+queue stays out unless a typed retry/recovery applies, or the removal was
+`manual` and a blocking label (`hold`, `queue-poison`, ...) was removed after
+it. The enroll and rearm tokens carry `workflows: write` so heads that edit
+`.github/workflows` can be enqueued. The Queue-Deferred Release workflow and
+its automatic label writer are also retired. Do not re-enable those paths to
+finish a PR.
 
 ### Hold contract (jovie-hold/v1)
 

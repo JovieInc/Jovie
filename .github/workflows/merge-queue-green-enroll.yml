@@ -9,9 +9,12 @@ name: Merge Queue Green Enroll
 # promote and a red main are separate issues from source admission, so green
 # PRs keep entering the native queue while promotion is held.
 #
-# Enqueues open, non-draft, same-repo PRs into main whose mergeStateStatus is
-# CLEAN (required checks green, no conflicts), that carry no hold/gated/incident
-# label. It runs when a required-check workflow finishes on a PR, or a PR loses
+# Enqueues open, non-draft, same-repo PRs into main whose required checks are
+# green with no conflicts (mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE: an
+# UNSTABLE head only has a non-required check pending or red, which the
+# ruleset does not gate on), that carry no hold/gated/incident label. GitHub
+# recomputes mergeability lazily, so a read right after main moves returns
+# UNKNOWN; the controller re-reads it briefly instead of dropping the wake. It runs when a required-check workflow finishes on a PR, or a PR loses
 # a hold label, plus a 15-minute reconciliation sweep: a queue ejection while
 # checks are already green produces no new check completion, so without the
 # sweep a dequeued green head is never re-armed (JOV-7589).
@@ -149,11 +152,15 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
+          # A head that edits .github/workflows cannot be enqueued without it
+          # ("`workflows` scope may be required"); the installation grants it.
+          permission-workflows: write
 
-      - name: Enqueue CLEAN PRs
+      - name: Enqueue green PRs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          MERGE_STATE_RETRY_MS: '3000'
           FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
           ADMISSION_RECOVERY_RECEIPT: ${{ needs.hold-failed-revision.outputs.admission_recovery_receipt || '' }}
         with:
@@ -166,8 +173,16 @@ jobs:
             // queue-poison: ejected twice in 24 h (scripts/lanes/pr_events.py, JOV-6904);
             // the lanes remove it with their fix.
             const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
+            // Required checks green and no conflicts. UNSTABLE only adds a
+            // non-required pending/red context (e.g. lane execution receipts).
+            const ADMISSIBLE = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
+            const retryMs = Math.max(0, Number(process.env.MERGE_STATE_RETRY_MS ?? 3000) || 0);
+            const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
             const { owner, repo } = context.repo;
-            const currentMainSha = (await github.rest.git.getRef({
+            // Main's SHA only resolves a base-branch failure hold, so read it
+            // once, lazily, for a held candidate (most wakes never need it).
+            let currentMainSha;
+            const readMainSha = async () => currentMainSha ??= (await github.rest.git.getRef({
               owner, repo, ref: 'heads/main',
             })).data.object.sha;
             // Use the triggering PR for automatic wakes. Scanning every eligible PR
@@ -238,7 +253,10 @@ jobs:
                       labels(first: 100) { pageInfo { hasNextPage } nodes { name } }
                       commits(last: 1) { nodes { commit { committedDate } } }
                       timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
-                        nodes { ... on RemovedFromMergeQueueEvent { createdAt } }
+                        nodes { ... on RemovedFromMergeQueueEvent { createdAt reason } }
+                      }
+                      releases: timelineItems(last: 20, itemTypes: [UNLABELED_EVENT]) {
+                        nodes { ... on UnlabeledEvent { createdAt label { name } } }
                       }
                     }
                   }
@@ -246,12 +264,23 @@ jobs:
               const eligible = pr => {
                 if (!pr || pr.state !== 'OPEN' || pr.baseRefName !== 'main') return false;
                 if (pr.isDraft || pr.isInMergeQueue || pr.isCrossRepository) return false;
-                if (pr.headRefOid !== candidate.head.sha || pr.mergeStateStatus !== 'CLEAN') return false;
+                if (pr.headRefOid !== candidate.head.sha || !ADMISSIBLE.has(pr.mergeStateStatus)) return false;
                 if (pr.labels.pageInfo.hasNextPage) return false;
                 return !pr.labels.nodes.some(l => BLOCKING.has(l.name.toLowerCase()));
               };
-              const pr = await readCurrent();
-              if (!eligible(pr)) continue;
+              // UNKNOWN means GitHub has not recomputed mergeability since main
+              // moved; the read itself starts that, so two short re-reads settle it.
+              let pr = await readCurrent();
+              for (let attempt = 1; pr?.mergeStateStatus === 'UNKNOWN' && attempt <= 2; attempt += 1) {
+                await sleep(retryMs * attempt);
+                pr = await readCurrent();
+              }
+              if (!eligible(pr)) {
+                if (pr && pr.state === 'OPEN' && !pr.isDraft && !pr.isInMergeQueue) {
+                  core.info(`skip #${candidate.number}: mergeStateStatus=${pr.mergeStateStatus}`);
+                }
+                continue;
+              }
               const statuses = await github.paginate(
                 github.rest.repos.listCommitStatusesForRef,
                 { owner, repo, ref: pr.headRefOid, per_page: 100 }
@@ -271,7 +300,9 @@ jobs:
               const sourceFailure = failurePolicy.revisionFailureDisposition({
                 statuses,
                 repository: `${owner}/${repo}`,
-                currentMainSha,
+                currentMainSha: statuses.some(status => status?.context === failurePolicy.FAILURE_HOLD_CONTEXT)
+                  ? await readMainSha()
+                  : undefined,
               });
               let failure = sourceFailure;
               if (failure.action === 'block') {
@@ -283,14 +314,30 @@ jobs:
               // consume the one typed non-deterministic retry.
               const lastRemoval = pr.timelineItems.nodes[0]?.createdAt;
               const headCommittedAt = pr.commits.nodes[0]?.commit.committedDate;
-              failure = failurePolicy.reenrollmentDisposition({
-                failure, statuses, repository: `${owner}/${repo}`, prNumber: pr.number, lastRemoval, headCommittedAt,
-                autoMergeEnabled: Number.isFinite(Date.parse(pr.autoMergeRequest?.enabledAt)),
-              });
-              if (failure.action === 'block') continue;
               const removedUnchangedHead = lastRemoval &&
                 (!headCommittedAt || headCommittedAt <= lastRemoval);
-              if (removedUnchangedHead && failure.action !== 'retry-once') continue;
+              // A manual removal (the dequeue-held job, or an agent pulling a
+              // PR) followed by removal of a blocking label is an explicit
+              // release of that same head. A failed_checks removal never is,
+              // and any revision failure hold still blocks first.
+              const removalReason = String(pr.timelineItems.nodes[0]?.reason || 'unknown').toLowerCase();
+              const releasedAfterManualRemoval = Boolean(removedUnchangedHead) &&
+                failure.action === 'allow' &&
+                removalReason === 'manual' &&
+                (pr.releases?.nodes || []).some(event =>
+                  typeof event?.createdAt === 'string' && event.createdAt > lastRemoval &&
+                  BLOCKING.has(String(event.label?.name || '').toLowerCase()));
+              if (!releasedAfterManualRemoval) {
+                failure = failurePolicy.reenrollmentDisposition({
+                  failure, statuses, repository: `${owner}/${repo}`, prNumber: pr.number, lastRemoval, headCommittedAt,
+                  autoMergeEnabled: Number.isFinite(Date.parse(pr.autoMergeRequest?.enabledAt)),
+                });
+              }
+              if (failure.action === 'block' ||
+                  (removedUnchangedHead && failure.action !== 'retry-once' && !releasedAfterManualRemoval)) {
+                core.info(`skip #${pr.number}: head unchanged since queue removal (${removalReason}; ${failure.reason})`);
+                continue;
+              }
               if (process.env.DRY_RUN === 'true') {
                 core.notice(`[dry run] would enqueue #${pr.number}`);
                 continue;
@@ -501,6 +548,8 @@ jobs:
           permission-contents: read
           permission-pull-requests: write
           permission-statuses: write
+          # Rearming auto-merge on a head that edits .github/workflows needs it.
+          permission-workflows: write
 
       - name: Rearm green victims of this merge group
         env:
