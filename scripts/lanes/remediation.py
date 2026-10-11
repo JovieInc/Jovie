@@ -31,13 +31,14 @@ NEEDS_HUMAN_LABEL_ID = "ccf5eaaa-8705-49f0-b264-ec3558d678b7"
 REMEDIATION_LABEL = "remediation"
 # Detector contract: label `remediation:<fingerprint>` on a JOV or LYB issue.
 LABEL_PREFIX = "remediation:"
-# One label-filtered Linear read per tick. No pagination, no per-issue read.
+# One cached label-filtered inventory per tick; bounded pagination, no per-issue reads.
 LABELED_EVENT_QUERY = (
-    'query{issues(first:100,filter:{team:{key:{in:["JOV","LYB"]}},'
-    'labels:{name:{startsWith:"remediation:"}}}){nodes{id identifier title description '
+    'query($after:String){issues(first:100,after:$after,filter:{team:{key:{in:["JOV","LYB"]}},'
+    'labels:{name:{startsWith:"remediation:"}}}){pageInfo{hasNextPage endCursor} nodes{id identifier title description '
     'url createdAt updatedAt state{name type} team{key states{nodes{id name type}}} '
     'labels{nodes{id name}}}}}'
 )
+EVENT_INVENTORY_PAGES = 20
 EVENT_CLAIM_TTL_S = 2 * 3600
 # MusicFetch gaps route at the in-house resolver cutover. Never a renewal.
 MUSICFETCH_CUTOVER = "JOV-7323"
@@ -888,9 +889,15 @@ def non_pr_event(event_name: str, payload: dict) -> dict | None:
             source = "main-ci"
         ws = WS_BY_SOURCE[source]
         excerpt = f"{name} {conclusion}"
+        # JOV-8044: scheduled/dispatch runs share one fingerprint per workflow
+        # and conclusion. head_sha moves every run, so including it files a new
+        # issue each recurrence instead of reopening the canonical one.
+        parts = [source, name, conclusion]
+        if kind not in {"schedule", "workflow_dispatch"}:
+            parts.append(str(run.get("head_sha") or ""))
         return remediation_event(
             source=source,
-            fingerprint=fingerprint([source, name, str(run.get("head_sha") or ""), conclusion]),
+            fingerprint=fingerprint(parts),
             subject={"sha": run.get("head_sha"), "workflow": name},
             evidence={"url": run.get("html_url") or "", "excerpt": excerpt},
             ws=ws,

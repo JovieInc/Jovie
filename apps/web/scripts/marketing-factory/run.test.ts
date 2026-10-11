@@ -21,7 +21,25 @@ import { FACTORY_STAGE_RUNNERS } from './stages';
 import { CONTENT_STAGE_RUNNERS } from './stages-content';
 
 const PAGE_ID = 'solutions-founders';
-const brief = loadFactoryBrief('solutions', 'founders');
+const legacy = loadFactoryBrief('solutions', 'founders');
+const brief = {
+  ...legacy,
+  media: legacy.media.map(entry => ({
+    ...entry,
+    input: {
+      ...entry.input,
+      editorial: {
+        benefit: 'Explain the tested product action',
+        focalDetail: 'One action',
+        rationale: 'Use the verified capture',
+        fallback: 'Retain the benefit text',
+        alternatives: [
+          { medium: 'video' as const, reason: 'Motion is unnecessary' },
+        ],
+      },
+    },
+  })),
+};
 const dryCopy = brief.dry?.copy as { slots: { text: string }[] };
 
 let runsDir: string;
@@ -33,6 +51,7 @@ function run(options: Partial<Parameters<typeof runFactory>[0]> = {}) {
   return runFactory({
     family: 'solutions',
     slug: 'founders',
+    brief,
     dry: true,
     runsDir,
     runners: CONTENT_STAGE_RUNNERS,

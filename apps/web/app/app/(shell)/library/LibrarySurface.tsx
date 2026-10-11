@@ -120,6 +120,7 @@ import {
   ViewModeSlider,
   type ViewModeSliderOption,
 } from '@/components/organisms/table';
+import { TableDependencyGuide } from '@/components/organisms/table/atoms/TableDependencyGuide';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
@@ -217,6 +218,10 @@ import {
   useLibraryGridDensity,
   useLibraryViewMode,
 } from './library-grid-preferences';
+import {
+  groupLibraryDependencies,
+  type LibraryDependency,
+} from './library-hierarchy';
 import {
   countLibrarySavedViewMatches,
   getLibrarySavedViewPredicate,
@@ -518,6 +523,10 @@ function countBy<T extends string>(
   return counts;
 }
 
+const LibraryDependencyContext = createContext<
+  ReadonlyMap<string, LibraryDependency>
+>(new Map());
+
 const ReleaseCell = memo(function ReleaseCell({
   asset,
 }: {
@@ -526,6 +535,7 @@ const ReleaseCell = memo(function ReleaseCell({
   const { playingPreviewId, onTogglePreview } = useContext(
     LibraryPreviewContext
   );
+  const dependency = useContext(LibraryDependencyContext).get(asset.id);
   const hasPreview = hasVerifiedLibraryAudioPreview(asset);
   const isPreviewPlaying = playingPreviewId === asset.id;
 
@@ -533,6 +543,12 @@ const ReleaseCell = memo(function ReleaseCell({
     // system-b-library-fluid-cell: no min-content width, so long titles
     // truncate instead of widening the table past its container.
     <div className='system-b-library-fluid-cell flex items-center gap-2.5'>
+      {dependency ? (
+        <TableDependencyGuide last={dependency.last} className='min-h-10' />
+      ) : null}
+      {dependency ? (
+        <span className='sr-only'>Part of {dependency.parentTitle}</span>
+      ) : null}
       <ArtworkFrame
         size='thumbnail'
         className='system-b-library-artwork-shell group/artwork h-10 w-10'
@@ -1863,7 +1879,8 @@ function LibraryReleaseTable({
   readonly onTogglePreview?: LibraryPreviewToggle;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
 }) {
-  const tableData = useMemo(() => [...assets], [assets]);
+  const hierarchy = useMemo(() => groupLibraryDependencies(assets), [assets]);
+  const tableData = hierarchy.rows;
   const previewContext = useMemo(
     () => ({
       playingPreviewId: playingPreviewId ?? null,
@@ -1913,7 +1930,9 @@ function LibraryReleaseTable({
   );
   const tableWithActions = (
     <LibraryEntityActionContext.Provider value={getContextMenuItems}>
-      {table}
+      <LibraryDependencyContext.Provider value={hierarchy.dependencies}>
+        {table}
+      </LibraryDependencyContext.Provider>
     </LibraryEntityActionContext.Provider>
   );
 
@@ -2364,6 +2383,7 @@ function AssetDrawer({
       objectHeader={
         current ? (
           <EntityHeader
+            className='px-3 pt-3'
             thumbnail={
               <div className='h-12 w-12 shrink-0 overflow-hidden'>
                 <LibraryMediaThumbnail asset={current} size='drawer' />
@@ -2983,13 +3003,15 @@ export function LibrarySurface({
       (() => true);
     const savedViewPredicate = getLibrarySavedViewPredicate(deferredSavedView);
 
-    return effectiveAssets
-      .filter(presetPredicate)
-      .filter(savedViewPredicate)
-      .filter(asset => libraryAssetMatchesStage(asset, deferredStage))
-      .filter(asset => assetMatchesFilters(asset, deferredFilters))
-      .filter(asset => assetMatchesPills(asset, deferredPills))
-      .toSorted(compareAssets(deferredSort));
+    return groupLibraryDependencies(
+      effectiveAssets
+        .filter(presetPredicate)
+        .filter(savedViewPredicate)
+        .filter(asset => libraryAssetMatchesStage(asset, deferredStage))
+        .filter(asset => assetMatchesFilters(asset, deferredFilters))
+        .filter(asset => assetMatchesPills(asset, deferredPills))
+        .toSorted(compareAssets(deferredSort))
+    ).rows;
   }, [
     deferredFilters,
     deferredPills,

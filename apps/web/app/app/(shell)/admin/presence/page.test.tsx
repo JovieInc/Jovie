@@ -36,6 +36,12 @@ describe('AdminPresencePage', () => {
     expect(mocks.load).not.toHaveBeenCalled();
   });
 
+  it('awaits the privacy gate before any company loader work', async () => {
+    mocks.requireAccess.mockRejectedValue(new Error('OVIE_PRIVACY_LOCKED'));
+    await expect(AdminPresencePage()).rejects.toThrow('OVIE_PRIVACY_LOCKED');
+    expect(mocks.load).not.toHaveBeenCalled();
+  });
+
   it('loads company presence data for admins', async () => {
     const data = { pages: [], sources: [], profilesUnavailable: false };
     mocks.requireAccess.mockResolvedValue('admin-user');
@@ -43,6 +49,13 @@ describe('AdminPresencePage', () => {
 
     const element = await AdminPresencePage();
     expect(mocks.load).toHaveBeenCalledTimes(1);
-    expect(element.props).toEqual({ data });
+    expect(element.props).toEqual({
+      data,
+      scope: {
+        actorId: 'admin-user',
+        workspaceId: 'jovie-company',
+        target: 'company',
+      },
+    });
   });
 });

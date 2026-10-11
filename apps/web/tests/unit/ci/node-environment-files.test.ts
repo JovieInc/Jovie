@@ -157,18 +157,27 @@ describe('tests/node-environment-files.json', () => {
     expect(redundant).toEqual([]);
   });
 
-  it('selects only files free of DOM, browser-API, and React references', () => {
-    const domBound = files().flatMap(entry => {
+  // Keep each file within the normal test timeout, rather than parsing the
+  // whole corpus in one test. Both policies share the same parse and print.
+  it.each(files())(
+    'selects %s without browser references or DOM matchers',
+    entry => {
       const path = resolve(webRoot, entry);
       // Missing entries are reported by the stale-list check above.
-      if (!existsSync(path)) return [];
-      const match = withoutComments(readFileSync(path, 'utf8')).match(
-        DOM_OR_REACT_REFERENCE
-      );
-      return match ? [`${entry} (references "${match[0]}")`] : [];
-    });
-    expect(domBound).toEqual([]);
-  });
+      if (!existsSync(path)) return;
+      const source = withoutComments(readFileSync(path, 'utf8'));
+      const browserReference = source.match(DOM_OR_REACT_REFERENCE);
+      const matcherCall = source.match(JEST_DOM_MATCHER_CALL);
+      expect(
+        browserReference
+          ? [`${entry} (references "${browserReference[0]}")`]
+          : []
+      ).toEqual([]);
+      expect(
+        matcherCall ? [`${entry} (calls "${matcherCall[1]}")`] : []
+      ).toEqual([]);
+    }
+  );
 
   it('flags DOM and hook usage but not identifiers that only contain the words', () => {
     for (const domUsage of [
@@ -228,17 +237,14 @@ describe('tests/node-environment-files.json', () => {
     ).not.toMatch(DOM_OR_REACT_REFERENCE);
   });
 
-  it('lists only files that use no jest-dom matchers', () => {
+  it('recognizes executable jest-dom calls while ignoring comments', () => {
     expect(Object.keys(jestDomMatchers)).toContain('toBeInTheDocument');
-    const matcherUsers = files().flatMap(entry => {
-      const path = resolve(webRoot, entry);
-      if (!existsSync(path)) return [];
-      const match = withoutComments(readFileSync(path, 'utf8')).match(
-        JEST_DOM_MATCHER_CALL
-      );
-      return match ? [`${entry} (calls "${match[1]}")`] : [];
-    });
-    expect(matcherUsers).toEqual([]);
+    expect(
+      withoutComments('// expect(value).toBeInTheDocument();')
+    ).not.toMatch(JEST_DOM_MATCHER_CALL);
+    expect(
+      withoutComments('expect(value).toBeInTheDocument /* comment */ ();')
+    ).toMatch(JEST_DOM_MATCHER_CALL);
   });
 
   it('loads DOM testing setup only when a DOM exists', () => {

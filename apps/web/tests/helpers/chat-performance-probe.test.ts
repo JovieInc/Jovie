@@ -170,6 +170,53 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
     expect(probe.usableStateMs).toBeUndefined();
   });
 
+  it('scores a composer already enabled when the reply is presented without adding two more frame waits', async () => {
+    installBrowserChatProbe({
+      user: 'Sent message',
+      assistant: 'Received reply',
+    });
+    const probe = probeWindow.__jovieChatPerformanceProbe!;
+    probe.start = 1000;
+    row('chat-user-bubble', 'Sent message');
+    row('chat-message-reply', 'Received reply');
+    const composer = document.createElement('textarea');
+    composer.setAttribute('aria-label', 'Chat Message Input');
+    document.body.append(composer);
+    await Promise.resolve();
+    frame(1016);
+    // Readiness still waits for the reply's actual paint opportunity.
+    expect(probe.usableStateMs).toBeUndefined();
+    expect(probe.renderToInteractiveMs).toBeUndefined();
+    frame(1032);
+    expect(probe.usableStateMs).toBe(32);
+    expect(probe.renderToInteractiveMs).toBe(0);
+    expect(frames.size).toBe(0);
+  });
+
+  it('records a real readiness delay above the unchanged 50ms budget', async () => {
+    installBrowserChatProbe({
+      user: 'Sent message',
+      assistant: 'Received reply',
+    });
+    row('chat-user-bubble', 'Sent message');
+    row('chat-message-reply', 'Received reply');
+    const composer = document.createElement('textarea');
+    composer.setAttribute('aria-label', 'Chat Message Input');
+    composer.disabled = true;
+    document.body.append(composer);
+    await Promise.resolve();
+    frame(110);
+    frame(120);
+    const probe = probeWindow.__jovieChatPerformanceProbe!;
+    frame(140);
+    frame(160);
+    expect(probe.renderToInteractiveMs).toBeUndefined();
+    composer.disabled = false;
+    frame(180);
+    frame(200);
+    expect(probe.renderToInteractiveMs).toBe(80);
+  });
+
   it('intersects horizontal and nested clipping regions before scoring a row', async () => {
     installBrowserChatProbe({
       user: 'Sent message',

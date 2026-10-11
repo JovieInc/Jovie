@@ -13,6 +13,9 @@
  */
 export const SHELL_RAIL_MOTION_MS = 420;
 
+/** Pointer bridge grace shared by both transient desktop rails. */
+export const SHELL_RAIL_PREVIEW_GRACE_MS = 180;
+
 /** Shared rail lifecycle. Rails are interruptible: a new input re-aims the
  *  phase at the latest requested geometry instead of queueing or snapping. */
 export type RailMotionPhase = 'closed' | 'opening' | 'open' | 'closing';
@@ -23,7 +26,7 @@ export type RailMotionPhase = 'closed' | 'opening' | 'open' | 'closing';
  * and its content travel together.
  */
 export const SHELL_RAIL_ALLOCATION =
-  'transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none';
+  'transition-shell-rail-allocation duration-cinematic ease-cinematic motion-reduce:transition-none';
 
 /** Main-plane geometry: the shell-owned surfaces that yield/reclaim canvas. */
 export const SHELL_RAIL_MAIN_PLANE =

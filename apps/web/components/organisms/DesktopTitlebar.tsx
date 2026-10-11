@@ -145,12 +145,12 @@ export function DesktopTitlebar() {
   const { canGoBack, canGoForward, goBack, goForward } = useDesktopNavigation();
   // useContext (not useSidebar) so this is safe outside SidebarProvider (e.g. demo shell)
   const sidebarCtx = useContext(SidebarContext);
-  const sidebarOpen = sidebarCtx?.state === 'open';
+  const sidebarOpen = sidebarCtx?.open === true;
   const toggleSidebar = sidebarCtx?.toggleSidebar;
   const isMobile = sidebarCtx?.isMobile === true;
   const sidebarToggleOpen = isMobile
     ? sidebarCtx?.openMobile === true
-    : sidebarOpen;
+    : sidebarCtx?.state === 'open';
 
   return (
     <div
@@ -178,8 +178,12 @@ export function DesktopTitlebar() {
               no-drag via the Electron drag-region CSS. */}
           <RailToggleButton
             side='left'
+            controlsId='shell-left-rail'
             open={sidebarToggleOpen}
-            openLabel='Collapse sidebar'
+            pinned={isMobile ? sidebarCtx?.openMobile : sidebarCtx?.open}
+            openLabel={
+              sidebarCtx?.isPreview ? 'Pin sidebar' : 'Collapse sidebar'
+            }
             closedLabel='Expand sidebar'
             onToggle={() => toggleSidebar?.()}
             disabled={!toggleSidebar}

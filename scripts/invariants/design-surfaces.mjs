@@ -1024,6 +1024,14 @@ export function validateDesignSurfacesContract(registry, options = {}) {
     );
   }
   errors.push(...certifyVisualRules(policy, options).errors);
+  if (
+    policy.sharedInteractionOwners !==
+    'docs/design-system/component-ownership.json'
+  ) {
+    errors.push(
+      'sharedInteractionOwners must bind the existing component ownership map'
+    );
+  }
   return errors;
 }
 

@@ -47,6 +47,34 @@ describe('useRightRailKeyboardShortcut', () => {
     expect(onToggle).toHaveBeenCalledOnce();
   });
 
+  it.each([{ repeat: true }, { isComposing: true }])(
+    'ignores unstable key input %j',
+    flags => {
+      renderHook(() => useRightRailKeyboardShortcut(onToggle));
+      act(() => dispatchKeyDown({ key: ']', ...flags }));
+      expect(onToggle).not.toHaveBeenCalled();
+    }
+  );
+
+  it('respects handled events and modal focus', () => {
+    renderHook(() => useRightRailKeyboardShortcut(onToggle));
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    const button = document.createElement('button');
+    dialog.append(button);
+    document.body.append(dialog);
+    act(() => {
+      dispatchKeyDown({ key: ']', target: button });
+      const event = new KeyboardEvent('keydown', {
+        key: ']',
+        cancelable: true,
+      });
+      event.preventDefault();
+      globalThis.dispatchEvent(event);
+    });
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
   it('does not fire bare `]` while focus is in a form element', () => {
     const input = document.createElement('input');
     document.body.append(input);
