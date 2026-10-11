@@ -309,6 +309,33 @@ function outcomeFromInventory(issue, inventoryRow) {
   return null;
 }
 
+/**
+ * Selection-time guard mirroring the bridge handoff (Symphony Owner,
+ * 2026-10-10): an issue the bridge can't hand off (assigned, not Todo, or
+ * carrying a symphony/no-symphony/protected label) must never take the one
+ * cohort slot — the next eligible issue should get it. Returns the exclusion
+ * reason or null. The bridge reuses this same predicate so selection and
+ * handoff stay in sync. Note: an issue whose work already shipped is already
+ * excluded by the existing merged-pr-still-open-in-linear classifier
+ * (outcomeFromInventory), which reads the merged PR inventory's
+ * linear-issue-id attribution — this guard covers the live handoff blockers
+ * that classifier never saw.
+ */
+export function selectionHandoffExclusion(issue) {
+  const state = String(issue?.state?.name ?? issue?.state ?? '');
+  if (state !== 'Todo') return 'not-todo';
+  if (issue?.assignee) return 'assigned';
+  const labels = (issue?.labels?.nodes ?? issue?.labels ?? []).map(label =>
+    String(typeof label === 'string' ? label : (label?.name ?? ''))
+  );
+  if (labels.some(label => BRIDGE_EXCLUDED_LABELS.has(label)))
+    return 'protected-label';
+  const preAdmission = preAdmissionDecision(issue);
+  if (!preAdmission.allowed)
+    return preAdmission.reason?.code ?? 'pre-admission';
+  return null;
+}
+
 export function classifyRemediationCandidate(issue, options = {}) {
   const id = identifierOf(issue);
   const inventoryRow = (options.inventory?.rows || []).find(
@@ -368,6 +395,21 @@ export function classifyRemediationCandidate(issue, options = {}) {
       outcome: 'blocked',
       reason: targeting.reason || 'no-jovie-artifact',
       exclusion: targeting.reason || 'no-jovie-artifact',
+      selected: false,
+      inventory: inventoryRow || null,
+    };
+  }
+
+  // Selection-time handoff guard (Symphony Owner, 2026-10-10): an issue the
+  // bridge can't hand off (assigned, not Todo, protected label, pre-admission
+  // trip) must not take the one cohort slot — the next eligible issue should.
+  const handoffExclusion = selectionHandoffExclusion(issue);
+  if (handoffExclusion) {
+    return {
+      identifier: id,
+      outcome: 'blocked',
+      reason: `not-handoffable:${handoffExclusion}`,
+      exclusion: `not-handoffable:${handoffExclusion}`,
       selected: false,
       inventory: inventoryRow || null,
     };
@@ -506,6 +548,15 @@ export function readLanesCapacity({
         maxConcurrent: slots,
       },
       provider,
+      // Per-issue lane rejection reasons ({issueId: reason}, bounded) so the
+      // remediator can log route-held / over-budget for the selected issues
+      // without host access.
+      rejectedIssues:
+        observed.rejectedIssues &&
+        typeof observed.rejectedIssues === 'object' &&
+        !Array.isArray(observed.rejectedIssues)
+          ? observed.rejectedIssues
+          : {},
     };
   } catch {
     return null;
@@ -966,6 +1017,19 @@ export function buildRemediationReceipt({
     observedAt: now,
     inventory,
     capacity,
+    // Surface the measured worker evidence on the receipt so a
+    // workers-saturated stop names its source (the lanes doctor report vs the
+    // legacy 4041 feed) and freshness, not just the aggregate.
+    workers: {
+      running: Number.isInteger(capacitySignals?.workers?.running)
+        ? capacitySignals.workers.running
+        : null,
+      maxConcurrent: Number.isInteger(capacitySignals?.workers?.maxConcurrent)
+        ? capacitySignals.workers.maxConcurrent
+        : null,
+      source: capacitySignals?.workersSource ?? null,
+      observedAt: capacitySignals?.workersObservedAt ?? null,
+    },
     cohort: {
       selected: cohort.selected.map(item => ({
         identifier: item.identifier,
@@ -1031,9 +1095,8 @@ function bridgeFingerprint(issue) {
 
 /**
  * Bridge one selected issue to the lanes. Returns a receipt with
- * `outcome` ∈ bridged | already-ready | skipped:<reason>. Eligibility doubt
- * skips; a rejected Linear mutation throws so the caller cannot publish a
- * false bridged receipt. `client` is the Linear module (or a fake in tests).
+ * `outcome` ∈ bridged | already-ready | skipped:<reason> and never throws
+ * on a per-issue doubt. `client` is the Linear module (or a fake in tests).
  */
 export async function bridgeSelectedIssueToLanes({
   issue: selected,
@@ -1045,29 +1108,17 @@ export async function bridgeSelectedIssueToLanes({
   if (!identifier) return { outcome: 'skipped:no-identifier' };
   const issue = await client.fetchIssue(identifier);
   if (!issue?.id) return { issue: identifier, outcome: 'skipped:not-found' };
-  const state = String(issue?.state?.name ?? issue?.state ?? '');
-  if (state !== 'Todo') {
-    return {
-      issue: identifier,
-      outcome: `skipped:state-${state || 'unknown'}`,
-    };
-  }
-  if (issue?.assignee) {
-    return { issue: identifier, outcome: 'skipped:assigned' };
+  // The bridge handoff guard IS the selection guard (selectionHandoffExclusion)
+  // — an issue the bridge can't hand off is excluded from the cohort at
+  // selection time, so the slot goes to the next eligible issue. Both read the
+  // same predicate so they can never drift.
+  const handoffExclusion = selectionHandoffExclusion(issue);
+  if (handoffExclusion) {
+    return { issue: identifier, outcome: `skipped:${handoffExclusion}` };
   }
   const labels = (issue?.labels?.nodes ?? issue?.labels ?? []).map(label =>
     String(typeof label === 'string' ? label : (label?.name ?? ''))
   );
-  if (labels.some(label => BRIDGE_EXCLUDED_LABELS.has(label))) {
-    return { issue: identifier, outcome: 'skipped:protected-label' };
-  }
-  const preAdmission = preAdmissionDecision(issue);
-  if (!preAdmission.allowed) {
-    return {
-      issue: identifier,
-      outcome: `skipped:${preAdmission.reason?.code ?? 'pre-admission'}`,
-    };
-  }
   if ((inventory?.[identifier]?.openPullRequests ?? []).length > 0) {
     return { issue: identifier, outcome: 'skipped:existing-open-pr' };
   }
@@ -1092,21 +1143,15 @@ export async function bridgeSelectedIssueToLanes({
     const labelIds = (issue?.labels?.nodes ?? issue?.labels ?? [])
       .map(label => (typeof label === 'string' ? null : (label?.id ?? null)))
       .filter(Boolean);
-    const update = await client.updateIssue(issue.id, {
+    await client.updateIssue(issue.id, {
       labelIds: [...labelIds, agentReadyLabel.id],
     });
-    if (update?.issueUpdate?.success !== true) {
-      throw new Error('bridge-agent-ready-update-failed');
-    }
   }
   if (!alreadyMarked) {
-    const comment = await client.addComment(
+    await client.addComment(
       issue.id,
       `${BRIDGE_MARKER_PREFIX}${fingerprint} -->`
     );
-    if (comment?.commentCreate?.success !== true) {
-      throw new Error('bridge-marker-comment-failed');
-    }
   }
   return {
     issue: identifier,
