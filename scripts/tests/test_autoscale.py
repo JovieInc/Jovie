@@ -209,7 +209,10 @@ class AutoscaleTest(unittest.TestCase):
             path = root / "maintenance-demand.json"
             path.write_text(json.dumps(census))
             self.assertEqual(A._demand("devin", A.collect(root, {}, NOW)), 3)
-            for stamp, count in ((NOW - 121, 3), (NOW + 1, 3), (NOW, True), (NOW, -1), (NOW, None)):
+            census["lanes"]["devin"] = {"observedAt": NOW - 3 * 60 - 55, "pending": 3}  # oldest a census may carry, next tick
+            path.write_text(json.dumps(census))
+            self.assertEqual(A._demand("devin", A.collect(root, {}, NOW)), 3)
+            for stamp, count in ((NOW - A.MAINTENANCE_DEMAND_STALE_S - 1, 3), (NOW + 1, 3), (NOW, True), (NOW, -1), (NOW, None)):
                 census["lanes"]["devin"] = {"observedAt": stamp, "pending": count}
                 path.write_text(json.dumps(census))
                 self.assertIsNone(A._demand("devin", A.collect(root, {}, NOW)))
@@ -564,6 +567,36 @@ class AutoscaleTest(unittest.TestCase):
         self.assertEqual(self.lane(credits, "codex")["ceiling"], 1, "codex stays bound by its leases")
         operator = decide(None, obs(), sample(cpuCount=16), {"devin": 2}, cfg(intervalS=60, hostMax=6), NOW)
         self.assertEqual(operator["host"]["ceiling"], 6, "an explicit host max still wins")
+    def test_credit_ceiling_dip_does_not_ratchet_the_lane_to_zero(self):
+        # Gem 2026-10-11 18:45: a codex lease dip set the ceiling to 0 for one tick; the clamp
+        # became the next level, so codex spawned nothing (no repairs, no demand census) after
+        # its account was free again.
+        bases, options = {"codex": 3}, cfg(intervalS=60)
+        dip = decide(None, obs(runningByProvider={"codex": 0}, codexUnleasedAvailable=0), sample(), bases, options, NOW)
+        row = self.lane(dip, "codex")
+        self.assertEqual((row["effective"], row["ceiling"], row["lastReason"]), (0, 0, "hold:lane-ceiling"))
+        self.assertEqual(row["target"], 3, "the clamp is published, not adopted as the AIMD level")
+        unknown_demand = obs(runningByProvider={"codex": 0}, codexUnleasedAvailable=1,
+                             eligiblePoolByProvider={"codex": 0}, maintenanceQueueByProvider={})
+        back = decide(dip, unknown_demand, sample(), bases, options, NOW + 60)
+        self.assertEqual((self.lane(back, "codex")["effective"], self.lane(back, "codex")["ceiling"]), (1, 1),
+                         "the seat returns with the credit, even before the lane can publish demand")
+    def test_legacy_ceiling_clamped_receipt_recovers_to_base(self):
+        legacy = {"mode": "apply", "lanes": {"codex": {"base": 3, "effective": 0, "ceiling": 0, "lastReason": "hold:lane-ceiling"}}}
+        state = decide(legacy, obs(runningByProvider={"codex": 0}, codexUnleasedAvailable=1, eligiblePoolByProvider={"codex": 0},
+                                   maintenanceQueueByProvider={}), sample(), {"codex": 3}, cfg(intervalS=60), NOW)
+        self.assertEqual((self.lane(state, "codex")["effective"], self.lane(state, "codex")["target"]), (1, 3))
+        # Gem 19:45Z: the clamp was followed by unknown-demand/psi-high ticks, so the stored
+        # reason no longer named the ceiling; a zero level still returns to the floor.
+        later = {"mode": "apply", "lanes": {"codex": {"base": 3, "effective": 0, "ceiling": 1,
+                                                    "lastReason": "hold:unknown-demand", "blockers": ["unknown-demand", "psi-high"]}}}
+        floor = decide(later, obs(runningByProvider={"codex": 0}, codexUnleasedAvailable=1, eligiblePoolByProvider={"codex": 0},
+                                  maintenanceQueueByProvider={}), sample(psi={"cpuSomeAvg10": 1.0, "memoryFullAvg10": 0.0, "ioFullAvg10": 14.0}),
+                       {"codex": 3}, cfg(intervalS=60), NOW)
+        self.assertEqual(self.lane(floor, "codex")["effective"], 1)
+        idle = {"mode": "apply", "lanes": {"devin": {"base": 4, "effective": 2, "lastReason": "idle-decay"}}}
+        kept = decide(idle, obs(runningByProvider={"devin": 2}), sample(), {"devin": 4}, cfg(), NOW)
+        self.assertEqual(self.lane(kept, "devin")["effective"], 2, "a decayed level is not a ceiling clamp")
     def test_fail_safe_collect_and_linear_capture(self):
         state = decide({"mode": "apply", "lanes": {"devin": {"effective": 8}, "claude": {"effective": 2}}}, obs(doctorFresh=False), sample(),
                        {"devin": 4, "claude": 0}, cfg(intervalS=60), NOW)
