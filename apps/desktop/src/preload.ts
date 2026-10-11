@@ -1,4 +1,11 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webFrame } from 'electron';
+import {
+  PAGE_TABS_CHANGED_CHANNEL,
+  PAGE_TABS_COMMAND_CHANNEL,
+  PAGE_TABS_GET_CHANNEL,
+  type PageTabsCommand,
+  type PageTabsState,
+} from './page-tabs';
 import { createSessionWorkReporter } from './session-work-state';
 
 // Scoped to this document's isolated world; full navigation cannot inherit idle.
@@ -46,6 +53,7 @@ const DESKTOP_UPDATE_INSTALL_CHANNEL = 'desktop-update-install';
 interface MinimalDocument {
   readonly documentElement?: {
     readonly dataset: Record<string, string | undefined>;
+    readonly style?: { setProperty: (name: string, value: string) => void };
   };
   addEventListener?: (
     type: 'DOMContentLoaded',
@@ -61,6 +69,11 @@ function markElectronRuntime(): boolean {
 
   root.dataset.desktopRuntime = 'electron';
   root.dataset.electronPlatform = process.platform;
+  root.dataset.desktopPageTabs = 'true';
+  root.style?.setProperty(
+    '--electron-zoom-factor',
+    String(webFrame?.getZoomFactor() ?? 1)
+  );
   return true;
 }
 
@@ -86,6 +99,11 @@ function onUpdateChannel(channel: UpdateChannel, cb: () => void): () => void {
 }
 
 installElectronRuntimeMarker();
+(
+  globalThis as {
+    addEventListener?: (type: string, listener: () => void) => void;
+  }
+).addEventListener?.('resize', markElectronRuntime);
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
@@ -133,6 +151,38 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /** Navigate forward in the SPA history stack. */
   goForward: () => {
     return ipcRenderer.invoke(GO_FORWARD_CHANNEL);
+  },
+
+  setPageTabsBounds: (bounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    dark: boolean;
+    ov: boolean;
+  }) => ipcRenderer.send('desktop-page-tabs-bounds', bounds),
+  getPageTabsAppearance: (): Promise<{ dark: boolean; ov: boolean } | null> =>
+    ipcRenderer.invoke('desktop-page-tabs-appearance-get'),
+  onPageTabsAppearance: (
+    callback: (appearance: { dark: boolean; ov: boolean }) => void
+  ) => {
+    const listener = (
+      _event: unknown,
+      appearance: { dark: boolean; ov: boolean }
+    ) => callback(appearance);
+    ipcRenderer.on('desktop-page-tabs-appearance', listener);
+    return () =>
+      ipcRenderer.removeListener('desktop-page-tabs-appearance', listener);
+  },
+  getPageTabs: (): Promise<PageTabsState | null> =>
+    ipcRenderer.invoke(PAGE_TABS_GET_CHANNEL),
+  pageTabsCommand: (command: PageTabsCommand): Promise<boolean> =>
+    ipcRenderer.invoke(PAGE_TABS_COMMAND_CHANNEL, command),
+  onPageTabsChanged: (callback: (state: PageTabsState) => void) => {
+    const listener = (_event: unknown, state: PageTabsState) => callback(state);
+    ipcRenderer.on(PAGE_TABS_CHANGED_CHANNEL, listener);
+    return () =>
+      ipcRenderer.removeListener(PAGE_TABS_CHANGED_CHANNEL, listener);
   },
 
   /** Announce readiness only while a client-router listener is installed. */
@@ -223,7 +273,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }>;
   },
   setDesktopPasskeyState: (update: 'enrolled' | 'dismissed' | 'reset') => {
-    return ipcRenderer.invoke(SET_DESKTOP_PASSKEY_STATE_CHANNEL, update) as Promise<{
+    return ipcRenderer.invoke(
+      SET_DESKTOP_PASSKEY_STATE_CHANNEL,
+      update
+    ) as Promise<{
       ok: boolean;
       reason?: string;
     }>;
@@ -291,11 +344,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * as in-app navigation — deep links land on the right screen, unsafe URLs
    * just focus the window.
    */
-  showNotification: (payload: {
-    title: string;
-    body?: string;
-    url?: string;
-  }) =>
+  showNotification: (payload: { title: string; body?: string; url?: string }) =>
     ipcRenderer.invoke(DESKTOP_NOTIFICATION_CHANNEL, payload) as Promise<{
       ok: boolean;
       reason?: string;

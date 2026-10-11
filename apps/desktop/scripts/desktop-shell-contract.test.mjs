@@ -429,7 +429,10 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     mainSource,
     /void contents\.loadURL\(buildDesktopAuthHandoffUrl\(authUrl\)\);/
   );
-  assert.match(mainSource, /loadHostedUrlAfterSplash\(win, hostedEntry\)/);
+  assert.match(
+    mainSource,
+    /loadHostedUrlAfterSplash\(\s*win,\s*tabs\.all\.length === 0 \? hostedEntry : APP_ENTRY_URL,\s*view\.webContents/
+  );
   assert.doesNotMatch(mainSource, /win\.loadURL\('about:blank'\)/);
   assert.doesNotMatch(mainSource, /parent: mainWindow/);
   assert.doesNotMatch(mainSource, /M31 10A20 20 0 0 0 11 30H31V10Z/);

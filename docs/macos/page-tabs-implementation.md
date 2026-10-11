@@ -66,9 +66,15 @@ custom click handlers, so these three menu actions retain their standard labels
 and shortcuts with explicit selected-document routing. Other native menu roles
 remain unchanged. Reference: https://www.electronjs.org/docs/latest/api/menu-item.
 
-This foundation adds lifecycle/bounds coverage to the real desktop test chain.
-The native integration layer must add execution of the actual IPC registration
-bodies and an isolated native Electron fixture before qualification.
+The real desktop test chain includes lifecycle/bounds coverage, execution of
+the actual IPC registration bodies and an isolated native Electron fixture.
 The source-only developer QA opt-in is used only for that synthetic profile;
 packaged remote-debugging protection remains enforced. Native fixture success
 is separate from authenticated staging Mac acceptance.
+
+The preload capability marker gates the new layout; older installed binaries
+retain their existing geometry. Native window close and app quit use the same
+all-document work probe, default to keeping unknown/unsent/active work, and
+preserve service lifetime on cancellation. Commands cannot mutate tabs during
+that confirmation. Confirmed window disposal releases hosted pages and local
+chrome without touching an already-destroyed native content view.

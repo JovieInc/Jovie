@@ -64,8 +64,9 @@
     "test:desktop-main-liveness": "vitest run --config vitest.config.mts scripts/main-liveness.test.ts scripts/desktop-launch-readiness.test.ts",
     "performance": "node scripts/capture-production-baseline.mjs",
     "test:performance": "node --test scripts/capture-production-baseline.test.mjs",
-    "test:page-tabs": "vitest run --config vitest.config.mts scripts/page-tabs.test.ts --coverage --coverage.include=src/page-tabs.ts --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory=coverage/page-tabs --coverage.thresholds.lines=95 --coverage.thresholds.functions=95 --coverage.thresholds.branches=85 --coverage.thresholds.statements=95",
-    "bundle:page-tabs": "node scripts/bundle-page-tabs.mjs"
+    "test:page-tabs": "vitest run --config vitest.config.mts scripts/page-tabs.test.ts scripts/page-tabs-bridge.test.ts --coverage --coverage.include=src/page-tabs.ts --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory=coverage/page-tabs --coverage.thresholds.lines=95 --coverage.thresholds.functions=95 --coverage.thresholds.branches=85 --coverage.thresholds.statements=95 && pnpm run test:page-tabs-native",
+    "bundle:page-tabs": "node scripts/bundle-page-tabs.mjs",
+    "test:page-tabs-native": "pnpm run compile && node --test scripts/page-tabs-native.test.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.8.9"

@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   app,
   BrowserWindow,
@@ -19,6 +20,7 @@ import {
   session,
   shell,
   type WebContents,
+  WebContentsView,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { authHandoffWindowBounds } from './auth-handoff-window';
@@ -134,6 +136,14 @@ import {
   packagedDesktopAppId,
   packagedUsesCompetingStagingShell,
 } from './ovie-door';
+import {
+  PAGE_TABS_CHANGED_CHANNEL,
+  PAGE_TABS_COMMAND_CHANNEL,
+  PAGE_TABS_GET_CHANNEL,
+  parsePageTabsBounds,
+  parsePageTabsCommand,
+  WindowPageTabs,
+} from './page-tabs';
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   classifyDesktopLoadFailure,
@@ -359,24 +369,67 @@ let desktopUpdatePhase: DesktopUpdatePhase = DESKTOP_UPDATE_INITIAL_STATE;
 // (up to date / error) shows a dialog; silent background checks stay silent.
 let pendingManualUpdateCheck = false;
 let mainWindow: BrowserWindow | null = null;
+const windowTabsChrome = new Map<BrowserWindow, WebContentsView>();
+const windowTabsAppearance = new Map<
+  BrowserWindow,
+  { dark: boolean; ov: boolean }
+>();
+const PAGE_TABS_CHROME_URL = pathToFileURL(
+  path.join(__dirname, 'page-tabs', 'index.html')
+).href;
+const PAGE_TABS_BOUNDS_CHANNEL = 'desktop-page-tabs-bounds';
+const PAGE_TABS_APPEARANCE_CHANNEL = 'desktop-page-tabs-appearance';
+const windowPageTabs = new Map<
+  BrowserWindow,
+  WindowPageTabs<WebContentsView>
+>();
+
+let pageExitPending = false;
+let appQuitApproved = false;
+const approvedWindowCloses = new WeakSet<BrowserWindow>();
+
 function getWindowContents(win: BrowserWindow): WebContents {
-  return win.webContents;
+  return windowPageTabs.get(win)?.active?.webContents ?? win.webContents;
 }
 
 function appDocuments(): { win: BrowserWindow; contents: WebContents }[] {
   return BrowserWindow.getAllWindows()
-    .filter(win => !win.isDestroyed() && !win.webContents.isDestroyed())
-    .map(win => ({ win, contents: win.webContents }));
+    .filter(win => !win.isDestroyed())
+    .flatMap(win => {
+      const tabs = windowPageTabs.get(win);
+      return (tabs ? tabs.all.map(view => view.webContents) : [win.webContents])
+        .filter(contents => !contents.isDestroyed())
+        .map(contents => ({ win, contents }));
+    });
 }
 
 function isMainPageContents(contents: WebContents): boolean {
   return Boolean(
     mainWindow &&
       !mainWindow.isDestroyed() &&
-      mainWindow.webContents === contents
+      windowPageTabs
+        .get(mainWindow)
+        ?.all.some(view => view.webContents === contents)
   );
 }
 
+function publishPageTabs(win: BrowserWindow): void {
+  const tabs = windowPageTabs.get(win);
+  if (!tabs || win.isDestroyed()) return;
+  const chrome = windowTabsChrome.get(win);
+  if (chrome && !chrome.webContents.isDestroyed())
+    chrome.webContents.send(PAGE_TABS_CHANGED_CHANNEL, tabs.state());
+  for (const view of tabs.all) {
+    const contents = view.webContents;
+    if (contents.isDestroyed()) continue;
+    if (parseUrl(contents.getURL())?.origin === APP_ORIGIN)
+      contents.send(PAGE_TABS_CHANGED_CHANNEL, tabs.state());
+    contents.send(
+      VISUAL_ACTIVITY_CHANNEL,
+      visualActivityReaders.get(contents.id)?.() ?? false
+    );
+  }
+}
 const desktopNavigation = new DesktopNavigationCoordinator();
 const visualActivityReaders = new Map<number, () => boolean>();
 let publicProfilePreviewWindow: BrowserWindow | null = null;
@@ -1889,6 +1942,48 @@ function allWindowWorkStateSafe(): Promise<boolean> {
   });
 }
 
+/** Keep every live page intact until the owner accepts a destructive exit. */
+async function requestPageExit(
+  win: BrowserWindow,
+  quit: boolean
+): Promise<void> {
+  if (pageExitPending || win.isDestroyed()) return;
+  pageExitPending = true;
+  try {
+    const safe = await allWindowWorkStateSafe();
+    if (win.isDestroyed()) return;
+    const accepted =
+      safe ||
+      (
+        await dialog.showMessageBox(win, {
+          type: 'question',
+          message: quit
+            ? `Quit ${getDesktopAppDisplayName()}?`
+            : 'Close this window?',
+          detail:
+            'Your tabs may contain unsent or active work. Continuing will stop that work.',
+          buttons: quit
+            ? ['Keep Working', 'Quit']
+            : ['Keep Window', 'Close Window'],
+          defaultId: 0,
+          cancelId: 0,
+        })
+      ).response === 1;
+    if (!accepted || win.isDestroyed()) return;
+    if (quit) {
+      appQuitApproved = true;
+      app.quit();
+    } else {
+      approvedWindowCloses.add(win);
+      win.close();
+    }
+  } catch (error) {
+    console.warn('[desktop-page-tabs] Could not complete close request', error);
+  } finally {
+    pageExitPending = false;
+  }
+}
+
 function isReloadableDocument(contents: WebContents): boolean {
   if (contents.isDestroyed()) return false;
   const parsed = parseUrl(contents.getURL());
@@ -2680,7 +2775,6 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     trafficLightPosition:
       process.platform === 'darwin' ? MACOS_TRAFFIC_LIGHT_POSITION : undefined,
     webPreferences: {
-      backgroundThrottling: false,
       contextIsolation: true,
       devTools: ENABLE_DEVTOOLS,
       nodeIntegration: false,
@@ -2764,8 +2858,119 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   if (initialAuthUrl) {
     showDesktopAuthHandoff(initialAuthUrl);
   }
-  installAppPage(win, win.webContents);
-  loadHostedUrlAfterSplash(win, hostedEntry);
+  const tabs = new WindowPageTabs<WebContentsView>({
+    create: () => {
+      const view = new WebContentsView({
+        webPreferences: {
+          backgroundThrottling: false,
+          contextIsolation: true,
+          devTools: ENABLE_DEVTOOLS,
+          nodeIntegration: false,
+          nodeIntegrationInSubFrames: false,
+          nodeIntegrationInWorker: false,
+          preload: path.join(__dirname, 'preload.js'),
+          sandbox: true,
+          webSecurity: true,
+          webviewTag: false,
+        },
+      });
+      view.setBackgroundColor(APP_BACKGROUND_COLOR);
+      installAppPage(win, view.webContents);
+      const update = () =>
+        tabs.update(view, {
+          title:
+            view.webContents
+              .getTitle()
+              .replace(/\s*[|–—]\s*(Jovie|Ovie).*$/i, '')
+              .trim()
+              .slice(0, 160) || 'New Chat',
+          loading: view.webContents.isLoadingMainFrame(),
+        });
+      view.webContents.on('page-title-updated', update);
+      view.webContents.on('did-start-loading', update);
+      view.webContents.on('did-stop-loading', update);
+      view.webContents.on('did-finish-load', () => publishPageTabs(win));
+      loadHostedUrlAfterSplash(
+        win,
+        tabs.all.length === 0 ? hostedEntry : APP_ENTRY_URL,
+        view.webContents
+      );
+      return view;
+    },
+    show: (view, previous) => {
+      if (previous && previous !== view)
+        win.contentView.removeChildView(previous);
+      if (previous !== view) win.contentView.addChildView(view);
+      const [width, height] = win.getContentSize();
+      view.setBounds({ x: 0, y: 0, width, height });
+      const chrome = windowTabsChrome.get(win);
+      if (chrome) {
+        win.contentView.removeChildView(chrome);
+        win.contentView.addChildView(chrome);
+      }
+      view.webContents.focus();
+    },
+    canClose: async view => {
+      const contents = view.webContents;
+      if (await contentsWorkStateSafe(contents)) return true;
+      if (win.isDestroyed() || contents.isDestroyed()) return false;
+      const result = await dialog.showMessageBox(win, {
+        type: 'question',
+        message: 'Close this tab?',
+        detail:
+          'This tab may contain unsent or active work. Closing it will stop that work.',
+        buttons: ['Keep Tab', 'Close Tab'],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      return result.response === 1;
+    },
+    close: view => {
+      if (!win.isDestroyed() && win.contentView.children.includes(view))
+        win.contentView.removeChildView(view);
+      if (!view.webContents.isDestroyed()) view.webContents.close();
+    },
+    publish: () => publishPageTabs(win),
+  });
+  windowPageTabs.set(win, tabs);
+  win.on('close', event => {
+    if (appQuitApproved || approvedWindowCloses.has(win)) return;
+    event.preventDefault();
+    void requestPageExit(win, false);
+  });
+  const chrome = new WebContentsView({
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      webviewTag: false,
+      preload: path.join(__dirname, 'preload.js'),
+      devTools: ENABLE_DEVTOOLS,
+    },
+  });
+  windowTabsChrome.set(win, chrome);
+  // Hidden until the active document reports the canonical column boundary.
+  chrome.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+  chrome.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  chrome.webContents.on('will-navigate', event => event.preventDefault());
+  chrome.webContents.on('will-redirect', event => event.preventDefault());
+  chrome.webContents.on('did-finish-load', () => publishPageTabs(win));
+  void chrome.webContents.loadURL(PAGE_TABS_CHROME_URL);
+  win.on('resize', () => {
+    const [width, height] = win.getContentSize();
+    for (const view of tabs.all) view.setBounds({ x: 0, y: 0, width, height });
+  });
+  win.once('closed', () => {
+    tabs.dispose();
+    if (!chrome.webContents.isDestroyed()) chrome.webContents.close();
+    windowTabsChrome.delete(win);
+    windowTabsAppearance.delete(win);
+    windowPageTabs.delete(win);
+  });
+  // A local backing canvas guarantees a first native paint independently of hosted loads.
+  void win.loadURL(buildDesktopBootSplashUrl());
+  tabs.create();
 
   return win;
 }
@@ -3008,6 +3213,16 @@ function buildUpdateMenuItem(): MenuItemConstructorOptions {
 
 function buildViewMenu(): MenuItemConstructorOptions[] {
   const viewMenu: MenuItemConstructorOptions[] = [];
+  const zoomPage = (change: number | null) => {
+    const focused = BrowserWindow.getFocusedWindow();
+    if (!focused || focused.isDestroyed()) return;
+    // Local tab chrome has its own origin. Menu zoom belongs to the selected
+    // app document even while keyboard focus remains on its tab controls.
+    const contents = getWindowContents(focused);
+    contents.setZoomLevel(
+      change === null ? 0 : contents.getZoomLevel() + change
+    );
+  };
 
   if (ENABLE_DEVTOOLS) {
     viewMenu.push(
@@ -3019,9 +3234,21 @@ function buildViewMenu(): MenuItemConstructorOptions[] {
   }
 
   viewMenu.push(
-    { role: 'resetZoom' },
-    { role: 'zoomIn' },
-    { role: 'zoomOut' },
+    {
+      label: 'Actual Size',
+      accelerator: 'CommandOrControl+0',
+      click: () => zoomPage(null),
+    },
+    {
+      label: 'Zoom In',
+      accelerator: 'CommandOrControl+Plus',
+      click: () => zoomPage(0.5),
+    },
+    {
+      label: 'Zoom Out',
+      accelerator: 'CommandOrControl+-',
+      click: () => zoomPage(-0.5),
+    },
     { type: 'separator' },
     { role: 'togglefullscreen' }
   );
@@ -3074,7 +3301,29 @@ function buildApplicationMenu(): Menu {
               if (url) void openPublicProfileInBrowser(url);
             },
           },
-          { role: 'close', accelerator: 'Command+W' },
+          {
+            label: 'New Tab',
+            accelerator: 'Command+T',
+            click: () => {
+              if (!mainWindow || isAuthHandoffOpen() || pageExitPending) return;
+              void windowPageTabs.get(mainWindow)?.command({ type: 'create' });
+            },
+          },
+          {
+            label: 'Close Tab',
+            accelerator: 'Command+W',
+            click: () => {
+              const focused = BrowserWindow.getFocusedWindow();
+              if (focused && focused !== mainWindow) {
+                focused.close();
+                return;
+              }
+              if (!mainWindow || isAuthHandoffOpen() || pageExitPending) return;
+              const tabs = windowPageTabs.get(mainWindow);
+              if (tabs)
+                void tabs.command({ type: 'close', id: tabs.state().activeId });
+            },
+          },
         ],
       }
     );
@@ -3207,6 +3456,86 @@ autoUpdater.on('error', error => {
   if (nightlyUpdateLaunch) {
     app.quit();
   }
+});
+
+function trustedPageTabRequest(event: IpcMainInvokeEvent): boolean {
+  const frame = event.senderFrame;
+  if (!frame || frame !== event.sender.mainFrame || frame.detached)
+    return false;
+  const chrome = mainWindow && windowTabsChrome.get(mainWindow);
+  const trustedChrome =
+    chrome?.webContents === event.sender && frame.url === PAGE_TABS_CHROME_URL;
+  return (
+    trustedChrome ||
+    (isMainPageContents(event.sender) && isTrustedIpcSender(event))
+  );
+}
+
+ipcMain.on(PAGE_TABS_BOUNDS_CHANNEL, (event, bounds: unknown) => {
+  if (
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    event.sender !== getWindowContents(mainWindow) ||
+    event.senderFrame !== event.sender.mainFrame ||
+    event.senderFrame.detached ||
+    parseUrl(getIpcSenderUrl(event))?.origin !== APP_ORIGIN ||
+    !bounds ||
+    typeof bounds !== 'object'
+  )
+    return;
+  const [width, height] = mainWindow.getContentSize();
+  const parsed = parsePageTabsBounds(bounds, event.sender.getZoomFactor(), [
+    width,
+    height,
+  ]);
+  if (!parsed) return;
+  const chrome = windowTabsChrome.get(mainWindow);
+  if (!chrome || chrome.webContents.isDestroyed()) return;
+  // The green native button extends past the compact rail. Keep chrome clear of all three controls.
+  chrome.setBounds(parsed.bounds);
+  chrome.webContents.setZoomFactor(event.sender.getZoomFactor());
+  windowTabsAppearance.set(mainWindow, parsed.appearance);
+  chrome.webContents.send(PAGE_TABS_APPEARANCE_CHANNEL, parsed.appearance);
+});
+
+ipcMain.handle(
+  'desktop-page-tabs-appearance-get',
+  (event, ...args: unknown[]) => {
+    if (!trustedPageTabRequest(event) || args.length !== 0 || !mainWindow)
+      return null;
+    return windowTabsAppearance.get(mainWindow) ?? null;
+  }
+);
+
+ipcMain.handle(PAGE_TABS_GET_CHANNEL, (event, ...args: unknown[]) => {
+  if (!trustedPageTabRequest(event) || args.length !== 0 || !mainWindow)
+    return null;
+  return windowPageTabs.get(mainWindow)?.state() ?? null;
+});
+
+ipcMain.handle(PAGE_TABS_COMMAND_CHANNEL, async (event, ...args: unknown[]) => {
+  const command = args.length === 1 ? parsePageTabsCommand(args[0]) : null;
+  if (
+    pageExitPending ||
+    !command ||
+    !trustedPageTabRequest(event) ||
+    !mainWindow ||
+    isAuthHandoffOpen()
+  )
+    return false;
+  const chrome = windowTabsChrome.get(mainWindow);
+  const fromChrome = chrome?.webContents === event.sender;
+  const result = await (windowPageTabs.get(mainWindow)?.command(command) ??
+    false);
+  if (
+    fromChrome &&
+    result &&
+    command.type !== 'create' &&
+    chrome &&
+    !chrome.webContents.isDestroyed()
+  )
+    chrome.webContents.focus();
+  return result;
 });
 
 // Native visibility stays truthful when backgroundThrottling disables Page Visibility.
@@ -3360,6 +3689,11 @@ ipcMain.on(APP_BOOTED_CHANNEL, event => {
 });
 
 app.on('before-quit', event => {
+  if (!appQuitApproved && mainWindow && !mainWindow.isDestroyed()) {
+    event.preventDefault();
+    void requestPageExit(mainWindow, true);
+    return;
+  }
   startupMaintenance?.dispose();
   mainLivenessMonitor?.dispose();
   mainLivenessMonitor = null;
