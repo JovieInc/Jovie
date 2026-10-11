@@ -1122,6 +1122,72 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
   });
 });
 
+describe('merged-PR attribution and reason-code observability (JOV-8000 follow-up 43)', () => {
+  it('a merged PR whose body only mentions the issue does NOT supersede it', () => {
+    // JOV-6269 was wrongly excluded as merged-pr-still-open-in-linear because
+    // #21212 / #21222 merely mention it in free body text. Only the
+    // linear-issue-id tag / branch name / title is a real shipped link.
+    const issueUnderTest = issue('JOV-6269');
+    const built = receiptFor([issueUnderTest], {
+      pullRequests: [
+        {
+          number: 21212,
+          state: 'MERGED',
+          mergedAt: NOW,
+          title: 'observability',
+          body: 'the bridge fired and JOV-6269 became agent-ready',
+        },
+      ],
+      capacitySignals: healthySignals({
+        workers: { running: 0, retrying: 0, maxConcurrent: 4 },
+      }),
+    });
+    const row = built.matrix.find(item => item.identifier === 'JOV-6269');
+    // not superseded by a passing mention — still eligible to be selected
+    assert.notEqual(row.reason, 'merged-pr-still-open-in-linear');
+  });
+
+  it('a merged PR carrying the linear-issue-id tag DOES supersede the issue', () => {
+    const issueUnderTest = issue('JOV-6022');
+    const built = receiptFor([issueUnderTest], {
+      pullRequests: [
+        {
+          number: 17244,
+          state: 'MERGED',
+          mergedAt: NOW,
+          title: 'ship it',
+          body: 'linear-issue-id:JOV-6022',
+        },
+      ],
+    });
+    const row = built.matrix.find(item => item.identifier === 'JOV-6022');
+    assert.equal(row.outcome, 'superseded');
+    assert.equal(row.reason, 'merged-pr-still-open-in-linear');
+  });
+
+  it('each receipt row carries the admission reasonCode so near-misses are diagnosable', () => {
+    const built = receiptFor(
+      [
+        issue('JOV-8001', {
+          title: 'Rotate the production credential',
+        }),
+        issue('JOV-8002'),
+      ],
+      {}
+    );
+    const blockedRow = built.matrix.find(
+      item => item.identifier === 'JOV-8001'
+    );
+    // credential-work: reasonCode names the disposition gate that rejected it
+    assert.equal(typeof blockedRow.reasonCode, 'string');
+    assert.ok(blockedRow.reasonCode.length > 0);
+    const selectedRow = built.matrix.find(
+      item => item.identifier === 'JOV-8002'
+    );
+    assert.ok('reasonCode' in selectedRow);
+  });
+});
+
 describe('selection exclusions for shipped and unhandoffable work (JOV-8000 follow-up 42)', () => {
   it('excludes an issue whose work already shipped (a merged PR carries its id) and selects the next candidate', () => {
     const shipped = issue('JOV-6022');

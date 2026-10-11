@@ -141,10 +141,40 @@ queued, and cancelled checks do not imply a terminal source failure.
 ## Retired admission automation
 
 `merge-queue-autoenroll.yml`, its heartbeat dispatch, and its fleet gate are
-retired. Since 2026-09-26, `merge-queue-green-enroll.yml` enqueues CLEAN,
-non-draft, unlabeled-hold PRs on green checks so production holds never stall
-merging; required checks on the merge group remain the only gate. The Queue-Deferred Release workflow and its automatic
-label writer are also retired. Do not re-enable those paths to finish a PR.
+retired. Since 2026-09-26, `merge-queue-green-enroll.yml` enqueues
+required-green, non-draft, unlabeled-hold PRs on green checks so production
+holds never stall merging; required checks on the merge group remain the only
+gate. Required-green means `mergeStateStatus` CLEAN, HAS_HOOKS or UNSTABLE
+(UNSTABLE only adds a pending or red non-required context, such as a lane
+`jovie-execution/*` receipt). An UNKNOWN read right after main moves is
+re-read twice before the wake is dropped. An unchanged head removed from the
+queue stays out unless a typed retry/recovery applies, or the removal was
+`manual` and a blocking label (`hold`, `queue-poison`, ...) was removed after
+it. The enroll and rearm tokens carry `workflows: write` so heads that edit
+`.github/workflows` can be enqueued. The Queue-Deferred Release workflow and
+its automatic label writer are also retired. Do not re-enable those paths to
+finish a PR.
+
+### Hold contract (jovie-hold/v1)
+
+A `hold` label must come with a receipt comment on the PR that names an owner
+and a machine-checkable release:
+
+```
+<!-- jovie-hold/v1 {"owner":"agent:<task>","until":"2026-10-12T18:00:00Z","reason":"..."} -->
+<!-- jovie-hold/v1 {"owner":"gem-lanes","head":"<40-hex sha>","reason":"waiting for a fix push"} -->
+```
+
+`until` is an expiry. `head` releases the hold once the PR head moves off that
+SHA. No receipt lasts more than 7 days from its own creation, and a receipt
+posted more than an hour before the latest `hold` event does not count. The
+`enforce-hold-contract` job in `merge-queue-green-enroll.yml`
+(`scripts/hold-contract.mjs`) runs on every reconcile. It removes holds that
+are ownerless (no valid receipt after 24 h), expired, or released by a head
+change, and leaves one comment each time. Prose conditions such as "until
+qualification" are not release conditions. The unlabel is done with the
+Jovie Bot token, so it wakes enrollment, and required checks still gate the
+merge.
 
 `queue-deferred`, `needs-rebase`, and `needs-conflict-resolution` are historical
 machine annotations, not native admission authority. Actual conflicts, failed
