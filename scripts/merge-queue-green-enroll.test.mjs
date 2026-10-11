@@ -74,6 +74,7 @@ async function fixture(
     afterStatusWrite,
     readCurrentSnapshot,
     effectSink,
+    env = {},
   } = {}
 ) {
   const mutations = [];
@@ -185,6 +186,8 @@ async function fixture(
         GITHUB_WORKSPACE: process.cwd(),
         FAILURE_HOLD_RECEIPT: failureReceipt,
         ADMISSION_RECOVERY_RECEIPT: admissionRecoveryReceipt,
+        MERGE_STATE_RETRY_MS: '0',
+        ...env,
       },
     },
     createRequire(import.meta.url)
@@ -390,6 +393,113 @@ test('preserves live holds, rejected heads, conflicts, drafts, queue membership 
     11: { timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z' }] } },
   };
   assert.deepEqual((await fixture({ roster, overrides })).mutations, []);
+});
+
+test('admits every required-green merge state and refuses blocked or conflicting ones', async () => {
+  // Live 2026-10-11: #21202 and #20203 sat UNSTABLE for a day with all four
+  // required checks green; only lane jovie-execution receipts were pending.
+  const states = [
+    'CLEAN',
+    'HAS_HOOKS',
+    'UNSTABLE',
+    'BLOCKED',
+    'BEHIND',
+    'DIRTY',
+    'DRAFT',
+  ];
+  const roster = states.map((_, i) => candidate(i + 1));
+  const overrides = Object.fromEntries(
+    states.map((mergeStateStatus, i) => [i + 1, { mergeStateStatus }])
+  );
+  const result = await fixture({ roster, overrides, eventName: 'schedule' });
+  assert.deepEqual(
+    result.mutations.map(mutation => mutation.id),
+    ['PR_1', 'PR_2', 'PR_3']
+  );
+});
+
+test('an UNKNOWN merge state after main moves is re-read instead of dropping the wake', async () => {
+  // Live 2026-10-11 18:57Z: every open PR read UNKNOWN right after main moved
+  // and settled within seconds; a single read skipped the PR until the next
+  // (throttled) sweep.
+  const settles = await fixture({
+    readCurrentSnapshot: (number, readCount) => ({
+      ...current(number),
+      mergeStateStatus: readCount < 3 ? 'UNKNOWN' : 'CLEAN',
+    }),
+  });
+  assert.deepEqual(settles.reads, [1, 1, 1]);
+  assert.deepEqual(settles.mutations, [{ id: 'PR_1', oid: sha }]);
+  const never = await fixture({
+    readCurrentSnapshot: number => ({
+      ...current(number),
+      mergeStateStatus: 'UNKNOWN',
+    }),
+  });
+  assert.deepEqual(never.reads, [1, 1, 1]);
+  assert.deepEqual(never.mutations, []);
+  const settled = await fixture({
+    overrides: { 1: { mergeStateStatus: 'BLOCKED' } },
+  });
+  assert.deepEqual(settled.reads, [1]);
+});
+
+test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
+  const removal = reason => ({
+    timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
+  });
+  const release = (name, createdAt = '2026-10-02T13:05:00Z') => ({
+    releases: { nodes: [{ createdAt, label: { name } }] },
+  });
+  const enqueued = async override =>
+    (await fixture({ overrides: { 1: override }, eventName: 'schedule' }))
+      .mutations.length;
+  assert.equal(await enqueued({ ...removal('MANUAL'), ...release('hold') }), 1);
+  assert.equal(
+    await enqueued({ ...removal('manual'), ...release('Queue-Poison') }),
+    1
+  );
+  assert.equal(await enqueued(removal('manual')), 0);
+  assert.equal(
+    await enqueued({ ...removal('manual'), ...release('lane-fix-red') }),
+    0
+  );
+  assert.equal(
+    await enqueued({
+      ...removal('manual'),
+      ...release('hold', '2026-10-02T12:59:00Z'),
+    }),
+    0
+  );
+  assert.equal(
+    await enqueued({ ...removal('FAILED_CHECKS'), ...release('hold') }),
+    0
+  );
+  assert.equal(
+    await enqueued({ ...removal(undefined), ...release('hold') }),
+    0
+  );
+  const sourceFailure = {
+    context: 'jovie-queue-failure-hold/v1',
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    description: 'class=deterministic-source;n=1;run=456;try=1',
+    target_url: 'https://github.com/JovieInc/Jovie/actions/runs/456',
+  };
+  const held = await fixture({
+    statuses: [sourceFailure],
+    overrides: { 1: { ...removal('manual'), ...release('hold') } },
+  });
+  assert.deepEqual(held.mutations, []);
+});
+
+test('queue mutation tokens can act on heads that edit workflow files', () => {
+  for (const job of ['enroll', 'rearm-green-victims']) {
+    const token = workflow.jobs[job].steps.find(
+      step => step.id === 'app-token'
+    );
+    assert.equal(token.with['permission-workflows'], 'write', job);
+  }
 });
 
 test('permits a repaired head committed after rejection, and dry runs never mutate', async () => {
