@@ -36,6 +36,11 @@ DERIVED_DATA_ROOT = Path(os.environ.get("LANES_DERIVED_DATA",
 PRUNE_DIRS = frozenset({".next", "test-results"})
 SKIP_DIRS = PRUNE_DIRS | {".git", "node_modules"}
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
+# Files the harness itself writes into a checkout. They are never source: counting them as
+# uncommitted work preserved clean checkouts, locked their PR branches and burned every
+# repair attempt on "already used by worktree" (2026-10-11, 25 PRs fix-exhausted).
+HARNESS_ARTIFACTS = (PRESERVED_REPAIR, ".codex-last-message.txt")
+SOURCE_PATHSPEC = ("--", ".", *(f":(exclude){name}" for name in HARNESS_ARTIFACTS))
 
 
 def now_iso() -> str:
@@ -80,7 +85,7 @@ def worktree_paths(repo: Path, run) -> list[Path]:
 
 def is_clean(path: Path, run) -> bool:
     """Clean = no tracked modifications and no untracked (non-ignored) files."""
-    result = run(["git", "-C", str(path), "status", "--porcelain"], capture_output=True, text=True, timeout=120)
+    result = run(["git", "-C", str(path), "status", "--porcelain", *SOURCE_PATHSPEC], capture_output=True, text=True, timeout=120)
     return result.returncode == 0 and not result.stdout.strip()
 
 
