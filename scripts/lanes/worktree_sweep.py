@@ -234,23 +234,37 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
 def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,
           now: float | None = None, closed: dict[Path, set[str]] | None = None, idle_s: float = IDLE_S,
           preserved_ttl_s: float = PRESERVED_TTL_S, prefix: str = "backup/mac",
-          date: str | None = None) -> dict:
+          date: str | None = None, state: Path | None = None) -> dict:
     now = time.time() if now is None else now
     date = date or datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
     closed = closed or {}
     report = {"at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
               "removed": [], "backups": [], "stripped": [], "kept": 0, "errors": []}
+    def yield_to_drain():
+        if state is not None and lifecycle.draining(state):
+            report["drained"] = True
+            return True
+        return False
+
+    if yield_to_drain():
+        return report
     live = live_paths(run)
     if live is None:
         report["errors"].append("process-state-unavailable")
         return report
     for repo in repos:
+        if yield_to_drain():
+            return report
         try:
             entries = linked_worktrees(repo, run)
         except (OSError, subprocess.SubprocessError) as error:
             report["errors"].append(f"list:{repo}:{type(error).__name__}")
             continue
         for path, branch in entries:
+            # A retirement is one unit: finish its preservation/removal before
+            # yielding, retaining the inherited lifecycle lease throughout.
+            if yield_to_drain():
+                return report
             if not path.exists() or not in_scope(path, roots, never):
                 continue
             try:
@@ -261,6 +275,8 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
                 # the sweep; it stays in place and is retried next interval.
                 report["kept"] += 1
                 report["errors"].append(f"{path}:{type(error).__name__}"[:200])
+        if yield_to_drain():
+            return report
         try:
             git(repo, run, "worktree", "prune", timeout=120)
         except (OSError, subprocess.SubprocessError):
@@ -315,9 +331,14 @@ def guarded_main(args) -> int:
         except BlockingIOError:
             return 0  # disk_guard or an earlier sweep owns cleanup
         repos = default_repos(home, args.repo)
-        closed = {repo: closed_branches(repo, subprocess.run) for repo in repos}
+        closed = {}
+        for repo in repos:
+            if lifecycle.draining(args.state):
+                break
+            closed[repo] = closed_branches(repo, subprocess.run)
         prefix = "backup/mac" if sys.platform == "darwin" else f"backup/{os.uname().nodename.split('.')[0]}"
-        report = sweep(repos, default_roots(home, args.state), default_never(home), closed=closed, prefix=prefix)
+        report = sweep(repos, default_roots(home, args.state), default_never(home),
+                       closed=closed, prefix=prefix, state=args.state)
     stamp = args.state / "worktree-sweep.json"
     try:
         started = json.loads(stamp.read_text()).get("startedAt")

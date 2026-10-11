@@ -8,6 +8,7 @@ import {
   type ReportKind,
   type ResourceOptions,
   reportIssue,
+  resolveMusic,
 } from './client.js';
 import { invokeFleetAction } from './fleet-client.js';
 import { FLEET_COMMANDS } from './fleet-contract.generated.js';
@@ -80,6 +81,39 @@ function report(kind: ReportKind) {
 }
 
 export const COMMANDS: readonly CommandSpec[] = [
+  {
+    path: ['music', 'resolve'],
+    tool: 'resolve_music',
+    summary:
+      'Resolve music links and artist identities through official catalogs and MusicBrainz. Ambiguous names return choices.',
+    arg: {
+      name: 'input',
+      description:
+        'Artist name/URL/MBID, track URL/ISRC, or album URL/UPC. Use --kind and --artist for track/album title searches.',
+    },
+    flags: [
+      { name: 'kind', description: 'artist (default), track, or album' },
+      {
+        name: 'artist',
+        description: 'Artist name for a track or album title search',
+      },
+      {
+        name: 'territory',
+        description: 'Two-letter country code for catalog lookup',
+      },
+    ],
+    readOnly: true,
+    run: (input, options) =>
+      resolveMusic(
+        required(input),
+        {
+          kind: input.flags?.kind,
+          artist: input.flags?.artist,
+          territory: input.flags?.territory,
+        },
+        options
+      ),
+  },
   ...FLEET_COMMANDS.map(command => ({
     internal: true,
     path: command.path,

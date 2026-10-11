@@ -28,7 +28,14 @@ import type {
   CommonDropdownItem,
   CommonDropdownProps,
 } from './common-dropdown-types';
-import { filterItems, getContentStyle } from './common-dropdown-utils';
+import {
+  filterItems,
+  flattenMenuItems,
+  getContentStyle,
+  MENU_MAX_SUBMENU_DEPTH,
+  menuNeedsSearch,
+  menuSubmenuDepth,
+} from './common-dropdown-utils';
 
 /**
  * CommonDropdown - Unified dropdown component supporting action, context,
@@ -53,7 +60,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
     contentClassName,
     triggerClassName,
     'aria-label': ariaLabel,
-    searchable = false,
+    searchable: requestedSearchable = false,
     searchPlaceholder = 'Search...',
     onSearch,
     onSearchChange,
@@ -67,6 +74,13 @@ export function CommonDropdown(props: CommonDropdownProps) {
     maxHeight,
     children,
   } = props;
+  const deepMenu = menuSubmenuDepth(items) > MENU_MAX_SUBMENU_DEPTH;
+  const menuItems = React.useMemo(
+    () => (deepMenu ? flattenMenuItems(items) : items),
+    [deepMenu, items]
+  );
+  const searchable =
+    requestedSearchable || deepMenu || menuNeedsSearch(menuItems);
 
   const isCompact = size === 'compact';
   const itemBase = isCompact ? MENU_ITEM_COMPACT : MENU_ITEM_BASE;
@@ -84,8 +98,8 @@ export function CommonDropdown(props: CommonDropdownProps) {
   const didMountRef = React.useRef(false);
 
   const filteredItems = React.useMemo(
-    () => filterItems(items, searchQuery, searchMode, filterItem),
-    [filterItem, items, searchMode, searchQuery]
+    () => filterItems(menuItems, searchQuery, searchMode, filterItem),
+    [filterItem, menuItems, searchMode, searchQuery]
   );
 
   const handleSearchChange = React.useCallback(
@@ -232,7 +246,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}
         className={cn(dropdownContentBase, contentClassName)}
-        style={getContentStyle(minWidth, maxHeight)}
+        style={getContentStyle(minWidth, maxHeight, 'dropdown')}
         onEscapeKeyDown={event => {
           if (searchQuery) {
             event.preventDefault();
@@ -281,7 +295,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}
         className={cn(contextContentBase, contentClassName)}
-        style={getContentStyle(minWidth, maxHeight)}
+        style={getContentStyle(minWidth, maxHeight, 'context')}
         onEscapeKeyDown={event => {
           if (searchQuery) {
             event.preventDefault();

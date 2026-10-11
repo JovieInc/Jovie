@@ -619,7 +619,7 @@ describe('deploy workflow Vercel env resolution', () => {
 
     expect(classifierJob).toContain('timeout-minutes: 3');
     expect(classifierJob).toContain(
-      'uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
+      'uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'
     );
     expect(classifierJob).toContain("node-version: '24'");
     // biome-ignore format: exact-diff/fail-closed contract stays compact for the integration-train cap

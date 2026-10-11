@@ -507,6 +507,40 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
+  it.each([
+    {
+      section: 'dashboard' as const,
+      variant: 'jovie' as const,
+      pathname: APP_ROUTES.DASHBOARD,
+    },
+    { section: 'ov' as const, variant: 'ov' as const, pathname: APP_ROUTES.OV },
+  ])(
+    'keeps the canonical $variant logo exposed when restored collapsed',
+    ({ section, variant, pathname }) => {
+      electronRuntimeMock.isElectronRuntime = false;
+      const { container } = renderUnifiedSidebar({
+        section,
+        variant,
+        pathname,
+        isAdmin: true,
+        sidebarDefaultOpen: false,
+      });
+      const logos = container.querySelectorAll(
+        `[data-brand-variant="${variant}"]`
+      );
+      expect(logos).toHaveLength(1);
+      expect(
+        logos[0].parentElement?.closest('[inert], [aria-hidden="true"]')
+      ).toBeNull();
+      expect(
+        screen.getByRole('button', { name: 'Switch Workspace' })
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByRole('button', { name: 'Expand sidebar' })
+      ).toHaveLength(1);
+    }
+  );
+
   it('turns the logo into a workspace selector for admins', () => {
     renderUnifiedSidebar({
       pathname: APP_ROUTES.DASHBOARD,
@@ -591,10 +625,19 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('button', { name: 'Search Sidebar' })
     ).not.toBeInTheDocument();
-    expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Account' })).toContainElement(
+      screen.getByTestId('user-button')
+    );
+    expect(userButtonPropsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ showUserInfo: true, profileHref: undefined })
+    );
     expect(
-      screen.getByRole('button', { name: 'Sign Out' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Sign Out' })
+    ).not.toBeInTheDocument();
+    for (const link of operatorLinks) {
+      expect(link).toHaveAttribute('data-navigation-item-id');
+      expect(link).toHaveClass('grid', 'rounded-lg');
+    }
     expect(
       container.querySelector('[data-sidebar-dock="true"]')
     ).toContainElement(screen.getByTestId('sidebar-whats-new'));

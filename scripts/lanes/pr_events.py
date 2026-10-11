@@ -61,7 +61,9 @@ STALE_DRAFT_S = 48 * 3600
 # A non-lane agent draft this old that is also stalled (idle past STALE_DRAFT_S, or already
 # conflicting/red) needs repair, unless a dependency it names is still open. Age and
 # retry exhaustion never authorize closing unfinished work (JOV-INV-011).
-AGENT_DRAFT_S = 7 * 24 * 3600
+# 3 days (was 7): with the 48h idle / red / conflict guard this is the abandonment floor Tim asked
+# the lanes to reclaim at (2026-10-10); 14 stalled agent drafts sat under the 7-day floor.
+AGENT_DRAFT_S = 3 * 24 * 3600
 # A PR updated this recently is between events (CI starting, enroll pending), not an orphan.
 ORPHAN_GRACE_S = 30 * 60
 EXHAUSTED = "exhausted"
@@ -191,9 +193,11 @@ def disabled_lanes(providers: dict | None = None) -> set[str]:
     return set(providers) - set(cost_order(providers))
 
 
-def in_scope(pr: dict, kind: str, disabled: set[str]) -> bool:
-    """The lanes own lane branches (drafts included) and every other open non-draft PR in the
-    repo; `green` only readies lane drafts; `orphan` is only a disabled lane's draft."""
+def in_scope(pr: dict, kind: str, disabled: set[str], now: float | None = None) -> bool:
+    """The lanes own lane branches (drafts included), every other open non-draft PR in the
+    repo, and abandoned agent drafts (Tim, 2026-10-10: Symphony reclaims abandoned drafts and
+    finishes, greens and promotes them); `green` readies lane drafts and reclaimed drafts;
+    `orphan` is only a disabled lane's draft."""
     if pr.get("isCrossRepository") or str(pr.get("state", "OPEN")).upper() != "OPEN":
         return False
     if {label.lower() for label in label_names(pr)} & HOLD_LABELS:
@@ -201,9 +205,10 @@ def in_scope(pr: dict, kind: str, disabled: set[str]) -> bool:
     lane_branch = LANE_BRANCH.match(pr.get("headRefName") or "")
     if kind == "orphan":
         return bool(lane_branch) and lane_branch.group("lane") in disabled
+    reclaimed = abandoned_agent_draft(pr, time.time() if now is None else now)
     if kind == "green":
-        return bool(lane_branch) and bool(pr.get("isDraft"))
-    return bool(lane_branch) or not pr.get("isDraft")
+        return (bool(lane_branch) and bool(pr.get("isDraft"))) or reclaimed
+    return bool(lane_branch) or not pr.get("isDraft") or reclaimed
 
 
 def agent_owned(pr: dict) -> bool:
@@ -283,7 +288,8 @@ def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int,
                 if kind.startswith(PREFIX) and kind[len(PREFIX):] in FIX_KINDS + TICK_KINDS]
         row = {"pr": number, "draft": bool(pr.get("isDraft")),
                "ageH": round((now - created) / 3600, 1) if created is not None else None,
-               "idleH": round(idle_s / 3600, 1), "head": pr.get("headRefName")}
+               "idleH": round(idle_s / 3600, 1), "head": pr.get("headRefName"),
+               "headSha": pr.get("headRefOid")}
         protected = preservation_reason(pr, attempts.get(str(number), {}), max_attempts,
                                         held=(held or {}).get(str(number)), now=now)
         if protected:
@@ -381,14 +387,14 @@ def queue_ejections(number: int, now: float, sh=run, *, head: str) -> int | None
     if not head:
         return None
     owner, name = REPO.split("/")
-    cursor, seen, count = None, set(), 0
+    cursor, seen, count, past_head = None, set(), 0, False
     for _ in range(100):
         before = f",before:{json.dumps(cursor)}" if cursor is not None else ""
         query = (f'{{repository(owner:"{owner}",name:"{name}"){{pullRequest(number:{number}){{'
                  'headRefOid state timelineItems(last:100' + before +
                  ',itemTypes:[PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){'
                  'pageInfo{hasPreviousPage startCursor} nodes{__typename '
-                 '... on PullRequestCommit{commit{oid}} '
+                 '... on PullRequestCommit{commit{oid parents(first:2){totalCount}}} '
                  '... on HeadRefForcePushedEvent{afterCommit{oid}} '
                  '... on RemovedFromMergeQueueEvent{createdAt reason}}}}}}')
         listed = sh(["gh", "api", "graphql", "-f", f"query={query}"])
@@ -404,8 +410,16 @@ def queue_ejections(number: int, now: float, sh=run, *, head: str) -> int | None
                 return None
             for item in reversed(timeline["nodes"]):
                 kind = item.get("__typename")
-                if kind == "PullRequestCommit" and (item.get("commit") or {}).get("oid") == head:
-                    return count
+                if kind == "PullRequestCommit":
+                    commit = item.get("commit") or {}
+                    # A sync with main (`update-branch`, a two-parent merge) is not a repair: the
+                    # same defect re-enters the queue under a new head. Count through it so the
+                    # second ejection still poisons (2026-10-10: #21118 looped six groups).
+                    if ((commit.get("parents") or {}).get("totalCount") or 1) > 1:
+                        past_head = past_head or commit.get("oid") == head
+                        continue
+                    if commit.get("oid") == head or past_head:
+                        return count
                 if kind == "HeadRefForcePushedEvent" and (item.get("afterCommit") or {}).get("oid") == head:
                     return count
                 if kind == "RemovedFromMergeQueueEvent":
@@ -1499,11 +1513,14 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
                     continue
                 else:
                     counts["staleAgentDrafts"] += 1
+                    if stalled_agent_draft:
+                        # Reclaimed: the lanes finish it like a stale lane draft (Tim, 2026-10-10).
+                        wanted.append("stale")
             else:
                 counts["staleOtherDrafts"] += 1
         scope_kind = {"green": "green"}
         for kind in wanted:
-            if PREFIX + kind not in labels and in_scope(pr, scope_kind.get(kind, "red"), disabled):
+            if PREFIX + kind not in labels and in_scope(pr, scope_kind.get(kind, "red"), disabled, now):
                 plan["label"].append((number, kind))
                 labels.add(PREFIX + kind)
         if pr.get("isDraft") or pr.get("isCrossRepository") or pr.get("isInMergeQueue"):

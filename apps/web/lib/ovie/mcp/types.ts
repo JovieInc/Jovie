@@ -81,6 +81,9 @@ export class OvieMcpInputError extends Error {
       | 'state must be open, closed, or all'
       | 'number must be a positive integer'
       | 'invalid initiative handoff'
+      | 'audience must be investor, customer, manager, founder, or internal'
+      | 'kind must be observed, inference, proposal, or approved-decision'
+      | 'verification requires action and repository together with actor'
   ) {
     super(publicMessage);
     this.name = 'OvieMcpInputError';

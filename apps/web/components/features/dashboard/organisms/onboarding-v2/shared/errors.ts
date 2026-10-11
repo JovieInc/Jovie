@@ -68,6 +68,13 @@ export function mapErrorToUserMessage(
     return { userMessage: ONBOARDING_RECEIPT_PENDING_MESSAGE };
   }
 
+  if (errorCode === 'CLAIM_EXPIRED') {
+    return {
+      userMessage:
+        'This claim link has expired or is no longer valid. Please request a new claim link.',
+    };
+  }
+
   // Invalid session - needs refresh
   if (message.includes('INVALID_SESSION')) {
     return {

@@ -34,12 +34,14 @@ describe('SearchableContent', () => {
 
     const clearButton = screen.getByRole('button', { name: 'Clear search' });
     expect(clearButton).toHaveClass(
+      'absolute',
       'h-4',
       'w-4',
       'before:h-11',
       'before:w-11',
       'before:content-[""]'
     );
+    expect(clearButton).not.toHaveClass('relative');
   });
 
   it('deliberate-red: rejects the old compact-only clear target', () => {

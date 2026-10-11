@@ -8,7 +8,7 @@ export interface ActivityHoverRowProps {
   readonly icon: LucideIcon;
   /** Primary row label (truncates if it overflows). */
   readonly label: string;
-  /** Right-aligned uppercase meta caption (e.g. timestamp, count). */
+  /** Right-aligned meta caption in its authored casing (e.g. timestamp, count). */
   readonly meta: string;
   readonly onClick?: () => void;
   /**
@@ -77,7 +77,7 @@ export function ActivityHoverRow({
           className='h-1.5 w-1.5 rounded-full bg-cyan-300/80 anim-calm-breath'
         />
       )}
-      <span className='text-3xs uppercase tracking-[0.06em] text-quaternary-token group-hover/act:text-tertiary-token transition-colors duration-subtle ease-subtle'>
+      <span className='text-3xs tracking-normal text-quaternary-token group-hover/act:text-tertiary-token transition-colors duration-subtle ease-subtle'>
         {meta}
       </span>
     </button>

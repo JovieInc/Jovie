@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { resolveTableNavAction } from '../utils/tableKeyMap';
 
 export interface TableKeyboardNavConfig<TData> {
@@ -8,6 +8,10 @@ export interface TableKeyboardNavConfig<TData> {
   readonly focusedIndex: number;
   readonly rowCount: number;
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
+  /** Virtualizer handoff for keyboard destinations outside the mounted window. */
+  readonly revealRow?: (index: number) => void;
+  readonly renderedRowWindow?: string;
+  readonly focusScope?: unknown;
   readonly setFocusedIndex: (index: number) => void;
   readonly onRowClick?: (row: TData) => void;
   /** Space; falls back to `onRowClick` when omitted. */
@@ -42,22 +46,74 @@ export function useTableKeyboardNav<TData>({
   rowCount,
   rowRefsMap,
   setFocusedIndex,
+  revealRow,
+  renderedRowWindow,
+  focusScope,
   onRowClick,
   onRowToggle,
   onToggleSelection,
   onExtendSelection,
 }: TableKeyboardNavConfig<TData>): TableKeyboardNavResult<TData> {
+  const pendingFocus = useRef<{
+    index: number;
+    origin: Element | null;
+    scope: unknown;
+  } | null>(null);
   const moveFocus = useCallback(
     (nextIndex: number) => {
+      pendingFocus.current = null;
       setFocusedIndex(nextIndex);
-      rowRefsMap.get(nextIndex)?.focus();
+      const row = rowRefsMap.get(nextIndex);
+      if (row) {
+        row.focus({ preventScroll: true });
+        row.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
+      } else if (revealRow) {
+        pendingFocus.current = {
+          index: nextIndex,
+          origin: document.activeElement,
+          scope: focusScope,
+        };
+        revealRow(nextIndex);
+      }
     },
-    [setFocusedIndex, rowRefsMap]
+    [setFocusedIndex, rowRefsMap, revealRow, focusScope]
   );
+
+  // Complete only an owned keyboard request after the virtual destination mounts.
+  useEffect(() => {
+    const request = pendingFocus.current;
+    if (!request) return;
+    const focusOwned =
+      document.activeElement === request.origin ||
+      (document.activeElement === document.body &&
+        !request.origin?.isConnected);
+    if (
+      !enabled ||
+      request.index !== focusedIndex ||
+      request.index >= rowCount ||
+      request.scope !== focusScope ||
+      !focusOwned
+    ) {
+      pendingFocus.current = null;
+      return;
+    }
+    const row = rowRefsMap.get(request.index);
+    if (row) {
+      pendingFocus.current = null;
+      row.focus({ preventScroll: true });
+    }
+  }, [
+    enabled,
+    focusedIndex,
+    rowCount,
+    rowRefsMap,
+    renderedRowWindow,
+    focusScope,
+  ]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent, rowIndex: number, rowData: TData) => {
-      if (!enabled) return;
+      if (!enabled || rowCount === 0) return;
 
       // Shifted letter selection belongs to these rows. Other consumers of
       // the shared mapper retain their ordinary j/k bindings.
@@ -72,29 +128,20 @@ export function useTableKeyboardNav<TData>({
 
       switch (action) {
         case 'next':
+        case 'prev': {
           event.preventDefault();
-          if (rowIndex < rowCount - 1) {
-            extend?.(rowIndex, rowIndex + 1);
-            moveFocus(rowIndex + 1);
+          const nextIndex = rowIndex + (action === 'next' ? 1 : -1);
+          if (nextIndex >= 0 && nextIndex < rowCount) {
+            extend?.(rowIndex, nextIndex);
+            moveFocus(nextIndex);
           }
           break;
-
-        case 'prev':
-          event.preventDefault();
-          if (rowIndex > 0) {
-            extend?.(rowIndex, rowIndex - 1);
-            moveFocus(rowIndex - 1);
-          }
-          break;
+        }
 
         case 'first':
-          event.preventDefault();
-          moveFocus(0);
-          break;
-
         case 'last':
           event.preventDefault();
-          moveFocus(rowCount - 1);
+          moveFocus(action === 'first' ? 0 : rowCount - 1);
           break;
 
         case 'activate':
@@ -123,20 +170,6 @@ export function useTableKeyboardNav<TData>({
       onExtendSelection,
     ]
   );
-
-  // Scroll focused row into view when it changes
-  useEffect(() => {
-    if (focusedIndex >= 0 && enabled) {
-      const rowElement = rowRefsMap.get(focusedIndex);
-      const prefersReducedMotion = window.matchMedia?.(
-        '(prefers-reduced-motion: reduce)'
-      ).matches;
-      rowElement?.scrollIntoView?.({
-        block: 'nearest',
-        behavior: prefersReducedMotion ? 'auto' : 'smooth',
-      });
-    }
-  }, [focusedIndex, enabled, rowRefsMap]);
 
   return { handleKeyDown };
 }

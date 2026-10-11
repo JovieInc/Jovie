@@ -5,6 +5,7 @@ import {
   type TestInfo,
   test,
 } from '@playwright/test';
+import { inspectShellMaterial } from './utils/shell-material-detector';
 
 const RELEASES_URL = '/app/releases';
 const AUDIENCE_URL = '/app/audience';
@@ -267,6 +268,14 @@ function analyticsToggle(page: Page) {
 // These assertions fail on builds that eagerly open the panel on mount.
 test.describe('audience analytics panel is decoupled from navigation @jov-5836', () => {
   test.use({ viewport: REPRODUCED_VIEWPORT });
+  test.beforeEach(async ({ page }) => {
+    // The default creator fixture can still be in onboarding; use the same
+    // ready creator as the composed shell certification, without real accounts.
+    await page.goto(
+      '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app'
+    );
+    await expect(page.locator('[data-app-shell-frame]')).toBeVisible();
+  });
 
   test('direct load of the audience tab opens no secondary panel', async ({
     page,
@@ -288,6 +297,13 @@ test.describe('audience analytics panel is decoupled from navigation @jov-5836',
       'false'
     );
     expect(new URL(page.url()).searchParams.get('panel')).toBeNull();
+    const material = await inspectShellMaterial(page);
+    await testInfo.attach('audience-closed-material', {
+      body: JSON.stringify(material),
+      contentType: 'application/json',
+    });
+    expect(material.plane).not.toBeNull();
+    expect(material.findings).toEqual([]);
     await testInfo.attach('contacts-audience-direct-load', {
       body: await page.screenshot({ fullPage: false }),
       contentType: 'image/png',
@@ -295,7 +311,7 @@ test.describe('audience analytics panel is decoupled from navigation @jov-5836',
     expectNoConsoleErrors(consoleErrors);
   });
 
-  test('presence -> contacts navigation opens no secondary panel', async ({
+  test('presence -> audience navigation opens no secondary panel', async ({
     page,
   }, testInfo) => {
     test.setTimeout(240_000);
@@ -308,12 +324,12 @@ test.describe('audience analytics panel is decoupled from navigation @jov-5836',
       timeout: 60_000,
     });
 
-    await page.getByRole('link', { name: 'Contacts', exact: true }).click();
+    // Current shell IA exposes Audience as the root; Contacts is contextual.
+    await page.getByRole('link', { name: 'Audience', exact: true }).click();
     await page.waitForURL(/\/app\/(?:dashboard\/)?contacts/, {
       timeout: 60_000,
     });
 
-    await page.getByRole('link', { name: 'Audience', exact: true }).click();
     await waitForAudienceTable(page);
 
     await expect(analyticsSidebar(page)).toBeHidden();
@@ -327,7 +343,7 @@ test.describe('audience analytics panel is decoupled from navigation @jov-5836',
 
   test('explicit toggle opens the panel and keeps header geometry stable', async ({
     page,
-  }) => {
+  }, testInfo) => {
     test.setTimeout(240_000);
 
     const consoleErrors: string[] = [];
@@ -345,6 +361,13 @@ test.describe('audience analytics panel is decoupled from navigation @jov-5836',
     expect(new URL(page.url()).searchParams.get('panel')).toBe('analytics');
 
     expectStableRect(before, await readRect(header), 'Dashboard header');
+    const material = await inspectShellMaterial(page);
+    await testInfo.attach('audience-open-material', {
+      body: JSON.stringify(material),
+      contentType: 'application/json',
+    });
+    expect(material.plane).not.toBeNull();
+    expect(material.findings).toEqual([]);
 
     await analyticsToggle(page).click();
     await expect(analyticsSidebar(page)).toBeHidden({ timeout: 15_000 });

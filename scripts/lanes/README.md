@@ -57,8 +57,10 @@ running worker. Production deploys are a separate track: only a red main stops s
 New-issue admission reports three separate counts: raw Todo candidates, candidates
 passing the issue predicate, and new issues after the owning lane's PR budget.
 Worker and doctor share the same budget decision: each dated lane branch counts
-once while non-green, with a cap of configured base slots × 2. Manual branches and
-disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
+once toward the active cap while non-green and advanceable, with a cap of
+configured base slots × 2. Held, repair-exhausted, and escalating PRs count
+separately toward the terminal cap of configured base slots × 4. Manual branches
+and disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
 malformed or truncation-ambiguous inventory stays unknown and cannot admit new
 issues. Maintenance claims still run first and do not depend on that budget read.
 HUD labels this count as new issues; it is not total company demand or a claim of
@@ -196,9 +198,13 @@ Gaps closed after the first week (no PR may sit unowned):
   a repair attempt or new authority.
 - Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
   drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
-  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
-  drafts receive `repair`, or `hold:dependency` while a named dependency is open.
-  A landed dependency releases repair; it never grants authority to discard the branch.
+  etc.) on a 3-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
+  drafts are reclaimed (Tim, 2026-10-10): the sweep labels them `lane-fix-stale` (plus
+  `conflict`/`red` as applicable), workers finish them with the stale-draft prompt, the
+  gate adopts them like lane drafts, and `ready_green` marks a CLEAN one ready with native
+  merge intent. `hold:dependency` applies while a named dependency is open; a landed
+  dependency releases the draft to the lanes. `hold` and human branches are never reclaimed,
+  and nothing here grants authority to discard the branch.
   JOV-INV-011 requires an explicit `duplicate` label before automatic retirement; age and
   exhaustion never close a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
   carrying `lane-fix-exhausted` or `queue-poison` for more than 48h (measured from the label's
@@ -277,7 +283,13 @@ healthy provider, configured slots, repeated dispatch attempts, and zero workers
 is being lost. `spawn-exit` fires when workers spawn every tick but no run starts or ends
 and no worktree exists; a worker that finishes its claim scan with nothing to do records a
 clean exit in `worker-idle.json`, so the alert only means workers are dying before or during
-the claim — a clean 'nothing claimable' exit is not a deadlock. Every alert also produces a generation-deduped
+the claim — a clean 'nothing claimable' exit is not a deadlock. `workers-without-completions`
+requires both an hour without a terminal run receipt and a current slot lease older than an
+hour; unknown legacy lease ages stay degraded, while newly acquired leases do not inherit an
+old completion age. `admission-repair-needed`
+requires five continuous minutes of known qualified demand blocked by an over-budget or
+terminal PR inventory, so the normal transition into existing-PR recovery does not create
+another issue. Every alert also produces a generation-deduped
 `jovie.control-plane-liveness-condition/v1` receipt in `doctor.json` and the independent
 status feed. The receipt carries its owner, affected resources, first observation, source
 freshness, ten-minute escalation deadline, recovery result, next action, and terminal
@@ -302,14 +314,19 @@ ChatGPT auth without reading credential files or discovering other accounts.
 `CODEX_LANE_CLI` may name an already installed executable when the host's PATH
 entry is broken; it does not install a CLI. API credentials are removed from the
 child environment, execution pins OpenAI plus `forced_login_method="chatgpt"`,
-and `--approve-for-me` retains the workspace sandbox and automatic approval review.
+and the supported `--sandbox workspace-write`, `approval_policy="on-request"`,
+and `approvals_reviewer="auto_review"` options retain the workspace sandbox and
+automatic approval review. The installed CLI need not support the TUI's
+`--approve-for-me` shortcut.
 An auth or rate/usage limit banks this one login and returns exit 75 to the existing
 handoff policy. This mode never rotates profiles, redeems reset credits, or probes
 private quota services. Auth status establishes login, not available plan quota.
 
 Enabling the mode and any nonzero `LANES_SLOTS_CODEX` value is a host configuration
-change, separate from landing source. Review the activation and rollback plan
-before changing the service. Existing issue/PR ownership, file-overlap admission,
+change, separate from landing source. Record the activation and rollback plan
+before changing the service. Routine repair or reactivation of the established
+shipping service uses its standing authority; genuinely new access or spend still
+requires its specific authority. Existing issue/PR ownership, file-overlap admission,
 slot limits, PR backlog budgets, capability floors, and independent security,
 review, queue and production gates still apply. Summer reasoning/notification
 failures are ancillary to `dispatch()`; they do not authorize bypassing an intake
@@ -330,7 +347,7 @@ Effective cost = base x (1 + quota pressure): Claude runs in its 5h window, bank
 
 `claude_lane.py run --model <id>` runs `claude -p` (`bypassPermissions`, JSON output, no session files, hooks on) on the host's claude.ai subscription or a `claude setup-token` in `~/.config/jovie-lanes/claude.env`. Anthropic API credentials are stripped and `health` refuses an API-key login. A usage limit banks the lane until its reset (default 5h); a burst limit backs off 5 minutes; a banked run exits 75 so the harness fails over. Repairs use Sonnet.
 
-Hyperagent runs agent `cmtj3n2q901i407adklzzq01t` (GLM 5.3 Developer, `auto`; the agent id picks the model, Astra Planner is `confirm`). It is remote-only (`repairs: false`): it claims issues through `hyperagent_lane.py` and local lanes maintain its PRs. Each attempt joins a live `list_agents` identity read with the owner's attestation at `~/.config/jovie-lanes/hyperagent-attestation.json` (`agentId`, `model`, `repository`, `currentInstructions`, `allInCap`, `balanceUsd`, `maxCostUsd`, `attestedAt`, `expiresAt`, `attestedBy`), because the API exposes no balance or cap. Without it the lane is unhealthy.
+Hyperagent runs agent `cmtj3n2q901i407adklzzq01t` (GLM 5.3 Developer, `auto`; the agent id picks the model, Astra Planner is `confirm`). It is remote-only (`repairs: false`): it claims issues through `hyperagent_lane.py` and local lanes maintain its PRs. Each attempt joins a live `list_agents` identity read with the owner's attestation at `~/.config/jovie-lanes/hyperagent-attestation.json` (`agentId`, `model`, `repository`, `currentInstructions`, `allInCap`, `balanceUsd`, `maxCostUsd`, `attestedAt`, `expiresAt`, `attestedBy`), because the API exposes no balance or cap. Without it the lane is unhealthy. Only the owner can write the attestation — the API exposes no balance or cap for an agent to read back — so a host that lacks it must scope the lane off with `LANES_SLOTS_HYPERAGENT=0` (no probe, no `provider-down` alert) rather than page on a credential that does not exist.
 
 ## Install on a host
 
@@ -356,6 +373,12 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitS` (seconds queued for a gate seat) on its receipt; the doctor aggregates
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
+
+**Ship now:** the gate timeout defaults to 3,600 seconds on macOS and remains 2,400 seconds
+elsewhere; `LANES_GATE_TIMEOUT_S` still overrides either default. **Re-evaluate when:** the mac
+records five gate timeouts in a 24-hour window after a full day on this release. **Then:** use the
+recorded gate waits and receipts to decide whether to reduce `LANES_GATE_SLOTS` before extending
+the timeout again.
 
 `SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. The
 doctor samples one-hour merge throughput every five minutes: queue depth,

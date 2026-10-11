@@ -64,6 +64,8 @@ def urlopen_router(payloads: dict[str, object]):
                 if isinstance(payload, Exception):
                     raise payload
                 return FakeResponse(url, payload)
+        if url.endswith("/api/health/db"):
+            raise MODULE.urllib.error.URLError("database fixture unavailable")
         raise AssertionError(f"unexpected urlopen target: {url}")
 
     return _open
@@ -145,15 +147,207 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                 return {"workflow_runs": []}
             if endpoint.startswith("actions/artifacts?"):
                 return {"artifacts": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {"workflow_runs": []}
             raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
 
         with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
             observed = MODULE.observe_main("JovieInc/Jovie")
 
+        # JOV-8000 follow-up 27: with no real ancestor attempt either, main
+        # stays unknown (fail closed) — the fallback finds nothing.
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
         self.assertEqual(observed["sourceGate"]["conclusion"], "skipped")
-        self.assertIn("no real attempt", observed["error"])
+        self.assertIn("no completed real attempt", observed["error"])
+
+    def test_observe_main_falls_back_to_recent_real_release_attempt(self):
+        """JOV-8000 follow-up 27: the queue-merge window. A merge-group run
+        lands the tip; its Main Release Ready is skipped by design (the job's
+        if binds to event=push); the direct push CI started minutes ago. The
+        exact tip carries only skipped attempts, so observe_main falls back to
+        the newest REAL attempt within the freshness bound (an ancestor's
+        push-CI gate) — green via the ancestor, named, fail-closed when the
+        bound has no real attempt (the test above)."""
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "skipped",
+                            "started_at": "2026-10-10T02:46:00Z",
+                            "completed_at": "2026-10-10T02:46:01Z",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 424242,
+                            "head_sha": "b" * 40,
+                            "created_at": "2026-10-10T02:11:50Z",
+                        }
+                    ]
+                }
+            if endpoint == "actions/runs/424242/jobs?per_page=100":
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-10-10T02:25:00Z",
+                            "completed_at": "2026-10-10T02:26:00Z",
+                            "html_url": "https://example.test/job/424242",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        now = MODULE.datetime(2026, 10, 10, 2, 50, tzinfo=MODULE.UTC)
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            with mock.patch.object(MODULE, "utc_now", return_value=now):
+                observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["reason"], "required-checks-green-ancestor-fallback")
+        self.assertEqual(
+            observed["sourceGate"]["source"], "ancestor-ci-workflow-job"
+        )
+        self.assertEqual(observed["sourceGate"]["ancestorSha"], "b" * 40)
+        self.assertIn("fell back to the newest real Main Release Ready attempt", observed["error"])
+
+    def test_observe_main_falls_back_when_exact_gate_is_pending_not_skipped(self):
+        """JOV-8000 follow-up 28 — the 38019846033 shape: minutes after a queue
+        merge (and minutes after the follow-up-27 fix itself landed), the tip's
+        direct push CI has STARTED — its Main Release Ready is PENDING, not
+        skipped. The follow-up-27 fallback only fired for the skipped shape and
+        the gate bound main-unknown through the pending window. The unified
+        fallback fires for pending/missing/no-verdict too: a fresh real
+        ancestor SUCCESS grades main green (named, with the ancestor sha)."""
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "in_progress",
+                            "conclusion": None,
+                            "started_at": "2026-10-10T03:14:20Z",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 424244,
+                            "head_sha": "c" * 40,
+                            "created_at": "2026-10-10T02:45:58Z",
+                        }
+                    ]
+                }
+            if endpoint == "actions/runs/424244/jobs?per_page=100":
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-10-10T02:53:00Z",
+                            "completed_at": "2026-10-10T02:54:00Z",
+                            "html_url": "https://example.test/job/424244",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        now = MODULE.datetime(2026, 10, 10, 3, 15, tzinfo=MODULE.UTC)
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            with mock.patch.object(MODULE, "utc_now", return_value=now):
+                observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["reason"], "required-checks-green-ancestor-fallback")
+        self.assertEqual(
+            observed["sourceGate"]["source"], "ancestor-ci-workflow-job"
+        )
+        self.assertEqual(observed["sourceGate"]["ancestorSha"], "c" * 40)
+        self.assertIn("fell back to the newest real Main Release Ready attempt", observed["error"])
+
+    def test_observe_main_ancestor_fallback_fails_closed_when_bound_exceeded(self):
+        """No real attempt within the freshness bound: main stays unknown."""
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "skipped",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 424243,
+                            "head_sha": "b" * 40,
+                            "created_at": "2026-10-10T00:00:00Z",
+                        }
+                    ]
+                }
+            if endpoint == "actions/runs/424243/jobs?per_page=100":
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        # 4h later: the only real attempt is older than the 3h bound.
+        now = MODULE.datetime(2026, 10, 10, 4, 0, tzinfo=MODULE.UTC)
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            with mock.patch.object(MODULE, "utc_now", return_value=now):
+                observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertIn("no completed real attempt", observed["error"])
 
     def test_observe_main_failure_is_still_red(self):
         def github_response(_repo: str, endpoint: str):
@@ -322,6 +516,10 @@ def _main_fixture(
         if endpoint.startswith(f"commits/{sha}/check-runs?"):
             return {"check_runs": check_runs}
         if endpoint.startswith("actions/runs?"):
+            return {"workflow_runs": []}
+        if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+            # JOV-8000 follow-up 28: the ancestor-fallback history query —
+            # empty by default so pending/missing fixtures fail closed.
             return {"workflow_runs": []}
         if endpoint.startswith("actions/artifacts?"):
             return {"artifacts": artifacts or []}
@@ -525,7 +723,7 @@ class ProductionHealthTests(unittest.TestCase):
                 "status": "green",
                 "url": url,
                 "reportedStatus": "healthy",
-                "dependencies": {"vercel-alias": {"status": "green", "detail": "canonical alias resolved without redirect"}, "database": {"status": "unknown", "detail": "deploy health database check"}},
+                "dependencies": {"vercel-alias": {"status": "green", "detail": "canonical alias resolved without redirect"}, "database": {"status": "unknown", "detail": "database health probe: transport or malformed response"}},
                 "deployedSha": "a" * 40,
             },
         )
@@ -632,6 +830,121 @@ class ProductionHealthTests(unittest.TestCase):
         unbound = MODULE.repository_bound_production({"status": "unknown"})
         self.assertEqual(unbound["status"], "unknown")
         self.assertIsNone(unbound["deployedSha"])
+
+
+class DatabaseObservationTests(unittest.TestCase):
+    URL = "https://jov.ie/api/health/deploy"
+    DB_URL = "https://jov.ie/api/health/db"
+
+    def observe(self, probe, *, origin=URL, deploy=None):
+        now = MODULE.utc_now()
+        calls = []
+
+        def open_url(url, timeout=0):
+            calls.append(url)
+            if url == origin:
+                return FakeResponse(url, deploy or {"healthy": True, "timestamp": MODULE.isoformat(now)})
+            if url.endswith("/api/health/db"):
+                if isinstance(probe, Exception):
+                    raise probe
+                if isinstance(probe, FakeResponse):
+                    return probe
+                return FakeResponse(url, probe)
+            if url.endswith("/build-info"):
+                return FakeResponse(url, {"commitSha": "a" * 40})
+            raise AssertionError(url)
+
+        with (
+            mock.patch.object(MODULE, "utc_now", return_value=now),
+            mock.patch.object(MODULE.urllib.request, "urlopen", side_effect=open_url),
+        ):
+            result = MODULE.observe_production(origin)
+        return result, calls
+
+    def test_stripped_deploy_liveness_uses_the_dedicated_database_probe(self):
+        result, calls = self.observe({"healthy": True, "timestamp": MODULE.isoformat(MODULE.utc_now())})
+        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["dependencies"]["database"]["status"], "green")
+        self.assertEqual(calls.count(self.DB_URL), 1)
+        self.assertEqual(result["deployedSha"], "a" * 40)
+
+    def test_database_failure_remains_red_despite_green_deploy_diagnostics(self):
+        payload = {"healthy": False, "timestamp": MODULE.isoformat(MODULE.utc_now())}
+        for probe in (payload, FakeResponse(self.DB_URL, payload, 503),
+                      MODULE.urllib.error.HTTPError(self.DB_URL, 503, "unhealthy", {}, io.BytesIO(json.dumps(payload).encode()))):
+            with self.subTest(probe=type(probe).__name__):
+                result, _ = self.observe(probe, deploy={"healthy": True, "checks": {"database": {"ok": True}}})
+                self.assertEqual(result["dependencies"]["database"]["status"], "red")
+
+    def test_malformed_stale_future_and_untyped_database_evidence_is_unknown(self):
+        now = MODULE.utc_now()
+        for payload in (
+            [], {}, {"healthy": "true", "timestamp": MODULE.isoformat(now)},
+            {"healthy": 1, "timestamp": MODULE.isoformat(now)},
+            {"status": "ok", "checks": {"database": {"ok": True}}},
+            {"healthy": True, "timestamp": "malformed"},
+            {"healthy": True, "timestamp": now.replace(tzinfo=None).isoformat()},
+            {"healthy": True, "timestamp": MODULE.isoformat(now - MODULE.timedelta(minutes=11))},
+            {"healthy": True, "timestamp": MODULE.isoformat(now + MODULE.timedelta(minutes=1))},
+        ):
+            with self.subTest(payload=payload):
+                result, _ = self.observe(payload)
+                self.assertEqual(result["dependencies"]["database"]["status"], "unknown")
+
+    def test_redirect_transport_and_non_success_cannot_report_database_green(self):
+        payload = {"healthy": True, "timestamp": MODULE.isoformat(MODULE.utc_now())}
+        for probe in (
+            FakeResponse("https://other.test/api/health/db", payload),
+            FakeResponse("https://jov.ie/other", payload),
+            FakeResponse(self.DB_URL, payload, 302),
+            FakeResponse(self.DB_URL, payload, 503),
+            FakeResponse(self.DB_URL, payload, 429),
+            MODULE.urllib.error.URLError("down"),
+            MODULE.urllib.error.HTTPError(self.DB_URL, 503, "unhealthy", {}, io.BytesIO(b"not json")),
+        ):
+            with self.subTest(probe=type(probe).__name__):
+                result, _ = self.observe(probe)
+                self.assertNotEqual(result["dependencies"]["database"]["status"], "green")
+
+    def test_probe_is_bound_to_the_configured_origin_without_credentials(self):
+        payload = {"healthy": True, "timestamp": MODULE.isoformat(MODULE.utc_now())}
+        origin = "https://staged.example.test:8443/api/health/deploy"
+        result, calls = self.observe(payload, origin=origin)
+        self.assertEqual(result["dependencies"]["database"]["status"], "green")
+        self.assertIn("https://staged.example.test:8443/api/health/db", calls)
+        self.assertNotIn(self.DB_URL, calls)
+        credential_fixture = MODULE.urllib.parse.urlunsplit((
+            "https", "fixture-user:fixture-password@example.test", "/api/health/deploy", "", ""))
+        for origin in ("http://jov.ie/api/health/deploy", credential_fixture,
+                       "https://jov.ie/api/health/deploy?token=secret", "https://jov.ie/api/health/deploy#fragment"):
+            with self.subTest(origin=origin):
+                result, calls = self.observe(payload, origin=origin)
+                self.assertEqual(result["dependencies"]["database"]["status"], "unknown")
+                self.assertFalse(any(url.endswith("/api/health/db") for url in calls))
+
+    def test_scoped_admission_retains_independent_screenshot_and_freshness_holds(self):
+        from scoped_admission import build_scoped_admission
+        now = MODULE.utc_now()
+        request = {"consumer": "deployment", "surface": "production-web", "repository": "JovieInc/Jovie",
+                   "revision": "a" * 40, "mutation": "promote-staged-web-release", "riskLane": "high"}
+        for db_healthy, screenshot_failed, expected in ((None, True, {"database", "check:Generate Screenshots"}),
+                                                      (True, True, {"check:Generate Screenshots"}),
+                                                      (None, False, {"database"}), (True, False, set())):
+            production, _ = self.observe({"healthy": db_healthy, "timestamp": MODULE.isoformat(now)})
+            receipt = {"observedAt": MODULE.isoformat(now), "signals": {
+                "production": production, "main": {"status": "green", "checks": [
+                    {"name": "Generate Screenshots", "classification": "optional", "verdict": "failed" if screenshot_failed else "success"}]},
+                "integrity": {"status": "clear"}, "controller": {"status": "failed"},
+                "concurrencyEvidence": {"accepted": False},
+                "closureHealth": {"repository": "JovieInc/Jovie", "newIssueIntakeAllowed": False}}}
+            admission = build_scoped_admission(receipt, request, now)
+            self.assertEqual({row["signal"] for row in admission["relevantBlockers"]}, expected)
+            self.assertEqual(admission["allowed"], not expected)
+            # Appending healthy evidence cannot erase the original unknown.
+            extra = {**request, "healthSignals": [{"signal": "database", "status": "green", "proof": "untrusted"}]}
+            self.assertEqual(build_scoped_admission(receipt, extra, now)["allowed"], not expected)
+            stale = {**receipt, "observedAt": MODULE.isoformat(now - MODULE.timedelta(minutes=11))}
+            self.assertFalse(build_scoped_admission(stale, request, now)["allowed"])
 
 
 MAIN_SHA = "a3eeefdd4dc681d1c9b5b4385720d661f5129137"
@@ -3100,7 +3413,95 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(cached["status"], "green")
         self.assertEqual(cached["source"], "last-known")
         self.assertIn("controller-observation-failed-used-last-known", cached["error"])
-        self.assertEqual(stale["status"], "failed")
+        # JOV-8000 follow-up 24: the stale-TTL connection refusal against the
+        # retired :4041 endpoint reads parked (the permanent retired-endpoint
+        # class) instead of failed.
+        self.assertEqual(stale["status"], "parked")
+        self.assertTrue(stale["retired"])
+
+    def test_retired_controller_endpoint_observes_parked(self):
+        """JOV-8000 follow-up 24: the default symphony URL is the RETIRED
+        Elixir endpoint (:4041, decommissioned per #20931). Connection
+        refused against it is the permanent retired-endpoint class: the
+        observation names it parked with the retired flag instead of a
+        crash-shaped failed, and a NON-retired URL keeps failed."""
+        now = MODULE.datetime(2026, 10, 9, 22, 40, tzinfo=MODULE.UTC)
+        with mock.patch.object(
+            MODULE.urllib.request,
+            "urlopen",
+            side_effect=ConnectionRefusedError("Connection refused"),
+        ):
+            retired = MODULE.observe_controller(
+                "http://127.0.0.1:4041/api/v1/state",
+                now=now,
+            )
+        self.assertEqual(retired["status"], "parked")
+        self.assertTrue(retired["retired"])
+        self.assertIn("controller-endpoint-retired", retired["error"])
+        with mock.patch.object(
+            MODULE.urllib.request,
+            "urlopen",
+            side_effect=ConnectionRefusedError("Connection refused"),
+        ):
+            other = MODULE.observe_controller(
+                "http://127.0.0.1:9999/api/v1/state",
+                now=now,
+            )
+        self.assertEqual(other["status"], "failed")
+        self.assertNotIn("retired", other)
+
+    def test_parked_controller_with_bound_production_feeds_hold_intake(self):
+        """The parked (retired-endpoint) controller keeps the
+        controller-failure family reason so the hold-intake bounded set
+        still engages — promotion of already-green PRs continues."""
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {
+            "status": "parked",
+            "retired": True,
+            "error": "controller-endpoint-retired: Connection refused",
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"controller-failure"},
+        )
+
+    def test_parked_controller_with_red_production_stays_blocked(self):
+        # production red adds production-not-green, outside the allowed pair.
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "red"}
+        signals["controller"] = {
+            "status": "parked",
+            "retired": True,
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
+    def test_parked_controller_does_not_hold_runtime_intake(self):
+        """A CRASHED controller (failed) holds runtime intake even in
+        hold-intake; a parked (retired) controller does not — the
+        hold-intake comment's own promise: already-green PRs keep
+        promoting while the controller is parked."""
+        base = dict(GREEN_SIGNALS)
+        base["production"] = {"status": "green", "deployedSha": "b" * 40}
+
+        crashed = dict(base)
+        crashed["controller"] = {"status": "failed"}
+        crashed_receipt = self.evaluate(crashed)
+        self.assertEqual(crashed_receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            crashed_receipt["workAdmission"]["activities"], ["tests", "review"]
+        )
+
+        parked = dict(base)
+        parked["controller"] = {"status": "parked", "retired": True}
+        parked_receipt = self.evaluate(parked)
+        self.assertEqual(parked_receipt["promotionMode"], "hold-intake")
+        self.assertNotEqual(
+            parked_receipt["workAdmission"]["activities"], ["tests", "review"]
+        )
 
     def test_last_known_green_controller_keeps_hold_intake(self):
         now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
@@ -4385,7 +4786,9 @@ class WorkflowContractTests(unittest.TestCase):
             content,
         )
         self.assertIn("jovie-fixed", content)
-        self.assertIn("cancel-in-progress: true", content)
+        self.assertIn("cancel-in-progress: false", content)
+        self.assertIn("group: fleet-gate-receipt", content)
+        self.assertIn("--sweep", content)
         self.assertIn("fleet-gate-receipt", content)
         self.assertIn("0 <= age < 120", content)
         self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST", content)
