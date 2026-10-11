@@ -1059,7 +1059,7 @@ class ProviderAndLockTest(unittest.TestCase):
         self.assertIn("xhigh", providers["codex"]["cmd"])
         # Tim 2026-10-03 (JOV-7706): Claude Code and Hyperagent join Devin and Codex as regular lanes.
         enabled = {name for name, spec in providers.items() if spec.get("enabled", True)}
-        self.assertEqual(enabled, {"devin", "codex", "claude", "hyperagent"})
+        self.assertEqual(enabled, {"devin", "codex", "claude", "hyperagent", "grok"})
         # Claude rides the subscription wrapper with a routed model; never a bare `claude` with API env.
         claude = providers["claude"]
         self.assertIn("{here}/claude_lane.py", claude["cmd"])
