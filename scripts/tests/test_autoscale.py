@@ -645,7 +645,7 @@ class AutoscaleTest(unittest.TestCase):
                 self.assertEqual(lane.dispatch(host), 0)
             tick = json.loads((host.state / "tick.json").read_text())
             self.assertIn("boom", tick["autoscaleError"])
-            self.assertEqual(tick["spawned"], ["devin", "devin", "devin", "devin", "codex", "codex", "codex", "claude", "claude", "hyperagent", "hyperagent"])
+            self.assertEqual(tick["spawned"], ["devin", "devin", "devin", "devin", "codex", "codex", "codex", "claude", "claude", "hyperagent", "hyperagent", "grok"])
             self.assertEqual(spawned, tick["spawned"])
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
             root = Path(tmp)

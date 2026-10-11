@@ -242,7 +242,7 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertIs(hyperagent["repairs"], False)
         self.assertEqual(hyperagent["agentId"], "cmtj3n2q901i407adklzzq01t")
         self.assertEqual(hyperagent["agentName"], "GLM 5.3 Developer")
-        self.assertFalse(catalog["grok"]["enabled"])
+        self.assertTrue(catalog["grok"].get("enabled", True))  # Tim 2026-10-11: grok lane on
         self.assertFalse(catalog["kimi"]["enabled"])
         for skip in ([], ["devin"], ["devin", "codex"], ["devin", "codex", "claude"]):
             chosen = remediation.route_lane(catalog, exclude=set(skip), healthy=lambda name, spec: True)
