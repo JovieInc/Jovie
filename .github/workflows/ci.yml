@@ -1137,7 +1137,9 @@ jobs:
           ref: main
           fetch-depth: 1
           persist-credentials: false
-          sparse-checkout: scripts/lib/merge-group-admission.mjs
+          sparse-checkout: |
+            scripts/lib/merge-group-admission.mjs
+            scripts/lib/github-rate-limit.mjs
           sparse-checkout-cone-mode: false
       - name: Require live queue membership and external admission checks
         id: admission
