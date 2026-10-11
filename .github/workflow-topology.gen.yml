@@ -1461,6 +1461,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:audit
     jobCount: 1
+  - name: Unstack Merged Parent
+    path: .github/workflows/unstack-merged-parent.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_dispatch
+    terminalReceipt: job:unstack
+    jobCount: 1
   - name: Vercel Preview Cleanup
     path: .github/workflows/vercel-preview-cleanup.yml
     active: true
