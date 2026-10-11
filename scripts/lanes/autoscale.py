@@ -12,6 +12,8 @@ MERGE_QUEUE_WAIT_BRAKE_MIN = 30
 RAMP_INTERVAL_S = 300  # surge ramp: proven demand > 2x seats doubles toward demand every 5 min
 # A census is stamped with its source rows' age (up to 3 x 60 s cache TTLs), read on the next minute tick.
 MAINTENANCE_DEMAND_STALE_S = 240
+# A saturated lane keeps its last positive census this long (one lane agent timeout, 5400 s).
+BUSY_DEMAND_STALE_S = 5400
 _OFF, _OBSERVE, _APPLY = frozenset({"0", "off", "false"}), frozenset({"observe", "shadow"}), frozenset({"1", "on", "true", "apply"})
 _AVG10, _PSI = re.compile(r"avg10=([0-9.]+)"), ("cpuSomeAvg10", "memoryFullAvg10", "ioFullAvg10")
 _HARD_REASONS = ("over-budget", "terminal-pr-backlog", "provider-disabled", "pr-inventory-unavailable")
@@ -190,7 +192,11 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
     disk, attribution = _obj(_obj(tick).get("disk")), _obj(observed.get("codexAttribution")); maintenance = observed.get("maintenanceQueueByProvider")
     # Workers publish from their existing claim scan; collecting adds no API reads.
     census = _obj(_read_json(root / "maintenance-demand.json", max_bytes=65536))
+    recent = {}
     if census.get("schema") == "symphony-lanes-maintenance-demand/v1":
+        recent = {name: pending for name, row in _obj(census.get("lanes")).items()
+                  if (pending := _count(_obj(row).get("pending"))) and (at := _num(_obj(row).get("observedAt"))) is not None
+                  and 0 <= now - at <= BUSY_DEMAND_STALE_S}
         maintenance = {name: _count(_obj(row).get("pending")) for name, row in _obj(census.get("lanes")).items()
                        if (at := _num(_obj(row).get("observedAt"))) is not None and 0 <= now - at <= MAINTENANCE_DEMAND_STALE_S}
     merge = _obj(observed.get("mergeThroughput")); merge_at = _num(merge.get("observedAt"))
@@ -198,6 +204,7 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
             "eligiblePoolByProvider": _obj(observed.get("eligiblePoolByProvider")),
             "newIssueBudgetByProvider": _obj(observed.get("newIssueBudgetByProvider")),
             "maintenanceQueueByProvider": maintenance if isinstance(maintenance, dict) else {},
+            "recentPositiveDemandByProvider": recent,
             "runningByProvider": running,
             "unhealthy": [item for item in (_obj(observed.get("tick")).get("unhealthy") or []) if isinstance(item, str)],
             "cooling": cooling, "cooldownAt": cooldown_at,
@@ -397,6 +404,14 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             rows[name]["target"] = current; continue
         recovery = current < base and (prev.get("recoveryPending") is True or prev.get("lastReason") in _LINEAR_COLLAPSE_REASONS)
         up, idle, demand = _int(prev.get("upStreak")) or 0, _int(prev.get("idleStreak")) or 0, _demand(name, obs, now)
+        if demand is None and running is not None and running >= current:
+            # Only a worker's claim scan publishes demand. A lane whose every seat is in a long
+            # run never rescans, so its fresh demand reads unknown exactly when it should grow
+            # (Gem 21:11Z: devin 1 seat busy, census 6 at 21:06:57). A recent positive census
+            # stands as the lower bound while the lane stays saturated.
+            demand = _count(_obj(obs.get("recentPositiveDemandByProvider")).get(name)) or None
+        lane_obs = obs if demand is None or _count(_obj(obs.get("maintenanceQueueByProvider")).get(name)) is not None else \
+            {**obs, "maintenanceQueueByProvider": {**_obj(obs.get("maintenanceQueueByProvider")), name: demand}}
         multi, additive = _multi_reason(name, obs, sample, now), _additive_reason(obs, sample)
         effective, reason, blockers, want, step_to = current, "hold:steady", [], False, current + 1; lane_ready = changed is None or now - changed >= interval
         host_ready = host_last is None or now - host_last >= HOST_COOLDOWN_S
@@ -422,7 +437,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             elif idle_signal:
                 up, reason, blockers = 0, "hold:zero-demand", ["zero-demand"]
             else:
-                blockers = _increase_blockers(name, obs, sample, now, running, demand)
+                blockers = _increase_blockers(name, lane_obs, sample, now, running, demand)
                 maintenance = _count(_obj(obs.get("maintenanceQueueByProvider")).get(name))
                 memory = _num(sample.get("memAvailableBytes"))
                 # Correct only a proven legacy Linear collapse. Every genuine

@@ -604,6 +604,32 @@ class AutoscaleTest(unittest.TestCase):
                      sample(psi={"cpuSomeAvg10": 50.0, "memoryFullAvg10": 0.0, "ioFullAvg10": 0.0}), {"devin": 2}, cfg(), now)
         self.assertEqual((self.lane(hot, "devin")["effective"], self.lane(hot, "devin")["lastReason"]),
                          (path[-1] // 2, "host-pressure"), "pressure still halves")
+    def test_saturated_lane_ramps_on_recent_positive_demand(self):
+        # Gem 21:11Z: devin's one seat was in a 30+ min run, so no devin claim scan refreshed
+        # the census (6 pending at 21:06:57) and autoscale held it at 1 on unknown-demand.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "doctor.json").write_text(json.dumps({"observed": {"now": NOW, "githubRemaining": 4000,
+                "eligiblePoolByProvider": {"devin": 0}, "newIssueBudgetByProvider": {"devin": {"reason": "over-budget"}},
+                "capacityByProvider": {"devin": {"running": 1}}}}))
+            def census(age, pending=6):
+                (root / "maintenance-demand.json").write_text(json.dumps({"schema": "symphony-lanes-maintenance-demand/v1",
+                    "lanes": {"devin": {"observedAt": NOW - age, "pending": pending}}}))
+                return {**obs(), **{key: value for key, value in A.collect(root, {}, NOW).items()
+                                    if key in ("maintenanceQueueByProvider", "recentPositiveDemandByProvider",
+                                               "newIssueBudgetByProvider", "eligiblePoolByProvider", "runningByProvider")}}
+            previous = {"mode": "apply", "lanes": {"devin": {"base": 2, "effective": 1, "target": 1, "lastChangeAt": NOW - 3600}},
+                        "host": {"lastChangeAt": NOW - 3600}}
+            seen = census(254)
+            self.assertIsNone(A._demand("devin", seen, NOW), "past the fresh window on its own")
+            grown = decide(previous, seen, sample(), {"devin": 2}, cfg(intervalS=60), NOW)
+            self.assertEqual((self.lane(grown, "devin")["effective"], self.lane(grown, "devin")["lastReason"]), (2, "sustained-demand"))
+            idle = decide(previous, {**seen, "runningByProvider": {"devin": 0}}, sample(), {"devin": 2}, cfg(intervalS=60), NOW)
+            self.assertEqual((self.lane(idle, "devin")["effective"], self.lane(idle, "devin")["lastReason"]), (1, "hold:not-saturated"),
+                             "an idle seat rescans; it does not borrow old demand")
+            for age, pending in ((A.BUSY_DEMAND_STALE_S + 1, 6), (254, 0)):
+                stale = decide(previous, census(age, pending), sample(), {"devin": 2}, cfg(intervalS=60), NOW)
+                self.assertEqual(self.lane(stale, "devin")["effective"], 1, (age, pending))
     def test_unhealthy_lane_takes_no_host_share(self):
         both = {"devin": 4, "hyperagent": 4}
         seen = obs(unhealthy=["hyperagent"], runningByProvider={"devin": 4, "hyperagent": 0},
