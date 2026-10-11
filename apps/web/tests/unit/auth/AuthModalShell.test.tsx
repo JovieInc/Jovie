@@ -47,6 +47,9 @@ describe('AuthModalShell', () => {
     HTMLDialogElement.prototype.showModal = vi.fn(function showModalMock(
       this: HTMLDialogElement
     ) {
+      // Native showModal opens the dialog before focusing its contents.
+      // A closed dialog correctly rejects focus in jsdom 30.1.2.
+      this.open = true;
       this.querySelector<HTMLElement>('button')?.focus();
     });
     HTMLDialogElement.prototype.close = vi.fn();
@@ -296,6 +299,7 @@ describe('AuthModalShell', () => {
 
     const dialog = container.querySelector('[data-auth-modal-shell]');
     expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('open');
     expect(document.body.style.overflow).toBe('hidden');
     expect(document.documentElement.style.overscrollBehavior).toBe('contain');
 
