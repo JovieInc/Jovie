@@ -1665,14 +1665,14 @@ class ClaimScanCacheTest(unittest.TestCase):
                 reason_lane.queued_jobs(client, "reasoning-job")
                 self.assertEqual(lane.cached_issue_state(client, "JOV-9"), "In Progress")
                 lane.cached_issue_state(client, "JOV-9")
-                self.assertTrue(hud.linear_model(Path("/x"))["ok"])
+                hud.linear_model(Path("/x"))  # the HUD reads the local mirror, never Linear
                 hud.linear_model(Path("/x"))
-                self.assertEqual(calls, {"hud": 1, "reason": 1, "state": 1})
+                self.assertEqual(calls, {"hud": 0, "reason": 1, "state": 1})
                 self.clock["now"] += lane.CLAIM_SCAN_TTL_S + 1
                 reason_lane.queued_jobs(client, "reasoning-job")
                 lane.cached_issue_state(client, "JOV-9")
                 hud.linear_model(Path("/x"))
-                self.assertEqual(calls, {"hud": 2, "reason": 2, "state": 2})
+                self.assertEqual(calls, {"hud": 0, "reason": 2, "state": 2})
         finally:
             hud.lane.Linear, hud.lane.SHARED_CACHE_DIR, reason_cache.SHARED_CACHE_DIR = saved
 
