@@ -1,0 +1,10 @@
+No code change or PR was needed. LYB-126 recovered automatically.
+
+- [Failing run](https://github.com/JovieInc/LogYourBody/actions/runs/37729651851): one async HealthKit test timed out.
+- [Recovery run](https://github.com/JovieInc/LogYourBody/actions/runs/37730950664): full CI passed, including iOS and launch-quality gates.
+- The failing test file’s blob SHA was identical across both runs, confirming a transient failure.
+- Linear LYB-126 automatically moved to Done.
+- Jovie worktree remains clean; no commit, push, or draft PR created.
+- GBrain was unavailable as documented.
+
+NOT-SHIPPABLE: already fixed by a successful LogYourBody main CI run; no change exists in the authorized Jovie repository.
