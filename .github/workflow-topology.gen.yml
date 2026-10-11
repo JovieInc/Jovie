@@ -693,7 +693,6 @@ nodes:
     triggeringStateTransition:
       - issues
       - pull_request_target
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:sweep
     jobCount: 2

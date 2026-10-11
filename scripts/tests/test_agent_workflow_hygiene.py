@@ -530,7 +530,8 @@ def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
     assert "pull_request_target:" in trigger
     assert "issues:" in trigger
     assert "types: [labeled]" in trigger
-    assert "schedule:" in trigger
+    # Event-driven only (JOV-INV-042): the labeled event deletes the label.
+    assert "schedule:" not in trigger
     assert "workflow_dispatch:" in trigger
     assert "actions/checkout" not in scrub
     assert 'gh api --method DELETE "repos/$GH_REPO/labels/$LABEL"' in scrub
