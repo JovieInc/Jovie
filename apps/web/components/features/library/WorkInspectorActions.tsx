@@ -189,7 +189,7 @@ export function WorkInspectorActions({
 
   return (
     <div className='space-y-2' data-testid={`work-actions-${asset.id}`}>
-      <div className='flex flex-wrap items-center gap-1.5'>
+      <div className='flex flex-wrap items-center gap-x-1.5 gap-y-2'>
         {action.kind === 'share_page' ? (
           <Button
             type='button'
@@ -236,29 +236,31 @@ export function WorkInspectorActions({
           </Button>
         ) : null}
 
-        {action.kind === 'share_page' && pageUrl ? (
-          <a
-            href={pageUrl}
-            target='_blank'
-            rel='noopener noreferrer'
-            className={QUIET_LINK_CLASS}
-            data-testid='work-action-preview-page'
-          >
-            <ExternalLink className='h-3.5 w-3.5' strokeWidth={2.25} />
-            Preview page
-          </a>
-        ) : null}
+        <div className='flex max-w-full shrink-0 flex-wrap items-center gap-1.5'>
+          {action.kind === 'share_page' && pageUrl ? (
+            <a
+              href={pageUrl}
+              target='_blank'
+              rel='noopener noreferrer'
+              className={QUIET_LINK_CLASS}
+              data-testid='work-action-preview-page'
+            >
+              <ExternalLink className='h-3.5 w-3.5' strokeWidth={2.25} />
+              Preview page
+            </a>
+          ) : null}
 
-        <button
-          type='button'
-          onClick={handleAskJovie}
-          className={QUIET_LINK_CLASS}
-          disabled={disabled}
-          data-testid='work-action-ask-jovie'
-        >
-          <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
-          Ask Jovie
-        </button>
+          <button
+            type='button'
+            onClick={handleAskJovie}
+            className={QUIET_LINK_CLASS}
+            disabled={disabled}
+            data-testid='work-action-ask-jovie'
+          >
+            <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
+            Ask Jovie
+          </button>
+        </div>
       </div>
 
       {action.blockedReason ? (

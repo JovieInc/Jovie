@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import type { WorkLaunchSummary } from '@/lib/library/work-actions';
@@ -91,6 +92,28 @@ describe('WorkInspectorActions', () => {
       'http://localhost:3000/tim/take-me-over'
     );
     expect(screen.queryByTestId('work-action-review-publish')).toBeNull();
+  });
+
+  it('keeps primary and utility actions in keyboard order without activating them on focus', async () => {
+    const user = userEvent.setup();
+    const onSharePrivately = vi.fn();
+    renderActions({ onSharePrivately });
+
+    await user.tab();
+    expect(screen.getByTestId('work-action-share-page')).toHaveFocus();
+    await user.tab();
+    expect(screen.getByTestId('work-action-preview-page')).toHaveFocus();
+    await user.tab();
+    expect(screen.getByTestId('work-action-ask-jovie')).toHaveFocus();
+    expect(openChatWithPromptMock).not.toHaveBeenCalled();
+    expect(onSharePrivately).not.toHaveBeenCalled();
+
+    await user.tab({ shift: true });
+    expect(screen.getByTestId('work-action-preview-page')).toHaveFocus();
+    await user.tab();
+    await user.keyboard('{Enter}');
+    expect(openChatWithPromptMock).toHaveBeenCalledOnce();
+    expect(openChatWithPromptMock.mock.calls[0]?.[0]).toContain('release-1');
   });
 
   it('offers Review & publish for a prepared unpublished work', () => {
