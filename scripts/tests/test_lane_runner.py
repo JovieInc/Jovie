@@ -183,7 +183,7 @@ class SelectionTest(unittest.TestCase):
         ]:
             with self.subTest(kwargs=kwargs, failures=failures):
                 self.assertIs(lane.pick_issue([target, other], failures, now=now, **kwargs), other)
-        for label in ("no-symphony", "type:epic", "auth"):
+        for label in ("hold", "auth"):
             target.labels = ["agent-ready", "dispatch-next", label]
             self.assertIs(lane.pick_issue([target, other], {}, now=now, provider="devin"), other)
         target.labels = ["agent-ready", "dispatch-next", "devin"]
@@ -199,7 +199,7 @@ class SelectionTest(unittest.TestCase):
         red = issue("JOV-RED")
         red.title = "Rotate production credentials"
         failures = {"JOV-EXHAUSTED": 3, "JOV-BACKOFF": {"count": 1, "at": 9990}}
-        cases = [(issue(labels=["Type:Epic"]), "excluded-label:type:epic"),
+        cases = [(issue(labels=["Hold"]), "excluded-label:hold"),
                  (red, "sensitive-text"), (issue(labels=["AUTH"]), "sensitive-provider"),
                  (issue("JOV-EXHAUSTED"), "retry-exhausted"),
                  (issue("JOV-BACKOFF"), "retry-backoff"),
@@ -213,8 +213,8 @@ class SelectionTest(unittest.TestCase):
                                  task if expected is None else None)
         self.assertIsNone(lane.admission_rejection(issue(labels=["AUTH"]), {}, 10000, provider="codex"))
         # Exactly one reason per candidate, preserving the existing gate precedence.
-        self.assertEqual(lane.admission_rejection(issue(labels=["Type:Epic", "auth"]), {}, 10000,
-                         provider="devin"), "excluded-label:type:epic")
+        self.assertEqual(lane.admission_rejection(issue(labels=["Hold", "auth"]), {}, 10000,
+                         provider="devin"), "excluded-label:hold")
 
     def test_orders_like_symphony_priority_then_age_with_none_last(self):
         now = datetime(2026, 9, 4, tzinfo=timezone.utc).timestamp()
@@ -252,35 +252,33 @@ class SelectionTest(unittest.TestCase):
 
     def test_skips_excluded_and_exhausted_work_but_drains_the_shared_pool(self):
         picked = lane.pick_issue([
-            issue("JOV-1", labels=["no-symphony"]),
+            issue("JOV-1", labels=["hold"]),
             issue("JOV-2", labels=["Area:Auth"]),
             issue("JOV-3", labels=[lane.SHARED_LABEL]),
             issue("JOV-4", priority=1),
         ], {"JOV-4": 3})
         self.assertEqual(picked.identifier, "JOV-3")
 
-    def test_remediation_label_is_not_skipped_for_no_symphony(self):
-        self.assertIsNone(lane.pick_issue([issue("JOV-7540", labels=["no-symphony"])], {}))
-        picked = lane.pick_issue([
-            issue("JOV-7540", labels=["no-symphony", "remediation:router"]),
-            issue("JOV-7551", labels=["no-symphony", "remediation:billing-health"]),
-        ], {})
-        self.assertEqual(picked.identifier, "JOV-7540")
-        self.assertIsNone(lane.admission_rejection(
-            issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000))
-        self.assertEqual(lane.admission_rejection(
-            issue("JOV-1", labels=["no-symphony", "remediation:router", "type:epic"]), {}, 10000),
-            "excluded-label:type:epic")
-        self.assertEqual(lane.admission_rejection(
-            issue("JOV-1", labels=["no-symphony", "remediation"]), {}, 10000),
-            "excluded-label:no-symphony")
-        os.environ["LANES_ESCALATION"] = "0"
-        try:
-            self.assertEqual(lane.admission_rejection(
-                issue("JOV-7540", labels=["no-symphony", "remediation:router"]), {}, 10000),
-                "excluded-label:no-symphony")
-        finally:
-            os.environ.pop("LANES_ESCALATION", None)
+    def test_only_a_hold_excludes_and_other_legacy_labels_route(self):
+        # Tim 2026-10-11: no-symphony, codex-blocked, reasoning-job and type:epic all have a way to land.
+        for labels in (["no-symphony"], ["no-symphony", "remediation"], ["reasoning-job"]):
+            with self.subTest(labels=labels):
+                self.assertIsNone(lane.admission_rejection(issue(labels=labels), {}, 10000, provider="devin"))
+        summer = issue(labels=["reasoning-job"])
+        summer.description = 'Summer asks.\n```json\n{"schema": "summer.reasoning-job/v1"}\n```'
+        self.assertEqual(lane.admission_rejection(summer, {}, 10000, provider="claude"), "reason-lane-job")
+        blocked = issue(labels=["codex-blocked"])
+        self.assertEqual(lane.admission_rejection(blocked, {}, 10000, provider="codex"), "codex-blocked")
+        self.assertIsNone(lane.admission_rejection(blocked, {}, 10000, provider="claude"))
+        epic = issue(labels=["Type:Epic"])
+        self.assertIsNone(lane.admission_rejection(epic, {}, 10000, provider="claude"))
+        self.assertEqual(lane.admission_rejection(epic, {}, 10000, provider="hyperagent"),
+                         "epic-local-lanes-only")
+        providers = {"codex": {}, "claude": {}, "hyperagent": {}}
+        self.assertEqual(lane.lane_restriction(blocked, providers), {"claude", "hyperagent"})
+        self.assertEqual(lane.lane_restriction(epic, providers), {"codex", "claude"})
+        self.assertEqual(lane.lane_restriction(issue(labels=["auth", "codex-blocked"]), providers), set())
+        self.assertIsNone(lane.lane_restriction(issue(), providers))
 
     def test_issues_with_an_open_lane_pr_anywhere_are_skipped(self):
         picked = lane.pick_issue([issue("JOV-1", priority=1), issue("JOV-2", priority=2)], {},
@@ -1392,7 +1390,9 @@ class LinearUnionSnapshotTest(unittest.TestCase):
         self.rows = [self.node(1, ["codex", "no-symphony", "auth"])]
         [found] = self.client.lane_issues("codex")
         self.assertIn("no-symphony", found.labels)
-        self.assertIsNone(lane.pick_issue([found], {}, provider="codex"))
+        # no-symphony no longer excludes; the sensitive auth label keeps it on codex.
+        self.assertIs(lane.pick_issue([found], {}, provider="codex"), found)
+        self.assertIsNone(lane.pick_issue([found], {}, provider="claude"))
 
     def test_expired_continuation_stops_before_another_request(self):
         started, calls = self.clock[0], []
@@ -1886,7 +1886,8 @@ class ClaimScanCacheTest(unittest.TestCase):
                 if "labels:{name:{eq:$l}}" in query:
                     calls["reason"] += 1
                     return {"issues": {"nodes": [{"id": "i", "identifier": "JOV-1", "title": "t",
-                                                  "description": "", "createdAt": "1"}]}}
+                                                  "description": '```json\n{"schema": "summer.reasoning-job/v1"}\n```',
+                                                  "createdAt": "1"}]}}
                 calls["hud"] += 1
                 return {"pool": {"nodes": []}, "triage": {"nodes": []}}
 
@@ -2703,6 +2704,16 @@ class WorkerTest(unittest.TestCase):
         lane.worker(self.host, "devin")
         self.assertEqual(self.linear.moves, [("id-JOV-3", "In Progress")])
         self.assertIn("passed the lane gate", self.linear.comments[-1][1])
+        self.assertEqual(self.execs[0][-3:], ["worker", "--provider", "devin"])
+
+    def test_an_epic_runs_as_a_decomposition_unit_and_keeps_its_settled_state(self):
+        self.linear.issues = [issue("JOV-3", labels=["type:epic"])]
+        lane.run_issue = lambda *a: self.fail("an epic is not an implementation run")
+        with patch.object(lane.epics, "run_epic", return_value={"verdict": "decomposed"}) as run_epic:
+            lane.worker(self.host, "devin")
+        self.assertEqual(run_epic.call_args.args[5].identifier, "JOV-3")
+        self.assertEqual(self.linear.moves, [("id-JOV-3", "In Progress")])
+        self.assertFalse(lane.failures_path(self.host).exists())
         self.assertEqual(self.execs[0][-3:], ["worker", "--provider", "devin"])
 
     def test_rearming_publishes_outside_claim_lock_then_refreshes_admission(self):
@@ -8571,7 +8582,11 @@ class RepositoryBindingTest(unittest.TestCase):
         held = self.lyb("LYB-2", labels=("symphony", "hold"))
         self.assertEqual(refusal(lane, self.binding, held, {}, now, frozenset()), "LYB:excluded-label:hold")
         epic = self.lyb("LYB-6", labels=("type:epic",))
-        self.assertEqual(refusal(lane, self.binding, epic, {}, now, frozenset()), "LYB:excluded-label:type:epic")
+        self.assertIsNone(refusal(lane, self.binding, epic, {}, now, frozenset(), "claude"))
+        self.assertEqual(refusal(lane, self.binding, epic, {}, now, frozenset(), "hyperagent"),
+                         "LYB:epic-local-lanes-only")
+        blocked = self.lyb("LYB-9", labels=("codex-blocked",))
+        self.assertEqual(refusal(lane, self.binding, blocked, {}, now, frozenset(), "codex"), "LYB:codex-blocked")
         auth = self.lyb("LYB-8", labels=("auth",))
         self.assertEqual(refusal(lane, self.binding, auth, {}, now, frozenset(), "devin"), "LYB:sensitive-provider")
         self.assertIsNone(refusal(lane, self.binding, auth, {}, now, frozenset(), lane.SENSITIVE_PROVIDER))
@@ -8636,6 +8651,19 @@ class RepositoryBindingTest(unittest.TestCase):
         self.assertEqual(query, lane.bindings.TODO_ALL_QUERY)
         self.assertNotIn("labels:{name", query)
         self.assertEqual(variables, {"team": "LYB"})
+
+    def test_lyb_epic_is_decomposed_in_its_own_repo_and_settles_its_own_state(self):
+        epic = self.lyb("LYB-60", labels=("type:epic",))
+        settled = {"verdict": "decomposed", "children": ["LYB-61"]}
+        with patch.object(lane.epics, "run_epic", return_value=settled) as run_epic:
+            verdict, linear, run, _ = self.claim([epic], [])
+        self.assertEqual(verdict, "decomposed")
+        run.assert_not_called()
+        self.assertEqual(run_epic.call_args.args[-1], self.binding.repo)
+        self.assertEqual(linear.moves, [("id-LYB-60", "In Progress")])  # no finish_issue move
+        with patch.object(lane.epics, "run_epic", return_value={"verdict": "failed", "reasons": ["x"]}):
+            verdict, linear, _, _ = self.claim([epic], [])
+        self.assertEqual(linear.moves[-1], ("id-LYB-60", "Todo"))
 
     def test_lyb_intake_budget_is_its_own_and_counts_open_lane_prs(self):
         prs = [{"number": n, "headRefName": f"codex/lyb-{n}-20261011t000000", "headRefOid": "a" * 40,

@@ -930,7 +930,7 @@ class RunnablePoolTest(unittest.TestCase):
         lane = load("lane_runner")
         def issue(key, labels=(), description=""):
             return lane.Issue(key, key, "Task", description, 1, "2026-09-01T00:00:00Z", list(labels))
-        candidates = [issue("JOV-GOOD"), issue("JOV-EPIC", ["type:epic"]),
+        candidates = [issue("JOV-GOOD"), issue("JOV-EPIC", ["hold"]),
                       issue("JOV-SENSITIVE", ["auth"]), issue("JOV-PRICE", description="Change live pricing"),
                       issue("JOV-OWNED"), issue("JOV-EXHAUSTED"), issue("JOV-BACKOFF")]
         providers = {"devin": {"label": "devin", "slots": 4},
@@ -961,7 +961,7 @@ class RunnablePoolTest(unittest.TestCase):
                     "devin": ["JOV-GOOD"], "codex": ["JOV-GOOD", "JOV-SENSITIVE"], "claude": []})
                 self.assertEqual(observed["poolByProvider"], {"devin": 1, "codex": 2, "claude": 0})
                 self.assertEqual(observed["candidatePoolByProvider"], {"devin": 7, "codex": 7, "claude": 0})
-                reasons = {"excluded-label:type:epic": 1, "sensitive-text": 1,
+                reasons = {"excluded-label:hold": 1, "sensitive-text": 1,
                            "in-flight-pr": 1, "retry-exhausted": 1, "retry-backoff": 1}
                 self.assertEqual(observed["rejectedByProvider"], {
                     "devin": {**reasons, "sensitive-provider": 1}, "codex": reasons, "claude": {}})
@@ -969,7 +969,7 @@ class RunnablePoolTest(unittest.TestCase):
                 # {issueId: reason} so route-held / over-budget is visible
                 # without host access; every rejected candidate is named.
                 rejected_issues = observed["rejectedIssues"]
-                self.assertEqual(rejected_issues.get("JOV-EPIC"), "excluded-label:type:epic")
+                self.assertEqual(rejected_issues.get("JOV-EPIC"), "excluded-label:hold")
                 self.assertEqual(rejected_issues.get("JOV-PRICE"), "sensitive-text")
                 self.assertEqual(rejected_issues.get("JOV-OWNED"), "in-flight-pr")
                 self.assertEqual(rejected_issues.get("JOV-EXHAUSTED"), "retry-exhausted")
@@ -981,13 +981,13 @@ class RunnablePoolTest(unittest.TestCase):
                 self.assertEqual(feed["admission"]["poolByProvider"], observed["poolByProvider"])
                 self.assertEqual(tracker.lane_issues.call_args_list, [mock.call("devin"), mock.call("codex")])
                 # Reproduce the reported eight nominal candidates, none runnable.
-                tracker.lane_issues.return_value = [issue(f"JOV-EPIC-{n}", ["type:epic"]) for n in range(5)] + [
+                tracker.lane_issues.return_value = [issue(f"JOV-EPIC-{n}", ["hold"]) for n in range(5)] + [
                     issue(f"JOV-PRICE-{n}", description="Change live pricing") for n in range(3)]
                 blocked = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
                 self.assertEqual(blocked["candidatePool"], 8)
                 self.assertEqual(blocked["pool"], 0)
                 self.assertEqual(blocked["rejectedByProvider"]["devin"], {
-                    "excluded-label:type:epic": 5, "sensitive-text": 3})
+                    "excluded-label:hold": 5, "sensitive-text": 3})
                 tracker.lane_issues.return_value = candidates
                 with mock.patch.dict(os.environ, {"LANES_SLOTS_CODEX": "0"}):
                     tracker.lane_issues.reset_mock()

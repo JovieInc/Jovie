@@ -59,6 +59,7 @@ import yc_corpus  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
+import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
@@ -72,7 +73,16 @@ SENSITIVE_LABELS = frozenset({
     "billing", "blocked:payments", "stripe", "cost-monitoring", "blocked:auth", "auth",
     "area:auth", "infra", "area:infra", "infrastructure", "vercel",
 })
-HARD_EXCLUDED_LABELS = frozenset({"hold", "no-symphony", "type:epic", "codex-blocked", "reasoning-job"})
+# Tim 2026-10-11: no label parks an issue forever. `hold` is the one stop signal, and the
+# reconcile pass (epics.reconcile) expires it after 72h without activity. `codex-blocked`
+# only steers routing away from codex; `reasoning-job` belongs to the reason lane only when
+# Summer's job block is present; `type:epic` is a decomposition unit (epics.py);
+# `no-symphony` no longer excludes (the claiming agent decides what the issue needs).
+HARD_EXCLUDED_LABELS = frozenset({"hold"})
+CODEX_BLOCKED_LABEL = "codex-blocked"
+REASONING_JOB_LABEL = "reasoning-job"
+# A remote lane cannot hand the harness a local decomposition plan.
+EPIC_REMOTE_LANES = frozenset({"hyperagent"})
 SENSITIVE_PROVIDER = "codex"
 # JOV-6896: codex lanes are implementation-only. Review work bills the leased ChatGPT
 # accounts without producing code, so a codex slot never claims a review-only task kind
@@ -105,7 +115,8 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
-              "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py"]
+              "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
+              "scripts/tests/test_epics.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
@@ -542,6 +553,34 @@ def issue_hits_red_line(issue: Issue) -> bool:
     return False
 
 
+def label_rejection(issue: Issue, provider: str | None = None) -> str | None:
+    """Label policy shared by the Jovie pool and every binding (bindings.refusal)."""
+    labels = {label.lower() for label in issue.labels}
+    excluded = sorted(HARD_EXCLUDED_LABELS & labels)
+    if excluded:
+        return "excluded-label:" + excluded[0]
+    if REASONING_JOB_LABEL in labels and reason_lane.has_job_block(issue.description):
+        return "reason-lane-job"
+    if CODEX_BLOCKED_LABEL in labels and provider == "codex":
+        return "codex-blocked"
+    if epics.is_epic(issue) and provider in EPIC_REMOTE_LANES:
+        return "epic-local-lanes-only"
+    return None
+
+
+def lane_restriction(issue: Issue, providers: dict) -> set[str] | None:
+    """The lanes the router may choose for this issue; None means any."""
+    allowed = set(providers)
+    if issue_is_sensitive(issue):
+        allowed &= {SENSITIVE_PROVIDER}
+    labels = {label.lower() for label in issue.labels}
+    if CODEX_BLOCKED_LABEL in labels:
+        allowed.discard("codex")
+    if epics.is_epic(issue):
+        allowed -= EPIC_REMOTE_LANES
+    return None if allowed == set(providers) else allowed
+
+
 def admission_rejection(issue: Issue, failures: dict, now: float,
                         in_flight: frozenset[str] = frozenset(),
                         provider: str | None = None, route=None) -> str | None:
@@ -550,14 +589,9 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     `route(issue)` is the cost-aware router (JOV-7706): an issue whose cheapest qualifying
     available route belongs to another lane is that lane's; none qualifying holds it."""
     labels = {label.lower() for label in issue.labels}
-    excluded = sorted(HARD_EXCLUDED_LABELS & labels)
-    # `remediation:*` outranks `no-symphony` (JOV-7540, JOV-7551). Other hard
-    # exclusions still apply. The bare `remediation` label does not.
-    if ("no-symphony" in excluded and remediation.escalation_enabled()
-            and remediation.has_remediation_event_label(issue.labels)):
-        excluded = [name for name in excluded if name != "no-symphony"]
-    if excluded:
-        return "excluded-label:" + excluded[0]
+    rejected = label_rejection(issue, provider)
+    if rejected:
+        return rejected
     if issue_hits_red_line(issue):
         return "sensitive-text"
     if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
@@ -818,7 +852,7 @@ def issue_router(host: "Host", name: str, providers: dict | None = None, policy:
             decisions[issue.identifier] = remediation.route_issue(
                 {"identifier": issue.identifier, "title": issue.title, "description": issue.description,
                  "labels": issue.labels}, providers, policy, availability,
-                only_lanes={SENSITIVE_PROVIDER} if issue_is_sensitive(issue) else None)
+                only_lanes=lane_restriction(issue, providers))
         return decisions[issue.identifier]
 
     route.decisions = decisions
@@ -6045,11 +6079,15 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         spec = {**spec, "model": route_decision["chosen"]["model"], "route": route_decision}
     notify_issue_claim(linear, issue, name, spec)
     try:
-        receipt = run_issue(host, name, spec, linear, issue)
+        receipt = (epics.run_epic(THIS, host, name, spec, linear, issue, host.repo) if epics.is_epic(issue)
+                   else run_issue(host, name, spec, linear, issue))
     finally:
         file_overlap.release_task(host.state, issue.identifier)
     verdict = receipt.get("verdict")
     note_event_outcome(host, issue, verdict)
+    if verdict in epics.SETTLED_VERDICTS:
+        slot.release()
+        return reexec(host, name)
     if verdict == "disk-held":
         linear.move(issue.id, "Todo")
         slot.release()
@@ -6221,6 +6259,12 @@ def dispatch(host: Host) -> int:
         tick["reason"] = reason_lane.tick(host, THIS, lambda: Linear(host.linear_env))
     except Exception as error:  # Summer's reasoning jobs never take dispatch down
         tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        if not os.environ.get("LANES_SELFTEST"):  # a release self-test never writes to Linear
+            teams = ["JOV", *(binding.key for binding in bindings.extra_bindings(THIS))]
+            tick["issueReconcile"] = epics.reconcile(THIS, host, lambda: Linear(host.linear_env), teams)
+    except Exception as error:  # epic closure and hold expiry never take dispatch down
+        tick["issueReconcileError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         corpus_owner = os.environ.get("YC_CORPUS_OWNER", "gem").split(".")[0]
         tick["ycCorpus"] = (yc_corpus.tick(host.state) if HOST == corpus_owner else
