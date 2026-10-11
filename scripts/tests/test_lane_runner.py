@@ -3499,6 +3499,11 @@ class DispatchTest(unittest.TestCase):
         clock = patch.object(lane.continuity_clock, "tick", return_value={"status": "current"})
         clock.start()
         self.addCleanup(clock.stop)
+        # yc_corpus.tick captures real Popen as its default argument. Replacing
+        # lane.subprocess.Popen does not isolate Gem's ancillary refresh path.
+        corpus = patch.object(lane.yc_corpus, "tick", return_value={"status": "current"})
+        self.corpus_tick = corpus.start()
+        self.addCleanup(corpus.stop)
 
     def test_coding_dispatch_continues_when_coordinator_reasoning_and_alerts_are_unavailable(self):
         # Summer/Gateway failure affects optional reasoning and observability, not
@@ -3515,6 +3520,8 @@ class DispatchTest(unittest.TestCase):
                 patch.object(lane.pr_events, "tick", return_value={}), \
                 patch.object(lane.reason_lane, "tick", side_effect=RuntimeError("credits unavailable")), \
                 patch.object(lane.doctor, "run", side_effect=RuntimeError("coordinator offline")), \
+                patch.object(lane, "HOST", "gem"), \
+                patch.dict(os.environ, {"YC_CORPUS_OWNER": "gem"}), \
                 patch.object(lane.subprocess, "Popen") as spawn:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             lane._save_event_delivery(host, {
@@ -3525,6 +3532,9 @@ class DispatchTest(unittest.TestCase):
             self.assertEqual(lane.dispatch(host), 0)
             self.assertEqual(spawn.call_count, 1)
             self.assertEqual(spawn.call_args.args[0][-1], "codex")
+            self.corpus_tick.assert_called_once_with(host.state)
+            self.assertFalse((host.state / "yc-corpus.json").exists(),
+                             "dispatch fixture must not schedule a real corpus refresh")
             tick = json.loads((host.state / "tick.json").read_text())
             self.assertEqual(tick["spawned"], ["codex"])
             self.assertIsNone(tick["error"])
@@ -5302,9 +5312,10 @@ class ManagedMeshArchiveTest(unittest.TestCase):
         self.assertEqual(proof["schema"], "jovie.mesh-managed-runtime/v1")
         self.assertTrue(proof["isolatedImportPassed"])
         self.assertFalse(proof["recipientAdmission"])
-        self.assertEqual(set(proof["outputs"]), {"receiver.mjs", "terminal.mjs"})
+        self.assertEqual(set(proof["outputs"]), {"receiver.mjs", "terminal.mjs", "wire.mjs"})
         self.assertEqual(proof["lockfileSha256"], hashlib.sha256((ROOT / "pnpm-lock.yaml").read_bytes()).hexdigest())
         expected = {"scripts/lanes/mesh-host-ack.mjs", "scripts/lanes/mesh-native-terminal.mjs",
+                    "scripts/lanes/mesh-current-wire.mjs",
                     "packages/agent-transport-contracts/work-order.ts",
                     "scripts/backlog-orchestrator/summer-triage-assessment-client.mjs"}
         self.assertEqual(set(proof["sourceFiles"]), expected)
