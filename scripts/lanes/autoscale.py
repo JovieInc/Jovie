@@ -9,6 +9,7 @@ LINEAR_INCREASE_RATIO, LINEAR_DECREASE_RATIO = 0.25, 0.10; LOAD_INCREASE_MAX, LO
 PSI_CPU_OK, PSI_MEM_OK, PSI_IO_OK, PSI_CPU_SEVERE, PSI_MEM_SEVERE, PSI_IO_SEVERE = 20, 2, 10, 40, 5, 20
 GATE_WAIT_INCREASE_MAX, GATE_WAIT_DECREASE, PRODUCTIVE_MIN, PRODUCTIVE_MIN_STARTS = 600, 1200, 0.5, 5; DISK_INCREASE_MIN, DISK_SOFT, DISK_HARD = 15, 10, 5
 MERGE_QUEUE_WAIT_BRAKE_MIN = 30
+RAMP_INTERVAL_S = 300  # surge ramp: proven demand > 2x seats doubles toward demand every 5 min
 # A census is stamped with its source rows' age (up to 3 x 60 s cache TTLs), read on the next minute tick.
 MAINTENANCE_DEMAND_STALE_S = 240
 _OFF, _OBSERVE, _APPLY = frozenset({"0", "off", "false"}), frozenset({"observe", "shadow"}), frozenset({"1", "on", "true", "apply"})
@@ -350,8 +351,10 @@ def _row(base, effective, running, changed, reason, blockers, ceiling, up=0, idl
     return {"base": base, "effective": effective, "floor": (MIN_SLOTS if base > 0 else 0) if floor is None else floor,
             "ceiling": ceiling, "running": running, "upStreak": up, "idleStreak": idle,
             "lastChangeAt": changed, "lastReason": reason, "blockers": blockers}
-def _limit_host(rows: dict, cap: int) -> None:
-    """Proportional bounded allocation; a real host ceiling may require zero seats."""
+def _limit_host(all_rows: dict, cap: int, exclude: set | frozenset = frozenset()) -> None:
+    """Proportional bounded allocation; a real host ceiling may require zero seats.
+    Excluded (unhealthy) lanes spawn no workers and take no host share."""
+    rows = {name: row for name, row in all_rows.items() if name not in exclude}
     total = sum(row["effective"] for row in rows.values())
     if total <= cap:
         return
@@ -395,7 +398,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
         recovery = current < base and (prev.get("recoveryPending") is True or prev.get("lastReason") in _LINEAR_COLLAPSE_REASONS)
         up, idle, demand = _int(prev.get("upStreak")) or 0, _int(prev.get("idleStreak")) or 0, _demand(name, obs, now)
         multi, additive = _multi_reason(name, obs, sample, now), _additive_reason(obs, sample)
-        effective, reason, blockers, want = current, "hold:steady", [], False; lane_ready = changed is None or now - changed >= interval
+        effective, reason, blockers, want, step_to = current, "hold:steady", [], False, current + 1; lane_ready = changed is None or now - changed >= interval
         host_ready = host_last is None or now - host_last >= HOST_COOLDOWN_S
         if multi:
             effective, reason, blockers, up, idle = max(0 if current == 0 else MIN_SLOTS, math.ceil(current / 2)), multi, [multi], 0, 0
@@ -437,13 +440,20 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
                 elif blockers:
                     up, reason = 0, "hold:" + blockers[0]
                 else:
-                    up = min(need, up + 1)
-                    hold = ("lane-cooldown" if not lane_ready else "host-cooldown" if not host_ready
-                            else "lane-ceiling" if current + 1 > ceiling else "up-streak" if up < need else None)
+                    # Tim 2026-10-11: capped by compute and credits only. Proven demand more than
+                    # twice the current seats ramps multiplicatively on a short interval instead
+                    # of one seat per 30 min (1 -> 16 took ~7.5 h with ~300 eligible issues).
+                    surge = demand is not None and demand > 2 * max(1, current)
+                    ramp_need = min(need, streak_ticks(RAMP_INTERVAL_S)) if surge else need
+                    ramp_ready = lane_ready or (surge and (changed is None or now - changed >= min(interval, RAMP_INTERVAL_S)))
+                    up = min(ramp_need, up + 1)
+                    hold = ("lane-cooldown" if not ramp_ready else "host-cooldown" if not host_ready
+                            else "lane-ceiling" if current + 1 > ceiling else "up-streak" if up < ramp_need else None)
                     if hold:
                         reason, blockers = "hold:" + hold, [hold]
                     else:
                         want, reason, blockers = True, "hold:one-lane", ["one-lane"]
+                        step_to = min(ceiling, demand, 2 * max(1, current)) if surge else current + 1
         target = effective
         if effective > ceiling:
             effective, reason, blockers = ceiling, "hold:lane-ceiling", ["lane-ceiling"]
@@ -451,14 +461,19 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
         rows[name]["target"] = target
         rows[name]["recoveryPending"] = recovery
         if want:
-            pending.append((demand or 0, order, name, current))
-    _limit_host(rows, host_cap)
+            pending.append((demand or 0, order, name, current, max(current + 1, step_to)))
+    _limit_host(rows, host_cap, exclude=set(obs.get("unhealthy") or []))
     if pending:
-        used = sum(row["effective"] for row in rows.values())
-        for _demand_value, _order, chosen, current in sorted(pending, key=lambda item: (item[0] / max(1, item[3]), -item[1]), reverse=True):
+        used = sum(row["effective"] for name, row in rows.items() if name not in set(obs.get("unhealthy") or []))
+        # Every lane with sustained demand may grow in the same tick while host headroom lasts.
+        for _demand_value, _order, chosen, current, step_to in sorted(pending, key=lambda item: (item[0] / max(1, item[3]), -item[1]), reverse=True):
             row = rows[chosen]
-            if row["effective"] == current and used + 1 <= host_cap and current + 1 <= row["ceiling"]:
-                row.update(effective=current + 1, target=current + 1, lastReason="sustained-demand", blockers=[], upStreak=0); break
+            grow = min(step_to, row["ceiling"]) - current
+            grow = min(grow, host_cap - used)
+            if row["effective"] == current and grow >= 1:
+                row.update(effective=current + grow, target=current + grow, lastReason="sustained-demand", blockers=[], upStreak=0)
+                used += grow
+                continue
             row.update(lastReason="hold:host-ceiling", blockers=["host-ceiling"])
     intake_reason = _linear_intake_reason(obs, now) if fresh else "stale-doctor"
     for name, row in rows.items():
