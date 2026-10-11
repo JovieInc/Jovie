@@ -198,7 +198,19 @@ function capture(command, env) {
 /**
  * Run a command (usually `gh ...`) until it succeeds, fails for a real reason,
  * or a quota reset falls outside `maxWaitMs`.
- * @returns {Promise<{ code: number, stdout: string, stderr: string, kind: string, deferred: boolean }>}
+ * @typedef {{ code: number, stdout: string, stderr: string }} CommandOutcome
+ * @param {string[]} command
+ * @param {{
+ *   attempts?: number,
+ *   env?: NodeJS.ProcessEnv,
+ *   log?: (message: string) => unknown,
+ *   maxWaitMs?: number,
+ *   now?: () => number,
+ *   readReset?: (resource: string) => { remaining: number, resetMs: number } | null,
+ *   run?: (command: string[], env: NodeJS.ProcessEnv) => Promise<CommandOutcome>,
+ *   sleep?: (ms: number) => Promise<unknown>,
+ * }} [options]
+ * @returns {Promise<CommandOutcome & { kind: string, deferred: boolean }>}
  */
 export async function runWithGitHubRetry(
   command,
