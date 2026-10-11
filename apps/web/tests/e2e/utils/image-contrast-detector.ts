@@ -402,9 +402,27 @@ export async function inspectImageContrast(
   const styleTag = await page.addStyleTag({
     content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; }`,
   });
+  // Under runner CPU contention headless Chromium intermittently rejects a
+  // capture with "Protocol error (Page.captureScreenshot): Unable to
+  // capture screenshot". Retry only that transient, at most twice; any
+  // other error, or a third failure, fails.
+  const captureScreenshot = async (): Promise<Buffer> => {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await page.screenshot({ type: 'png' });
+      } catch (error) {
+        if (
+          attempt >= 3 ||
+          !String(error).includes('Unable to capture screenshot')
+        ) {
+          throw error;
+        }
+      }
+    }
+  };
   let screenshot: Buffer;
   try {
-    screenshot = await page.screenshot({ type: 'png' });
+    screenshot = await captureScreenshot();
   } finally {
     await styleTag.evaluate(tag => tag.remove());
   }

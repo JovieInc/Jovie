@@ -157,11 +157,36 @@ class CurrentLoginTest(Isolated):
         name, handle = codex.pick({}, time.time())
         self.assertEqual(name, "current-login")
         try:
-            self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+            with patch.object(codex, "LEASE_WAIT_S", 0):
+                self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
             self.assertFalse((self.root / "launch.json").exists())
         finally:
             handle.close()
         self.assertEqual(self.invoke(), 0)
+
+    def test_a_busy_lease_is_waited_for_not_reported_as_exhaustion(self):
+        # Gem 2026-10-11 18:38-18:43: concurrent runs lost the one lease, exited 75, were charged
+        # a fix attempt or cooled the whole provider while the account was healthy.
+        self.fake_cli()
+        name, handle = codex.pick({}, time.time())
+        self.assertEqual(name, "current-login")
+        waits = []
+        def release(seconds):
+            waits.append(seconds)
+            handle.close()
+        with patch.object(codex.time, "sleep", side_effect=release):
+            self.assertEqual(self.invoke(), 0)
+        self.assertEqual(waits, [codex.LEASE_POLL_S])
+        self.assertTrue((self.root / "launch.json").exists())
+        self.assertEqual(codex.read_state()["current-login"]["runs"], 1, "the wait itself is not a run")
+
+    def test_successful_run_clears_a_stale_last_error(self):
+        self.fake_cli()
+        codex.write_state({"current-login": {"lastKind": "auth", "lastError": "401", "runs": 2}})
+        self.assertEqual(self.invoke(), 0)
+        entry = codex.read_state()["current-login"]
+        self.assertEqual(entry["lastKind"], "ok")
+        self.assertNotIn("lastError", entry)
 
     def test_limit_banks_single_login_without_rotation_or_credit_redemption(self):
         self.fake_cli("You've hit your usage limit. Try again in 2 hours.", 1)

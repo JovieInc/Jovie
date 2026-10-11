@@ -1,3 +1,6 @@
+import { createRequire } from 'node:module';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { ChangelogRelease } from './changelog-parser';
 import {
@@ -5,7 +8,10 @@ import {
   extractCustomerChangelogTechnical,
   formatCustomerChangelogTertiary,
   groupCustomerChangelogByMonth,
+  isCustomerChangelogPostUrl,
+  parseCustomerChangelogHero,
   projectCustomerChangelog,
+  resolveCustomerChangelogHero,
   splitCustomerChangelogOutcome,
 } from './customer-changelog';
 
@@ -211,5 +217,93 @@ describe('customer changelog projection', () => {
     expect(formatCustomerChangelogTertiary('2026-08-16', '26.8.1')).toBe(
       'August 16, 2026 · v26.8.1'
     );
+  });
+});
+
+describe('published version hero authority', () => {
+  it('preserves the existing decorative centered cover for the resolved post', () => {
+    const hero = resolveCustomerChangelogHero('2026-10-02');
+    expect(hero).toEqual({
+      postId: '2026-10-02',
+      kind: 'image',
+      src: '/images/hero/changelog-version.webp',
+      alt: '',
+      objectFit: 'cover',
+      objectPosition: 'center',
+    });
+    expect(parseCustomerChangelogHero(hero, '2026-10-02')).toEqual(hero);
+    expect(parseCustomerChangelogHero(hero, '2026-10-01')).toBeNull();
+  });
+  it('rejects malformed or changed media while returning only the canonical descriptor', () => {
+    const hero = resolveCustomerChangelogHero('2026-10-02');
+    for (const value of [
+      null,
+      [],
+      'image',
+      {},
+      ...Object.keys(hero).map(key => ({ ...hero, [key]: 'unexpected' })),
+    ]) {
+      expect(parseCustomerChangelogHero(value, hero.postId)).toBeNull();
+    }
+    expect(parseCustomerChangelogHero(hero, '')).toBeNull();
+    expect(
+      parseCustomerChangelogHero({ ...hero, untrusted: 'ignored' }, hero.postId)
+    ).toEqual(hero);
+  });
+  it.each([
+    'javascript:alert(1)',
+    '/changelog/x',
+    'https://jov.ie/changelog/x?old=1',
+    'https://jov.ie/changelog/y',
+  ])('rejects an invalid or mismatched post URL %s', url => {
+    expect(isCustomerChangelogPostUrl(url, 'x')).toBe(false);
+  });
+});
+
+describe('update parser client boundary', () => {
+  it('excludes server projection schemas from client parsers while retaining server validation', async () => {
+    const require = createRequire(import.meta.url);
+    const esbuild = createRequire(require.resolve('vitest/package.json'))(
+      'esbuild'
+    ) as {
+      build: (options: Record<string, unknown>) => Promise<{
+        metafile: {
+          outputs: Record<
+            string,
+            { inputs: Record<string, { bytesInOutput: number }> }
+          >;
+        };
+      }>;
+    };
+    const bundledZodBytes = async (contents: string) => {
+      const build = await esbuild.build({
+        stdin: {
+          contents,
+          resolveDir: dirname(fileURLToPath(import.meta.url)),
+        },
+        bundle: true,
+        minify: true,
+        platform: 'browser',
+        write: false,
+        metafile: true,
+      });
+      return Object.values(build.metafile.outputs)
+        .flatMap(output => Object.entries(output.inputs))
+        .filter(([path]) => /[/\\]zod[/\\]/u.test(path))
+        .reduce((total, [, input]) => total + input.bytesInOutput, 0);
+    };
+    expect(
+      await bundledZodBytes(`
+      import { parseWhatsNewFeed } from './whats-new';
+      import { parseDailyWhatsNewPrompt } from './release-communications/prompt';
+      console.log(parseWhatsNewFeed(globalThis.INPUT), parseDailyWhatsNewPrompt(globalThis.INPUT));
+    `)
+    ).toBe(0);
+    expect(
+      await bundledZodBytes(`
+      import { CustomerChangelogEntrySchema } from './customer-changelog';
+      console.log(CustomerChangelogEntrySchema.parse(globalThis.INPUT));
+    `)
+    ).toBeGreaterThan(0);
   });
 });

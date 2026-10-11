@@ -67,6 +67,10 @@ GENERATED_RESOLVERS = {
 DIFF_POLICY = frozenset({"secret-file", "diff-too-large", "lockfile-without-manifest"})
 STALE_LABELS = frozenset({"lane-fix-exhausted", "queue-poison", "lane-fix-escalating"})
 FLAKY_CONCLUSIONS = frozenset({"CANCELLED", "TIMED_OUT", "STARTUP_FAILURE", "CANCELED"})
+# Summary checks that only restate their underlying jobs. Their own FAILURE carries no cause
+# of its own, so they never decide whether a failure is infrastructure (2026-10-11: a runner
+# outage cancelled jobs, PR Ready failed, and the PR went to a model that had nothing to fix).
+AGGREGATE_CHECKS = frozenset({"pr ready", "ci summary", "rollup"})
 RED_CONCLUSIONS = FLAKY_CONCLUSIONS | {"FAILURE"}
 PENDING_STATUS = frozenset({"IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED"})
 INFRA_TEXT = re.compile(
@@ -168,6 +172,11 @@ def _conclusion(check: dict) -> str:
 
 def _failing(pr: dict) -> list[dict]:
     return [check for check in _checks(pr) if _conclusion(check) in RED_CONCLUSIONS]
+
+
+def _aggregate(check: dict) -> bool:
+    return bool(check.get("synthetic")) or str(check.get("name") or check.get("context") or "").strip().lower() \
+        in AGGREGATE_CHECKS
 
 
 def _pending(pr: dict) -> list[dict]:
@@ -313,8 +322,14 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     failing = _failing(pr)
     flaky = [check for check in failing if _conclusion(check) in FLAKY_CONCLUSIONS
              or INFRA_TEXT.search(str(check.get("excerpt") or check.get("name") or ""))]
+    underlying = [check for check in failing if not _aggregate(check)]
     if overlap:
         return blocker("flaky-infra", "main-red", [f"main is red on {', '.join(overlap)}"], "wait")
+    if underlying and all(check in flaky for check in underlying):
+        # Every real failure is a cancellation/timeout/runner fault; a red summary over
+        # them is the same outage, so rerun instead of spending a model attempt.
+        return blocker("flaky-infra", "infra",
+                       [f"{check.get('name')}: {_conclusion(check)}" for check in underlying], "rerun")
     if failing and len(flaky) == len(failing):
         return blocker("flaky-infra", "infra",
                        [f"{check.get('name')}: {_conclusion(check)}" for check in flaky], "rerun")
@@ -889,9 +904,15 @@ def non_pr_event(event_name: str, payload: dict) -> dict | None:
             source = "main-ci"
         ws = WS_BY_SOURCE[source]
         excerpt = f"{name} {conclusion}"
+        # JOV-8044: scheduled/dispatch runs share one fingerprint per workflow
+        # and conclusion. head_sha moves every run, so including it files a new
+        # issue each recurrence instead of reopening the canonical one.
+        parts = [source, name, conclusion]
+        if kind not in {"schedule", "workflow_dispatch"}:
+            parts.append(str(run.get("head_sha") or ""))
         return remediation_event(
             source=source,
-            fingerprint=fingerprint([source, name, str(run.get("head_sha") or ""), conclusion]),
+            fingerprint=fingerprint(parts),
             subject={"sha": run.get("head_sha"), "workflow": name},
             evidence={"url": run.get("html_url") or "", "excerpt": excerpt},
             ws=ws,

@@ -25,7 +25,10 @@ import {
   buildScriptedFallbackResponse,
   type FallbackReason,
 } from '@/lib/chat/onboarding-script/respond';
-import { STREAM_ERROR_LINE } from '@/lib/chat/onboarding-script/script';
+import {
+  OWNERSHIP_CONFLICT_LINE,
+  STREAM_ERROR_LINE,
+} from '@/lib/chat/onboarding-script/script';
 import {
   type PersistedOnboardingMessage,
   resumeOnboardingTranscript,
@@ -57,6 +60,7 @@ import {
   ONBOARDING_SESSION_COOKIE_NAME,
   verifySessionCookie,
 } from '@/lib/onboarding/session';
+import { hasSpotifyProfileIdentityConflict } from '@/lib/profile/spotify-profile-identity';
 import {
   checkAnonymousChatRateLimit,
   checkAuthenticatedOnboardingChatRateLimit,
@@ -331,6 +335,7 @@ export async function tryHandleAnonymousOnboardingChat(
   const cookieSessionId = verifySessionCookie(
     cookieMap.get(ONBOARDING_SESSION_COOKIE_NAME)
   );
+  let verifiedAppUserId: string | null = null;
   let ownedConversation: Awaited<
     ReturnType<typeof findOnboardingConversation>
   > = null;
@@ -351,6 +356,7 @@ export async function tryHandleAnonymousOnboardingChat(
         );
       }
       if (appUser) {
+        verifiedAppUserId = appUser.id;
         const conversation = await findOnboardingConversation({
           userId: appUser.id,
           sessionId: null,
@@ -736,6 +742,86 @@ export async function tryHandleAnonymousOnboardingChat(
       ? 'injected'
       : null;
 
+  // Check the canonical Spotify identity on every turn, including a new
+  // picker/URL confirmation. Neither client history nor a matching artist
+  // can authorize a claim, handle change, or checkout suggestion.
+  if (onboardingState.spotifyArtistId) {
+    let identityConflict: boolean;
+    try {
+      identityConflict = await hasSpotifyProfileIdentityConflict(
+        db,
+        onboardingState.spotifyArtistId,
+        verifiedAppUserId
+      );
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { context: 'onboarding_identity_lookup', requestId },
+      });
+      return NextResponse.json(
+        {
+          error: 'Profile ownership could not be verified. Try again.',
+          errorCode: 'SPOTIFY_IDENTITY_LOOKUP_FAILED',
+          requestId,
+        },
+        { status: 503, headers: responseHeaders }
+      );
+    }
+    if (identityConflict) {
+      const confirmationPart = serverArtistConfirmation?.historyMessage
+        .parts[0] as
+        | { input: Record<string, unknown>; output: Record<string, unknown> }
+        | undefined;
+      const recovery: FallbackTurn = {
+        line: OWNERSHIP_CONFLICT_LINE,
+        text: OWNERSHIP_CONFLICT_LINE.text,
+        // Persist enrichment only, so a reload still knows which artist
+        // is blocked. No claim, handle, or checkout tool is emitted.
+        toolEvents: confirmationPart
+          ? [
+              {
+                toolName: 'confirmSpotifyArtist',
+                input: confirmationPart.input,
+                output: confirmationPart.output,
+              },
+            ]
+          : [],
+      };
+      const built = buildScriptedFallbackResponse({
+        turn: recovery,
+        reason: 'ownership_conflict',
+        headers: {
+          ...responseHeaders,
+          'x-onboarding-error-code': 'SPOTIFY_IDENTITY_CONFLICT',
+        },
+      });
+      try {
+        await persistAnonymousAssistantRecord({
+          conversationId,
+          latestUserClientMessageId: latestUserMessage.clientMessageId,
+          content: recovery.text,
+          toolCalls: built.persistedToolEvents,
+          assistantSource: 'script',
+          scriptLineKey: recovery.line.key,
+        });
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: {
+            context: 'onboarding_identity_recovery_persistence',
+            requestId,
+          },
+        });
+        return NextResponse.json(
+          {
+            error: 'Your conversation could not be saved. Try again.',
+            errorCode: 'ONBOARDING_CHAT_PERSISTENCE_FAILED',
+            requestId,
+          },
+          { status: 503, headers: responseHeaders }
+        );
+      }
+      return built.response;
+    }
+  }
   try {
     if (forcedFallbackReason) {
       return await serveScriptedFallback(forcedFallbackReason);

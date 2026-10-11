@@ -589,10 +589,9 @@ class RelayTest(unittest.TestCase):
         terminal = pr(number=5, branch="tim/terminal", mergeable="CONFLICTING",
                       labels=["lane-fix-exhausted"])
         claimed = pr(number=6, branch="tim/claimed", sha="claimed-head", mergeable="CONFLICTING")
-        claim_url = (f"repos/{events.REPO}/issues/6/comments?per_page=100&sort=created&direction=desc")
         shell = Shell({
             ("gh", "pr", "list"): [terminal, claimed],
-            ("gh", "api", claim_url):
+            ("gh", "api", "--paginate"):
                 f"🤖 lane claim kind=fix sha=claimed-head host=gem at={claimed_at}\n",
         })
         with patch.object(events.time, "time", return_value=NOW):
@@ -628,6 +627,24 @@ class RelayTest(unittest.TestCase):
         self.assertEqual((sentry["source"], sentry["ws"]), ("sentry", "reliability"))
         self.assertIsNone(events.remediation.event_from_sentry({}))
 
+    def test_schedule_failure_fingerprint_ignores_head_sha(self):
+        """JOV-8044: a recurring scheduled red must dedupe to one intake event.
+
+        head_sha moves every scheduled run; including it filed a new issue per
+        failure instead of reopening the canonical one."""
+        base = {"name": "CI Duration Ratchet", "event": "schedule", "conclusion": "failure",
+                "head_branch": "main", "pull_requests": [],
+                "html_url": "https://example.test/run/1", "updated_at": "2026-10-08T00:00:00Z"}
+        first = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**base, "head_sha": "sha-a"}})
+        second = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**base, "head_sha": "sha-b"}})
+        self.assertEqual(first["fingerprint"], second["fingerprint"])
+        self.assertEqual(first["ws"], "ci")
+        push = {"name": "CI", "event": "push", "conclusion": "failure", "head_branch": "main",
+                "pull_requests": [], "html_url": "https://example.test/run/2"}
+        push_a = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**push, "head_sha": "sha-a"}})
+        push_b = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**push, "head_sha": "sha-b"}})
+        self.assertNotEqual(push_a["fingerprint"], push_b["fingerprint"])
+
     def test_push_event_runs_the_conflict_read(self):
         shell = Shell({("gh", "pr", "list"): []})
         self.assertEqual(events.relay("push", {}, shell, set()), [])
@@ -645,6 +662,23 @@ class RelayTest(unittest.TestCase):
             finally:
                 os.environ.clear()
                 os.environ.update(saved)
+
+
+class ClaimCommentTest(unittest.TestCase):
+    def test_claim_read_covers_only_the_ttl_window_on_every_page(self):
+        # The per-issue comments endpoint ignores sort/direction and pages oldest first:
+        # #20979 had 114 comments, so every claim after the 100th was invisible.
+        stamp = lambda age: datetime.fromtimestamp(NOW - age, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        shell = Shell({("gh", "api", "--paginate"):
+                       f"🤖 lane claim kind=fix sha=h1 host=mac at={stamp(60)}\n"
+                       f"🤖 lane claim kind=gate sha=h1 host=gem at={stamp(30)}\n"})
+        self.assertTrue(events.claim_active(7, "h1", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
+        self.assertFalse(events.claim_active(7, "h1", shell, NOW, kind="gate", exclude_host="gem"),
+                         "a host never defers to its own claim")
+        self.assertFalse(events.claim_active(7, "h2", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
+        since = stamp(events.CLAIM_TTL_S)
+        self.assertEqual(shell.calls[0][:4], ["gh", "api", "--paginate",
+                                              f"repos/{events.REPO}/issues/7/comments?per_page=100&since={since}"])
 
 
 class ClaimTest(unittest.TestCase):
@@ -1153,9 +1187,8 @@ class GapTest(unittest.TestCase):
     def test_reconcile_does_not_relabel_a_head_with_an_active_repair_claim(self):
         target = self.node(6, headRefOid="claimed-head", mergeStateStatus="DIRTY")
         claimed_at = datetime.fromtimestamp(NOW - 60, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        claim_url = f"repos/{events.REPO}/issues/6/comments?per_page=100&sort=created&direction=desc"
         shell = Shell({
-            ("gh", "api", claim_url):
+            ("gh", "api", "--paginate"):
                 f"🤖 lane claim kind=fix sha=claimed-head host=gem at={claimed_at}\n",
         })
         with patch.object(events, "open_prs_state", return_value=[target]):

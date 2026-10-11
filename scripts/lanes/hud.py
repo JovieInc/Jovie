@@ -245,14 +245,15 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
         def fetch():
             return client.gql(
             'query($labels:[String!]!' + (',$numbers:[Float!]!' if numbers else '') + '){'
-            'pool: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},labels:{name:{in:$labels}}})'
-            '{nodes{identifier priority labels{nodes{name}}}}'
+            # Every JOV Todo issue is a candidate (2026-10-11); labels only break the count down.
+            'pool: issues(first:250,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}}})'
+            '{pageInfo{hasNextPage} nodes{identifier priority labels{nodes{name}}}}'
             + ('active: issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}})'
                '{nodes{identifier title state{name}}}' if numbers else '')
             + 'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
             '{nodes{identifier}}}', {"labels": list(LANE_LABELS), **({"numbers": numbers} if numbers else {})})
 
-        data = lane.shared(f"claim-hud-linear-{token}", lane.CLAIM_SCAN_TTL_S, fetch)
+        data = lane.shared(f"claim-hud-linear-v2-{token}", lane.CLAIM_SCAN_TTL_S, fetch)
     except Exception as error:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"[:100]}
     pool = Counter()
@@ -261,7 +262,9 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
             if label["name"] in LANE_LABELS:
                 pool[label["name"]] += 1
     active = {n["identifier"]: n["title"] for n in (data.get("active") or {"nodes": []})["nodes"]}
-    return {"ok": True, "pool": dict(pool), "poolTotal": len(data["pool"]["nodes"]), "active": active,
+    total = len(data["pool"]["nodes"])
+    more = bool((data["pool"].get("pageInfo") or {}).get("hasNextPage"))
+    return {"ok": True, "pool": dict(pool), "poolTotal": f"{total}+" if more else total, "active": active,
             "triage": len(data["triage"]["nodes"]), "fetchedAt": utcnow().isoformat()}
 
 
@@ -538,7 +541,9 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     shown = 0
     for name, count in local["slots"].items():
         mine = [w for w in workers if w["provider"] == name]
-        for index in range(count):
+        # Seats taken before an autoscale reduction finish naturally; hiding them showed
+        # "codex 2/0" with no rows while two codex workers were still running.
+        for index in range(max(count, len(mine))):
             if shown >= rows_budget:
                 break
             worker = mine[index] if index < len(mine) else None

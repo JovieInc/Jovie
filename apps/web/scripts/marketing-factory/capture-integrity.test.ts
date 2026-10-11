@@ -42,7 +42,25 @@ afterEach(() => {
   for (const path of dirs.splice(0))
     rmSync(path, { recursive: true, force: true });
 });
-const brief = loadFactoryBrief('solutions', 'founders');
+const legacy = loadFactoryBrief('solutions', 'founders');
+const brief = {
+  ...legacy,
+  media: legacy.media.map(entry => ({
+    ...entry,
+    input: {
+      ...entry.input,
+      editorial: {
+        benefit: 'Explain the tested product action',
+        focalDetail: 'One action',
+        rationale: 'Use the verified capture',
+        fallback: 'Retain the benefit text',
+        alternatives: [
+          { medium: 'video' as const, reason: 'Motion is unnecessary' },
+        ],
+      },
+    },
+  })),
+};
 const metrics = { cls: 0, lcpMs: 900 };
 const artifact = (): FactoryStageArtifact<'render'> => ({
   pageId: 'solutions-founders',
@@ -236,6 +254,7 @@ async function rework(revise: boolean, mode: 'dry' | 'live' = 'dry') {
   const manifest = await runFactory({
     family: 'solutions',
     slug: 'founders',
+    brief,
     runsDir,
     providers: { ...setup.providers, mode },
   });
@@ -331,6 +350,7 @@ describe('retained rework evidence', () => {
     await runFactory({
       family: 'solutions',
       slug: 'founders',
+      brief,
       runsDir: result.runsDir,
       dry: true,
     });
@@ -361,6 +381,7 @@ describe('retained rework evidence', () => {
       runFactory({
         family: 'solutions',
         slug: 'founders',
+        brief,
         runsDir: result.runsDir,
         dry: true,
         fromStage: 'render',
@@ -375,6 +396,7 @@ describe('retained rework evidence', () => {
     await runFactory({
       family: 'solutions',
       slug: 'founders',
+      brief,
       runsDir: result.runsDir,
       dry: true,
     });
@@ -430,6 +452,7 @@ describe('retained rework evidence', () => {
       runFactory({
         family: 'solutions',
         slug: 'founders',
+        brief,
         runsDir: result.runsDir,
         dry: true,
         fromStage: 'render',
@@ -447,6 +470,7 @@ describe('retained rework evidence', () => {
         await runFactory({
           family: 'solutions',
           slug: 'founders',
+          brief,
           runsDir: result.runsDir,
           dry: true,
         });
@@ -481,6 +505,7 @@ describe('retained rework evidence', () => {
         runFactory({
           family: 'solutions',
           slug: 'founders',
+          brief,
           runsDir: result.runsDir,
           dry: true,
           fromStage: 'render',
@@ -498,6 +523,7 @@ describe('retained rework evidence', () => {
     await runFactory({
       family: 'solutions',
       slug: 'founders',
+      brief,
       runsDir: result.runsDir,
       dry: true,
       fromStage: 'render',
@@ -506,6 +532,7 @@ describe('retained rework evidence', () => {
     await runFactory({
       family: 'solutions',
       slug: 'founders',
+      brief,
       runsDir: result.runsDir,
       dry: true,
     });
@@ -518,6 +545,7 @@ describe('retained rework evidence', () => {
       runFactory({
         family: 'solutions',
         slug: 'founders',
+        brief,
         runsDir: result.runsDir,
         dry: true,
         fromStage: 'render',
