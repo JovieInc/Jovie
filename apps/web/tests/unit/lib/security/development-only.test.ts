@@ -235,7 +235,12 @@ describe('development-only security helpers', () => {
       }
     );
 
-    it.each([
+    it.each<{
+      name: string;
+      env: Record<string, string>;
+      hostname: string;
+      headers: Record<string, string>;
+    }>([
       {
         name: 'missing opt-in',
         env: { E2E_USE_TEST_AUTH_BYPASS: '' },
