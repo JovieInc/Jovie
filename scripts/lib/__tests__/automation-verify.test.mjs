@@ -43,6 +43,59 @@ const SERVICE_CENSUS_SELECTOR_TESTS = [
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
 ];
 
+describe('Sentry deployment contract selection', () => {
+  const inputs = [
+    '.github/actions/sentry-error-gate/action.yml',
+    '.github/scripts/sentry-read-json.sh',
+    'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
+    'scripts/run-affected-tests.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+    'docs/runbooks/production-sentry-uncertainty-recovery.md',
+  ];
+  const deploymentContract = 'apps/web/tests/unit/ci/deploy-workflow.test.ts';
+
+  it('retains the existing deployment contract for transport-only and contract repair changes', () => {
+    for (const files of [inputs, [...inputs, deploymentContract]]) {
+      const plan = buildAffectedTestPlan(files);
+      expect(plan.mode).toBe('selected');
+      expect(plan.selectedTests).toEqual([deploymentContract]);
+      expect(plan.scriptVitestTests).toContain(
+        'scripts/lib/__tests__/sentry-error-gate-request.test.mjs'
+      );
+      expect(plan.scriptVitestTests).toContain(
+        'scripts/lib/__tests__/automation-verify.test.mjs'
+      );
+    }
+  });
+
+  it('requires a Sentry-specific input before narrowing a deployment-only repair', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        deploymentContract,
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the existing deployment contract is unavailable', () => {
+    const plan = buildAffectedTestPlan(inputs, {
+      isFileAvailable: file => file !== deploymentContract,
+    });
+    expect(plan.mode).toBe('full');
+    expect(plan.fallbackReason).toBe(
+      'Sentry deployment workflow contract is unavailable'
+    );
+  });
+
+  it('does not shrink unrelated product changes into the Sentry closure', () => {
+    expect(
+      buildAffectedTestPlan([...inputs, 'apps/web/lib/unknown-release-peer.ts'])
+        .mode
+    ).toBe('full');
+  });
+});
+
 describe('lane Python qualification coverage', () => {
   it.each([
     ['lane source', ['scripts/lanes/hyperagent_lane.py']],
@@ -229,6 +282,86 @@ describe('Devin Free expiry coverage selection', () => {
     );
     expect(mixed.mode).toBe('full');
     expect(mixed.lanePythonCoverage).toBe(true);
+  });
+});
+
+describe('Codex subscription capacity coverage selection', () => {
+  const inputs = [
+    'scripts/lanes/codex_lane.py',
+    'scripts/tests/test_codex_lane.py',
+  ];
+  it('runs the required subscription metadata and storage-failure suite with branch coverage', () => {
+    const plan = buildAffectedTestPlan(inputs, { isFileAvailable: () => true });
+    expect(plan.lanePythonCoverage).toBe(true);
+    const commands = buildSelectedTestCommands(plan, '1');
+    const command = commands.find(
+      ([binary, args]) =>
+        binary === 'env' &&
+        Array.isArray(args) &&
+        args.some(arg => arg.includes('coverage run --branch'))
+    );
+    expect(command).toBeDefined();
+    if (!command || !Array.isArray(command[1])) {
+      throw new Error(
+        'Expected Codex subscription structural Python command arguments'
+      );
+    }
+    expect(command[1].join(' ')).toContain('scripts/tests/test_codex_lane.py');
+    expect(command[1].join(' ')).toContain(
+      '*/scripts/lanes/codex_lane.py" --fail-under=85'
+    );
+  });
+  it('fails closed with missing tests and preserves unknown mixed-peer fallback', () => {
+    const missing = buildAffectedTestPlan(inputs, {
+      isFileAvailable: file => file !== inputs[1],
+    });
+    expect(missing.mode).toBe('full');
+    expect(missing.fallbackReason).toBe(
+      'Codex subscription capacity coverage proof is unavailable'
+    );
+    const mixed = buildAffectedTestPlan(
+      [...inputs, 'scripts/lanes/unknown-new.py'],
+      { isFileAvailable: () => true }
+    );
+    expect(mixed.mode).toBe('full');
+    expect(mixed.lanePythonCoverage).toBe(true);
+  });
+  const closure = [
+    ...inputs,
+    'scripts/ci-fast-lanes.mjs',
+    'scripts/run-affected-tests.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+    'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  ];
+  it('qualifies the complete source closure with canonical Python coverage and both plumbing suites', () => {
+    const plan = buildAffectedTestPlan(closure, {
+      isFileAvailable: () => true,
+    });
+    expect(plan.mode).toBe('selected');
+    expect(plan.lanePythonCoverage).toBe(true);
+    expect(plan.scriptVitestTests).toEqual(SERVICE_CENSUS_SELECTOR_TESTS);
+    expect(buildSelectedTestCommands(plan, '1')).toContainEqual([
+      'env',
+      ['CI=true', 'bash', '-c', STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]],
+    ]);
+  });
+  it.each(closure)(
+    'fails closed when qualification file %s is unavailable',
+    missing => {
+      const plan = buildAffectedTestPlan(closure, {
+        isFileAvailable: file => file !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.lanePythonCoverage).toBe(true);
+    }
+  );
+  it('retains the full fallback for extra peers outside the reviewed closure', () => {
+    const plan = buildAffectedTestPlan(
+      [...closure, 'scripts/other-control.mjs'],
+      { isFileAvailable: () => true }
+    );
+    expect(plan.mode).toBe('full');
+    expect(plan.lanePythonCoverage).toBe(true);
   });
 });
 

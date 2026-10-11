@@ -430,15 +430,40 @@ export function lifecycleHolds(input) {
  * @returns {Promise<Record<string, any>>}
  */
 async function linearGraphql(fetchImpl, apiKey, query, variables) {
-  const response = await fetchWithRetry(fetchImpl, LINEAR_API, {
-    method: 'POST',
-    headers: {
-      Authorization: apiKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  if (!response.ok) {
+  // Bounded retry for transient Linear upstream failures (JOV-8012): a
+  // 503/502/504 from Linear used to fail the whole sweep even though the
+  // next scheduled run converged. Retry the transport statuses and the
+  // shared-key rate limit with backoff; persistent errors still throw.
+  const maxAttempts = 4;
+  /** @type {Error | null} */
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetchWithRetry(fetchImpl, LINEAR_API, {
+      method: 'POST',
+      headers: {
+        Authorization: apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+    if (response.ok) {
+      const payload =
+        /** @type {{ errors?: unknown, data?: Record<string, any> }} */ (
+          await response.json()
+        );
+      if (Array.isArray(payload.errors) && payload.errors.length > 0) {
+        throw new Error(
+          payload.errors
+            .map(error =>
+              error && typeof error === 'object' && 'message' in error
+                ? String(error.message)
+                : 'Linear request failed'
+            )
+            .join('; ')
+        );
+      }
+      return payload.data ?? {};
+    }
     // Linear answers a spent rate limit with HTTP 400 and RATELIMITED. The
     // lifecycle key is shared with Summer and agents, so name it plainly.
     /** @type {any} */
@@ -451,7 +476,7 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
       .map((/** @type {any} */ error) => String(error?.message ?? ''))
       .filter(Boolean)
       .join('; ');
-    throw Object.assign(
+    lastError = Object.assign(
       new Error(
         limited
           ? `Linear rate limited (HTTP ${response.status})`
@@ -459,23 +484,13 @@ async function linearGraphql(fetchImpl, apiKey, query, variables) {
       ),
       { rateLimited: limited }
     );
+    const retryable = response.status === 429 || response.status >= 500;
+    if (!retryable || attempt === maxAttempts) throw lastError;
+    // Exponential backoff, bounded for the 15-minute sweep budget.
+    const delayMs = Math.min(4_000, 2 ** (attempt - 1) * 250);
+    await new Promise(resolve => setTimeout(resolve, delayMs));
   }
-  const payload =
-    /** @type {{ errors?: unknown, data?: Record<string, any> }} */ (
-      await response.json()
-    );
-  if (Array.isArray(payload.errors) && payload.errors.length > 0) {
-    throw new Error(
-      payload.errors
-        .map(error =>
-          error && typeof error === 'object' && 'message' in error
-            ? String(error.message)
-            : 'Linear request failed'
-        )
-        .join('; ')
-    );
-  }
-  return payload.data ?? {};
+  throw lastError ?? new Error('Linear request failed');
 }
 
 /**

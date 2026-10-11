@@ -257,6 +257,24 @@ class SweepTest(unittest.TestCase):
         self.assertNotIn(sweeper.PRESERVED_REPAIR, files)
 
 
+    def test_cleanup_preserved_clean_checkout_frees_its_branch(self):
+        # 2026-10-11 on Gem: cleanup preserved checkouts whose only "changes" were harness files,
+        # which locked their PR branches; every repair failed "already used by worktree".
+        clean = self.worktree("codex/jov-4411")
+        work = self.worktree("codex/jov-real-work")
+        repair = self.worktree("codex/jov-cancelled")
+        for path, reasons in ((clean, ["cleanup-source-unverified"]), (work, ["cleanup-source-unverified"]),
+                              (repair, ["cancelled"])):
+            (path / sweeper.PRESERVED_REPAIR).write_text(json.dumps({"pr": None, "issue": None, "reason": reasons}))
+            (path / ".codex-last-message.txt").write_text("done\n")
+        (work / "unsaved.txt").write_text("real work\n")
+        report = self.sweep(now=time.time() + 2 * 3600)
+        self.assertFalse(clean.exists())
+        self.assertEqual([row["reason"] for row in report["removed"]], ["preserved-clean"])
+        self.assertTrue(work.exists(), "real uncommitted work stays preserved until its TTL")
+        self.assertTrue(repair.exists(), "a cancelled repair's marker is not a cleanup marker")
+        self.assertEqual(self.remote_branches(), [], "a clean checkout needs no backup branch")
+
 class ScopeTest(unittest.TestCase):
     def test_glob_roots_match_only_direct_children(self):
         home = Path("/home/u")

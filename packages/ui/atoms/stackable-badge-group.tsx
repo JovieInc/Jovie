@@ -143,7 +143,7 @@ export function StackableBadgeGroup({
             <Button
               aria-label={`Show ${overflowCount} more badges`}
               className={cn(
-                'ms-1 h-5 shrink-0 px-1.5 text-3xs font-medium tabular-nums',
+                'ms-1 h-5 min-h-0 shrink-0 px-1.5 text-3xs font-medium tabular-nums',
                 density === 'standard' && 'h-6'
               )}
               size='sm'

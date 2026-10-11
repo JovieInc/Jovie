@@ -84,25 +84,45 @@ export async function fetchWithRetry(fetchImpl, ...args) {
  */
 export function githubClient(fetchImpl, token) {
   return async path => {
-    const response = await fetchWithRetry(
-      fetchImpl,
-      `https://api.github.com/${path}`,
-      {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${token}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-          'User-Agent': 'jovie-linear-sync-on-merge',
-        },
+    // Bounded retry for transient GitHub upstream failures: a 503 from
+    // api.github.com used to fail the whole lifecycle evaluation (JOV-5143,
+    // run 37818346153) even though the next sweep would have converged.
+    // Mirrors the Linear retry in linear-sync-on-merge.mjs: 4 attempts,
+    // exponential backoff; persistent errors and 4xx still throw.
+    const maxAttempts = 4;
+    /** @type {Error | null} */
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const response = await fetchWithRetry(
+        fetchImpl,
+        `https://api.github.com/${path}`,
+        {
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'jovie-linear-sync-on-merge',
+          },
+        }
+      );
+      if (response.ok) {
+        return {
+          body: await response.json(),
+          link: response.headers?.get?.('link') ?? '',
+        };
       }
-    );
-    if (!response.ok) {
-      throw new Error(`GitHub HTTP ${response.status ?? 'error'} for ${path}`);
+      lastError = new Error(
+        `GitHub HTTP ${response.status ?? 'error'} for ${path}`
+      );
+      const retryable =
+        response.status === 429 ||
+        (typeof response.status === 'number' && response.status >= 500);
+      if (!retryable || attempt === maxAttempts) throw lastError;
+      // Exponential backoff, bounded for the 15-minute sweep budget.
+      const delayMs = Math.min(4_000, 2 ** (attempt - 1) * 250);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
-    return {
-      body: await response.json(),
-      link: response.headers?.get?.('link') ?? '',
-    };
+    throw lastError ?? new Error(`GitHub request failed for ${path}`);
   };
 }
 

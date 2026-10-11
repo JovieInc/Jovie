@@ -38,8 +38,8 @@ vi.mock('@/lib/synthetic/passage.server', () => ({
   resolveSyntheticPassage: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock('@/components/features/onboarding/OnboardingShell', () => ({
-  OnboardingShell: ({
+vi.mock('@/components/features/onboarding/OnboardingSessionBoundary', () => ({
+  OnboardingSessionBoundary: ({
     sessionLabel,
     starterHandoff,
   }: {
@@ -100,9 +100,7 @@ describe('/start page', () => {
     const { default: StartPage } = await import('@/app/(dynamic)/start/page');
     render(await StartPage());
 
-    expect(getWaitlistAccessMock).toHaveBeenCalledExactlyOnceWith(
-      'artist@example.com'
-    );
+    expect(getWaitlistAccessMock).not.toHaveBeenCalled();
     expect(screen.getByTestId('onboarding-shell')).toBeTruthy();
     expect(redirectMock).not.toHaveBeenCalled();
   });
@@ -119,13 +117,14 @@ describe('/start page', () => {
 
     const { default: StartPage } = await import('@/app/(dynamic)/start/page');
 
-    await expect(StartPage()).rejects.toThrow('NEXT_REDIRECT:/waitlist');
-    expect(isWaitlistGateEnabledMock).toHaveBeenCalledOnce();
+    render(await StartPage());
+    expect(screen.getByTestId('onboarding-shell')).toBeTruthy();
+    expect(isWaitlistGateEnabledMock).not.toHaveBeenCalled();
     expect(getWaitlistAccessMock).not.toHaveBeenCalled();
-    expect(redirectMock).toHaveBeenCalledExactlyOnceWith('/waitlist');
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 
-  it('redirects WAITLIST_PENDING to the receipt only when a durable pending entry exists', async () => {
+  it('lets a durable waitlisted account resume without a receipt redirect', async () => {
     resolveUserStateMock.mockResolvedValue({
       state: CanonicalUserState.WAITLIST_PENDING,
       context: { email: 'artist@example.com' },
@@ -137,11 +136,10 @@ describe('/start page', () => {
 
     const { default: StartPage } = await import('@/app/(dynamic)/start/page');
 
-    await expect(StartPage()).rejects.toThrow('NEXT_REDIRECT:/waitlist');
-    expect(getWaitlistAccessMock).toHaveBeenCalledExactlyOnceWith(
-      'artist@example.com'
-    );
-    expect(redirectMock).toHaveBeenCalledExactlyOnceWith('/waitlist');
+    render(await StartPage());
+    expect(screen.getByTestId('onboarding-shell')).toBeTruthy();
+    expect(getWaitlistAccessMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 
   it('does not render a pending receipt for a non-pending durable status', async () => {

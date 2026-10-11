@@ -116,6 +116,7 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
     candidates = {name: linear.lane_issues(specs[name]["label"])
                   for name, seats in capacity.items() if seats["slots"] > 0}
     qualified, rejected = {}, {}
+    rejected_issues = {}
     for name in capacity:
         qualified[name], rejected[name] = [], {}
         # Work the router sends to another lane is not this lane's idle capacity (JOV-7706).
@@ -129,8 +130,17 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
                 qualified[name].append(issue)
             else:
                 rejected[name][reason] = rejected[name].get(reason, 0) + 1
+                # Per-issue view (bounded): the remediator surfaces
+                # route-held/over-budget per selected issue without host access.
+                rejected_issues[issue.identifier] = reason
     counts = {name: len(candidates.get(name, [])) for name in capacity}
-    return qualified, len({issue.identifier for issues in candidates.values() for issue in issues}), counts, rejected
+    return (
+        qualified,
+        len({issue.identifier for issues in candidates.values() for issue in issues}),
+        counts,
+        rejected,
+        rejected_issues,
+    )
 
 
 def observe(host, lane, codex, now: float | None = None) -> dict:
@@ -173,14 +183,15 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         linear_skipped = None
     if linear_skipped:
         pool, candidate_pool, pool_by_provider, qualified_jobs = None, None, {}, {}
-        candidate_counts, rejected = {}, {}
+        candidate_counts, rejected, rejected_issues = {}, {}, {}
         eligible_pool, eligible_by_provider, budgets = None, {}, {}
         linear_error = None
     else:
         try:
-            qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
+            (qualified_by_provider, candidate_pool, candidate_counts,
+             rejected, rejected_issues) = qualified_pool(host, lane, capacity_by_provider, now)
             design_census = design_gate.apply_to_pool(
-                qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo), now=now)
+                qualified_by_provider, read_text=design_gate.repo_reader(host.repo))
             eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
             eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
             budgets = {name: lane.read_new_issue_budget(name, seats.get("base", seats["slots"]))
@@ -197,7 +208,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         except (Exception, SystemExit) as error:
             design_census = None
             pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
-            candidate_counts, rejected = {}, {}
+            candidate_counts, rejected, rejected_issues = {}, {}, {}
             eligible_pool, eligible_by_provider, budgets = None, {}, {}
     github = None
     merged, merged_error, merged_window, merge_throughput, merge_throughput_error = [], None, None, None, None
@@ -254,6 +265,10 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "codexAttribution": codex_attribution(accounts, account_observed_at),
         "qualifiedJobsByProvider": qualified_jobs,
         "candidatePoolByProvider": candidate_counts, "rejectedByProvider": rejected,
+        # Per-issue rejection reasons (bounded to 20, deterministic order) so
+        # route-held:frontier / over-budget on a specific bridged/agent-ready
+        # issue is visible without host access (read by the remediator).
+        "rejectedIssues": dict(sorted(rejected_issues.items())[:20]),
         "designGate": design_census,
         "fileOverlap": file_overlap.doctor_view(state),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
@@ -552,6 +567,35 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     tick = obs.get("tick") or {}
     if tick.get("error"):
         alerts["tick-error"] = f"last dispatch tick failed: {tick['error'][:140]}"
+    delivery = tick.get("remediationEvents") or {}
+    delivery_error = tick.get("remediationEventsError")
+    if delivery.get("deliveryFailed"):
+        alerts["remediation-delivery"] = (
+            "remediation action lacks authoritative acknowledgement; "
+            f"failed={delivery.get('deliveryFailed', 'unknown')}, "
+            f"exhausted={delivery.get('deliveryExhausted', 'unknown')}, "
+            f"next retry={delivery.get('deliveryNextAt', 'unknown')}"
+            + (f", reconciliation error={delivery_error}" if delivery_error else "")
+            + "; inspect event-delivery.json")
+    elif delivery_error:
+        status_error = tick.get("remediationDeliveryStatusError")
+        journal = ("journal status unavailable"
+                   if status_error else
+                   f"journal failed={delivery.get('deliveryFailed', 'unknown')}, "
+                   f"exhausted={delivery.get('deliveryExhausted', 'unknown')}, "
+                   f"next retry={delivery.get('deliveryNextAt', 'unknown')}")
+        alerts["remediation-delivery"] = (
+            f"remediation reconciliation failed before a healthy delivery pass; error={delivery_error}; "
+            f"{journal}"
+            + (f", status error={status_error}" if status_error else "")
+            + "; inspect event-delivery.json")
+    elif ((previous or {}).get("conditions") or {}).get("remediation-delivery", {}).get("state") == "active":
+        observed = delivery.get("deliveryObservedAt")
+        confirmed = (isinstance(observed, (int, float)) and 0 <= obs["now"] - observed <= 180
+                     and not delivery.get("deliveryBusy") and delivery.get("deliveryPending") == 0
+                     and delivery.get("deliveryFailed") == 0)
+        if not confirmed:
+            alerts["remediation-delivery"] = "remediation delivery remains unverified; retain prior failure owner and deadline"
     account_state = obs.get("codexAttribution") or codex_attribution(obs.get("codex") or {}, obs["now"])
     for name in tick.get("unhealthy", []):
         if name == "codex" and account_state["state"] in {"leases-occupied", "quota-banked", "cooldown"}:
@@ -654,15 +698,8 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
         alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
-    stale_briefs = (obs.get("designGate") or {}).get("stale") or []
-    if stale_briefs:
-        alerts["design-brief-stale"] = (f"{len(stale_briefs)} needs-design-brief issue(s) held past 24h "
-                                        f"without a build claim ({', '.join(stale_briefs[:5])})")
-    elif obs.get("designGate") is None:
-        # A failed/cooldown census cannot prove recovery of a previously observed alarm.
-        prior_alarm = ((previous or {}).get("alerts") or {}).get("design-brief-stale")
-        if prior_alarm:
-            alerts["design-brief-stale"] = prior_alarm
+    # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
+    # claiming run writes it), so a held brief is no longer a condition to watch.
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
@@ -730,6 +767,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "workers-without-completions": "verify-process-and-fenced-repair-ownership",
         "admission-repair-needed": "repair-existing-pr-inventory-before-new-intake",
         "delivery-stalled": "investigate-repair-and-verify-native-delivery",
+        "remediation-delivery": "repair-and-read-back-existing-event-delivery",
     }
     resources = {
         "linear-down": ["linear", "pool"],
@@ -750,8 +788,6 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                  else float((previous.get("providerIdleSince") or {}).get(provider, now)))
         source_status = "unknown" if key == "linear-down" else "stale" if key == "hud-stale" else "degraded"
         if key == "delivery-stalled" and (obs.get("delivery") or {}).get("state") in ("unknown", "controller-held"):
-            source_status = "unknown"
-        if key == "design-brief-stale" and obs.get("designGate") is None:
             source_status = "unknown"
         if key == "admission-repair-needed" and (obs.get("eligiblePool") is None or obs.get("pool") is None
                 or any(row.get("reason") == "pr-inventory-unavailable"

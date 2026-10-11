@@ -5,10 +5,15 @@ Devin, Codex, Claude Code and Hyperagent are the lanes that ship (Claude and Hyp
 JOV-7706); grok and kimi stay `enabled: false`. Symphony Elixir on Gem is retired (its units are stopped and masked by
 `gem-retire-elixir.sh`); nothing else claims JOV work.
 
-A lane is a Linear label plus a provider command in `providers.json`. Every enabled lane
-reads the shared `agent-ready` pool as well as its own label; the cost-aware router (below)
-decides which lane takes each issue. Issues carrying
-`no-symphony`, billing, auth, infra or epic labels are never taken.
+A lane is a provider command in `providers.json` plus a Linear label that expresses a routing
+preference. Every JOV Todo issue is eligible (Tim 2026-10-11: no `agent-ready`, plan or
+approval label is required): every lane reads one shared all-Todo snapshot per TTL (at most
+`TODO_POOL_PAGES` x 100 issues; a larger pool fails closed) and the cost-aware router (below)
+decides which lane takes each issue. Issues carrying `hold`, `no-symphony`, `type:epic`,
+`codex-blocked` or `reasoning-job` are never taken; auth, billing and infra labels route only
+to the guarded Codex lane. Issue runs get a goal and a definition of done (the issue's own
+acceptance section when it has one) instead of a pre-approved plan, may run gstack
+`/autoplan` themselves for non-trivial work, and never wait for an approval label.
 
 The harness, not the model, owns:
 
@@ -46,6 +51,7 @@ The harness, not the model, owns:
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
 | Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash, HTTP 404, unhealthy) hands the same worktree to the next enabled, healthy, uncooled lane in `providers.json` tier order, up to 2 handoffs; the receipt records `handoffs` (with `reason`) and `finishedBy`. Disabled entries and remote-only lanes (`repairs: false`, Hyperagent) are never chosen | `run_issue()`, `next_provider()`, `remediation.route_lane()` |
+| Repository bindings: the one service also routes LogYourBody (Linear `LYB` -> `JovieInc/LogYourBody`, `~/LogYourBody` on Gem, `LANES_REPO_LYB` overrides, `LANES_BINDING_LYB=0` disables). A worker spends its held seat on one LYB repair (red or behind lane PR, 2 tries per head, a per-PR lease so two seats never repair one PR) or one claim (any Todo issue without `hold` or a hard-excluded label; sensitive labels only on the Codex lane; no LYB-specific concurrency cap, only the host's seats; `maxOpenPrs` counts open lane PRs plus running issue runs and limits new intake only, never repair) before Jovie intake. Jovie-only holds never block LYB and a binding fault never blocks Jovie. The harness pushes, opens a ready PR (never draft: LYB's native merge queue skips drafts; a repair readies a draft lane PR) and moves the issue to In Review; LYB required checks and its native queue land it. Refusal reasons land in `bindings.json`. LYB remediation events never run in the Jovie repo | `bindings.py`, `routing.json` `bindings`, `worker_with_slot()` |
 | Cost-aware routing: one capability floor per issue (`routing.json`), then the cheapest available `(lane, model)` route that clears it by effective cost; every claim is logged with its rationale | `remediation.route_issue()`, `issue_router()`, `runs/routing.jsonl` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
@@ -57,8 +63,10 @@ running worker. Production deploys are a separate track: only a red main stops s
 New-issue admission reports three separate counts: raw Todo candidates, candidates
 passing the issue predicate, and new issues after the owning lane's PR budget.
 Worker and doctor share the same budget decision: each dated lane branch counts
-once while non-green, with a cap of configured base slots × 2. Manual branches and
-disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
+once toward the active cap while non-green and advanceable, with a cap of
+configured base slots × 2. Held, repair-exhausted, and escalating PRs count
+separately toward the terminal cap of configured base slots × 4. Manual branches
+and disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
 malformed or truncation-ambiguous inventory stays unknown and cannot admit new
 issues. Maintenance claims still run first and do not depend on that budget read.
 HUD labels this count as new issues; it is not total company demand or a claim of
@@ -196,9 +204,13 @@ Gaps closed after the first week (no PR may sit unowned):
   a repair attempt or new authority.
 - Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
   drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
-  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
-  drafts receive `repair`, or `hold:dependency` while a named dependency is open.
-  A landed dependency releases repair; it never grants authority to discard the branch.
+  etc.) on a 3-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
+  drafts are reclaimed (Tim, 2026-10-10): the sweep labels them `lane-fix-stale` (plus
+  `conflict`/`red` as applicable), workers finish them with the stale-draft prompt, the
+  gate adopts them like lane drafts, and `ready_green` marks a CLEAN one ready with native
+  merge intent. `hold:dependency` applies while a named dependency is open; a landed
+  dependency releases the draft to the lanes. `hold` and human branches are never reclaimed,
+  and nothing here grants authority to discard the branch.
   JOV-INV-011 requires an explicit `duplicate` label before automatic retirement; age and
   exhaustion never close a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
   carrying `lane-fix-exhausted` or `queue-poison` for more than 48h (measured from the label's
@@ -367,6 +379,12 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitS` (seconds queued for a gate seat) on its receipt; the doctor aggregates
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
+
+**Ship now:** the gate timeout defaults to 3,600 seconds on macOS and remains 2,400 seconds
+elsewhere; `LANES_GATE_TIMEOUT_S` still overrides either default. **Re-evaluate when:** the mac
+records five gate timeouts in a 24-hour window after a full day on this release. **Then:** use the
+recorded gate waits and receipts to decide whether to reduce `LANES_GATE_SLOTS` before extending
+the timeout again.
 
 `SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. The
 doctor samples one-hour merge throughput every five minutes: queue depth,
@@ -670,39 +688,21 @@ checked against `app-ui-primitives.gen.json`, a projection of
 `DESIGN_SYSTEM_COMPONENT_IDS` and `AppScreenComponentId` that a test keeps
 in sync with those registries.
 
-**What happens to a held issue (JOV-7717: a brief must never block forever).**
-`worker()` calls `design_gate.pick_build_issue(...)` with the existing
-`pick_issue`. That call does five things:
+**No issue waits for a brief (Tim 2026-10-11).** `worker()` calls
+`design_gate.pick_build_issue(...)` with the existing `pick_issue`; ordinary
+order and eligibility choose the issue. A gated issue whose brief is missing or
+incomplete (inline or linked) is claimed as `brief-auto`: the gate labels it,
+clears any legacy `needs-design-brief` label, comments once, and appends one
+founder `jovie.work-order/v1` block for the taste call, which Summer's founder
+path (JOV-7739) posts to Ovie after the fact. The claiming build run writes the
+brief itself from the template and canon (`DESIGN_LOOP_CONTRACT`), puts it in
+the PR body, and builds in the same run. There is no separate brief run, no
+`held-at` marker and no frontier retry.
 
-1. **First claim.** A held issue goes ahead of build work: among issues whose
-   brief run is due, `pick_issue` order and eligibility choose one. The gate
-   adds `needs-design-brief` and a `held-at` marker once.
-2. **Brief run.** `run_brief` runs the same provider with a brief-only prompt.
-   The prompt says to write `.design-brief.md` and not to invent artifacts.
-   The runner appends the result inline under
-   `<!-- design-gate:brief-lane -->`, even if the run produced nothing, and
-   opens no PR. The issue returns to Todo.
-3. **Frontier retry.** If steps are still missing, the next claim runs one
-   retry on the `codex` lane (if healthy, otherwise the same lane). It fills
-   the steps from canon (DESIGN.md and the registries) and replaces the draft
-   under `<!-- design-gate:brief-retry -->`.
-4. **Auto-admission.** After the retry, or 24h after `held-at`, an incomplete
-   brief is admitted as `brief-auto`. The gate labels it, comments a warning,
-   and appends one founder `jovie.work-order/v1` block for the taste call. An
-   auto-admitted issue keeps brief-lane priority until its build claim, so the
-   24h escape cannot fall back into ordinary pool ordering. Summer's founder
-   path (JOV-7739) posts that block to Ovie with no model turn.
-5. **Linked briefs.** A linked `Design brief:` doc is never overwritten. It
-   gets no brief run and follows the 24h rule.
-
-`doctor.py` adds `designGate` to the admission census, deduped:
-
-- `gated`, `admitted`, `autoAdmitted`, `needsBrief` and `missingSteps`;
-- `ageHistogram`: time since `held-at` for issues still held or labeled;
-- `stale`: issues held past 25h. Any entry raises the `design-brief-stale`
-  alert.
-
-Incomplete briefs also increment `rejectedByProvider["needs-design-brief"]`.
+`doctor.py` adds `designGate` to the admission census, deduped: `gated`,
+`admitted`, `autoAdmitted` and `missingSteps` (steps the claiming runs will
+write). Nothing is rejected for a brief and there is no `design-brief-stale`
+alert.
 
 Design loop (JOV-7759): a gated issue's build prompt carries
 `DESIGN_LOOP_CONTRACT`. The lane plans from the brief, builds, and iterates

@@ -1246,7 +1246,7 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
         encoding="utf-8"
     )
 
-    assert "max-parallel: 1" in full_matrix
+    assert "max-parallel: 8" in full_matrix
     assert "needs: [context, deterministic]" in nightly_agent
     assert "schedule:" not in nightly_agent
     assert "push:" in nightly_agent

@@ -889,9 +889,15 @@ def non_pr_event(event_name: str, payload: dict) -> dict | None:
             source = "main-ci"
         ws = WS_BY_SOURCE[source]
         excerpt = f"{name} {conclusion}"
+        # JOV-8044: scheduled/dispatch runs share one fingerprint per workflow
+        # and conclusion. head_sha moves every run, so including it files a new
+        # issue each recurrence instead of reopening the canonical one.
+        parts = [source, name, conclusion]
+        if kind not in {"schedule", "workflow_dispatch"}:
+            parts.append(str(run.get("head_sha") or ""))
         return remediation_event(
             source=source,
-            fingerprint=fingerprint([source, name, str(run.get("head_sha") or ""), conclusion]),
+            fingerprint=fingerprint(parts),
             subject={"sha": run.get("head_sha"), "workflow": name},
             evidence={"url": run.get("html_url") or "", "excerpt": excerpt},
             ws=ws,

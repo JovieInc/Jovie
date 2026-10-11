@@ -115,7 +115,10 @@ describe('DashboardNav', () => {
     expect(
       search.compareDocumentPosition(newChat) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(search.parentElement).toHaveClass('h-9', 'shrink-0');
+    expect(search.closest('[data-sidebar-search-slot]')).toHaveClass(
+      'h-9',
+      'shrink-0'
+    );
   });
 
   it('hides Identity when PROFILES_WORKSPACE is off so the rail cannot 404', () => {
@@ -401,15 +404,21 @@ describe('DashboardNav', () => {
       renderFn: fastRender,
       appFlags: { PROFILES_WORKSPACE: true },
       sidebarProps: { defaultOpen: false },
+      navChildren: <button type='button'>Search fixture</button>,
     });
 
     expect(primaryLinks(container)).toHaveLength(4);
-    // JOV-4522: the search/inbox pill stages out (max-height + opacity +
-    // travel) rather than popping to display:none at frame one.
-    expect(getByRole('link', { name: 'New Chat' }).parentElement).toHaveClass(
-      'group-data-[collapsible=icon]:max-h-0',
-      'group-data-[collapsible=icon]:opacity-0'
+    // JOV-8017: New Chat retains command ownership in the icon rail.
+    // The composed Storybook spec verifies its painted geometry through motion.
+    expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.CHAT
     );
+    const secondary = container.querySelector(
+      '[data-sidebar-search-divider]'
+    )?.parentElement;
+    expect(secondary).toHaveAttribute('inert');
+    expect(secondary).toHaveAttribute('aria-hidden', 'true');
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,
       enabled: false,
