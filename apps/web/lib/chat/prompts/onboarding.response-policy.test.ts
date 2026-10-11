@@ -112,7 +112,7 @@ describe('onboarding compact response policy', () => {
 
   it('versions the changed onboarding prompt without changing its stable trace identity', () => {
     expect(resolveChatPromptRegistryEntry('onboarding')).toMatchObject({
-      version: 3,
+      version: 4,
       versionId: 'jovie-chat-onboarding-system:v1',
     });
     expect(resolveChatPromptRegistryEntry('app').version).toBe(1);
