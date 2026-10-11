@@ -515,35 +515,29 @@ class PromotionTest(unittest.TestCase):
 class LinearAndBudgetTest(unittest.TestCase):
     """2026-09-27: Linear rejects `number in [0]` and REST rate_limit misreports GraphQL."""
 
-    def fake_linear(self, calls):
-        class Client:
-            def __init__(self, _env):
-                pass
-
-            def gql(self, query, variables):
-                calls.append((query, variables))
-                data = {"pool": {"nodes": [{"identifier": "JOV-1", "priority": 1, "labels": {"nodes": [{"name": "devin"}]}}]},
-                        "triage": {"nodes": []}}
-                if "$numbers" in query:
-                    data["active"] = {"nodes": [{"identifier": "JOV-7", "title": "t", "state": {"name": "In Progress"}}]}
-                return data
-        return Client
-
-    def test_idle_host_never_sends_a_zero_issue_number(self):
-        calls = []
-        original = hud.lane.Linear
-        hud.lane.Linear = self.fake_linear(calls)
-        try:
-            idle = hud.linear_model(Path("/x"))
+    def test_linear_panel_reads_the_local_mirror_without_a_linear_request(self):
+        """2026-10-11: the HUD spends no Linear budget; it reads the dispatch tick's mirror."""
+        import os
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"LANES_STATE": tmp}), \
+                mock.patch.object(hud.lane, "Linear", side_effect=AssertionError("no Linear client")):
+            self.assertFalse(hud.linear_model(Path("/x"))["ok"])  # never filled: said so, not faked
+            def row(n, state, labels):
+                return {"id": f"i{n}", "identifier": f"JOV-{n}", "title": f"t{n}", "description": "",
+                        "priority": 1, "createdAt": "2026-10-01T00:00:00.000Z",
+                        "updatedAt": "2026-10-11T00:00:00.000Z", "state": {"name": state, "type": "unstarted"},
+                        "labels": {"pageInfo": {"hasNextPage": False}, "nodes": [{"name": l} for l in labels]}}
+            hud.lane.linear_sync.apply(Path(tmp), "JOV", [row(1, "Todo", ["devin"]), row(7, "In Progress", []),
+                                                         row(9, "Triage", ["codex"])])
+            with hud.lane.linear_sync._mutating(hud.lane.linear_sync.mirror_path(Path(tmp), "JOV"),
+                                                hud.lane.linear_sync.MIRROR) as data:
+                data.update(cursor="x", syncedAt=1_800_000_000.0)
+            hud.lane.linear_sync.enqueue(Path(tmp), "comment", "i1", body="claimed")
             busy = hud.linear_model(Path("/x"), ["JOV-7"])
-        finally:
-            hud.lane.Linear = original
-        self.assertTrue(idle["ok"])
-        self.assertEqual(idle["active"], {})
-        self.assertNotIn("numbers", calls[0][1])
-        self.assertNotIn("$numbers", calls[0][0])
-        self.assertEqual(calls[1][1]["numbers"], [7])
-        self.assertEqual(busy["active"], {"JOV-7": "t"})
+        self.assertTrue(busy["ok"])
+        self.assertEqual((busy["active"], busy["poolTotal"], busy["triage"], busy["outbox"]),
+                         ({"JOV-7": "t7"}, 1, 1, 1))
+        self.assertEqual(busy["pool"].get("devin"), 1)
 
     def test_graphql_budget_reads_graphql_not_rest(self):
         seen = []

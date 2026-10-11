@@ -236,36 +236,27 @@ def read_text(path: Path) -> str:
 
 
 def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
-    """Pool counts, triage returns, and the titles of exactly the issues this host is working."""
-    numbers = sorted({int(target.split("-")[1]) for target in in_flight if target.startswith("JOV-")})
+    """Pool counts, triage returns and the titles of the issues this host is working, read
+    from the local Linear mirror: the HUD spends no Linear request (2026-10-11)."""
     try:
-        client = lane.Linear(env_file)
-        token = lane._cache_token("-".join(str(number) for number in numbers) or "idle")
-
-        def fetch():
-            return client.gql(
-            'query($labels:[String!]!' + (',$numbers:[Float!]!' if numbers else '') + '){'
-            # Every JOV Todo issue is a candidate (2026-10-11); labels only break the count down.
-            'pool: issues(first:250,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}}})'
-            '{pageInfo{hasNextPage} nodes{identifier priority labels{nodes{name}}}}'
-            + ('active: issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}})'
-               '{nodes{identifier title state{name}}}' if numbers else '')
-            + 'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
-            '{nodes{identifier}}}', {"labels": list(LANE_LABELS), **({"numbers": numbers} if numbers else {})})
-
-        data = lane.shared(f"claim-hud-linear-v2-{token}", lane.CLAIM_SCAN_TTL_S, fetch)
+        state = lane.lane_state_dir()
+        if state is None:
+            raise RuntimeError("no lanes state dir")
+        mirror = lane.linear_sync.read_mirror(state, "JOV")
+        view = lane.linear_sync.status(state)
     except Exception as error:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"[:100]}
-    pool = Counter()
-    for node in data["pool"]["nodes"]:
-        for label in node["labels"]["nodes"]:
-            if label["name"] in LANE_LABELS:
-                pool[label["name"]] += 1
-    active = {n["identifier"]: n["title"] for n in (data.get("active") or {"nodes": []})["nodes"]}
-    total = len(data["pool"]["nodes"])
-    more = bool((data["pool"].get("pageInfo") or {}).get("hasNextPage"))
-    return {"ok": True, "pool": dict(pool), "poolTotal": f"{total}+" if more else total, "active": active,
-            "triage": len(data["triage"]["nodes"]), "fetchedAt": utcnow().isoformat()}
+    rows = list((mirror.get("issues") or {}).values())
+    todo = lane.linear_sync.todo(state, "JOV")
+    pool = Counter(label for row in todo for label in row["labels"] if label in LANE_LABELS)
+    wanted = set(in_flight)
+    active = {row["identifier"]: row["title"] for row in rows if row["identifier"] in wanted}
+    triage = sum(1 for row in rows if row["state"] == "Triage" and set(row["labels"]) & set(LANE_LABELS))
+    jov = view["mirror"]["JOV"]
+    synced = mirror.get("syncedAt")
+    return {"ok": synced is not None, "error": "mirror filling", "pool": dict(pool), "poolTotal": len(todo),
+            "active": active, "triage": triage, "mirrorAgeS": jov["ageS"], "outbox": view["outbox"]["depth"],
+            "fetchedAt": datetime.fromtimestamp(synced, timezone.utc).isoformat() if synced else None}
 
 
 def gh_json(args: list[str], timeout: int = 40):
@@ -504,7 +495,8 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     # header
     gh_note = (f"GitHub {github['rate']['graphql']}/5000" if github.get("rate") else
                "GitHub " + rgb(RED, github.get("errors", {}).get("rate", "unread")))
-    linear_note = "Linear ok" if linear.get("ok") else "Linear " + rgb(RED, linear.get("error", "unread"))
+    linear_note = (f"Linear mirror {age(linear['fetchedAt'], now)} · outbox {linear.get('outbox', 0)}" if linear.get("ok")
+                   else "Linear " + rgb(RED, linear.get("error", "unread")))
     stale_flags = []
     if github.get("fetchedAt") and (now - datetime.fromisoformat(github["fetchedAt"])).total_seconds() > 3 * REFRESH_REMOTE_S:
         stale_flags.append("github stale " + age(github["fetchedAt"], now))
