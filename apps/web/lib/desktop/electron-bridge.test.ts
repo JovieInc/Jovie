@@ -23,6 +23,7 @@ import {
   observeDesktopVisualActivity,
   reportDesktopWorkState,
   useDesktopBuildIdentity,
+  useDesktopPageTabs,
 } from './electron-bridge';
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -61,10 +62,89 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  clearElectronAPI();
   Object.defineProperty(window, 'open', {
     configurable: true,
     writable: true,
     value: originalWindowOpen,
+  });
+});
+
+describe('native page-tab state adapter', () => {
+  const state = {
+    activeId: 1,
+    tabs: [{ id: 1, title: 'Library', loading: false }],
+  };
+  it('keeps older binaries safe and returns failure when their command bridge is absent', async () => {
+    setElectronAPI({ versions: { app: 'old' } });
+    const { result } = renderHook(() => useDesktopPageTabs());
+    expect(result.current.state).toBeNull();
+    expect(await result.current.command({ type: 'create' })).toBe(false);
+  });
+  it('prefers a live event over a slow initial read and rejects malformed state', async () => {
+    let resolveInitial: (value: unknown) => void = () => undefined;
+    let listener: (value: unknown) => void = () => undefined;
+    const stop = vi.fn();
+    setElectronAPI({
+      getPageTabs: () =>
+        new Promise(resolve => {
+          resolveInitial = resolve;
+        }),
+      onPageTabsChanged: (callback: typeof listener) => {
+        listener = callback;
+        return stop;
+      },
+      pageTabsCommand: vi
+        .fn()
+        .mockRejectedValue(new Error('native unavailable')),
+    });
+    const { result, unmount } = renderHook(() => useDesktopPageTabs());
+    act(() => listener(state));
+    await act(async () =>
+      resolveInitial({
+        activeId: 2,
+        tabs: [{ id: 2, title: 'Old snapshot', loading: false }],
+      })
+    );
+    expect(result.current.state).toEqual(state);
+    for (const invalid of [
+      null,
+      {},
+      { ...state, activeId: 2 },
+      { ...state, tabs: [state.tabs[0], state.tabs[0]] },
+      { ...state, tabs: [{ id: 1, title: 'x'.repeat(161), loading: false }] },
+      { ...state, tabs: [{ id: 1, title: 'x', loading: 'true' }] },
+    ])
+      act(() => listener(invalid));
+    expect(result.current.state).toEqual(state);
+    expect(await result.current.command({ type: 'create' })).toBe(false);
+    unmount();
+    expect(stop).toHaveBeenCalledOnce();
+    act(() =>
+      listener({
+        activeId: 2,
+        tabs: [{ id: 2, title: 'Late', loading: false }],
+      })
+    );
+    expect(result.current.state).toEqual(state);
+  });
+  it('accepts a valid initial read and does not surface a rejected native read', async () => {
+    setElectronAPI({
+      getPageTabs: async () => state,
+      onPageTabsChanged: () => () => undefined,
+      pageTabsCommand: async () => true,
+    });
+    const first = renderHook(() => useDesktopPageTabs());
+    await waitFor(() => expect(first.result.current.state).toEqual(state));
+    expect(await first.result.current.command({ type: 'create' })).toBe(true);
+    first.unmount();
+    setElectronAPI({
+      getPageTabs: vi.fn().mockRejectedValue(new Error('unavailable')),
+      onPageTabsChanged: () => () => undefined,
+    });
+    const second = renderHook(() => useDesktopPageTabs());
+    await act(async () => await Promise.resolve());
+    expect(second.result.current.state).toBeNull();
   });
 });
 

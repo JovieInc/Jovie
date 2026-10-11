@@ -235,6 +235,7 @@ apps/desktop/src/*
 !apps/desktop/src/ovie-browser-recovery.ts
 !apps/desktop/src/nightly-update-launch-agent.ts
 !apps/desktop/src/navigation-coordinator.ts
+!apps/desktop/src/page-tabs.ts
 !apps/desktop/src/window-state-store.ts
 !apps/desktop/src/desktop-launch-readiness.ts
 !apps/desktop/src/startup-maintenance.ts

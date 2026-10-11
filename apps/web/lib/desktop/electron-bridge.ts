@@ -27,6 +27,32 @@ export interface DesktopBuildIdentity {
 }
 
 export interface ElectronAPI {
+  readonly getPageTabsAppearance?: () => Promise<{
+    readonly dark: boolean;
+    readonly ov: boolean;
+  } | null>;
+  readonly setPageTabsBounds?: (bounds: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+    readonly dark: boolean;
+    readonly ov: boolean;
+  }) => void;
+  readonly onPageTabsAppearance?: (
+    callback: (appearance: {
+      readonly dark: boolean;
+      readonly ov: boolean;
+    }) => void
+  ) => () => void;
+  /** Independent native page views. Optional for older installed binaries. */
+  readonly getPageTabs?: () => Promise<DesktopPageTabsState | null>;
+  readonly pageTabsCommand?: (
+    command: DesktopPageTabsCommand
+  ) => Promise<boolean>;
+  readonly onPageTabsChanged?: (
+    callback: (state: DesktopPageTabsState) => void
+  ) => () => void;
   readonly platform: NodeJS.Platform;
   readonly electronVersion: string;
   /** Main-process-validated package provenance. Optional for older shells. */
@@ -150,6 +176,75 @@ export interface ElectronAPI {
   ) => Promise<{ readonly ok: boolean; readonly reason?: string }>;
 }
 
+export interface DesktopPageTabsState {
+  readonly activeId: number;
+  readonly tabs: readonly {
+    readonly id: number;
+    readonly title: string;
+    readonly loading: boolean;
+  }[];
+}
+
+export type DesktopPageTabsCommand =
+  | { readonly type: 'create' }
+  | { readonly type: 'select' | 'close'; readonly id: number };
+
+function isDesktopPageTabsState(value: unknown): value is DesktopPageTabsState {
+  if (!value || typeof value !== 'object') return false;
+  const state = value as Partial<DesktopPageTabsState>;
+  return (
+    Number.isSafeInteger(state.activeId) &&
+    Array.isArray(state.tabs) &&
+    state.tabs.length > 0 &&
+    state.tabs.some(tab => tab?.id === state.activeId) &&
+    new Set(state.tabs.map(tab => tab?.id)).size === state.tabs.length &&
+    state.tabs.every(
+      tab =>
+        tab &&
+        Number.isSafeInteger(tab.id) &&
+        tab.id > 0 &&
+        typeof tab.title === 'string' &&
+        tab.title.length <= 160 &&
+        typeof tab.loading === 'boolean'
+    )
+  );
+}
+
+export function useDesktopPageTabs() {
+  const [state, setState] = useState<DesktopPageTabsState | null>(null);
+  useEffect(() => {
+    const api = getRawElectronAPI();
+    if (!api?.getPageTabs || !api.onPageTabsChanged) return;
+    let live = true;
+    let receivedEvent = false;
+    const unsubscribe = api.onPageTabsChanged(value => {
+      receivedEvent = true;
+      if (live && isDesktopPageTabsState(value)) setState(value);
+    });
+    void api
+      .getPageTabs()
+      .then(value => {
+        if (live && !receivedEvent && isDesktopPageTabsState(value))
+          setState(value);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+      unsubscribe();
+    };
+  }, []);
+  return {
+    state,
+    command: async (command: DesktopPageTabsCommand): Promise<boolean> => {
+      try {
+        return (await getRawElectronAPI()?.pageTabsCommand?.(command)) ?? false;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
 export interface DesktopAuthCompletion {
   readonly code: string;
   readonly state: string;
@@ -232,7 +327,7 @@ function reportMissingBridgeMethod(method: keyof ElectronAPI): void {
   );
 }
 
-function getRawElectronAPI(): Partial<ElectronAPI> | undefined {
+export function getRawElectronAPI(): Partial<ElectronAPI> | undefined {
   if (globalThis.window === undefined) return undefined;
   const raw = (
     globalThis.window as Window & { electronAPI?: Partial<ElectronAPI> }

@@ -125,7 +125,10 @@ test('every Electron launch and package path bundles the preload', async () => {
     await readFile(join(desktopRoot, 'package.json'), 'utf8')
   );
 
-  assert.equal(packageJson.scripts.compile, 'tsc && pnpm run bundle:preload');
+  assert.equal(
+    packageJson.scripts.compile,
+    'tsc && pnpm run bundle:preload && pnpm run bundle:page-tabs'
+  );
   for (const scriptName of [
     'dev',
     'build:staging',
