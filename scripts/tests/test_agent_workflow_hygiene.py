@@ -1383,6 +1383,15 @@ def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     assert "env.SLACK_WEBHOOK_URL != ''" in all_success
 
 
+def test_product_screenshot_servers_bind_to_loopback() -> None:
+    """Both production server forms must enforce the fixture trust boundary."""
+    start = _step_block("screenshots.yml", "Start production server")
+    assert "HOSTNAME: localhost" in start
+    assert "SERVER_COMMAND=(node .next/standalone/apps/web/server.js)" in start
+    assert "SERVER_COMMAND=(pnpm run start --hostname localhost)" in start
+    assert 'setsid "${SERVER_COMMAND[@]}"' in start
+
+
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     """The screenshot publisher must outlive capture plus the normal push gate."""
     producer_job = _job_block("screenshots.yml", "generate")
