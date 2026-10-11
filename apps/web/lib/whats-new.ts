@@ -11,13 +11,13 @@
  */
 
 import { type ChangelogRelease, changelogInlineText } from './changelog-parser';
+import { projectCustomerChangelog } from './customer-changelog';
 import {
   type CustomerChangelogHero,
   isCustomerChangelogPostUrl,
   parseCustomerChangelogHero,
-  projectCustomerChangelog,
   resolveCustomerChangelogHero,
-} from './customer-changelog';
+} from './customer-changelog-hero';
 
 export const WHATS_NEW_CONTRACT_VERSION = 1;
 export const WHATS_NEW_ENTRY_LIMIT = 5;

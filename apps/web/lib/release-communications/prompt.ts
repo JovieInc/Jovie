@@ -2,7 +2,7 @@ import {
   type CustomerChangelogHero,
   isCustomerChangelogPostUrl,
   parseCustomerChangelogHero,
-} from '../customer-changelog';
+} from '../customer-changelog-hero';
 import type { WhatsNewEntry } from '../whats-new';
 import {
   type DailyPost,
