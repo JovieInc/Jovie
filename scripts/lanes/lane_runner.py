@@ -63,15 +63,16 @@ import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
 REPO_SLUG = "JovieInc/Jovie"
-# `agent-ready` is the shared pool every enabled lane drains (Symphony Elixir is retired);
-# the rest stay with humans.
+# Tim 2026-10-11: every JOV Todo issue is eligible; no label is required. `agent-ready` +
+# `dispatch-next` still designates bottleneck work, and a lane label (devin, codex, ...) is a
+# routing preference (remediation.explicit_lane), never an admission requirement.
 SHARED_LABEL = "agent-ready"
+# Sensitive surfaces stay claimable, but only by SENSITIVE_PROVIDER under the guarded contract.
 SENSITIVE_LABELS = frozenset({
     "billing", "blocked:payments", "stripe", "cost-monitoring", "blocked:auth", "auth",
     "area:auth", "infra", "area:infra", "infrastructure", "vercel",
 })
-EXCLUDED_LABELS = frozenset({"no-symphony", *SENSITIVE_LABELS, "type:epic", "codex-blocked", "reasoning-job"})
-HARD_EXCLUDED_LABELS = frozenset({"no-symphony", "type:epic", "codex-blocked", "reasoning-job"})
+HARD_EXCLUDED_LABELS = frozenset({"hold", "no-symphony", "type:epic", "codex-blocked", "reasoning-job"})
 SENSITIVE_PROVIDER = "codex"
 # JOV-6896: codex lanes are implementation-only. Review work bills the leased ChatGPT
 # accounts without producing code, so a codex slot never claims a review-only task kind
@@ -138,7 +139,11 @@ OPEN_PRS_PER_SLOT = 2
 # (codex may not adopt/gate). They are bounded separately so they cannot pin the
 # active budget at its cap forever (JOV-7514: codex idle with 7 terminal PRs).
 TERMINAL_PRS_PER_SLOT = 4
-LANE_ISSUE_PAGES = 5  # <=500 Todo candidates per lane read
+LANE_ISSUE_PAGES = 5  # <=500 rows per bounded label/state read
+# The claim pool is every JOV Todo issue: one shared snapshot per TTL, <=1000 issues (316 on
+# 2026-10-11). A larger pool fails closed as lane-inventory-page-limit; raise this bound.
+TODO_POOL = "*"
+TODO_POOL_PAGES = 10
 STALE_DRAFT_S = 24 * 3600
 SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
@@ -920,7 +925,10 @@ def provider_may_run(provider: str, kind: str) -> bool:
 # the lane plans, builds, then iterates privately on the machine gate stack. Tim
 # sees only the finished design, as an Ovie taste card filed after landing.
 DESIGN_LOOP_CONTRACT = [
-    "- Design loop (UI issue). Plan from the design brief in the issue (steps 1-9), then",
+    "- Design loop (UI issue). Plan from the design brief in the issue (steps 1-9). If it is",
+    "  missing or incomplete, write it yourself first from docs/design/design-brief-template.md",
+    "  (marketing) or docs/design/app-ui-brief-template.md (app UI) and canon, put it in the PR",
+    "  body, and keep going in this run: nobody else will write it. Then",
     "  build the real thing with canonical tokens and components only. Before the PR,",
     "  iterate privately until every applicable gate is green on your final diff:",
     "  `pnpm design:conformance:gate` (includes the frontend-skill machine checks),",
@@ -931,6 +939,43 @@ DESIGN_LOOP_CONTRACT = [
     "  the founder taste card after landing. List each changed screen and state in the",
     "  handoff so the card shows the right surfaces.",
 ]
+
+
+# An issue section that already states when the work is done.
+DONE_SECTION = re.compile(
+    r"^#{1,6}\s*(?:definition of done|acceptance(?: criteria)?|success criteria|done when|"
+    r"exit criteria)\b[^\n]*\n(?P<body>.*?)(?=^#{1,6}\s|\Z)", re.IGNORECASE | re.MULTILINE | re.DOTALL)
+
+
+def definition_of_done(issue) -> list[str]:
+    """The issue's own done criteria when it states them, else ones derived from its title."""
+    found = DONE_SECTION.search(getattr(issue, "description", "") or "")
+    body = found.group("body").strip() if found else ""
+    if body:
+        return [f"  {line}" for line in body.splitlines()[:30] if line.strip()]
+    return [f"  - The outcome named in the title ({issue.title.strip()[:160]}) is true on main",
+            "    after your one PR merges, and the description's details are handled.",
+            "  - A test fails without the change and passes with it (docs-only work excepted).",
+            "  - The narrow relevant checks pass on your final diff."]
+
+
+def goal_contract(issue) -> list[str]:
+    """Tim 2026-10-11: a goal with a clear definition of done replaces a pre-approved plan."""
+    return [
+        "## Goal",
+        f"Ship {issue.identifier}: {issue.title.strip()}. You own it end to end in this run.",
+        "",
+        "## Definition of done",
+        *definition_of_done(issue),
+        "  Restate it in your own words before you start, then work until every line is true.",
+        "",
+        "## Planning",
+        "- No plan approval is needed and none is coming. Never wait for a plan, an approval",
+        "  label (`plan-approved`, `admission-approved`, ...), a design brief or another agent.",
+        "- For a non-trivial change you may run gstack `/autoplan` yourself first; it decides",
+        "  on its own. For a small, clear fix, just build it.",
+        "",
+    ]
 
 
 def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | None = None) -> str:
@@ -959,6 +1004,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "## Company context (GBrain; prior decisions and post-mortems — verify against source)",
         context_pack or "(GBrain unavailable for this run; rely on repo docs.)",
         "",
+        *goal_contract(issue),
         "## Contract (the harness verifies every line; unmet items fail the run)",
         f"- Repo {REPO_SLUG}. Work on branch `{branch}` from origin/main. Read CLAUDE.md, the",
         "  rules it routes to for the files you touch, and docs/PR_FLOW.md before editing.",
@@ -983,9 +1029,9 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "- If the issue is not code-shippable or already fixed, open no PR and end with a",
         "  line `NOT-SHIPPABLE: <reason>`.",
         "- You are unattended: nobody will answer a question. Never stop to ask; choose the",
-        "  non-interactive path. Do not run gstack or other skill workflows (ship, review, qa,",
-        "  upgrade) and do not upgrade any tooling: commit with git and open the PR with",
-        "  `gh pr create --draft`.",
+        "  non-interactive path. Apart from `/autoplan`, do not run gstack or other skill",
+        "  workflows (ship, review, qa, upgrade) and do not upgrade any tooling: commit with git",
+        "  and open the PR with `gh pr create --draft`.",
         "- Remove any git worktrees you create when done (`git worktree remove`); the host",
         "  reclaims idle ones, but ENOSPC once took every lane down at once.",
         *sensitive_contract,
@@ -1688,18 +1734,6 @@ class Linear:
             cursors.add(after)
         raise LaneInventoryUnknown("lane-inventory-page-limit")
 
-    def _todo_catalog(self, label: str) -> list[str]:
-        labels = {SHARED_LABEL, label}
-        for provider, spec in load_providers().items():
-            if not spec.get("enabled", True):
-                continue
-            slots = os.environ.get(f"LANES_SLOTS_{provider.upper()}", spec.get("slots", 1))
-            if str(slots).isdigit() and int(slots) > 0 and isinstance(spec.get("label"), str):
-                labels.add(spec["label"])
-        if any(not isinstance(value, str) or not value.strip() for value in labels):
-            raise LaneInventoryUnknown("lane-catalog-malformed")
-        return sorted(labels)
-
     def _todo_scope(self) -> str:
         return _linear_scope_id(self.key)
 
@@ -1730,7 +1764,7 @@ class Linear:
                     or not isinstance(row.get("labels"), list)
                     or any(not isinstance(name, str) or not name for name in row["labels"])):
                 raise LaneInventoryUnknown("lane-snapshot-row-invalid")
-            if row["id"] in ids or not set(row["labels"]).intersection(labels):
+            if row["id"] in ids or (labels != [TODO_POOL] and not set(row["labels"]).intersection(labels)):
                 raise LaneInventoryUnknown("lane-snapshot-membership-invalid")
             ids.add(row["id"])
         revision = hashlib.sha256(json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -1772,12 +1806,15 @@ class Linear:
                 raise LaneInventoryUnknown("lane-inventory-scan-expired")
             if not self._snapshot_budget_admitted(pages - page_index):
                 raise LaneInventoryUnknown("linear-refresh-reserve-held")
+            everything = labels == [TODO_POOL]
             data = self.gql(
-                'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
-                'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},'
-                'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
+                ('query($after:String)' if everything else 'query($labels:[String!]!,$after:String)')
+                + '{issues(first:100,after:$after,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}}'
+                + ('' if everything else ',labels:{name:{in:$labels}}')
+                + '}){pageInfo{hasNextPage endCursor} '
                 'nodes{id identifier title description priority createdAt '
-                'labels(first:50){pageInfo{hasNextPage} nodes{name}}}}}', {"labels": labels, "after": after})
+                'labels(first:50){pageInfo{hasNextPage} nodes{name}}}}}',
+                {"after": after} if everything else {"labels": labels, "after": after})
             if not 0 <= time.time() - started < CLAIM_SCAN_TTL_S:
                 raise LaneInventoryUnknown("lane-inventory-scan-expired")
             edge = data.get("issues") if isinstance(data, dict) else None
@@ -1824,44 +1861,37 @@ class Linear:
                     "sourceStartedAt": started, "completedAt": time.time(), "complete": False, "overflow": True}
         raise LaneInventoryUnknown("lane-inventory-page-limit")
 
-    def _paginated_lane_issues(self, label: str) -> list[dict]:
-        """Structural union overflow alone falls back to the unchanged per-pool bound."""
-        labels = sorted({label, SHARED_LABEL})
-        return self._todo_snapshot(labels, LANE_ISSUE_PAGES)["rows"]
+    def lane_issues(self, label: str | None = None) -> list[Issue]:
+        """Every JOV Todo issue, from one complete, credential-bound snapshot per host per TTL.
 
-    def lane_issues(self, label: str) -> list[Issue]:
-        """One complete, credential/catalog-bound Todo snapshot per host per minute.
-
-        This is candidate observation only. Consequential state, mutation readbacks,
-        holds and ownership remain freshly checked at the ordinary claim boundary."""
-        catalog = self._todo_catalog(label)
+        Tim 2026-10-11: any issue is eligible, so every lane reads the same snapshot and
+        `label` (the caller's lane) no longer narrows it; admission_rejection and the router
+        decide. A truncated scan fails closed. This is candidate observation only:
+        consequential state, mutation readbacks, holds and ownership remain freshly checked
+        at the ordinary claim boundary."""
+        catalog = [TODO_POOL]
         binding = hashlib.sha256(json.dumps([self._todo_scope(), catalog], separators=(",", ":")).encode()).hexdigest()
-        value = shared(f"claim-todo-union-v1-{binding}", CLAIM_SCAN_TTL_S,
-                       lambda: self._todo_snapshot(catalog, LANE_ISSUE_PAGES * max(1, len(catalog) - 1), overflow=len(catalog) > 2),
+        value = shared(f"claim-todo-all-v2-{binding}", CLAIM_SCAN_TTL_S,
+                       lambda: self._todo_snapshot(catalog, TODO_POOL_PAGES),
                        validate=lambda envelope: self._todo_envelope_valid(envelope, catalog))
         if value is None:
             raise LaneInventoryUnknown("lane-snapshot-unavailable")
-        if value.get("overflow") is True:
-            scoped = sorted({label, SHARED_LABEL})
-            value = shared(f"claim-todo-fallback-v1-{binding}-{_cache_token(label)}", CLAIM_SCAN_TTL_S,
-                           lambda: self._todo_snapshot(scoped, LANE_ISSUE_PAGES),
-                           validate=lambda envelope: self._todo_envelope_valid(envelope, scoped))
-            if value is None:
-                raise LaneInventoryUnknown("lane-snapshot-unavailable")
-        rows = [row for row in value["rows"] if label in row["labels"] or SHARED_LABEL in row["labels"]]
-        if len(rows) > 100 * LANE_ISSUE_PAGES:
+        rows = value.get("rows")
+        if value.get("overflow") is True or not isinstance(rows, list) or len(rows) > 100 * TODO_POOL_PAGES:
             raise LaneInventoryUnknown("lane-inventory-page-limit")
         return [Issue(row["id"], row["identifier"], row["title"], row["description"],
                       row["priority"], row["created_at"], list(row["labels"])) for row in rows]
 
-    def active_lane_issues(self, labels: list[str]) -> list[Issue]:
-        """In Progress work claimed from a lane pool, for cross-host overlap admission."""
+    def active_lane_issues(self, labels: list[str] | None = None) -> list[Issue]:
+        """In Progress work, for cross-host overlap admission. Every JOV issue is claimable,
+        so no labels (the default) means all In Progress JOV work."""
         nodes = self._bounded_lane_nodes(
-                'query($labels:[String!]!,$after:String){issues(first:100,after:$after,'
-                'filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"In Progress"}},'
-                'labels:{name:{in:$labels}}}){pageInfo{hasNextPage endCursor} '
+                ('query($after:String)' if not labels else 'query($labels:[String!]!,$after:String)')
+                + '{issues(first:100,after:$after,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"In Progress"}}'
+                + ('' if not labels else ',labels:{name:{in:$labels}}')
+                + '}){pageInfo{hasNextPage endCursor} '
                 'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}',
-                {"labels": labels})
+                {"labels": labels} if labels else {})
         return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
                       n["createdAt"], [label["name"] for label in n["labels"]["nodes"]])
                 for n in nodes]
@@ -2527,66 +2557,6 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
          "costs": {"apiCalls": 1}, "mutationsPerformed": receipt.get("pr") and ["pull_request"] or [],
          "confidence": "high" if result == "succeeded" else "unknown", "dependencies": [name]},
         coordination=coordination)
-    with open(runs / "ledger.jsonl", "a") as ledger:
-        ledger.write(json.dumps(receipt) + "\n")
-    return receipt
-
-
-def brief_retry_lane(host: Host, name: str, spec: dict) -> tuple[str, dict]:
-    """JOV-7717: the frontier retry runs on the frontier lane when it is usable."""
-    frontier = design_gate.BRIEF_RETRY_PROVIDER
-    catalog = load_providers()
-    candidate = catalog.get(frontier)
-    if (name != frontier and candidate and candidate.get("enabled", True)
-            and not cooling(host, frontier) and provider_healthy(candidate)):
-        return frontier, candidate
-    return name, spec
-
-
-def run_brief(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -> dict:
-    """JOV-7541 design/brief lane: one brief-only run on a detached checkout, no PR.
-
-    The second run for an issue is the frontier retry (JOV-7717); after it the
-    gate admits the issue as `brief-auto`, so a brief never blocks for good."""
-    retry = design_gate.brief_retry(issue)
-    if retry:
-        name, spec = brief_retry_lane(host, name, spec)
-    run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{issue.identifier}-{name}-brief-{uuid.uuid4().hex[:6]}"
-    runs = host.state / "runs"
-    runs.mkdir(parents=True, exist_ok=True)
-    worktree = host.state / "worktrees" / run_id
-    receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "provider": name, "model": spec.get("model"),
-               "kind": "design-brief", "briefRetry": retry, "issue": issue.identifier, "linearIssueId": issue.id,
-               "worktree": str(worktree), "startedAt": now_iso()}
-    with open(runs / f"{run_id}.log", "w") as log:
-        try:
-            require_disk(host, "brief-checkout")
-            sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo, log=log)
-            sh(["git", "worktree", "add", "-q", "--detach", str(worktree), "origin/main"], cwd=host.repo, log=log)
-            brain_context = context_pack(issue)
-            prompt = design_gate.render_brief_prompt(
-                issue, brain_context, retry=retry, missing=design_gate.build_admission(issue)["missing"])
-            prompt_file = runs / f"{run_id}.prompt.md"
-            receipt["contextManifests"] = [write_agent_prompt(
-                prompt_file, prompt, "issue", name,
-                {"issue": json.dumps({"id": issue.id, "identifier": issue.identifier, "title": issue.title,
-                                      "description": issue.description}, sort_keys=True),
-                 "gbrain": brain_context, "branch": "design-brief"})]
-            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
-                                                       "cwd": str(worktree),
-                                                       "provider_receipt": str(runs / f"{run_id}.provider.jsonl")}),
-                              worktree, log, host.agent_timeout, guard=lambda: require_disk(host, "brief-running"))
-            brief = worktree / design_gate.BRIEF_FILE
-            receipt.update(agentExit=agent.returncode, **design_gate.publish_brief(
-                linear, issue, brief.read_text(errors="replace") if brief.exists() else "", retry=retry))
-        except DiskAdmissionError as error:
-            receipt.update(verdict="disk-held", reasons=[str(error)])
-        except Exception as error:  # a broken run must still leave a receipt and free its issue
-            receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
-        finally:
-            (worktree / design_gate.BRIEF_FILE).unlink(missing_ok=True)
-            remove_worktree(host, worktree)
-    receipt.update(endedAt=now_iso(), result={"verdict": receipt.get("verdict"), "pr": None, "commit": None})
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
@@ -5197,15 +5167,13 @@ def overlap_inventory(host: Host, linear: Linear) -> tuple[list[dict], list[dict
     prs = overlap_prs_summary()
     if prs is None:
         return None
-    provider_labels = [spec["label"] for spec in load_providers().values() if spec.get("label")]
-
     def fetch_active():
         return [{"id": issue.id, "identifier": issue.identifier, "title": issue.title,
                  "description": issue.description, "priority": issue.priority,
                  "createdAt": issue.created_at, "labels": issue.labels}
-                for issue in linear.active_lane_issues([SHARED_LABEL, *provider_labels])]
+                for issue in linear.active_lane_issues()]
     try:
-        active = shared("file-overlap-tasks-v2", SUMMARY_TTL_S, fetch_active)
+        active = shared("file-overlap-tasks-v3", SUMMARY_TTL_S, fetch_active)
     except LinearRateLimited:
         raise
     except Exception:
@@ -6053,9 +6021,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         log_route(host, name, route_decision)
         spec = {**spec, "model": route_decision["chosen"]["model"], "route": route_decision}
     notify_issue_claim(linear, issue, name, spec)
-    runner = run_brief if design_gate.wants_brief(issue, host.repo) else run_issue
     try:
-        receipt = runner(host, name, spec, linear, issue)
+        receipt = run_issue(host, name, spec, linear, issue)
     finally:
         file_overlap.release_task(host.state, issue.identifier)
     verdict = receipt.get("verdict")
@@ -6111,8 +6078,6 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     if verdict in {"gate-in-progress", "gate-deferred", "gate-already-completed"}:
         linear.comment(issue.id, f"🤖 lane `{name}`: PR {receipt.get('prUrl')} remains with its exact-head gate "
                                  f"({verdict}); no issue retry charged and no new certification claimed.")
-    elif verdict in ("brief-complete", "brief-incomplete"):
-        linear.move(issue.id, "Todo")  # complete: the next claim builds it; incomplete: gate holds it
     elif verdict == "not-shippable":
         linear.move(issue.id, "Backlog")
         linear.comment(issue.id, f"🤖 lane `{name}` judged this not code-shippable: {receipt['reasons'][0]}\n"
