@@ -97,10 +97,10 @@ class JudgeTest(unittest.TestCase):
         self.assertNotIn('remediation-delivery', alerts)
         self.assertEqual(doctor.condition_receipts(alerts, prior, good, 'gem')['remediation-delivery']['state'], 'resolved')
 
-    def test_design_brief_held_past_24h_alerts(self):
-        alerts = doctor.judge(obs(designGate={"stale": ["JOV-3"]}))
-        self.assertIn("JOV-3", alerts["design-brief-stale"])
-        self.assertEqual(doctor.judge(obs(designGate={"stale": []})), {})
+    def test_design_brief_stale_alert_is_retired(self):
+        # 2026-10-11: no issue is held for a brief, so even a legacy census never alerts.
+        self.assertEqual(doctor.judge(obs(designGate={"stale": ["JOV-3"]})), {})
+        self.assertEqual(doctor.judge(obs(designGate={"gated": 1, "autoAdmitted": 1})), {})
 
     def test_escalation_alert_names_the_pr_and_class(self):
         alerts = doctor.judge(obs(escalation={"surfaced": [{"pr": 7, "cls": "needs-human-decision"}]}))
@@ -384,26 +384,17 @@ class ReconcileTest(unittest.TestCase):
         self.assertNotIn("workers-without-completions", doctor.judge(obs(lastWorkAge=60), prior))
         self.assertNotIn("workers-without-completions", doctor.judge(obs(lastWorkAge=None)))
 
-    def test_unknown_design_census_preserves_alarm_until_observed_recovery(self):
-        for reason in ({"linearError": "pool read failed"}, {"linearSkipped": "cooldown"}):
+    def test_open_design_brief_alarm_resolves_after_the_retirement(self):
+        for reason in ({"linearError": "pool read failed"}, {"linearSkipped": "cooldown"}, {}):
             with self.subTest(reason=reason):
                 tracker = FakeTracker()
-                observed = obs(designGate={"stale": ["JOV-3"]})
-                alerts = doctor.judge(observed)
+                observed = obs()
+                alerts = {"design-brief-stale": "1 needs-design-brief issue(s) held past 24h (JOV-3)"}
                 state = doctor.reconcile(alerts, {}, tracker, observed["now"],
                                          doctor.condition_receipts(alerts, {}, observed, "gem"))
                 observed = obs(designGate=None, **reason)
                 alerts = doctor.judge(observed, state)
-                state = doctor.reconcile(alerts, state, tracker, observed["now"],
-                                         doctor.condition_receipts(alerts, state, observed, "gem"))
-                self.assertEqual(tracker.closed, [])
-                self.assertIsNone(state["issues"]["design-brief-stale"]["closedAt"])
-                condition = state["conditions"]["design-brief-stale"]
-                self.assertEqual(condition["state"], "active")
-                self.assertEqual(condition["source"]["status"], "unknown")
-                self.assertEqual(condition["generation"], 1)
-                observed = obs(designGate={"stale": []})
-                alerts = doctor.judge(observed, state)
+                self.assertNotIn("design-brief-stale", alerts)
                 state = doctor.reconcile(alerts, state, tracker, observed["now"],
                                          doctor.condition_receipts(alerts, state, observed, "gem"))
                 self.assertEqual(tracker.closed.count("id-design-brief-stale"), 1)
@@ -974,6 +965,17 @@ class RunnablePoolTest(unittest.TestCase):
                            "in-flight-pr": 1, "retry-exhausted": 1, "retry-backoff": 1}
                 self.assertEqual(observed["rejectedByProvider"], {
                     "devin": {**reasons, "sensitive-provider": 1}, "codex": reasons, "claude": {}})
+                # Per-issue rejection view (JOV-8000 follow-up 39): bounded
+                # {issueId: reason} so route-held / over-budget is visible
+                # without host access; every rejected candidate is named.
+                rejected_issues = observed["rejectedIssues"]
+                self.assertEqual(rejected_issues.get("JOV-EPIC"), "excluded-label:type:epic")
+                self.assertEqual(rejected_issues.get("JOV-PRICE"), "sensitive-text")
+                self.assertEqual(rejected_issues.get("JOV-OWNED"), "in-flight-pr")
+                self.assertEqual(rejected_issues.get("JOV-EXHAUSTED"), "retry-exhausted")
+                self.assertEqual(rejected_issues.get("JOV-BACKOFF"), "retry-backoff")
+                self.assertNotIn("JOV-GOOD", rejected_issues)
+                self.assertLessEqual(len(rejected_issues), 20)
                 feed = doctor.status_feed(host, lane, observed, {}, {})
                 self.assertEqual(feed["admission"]["rejectedByProvider"], observed["rejectedByProvider"])
                 self.assertEqual(feed["admission"]["poolByProvider"], observed["poolByProvider"])

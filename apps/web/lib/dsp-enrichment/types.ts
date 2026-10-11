@@ -254,6 +254,12 @@ export interface MusicBrainzArtist {
   relations?: MusicBrainzRelation[];
   isnis?: string[];
   ipis?: string[];
+  'release-groups'?: Array<{
+    id: string;
+    title: string;
+    'primary-type'?: string | null;
+    'first-release-date'?: string | null;
+  }>;
 }
 
 /**

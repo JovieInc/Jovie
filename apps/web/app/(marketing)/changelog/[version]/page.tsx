@@ -32,6 +32,7 @@ import {
   buildArticleSchema,
   buildBreadcrumbSchema,
 } from '@/lib/constants/schemas';
+import { resolveCustomerChangelogHero } from '@/lib/customer-changelog';
 import '../changelog-editorial.css';
 
 export const revalidate = false;
@@ -158,6 +159,7 @@ export default async function ChangelogReleasePage({
     0
   );
 
+  const hero = resolveCustomerChangelogHero(release.version);
   const canonical = `${BASE_URL}/changelog/${encodeURIComponent(version)}`;
   // Undated releases get breadcrumbs only: Article requires datePublished.
   const label = changelogVersionLabel(version);
@@ -184,7 +186,7 @@ export default async function ChangelogReleasePage({
       <script type='application/ld+json'>{breadcrumbSchema}</script>
       <div className='marketing-hero-dock relative overflow-hidden'>
         <MarketingEditorialHeroPhoto
-          src='/images/hero/changelog-version.webp'
+          src={hero.src}
           opacity={0.22}
           testId='changelog-version-hero-photo'
         />

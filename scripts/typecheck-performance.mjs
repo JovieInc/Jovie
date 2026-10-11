@@ -4,12 +4,14 @@ import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 
@@ -252,6 +254,17 @@ function aggregate(samples) {
   };
 }
 
+// The singleflight launcher replays a completed result for 30 s, which would
+// turn every sample after the first into a cache replay. A fresh state dir
+// per sample keeps each timed run a real typecheck (JOV-8044).
+export function sampleEnv(index) {
+  return {
+    TYPECHECK_SINGLEFLIGHT_DIR: mkdtempSync(
+      join(tmpdir(), `jovie-typecheck-performance-${index}-`)
+    ),
+  };
+}
+
 async function runScenario(name, definition, count) {
   if (EDITS[name])
     runCommand([...TURBO, '--summarize', '--output-logs=errors-only']);
@@ -259,28 +272,34 @@ async function runScenario(name, definition, count) {
   for (let index = 0; index < count; index += 1) {
     const execute = () => {
       if (definition.diagnostics)
-        return runCommand([
-          ...PNPM,
-          '--filter=@jovie/web',
-          'exec',
-          'tsc',
-          '-p',
-          'tsconfig.typecheck.json',
-          '--noEmit',
-          '--incremental',
-          '--tsBuildInfoFile',
-          '.cache/tsbuildinfo',
-          '--extendedDiagnostics',
-          '--pretty',
-          'false',
-        ]);
-      return runCommand([
-        ...TURBO,
-        ...definition.args,
-        '--summarize',
-        '--output-logs=errors-only',
-        '--env-mode=loose',
-      ]);
+        return runCommand(
+          [
+            ...PNPM,
+            '--filter=@jovie/web',
+            'exec',
+            'tsc',
+            '-p',
+            'tsconfig.typecheck.json',
+            '--noEmit',
+            '--incremental',
+            '--tsBuildInfoFile',
+            '.cache/tsbuildinfo',
+            '--extendedDiagnostics',
+            '--pretty',
+            'false',
+          ],
+          sampleEnv(index)
+        );
+      return runCommand(
+        [
+          ...TURBO,
+          ...definition.args,
+          '--summarize',
+          '--output-logs=errors-only',
+          '--env-mode=loose',
+        ],
+        sampleEnv(index)
+      );
     };
     const measured = () => {
       if (definition.cold) clearBuildInfo();
