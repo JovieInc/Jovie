@@ -31,6 +31,11 @@ export const GREEN_SOURCE_HOLD_LABELS = Object.freeze([
   ...new Set([...WRITER_PROMOTION_HOLD_LABELS, ...TIM_HOLD_LABELS]),
 ]);
 
+// UNSTABLE means only non-required checks are red or pending. The fail-closed
+// check-blocker scan below still rejects every terminal non-advisory failure,
+// so an UNSTABLE draft is admitted only when its remaining noise is advisory.
+export const GREEN_SOURCE_MERGE_STATES = Object.freeze(['CLEAN', 'UNSTABLE']);
+
 const SHA_RE = /^[0-9a-f]{40}$/;
 
 function exactSha(value) {
@@ -120,7 +125,7 @@ export function classifyGreenSourceDraft(input = {}) {
   const mergeStateStatus = String(
     input.mergeStateStatus ?? input.merge_state_status ?? ''
   ).toUpperCase();
-  if (mergeStateStatus !== 'CLEAN') {
+  if (!GREEN_SOURCE_MERGE_STATES.includes(mergeStateStatus)) {
     return {
       eligible: false,
       reason: `mergeStateStatus:${mergeStateStatus || 'unknown'}`,
@@ -136,6 +141,91 @@ export function classifyGreenSourceDraft(input = {}) {
   }
 
   return { eligible: true, reason: 'green-source-clean' };
+}
+
+function prNumberOf(pr) {
+  const number = Number.parseInt(String(pr?.number ?? pr?.n ?? ''), 10);
+  return Number.isSafeInteger(number) && number > 0 ? number : 0;
+}
+
+function skippedByStaticPolicy(pr) {
+  return (
+    isProtectedGreenSourcePr(prNumberOf(pr)) ||
+    hasGreenSourceHold(pr.labels) ||
+    hasControlledProofMarker({
+      labels: pr.labels,
+      branch: pr.headRefName ?? pr.branch,
+      title: pr.title,
+    })
+  );
+}
+
+function rotate(list, offset) {
+  if (list.length === 0) return list;
+  const start =
+    (((Number.parseInt(String(offset ?? 0), 10) || 0) % list.length) +
+      list.length) %
+    list.length;
+  return [...list.slice(start), ...list.slice(0, start)];
+}
+
+/**
+ * Missed-event recovery cohort: open main drafts that already look green in a
+ * single `gh pr list` snapshot. Live state and checks are re-read per PR before
+ * any mutation, so this is discovery only. The rotation offset (the workflow
+ * run number) keeps a permanently ineligible draft from starving the rest.
+ */
+export function selectMissedCohort(prs = [], options = {}) {
+  const limit = Math.max(
+    0,
+    Number.parseInt(String(options.limit ?? 0), 10) || 0
+  );
+  if (limit === 0) return [];
+  const skip = Number.parseInt(String(options.skip ?? 0), 10) || 0;
+  const candidates = (Array.isArray(prs) ? prs : [])
+    .filter(pr => pr && (pr.isDraft === true || pr.draft === true))
+    .filter(pr => String(pr.baseRefName ?? '') === 'main')
+    .filter(pr => prNumberOf(pr) > 0 && prNumberOf(pr) !== skip)
+    .filter(pr => !skippedByStaticPolicy(pr))
+    .filter(pr => String(pr.mergeable ?? '').toUpperCase() === 'MERGEABLE')
+    .filter(pr =>
+      GREEN_SOURCE_MERGE_STATES.includes(
+        String(pr.mergeStateStatus ?? '').toUpperCase()
+      )
+    )
+    .map(prNumberOf)
+    .sort((a, b) => a - b);
+  return rotate(candidates, options.offset).slice(0, limit);
+}
+
+/**
+ * Orphaned stacked drafts: the base branch is not main and no open PR owns it
+ * as a head. The repo keeps merged head branches (delete_branch_on_merge is
+ * off), so GitHub never retargets these children and the green-source path
+ * (main-only) never sees them. The caller must still prove the parent PR was
+ * MERGED before retargeting; a closed-unmerged parent stays untouched.
+ */
+export function selectOrphanedStacks(prs = [], options = {}) {
+  const limit = Math.max(
+    0,
+    Number.parseInt(String(options.limit ?? 0), 10) || 0
+  );
+  if (limit === 0) return [];
+  const list = Array.isArray(prs) ? prs : [];
+  const openHeads = new Set(
+    list.map(pr => String(pr?.headRefName ?? '')).filter(Boolean)
+  );
+  const candidates = list
+    .filter(pr => pr && (pr.isDraft === true || pr.draft === true))
+    .filter(pr => {
+      const base = String(pr.baseRefName ?? '');
+      return base !== '' && base !== 'main' && !openHeads.has(base);
+    })
+    .filter(pr => prNumberOf(pr) > 0)
+    .filter(pr => !skippedByStaticPolicy(pr))
+    .map(pr => ({ number: prNumberOf(pr), base: String(pr.baseRefName) }))
+    .sort((a, b) => a.number - b.number);
+  return rotate(candidates, options.offset).slice(0, limit);
 }
 
 function readStdin() {
@@ -154,6 +244,27 @@ function main(argv) {
   }
   if (cmd === 'protected') {
     process.stdout.write(`${GREEN_SOURCE_PROTECTED_PRS.join(',')}\n`);
+    return 0;
+  }
+  if (cmd === 'cohort' || cmd === 'orphans') {
+    let parsed = [];
+    try {
+      parsed = JSON.parse(readStdin().trim() || '[]');
+    } catch {
+      parsed = [];
+    }
+    const options = {
+      limit: argv[3] ?? 0,
+      offset: argv[4] ?? 0,
+      skip: argv[5] ?? 0,
+    };
+    const out =
+      cmd === 'cohort'
+        ? selectMissedCohort(parsed, options).map(String)
+        : selectOrphanedStacks(parsed, options).map(
+            o => `${o.number}\t${o.base}`
+          );
+    if (out.length > 0) process.stdout.write(`${out.join('\n')}\n`);
     return 0;
   }
   if (cmd === 'classify') {
@@ -179,7 +290,7 @@ function main(argv) {
     return 0;
   }
   console.error(
-    'Usage: auto-ready-green-drafts.mjs <classify|hold-re|protected>'
+    'Usage: auto-ready-green-drafts.mjs <classify|cohort|orphans|hold-re|protected>'
   );
   return 2;
 }

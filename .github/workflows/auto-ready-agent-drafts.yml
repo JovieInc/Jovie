@@ -2,7 +2,7 @@ name: Auto-Ready Agent Drafts
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # necessary-trust-boundary: Hosted GitHub App token undrafts same-repo green-source drafts after PR Ready and required checks succeed CLEAN; this hop never enables auto-merge or enrolls the merge queue.
-# removal-trigger: Remove the workflow_run and check_suite wakes when GitHub natively undrafts same-repo drafts that already satisfy required SUCCESS and CLEAN without a hosted App-token hop.
+# removal-trigger: Remove the workflow_run wake when GitHub natively undrafts same-repo drafts that already satisfy required SUCCESS and CLEAN without a hosted App-token hop.
 
 # Two controllers share this workflow:
 #
@@ -24,11 +24,13 @@ name: Auto-Ready Agent Drafts
 # with pr_number + head_sha is a targeted green-source undraft. Opt out
 # per-PR with machine/security/hold labels or controlled-proof/canary markers.
 
+# Wake only on the workflows that publish the required source contexts
+# (Source Validation: PR Ready + Migration Guard; Fork PR Gate; PR Size Guard).
+# CI runs only on merge_group/push and check_suite fired for every workflow on
+# every head, so both were pure duplicate wakes (~20% of runs, all no-ops).
 on:
   workflow_run:
-    workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
-    types: [completed]
-  check_suite:
+    workflows: ['Source Validation', 'Fork PR Gate', 'PR Size Guard']
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -41,9 +43,9 @@ on:
         required: false
         type: string
 
-concurrency:
-  group: auto-ready-agent-drafts
-  cancel-in-progress: false
+# Concurrency is job-scoped on purpose. A workflow-level group made every
+# skipped wake (job `if:` false) enter the same group and replace the single
+# pending real run, silently dropping other PRs' green events.
 
 permissions:
   contents: read
@@ -53,6 +55,9 @@ jobs:
     # Writer-proof recovery stays manual. CI/check_suite must not scan 200 PRs
     # looking for proof receipts — that path is author-owned.
     if: github.event_name == 'workflow_dispatch' && inputs.pr_number == ''
+    concurrency:
+      group: auto-ready-agent-drafts
+      cancel-in-progress: false
     # Fleet controller: use the hosted image contract so `gh` is always
     # available. Some self-hosted fast runners intentionally lack it.
     runs-on: ubuntu-latest
@@ -106,18 +111,15 @@ jobs:
         ) &&
         (
           startsWith(github.event.workflow_run.path, '.github/workflows/source-validation.yml') ||
-          startsWith(github.event.workflow_run.path, '.github/workflows/ci.yml') ||
           startsWith(github.event.workflow_run.path, '.github/workflows/fork-pr-gate.yml') ||
           startsWith(github.event.workflow_run.path, '.github/workflows/pr-size-guard.yml')
         )
-      ) ||
-      (
-        github.event_name == 'check_suite' &&
-        github.event.check_suite.conclusion == 'success' &&
-        github.event.check_suite.app.slug == 'github-actions' &&
-        github.event.check_suite.head_branch != github.event.repository.default_branch &&
-        github.event.check_suite.pull_requests[0].number > 0
       )
+    # One lane per PR (or head): a newer wake for the same PR supersedes the
+    # pending one, and wakes for different PRs never cancel each other.
+    concurrency:
+      group: auto-ready-green-source-${{ github.event.inputs.pr_number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.run_id }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -149,7 +151,10 @@ jobs:
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
-          TARGET_PR: ${{ github.event.inputs.pr_number || github.event.workflow_run.pull_requests[0].number || github.event.check_suite.pull_requests[0].number || '' }}
-          TARGET_HEAD: ${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.event.check_suite.head_sha || '' }}
-          MISSED_COHORT: ${{ github.event_name == 'workflow_run' && '5' || '0' }}
+          TARGET_PR: ${{ github.event.inputs.pr_number || github.event.workflow_run.pull_requests[0].number || '' }}
+          TARGET_HEAD: ${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || '' }}
+          # Missed-event recovery rides only the PR Ready producer's wakes and
+          # rotates by run number so no ineligible draft starves the rest.
+          MISSED_COHORT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Source Validation' && '3' || '0' }}
+          RUN_OFFSET: ${{ github.run_number }}
         run: bash scripts/auto-ready-green-drafts.sh

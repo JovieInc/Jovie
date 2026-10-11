@@ -2,7 +2,7 @@
 # Auto-Ready green-source drafts
 #
 # Event-driven undraft for open main drafts whose required source checks are
-# SUCCESS and mergeability is CLEAN. This restores the July wake that died
+# SUCCESS and mergeability is CLEAN (or UNSTABLE with only advisory noise). This restores the July wake that died
 # when auto-ready-agent-drafts.yml became workflow_dispatch-only.
 #
 # This controller never enables native auto-merge and never enrolls the merge
@@ -16,7 +16,9 @@
 #   DRY_RUN=1                 classify and print only; flip no PRs
 #   TARGET_PR                 optional exact PR number
 #   TARGET_HEAD               optional exact 40-character head SHA
-#   MISSED_COHORT             extra already-green drafts to consider (default 0)
+#   MISSED_COHORT             extra already-green drafts (and orphaned stacked
+#                             drafts) to consider (default 0)
+#   RUN_OFFSET                cohort rotation offset (workflow run number)
 set -euo pipefail
 
 # shellcheck source=./scripts/lib/gh-retry.sh
@@ -27,6 +29,7 @@ DRY_RUN="${DRY_RUN:-0}"
 TARGET_PR="${TARGET_PR:-}"
 TARGET_HEAD="${TARGET_HEAD:-}"
 MISSED_COHORT="${MISSED_COHORT:-0}"
+RUN_OFFSET="${RUN_OFFSET:-0}"
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 CLASSIFY_LIB="$SCRIPT_DIR/lib/auto-ready-green-drafts.mjs"
 READY_MARKER="auto-ready-green-source"
@@ -210,7 +213,10 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
     upsert_status_comment "$n" "🤖 Auto-ready green-source: the exact head reached terminal state=${state_after} during verification. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     return 0
   fi
-  if [[ "$draft_after" == "false" && "$head_after" == "$live_head" && -z "$held_after" && "$merge_after" == "CLEAN" ]]; then
+  # Mergeability was proven on this exact head before mutation. Leaving draft
+  # wakes new (often advisory) checks, so a transient BLOCKED/UNSTABLE here is
+  # expected and must not trigger a re-draft loop.
+  if [[ "$draft_after" == "false" && "$head_after" == "$live_head" && -z "$held_after" ]]; then
     echo "    ✓ marked #$n ready; Auto-Enroll owns queue admission"
     upsert_status_comment "$n" "🤖 Auto-ready green-source: marked ready after PR Ready + required checks SUCCESS and mergeable CLEAN. Auto-Enroll / jovie-bot own queue admission. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     return 0
@@ -274,38 +280,58 @@ elif [[ -n "$TARGET_HEAD" ]]; then
   fi
 fi
 
+retarget_orphaned_stack() {  # retarget_orphaned_stack <num> <base-branch>
+  local n="$1" base="$2" owner="${REPO%%/*}" merged
+  # The parent must be MERGED. A closed-unmerged parent means the child would
+  # carry abandoned work onto main, so it stays untouched for its owner.
+  if ! merged="$(gh_retry api "repos/${REPO}/pulls?state=closed&head=${owner}:${base}&per_page=10" \
+    --jq '[.[] | select(.merged_at != null) | .number] | first // empty' 2>/dev/null)"; then
+    echo "    ~ could not read parent of #$n (base $base); leaving PR unchanged"
+    return 0
+  fi
+  if [[ -z "$merged" ]]; then
+    echo "    ~ #$n base $base has no merged parent; leaving PR unchanged"
+    return 0
+  fi
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would retarget #$n from merged parent #$merged ($base) to main"
+    return 0
+  fi
+  local live
+  if ! live="$(read_state "$n" 2>/dev/null)" \
+    || ! jq -e --arg base "$base" '.state == "OPEN" and .draft == true and .base == $base' <<<"$live" >/dev/null; then
+    echo "    ~ #$n changed before retarget; leaving PR unchanged"
+    return 0
+  fi
+  if ! gh_retry pr edit "$n" -R "$REPO" --base main >/dev/null 2>&1; then
+    echo "    !! failed to retarget #$n to main"
+    return 0
+  fi
+  echo "    ✓ retargeted #$n to main (parent #$merged merged)"
+  upsert_status_comment "$n" "🤖 Auto-ready green-source: retargeted this stacked draft to \`main\` because its parent #$merged merged and its base \`$base\` was left behind. Green-source will undraft it once required checks are SUCCESS and it is mergeable. _(at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+}
+
 if [[ "$MISSED_COHORT" =~ ^[1-9][0-9]*$ ]]; then
-  echo "=== MISSED COHORT: up to $MISSED_COHORT already-green drafts ==="
+  echo "=== MISSED COHORT: up to $MISSED_COHORT already-green drafts (offset $RUN_OFFSET) ==="
   SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-    --json number,isDraft,labels,headRefName,headRefOid,baseRefName,mergeable,mergeStateStatus --jq '
-    [ .[] | select(.isDraft == true) | select(.baseRefName == "main") | {
-      n: .number,
-      mergeable: .mergeable,
-      mergeStateStatus: .mergeStateStatus,
-      L: [.labels[].name]
-    } ]')"
-  considered=0
-  while read -r pr; do
-    [[ -z "$pr" ]] && continue
-    n="$(jq -r '.n' <<<"$pr")"
-    if [[ "$considered" -ge "$MISSED_COHORT" ]]; then
-      break
-    fi
+    --json number,isDraft,labels,title,headRefName,baseRefName,mergeable,mergeStateStatus)"
+  mapfile -t cohort < <(node "$CLASSIFY_LIB" cohort "$MISSED_COHORT" "$RUN_OFFSET" "${TARGET_PR:-0}" <<<"$SNAP")
+  for n in "${cohort[@]}"; do
+    [[ -z "$n" ]] && continue
     echo "  missed candidate #$n"
     missed_status=0
     undraft_if_eligible "$n" || missed_status=$?
     if [[ "$missed_status" -eq 2 ]]; then
       exit 2
     fi
-    considered=$((considered + 1))
-  done < <(echo "$SNAP" | jq -c --arg hold_re "$HOLD_LABEL_RE" --arg protected "$PROTECTED_PRS" --argjson skip "${TARGET_PR:-0}" '
-    .[]
-    | select(.n != $skip)
-    | select(($protected | split(",") | index(.n | tostring)) | not)
-    | select([.L[] | select(test($hold_re))] | length == 0)
-    | select(.mergeable == "MERGEABLE")
-    | select(.mergeStateStatus == "CLEAN")
-  ')
+  done
+
+  echo "=== ORPHANED STACKS: drafts whose parent branch already merged ==="
+  while IFS=$'\t' read -r n base; do
+    [[ -z "$n" ]] && continue
+    echo "  orphan candidate #$n (base $base)"
+    retarget_orphaned_stack "$n" "$base"
+  done < <(node "$CLASSIFY_LIB" orphans "$MISSED_COHORT" "$RUN_OFFSET" <<<"$SNAP")
 fi
 
 echo "=== done (DRY_RUN=$DRY_RUN) ==="
