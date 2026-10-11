@@ -3515,12 +3515,20 @@ class DispatchTest(unittest.TestCase):
             sweep.assert_called_once_with(host.state, host.repo, 4.0)
             self.assertEqual(json.loads((host.state / "tick.json").read_text())["worktreeSweep"], "spawned")
 
-    def test_spawns_one_worker_per_slot_without_cleanup_on_the_dispatch_tick(self):
+    def test_dispatch_respects_slots_health_and_quota_without_cleanup(self):
         saved = (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
                  lane.disk_guard.check)
         spawned = []
-        lane.load_providers = lambda: {"a": {"slots": 2}, "b": {"slots": 3}, "c": {"slots": 1, "enabled": False}, "d": {"slots": 4}}
-        lane.provider_healthy = lambda spec: self.fail("host-scoped-off provider was probed") if spec["slots"] == 4 else spec["slots"] == 2
+        lane.load_providers = lambda: {
+            "a": {"slots": 2},
+            "b": {"slots": 3},
+            "c": {"slots": 1, "enabled": False},
+            "claude": {"slots": 2, "quota": {"source": "claude-lane"}},
+            "d": {"slots": 4},
+        }
+        lane.provider_healthy = lambda spec: (
+            self.fail("unavailable provider was probed")
+            if spec["slots"] == 4 or spec.get("quota") else spec["slots"] == 2)
         lane.subprocess.Popen = lambda args, **kw: spawned.append(args[-1])
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
         lane.doctor.run = lambda *a, **k: {}
@@ -3529,17 +3537,20 @@ class DispatchTest(unittest.TestCase):
             old = Path(tmp) / "worktrees/old"
             old.mkdir(parents=True)
             os.utime(old, (0, 0))
-            os.environ["LANES_SLOTS_D"] = "0"  # d is scoped off this host
+            (Path(tmp) / "claude-quota.json").write_text(json.dumps({
+                "bank": {"kind": "usage-limit", "until": time.time() + 60},
+            }))
             try:
-                host = lane.Host(state=Path(tmp), repo=Path(tmp))
-                self.assertEqual(lane.dispatch(host), 0)
+                with patch.dict(os.environ, {"LANES_SLOTS_CLAUDE": "2", "LANES_SLOTS_D": "0"}):
+                    host = lane.Host(state=Path(tmp), repo=Path(tmp))
+                    self.assertEqual(lane.dispatch(host), 0)
             finally:
-                os.environ.pop("LANES_SLOTS_D", None)
                 (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
                  lane.disk_guard.check) = saved
             self.assertTrue(old.exists(), "cleanup belongs after slot acquisition, not on each dispatch tick")
             tick = json.loads((host.state / "tick.json").read_text())
             self.assertEqual((tick["unhealthy"], tick["spawned"], tick["error"]), (["b"], ["a", "a"], None))
+            self.assertEqual(tick["quotaBlocked"], {"claude": "banked:usage-limit"})
         self.assertEqual(spawned, ["a", "a"])
 
     def test_only_the_best_pr_per_issue_gets_lane_effort(self):
