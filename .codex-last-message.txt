@@ -1,0 +1,14 @@
+BLOCKED — no code change or push was made.
+
+Evidence:
+
+- PR #20970 remains open, outside the merge queue, at `2700f7958`.
+- Both hosted attempts had `Run deterministic source contract` explicitly cancelled during `component-ship-gate`.
+- The Card test and story requirements pass.
+- Card tests: 37/37 passed.
+- Local full gate passed static checks and rendered certification, then the Storybook build was killed with `SIGKILL`.
+- Worktree is clean and matches the remote branch.
+
+This is a shared Storybook certification resource/cancellation failure, not a defect introduced by this PR. gbrain was unavailable during investigation.
+
+NOT-SHIPPABLE: Source Validation cannot complete because the current live Storybook certification build is being externally cancelled or resource-killed.
