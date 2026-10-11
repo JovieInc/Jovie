@@ -60,16 +60,12 @@ export const KNOWN_RED_ORPHANS = Object.freeze({
     'red on main: registry.capabilities[4] claims autonomousSafe without its prior gates.',
   'scripts/voice-stack-bake-off/bake-off.test.mjs':
     'red on main: validate-test-script.ts imports zod, which scripts/ cannot resolve.',
-  'scripts/lib/__tests__/ci-schedule-inventory.test.mjs':
-    'red on main: two cron workflows lack a clock-class; fixed separately in #18430.',
   'scripts/lib/__tests__/component-shadcn-outcome-inventory.test.mjs':
     'red on main: composition inventory expects 4 entries, finds 6.',
   'scripts/lib/__tests__/pr-preparation-canary.test.mjs':
     'red on main: canonical queue-hold list no longer contains every expected hold.',
   'scripts/lib/__tests__/scripts-hermes-path-death.test.mjs':
     'red on main: 8 live package-path citations to the removed hermes path remain.',
-  'scripts/lib/__tests__/typecheck-singleflight.test.mjs':
-    'red on main: live-owner heartbeat case emits no "phase=wait" line.',
 });
 
 /**

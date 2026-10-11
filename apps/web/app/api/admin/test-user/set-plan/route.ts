@@ -7,10 +7,10 @@
 
 import { NextResponse } from 'next/server';
 
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export async function POST() {
-  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
 
   if (!entitlements.isAuthenticated) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

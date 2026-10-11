@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type CapacityHorizon, capacityHorizonSchema } from './capacity';
 import {
   DELIVERY_MERGE_REPOS,
   type DeliverySummary,
@@ -52,6 +53,23 @@ const operationalTaskSchema = z.object({
   retryAt: z.string().nullable(),
   sourceRevision: z.string().max(128).nullable(),
   updatedAt: z.string().nullable(),
+  pullRequest: z
+    .object({
+      number: z.number().int().positive(),
+      url: z.string().url().startsWith('https://').nullable(),
+      branch: z.string().max(160).nullable(),
+      agent: z.enum(['devin', 'codex']).nullable(),
+      isDraft: z.boolean(),
+      checks: z.object({
+        rollup: z.enum(['success', 'failure', 'pending', 'unknown']),
+        failing: z.array(z.string().max(120)).max(20),
+      }),
+      queuePosition: z.number().int().positive().nullable(),
+      queueState: z.string().max(32).nullable(),
+      createdAt: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 
 const operationalTaskFeedSchema = z.object({
@@ -122,6 +140,11 @@ const sourceObservationSchema = z.object({
     .default(NOT_MEASURED_DURATIONS),
 });
 
+export function parseCapacityHorizon(value: unknown): CapacityHorizon | null {
+  const parsed = capacityHorizonSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 const deliveryLanesSchema = z.object({
   running: countMeasurementSchema,
   slots: countMeasurementSchema,
@@ -139,6 +162,7 @@ const deliveryLanesSchema = z.object({
   alerts: z.array(z.string().max(160)),
   heldByReason: z.record(z.string(), z.number().int().nonnegative()),
   failedByReason: z.record(z.string(), z.number().int().nonnegative()),
+  capacity: capacityHorizonSchema.nullable().optional().default(null),
   publishedAt: z.string().nullable(),
   stale: z.boolean(),
 });
@@ -168,6 +192,16 @@ const deliveryProductionSchema = z.object({
   behindMain: countMeasurementSchema,
 });
 
+const deliveryCertifiedHeadSchema = z.object({
+  sha: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/i)
+    .nullable(),
+  certifiedAt: z.string().nullable(),
+});
+
+const deliveryStagingSchema = deliveryProductionSchema;
+
 const deliverySummerSchema = z.object({
   availability: z.enum(['up', 'down', 'degraded']).nullable(),
 });
@@ -195,11 +229,17 @@ export function parseDeliverySummary(value: unknown): DeliverySummary {
       empty.mergeQueueDepth
     ),
     inFlight: block(countMeasurementSchema, record.inFlight, empty.inFlight),
+    certifiedHead: block(
+      deliveryCertifiedHeadSchema,
+      record.certifiedHead,
+      empty.certifiedHead
+    ),
     production: block(
       deliveryProductionSchema,
       record.production,
       empty.production
     ),
+    staging: block(deliveryStagingSchema, record.staging, empty.staging),
     summer: block(deliverySummerSchema, record.summer, empty.summer),
   };
 }

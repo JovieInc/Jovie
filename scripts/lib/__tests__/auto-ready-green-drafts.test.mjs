@@ -1,13 +1,23 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   classifyGreenSourceDraft,
   GREEN_SOURCE_HOLD_LABELS,
+  GREEN_SOURCE_MERGE_STATES,
   GREEN_SOURCE_PROTECTED_PRS,
   greenSourceHoldRegex,
   hasGreenSourceHold,
   isProtectedGreenSourcePr,
+  selectMissedCohort,
   TIM_HOLD_LABELS,
 } from '../auto-ready-green-drafts.mjs';
 
@@ -198,6 +208,23 @@ describe('green-source draft classifier', () => {
     });
   });
 
+  it('admits UNSTABLE only when the fail-closed blocker scan is empty', () => {
+    expect(GREEN_SOURCE_MERGE_STATES).toEqual(['CLEAN', 'UNSTABLE']);
+    expect(
+      classifyGreenSourceDraft(draft({ mergeStateStatus: 'UNSTABLE' }))
+    ).toEqual({ eligible: true, reason: 'green-source-clean' });
+    expect(
+      classifyGreenSourceDraft(
+        draft({
+          mergeStateStatus: 'UNSTABLE',
+          checks: greenChecks([
+            { name: 'parity', bucket: 'fail', state: 'FAILURE' },
+          ]),
+        })
+      )
+    ).toMatchObject({ eligible: false, reason: 'checks:parity' });
+  });
+
   it('emits a hold regex that matches Tim-hold and machine holds only', () => {
     const re = new RegExp(greenSourceHoldRegex());
     expect(re.test('hold')).toBe(true);
@@ -248,17 +275,20 @@ describe('green-source controller contract', () => {
   it('keeps writer-proof recovery manual-only and wakes green-source from CI events', () => {
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('workflow_run:');
-    expect(workflow).toContain('check_suite:');
+    expect(workflow).not.toContain('check_suite:');
+    expect(workflow).not.toContain('github.event.check_suite');
+    expect(workflow).not.toMatch(/^concurrency:/m);
     expect(workflow).toContain(
-      "workflows: ['CI', 'Fork PR Gate', 'PR Size Guard']"
+      'group: auto-ready-green-source-${{ github.event.inputs.pr_number'
+    );
+    expect(workflow).toContain('RUN_OFFSET: ${{ github.run_number }}');
+    expect(workflow).toContain(
+      "workflows: ['Source Validation', 'Fork PR Gate', 'PR Size Guard']"
     );
     expect(workflow).toContain('scripts/auto-ready-green-drafts.sh');
     expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
     expect(workflow).toContain(
       "github.event.workflow_run.event == 'pull_request'"
-    );
-    expect(workflow).toContain(
-      'github.event.check_suite.head_branch != github.event.repository.default_branch'
     );
     expect(workflow).not.toContain('schedule:');
     expect(workflow).not.toContain('pull_request:');
@@ -278,5 +308,183 @@ describe('green-source controller contract', () => {
     expect(workflow).toContain('id: green-source');
     expect(workflow).toContain('TARGET_PR');
     expect(workflow).toContain('TARGET_HEAD');
+  });
+});
+
+function listed(overrides = {}) {
+  return {
+    number: 20874,
+    isDraft: true,
+    baseRefName: 'main',
+    headRefName: 'codex/some-fix',
+    title: 'fix: something',
+    labels: [],
+    mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN',
+    ...overrides,
+  };
+}
+
+describe('missed-event cohort selection', () => {
+  it('selects green-looking main drafts and skips held, protected, proof, ready and red ones', () => {
+    const prs = [
+      listed({ number: 30 }),
+      listed({ number: 31, mergeStateStatus: 'UNSTABLE' }),
+      listed({ number: 32, labels: [{ name: 'hold' }] }),
+      listed({ number: 17156 }),
+      listed({ number: 33, labels: [{ name: 'canary' }] }),
+      listed({ number: 34, isDraft: false }),
+      listed({ number: 35, mergeStateStatus: 'BLOCKED' }),
+      listed({ number: 36, mergeable: 'CONFLICTING' }),
+      listed({ number: 37, baseRefName: 'feat/parent' }),
+      listed({ number: 38 }),
+    ];
+    expect(selectMissedCohort(prs, { limit: 10 })).toEqual([30, 31, 38]);
+    expect(selectMissedCohort(prs, { limit: 10, skip: 31 })).toEqual([30, 38]);
+    expect(selectMissedCohort(prs, { limit: 0 })).toEqual([]);
+  });
+
+  it('rotates by run offset so an ineligible head of the list cannot starve the rest', () => {
+    const prs = [10, 11, 12, 13].map(number => listed({ number }));
+    expect(selectMissedCohort(prs, { limit: 2, offset: 0 })).toEqual([10, 11]);
+    expect(selectMissedCohort(prs, { limit: 2, offset: 1 })).toEqual([11, 12]);
+    expect(selectMissedCohort(prs, { limit: 2, offset: 7 })).toEqual([13, 10]);
+  });
+});
+
+describe('green-source shell controller (fake gh)', () => {
+  const greenChecksJson = JSON.stringify(greenChecks());
+
+  function runController(snapshot, env = {}) {
+    const dir = mkdtempSync(join(tmpdir(), 'green-source-'));
+    try {
+      const states = Object.fromEntries(
+        snapshot.map(pr => [
+          String(pr.number),
+          {
+            data: {
+              repository: {
+                pullRequest: {
+                  isDraft: pr.isDraft,
+                  headRefOid: head,
+                  headRefName: pr.headRefName,
+                  baseRefName: pr.baseRefName,
+                  body: '',
+                  title: pr.title,
+                  state: 'OPEN',
+                  mergeable: pr.mergeable,
+                  mergeStateStatus: pr.mergeStateStatus,
+                  labels: { nodes: pr.labels },
+                },
+              },
+            },
+          },
+        ])
+      );
+      writeFileSync(join(dir, 'snapshot.json'), JSON.stringify(snapshot));
+      writeFileSync(join(dir, 'states.json'), JSON.stringify(states));
+      writeFileSync(join(dir, 'checks.json'), greenChecksJson);
+      const fakeGh = `#!/usr/bin/env bash
+set -euo pipefail
+D="${dir}"
+echo "$1 $2 $3" >> "$D/calls.log"
+args=("$@")
+jq_expr=""
+for ((i=0; i<\${#args[@]}; i++)); do
+  if [[ "\${args[$i]}" == "--jq" ]]; then jq_expr="\${args[$((i+1))]}"; fi
+done
+emit() { if [[ -n "$jq_expr" ]]; then jq -r "$jq_expr"; else cat; fi; }
+case "$1 $2" in
+  "pr list") cat "$D/snapshot.json" | emit ;;
+  "pr checks") cat "$D/checks.json" ;;
+  "api graphql")
+    n=""
+    for a in "$@"; do [[ "$a" == number=* ]] && n="\${a#number=}"; done
+    jq -c --arg n "$n" '.[$n]' "$D/states.json" | emit ;;
+  *)
+    if [[ "$1" == "api" && "$2" == repos/*/commits/*/pulls ]]; then
+      sha="\${2%/pulls}"; sha="\${sha##*/}"
+      jq -c --arg sha "$sha" '[.[] | {number, state: "open", base: {ref: .baseRefName}, head: {sha: $sha}}]' "$D/snapshot.json" | emit
+    fi ;;
+esac
+`;
+      writeFileSync(join(dir, 'gh'), fakeGh);
+      chmodSync(join(dir, 'gh'), 0o755);
+      const result = spawnSync(
+        'bash',
+        [resolve(repoRoot, 'scripts/auto-ready-green-drafts.sh')],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            DRY_RUN: '1',
+            MISSED_COHORT: '3',
+            RUN_OFFSET: '0',
+            TARGET_PR: '',
+            TARGET_HEAD: '',
+            GH_RETRY_ATTEMPTS: '1',
+            ...env,
+          },
+        }
+      );
+      let calls = [];
+      try {
+        calls = readFileSync(join(dir, 'calls.log'), 'utf8')
+          .split('\n')
+          .filter(Boolean);
+      } catch {}
+      return { ...result, calls };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('evaluates the missed cohort instead of crashing in jq (regression)', () => {
+    const result = runController([
+      listed({ number: 20874 }),
+      listed({ number: 20834, mergeStateStatus: 'UNSTABLE' }),
+      listed({ number: 20991, labels: [{ name: 'hold' }] }),
+    ]);
+    expect(result.stderr).not.toContain('jq: error');
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('would mark #20874 ready');
+    expect(result.stdout).toContain('would mark #20834 ready');
+    expect(result.stdout).not.toContain('#20991');
+  });
+
+  it('an event for a ready PR costs one API read and never lists every PR', () => {
+    const result = runController([listed({ number: 21261, isDraft: false })], {
+      TARGET_PR: '21261',
+      TARGET_HEAD: head,
+      MISSED_COHORT: '0',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('green-source not-draft');
+    expect(result.calls, result.calls.join('\n')).toHaveLength(1);
+    expect(result.calls.join('\n')).not.toContain('pr list');
+  });
+
+  it('resolves a head-only event with the commit pulls API, not a PR scan', () => {
+    const result = runController([listed({ number: 20783 })], {
+      TARGET_HEAD: head,
+      MISSED_COHORT: '0',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('→ #20783');
+    expect(result.calls.join('\n')).toContain(`commits/${head}/pulls`);
+    expect(result.calls.join('\n')).not.toContain('pr list');
+  });
+
+  it('bounds a one-draft missed cohort to a single list plus one PR evaluation', () => {
+    const result = runController(
+      [listed({ number: 1 }), listed({ number: 2 }), listed({ number: 3 })],
+      { MISSED_COHORT: '1', RUN_OFFSET: '1' }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('missed candidate #2');
+    expect(result.stdout).not.toContain('#1 ');
+    // pr list + (state, checks) twice before the (dry-run) mutation.
+    expect(result.calls.length).toBeLessThanOrEqual(5);
   });
 });

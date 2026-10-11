@@ -56,12 +56,16 @@ describe('Eve identity packs (JOV-5216)', () => {
     expect(eveTurn.pack.conversationalAuthority).toBe('summer');
     expect(() => eveTurn.require('ingest-ack')).not.toThrow();
     expect(() => eveTurn.require('gbrain-read')).not.toThrow();
+    expect(() => eveTurn.require('provider-work-read')).not.toThrow();
     expect(() => eveTurn.require('privileged-gbrain-write')).toThrow(
       EveCapabilityDeniedError
     );
     expect(() => eveTurn.require('symphony-heal')).toThrow(
       EveCapabilityDeniedError
     );
+    expect(() =>
+      bindEveIdentityForTurn('jovie').require('provider-work-read')
+    ).toThrow(EveCapabilityDeniedError);
   });
 
   it('binds ov chat mode through the same entry as the chat route', async () => {

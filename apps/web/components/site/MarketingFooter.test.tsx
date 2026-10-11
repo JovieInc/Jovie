@@ -52,6 +52,52 @@ describe('MarketingFooter', () => {
     themeState.setTheme.mockReset();
   });
 
+  it('keeps the Music column until generic creator nav is passed', () => {
+    render(<MarketingFooter />);
+    expect(screen.getByRole('heading', { name: 'Music' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Customers' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Fan Capture' })).toHaveAttribute(
+      'href',
+      '/artist-profiles#capture-every-fan'
+    );
+  });
+
+  it('renames the Music column when generic creator nav is passed', () => {
+    render(<MarketingFooter genericCreatorNav />);
+    expect(screen.getByRole('heading', { name: 'Customers' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Music' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+      'href',
+      '/solutions/artists'
+    );
+    expect(screen.getByRole('link', { name: 'Smart Links' })).toHaveAttribute(
+      'href',
+      '/smart-links'
+    );
+    expect(
+      screen.getByRole('link', { name: 'Audience Capture' })
+    ).toHaveAttribute('href', '/artist-profiles#capture-every-fan');
+    expect(
+      screen.getByRole('link', { name: 'Audience Reactivation' })
+    ).toHaveAttribute('href', '/artist-profiles#bring-them-back-automatically');
+    expect(screen.queryByRole('link', { name: 'Fan Capture' })).toBeNull();
+  });
+
+  it('keeps the current footer columns while the about refresh flag is off', () => {
+    mockUsePathname.mockReturnValue('/about');
+    render(<MarketingFooter />);
+
+    expect(screen.getByRole('link', { name: 'Blog' })).toHaveAttribute(
+      'href',
+      '/blog'
+    );
+    expect(screen.getByRole('heading', { name: 'Connect' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/product'
+    );
+  });
+
   it('renders the full marketing footer when the full-footer flag is enabled', () => {
     mockUsePathname.mockReturnValue('/solutions');
     render(<MarketingFooter />);
@@ -84,10 +130,13 @@ describe('MarketingFooter', () => {
     expect(screen.getByRole('heading', { name: 'Product' })).toHaveClass(
       'line-clamp-2'
     );
-    expect(screen.getByRole('link', { name: 'Status' })).toHaveAttribute(
-      'href',
-      'https://status.jov.ie'
+    // DETAILS.md text casing: never ALL CAPS for column headings.
+    expect(screen.getByRole('heading', { name: 'Product' })).not.toHaveClass(
+      'mf-eyebrow--caps'
     );
+    // status.jov.ie currently serves Vercel DEPLOYMENT_NOT_FOUND; the public
+    // footer omits the link until the status deployment is restored (JOV-7135).
+    expect(screen.queryByRole('link', { name: 'Status' })).toBeNull();
   });
 
   it('renders the full homepage footer without the duplicate final CTA', () => {

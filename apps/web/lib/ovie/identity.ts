@@ -18,6 +18,7 @@ export type EveCapability =
   | 'privileged-gbrain-write'
   | 'operational-gbrain-write'
   | 'linear-coordination-write'
+  | 'provider-work-read'
   | 'symphony-heal'
   | 'gbrain-read'
   | 'ingest-ack';
@@ -33,6 +34,8 @@ export type EveIdentityPack = {
   readonly canOperationalWriteGbrain: boolean;
   /** Explicit founder-intent Linear create/update with readback only. */
   readonly canLinearCoordinationWrite: boolean;
+  /** Founder-only, read-only Jovie work from installed providers. */
+  readonly canReadProviderWork: boolean;
   readonly canHealSymphony: boolean;
   readonly canIngestAck: boolean;
   readonly canReadGbrain: boolean;
@@ -58,6 +61,7 @@ const JOVIE_PACK: EveIdentityPack = {
   canPrivilegedWriteGbrain: false,
   canOperationalWriteGbrain: false,
   canLinearCoordinationWrite: false,
+  canReadProviderWork: false,
   canHealSymphony: false,
   canIngestAck: false,
   canReadGbrain: false,
@@ -73,6 +77,7 @@ const SUMMER_PACK: EveIdentityPack = {
   canPrivilegedWriteGbrain: false,
   canOperationalWriteGbrain: true,
   canLinearCoordinationWrite: true,
+  canReadProviderWork: true,
   canHealSymphony: false,
   canIngestAck: true,
   canReadGbrain: true,
@@ -106,6 +111,8 @@ export function authorizeEveCapability(
       return { allowed: pack.canOperationalWriteGbrain };
     case 'linear-coordination-write':
       return { allowed: pack.canLinearCoordinationWrite };
+    case 'provider-work-read':
+      return { allowed: pack.canReadProviderWork };
     case 'symphony-heal':
       return { allowed: pack.canHealSymphony };
     case 'gbrain-read':

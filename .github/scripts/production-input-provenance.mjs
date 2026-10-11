@@ -177,6 +177,7 @@ export function generateSbom(root, expectedSha, output, options) {
 }
 
 export function supplyChainSnapshot(root, sbomPath, runner = {}) {
+  root = realpathSync(root);
   const files = requiredSupplyChainFiles.map(path => entry(root, path));
   check(
     files.every(file => file.kind === 'file'),

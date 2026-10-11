@@ -18,7 +18,7 @@ const KIT_SOURCE_FILES = [
 ] as const;
 
 describe('MarketingShippedSitesShowcase', () => {
-  it('renders live shipped artist tiles, not placeholder copy', () => {
+  it('labels demo product views and links them to the real public profile', () => {
     render(<MarketingShippedSitesShowcase />);
 
     expect(
@@ -31,6 +31,14 @@ describe('MarketingShippedSitesShowcase', () => {
       screen.getByTestId('marketing-shipped-sites-showcase')
     ).toBeInTheDocument();
 
+    expect(
+      screen.getByText(SHIPPED_SITES_SHOWCASE_COPY.body)
+    ).toHaveTextContent('Demonstration profiles');
+    expect(
+      screen.queryByText(
+        /Real Jovie profiles already shipping|Live Artist Sites/i
+      )
+    ).toBeNull();
     const tiles = screen.getAllByTestId('shipped-site-tile');
     expect(tiles).toHaveLength(SHIPPED_SITE_TILES.length);
     expect(tiles.length).toBeGreaterThanOrEqual(6);
@@ -52,6 +60,19 @@ describe('MarketingShippedSitesShowcase', () => {
     expect(
       screen.queryByRole('link', { name: /Get started/i })
     ).not.toBeInTheDocument();
+  });
+
+  it('uses the Tim White desktop demonstration for its Tim White identity', () => {
+    render(<MarketingShippedSitesShowcase />);
+    const desktop = screen.getByRole('img', {
+      name: /demo of Tim White.*desktop/i,
+    });
+    expect(desktop.getAttribute('src')).toContain(
+      'tim-white-profile-live-desktop.png'
+    );
+    expect(
+      desktop.closest('[data-testid="shipped-site-tile"]')
+    ).toHaveTextContent('Tim White');
   });
 
   it('stays on artist profiles and off the umbrella homepage', () => {

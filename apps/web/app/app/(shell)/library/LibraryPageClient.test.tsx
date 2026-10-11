@@ -48,7 +48,7 @@ describe('LibraryPageClient stages', () => {
     render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
 
     expect(
-      screen.queryByRole('tablist', { name: 'Library Stages' })
+      screen.queryByRole('tablist', { name: 'Work Stages' })
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Artist Rules' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Import YouTube' })).toBeNull();
@@ -60,7 +60,7 @@ describe('LibraryPageClient stages', () => {
     render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
 
     expect(replace).toHaveBeenCalledWith(
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?rules=1`
+      `${APP_ROUTES.SETTINGS_PROFILE}?rules=1`
     );
   });
 

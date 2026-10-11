@@ -2,6 +2,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
+import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { CACHE_TAGS } from '@/lib/cache/tags';
@@ -225,6 +226,9 @@ export async function createAdditionalProfile(input: {
     });
 
     revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+
+    // Passive first-touch receipt (JOV-5036): idempotent, best-effort.
+    await attachFirstTouchReceipt(user.id);
 
     return { success: true, profileId: profile.id };
   } catch (error) {

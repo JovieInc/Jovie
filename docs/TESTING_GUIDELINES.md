@@ -75,3 +75,41 @@ Coverage is not the goal — coverage on the right files is. The risk-based dash
 - For regressions, **write the failing test before the fix** to lock the behavior.
 - Keep **test utilities DRY** but approachable—prefer readable fixtures over deep helper stacks.
 - Treat **lint/typecheck warnings in tests as bugs**; fix them before merging.
+
+
+## Local worktree identity (JOV-7353)
+
+The existing `pnpm --filter web dev:fast` launcher derives an opaque checkout ID
+from the canonical Git worktree root, the full HEAD, a fresh random boot ID and
+`PORT` (default 3100). It replaces inherited identity on every launch. Paths and
+branch names are never included. The app exposes this local-only object at
+`/api/health/build-info`; this is correlation, not evidence of a clean checkout,
+committed changes, a deployed release, or successful application behavior.
+
+Managed local runs of the main, noauth, desktop-smoke and mobile-smoke Playwright
+configs verify checkout/head/port **before global setup seeds or warms routes**.
+The observed boot ID is then available in `testInfo.config.metadata.worktree`.
+Reusing a port from another checkout or a server started before a HEAD change
+fails with `Worktree identity mismatch`; restart the intended app. An unmanaged
+`BASE_URL`, external deployment, custom server without the dev-launcher identity,
+and other specialized configs are not certified by this local contract.
+
+The same `jovie.worktree.id`, `.head` and `.boot` attributes are composed into the
+existing Sentry client/server configuration for errors, metrics and span data,
+and into Vercel AI SDK telemetry metadata. Local application logs include ID and
+boot. No exporter is enabled by this change: local Sentry remains disabled under
+its existing policy, and Agnost remains opt-in. Production/preview builds omit
+local identity even if an identity environment value was inherited. There is no
+new telemetry service, credential, account or vendor. The integration test uses
+the installed Sentry SDK with an in-memory transport; it proves serialization,
+not ingestion into a hosted account. When telemetry is enabled under existing
+policy, filter by `jovie.worktree.id` and `.boot` to isolate a run.
+
+Adopt-first decision: extend the existing dev launcher, Playwright, Sentry and AI
+telemetry hooks. Existing installed Sentry 10.75.3 supports initial scope tags,
+`beforeSendMetric` and `beforeSendSpan`; a custom collector or a second OTel SDK
+would duplicate those capabilities. Ship this affected-only identity boundary;
+re-evaluate if a specialized managed config or a new exporter is used for local
+qualification, then compose the same identity into that existing path. The
+broader JOV-3642 boot/reproduce/fix/query workflow still needs its own runtime
+receipts; this source change alone does not certify it.

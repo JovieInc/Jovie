@@ -1,18 +1,18 @@
 import type {
+  ConnectionStatus,
+  PresenceSignal,
   ProfilesWorkspaceFilter,
   ProfileWorkspaceRow,
-} from '@/app/app/(shell)/profiles/data';
+} from '@/components/features/presence/types';
 import { isPresenceObservationStale } from './presence-identity';
 
-export type ConnectionStatusTone = 'success' | 'warning' | 'error' | 'neutral';
-
-export interface ConnectionStatus {
-  readonly label: string;
-  readonly tone: ConnectionStatusTone;
-  readonly needsAttention: boolean;
-  readonly nextAction: string;
-  readonly sortPriority: number;
-}
+export type {
+  ConnectionStatus,
+  ConnectionStatusTone,
+  PresenceSignal,
+  PresenceSignalKind,
+  PresenceSignalTone,
+} from '@/components/features/presence/types';
 
 export interface ConnectionsWorkspaceSummary {
   readonly connectionCount: number;
@@ -130,8 +130,7 @@ export function getConnectionStatus(
       tone: 'error',
       needsAttention: true,
       sortPriority: 0,
-      nextAction:
-        'Inspect the source to check this identity conflict. Identity confirmation is not yet available here.',
+      nextAction: 'Resolve this identity using the retained source evidence.',
     };
   }
   if (row.qualificationStatus === 'suggested') {
@@ -140,8 +139,17 @@ export function getConnectionStatus(
       tone: 'warning',
       needsAttention: true,
       sortPriority: 0,
+      nextAction: 'Confirm whether this public identity belongs to the artist.',
+    };
+  }
+  if (row.qualificationStatus === 'rejected') {
+    return {
+      label: 'Not You',
+      tone: 'neutral',
+      needsAttention: false,
+      sortPriority: 4,
       nextAction:
-        'Inspect the source to check whether it belongs to the artist. Identity confirmation is not yet available here.',
+        'This identity was rejected and is retained as negative evidence.',
     };
   }
   if (row.monitoringState === 'locked') {
@@ -328,22 +336,6 @@ export function formatProfileRankChange(
  * - `finding` — Jovie detected something worth the artist's attention
  * - `recommendation` — Jovie suggests an action (not wrong, just improvable)
  */
-export type PresenceSignalKind =
-  | 'state'
-  | 'blocker'
-  | 'finding'
-  | 'recommendation';
-
-export type PresenceSignalTone = 'success' | 'warning' | 'error' | 'neutral';
-
-export interface PresenceSignal {
-  readonly kind: PresenceSignalKind;
-  readonly tone: PresenceSignalTone;
-  readonly label: string;
-  readonly detail: string;
-  readonly sortOrder: number;
-}
-
 /**
  * Classify a workspace row into its four separated signal primitives,
  * derived from the canonical connection status so the two stay in lockstep.

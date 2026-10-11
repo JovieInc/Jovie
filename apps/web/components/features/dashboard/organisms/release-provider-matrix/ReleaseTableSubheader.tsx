@@ -12,8 +12,8 @@ import {
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
   PageToolbar,
 } from '@/components/organisms/table';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';

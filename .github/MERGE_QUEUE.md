@@ -118,9 +118,9 @@ queued, and cancelled checks do not imply a terminal source failure.
   with immutable ordinary test companions, validates actual behavioral tests
   and coverage, and uses a separate trusted writer to compare-and-swap the
   current PR head. Source landing does not prove activation or a successful
-  repair. Existing Hyperagent delivery handles merge-group failures; an
-  accepted webhook is not a repair or merge receipt. Repair findings in their
-  source PR and let GitHub rebuild the group. No new queue controller is needed.
+  repair. An accepted webhook is not a repair or merge receipt. Repair findings
+  in their source PR and let GitHub rebuild the group.
+- Revision failure hold (JOV-5117): a terminal `CI` `merge_group` run maps   `gh-readonly-queue/main/pr-N-*` to PR `N`, then uses the ordered queue/commit   timeline to bind the failed attempt to its exact source head. The trusted   `Merge Queue Green Enroll` controller writes   `jovie-queue-failure-hold/v1` on that source commit before attempting dequeue and   disabling native auto-merge. The Jovie Bot token for that job is not minted with merge-queue write, so `dequeuePullRequest` may return `Resource not accessible by integration`. That denial, and a `not in queue` response, are logged and do not fail the job: GitHub already removes a pull request when its merge_group run fails. The hold status and auto-merge disable still persist. Any other dequeue or auto-merge error fails the job. Deterministic source failures are held after   one attempt. Retryable or infrastructure-class failures may consume exactly   one controller-owned retry; `jovie-queue-failure-retry/v1` spends it before   re-enrollment. Main movement, elapsed time, labels, production completion,   and generic maintenance do not clear either receipt. A new source SHA has no   old commit status and may enroll after normal source checks. Required checks,   native queue membership, and exact combined-head CI remain authoritative and   unchanged.
 - Pre-land CHANGELOG prohibition (JOV-5291 / JOV-5378): GitHub's server merge
   ignores local union drivers, so two Unreleased `CHANGELOG.md` edits in one
   group park the later entry. Implementation PRs never edit `CHANGELOG.md`.
@@ -141,10 +141,40 @@ queued, and cancelled checks do not imply a terminal source failure.
 ## Retired admission automation
 
 `merge-queue-autoenroll.yml`, its heartbeat dispatch, and its fleet gate are
-retired. Since 2026-09-26, `merge-queue-green-enroll.yml` enqueues CLEAN,
-non-draft, unlabeled-hold PRs on green checks so production holds never stall
-merging; required checks on the merge group remain the only gate. The Queue-Deferred Release workflow and its automatic
-label writer are also retired. Do not re-enable those paths to finish a PR.
+retired. Since 2026-09-26, `merge-queue-green-enroll.yml` enqueues
+required-green, non-draft, unlabeled-hold PRs on green checks so production
+holds never stall merging; required checks on the merge group remain the only
+gate. Required-green means `mergeStateStatus` CLEAN, HAS_HOOKS or UNSTABLE
+(UNSTABLE only adds a pending or red non-required context, such as a lane
+`jovie-execution/*` receipt). An UNKNOWN read right after main moves is
+re-read twice before the wake is dropped. An unchanged head removed from the
+queue stays out unless a typed retry/recovery applies, or the removal was
+`manual` and a blocking label (`hold`, `queue-poison`, ...) was removed after
+it. The enroll and rearm tokens carry `workflows: write` so heads that edit
+`.github/workflows` can be enqueued. The Queue-Deferred Release workflow and
+its automatic label writer are also retired. Do not re-enable those paths to
+finish a PR.
+
+### Hold contract (jovie-hold/v1)
+
+A `hold` label must come with a receipt comment on the PR that names an owner
+and a machine-checkable release:
+
+```
+<!-- jovie-hold/v1 {"owner":"agent:<task>","until":"2026-10-12T18:00:00Z","reason":"..."} -->
+<!-- jovie-hold/v1 {"owner":"gem-lanes","head":"<40-hex sha>","reason":"waiting for a fix push"} -->
+```
+
+`until` is an expiry. `head` releases the hold once the PR head moves off that
+SHA. No receipt lasts more than 7 days from its own creation, and a receipt
+posted more than an hour before the latest `hold` event does not count. The
+`enforce-hold-contract` job in `merge-queue-green-enroll.yml`
+(`scripts/hold-contract.mjs`) runs on every reconcile. It removes holds that
+are ownerless (no valid receipt after 24 h), expired, or released by a head
+change, and leaves one comment each time. Prose conditions such as "until
+qualification" are not release conditions. The unlabel is done with the
+Jovie Bot token, so it wakes enrollment, and required checks still gate the
+merge.
 
 `queue-deferred`, `needs-rebase`, and `needs-conflict-resolution` are historical
 machine annotations, not native admission authority. Actual conflicts, failed
@@ -200,7 +230,10 @@ runtime behavior, or Summer commissioning.
 - PR not entering: inspect the exact-head Merge when ready request, current
   draft/mergeability state, hard-gate labels, and required GitHub checks.
 - Combined head red: repair the source PR and let GitHub rebuild the queue
-  group. Do not force a stale combined head through production.
+  group. Inspect `jovie-queue-failure-hold/v1` on the exact source commit; do
+  not force a held combined head through production.
+- Recurrence: `node scripts/promotion-loss-metrics.mjs --since 24h` reports
+  merge-group attempts per merge plus deterministic same-head recurrence.
 - Emergency response: inspect the native ruleset and exact queue entry,
   repair the source or required check, and prove a fresh native canary.
 

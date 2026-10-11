@@ -190,6 +190,13 @@ function formatDay(
   );
 }
 
+// JOV-4429: each Tickets link needs a unique accessible name — tour lists
+// often reuse one ticketing URL for every date, which otherwise renders as
+// a duplicate CTA cluster to assistive tech and the copy-regression guard.
+function ticketLinkLabel(tourDate: TourDateViewModel) {
+  return `Tickets for ${tourDate.venueName} on ${formatMonth(tourDate.startDate, tourDate.timezone)} ${formatDay(tourDate.startDate, tourDate.timezone)}`;
+}
+
 function formatReleaseMeta(
   releaseType: string | null | undefined,
   releaseDate: string | Date | null | undefined
@@ -621,6 +628,7 @@ export function ProfileDesktopSurface({
                     {tourDate.ticketUrl ? (
                       <a
                         href={tourDate.ticketUrl}
+                        aria-label={ticketLinkLabel(tourDate)}
                         className='inline-flex h-11 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
                       >
                         Tickets
@@ -937,6 +945,7 @@ export function ProfileDesktopSurface({
                 {tourDate.ticketUrl ? (
                   <a
                     href={tourDate.ticketUrl}
+                    aria-label={ticketLinkLabel(tourDate)}
                     className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
                     Tickets
@@ -1051,7 +1060,13 @@ export function ProfileDesktopSurface({
 
         <div className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
           <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
-          <div className='relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] p-5 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+          <div
+            // The document scrolls at desktop widths (globals.css md+ unlock),
+            // so this pane must chain overscroll to the page — `overscroll-contain`
+            // trapped the wheel at the pane's edges (JOV-7412).
+            className='relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-auto [touch-action:pan-y] [will-change:scroll-position] p-5 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+            data-testid='profile-desktop-content-scroll'
+          >
             {nonHomeContent}
           </div>
         </div>

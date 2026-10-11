@@ -16,7 +16,7 @@ describe('DevelopersPage', () => {
     render(<DevelopersPage />);
 
     expect(
-      screen.getByRole('heading', { name: 'Public artist data, in the open.' })
+      screen.getByRole('heading', { name: 'Public profile data, in the open.' })
     ).toBeInTheDocument();
     expect(
       screen.getByText('curl https://jov.ie/api/v1/{username}')
@@ -39,7 +39,7 @@ describe('DevelopersPage', () => {
 
     expect(
       screen.getByText(
-        /anonymous GET access to data an artist has made public/i
+        /anonymous GET access to data a creator has made public/i
       )
     ).toBeInTheDocument();
     expect(
@@ -88,7 +88,7 @@ describe('developer guide contract vs llms guidance (JOV-6265)', () => {
     const guidance = await getLlmsTxt().text();
 
     expect(guidance).toContain(
-      'the public artist API and anonymous MCP tools are read-only'
+      'the public profile API and anonymous MCP tools are read-only'
     );
     // The HTML guide must agree with the machine guidance: neither surface
     // may claim a capability the other denies.

@@ -10,6 +10,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
+import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
@@ -159,6 +160,12 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
       onboardingCompletedAt: new Date(),
       isPublic: true,
     });
+
+    // Passive first-touch receipt (JOV-5036): idempotent, best-effort.
+    const { userId } = await getCachedAuth();
+    if (userId) {
+      await attachFirstTouchReceipt(userId);
+    }
   } catch (error) {
     // updateCreatorProfile already captures unexpected runtime errors.
     // Only capture validation errors thrown before that call.

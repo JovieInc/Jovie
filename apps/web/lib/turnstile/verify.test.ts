@@ -16,11 +16,61 @@ afterAll(() => {
   }
 });
 
+import { TURNSTILE_ALWAYS_PASS_SECRET_KEY } from './keys';
 import {
   classifyTurnstileFailure,
   isTurnstileConfigured,
+  verifyTurnstileTestModeToken,
   verifyTurnstileToken,
 } from './verify';
+
+describe('verifyTurnstileTestModeToken (JOV-7697)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('runs real siteverify with the official always-pass test secret', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true }), { status: 200 })
+      );
+
+    const result = await verifyTurnstileTestModeToken(
+      'XXXX.DUMMY.TOKEN.XXXX',
+      '1.2.3.4'
+    );
+
+    expect(result.success).toBe(true);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toContain('turnstile/v0/siteverify');
+    const body = init?.body as URLSearchParams;
+    expect(body.get('secret')).toBe(TURNSTILE_ALWAYS_PASS_SECRET_KEY);
+    expect(body.get('response')).toBe('XXXX.DUMMY.TOKEN.XXXX');
+  });
+
+  it('still fails closed on a missing token', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const result = await verifyTurnstileTestModeToken(undefined);
+    expect(result).toEqual({ success: false, reason: 'missing_token' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a siteverify rejection as a failure', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          success: false,
+          'error-codes': ['invalid-input-response'],
+        }),
+        { status: 200 }
+      )
+    );
+    const result = await verifyTurnstileTestModeToken('real-widget-token');
+    expect(result.success).toBe(false);
+    expect(result.errorCodes).toEqual(['invalid-input-response']);
+  });
+});
 
 describe('verifyTurnstileToken', () => {
   beforeEach(() => {

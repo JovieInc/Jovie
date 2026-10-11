@@ -290,6 +290,7 @@ export function ProfileCompactTemplate({
   releaseCredits,
   embeddedPreview = false,
 }: ProfileCompactTemplateProps) {
+  const previousLocationModeRef = useRef<ProfileMode | undefined>(undefined);
   const visibleReleaseCredits = (releaseCredits ?? []).filter(
     group => group.entries.length > 0
   );
@@ -498,7 +499,7 @@ export function ProfileCompactTemplate({
     );
   }, []);
 
-  const { notificationsContextValue, notificationsController } =
+  const { notificationsContextValue, notificationsController, locationMode } =
     useProfileShell({
       artist,
       socialLinks,
@@ -622,20 +623,29 @@ export function ProfileCompactTemplate({
     [hasContacts, hasReleases, hasTip, isDesktopLayout]
   );
 
-  const syncRequestedModeFromLocation = useCallback(() => {
-    setRequestedMode(currentMode => {
-      const nextMode = getInitialModeFromLocation(mode, true);
-      if (currentMode !== nextMode) {
-        suppressNextHistorySyncRef.current = true;
-        initialLocationModeAlignedRef.current = false;
-      }
-      return nextMode;
-    });
-  }, [mode]);
+  const syncRequestedModeFromLocation = useCallback(
+    (fallbackMode = mode) => {
+      setRequestedMode(currentMode => {
+        const nextMode = getInitialModeFromLocation(fallbackMode, true);
+        if (currentMode !== nextMode) {
+          suppressNextHistorySyncRef.current = true;
+          initialLocationModeAlignedRef.current = false;
+        }
+        return nextMode;
+      });
+    },
+    [mode]
+  );
 
   useEffect(() => {
-    syncRequestedModeFromLocation();
-  }, [mode, syncRequestedModeFromLocation]);
+    const previousMode = previousLocationModeRef.current;
+    previousLocationModeRef.current = locationMode;
+    // Reuse the shell's hydration-safe location store for client Link changes.
+    // Later query removal means Home even with a cached Contact server mode.
+    const locationChanged =
+      previousMode !== undefined && previousMode !== locationMode;
+    syncRequestedModeFromLocation(locationChanged ? 'profile' : mode);
+  }, [locationMode, mode, syncRequestedModeFromLocation]);
 
   useEffect(() => {
     if (requestedMode === getModeFromUrl()) {
@@ -709,7 +719,7 @@ export function ProfileCompactTemplate({
       profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
         globalThis.history.state
       );
-      syncRequestedModeFromLocation();
+      syncRequestedModeFromLocation('profile');
     };
 
     globalThis.addEventListener('popstate', handlePopState);
@@ -930,11 +940,6 @@ export function ProfileCompactTemplate({
         onProfilePacResolved={setResolvedProfilePacAssignment}
         onResolved={markVisitorAssignmentResolved}
       />
-      <ReleaseCreditsDrawer
-        open={creditsOpen}
-        onOpenChange={setCreditsOpen}
-        credits={visibleReleaseCredits}
-      />
       <PublicProfileLayoutShell
         artistName={artist.name}
         heroImageUrl={heroImageUrl}
@@ -961,6 +966,12 @@ export function ProfileCompactTemplate({
             }
             data-public-profile-nav={publicProfileNavIds}
           >
+            <ReleaseCreditsDrawer
+              open={creditsOpen && !isDesktopLayout}
+              onOpenChange={setCreditsOpen}
+              credits={visibleReleaseCredits}
+              presentation={drawerPresentation}
+            />
             {profileBanner && !isDesktopLayout ? (
               <div
                 className='relative z-20 w-full shrink-0'
@@ -971,6 +982,14 @@ export function ProfileCompactTemplate({
             ) : null}
             <div className='profile-compact-surface-slot relative min-h-0 flex-1'>
               <ProfileCompactSurface
+                proofClaimCta={
+                  proofClaim && claimFooterHref
+                    ? {
+                        href: claimFooterHref,
+                        label: claimFooterLabel ?? 'Claim yours',
+                      }
+                    : null
+                }
                 renderMode='interactive'
                 presentation={drawerPresentation}
                 onOpenReleaseCredits={
@@ -1050,53 +1069,64 @@ export function ProfileCompactTemplate({
         }
         desktopSurface={
           PROFILE_DESKTOP_SURFACE_ENABLED ? (
-            <ProfileDesktopSurface
-              presentation='modal'
-              overlaysEnabled={isDesktopLayout}
-              onReady={handleDesktopSurfaceReady}
-              artist={artist}
-              socialLinks={socialLinks}
-              contacts={contacts}
-              showPayButton={showPayButton}
-              latestRelease={latestRelease}
-              profileSettings={profileSettings}
-              alertOptInVariant={resolvedAlertOptInVariant}
-              allowFanCapture={allowFanCapture}
-              genres={genres}
-              pressPhotos={pressPhotos}
-              allowPhotoDownloads={allowPhotoDownloads}
-              creditSegments={creditSegments}
-              photoDownloadSizes={photoDownloadSizes}
-              tourDates={tourDates}
-              viewerCountryCode={resolvedViewerCountryCode}
-              visitorAssignmentResolved={visitorAssignmentResolved}
-              releases={releases}
-              catalogLoadFailed={catalogLoadFailed}
-              drawerOpen={drawerOpen}
-              drawerView={drawerView}
-              activeMode={requestedMode}
-              onModeSelect={nextMode => {
-                clearCloseResetTimer();
-                setRequestedMode(nextMode);
-              }}
-              onAlertsModalClose={() => setRequestedMode('profile')}
-              onDrawerOpenChange={handleDrawerOpenChange}
-              onDrawerViewChange={handleDrawerViewChange}
-              onOpenMenu={() => openDrawerMode('menu')}
-              onPlayClick={handlePlayClick}
-              onBack={handleBack}
-              profileHref={profileHref}
-              isSubscribed={isSubscribed}
-              contentPrefs={contentPrefs}
-              onTogglePref={handleTogglePref}
-              onUnsubscribe={handleUnsubscribe}
-              isUnsubscribing={unsubMutation.isPending}
-              onOpenReleaseCredits={
-                visibleReleaseCredits.length > 0
-                  ? () => setCreditsOpen(true)
-                  : undefined
-              }
-            />
+            <div
+              className='relative flex min-h-0 w-full flex-1 flex-col'
+              data-sheet-container
+            >
+              <ProfileDesktopSurface
+                presentation='modal'
+                overlaysEnabled={isDesktopLayout}
+                onReady={handleDesktopSurfaceReady}
+                artist={artist}
+                socialLinks={socialLinks}
+                contacts={contacts}
+                showPayButton={showPayButton}
+                latestRelease={latestRelease}
+                profileSettings={profileSettings}
+                alertOptInVariant={resolvedAlertOptInVariant}
+                allowFanCapture={allowFanCapture}
+                genres={genres}
+                pressPhotos={pressPhotos}
+                allowPhotoDownloads={allowPhotoDownloads}
+                creditSegments={creditSegments}
+                photoDownloadSizes={photoDownloadSizes}
+                tourDates={tourDates}
+                viewerCountryCode={resolvedViewerCountryCode}
+                visitorAssignmentResolved={visitorAssignmentResolved}
+                releases={releases}
+                catalogLoadFailed={catalogLoadFailed}
+                drawerOpen={drawerOpen}
+                drawerView={drawerView}
+                activeMode={requestedMode}
+                onModeSelect={nextMode => {
+                  clearCloseResetTimer();
+                  setRequestedMode(nextMode);
+                }}
+                onAlertsModalClose={() => setRequestedMode('profile')}
+                onDrawerOpenChange={handleDrawerOpenChange}
+                onDrawerViewChange={handleDrawerViewChange}
+                onOpenMenu={() => openDrawerMode('menu')}
+                onPlayClick={handlePlayClick}
+                onBack={handleBack}
+                profileHref={profileHref}
+                isSubscribed={isSubscribed}
+                contentPrefs={contentPrefs}
+                onTogglePref={handleTogglePref}
+                onUnsubscribe={handleUnsubscribe}
+                isUnsubscribing={unsubMutation.isPending}
+                onOpenReleaseCredits={
+                  visibleReleaseCredits.length > 0
+                    ? () => setCreditsOpen(true)
+                    : undefined
+                }
+              />
+              <ReleaseCreditsDrawer
+                open={creditsOpen && isDesktopLayout}
+                onOpenChange={setCreditsOpen}
+                credits={visibleReleaseCredits}
+                presentation='modal'
+              />
+            </div>
           ) : null
         }
       />

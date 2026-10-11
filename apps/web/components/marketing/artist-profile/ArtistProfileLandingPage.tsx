@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
+import type { LogoPlacement } from '@/data/product-truth/logo-permissions';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { MarketingPlatformSpecBento } from '../MarketingPlatformSpecBento';
@@ -46,13 +47,19 @@ const DEFAULT_CALLOUTS = [
   },
 ] as const;
 
-function ArtistProfileAnnotatedTruth({
+export function ArtistProfileAnnotatedTruth({
   specWall,
 }: Readonly<{ specWall: ArtistProfileLandingCopy['specWall'] }>) {
   const callouts = specWall.callouts ?? DEFAULT_CALLOUTS;
 
   return (
-    <ArtistProfileSectionShell className='ap-annotated-truth bg-surface-0'>
+    <ArtistProfileSectionShell
+      className='ap-annotated-truth bg-surface-0'
+      sectionId='feature-split'
+      sectionVariant='phone-left'
+      sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.tsx'
+      sectionOccurrence='annotated-truth'
+    >
       <div className='mx-auto max-w-public-content'>
         <ArtistProfileSectionHeader
           align='left'
@@ -68,7 +75,7 @@ function ArtistProfileAnnotatedTruth({
               <Image
                 fill
                 src={LIVE_PROFILE.publicUrl}
-                alt="Tim White's live Jovie artist profile."
+                alt="Demo of Tim White's Jovie artist profile."
                 className='object-cover object-top'
                 sizes='(min-width: 1024px) 21rem, 18rem'
               />
@@ -171,11 +178,13 @@ function ArtistProfileAnnotatedTruth({
 interface ArtistProfileLandingPageProps {
   readonly copy: ArtistProfileLandingCopy;
   readonly flags: ArtistProfileSectionFlags;
+  readonly logoPlacement: LogoPlacement;
 }
 
 export function ArtistProfileLandingPage({
   copy,
   flags,
+  logoPlacement,
 }: Readonly<ArtistProfileLandingPageProps>) {
   if (!flags.FULL_PAGE) {
     return (
@@ -190,6 +199,7 @@ export function ArtistProfileLandingPage({
       <ArtistProfileHeroAdaptiveIntro
         hero={copy.hero}
         adaptive={copy.adaptive}
+        logoPlacement={logoPlacement}
       />
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
         <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />

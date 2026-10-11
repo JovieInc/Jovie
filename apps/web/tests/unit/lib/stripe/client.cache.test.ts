@@ -661,4 +661,56 @@ describe('Stripe Client - Cache Behavior', () => {
       );
     });
   });
+
+  describe('Synthetic principal marker (JOV-7697)', () => {
+    const emptySearch = {
+      data: [],
+      has_more: false,
+      object: 'search_result',
+      url: '/v1/customers/search',
+    };
+
+    beforeEach(() => {
+      mockedCacheQuery.mockImplementation(async (_key, queryFn) => queryFn());
+    });
+
+    it('marks a new synthetic principal customer with its roster actor', async () => {
+      const email = 'canary+synthetic-grokbot-run42@mail.example';
+      mockStripeCustomers.search
+        .mockResolvedValueOnce(emptySearch)
+        .mockResolvedValueOnce(emptySearch);
+      mockStripeCustomers.create.mockResolvedValueOnce(
+        createMockCustomer('cus_synthetic', 'user_synthetic', email)
+      );
+
+      await getOrCreateCustomer('user_synthetic', email);
+
+      expect(mockStripeCustomers.create).toHaveBeenCalledWith({
+        email,
+        name: undefined,
+        metadata: {
+          clerk_user_id: 'user_synthetic',
+          created_via: 'jovie_app',
+          synthetic_principal: 'grokbot',
+        },
+      });
+    });
+
+    it('leaves real customer metadata unchanged', async () => {
+      mockStripeCustomers.search
+        .mockResolvedValueOnce(emptySearch)
+        .mockResolvedValueOnce(emptySearch);
+      mockStripeCustomers.create.mockResolvedValueOnce(
+        createMockCustomer('cus_real', 'user_real', 'artist@band.com')
+      );
+
+      await getOrCreateCustomer('user_real', 'artist@band.com');
+
+      expect(mockStripeCustomers.create).toHaveBeenCalledWith({
+        email: 'artist@band.com',
+        name: undefined,
+        metadata: { clerk_user_id: 'user_real', created_via: 'jovie_app' },
+      });
+    });
+  });
 });

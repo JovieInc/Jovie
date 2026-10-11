@@ -167,7 +167,7 @@ describe('CardTitle', () => {
     render(<CardTitle>Title text</CardTitle>);
     const title = screen.getByRole('heading', { level: 3 });
     expect(title).toBeInTheDocument();
-    expect(title.className).toContain('text-base');
+    expect(title.className).toContain('text-(length:--text-base)');
     expect(title.className).toContain('font-semibold');
     expect(title.className).toContain('text-primary-token');
   });
@@ -190,7 +190,7 @@ describe('CardTitle', () => {
     );
     const title = screen.getByRole('heading', { level: 1 });
     expect(title).toBeInTheDocument();
-    expect(title.className).toContain('text-base');
+    expect(title.className).toContain('text-(length:--text-base)');
   });
 
   it('supports asChild with non-heading elements', () => {
@@ -362,7 +362,7 @@ describe('Card composition', () => {
     // Verify classes are still applied
     expect(article.className).toContain('rounded-(--system-b-radius-card)');
     expect(header.className).toContain('flex');
-    expect(title.className).toContain('text-base');
+    expect(title.className).toContain('text-(length:--text-base)');
   });
 
   it('applies partial-data content state', () => {

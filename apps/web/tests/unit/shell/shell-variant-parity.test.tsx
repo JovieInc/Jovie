@@ -14,6 +14,7 @@ import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({ toggle: vi.fn() }),
+  useOptionalPreviewPanelState: () => null,
 }));
 
 vi.mock('@/components/organisms/PersistentAudioBar', () => ({
@@ -42,14 +43,6 @@ vi.mock('@/features/dashboard/dashboard-nav', () => ({
 
 vi.mock('@/components/organisms/user-button', () => ({
   UserButton: () => <div data-testid='fixture-user-button' />,
-}));
-
-vi.mock('@/features/feedback/SidebarUpgradeBanner', () => ({
-  SidebarUpgradeBanner: () => null,
-}));
-
-vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
-  SidebarInstallBanner: () => null,
 }));
 
 vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({

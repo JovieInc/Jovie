@@ -284,7 +284,7 @@ test.describe('Cookie banner @smoke', () => {
       expect(findMeBox).not.toBeNull();
       expect(
         boxesOverlap(bannerBox!, findMeBox!),
-        `Cookie banner overlaps Find me at ${viewport.width}x${viewport.height}`
+        `Cookie banner overlaps the homepage primary CTA at ${viewport.width}x${viewport.height}`
       ).toBe(false);
 
       if (viewport.name === 'mobile') {

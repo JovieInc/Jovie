@@ -4,7 +4,15 @@ import { existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DELIVERY_CONTROLLER_COVERAGE_ARGS } from './ci-fast-lanes.mjs';
+import {
+  DELIVERY_CONTROLLER_COVERAGE_ARGS,
+  STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
+} from './ci-fast-lanes.mjs';
+import {
+  BLOG_CERTIFICATION_PROOFS,
+  classifyBlogContentDiff,
+  isBlogContentCandidatePath,
+} from './lib/blog-content-ci.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -28,6 +36,24 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
   [
     'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
     ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
+  ],
+  [
+    'apps/web/data/marketing/penContracts.ts',
+    [
+      'apps/web/tests/unit/marketing/component-registry.test.ts',
+      'apps/web/tests/unit/marketing/locked-pen-chrome-contract.test.ts',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileAdaptiveSection.test.tsx',
+      'apps/web/tests/unit/marketing/artist-profile/ArtistProfileOutcomesLedger.test.tsx',
+      'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
+    ],
+  ],
+  [
+    'apps/web/lib/leads/qualification-decision.ts',
+    ['apps/web/tests/lib/leads/qualification-decision.test.ts'],
+  ],
+  [
+    'apps/web/lib/leads/qualify.ts',
+    ['apps/web/tests/lib/leads/qualify.test.ts'],
   ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
@@ -144,8 +170,6 @@ const HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS = [
   'apps/web/tests/unit/home/mounted-home-product-statement-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-trust-strip-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-workspace-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/release-mode-mock-card-system-b-style-guard.test.tsx',
-  'apps/web/tests/unit/home/release-operating-system-showcase-system-b-style-guard.test.tsx',
 ];
 const HOMEPAGE_SYSTEM_B_GUARD_EXACT_INPUTS = new Set([
   'apps/web/components/marketing/ClientFaqAccordion.tsx',
@@ -202,6 +226,12 @@ const SUMMER_COMMISSIONING_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_PRIMARY_INPUTS = new Set([
   'scripts/capability-benchmark/capability-benchmark-registry.json',
+  'scripts/capability-benchmark/decision-routing-benchmark.json',
+  'scripts/capability-benchmark/computer-use-decision.jsonl',
+  'scripts/capability-benchmark/computer-use-decision.mjs',
+  'scripts/capability-benchmark/computer-use-decision.test.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.test.mjs',
   'scripts/capability-benchmark/capability-benchmark.mjs',
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
   'docs/operations/CAPABILITY_BENCHMARK.md',
@@ -213,6 +243,8 @@ const CAPABILITY_BENCHMARK_LANE = new Set([
 ]);
 const CAPABILITY_BENCHMARK_NODE_TESTS = [
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
+  'scripts/capability-benchmark/computer-use-decision.test.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.test.mjs',
 ];
 const SUMMER_COMMISSIONING_NODE_TESTS = [
   'scripts/summer-commissioning/company-registry.test.mjs',
@@ -316,6 +348,8 @@ const CI_UI_DRIFT_GUARDRAIL_NODE_TESTS = [
 const OWNERLESS_RECOVERY_POLICY_TEST =
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs';
 const CI_CONTROL_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
+  'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-eval.test.mjs',
@@ -362,6 +396,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
   'scripts/lib/__tests__/setup-worktree-health.test.mjs',
   'scripts/lib/__tests__/linear-issue-intake.test.mjs',
+  'scripts/lib/__tests__/remediation-signal.test.mjs',
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
   'scripts/lib/__tests__/product-lane-classifier.test.mjs',
@@ -475,6 +510,60 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-lines=85',
       '--test-coverage-branches=75',
       '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    'scripts/publish-coverage-report.test.mjs',
+    'scripts/lib/publish-coverage-report.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=90',
+    ],
+  ],
+  [
+    'scripts/coverage-surface-files.test.mjs',
+    'scripts/lib/coverage-surface-files.mjs',
+    [
+      '--test-coverage-lines=100',
+      '--test-coverage-branches=100',
+      '--test-coverage-functions=100',
+    ],
+  ],
+  [
+    'scripts/invariants/sonar-repair-contract.test.mjs',
+    'scripts/invariants/sonar-repair-contract.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=95',
+    ],
+  ],
+  [
+    'scripts/normalize-sonar-lcov.test.mjs',
+    'scripts/normalize-sonar-lcov.mjs',
+    [
+      '--test-coverage-lines=100',
+      '--test-coverage-branches=100',
+      '--test-coverage-functions=100',
+    ],
+  ],
+  [
+    '.github/scripts/internal-pr-review.test.mjs',
+    '.github/scripts/internal-pr-review.mjs',
+    [
+      '--test-coverage-lines=85',
+      '--test-coverage-branches=80',
+      '--test-coverage-functions=85',
+    ],
+  ],
+  [
+    'scripts/lib/__tests__/source-admission-policy.test.mjs',
+    'scripts/lib/source-admission-policy.mjs',
+    [
+      '--test-coverage-lines=95',
+      '--test-coverage-branches=90',
+      '--test-coverage-functions=100',
     ],
   ],
 ];
@@ -837,6 +926,17 @@ const VISUAL_QA_DIFF_ARTIFACTS_MANIFEST = new Set([
   VISUAL_QA_DIFF_ARTIFACTS_SOURCE,
   VISUAL_QA_DIFF_ARTIFACTS_TEST,
 ]);
+const CERTIFICATION_NORMALIZATION_SOURCE =
+  'apps/web/lib/ovie/certifications/normalize.ts';
+const CERTIFICATION_NORMALIZATION_TESTS = [
+  'apps/web/lib/ovie/certifications/normalize.test.ts',
+  'apps/web/lib/ovie/certifications/inventory.server.test.ts',
+  'apps/web/components/features/admin/certifications/CertificationDetailRail.test.tsx',
+];
+const CERTIFICATION_NORMALIZATION_MANIFEST = new Set([
+  CERTIFICATION_NORMALIZATION_SOURCE,
+  ...CERTIFICATION_NORMALIZATION_TESTS,
+]);
 const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = new Set([
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
@@ -959,9 +1059,17 @@ const LINEAR_SYNC_ON_MERGE_PRIMARY = new Set([
   '.github/workflows/linear-sync-on-merge.yml',
   'scripts/lib/linear-sync-on-merge.mjs',
   'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+  'scripts/lib/validation-lifecycle.mjs',
+  'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+  'scripts/lib/validation-sync.mjs',
+  'scripts/lib/__tests__/validation-sync.test.mjs',
+  'scripts/lib/__tests__/fixtures/validation-world.mjs',
+  'scripts/lib/founder-taste-order.mjs',
+  'scripts/lib/__tests__/founder-taste-order.test.mjs',
 ]);
 const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   ...LINEAR_SYNC_ON_MERGE_PRIMARY,
+  '.github/workflow-topology.gen.yml',
   '.claude/rules/linear.md',
   '.github/MERGE_QUEUE.md',
   '.github/workflows/README.md',
@@ -973,17 +1081,316 @@ const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   'scripts/run-affected-tests.mjs',
 ]);
 
-export function buildAffectedTestPlan(
+export function classifyBlogContentForAffectedTests(base, head, options) {
+  try {
+    return classifyBlogContentDiff(base, head, options);
+  } catch {
+    console.warn(
+      '[affected-tests] Blog diff classification failed; requiring the full suite.'
+    );
+    return undefined;
+  }
+}
+
+const LANE_PYTHON_COVERAGE_INPUTS = new Set([
+  ...[
+    'lane_runner',
+    'pr_events',
+    'reason_lane',
+    'doctor',
+    'hud',
+    'disk_guard',
+    'worktree_sweep',
+    'service_census',
+    'hyperagent_lane',
+    'codex_lane',
+    'devin_free_policy',
+    'execution_attempt',
+    'gh_app_token',
+  ].flatMap(name => [
+    `scripts/lanes/${name}.py`,
+    `scripts/tests/test_${name}.py`,
+  ]),
+  // The merge reader is exercised by the doctor transport/window regressions.
+  'scripts/lanes/merge_evidence.py',
+  // Immutable dependency classification is covered by the real lane gate tests.
+  'scripts/lanes/dependency_diff.py',
+]);
+
+// Service ownership and maintenance qualification changes are Python controls.
+// Permit only the complete reviewed control/coverage-plumbing signature; extra
+// peers retain the existing full fallback, including selector infrastructure.
+const SERVICE_CENSUS_QUALIFICATION_MANIFEST = new Set([
+  'scripts/lanes/service_census.py',
+  'scripts/lanes/worktree_sweep.py',
+  'scripts/lanes/lane_runner.py',
+  'scripts/tests/test_service_census.py',
+  'scripts/tests/test_worktree_sweep.py',
+  'scripts/ci-fast-lanes.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS = [
+  ...AFFECTED_TEST_SELECTOR_TESTS,
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+];
+const DEPENDENCY_GATE_QUALIFICATION_MANIFEST = new Set([
+  'scripts/lanes/dependency_diff.py',
+  'scripts/lanes/lane_runner.py',
+  'scripts/tests/test_lane_runner.py',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const CODEX_CAPACITY_QUALIFICATION_MANIFEST = new Set([
+  'scripts/lanes/codex_lane.py',
+  'scripts/tests/test_codex_lane.py',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+
+export function buildAffectedTestPlan(changedFiles, options) {
+  const files = unique(changedFiles.filter(Boolean));
+  const plan = planAffectedTests(files, options);
+  const lanePythonCoverage = files.some(file =>
+    LANE_PYTHON_COVERAGE_INPUTS.has(file)
+  );
+  const unknownPythonPeer =
+    lanePythonCoverage &&
+    files.some(
+      file => file.endsWith('.py') && !LANE_PYTHON_COVERAGE_INPUTS.has(file)
+    );
+  const isFileAvailable =
+    options?.isFileAvailable ?? (file => existsSync(resolve(REPO_ROOT, file)));
+  const missingMergeEvidenceProof =
+    files.some(file =>
+      [
+        'scripts/lanes/merge_evidence.py',
+        'scripts/lanes/hud.py',
+        'scripts/tests/test_hud.py',
+      ].includes(file)
+    ) &&
+    !['scripts/tests/test_doctor.py', 'scripts/tests/test_hud.py'].every(
+      isFileAvailable
+    );
+  const missingDevinFreeProof =
+    files.includes('scripts/lanes/devin_free_policy.py') &&
+    !isFileAvailable('scripts/tests/test_devin_free_policy.py');
+  const missingCodexCapacityProof =
+    files.includes('scripts/lanes/codex_lane.py') &&
+    !isFileAvailable('scripts/tests/test_codex_lane.py');
+  // Global/full early returns need the same command fields as focused plans.
+  // Retain lane coverage even when an unrelated input requires the full suite.
+  return {
+    selectedTests: [],
+    rootVitestTests: [],
+    pythonTests: [],
+    pythonUnittestTests: [],
+    scriptVitestTests: [],
+    scriptVitestCoverageArgs: [],
+    nodeTests: [],
+    nodeTestArgs: [],
+    retouchPromptCoverage: false,
+    ...plan,
+    ...(lanePythonCoverage
+      ? {
+          lanePythonCoverage: true,
+          mode:
+            unknownPythonPeer ||
+            missingMergeEvidenceProof ||
+            missingDevinFreeProof ||
+            missingCodexCapacityProof
+              ? 'full'
+              : plan.mode === 'none'
+                ? 'selected'
+                : plan.mode,
+          ...(missingCodexCapacityProof
+            ? {
+                fallbackReason:
+                  'Codex subscription capacity coverage proof is unavailable',
+              }
+            : missingDevinFreeProof
+              ? {
+                  fallbackReason:
+                    'Devin Free expiry coverage proof is unavailable',
+                }
+              : missingMergeEvidenceProof
+                ? {
+                    fallbackReason:
+                      'merge evidence coverage proof is unavailable',
+                  }
+                : unknownPythonPeer
+                  ? {
+                      fallbackReason:
+                        'unmapped Python peer mixed with lane coverage',
+                    }
+                  : {}),
+        }
+      : {}),
+  };
+}
+
+function planAffectedTests(
   changedFiles,
   {
     isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
     readFile = readRepoFile,
+    blogContentReceipt = undefined,
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  const sentryGateInputs = new Set([
+    '.github/actions/sentry-error-gate/action.yml',
+    '.github/scripts/sentry-read-json.sh',
+    'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
+  ]);
+  const sentryDeploymentContract =
+    'apps/web/tests/unit/ci/deploy-workflow.test.ts';
+  if (
+    files.some(file => sentryGateInputs.has(file)) &&
+    files.every(
+      file =>
+        sentryGateInputs.has(file) ||
+        file === sentryDeploymentContract ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file) ||
+        file === 'docs/runbooks/production-sentry-uncertainty-recovery.md'
+    )
+  ) {
+    if (!isFileAvailable(sentryDeploymentContract)) {
+      return fullSuitePlan(
+        'Sentry deployment workflow contract is unavailable'
+      );
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [sentryDeploymentContract],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      nodeTests: [],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
+        'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+        'scripts/lib/__tests__/ci-harness.test.mjs',
+        'scripts/lib/__tests__/production-release-supersession.test.mjs',
+      ],
+    };
+  }
+  if (
+    files.length === CODEX_CAPACITY_QUALIFICATION_MANIFEST.size &&
+    files.every(file => CODEX_CAPACITY_QUALIFICATION_MANIFEST.has(file))
+  ) {
+    if (![...CODEX_CAPACITY_QUALIFICATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan(
+        'Codex subscription capacity qualification proof is unavailable'
+      );
+    }
+    // The reviewed source and selector closure retains the entire structural
+    // Python runner and both CI plumbing suites, including every coverage floor.
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
+  if (
+    files.length === DEPENDENCY_GATE_QUALIFICATION_MANIFEST.size &&
+    files.every(file => DEPENDENCY_GATE_QUALIFICATION_MANIFEST.has(file))
+  ) {
+    if (![...DEPENDENCY_GATE_QUALIFICATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan(
+        'dependency gate qualification proof is unavailable'
+      );
+    }
+    // Preserve the entire canonical structural Python command and its floors,
+    // plus the selector and CI plumbing tests, for this exact source closure.
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
+  const isExactServiceCensusQualification =
+    files.length === SERVICE_CENSUS_QUALIFICATION_MANIFEST.size &&
+    files.every(file => SERVICE_CENSUS_QUALIFICATION_MANIFEST.has(file));
+  if (isExactServiceCensusQualification) {
+    if (
+      ![
+        ...SERVICE_CENSUS_QUALIFICATION_MANIFEST,
+        ...SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return fullSuitePlan('service census qualification proof is unavailable');
+    }
+    // buildAffectedTestPlan retains the complete structural Python coverage
+    // command. This selector only supplies both coverage-plumbing test suites.
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
+  if (files.some(isBlogContentCandidatePath)) {
+    if (
+      !blogContentReceipt?.contentOnly ||
+      files.length !== blogContentReceipt.changedPaths?.length ||
+      files.some(file => !blogContentReceipt.changedPaths.includes(file))
+    ) {
+      return fullSuitePlan(
+        'blog content diff was mixed, unsafe, or lacked status-aware qualification'
+      );
+    }
+    if (!BLOG_CERTIFICATION_PROOFS.every(isFileAvailable)) {
+      return fullSuitePlan('blog certification proof is unavailable');
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [...BLOG_CERTIFICATION_PROOFS],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [],
+      nodeTests: [],
+      blogCandidateBuild: true,
+    };
+  }
+  const isBoundedCertificationNormalizationChange = files.includes(
+    CERTIFICATION_NORMALIZATION_SOURCE
+  );
+  if (isBoundedCertificationNormalizationChange) {
+    if (!files.every(file => CERTIFICATION_NORMALIZATION_MANIFEST.has(file))) {
+      return fullSuitePlan('mixed certification normalization source changes');
+    }
+    if (![...CERTIFICATION_NORMALIZATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan('certification normalization proof is unavailable');
+    }
   }
   const isLinearSyncOnMerge =
     files.some(file => LINEAR_SYNC_ON_MERGE_PRIMARY.has(file)) &&
@@ -1004,7 +1411,24 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: [],
       scriptVitestTests: [
         'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+        'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+        'scripts/lib/__tests__/validation-sync.test.mjs',
+        'scripts/lib/__tests__/founder-taste-order.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+      scriptVitestCoverageArgs: [
+        '--coverage',
+        '--coverage.include=lib/linear-sync-on-merge.mjs',
+        '--coverage.include=lib/validation-lifecycle.mjs',
+        '--coverage.include=lib/validation-sync.mjs',
+        '--coverage.include=lib/founder-taste-order.mjs',
+        '--coverage.reporter=text',
+        '--coverage.reporter=json-summary',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.lines=85',
+        '--coverage.thresholds.statements=85',
+        '--coverage.thresholds.functions=80',
+        '--coverage.thresholds.branches=70',
       ],
       nodeTests: [],
     };
@@ -1090,6 +1514,11 @@ export function buildAffectedTestPlan(
       scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
       nodeTests: CAPABILITY_BENCHMARK_NODE_TESTS,
     };
+  }
+  if (files.some(file => CAPABILITY_BENCHMARK_PRIMARY_INPUTS.has(file))) {
+    return fullSuitePlan(
+      'Capability benchmark change exceeds its focused lane'
+    );
   }
   const isBoundedSummerCommissioningChange =
     files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&
@@ -1541,7 +1970,9 @@ export function buildAffectedTestPlan(
         manifest.has(file) &&
         (hasUnsupportedAutomationPeer || !directlyRunnableTestFiles.has(file))
     );
-  const mandatoryTests = [];
+  const mandatoryTests = isBoundedCertificationNormalizationChange
+    ? [...CERTIFICATION_NORMALIZATION_TESTS]
+    : [];
   const hasSeedConfirmationChange = files.some(
     file =>
       file === 'apps/web/tests/seed-test-data.ts' ||
@@ -1649,7 +2080,19 @@ export function buildAffectedTestPlan(
     mandatoryTests.push(...RUNNER_PREREQUISITE_CONTRACT_TESTS);
   }
 
-  const selectedTests = unique([...directTests, ...mandatoryTests]);
+  if (
+    isBoundedCertificationNormalizationChange &&
+    !mandatoryTests.every(isFileAvailable)
+  ) {
+    return fullSuitePlan('certification normalization proof is unavailable');
+  }
+  const selectedTests = unique([
+    ...(isBoundedCertificationNormalizationChange
+      ? CERTIFICATION_NORMALIZATION_TESTS
+      : []),
+    ...directTests,
+    ...mandatoryTests,
+  ]);
   const rootVitestTests = unique([
     ...(isExactVercelCongestionControl
       ? VERCEL_CONGESTION_CONTROL_ROOT_VITEST_TESTS
@@ -1704,6 +2147,11 @@ export function buildAffectedTestPlan(
   ]);
   const isCoveredSource = file => {
     if (VITEST_TEST_FILE.test(file)) return true;
+    if (
+      isBoundedCertificationNormalizationChange &&
+      CERTIFICATION_NORMALIZATION_MANIFEST.has(file)
+    )
+      return true;
     const fixtureTests = KNOWN_VITEST_FIXTURE_TESTS.get(file);
     if (fixtureTests) return fixtureTests.every(isFileAvailable);
     if (file.startsWith('apps/web/components/features/profile/')) return true;
@@ -2136,6 +2584,16 @@ export async function runCommandStatus(
   logger(
     `[affected-tests] complete ${label} status=${status} elapsedMs=${Date.now() - startedAt} pid=${child.pid ?? 'unknown'} command=${commandText}`
   );
+  if (bufferOutput) {
+    // Queue a barrier after both the stage output and completion log. The CLI
+    // can exit immediately, so its parent pipe must finish writing first.
+    await new Promise((resolveWrite, rejectWrite) => {
+      process.stdout.write('', error => {
+        if (error) rejectWrite(error);
+        else resolveWrite();
+      });
+    });
+  }
   return status;
 }
 
@@ -2190,7 +2648,7 @@ async function runCommands(commands, concurrency = 1, options = {}) {
   }
 
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  process.exit(failureStatus);
+  return failureStatus;
 }
 
 export function buildCompanyRegistryTestCommand() {
@@ -2254,6 +2712,7 @@ export function buildControlCoverageCommands() {
     '--coverage.include=lib/github-open-prs-rest.mjs',
     '--coverage.include=lib/pr-conflict-event.mjs',
     '--coverage.include=lib/pr-conflict-handler.mjs',
+    '--coverage.include=lib/product-lane-classifier.mjs',
     '--coverage.thresholds.perFile=true',
     '--coverage.thresholds.lines=85',
     '--coverage.thresholds.branches=75',
@@ -2277,8 +2736,36 @@ export function buildControlCoverageCommands() {
   return [
     ['pnpm', nativeCoverageArgs],
     ['pnpm', ownerlessCoverageArgs],
+    [
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        'lib/__tests__/production-lane-range.test.mjs',
+        '--coverage',
+        '--coverage.include=lib/production-lane-range.mjs',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.statements=75',
+        '--coverage.thresholds.lines=75',
+        '--coverage.thresholds.branches=70',
+        '--coverage.thresholds.functions=90',
+        controlCoverageReportsDirectory('production-lane-range'),
+      ],
+    ],
   ];
 }
+
+const SUMMER_PIN_GUARD_WEB_TEST =
+  'apps/web/lib/ovie/summer-deployment-pin-guard.test.ts';
+const SUMMER_PIN_GUARD_NODE_COMMAND = [
+  'node',
+  ['--test', 'scripts/summer-deployment-pin-guard.test.mjs'],
+];
 
 export function buildSelectedTestCommands(
   plan,
@@ -2287,6 +2774,17 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (plan.lanePythonCoverage) {
+    // Qualification must fail when the CI-pinned Python dependencies are absent,
+    // even on a local host; the structural wrapper's local skip is not proof.
+    commands.push([
+      'env',
+      ['CI=true', 'bash', '-c', STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]],
+    ]);
+  }
+  if (plan.selectedTests.includes(SUMMER_PIN_GUARD_WEB_TEST)) {
+    commands.push(SUMMER_PIN_GUARD_NODE_COMMAND);
+  }
   if (plan.deliveryControllerCoverage) {
     commands.push(['node', [...DELIVERY_CONTROLLER_COVERAGE_ARGS]]);
   }
@@ -2411,6 +2909,25 @@ export function buildSelectedTestCommands(
       ],
     ]);
   }
+  if (plan.blogCandidateBuild) {
+    commands.push([
+      'env',
+      [
+        'NEXT_PUBLIC_APP_URL=http://localhost:3100',
+        'NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100',
+        'NEXT_PUBLIC_CLERK_MOCK=1',
+        'NEXT_PUBLIC_CLERK_PROXY_DISABLED=1',
+        'NEXT_PUBLIC_E2E_MODE=1',
+        'NEXT_IGNORE_ESLINT=1',
+        'NEXT_IGNORE_TYPECHECK=1',
+        'NEXT_PRIVATE_SKIP_SIZE_CHECK=true',
+        'pnpm',
+        'turbo',
+        'build',
+        '--filter=@jovie/web',
+      ],
+    ]);
+  }
   return commands;
 }
 
@@ -2443,6 +2960,8 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
   return [
     buildCompanyRegistryTestCommand(),
     buildProjectCreationTestCommand(),
+    // Keep the full repository pin scan outside Vitest's 12-second test budget.
+    SUMMER_PIN_GUARD_NODE_COMMAND,
     ...commands,
   ];
 }
@@ -2571,9 +3090,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     DEFAULT_PROGRESS_INTERVAL_MS
   );
   const explicitFiles = argValue(args, '--changed-files-json', '');
-  const plan = buildAffectedTestPlan(
-    explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base)
+  const files = explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base);
+  const prerequisitesAvailable = BLOG_CERTIFICATION_PROOFS.every(file =>
+    existsSync(resolve(REPO_ROOT, file))
   );
+  const blogContentReceipt =
+    !explicitFiles && files.some(isBlogContentCandidatePath)
+      ? classifyBlogContentForAffectedTests(base, 'HEAD', {
+          prerequisitesAvailable,
+        })
+      : undefined;
+  const plan = buildAffectedTestPlan(files, { blogContentReceipt });
   if (args.includes('--dry-run')) {
     console.log(JSON.stringify(plan, null, 2));
     process.exit(0);
@@ -2586,11 +3113,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     // 2k-file web suite to trigger host memory pressure near teardown. Keep
     // deterministic, bounded-memory shards, but schedule a small bounded set
     // concurrently so a complete fail-closed suite does not serialize all 8.
-    await runCommands(buildFullSuiteCommands(maxWorkers), shardConcurrency, {
-      timeoutMs: shardTimeoutMs,
-      progressIntervalMs,
-      labelPrefix: 'shard',
-    });
+    const fullStatus = await runCommands(
+      buildFullSuiteCommands(maxWorkers),
+      shardConcurrency,
+      {
+        timeoutMs: shardTimeoutMs,
+        progressIntervalMs,
+        labelPrefix: 'shard',
+      }
+    );
+    if (fullStatus !== 0) process.exit(fullStatus);
   }
 
   const coverageBase = plan.retouchPromptCoverage
@@ -2605,13 +3137,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         encoding: 'utf8',
       }).trim()
     : undefined;
-  await runCommands(
-    buildSelectedTestCommands(plan, maxWorkers, coverageBase, coverageHead),
-    1,
-    {
-      timeoutMs: shardTimeoutMs,
-      progressIntervalMs,
-      labelPrefix: 'selected',
-    }
+  process.exit(
+    await runCommands(
+      buildSelectedTestCommands(plan, maxWorkers, coverageBase, coverageHead),
+      1,
+      {
+        timeoutMs: shardTimeoutMs,
+        progressIntervalMs,
+        labelPrefix: 'selected',
+      }
+    )
   );
 }

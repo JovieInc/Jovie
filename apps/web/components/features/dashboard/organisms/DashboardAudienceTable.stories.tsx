@@ -1,9 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { DashboardStoryProviders } from '@/.storybook/dashboard-fixtures';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import type { AudienceMember } from '@/types';
-import { DashboardAudienceTable } from './dashboard-audience-table';
+import {
+  DashboardAudienceTable,
+  DEFAULT_AUDIENCE_FILTERS,
+} from './dashboard-audience-table';
 
 const mockDashboardData: DashboardData = {
   user: { id: 'story-user' },
@@ -21,6 +24,13 @@ const mockDashboardData: DashboardData = {
     tipsSubmitted: 0,
     totalReceivedCents: 0,
     monthReceivedCents: 0,
+  },
+  profileCompletion: {
+    percentage: 100,
+    completedCount: 6,
+    totalCount: 6,
+    steps: [],
+    profileIsLive: true,
   },
 };
 
@@ -44,6 +54,7 @@ const mockMembers: AudienceMember[] = [
       { url: 'https://instagram.com', timestamp: new Date().toISOString() },
       { url: 'https://tiktok.com', timestamp: new Date().toISOString() },
     ],
+    utmParams: {},
     email: 'sasha@example.com',
     phone: null,
     spotifyConnected: false,
@@ -68,6 +79,7 @@ const mockMembers: AudienceMember[] = [
       { label: 'Visited profile', timestamp: new Date().toISOString() },
     ],
     referrerHistory: [],
+    utmParams: {},
     email: null,
     phone: null,
     spotifyConnected: false,
@@ -95,6 +107,7 @@ const mockMembers: AudienceMember[] = [
     referrerHistory: [
       { url: 'https://youtube.com', timestamp: new Date().toISOString() },
     ],
+    utmParams: {},
     email: null,
     phone: '+15555555555',
     spotifyConnected: false,
@@ -130,16 +143,16 @@ const meta: Meta<typeof DashboardAudienceTable> = {
       },
     },
   },
-  tags: ['autodocs', 'audience-a11y', 'no-vitest'],
+  tags: ['autodocs', 'audience-a11y'],
   decorators: [
     Story => (
-      <DashboardDataProvider value={mockDashboardData}>
+      <DashboardStoryProviders dashboardData={mockDashboardData}>
         <TableMetaProvider>
           <div className='h-180 bg-surface-1 text-primary-token'>
             <Story />
           </div>
         </TableMetaProvider>
-      </DashboardDataProvider>
+      </DashboardStoryProviders>
     ),
   ],
 };
@@ -153,12 +166,13 @@ export const MembersLight: Story = {
     mode: 'members',
     rows: mockMembers,
     total: 42,
-    page: 1,
-    pageSize: 10,
+    view: 'all',
+    filters: DEFAULT_AUDIENCE_FILTERS,
+    subscriberCount: 18,
     sort: 'lastSeen',
     direction: 'desc',
-    onPageChange: () => {},
-    onPageSizeChange: () => {},
+    onViewChange: () => {},
+    onFiltersChange: () => {},
     onSortChange: () => {},
   },
   parameters: {
@@ -171,12 +185,13 @@ export const MembersDark: Story = {
     mode: 'members',
     rows: mockMembers,
     total: 42,
-    page: 1,
-    pageSize: 10,
+    view: 'all',
+    filters: DEFAULT_AUDIENCE_FILTERS,
+    subscriberCount: 18,
     sort: 'lastSeen',
     direction: 'desc',
-    onPageChange: () => {},
-    onPageSizeChange: () => {},
+    onViewChange: () => {},
+    onFiltersChange: () => {},
     onSortChange: () => {},
   },
   parameters: {
@@ -192,12 +207,13 @@ export const SubscribersLight: Story = {
       type: member.email ? 'email' : 'sms',
     })),
     total: 12,
-    page: 1,
-    pageSize: 10,
+    view: 'all',
+    filters: DEFAULT_AUDIENCE_FILTERS,
+    subscriberCount: 12,
     sort: 'createdAt',
     direction: 'desc',
-    onPageChange: () => {},
-    onPageSizeChange: () => {},
+    onViewChange: () => {},
+    onFiltersChange: () => {},
     onSortChange: () => {},
   },
   parameters: {
@@ -213,12 +229,13 @@ export const SubscribersDark: Story = {
       type: member.email ? 'email' : 'sms',
     })),
     total: 12,
-    page: 1,
-    pageSize: 10,
+    view: 'all',
+    filters: DEFAULT_AUDIENCE_FILTERS,
+    subscriberCount: 12,
     sort: 'createdAt',
     direction: 'desc',
-    onPageChange: () => {},
-    onPageSizeChange: () => {},
+    onViewChange: () => {},
+    onFiltersChange: () => {},
     onSortChange: () => {},
   },
   parameters: {
@@ -362,10 +379,13 @@ function generateMockMembers(count: number): AudienceMember[] {
       intentLevel,
       latestActions,
       referrerHistory,
+      utmParams: {},
       email,
       phone,
       spotifyConnected: type === 'spotify',
       purchaseCount: Math.floor((i * 3) % 5),
+      tipAmountTotalCents: Math.floor((i * 137) % 5000),
+      tipCount: Math.floor((i * 3) % 5),
       tags: i % 5 === 0 ? ['superfan'] : i % 7 === 0 ? ['vip'] : [],
       deviceType,
       lastSeenAt: new Date(Date.now() - (i % 30) * 86400000).toISOString(),
@@ -404,12 +424,13 @@ export const VirtualizationDemo: Story = {
     mode: 'members',
     rows: largeMemberSet,
     total: largeMemberSet.length,
-    page: 1,
-    pageSize: largeMemberSet.length, // Show all at once to demo virtualization
+    view: 'all',
+    filters: DEFAULT_AUDIENCE_FILTERS,
+    subscriberCount: largeMemberSet.length,
     sort: 'lastSeen',
     direction: 'desc',
-    onPageChange: () => {},
-    onPageSizeChange: () => {},
+    onViewChange: () => {},
+    onFiltersChange: () => {},
     onSortChange: () => {},
     profileUrl: 'https://jovie.link/demo',
   },
@@ -432,12 +453,13 @@ export const VirtualizationDemoDark: Story = {
     mode: 'members',
     rows: largeMemberSet,
     total: largeMemberSet.length,
-    page: 1,
-    pageSize: largeMemberSet.length,
+    view: 'all',
+    filters: DEFAULT_AUDIENCE_FILTERS,
+    subscriberCount: largeMemberSet.length,
     sort: 'lastSeen',
     direction: 'desc',
-    onPageChange: () => {},
-    onPageSizeChange: () => {},
+    onViewChange: () => {},
+    onFiltersChange: () => {},
     onSortChange: () => {},
     profileUrl: 'https://jovie.link/demo',
   },
@@ -463,12 +485,13 @@ export const VirtualizationSubscribers: Story = {
       type: member.email ? ('email' as const) : ('sms' as const),
     })),
     total: largeMemberSet.length,
-    page: 1,
-    pageSize: largeMemberSet.length,
+    view: 'all',
+    filters: DEFAULT_AUDIENCE_FILTERS,
+    subscriberCount: largeMemberSet.length,
     sort: 'createdAt',
     direction: 'desc',
-    onPageChange: () => {},
-    onPageSizeChange: () => {},
+    onViewChange: () => {},
+    onFiltersChange: () => {},
     onSortChange: () => {},
     profileUrl: 'https://jovie.link/demo',
   },

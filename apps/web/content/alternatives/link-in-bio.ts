@@ -3,59 +3,107 @@ import type { AlternativeData } from './types';
 export const linkInBioAlternative: AlternativeData = {
   slug: 'link-in-bio',
   category: 'Link in Bio',
-  title: 'Best Link in Bio Tool (2026)',
+  title: 'A Link in Bio for Artists (2026)',
   metaDescription:
-    'The best link in bio tool for a profile that does more than list links. Jovie adapts to each visitor, captures contacts, and sends automatic update notifications.',
-  heroHeadline: 'The best link in bio tool',
+    'Use Jovie as an artist link in bio with a public profile, release smart links, audience capture, and enrolled artist workflows.',
+  heroHeadline: 'A link in bio for artists',
   heroSubheadline:
-    'Most link-in-bio tools are a static list. Jovie is a profile that adapts to what you share, captures contacts, and notifies your audience automatically.',
+    'Jovie combines a public artist profile, release smart links, and audience capture, with additional artist workflows available by access level.',
   heroImage: {
     src: '/images/hero/alternatives-link-in-bio.webp',
     alt: 'A vertical column of purple light through dark smoke.',
   },
   whySwitch: [
-    'A static link page treats every update the same, so nothing leads.',
-    'Link pages are passive. Visitors click once and forget. Jovie captures contacts and notifies them when you publish something new.',
-    'Manual link management wastes time. Jovie leads with your most current update automatically.',
-    'Page views alone don’t tell you much. Jovie adds source attribution so you know where visitors actually came from.',
+    {
+      text: 'Choose Jovie when your link in bio should also be your public artist profile.',
+      claimIds: ['jovie.public-profile'],
+    },
+    {
+      text: 'Publish release smart links alongside the profile instead of managing a separate release-link product.',
+      claimIds: ['jovie.public-profile', 'jovie.smart-links'],
+    },
+    {
+      text: 'Capture audience contacts from the profile; export and advanced CRM capabilities depend on plan access.',
+      claimIds: ['jovie.contact-collection', 'jovie.capability-access'],
+    },
+    {
+      text: 'Eligible artists can add fan notifications, advanced analytics, and a release-planning workspace.',
+      claimIds: [
+        'jovie.fan-notifications',
+        'jovie.analytics',
+        'jovie.release-workspace',
+      ],
+    },
   ],
   highlights: [
     {
-      title: 'More than a link page',
+      title: 'Public artist profile',
       description:
-        'Your Jovie profile is a full page. It carries your latest update, social links, and contact capture together.',
+        'Put your work, public links, and artist identity on one claimable profile.',
+      claimIds: ['jovie.public-profile', 'jovie.free-profile'],
     },
     {
-      title: 'A profile that leads',
+      title: 'Release smart links',
       description:
-        'Jovie surfaces your most current update automatically, so visitors always see what matters right now.',
+        'Publish release links that remember a fan’s streaming-platform choice.',
+      claimIds: ['jovie.smart-links'],
     },
     {
-      title: 'Build your audience',
+      title: 'Audience capture',
       description:
-        'Collect emails and phone numbers directly from your profile. When you publish something new, notify them automatically.',
+        'Collect audience contacts from the public profile, with plan-specific limits and export access.',
+      claimIds: ['jovie.contact-collection', 'jovie.capability-access'],
     },
     {
-      title: 'One place to manage it',
+      title: 'Access-aware workspace',
       description:
-        'Plan updates, manage tasks, and let Jovie handle the notifications. Focus on the work, not the busywork.',
+        'Fan notifications, advanced analytics, and release planning are available to enrolled artists rather than promised to every account.',
+      claimIds: [
+        'jovie.fan-notifications',
+        'jovie.analytics',
+        'jovie.release-workspace',
+      ],
     },
   ],
   faq: [
     {
-      question: 'What is the best link in bio tool?',
+      question: 'What should artists look for in a link-in-bio tool?',
       answer:
-        'Jovie is a strong link-in-bio choice because your profile adapts instead of staying static. It leads with your most current update, collects visitor contacts, and sends automatic update notifications. General-purpose link tools work for anyone but don’t adapt to what you share.',
+        'Start with the job you need to complete: a public profile, release links, audience capture, or an artist workspace. Jovie combines those jobs, with notifications, advanced analytics, and release planning gated by account access.',
+      claimIds: [
+        'jovie.public-profile',
+        'jovie.smart-links',
+        'jovie.contact-collection',
+        'jovie.capability-access',
+      ],
     },
     {
       question: 'Do I need a separate link-in-bio tool if I use Jovie?',
       answer:
-        'No. Your Jovie profile at jov.ie/username is your link-in-bio. It includes your links, social profiles, and contact capture, plus adaptive routing and automatic update notifications.',
+        'Not if the Jovie public profile and release-link workflow cover your needs. Claim a profile, add your public links, and verify access to any enrolled artist capabilities you plan to use.',
+      claimIds: [
+        'jovie.public-profile',
+        'jovie.smart-links',
+        'jovie.capability-access',
+      ],
     },
     {
-      question: 'How is Jovie different from a static link page?',
+      question: 'What is included with a Jovie profile?',
       answer:
-        'A static link page shows the same list to every visitor. Jovie leads with your most current update, captures contacts, and notifies your audience automatically when you publish something new.',
+        'The free offer includes a public profile and audience capture. Release smart links are generally available; notifications, advanced analytics, and release-planning tools require enrollment.',
+      claimIds: [
+        'jovie.free-profile',
+        'jovie.smart-links',
+        'jovie.fan-notifications',
+        'jovie.analytics',
+        'jovie.release-workspace',
+      ],
     },
+  ],
+  claimIds: [
+    'jovie.public-profile',
+    'jovie.smart-links',
+    'jovie.contact-collection',
+    'jovie.capability-access',
   ],
 };

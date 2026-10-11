@@ -17,6 +17,7 @@ export const APP_ROUTES = {
   LEGACY_DASHBOARD: '/app/dashboard',
   /** Legacy earnings path. Keep for old bookmarks; use EARNINGS for canonical entry. */
   DASHBOARD_EARNINGS: '/app/dashboard/earnings',
+  /** Legacy links path. Keep for old bookmarks; use LINKS for navigation. */
   DASHBOARD_LINKS: '/app/dashboard/links',
   DASHBOARD_PROFILE: '/app/dashboard/profile',
   /** Legacy audience path. Keep as a redirect source only. */
@@ -36,15 +37,23 @@ export const APP_ROUTES = {
   DASHBOARD_CONTACTS: '/app/dashboard/contacts',
   DASHBOARD_TOUR_DATES: '/app/dashboard/tour-dates',
   DASHBOARD_RELEASE_PLAN: '/app/dashboard/release-plan',
+  /** Legacy dashboard insights path. Keep as a redirect source only; use INSIGHTS. */
+  LEGACY_DASHBOARD_INSIGHTS: '/app/dashboard/insights',
   /** @deprecated Profile is now a drawer on the chat route. Use CHAT instead. */
   PROFILE: '/app/chat',
   CONTACTS: '/app/contacts',
+  /** Audience context inside the Contacts workspace. */
+  CONTACTS_AUDIENCE: '/app/contacts?tab=audience',
   RELEASES: '/app/releases',
   TOUR_DATES: '/app/tour-dates',
   CALENDAR: '/app/calendar',
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
+  /** Private Money overview — individual financial owner only (JOV-4618). */
+  MONEY: '/app/money',
   LIBRARY: '/app/library',
+  /** Canonical user-facing smart-link workspace (JOV-7160). */
+  LINKS: '/app/links',
   /** Legacy Tracks path. Keep as a redirect source only — Tracks folded into Library (JOV-4846). */
   LEGACY_TRACKS: '/app/tracks',
   TASKS: '/app/tasks',
@@ -55,14 +64,17 @@ export const APP_ROUTES = {
   YOUTUBE_REVIVAL: '/app/youtube',
   JOVIE_WORK: '/app/jovie-work',
   LYRICS: '/app/lyrics',
+  /** Legacy Presence workspace path. Keep for old bookmarks; use PRESENCE for navigation. */
   PROFILES: '/app/profiles',
-  /** Legacy profile-presence route. Use PROFILES for navigation. */
+  /** Public-facing output generated for the active identity. */
   PRESENCE: '/app/presence',
 
   // Settings
   SETTINGS: '/app/settings',
   SETTINGS_ACCOUNT: '/app/settings/account',
-  SETTINGS_ARTIST_PROFILE: '/app/settings/artist-profile',
+  SETTINGS_PROFILE: '/app/settings/profile',
+  /** @deprecated Use SETTINGS_PROFILE — the artist-profile settings path is a legacy alias. */
+  SETTINGS_ARTIST_PROFILE: '/app/settings/profile',
   SETTINGS_APPEARANCE: '/app/settings/appearance',
   SETTINGS_BILLING: '/app/settings/billing',
   SETTINGS_USAGE: '/app/settings/usage',
@@ -74,8 +86,6 @@ export const APP_ROUTES = {
   SETTINGS_AUDIENCE: '/app/settings/audience',
   SETTINGS_ANALYTICS: '/app/settings/analytics',
   SETTINGS_ADMIN: '/app/settings/admin',
-  SETTINGS_RETARGETING_ADS: '/app/settings/retargeting-ads',
-  SETTINGS_REFERRAL: '/app/settings/referral',
   /** @deprecated Use SETTINGS_DATA_PRIVACY instead */
   SETTINGS_DELETE_ACCOUNT: '/app/settings/delete-account',
 
@@ -85,6 +95,8 @@ export const APP_ROUTES = {
   LEGACY_ADMIN: '/app/admin',
   ADMIN: '/app/ov',
   ADMIN_CHAT: '/app/ov/chat',
+  /** Internal visual catalog for canonical chat lifecycle and artifact states. */
+  ADMIN_CHAT_PLAYGROUND: '/app/ov/chat-playground',
   /** Founder home: business and production reality in one scan. */
   ADMIN_NOW: '/hud',
   ADMIN_OPS: '/hud',
@@ -315,6 +327,11 @@ export function buildReleaseTasksRoute(releaseId: string): string {
 
 export function buildReleaseDownloadsRoute(releaseId: string): string {
   return `${APP_ROUTES.RELEASES}/${encodeURIComponent(releaseId)}/downloads`;
+}
+
+/** Earnings settings live on the profile pay tab. Shortcuts should open this, not the legacy earnings redirect. */
+export function buildArtistProfilePayRoute(): string {
+  return `${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`;
 }
 
 export function buildLibraryViewRoute(

@@ -3,7 +3,8 @@ import Foundation
 enum NativeAuthExchangeError: Error, Equatable, LocalizedError {
   case decodingFailed
   case invalidResponse
-  case requestFailed(statusCode: Int)
+  case rejectedBeforeConsume(reason: String)
+  case requestFailed(statusCode: Int, reason: String? = nil)
   case transportFailed(code: Int)
 
   var errorDescription: String? {
@@ -12,7 +13,12 @@ enum NativeAuthExchangeError: Error, Equatable, LocalizedError {
       return "The auth response could not be decoded."
     case .invalidResponse:
       return "The auth server returned an invalid response."
-    case let .requestFailed(statusCode):
+    case .rejectedBeforeConsume:
+      return "This sign-in link could not be completed. Try signing in again."
+    case let .requestFailed(statusCode, reason):
+      if let reason, !reason.isEmpty {
+        return "The auth exchange failed with status code \(statusCode) (\(reason))."
+      }
       return "The auth exchange failed with status code \(statusCode)."
     case let .transportFailed(code):
       return "The auth exchange network request failed with code \(code)."
@@ -59,7 +65,8 @@ struct NativeAuthExchangeClient: Sendable {
         client: "ios",
         code: authReturn.code,
         state: authReturn.state,
-        codeVerifier: authReturn.codeVerifier
+        codeVerifier: authReturn.codeVerifier,
+        nativeAttempt: authReturn.nativeAttempt
       )
     )
 
@@ -80,11 +87,26 @@ struct NativeAuthExchangeClient: Sendable {
     }
 
     guard (200 ... 299).contains(httpResponse.statusCode) else {
+      // The route returns a typed `reason` for handled rejections
+      // (missing/expired/wrong_verifier/ott_missing/ott_invalid/…). Carry it
+      // through so a bare "401" in telemetry is attributable (JOV-4853).
+      let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+      let reason = Self.exchangeFailureReason(from: object)
       MobileAuthDiagnostics.record(
         "native_exchange_failed",
-        detail: "status=\(httpResponse.statusCode)"
+        detail: "status=\(httpResponse.statusCode)\(reason.map { " reason=\($0)" } ?? "")"
       )
-      throw NativeAuthExchangeError.requestFailed(statusCode: httpResponse.statusCode)
+      if httpResponse.statusCode == 401,
+         object?["exchangePhase"] as? String == "preconsume",
+         let rawReason = object?["reason"] as? String,
+         ["missing", "wrong_code", "wrong_client", "wrong_state", "wrong_attempt", "wrong_verifier", "expired", "replayed"]
+           .contains(rawReason) {
+        throw NativeAuthExchangeError.rejectedBeforeConsume(reason: rawReason)
+      }
+      throw NativeAuthExchangeError.requestFailed(
+        statusCode: httpResponse.statusCode,
+        reason: reason
+      )
     }
 
     do {
@@ -95,6 +117,18 @@ struct NativeAuthExchangeClient: Sendable {
       throw NativeAuthExchangeError.decodingFailed
     }
   }
+
+  private static func exchangeFailureReason(from object: [String: Any]?) -> String? {
+    guard let object,
+      let reason = (object["reason"] as? String)?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !reason.isEmpty
+    else {
+      return nil
+    }
+
+    return reason
+  }
 }
 
 private struct NativeAuthExchangeRequest: Encodable {
@@ -102,4 +136,5 @@ private struct NativeAuthExchangeRequest: Encodable {
   let code: String
   let state: String
   let codeVerifier: String
+  let nativeAttempt: String?
 }

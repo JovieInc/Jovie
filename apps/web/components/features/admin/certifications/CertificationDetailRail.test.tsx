@@ -73,6 +73,35 @@ describe('CertificationDetailRail', () => {
     expect(screen.queryByTestId('certification-blockers')).toBeNull();
   });
 
+  it('opens an existing public proof ref from the evidence list', () => {
+    const row = fixtureRow('contact-page');
+    const ref = '/product-screenshots/tim-white-profile-contact-phone.png';
+    renderRail({
+      row: { ...row, evidence: [{ ...row.evidence[0], href: null, ref }] },
+    });
+    expect(screen.getByRole('link', { name: ref })).toHaveAttribute(
+      'href',
+      ref
+    );
+  });
+
+  it('keeps history and source available behind collapsed sections', () => {
+    renderRail();
+    expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(screen.getByRole('button', { name: 'Source' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'History' }));
+    expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+  });
+
   it('certifies in one activation and requires a note to request changes', () => {
     renderRail();
     fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
@@ -111,6 +140,25 @@ describe('CertificationDetailRail', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'The evidence changed since this page loaded.'
     );
+  });
+
+  it('launches the walkthrough only when a decision can land', () => {
+    const onWalkthrough = vi.fn();
+    renderRail({ onWalkthrough });
+    fireEvent.click(screen.getByTestId('certification-walkthrough-action'));
+    expect(onWalkthrough).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the walkthrough action for items that cannot be decided', () => {
+    renderRail({
+      onWalkthrough: vi.fn(),
+      row: fixtureRow('claim', {
+        packet: fixturePacket('claim', {
+          visualProof: [fixtureReceipt('visual_proof', 'v', 'failed')],
+        }),
+      }),
+    });
+    expect(screen.queryByTestId('certification-walkthrough-action')).toBeNull();
   });
 
   it('locks actions while a decision is pending', () => {

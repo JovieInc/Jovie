@@ -1,14 +1,87 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { SegmentControl } from './segment-control';
+import { SegmentControl, Tabs, TabsPrimitive } from './segment-control';
 
 const defaultOptions = [
   { value: 'links', label: 'Links' },
   { value: 'music', label: 'Music' },
   { value: 'videos', label: 'Videos' },
 ] as const;
+
+describe('Tabs pending state', () => {
+  it('prevents activation while pending and restores the same action when enabled', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const ref = createRef<HTMLButtonElement>();
+    const view = (disabled: boolean) => (
+      <Tabs.Root defaultValue='links' onValueChange={onValueChange}>
+        <Tabs.List aria-label='Profile views'>
+          <Tabs.Trigger value='links'>Links</Tabs.Trigger>
+          <Tabs.Trigger
+            ref={ref}
+            value='music'
+            disabled={disabled}
+            className='min-w-0'
+          >
+            Music
+          </Tabs.Trigger>
+        </Tabs.List>
+        <Tabs.Content value='music'>Music services</Tabs.Content>
+      </Tabs.Root>
+    );
+    const { rerender } = render(view(true));
+    const choice = screen.getByRole('tab', { name: 'Music' });
+    expect(ref.current).toBe(choice);
+    expect(choice).toBeDisabled();
+    expect(choice).toHaveClass(
+      'disabled:opacity-(--state-disabled-opacity)',
+      'min-w-0'
+    );
+    await user.click(choice);
+    expect(onValueChange).not.toHaveBeenCalled();
+    rerender(view(false));
+    expect(choice).toBeEnabled();
+    await user.click(choice);
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith('music');
+    expect(screen.getByRole('tabpanel', { name: 'Music' })).toHaveTextContent(
+      'Music services'
+    );
+  });
+
+  it('preserves arrow-key selection and skips a disabled choice', async () => {
+    const user = userEvent.setup();
+    render(
+      <Tabs.Root defaultValue='links'>
+        <Tabs.List aria-label='Profile views'>
+          <Tabs.Trigger value='links'>Links</Tabs.Trigger>
+          <Tabs.Trigger value='music' disabled>
+            Music
+          </Tabs.Trigger>
+          <Tabs.Trigger value='videos'>Videos</Tabs.Trigger>
+        </Tabs.List>
+        <Tabs.Content value='videos'>Video services</Tabs.Content>
+      </Tabs.Root>
+    );
+    screen.getByRole('tab', { name: 'Links' }).focus();
+    await user.keyboard('{ArrowRight}');
+    const choice = screen.getByRole('tab', { name: 'Videos' });
+    expect(choice).toHaveFocus();
+    expect(choice).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'Videos' })).toHaveTextContent(
+      'Video services'
+    );
+  });
+
+  it('retains the explicit raw primitive escape hatch', () => {
+    expect(Tabs.Root).toBe(TabsPrimitive.Root);
+    expect(Tabs.List).toBe(TabsPrimitive.List);
+    expect(Tabs.Content).toBe(TabsPrimitive.Content);
+    expect(Tabs.Trigger).not.toBe(TabsPrimitive.Trigger);
+  });
+});
 
 describe('SegmentControl', () => {
   describe('Basic Rendering', () => {

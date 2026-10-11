@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import type {
   HudEnvActiveException,
   HudEnvExceptionLane,
@@ -63,7 +63,7 @@ function seedQueryClient(): QueryClient {
   return queryClient;
 }
 
-function withQueryClient(children: ReactNode): ReactNode {
+function withQueryClient(children: ReactNode): ReactElement {
   return (
     <QueryClientProvider client={seedQueryClient()}>
       {children}

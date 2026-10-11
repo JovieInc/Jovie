@@ -87,20 +87,25 @@ final class JovieUITests: XCTestCase {
       $0.buttons["Copy URL"]
     }
 
-    XCTAssertTrue(app.staticTexts["Profile"].exists)
+    XCTAssertTrue(app.staticTexts["Identity"].exists)
     XCTAssertTrue(app.buttons["Open navigation drawer"].exists)
-    XCTAssertTrue(app.buttons["shell-actions-menu"].exists)
-    app.buttons["shell-actions-menu"].tap()
-    XCTAssertTrue(
-      app.buttons["Open Settings"].waitForExistence(timeout: 3),
-      "Settings must stay reachable from the shell Actions menu.\n\(app.debugDescription)"
-    )
-    app.buttons["shell-actions-menu"].tap()
     XCTAssertTrue(app.buttons["dashboard-copy-url-button"].isEnabled)
     XCTAssertTrue(app.buttons["dashboard-share-profile-button"].isEnabled)
     XCTAssertTrue(app.buttons["Open Public Profile"].exists)
     XCTAssertTrue(app.buttons["Open Public Profile"].isEnabled)
+    XCTAssertEqual(
+      app.staticTexts["apple-wallet-profile-pass-status"].label,
+      "Apple Wallet isn't available for this profile yet."
+    )
     attachScreenshot(named: "profile", app: app)
+
+    let actionsMenu = app.buttons["shell-actions-menu"]
+    XCTAssertTrue(actionsMenu.exists)
+    actionsMenu.tap()
+    XCTAssertTrue(
+      app.buttons["Open Settings"].waitForExistence(timeout: 3),
+      "Settings must stay reachable from the shell Actions menu.\n\(app.debugDescription)"
+    )
   }
 
   func testPublicProfileOpensInFullScreenEmbeddedBrowser() {
@@ -157,7 +162,7 @@ final class JovieUITests: XCTestCase {
       $0.buttons["QR unavailable"]
     }
 
-    XCTAssertTrue(app.staticTexts["Profile"].exists)
+    XCTAssertTrue(app.staticTexts["Identity"].exists)
     let copyButton = app.buttons["dashboard-copy-url-button"]
     let shareButton = app.buttons["dashboard-share-profile-button"]
     XCTAssertTrue(copyButton.exists)
@@ -328,7 +333,7 @@ final class JovieUITests: XCTestCase {
     XCTAssertFalse(app.buttons["profile-completion-web-fallback"].exists)
   }
 
-  func testFullScreenSettingsLogsOutToSignedOut() {
+  func testFullScreenSettingsLogsOutToSignedOut() throws {
     let app = launchMockApp(
       launchArgument: "-ui-testing-settings",
       additionalLaunchArguments: ["-ui-testing-delayed-logout"],
@@ -352,6 +357,7 @@ final class JovieUITests: XCTestCase {
         "Settings row \(linkTitle) did not appear in the accessibility tree.\n\(app.debugDescription)"
       )
     }
+    app.swipeUp()
     for valueTitle in ["Version", "Build"] {
       XCTAssertTrue(
         app.staticTexts[valueTitle].waitForExistence(timeout: 2),
@@ -381,28 +387,57 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "settings-logout-confirmation", app: app)
     app.buttons["Confirm Log Out"].tap()
 
-    XCTAssertTrue(
-      app.staticTexts["Logging Out"].waitForExistence(timeout: 2),
-      "Settings did not expose its deterministic pending logout state.\n\(app.debugDescription)"
+    func findSnapshot(
+      in snapshot: any XCUIElementSnapshot,
+      label: String,
+      type: XCUIElement.ElementType
+    ) -> (any XCUIElementSnapshot)? {
+      if snapshot.label == label && snapshot.elementType == type {
+        return snapshot
+      }
+      for child in snapshot.children {
+        if let match = findSnapshot(in: child, label: label, type: type) {
+          return match
+        }
+      }
+      return nil
+    }
+
+    // Capture the marker and control from one tree during the existing wait.
+    // Later live queries can run after the five-second fixture has completed.
+    var pendingLogoutSnapshot: (any XCUIElementSnapshot)?
+    let pendingState = XCTNSPredicateExpectation(
+      predicate: NSPredicate { _, _ in
+        guard let snapshot = try? app.snapshot(),
+          findSnapshot(in: snapshot, label: "Logging Out", type: .staticText) != nil,
+          let control = findSnapshot(in: snapshot, label: "Log Out", type: .button)
+        else { return false }
+        pendingLogoutSnapshot = control
+        return true
+      },
+      object: app
     )
-    let pendingLogoutButton = app.buttons["Log Out"]
-    XCTAssertTrue(
-      pendingLogoutButton.waitForExistence(timeout: 1),
-      "Pending logout control did not remain in the accessibility tree.\n\(app.debugDescription)"
+    XCTAssertEqual(
+      XCTWaiter.wait(for: [pendingState], timeout: 2),
+      .completed,
+      "Settings did not expose its pending marker and logout control together.\n\(app.debugDescription)"
     )
-    XCTAssertFalse(
-      pendingLogoutButton.isEnabled,
-      "Pending logout must reject duplicate submission."
-    )
-    XCTAssertEqual(pendingLogoutButton.frame.minX, idleFrame.minX, accuracy: 1)
-    XCTAssertEqual(pendingLogoutButton.frame.minY, idleFrame.minY, accuracy: 1)
-    XCTAssertEqual(pendingLogoutButton.frame.width, idleFrame.width, accuracy: 1)
-    XCTAssertEqual(pendingLogoutButton.frame.height, idleFrame.height, accuracy: 1)
+    let pendingSnapshot = try XCTUnwrap(pendingLogoutSnapshot)
 
     XCTAssertTrue(
       app.buttons["Continue to Jovie"].waitForExistence(timeout: 5),
       "Logout did not return to signed-out state.\n\(app.debugDescription)"
     )
+    // The live control has retired; assertions use the observed pending state.
+    XCTAssertFalse(pendingSnapshot.isEnabled, "Pending logout must reject duplicate submission.")
+    let pendingFrame = pendingSnapshot.frame
+    XCTAssertGreaterThan(pendingFrame.width, 0, "Pending logout must have a visible frame.")
+    XCTAssertGreaterThan(pendingFrame.height, 0, "Pending logout must have a visible frame.")
+    XCTAssertEqual(pendingFrame.minX, idleFrame.minX, accuracy: 1)
+    XCTAssertEqual(pendingFrame.minY, idleFrame.minY, accuracy: 1)
+    XCTAssertEqual(pendingFrame.width, idleFrame.width, accuracy: 1)
+    XCTAssertEqual(pendingFrame.height, idleFrame.height, accuracy: 1)
+
   }
 
   func testDrawerSwitchesBetweenChatAndProfile() {
@@ -501,18 +536,12 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertFalse(
       shellControlExists(app, identifier: "shell-tab-library"),
-      "Library must not be a bottom tab.\n\(app.debugDescription)"
+      "Work must not be a bottom tab.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
       app.buttons["shell-actions-menu"].exists,
       "The Actions overflow must be the shell's single trailing control.\n\(app.debugDescription)"
     )
-    app.buttons["shell-actions-menu"].tap()
-    XCTAssertTrue(
-      app.descendants(matching: .any)["shell-talk-fab"].waitForExistence(timeout: 3),
-      "Talk must stay reachable from the Actions menu.\n\(app.debugDescription)"
-    )
-    app.buttons["shell-actions-menu"].tap()
     XCTAssertFalse(
       app.buttons["chat-voice-button"].exists,
       "Composer mic should stay removed.\n\(app.debugDescription)"
@@ -521,13 +550,68 @@ final class JovieUITests: XCTestCase {
     app.buttons["Open navigation drawer"].tap()
     XCTAssertTrue(
       app.buttons["shell-drawer-surface-shell-tab-library"].waitForExistence(timeout: 3),
-      "Sidebar must expose Library.\n\(app.debugDescription)"
+      "Sidebar must expose Work.\n\(app.debugDescription)"
     )
     XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-calendar"].exists)
     XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-inbox"].exists)
     XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-profile"].exists)
     XCTAssertTrue(app.buttons["shell-drawer-talk"].exists)
     attachScreenshot(named: "chat-first-sidebar", app: app)
+  }
+
+  func testDrawerUsesCanonicalRootsAndWorkChildren() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "chat composer") {
+      $0.textFields["chat-composer-input"]
+    }
+    app.buttons["Open navigation drawer"].tap()
+    let home = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(waitForHittable(home, timeout: 3))
+    let identity = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    let work = app.buttons["shell-drawer-surface-shell-tab-library"]
+    let inbox = app.buttons["shell-drawer-surface-shell-tab-inbox"]
+    let calendar = app.buttons["shell-drawer-surface-shell-tab-calendar"]
+    let audience = app.buttons["shell-drawer-surface-shell-tab-audience"]
+    XCTAssertEqual(home.label, "Home")
+    XCTAssertEqual(identity.label, "Identity")
+    let rows = [home, identity, work, inbox, calendar, audience]
+    for (above, below) in zip(rows, rows.dropFirst()) {
+      XCTAssertLessThan(above.frame.maxY, below.frame.maxY)
+      XCTAssertGreaterThanOrEqual(below.frame.height, 44)
+    }
+    XCTAssertGreaterThan(inbox.frame.minX, work.frame.minX)
+    XCTAssertEqual(inbox.frame.minX, calendar.frame.minX, accuracy: 1)
+    attachScreenshot(named: "ios-canonical-information-architecture", app: app)
+
+    inbox.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["inbox-surface"].waitForExistence(timeout: 3))
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(waitForHittable(calendar, timeout: 3))
+    calendar.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["calendar-surface"].waitForExistence(timeout: 3))
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(waitForHittable(identity, timeout: 3))
+    identity.tap()
+    XCTAssertTrue(app.buttons["Copy URL"].waitForExistence(timeout: 3))
+  }
+
+  func testOfflineStatusReservesToolbarGeometry() {
+    let onlineApp = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "chat composer") {
+      $0.textFields["chat-composer-input"]
+    }
+    let onlineTitle = onlineApp.staticTexts["Home"].firstMatch.frame
+    let onlineActions = onlineApp.buttons["shell-actions-menu"].frame
+    XCTAssertFalse(onlineApp.staticTexts["Offline"].exists)
+    onlineApp.terminate()
+
+    let offlineApp = launchMockApp(launchArgument: "-ui-testing-chat-offline", expectedElementDescription: "chat composer") {
+      $0.textFields["chat-composer-input"]
+    }
+    XCTAssertTrue(offlineApp.staticTexts["Offline"].exists)
+    let offlineTitle = offlineApp.staticTexts["Home"].firstMatch.frame
+    let offlineActions = offlineApp.buttons["shell-actions-menu"].frame
+    XCTAssertEqual(onlineTitle.minY, offlineTitle.minY, accuracy: 1)
+    XCTAssertEqual(onlineActions.minY, offlineActions.minY, accuracy: 1)
+    attachScreenshot(named: "ios-offline-stable-toolbar", app: offlineApp)
   }
 
   func testShellVlogControlOpensPromptCaptureDirectly() {
@@ -668,6 +752,11 @@ final class JovieUITests: XCTestCase {
       $0.textFields["chat-composer-input"]
     }
 
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-bar"),
+      "Talk must not require a bottom tab bar.\n\(app.debugDescription)"
+    )
+
     let actionsMenu = app.buttons["shell-actions-menu"]
     XCTAssertTrue(
       actionsMenu.waitForExistence(timeout: 3),
@@ -677,11 +766,6 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(
       app.descendants(matching: .any)["shell-talk-fab"].waitForExistence(timeout: 3),
       "Talk did not appear in the shell Actions menu.\n\(app.debugDescription)"
-    )
-    actionsMenu.tap()
-    XCTAssertFalse(
-      shellControlExists(app, identifier: "shell-tab-bar"),
-      "Talk must not require a bottom tab bar.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["chat-voice-button"].exists,
@@ -994,7 +1078,7 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertTrue(
       app.buttons["shell-drawer-surface-shell-tab-library"].isHittable,
-      "Sidebar Library must be reachable after a leading swipe.\n\(app.debugDescription)"
+      "Sidebar Work must be reachable after a leading swipe.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["Copy URL"].exists,
@@ -1083,9 +1167,25 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertEqual(reduceMotionStatus.value as? String, "Interactive progress hidden")
 
+    XCTAssertTrue(
+      app.staticTexts["Home"].isHittable,
+      "Reduce Motion fixture did not start on Home.\n\(app.debugDescription)"
+    )
+
     let shortStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.42))
     let shortEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.42))
-    shortStart.press(forDuration: 0.4, thenDragTo: shortEnd)
+    // This phase rejects a short, slow drag. XCTest's default 500px/s can
+    // legitimately open the drawer through the projected-distance policy.
+    shortStart.press(
+      forDuration: 0.4,
+      thenDragTo: shortEnd,
+      withVelocity: XCUIGestureVelocity(rawValue: 50),
+      thenHoldForDuration: 0
+    )
+    XCTAssertTrue(
+      app.staticTexts["Home"].isHittable,
+      "The rejected drag left Home.\n\(app.debugDescription)"
+    )
     XCTAssertFalse(app.descendants(matching: .any)["shell-drawer"].isHittable)
     XCTAssertFalse(app.descendants(matching: .any)["shell-right-rail"].isHittable)
     XCTAssertEqual(
@@ -1941,6 +2041,7 @@ final class JovieUITests: XCTestCase {
 
     let callbackURL = try requiredEnvironmentValue("JOVIE_IOS_AUTH_CALLBACK_URL")
     let codeVerifier = try requiredEnvironmentValue("JOVIE_IOS_PENDING_CODE_VERIFIER")
+    let nativeAttempt = try requiredEnvironmentValue("JOVIE_IOS_PENDING_NATIVE_ATTEMPT")
     let apiBaseURL =
       testEnvironmentValue("JOVIE_IOS_API_BASE_URL") ??
       testEnvironmentValue("API_BASE_URL") ??
@@ -1961,6 +2062,7 @@ final class JovieUITests: XCTestCase {
     app.launchEnvironment["API_BASE_URL"] = apiBaseURL
     app.launchEnvironment["WEB_BASE_URL"] = webBaseURL
     app.launchEnvironment["JOVIE_IOS_PENDING_CODE_VERIFIER"] = codeVerifier
+    app.launchEnvironment["JOVIE_IOS_PENDING_NATIVE_ATTEMPT"] = nativeAttempt
     addTeardownBlock { [app] in
       self.endUITestSession(app)
     }
@@ -2088,7 +2190,7 @@ final class JovieUITests: XCTestCase {
   }
 
   func testAuthCallbackDeepLinkCompletesHarness() throws {
-    let callbackURL = "ie.jov.jovie://auth/complete?code=test_code&state=state_123"
+    let callbackURL = "ie.jov.jovie://auth/complete?code=test_code&state=state_123&native_attempt=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     let app = launchMockApp(
       launchArgument: "-ui-testing-auth-callback",
       additionalLaunchArguments: ["-ui-testing-open-auth-callback", callbackURL],
@@ -2151,7 +2253,7 @@ final class JovieUITests: XCTestCase {
     }
 
     try openAuthCallbackURL(
-      "ie.jov.jovie://auth/complete?error=access_denied&state=state_123&iss=https%3A%2F%2Fjov.ie%2Fapi%2Fauth",
+      "ie.jov.jovie://auth/complete?error=access_denied&state=state_123&native_attempt=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&iss=https%3A%2F%2Fjov.ie%2Fapi%2Fauth",
       targetApp: app
     )
 
@@ -2197,7 +2299,7 @@ final class JovieUITests: XCTestCase {
         "Chat message",
         "Send",
         "Chat",
-        "Library",
+        "Work",
         "Inbox",
         "Calendar",
         "Done",

@@ -42,3 +42,22 @@ describe('JOV-5466 token retire', () => {
     expect(source).not.toMatch(/--linear-app-/);
   });
 });
+
+describe('JOV-6773 red drift', () => {
+  it('renders the danger tone with the error token, not raw red-*', () => {
+    const { container } = render(
+      <ShellMetadataChip tone='danger'>Overdue</ShellMetadataChip>
+    );
+    const chip = container.firstElementChild as HTMLElement;
+    expect(chip.className).toContain('text-error');
+    expect(chip.className).not.toMatch(/\bred-\d/);
+  });
+
+  it('does not keep raw red-* tone classes in source', () => {
+    const source = readFileSync(
+      resolve(__dirname, './ShellMetadataChip.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/\bred-\d/);
+  });
+});

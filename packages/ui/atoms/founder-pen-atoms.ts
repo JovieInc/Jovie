@@ -46,3 +46,35 @@ export const FOUNDER_PEN_ATOM_CONSUMERS: Readonly<
   overflow: 'packages/ui/atoms/overflow-menu-trigger.tsx',
   board: null,
 };
+
+/**
+ * Skill-passed founder video atom masters on the canonical Pen file
+ * `Jovie Design Studio — canonical.pen` (frontend-skill PASS on the durable
+ * save — JOV-5096). These are the locked fit/contain masters for product
+ * video/motion surfaces: video fits or contains its frame, album art is
+ * never cropped, and nothing overlays art, merch, or a face. Order matches
+ * the locked Pen ordering; there is no second master per surface.
+ */
+export const FOUNDER_PEN_VIDEO_ATOM_IDS = [
+  'nwLcB',
+  'TJBDn',
+  'iH2Mt',
+  'vjFWM',
+  'S1D4Bj',
+  'EQ16R',
+  'G5t8qZ',
+] as const;
+
+export type FounderPenVideoAtomId = (typeof FOUNDER_PEN_VIDEO_ATOM_IDS)[number];
+
+/**
+ * Jovie source consumers that render product video/motion and must stay
+ * bound to the locked fit/contain masters above.
+ */
+export const FOUNDER_PEN_VIDEO_SURFACE_CONSUMERS = [
+  'apps/web/components/organisms/media-canvas/MediaCanvasViewer.tsx',
+  'apps/web/components/features/demo/DemoVideoPlayer.tsx',
+  'apps/web/components/features/demo/DemoVideoPage.tsx',
+  'apps/web/components/features/pitch/InvestorBrief.tsx',
+  'apps/web/components/features/admin/certifications/CertificationWalkthrough.tsx',
+] as const;

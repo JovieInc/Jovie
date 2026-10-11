@@ -21,6 +21,10 @@ const {
   mockReconcileOrphanedAcceptedActions,
   mockProbeRedisOperability,
   mockCaptureError,
+  mockRunBillingSyncRemediation,
+  mockGetAcquisitionEligibility,
+  mockGetAuthSignupOnboardingCanaryStatus,
+  mockGetPublicProfileCanaryStatus,
 } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
@@ -42,6 +46,19 @@ const {
   mockReconcileOrphanedAcceptedActions: vi.fn(),
   mockProbeRedisOperability: vi.fn(),
   mockCaptureError: vi.fn(),
+  mockRunBillingSyncRemediation: vi.fn(),
+  mockGetAcquisitionEligibility: vi.fn(),
+  mockGetAuthSignupOnboardingCanaryStatus: vi.fn(),
+  mockGetPublicProfileCanaryStatus: vi.fn(),
+}));
+
+vi.mock('@/lib/admin/ops-queries', () => ({
+  getAuthSignupOnboardingCanaryStatus: mockGetAuthSignupOnboardingCanaryStatus,
+  getPublicProfileCanaryStatus: mockGetPublicProfileCanaryStatus,
+}));
+
+vi.mock('@/lib/acquisition/eligibility.server', () => ({
+  getAcquisitionEligibility: mockGetAcquisitionEligibility,
 }));
 
 vi.mock(
@@ -50,6 +67,10 @@ vi.mock(
     reconcileOrphanedAcceptedActions: mockReconcileOrphanedAcceptedActions,
   })
 );
+
+vi.mock('@/lib/billing/sync-remediation', () => ({
+  runBillingSyncRemediation: mockRunBillingSyncRemediation,
+}));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -214,11 +235,83 @@ describe('GET /api/cron/frequent', () => {
       status: 'healthy',
       latencyMs: 5,
     });
+    mockRunBillingSyncRemediation.mockResolvedValue({
+      findings: 0,
+      filed: [],
+      skipped: false,
+    });
+    mockGetAuthSignupOnboardingCanaryStatus.mockImplementation(async () => ({
+      runAt: new Date().toISOString(),
+    }));
+    mockGetPublicProfileCanaryStatus.mockImplementation(async () => ({
+      runAt: new Date().toISOString(),
+    }));
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
+  });
+
+  it('alarms on a deliberately expired canary without blocking sibling jobs', async () => {
+    vi.setSystemTime(new Date('2026-03-24T10:00:00.000Z'));
+    mockGetAuthSignupOnboardingCanaryStatus.mockResolvedValue({
+      runAt: '2026-03-23T08:00:00.000Z',
+      pass: true,
+    });
+    const { GET } = await import('@/app/api/cron/frequent/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { authorization: 'Bearer test-secret' },
+      })
+    );
+    const body = await response.json();
+    expect(body.success).toBe(false);
+    expect(body.results.canaryReceiptFreshness).toMatchObject({
+      success: false,
+      error: expect.stringContaining('auth-signup-onboarding (stale)'),
+    });
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Frequent cron: canaryReceiptFreshness failed',
+      expect.any(Error),
+      expect.objectContaining({
+        error_class: 'canary_receipt_stale',
+        fingerprint: 'scheduled-acquisition-canary-stale',
+      })
+    );
+    expect(mockProcessCampaigns).toHaveBeenCalledOnce();
+  });
+
+  it('alarms on an expired Redis key even when no acquisition runs', async () => {
+    vi.setSystemTime(new Date('2026-03-24T10:00:00.000Z'));
+    mockGetPublicProfileCanaryStatus.mockResolvedValue(null);
+    const { GET } = await import('@/app/api/cron/frequent/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { authorization: 'Bearer test-secret' },
+      })
+    );
+    const body = await response.json();
+    expect(body.results.canaryReceiptFreshness).toMatchObject({
+      success: false,
+      error: expect.stringContaining('public-profile (missing)'),
+    });
+    expect(mockGetAcquisitionEligibility).not.toHaveBeenCalled();
+  });
+
+  it('keeps hourly freshness reads out of the other frequent invocations', async () => {
+    const { GET } = await import('@/app/api/cron/frequent/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { authorization: 'Bearer test-secret' },
+      })
+    );
+    expect((await response.json()).results.canaryReceiptFreshness).toEqual({
+      success: true,
+      skipped: true,
+    });
+    expect(mockGetAuthSignupOnboardingCanaryStatus).not.toHaveBeenCalled();
+    expect(mockGetPublicProfileCanaryStatus).not.toHaveBeenCalled();
   });
 
   it('runs notification scheduling and sending on every 15-minute invocation', async () => {
@@ -233,6 +326,8 @@ describe('GET /api/cron/frequent', () => {
 
     expect(response.status).toBe(200);
     expect(mockProcessOutreachBatch).toHaveBeenCalledWith(10);
+    // Instantly sends are off by default, so the cone is never probed.
+    expect(mockGetAcquisitionEligibility).not.toHaveBeenCalled();
     expect(mockScheduleReleaseNotifications).toHaveBeenCalledTimes(1);
     expect(mockSendPendingNotifications).toHaveBeenCalledTimes(1);
     expect(mockReconcileOrphanedAcceptedActions).toHaveBeenCalledWith(20);
@@ -252,11 +347,66 @@ describe('GET /api/cron/frequent', () => {
     });
     expect(data.results.scheduleNotifications.success).toBe(true);
     expect(data.results.sendNotifications.success).toBe(true);
+    expect(data.results.billingSyncRemediation).toEqual({
+      success: true,
+      data: { findings: 0, filed: [], skipped: false },
+    });
+    expect(mockRunBillingSyncRemediation).toHaveBeenCalledOnce();
     expect(data.results.redisOperability).toEqual({
       success: true,
       skipped: true,
     });
     expect(mockProbeRedisOperability).not.toHaveBeenCalled();
+  });
+
+  it('skips autonomous outreach while ACQUISITION_ELIGIBLE is false', async () => {
+    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
+    mockGetAcquisitionEligibility.mockResolvedValue({
+      eligible: false,
+      verdict: 'BLOCKED',
+      firstBlocker: {
+        id: 'payment_entitlement',
+        status: 'red',
+        nextAction: 'Fix the Golden Path lane.',
+      },
+    });
+    const { GET } = await import('@/app/api/cron/frequent/route');
+
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(mockProcessOutreachBatch).not.toHaveBeenCalled();
+    expect(data.results.outreach).toMatchObject({
+      success: true,
+      data: {
+        skipped: true,
+        reason: 'acquisition_not_eligible',
+        verdict: 'BLOCKED',
+        firstBlocker: 'payment_entitlement',
+      },
+    });
+  });
+
+  it('dispatches outreach once the cone is eligible', async () => {
+    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
+    mockGetAcquisitionEligibility.mockResolvedValue({
+      eligible: true,
+      verdict: 'ELIGIBLE',
+      firstBlocker: null,
+    });
+    const { GET } = await import('@/app/api/cron/frequent/route');
+
+    await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+
+    expect(mockProcessOutreachBatch).toHaveBeenCalledWith(10);
   });
 
   it('returns 207 and classifies an exhausted Redis quota as a failed canary', async () => {
@@ -306,6 +456,9 @@ describe('GET /api/cron/frequent', () => {
       success: true,
       data: { status: 'healthy', latencyMs: 5 },
     });
+    expect(data.results.canaryReceiptFreshness.success).toBe(true);
+    expect(mockGetAuthSignupOnboardingCanaryStatus).toHaveBeenCalledOnce();
+    expect(mockGetPublicProfileCanaryStatus).toHaveBeenCalledOnce();
   });
 
   it('returns 207 when notification scheduling fails', async () => {

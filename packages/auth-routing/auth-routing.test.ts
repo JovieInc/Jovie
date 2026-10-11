@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAuthStartUrl,
+  buildDesktopAuthLoopbackUrl,
   buildElectronAuthCompleteUrl,
   buildIosAuthCompleteUrl,
+  buildIosUniversalAuthCompleteUrl,
   buildNativeExchangeCodeRecord,
   buildNativeHandbackBouncePath,
   classifyNavigation,
@@ -10,7 +12,9 @@ import {
   createAuthStateRecord,
   getElectronAuthCompleteProtocolForOrigin,
   isAllowlistedNativeHandbackUrl,
+  isValidNativeAttempt,
   NATIVE_HANDBACK_BOUNCE_PATHS,
+  parseDesktopLoopbackPortParam,
   resolveAuthCallback,
   sanitizeReturnTo,
   validateNativeExchange,
@@ -326,6 +330,114 @@ describe('auth routing boundary', () => {
     ).toBe(`${NATIVE_HANDBACK_BOUNCE_PATHS.ios}?code=ios_code&state=ios_state`);
   });
 
+  it('threads the loopback listener port onto the electron bounce only', () => {
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'electron',
+        code: 'electron_code',
+        state: 'electron_state',
+        desktopFlow: 'flow_nonce',
+        desktopLoopbackPort: 51234,
+      })
+    ).toBe(
+      `${NATIVE_HANDBACK_BOUNCE_PATHS.electron}?code=electron_code&state=electron_state&desktop_flow=flow_nonce&loopback_port=51234`
+    );
+    // No flow to bind to, and never on the iOS bounce.
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'electron',
+        code: 'electron_code',
+        state: 'electron_state',
+        desktopLoopbackPort: 51234,
+      })
+    ).not.toContain('loopback_port');
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'ios',
+        code: 'ios_code',
+        state: 'ios_state',
+        desktopFlow: 'flow_nonce',
+        desktopLoopbackPort: 51234,
+      })
+    ).toBe(`${NATIVE_HANDBACK_BOUNCE_PATHS.ios}?code=ios_code&state=ios_state`);
+  });
+
+  it('accepts only real TCP ports for the loopback listener', () => {
+    expect(parseDesktopLoopbackPortParam('51234')).toBe(51234);
+    expect(parseDesktopLoopbackPortParam('1')).toBe(1);
+    expect(parseDesktopLoopbackPortParam('65535')).toBe(65535);
+    for (const bad of [
+      null,
+      '',
+      '0',
+      '65536',
+      '80.5',
+      '-1',
+      'abc',
+      '51234;rm',
+      ' 51234',
+      '000000',
+    ]) {
+      expect(parseDesktopLoopbackPortParam(bad)).toBeNull();
+    }
+  });
+
+  it('builds a 127.0.0.1 handback URL bound to code, state, and flow', () => {
+    expect(
+      buildDesktopAuthLoopbackUrl({
+        port: 51234,
+        code: 'electron_code',
+        state: 'electron_state',
+        desktopFlow: 'flow_nonce',
+      })
+    ).toBe(
+      'http://127.0.0.1:51234/auth/complete?code=electron_code&state=electron_state&desktop_flow=flow_nonce'
+    );
+  });
+
+  it('only lets Electron flows with a flow nonce record a loopback port', () => {
+    const base = {
+      intent: 'sign_in' as const,
+      state: 'state_123',
+      codeChallenge: 'challenge',
+      desktopFlow: 'flow_nonce_abcdef123456',
+      now: 1_000,
+    };
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'electron',
+        returnTo: '/app',
+        desktopLoopbackPort: 51234,
+      }).desktopLoopbackPort
+    ).toBe(51234);
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'electron',
+        returnTo: '/app',
+        desktopFlow: null,
+        desktopLoopbackPort: 51234,
+      }).desktopLoopbackPort
+    ).toBeUndefined();
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'ios',
+        returnTo: '/app',
+        desktopLoopbackPort: 51234,
+      }).desktopLoopbackPort
+    ).toBeUndefined();
+    expect(
+      createAuthStateRecord({
+        ...base,
+        client: 'electron',
+        returnTo: '/app',
+        desktopLoopbackPort: 70000,
+      }).desktopLoopbackPort
+    ).toBeUndefined();
+  });
+
   it('only lets Electron flows with a flow nonce opt into return codes', () => {
     const base = {
       intent: 'sign_in' as const,
@@ -459,4 +571,99 @@ describe('auth routing boundary', () => {
       returnPath: '/app/settings',
     });
   });
+  it.each([
+    null,
+    '',
+    'a'.repeat(42),
+    'a'.repeat(44),
+    '+'.repeat(43),
+    ' '.repeat(43),
+    `${'a'.repeat(43)}\n`,
+  ])(
+    'rejects malformed attempt %s without downgrading to legacy',
+    nativeAttempt => {
+      expect(isValidNativeAttempt('ios', nativeAttempt)).toBe(false);
+    }
+  );
+
+  it('carries iOS correlation through every handback builder and preserves legacy omission', () => {
+    const nativeAttempt = 'a'.repeat(43);
+    const start = {
+      baseUrl: 'https://jov.ie',
+      client: 'ios' as const,
+      intent: 'sign_in' as const,
+      returnTo: '/app',
+      nativeAttempt,
+    };
+    const stateRecord = createAuthStateRecord({
+      ...start,
+      state: 'state',
+      now: 1,
+    });
+    const handback = { code: 'code', state: 'state', nativeAttempt };
+    const urls = [
+      buildAuthStartUrl(start),
+      buildIosAuthCompleteUrl(handback),
+      buildIosUniversalAuthCompleteUrl({
+        ...handback,
+        origin: 'https://jov.ie',
+      }),
+      buildNativeHandbackBouncePath({ ...handback, client: 'ios' }),
+      resolveAuthCallback({ stateRecord, exchangeCode: 'code' }).redirectUrl,
+    ];
+    for (const url of urls) {
+      expect(
+        new URL(url, 'https://jov.ie').searchParams.getAll('native_attempt')
+      ).toEqual([nativeAttempt]);
+    }
+    expect(
+      createAuthStateRecord({
+        ...start,
+        nativeAttempt: undefined,
+        state: 's',
+        now: 1,
+      })
+    ).not.toHaveProperty('nativeAttempt');
+    for (const client of ['web', 'electron'] as const) {
+      expect(() => buildAuthStartUrl({ ...start, client })).toThrow(
+        'Invalid native_attempt'
+      );
+    }
+  });
+
+  it.each([
+    [undefined, 'a'.repeat(43)],
+    ['a'.repeat(43), undefined],
+    ['a'.repeat(43), 'b'.repeat(43)],
+  ])(
+    'rejects attempt mismatch %s / %s before PKCE',
+    (storedAttempt, nativeAttempt) => {
+      const record = buildNativeExchangeCodeRecord({
+        code: 'code',
+        client: 'ios',
+        state: 'state',
+        userId: 'user',
+        returnTo: '/app',
+        codeChallenge: 'challenge',
+        nativeAttempt: storedAttempt,
+        now: 1,
+      });
+      let challengeCalls = 0;
+      const result = validateNativeExchange({
+        record,
+        client: 'ios',
+        code: 'code',
+        state: 'state',
+        nativeAttempt,
+        codeVerifier: 'v',
+        now: 2,
+        createCodeChallenge: () => {
+          challengeCalls++;
+          return 'challenge';
+        },
+      });
+      expect(result).toEqual({ ok: false, reason: 'wrong_attempt' });
+      expect(challengeCalls).toBe(0);
+    }
+  );
 });

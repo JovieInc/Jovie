@@ -50,6 +50,8 @@ describe('ReleaseTable System B style guard', () => {
     // Banned icon guard (Tim, 2026-09-25): the empty-state icon is Layers.
     expect(sources).not.toContain('Disc3');
     expect(sources).toContain("name='Layers'");
+    expect(sources).not.toContain('max-sm:hidden');
+    expect(sources).toContain('priority: 1');
   });
 
   it('keeps ReleaseTable primitives token-backed', () => {

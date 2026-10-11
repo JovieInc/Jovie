@@ -84,7 +84,7 @@ const PERFORMANCE_SUITE_FILES = [
   'tests/unit/atoms/SocialIcon.test.tsx',
   'tests/unit/api/health/comprehensive.critical.test.ts',
   'tests/unit/ci/deploy-workflow.test.ts',
-  'tests/unit/lib/fetch/deduped-fetch.test.ts',
+  'tests/unit/lib/fetch/retired-lifecycles.test.ts',
   'tests/unit/lib/geo.test.ts',
   'tests/unit/lib/routing/not-found-context.test.ts',
   'tests/unit/lib/utm/build-url.test.ts',

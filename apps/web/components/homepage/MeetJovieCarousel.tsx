@@ -10,7 +10,7 @@ import type { HomepageArtistProfilePreviews } from './HomepageArtistProfiles';
 export function ArtistProfileCardRow({
   previews,
 }: Readonly<{ previews: HomepageArtistProfilePreviews }>) {
-  const railRef = useRef<HTMLDivElement | null>(null);
+  const railRef = useRef<HTMLElement | null>(null);
   const [scrollState, setScrollState] = useState({
     canGoPrevious: false,
     canGoNext: previews.length > 3,
@@ -57,6 +57,19 @@ export function ArtistProfileCardRow({
     });
   }, []);
 
+  const handleRailKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        scrollRail('next');
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        scrollRail('previous');
+      }
+    },
+    [scrollRail]
+  );
+
   return (
     <div className='homepage-artist-profiles__carousel'>
       <nav
@@ -84,18 +97,16 @@ export function ArtistProfileCardRow({
           <ChevronRight aria-hidden='true' size={18} strokeWidth={1.9} />
         </Button>
       </nav>
-      <div
+      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: arrow keys pan the scroll rail — the region itself is the keyboard entry point (axe scrollable-region-focusable) */}
+      <section
+        aria-label='Artist Profile Previews'
         className='homepage-artist-profiles__row'
+        onKeyDown={handleRailKeyDown}
         onScroll={updateScrollState}
         ref={railRef}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region needs a keyboard entry point for native scrolling
+        tabIndex={0}
       >
-        <button
-          className='homepage-artist-profiles__keyboard-scroll-control sr-only'
-          onClick={() => scrollRail('next')}
-          type='button'
-        >
-          Scroll Artist Profile Previews
-        </button>
         <ul
           aria-label='Jovie Artist Profile Previews'
           className='homepage-artist-profiles__track'
@@ -125,7 +136,7 @@ export function ArtistProfileCardRow({
             </li>
           ))}
         </ul>
-      </div>
+      </section>
     </div>
   );
 }

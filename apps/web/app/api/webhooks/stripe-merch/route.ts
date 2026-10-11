@@ -132,9 +132,15 @@ export async function POST(request: NextRequest) {
       webhookRecordId,
     });
     if (!claimAcquired) {
+      // Another worker holds the lease and has not finished. A 200 here makes
+      // Stripe stop retrying, which leaves the row unprocessed if that worker
+      // dies. Stay retryable until processed_at is set.
       return NextResponse.json(
-        { received: true },
-        { headers: NO_STORE_HEADERS }
+        { error: 'Webhook processing in progress' },
+        {
+          status: 503,
+          headers: { ...NO_STORE_HEADERS, 'Retry-After': '5' },
+        }
       );
     }
 

@@ -1,0 +1,53 @@
+{
+  "schema": "jovie-lane-routing-policy/v1",
+  "about": "Risk floor per issue for remediation.route_issue (JOV-7706). Route costs and capabilities live on each lane's `routes` in providers.json. Frontier = protected surfaces (JOV-7343 blast radius) and company-OS orchestration (JOV-7701); bounded = frozen plans and mechanical work.",
+  "frontier": {
+    "labels": [
+      "route:frontier",
+      "protected",
+      "governance",
+      "ws:release-deploy",
+      "ws:symphony-throughput",
+      "ws:security-auth"
+    ],
+    "titlePatterns": [
+      "\\b(staging|production|release)[- ]controller\\b",
+      "\\bmerge[- ]queue\\b",
+      "\\b(admission|promotion|rollback|release[- ]lineage)\\b",
+      "\\b(model|provider|lane)[- ]rout(er|ing)\\b",
+      "\\b(governor|governance|control[- ]plane|authority)\\b",
+      "\\bcertification (policy|rules?)\\b",
+      "\\bmigrations?\\b",
+      "\\bentitlements?\\b"
+    ],
+    "bodyPatterns": [
+      "\\.github/workflows/(staging|production)-controller",
+      "scripts/lanes/(remediation|routing|providers)",
+      "apps/web/drizzle/migrations/"
+    ]
+  },
+  "bounded": {
+    "labels": [
+      "route:bounded",
+      "frozen-plan",
+      "mechanical",
+      "ws:docs-changelog"
+    ],
+    "bodyMarkers": ["<!-- frozen-plan", "## Frozen plan"]
+  },
+  "bindings": {
+    "about": "Extra Linear team -> repo bindings run by the one lanes service (scripts/lanes/bindings.py). Jovie (JOV, LANES_REPO, lane gate) is the implicit default. Active on `hosts` or wherever LANES_REPO_<KEY> points at a checkout; LANES_BINDING_<KEY>=0 turns one off. Tim 2026-10-11: any Todo issue is eligible (empty `requiredLabels`; only `excludedLabels` and the harness hard exclusions hold work back) and no run waits on a plan approval. LYB runs one at a time, opens a ready PR then moves the issue to In Review; LYB's own required checks and native merge queue land it.",
+    "LYB": {
+      "enabled": true,
+      "hosts": ["gem"],
+      "repo": "~/LogYourBody",
+      "repoSlug": "JovieInc/LogYourBody",
+      "requiredLabels": [],
+      "excludedLabels": ["hold"],
+      "gate": "github-required-checks",
+      "maxOpenPrs": 3,
+      "install": ["pnpm", "install", "--frozen-lockfile", "--prefer-offline"],
+      "reviewState": "In Review"
+    }
+  }
+}

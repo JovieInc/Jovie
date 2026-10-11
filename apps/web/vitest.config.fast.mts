@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
 import fs from 'fs';
@@ -6,7 +7,6 @@ import {
   defineConfig,
   type TestProjectInlineConfiguration,
 } from 'vitest/config';
-import RetryVisibilityReporter from '../../scripts/lib/vitest-retry-reporter.mjs';
 import DurationShardSequencer from './scripts/vitest-duration-sequencer.mjs';
 
 // Resolve the real filesystem path (handles Windows short-name paths like TIMWHI~1)
@@ -21,6 +21,17 @@ const realRoot = (() => {
 const workspaceRoot = realRoot.includes(`${path.sep}.stryker-tmp${path.sep}`)
   ? path.resolve(realRoot, '../../../..')
   : path.resolve(realRoot, '../..');
+// Stryker copies the app into a sandbox; shared reporters stay at the workspace root.
+const { default: RetryVisibilityReporter } = await import(
+  pathToFileURL(
+    path.resolve(workspaceRoot, 'scripts/lib/vitest-retry-reporter.mjs')
+  ).href
+);
+const { readCliExcludePatterns } = await import(
+  pathToFileURL(
+    path.resolve(workspaceRoot, 'scripts/lib/ci-web-vitest-fast-args.mjs')
+  ).href
+);
 
 // Load environment variables from .env.test if it exists to keep parity with the
 // standard configuration while using the optimized defaults locally.
@@ -108,6 +119,13 @@ const flakyOutputFile = junitOutputFile.replace(
   '.flaky.json'
 );
 
+// Vitest drops CLI `--exclude` for `test.projects` (it only reaches the root
+// config), so the quarantine ledger's `--exclude=<path>` flags stopped
+// excluding anything once the node/jsdom projects landed and quarantined files
+// ran blocking in the sharded unit run. Fold them into the root exclude that
+// both projects inherit (`extends: true`).
+const cliExcludePatterns = readCliExcludePatterns(process.argv);
+
 // Changed-suite runs can fan out many short-lived workers on parity branches,
 // which increases startup churn and causes timeout cascades under aggregate load.
 // Keep this mode deterministic by running in a single long-lived fork with
@@ -194,6 +212,7 @@ export default defineConfig({
       ...(isCoverageRun
         ? ['tests/unit/ci/playwright-artifact-secrets.test.ts']
         : []),
+      ...cliExcludePatterns,
     ],
 
     // Performance optimizations

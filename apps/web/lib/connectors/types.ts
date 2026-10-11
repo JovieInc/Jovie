@@ -70,6 +70,8 @@ export interface ConnectorDefinition {
   readonly oauthBundle: ConnectorOAuthBundle;
   /** Scopes requested when connecting this provider (unioned per oauthBundle). */
   readonly oauthScopes: readonly string[];
+  /** User-facing labels aligned with `oauthScopes` for connection status UI. */
+  readonly oauthScopeLabels: readonly string[];
   /** Token storage/refresh strategy. */
   readonly tokenHandler: ConnectorTokenHandler;
   /**

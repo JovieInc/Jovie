@@ -1,11 +1,12 @@
 'use client';
-// @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
+// @coverage-via apps/web/tests/components/release-provider-matrix/ReleaseTable.test.tsx
 
 import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import { formatReleaseDateMonthYear } from '@/lib/discography/formatting';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { useSortingManager } from './hooks/useSortingManager';
@@ -147,9 +148,14 @@ export function ReleaseTable({
       minSize: 200,
       size: 9999, // Large value to make it flex and fill available space
       enableSorting: false,
-      meta: { className: designV1 ? 'pl-3 pr-2' : 'pl-4 pr-2.5' },
+      meta: {
+        className: designV1 ? 'pl-3 pr-2' : 'pl-4 pr-2.5',
+        primary: true,
+        minWidth: 200,
+      },
     });
 
+    const metaWidth = designV1 ? 390 : 260;
     const rightMetaColumn = columnHelper.display({
       id: 'meta',
       // NOSONAR S6478: TanStack Table header renderer prop, component already extracted
@@ -159,12 +165,16 @@ export function ReleaseTable({
         getSmartLinkLockReason,
         designV1
       ),
-      size: designV1 ? 390 : 260,
+      size: metaWidth,
       minSize: 100,
       meta: {
-        className: designV1
-          ? 'max-sm:hidden pl-2 pr-3 sm:table-cell'
-          : 'max-sm:hidden pl-2 pr-4 sm:table-cell',
+        className: designV1 ? 'pl-2 pr-3' : 'pl-2 pr-4',
+        priority: 1,
+        minWidth: metaWidth,
+        compact: release =>
+          release.releaseDate
+            ? formatReleaseDateMonthYear(release.releaseDate)
+            : null,
       },
     });
 

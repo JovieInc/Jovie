@@ -1,5 +1,5 @@
-// The v3 homepage is dark-launched: HOMEPAGE_V3_ENABLED is a build-time
-// constant that is off by default, so the live `/` is unchanged until flip.
+// The v3 homepage is live (Tim 2026-09-28): HOMEPAGE_V3_ENABLED is a
+// build-time constant that is on unless explicitly rolled back with 0/false.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -14,20 +14,16 @@ describe('homepage v3 dark-launch flag', () => {
     vi.resetModules();
   });
 
-  it('is off unless NEXT_PUBLIC_FEATURE_HOMEPAGE_V3 is 1 or true', async () => {
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_HOMEPAGE_V3', '');
+  it.each([
+    ['', true],
+    ['1', true],
+    ['true', true],
+    ['0', false],
+    ['false', false],
+  ])('NEXT_PUBLIC_FEATURE_HOMEPAGE_V3=%j resolves to %s', async (value, on) => {
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_HOMEPAGE_V3', value);
     expect((await import('@/lib/flags/homepage-v3')).HOMEPAGE_V3_ENABLED).toBe(
-      false
-    );
-    vi.resetModules();
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_HOMEPAGE_V3', '1');
-    expect((await import('@/lib/flags/homepage-v3')).HOMEPAGE_V3_ENABLED).toBe(
-      true
-    );
-    vi.resetModules();
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_HOMEPAGE_V3', 'true');
-    expect((await import('@/lib/flags/homepage-v3')).HOMEPAGE_V3_ENABLED).toBe(
-      true
+      on
     );
   });
 

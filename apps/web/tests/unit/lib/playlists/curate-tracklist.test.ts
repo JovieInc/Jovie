@@ -12,17 +12,10 @@ const { createMessageMock, captureErrorMock } = vi.hoisted(() => ({
   captureErrorMock: vi.fn(),
 }));
 
-vi.mock('@anthropic-ai/sdk', () => {
-  class AnthropicMock {
-    readonly messages = {
-      create: createMessageMock,
-    };
-  }
-
-  return {
-    default: AnthropicMock,
-  };
-});
+vi.mock('@/lib/ai/sdk', () => ({
+  gateway: (id: string) => ({ __model: id }),
+  generateText: createMessageMock,
+}));
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: captureErrorMock,
@@ -79,26 +72,21 @@ describe('curateTracklist', () => {
     });
 
     createMessageMock.mockResolvedValueOnce({
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify([
-            'track-1',
-            'track-2',
-            'track-3',
-            'track-4',
-            'track-1',
-            'track-5',
-            'track-6',
-            'track-7',
-            'track-8',
-            'track-9',
-            'track-10',
-            'track-11',
-            'track-12',
-          ]),
-        },
-      ],
+      text: JSON.stringify([
+        'track-1',
+        'track-2',
+        'track-3',
+        'track-4',
+        'track-1',
+        'track-5',
+        'track-6',
+        'track-7',
+        'track-8',
+        'track-9',
+        'track-10',
+        'track-11',
+        'track-12',
+      ]),
     });
 
     const result = await curateTracklist({
@@ -129,13 +117,13 @@ describe('curateTracklist', () => {
 
     createMessageMock
       .mockResolvedValueOnce({
-        content: [{ type: 'text', text: llmSelection }],
+        text: llmSelection,
       })
       .mockResolvedValueOnce({
-        content: [{ type: 'text', text: llmSelection }],
+        text: llmSelection,
       })
       .mockResolvedValueOnce({
-        content: [{ type: 'text', text: llmSelection }],
+        text: llmSelection,
       });
 
     await expect(
@@ -164,7 +152,7 @@ describe('curateTracklist', () => {
     ].join('\n');
 
     createMessageMock.mockResolvedValueOnce({
-      content: [{ type: 'text', text: fencedTrackList }],
+      text: fencedTrackList,
     });
 
     const result = await curateTracklist({
@@ -188,13 +176,13 @@ describe('curateTracklist', () => {
 
     createMessageMock
       .mockResolvedValueOnce({
-        content: [{ type: 'text', text: modelSelection }],
+        text: modelSelection,
       })
       .mockResolvedValueOnce({
-        content: [{ type: 'text', text: modelSelection }],
+        text: modelSelection,
       })
       .mockResolvedValueOnce({
-        content: [{ type: 'text', text: modelSelection }],
+        text: modelSelection,
       });
 
     await expect(

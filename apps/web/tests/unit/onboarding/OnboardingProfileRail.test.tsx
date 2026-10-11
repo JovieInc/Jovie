@@ -132,4 +132,38 @@ describe('OnboardingProfileRail', () => {
         .some(link => link.getAttribute('href')?.includes('evil.test'))
     ).toBe(false);
   });
+
+  it('previews jov.ie/<handle> for a non-artist with a public profile', () => {
+    fastRender(
+      <OnboardingProfileRail
+        state={{
+          artist: null,
+          artistConfirmed: false,
+          handle: 'avery',
+          socialLinks: ['https://instagram.com/avery'],
+        }}
+      />
+    );
+
+    const phonePreview = screen.getByTestId('onboarding-phone-preview');
+    expect(
+      within(phonePreview).getByTestId('profile-identity-handle')
+    ).toHaveTextContent('jov.ie/avery');
+    expect(screen.queryAllByTitle('Spotify')).toHaveLength(0);
+  });
+
+  it('renders nothing for a non-artist before a public profile is shared', () => {
+    fastRender(
+      <OnboardingProfileRail
+        state={{
+          artist: null,
+          artistConfirmed: false,
+          handle: 'avery',
+          socialLinks: [],
+        }}
+      />
+    );
+
+    expect(screen.queryByTestId('onboarding-profile-rail')).toBeNull();
+  });
 });

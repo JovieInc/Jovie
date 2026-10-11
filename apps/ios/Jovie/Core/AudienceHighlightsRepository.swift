@@ -49,6 +49,10 @@ actor AudienceHighlightsCache {
     defaults.removeObject(forKey: cacheKey(for: userID))
   }
 
+  func remove(for userID: String, ifOwnedBy ownership: NativeSessionOwnership) {
+    NativeSessionTokenStore.performIfCurrent(ownership) { remove(for: userID) }
+  }
+
   private func cacheKey(for userID: String) -> String {
     "ie.jov.Jovie.audienceHighlights.\(userID)"
   }

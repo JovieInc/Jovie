@@ -1,5 +1,7 @@
 import type { BetterAuthPlugin } from 'better-auth';
 import { APIError, createAuthMiddleware, getOAuthState } from 'better-auth/api';
+import { isAllowedMcpRedirectUri } from '@/lib/oauth/mcp-redirect-allowlist';
+import { isOAuthProviderTrustedClient } from './oauth-trusted-clients';
 
 const HANDOFF_STATE_KEY = 'jovieOAuthProviderReturn';
 const HANDOFF_STATE_VERSION = 1;
@@ -218,6 +220,12 @@ export function oauthProviderErrorReturn(): BetterAuthPlugin {
                 where: [{ field: 'clientId', value: clientId }],
               });
             if (!isValidAuthorizationClient(client, clientId, redirectURI)) {
+              return;
+            }
+            if (
+              !isOAuthProviderTrustedClient(clientId) &&
+              !isAllowedMcpRedirectUri(redirectURI)
+            ) {
               return;
             }
 

@@ -1,3 +1,4 @@
+// @coverage-via apps/web/components/marketing/artist-profile/ArtistProfileSectionBindings.test.tsx
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { FaqSection } from '../FaqSection';
 import './ArtistProfileFaq.css';
@@ -10,6 +11,7 @@ export function ArtistProfileFaq({ faq }: Readonly<ArtistProfileFaqProps>) {
   return (
     <div id='faq' className='artist-profile-faq'>
       <FaqSection
+        sectionVariant='objection-handler'
         items={[...faq.items]}
         heading={faq.headline}
         className='artist-profile-faq__inner'

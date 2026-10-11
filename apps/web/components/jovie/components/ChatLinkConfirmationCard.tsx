@@ -26,6 +26,8 @@ interface ChatLinkConfirmationCardProps {
   readonly originalUrl: string;
   /** Stable tool call id for durable dismiss/undo ledger (JOV-3549). */
   readonly toolCallId?: string;
+  /** Interactive fixtures confirm locally without mutating the profile. */
+  readonly preview?: boolean;
 }
 
 type CardState = 'pending' | 'adding' | 'added' | 'updated' | 'dismissed';
@@ -68,6 +70,7 @@ export function ChatLinkConfirmationCard({
   normalizedUrl,
   originalUrl,
   toolCallId,
+  preview = false,
 }: ChatLinkConfirmationCardProps) {
   const [state, setState] = useState<CardState>(() =>
     isProposalDismissed(toolCallId) ? 'dismissed' : 'pending'
@@ -78,6 +81,10 @@ export function ChatLinkConfirmationCard({
 
   const handleAdd = useCallback(() => {
     setErrorMessage(null);
+    if (preview) {
+      setState('added');
+      return;
+    }
     setState('adding');
 
     // Optimistically add the link to the live profile preview so the bento
@@ -128,6 +135,7 @@ export function ChatLinkConfirmationCard({
     confirmLink,
     previewPanel,
     toolCallId,
+    preview,
   ]);
 
   const handleDismiss = useCallback(() => {
@@ -198,7 +206,7 @@ export function ChatLinkConfirmationCard({
             {normalizedUrl}
           </p>
           {errorMessage && (
-            <output className='mt-1 block text-xs text-danger-token'>
+            <output className='mt-1 block text-xs text-error'>
               {errorMessage}
             </output>
           )}
@@ -210,7 +218,7 @@ export function ChatLinkConfirmationCard({
             disabled={state === 'adding'}
             className={cn(
               'system-b-chat-link-primary-action',
-              'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
+              'border border-(--color-btn-primary-bg) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover',
               'disabled:opacity-50 transition-colors'
             )}
           >

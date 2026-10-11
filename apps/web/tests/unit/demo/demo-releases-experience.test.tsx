@@ -143,7 +143,9 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
     user: null,
     creatorProfiles: [],
+    identities: [],
     selectedProfile: null,
+    activeIdentity: null,
     needsOnboarding: false,
     sidebarCollapsed: false,
     hasSocialLinks: false,
@@ -170,6 +172,10 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 const { DemoReleasesExperience } = await import(
   '@/features/demo/DemoReleasesExperience'
 );
+
+// Load the real lazy drawer before timing UI interactions, rather than timing
+// Vitest's cold module transforms as part of the track-number regression.
+await import('@/components/organisms/release-sidebar');
 
 const LEADING_RELEASE_TITLE = "I'm Not Alone Remixes";
 

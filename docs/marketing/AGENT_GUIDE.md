@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.3.0
+spec-version: 1.4.0
 doc-freshness: docs/marketing/AGENT_GUIDE.md
 -->
 # Marketing Agent Guide
@@ -12,13 +12,19 @@ doc-freshness: docs/marketing/AGENT_GUIDE.md
 > `COMPOSITION_RULES.md`) are optional commentary. Copy generation follows the
 > typed contract below.
 
-spec-version: 1.3.0 · registry: `apps/web/data/marketing/index.ts`.
+spec-version: 1.4.0 · registry: `apps/web/data/marketing/index.ts`.
 
 ## Founder direction
 
 Before marketing design or copy work, read [Design invariants](./DESIGN_INVARIANTS.md).
 It owns the scoped 2026-09-13 founder decisions, approval distinctions, and
 review requirements; it does not create a second executable invariant registry.
+
+For company About, artist About and search-oriented content, apply
+[About pages and search evidence](./COMPOSITION_RULES.md#about-pages-and-search-evidence).
+It classifies verified requirements, editorial recipes and measurement hypotheses.
+Reuse the existing claim/copy/SEO contracts; practitioner advice is not a new
+ranking law or permission to fabricate proof.
 
 ## The 4-step procedure
 
@@ -247,6 +253,15 @@ replaced, removed, reduced in salience, or rejected, never fixed with post-hoc
 recoloring or a fake grade. Product screenshots, customer evidence,
 documentary material, album art, merch artwork, and artist retouching remain
 truthful source material rather than palette-controlled set pieces.
+
+Generated imagery that includes a Jovie marketing character must also embed
+`MARKETING_ASSET_GENERATION_CHARACTER_CONTRACT`; independent visual review
+uses the matching `MARKETING_VISUAL_REVIEW_CHARACTER_CONTRACT`. Both project
+the casting, persona, ICP, individuality, scene-coherence, and physical-world
+rules from `canon/virtual-models.json` through
+`apps/web/data/marketing/characterSystem.ts`. Run
+`auditMarketingCharacterGenerationBrief` before generation; a prompt cannot
+substitute for the required structured persona and physics brief.
 
 Only one candidate may reach Taste. It needs one digest-bound passing receipt
 for every gate in `MARKETING_TASTE_GATE_IDS`, including independent visual

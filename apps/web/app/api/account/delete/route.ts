@@ -7,6 +7,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { feedbackItems } from '@/lib/db/schema/feedback';
+import { iosPushDevices } from '@/lib/db/schema/ios-push-devices';
 import { preSaveTokens } from '@/lib/db/schema/pre-save';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { emailSuppressions } from '@/lib/db/schema/suppression';
@@ -184,6 +185,9 @@ export async function POST(request: Request) {
           .delete(creatorProfiles)
           .where(eq(creatorProfiles.userId, user.id));
         await tx.delete(preSaveTokens).where(eq(preSaveTokens.userId, user.id));
+        await tx
+          .delete(iosPushDevices)
+          .where(eq(iosPushDevices.userId, user.id));
         await tx.delete(feedbackItems).where(eq(feedbackItems.userId, user.id));
         await tx
           .delete(emailSuppressions)

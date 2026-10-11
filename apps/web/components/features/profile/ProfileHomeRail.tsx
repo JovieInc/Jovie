@@ -1,14 +1,6 @@
 'use client';
 
-import { type MouseEvent, memo, useMemo } from 'react';
-import {
-  EntityCard,
-  type EntityCardModel,
-  merchToEntityCard,
-  releaseToEntityCard,
-  showToEntityCard,
-} from '@/components/organisms/entity-card';
-import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
+import { memo, useMemo } from 'react';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import {
@@ -22,16 +14,13 @@ import { useUserLocation } from '@/hooks/useUserLocation';
 import {
   DEFAULT_PROFILE_PAC_ASSIGNMENT,
   type ProfilePacAssignment,
-  type ProfilePacS2Slot,
 } from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
-import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { ProfileCardAccentAssignment } from '@/lib/profile/mode-card-accent';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 import { ProfilePacCard, type ProfilePacRelease } from './pac/ProfilePacCard';
-import { ReleaseCatalogCarousel } from './ReleaseCatalogCarousel';
 import type { PublicRelease } from './releases/types';
 import { usePacEvents } from './usePacEvents';
 
@@ -41,15 +30,11 @@ interface ProfileHomeRailProps {
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
-  readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly tourDates?: readonly TourDateViewModel[];
   readonly hasPlayableDestinations: boolean;
   readonly captureEnabled?: boolean;
   readonly renderMode?: ProfileRenderMode;
   readonly previewActionLabel?: string;
-  readonly onPlayClick?: () => void;
-  readonly onAlertsClick?: (context: NotificationSourceContext) => void;
-  readonly showAlertsCard?: boolean;
   readonly isSubscribed?: boolean;
   readonly profilePacAssignment?: ProfilePacAssignment;
   readonly viewerLocation?: UserLocation | null;
@@ -86,110 +71,21 @@ function getUpcomingTourDates(
     );
 }
 
-function HomeAlertsCard({
-  artist,
-  onAlertsClick,
-  renderMode,
-  sourceContext,
-}: Readonly<{
-  artist: Artist;
-  onAlertsClick?: (context: NotificationSourceContext) => void;
-  renderMode: ProfileRenderMode;
-  sourceContext: NotificationSourceContext;
-}>) {
-  const isInteractive = renderMode === 'interactive';
-  const subscribeHref = `/${artist.handle}?mode=subscribe`;
-  const handleClick = isInteractive
-    ? (event: MouseEvent<HTMLElement>) => {
-        if (!onAlertsClick) {
-          return;
-        }
-        event.preventDefault();
-        onAlertsClick(sourceContext);
-      }
-    : undefined;
-
-  // Alerts use the same compact row anatomy as every other item in Latest.
-  // The icon is carried by the kind label, so this non-media row spends its
-  // full footprint on the message and action.
-  const model: EntityCardModel = {
-    id: `alerts-${artist.id}`,
-    kind: 'alerts',
-    href: isInteractive ? subscribeHref : null,
-    imageUrl: null,
-    imageAlt: `Alerts for ${artist.name}`,
-    eyebrow: artist.name,
-    title: 'Alerts',
-    meta: 'Music, shows, merch — first.',
-    cta: {
-      label: 'Get Updates',
-      href: isInteractive ? subscribeHref : null,
-    },
-  };
-
-  return (
-    <EntityCard
-      model={model}
-      treatment='detailed'
-      surface='pearl'
-      anatomy='profile-landscape'
-      className='h-full w-full overflow-hidden'
-      dataTestId='profile-home-alerts-fallback-card'
-      onClick={handleClick}
-    />
-  );
-}
-
-function getS2OrderedItems({
-  assignedSlot,
-  merchItems,
-  showItems,
-}: Readonly<{
-  assignedSlot: ProfilePacS2Slot;
-  merchItems: readonly EntityCardModel[];
-  showItems: readonly EntityCardModel[];
-}>) {
-  const slotBuckets: Record<ProfilePacS2Slot, readonly EntityCardModel[]> = {
-    merch: merchItems,
-    tip: [],
-    tickets: showItems,
-    rsvp: showItems,
-  };
-  const preferredItems = slotBuckets[assignedSlot];
-  const fallbackItems =
-    assignedSlot === 'tickets' || assignedSlot === 'rsvp'
-      ? merchItems
-      : showItems;
-
-  return preferredItems.length > 0
-    ? [...preferredItems, ...fallbackItems]
-    : [...merchItems, ...showItems];
-}
-
-export const __profileHomeRailTestUtils = {
-  getS2OrderedItems,
-};
-
 /**
- * Editorial cap (JOV-6199): Home is curated, not a catalog dump. At most one
- * featured card (the PAC leading slot) plus at most two secondary cards. The
- * fan-capture ("Get Updates") card counts toward the secondary cap, so when
- * it renders, only one other secondary item is shown. The full catalog lives
- * on the Music destination.
+ * Editorial surface (JOV-6199, JOV-7123): Home is one curated card — the
+ * featured PAC — not a catalog stack. The PAC's state machine resolves the
+ * subject per visitor (release, merch, next show, tip, listen, capture), so
+ * no secondary card carousel follows it. The full catalog lives on the Music
+ * destination and fan capture lives inside the card's prompt state.
  */
-const SECONDARY_ITEM_CAP = 2;
-
 export const ProfileHomeRail = memo(function ProfileHomeRail({
   artist,
   latestRelease,
   profileSettings,
-  featuredPlaylistFallback,
   tourDates = [],
   hasPlayableDestinations,
   captureEnabled = true,
   renderMode = 'interactive',
-  onAlertsClick,
-  showAlertsCard = true,
   isSubscribed = false,
   profilePacAssignment = DEFAULT_PROFILE_PAC_ASSIGNMENT,
   viewerLocation,
@@ -200,14 +96,14 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   pacArtPriority = false,
   featuredAccent,
 }: Readonly<ProfileHomeRailProps>) {
-  // PAC instrumentation (spec §8): pac_exposure fires when the rail is ≥50%
+  // PAC instrumentation (spec §8): pac_exposure fires when the card is ≥50%
   // visible, once per state per session, keyed to the visitor's variant.
   const { exposureRef } = usePacEvents({
     profileId: artist.id,
     assignment: profilePacAssignment,
     enabled: renderMode !== 'preview',
   });
-  // Re-evaluate visibility at the release boundary so the rail's "Drops in"
+  // Re-evaluate visibility at the release boundary so the card's "Drops in"
   // chrome transitions to "Out Now" when the release drops, even if the
   // page was served from a stale ISR cache.
   const now = useReleaseAwareNow(latestRelease?.releaseDate);
@@ -225,7 +121,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     upcomingTourDates.length > 0 &&
     !releaseVisibility?.show;
   // one-modal-layer-v1: never open the browser geolocation prompt from a
-  // passive rail — use cached/granted location only.
+  // passive surface — use cached/granted location only.
   const { location } = useUserLocation({
     enabled: shouldResolveGeo,
     permissionMode: 'granted-only',
@@ -236,124 +132,6 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     effectiveLocation
   );
   const nearbyTourDateId = nearbyDates[0]?.date?.id ?? null;
-
-  // The capture card renders as the carousel's trailing secondary slot, so it
-  // consumes one of the two secondary slots under the editorial cap.
-  const showCaptureCard = showAlertsCard && !isSubscribed;
-  const secondaryItemLimit = SECONDARY_ITEM_CAP - (showCaptureCard ? 1 : 0);
-
-  // One ordered card list — merch, shows, then back-catalog fills any
-  // remaining secondary slots. The featured latest release is NOT an entity
-  // card here: it lives in the carousel's leading slot as the PAC card below,
-  // so it never renders twice.
-  const carouselItems = useMemo<EntityCardModel[]>(() => {
-    const featuredItems: EntityCardModel[] = [];
-    const releaseItems: EntityCardModel[] = [];
-    const merchItems: EntityCardModel[] = [];
-    const showItems: EntityCardModel[] = [];
-
-    // The PAC card hosts the visible latest release; only the slug is needed
-    // here to keep it out of the plain catalog list.
-    const hasFeaturedRelease = Boolean(
-      releaseVisibility?.show && latestRelease
-    );
-    const featuredReleaseSlug =
-      hasFeaturedRelease && latestRelease ? latestRelease.slug : null;
-
-    if (
-      !hasFeaturedRelease &&
-      upcomingTourDates.length === 0 &&
-      featuredPlaylistFallback
-    ) {
-      // Fallback feature when there's no release or upcoming show: the
-      // artist's confirmed "This Is" playlist, as a music card.
-      featuredItems.push({
-        id: `playlist-${featuredPlaylistFallback.playlistId}`,
-        kind: 'music',
-        href: featuredPlaylistFallback.url,
-        imageUrl: featuredPlaylistFallback.imageUrl,
-        imageAlt: featuredPlaylistFallback.title,
-        accent: 'green',
-        eyebrow: 'Playlist',
-        title: featuredPlaylistFallback.title,
-        cta: {
-          label: 'Open Playlist',
-          href: featuredPlaylistFallback.url,
-          external: true,
-        },
-      });
-    }
-
-    // Back catalog: include non-featured releases in the same carousel.
-    // Dedupe accidental same-title/year/type clones so the rail stays legible.
-    const seenCatalogKeys = new Set<string>();
-    for (const release of releases) {
-      if (release.slug === '' || release.slug === featuredReleaseSlug) {
-        continue;
-      }
-      const year = release.releaseDate
-        ? new Date(release.releaseDate).getUTCFullYear()
-        : 'unknown';
-      const catalogKey = [
-        release.title.trim().toLowerCase(),
-        release.releaseType ?? '',
-        year,
-      ].join('|');
-      if (seenCatalogKeys.has(catalogKey)) {
-        continue;
-      }
-      seenCatalogKeys.add(catalogKey);
-      releaseItems.push(
-        releaseToEntityCard(release, { handle: artist.handle, now })
-      );
-    }
-
-    // Shoppable merch (revenue) next.
-    for (const card of merchCards) {
-      merchItems.push(merchToEntityCard(card, { handle: artist.handle }));
-    }
-
-    // Upcoming shows, nearest-to-viewer first when geo resolved.
-    const shows = [...upcomingTourDates].sort((a, b) =>
-      a.id === nearbyTourDateId ? -1 : b.id === nearbyTourDateId ? 1 : 0
-    );
-    for (const show of shows) {
-      showItems.push(
-        showToEntityCard({
-          id: show.id,
-          title: show.title,
-          venueName: show.venueName,
-          city: show.city,
-          startDate: show.startDate,
-          timezone: show.timezone,
-          ticketUrl: show.ticketUrl,
-          ticketStatus: show.ticketStatus,
-        })
-      );
-    }
-
-    return [
-      ...featuredItems,
-      ...getS2OrderedItems({
-        assignedSlot: profilePacAssignment.s2Slot,
-        merchItems,
-        showItems,
-      }),
-      ...releaseItems,
-    ].slice(0, secondaryItemLimit);
-  }, [
-    artist.handle,
-    featuredPlaylistFallback,
-    latestRelease,
-    merchCards,
-    nearbyTourDateId,
-    now,
-    profilePacAssignment.s2Slot,
-    releases,
-    secondaryItemLimit,
-    releaseVisibility?.show,
-    upcomingTourDates,
-  ]);
 
   // Primary Action Card subject: the visible latest release (preferred) or
   // the newest catalog release. Preview URL comes from the lite releases
@@ -396,26 +174,9 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
       hasPlayableDestinations
   );
 
-  const alertsCard = !showCaptureCard ? null : (
-    <HomeAlertsCard
-      artist={artist}
-      onAlertsClick={onAlertsClick}
-      renderMode={renderMode}
-      sourceContext={{
-        artistId: artist.id,
-        profileId: artist.id,
-        profileSlug: artist.handle,
-        currentTab: 'home',
-        ctaLocation: 'home_alerts_card',
-        intent: 'general_alerts',
-      }}
-    />
-  );
-
-  // Pen parity (Tim, 2026-09-26): the PAC is the featured Listen mode card
-  // under the identity header. The rest of the highlights (back catalog,
-  // merch, shows, alerts) follow in the same carousel as before.
-  const hasCarouselContent = carouselItems.length > 0 || alertsCard !== null;
+  // Pen parity (Tim, 2026-09-26/28): the featured editorial card is the only
+  // card surface under the identity header — it replaces the highlights
+  // carousel in place rather than stacking above it.
   return (
     <div
       ref={exposureRef}
@@ -439,15 +200,6 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
           artPriority={pacArtPriority}
           hasPlayableDestinations={hasPlayableDestinations}
           captureEnabled={captureEnabled}
-        />
-      ) : null}
-      {hasCarouselContent ? (
-        <ReleaseCatalogCarousel
-          items={carouselItems}
-          artistHandle={artist.handle}
-          artistId={artist.id}
-          analyticsEnabled={renderMode !== 'preview'}
-          trailing={alertsCard}
         />
       ) : null}
     </div>

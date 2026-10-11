@@ -104,7 +104,7 @@ export function LibraryPageClient({
   const rulesDeepLink = searchParams.get('rules');
   useEffect(() => {
     if (rulesDeepLink !== '1') return;
-    router.replace(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?rules=1`);
+    router.replace(`${APP_ROUTES.SETTINGS_PROFILE}?rules=1`);
   }, [router, rulesDeepLink]);
 
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -190,7 +190,7 @@ export function LibraryPageClient({
   const stageTabs = (
     <div
       role='tablist'
-      aria-label='Library Stages'
+      aria-label='Work Stages'
       data-testid='library-stage-tabs'
       data-youtube-connected={youtubeConnected ? 'true' : 'false'}
       className='flex min-w-0 flex-1 items-center gap-1 overflow-x-auto p-0.5 -m-0.5'

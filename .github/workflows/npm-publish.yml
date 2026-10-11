@@ -1,9 +1,28 @@
 name: Publish @jovie/cli to npm
 
-# Publication is a deliberate operator action. Keep this workflow manual-only;
-# a main push or pull request must never acquire npm publish authority.
+# Every main push that changes shipped CLI bytes publishes the next unpublished
+# patch, behind the same chaos matrix, tested-bytes identity and provenance
+# gates as a manual release. Pull requests never acquire publish authority.
 on:
+  push:
+    branches: [main]
+    paths:
+      - packages/jovie-cli/src/**
+      - packages/jovie-cli/package.json
+      - packages/jovie-cli/README.md
+      - packages/jovie-cli/LICENSE
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: Optional stable CLI YY.M.PATCH release; blank publishes the next unpublished patch.
+        type: string
+        required: false
+        default: ''
+      publish_mcp_only:
+        description: Verify the byte-identical published npm artifact and publish its MCP listing.
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -13,18 +32,223 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Publish @jovie/cli
+  # JOV-7714: the exact bytes we publish must first pass the black-box chaos
+  # gate on every supported OS and Node line. The publish job re-packs and
+  # refuses to publish unless its integrity equals this tested tarball.
+  chaos-tarball:
+    name: Pack the chaos-tested release candidate
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     permissions:
       contents: read
-      id-token: write
+    outputs:
+      integrity: ${{ steps.pack.outputs.integrity }}
+      sha: ${{ steps.pack.outputs.sha }}
+      version: ${{ steps.pack.outputs.version }}
     steps:
       - name: Check out exact main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 9.15.9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Build @jovie/cli
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @jovie/cli run build
+
+      - name: Pack the versioned tarball
+        id: pack
+        shell: bash
+        env:
+          CLI_RELEASE_VERSION: ${{ inputs.release_version }}
+          PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only }}
+        run: |
+          set -euo pipefail
+          # A blank selection (every push) takes the next unpublished patch;
+          # MCP-only resumes an existing release, so it keeps the VERSION default.
+          packument="$RUNNER_TEMP/jovie-cli-packument.json"
+          packument_status="$(curl --silent --show-error \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --retry 2 \
+            --output "$packument" \
+            --write-out '%{http_code}' \
+            https://registry.npmjs.org/@jovie%2Fcli)"
+          test "$packument_status" = 200 || {
+            echo "::error::Could not read published @jovie/cli versions (HTTP $packument_status)."
+            exit 1
+          }
+          release_version="$(PACKUMENT="$packument" node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { nextReleaseVersion, resolveReleaseVersion } from './packages/jovie-cli/scripts/pack-manifest.ts';
+          const canonical = readFileSync('VERSION', 'utf8');
+          const published = Object.keys(JSON.parse(readFileSync(process.env.PACKUMENT, 'utf8')).versions ?? {});
+          process.stdout.write(process.env.CLI_RELEASE_VERSION || process.env.PUBLISH_MCP_ONLY === 'true'
+            ? resolveReleaseVersion(canonical, process.env.CLI_RELEASE_VERSION)
+            : nextReleaseVersion(canonical, published));
+          NODE
+          )"
+          printf 'version=%s\nsha=%s\n' "$release_version" "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          staging_dir="$RUNNER_TEMP/jovie-cli-publish"
+          pack_dir="$RUNNER_TEMP/jovie-cli-chaos"
+          mkdir -p "$staging_dir" "$pack_dir"
+          cp packages/jovie-cli/package.json "$staging_dir/package.json"
+          cp -R packages/jovie-cli/dist "$staging_dir/dist"
+          cp packages/jovie-cli/README.md packages/jovie-cli/LICENSE "$staging_dir/"
+          RELEASE_VERSION="$release_version" STAGING_DIR="$staging_dir" node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+
+          const manifestPath = `${process.env.STAGING_DIR}/package.json`;
+          const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+          manifest.version = process.env.RELEASE_VERSION;
+          writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
+          (
+            cd "$staging_dir"
+            npm pack --ignore-scripts --json --pack-destination "$pack_dir" > "$RUNNER_TEMP/chaos-pack.json"
+          )
+          cp packages/jovie-cli/scripts/chaos-blackbox.mjs "$pack_dir/"
+          integrity="$(node -e 'const [p] = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); process.stdout.write(p.integrity)' "$RUNNER_TEMP/chaos-pack.json")"
+          test -n "$integrity"
+          printf 'integrity=%s\n' "$integrity" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the release candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jovie-cli-chaos-candidate
+          path: ${{ runner.temp }}/jovie-cli-chaos
+          if-no-files-found: error
+          retention-days: 7
+
+  # Self-hosted Macs are primary; hosted macOS is the fallback when the
+  # heartbeat is stale, so a sleeping Mac or a saturated org pool never
+  # blocks a release. Same contract as ios-ci.yml's route.
+  mac-runner-route:
+    name: Mac Runner Route
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      runner_class: ${{ steps.route.outputs.runner_class }}
+    steps:
+      - name: Checkout trusted runner routing policy
+        if: ${{ vars.JOVIE_MAC_RUNNER != 'off' }}
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          sparse-checkout: |
+            .github/scripts/await-runner-heartbeat.sh
+            .github/scripts/query-runner-heartbeat.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Query Mac runner heartbeat
+        id: heartbeat
+        if: ${{ vars.JOVIE_MAC_RUNNER != 'off' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml
+          HEARTBEAT_MAX_AGE_SECONDS: '1500'
+          HEARTBEAT_API_TIMEOUT_SECONDS: '5'
+          HEARTBEAT_POLL_ATTEMPTS: '1'
+          HEARTBEAT_POLL_INTERVAL_SECONDS: '1'
+        run: |
+          set -uo pipefail
+          helper='.github/scripts/await-runner-heartbeat.sh'
+          if [ -x "$helper" ]; then
+            timeout 60s "$helper" || true
+          fi
+          exit 0
+
+      - name: Select Mac runner route
+        id: route
+        env:
+          HEARTBEAT_HEALTH: ${{ steps.heartbeat.outputs.health }}
+          HEARTBEAT_EVIDENCE: ${{ steps.heartbeat.outputs.evidence }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner_class='hosted'
+          if [ "$HEARTBEAT_HEALTH" = 'up' ]; then
+            runner_class='mac'
+          fi
+          echo "runner_class=$runner_class" >> "$GITHUB_OUTPUT"
+          echo "::notice::CLI chaos Mac route: $runner_class — ${HEARTBEAT_EVIDENCE:-not probed}"
+
+  chaos-matrix:
+    name: CLI chaos gate (${{ matrix.os }}, Node ${{ matrix.node }})
+    needs: [chaos-tarball, mac-runner-route]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        # The engines floor, the next major, and the Node 22 line that still runs.
+        node: ['22.13.0', '24.21.0', '26']
+    runs-on: ${{ matrix.os == 'macos-latest' && needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Download the release candidate
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: jovie-cli-chaos-candidate
+          path: ${{ runner.temp }}/jovie-cli-chaos
+
+      - name: Install the tarball into a clean directory and run the chaos gate
+        shell: bash
+        env:
+          PACK_DIR: ${{ runner.temp }}/jovie-cli-chaos
+          CLEAN_DIR: ${{ runner.temp }}/jovie-cli-clean
+        run: |
+          set -euo pipefail
+          mkdir -p "$CLEAN_DIR"
+          tarball="$(ls "$PACK_DIR"/jovie-cli-*.tgz)"
+          npm install --prefix "$CLEAN_DIR" --ignore-scripts --no-audit --no-fund --package-lock=false "$tarball"
+          shim="$CLEAN_DIR/node_modules/.bin/jovie"
+          if [ "$RUNNER_OS" = Windows ]; then shim="$shim.cmd"; fi
+          node "$PACK_DIR/chaos-blackbox.mjs" \
+            --bin "$CLEAN_DIR/node_modules/@jovie/cli/dist/cli.js" \
+            --shim "$shim" \
+            --profile release
+
+  publish:
+    name: Publish @jovie/cli
+    needs: [chaos-tarball, chaos-matrix]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out the chaos-tested main commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.chaos-tarball.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -34,7 +258,7 @@ jobs:
           version: 9.15.9
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -47,6 +271,8 @@ jobs:
         env:
           PACKAGE_NAME: '@jovie/cli'
           REGISTRY_URL: https://registry.npmjs.org
+          PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only }}
+          CLI_RELEASE_VERSION: ${{ needs.chaos-tarball.outputs.version }}
         run: |
           set -euo pipefail
 
@@ -59,20 +285,25 @@ jobs:
             exit 1
           }
 
-          git fetch --no-tags --depth=1 origin main
+          # Main may advance during the chaos matrix; the tested commit must
+          # still be on main, and a later push publishes the newer bytes.
+          git fetch --no-tags origin main
           checked_out_sha="$(git rev-parse HEAD)"
           current_main_sha="$(git rev-parse origin/main)"
           [[ "$checked_out_sha" =~ ^[0-9a-f]{40}$ ]]
-          test "$checked_out_sha" = "$current_main_sha" || {
-            echo "::error::Checkout is not the exact current origin/main commit."
+          git merge-base --is-ancestor "$checked_out_sha" "$current_main_sha" || {
+            echo "::error::Checkout is not a commit on origin/main."
             exit 1
           }
 
-          release_version="$(tr -d '[:space:]' < VERSION)"
-          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-            echo "::error::VERSION is not a valid release version."
-            exit 1
-          }
+          release_version="$(node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { resolveReleaseVersion } from './packages/jovie-cli/scripts/pack-manifest.ts';
+          process.stdout.write(resolveReleaseVersion(
+            readFileSync('VERSION', 'utf8'), process.env.CLI_RELEASE_VERSION
+          ));
+          NODE
+          )"
           export RELEASE_VERSION="$release_version"
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
@@ -103,9 +334,9 @@ jobs:
           for (const [field, valid] of required) {
             if (!valid) throw new Error(`Invalid @jovie/cli publication field: ${field}`);
           }
-          if (manifest.version && manifest.version !== expectedVersion) {
+          if (Object.hasOwn(manifest, 'version') && manifest.version !== expectedVersion) {
             throw new Error(
-              `Package version ${manifest.version} does not match VERSION ${expectedVersion}.`
+              `Package version ${manifest.version} does not match CLI release ${expectedVersion}.`
             );
           }
           NODE
@@ -123,11 +354,19 @@ jobs:
             "$REGISTRY_URL/$version_path/$release_version")"
           case "$registry_status" in
             404)
+              test "$PUBLISH_MCP_ONLY" = false || {
+                echo "::error::MCP-only publication requires an existing npm release."
+                exit 1
+              }
               echo "@jovie/cli@$release_version is not published; continuing."
               ;;
             200)
-              echo "::error::@jovie/cli@$release_version is already published."
-              exit 1
+              if test "$PUBLISH_MCP_ONLY" = true; then
+                echo "Existing npm release will be verified before MCP publication."
+              else
+                echo "::error::@jovie/cli@$release_version is already published."
+                exit 1
+              fi
               ;;
             *)
               echo "::error::Could not prove @jovie/cli@$release_version is unpublished (HTTP $registry_status)."
@@ -149,6 +388,8 @@ jobs:
         run: pnpm --filter @jovie/cli run build
 
       - name: Run @jovie/cli package smoke
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: pnpm --filter @jovie/cli run pack:dry
 
       - name: Stage the versioned package
@@ -156,6 +397,7 @@ jobs:
         shell: bash
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          TESTED_INTEGRITY: ${{ needs.chaos-tarball.outputs.integrity }}
         run: |
           set -euo pipefail
           staging_dir="$RUNNER_TEMP/jovie-cli-publish"
@@ -193,6 +435,9 @@ jobs:
           ) {
             throw new Error('Versioned npm package smoke did not produce the expected CLI files.');
           }
+          if (!process.env.TESTED_INTEGRITY || pack.integrity !== process.env.TESTED_INTEGRITY) {
+            throw new Error('Publication bytes differ from the chaos-tested tarball; refusing to publish.');
+          }
           NODE
           printf 'path=%s\n' "$staging_dir" >> "$GITHUB_OUTPUT"
 
@@ -200,6 +445,7 @@ jobs:
       # short-lived publish credential. No long-lived npm token exists.
       # Requires npm >= 11.5.1; Node 22 bundles npm 10.
       - name: Use npm with trusted publishing support
+        if: ${{ !inputs.publish_mcp_only }}
         shell: bash
         run: |
           set -euo pipefail
@@ -207,6 +453,7 @@ jobs:
           node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); if (a<11||(a===11&&(b<5||(b===5&&c<1)))) { console.error("::error::npm >= 11.5.1 is required for trusted publishing"); process.exit(1) }' "$(npm --version)"
 
       - name: Publish with npm provenance
+        if: ${{ !inputs.publish_mcp_only }}
         shell: bash
         env:
           PACKAGE_DIR: ${{ steps.package.outputs.path }}
@@ -217,17 +464,18 @@ jobs:
           test "$(node --input-type=module -e \
             'const fs = await import("node:fs"); const p = JSON.parse(fs.readFileSync(process.env.PACKAGE_DIR + "/package.json", "utf8")); process.stdout.write(p.version)')" \
             = "$RELEASE_VERSION"
-          git fetch --no-tags --depth=1 origin main
+          git fetch --no-tags origin main
           checked_out_sha="$(git rev-parse HEAD)"
           current_main_sha="$(git rev-parse origin/main)"
           [[ "$checked_out_sha" =~ ^[0-9a-f]{40}$ ]]
-          test "$checked_out_sha" = "$current_main_sha" || {
-            echo "::error::Checkout drifted from current origin/main immediately before publication."
+          git merge-base --is-ancestor "$checked_out_sha" "$current_main_sha" || {
+            echo "::error::Checkout left origin/main immediately before publication."
             exit 1
           }
           npm publish --provenance --access public "$PACKAGE_DIR"
 
       - name: Prove public registry release
+        id: public_release
         shell: bash
         env:
           PACKAGE_NAME: '@jovie/cli'
@@ -240,7 +488,12 @@ jobs:
             'process.stdout.write(encodeURIComponent(process.env.PACKAGE_NAME))')"
 
           registry_status=000
-          for attempt in {1..12}; do
+          # npm trusted publishing can acknowledge a release many minutes
+          # before the version is readable from the public registry, and the
+          # abbreviated packument npm resolves against can lag further behind
+          # the version manifest. Share one deadline across both waits.
+          deadline=$((SECONDS + 1200))
+          while (( SECONDS < deadline )); do
             registry_status="$(curl --silent --show-error \
               --connect-timeout 10 \
               --max-time 30 \
@@ -276,14 +529,21 @@ jobs:
           NODE
 
           install_root="$(mktemp -d "$RUNNER_TEMP/jovie-cli-public-install.XXXXXX")"
-          npm install \
+          until npm install \
             --prefix "$install_root" \
             --ignore-scripts \
             --no-audit \
             --no-fund \
             --package-lock=false \
             --registry "$REGISTRY_URL" \
-            "$PACKAGE_NAME@$RELEASE_VERSION"
+            "$PACKAGE_NAME@$RELEASE_VERSION"; do
+            (( SECONDS < deadline )) || {
+              echo "::error::Published version was not installable from the public registry."
+              exit 1
+            }
+            sleep 10
+          done
+          printf 'install_root=%s\n' "$install_root" >> "$GITHUB_OUTPUT"
           installed_cli="$install_root/node_modules/.bin/jovie"
           test -x "$installed_cli"
           test "$("$installed_cli" --version)" = "$RELEASE_VERSION"
@@ -308,3 +568,55 @@ jobs:
 
           echo "Public npm registry, provenance, ownership, fresh install, and runtime receipts passed." \
             >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify exact staged bytes and prepare MCP manifest
+        if: ${{ inputs.publish_mcp_only }}
+        shell: bash
+        env:
+          STAGING_DIR: ${{ steps.package.outputs.path }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          export MCP_PACK_PATH="$RUNNER_TEMP/jovie-mcp-pack.json"
+          export METADATA_PATH="$RUNNER_TEMP/jovie-cli-public-metadata.json"
+          export MCP_MANIFEST_PATH="$RUNNER_TEMP/jovie-mcp-server.json"
+          (
+            cd "$STAGING_DIR"
+            npm pack --ignore-scripts --json > "$MCP_PACK_PATH"
+          )
+          node packages/jovie-cli/scripts/verify-published-package.mjs
+          npm audit signatures --prefix '${{ steps.public_release.outputs.install_root }}'
+
+      - name: Publish exact MCP listing using GitHub OIDC
+        if: ${{ inputs.publish_mcp_only }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" || {
+            echo "::error::Main advanced before MCP publication."
+            exit 1
+          }
+          publisher_archive="$RUNNER_TEMP/mcp-publisher.tar.gz"
+          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
+            https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz \
+            --output "$publisher_archive"
+          echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  $publisher_archive" | sha256sum --check
+          publisher_dir="$RUNNER_TEMP/mcp-publisher"
+          mkdir -p "$publisher_dir"
+          tar -xzf "$publisher_archive" -C "$publisher_dir" mcp-publisher
+          "$publisher_dir/mcp-publisher" validate "$RUNNER_TEMP/jovie-mcp-server.json"
+          "$publisher_dir/mcp-publisher" login github-oidc
+          "$publisher_dir/mcp-publisher" publish "$RUNNER_TEMP/jovie-mcp-server.json"
+          registry_result="$RUNNER_TEMP/jovie-mcp-registry-readback.json"
+          curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
+            https://registry.modelcontextprotocol.io/v0.1/servers/io.github.JovieInc%2Fjovie/versions/latest \
+            --output "$registry_result"
+          export REGISTRY_RESULT="$registry_result"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const expected = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/jovie-mcp-server.json`, 'utf8'));
+          const actual = JSON.parse(readFileSync(process.env.REGISTRY_RESULT, 'utf8'));
+          const { verifyRegistryReadback } = await import('./packages/jovie-cli/scripts/verify-published-package.mjs');
+          verifyRegistryReadback(actual, expected);
+          NODE

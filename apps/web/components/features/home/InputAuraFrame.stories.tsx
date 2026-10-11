@@ -38,11 +38,13 @@ type Story = StoryObj<typeof meta>;
 export const DefaultConic: Story = {
   args: {
     treatment: 'default',
+    children: null,
   },
 };
 
 export const Editorial: Story = {
   args: {
     treatment: 'editorial',
+    children: null,
   },
 };

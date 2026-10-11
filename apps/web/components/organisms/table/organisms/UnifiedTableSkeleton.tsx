@@ -1,6 +1,7 @@
 'use client';
 
 import type { ColumnDef, RowData } from '@/lib/tanstack-table';
+import type { TableRowMode } from '../table.styles';
 import { UnifiedTable } from './UnifiedTable';
 
 export interface UnifiedTableSkeletonProps<TData extends RowData> {
@@ -33,15 +34,22 @@ export interface UnifiedTableSkeletonProps<TData extends RowData> {
       | 'badge'
       | 'button'
       | 'release'
-      | 'meta';
+      | 'meta'
+      | 'person';
   }>;
 
   /**
    * Row height in pixels. Must match the loaded table's rowHeight to avoid
    * layout shift on data arrival.
-   * @default 32
+   * @default 40
    */
   readonly rowHeight?: number;
+
+  /**
+   * Row mode. Must match the loaded table's rowMode; it owns row and cell
+   * content height together, which a bare rowHeight cannot.
+   */
+  readonly rowMode?: TableRowMode;
 
   /**
    * Min width for table (prevents column squishing).
@@ -91,6 +99,7 @@ export function UnifiedTableSkeleton<TData extends RowData>({
   skeletonRows = 20,
   skeletonColumnConfig,
   rowHeight,
+  rowMode,
   minWidth,
   className,
   containerClassName,
@@ -104,6 +113,7 @@ export function UnifiedTableSkeleton<TData extends RowData>({
       skeletonRows={skeletonRows}
       skeletonColumnConfig={skeletonColumnConfig}
       rowHeight={rowHeight}
+      rowMode={rowMode}
       minWidth={minWidth}
       className={className}
       containerClassName={containerClassName}

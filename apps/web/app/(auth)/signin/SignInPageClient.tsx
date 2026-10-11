@@ -5,7 +5,12 @@ import { useEffect, useMemo } from 'react';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { toast } from '@/components/feedback';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
+import {
+  AuthLayout,
+  AuthOfferSummary,
+  AuthRoutePrefetch,
+  AuthShell,
+} from '@/features/auth';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
@@ -69,10 +74,10 @@ function SignInOauthErrorBanner() {
 
   return (
     <div
-      className='mb-4 rounded-sm border border-destructive/30 bg-destructive/5 px-4 py-3 text-left'
+      className='mb-4 rounded-sm border border-error/30 bg-error/5 px-4 py-3 text-left'
       role='alert'
     >
-      <p className='text-sm font-medium text-destructive'>{message}</p>
+      <p className='text-sm font-medium text-error'>{message}</p>
     </div>
   );
 }
@@ -162,7 +167,11 @@ function getFallbackRedirectUrl(
   );
 }
 
-export function SignInPageClient() {
+export function SignInPageClient({
+  showOfferSummary = false,
+}: Readonly<{
+  readonly showOfferSummary?: boolean;
+}> = {}) {
   const searchParams = useSearchParams();
   const email = searchParams.get('email')?.trim() ?? '';
   const resetConfirmed = searchParams.get('reset') === '1';
@@ -207,6 +216,7 @@ export function SignInPageClient() {
       >
         <AuthRoutePrefetch href={signUpUrl} />
         <SignInOauthErrorBanner />
+        {showOfferSummary ? <AuthOfferSummary mode='sign-in' enabled /> : null}
         <AuthShell
           mode='sign-in'
           forceOppositeModeHardNavigation

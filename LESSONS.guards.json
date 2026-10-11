@@ -1,0 +1,516 @@
+{
+  "schema": "jovie.feedback-guards/v1",
+  "reviewedOn": "2026-10-01",
+  "lessons": [
+    {
+      "fingerprint": "`captureWarning(message, context)` files Linear as `Error: {json}`",
+      "lessonSha256": "ca6053292eeb48c420f5f14ade500c9a18b72fd494b94f153575b035fab6ed69",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/lib/error-tracking.test.ts",
+          "anchor": "does not title context-only bags as Error JSON (JOV-5263)",
+          "reason": "Checks context bags do not become JSON Error titles."
+        }
+      ]
+    },
+    {
+      "fingerprint": "OAuth provider buttons use a code allowlist, not NEXT_PUBLIC kill-switches",
+      "lessonSha256": "9c89a87aa42206a966bf02978d6e0f4e28498719e22f3c8ca546d3b56d70d2ee",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/lib/auth/oauth-providers.test.ts",
+          "anchor": "is independent of NEXT_PUBLIC_CLERK_OAUTH_* env vars",
+          "reason": "Exercises provider allowlisting regardless of environment flags."
+        }
+      ]
+    },
+    {
+      "fingerprint": "YouTube vs YouTube Music are distinct ProviderKeys",
+      "lessonSha256": "ec9bb4d7902e0eab35327a382d90b566f00a8aed136c6b2a7580c556979e4380",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/lib/dsp/registry.test.ts",
+          "anchor": "resolves snake_case keys",
+          "reason": "Preserves youtube_music as its own normalized key."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/lib/dsp/registry.test.ts",
+          "anchor": "returns false for YouTube (social for dashboard routing)",
+          "reason": "Distinguishes main YouTube from streaming DSP routing."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Sidebar footer identity is one group, not two rows (JOV-5272)",
+      "lessonSha256": "4cbbc6acb29fa62c1dcc44ad1e5a9809c8e7b49440c7a489f8b1d243363d25bf",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/components/organisms/sidebar-identity-group/SidebarIdentityGroup.test.tsx",
+          "anchor": "renders exactly one identity group with sibling identity and Public Profile actions",
+          "reason": "Checks semantic group ownership and sibling actions."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/components/organisms/sidebar-identity-group/SidebarIdentityGroup.test.tsx",
+          "anchor": "is a deliberate-red split of two top-level identity groups",
+          "reason": "Retains the rejected split as the regression fixture."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Layout-stability guards must model semantic ownership, not ban all reflow",
+      "lessonSha256": "cb284b285bb0c7b99647005007f75f58049f08b6772925aae0754f85720b797c",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/design-system/layout-stability-policy.test.ts",
+          "anchor": "keeps the canonical FAQ on a collapsed, bounded disclosure contract",
+          "reason": "Checks hidden closed panels and declared disclosure ownership."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Route-level ordering tests must cover the real transaction entry point",
+      "lessonSha256": "08b833857c79b8ffe2b681abd8dd67fa39f03642b7479f31914dc9de1174d523",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/api/dashboard/profile/route-rollback.test.ts",
+          "anchor": "derives a changed avatar theme after preflight and before the write transaction",
+          "reason": "Asserts ordering at the real dashboard PUT route entry."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Repeated review comments must become durable guardrails",
+      "lessonSha256": "1134d265b7df27df9e77fe98e457b869f001249edf3faaaa99874512c12a19c0",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/code-style.md",
+          "anchor": "## Self-Improvement Loop",
+          "reason": "Requires reviewer corrections to become a scoped rule and lesson."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Windows setup must use Git Bash, not the WSL launcher",
+      "lessonSha256": "964b6f9bfd3760ecfc89707318c7a67aded0339d0bd6f111738b11ad92d6f823",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/environment.md",
+          "anchor": "On Windows PowerShell, use the wrapper so Git for Windows Bash is used (not the WSL launcher):",
+          "reason": "Directs Windows setup through the explicit Git Bash wrapper."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Staging auth must never fall back to production Clerk keys",
+      "lessonSha256": "b968cc7b0dfc92d3e72a0f092ad16428803bf30358d1f7829aad2024583824a4",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/auth.md",
+          "anchor": "**Clerk is retired.** Do not import `@clerk/*`, do not add `CLERK_*` /",
+          "reason": "Prevents reintroducing the historical Clerk remediation; active-host Better Auth guidance follows."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Stale test mocks after UI removal",
+      "lessonSha256": "7780867ee400b3ad3194025568de09d1e715f6cda0b1bd6181530abee79e8e3d",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/testing.md",
+          "anchor": "- When removing UI behavior, find and remove or rewrite its obsolete assertions",
+          "reason": "Requires test and mock cleanup with UI removal while retaining remaining behavior coverage."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Mock return types must match full hook return type",
+      "lessonSha256": "ae9fb0287cec96d784fcda36065f8ee4c090172547267dc2c3d43ff7c96542ff",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/testing.md",
+          "anchor": "- Custom-hook mocks must satisfy the complete hook return type. Include every",
+          "reason": "Requires complete hook mocks and typed fixtures rather than missing arrays."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Local auth bypass must stay host-stable",
+      "lessonSha256": "de13f0939e209523138c9d831b72c95613ce8999940510294526b35358711435",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/api/dev/test-auth-routes.test.ts",
+          "anchor": "accepts GET /enter when URL host is the bind address but Host header is loopback",
+          "reason": "Checks app-relative redirect and trusted loopback host behavior."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Next cache invalidation must stay Node-safe in shared test helpers",
+      "lessonSha256": "64af3ead0728db4959865977b27694a7bfb08e75884efbcebc7c1b28136b2f0b",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/lib/testing/test-user-provision.server.test.ts",
+          "anchor": "ignores missing Next cache context during plain Node test seeding",
+          "reason": "Accepts only the plain-Node missing-context case."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/lib/testing/test-user-provision.server.test.ts",
+          "anchor": "rethrows unexpected cache invalidation failures",
+          "reason": "Preserves failure for other invalidation errors."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Never link to `/claim` from CTAs",
+      "lessonSha256": "e565fb0035442f733ca0644314b31bb0a415bc4c98bf8e832fc858a601b3cd93",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/ui.md",
+          "anchor": "- Marketing signup CTAs use `/signup`. Do not send them to `/claim`, `/register`",
+          "reason": "Separates signup conversion from the artist claim route."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Marketing traction copy must be factual",
+      "lessonSha256": "617c632265e9a33bf9e279a47f6d4e5fb236cf509889b8e945f8b3d5c3b4c7dd",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/ui.md",
+          "anchor": "- Marketing copy must not invent adoption metrics, customer counts, waitlist sizes, or traction claims.",
+          "reason": "Requires current verified numbers or qualitative copy."
+        }
+      ]
+    },
+    {
+      "fingerprint": "CSS cache corruption after git worktree switches",
+      "lessonSha256": "0f18ff315cf35e5c45d18bd7b68f4b8fdd5d15959b706081f892a4e68ed1c3ba",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/environment.md",
+          "anchor": "- Stop the worktree's dev server before checkout, stash or stash-pop operations.",
+          "reason": "Prevents concurrent branch switching and limits cache repair to the affected worktree."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Tim White homepage identity must come from one canonical source",
+      "lessonSha256": "ce9631ad5935e8245c14ce017574df9908f8b9edc21c5dbe29d7277fc0dde345",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/home/tim-white-profile.test.ts",
+          "anchor": "uses the founder mockup avatar and canonical Spotify identity",
+          "reason": "Compares demos against canonical founder identity constants."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/home/tim-white-profile.test.ts",
+          "anchor": "keeps the homepage phone mock content aligned with the canonical profile",
+          "reason": "Checks a sibling homepage mock uses the same identity."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Calvin Harris demo content must avoid founder-name collisions",
+      "lessonSha256": "412501757bc6962560874e461b95a35a1285dbe10ddad20f994a17a02def8615",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/ui.md",
+          "anchor": "- Calvin Harris demo fixtures must not include `Blessings`, Clementine Douglas, or any Tim White credit.",
+          "reason": "Forbids the specific founder/Calvin identity collision across fixtures."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Human feedback about visual slop must become a repo rule immediately",
+      "lessonSha256": "b10ebc865151eb65af6ebbe4abd9f591b8d52cc9d43062b9cd4b058c241925a0",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/code-style.md",
+          "anchor": "## Self-Improvement Loop",
+          "reason": "Requires human corrections to become durable rules."
+        },
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/ui.md",
+          "anchor": "- When revising a marketing layout and the direction is unclear, do not add explanatory copy or chrome as a hedge.",
+          "reason": "Applies subtraction rather than reintroducing rejected decorative chrome."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Premium homepage heroes cannot hide proof below the fold",
+      "lessonSha256": "f028f370a739dfaf6f27b13ba2eb85741e64e15668a5dc85d26b0d291b28f898",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/ui.md",
+          "anchor": "- Honor the marketing registry's above-the-fold hero contract: do not use a",
+          "reason": "Binds hero composition to the registry and keeps first proof inside the opening composition."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Outbound greetings must fail safe instead of guessing names",
+      "lessonSha256": "ca4deee3be6bfc139ced0816a9662e3a463d4b4b902006126e38f485e5aa0803",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/lib/email/claim-invite-template.test.ts",
+          "anchor": "falls back to a generic greeting for symbols, emoji, and smashed names",
+          "reason": "Checks risky creator strings do not become guessed personal greetings."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/lib/email/claim-invite-followup-template.test.ts",
+          "anchor": "falls back to a generic greeting in follow-ups when the name looks like a handle",
+          "reason": "Guards the sibling follow-up template against the same regression."
+        }
+      ]
+    },
+    {
+      "fingerprint": "CSS variables in `:root` don't auto-register as Tailwind utilities",
+      "lessonSha256": "e7a3d28e613f1af86f3face0e9192e317006e944c9827f6e174d1815f3a83bbe",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/ui.md",
+          "anchor": "- Register new Tailwind v4 utility tokens in `@theme` or `@theme inline` in",
+          "reason": "Requires emitted utility registration in addition to CSS variables."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Shell canvas and card surfaces must stay separate",
+      "lessonSha256": "3c8adaa521c94acced8eeb4f59d9c753072476e1568f7de1e2aa3cf63d44f6fc",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/app/surface-elevation-guardrails.test.ts",
+          "anchor": "keeps task and preview cards off the shell canvas token",
+          "reason": "Guards card versus canvas elevation."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/app/surface-elevation-guardrails.test.ts",
+          "anchor": "routes shared shell wrappers through AppShellContentPanel",
+          "reason": "Guards canonical content wrapper ownership."
+        }
+      ]
+    },
+    {
+      "fingerprint": "AI-generated UI defaults drift toward all-caps and border-heavy layouts",
+      "lessonSha256": "a913f8de54456a87661aa3fe7ead934d7f0f494f93bf4d8180cdf48d14a70c8f",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/ui.md",
+          "anchor": "- Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move;",
+          "reason": "Forbids generic uppercase chrome and preserves explicit canonical exceptions."
+        },
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/ui.md",
+          "anchor": "- Borders are a supporting tool, not the main design language;",
+          "reason": "Keeps hierarchy in spacing, typography and surface contrast."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Hover polish must stay visual, not positional",
+      "lessonSha256": "f7b7863da7daa445b78ed1f389591f024bdf9d36139bdc2f7edb795a7b2ef70d",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/ui.md",
+          "anchor": "### No Decorative Hover Motion",
+          "reason": "Explicitly forbids decorative translate/scale while preserving intentional spatial interaction."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Windsurf IDE silently reverts external file edits",
+      "lessonSha256": "e1baa9950547534fedcdd46395050557661eb2abe0caef9578e8174fe6614e49",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/environment.md",
+          "anchor": "- Coordinate with another editor before editing a file it has open: close that",
+          "reason": "Prevents competing autosave and requires saved-file/diff readback."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Implementation PRs must not edit CHANGELOG.md (JOV-5378)",
+      "lessonSha256": "8e1fe4bb46dabf552ecba2f10c4f9cf01fcfbd3ea2ff799f21e6a362b2452bdc",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "scripts/lib/__tests__/pre-land-changelog.test.mjs",
+          "anchor": "rejects implementation diffs that add or edit CHANGELOG.md",
+          "reason": "Rejects pre-land changelog modifications."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Desktop release handoff is Linear/PR evidence, not CHANGELOG.md",
+      "lessonSha256": "2b08c020ca4d0a35644620cf263f89d4b22139ba3d9277dcbf08b047f42784d9",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "scripts/desktop-release-guard.test.mjs",
+          "anchor": "passes when desktop files defer release state to the post-land publisher",
+          "reason": "Allows source changes without release artifacts."
+        },
+        {
+          "kind": "test",
+          "path": "scripts/desktop-release-guard.test.mjs",
+          "anchor": "fails when desktop changes include a pre-land changelog artifact",
+          "reason": "Keeps desktop source subject to the pre-land artifact ban."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Local Doppler commands must pin `jovie-web/dev`",
+      "lessonSha256": "6c61a34a9f48de5d2cd9b3fac8ed0a4f72d6b9505a028b5c1f9df84a83c2af33",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/environment.md",
+          "anchor": "ALL commands that need secrets MUST be prefixed with Doppler.",
+          "reason": "Specifies the explicit jovie-web/dev wrapper rather than ambient scope."
+        }
+      ]
+    },
+    {
+      "fingerprint": "New generated Drizzle migrations must be allowed to update `_journal.json`",
+      "lessonSha256": "19fb92ce2df1a7e92cc27b6dc508952859e37c681d18bb602592c4298768450c",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/db.md",
+          "anchor": "- **ALLOW** generated append-only migration artifacts for a new migration:",
+          "reason": "Permits new SQL, snapshot and journal append while existing migrations remain immutable."
+        }
+      ]
+    },
+    {
+      "fingerprint": "`pnpm vitest --run --changed` exits 0 with no test files",
+      "lessonSha256": "c90b1224f0b0ec1f224257c16c2a3ac405b0b0637da56d3cfe08cf274bca9e41",
+      "guards": [
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/testing.md",
+          "anchor": "- Zero executed tests are not a pass receipt. For executable changes run the",
+          "reason": "Requires executed test counts and actual CI selectors, correcting the old false-pass claim."
+        }
+      ]
+    },
+    {
+      "fingerprint": "`/claim` route gating in sentry route-detector",
+      "lessonSha256": "77ec7a4f8c3ae952e65e2304a4df1994efa350fb67ee85725a90aa820fcbd7a2",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/lib/sentry/route-detector.test.ts",
+          "anchor": "should return true for explicit public route: %s",
+          "reason": "Table explicitly includes /claim as a public tracking route, independently of signup CTAs."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Optional promo fixtures must not break public CI lanes",
+      "lessonSha256": "bc87a56916bdfc7c514f5740d22621b8e9fbacac4c582685810e818a0635b108",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/e2e/seed-test-data.test.ts",
+          "anchor": "detects missing promo_downloads relation errors",
+          "reason": "Recognizes the optional missing relation."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/e2e/seed-test-data.test.ts",
+          "anchor": "does not treat unrelated missing relations as promo_downloads errors",
+          "reason": "Keeps unrelated schema failures fatal."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Playwright route-audit manifests must not crash at import time",
+      "lessonSha256": "964325af29a71fe55f1b97c8305efd1d62b22fc8c0f3fbb2d34329a36dc87fbc",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/e2e/axe-audit.spec.ts",
+          "anchor": "public surface manifests load successfully",
+          "reason": "Always registers a test that fails on manifest loading errors, even without generated routes."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Preview bypasses must not reopen production health routes",
+      "lessonSha256": "ff0a28ff9a52f48739ff59cde1543507b31b79e8812f1e13ac89be389440d977",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/api/health/auth.critical.test.ts",
+          "anchor": "blocks trusted test-bypass probes on production deploys",
+          "reason": "Checks production remains forbidden even with a resolved bypass user."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Protected deployment evidence must be one fail-closed boundary",
+      "lessonSha256": "9be675f44c4d687b00743acd245f48d1aaba53e5aad3960d1f4a75da95429411",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/ci/deploy-workflow.test.ts",
+          "anchor": "keeps Vercel secrets and runtime values out of every preview and production process argument",
+          "reason": "Checks process argument boundaries."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/ci/deploy-workflow.test.ts",
+          "anchor": "binds the exact project deployment before cookie-only canary and auth smoke",
+          "reason": "Checks exact deployment binding and canonical protected probe ownership."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/ci/deploy-workflow.test.ts",
+          "anchor": "isolates OIDC in a no-checkout attestation job and strips Git credentials from sensitive jobs",
+          "reason": "Checks workflow permission and credential isolation."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/ci/deploy-workflow.test.ts",
+          "anchor": "recovers one payload-bound interrupted marker with a full leased rerun",
+          "reason": "Checks exact marker recovery lease semantics."
+        }
+      ]
+    }
+  ]
+}

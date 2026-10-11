@@ -9,7 +9,7 @@ import {
 } from '@/lib/entity/sameAs';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { CreatorProfile, LegacySocialLink } from '@/types/db';
-import { resolveArtistEntityType } from './artist-entity';
+import { profileEntityAnchor, resolveArtistEntityType } from './artist-entity';
 import { formatSchemaEventStartDate } from './event-date';
 
 /** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
@@ -116,6 +116,24 @@ function buildDspListenActions(
   );
 }
 
+function profileEntityDescription(
+  profile: CreatorProfile,
+  profileName: string
+): string {
+  if (profile.bio) return profile.bio;
+  if (profile.creator_type === 'artist') return `Music by ${profileName}`;
+  return profileName;
+}
+
+function profileEntityGenre(
+  profile: CreatorProfile,
+  genres: string[] | null
+): string[] | undefined {
+  if (genres && genres.length > 0) return genres;
+  if (profile.creator_type === 'artist') return ['Music'];
+  return undefined;
+}
+
 function buildArtistEntitySchema(
   profile: CreatorProfile,
   artistName: string,
@@ -125,11 +143,12 @@ function buildArtistEntitySchema(
   listenActions: ReturnType<typeof buildListenActions>,
   entityMentions: readonly ProfileEntityMention[]
 ): Record<string, unknown> {
+  const genre = profileEntityGenre(profile, genres);
   return {
     '@type': resolveArtistEntityType(profile.creator_type),
-    '@id': `${profileUrl}#musicgroup`,
+    '@id': `${profileUrl}#${profileEntityAnchor(profile.creator_type)}`,
     name: artistName,
-    description: profile.bio || `Music by ${artistName}`,
+    description: profileEntityDescription(profile, artistName),
     url: profileUrl,
     ...(uniqueSocialUrls.length > 0 && { sameAs: uniqueSocialUrls }),
     ...(entityMentions.length > 0 && {
@@ -139,7 +158,7 @@ function buildArtistEntitySchema(
         url: mention.url,
       })),
     }),
-    genre: genres && genres.length > 0 ? genres : ['Music'],
+    ...(genre ? { genre } : {}),
     ...(profile.avatar_url && {
       image: {
         '@type': 'ImageObject',
@@ -170,12 +189,13 @@ function buildArtistEntitySchema(
 function buildProfilePageSchema(
   profile: CreatorProfile,
   artistName: string,
-  profileUrl: string
+  profileUrl: string,
+  entityId: string
 ): Record<string, unknown> {
   return {
     '@type': 'ProfilePage',
     '@id': `${profileUrl}#profilepage`,
-    mainEntity: { '@id': `${profileUrl}#musicgroup` },
+    mainEntity: { '@id': entityId },
     url: profileUrl,
     name: `${artistName} | Jovie`,
     ...(profile.created_at && { dateCreated: profile.created_at }),
@@ -186,7 +206,8 @@ function buildProfilePageSchema(
 function buildMusicEventSchema(
   tourDate: TourDateViewModel,
   artistName: string,
-  profileUrl: string
+  profileUrl: string,
+  entityId: string
 ): Record<string, unknown> {
   const { eventStatus, availability } = mapTicketStatus(tourDate.ticketStatus);
   const eventName = tourDate.title || `${artistName} at ${tourDate.venueName}`;
@@ -219,7 +240,7 @@ function buildMusicEventSchema(
       tourDate.timezone
     ),
     location: locationParts,
-    performer: { '@id': `${profileUrl}#musicgroup` },
+    performer: { '@id': entityId },
     eventStatus,
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
   };
@@ -277,6 +298,7 @@ export function generateProfileStructuredData(
 
   const uniqueSocialUrls = buildUniqueSocialUrls(profile, links, identityLinks);
   const listenActions = buildDspListenActions(profile, links);
+  const entityId = `${profileUrl}#${profileEntityAnchor(profile.creator_type)}`;
   const artistEntitySchema = buildArtistEntitySchema(
     profile,
     artistName,
@@ -289,7 +311,8 @@ export function generateProfileStructuredData(
   const profilePageSchema = buildProfilePageSchema(
     profile,
     artistName,
-    profileUrl
+    profileUrl,
+    entityId
   );
   const breadcrumbSchema = buildBreadcrumbObject([
     { name: 'Home', url: BASE_URL },
@@ -297,7 +320,9 @@ export function generateProfileStructuredData(
   ]);
   const eventSchemas = tourDates
     .slice(0, MAX_EVENT_SCHEMAS)
-    .map(tourDate => buildMusicEventSchema(tourDate, artistName, profileUrl));
+    .map(tourDate =>
+      buildMusicEventSchema(tourDate, artistName, profileUrl, entityId)
+    );
 
   return {
     '@context': 'https://schema.org',

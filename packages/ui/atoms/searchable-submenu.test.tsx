@@ -44,6 +44,18 @@ function getItemButton(container: HTMLElement, label: string): HTMLElement {
 }
 
 describe('SearchableList', () => {
+  it('keeps option IDs unique across instances and exposes disabled options', () => {
+    const items = [{ id: 'same', label: 'Unavailable', disabled: true }];
+    render(
+      <>
+        <SearchableList items={items} onSelect={vi.fn()} />
+        <SearchableList items={items} onSelect={vi.fn()} />
+      </>
+    );
+    const options = screen.getAllByRole('option', { name: 'Unavailable' });
+    expect(new Set(options.map(option => option.id)).size).toBe(2);
+    for (const option of options) expect(option).toBeDisabled();
+  });
   describe('Rendering', () => {
     it('renders all items as options in accessible select', () => {
       render(<SearchableList items={sampleItems} onSelect={vi.fn()} />);

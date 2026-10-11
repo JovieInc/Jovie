@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChangelogParseResult } from '@/lib/changelog-parser';
 
 const SNAPSHOT: ChangelogParseResult = {
@@ -50,6 +50,26 @@ const SNAPSHOT: ChangelogParseResult = {
   ],
 };
 
+function reviewedSnapshot(
+  snapshot: ChangelogParseResult
+): ChangelogParseResult {
+  return {
+    ...snapshot,
+    releases: snapshot.releases.map(release => ({
+      ...release,
+      customerOutcomes: Object.fromEntries(
+        Object.values(release.sections)
+          .flat()
+          .map(text => [
+            text,
+            { availability: 'unverified' as const, prerequisites: [] },
+          ])
+      ),
+    })),
+  };
+}
+let currentSnapshot = reviewedSnapshot(SNAPSHOT);
+
 vi.mock('next/link', () => ({
   default: ({
     href,
@@ -66,7 +86,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('@/lib/changelog-source', () => ({
-  getChangelogSnapshot: async () => SNAPSHOT,
+  getChangelogSnapshot: async () => reviewedSnapshot(currentSnapshot),
 }));
 
 vi.mock('@/components/marketing/changelog/ChangelogSubscribeColumn', () => ({
@@ -80,6 +100,41 @@ vi.mock('@/components/site/MarketingFooterCta', () => ({
 import ChangelogPage, { metadata } from './page';
 
 describe('public changelog page', () => {
+  beforeEach(() => {
+    currentSnapshot = reviewedSnapshot(SNAPSHOT);
+  });
+  it('does not describe older empty slots as newer than a published daily update', async () => {
+    currentSnapshot = {
+      ...SNAPSHOT,
+      releases: [
+        {
+          ...SNAPSHOT.releases[0],
+          version: '2026-10-02',
+          kind: 'daily',
+          date: '2026-10-02',
+        },
+      ],
+    };
+    render(await ChangelogPage());
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'October 2026' })).toBeVisible();
+  });
+  it.each(['empty', 'undated'] as const)(
+    'reports %s publication without inventing a date or update',
+    async kind => {
+      currentSnapshot = {
+        ...SNAPSHOT,
+        releases:
+          kind === 'empty' ? [] : [{ ...SNAPSHOT.releases[0], date: '' }],
+      };
+      render(await ChangelogPage());
+      expect(screen.getByRole('status')).toHaveTextContent(
+        kind === 'empty'
+          ? 'No customer updates have been published yet.'
+          : 'The latest published update is listed below.'
+      );
+    }
+  );
   it('keeps one customer-facing heading and discloses unpublished source slots', async () => {
     render(await ChangelogPage());
 
@@ -93,7 +148,7 @@ describe('public changelog page', () => {
     expect(
       screen.getByLabelText('Subscribe To Changelog Updates')
     ).toBeVisible();
-    expect(screen.getAllByText('Product update')).toHaveLength(2);
+    expect(screen.queryByText('Product update')).not.toBeInTheDocument();
   });
 
   it('uses a descriptive product-update title for search and sharing', () => {

@@ -5,6 +5,7 @@ import {
   parseOvieCertificationDecisionRequest,
   recordOvieCertificationDecision,
 } from '@/lib/ovie/certifications/inventory.server';
+import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,8 @@ function json(body: Record<string, unknown>, status: number) {
  * reviewer identity always comes from the session, never from the body.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const denied = await requireOvieApiAccess({ privileged: true });
+  if (denied) return denied;
   if (request.headers.get('authorization')) {
     return json(
       {

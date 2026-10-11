@@ -113,7 +113,7 @@ const TOOLBAR_STORAGE_KEY = '__dev_toolbar_open';
 const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 
 const ENV_COLORS: Record<string, string> = {
-  production: 'bg-red-500/20 text-red-400 border-red-500/30',
+  production: 'bg-error/20 text-error border-error/30',
   preview: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
 };
 
@@ -194,7 +194,7 @@ const PROMOTE_LABELS: Record<PromoteState, string> = {
 
 function getPromoteButtonColor(state: PromoteState): string {
   if (state === 'done') return 'text-accent';
-  if (state === 'error') return 'text-red-400';
+  if (state === 'error') return 'text-error';
   return 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10';
 }
 
@@ -274,6 +274,18 @@ export function DevToolbar({
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
   const [copiedField, setCopiedField] = useState<'sha' | 'route' | null>(null);
+  const clipboardMountedRef = useRef(false);
+  const clipboardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    clipboardMountedRef.current = true;
+    return () => {
+      clipboardMountedRef.current = false;
+      if (clipboardTimerRef.current !== null) {
+        clearTimeout(clipboardTimerRef.current);
+        clipboardTimerRef.current = null;
+      }
+    };
+  }, []);
   const [syncClerkState, setSyncClerkState] = useState<
     'idle' | 'loading' | 'done' | 'noop' | 'error'
   >('idle');
@@ -654,8 +666,15 @@ export function DevToolbar({
   async function copyToClipboard(text: string, field: 'sha' | 'route') {
     try {
       await navigator.clipboard.writeText(text);
+      if (!clipboardMountedRef.current) return;
+      if (clipboardTimerRef.current !== null) {
+        clearTimeout(clipboardTimerRef.current);
+      }
       setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 1500);
+      clipboardTimerRef.current = setTimeout(() => {
+        clipboardTimerRef.current = null;
+        setCopiedField(null);
+      }, 1500);
     } catch {
       // Clipboard not available — fail silently
     }
@@ -1170,7 +1189,7 @@ export function DevToolbar({
                   )}
 
                   {personaError && (
-                    <div className='border-t border-subtle px-3 py-2 text-3xs text-red-400'>
+                    <div className='border-t border-subtle px-3 py-2 text-3xs text-error'>
                       {personaError}
                     </div>
                   )}

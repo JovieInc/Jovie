@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getAccountMetricCohort,
   getEmailDomain,
   getEmailSendBlockReason,
+  INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN,
   isInternalOrTestAccountEmail,
   isReservedTestEmailDomain,
   normalizeEmail,
@@ -50,6 +52,12 @@ describe('isInternalOrTestAccountEmail', () => {
     ['demo@jov.ie', 'demo local part'],
     ['dualipa-public@jov.ie', 'demo placeholder suffix'],
     ['seeded@data.test', 'reserved .test domain'],
+    ['auth-surface-qa+clerk_test@test.jovie.com', 'dogfood QA domain'],
+    ['money-referrer-123@test.jovie.com', 'e2e dogfood email'],
+    ['anyone@staging.test.jovie.com', 'dogfood subdomain'],
+    ['dogfood-tim@gmail.com', 'dogfood local part on external domain'],
+    ['canary+synthetic-grokbot@mail.example', 'synthetic principal tag'],
+    ['ops+synthetic-muse-run7@gmail.com', 'synthetic tag on external domain'],
   ])('excludes %s (%s)', email => {
     expect(isInternalOrTestAccountEmail(email)).toBe(true);
   });
@@ -58,6 +66,8 @@ describe('isInternalOrTestAccountEmail', () => {
     ['artist@band.com'],
     ['fan.name@gmail.com'],
     ['latest.music@outlook.com'],
+    ['synthetic-fan@gmail.com'],
+    ['fan+synthetic@gmail.com'],
     ['contestant@exampled.com'],
     [' publicist@label.co '],
     [null],
@@ -65,5 +75,45 @@ describe('isInternalOrTestAccountEmail', () => {
     ['not-an-email'],
   ])('keeps %s as an external account', email => {
     expect(isInternalOrTestAccountEmail(email)).toBe(false);
+  });
+
+  // INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN is the Postgres `~*` copy of the JS
+  // classifier. Both must agree or SQL aggregate counts would diverge from
+  // per-row filtering (JOV-7362).
+  const sqlPattern = new RegExp(INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN, 'i');
+
+  it.each([
+    ['tim@jov.ie'],
+    ['auth-surface-qa+clerk_test@test.jovie.com'],
+    ['money-referrer-123@test.jovie.com'],
+    ['anyone@staging.test.jovie.com'],
+    ['e2e-42@jov.ie'],
+    ['dogfood-tim@gmail.com'],
+    ['dualipa-public@jov.ie'],
+    ['seeded@data.test'],
+    ['canary+synthetic-grokbot@mail.example'],
+    ['ops+synthetic-muse-run7@gmail.com'],
+  ])('SQL pattern excludes %s', email => {
+    expect(sqlPattern.test(email.toLowerCase())).toBe(true);
+  });
+
+  it.each([
+    ['artist@band.com'],
+    ['fan.name@gmail.com'],
+    ['quality@band.com'],
+    ['synthetic-fan@gmail.com'],
+    ['fan+synthetic@gmail.com'],
+  ])('SQL pattern keeps %s external', email => {
+    expect(sqlPattern.test(email.toLowerCase())).toBe(false);
+  });
+});
+
+describe('getAccountMetricCohort', () => {
+  it('separates customers, synthetic principals, and unknown traffic', () => {
+    expect(getAccountMetricCohort('artist@band.com')).toBe('customer');
+    expect(getAccountMetricCohort('auth-surface-qa@test.jovie.com')).toBe(
+      'synthetic'
+    );
+    expect(getAccountMetricCohort(null)).toBe('unattributed');
   });
 });

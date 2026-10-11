@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/admin';
 import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 
 const VERCEL_API = 'https://api.vercel.com';
@@ -15,7 +15,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  * Requires: Admin privileges
  */
 export async function GET() {
-  const authError = await requireAdmin();
+  const authError = await requireOvieApiAccess();
   if (authError) return authError;
 
   const token = env.VERCEL_API_TOKEN;

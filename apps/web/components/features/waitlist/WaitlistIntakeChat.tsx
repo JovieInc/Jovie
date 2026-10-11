@@ -383,7 +383,7 @@ export function WaitlistIntakeChat({
               className='border-t border-white/[0.07] p-3 sm:p-4'
             >
               {error ? (
-                <p className='mb-2 text-app text-red-300' role='alert'>
+                <p className='mb-2 text-app text-error' role='alert'>
                   {error}
                 </p>
               ) : null}

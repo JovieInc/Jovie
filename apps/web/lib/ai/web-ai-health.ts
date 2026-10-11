@@ -106,6 +106,9 @@ const healthObjectSchema = z.object({
 });
 
 const PROBE_TIMEOUT_MS = 30_000;
+// GLM-5.3 always reasons, and Gateway counts reasoning against this ceiling.
+// Keep the probe cheap while leaving enough room for final text/JSON output.
+const PROBE_MAX_OUTPUT_TOKENS = 1_024;
 
 export type ExecuteWebAiHealthProbe = (
   definition: WebAiHealthProbeDefinition
@@ -222,6 +225,8 @@ export async function executeWebAiHealthProbe(
     prompt: definition.prompt,
     temperature: 0,
     maxRetries: 0,
+    maxOutputTokens: PROBE_MAX_OUTPUT_TOKENS,
+    reasoning: 'low',
     abortSignal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     experimental_telemetry: {
       functionId: `jovie-web-ai-health-${definition.surface}`,
@@ -229,19 +234,18 @@ export async function executeWebAiHealthProbe(
   } as const;
 
   if (definition.mode === 'stream') {
-    const result = streamText({ ...common, maxOutputTokens: 12 });
+    const result = streamText(common);
     return result.text;
   }
 
   if (definition.mode === 'text') {
-    const result = await generateText({ ...common, maxOutputTokens: 12 });
+    const result = await generateText(common);
     return result.text;
   }
 
   const result = await generateObject({
     ...common,
     schema: healthObjectSchema,
-    maxOutputTokens: 40,
   });
   return result.object.response;
 }

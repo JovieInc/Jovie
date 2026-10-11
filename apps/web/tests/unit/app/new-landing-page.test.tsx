@@ -1,8 +1,10 @@
 import { render, screen } from '@testing-library/react';
-import Link from 'next/link';
 import { describe, expect, it, vi } from 'vitest';
 import NewLandingPage from '@/app/(marketing)/new/page';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+import { APP_ROUTES } from '@/constants/routes';
+
+const redirectMock = vi.hoisted(() => vi.fn());
 
 // Enable center nav here so this test can assert the canonical public nav.
 vi.mock('@/lib/flags/marketing-static', async importOriginal => {
@@ -18,23 +20,6 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
   };
 });
 
-vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
-  HomepageV2Route: () => (
-    <main data-testid='homepage-v2-route'>
-      <h1>Make every release feel bigger.</h1>
-      <Link data-testid='homepage-v2-hero-primary-cta' href='/signup'>
-        Get started
-      </Link>
-      <Link href='/artist-profiles'>Explore artist profiles</Link>
-      <h2>One system for the whole release cycle.</h2>
-      <h2>Artist profiles built to convert.</h2>
-      <h2>Capture every fan. Send them every release automatically.</h2>
-      <h2>Pricing.</h2>
-      <div data-testid='homepage-v2-release-pages-preview'>Preview</div>
-    </main>
-  ),
-}));
-
 vi.mock('@/constants/app', async importOriginal => {
   const actual = await importOriginal<typeof import('@/constants/app')>();
   return {
@@ -45,6 +30,10 @@ vi.mock('@/constants/app', async importOriginal => {
 });
 
 vi.mock('next/navigation', () => ({
+  redirect: (url: string) => {
+    redirectMock(url);
+    throw new Error('NEXT_REDIRECT');
+  },
   usePathname: () => '/new',
   useRouter: () => ({
     push: vi.fn(),
@@ -76,46 +65,7 @@ describe('NewLandingPage', () => {
       screen.getByRole('link', { name: 'Request access' })
     ).toHaveAttribute('href', '/signup');
 
-    render(<NewLandingPage />);
-
-    expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: 'Make every release feel bigger.',
-      })
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-v2-hero-primary-cta')).toHaveAttribute(
-      'href',
-      '/signup'
-    );
-    expect(
-      screen.getByRole('link', { name: 'Explore artist profiles' })
-    ).toHaveAttribute('href', '/artist-profiles');
-    expect(
-      screen.getByRole('heading', {
-        name: 'One system for the whole release cycle.',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        name: 'Artist profiles built to convert.',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        name: 'Capture every fan. Send them every release automatically.',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        name: 'Pricing.',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('homepage-v2-release-pages-preview')
-    ).toHaveTextContent('Preview');
-    expect(
-      screen.queryByRole('heading', { name: 'Real artists. Real workflows.' })
-    ).not.toBeInTheDocument();
+    expect(() => render(<NewLandingPage />)).toThrow('NEXT_REDIRECT');
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.HOME);
   });
 });

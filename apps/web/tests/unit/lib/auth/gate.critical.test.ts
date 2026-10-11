@@ -436,6 +436,40 @@ describe('@critical gate.ts (Better Auth)', () => {
     });
   });
 
+  it('keeps the synthetic visual-capture session when waitlist gate lookup throws (JOV-7126 producer, no NEXT_PUBLIC_E2E_MODE)', async () => {
+    // The screen-certification producer (JOV-7126) is a second secretless
+    // capture caller. It authenticates via the server-only
+    // E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH signal instead of the client-inlined
+    // NEXT_PUBLIC_E2E_MODE flag PR visual review uses, so it must not need
+    // NEXT_PUBLIC_E2E_MODE to reach the same fallback.
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH', '1');
+    vi.stubEnv('VERCEL_ENV', 'development');
+    mockGetCachedDevTestAuthSession.mockResolvedValue({
+      dbUserId: 'ba_admin',
+      clerkUserId: 'ba_admin',
+      email: 'browse-admin+clerk_test@jov.ie',
+      persona: 'admin',
+      isAdmin: true,
+    });
+    mockIsWaitlistGateEnabled.mockRejectedValue(
+      new Error('database unavailable in visual capture')
+    );
+    mockDbSelect.mockReturnValue(
+      chainLimitRejecting(new Error('database unavailable in visual capture'))
+    );
+
+    const result = await resolveUserState({
+      knownClerkUserId: 'ba_admin',
+    });
+
+    expect(result).toMatchObject({
+      state: CanonicalUserState.ACTIVE,
+      clerkUserId: 'ba_admin',
+      dbUserId: '00000000-0000-4000-8000-000000000101',
+    });
+  });
+
   it('still fails closed when waitlist gate lookup throws outside E2E fallback', async () => {
     mockGetSession.mockResolvedValue({
       user: { id: 'ba_live', email: 'live@example.com' },

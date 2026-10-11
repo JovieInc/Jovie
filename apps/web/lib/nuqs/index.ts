@@ -85,6 +85,7 @@ export {
   type AnalyticsRange,
   type AnalyticsView,
   type AudienceFilter,
+  type AudiencePanel,
   type AudienceSortField,
   type AudienceView,
   adminAssetIssuesFilters,
@@ -121,12 +122,15 @@ export {
   analyticsViewParser,
   analyticsViews,
   audienceFilters,
+  audiencePanelParser,
+  audiencePanels,
   audienceSearchParams,
   // Audience table
   audienceSortFields,
   audienceSortParser,
   audienceViewParser,
   audienceViews,
+  founderFunnelRangeParser,
   type ProfileMode,
   // Base parsers
   pageParser,

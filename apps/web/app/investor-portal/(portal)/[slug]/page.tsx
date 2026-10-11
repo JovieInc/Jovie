@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 import { getInvestorManifest } from '@/lib/investors/manifest';
 import { getInvestorPortalAccess } from '@/lib/investors/portal-access';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { MemoContent } from '../../_components/MemoContent';
 
 interface PageProps {
@@ -59,7 +60,7 @@ export async function generateMetadata({
 
   return {
     title: page ? `${page.title} — Jovie Investors` : 'Not Found',
-    robots: { index: false, follow: false },
+    robots: NOINDEX_ROBOTS,
   };
 }
 

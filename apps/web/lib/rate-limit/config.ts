@@ -455,6 +455,21 @@ export const RATE_LIMITERS = {
     requireRedis: true,
   } satisfies RateLimitConfig,
 
+  /**
+   * Anonymous creator extraction (GET /api/agents/creator-lookup): 60 per hour
+   * per IP. Each request performs one bounded fetch to a supported platform.
+   */
+  agentCreatorLookup: {
+    name: 'Agent Creator Lookup',
+    limit: 60,
+    window: '1 h',
+    prefix: 'public:agent-creator-lookup',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
   /** Public click: 50 requests per minute per IP */
   publicClick: {
     name: 'Public Click',
@@ -497,6 +512,22 @@ export const RATE_LIMITERS = {
   } satisfies RateLimitConfig,
 
   /**
+   * Investor-portal token validation: 30 attempts per minute per IP.
+   * Each attempt is a DB-backed token lookup, so the dedicated bucket bounds
+   * brute-force token guessing whether the token arrives via ?t= or cookie.
+   */
+  investorPortalToken: {
+    name: 'Investor Portal Token',
+    limit: 30,
+    window: '1 m',
+    prefix: 'public:investor-portal-token',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /**
    * Private library share link reads: 30 requests per minute per IP.
    * This token-bearing RSC surface performs database reads for both metadata
    * and page content, so it needs a dedicated bucket before either lookup.
@@ -506,6 +537,30 @@ export const RATE_LIMITERS = {
     limit: 30,
     window: '1 m',
     prefix: 'public:library-asset-share',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /** Public rider reads/exports: 30/min per IP. */
+  riderPublicAccess: {
+    name: 'Rider Public Access',
+    limit: 30,
+    window: '1 m',
+    prefix: 'public:rider-access',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /** Rider password unlocks: 10/10min per IP+profile; fail-closed. */
+  riderUnlock: {
+    name: 'Rider Unlock',
+    limit: 10,
+    window: '10 m',
+    prefix: 'public:rider-unlock',
     analytics: false,
     algorithm: 'fixed-window',
     trafficClass: 'anonymous',

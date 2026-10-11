@@ -1,12 +1,15 @@
 'use client';
 
 import {
+  buildDesktopAuthLoopbackUrl,
   buildElectronAuthCompleteUrl,
   buildIosAuthCompleteUrl,
   type ElectronAuthCompleteProtocol,
   getElectronAuthCompleteProtocolForOrigin,
+  isValidNativeAttempt,
   NATIVE_HANDBACK_BOUNCE_PATHS,
   type NativeAuthClient,
+  parseDesktopLoopbackPortParam,
 } from '@jovie/auth-routing';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
@@ -70,7 +73,15 @@ function NativeReturnContent() {
   const nativeReturnParams = useMemo(() => {
     const code = sanitizeExchangeCode(searchParams.get('code'));
     const state = sanitizeExchangeCode(searchParams.get('state'));
-    if (!code || !state) return null;
+    const attempts = searchParams.getAll('native_attempt');
+    const nativeAttempt = attempts[0];
+    if (
+      !code ||
+      !state ||
+      attempts.length > 1 ||
+      !isValidNativeAttempt(client, nativeAttempt)
+    )
+      return null;
 
     const rawDesktopFlow = searchParams.get('desktop_flow');
     const desktopFlow =
@@ -78,8 +89,8 @@ function NativeReturnContent() {
         ? rawDesktopFlow
         : null;
 
-    return { code, state, desktopFlow };
-  }, [searchParams]);
+    return { code, state, desktopFlow, nativeAttempt };
+  }, [client, searchParams]);
 
   // Fallback when the deep link cannot reach the app: the user types this
   // into the Mac app, which redeems it with its own PKCE verifier.
@@ -100,6 +111,35 @@ function NativeReturnContent() {
       protocol,
     });
   }, [client, nativeReturnParams, protocol]);
+
+  // RFC 8252 section 7.3 loopback return: when the pending app advertised a
+  // 127.0.0.1 listener at /auth/start, hand it the same code/state pair the
+  // deep link carries. A fetch (not a top-level navigation) so sign-in done
+  // on another device — where nothing is listening — still shows the return
+  // code instead of a browser error page. Same-device by construction.
+  const loopbackUrl = useMemo(() => {
+    if (client !== 'electron' || !nativeReturnParams) return null;
+    const port = parseDesktopLoopbackPortParam(
+      searchParams.get('loopback_port')
+    );
+    if (!port) return null;
+    return buildDesktopAuthLoopbackUrl({ ...nativeReturnParams, port });
+  }, [client, nativeReturnParams, searchParams]);
+
+  useEffect(() => {
+    if (!loopbackUrl || typeof globalThis.fetch !== 'function') return;
+    const controller = new AbortController();
+    globalThis
+      .fetch(loopbackUrl, {
+        credentials: 'omit',
+        signal: controller.signal,
+      })
+      .catch(() => {
+        // App not listening (finished on another device, or an older app).
+        // The deep link and return code still cover the handback.
+      });
+    return () => controller.abort();
+  }, [loopbackUrl]);
 
   return (
     <main className='grid min-h-dvh place-items-center bg-base px-6 text-primary-token'>

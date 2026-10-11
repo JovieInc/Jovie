@@ -4,6 +4,7 @@
  * Lightweight metadata-first extraction using OpenGraph tags.
  */
 
+import { disabledSocialHtmlDocument } from '@/lib/ingestion/social-html-policy';
 import type { ExtractionResult } from '../types';
 import {
   createExtractionResult,
@@ -12,7 +13,6 @@ import {
   extractMetaContent,
   extractOpenGraphProfile,
   type FetchOptions,
-  fetchDocument,
   type StrategyConfig,
   validatePlatformUrl,
 } from './base';
@@ -48,24 +48,14 @@ export function extractTwitterHandle(url: string): string | null {
 
 export async function fetchTwitterDocument(
   sourceUrl: string,
-  options?: FetchOptions
+  _options?: FetchOptions
 ): Promise<string> {
   const validated = validateTwitterUrl(sourceUrl);
   if (!validated) {
     throw new ExtractionError('Invalid Twitter profile URL', 'INVALID_URL');
   }
 
-  const { html } = await fetchDocument(validated, {
-    ...options,
-    timeoutMs: TWITTER_CONFIG.defaultTimeoutMs,
-    headers: {
-      Accept: 'text/html,application/xhtml+xml',
-      ...options?.headers,
-    },
-    allowedHosts: TWITTER_CONFIG.validHosts,
-  });
-
-  return html;
+  return disabledSocialHtmlDocument();
 }
 
 export function extractTwitter(html: string): ExtractionResult {

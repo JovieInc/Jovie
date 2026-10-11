@@ -19,8 +19,8 @@ const APP_ORIGIN = 'https://jov.ie';
 const HUD_URL = 'https://jov.ie/hud';
 const APP_URL = 'https://jov.ie/app/chat';
 
-const hudContents = { getURL: () => HUD_URL };
-const appContents = { getURL: () => APP_URL };
+const hudContents = { getURL: () => HUD_URL, isDestroyed: () => false };
+const appContents = { getURL: () => APP_URL, isDestroyed: () => false };
 const foreignContents = { getURL: () => 'https://evil.example/hud' };
 
 test('permission origin is trusted only for the exact app origin', () => {
@@ -128,33 +128,39 @@ test('media classifiers distinguish audio-only requests from screen capture', ()
   expect(isDisplayCapturePermission('media')).toBe(false);
 });
 
+const hudDetails = {
+  requestingUrl: HUD_URL,
+  securityOrigin: APP_ORIGIN,
+  isMainFrame: true,
+};
+
 test('HUD screen permission grants display-capture and screen media on a trusted capture route', () => {
   const request = {
     parseUrl,
     appOrigin: APP_ORIGIN,
-    webContents: null,
-    requestingOrigin: HUD_URL,
+    webContents: hudContents as never,
+    requestingOrigin: APP_ORIGIN,
   };
 
   expect(
     shouldGrantTrustedHudScreenPermission({
       ...request,
       permission: 'display-capture',
-      details: {},
+      details: hudDetails,
     })
   ).toBe(true);
   expect(
     shouldGrantTrustedHudScreenPermission({
       ...request,
       permission: 'media',
-      details: { mediaTypes: ['video'] },
+      details: { ...hudDetails, mediaTypes: ['video'] },
     })
   ).toBe(true);
   expect(
     shouldGrantTrustedHudScreenPermission({
       ...request,
       permission: 'media',
-      details: { mediaTypes: ['audio', 'video'] },
+      details: { ...hudDetails, mediaTypes: ['audio', 'video'] },
     })
   ).toBe(true);
 });
@@ -163,8 +169,8 @@ test('HUD screen permission denies untrusted origins, non-capture routes, and no
   const request = {
     parseUrl,
     appOrigin: APP_ORIGIN,
-    webContents: null,
-    requestingOrigin: HUD_URL,
+    webContents: hudContents as never,
+    requestingOrigin: APP_ORIGIN,
   };
 
   expect(
@@ -172,41 +178,41 @@ test('HUD screen permission denies untrusted origins, non-capture routes, and no
       ...request,
       requestingOrigin: 'https://evil.example/hud',
       permission: 'display-capture',
-      details: {},
+      details: hudDetails,
     })
   ).toBe(false);
   expect(
     shouldGrantTrustedHudScreenPermission({
       ...request,
-      requestingOrigin: APP_URL,
+      requestingOrigin: APP_ORIGIN,
       permission: 'display-capture',
-      details: {},
+      details: { ...hudDetails, requestingUrl: APP_URL },
     })
   ).toBe(false);
   expect(
     shouldGrantTrustedHudScreenPermission({
       ...request,
       permission: 'media',
-      details: { mediaTypes: ['audio'] },
+      details: { ...hudDetails, mediaTypes: ['audio'] },
     })
   ).toBe(false);
   expect(
     shouldGrantTrustedHudScreenPermission({
       ...request,
       permission: 'clipboard-read',
-      details: {},
+      details: hudDetails,
     })
   ).toBe(false);
 });
 
-test('HUD screen permission resolves the capture route from webContents when no requesting origin is given', () => {
+test('HUD screen permission uses explicit document attribution even without the optional requesting origin', () => {
   expect(
     shouldGrantTrustedHudScreenPermission({
       parseUrl,
       appOrigin: APP_ORIGIN,
       webContents: hudContents as never,
       permission: 'display-capture',
-      details: {},
+      details: hudDetails,
     })
   ).toBe(true);
   expect(
@@ -215,7 +221,7 @@ test('HUD screen permission resolves the capture route from webContents when no 
       appOrigin: APP_ORIGIN,
       webContents: appContents as never,
       permission: 'display-capture',
-      details: {},
+      details: hudDetails,
     })
   ).toBe(false);
 });
@@ -224,37 +230,37 @@ test('permission-check variants apply the same trusted capture-route contract', 
   const check = {
     parseUrl,
     appOrigin: APP_ORIGIN,
-    webContents: null,
-    requestingOrigin: HUD_URL,
+    webContents: hudContents as never,
+    requestingOrigin: APP_ORIGIN,
   };
 
   expect(
     shouldGrantTrustedHudScreenPermissionCheck({
       ...check,
       permission: 'displayCapture',
-      details: {},
+      details: hudDetails,
     })
   ).toBe(true);
   expect(
     shouldGrantTrustedHudScreenPermissionCheck({
       ...check,
       permission: 'media',
-      details: { mediaType: 'video' },
+      details: { ...hudDetails, mediaType: 'video' },
     })
   ).toBe(true);
   expect(
     shouldGrantTrustedHudScreenPermissionCheck({
       ...check,
       permission: 'media',
-      details: { mediaType: 'audio' },
+      details: { ...hudDetails, mediaType: 'audio' },
     })
   ).toBe(false);
   expect(
     shouldGrantTrustedHudScreenPermissionCheck({
       ...check,
-      requestingOrigin: APP_URL,
+      requestingOrigin: APP_ORIGIN,
       permission: 'displayCapture',
-      details: {},
+      details: { ...hudDetails, requestingUrl: APP_URL },
     })
   ).toBe(false);
   expect(
@@ -262,7 +268,7 @@ test('permission-check variants apply the same trusted capture-route contract', 
       ...check,
       requestingOrigin: 'https://evil.example/hud',
       permission: 'media',
-      details: { mediaType: 'video' },
+      details: { ...hudDetails, mediaType: 'video' },
     })
   ).toBe(false);
 });
@@ -328,4 +334,92 @@ test('audio permission grants mic for trusted audio-only media on any app route 
       details: { mediaType: 'audio' },
     })
   ).toBe(false);
+});
+
+const hudRequest = {
+  parseUrl,
+  appOrigin: APP_ORIGIN,
+  webContents: hudContents as never,
+  requestingOrigin: APP_ORIGIN,
+};
+
+test('screen admission denies missing, stale, foreign and subframe attribution before native selection', () => {
+  for (const overrides of [
+    { webContents: null },
+    {
+      webContents: { getURL: () => HUD_URL, isDestroyed: () => true } as never,
+    },
+    { webContents: appContents as never },
+    { requestingOrigin: 'https://evil.example' },
+    { details: { ...hudDetails, requestingUrl: 'https://evil.example/hud' } },
+    { details: { ...hudDetails, requestingUrl: APP_URL } },
+    { details: { ...hudDetails, requestingUrl: `${HUD_URL}x` } },
+    { details: { ...hudDetails, requestingUrl: `${HUD_URL}?old=1` } },
+    { details: { ...hudDetails, securityOrigin: 'https://evil.example' } },
+    { details: { ...hudDetails, securityOrigin: 42 } },
+    { details: { ...hudDetails, isMainFrame: false } },
+    { details: { requestingUrl: HUD_URL } },
+    { details: { isMainFrame: true } },
+    { details: null },
+  ]) {
+    const input = {
+      ...hudRequest,
+      permission: 'display-capture',
+      details: hudDetails,
+      ...overrides,
+    };
+    expect(shouldGrantTrustedHudScreenPermission(input)).toBe(false);
+    expect(shouldGrantTrustedHudScreenPermissionCheck(input)).toBe(false);
+  }
+});
+
+test('empty-device support does not accept missing or malformed lists or change audio/video classification', () => {
+  for (const mediaTypes of [
+    undefined,
+    null,
+    'video',
+    {},
+    ['audio'],
+    ['unknown'],
+  ]) {
+    expect(
+      shouldGrantTrustedHudScreenPermission({
+        ...hudRequest,
+        permission: 'media',
+        details: { ...hudDetails, mediaTypes },
+      })
+    ).toBe(false);
+  }
+  expect(
+    shouldGrantTrustedHudScreenPermission({
+      ...hudRequest,
+      permission: 'clipboard-read',
+      details: hudDetails,
+    })
+  ).toBe(false);
+  expect(
+    shouldGrantTrustedHudScreenPermissionCheck({
+      ...hudRequest,
+      permission: 'media',
+      details: { ...hudDetails, mediaType: 'audio' },
+    })
+  ).toBe(false);
+  expect(isScreenMediaPermissionRequest({ mediaTypes: [] })).toBe(false);
+  expect(
+    shouldGrantTrustedAudioPermission({
+      ...hudRequest,
+      permission: 'media',
+      details: { ...hudDetails, mediaTypes: [] },
+    })
+  ).toBe(false);
+});
+
+test('empty-device display request is allowed for the current HUD document', () => {
+  expect(
+    shouldGrantTrustedHudScreenPermission({
+      ...hudRequest,
+      permission: 'media',
+      details: { ...hudDetails, mediaTypes: [] },
+    })
+  ).toBe(true);
 });

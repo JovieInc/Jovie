@@ -27,6 +27,20 @@ const MAX_AGE = 24 * 60 * 60_000;
 // viewports x PNG/receipt). Keep modest headroom while rejecting zip bombs.
 const MAX_ARCHIVE_MEMBERS = 256;
 const MAX_EXTRACTED_ARTIFACT_BYTES = 512 * 1024 * 1024;
+// JOV-INV-018 incident (2026-09-28): `spawnSync`'s default-scoped 32MB
+// stdout cap silently killed `gh api .../zip` once the marketing bundle
+// (60 routes x two viewports of full-page PNGs) grew past ~33MB — observed
+// at 163MB. The kill sets `status: null`, so `run()` threw the generic
+// 'controlled transport unavailable', which every caller reported as
+// "controlled GitHub artifact resolver is unavailable" for every screen
+// routed through that artifact, masking real per-screen findings (or a
+// real pass) behind a misleading transport error. The download transport
+// must never be the tightest ceiling in this pipeline: extraction already
+// owns the authoritative zip-bomb limit via MAX_EXTRACTED_ARTIFACT_BYTES,
+// so give the raw (already PNG-compressed, so barely smaller) download the
+// same ceiling plus headroom rather than an arbitrary lower one.
+const MAX_ARTIFACT_DOWNLOAD_BYTES =
+  MAX_EXTRACTED_ARTIFACT_BYTES + 128 * 1024 * 1024;
 const validId = value => Number.isSafeInteger(value) && value > 0;
 const isObject = value =>
   value && typeof value === 'object' && !Array.isArray(value);
@@ -51,16 +65,23 @@ const paths = value =>
 const equal = (left, right) =>
   left?.length === right?.length &&
   left.every((value, index) => value === right[index]);
+// JOV-7126: a proof route can carry a query string (e.g. `/hud?fs=1`, the
+// isolated-chrome mode of a screen whose default route renders something
+// else entirely). `expectedRoute` is parsed the same way so a bare route
+// (every other screen) still requires an exactly empty search string —
+// this only widens what an exact, caller-declared query can additionally
+// match, never what an empty one does.
 const validLocalFinalUrl = (value, expectedRoute) => {
   if (typeof value !== 'string' || typeof expectedRoute !== 'string')
     return false;
   try {
     const url = new URL(value);
+    const expected = new URL(expectedRoute, 'http://localhost');
     return (
       url.protocol === 'http:' &&
       ['localhost', '127.0.0.1'].includes(url.hostname) &&
-      url.pathname === expectedRoute &&
-      url.search === '' &&
+      url.pathname === expected.pathname &&
+      url.search === expected.search &&
       url.hash === ''
     );
   } catch {
@@ -83,10 +104,29 @@ export function marketingArtifactName(headSha) {
     ? `marketing-route-screenshots-${headSha.toLowerCase()}`
     : null;
 }
+/**
+ * Non-marketing (`SCREEN_PROOF_ROUTES`-style) screen-proof artifacts are
+ * named per screen so two dedicated single-screen producers never collide
+ * inside one workflow run's artifact namespace. `web.public-profile` keeps
+ * the original bare `PRODUCER.artifact` name — it predates this per-screen
+ * scheme and already has landed workflow history and receipts bound to it.
+ * @param {unknown} screenId
+ * @returns {string | null} the exact trusted artifact name, or null when
+ *   `screenId` cannot be turned into one
+ */
+export function screenProofArtifactName(screenId) {
+  if (screenId === 'web.public-profile') return PRODUCER.artifact;
+  if (typeof screenId !== 'string') return null;
+  const dot = screenId.indexOf('.');
+  if (dot === -1 || dot === screenId.length - 1) return null;
+  const suffix = screenId.slice(dot + 1);
+  if (!/^[a-z0-9-]+$/.test(suffix)) return null;
+  return `${PRODUCER.artifact}-${suffix}`;
+}
 function run(command, args, binary = false) {
   const result = spawnSync(command, args, {
     encoding: binary ? undefined : 'utf8',
-    maxBuffer: 32 * 1024 * 1024,
+    maxBuffer: binary ? MAX_ARTIFACT_DOWNLOAD_BYTES : 32 * 1024 * 1024,
   });
   if (result.status !== 0) throw new Error('controlled transport unavailable');
   return result.stdout;
@@ -340,7 +380,8 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
         item.head_sha?.toLowerCase() === context.headSha.toLowerCase()
     );
     const trustedName =
-      artifact.name === PRODUCER.artifact || artifact.name === marketingName;
+      artifact.name === marketingName ||
+      artifact.name === screenProofArtifactName(context.screenId);
     const currentRunId = Number(process.env.GITHUB_RUN_ID);
     const currentAttempt = Number(process.env.GITHUB_RUN_ATTEMPT);
     const completedRun = workflowRun.conclusion === 'success';

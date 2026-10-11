@@ -43,6 +43,14 @@ export const SCHEMA_FRAGMENTS = {
       height: 512,
     },
   },
+  // City-level only: no street address is published.
+  address: {
+    '@type': 'PostalAddress' as const,
+    addressLocality: 'Los Angeles',
+    addressRegion: 'CA',
+    postalCode: '90028',
+    addressCountry: 'US',
+  },
   contactPoint: {
     '@type': 'ContactPoint' as const,
     contactType: 'customer support',
@@ -107,6 +115,7 @@ export function buildOrganizationSchema(overrides: {
     description: overrides.description,
     ...(overrides.sameAs?.length ? { sameAs: overrides.sameAs } : {}),
     contactPoint: SCHEMA_FRAGMENTS.contactPoint,
+    address: SCHEMA_FRAGMENTS.address,
     foundingDate: '2024',
     additionalType: 'https://schema.org/SoftwareApplication',
     knowsAbout: [...COMPANY_IDENTITY.knowsAbout],

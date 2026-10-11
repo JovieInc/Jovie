@@ -654,19 +654,13 @@ describe('getBaseClientConfig', () => {
     expect(config).toHaveProperty('dsn');
     expect(config).toHaveProperty('release');
     expect(config).toHaveProperty('tracesSampleRate');
-    expect(config).toHaveProperty('enableLogs');
-    expect(config).toHaveProperty('sendDefaultPii');
+    expect(config).toHaveProperty('dataCollection');
     expect(config).toHaveProperty('beforeSend');
   });
 
-  it('should have sendDefaultPii disabled for client', () => {
+  it('should disable user collection for client', () => {
     const config = getBaseClientConfig();
-    expect(config.sendDefaultPii).toBe(false);
-  });
-
-  it('should have enableLogs enabled', () => {
-    const config = getBaseClientConfig();
-    expect(config.enableLogs).toBe(true);
+    expect(config.dataCollection?.userInfo).toBe(false);
   });
 
   it('should have beforeSend function', () => {
@@ -814,25 +808,19 @@ describe('getBaseServerConfig', () => {
     expect(config).toHaveProperty('dsn');
     expect(config).toHaveProperty('release');
     expect(config).toHaveProperty('tracesSampleRate');
-    expect(config).toHaveProperty('enableLogs');
-    expect(config).toHaveProperty('sendDefaultPii');
+    expect(config).toHaveProperty('dataCollection');
     expect(config).toHaveProperty('beforeSend');
     expect(config).toHaveProperty('debug');
   });
 
-  it('should have sendDefaultPii enabled for server (scrubbed via beforeSend)', () => {
+  it('should retain server user context (scrubbed via beforeSend)', () => {
     const config = getBaseServerConfig();
-    expect(config.sendDefaultPii).toBe(true);
+    expect(config.dataCollection?.userInfo).toBe(true);
   });
 
   it('should have debug disabled', () => {
     const config = getBaseServerConfig();
     expect(config.debug).toBe(false);
-  });
-
-  it('should have enableLogs enabled', () => {
-    const config = getBaseServerConfig();
-    expect(config.enableLogs).toBe(true);
   });
 });
 

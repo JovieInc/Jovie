@@ -1,5 +1,13 @@
 import 'server-only';
 
+import type { AcquisitionCertificationStore } from '@/lib/acquisition/certification-store';
+import {
+  type AcquisitionEligibility,
+  describeAcquisitionBlock,
+} from '@/lib/acquisition/eligibility';
+import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
+import { readFeatureRegistrySource } from '@/lib/admin/feature-registry-source';
+import type { FounderReviewItem } from '@/lib/admin/founder-review-registry';
 import {
   evaluateCertificationAdmission,
   type FounderCertificationDecisionKind,
@@ -10,6 +18,7 @@ import type {
 } from '@/lib/agent-os/certification-adapter';
 import {
   type CertificationInboxDelivery,
+  type CertificationInboxMachineEvidence,
   projectCertificationInbox,
 } from '@/lib/agent-os/certification-inbox';
 import { getMarketingCertificationStore } from '@/lib/agent-os/certification-runtime-store';
@@ -27,13 +36,13 @@ import {
   type CertificationPacketFile,
   type CertificationPacketFileRead,
   PACKET_FILE_DOMAINS,
-  type PacketFileDomain,
   readCertificationPacketFiles,
 } from './packet-files.server';
 import {
   OVIE_CERTIFICATION_DOMAIN_LABELS,
   OVIE_CERTIFICATION_INVENTORY_CONTRACT,
   type OvieCertificationDecisionRequest,
+  type OvieCertificationDomainId,
   type OvieCertificationDomainSummary,
   type OvieCertificationInventory,
   type OvieCertificationInventoryIssue,
@@ -57,10 +66,62 @@ const MARKETING_SURFACE_LABELS = {
 const ACQUISITION_NOTE =
   'No trusted production candidate inventory exists yet; acquisition decisions stay in the acquisition store.';
 
+const CUSTOMERS_NOTE =
+  'No customer prospect inventory is connected yet; the kernel v2 candidate inventory lands with the customer epic.';
+
+/**
+ * One ranked customer prospect in certification. `subjectId` is the v1
+ * prospect subject (`acquisition:premade-artist-profile:<leadId>:<runId>`);
+ * `revision` is the immutable domain revision `decide` binds to. Ranking
+ * fields come from the pipeline's `rankCustomer` output.
+ */
+export interface CustomerCertificationCandidateRef {
+  readonly subjectId: string;
+  readonly revision: string;
+  readonly rank: number | null;
+  readonly payScore: number | null;
+  readonly fitScore: number | null;
+  readonly heldFor: readonly string[];
+  readonly updatedAt: string;
+}
+
+/**
+ * The prospect inventory plus the acquisition certification store that owns
+ * its rows and decisions. Absent until a trusted candidate inventory exists —
+ * the domain then reports `not_connected` instead of a certified zero.
+ */
+export interface CustomerCertificationSource {
+  list(): Promise<readonly CustomerCertificationCandidateRef[]>;
+  store(): Pick<AcquisitionCertificationStore, 'project' | 'decide'>;
+}
+
+/**
+ * Feature Registry packets are derived from the committed
+ * `docs/FEATURE_REGISTRY.md` source at read time — the same projection the
+ * admin page renders. `sourceUpdatedAt` is the registry file's mtime and
+ * stands in for `packetUpdatedAt` in the shared decision ledger.
+ */
+export interface FeatureRegistryCertificationSource {
+  list(): Promise<{
+    readonly items: readonly FounderReviewItem[];
+    readonly sourceUpdatedAt: string;
+  }>;
+}
+
 export interface OvieCertificationInventoryDeps {
   readonly marketingStore: () => MarketingCertificationStore;
   readonly backend: () => CertificationRecordBackend;
   readonly readPacketFiles: () => Promise<CertificationPacketFileRead>;
+  readonly featureRegistry: FeatureRegistryCertificationSource;
+  readonly customers?: CustomerCertificationSource;
+  /**
+   * ACQUISITION_ELIGIBLE (JOV-7696). Prospect outreach is acquisition, so a
+   * prospect reaches the founder only while the $199 cone is green. Absent
+   * reads as unknown and holds prospects (fail closed).
+   */
+  readonly acquisitionEligibility?: () => Promise<
+    Pick<AcquisitionEligibility, 'eligible' | 'verdict' | 'firstBlocker'>
+  >;
 }
 
 export const defaultOvieCertificationInventoryDeps: OvieCertificationInventoryDeps =
@@ -68,7 +129,38 @@ export const defaultOvieCertificationInventoryDeps: OvieCertificationInventoryDe
     marketingStore: getMarketingCertificationStore,
     backend: postgresRecordBackend,
     readPacketFiles: () => readCertificationPacketFiles(),
+    featureRegistry: { list: readFeatureRegistrySource },
+    acquisitionEligibility: () => getAcquisitionEligibility(),
   };
+
+async function prospectMachineEvidence(
+  deps: OvieCertificationInventoryDeps
+): Promise<CertificationInboxMachineEvidence> {
+  if (!deps.acquisitionEligibility) {
+    return {
+      status: 'unknown',
+      summary: 'ACQUISITION_ELIGIBLE is not wired for prospect certification.',
+    };
+  }
+  try {
+    const eligibility = await deps.acquisitionEligibility();
+    if (eligibility.eligible) {
+      return {
+        status: 'green',
+        summary: describeAcquisitionBlock(eligibility),
+      };
+    }
+    return {
+      status: eligibility.verdict === 'BLOCKED' ? 'red' : 'unknown',
+      summary: describeAcquisitionBlock(eligibility),
+    };
+  } catch {
+    return {
+      status: 'unknown',
+      summary: 'ACQUISITION_ELIGIBLE could not be read.',
+    };
+  }
+}
 
 const STATE_ORDER = new Map(
   (
@@ -199,7 +291,7 @@ async function marketingDomain(
 }
 
 async function packetDomain(
-  domain: PacketFileDomain,
+  domain: OvieCertificationDomainId,
   files: readonly CertificationPacketFile[],
   deps: OvieCertificationInventoryDeps,
   evaluatedAt: string
@@ -264,6 +356,215 @@ async function packetDomain(
   }
 }
 
+const FEATURE_REGISTRY_SURFACE_LABELS = {
+  behavior: 'Atomic Behavior',
+  capability: 'Feature Capability',
+  component: 'Registry Component',
+} as const;
+
+function featureRegistryPacketFile(
+  item: FounderReviewItem,
+  sourceUpdatedAt: string
+): CertificationPacketFile {
+  return {
+    domain: 'feature_registry',
+    surface: FEATURE_REGISTRY_SURFACE_LABELS[item.scope],
+    packetUpdatedAt: sourceUpdatedAt,
+    links: [],
+    packet: item.certificationPacket,
+    file: item.source,
+  };
+}
+
+/**
+ * The Feature Registry projects the same kernel admission and decision ledger
+ * as packet-file domains; only the packet source differs (the committed
+ * FEATURE_REGISTRY.md instead of worker packet files).
+ */
+async function featureRegistryDomain(
+  deps: OvieCertificationInventoryDeps,
+  evaluatedAt: string
+): Promise<CertificationDomainProjection> {
+  const domain = 'feature_registry' as const;
+  let source: Awaited<ReturnType<FeatureRegistryCertificationSource['list']>>;
+  try {
+    source = await deps.featureRegistry.list();
+  } catch {
+    return {
+      rows: [],
+      deliveries: [],
+      summary: {
+        domain,
+        label: OVIE_CERTIFICATION_DOMAIN_LABELS[domain],
+        status: 'error',
+        rowCount: 0,
+        note: 'The feature registry source could not be read.',
+      },
+      issues: [
+        {
+          domain,
+          source: 'feature_registry',
+          message: 'Feature registry read failed.',
+        },
+      ],
+    };
+  }
+  return packetDomain(
+    domain,
+    source.items.map(item =>
+      featureRegistryPacketFile(item, source.sourceUpdatedAt)
+    ),
+    deps,
+    evaluatedAt
+  );
+}
+
+/**
+ * One customer prospect row plus its inbox delivery. The row is a pure
+ * projection of the acquisition store's candidate state — ranking fields are
+ * pass-through, and the kernel admission is re-derived from the store's bound
+ * packet so the decision digest a card acts on is the store's own.
+ */
+async function customerProjection(
+  store: Pick<AcquisitionCertificationStore, 'project' | 'decide'>,
+  candidate: CustomerCertificationCandidateRef,
+  evaluatedAt: string,
+  machineEvidence?: CertificationInboxMachineEvidence
+): Promise<{
+  readonly row: OvieCertificationRow;
+  readonly delivery: CertificationInboxDelivery;
+}> {
+  const projection = await store.project(candidate.subjectId);
+  const decisions = projection.receipts.map(receipt => receipt.decision);
+  const admission = {
+    ...evaluateCertificationAdmission({
+      packet: projection.packet,
+      decisions,
+      evaluatedAt,
+    }),
+    // The store's own gates (fresh evidence, bound candidate fields,
+    // idempotent effect) hold the row at working even when the kernel
+    // admission would otherwise read review-ready.
+    state: projection.state,
+  };
+  const row = normalizeKernelCertificationRow({
+    domain: 'customers',
+    surface: 'Customer Prospect',
+    packet: projection.packet,
+    admission,
+    decisions,
+    auditHistory: [],
+    updatedAt: candidate.updatedAt,
+  });
+  const gated = new Set(row.blockers.map(blocker => blocker.code));
+  return {
+    row: {
+      ...row,
+      blockers: [
+        ...row.blockers,
+        ...projection.missing
+          .filter(code => !gated.has(code))
+          .map(code => ({
+            code,
+            tier: 'state',
+            summary: `Candidate gate failed: ${code}.`,
+          })),
+      ],
+      rank: candidate.rank,
+      payScore: candidate.payScore,
+      fitScore: candidate.fitScore,
+      heldFor: candidate.heldFor,
+    },
+    delivery: {
+      admission,
+      domain: 'customers',
+      observedAt: candidate.updatedAt,
+      packet: projection.packet,
+      ranking: { impact: (candidate.payScore ?? 0) * 10 },
+      requestedDecision: 'Certify this prospect for outreach.',
+      ...(machineEvidence ? { machineEvidence } : {}),
+    },
+  };
+}
+
+async function customersDomain(
+  deps: OvieCertificationInventoryDeps,
+  evaluatedAt: string
+): Promise<CertificationDomainProjection> {
+  const domain = 'customers' as const;
+  const label = OVIE_CERTIFICATION_DOMAIN_LABELS[domain];
+  const source = deps.customers;
+  if (!source) {
+    return {
+      rows: [],
+      deliveries: [],
+      summary: {
+        domain,
+        label,
+        status: 'not_connected',
+        rowCount: 0,
+        note: CUSTOMERS_NOTE,
+      },
+      issues: [],
+    };
+  }
+  try {
+    const candidates = await source.list();
+    if (candidates.length === 0) {
+      return {
+        rows: [],
+        deliveries: [],
+        summary: {
+          domain,
+          label,
+          status: 'empty',
+          rowCount: 0,
+          note: 'No customer prospects are in certification yet.',
+        },
+        issues: [],
+      };
+    }
+    const store = source.store();
+    const machineEvidence = await prospectMachineEvidence(deps);
+    const projections = await Promise.all(
+      candidates.map(candidate =>
+        customerProjection(store, candidate, evaluatedAt, machineEvidence)
+      )
+    );
+    return {
+      rows: projections.map(projection => projection.row),
+      deliveries: projections.map(projection => projection.delivery),
+      summary: {
+        domain,
+        label,
+        status: 'connected',
+        rowCount: projections.length,
+        note: null,
+      },
+      issues: [],
+    };
+  } catch {
+    return {
+      rows: [],
+      deliveries: [],
+      summary: {
+        domain,
+        label,
+        status: 'error',
+        rowCount: 0,
+        note: 'The customer certification inventory could not be read.',
+      },
+      issues: [
+        {
+          domain,
+          source: 'customer_prospect_inventory',
+          message: 'Customer certification inventory read failed.',
+        },
+      ],
+    };
+  }
+}
+
 function compareRows(a: OvieCertificationRow, b: OvieCertificationRow) {
   return (
     (STATE_ORDER.get(a.state) ?? 0) - (STATE_ORDER.get(b.state) ?? 0) ||
@@ -279,6 +580,8 @@ export async function readOvieCertificationInventory(
   const packetRead = await deps.readPacketFiles();
   const results = await Promise.all([
     marketingDomain(deps, generatedAt),
+    customersDomain(deps, generatedAt),
+    featureRegistryDomain(deps, generatedAt),
     ...PACKET_FILE_DOMAINS.map(domain =>
       packetDomain(
         domain,
@@ -355,6 +658,15 @@ export function parseOvieCertificationDecisionRequest(
   }
   // Request changes is a comment; an empty one gives the worker nothing to do.
   if (value.decision === 'changes_requested' && !notes) return null;
+  // Customer rejections map onto the acquisition store's `rejected`
+  // decision, which requires the founder's reason.
+  if (
+    value.rowId.startsWith('customers:') &&
+    value.decision === 'rejected' &&
+    !notes
+  ) {
+    return null;
+  }
   return {
     rowId: value.rowId,
     evidenceDigest: value.evidenceDigest,
@@ -362,6 +674,74 @@ export function parseOvieCertificationDecisionRequest(
     notes,
     actionId: value.actionId,
   };
+}
+
+/**
+ * Card and table decisions on a customer prospect are the same call: the
+ * row's revision and evidence digest bind to the acquisition store's `decide`
+ * either way, so both surfaces land one identical receipt.
+ */
+async function recordCustomerDecision(
+  request: OvieCertificationDecisionRequest,
+  subjectId: string,
+  deps: OvieCertificationInventoryDeps,
+  decidedAt: string
+): Promise<OvieCertificationDecisionOutcome> {
+  const source = deps.customers;
+  if (!source) {
+    return {
+      ok: false,
+      status: 404,
+      error: 'unknown_certification',
+      message: 'Customer prospect certification is not connected.',
+    };
+  }
+  let candidate: CustomerCertificationCandidateRef | undefined;
+  try {
+    candidate = (await source.list()).find(
+      item => item.subjectId === subjectId
+    );
+  } catch {
+    return {
+      ok: false,
+      status: 409,
+      error: 'customer_inventory_unavailable',
+      message: 'The customer certification inventory could not be read.',
+    };
+  }
+  if (!candidate) {
+    return {
+      ok: false,
+      status: 404,
+      error: 'unknown_certification',
+      message: 'This certification item is not a connected customer prospect.',
+    };
+  }
+  const store = source.store();
+  try {
+    await store.decide({
+      subjectId,
+      revision: candidate.revision,
+      evidenceDigest: request.evidenceDigest,
+      actionId: request.actionId,
+      // The acquisition decision ledger has approve/reject only; request
+      // rebuild is recorded as a rejection carrying the founder's notes.
+      decision: request.decision === 'approved' ? 'approved' : 'rejected',
+      notes: request.notes,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'decision_rejected',
+      message:
+        error instanceof Error
+          ? error.message
+          : 'The decision could not be recorded.',
+    };
+  }
+  const projection = await customerProjection(store, candidate, decidedAt);
+  return { ok: true, row: projection.row };
 }
 
 const DECISION_FAILURE_MESSAGES: Record<string, string> = {
@@ -374,6 +754,69 @@ const DECISION_FAILURE_MESSAGES: Record<string, string> = {
   decision_predates_packet:
     'The packet is newer than this decision. Refresh and review again.',
 };
+
+/**
+ * Feature Registry decisions land in the same shared packet-decision ledger
+ * path as packet-file domains; the packet is re-derived from the committed
+ * registry source, so a stale client digest or item fails closed.
+ */
+async function recordFeatureRegistryDecision(
+  request: OvieCertificationDecisionRequest,
+  subjectId: string,
+  deps: OvieCertificationInventoryDeps,
+  decidedAt: string,
+  reviewer: string
+): Promise<OvieCertificationDecisionOutcome> {
+  let source: Awaited<ReturnType<FeatureRegistryCertificationSource['list']>>;
+  try {
+    source = await deps.featureRegistry.list();
+  } catch {
+    return {
+      ok: false,
+      status: 409,
+      error: 'feature_registry_unavailable',
+      message: 'The feature registry could not be read.',
+    };
+  }
+  const item = source.items.find(candidate => candidate.id === subjectId);
+  if (!item) {
+    return {
+      ok: false,
+      status: 404,
+      error: 'unknown_certification',
+      message: 'This certification item is not in the feature registry.',
+    };
+  }
+  const target = featureRegistryPacketFile(item, source.sourceUpdatedAt);
+  const backend = deps.backend();
+  const result = await recordPacketFounderDecision({
+    backend,
+    target,
+    decidedAt,
+    decision: {
+      id: request.actionId,
+      decision: request.decision,
+      evidenceDigest: request.evidenceDigest,
+      notes: request.notes,
+      reviewer,
+    },
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      status: 409,
+      error: result.reason,
+      message:
+        DECISION_FAILURE_MESSAGES[result.reason] ??
+        'The decision could not be recorded.',
+    };
+  }
+  const ledger = await readPacketDecisionLedger(backend, target.domain);
+  return {
+    ok: true,
+    row: packetRow(target, ledger.records[subjectId], decidedAt),
+  };
+}
 
 /**
  * Dispatch one founder decision to the kernel owner of the row's domain.
@@ -396,6 +839,18 @@ export async function recordOvieCertificationDecision(
       error: 'assurance_profile_missing',
       message: MARKETING_ASSURANCE_GATE,
     };
+  }
+  if (domain === 'customers') {
+    return recordCustomerDecision(request, subjectId, deps, decidedAt);
+  }
+  if (domain === 'feature_registry') {
+    return recordFeatureRegistryDecision(
+      request,
+      subjectId,
+      deps,
+      decidedAt,
+      reviewer
+    );
   }
   if (!(PACKET_FILE_DOMAINS as readonly string[]).includes(domain)) {
     return {
@@ -422,7 +877,7 @@ export async function recordOvieCertificationDecision(
   const backend = deps.backend();
   const result = await recordPacketFounderDecision({
     backend,
-    file,
+    target: file,
     decidedAt,
     decision: {
       id: request.actionId,

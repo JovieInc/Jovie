@@ -47,6 +47,7 @@ test('accepts only the pinned capped advisory gateway policy and nine targets', 
   assert.equal(result.policy.billing.hardCap, true);
   assert.ok(result.policy.billing.monthlyCapUsd > 0);
   assert.equal(result.policy.billing.onUnknownPrice, 'skip');
+  assert.equal(result.policy.models.cheap.gatewayId, 'zai/glm-5.3-flash');
   assert.equal(result.policy.execution.status, 'advisory');
   assert.equal(result.policy.execution.blocking, false);
   assert.equal(result.policy.execution.prCodeExecution, 'none');
@@ -151,6 +152,13 @@ test('holds uncapped, blocking, fallback, or code-executing policy values before
     policy => {
       policy.execution.dotenv = true;
     },
+    // JOV-7119: a banned-provider cheap model fails closed before the hash check.
+    policy => {
+      policy.models.cheap.gatewayId = 'openai/gpt-6-luna';
+    },
+    policy => {
+      delete policy.models;
+    },
   ];
   for (const change of cases) {
     assertCode('policy-held', () =>
@@ -250,6 +258,8 @@ test('DeepSec config refuses to load unless the policy is advisory', () => {
     'utf8'
   );
   assert.match(config, /execution\.status !== 'advisory'/);
-  assert.match(config, /mode: 'gateway'/);
+  assert.match(config, /mode: 'local', provider: 'local'/);
+  assert.match(config, /defaultAgent: 'codex'/);
+  assert.doesNotMatch(config, /mode: 'gateway'|provider: 'vercel'/);
   assert.match(config, /DEEPSEC_SOURCE_ROOT/);
 });

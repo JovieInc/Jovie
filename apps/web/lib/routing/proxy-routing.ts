@@ -1,5 +1,6 @@
 import { HOSTNAME, STAGING_HOSTNAMES } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { OVIE_OAUTH_VERIFY_PATH } from '@/lib/ovie/mcp/oauth-contract';
 import { isReservedUsername } from '@/lib/validation/username-core';
 
 export interface PathCategory {
@@ -176,6 +177,7 @@ export function categorizePath(pathname: string): PathCategory {
   const cached = _categorizePathCache.get(pathname);
   if (cached) return cached;
   const isAuthPath =
+    pathname === OVIE_OAUTH_VERIFY_PATH ||
     pathname === APP_ROUTES.SIGNIN ||
     pathname === APP_ROUTES.SIGNIN_HYPHEN ||
     pathname === APP_ROUTES.SIGNUP ||

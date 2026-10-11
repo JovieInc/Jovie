@@ -1,6 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const { runtimeUpdate } = vi.hoisted(() => ({
+  runtimeUpdate: { available: false },
+}));
+vi.mock('./RuntimeUpdateProvider', () => ({
+  useRuntimeUpdate: () => runtimeUpdate,
+}));
+
 import { SidebarInboxLink } from './SidebarInboxLink';
 
 describe('central Inbox bell', () => {
@@ -17,6 +25,20 @@ describe('central Inbox bell', () => {
     await userEvent.tab();
     expect(link).toHaveFocus();
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
+  });
+  it('keeps available runtime updates visible even when server work is empty', () => {
+    runtimeUpdate.available = true;
+    try {
+      render(
+        <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
+      );
+      const link = screen.getByRole('link', {
+        name: 'Inbox — All Caught Up; App Update Available',
+      });
+      expect(link.querySelector('[data-runtime-update]')).not.toBeNull();
+    } finally {
+      runtimeUpdate.available = false;
+    }
   });
   it.each([
     [{ state: 'empty' as const, pendingCount: 0 }, 'Inbox — All Caught Up'],

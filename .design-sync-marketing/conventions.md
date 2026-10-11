@@ -27,7 +27,6 @@ sequences them; the components do not depend on each other.
 | `ArtistProfileCaptureSection` | Fan capture / "capture every fan" feature callout |
 | `ArtistProfileReactivationSection` | Re-engagement / bring-them-back feature callout |
 | `ArtistProfileMonetizationSection` | Monetisation feature callout |
-| `ArtistProfilePayFlowVideoSection` | Pay-flow video variant (flag: SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO) |
 | `ArtistProfileSpecWall` | Grid of feature tiles (spec wall) |
 | `ArtistProfileHowItWorks` | Numbered step section |
 | `ArtistProfileSocialProof` | Testimonials / social proof (flag: SOCIAL_PROOF) |

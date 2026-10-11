@@ -44,12 +44,14 @@ export type OvieCertificationTierStatus =
 
 export const OVIE_CERTIFICATION_DOMAINS = [
   'marketing_components',
+  'customers',
   'flows',
   'public_profiles',
   'smart_links',
   'marketing',
   'lyb',
   'acquisition',
+  'feature_registry',
 ] as const;
 
 export type OvieCertificationDomainId =
@@ -104,6 +106,16 @@ export interface OvieCertificationDecisionAvailability {
   readonly reason: string | null;
   /** Kernel evidence digest the decision must bind to. */
   readonly evidenceDigest: string | null;
+  /**
+   * The founder decision bound to the current evidence digest, if one exists.
+   * Stale decisions recorded against older evidence never appear here.
+   */
+  readonly currentDecision: {
+    readonly kind: OvieCertificationDecisionKind;
+    readonly decidedAt: string;
+    readonly reviewer: string;
+    readonly notes: string | null;
+  } | null;
 }
 
 export interface OvieCertificationRow {
@@ -128,6 +140,14 @@ export interface OvieCertificationRow {
   readonly links: readonly OvieCertificationLink[];
   readonly history: readonly OvieCertificationHistoryEvent[];
   readonly decision: OvieCertificationDecisionAvailability;
+  /**
+   * Customers domain only (CERTIFICATION_V2_CUSTOMERS section 11): the
+   * pipeline ranking fields. Absent on every other domain's row.
+   */
+  readonly rank?: number | null;
+  readonly payScore?: number | null;
+  readonly fitScore?: number | null;
+  readonly heldFor?: readonly string[];
   readonly source: {
     readonly repository: string;
     readonly sha: string;
@@ -184,12 +204,14 @@ export const OVIE_CERTIFICATION_DOMAIN_LABELS: Readonly<
   Record<OvieCertificationDomainId, string>
 > = {
   marketing_components: 'Marketing Components',
+  customers: 'Customers',
   flows: 'Flows',
   public_profiles: 'Public Profiles',
   smart_links: 'Smart Links',
   marketing: 'Marketing',
   lyb: 'LYB',
   acquisition: 'Acquisition',
+  feature_registry: 'Feature Registry',
 };
 
 export const OVIE_CERTIFICATION_STATE_LABELS: Readonly<

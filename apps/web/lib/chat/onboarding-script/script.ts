@@ -33,7 +33,8 @@ export type ScriptStepId =
   | 'instant_access'
   | 'waitlist'
   | 'done'
-  | 'stream_error';
+  | 'stream_error'
+  | 'ownership_conflict';
 
 export interface ScriptLine {
   readonly key: `${ScriptStepId}:${string}`;
@@ -110,6 +111,12 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   ),
 
   line(
+    'ownership_conflict',
+    'v1',
+    'This artist already has a Jovie profile. Sign in with the original account or use the verified profile claim flow.'
+  ),
+
+  line(
     'stream_error',
     'v3',
     'Lost the thread mid-sentence. Say that again and we pick it up.'
@@ -158,11 +165,15 @@ export const SCRIPT_STEP_IDS: readonly ScriptStepId[] = [
   'waitlist',
   'done',
   'stream_error',
+  'ownership_conflict',
 ];
 
 export function isScriptStepId(value: string): value is ScriptStepId {
   return (SCRIPT_STEP_IDS as readonly string[]).includes(value);
 }
+
+// Ownership recovery is fixed server copy, never a promoted model line.
+export const OWNERSHIP_CONFLICT_LINE = pickLine('ownership_conflict', '');
 
 /** Mid-stream error line (used as the `onError` text — no SSE swap possible). */
 export const STREAM_ERROR_LINE = SCRIPT_LINES.find(

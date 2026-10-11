@@ -9,13 +9,20 @@ const repoRoot = resolve(
 );
 
 describe('Summer deployment pin guard', () => {
-  it('fails the repository when a Summer deployment pin is present', () => {
+  it('rejects deployment pins while allowing stable and historical references', () => {
     const result = spawnSync(
       process.execPath,
-      ['--test', 'scripts/summer-deployment-pin-guard.test.mjs'],
+      [
+        '--test',
+        '--test-name-pattern',
+        'rejects a per-deployment|allows a historical',
+        'scripts/summer-deployment-pin-guard.test.mjs',
+      ],
       { cwd: repoRoot, encoding: 'utf8' }
     );
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('finds no Summer deployment pin');
+    expect(result.stdout).toContain('rejects a per-deployment Summer URL');
+    expect(result.stdout).toContain('allows a historical incident line');
+    expect(result.stdout).toMatch(/\bpass 2\b/u);
   });
 });

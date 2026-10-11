@@ -28,7 +28,7 @@ describe('HomepageHeroMockupCarousel', () => {
     expectActiveShot(firstShotId);
     expect(
       screen.getByText(
-        /Showing Artist Profile: A profile that looks ready before fans arrive\./
+        /Showing Creator Profile: A profile that looks ready before the audience arrives\./
       )
     ).toBeTruthy();
 

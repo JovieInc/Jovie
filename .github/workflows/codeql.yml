@@ -10,17 +10,14 @@
 # supported CodeQL languages.
 #
 name: CodeQL Security Analysis
-# clock-class: upstream-advisory
 
 on:
-  # Risk-tiered CI: CodeQL runs on the merged code (post-merge on main) + nightly
+  # Risk-tiered CI: CodeQL runs on changed merged code (post-merge on main)
   # deep scan — NOT on every PR/merge-queue batch. Running 5-language CodeQL on
   # each PR saturated the runner pool and stalled the merge queue (2026-06-22).
   # Hygiene (#10463): keep pull_request off — JS matrix budget is 360 min.
   push:
     branches: ['main']
-  schedule:
-    - cron: '36 5 * * *' # Nightly at 05:36 UTC
   workflow_dispatch:
 
 permissions: {}

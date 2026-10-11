@@ -2,6 +2,7 @@ import 'server-only';
 import { createGateway, gateway as defaultGateway } from '@ai-sdk/gateway';
 import * as ai from 'ai';
 
+import { assertGatewayModelAllowed } from '@/lib/constants/ai-models';
 import { env } from '@/lib/env-server';
 import {
   guardModelOutput,
@@ -197,11 +198,18 @@ function getGatewayProvider(): GatewayModelSelector {
  * model on the same provider instance, so image calls use the same API key or
  * Vercel OIDC fallback and the same optional Helicone base URL.
  */
-const gatewaySelector = ((...args: Parameters<GatewayModelSelector>) =>
-  getGatewayProvider()(...args)) as GatewayModelSelector;
+const gatewaySelector = ((modelId: string) => {
+  // JOV-7119: OpenAI/Anthropic are banned on the gateway — fail fast instead
+  // of letting a call bill per-token or fall back to another banned model.
+  assertGatewayModelAllowed(modelId);
+  return getGatewayProvider()(modelId);
+}) as GatewayModelSelector;
 
 gatewaySelector.image = ((
   modelId: Parameters<GatewayModelSelector['image']>[0]
-) => getGatewayProvider().image(modelId)) as GatewayModelSelector['image'];
+) => {
+  assertGatewayModelAllowed(modelId);
+  return getGatewayProvider().image(modelId);
+}) as GatewayModelSelector['image'];
 
 export const gateway: GatewayModelSelector = gatewaySelector;

@@ -21,6 +21,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
+  args: { children: null },
   render: () => (
     <PublicPageShell footerVariant='minimal' mainOffset={false}>
       <section className='bg-base px-6 py-16 text-primary-token'>
@@ -37,6 +38,7 @@ export const Default: Story = {
 };
 
 export const MinimalHeaderWithoutSkipLink: Story = {
+  args: { children: null },
   render: () => (
     <PublicPageShell
       footerVariant='minimal'

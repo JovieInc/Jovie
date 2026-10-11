@@ -38,6 +38,9 @@ vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
 
 import { getInvestorPortalAccess } from './portal-access';
 
+const CLAIM_TOKEN = 'a'.repeat(43);
+const LIVE_EXPIRY = new Date('2099-01-01T00:00:00.000Z');
+
 describe('getInvestorPortalAccess', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -51,8 +54,8 @@ describe('getInvestorPortalAccess', () => {
   });
 
   it('grants an active investor link and keeps its name for the greeting', async () => {
-    mocks.cookieValue = 'token-1';
-    mocks.rows = [{ investorName: 'Ada', expiresAt: null }];
+    mocks.cookieValue = CLAIM_TOKEN;
+    mocks.rows = [{ investorName: 'Ada', expiresAt: LIVE_EXPIRY }];
 
     await expect(getInvestorPortalAccess()).resolves.toEqual({
       kind: 'investor',
@@ -62,7 +65,7 @@ describe('getInvestorPortalAccess', () => {
   });
 
   it('rejects an expired investor link', async () => {
-    mocks.cookieValue = 'token-1';
+    mocks.cookieValue = CLAIM_TOKEN;
     mocks.rows = [{ investorName: 'Ada', expiresAt: new Date(0) }];
 
     await expect(getInvestorPortalAccess()).resolves.toBeNull();
@@ -88,8 +91,22 @@ describe('getInvestorPortalAccess', () => {
     await expect(getInvestorPortalAccess()).resolves.toBeNull();
   });
 
-  it('fails closed when the lookup throws', async () => {
+  it('rejects a legacy token that never expires', async () => {
+    mocks.cookieValue = CLAIM_TOKEN;
+    mocks.rows = [{ investorName: 'Ada', expiresAt: null }];
+
+    await expect(getInvestorPortalAccess()).resolves.toBeNull();
+  });
+
+  it('rejects a short guess before querying', async () => {
     mocks.cookieValue = 'token-1';
+
+    await expect(getInvestorPortalAccess()).resolves.toBeNull();
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the lookup throws', async () => {
+    mocks.cookieValue = CLAIM_TOKEN;
     mocks.select.mockImplementation(() => {
       throw new Error('db down');
     });

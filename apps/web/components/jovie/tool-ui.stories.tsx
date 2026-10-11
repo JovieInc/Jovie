@@ -22,9 +22,9 @@ const libraryReadyParts = [
     output: {
       action: 'presence_build_artifact',
       stepId: 'surface_library_opportunities',
-      title: 'Library opportunities',
+      title: 'Work opportunities',
       summary:
-        'Your Library presence queue is ready. Findings stay local and nothing was sent.',
+        'Your Work opportunity queue is ready. Findings stay local and nothing was sent.',
       facts: [
         { label: 'Repair queue', value: '1 open' },
         { label: 'Collisions', value: '0 to review' },
@@ -44,7 +44,7 @@ const libraryErrorParts = [
     toolCallId: 'presence-build:surface_library_opportunities',
     state: 'output-error',
     input: { stepId: 'surface_library_opportunities' },
-    errorText: 'Library presence lookup failed.',
+    errorText: 'Work presence lookup failed.',
   },
 ] satisfies readonly MessagePart[];
 

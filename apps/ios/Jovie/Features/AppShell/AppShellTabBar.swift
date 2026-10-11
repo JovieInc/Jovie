@@ -194,15 +194,21 @@ enum AppShellPanePolicy {
     .none
   }
 
+  /// The same ordered root ontology as canonicalSidebarNavigation on web.
+  /// Inbox and Calendar are workflows within Work, not extra product roots.
+  static func rootDestinations(chatEnabled: Bool, audienceEnabled: Bool) -> [AppShellTab] {
+    var roots: [AppShellTab] = chatEnabled ? [.chat] : []
+    roots.append(contentsOf: [.profile, .library])
+    if audienceEnabled { roots.append(.audience) }
+    return roots
+  }
+
+  static func childDestinations(of root: AppShellTab) -> [AppShellTab] {
+    root == .library ? [.inbox, .calendar] : []
+  }
+
   static func sidebarDestinations(chatEnabled: Bool, audienceEnabled: Bool) -> [AppShellTab] {
-    var tabs: [AppShellTab] = []
-    if chatEnabled {
-      tabs.append(.chat)
-    }
-    tabs.append(contentsOf: [.library, .calendar, .inbox, .profile])
-    if audienceEnabled {
-      tabs.append(.audience)
-    }
-    return tabs
+    rootDestinations(chatEnabled: chatEnabled, audienceEnabled: audienceEnabled)
+      .flatMap { [$0] + childDestinations(of: $0) }
   }
 }

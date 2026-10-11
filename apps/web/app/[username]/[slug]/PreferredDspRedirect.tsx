@@ -21,9 +21,66 @@ interface PreferredDspRedirectProps {
 }
 
 /**
+ * Session-scoped flag marking that this SmartLink already consumed its
+ * one-shot automatic redirect. Deliberate revisits (in-app nav, browser Back,
+ * reloads within the tab session) render the page instead of looping back to
+ * the DSP. Keyed by pathname so release and track SmartLinks are independent.
+ */
+function autoRedirectStorageKey(pathname: string): string {
+  return `jovie:smartlink:auto-redirected:${pathname}`;
+}
+
+function readSessionFlag(key: string): boolean {
+  try {
+    return globalThis.sessionStorage?.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeSessionFlag(key: string): void {
+  try {
+    globalThis.sessionStorage?.setItem(key, '1');
+  } catch {
+    // Storage unavailable (private mode, quota) — redirect still fires once.
+  }
+}
+
+/**
+ * True when this page load is a history traversal (Back/Forward) or a BFCache
+ * restore. Returning to the SmartLink is explicit evidence the user wants the
+ * Jovie surface, so inferred redirect intent must not fire again.
+ */
+function isHistoryTraversal(): boolean {
+  try {
+    const entry = globalThis.performance?.getEntriesByType?.(
+      'navigation'
+    )?.[0] as PerformanceNavigationTiming | undefined;
+    if (entry?.type === 'back_forward') return true;
+  } catch {
+    // Performance API unavailable — fall through to the session flag.
+  }
+  return false;
+}
+
+function readListenCookie(): string | undefined {
+  const cookieEntry = document.cookie
+    .split(';')
+    .find(cookie => cookie.trim().startsWith(`${LISTEN_COOKIE}=`));
+  return cookieEntry
+    ? cookieEntry.slice(cookieEntry.indexOf('=') + 1).trim()
+    : undefined;
+}
+
+/**
  * Client component that reads the user's preferred DSP from the cookie
  * and redirects to that provider if available. This runs on the client
  * to preserve ISR caching on the server page.
+ *
+ * Preference is durable (cookie); inferred redirect intent is not. An
+ * automatic redirect fires at most once per SmartLink per tab session and is
+ * suppressed entirely on history traversals, so browser Back always renders
+ * the page. Explicit `?dsp=` taps are user intent and always redirect.
  */
 export function PreferredDspRedirect({
   providerLinks,
@@ -35,12 +92,7 @@ export function PreferredDspRedirect({
     const explicitProvider = searchParams.get('dsp');
     const shouldSkipPreferredRedirect = searchParams.get('noredirect') === '1';
 
-    const cookieEntry = document.cookie
-      .split(';')
-      .find(cookie => cookie.trim().startsWith(`${LISTEN_COOKIE}=`));
-    const cookieValue = cookieEntry
-      ? cookieEntry.slice(cookieEntry.indexOf('=') + 1).trim()
-      : undefined;
+    const cookieValue = readListenCookie();
 
     const providerKey = (explicitProvider ??
       (shouldSkipPreferredRedirect ? null : cookieValue)) as ProviderKey | null;
@@ -53,6 +105,13 @@ export function PreferredDspRedirect({
       link => link.providerId === providerKey
     );
     if (!matchingLink?.url) return;
+
+    const isAutomaticRedirect = !explicitProvider;
+    if (isAutomaticRedirect) {
+      const storageKey = autoRedirectStorageKey(globalThis.location.pathname);
+      if (isHistoryTraversal() || readSessionFlag(storageKey)) return;
+      writeSessionFlag(storageKey);
+    }
 
     if (artistHandle && tracking?.contentId && tracking?.contentType) {
       postJsonBeacon(

@@ -100,7 +100,9 @@ run_live_auth_simulator_smoke() {
   echo "Creating dev native auth callback against $api_base_url..."
   callback_response="$(
     node --input-type=module - "$api_base_url" "$persona" <<'NODE'
+import { randomBytes } from 'node:crypto';
 const [apiBaseUrl, persona] = process.argv.slice(2);
+const nativeAttempt = randomBytes(32).toString('base64url');
 const endpoint = new URL('/api/dev/test-auth/mobile-callback', apiBaseUrl);
 const response = await fetch(endpoint, {
   method: 'POST',
@@ -109,6 +111,7 @@ const response = await fetch(endpoint, {
   },
   body: JSON.stringify({
     persona,
+    nativeAttempt,
     returnTo: '/app',
   }),
 });
@@ -128,7 +131,7 @@ try {
   process.exit(1);
 }
 
-if (!payload.callbackUrl || !payload.codeVerifier) {
+if (!payload.callbackUrl || !payload.codeVerifier || payload.nativeAttempt !== nativeAttempt) {
   console.error('Native auth callback route returned an incomplete payload.');
   console.error(JSON.stringify(payload));
   process.exit(1);
@@ -140,11 +143,16 @@ NODE
 
   local callback_url
   local code_verifier
+  local native_attempt
   callback_url="$(
     node -e "const data = JSON.parse(process.argv[1]); process.stdout.write(data.callbackUrl);" "$callback_response"
   )"
   code_verifier="$(
     node -e "const data = JSON.parse(process.argv[1]); process.stdout.write(data.codeVerifier);" "$callback_response"
+  )"
+
+  native_attempt="$(
+    node -e "const data = JSON.parse(process.argv[1]); process.stdout.write(data.nativeAttempt);" "$callback_response"
   )"
 
   echo "Launching native exchange iOS auth smoke in simulator $destination_id..."
@@ -166,6 +174,7 @@ NODE
     "SIMCTL_CHILD_API_BASE_URL=$api_base_url"
     "SIMCTL_CHILD_WEB_BASE_URL=$web_base_url"
     "SIMCTL_CHILD_JOVIE_IOS_PENDING_CODE_VERIFIER=$code_verifier"
+    "SIMCTL_CHILD_JOVIE_IOS_PENDING_NATIVE_ATTEMPT=$native_attempt"
     "SIMCTL_CHILD_JOVIE_IOS_LIVE_AUTH_STATUS=1"
   )
 

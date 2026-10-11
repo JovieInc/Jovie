@@ -30,6 +30,7 @@ const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const EXPECTED_MERGE_GATE_NAMES = [
   'Path Changes',
   'ci-fast',
+  'Blog Content Qualification',
   'CI Risk Classifier',
   'Secret Scan (gitleaks + trufflehog)',
   'Golden Path Lock',
@@ -48,6 +49,7 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Golden Eval Set (deterministic)',
   'Lighthouse (dashboard gate)',
   'Lighthouse (onboarding gate)',
+  'Database Certification (isolated Neon)',
 ];
 
 describe('ci-harness manifest', () => {
@@ -129,7 +131,6 @@ describe('ci-harness manifest', () => {
       'E2E DB Migrate',
       'Full E2E (Preview)',
       'Admin E2E Smoke',
-      'Neon DB',
       'Preview Deploy (manual)',
       'Production Release',
       'Main Release Ready',
@@ -221,7 +222,7 @@ describe('ci-harness manifest', () => {
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
 
     expect(prReady).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]'
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]'
     );
     expect(prReady).toContain('needs.ci-exact-head-coverage.result');
     expect(prReady).toContain('Evaluate deterministic source PR checks');
@@ -257,7 +258,6 @@ describe('ci-harness manifest', () => {
 
     const manualJobs = [
       'ci-knip',
-      'neon-db',
       'ci-drizzle-check',
       'ci-build-public',
       'ci-layout-guard',
@@ -564,6 +564,7 @@ describe('ci-harness manifest', () => {
     expect(mergeReady).toContain('ci-macos');
     expect(mergeReady).toContain('ci-cross-product-integration');
     expect(mergeReady).toContain('drizzle-migration-guard');
+    expect(mergeReady).toContain('neon-db');
     expect(mergeReady).not.toContain(
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
     );

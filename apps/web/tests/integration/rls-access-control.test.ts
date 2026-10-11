@@ -8,7 +8,11 @@ import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
-import { withRlsAnonymous, withRlsUser } from '../setup-db';
+import {
+  setupDatabaseBeforeAll,
+  withRlsAnonymous,
+  withRlsUser,
+} from '../setup-db';
 
 /**
  * RLS Access Control Tests
@@ -23,17 +27,12 @@ import { withRlsAnonymous, withRlsUser } from '../setup-db';
  * - Profiles can only be updated/deleted by their owners
  */
 
-// Use the global test database connection provisioned in tests/setup.ts
-const db = (
-  globalThis as typeof globalThis & { db?: NeonDatabase<typeof schema> }
-).db;
+setupDatabaseBeforeAll();
 
-if (!db) {
-  describe.skip('RLS access control (database)', () => {
-    it.todo('skips because no database connection is configured');
-  });
-} else {
-  describe('RLS access control (database)', () => {
+describe.skipIf(!process.env.DATABASE_URL)(
+  'RLS access control (database)',
+  () => {
+    let db: NeonDatabase<typeof schema>;
     let userAClerkId: string;
     let userBClerkId: string;
     let userAId: string;
@@ -44,6 +43,14 @@ if (!db) {
     let privatePhotoId: string;
 
     beforeAll(async () => {
+      const connection = (
+        globalThis as typeof globalThis & {
+          db?: NeonDatabase<typeof schema>;
+        }
+      ).db;
+      if (!connection) throw new Error('Database connection not initialized');
+      db = connection;
+
       const now = Date.now();
       userAClerkId = `rls_user_a_${now}`;
       userBClerkId = `rls_user_b_${now}`;
@@ -109,8 +116,34 @@ if (!db) {
       privatePhotoId = privatePhoto.id;
     });
 
+    it('uses the migrated policies through a least-privilege runtime role', async () => {
+      const role = await db.execute(drizzleSql`
+        SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls
+        FROM pg_roles WHERE rolname = 'test_app_user'
+      `);
+      expect(role.rows[0]).toMatchObject({
+        rolsuper: false,
+        rolcreatedb: false,
+        rolcreaterole: false,
+        rolbypassrls: false,
+      });
+
+      const policies = await db.execute(drizzleSql`
+        SELECT policyname, qual
+        FROM pg_policies
+        WHERE schemaname = 'public' AND tablename = 'creator_profiles'
+      `);
+      const migratedOwnerPolicy = policies.rows.find(
+        row => row.policyname === 'creator_profiles_select_owner'
+      );
+      expect(migratedOwnerPolicy?.qual).toContain('current_app_user_uuid()');
+      expect(policies.rows.map(row => row.policyname)).toContain(
+        'creator_profiles_owner_bridge'
+      );
+    });
+
     it("prevents a user from reading another user's private profile", async () => {
-      const rows = await withRlsUser(userAClerkId, async tx => {
+      const rows = await withRlsUser(userAId, async tx => {
         return tx.execute(
           drizzleSql.raw(
             `SELECT id FROM creator_profiles WHERE id = '${privateProfileId}'`
@@ -123,7 +156,7 @@ if (!db) {
     });
 
     it('allows the owner to read their own private profile', async () => {
-      const rows = await withRlsUser(userBClerkId, async tx => {
+      const rows = await withRlsUser(userBId, async tx => {
         return tx.execute(
           drizzleSql.raw(
             `SELECT id FROM creator_profiles WHERE id = '${privateProfileId}'`
@@ -137,7 +170,7 @@ if (!db) {
     });
 
     it("prevents a user from updating another user's profile", async () => {
-      const updated = await withRlsUser(userAClerkId, async tx => {
+      const updated = await withRlsUser(userAId, async tx => {
         return tx.execute(
           drizzleSql.raw(
             `UPDATE creator_profiles SET display_name = 'unauthorized-update' WHERE id = '${privateProfileId}' RETURNING id`
@@ -213,7 +246,7 @@ if (!db) {
         })
         .returning({ id: billingAuditLog.id });
 
-      const asB = await withRlsUser(userBClerkId, async tx => {
+      const asB = await withRlsUser(userBId, async tx => {
         return tx.execute(
           drizzleSql.raw(
             `SELECT id FROM billing_audit_log WHERE id = '${audit.id}'`
@@ -239,7 +272,7 @@ if (!db) {
         content: 'secret message',
       });
 
-      const asA = await withRlsUser(userAClerkId, async tx => {
+      const asA = await withRlsUser(userAId, async tx => {
         return tx.execute(
           drizzleSql.raw(
             `SELECT id FROM chat_conversations WHERE id = '${conversation.id}'`
@@ -248,7 +281,7 @@ if (!db) {
       });
       expect(asA.rows).toHaveLength(0);
 
-      const messagesAsA = await withRlsUser(userAClerkId, async tx => {
+      const messagesAsA = await withRlsUser(userAId, async tx => {
         return tx.execute(
           drizzleSql.raw(
             `SELECT id FROM chat_messages WHERE conversation_id = '${conversation.id}'`
@@ -269,7 +302,7 @@ if (!db) {
         })
         .returning({ id: tips.id });
 
-      const asA = await withRlsUser(userAClerkId, async tx => {
+      const asA = await withRlsUser(userAId, async tx => {
         return tx.execute(
           drizzleSql.raw(`SELECT id FROM tips WHERE id = '${tip.id}'`)
         );
@@ -284,5 +317,5 @@ if (!db) {
         .limit(1);
       expect(row?.id).toBe(tip.id);
     });
-  });
-}
+  }
+);

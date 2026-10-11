@@ -10,10 +10,17 @@ import type { AdminLead } from '@/lib/queries';
 const mockLeadsInfiniteQuery = vi.fn();
 const mockUpdateLeadStatusMutation = vi.fn();
 
-vi.mock('@/lib/queries', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/queries')>();
+vi.mock('@/lib/queries', async () => {
+  const [fetchQueries, { queryKeys }] = await Promise.all([
+    vi.importActual<typeof import('@/lib/queries/fetch')>(
+      '@/lib/queries/fetch'
+    ),
+    vi.importActual<typeof import('@/lib/queries/keys')>('@/lib/queries/keys'),
+  ]);
+
   return {
-    ...actual,
+    isForbiddenError: fetchQueries.isForbiddenError,
+    queryKeys,
     useLeadsInfiniteQuery: (...args: unknown[]) =>
       mockLeadsInfiniteQuery(...args),
     useUpdateLeadStatusMutation: () => mockUpdateLeadStatusMutation(),

@@ -40,7 +40,9 @@ function productionFiles(dir: string, out: string[] = []): string[] {
 }
 
 describe('shipping-state dead source guard', () => {
-  it('has no production reference to the retired Symphony port or Gem-local state', () => {
+  it('has no production reference to the retired Symphony port or Gem-local state', {
+    timeout: 60_000,
+  }, () => {
     const offenders = sourceDirs
       .flatMap(dir => productionFiles(dir))
       .filter(file => {

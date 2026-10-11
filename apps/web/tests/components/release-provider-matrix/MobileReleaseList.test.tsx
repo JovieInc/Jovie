@@ -153,4 +153,10 @@ describe('MobileReleaseList', () => {
     expect(badge.className).toContain('items-center');
     expect(badge.className).toContain('leading-none');
   });
+
+  it('imports mobile tokens from the direct module instead of the barrel', () => {
+    const source = readWebSource(mobileReleaseListSourcePath);
+    expect(source).toContain('@/features/dashboard/tokens/mobile-tokens');
+    expect(source).not.toContain("from '@/features/dashboard/tokens'");
+  });
 });

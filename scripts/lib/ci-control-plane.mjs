@@ -38,3 +38,18 @@ export {
   validateAggregateRequiredChecks,
   validateMergeQueueRepoConfig,
 } from './merge-queue-guard.mjs';
+export {
+  buildLivenessEvent,
+  classifyPrLiveness,
+  DEFAULT_MAX_REMEDIATION_ATTEMPTS,
+  DEFAULT_PR_LIVENESS_THRESHOLDS,
+  HEARTBEAT_TYPES,
+  LIVENESS_BREACHES,
+  livenessIdempotencyKey,
+  nextRemediationAction,
+  PR_LIVENESS_EVENT_SCHEMA,
+  PR_LIVENESS_RECEIPT_SCHEMA,
+  PR_LIVENESS_SCHEMA,
+  PR_LIVENESS_STATES,
+  REMEDIATION_ACTIONS,
+} from './pr-liveness.mjs';

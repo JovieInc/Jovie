@@ -4,17 +4,13 @@ import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import {
-  ShellReleasesView,
-  type ShellReleasesViewProps,
-} from './ShellReleasesView';
+  PRIMARY_PROVIDER_KEYS,
+  PROVIDER_CONFIG,
+} from '@/lib/discography/config';
+import { ShellReleasesView } from './ShellReleasesView';
 
-const providerConfig = {
-  spotify: { label: 'Spotify', accent: '#1db954' },
-} satisfies ShellReleasesViewProps['providerConfig'];
-
-const primaryProviders = [
-  'spotify',
-] satisfies ShellReleasesViewProps['primaryProviders'];
+const providerConfig = PROVIDER_CONFIG;
+const primaryProviders = PRIMARY_PROVIDER_KEYS;
 
 const meta = {
   title: 'Dashboard/Releases/Shell Releases View',

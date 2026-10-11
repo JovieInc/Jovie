@@ -51,21 +51,27 @@ const SAME_ORIGIN_EXTERNAL_ROUTE_PREFIXES = [
   '/about',
   '/ai',
   '/alternatives',
+  '/api-versioning',
   '/artist-notifications',
   '/artist-profile',
   '/artist-profiles',
   '/artists',
   '/blog',
   '/brand',
+  '/card',
   '/changelog',
   '/claim',
+  '/cli',
   '/compare',
   '/demo',
   '/demovideo',
+  '/developers',
   '/docs',
   '/download',
   '/drop',
+  '/engineering',
   '/go',
+  '/instant-merch',
   '/investors',
   '/launch',
   '/legal',
@@ -74,10 +80,16 @@ const SAME_ORIGIN_EXTERNAL_ROUTE_PREFIXES = [
   '/p',
   '/pay',
   '/pricing',
+  '/product',
   '/r',
   '/renders',
   '/s',
+  '/smart-links',
+  '/solutions',
   '/support',
+  '/voice',
+  '/waitlist',
+  '/youtube-thumbnails',
   '/auth/start',
   '/auth/native-complete',
   '/signin',
@@ -135,7 +147,8 @@ export function parseUrl(urlString: string): URL | null {
   if (urlString.startsWith('//')) return null;
 
   try {
-    return new URL(urlString);
+    const parsed = new URL(urlString);
+    return parsed.username || parsed.password ? null : parsed;
   } catch {
     return null;
   }
@@ -157,7 +170,7 @@ function hasSafePathname(pathname: string): boolean {
     return false;
   }
 
-  return !decoded.includes('\\') && !decoded.startsWith('//');
+  return !decoded.includes('\\') && !decoded.includes('//');
 }
 
 function isAppOriginUrl(parsed: URL, options: UrlDispositionOptions): boolean {

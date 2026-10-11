@@ -75,6 +75,8 @@ export interface PublicDiscogReleaseLite {
   releaseDate: string | null;
   revealDate: string | null;
   artworkUrl: string | null;
+  /** First non-empty track preview URL in disc/track order, when one exists. */
+  primaryPreviewUrl: string | null;
 }
 
 export interface UpsertReleaseInput {
@@ -292,6 +294,66 @@ async function getArtistNamesForReleases(
 }
 
 /**
+ * First non-empty track preview URL per release (disc/track order), matching
+ * the `primary_preview_url` projection in {@link trackSummarySelectColumns}.
+ * Kept separate so the Lite query pays only for the column the public PAC
+ * needs instead of the full track-summary aggregate.
+ */
+async function getPrimaryPreviewUrlsForReleases(
+  releaseIds: string[]
+): Promise<Map<string, string>> {
+  if (releaseIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await db
+    .select({
+      releaseId: discogReleaseTracks.releaseId,
+      primaryPreviewUrl:
+        drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogRecordings.previewUrl}), '') ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL))[1]`.as(
+          'primary_preview_url'
+        ),
+    })
+    .from(discogReleaseTracks)
+    .innerJoin(
+      discogRecordings,
+      eq(discogReleaseTracks.recordingId, discogRecordings.id)
+    )
+    .where(inArray(discogReleaseTracks.releaseId, releaseIds))
+    .groupBy(discogReleaseTracks.releaseId);
+
+  const urlsByRelease = new Map<string, string>();
+  for (const row of rows) {
+    if (row.primaryPreviewUrl) {
+      urlsByRelease.set(row.releaseId, row.primaryPreviewUrl);
+    }
+  }
+
+  // Unmigrated releases can still store previews only in discog_tracks.
+  // Preserve new-model previews and bound the fallback to missing releases.
+  const missingIds = releaseIds.filter(id => !urlsByRelease.has(id));
+  if (missingIds.length > 0) {
+    const legacyRows = await db
+      .select({
+        releaseId: discogTracks.releaseId,
+        primaryPreviewUrl:
+          drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogTracks.previewUrl}), '') ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogTracks.previewUrl}), '') IS NOT NULL))[1]`.as(
+            'primary_preview_url'
+          ),
+      })
+      .from(discogTracks)
+      .where(inArray(discogTracks.releaseId, missingIds))
+      .groupBy(discogTracks.releaseId);
+    for (const row of legacyRows) {
+      if (row.primaryPreviewUrl) {
+        urlsByRelease.set(row.releaseId, row.primaryPreviewUrl);
+      }
+    }
+  }
+  return urlsByRelease;
+}
+
+/**
  * Get the latest release for a creator profile (by release date, most recent first)
  */
 export async function getLatestReleaseForProfile(
@@ -441,15 +503,18 @@ export async function getReleasesForProfileLite(
 
   if (releases.length === 0) return [];
 
-  const artistNamesByRelease = await getArtistNamesForReleases(
-    releases.map(r => r.id)
-  );
+  const releaseIds = releases.map(r => r.id);
+  const [artistNamesByRelease, previewUrlsByRelease] = await Promise.all([
+    getArtistNamesForReleases(releaseIds),
+    getPrimaryPreviewUrlsForReleases(releaseIds),
+  ]);
 
   return releases.map(release => ({
     ...release,
     releaseDate: release.releaseDate?.toISOString() ?? null,
     revealDate: release.revealDate?.toISOString() ?? null,
     artistNames: artistNamesByRelease.get(release.id) ?? [],
+    primaryPreviewUrl: previewUrlsByRelease.get(release.id) ?? null,
   }));
 }
 

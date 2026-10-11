@@ -62,6 +62,11 @@ Unknown means measure first.
 - Distribution work waits if production/activation is broken.
 - Start with low-risk audiences before high-profile outreach when product stability is uncertain.
 - Every campaign must have a measurement and stop rule.
+- About pages answer the visitor's identity and trust questions with supported
+  facts and inspectable links. Company and artist pages retain their own search
+  intent; structural SEO checks never prove ranking or customer conversion.
+  Apply the [verified About/search guidance](../docs/marketing/COMPOSITION_RULES.md#about-pages-and-search-evidence)
+  through the existing copy, product-truth, SEO and measurement owners.
 - Jovie-owned generated or intentionally art-directed campaign imagery follows
   the design canon's scene-first color harmony: controllable set color is
   chosen before generation/capture, and protected real-world identity remains
@@ -93,6 +98,7 @@ The executable landing-page copy workflow is in
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-02 | Added source-classified About/search guidance and distinct artist/ranking outcome boundaries. | Tim voice direction; JOV-7429; Google Search Central |
 | 2026-08-21 | Linked Jovie-owned generated campaign imagery to the scene-first design color contract. | Tim White approval |
 | 2026-08-04 | Added outcome-bound semantic guard against prompt/meta-copy leakage; shadow legacy, delta new/changed copy. | Tim White direction |
 | 2026-08-03 | Added meaning-first section intent, headline-story, and evidence rules. | Tim White direction |

@@ -1,12 +1,15 @@
+import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  mockPrivacy,
   mockGetCachedAuth,
   mockGetFreshAuth,
   mockIsAdmin,
   mockCaptureWarning,
   mockAddBreadcrumb,
 } = vi.hoisted(() => ({
+  mockPrivacy: vi.fn(),
   mockGetCachedAuth: vi.fn(),
   mockGetFreshAuth: vi.fn(),
   mockIsAdmin: vi.fn(),
@@ -14,6 +17,16 @@ const {
   mockAddBreadcrumb: vi.fn(),
 }));
 
+vi.mock('@/lib/ovie/privacy-lock/server', () => ({
+  assertOviePrivacyUnlocked: mockPrivacy,
+}));
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  privacyErrorResponse: () =>
+    NextResponse.json(
+      { error: 'Privacy locked', code: 'PRIVACY_UNLOCK_REQUIRED' },
+      { status: 403 }
+    ),
+}));
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
   getFreshAuth: mockGetFreshAuth,
@@ -40,6 +53,7 @@ vi.mock('@/lib/auth/mask-user-id', () => ({
 describe('requireAdmin (Better Auth)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrivacy.mockResolvedValue(undefined);
     vi.resetModules();
   });
 
@@ -156,5 +170,22 @@ describe('checkIsAdmin (Better Auth)', () => {
     const { checkIsAdmin } = await import('@/lib/admin/middleware');
     await expect(checkIsAdmin()).resolves.toBe(true);
     expect(mockIsAdmin).toHaveBeenCalledWith('user_admin');
+  });
+});
+
+describe('admin API private data boundary', () => {
+  it('denies role-authorized access before data when privacy is locked', async () => {
+    mockGetCachedAuth.mockResolvedValue({
+      userId: 'user_admin',
+      sessionId: 's1',
+    });
+    mockIsAdmin.mockResolvedValue(true);
+    mockPrivacy.mockRejectedValue(Error('privacy locked'));
+    const { requireAdmin } = await import('@/lib/admin/middleware');
+    expect((await requireAdmin())?.status).toBe(403);
+    expect(mockPrivacy).toHaveBeenCalledWith({
+      userId: 'user_admin',
+      sessionId: 's1',
+    });
   });
 });

@@ -6,22 +6,32 @@
  */
 export const HOMEPAGE_IDENTITY_COPY = {
   seo: {
-    title: 'Jovie | Your living identity on the internet',
+    title: 'Jovie | Be found. Be understood.',
     description:
-      'Your work, your links, your next chapter. Together in your Jovie profile.',
+      'Claim your name. Jovie makes you easy to reach, for people and for agents.',
   },
   hero: {
-    headline: 'Your living identity on the internet.',
+    kicker: 'Jovie',
+    headline: 'Be found. Be understood.',
+    // JOV-7581: do not claim web research here. profile-monitoring is
+    // internal-only and has no public marketing block.
     subhead:
-      'Your work, your links, your next chapter. Together in your Jovie profile.',
-    // Certified conversion (JOV-5085): the hero action is always the name
-    // search, even while the waitlist gate is on.
-    search: {
-      placeholder: 'Search your name',
-      action: 'Find me',
+      'Claim your name. Jovie makes you easy to reach, for people and for agents.',
+    // Homepage conversion (EVENT 2026-09-28, Tim: link claim replaces the
+    // JOV-5085 name search): claim jov.ie/you, then /start with the handle.
+    claim: {
+      domain: 'jov.ie/',
+      placeholder: 'you',
+      action: 'Claim',
     },
-    // Real first-party proof (JOV-6946): the hero shows Tim White's live
-    // jov.ie/tim profile, never a fictional placeholder person.
+    // Real first-party proof (JOV-6946, JOV-INV-038 proximal proof): the
+    // claim card shows Tim White's real claimed jov.ie/tim, never a
+    // fictional placeholder person (Tim 2026-09-28).
+    preview: {
+      label: 'Claimed',
+      name: 'Tim White',
+      role: 'Founder, Jovie',
+    },
     proofAlt: 'Tim White’s Jovie profile at jov.ie/tim',
   },
   // Presence and structure chapters, then the close.
@@ -57,8 +67,40 @@ export const HOMEPAGE_IDENTITY_COPY = {
       },
     },
   ],
+  // Plain answers to the questions a first visit raises. Every answer names a
+  // shipped surface: the free plan, jov.ie/you/llms.txt and the read-only
+  // profile API (lib/agent/site-llms-guidance.ts).
+  faq: {
+    heading: 'Questions',
+    items: [
+      {
+        question: 'What is Jovie?',
+        answer:
+          'Jovie gives you one public profile at jov.ie/you. It holds your name, your story, your work and your links, plus ways to reach you, like events and payments.',
+      },
+      {
+        question: 'How do I claim my name?',
+        answer:
+          'Type the name you want after jov.ie/ and select Claim. If the name is free, Jovie walks you through setting up the rest of your profile.',
+      },
+      {
+        question: 'Who is Jovie for?',
+        answer:
+          'Anyone who wants to be easy to find and easy to reach: founders, investors, creators, authors and the people they work with.',
+      },
+      {
+        question: 'What does it mean to be reachable by agents?',
+        answer:
+          'Every public profile also has a machine-readable summary at jov.ie/you/llms.txt and read-only structured data, so AI assistants can find you and describe you accurately.',
+      },
+      {
+        question: 'Does it cost anything?',
+        answer:
+          'Your public Jovie profile is free. Paid plans add more tools, and the pricing page lists what each one includes.',
+      },
+    ],
+  },
   close: {
     headline: 'Make it your Jovie profile.',
-    action: 'Find your profile',
   },
 } as const;

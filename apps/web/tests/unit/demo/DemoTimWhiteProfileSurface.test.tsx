@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
@@ -11,6 +11,7 @@ const { mockSearchParams, mockStaticArtistPage } = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => mockSearchParams(),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
 vi.mock('@/features/profile/StaticArtistPage', () => ({
@@ -18,6 +19,19 @@ vi.mock('@/features/profile/StaticArtistPage', () => ({
     mockStaticArtistPage(props);
     return <div data-testid='static-artist-page' />;
   },
+}));
+
+// This suite covers demo state selection. Rail/PAC behavior has its own real
+// mounted tests; isolate those unrelated renderers from the showcase inventory.
+vi.mock('@/features/profile/ProfileHomeRail', () => ({
+  ProfileHomeRail: () => <div data-testid='profile-home-rail' />,
+}));
+vi.mock('@/features/profile/ProfilePrimaryActionCard', () => ({
+  ProfilePrimaryActionCard: ({
+    dataTestId,
+  }: {
+    readonly dataTestId: string;
+  }) => <div data-testid={dataTestId} />,
 }));
 
 vi.mock('@/features/demo/DemoClientProviders', () => ({
@@ -51,6 +65,22 @@ describe('DemoTimWhiteProfileSurface', () => {
     mockSearchParams.mockReturnValue(new URLSearchParams());
     mockStaticArtistPage.mockClear();
   });
+
+  it(
+    'shows supported card examples without inventing an alerts fallback card',
+    async () => {
+      await renderSurface('showcase=cards');
+      expect(
+        screen.getByTestId('demo-showcase-tim-white-profile-cards')
+      ).toBeVisible();
+      expect(
+        screen.queryByTestId('tim-white-cards-alerts-fallback')
+      ).toBeNull();
+      expect(screen.getByTestId('tim-white-cards-release-live')).toBeVisible();
+      expect(screen.getByTestId('tim-white-cards-tour-next')).toBeVisible();
+    },
+    SLOW_DEMO_SURFACE_TIMEOUT_MS
+  );
 
   it(
     'renders the default clean Tim White profile screenshot surface',

@@ -1,10 +1,10 @@
-import { head } from '@vercel/blob';
 import {
   AUDIO_FORMAT_REGISTRY,
   type AudioFormatId,
   getAudioFormatByFileName,
   getAudioFormatByMimeType,
 } from '@/lib/audio/constants';
+import { inspectOwnedBlob } from '@/lib/blob-inspection';
 import { logger } from '@/lib/utils/logger';
 import { type AudioBlobSurface, getAudioBlobPathPrefix } from './blob-path';
 
@@ -245,34 +245,25 @@ async function verifyAudioBlobInternal(input: {
       'The declared audio format is not supported.'
     );
 
-  const metadata = await head(input.blobPathname);
-  if (
-    !metadata.pathname.startsWith(expectedPrefix) ||
-    metadata.pathname !== input.blobPathname ||
-    !metadata.url
-  ) {
-    reject(
-      'audio.blob_ownership',
-      'Audio upload must belong to the authenticated user.'
-    );
-  }
-  if (
-    !Number.isSafeInteger(metadata.size) ||
-    metadata.size <= 0 ||
-    metadata.size > input.maxSizeBytes
-  ) {
-    reject(
-      'audio.blob_metadata',
-      'The stored audio size is invalid or exceeds the upload limit.'
-    );
-  }
-
-  const response = await fetch(metadata.url, {
-    headers: { Range: `bytes=0-${MAX_BYTES_TO_INSPECT - 1}` },
+  const metadata = await inspectOwnedBlob({
+    blobPathname: input.blobPathname,
+    expectedPathPrefix: expectedPrefix,
+    maxSizeBytes: input.maxSizeBytes,
+    maxBytesToInspect: MAX_BYTES_TO_INSPECT,
+    onOwnershipError: () =>
+      reject(
+        'audio.blob_ownership',
+        'Audio upload must belong to the authenticated user.'
+      ),
+    onInvalidSize: () =>
+      reject(
+        'audio.blob_metadata',
+        'The stored audio size is invalid or exceeds the upload limit.'
+      ),
+    onUnreadable: () =>
+      reject('audio.blob_metadata', 'The stored audio could not be read.'),
   });
-  if (!response.ok)
-    reject('audio.blob_metadata', 'The stored audio could not be read.');
-  const bytes = new Uint8Array(await response.arrayBuffer());
+  const bytes = metadata.bytes;
   const formatId = sniffAudioBytes(bytes, metadata.size);
   if (!formatId)
     reject(

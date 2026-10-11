@@ -27,7 +27,7 @@ const routeSource = `
 export const APP_ROUTES = {
   START: '/start',
   LIBRARY: '/app/library',
-  SETTINGS_ARTIST_PROFILE: '/app/settings/artist-profile',
+  SETTINGS_PROFILE: '/app/settings/artist-profile',
 } as const;
 `;
 

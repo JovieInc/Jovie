@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   ProfileWorkspaceConnectorRow,
   ProfileWorkspaceSurfaceRow,
@@ -30,7 +30,9 @@ function surface(
     monitoringState: 'active',
     rank: 4,
     previousRank: 6,
-    lastObservedAt: '2026-09-16T00:00:00.000Z',
+    lastObservedAt: new Date(
+      Date.now() - PRESENCE_STALE_AFTER_MS / 2
+    ).toISOString(),
     ...overrides,
   };
 }
@@ -53,6 +55,16 @@ function connector(
 }
 
 describe('connections workspace helpers', () => {
+  beforeEach(() => {
+    // Keep healthy and deliberately stale observations relative to one test clock.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-17T00:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('does not claim healthy monitoring during an unavailable search provider', () => {
     expect(getConnectionStatus(surface(), false)).toMatchObject({
       label: 'Search Unavailable',
@@ -143,6 +155,19 @@ describe('connections workspace helpers', () => {
     ).toEqual(['conflicting', 'locked', 'spotify']);
     expect(getConnectionStatus(conflicting).label).toBe('Needs Review');
     expect(getConnectionStatus(locked).label).toBe('Limit Reached');
+  });
+
+  it('retains rejected identities as non-actionable negative evidence', () => {
+    expect(
+      getConnectionStatus(
+        surface({ qualificationStatus: 'rejected', monitoringState: 'active' })
+      )
+    ).toMatchObject({
+      label: 'Not You',
+      needsAttention: false,
+      nextAction:
+        'This identity was rejected and is retained as negative evidence.',
+    });
   });
 
   it('orders broken, limited, measured, then unmeasured connections', () => {
@@ -277,6 +302,20 @@ describe('connections workspace helpers', () => {
       ]).monitoringLabel
     ).toBe('Unavailable');
   });
+
+  it.each([
+    [PRESENCE_STALE_AFTER_MS, 'Active', false],
+    [PRESENCE_STALE_AFTER_MS + 1, 'Stale', true],
+  ] as const)(
+    'preserves monitoring freshness at observation age %i milliseconds',
+    (ageMs, label, needsAttention) => {
+      const row = surface({
+        lastObservedAt: new Date(Date.now() - ageMs).toISOString(),
+      });
+
+      expect(getConnectionStatus(row)).toMatchObject({ label, needsAttention });
+    }
+  );
 
   it('treats stale observations as attention, not a zero score', () => {
     const stale = surface({

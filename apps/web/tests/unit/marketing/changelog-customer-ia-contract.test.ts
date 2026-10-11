@@ -42,16 +42,28 @@ describe('customer changelog IA contract', () => {
     expect(archive).not.toContain('Show 5');
     expect(archive).not.toContain('Showing');
     expect(archive).toContain('Technical details');
-    expect(archive).toContain('Product update');
+    // One entry, told once: no placeholder label or second card repeating
+    // the announcement; real media only via the projected media contract.
+    expect(archive).not.toContain('Product update');
+    expect(archive).not.toContain('changelog-entry__card');
+    expect(archive).not.toContain('changelog-entry-media--');
+    expect(archive).toContain('entry.media');
     expect(archive).not.toContain('gradient');
-    expect(archive).not.toContain('<img');
 
     const editorialCss = readWebSource(EDITORIAL_CSS);
+    // The archive needs the full editorial width; reserving the subscription
+    // column squeezes the nested date/copy/media grid below readable widths.
+    expect(editorialCss).toMatch(
+      /\.changelog-entries\s*\{\s*grid-column: 1 \/ -1;/
+    );
+    expect(editorialCss).toMatch(
+      /\.changelog-subscribe-rail\s*\{\s*grid-column: 2;\s*grid-row: 1;/
+    );
     expect(editorialCss).toContain(
       'top: calc(var(--public-shell-header-offset) + var(--space-4));'
     );
     expect(editorialCss).toMatch(
-      /\.changelog-subscribe-rail\s*\{[\s\S]*position: sticky/
+      /\.changelog-subscribe-rail > \.changelog-subscribe\s*\{\s*position: sticky/
     );
     expect(editorialCss).toMatch(
       /@media \(max-width: 1023px\)[\s\S]*\.changelog-subscribe-rail[\s\S]*position: static/

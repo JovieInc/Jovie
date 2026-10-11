@@ -7,14 +7,22 @@
 #
 #   diverged  main was rewound or force-pushed past this SHA      -> yield
 #   ancestor  a newer generation is already queued in the FIFO    -> yield,
-#             unless main has carried unshipped commits for longer than
-#             PRODUCTION_STARVATION_SECONDS                          -> proceed
+#             even past the PRODUCTION_STARVATION_SECONDS bound —
+#             a queued generation costs seconds to yield, so a stale
+#             backlog drains to the newest queued generation instead
+#             of every stale generation running the full pipeline
+#   ancestor  newer generation queued, but this generation is already
+#             IN_FLIGHT past coalescing and production is starving    -> proceed
+#             (the bound still guarantees a ship under perpetual merges)
 #   ancestor  no newer generation is queued yet                    -> proceed
 #
 # Yielding only to a generation that already exists keeps the FIFO draining
-# faster than merges arrive; the time bound guarantees progress even if it
-# does not. 2026-09-26: exact-SHA yields at every boundary left jov.ie 611
-# commits behind main while every generation was superseded mid-pipeline.
+# faster than merges arrive; the starvation bound keeps an in-flight
+# generation from yielding forever. 2026-09-26: exact-SHA yields at every
+# boundary left jov.ie 611 commits behind main while every generation was
+# superseded mid-pipeline. 2026-09-29: letting queued ancestors keep the
+# lease under starvation shipped every stale generation FIFO (78 queued,
+# ~15h behind); the bound now applies only to generations already in flight.
 set -euo pipefail
 
 expected="${EXPECTED_SHA:?EXPECTED_SHA is required}"
@@ -22,6 +30,11 @@ current="${CURRENT_MAIN_SHA:?CURRENT_MAIN_SHA is required}"
 repository="${REPOSITORY:-${GITHUB_REPOSITORY:-}}"
 run_id="${GITHUB_RUN_ID:-0}"
 boundary="${BOUNDARY:-release lineage}"
+# IN_FLIGHT=true marks boundaries reached after this generation committed
+# pipeline work (past coalescing). Only there does the starvation bound keep
+# the lease despite a queued successor; a still-queued generation always
+# drains to the newest queued generation.
+in_flight="${IN_FLIGHT:-false}"
 build_info_url="${PRODUCTION_BUILD_INFO_URL:-https://jov.ie/api/health/build-info}"
 starvation_seconds="${PRODUCTION_STARVATION_SECONDS:-5400}"
 gh_cli="${GH_CLI:-gh}"
@@ -70,11 +83,27 @@ if [ "$lineage" = diverged ]; then
 elif [ "$lineage" = ancestor ]; then
   # A newer generation already waiting on the production-mutation lease will
   # ship a SHA closer to main; yield to it rather than build a stale one.
-  runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&per_page=30" 2>/dev/null || true)"
-  pending="$(jq -r --argjson run "$run_id" \
-    '[(.workflow_runs // [])[] | select(.status != "completed" and .id > $run)] | length' \
-    <<<"${runs_json:-{\}}" 2>/dev/null || echo 0)"
-  [[ "$pending" =~ ^[0-9]+$ ]] || pending=0
+  # Unknown visibility must not become an empty-queue decision, including
+  # under starvation. Emit bounded diagnostics without raw API response text.
+  lookup_status=0
+  runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&per_page=30" 2>/dev/null)" || lookup_status=$?
+  if [ "$lookup_status" -ne 0 ] || ! pending="$(jq -er --argjson run "$run_id" '
+    if (.workflow_runs | type) != "array" or
+      any(.workflow_runs[]; (.id | type) != "number" or .id <= 0 or
+        (.status | type) != "string" or (.status | length) == 0)
+    then error("invalid workflow run listing")
+    else [.workflow_runs[] | select(.status != "completed" and .id > $run)] | length end
+  ' <<<"$runs_json" 2>/dev/null)"; then
+    emit lineage "$lineage"
+    emit successor_pending unknown
+    emit successor_lookup_exit "$lookup_status"
+    emit starving unknown
+    emit gate_decision error
+    emit gate_reason successor_lookup_unavailable
+    echo "::error::Release successor lookup is unknown (exit=$lookup_status); inspect Actions run-list access/response before admission." >&2
+    printf 'decision=error\n'
+    exit 1
+  fi
   if [ "$pending" -gt 0 ]; then
     successor_pending=true
   fi
@@ -106,8 +135,10 @@ elif [ "$lineage" = ancestor ]; then
 
   if [ "$successor_pending" = false ]; then
     reason="main advanced to $current but no newer generation is queued; ancestor $expected keeps the lease"
+  elif [ "$starving" = true ] && [ "$in_flight" = true ]; then
+    reason="production is starving ($starve_detail); in-flight ancestor $expected keeps the lease despite $pending queued successor(s)"
   elif [ "$starving" = true ]; then
-    reason="production is starving ($starve_detail); ancestor $expected keeps the lease despite $pending queued successor(s)"
+    reason="production is starving ($starve_detail); queued ancestor $expected drains to the newest of $pending queued successor(s)"
   else
     reason="$pending newer generation(s) already queued behind $expected; yielding the lease"
   fi
@@ -116,13 +147,14 @@ fi
 decision=yield
 if [ "$lineage" = exact ]; then
   decision=proceed
-elif [ "$lineage" = ancestor ] && { [ "$successor_pending" = false ] || [ "$starving" = true ]; }; then
+elif [ "$lineage" = ancestor ] && { [ "$successor_pending" = false ] || { [ "$starving" = true ] && [ "$in_flight" = true ]; }; }; then
   decision=proceed
 fi
 
 emit lineage "$lineage"
 emit successor_pending "$successor_pending"
 emit starving "$starving"
+emit in_flight "$in_flight"
 emit live_sha "$live_sha"
 emit unshipped_commits "$unshipped_commits"
 emit unshipped_age_seconds "$unshipped_age_seconds"

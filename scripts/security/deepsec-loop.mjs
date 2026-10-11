@@ -74,6 +74,20 @@ function round(value, places = 4) {
 
 // ---- Models --------------------------------------------------------------
 
+// Gateway model policy (Tim directive 2026-09-28, JOV-7119): OpenAI and
+// Anthropic are banned on the Vercel AI Gateway — no per-token billing under
+// any path. DeepSec may only scan with the approved zai pair; the bench
+// leaderboard keeps recommending banned models, so selection filters here
+// rather than trusting the source.
+export const ALLOWED_GATEWAY_MODELS = Object.freeze([
+  'zai/glm-5.3',
+  'zai/glm-5.3-flash',
+]);
+
+export function isAllowedGatewayModel(gatewayId) {
+  return ALLOWED_GATEWAY_MODELS.includes(gatewayId);
+}
+
 // DeepSecBench rows name the gateway id; codex/claude harnesses take the bare
 // model name, pi takes the full gateway id (mirrors deepsec's own mapping).
 export function harnessModel(entry) {
@@ -86,10 +100,13 @@ export function harnessModel(entry) {
   });
 }
 
-// The best-scoring configuration of each of the top-N distinct models.
+// The best-scoring configuration of each of the top-N distinct models, limited
+// to the gateway-approved set — a banned-provider leaderboard entry is never a
+// scan candidate (JOV-7119).
 export function frontierModels(results, topN) {
   const best = new Map();
   for (const row of results ?? []) {
+    if (!isAllowedGatewayModel(row?.modelId)) continue;
     if (typeof row?.score !== 'number' || !row.modelId) continue;
     const current = best.get(row.modelId);
     if (!current || row.score > current.score) best.set(row.modelId, row);
@@ -619,16 +636,22 @@ export function planReconciliation({ groups, issues, analyzed, maxNew }) {
   return actions;
 }
 
-// Files whose open or unverified issues need a same-model re-scan.
+// Files whose open or unverified issues need a same-model re-scan. Markers
+// recorded before the gateway model ban (JOV-7119) name openai/anthropic ids
+// that can no longer run; those verifications fall back to the approved cheap
+// model rather than billing a banned provider.
 export function verificationTargets(issues) {
   const byModel = new Map();
   for (const issue of issues) {
     const marker = readMarker(issue.description);
     if (!marker?.fp || marker.verifiedAt || stateType(issue) === 'canceled')
       continue;
-    const files = byModel.get(marker.model) ?? new Set();
+    const model = isAllowedGatewayModel(marker.model)
+      ? marker.model
+      : ALLOWED_GATEWAY_MODELS[1];
+    const files = byModel.get(model) ?? new Set();
     files.add(marker.path);
-    byModel.set(marker.model, files);
+    byModel.set(model, files);
   }
   return [...byModel].map(([gatewayId, files]) => ({
     gatewayId,

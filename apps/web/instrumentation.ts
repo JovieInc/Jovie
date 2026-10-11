@@ -178,6 +178,14 @@ async function runEnvironmentValidationWithRetry() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { musicResolverCutoverReceipt } = await import(
+      '@/lib/music-resolver/musicfetch-gate'
+    );
+    console.info(
+      '[STARTUP] Music resolver cutover receipt',
+      musicResolverCutoverReceipt()
+    );
+
     if (!isLocalTestRuntime() && process.env.CI !== 'true') {
       // Agnost AI analytics (Vercel AI SDK spans via OpenTelemetry).
       // Lazy import keeps OTel out of Edge bundles; init failure must not block boot.
@@ -325,12 +333,18 @@ export async function onRequestError(...args: unknown[]) {
   // Linear title. Nested wrappers keep the bag on `cause`. A raw quota
   // `UpstashError` (JOV-5181 / JOV-5184) files as `ERR max requests limit
   // exceeded` — the hourly operability canary owns the standing alert.
-  const [{ isOpaqueUpstashErrorJsonBag }, { isRedisQuotaFailure }] =
-    await Promise.all([
-      import('@/lib/sentry/non-actionable-issues'),
-      import('@/lib/utils/errors'),
-    ]);
-  if (isOpaqueUpstashErrorJsonBag(args[0]) || isRedisQuotaFailure(args[0])) {
+  const [
+    { isMusicfetchCutoverCapture, isOpaqueUpstashErrorJsonBag },
+    { isRedisQuotaFailure },
+  ] = await Promise.all([
+    import('@/lib/sentry/non-actionable-issues'),
+    import('@/lib/utils/errors'),
+  ]);
+  if (
+    isOpaqueUpstashErrorJsonBag(args[0]) ||
+    isRedisQuotaFailure(args[0]) ||
+    isMusicfetchCutoverCapture(args[0])
+  ) {
     return;
   }
 

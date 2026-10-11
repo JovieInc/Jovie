@@ -41,6 +41,17 @@ Name tests by behavior: `describe('ComponentName')` → `it('shows error when in
 
 See `.claude/rules/auth.md` → "E2E Authentication" for the canonical helpers, do-not patterns, and golden-path references. Use `E2E_USE_TEST_AUTH_BYPASS=1` and `/api/dev/test-auth/enter`. Do not import `@clerk/testing` or create Clerk test users.
 
+## Keep Tests Aligned With Removed UI And Hook Contracts
+
+- When removing UI behavior, find and remove or rewrite its obsolete assertions
+  and mocks in the same change. Preserve coverage for behavior that still exists.
+- Custom-hook mocks must satisfy the complete hook return type. Include every
+  required field, especially arrays such as `modeLinks` and `socialLinks` (use
+  `[]` when empty); use `satisfies ReturnType<typeof hook>` where available.
+- Zero executed tests are not a pass receipt. For executable changes run the
+  relevant repository/CI selector and record actual counts and coverage, even
+  when a changed-test command exits successfully with no matching files.
+
 ## Next Cache APIs In Shared Test Helpers
 
 - Helpers used by Playwright global setup, `tsx` seed scripts, or any plain Node entrypoint must not call `revalidateTag()` or `revalidatePath()` unguarded.

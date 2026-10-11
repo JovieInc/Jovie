@@ -212,6 +212,22 @@ describe('useJovieChat', () => {
     expect(result.current.isRateLimited).toBe(false);
   });
 
+  it('captures rejected text from the same-batch draft instead of an older render', () => {
+    const { result } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1' })
+    );
+    act(() => {
+      result.current.setInput('Latest');
+      result.current.setInput(current => `${current} rejected draft`);
+      onRejectHandler?.();
+    });
+    expect(result.current.input).toBe('Latest rejected draft');
+    expect(result.current.chatError?.failedMessage).toBe(
+      'Latest rejected draft'
+    );
+    expect(result.current.chatError?.type).toBe('rate_limit');
+  });
+
   it('does not overwrite in-flight first message with loaded conversation sync while streaming', () => {
     mockConversationData = {
       conversation: { id: 'conv_123', title: null },

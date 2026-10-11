@@ -60,6 +60,16 @@ describe('connector provider registry', () => {
     ).toBe('youtube');
   });
 
+  it('keeps Work placement and approved YouTube actions in the description', () => {
+    const description = getConnectorDefinition(
+      CONNECTOR_PROVIDERS.youtube
+    ).description;
+
+    expect(description).toContain('into Work');
+    expect(description).toContain('thumbnail changes');
+    expect(description).toContain('post approved comment replies');
+  });
+
   it('exposes oauth scopes, token handler, sync runner, and webhook key', () => {
     const gmail = getConnectorDefinition(CONNECTOR_PROVIDERS.gmail);
     expect(gmail.oauthScopes).toContain(GOOGLE_OAUTH_SCOPE.gmailReadonly);

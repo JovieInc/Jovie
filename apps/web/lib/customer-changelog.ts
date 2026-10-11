@@ -1,16 +1,14 @@
 /**
  * Customer changelog projection (JOV-6203 Wave 1).
  *
- * Invariant: deployment ≠ changelog entry. CHANGELOG.md remains the
- * engineering release log. This module projects public bullets into
- * customer-outcome objects for `/changelog`. Version pages + RSS/JSON
- * keep the raw release parser.
- *
- * Schema fields seed later RSS/JSON / in-app What’s new parity. Wave 1
- * does not rewire those surfaces.
+ * Invariant: deployment ≠ changelog entry. CHANGELOG.md keeps engineering
+ * history; exact reviewed copy from verified publication receipts feeds
+ * `/changelog`, customer feeds, and What's New. Version pages preserve the
+ * technical record and dates. Unknown rollout scope never becomes GA.
  */
 
 import { z } from 'zod';
+import { isCustomerCopy } from './changelog-filter-rules';
 import {
   type ChangelogRelease,
   type ChangelogSection,
@@ -49,35 +47,53 @@ export const CUSTOMER_CHANGELOG_AVAILABILITY = [
   'ga',
   'preview',
   'limited',
+  'unverified',
 ] as const;
 
 export type CustomerChangelogAvailability =
   (typeof CUSTOMER_CHANGELOG_AVAILABILITY)[number];
 
-export const CustomerChangelogMediaSchema = z
-  .object({
-    kind: z.enum(['image', 'video']),
-    src: z.string().min(1),
-    alt: z.string(),
-  })
-  .nullable();
+export const CustomerChangelogMediaSchema = /* @__PURE__ */ (() =>
+  z
+    .object({
+      kind: z.enum(['image', 'video']),
+      src: z.string().min(1),
+      alt: z.string(),
+    })
+    .nullable())();
 
-export const CustomerChangelogEntrySchema = z.object({
-  title: z.string().min(1),
-  slug: z.string().min(1),
-  date: z.string(),
-  summary: z.string(),
-  category: z.enum(CUSTOMER_CHANGELOG_CATEGORIES),
-  capabilities: z.array(z.string()),
-  surfaces: z.array(z.string()),
-  availability: z.enum(CUSTOMER_CHANGELOG_AVAILABILITY),
-  media: CustomerChangelogMediaSchema,
-  technicalVersion: z.string().min(1),
-  explanation: z.string(),
-  supporting: z.array(z.string()),
-  technical: z.array(z.string()),
-  prominence: z.enum(CUSTOMER_CHANGELOG_PROMINENCE),
-});
+// Client consumers import the narrow module directly; server projection stays here.
+export {
+  type CustomerChangelogHero,
+  isCustomerChangelogPostUrl,
+  parseCustomerChangelogHero,
+  resolveCustomerChangelogHero,
+} from './customer-changelog-hero';
+
+export const CustomerChangelogEntrySchema = /* @__PURE__ */ (() =>
+  z.object({
+    title: z.string().min(1),
+    slug: z.string().min(1),
+    date: z.string(),
+    summary: z.string(),
+    category: z.enum(CUSTOMER_CHANGELOG_CATEGORIES),
+    capabilities: z.array(z.string()),
+    surfaces: z.array(z.string()),
+    availability: z.enum(CUSTOMER_CHANGELOG_AVAILABILITY),
+    prerequisites: z.array(z.string()).optional(),
+    action: z
+      .object({
+        label: z.string().min(1),
+        href: z.string().min(1),
+      })
+      .nullable(),
+    media: CustomerChangelogMediaSchema,
+    technicalVersion: z.string().min(1),
+    explanation: z.string(),
+    supporting: z.array(z.string()),
+    technical: z.array(z.string()),
+    prominence: z.enum(CUSTOMER_CHANGELOG_PROMINENCE),
+  }))();
 
 export type CustomerChangelogEntry = z.infer<
   typeof CustomerChangelogEntrySchema
@@ -260,6 +276,12 @@ export function projectCustomerChangelog(
     let index = 0;
     for (const section of SECTION_ORDER) {
       for (const bullet of release.sections[section]) {
+        const publication = release.customerOutcomes?.[bullet];
+        // The technical release log is not a customer-publication authority.
+        if (!publication || !isCustomerCopy(bullet)) {
+          index += 1;
+          continue;
+        }
         const { title: rawTitle, explanation: rawExplanation } =
           splitCustomerChangelogOutcome(bullet);
         const titleParts = extractCustomerChangelogTechnical(rawTitle);
@@ -284,11 +306,13 @@ export function projectCustomerChangelog(
             category: SECTION_CATEGORY[section],
             capabilities: inferCapabilities(haystack),
             surfaces: inferSurfaces(haystack),
-            availability: 'ga',
+            availability: publication.availability,
+            prerequisites: publication.prerequisites,
+            action: publication.action ?? null,
             media: null,
             technicalVersion: release.version,
             explanation,
-            supporting: [],
+            supporting: publication.supporting ?? [],
             technical,
             prominence: SECTION_PROMINENCE[section],
           })

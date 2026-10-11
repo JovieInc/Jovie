@@ -28,6 +28,9 @@ vi.mock('@/lib/db', () => ({
     select: () => ({
       from: () => ({
         where: () => ({
+          orderBy: () => ({
+            limit: async () => hoisted.selectRows.shift() ?? [],
+          }),
           limit: async () => hoisted.selectRows.shift() ?? [],
         }),
       }),
@@ -116,6 +119,37 @@ describe('POST /api/agents/profiles', () => {
     const body = await (await post({ url: SPOTIFY_URL })).json();
     expect(body.claimUrl).toBeNull();
     expect(body.claimed).toBe(true);
+  });
+
+  it('prefers the canonical handle when a QA duplicate shares the Spotify ID', async () => {
+    // JOV-6919: `tmoc*` machine handles are excluded from every public surface
+    // (profile page, /api/v1) — returning one hands agents a 404 phantom.
+    hoisted.selectRows = [
+      [
+        { username: 'tmoc9mm7xfvx02c', isClaimed: true, isPublic: true },
+        { username: 'tim', isClaimed: true, isPublic: true },
+      ],
+    ];
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(200);
+    expect((await res.json()).username).toBe('tim');
+    expect(hoisted.ingest).not.toHaveBeenCalled();
+  });
+
+  it('creates a new profile when only an internal handle holds the Spotify ID', async () => {
+    hoisted.selectRows = [
+      [{ username: 'tmoc9mm7xfvx02c', isClaimed: true, isPublic: true }],
+      [{ isPublic: true }],
+    ];
+    hoisted.ingest.mockResolvedValue(
+      Response.json({ ok: true, profile: { username: 'tim_1' } })
+    );
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(201);
+    expect((await res.json()).username).toBe('tim_1');
+    expect(hoisted.ingest).toHaveBeenCalledWith(SPOTIFY_URL, {
+      allocateNewHandleOnCollision: true,
+    });
   });
 
   it('creates a profile with collision-safe ingestion', async () => {

@@ -81,7 +81,29 @@ vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
 }));
 
 vi.mock('@/features/release/ReleaseCreditsDrawer', () => ({
-  ReleaseCreditsDrawer: () => <div data-testid='credits-drawer' />,
+  ReleaseCreditsDrawer: ({
+    open,
+    credits,
+  }: {
+    open: boolean;
+    credits?: Array<{
+      label: string;
+      entries: Array<{ name: string }>;
+    }>;
+  }) => (
+    <div data-testid='credits-drawer'>
+      {open
+        ? credits?.map(group => (
+            <section key={group.label}>
+              <h2>{group.label}</h2>
+              {group.entries.map(entry => (
+                <span key={entry.name}>{entry.name}</span>
+              ))}
+            </section>
+          ))
+        : null}
+    </div>
+  ),
 }));
 
 vi.mock('@/features/release/SmartLinkAudioPreview', () => ({
@@ -409,6 +431,76 @@ describe('@critical ReleaseLandingPage', () => {
     const flowEl = screen.getByText('MC Flow');
     expect(flowEl.tagName).toBe('SPAN');
     expect(flowEl.closest('a')).toBeNull();
+  });
+
+  it('exposes Take Me Over featured and remixer roles without substituting either', () => {
+    render(
+      <ReleaseLandingPage
+        {...defaultProps}
+        release={{
+          ...defaultProps.release,
+          title: 'Take Me Over (Austin Leeds Remix)',
+        }}
+        primaryArtists={[{ name: 'Tim White', handle: 'timwhite' }]}
+        featuredArtists={[{ name: 'Erica Gibson', handle: null }]}
+        credits={[
+          {
+            role: 'main_artist',
+            label: 'Primary artist',
+            entries: [
+              {
+                artistId: 'tim',
+                name: 'Tim White',
+                handle: 'timwhite',
+                role: 'main_artist',
+                position: 0,
+              },
+            ],
+          },
+          {
+            role: 'featured_artist',
+            label: 'Featured artist',
+            entries: [
+              {
+                artistId: 'erica',
+                name: 'Erica Gibson',
+                handle: null,
+                role: 'featured_artist',
+                position: 1,
+              },
+            ],
+          },
+          {
+            role: 'remixer',
+            label: 'Remixer',
+            entries: [
+              {
+                artistId: 'austin',
+                name: 'Austin Leeds',
+                handle: null,
+                role: 'remixer',
+                position: 2,
+              },
+            ],
+          },
+        ]}
+        initialMenuOpen
+      />
+    );
+
+    expect(screen.getByTestId('smart-link-artist-byline')).toHaveTextContent(
+      'Tim White feat. Erica Gibson'
+    );
+    expect(
+      screen.getByTestId('smart-link-artist-byline')
+    ).not.toHaveTextContent('Austin Leeds');
+    fireEvent.click(screen.getByRole('button', { name: 'Credits' }));
+    expect(
+      screen.getByRole('heading', { name: 'Featured artist' })
+    ).toBeVisible();
+    expect(screen.getAllByText('Erica Gibson')).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'Remixer' })).toBeVisible();
+    expect(screen.getByText('Austin Leeds')).toBeVisible();
   });
 
   it('captures javascript: protocol in provider URLs for XSS audit', () => {

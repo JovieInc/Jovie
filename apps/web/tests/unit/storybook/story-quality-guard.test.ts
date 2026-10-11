@@ -38,15 +38,35 @@ describe('storybook story quality guard', () => {
   // The guard scans the full story library plus git provenance in one shot;
   // under merge-queue machine load this exceeds the 12s default test budget
   // (observed timing out a merge-group shard twice on 2026-09-03).
-  it('passes on the current product story library and provenance receipts', {
-    timeout: 60_000,
-  }, () => {
-    const output = execFileSync(process.execPath, [guardPath], {
+  //
+  // In a shallow checkout the guard must first repair history: its
+  // `fetch --unshallow` needs minutes on this repo and, without a token,
+  // runs unauthenticated. That lane (the nightly deterministic job checks
+  // out at depth 1 with persist-credentials: false) cannot converge inside
+  // any sane test budget BY DESIGN — the failure carries zero signal, so
+  // skip it with a named condition. Every history-bearing surface (full
+  // nightly suite, PR lanes, local) still runs the real guard.
+  const shallowWithoutToken =
+    spawnSync('git', ['rev-parse', '--is-shallow-repository'], {
       cwd: repoRoot,
       encoding: 'utf8',
-    });
-    expect(output).toContain('[story-quality] clean');
-  });
+    }).stdout.trim() === 'true' &&
+    !process.env.GH_TOKEN &&
+    !process.env.GITHUB_TOKEN;
+
+  it.skipIf(shallowWithoutToken)(
+    'passes on the current product story library and provenance receipts',
+    {
+      timeout: 60_000,
+    },
+    () => {
+      const output = execFileSync(process.execPath, [guardPath], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+      });
+      expect(output).toContain('[story-quality] clean');
+    }
+  );
 
   it('rejects a non-ancestor receipt in an isolated git fixture', () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), 'jovie-story-provenance-'));
@@ -142,6 +162,75 @@ export const Fixture = { parameters: { pen: { sourceSha: '${receiptSha}' } } };
       expect(output).not.toContain('story-provenance-ancestor');
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('repairs a mid-run shallow boundary before reporting a receipt', () => {
+    // JOV-6623: a concurrent depth-limited fetch can re-shallow the checkout
+    // after the job's base-fetch step verified it was complete. The guard must
+    // unshallow and re-run the verdict instead of failing a good receipt.
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'jovie-story-heal-'));
+    const shimDir = mkdtempSync(join(tmpdir(), 'jovie-git-shim-'));
+    const storyRelative = 'apps/web/components/Fixture.stories.tsx';
+    const storyPath = join(fixtureRoot, storyRelative);
+
+    try {
+      mkdirSync(dirname(storyPath), { recursive: true });
+      fixtureGit(fixtureRoot, ['init', '-b', 'main']);
+      fixtureGit(fixtureRoot, ['config', 'user.email', 'fixture@example.com']);
+      fixtureGit(fixtureRoot, ['config', 'user.name', 'Story Fixture']);
+      writeFileSync(storyPath, 'export default {};\n');
+      fixtureGit(fixtureRoot, ['add', storyRelative]);
+      fixtureGit(fixtureRoot, ['commit', '-m', 'seed story']);
+      const receiptSha = fixtureGit(fixtureRoot, ['rev-parse', 'HEAD']);
+      writeFileSync(storyPath, 'export default {};\n// v2\n');
+      fixtureGit(fixtureRoot, ['add', storyRelative]);
+      fixtureGit(fixtureRoot, ['commit', '-m', 'middle']);
+      const boundarySha = fixtureGit(fixtureRoot, ['rev-parse', 'HEAD']);
+      writeFileSync(
+        storyPath,
+        `export default {};
+export const Fixture = { parameters: { pen: { sourceSha: '${receiptSha}' } } };
+`
+      );
+      fixtureGit(fixtureRoot, ['add', storyRelative]);
+      fixtureGit(fixtureRoot, ['commit', '-m', 'record receipt']);
+
+      // The receipt object stays in the object store; the boundary only hides
+      // it from HEAD. The shim's `fetch` is the unshallow repair: it drops the
+      // boundary and exits 0. Everything else delegates to the real git.
+      writeFileSync(join(fixtureRoot, '.git/shallow'), `${boundarySha}\n`);
+      const realGit = execFileSync('which', ['git'], {
+        encoding: 'utf8',
+      }).trim();
+      writeFileSync(
+        join(shimDir, 'git'),
+        `#!/bin/sh
+while [ "$1" = "-c" ]; do shift 2; done
+if [ "$1" = "fetch" ]; then rm -f "$PWD/.git/shallow"; exit 0; fi
+exec ${JSON.stringify(realGit)} "$@"
+`
+      );
+      execFileSync('chmod', ['+x', join(shimDir, 'git')]);
+
+      const result = spawnSync(process.execPath, [guardPath], {
+        cwd: fixtureRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${shimDir}:${process.env.PATH}`,
+          GIT_CEILING_DIRECTORIES: dirname(fixtureRoot),
+          STORYBOOK_QUALITY_ROOT: fixtureRoot,
+        },
+      });
+      const output = `${result.stdout}${result.stderr}`;
+      expect(result.status).toBe(0);
+      expect(output).toContain('[story-quality] clean');
+      expect(output).not.toContain('story-provenance-ancestor');
+      expect(output).not.toContain('story-provenance-shallow');
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+      rmSync(shimDir, { recursive: true, force: true });
     }
   });
 

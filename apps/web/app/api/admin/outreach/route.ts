@@ -11,21 +11,24 @@ import {
 } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { describeAcquisitionBlock } from '@/lib/acquisition/eligibility';
+import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { campaignSettings } from '@/lib/db/schema/admin';
 import { leads } from '@/lib/db/schema/leads';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   captureError,
   captureWarning,
   getSafeErrorMessage,
 } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { isInstantlyOutboundEnabled } from '@/lib/leads/outbound-gates';
 import {
   OUTREACH_QUEUE_CLAIM_TTL_MS,
   processOutreachBatch,
 } from '@/lib/leads/outreach-batch';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { outreachListQuerySchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -43,8 +46,11 @@ function jsonError(message: string, status: number) {
   );
 }
 
-async function requireAdminAccess(session: 'cookie' | 'fresh' = 'cookie') {
-  const entitlements = await getCurrentUserEntitlements({ session });
+async function requireAdminAccess(
+  session: 'cookie' | 'fresh' = 'cookie',
+  purpose?: 'read'
+) {
+  const entitlements = await getOvieOperatorEntitlements({ session, purpose });
 
   if (!entitlements.isAuthenticated) {
     return jsonError('Unauthorized', 401);
@@ -124,7 +130,7 @@ function isMissingLeadSchemaColumnError(error: unknown): boolean {
  * GET /api/admin/outreach — List outreach leads by queue.
  */
 export async function GET(request: NextRequest) {
-  const authError = await requireAdminAccess();
+  const authError = await requireAdminAccess('fresh');
   if (authError) {
     return authError;
   }
@@ -338,6 +344,24 @@ export async function POST(request: NextRequest) {
     }
 
     const { limit } = validated.data;
+
+    // JOV-7696: a manual trigger is still acquisition, so it waits for
+    // ACQUISITION_ELIGIBLE exactly like the frequent cron (JOV-7859).
+    if (isInstantlyOutboundEnabled()) {
+      const eligibility = await getAcquisitionEligibility();
+      if (!eligibility.eligible) {
+        return NextResponse.json(
+          {
+            error: describeAcquisitionBlock(eligibility),
+            code: 'ACQUISITION_NOT_ELIGIBLE',
+            verdict: eligibility.verdict,
+            firstBlocker: eligibility.firstBlocker?.id ?? null,
+          },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
+
     const result = await processOutreachBatch(limit, {
       ignorePipelineEnabled: true,
     });

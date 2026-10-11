@@ -29,8 +29,8 @@ const CSS_FILES = [
   join(WEB_ROOT, 'styles', 'linear-tokens.css'),
 ];
 
-/** Token names that represent a motion duration. */
-const DURATION_TOKEN = /^--(?:[\w-]*-)?(?:duration|speed)(?:-[\w-]*)?$/;
+/** Token names that represent a motion duration or a stagger step. */
+const DURATION_TOKEN = /^--(?:[\w-]*-)?(?:duration|speed|stagger)(?:-[\w-]*)?$/;
 const isDurationToken = (name: string) =>
   DURATION_TOKEN.test(name) &&
   // transition-duration-* theme entries alias --duration-* (already zeroed)
@@ -133,6 +133,7 @@ describe('reduced-motion zeroes ALL duration tokens', () => {
       '--duration-slowest',
       '--ds-motion-subtle-duration',
       '--ds-motion-cinematic-duration',
+      '--stagger-block',
     ]) {
       expect(
         designSystemZeroed?.has(token),

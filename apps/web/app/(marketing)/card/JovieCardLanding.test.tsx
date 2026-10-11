@@ -23,21 +23,16 @@ describe('JovieCardLanding', () => {
     expect(heading).toBeVisible();
     expect(heading).toHaveClass('line-clamp-3');
     expect(screen.getByText(JOVIE_CARD_COPY.hero.body)).toBeVisible();
-    expect(screen.getAllByText('Coming soon')).toHaveLength(2);
+    // Status is disclosed once, beside the visual — not as a stranded line.
+    expect(screen.getByText(/^Coming soon · /u)).toBeVisible();
     expect(screen.getByRole('link', { name: 'Join the list' })).toHaveAttribute(
       'href',
       '#join-the-list'
     );
     expect(screen.getByRole('button', { name: 'Join the list' })).toBeVisible();
     expect(
-      screen.getAllByRole('link', { name: 'See how it works' })
-    ).toHaveLength(2);
-    for (const link of screen.getAllByRole('link', {
-      name: 'See how it works',
-    })) {
-      expect(link).toHaveAttribute('href', '#how-it-works');
-    }
-    expect(screen.getByText(/Illustrative card/u)).toBeVisible();
+      screen.getByRole('link', { name: 'See how it works' })
+    ).toHaveAttribute('href', '#how-it-works');
     expect(
       screen.getByTestId('product-screenshot-frame-public-profile-mobile')
     ).toBeVisible();
@@ -47,6 +42,8 @@ describe('JovieCardLanding', () => {
         section.getAttribute('data-marketing-section')
       )
     ).toEqual(['hero', 'how-it-works', 'feature-grid', 'faq', 'cta']);
+    expect(container.querySelector('.marketing-kicker')).toBeNull();
+    expect(screen.queryByText('Your name')).not.toBeInTheDocument();
   });
 
   it('does not imply certification, access, pricing, or measured QR results', () => {

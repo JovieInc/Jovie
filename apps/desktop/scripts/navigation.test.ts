@@ -33,6 +33,19 @@ test('parseUrl rejects protocol-relative and unparseable input', () => {
   expect(parseUrl('')).toBeNull();
 });
 
+test('parseUrl rejects embedded credentials before any URL policy can admit them', () => {
+  for (const target of [
+    'https://jov.ie/developers',
+    'https://accounts.jov.ie/sign-in',
+    'https://tenant.clerk.accounts.dev/sign-in',
+  ]) {
+    const credentialedUrl = new URL(target);
+    credentialedUrl.username = 'test-user';
+    credentialedUrl.password = 'test-password';
+    expect(parseUrl(credentialedUrl.toString())).toBeNull();
+  }
+});
+
 test('matchesPathPrefix respects path segment boundaries', () => {
   expect(matchesPathPrefix('/app', '/app')).toBe(true);
   expect(matchesPathPrefix('/app/chat', '/app')).toBe(true);

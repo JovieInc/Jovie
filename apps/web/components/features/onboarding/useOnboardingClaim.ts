@@ -40,6 +40,7 @@ type ClaimStatus =
   | 'claimed'
   | 'no-op'
   | 'retry-after-webhook'
+  | 'identity-conflict'
   | 'error';
 
 interface ClaimResponse {
@@ -48,6 +49,7 @@ interface ClaimResponse {
   readonly retryAfterWebhook?: boolean;
   readonly alreadyClaimed?: boolean;
   readonly errorCode?: string;
+  readonly profileError?: { readonly errorCode: string };
   readonly waitlistIntakeRequired?: boolean;
   readonly waitlist?: {
     readonly entryId: string;
@@ -64,7 +66,10 @@ interface ClaimResponse {
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1_500;
 
-export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
+export function useOnboardingClaim(
+  claimTrigger = 0,
+  enabled = true
+): ClaimStatus {
   const { isLoaded, isSignedIn } = useAuthSafe();
   const router = useRouter();
   const [status, setStatus] = useState<ClaimStatus>('idle');
@@ -73,7 +78,7 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
   const claimedRef = useRef(false);
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (!enabled || !isLoaded || !isSignedIn) return;
     if (claimedRef.current) return;
     if (completedTriggersRef.current.has(claimTrigger)) return;
     // Prevent duplicate in-flight requests for the same trigger value.
@@ -90,7 +95,11 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
     };
 
     const attemptClaim = async (attempt: number): Promise<void> => {
-      setStatus('pending');
+      // Keep an unresolved ownership conflict visible while a later turn is
+      // checked; an in-flight retry is not evidence the conflict cleared.
+      setStatus(current =>
+        current === 'identity-conflict' ? current : 'pending'
+      );
       const startedAt = Date.now();
       let response: Response;
       try {
@@ -125,6 +134,17 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
         // reserved / locked-in / manage-as-owner success navigation.
         markTriggerCompleted();
         setStatus('error');
+        return;
+      }
+
+      if (
+        body.errorCode === 'SPOTIFY_IDENTITY_CONFLICT' ||
+        body.profileError?.errorCode === 'SPOTIFY_IDENTITY_CONFLICT'
+      ) {
+        // Preserve the transcript for correction; a saved waitlist receipt is
+        // not proof that its requested profile/handle was reserved.
+        markTriggerCompleted();
+        setStatus('identity-conflict');
         return;
       }
 
@@ -234,7 +254,7 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
     // The router closure value is always current for the navigate-on-claim
     // path because navigation only happens after a successful fetch response,
     // long after any router reference churn would have settled.
-  }, [claimTrigger, isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [claimTrigger, enabled, isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return status;
 }

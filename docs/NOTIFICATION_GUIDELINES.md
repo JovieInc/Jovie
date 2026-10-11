@@ -27,12 +27,17 @@ If a feature cannot name which bus slot it needs and what it yields to, it does 
 ## Server-delivered notifications (email/sms/push/in-app)
 
 - Send cross-channel notifications through `lib/notifications/service.ts` to avoid duplicating provider logic.
+- Decide human delivery through `lib/notifications/attention-policy.ts`. It is the single quiet-hours evaluator; feature and channel code must execute its `deliver-now`, `defer-until`, `aggregate`, or `suppress` result and must not implement local time-window or bypass rules.
 - Email delivery is handled by Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO_EMAIL`). Defaults are `notifications@jov.ie` for system sender/reply-to; founder-personal mail uses `tim@jov.ie`.
 - SMS delivery is handled by the outbound connector (`providers/sms/outbound-sms.ts` → `twilio-sender.ts`), gated by `OUTBOUND_SMS_ENABLED` and the global STOP suppression ledger (`notification_contacts.smsStatus`). Per-artist consent and unsubscribe are enforced upstream by the subscribe flow and release scheduler.
 - **First merch-sale text:** artist-facing, once forever per creator. Hook is Stripe merch `checkout.session.completed` (`handleMerchCheckoutCompleted`), not Printful fulfillment. Copy lives in `lib/merch/first-sale-text.ts` (`FIRST_SALE_TEXT_COPY`). Sends through `sendNotification` SMS. Live send requires `FIRST_SALE_TEXT_LIVE=true` (default dry-run) plus `OUTBOUND_SMS_ENABLED`. Idempotency is a CAS write to `creator_profiles.settings.firstSaleText`. Destination is the owning user's Better Auth `phoneNumber` when present; no phone means claim and skip.
 - **SMS unit economics (JOV-3626 spike):** US outbound ≈ **$0.008/segment** fully loaded (Twilio 10DLC + delivery log). Release bodies cap near 2 segments. Re-evaluate pricing when fleet exceeds **5,000 segments/day** or any artist exceeds **500 SMS subs** with >2 alerts/month. Flip `OUTBOUND_SMS_ENABLED=true` in Doppler only after A2P 10DLC verification.
 - Preferences are resolved from creator profile settings (`settings.marketing_emails` + `marketingOptOut`) and channel toggles under `settings.notifications.channels`.
 - Provide a stable `id`/`dedupKey` so `dismissNotification` can stop the same message from fanning out across channels (e.g., when a user dismisses an in-app toast).
+
+### Quiet-hours product default
+
+Tim's product default is **22:00–07:00 America/Los_Angeles**. This is a fallback assumption, not a permanent identity lock: persisted `recipient_preferences.timezone`, `quiet_hours_start`, and `quiet_hours_end` values override it through the recipient-preferences write path, without a code change. The evaluator always uses the recipient's persisted IANA timezone and wall-time window, never the server clock.
 - Example:
   ```ts
   import { sendNotification, dismissNotification } from '@/lib/notifications/service';
@@ -43,12 +48,12 @@ If a feature cannot name which bus slot it needs and what it yields to, it does 
       category: 'product',
       subject: 'New feature available',
       text: 'Try the new dashboard filters.',
-      channels: ['email', 'sms', 'in_app'],
+      channels: ['email', 'sms', 'push'],
     },
     { creatorProfileId, email, phone }
   );
 
-  // When user dismisses the in-app notification:
+  // When user dismisses the notification:
   await dismissNotification(`dashboard-alert-${userId}`, { creatorProfileId });
   ```
 
@@ -59,13 +64,13 @@ Two channel types live in `apps/web/types/notifications.ts`. They look similar b
 | Type | Values | Purpose | Where it lives |
 | --- | --- | --- | --- |
 | `NotificationChannel` | `'sms' \| 'email'` | Fan-facing subscription enum. What a fan picks on a public profile and what's persisted in the DB (`notification_subscriptions.channel`, `notification_contacts.*Status`). | Subscribe/unsubscribe API, fan preference UI, validation schemas |
-| `NotificationDeliveryChannel` | `'email' \| 'sms' \| 'push' \| 'in_app'` | App-wide outbound dispatch enum. The transports `sendNotification()` can target. Superset of `NotificationChannel`. | `service.ts`, notification preferences, dispatch results |
+| `NotificationDeliveryChannel` | `'email' \| 'sms' \| 'push'` | App-wide outbound dispatch enum. The transports `sendNotification()` can target. Superset of `NotificationChannel`. | `service.ts`, notification preferences, dispatch results |
 
 Rules:
 
 - `sendNotification()` only accepts `NotificationDeliveryChannel`. SMS dispatch goes through it directly — there is no shadow type or bypass path.
-- DB-facing fan subscription code (subscribe API, fan UI) uses `NotificationChannel` because fans cannot pick `push` or `in_app`.
-- When converting between the two, the safe direction is `NotificationChannel → NotificationDeliveryChannel` (widening). Do not narrow `NotificationDeliveryChannel` to `NotificationChannel` without explicitly handling `push`/`in_app`.
+- DB-facing fan subscription code (subscribe API, fan UI) uses `NotificationChannel` because fans cannot pick `push`.
+- When converting between the two, the safe direction is `NotificationChannel → NotificationDeliveryChannel` (widening). Do not narrow `NotificationDeliveryChannel` to `NotificationChannel` without explicitly handling `push`.
 
 ## When to Use Toasts vs Console Logging
 

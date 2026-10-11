@@ -71,6 +71,8 @@ const nextConfig = {
       'runtime-data/apps/eve-pilot/identities/summer/instructions.md',
       'tests/quarantine.json',
       'content/**/*',
+      // Blog catalog validation checks these assets with fs.access at request time.
+      'public/images/blog/**/*',
       'lib/chat/knowledge/topics/**/*',
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',
@@ -275,6 +277,25 @@ const nextConfig = {
         source: '/api/health/:path*',
         headers: healthNoStoreHeaders,
       },
+      {
+        // `:path*` does not match the exact root. Keep failure and liveness
+        // bodies out of the public CDN cache. Vary stays on this exact rule
+        // so build-info and redis keep the shared health header block.
+        source: '/api/health',
+        headers: [
+          ...healthNoStoreHeaders,
+          { key: 'Vary', value: 'Authorization, Cookie' },
+        ],
+      },
+      {
+        // Billing sync detail is credentialed. A public s-maxage would let
+        // the CDN replay an authorized body to anonymous callers (JOV-7557).
+        source: '/api/billing/health',
+        headers: [
+          ...healthNoStoreHeaders,
+          { key: 'Vary', value: 'Authorization, Cookie' },
+        ],
+      },
       // Homepage is content-negotiated (HTML vs Markdown). Do not mark it
       // immutable: a year-long HTML object cannot safely mix with Accept.
       {
@@ -410,8 +431,8 @@ const nextConfig = {
       { source: '/app/dashboard/chat', destination: '/app/chat' },
       { source: '/app/settings', destination: '/app/settings/account' },
       {
-        source: '/app/settings/profile',
-        destination: '/app/settings/artist-profile',
+        source: '/app/settings/artist-profile',
+        destination: '/app/settings/profile',
       },
       {
         source: '/app/settings/appearance',
@@ -439,7 +460,7 @@ const nextConfig = {
       },
       {
         source: '/app/settings/remove-branding',
-        destination: '/app/settings/artist-profile',
+        destination: '/app/settings/profile',
       },
       {
         source: '/app/settings/ad-pixels',
@@ -447,7 +468,7 @@ const nextConfig = {
       },
       {
         source: '/app/settings/branding',
-        destination: '/app/settings/artist-profile',
+        destination: '/app/settings/profile',
       },
       {
         source: '/app/admin/waitlist',
@@ -539,6 +560,21 @@ const nextConfig = {
         destination: '/artists',
         permanent: true,
       },
+      // Consolidate the singular marketing alias onto the canonical lander.
+      // Use an explicit 301 for search engines and existing inbound links.
+      {
+        source: '/artist-profile',
+        destination: '/artist-profiles',
+        statusCode: 301,
+      },
+      // No /solutions index page exists; send it to the shipped solutions
+      // route instead of falling through to profile resolution ("Profile
+      // not found").
+      {
+        source: '/solutions',
+        destination: '/solutions/artists',
+        permanent: true,
+      },
       {
         source: '/engagement-engine',
         destination: '/artist-notifications',
@@ -618,11 +654,25 @@ const nextConfig = {
 
     return {
       beforeFiles: [
+        {
+          source: '/hud/wiki',
+          destination: '/app/ov/wiki',
+        },
+        {
+          source: '/hud/wiki/:path*',
+          destination: '/app/ov/wiki/:path*',
+        },
         // Default /hud is a filesystem route outside /app/(shell). Intercept
-        // it before that page so Ops inherits sidebar + app chrome. Isolated
-        // query modes stay on /hud: fullscreen and kiosk token. The packaged
-        // Mac door (?ovie=mac) also gets the shell so the founder can reach
-        // Chat, Growth and revenue from Ops (JOV-6164).
+        // it before that page so Ops inherits sidebar + app chrome. A signed
+        // kiosk token is the only presentation boundary; browser fullscreen
+        // expands the existing main-content surface. `fs=1` is the third
+        // exemption (JOV-7126): it is the only way to reach the isolated
+        // apps/web/app/hud/page.tsx source directly (screen-cert producer
+        // web.hud-isolated, per scripts/invariants/screen-certification.mjs),
+        // which documented this exemption before it actually existed here —
+        // that source page stays admin-gated on its own
+        // (getCurrentAdminPageAccess), so this exemption does not widen who
+        // can reach it, only which of the two equivalent pages renders.
         {
           source: '/hud',
           missing: [
@@ -736,6 +786,9 @@ const nextConfig = {
       '@dnd-kit/utilities',
       'framer-motion',
       'motion',
+      // Motion's React entry declares full motion aliases beside wildcard
+      // exports. Resolve named helpers to their leaves before bundling.
+      'motion/react',
       'zod',
       '@tanstack/react-table',
       '@tanstack/react-virtual',
@@ -798,7 +851,7 @@ module.exports = exposeBaseStaticConfigForTooling(
 // Sentry upload credentials; applying the plugin there has caused generated
 // interception helpers to be externalized without being copied into standalone.
 // The Sentry runtime SDK (sentry.server.config.ts) works independently.
-const { withSentryConfig } = require('@sentry/nextjs');
+const { withSentryConfig } = require('@sentry/nextjs/config');
 
 const hasSentryAuthToken = Boolean(process.env.SENTRY_AUTH_TOKEN);
 const shouldUseSentryPlugin =

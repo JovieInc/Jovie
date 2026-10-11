@@ -44,7 +44,33 @@ describe('jovie CLI', () => {
     expect(result).toBe(0);
     expect(stdout.read()).toContain('artist get <username>');
     expect(stdout.read()).toContain('profile create <url>');
-    expect(stdout.read()).toContain('No login or API key');
+    expect(stdout.read()).toContain(
+      'No login or API key is needed for public commands.'
+    );
+  });
+
+  it('lists public commands before internal fleet ones and accepts `help`', async () => {
+    const stdout = createOutput();
+    await expect(runCli(['help'], { stdout: stdout.output })).resolves.toBe(0);
+    const help = stdout.read();
+    expect(help.indexOf('artist get <username>')).toBeLessThan(
+      help.indexOf('Internal fleet')
+    );
+    expect(help.indexOf('Internal fleet')).toBeLessThan(
+      help.indexOf('fleet register')
+    );
+    // Long command names wrap instead of pushing summaries out of the column.
+    expect(help).toMatch(/--input <text>\n {31}Invoke canonical/);
+  });
+
+  it('names the unknown option without parseArgs escaping advice', async () => {
+    const stderr = createOutput();
+    await expect(
+      runCli(['artist', 'get', 'tim', '--bogus'], { stderr: stderr.output })
+    ).resolves.toBe(2);
+    expect(stderr.read()).toBe(
+      'Unknown option --bogus.\nRun `jovie --help` for usage.\n'
+    );
   });
 
   it('prints the source fallback version before command validation', async () => {
@@ -66,6 +92,13 @@ describe('jovie CLI', () => {
   });
 
   it.each([
+    {
+      args: ['creator', 'lookup', 'https://youtube.com/@creator'],
+      body: '{"platform":"youtube","displayName":"Creator"}',
+      expectedPath:
+        '/api/agents/creator-lookup?url=https%3A%2F%2Fyoutube.com%2F%40creator',
+      expectedOutput: { platform: 'youtube', displayName: 'Creator' },
+    },
     {
       args: ['artist', 'get', 'demo'],
       body: '{"artist":{"username":"demo"}}',
@@ -155,8 +188,10 @@ describe('jovie CLI', () => {
     expect(JSON.parse(stdout.read())).toEqual({
       error: {
         code: 'REQUEST_FAILED',
-        message: 'GET https://jov.ie/api/v1/demo returned HTTP 404',
+        apiCode: 'ARTIST_NOT_FOUND',
+        message: 'No public Jovie artist named "demo". Check the username.',
         responseBody: 'missing',
+        retryable: false,
         status: 404,
       },
     });
@@ -295,15 +330,16 @@ describe('jovie CLI', () => {
     expect(stderr.read()).toContain('--full is only supported by docs llms');
   });
 
-  it('keeps an unexpected response-body failure distinct from request failures', async () => {
+  it('reports response stream failure with a stable request code', async () => {
     const stdout = createOutput();
     const fetchImpl: FetchImplementation = async () =>
-      ({
-        ok: true,
-        text: async () => {
-          throw new Error('body stream unavailable');
-        },
-      }) as unknown as Response;
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(new Error('body stream unavailable'));
+          },
+        })
+      );
 
     await expect(
       runCli(['docs', 'llms', '--json'], {
@@ -313,8 +349,9 @@ describe('jovie CLI', () => {
     ).resolves.toBe(1);
     expect(JSON.parse(stdout.read())).toEqual({
       error: {
-        code: 'CLI_ERROR',
+        code: 'REQUEST_FAILED',
         message: 'body stream unavailable',
+        status: 200,
       },
     });
   });
@@ -381,6 +418,12 @@ describe('jovie CLI', () => {
       join(dir, 'jovie/SKILL.md'),
     ]);
 
+    const noAgents = createOutput();
+    await expect(
+      runCli(['init'], { homeDir: dir, stderr: noAgents.output })
+    ).resolves.toBe(2);
+    expect(noAgents.read()).toContain('No supported agent found');
+
     const stderr = createOutput();
     await expect(
       runCli(['mcp', '--base-url', 'ftp://x'], {
@@ -435,5 +478,131 @@ describe('jovie CLI', () => {
     const help = createOutput();
     await runCli(['--help'], { stdout: help.output });
     expect(help.read()).toContain('report bug --title <text> --details <text>');
+  });
+});
+
+describe('machine-readable special commands', () => {
+  it('prints JSON help and version', async () => {
+    for (const flag of ['--help', '--version']) {
+      const stdout = createOutput();
+      expect(await runCli([flag, '--json'], { stdout: stdout.output })).toBe(0);
+      expect(JSON.parse(stdout.read())).toHaveProperty(
+        flag === '--help' ? 'content' : 'version'
+      );
+    }
+  });
+  it('rejects unsupported special command flags', async () => {
+    for (const args of [
+      ['skill', '--full', '--json'],
+      ['skill', '--title', 'bad', '--json'],
+    ]) {
+      const stdout = createOutput();
+      expect(await runCli(args, { stdout: stdout.output })).toBe(2);
+      expect(JSON.parse(stdout.read()).error.code).toBe('USAGE_ERROR');
+    }
+  });
+});
+
+describe('jovie music resolve', () => {
+  it('dispatches the resolver flags and prints the resulting identity as JSON', async () => {
+    const stdout = createOutput();
+    const stderr = createOutput();
+    const result = {
+      status: 'resolved',
+      mbid: '51972833-bb04-46b7-9401-45a5ab449ebd',
+      artistMetadata: { isnis: ['0000000427529721'] },
+    };
+    const fetchImpl: FetchImplementation = async (url, init) => {
+      expect(String(url)).toBe('https://jov.ie/api/music/mcp');
+      const body = JSON.parse(String(init?.body));
+      expect(body.params.arguments).toEqual({
+        kind: 'artist',
+        input: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+      });
+      return Response.json({
+        jsonrpc: '2.0',
+        id: 'jovie-music-resolve',
+        result: { structuredContent: result, isError: false },
+      });
+    };
+    await expect(
+      runCli(
+        [
+          'music',
+          'resolve',
+          'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+          '--json',
+        ],
+        { fetchImpl, stdout: stdout.output, stderr: stderr.output }
+      )
+    ).resolves.toBe(0);
+    expect(JSON.parse(stdout.read())).toEqual(result);
+    expect(stderr.read()).toBe('');
+  });
+
+  it('accepts --kind, which mesh commands also declare', async () => {
+    const stdout = createOutput();
+    const fetchImpl: FetchImplementation = async (_url, init) => {
+      expect(JSON.parse(String(init?.body)).params.arguments).toEqual({
+        kind: 'track',
+        input: 'Karma Police',
+        artist: 'Radiohead',
+      });
+      return Response.json({
+        jsonrpc: '2.0',
+        id: 'jovie-music-resolve',
+        result: { structuredContent: { status: 'resolved' }, isError: false },
+      });
+    };
+    await expect(
+      runCli(
+        [
+          'music',
+          'resolve',
+          'Karma Police',
+          '--kind',
+          'track',
+          '--artist',
+          'Radiohead',
+          '--json',
+        ],
+        { fetchImpl, stdout: stdout.output }
+      )
+    ).resolves.toBe(0);
+    expect(JSON.parse(stdout.read())).toEqual({ status: 'resolved' });
+
+    const mesh = createOutput();
+    await runCli(['mesh', 'register', '--kind', 'not-a-kind'], {
+      stderr: mesh.output,
+    });
+    expect(mesh.read()).not.toContain('Unsupported option for mesh');
+  });
+
+  it('exits with a structured retryable failure when the resolver fails', async () => {
+    const stdout = createOutput();
+    const stderr = createOutput();
+    const fetch = createFetch(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'jovie-music-resolve',
+        result: {
+          isError: true,
+          structuredContent: {
+            error: { code: 'UPSTREAM_FAILURE', retryable: true },
+          },
+        },
+      })
+    );
+    await expect(
+      runCli(['music', 'resolve', 'Tim White', '--json'], {
+        fetchImpl: fetch.fetchImpl,
+        stdout: stdout.output,
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(1);
+    expect(JSON.parse(stdout.read())).toMatchObject({
+      error: { apiCode: 'UPSTREAM_FAILURE', retryable: true },
+    });
+    expect(stderr.read()).toBe('');
   });
 });

@@ -1,0 +1,253 @@
+import { render, screen } from '@testing-library/react';
+import { useState } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  getFreshAuth: vi.fn(),
+  privacyState: vi.fn(),
+  dashboard: vi.fn(),
+  shellDashboard: vi.fn(),
+  flags: vi.fn(),
+  dehydrated: vi.fn(),
+  essential: vi.fn(),
+  boundaryMounts: 0,
+}));
+
+vi.mock('next/headers', () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
+vi.mock('next/navigation', () => ({ redirect: vi.fn() }));
+vi.mock('@/components/UnavailablePage', () => ({
+  UnavailablePage: () => <div>Unavailable</div>,
+}));
+vi.mock('@/components/organisms/AuthShellWrapper', () => ({
+  AuthShellWrapper: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+}));
+vi.mock('@/components/organisms/OperatorBannerWrapper', () => ({
+  OperatorBannerWrapper: () => null,
+}));
+vi.mock('@/features/admin/OperatorBannerWrapper', () => ({
+  OperatorBannerWrapper: () => null,
+}));
+vi.mock('@/features/admin/ImpersonationBannerWrapper', () => ({
+  ImpersonationBannerWrapper: () => null,
+}));
+vi.mock('@/features/workspace-lock/WorkspaceLockScreen', () => ({
+  WorkspaceLockScreen: () => <div>Unlock Ovie</div>,
+}));
+vi.mock('@/lib/auth/ban-check', () => ({
+  getUserBanStatus: async () => ({ isBanned: false }),
+}));
+vi.mock('@/lib/auth/cached', () => ({ getFreshAuth: mocks.getFreshAuth }));
+vi.mock('@/lib/ovie/privacy-lock/server', () => ({
+  getOviePrivacyLockState: mocks.privacyState,
+}));
+vi.mock('@/lib/app-shell/workspaces', () => ({
+  shouldRenderOperatorChrome: () => true,
+}));
+vi.mock('@/lib/flags/client', () => ({
+  AppFlagProvider: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+}));
+vi.mock('@/lib/flags/route-snapshots', () => ({
+  resolveAppShellRouteFlagNames: () => [],
+}));
+vi.mock('@/lib/flags/server', () => ({
+  getAppFlagsSnapshot: mocks.flags,
+}));
+vi.mock('@/lib/queries', () => ({
+  HydrateClient: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+}));
+vi.mock('@/lib/queries/server', () => ({
+  getDehydratedState: mocks.dehydrated,
+}));
+vi.mock('@/lib/workspace-lock/money-visibility', () => ({
+  MoneyVisibilityProvider: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+}));
+vi.mock('@/lib/workspace-lock/workspace-lock', () => ({
+  isMoneyHiddenCookieValue: () => false,
+  MONEY_HIDDEN_COOKIE: 'money',
+}));
+vi.mock('./DashboardLoadTracker', () => ({ DashboardLoadTracker: () => null }));
+vi.mock('./DashboardShellPrivacyBoundary', () => ({
+  DashboardShellPrivacyBoundary: ({
+    children,
+    initiallyLocked,
+    dashboardData,
+    unlockedShellChrome,
+  }: {
+    children: React.ReactNode;
+    initiallyLocked: boolean;
+    dashboardData: unknown;
+    unlockedShellChrome?: React.ReactNode;
+  }) => {
+    const [locked] = useState(initiallyLocked);
+    const [mountId] = useState(() => ++mocks.boundaryMounts);
+    if (!dashboardData && !locked) return null;
+    return (
+      <div
+        data-boundary-mount={mountId}
+        data-has-chrome={String(Boolean(unlockedShellChrome))}
+        data-has-children={String(Boolean(children))}
+        data-initially-locked={String(initiallyLocked)}
+        data-effective-locked={String(locked)}
+      >
+        {locked ? <div>Unlock Ovie</div> : children}
+      </div>
+    );
+  },
+}));
+vi.mock('./dashboard/actions', () => ({
+  getDashboardData: mocks.dashboard,
+  getDashboardShellData: mocks.shellDashboard,
+  setSidebarCollapsed: vi.fn(),
+}));
+vi.mock('./ProfileCompletionRedirect', () => ({
+  ProfileCompletionRedirect: () => null,
+}));
+vi.mock('./shell-route-matches', () => ({
+  shouldRedirectToOnboarding: () => false,
+  shouldUseEssentialShellData: mocks.essential,
+}));
+
+import { DashboardShellContent } from './DashboardShellContent';
+
+const shell = (
+  mode: 'ov' | 'customer',
+  child: React.ReactNode,
+  pathname = '/app'
+) =>
+  DashboardShellContent({ userId: 'user-1', pathname, mode, children: child });
+
+const ovieState = (enabled: boolean, locked: boolean) => {
+  mocks.getFreshAuth.mockResolvedValue({
+    userId: 'user-1',
+    sessionId: 'session-1',
+  });
+  mocks.privacyState.mockResolvedValue({
+    enabled,
+    locked,
+    unlockedUntil: null,
+  });
+};
+
+const boundaryMount = () =>
+  document
+    .querySelector('[data-boundary-mount]')
+    ?.getAttribute('data-boundary-mount');
+
+const dashboardData = {
+  user: { id: 'user-1' },
+  creatorProfiles: [],
+  selectedProfile: null,
+  needsOnboarding: false,
+  sidebarCollapsed: false,
+  hasSocialLinks: false,
+  hasMusicLinks: false,
+  isAdmin: true,
+  tippingStats: { totalTips: 0, totalAmount: 0, recentTips: [] },
+  profileCompletion: {
+    percentage: 0,
+    completedCount: 0,
+    totalCount: 0,
+    steps: [],
+    profileIsLive: false,
+  },
+};
+
+describe('DashboardShellContent privacy decision', () => {
+  afterEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    mocks.boundaryMounts = 0;
+    mocks.flags.mockResolvedValue({});
+    mocks.dehydrated.mockReturnValue({ private: 'cache' });
+    mocks.essential.mockReturnValue(true);
+  });
+
+  it('does not invoke dashboard data or serialize child pages while Ovie is locked', async () => {
+    ovieState(true, true);
+    const tree = await shell('ov', <div>Private route child</div>);
+
+    render(tree);
+    expect(screen.getByText('Unlock Ovie')).toBeInTheDocument();
+    expect(screen.queryByText('Private route child')).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[data-initially-locked="true"]')
+    ).toHaveAttribute('data-has-children', 'false');
+    expect(
+      document.querySelector('[data-initially-locked="true"]')
+    ).toHaveAttribute('data-has-chrome', 'false');
+    expect(mocks.dehydrated).not.toHaveBeenCalled();
+    expect(mocks.shellDashboard).not.toHaveBeenCalled();
+    expect(mocks.dashboard).not.toHaveBeenCalled();
+    expect(mocks.flags).not.toHaveBeenCalled();
+  });
+
+  it('keeps disabled Ovie privacy usable without consulting the legacy step-up state', async () => {
+    mocks.essential.mockReturnValue(false);
+    ovieState(false, false);
+    mocks.dashboard.mockResolvedValue(dashboardData);
+    const tree = await shell('ov', <div>Ovie dashboard</div>);
+
+    render(tree);
+    expect(screen.getByText('Ovie dashboard')).toBeInTheDocument();
+    expect(mocks.dashboard).toHaveBeenCalledOnce();
+    expect(mocks.dehydrated).toHaveBeenCalledOnce();
+  });
+
+  it('never queries Ovie privacy for the ordinary Jovie shell', async () => {
+    mocks.shellDashboard.mockResolvedValue(dashboardData);
+    const tree = await shell('customer', <div>Jovie dashboard</div>);
+
+    render(tree);
+    expect(screen.getByText('Jovie dashboard')).toBeInTheDocument();
+    expect(mocks.privacyState).not.toHaveBeenCalled();
+    expect(mocks.getFreshAuth).not.toHaveBeenCalled();
+  });
+
+  it('reinitializes the privacy boundary on warm Jovie to locked Ovie navigation', async () => {
+    mocks.shellDashboard.mockResolvedValue(dashboardData);
+    const jovieTree = await shell('customer', <div>Jovie dashboard</div>);
+    const view = render(jovieTree);
+    const jovieMount = boundaryMount();
+    expect(screen.getByText('Jovie dashboard')).toBeInTheDocument();
+
+    ovieState(true, true);
+    const ovieTree = await shell('ov', <div>Private Ovie dashboard</div>);
+    view.rerender(ovieTree);
+
+    expect(screen.getByText('Unlock Ovie')).toBeInTheDocument();
+    expect(screen.queryByText('Jovie dashboard')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Private Ovie dashboard')
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[data-effective-locked="true"]')
+    ).toBeTruthy();
+    expect(boundaryMount()).not.toBe(jovieMount);
+  });
+
+  it('keeps the privacy boundary mounted across ordinary route changes', async () => {
+    mocks.shellDashboard.mockResolvedValue(dashboardData);
+    const firstTree = await shell('customer', <div>Dashboard route</div>);
+    const view = render(firstTree);
+    const initialMount = boundaryMount();
+
+    const nextTree = await shell(
+      'customer',
+      <div>Settings route</div>,
+      '/app/settings'
+    );
+    view.rerender(nextTree);
+
+    expect(screen.getByText('Settings route')).toBeInTheDocument();
+    expect(boundaryMount()).toBe(initialMount);
+  });
+});

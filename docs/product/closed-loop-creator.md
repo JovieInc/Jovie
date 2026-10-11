@@ -71,17 +71,27 @@ as `unknown` or `proxy`.
 
 ## Authenticated workspace scope
 
-Presence is the recurring artist workspace for DSP profiles, social networks,
-public pages, search rank, answer-engine visibility, audience quality, and
-monitoring signals. Its canonical route is `/app/profiles`; `/app/presence` remains
-a legacy alias. Account-authorized integrations such as Gmail and Google Calendar
-belong in Settings at `/app/settings/connectors`, labeled **Connections**. Shared
-provider plumbing does not make an OAuth grant an artist-presence activity.
+Identity and Presence are separate product concepts. An **Identity** is the
+person, artist, founder, company, project, or other managed object Jovie
+represents. **Presence** is public-facing output generated for the active
+identity. Identity contains the world; Presence is one published view of it.
 
-Contacts remains a global action and surface in every account. For a single
-artist, Library, Calendar, and Presence stay flat in the sidebar. For multiple
-artists, only those three artist-owned destinations sit under the selected
-artist's collapsible group. Relationship work must not look owned by one artist.
+Presence is the recurring workspace for public profiles, social networks,
+public pages, search rank, answer-engine visibility, audience quality, and
+monitoring signals. Its canonical route is `/app/presence`; `/app/profiles` is a
+legacy alias. Account-authorized integrations such as Gmail and Google Calendar
+belong in Settings at `/app/settings/connectors`, labeled **Connections**. Shared
+provider plumbing does not make an OAuth grant a Presence activity.
+
+The dashboard always operates in an active-identity context. Links, Audience,
+Events, Products, Releases, and other contextual data and actions resolve to
+that identity. A single-identity account gets no extra identity-management
+chrome. When an account manages multiple identities, the shell exposes an
+identity switcher instead of adding Identities as a root destination.
+
+Contacts remains a global action and surface in every account. Relationship
+work must not look owned by one identity even when a contextual projection is
+filtered by the active identity.
 
 Public marketing may interlink an artist-profile outcome to a dedicated feature
 page only when the relationship is material and supportable. Artist Profiles may

@@ -68,10 +68,12 @@
   --ds-marketing-display-size: clamp(4rem, 6.9vw, 6.25rem);
   --ds-marketing-display-leading: 0.94;
   --ds-marketing-display-tracking: -0.045em;
+  /* Section titles cap at the 56px marketing hero headline so no h2 ever
+     outranks the page h1 (route DOM heading-hierarchy-inversion). */
   --ds-marketing-title-size: clamp(
     var(--text-4xl),
     4.6vw,
-    calc(var(--text-5xl) + var(--space-4))
+    calc(var(--text-5xl) + var(--space-2))
   );
   --ds-marketing-title-leading: 1.08;
   --ds-marketing-title-tracking: 0;
@@ -323,7 +325,14 @@
   --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
   --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
   --profile-composer-border: rgba(255, 255, 255, 0.1);
-  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  /* JOV-INV-019 image-contrast: the dock sits over the page's own photo
+     content (mode-card artwork, ambient backdrop), so its glass scrim must
+     stay opaque enough to guarantee 4.5:1 for its white glyphs against any
+     underlying image, not just a typical dark one. Darkened + raised opacity
+     2026-09-29 (was rgba(30, 32, 40, 0.52)); lens now shares the same dark
+     material instead of a white tint that diluted the scrim under the
+     active tab. */
+  --profile-dock-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-border: rgba(255, 255, 255, 0.18);
   --profile-dock-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
@@ -338,7 +347,7 @@
   --profile-dock-glow: rgba(255, 255, 255, 0.05);
   --profile-dock-rim-top: rgba(255, 255, 255, 0.38);
   --profile-dock-rim-bottom: rgba(0, 0, 0, 0.24);
-  --profile-dock-lens-bg: rgba(255, 255, 255, 0.13);
+  --profile-dock-lens-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-lens-sheen: rgba(255, 255, 255, 0.14);
   --profile-dock-lens-rim: rgba(255, 255, 255, 0.34);
   --profile-dock-lens-rim-bottom: rgba(255, 255, 255, 0.06);
@@ -453,13 +462,19 @@
   }
 }
 
-:where(.profile-aeo-content) {
-  --profile-aeo-text: var(--color-text-tooltip);
+:where(
+  .profile-aeo-content,
+  [data-testid="profile-mobile-notifications-flow"]
+) {
   --profile-aeo-muted: color-mix(
     in oklab,
     var(--color-text-tooltip) 70%,
     transparent
   );
+}
+
+:where(.profile-aeo-content) {
+  --profile-aeo-text: var(--color-text-tooltip);
   --profile-aeo-border: color-mix(
     in oklab,
     var(--color-text-tooltip) 14%,
@@ -761,17 +776,38 @@
    static DOM, but out of mobile layout so it cannot add page scroll below the
    compact profile. Desktop keeps the readable AEO section. */
 @media (max-width: 767px) {
-  /* The consent card mounts lazily after geo/cookie checks. Keep it in the
-     safe-area top overlay on phones: the bottom region contains both the
-     profile's primary conversion action and the canonical glass dock. */
+  /* The consent card mounts lazily after geo/cookie checks. On phones it
+     sits at the bottom, directly above the dock stack (and the proof claim
+     bar, which grows --profile-bottom-nav-height), so it never covers the
+     profile identity or the dock (Tim 2026-09-29, JOV-7114). */
   .cookie-banner-card--above-public-profile-dock {
-    top: max(env(safe-area-inset-top), 8px);
-    bottom: auto;
+    top: auto;
+    bottom: var(--profile-bottom-nav-height);
     left: min(50vw, calc(var(--profile-shell-max-width) / 2));
     right: auto !important;
-    width: min(254px, calc(100vw - 136px)) !important;
+    /* Same edges as the claim bar and dock below it. */
+    width: min(358px, calc(100vw - 32px)) !important;
     max-width: none;
     transform: translateX(-50%);
+  }
+
+  /* The canonical launcher occupies the clear upper-right rail. Keep its
+     placement here with the profile dock and proof claim-bar geometry so it
+     cannot intercept either the navigation or the featured action. */
+  [data-ask-jovie-launcher] {
+    top: calc(env(safe-area-inset-top) + var(--space-16));
+    bottom: auto;
+  }
+
+  /* The proof claim bar rides inside the dock; content clears both. */
+  :root:has([data-testid="profile-proof-claim-bar"]) {
+    --profile-bottom-nav-height: calc(
+      var(--space-8) +
+      max(10px, env(safe-area-inset-bottom)) +
+      var(--space-2) +
+      var(--space-6) +
+      52px
+    );
   }
 
   .profile-viewport ~ .profile-aeo-content {
@@ -834,6 +870,29 @@
   flex: 0 0 auto;
 }
 
+/* Reserve the floating dock outside the home scroll box at every compact
+   breakpoint. End padding makes the last row reachable after scrolling, but
+   it cannot stop an absolute dock from covering the current viewport. The
+   desktop shell is a fixed-height phone card, so without this the last card
+   renders half-covered by the dock at rest even though it can technically
+   scroll into view (JOV-7192). Embedded previews render no dock, so they keep
+   the in-box padding instead. */
+:where(
+  [data-testid="profile-compact-surface"][data-mode="profile"]:not(
+      [data-presentation="embedded"]
+    )
+    > .profile-home-content-column
+) {
+  margin-bottom: var(--profile-bottom-nav-height);
+}
+
+[data-testid="profile-compact-surface"][data-mode="profile"]:not(
+    [data-presentation="embedded"]
+  )
+  .profile-home-content-scroll {
+  padding-bottom: 0;
+}
+
 /* From md up the compact surface is a fixed-height phone card with overflow
    hidden. Natural-height content ran past the card, under the tab bar, and
    could never be scrolled into view (jov.ie/tim dogfood 2026-09-27). Bound the
@@ -872,22 +931,6 @@
     flex: 1 1 0%;
     justify-content: flex-start;
     min-height: 0;
-  }
-
-  /* Reserve the floating dock outside the scroll box. The existing padding
-     utility reserves the same space inside the box, which would make the
-     layout metrics report content underneath the dock after the hero is
-     pinned to its token. */
-  :where(
-    [data-testid="profile-compact-surface"][data-mode="profile"]
-      > .profile-home-content-column
-  ) {
-    margin-bottom: var(--profile-bottom-nav-height);
-  }
-
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-    .profile-home-content-scroll {
-    padding-bottom: 0;
   }
 
   /* Large text can make the in-flow identity taller than the phone viewport.
@@ -1157,8 +1200,9 @@
      one big step from primary, then a compressed ordered tail. */
   --color-text-primary-token: lch(9.894% 0 282);
   --color-text-secondary-token: #5a606a;
-  --color-text-tertiary-token: #666c76;
-  --color-text-quaternary-token: #6a7078;
+  /* Tail steps clear 4.5:1 on the selected row tint (JOV-7861). */
+  --color-text-tertiary-token: #626872;
+  --color-text-quaternary-token: #646a72;
   --color-text-disabled-token: oklch(
     70% var(--theme-base-chroma) var(--theme-base-hue)
   );
@@ -1396,7 +1440,8 @@
      compressed ordered tail. */
   --noir-ion-text-secondary: #a0a5af;
   --noir-ion-text-muted: #8f95a0;
-  --noir-ion-text-tertiary: #858b96;
+  /* Clears 4.5:1 on the selected row tint over surface-1 (JOV-7861). */
+  --noir-ion-text-tertiary: #8c939e;
   --noir-ion-text-disabled: #525d75;
   --noir-ion-text-inverse: #020307;
   --noir-ion-ion: #11afff;
@@ -1632,7 +1677,9 @@
   --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
   --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
   --profile-composer-border: rgba(255, 255, 255, 0.1);
-  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  /* JOV-INV-019 image-contrast: keep this in sync with the .profile-viewport
+     block above — see its comment for why the scrim must be this opaque. */
+  --profile-dock-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-border: rgba(255, 255, 255, 0.18);
   --profile-dock-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
@@ -1647,7 +1694,7 @@
   --profile-dock-glow: rgba(255, 255, 255, 0.05);
   --profile-dock-rim-top: rgba(255, 255, 255, 0.38);
   --profile-dock-rim-bottom: rgba(0, 0, 0, 0.24);
-  --profile-dock-lens-bg: rgba(255, 255, 255, 0.13);
+  --profile-dock-lens-bg: rgba(18, 19, 24, 0.86);
   --profile-dock-lens-sheen: rgba(255, 255, 255, 0.14);
   --profile-dock-lens-rim: rgba(255, 255, 255, 0.34);
   --profile-dock-lens-rim-bottom: rgba(255, 255, 255, 0.06);
@@ -1894,6 +1941,67 @@
   border-radius: var(--profile-card-radius);
   background: var(--profile-mode-card-bg);
   color: var(--profile-mode-card-fg);
+}
+
+/* Pen D14lo6 / tkdyb: retain the reserved card height, then compact the art
+   and spacing when the home region is shorter so the action clears the dock. */
+[data-testid="profile-compact-surface"]:not(
+    [data-profile-overflow-mode="scroll"]
+  )
+  [data-testid="profile-home-rail"]
+  > [data-presentation="featured"] {
+  height: calc(var(--spacing) * 80);
+  min-height: calc(var(--spacing) * 52);
+  container: profile-featured-card / size;
+}
+
+[data-testid="profile-compact-surface"]:not(
+    [data-profile-overflow-mode="scroll"]
+  )
+  [data-testid="profile-home-rail"]
+  > [data-presentation="featured"]
+  > .profile-mode-card {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 767px) {
+  [data-testid="profile-compact-surface"]:not(
+      [data-profile-overflow-mode="scroll"]
+    )
+    [data-testid="profile-home-rail"]
+    > [data-presentation="featured"] {
+    height: min(calc(var(--spacing) * 80), 100%);
+  }
+}
+
+@container profile-featured-card (height < 20rem) {
+  .profile-mode-card {
+    padding: var(--space-3);
+  }
+  .profile-mode-card > div:first-child {
+    min-height: var(--space-4);
+  }
+  .profile-mode-card > div:has(> [data-testid="profile-pac-featured-art"]) {
+    margin-top: var(--space-1);
+  }
+  [data-testid="profile-pac-featured-art"] {
+    width: var(--space-12);
+    height: var(--space-12);
+  }
+  .profile-mode-card > div:last-child {
+    padding-top: var(--space-1);
+  }
+  .profile-mode-card h2 {
+    line-height: var(--space-7);
+  }
+  .profile-mode-card p {
+    margin-top: 0;
+    line-height: var(--space-5);
+  }
+  .profile-mode-card [aria-live="polite"] {
+    min-height: 0;
+  }
 }
 
 :where(.profile-mode-card)::before {
@@ -2651,6 +2759,10 @@
      Always prefer these over hardcoded numbers; they pick up reduced-motion. */
   --duration-subtle: var(--ds-motion-subtle-duration);
   --duration-cinematic: var(--ds-motion-cinematic-duration);
+  /* Step between sibling blocks entering in sequence (hero children, scroll
+     reveals, chat cards). Zeroed with the durations under reduced motion so
+     nothing waits on a step that no longer animates. */
+  --stagger-block: 80ms;
 
   /* Easings - Linear uses cubic-bezier for smooth feel */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -2703,6 +2815,7 @@
     --duration-slowest: 0ms;
     --duration-subtle: 0ms;
     --duration-cinematic: 0ms;
+    --stagger-block: 0ms;
   }
 }
 
@@ -2954,6 +3067,13 @@ html:not(.dark) .smart-link-powered-by {
 
 html:not(.dark) .smart-link-powered-by {
   color: rgb(64 64 64) !important;
+}
+
+/* Marketing headings balance their lines so no headline strands one word on
+   its last line (route DOM orphaned-line). Zero specificity: an explicit
+   text-wrap on a heading still wins. */
+:where(.system-b-marketing) :where(h1, h2, h3) {
+  text-wrap: balance;
 }
 
 /* Marketing typography: headings use Satoshi (display font). Product controls

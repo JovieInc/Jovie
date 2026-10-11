@@ -14,8 +14,16 @@ export const SECURITY_TARGETS = Object.freeze([
   'apps/web/lib/entitlements/server.ts',
 ]);
 
+// OpenAI/Anthropic are banned on the gateway (JOV-7119); the scanner may only
+// ever run the approved zai pair. Checked before the byte-pin so a swapped
+// cheap model fails with a clear code even if the hash were re-pinned.
+export const ALLOWED_GATEWAY_MODELS = Object.freeze([
+  'zai/glm-5.3',
+  'zai/glm-5.3-flash',
+]);
+
 const POLICY_SHA256 =
-  '8c017016c339884e82e7f24d5596dfba646727dbe84508cd40885d6483a59cd2';
+  '34bc8803db796a87fbf1d55440c62c696b38674968e30eb7845259936969057b';
 const EXCLUDED = new Set([
   '.git',
   '.deepsec',
@@ -129,6 +137,11 @@ export function validatePolicy(policyBytes, targetsBytes) {
     fail(
       'policy-held',
       'only the capped, advisory, fallback-free gateway policy is allowed'
+    );
+  if (!ALLOWED_GATEWAY_MODELS.includes(policy.models?.cheap?.gatewayId))
+    fail(
+      'policy-held',
+      'cheap scan model must be on the gateway-approved set (JOV-7119)'
     );
   if (sha256(policyBytes) !== POLICY_SHA256)
     fail(

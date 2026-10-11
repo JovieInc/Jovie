@@ -2,6 +2,8 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
 
+import { createTelemetryObserver, isTimeoutError } from './gbrain-metrics.mjs';
+
 const execFileAsync = promisify(execFile);
 const GBRAIN_TIMEOUT_MS = 30_000;
 const CONTEXT_LOOKUP_TIMEOUT_MS = 10_000;
@@ -110,6 +112,7 @@ function lookupFailure(errors) {
  *   dialect?: 'adapter' | 'legacy',
  *   execute?: (command: string, args: string[], options: {encoding: string, timeout: number}) => unknown | Promise<unknown>,
  *   now?: () => number,
+ *   observe?: (record: object) => void,
  * }} [options]
  */
 export function createGbrainClient({
@@ -120,7 +123,27 @@ export function createGbrainClient({
     return result.stdout;
   },
   now = Date.now,
+  observe,
 } = {}) {
+  function emit(record) {
+    try {
+      observe?.(record);
+    } catch {
+      // Telemetry observers must never break or slow a retrieval.
+    }
+  }
+
+  function emitFailure(operation, target, startedAt, error) {
+    emit({
+      operation,
+      target,
+      source: null,
+      outcome: isTimeoutError(error) ? 'timeout' : 'error',
+      ms: Math.max(0, now() - startedAt),
+      error,
+    });
+  }
+
   function searchArgs(command, query, limit) {
     return dialect === 'adapter'
       ? [command, query, String(limit)]
@@ -137,13 +160,28 @@ export function createGbrainClient({
 
   async function getPageWithEvidence(slug, options = {}) {
     const startedAt = now();
-    const page = parsePage(
-      slug,
-      await run(
-        ['get', slug],
-        positiveTimeout(options.timeoutMs, GBRAIN_TIMEOUT_MS)
-      )
-    );
+    let page;
+    try {
+      page = parsePage(
+        slug,
+        await run(
+          ['get', slug],
+          positiveTimeout(options.timeoutMs, GBRAIN_TIMEOUT_MS)
+        )
+      );
+    } catch (error) {
+      emitFailure('get', slug, startedAt, error);
+      throw error;
+    }
+    emit({
+      operation: 'get',
+      target: slug,
+      source: 'get',
+      outcome: page ? 'hit' : 'clean_miss',
+      ms: Math.max(0, now() - startedAt),
+      resultCount: page ? 1 : 0,
+      revisions: page?.revision ? [page.revision] : [],
+    });
     return { page, source: 'get', ms: Math.max(0, now() - startedAt) };
   }
 
@@ -196,7 +234,22 @@ export function createGbrainClient({
     );
     const startedAt = now();
     const deadline = startedAt + timeoutMs;
-    const { slugs, source } = await resolveSearchSlugs(query, limit, timeoutMs);
+    let resolved;
+    try {
+      resolved = await resolveSearchSlugs(query, limit, timeoutMs);
+    } catch (error) {
+      emitFailure('search', query, startedAt, error);
+      throw error;
+    }
+    const { slugs, source } = resolved;
+    emit({
+      operation: 'search',
+      target: query,
+      source,
+      outcome: slugs.length > 0 ? 'hit' : 'clean_miss',
+      ms: Math.max(0, now() - startedAt),
+      resultCount: slugs.length,
+    });
     const pages = [];
     for (const slug of slugs) {
       const remainingMs = deadline - now();
@@ -221,7 +274,9 @@ export function createGbrainClient({
   });
 }
 
-const defaultClient = createGbrainClient();
+const defaultClient = createGbrainClient({
+  observe: createTelemetryObserver(),
+});
 
 export const getPage = defaultClient.getPage;
 export const searchPages = defaultClient.searchPages;

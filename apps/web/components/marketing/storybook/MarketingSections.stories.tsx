@@ -45,6 +45,7 @@ import {
   MARKETING_SECTION_IDS,
   type MarketingSectionId,
 } from '@/data/marketing';
+import { LOGO_PERMISSION_FIXTURES } from '@/data/product-truth/logo-permissions.fixture';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import {
   MARKETING_SECTION_STORY_GAPS,
@@ -166,6 +167,8 @@ export const logoCloud: Story = {
         adaptive={ARTIST_PROFILE_COPY.adaptive}
         phoneCaption={ARTIST_PROFILE_COPY.hero.phoneCaption}
         phoneSubcaption={ARTIST_PROFILE_COPY.hero.phoneSubcaption}
+        logoPlacement={{ page: '/artist-profiles' }}
+        fixturePermissions={LOGO_PERMISSION_FIXTURES}
       />
     </SectionFrame>
   ),
@@ -204,8 +207,8 @@ export const artistProfileAssembly: Story = {
     <SectionFrame sectionId='feature-split'>
       <ArtistProfileLandingPage
         copy={ARTIST_PROFILE_COPY}
-        socialProof={ARTIST_PROFILE_SOCIAL_PROOF}
         flags={{ FULL_PAGE: false, SOCIAL_PROOF: false, FAQ: false }}
+        logoPlacement={{ page: '/artist-profiles' }}
       />
     </SectionFrame>
   ),
@@ -321,7 +324,12 @@ export const comparison: Story = {
             WIP: registry points at ComparisonData; matrix is page-local. Story
             composes verified competitor rows from content/comparisons.
           </p>
-          <div className='mt-8 overflow-x-auto'>
+          <section
+            className='mt-8 overflow-x-auto'
+            aria-label={`Jovie vs ${data.competitor} feature matrix`}
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region needs a keyboard entry point for native scrolling (axe scrollable-region-focusable)
+            tabIndex={0}
+          >
             <table className='w-full min-w-160 border-collapse text-left text-sm'>
               <thead>
                 <tr className='border-b border-subtle'>
@@ -363,7 +371,7 @@ export const comparison: Story = {
                 ))}
               </tbody>
             </table>
-          </div>
+          </section>
         </MarketingContainer>
       </SectionFrame>
     );
@@ -466,6 +474,18 @@ export const artistProfileCalloutSystem: Story = {
           </MarketingSurfaceCard>
         </div>
       </MarketingSnapRail>
+    </SectionFrame>
+  ),
+};
+
+export const productGallery: Story = {
+  name: 'product-gallery',
+  render: () => (
+    <SectionFrame sectionId='product-gallery'>
+      <MarketingShippedSitesShowcase />
+      <ArtistProfileReleaseCycleGallery
+        releaseCycle={ARTIST_PROFILE_COPY.releaseCycle}
+      />
     </SectionFrame>
   ),
 };

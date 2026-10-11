@@ -188,10 +188,20 @@ function decisionAvailability(
 ): OvieCertificationDecisionAvailability {
   const { admission, decisions } = input;
   const evidenceDigest = admission.decisionEvidenceDigest;
+  const current = admission.currentDecision;
+  const currentDecision = current
+    ? {
+        kind: current.decision,
+        decidedAt: current.decidedAt,
+        reviewer: current.reviewer,
+        notes: current.notes,
+      }
+    : null;
   const unavailable = (reason: string) => ({
     available: false,
     reason,
     evidenceDigest,
+    currentDecision,
   });
 
   if (!evidenceDigest) {
@@ -209,7 +219,7 @@ function decisionAvailability(
     );
   }
   if (input.domainDecisionGate) return unavailable(input.domainDecisionGate);
-  return { available: true, reason: null, evidenceDigest };
+  return { available: true, reason: null, evidenceDigest, currentDecision };
 }
 
 export function normalizeKernelCertificationRow(
@@ -218,6 +228,9 @@ export function normalizeKernelCertificationRow(
   const { packet, admission } = input;
   const receipts = packetReceipts(packet);
   const blockedTiers = new Set(admission.blockers.map(b => b.tier));
+  const blockedReceipts = new Set(
+    admission.blockers.map(blocker => `${blocker.tier}:${blocker.id}`)
+  );
   const tiers = Object.fromEntries(
     OVIE_CERTIFICATION_TIERS.map(tier => [
       tier,
@@ -228,7 +241,13 @@ export function normalizeKernelCertificationRow(
   const evidence: OvieCertificationEvidence[] = receipts.map(receipt => ({
     id: receipt.id,
     tier: receipt.tier,
-    status: receiptStatus(receipt.status),
+    // A provider's pass is not current proof when the kernel rejects its
+    // source binding, digest, or required media relationship.
+    status:
+      receipt.status === 'passed' &&
+      blockedReceipts.has(`${receipt.tier}:${receipt.id}`)
+        ? 'failed'
+        : receiptStatus(receipt.status),
     summary: receipt.summary,
     ref: receipt.ref,
     href: resolveEvidenceHref(receipt.ref, packet.source),

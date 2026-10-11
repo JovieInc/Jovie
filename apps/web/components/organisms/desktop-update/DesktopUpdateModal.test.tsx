@@ -43,7 +43,7 @@ describe('DesktopUpdateModalView', () => {
     const props = renderView(available, {
       notes: { summary: 'Ship it', items: ['Faster sync'] },
     });
-    expect(screen.getByText('Jovie 26.9.16 is available')).toBeInTheDocument();
+    expect(screen.getByText('Jovie 26.9.16 Is Available')).toBeInTheDocument();
     expect(screen.getByText('Faster sync')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Download' }));
@@ -53,23 +53,47 @@ describe('DesktopUpdateModalView', () => {
   it('links to release notes when none were fetched and dismisses via Later', async () => {
     const props = renderView(available);
     expect(
-      screen.getByRole('link', { name: 'Read the release notes' })
+      screen.getByRole('link', { name: 'Read the Release Notes' })
     ).toHaveAttribute('href', NOTES_URL);
 
     await userEvent.click(screen.getByRole('button', { name: 'Later' }));
     expect(props.onLater).toHaveBeenCalledTimes(1);
   });
 
-  it('renders download progress', () => {
-    renderView(downloadingUpdate(42));
+  it('renders download progress with the version, size and speed', () => {
+    const props = renderView(
+      {
+        ...downloadingUpdate(42),
+        transferredBytes: 84 * 1024 * 1024,
+        totalBytes: 200 * 1024 * 1024,
+        bytesPerSecond: 12 * 1024 * 1024,
+      },
+      { version: '26.9.16' }
+    );
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
-    expect(screen.getByText('Downloading update')).toBeInTheDocument();
+    expect(screen.getByText('Downloading Jovie 26.9.16')).toBeInTheDocument();
+    expect(screen.getByText('84 MB of 200 MB')).toBeInTheDocument();
+    expect(screen.getByText('12 MB/s')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hide' })).toBeInTheDocument();
+    expect(props.onDownload).not.toHaveBeenCalled();
+  });
+
+  it('formats the release date and reserves space while notes load', () => {
+    renderView(
+      { ...available, releaseDate: '2026-09-27T05:33:26Z' },
+      { loading: true }
+    );
+    expect(screen.getByText('Released Sep 27')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('desktop-update-notes').querySelector('[aria-hidden]')
+    ).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Download' })).toHaveFocus();
   });
 
   it('offers restart in the ready state and retry in the error state', async () => {
     const ready = renderView({ state: 'ready', version: '26.9.16' });
     await userEvent.click(
-      screen.getByRole('button', { name: 'Restart to update' })
+      screen.getByRole('button', { name: 'Restart To Update' })
     );
     expect(ready.onInstall).toHaveBeenCalledTimes(1);
 
@@ -78,8 +102,17 @@ describe('DesktopUpdateModalView', () => {
       message: 'offline',
       retryable: true,
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Try Again' }));
     expect(error.onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not offer a retry that cannot work', () => {
+    renderView({ state: 'error', message: 'signature', retryable: false });
+    expect(screen.getByText('Update Did Not Download')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Try Again' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/jov\.ie\/download/)).toBeInTheDocument();
   });
 });
 

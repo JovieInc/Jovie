@@ -1,15 +1,22 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Virtualizer } from '@tanstack/react-virtual';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatInput } from '@/components/jovie/components/ChatInput';
+import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
 import { CHAT_EMPTY_SAMPLE_STORAGE_KEY } from './chat-empty-starters';
+import {
+  type ComposerDraft,
+  createComposerDraft,
+} from './hooks/useComposerDraft';
 import {
   CHAT_EMPTY_TOP_SPACING_OWNER,
   CHAT_EMPTY_VIEWPORT_CLASSNAME,
   ChatComposerSurface,
+  ChatDraftComposerSurface,
+  ChatDraftWorkState,
   ChatEmptyStateComposerRegion,
   ChatInlineError,
   ChatLoadingConversationSkeleton,
@@ -232,8 +239,10 @@ describe('ChatThreadMessages collapsed summer failures', () => {
 
 function renderComposerSurface({
   suppressUsageAlert = false,
+  draft,
 }: {
   readonly suppressUsageAlert?: boolean;
+  readonly draft?: ComposerDraft;
 } = {}) {
   const client = new QueryClient({
     defaultOptions: {
@@ -243,7 +252,7 @@ function renderComposerSurface({
   });
   const chatInputProps: ComponentProps<typeof ChatInput> = {
     value: '',
-    onChange: () => undefined,
+    onChange: draft?.set ?? (() => undefined),
     onSubmit: () => undefined,
     isLoading: false,
     isSubmitting: false,
@@ -253,36 +262,130 @@ function renderComposerSurface({
     onRemoveFile: () => undefined,
   };
 
-  return render(
+  const surfaceProps: ComponentProps<typeof ChatComposerSurface> = {
+    chatInputProps,
+    showThreadView: false,
+    suppressUsageAlert,
+    isRateLimited: false,
+    showManifest: false,
+    manifestCollapsed: false,
+    showChips: false,
+    pendingFiles: [],
+    aggregate: {
+      total: 0,
+      done: 0,
+      overallPct: 0,
+      speed: '0 B/s',
+      eta: '—',
+      locked: 0,
+    },
+    isUploading: false,
+    isPro: true,
+    onRemoveFile: () => undefined,
+    onCollapseManifest: () => undefined,
+    onExpandManifest: () => undefined,
+  };
+
+  const content = (currentProps = surfaceProps) => (
     <QueryClientProvider client={client}>
       <TooltipProvider>
-        <ChatComposerSurface
-          chatInputProps={chatInputProps}
-          showThreadView={false}
-          suppressUsageAlert={suppressUsageAlert}
-          isRateLimited={false}
-          showManifest={false}
-          manifestCollapsed={false}
-          showChips={false}
-          pendingFiles={[]}
-          aggregate={{
-            total: 0,
-            done: 0,
-            overallPct: 0,
-            speed: '0 B/s',
-            eta: '—',
-            locked: 0,
-          }}
-          isUploading={false}
-          isPro
-          onRemoveFile={() => undefined}
-          onCollapseManifest={() => undefined}
-          onExpandManifest={() => undefined}
-        />
+        {draft ? (
+          <>
+            <ChatDraftWorkState
+              draft={draft}
+              hasAttachments={false}
+              isUploading={false}
+              isLoading={false}
+              isSubmitting={false}
+              isLoadingConversation={false}
+              status='ready'
+              messages={[]}
+            />
+            <ChatDraftComposerSurface {...currentProps} draft={draft} />
+          </>
+        ) : (
+          <ChatComposerSurface {...currentProps} />
+        )}
       </TooltipProvider>
     </QueryClientProvider>
   );
+  const view = render(content());
+  return {
+    ...view,
+    rerenderSurface: (updates: Partial<typeof surfaceProps> = {}) =>
+      view.rerender(content({ ...surfaceProps, ...updates })),
+  };
 }
+
+describe('draft-connected composer sections', () => {
+  it('skips unchanged parent props but keeps draft and control changes live through memo', () => {
+    const memoSurface =
+      ChatDraftComposerSurface as typeof ChatDraftComposerSurface & {
+        type: (
+          props: ComponentProps<typeof ChatDraftComposerSurface>
+        ) => ReactNode;
+      };
+    expect(typeof memoSurface.type).toBe('function');
+    const renders = vi.spyOn(memoSurface, 'type');
+    const draft = createComposerDraft('Before');
+    const view = renderComposerSurface({ draft });
+    try {
+      const input = screen.getByRole('textbox', { name: 'Chat Message Input' });
+      const initialRenders = renders.mock.calls.length;
+      view.rerenderSurface();
+      expect(renders).toHaveBeenCalledTimes(initialRenders);
+
+      act(() => draft.set('After'));
+      expect(input).toHaveValue('After');
+      expect(renders.mock.calls.length).toBeGreaterThan(initialRenders);
+      const draftRenders = renders.mock.calls.length;
+
+      view.rerenderSurface({ isRateLimited: true });
+      expect(
+        screen.getByText(
+          'Sending too fast. Please wait a second before your next message.'
+        )
+      ).toBeVisible();
+      expect(renders.mock.calls.length).toBeGreaterThan(draftRenders);
+      view.rerenderSurface({ isRateLimited: false });
+      expect(
+        screen.queryByText(
+          'Sending too fast. Please wait a second before your next message.'
+        )
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Chat Message Input' })).toBe(
+        input
+      );
+      expect(input).toHaveValue('After');
+    } finally {
+      view.unmount();
+      renders.mockRestore();
+    }
+  });
+
+  it('keeps the real input and committed work state current without a parent rerender', () => {
+    const draft = createComposerDraft('Restored draft');
+    const view = renderComposerSurface({ draft });
+    const input = screen.getByRole('textbox', { name: 'Chat Message Input' });
+    expect(input).toHaveValue('Restored draft');
+    expect(getDesktopWorkState()?.hasDraft).toBe(true);
+
+    act(() => draft.set(previous => `${previous} plus an edit`));
+    expect(input).toHaveValue('Restored draft plus an edit');
+
+    fireEvent.change(input, {
+      target: { value: 'Typed through the real input' },
+    });
+    expect(draft.getSnapshot()).toBe('Typed through the real input');
+    expect(getDesktopWorkState()?.hasDraft).toBe(true);
+
+    act(() => draft.set(''));
+    expect(input).toHaveValue('');
+    expect(getDesktopWorkState()?.hasDraft).toBe(false);
+    view.unmount();
+    expect(getDesktopWorkState()).toBeNull();
+  });
+});
 
 describe('ChatComposerSurface one-chrome-layer wiring', () => {
   it('renders the single usage banner slot by default', () => {

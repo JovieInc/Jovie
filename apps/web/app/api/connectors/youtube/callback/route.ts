@@ -147,6 +147,7 @@ async function upsertYouTubeConnectorAccount(input: {
     canRead: true,
     canSetThumbnail: true,
     canAnalytics: true,
+    canReplyToComments: true,
     channelTitle: input.channel.title,
   };
   const [account] = await db

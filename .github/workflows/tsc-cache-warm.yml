@@ -36,9 +36,9 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.cache/tsbuildinfo*
-          key: jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json') }}-h${{ steps.hour.outputs.hour }}
+          key: jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-h${{ steps.hour.outputs.hour }}
           restore-keys: |
-            jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json') }}-
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-
             jovie-web-tsbuildinfo-v2-${{ runner.os }}-
       # Unconditional (JOV-6835): queue-proven main pushes skip every ci.yml
       # lane, so this is the only main-scoped writer of the exact node_modules
@@ -52,6 +52,7 @@ jobs:
         run: |
           pnpm --filter @jovie/web run typecheck
           pnpm --filter @jovie/web run typecheck:tests
+          pnpm --filter @jovie/web run typecheck:stories
       - name: Save web tsc incremental state
         if: ${{ success() && steps.web-tsbuildinfo.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

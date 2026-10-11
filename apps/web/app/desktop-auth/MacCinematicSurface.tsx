@@ -18,7 +18,7 @@ export function MacCinematicSurface({
 }: MacCinematicSurfaceProps) {
   return (
     <main
-      className='relative isolate grid min-h-dvh place-items-center overflow-hidden bg-(--color-bg-base) px-6 text-primary-token'
+      className='relative isolate grid min-h-dvh place-items-center overflow-x-hidden bg-(--color-bg-base) px-6 py-6 text-primary-token'
       data-desktop-auth-state={state}
       data-auth-shell-kind={shellKind}
       data-testid={testId}

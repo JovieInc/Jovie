@@ -74,7 +74,7 @@ export function OvieCeoOverview({
   return (
     <ContentSurfaceCard
       surface='default'
-      className='overflow-hidden p-0'
+      className='overflow-hidden'
       data-testid='ovie-ceo-overview'
     >
       <div className='border-b border-subtle px-4 py-3 sm:px-5'>
@@ -113,36 +113,42 @@ export function OvieCeoOverview({
             >
               {metric.detail}
             </p>
-            <dl className='grid grid-cols-2 gap-1 text-2xs leading-4 text-tertiary-token'>
-              <div>
-                <dt className='inline font-medium text-secondary-token'>
-                  Source{' '}
-                </dt>
-                <dd className='inline'>{metric.authoritativeSource}</dd>
-              </div>
-              <div>
-                <dt className='inline font-medium text-secondary-token'>
-                  Observed{' '}
-                </dt>
-                <dd className='inline'>
-                  {formatObservationTime(metric.observedAt)}
-                </dd>
-              </div>
-              <div>
-                <dt className='inline font-medium text-secondary-token'>
-                  Fresh Until{' '}
-                </dt>
-                <dd className='inline'>
-                  {formatObservationTime(metric.freshnessDeadline)}
-                </dd>
-              </div>
-              <div>
-                <dt className='inline font-medium text-secondary-token'>
-                  Owner{' '}
-                </dt>
-                <dd className='inline'>{metric.owner}</dd>
-              </div>
-              <div className='col-span-2 flex min-h-11 items-center gap-3 pt-1'>
+            <div>
+              {/* Actions (Retry, drill-down) are not term/definition metadata,
+                  so they live outside the dl — a <dl> group must be only
+                  dt/dd pairs, and axe's only-dlitems rule flags any other
+                  content (JOV-7126 producer axe scan on web.hud-isolated). */}
+              <dl className='grid grid-cols-2 gap-1 text-2xs leading-4 text-tertiary-token'>
+                <div>
+                  <dt className='inline font-medium text-secondary-token'>
+                    Source{' '}
+                  </dt>
+                  <dd className='inline'>{metric.authoritativeSource}</dd>
+                </div>
+                <div>
+                  <dt className='inline font-medium text-secondary-token'>
+                    Observed{' '}
+                  </dt>
+                  <dd className='inline'>
+                    {formatObservationTime(metric.observedAt)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className='inline font-medium text-secondary-token'>
+                    Fresh Until{' '}
+                  </dt>
+                  <dd className='inline'>
+                    {formatObservationTime(metric.freshnessDeadline)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className='inline font-medium text-secondary-token'>
+                    Owner{' '}
+                  </dt>
+                  <dd className='inline'>{metric.owner}</dd>
+                </div>
+              </dl>
+              <div className='flex min-h-11 items-center gap-3 pt-1'>
                 {onRetry &&
                 [
                   'stale',
@@ -188,7 +194,7 @@ export function OvieCeoOverview({
                   )}
                 </a>
               </div>
-            </dl>
+            </div>
           </section>
         ))}
       </div>

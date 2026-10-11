@@ -29,6 +29,10 @@ export function ArtistProfileCaptureSection({
   if (!isEditorialCapture(capture)) {
     return (
       <ArtistProfileSectionShell
+        sectionId='capture'
+        sectionVariant='product-demo'
+        sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx'
+        sectionOccurrence='fan-capture'
         className='ap-capture-section--visual'
         id={id}
         penContractId={MARKETING_PEN_CONTRACT_IDS.section.capture}
@@ -50,6 +54,10 @@ export function ArtistProfileCaptureSection({
 
   return (
     <ArtistProfileSectionShell
+      sectionId='capture'
+      sectionVariant='product-demo'
+      sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx'
+      sectionOccurrence='fan-capture'
       className='ap-capture-loop bg-surface-0'
       id={id}
       penContractId={MARKETING_PEN_CONTRACT_IDS.section.capture}
@@ -69,9 +77,8 @@ export function ArtistProfileCaptureSection({
           className='ap-capture-loop__visual relative'
           data-testid='artist-profile-capture-demo'
         >
-          <figcaption className='sr-only'>
-            A focused Jovie fan opt-in accepts an email, confirms the fan, and
-            turns that moment into an audience the artist can reach again.
+          <figcaption className='mb-4 text-sm text-secondary-token'>
+            Illustrative opt-in · no message is sent
           </figcaption>
           <ArtistProfileCaptureVisual
             capture={capture}

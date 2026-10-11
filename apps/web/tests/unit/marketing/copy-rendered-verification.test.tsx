@@ -127,9 +127,6 @@ function pricingRenderedSurface(): RenderedCopySurface {
           ...scrapedLines(container, [
             ['headline', '#pricing-hero-heading'],
             ['body', '.marketing-hero-subtitle'],
-            ['supporting:2', '.system-b-pricing-story-label'],
-            ['supporting:3', '.system-b-pricing-story-title'],
-            ['supporting:4', '.system-b-pricing-story-body'],
           ]),
           renderedLine('supporting:0', heroCtas[0] ?? ''),
           renderedLine('supporting:1', heroCtas[1] ?? ''),
@@ -327,11 +324,11 @@ describe('rendered marketing copy audit — /pricing', () => {
     const surface = mutateLine(
       pricingRenderedSurface(),
       'hero',
-      'supporting:2',
-      'Artist profile'
+      'supporting:1',
+      'Explore profiles'
     );
     const issues = auditRenderedMarketingCopy(brief, draft, surface, {
-      exceptions: [exception('hero', 'supporting:2', 'Artist profile')],
+      exceptions: [exception('hero', 'supporting:1', 'Explore profiles')],
     });
     expect(issues).toEqual([]);
   });

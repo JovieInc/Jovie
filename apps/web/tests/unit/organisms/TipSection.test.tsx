@@ -133,10 +133,15 @@ describe('TipSection', () => {
     const venmoButton = await screen.findByRole('button', {
       name: 'Continue with Venmo',
     });
-    const venmoLogoClass = venmoButton
-      .querySelector('svg')
+    const activeIcon = venmoButton.querySelector(
+      '[data-testid="action-dial-icon-venmo"]'
+    );
+    const venmoLogoClass = activeIcon
+      ?.querySelector('svg')
       ?.getAttribute('class');
 
+    expect(venmoButton).toHaveAttribute('data-dsp-provider', 'venmo');
+    expect(activeIcon).toHaveStyle({ transform: 'translateY(0%)' });
     expect(venmoButton.className).toContain('bg-btn-primary');
     expect(venmoButton.className).not.toContain('bg-[#008CFF]');
     expect(venmoLogoClass).toContain('text-brand-venmo');

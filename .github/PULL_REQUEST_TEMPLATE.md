@@ -2,6 +2,15 @@
 
 Brief description of the changes in this PR.
 
+### Customer outcome (post-deploy publication)
+
+For a material customer change, include one approved, plain-language outcome
+in the metadata block described in [the publishing contract](../docs/CHANGELOG_PUBLICATION.md).
+Group related PRs under one outcome key. Include a public customer-path check;
+declare GA, preview, or limited rollout and its prerequisites. Merge and
+deployment alone do not prove availability. Internal work uses
+`releaseWorthy: false`. Do not edit `CHANGELOG.md` on implementation branches.
+
 ## Type of Change
 
 - [ ] Bug fix (non-breaking change which fixes an issue)
@@ -25,7 +34,7 @@ Per `.claude/rules/testing.md`, **every bug fix needs a regression test** at the
 
 Complete this section when the PR is a bug fix (`fix:` commits/title, `fix/` branch, or the Bug fix checkbox below):
 
-- [ ] Regression test added or updated (`*.test.*` / `*.spec.*`)
+- [ ] Regression test added or updated (`*.test.*` / `*.spec.*` / `test_*.py`)
 - [ ] `Regression test: <changed test path>` noted in this PR description
 - [ ] OR a bounded exception documents scope, rationale, independent approval,
       expiry, review trigger, and visible residual count

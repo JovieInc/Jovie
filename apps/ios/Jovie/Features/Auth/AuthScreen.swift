@@ -1,21 +1,10 @@
-import OSLog
 import SwiftUI
-
-private let authLogger = Logger(
-  subsystem: Bundle.main.bundleIdentifier ?? "ie.jov.Jovie",
-  category: "Auth"
-)
 
 struct AuthScreen: View {
   let isMock: Bool
   let isSignInUnavailable: Bool
-  let webBaseURL: URL
   let errorMessage: String?
-  let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
-  let onAuthError: @MainActor (String?) -> Void
-
-  @State private var authCoordinator = MobileAuthCoordinator()
-  @State private var didRequestBrowserAuth = false
+  @ObservedObject var authCoordinator: MobileAuthCoordinator
   @State private var hasAppeared = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -55,7 +44,7 @@ struct AuthScreen: View {
           }
 
           BrowserAuthActions(
-            isOpening: didRequestBrowserAuth,
+            isOpening: authCoordinator.isOpening,
             isDisabled: isSignInUnavailable,
             errorMessage: errorMessage,
             action: startBrowserAuth
@@ -82,61 +71,7 @@ struct AuthScreen: View {
   }
 
   private func startBrowserAuth() {
-    guard canStartMobileAuth(isMock: isMock, isOpening: didRequestBrowserAuth) else {
-      return
-    }
-
-    didRequestBrowserAuth = true
-    Observability.addBreadcrumb(
-      .authStart,
-      context: ["provider": "browser", "base_url": webBaseURL]
-    )
-    Observability.addBreadcrumb(
-      .authProviderSelected,
-      context: ["provider": "browser"]
-    )
-    onAuthError(nil)
-
-    authCoordinator.startSignIn(baseURL: webBaseURL) { result in
-      Task { @MainActor in
-        didRequestBrowserAuth = false
-
-        switch result {
-        case let .success(authReturn):
-          onAuthReturn(authReturn)
-        case let .failure(error):
-          if isAuthSessionCancellation(error) {
-            Observability.addBreadcrumb(
-              .authSessionClosed,
-              context: ["reason": "user_cancelled"]
-            )
-            onAuthError(mobileAuthFailureMessage(for: error))
-            return
-          }
-
-          if case MobileAuthCoordinatorError.providerError = error {
-            onAuthError(mobileAuthFailureMessage(for: error))
-            return
-          }
-
-          Observability.addBreadcrumb(
-            .authSessionClosed,
-            level: .warning,
-            context: ["reason": "browser_auth_failed"]
-          )
-          Observability.captureError(
-            error,
-            event: .authSessionClosed,
-            context: [
-              "stage": "browser_auth",
-              "error_type": String(describing: type(of: error)),
-            ]
-          )
-          onAuthError(mobileAuthFailureMessage(for: error))
-          authLogger.error("Mobile browser auth failed: \(error.localizedDescription, privacy: .public)")
-        }
-      }
-    }
+    authCoordinator.startBrowserAuth(isMock: isMock)
   }
 }
 

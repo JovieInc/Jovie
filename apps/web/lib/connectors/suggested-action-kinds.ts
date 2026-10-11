@@ -7,6 +7,7 @@ export const YOUTUBE_THUMBNAIL_CANDIDATE_KIND =
   'youtube.thumbnail_candidate' as const;
 export const WORKFLOW_CAPTURE_REQUEST_KIND =
   'workflow_capture.request' as const;
+export const SOCIAL_REPLY_DRAFT_KIND = 'social_reply.draft' as const;
 
 export const THUMBNAIL_DECISION_KINDS = [
   YOUTUBE_THUMBNAIL_PLAYBOOK_KIND,

@@ -1,4 +1,13 @@
-import { and, sql as drizzleSql, eq, gte, lte } from 'drizzle-orm';
+import {
+  and,
+  sql as drizzleSql,
+  eq,
+  getTableName,
+  gte,
+  isNotNull,
+  isNull,
+  lte,
+} from 'drizzle-orm';
 import {
   buildEvidenceReceiptSet,
   buildMetricReceipt,
@@ -28,8 +37,10 @@ import {
   dailyProfileViews,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
+import { INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -611,4 +622,109 @@ export async function getCanonicalProfileViews(input: {
     .where(and(...conditions));
 
   return Number(row?.views ?? 0);
+}
+
+/**
+ * Phone numbers with a confirmed, consented, non-unsubscribed subscription
+ * for the given creator profile. `smsConsentAt` is the TCPA consent ledger —
+ * without it the recipient is never sendable for a marketing blast.
+ */
+export async function listConsentedSmsRecipientPhones(
+  creatorProfileId: string,
+  limit: number
+): Promise<readonly string[]> {
+  const rows = await db
+    .select({ phone: notificationSubscriptions.phone })
+    .from(notificationSubscriptions)
+    .where(
+      and(
+        eq(notificationSubscriptions.creatorProfileId, creatorProfileId),
+        isNotNull(notificationSubscriptions.phone),
+        isNotNull(notificationSubscriptions.confirmedAt),
+        isNotNull(notificationSubscriptions.smsConsentAt),
+        isNull(notificationSubscriptions.unsubscribedAt)
+      )
+    )
+    .limit(limit);
+
+  return rows
+    .map(row => row.phone)
+    .filter((phone): phone is string => Boolean(phone));
+}
+
+/** Canonical profile_views across public claimed profiles, excluding internal accounts.
+ * Missing tables remain unmeasured; errors propagate to the evidence loader. */
+export async function getCanonicalCustomerProfileExposure(
+  windowDays: number
+): Promise<{
+  readonly count: number;
+  readonly latestAt: string | null;
+} | null> {
+  if (
+    !(await doesTableExist(TABLE_NAMES.creatorProfiles)) ||
+    !(await doesTableExist(TABLE_NAMES.dailyProfileViews))
+  ) {
+    return null;
+  }
+  const [row] = await db
+    .select({
+      count: drizzleSql<number>`coalesce(sum(${dailyProfileViews.viewCount}), 0)::int`,
+      latest: drizzleSql<string | null>`max(${dailyProfileViews.viewDate})`,
+    })
+    .from(dailyProfileViews)
+    .innerJoin(
+      creatorProfiles,
+      eq(creatorProfiles.id, dailyProfileViews.creatorProfileId)
+    )
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(
+      and(
+        drizzleSql`${dailyProfileViews.viewDate} >= current_date - ${windowDays}::int`,
+        eq(creatorProfiles.isPublic, true),
+        eq(creatorProfiles.isClaimed, true),
+        drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`
+      )
+    );
+
+  return { count: Number(row?.count ?? 0), latestAt: row?.latest ?? null };
+}
+
+/** Canonical total_clicks across public claimed profiles, excluding internal accounts.
+ * Missing tables remain unmeasured; errors propagate to the evidence loader. */
+export async function getCanonicalCustomerLinkOutcome(
+  windowDays: number
+): Promise<{
+  readonly count: number;
+  readonly latestAt: string | null;
+} | null> {
+  if (
+    !(await doesTableExist(TABLE_NAMES.creatorProfiles)) ||
+    !(await doesTableExist(getTableName(clickEvents)))
+  ) {
+    return null;
+  }
+  const [row] = await db
+    .select({
+      count: drizzleSql<number>`count(*)::int`,
+      latest: drizzleSql<
+        string | null
+      >`max(${clickEvents.createdAt}::date)::text`,
+    })
+    .from(clickEvents)
+    .innerJoin(
+      creatorProfiles,
+      eq(creatorProfiles.id, clickEvents.creatorProfileId)
+    )
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(
+      and(
+        drizzleSql`${clickEvents.createdAt} >= now() - make_interval(days => ${windowDays})`,
+        eq(clickEvents.isBot, false),
+        eq(creatorProfiles.isPublic, true),
+        eq(creatorProfiles.isClaimed, true),
+        drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`
+      )
+    );
+
+  return { count: Number(row?.count ?? 0), latestAt: row?.latest ?? null };
 }

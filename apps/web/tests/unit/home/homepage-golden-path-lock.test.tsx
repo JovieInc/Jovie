@@ -1,9 +1,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { HomepageClose } from '@/components/homepage/HomepageClose';
-import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
-import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
-import { HERO_COPY } from '@/components/homepage/intent';
+import { HomepageIdentityClose } from '@/components/homepage/HomepageIdentityClose';
+import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { evaluateHomepageHtml } from '../../../../../scripts/lib/golden-path-lock.mjs';
 
@@ -16,33 +14,27 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
-  useArtistSearchQuery: () => ({
-    results: [],
-    state: 'idle',
-    search: vi.fn(),
-    clear: vi.fn(),
-  }),
+vi.mock('next/image', () => ({
+  default: (props: Record<string, unknown>) => {
+    const { priority, ...rest } = props;
+    void priority;
+    return <img alt='' {...rest} />;
+  },
 }));
 
 /**
- * JOV-5085 / JOV-5864: production keeps WAITLIST_ENABLED on. That gate must
- * not remove the certified homepage conversion the prod probe reads from HTML.
+ * Production keeps WAITLIST_ENABLED on. That gate must not remove the homepage
+ * conversion the prod probe reads from HTML: the jov.ie/you link claim that
+ * submits to /start (Tim 2026-09-28, replacing the JOV-5085 name search).
  */
 describe('homepage golden-path lock', () => {
-  it('keeps Search your name → Find me and a /start handoff while the waitlist gate is on', () => {
+  it('keeps the jov.ie/you claim and a /start handoff while the waitlist gate is on', () => {
     expect(FEATURE_FLAGS.WAITLIST_ENABLED).toBe(true);
 
     const { container } = render(
       <>
-        <HomepageEditorialHero
-          headingId='home-hero-heading'
-          headline={HERO_COPY.headline}
-          support={HERO_COPY.subhead}
-          search={HERO_COPY.search}
-        />
-        <HomepageClose />
-        <HomepageNoScriptContent />
+        <HomepageIdentityHero headingId='home-hero-heading' />
+        <HomepageIdentityClose />
       </>
     );
 
@@ -50,6 +42,7 @@ describe('homepage golden-path lock', () => {
     expect(check).toMatchObject({
       id: 'homepage-cta',
       ok: true,
+      reason: expect.stringContaining('link claim'),
     });
     expect(container.innerHTML).not.toContain('Request access');
     expect(container.innerHTML).not.toContain('Get started');

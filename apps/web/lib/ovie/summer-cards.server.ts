@@ -29,6 +29,7 @@ const storedCardSchema = z.object({
   defaultIfSilent: z.string().nullable(),
   recipient: z.string().nullable(),
   amountUsd: z.number().nullable(),
+  preflightReceiptId: z.string().nullable().default(null),
   evidence: z.array(z.string()),
   status: z.enum(['pending', 'approved', 'rejected']),
   comment: z.string().nullable(),
@@ -58,6 +59,11 @@ async function readStoredCard(id: string): Promise<StoredCard | null> {
   return parsed.data;
 }
 
+export async function getSummerCard(id: string): Promise<SummerCard | null> {
+  const stored = await readStoredCard(id);
+  return stored ? toCard(stored) : null;
+}
+
 export type SummerCardSubmission =
   | { readonly outcome: 'created'; readonly card: SummerCard }
   | { readonly outcome: 'replayed'; readonly card: SummerCard }
@@ -80,6 +86,7 @@ export async function submitSummerCard(
     defaultIfSilent: input.defaultIfSilent,
     recipient: input.recipient,
     amountUsd: input.amountUsd,
+    preflightReceiptId: input.preflightReceiptId,
     evidence: input.evidence,
     status: 'pending',
     comment: null,

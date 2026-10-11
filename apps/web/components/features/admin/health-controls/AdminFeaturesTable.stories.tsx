@@ -1,3 +1,4 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { AdminFeaturesTable } from '@/app/app/(shell)/admin/features/AdminFeaturesTable';
 
@@ -40,6 +41,25 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Desktop: Story = {};
+
+export const LongDescriptions: Story = {
+  args: {
+    initialRows: rows.map(row => ({
+      ...row,
+      description:
+        'Keep the workspace available while provider connections refresh. ' +
+        'This description intentionally spans several lines to verify that full ' +
+        'details stay accessible without changing the height of any table row. '.repeat(
+          8
+        ),
+    })),
+  },
+};
+
+export const LongDescriptionsLight: Story = {
+  ...LongDescriptions,
+  parameters: { themes: { themeOverride: 'light' } },
+};
 
 export const Mobile: Story = {
   parameters: {

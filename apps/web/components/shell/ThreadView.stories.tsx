@@ -15,4 +15,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    thread: { id: 'thread-1', title: 'Release plan', status: 'running' },
+    children: 'Thread turns render here.',
+  },
+};

@@ -28,7 +28,8 @@ export type {
 interface ConnectorCardProps {
   readonly provider: ConnectorProviderId;
   readonly status: ConnectorStatus;
-  readonly email?: string;
+  readonly accountLabel?: string;
+  readonly scopes?: readonly string[];
   readonly errorMessage?: string;
   readonly onConnect?: () => void;
   readonly onDisconnect?: () => void;
@@ -73,7 +74,8 @@ const STATUS_BADGE: Record<
 export function ConnectorCard({
   provider,
   status,
-  email,
+  accountLabel,
+  scopes,
   errorMessage,
   onConnect,
   onDisconnect,
@@ -98,13 +100,17 @@ export function ConnectorCard({
   const actionHandler = isConnected ? onDisconnect : onConnect;
   const normalizedError = errorMessage?.trim();
   const detailLine = isConnected
-    ? email?.trim()
+    ? accountLabel?.trim()
     : needsAttention
       ? normalizedError ||
         (status === 'needs_reauth'
           ? 'Reconnect to continue syncing.'
           : 'Connection failed. Try again.')
       : undefined;
+  const grantedScopeLabels = definition.oauthScopes.flatMap((scope, index) => {
+    const label = definition.oauthScopeLabels[index];
+    return scopes?.includes(scope) && label ? [label] : [];
+  });
 
   return (
     <div
@@ -162,6 +168,14 @@ export function ConnectorCard({
           >
             {detailLine ?? <span aria-hidden='true'>&nbsp;</span>}
           </p>
+          {isConnected && grantedScopeLabels.length > 0 && (
+            <ul
+              className='text-xs text-tertiary'
+              aria-label={`${definition.label} granted scopes`}
+            >
+              <li>Scopes: {grantedScopeLabels.join(', ')}</li>
+            </ul>
+          )}
         </div>
       </div>
 

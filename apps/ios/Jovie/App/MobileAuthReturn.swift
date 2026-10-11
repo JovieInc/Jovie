@@ -28,10 +28,18 @@ enum MobileAuthDiagnostics {
   }
 }
 
-struct MobileAuthReturn: Equatable {
+struct MobileAuthReturn: Equatable, Sendable {
   let code: String
   let state: String
   let codeVerifier: String
+  let nativeAttempt: String?
+
+  init(code: String, state: String, codeVerifier: String, nativeAttempt: String? = nil) {
+    self.code = code
+    self.state = state
+    self.codeVerifier = codeVerifier
+    self.nativeAttempt = nativeAttempt
+  }
 }
 
 struct MobileAuthProviderError: Equatable {
@@ -50,8 +58,31 @@ struct MobileAuthProviderError: Equatable {
 final class MobileAuthPendingStore {
   static let shared = MobileAuthPendingStore()
 
+  struct Snapshot: Equatable, Sendable {
+    fileprivate let generation: UUID
+    fileprivate let verifier: String?
+    fileprivate var record: Record? = nil
+    var isCorrelated: Bool { record != nil }
+  }
+
+  fileprivate struct Record: Codable, Equatable, Sendable {
+    var version = 1
+    let nativeAttempt: String
+    let verifier: String
+    let origin: String
+    var client = "ios"
+    let createdAt: TimeInterval
+    var claimID: UUID?
+  }
+
+  struct Claim: Sendable {
+    let authReturn: MobileAuthReturn
+    fileprivate let snapshot: Snapshot
+  }
+
   private let defaults: UserDefaults
   private let codeVerifierKey = "ie.jov.Jovie.auth.pendingCodeVerifier"
+  private var generation = UUID()
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
@@ -64,10 +95,96 @@ final class MobileAuthPendingStore {
       return
     }
 
+    generation = UUID()
     defaults.set(trimmedVerifier, forKey: codeVerifierKey)
   }
 
+  @discardableResult
+  func save(codeVerifier: String, nativeAttempt: String, baseURL: URL) -> Bool {
+    guard !codeVerifier.isEmpty, MobileAuthReturnParser.isValidNativeAttempt(nativeAttempt),
+          let origin = Self.origin(baseURL) else { return false }
+    return write(Record(nativeAttempt: nativeAttempt, verifier: codeVerifier,
+      origin: origin, createdAt: Date().timeIntervalSince1970))
+  }
+
+  private func write(_ record: Record) -> Bool {
+    guard let data = try? JSONEncoder().encode(record) else { return false }
+    generation = UUID()
+    defaults.set(data, forKey: codeVerifierKey)
+    return true
+  }
+
+  private static func origin(_ url: URL) -> String? {
+    guard MobileBrowserAuthURLBuilder.isSupportedBrowserAuthURL(url),
+          var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+          components.user == nil, components.password == nil else { return nil }
+    components.scheme = components.scheme?.lowercased()
+    components.host = components.host?.lowercased()
+    if (components.scheme == "https" && components.port == 443)
+      || (components.scheme == "http" && components.port == 80) { components.port = nil }
+    components.path = ""
+    components.query = nil
+    components.fragment = nil
+    return components.string
+  }
+
+  func matches(_ url: URL, snapshot: Snapshot, baseURL: URL) -> Bool {
+    guard isCurrent(snapshot), let record = snapshot.record, record.claimID == nil,
+          record.origin == Self.origin(baseURL),
+          MobileAuthReturnParser.nativeAttempt(url) == record.nativeAttempt else { return false }
+    return url.scheme?.lowercased() == "ie.jov.jovie" || Self.origin(url) == record.origin
+  }
+
+  func claim(_ url: URL, matching snapshot: Snapshot, baseURL: URL) -> Claim? {
+    guard matches(url, snapshot: snapshot, baseURL: baseURL), var record = snapshot.record,
+          let parsed = MobileAuthReturnParser.parse(url, codeVerifier: record.verifier) else { return nil }
+    record.claimID = UUID()
+    guard write(record) else { return nil }
+    return Claim(authReturn: MobileAuthReturn(code: parsed.code, state: parsed.state,
+      codeVerifier: parsed.codeVerifier, nativeAttempt: record.nativeAttempt), snapshot: self.snapshot())
+  }
+
+  func isCurrent(_ claim: Claim) -> Bool { isCurrent(claim.snapshot) }
+
+  @discardableResult
+  func rearm(_ claim: Claim) -> Bool {
+    guard isCurrent(claim), var record = claim.snapshot.record, record.claimID != nil else { return false }
+    record.claimID = nil
+    return write(record)
+  }
+
+  func finish(_ claim: Claim) { clear(matching: claim.snapshot) }
+
+  func snapshot() -> Snapshot {
+    if let data = defaults.data(forKey: codeVerifierKey),
+       let record = try? JSONDecoder().decode(Record.self, from: data),
+       record.version == 1, record.client == "ios", record.createdAt.isFinite,
+       !record.verifier.isEmpty, MobileAuthReturnParser.isValidNativeAttempt(record.nativeAttempt),
+       let url = URL(string: record.origin), Self.origin(url) == record.origin {
+      return Snapshot(generation: generation, verifier: record.verifier, record: record)
+    }
+    let value = defaults.string(forKey: codeVerifierKey)?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return Snapshot(generation: generation, verifier: value?.isEmpty == false ? value : nil)
+  }
+
+  func isCurrent(_ snapshot: Snapshot) -> Bool { self.snapshot() == snapshot }
+
+  func consumeCodeVerifier(matching snapshot: Snapshot) -> String? {
+    guard isCurrent(snapshot), snapshot.verifier != nil else { return nil }
+    return consumeCodeVerifier()
+  }
+
+  @discardableResult
+  func clear(matching snapshot: Snapshot) -> Bool {
+    guard isCurrent(snapshot) else { return false }
+    clear()
+    return true
+  }
+
   func consumeCodeVerifier() -> String? {
+    // Legacy parser helpers cannot consume the new correlated record.
+    guard defaults.data(forKey: codeVerifierKey) == nil else { return nil }
     let verifier = defaults.string(forKey: codeVerifierKey)?
       .trimmingCharacters(in: .whitespacesAndNewlines)
     clear()
@@ -80,16 +197,12 @@ final class MobileAuthPendingStore {
   }
 
   func hasCodeVerifier() -> Bool {
-    guard let verifier = defaults.string(forKey: codeVerifierKey)?
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-    else {
-      return false
-    }
-
-    return !verifier.isEmpty
+    let pending = snapshot()
+    return pending.verifier != nil && pending.record?.claimID == nil
   }
 
   func clear() {
+    generation = UUID()
     defaults.removeObject(forKey: codeVerifierKey)
   }
 }
@@ -137,6 +250,14 @@ final class MobileAuthCallbackURLInbox {
     NotificationCenter.default.post(name: .jovieAuthCallbackURL, object: url)
   }
 
+  func allowRetry(nativeAttempt: String) {
+    pendingURLs.removeAll { MobileAuthReturnParser.nativeAttempt($0) == nativeAttempt }
+    seenURLKeys = seenURLKeys.filter { value in
+      guard let url = URL(string: value) else { return true }
+      return MobileAuthReturnParser.nativeAttempt(url) != nativeAttempt
+    }
+  }
+
   func drain() -> [URL] {
     let urls = pendingURLs
     pendingURLs.removeAll()
@@ -145,6 +266,20 @@ final class MobileAuthCallbackURLInbox {
 }
 
 enum MobileAuthReturnParser {
+  static func isValidNativeAttempt(_ value: String) -> Bool {
+    value.utf8.count == 43 && value.utf8.allSatisfy {
+      (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || $0 == 45 || $0 == 95
+    }
+  }
+
+  static func nativeAttempt(_ url: URL) -> String? {
+    guard isSupportedCallback(url) else { return nil }
+    let values = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+      .filter { $0.name == "native_attempt" } ?? []
+    guard values.count == 1, let value = values.first?.value, isValidNativeAttempt(value) else { return nil }
+    return value
+  }
+
   static func parseProviderError(_ url: URL) -> MobileAuthProviderError? {
     guard isSupportedCallback(url) else { return nil }
 
@@ -221,6 +356,14 @@ enum MobileAuthReturnParser {
       state: components.state,
       codeVerifier: verifier
     )
+  }
+
+  @MainActor
+  static func parse(_ url: URL, pendingStore: MobileAuthPendingStore,
+                    matching snapshot: MobileAuthPendingStore.Snapshot) -> MobileAuthReturn? {
+    guard let components = parseCallbackComponents(url),
+          let verifier = pendingStore.consumeCodeVerifier(matching: snapshot) else { return nil }
+    return MobileAuthReturn(code: components.code, state: components.state, codeVerifier: verifier)
   }
 
   private static func parseCallbackComponents(_ url: URL) -> (code: String, state: String)? {

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
+  type ColumnDef,
   createColumnHelper,
   getCoreRowModel,
   getSortedRowModel,
@@ -26,7 +27,7 @@ function HeaderHarness() {
       header: 'Actions',
       enableSorting: false,
     }),
-  ];
+  ] as ColumnDef<Row, unknown>[];
 
   const table = useReactTable({
     data: [

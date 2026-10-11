@@ -3,6 +3,15 @@ import {
   buildSpotifyCatalogConnectionRoute,
 } from '@/constants/routes';
 import {
+  rankSocialInboxDrafts,
+  type SocialInboxRankingPreferences,
+} from '@/lib/connectors/social-inbox-ranker';
+import {
+  parseSocialReplyDraft,
+  type SocialReplyAuthorKind,
+} from '@/lib/connectors/social-reply-draft';
+import {
+  SOCIAL_REPLY_DRAFT_KIND,
   WORKFLOW_CAPTURE_REQUEST_KIND,
   YOUTUBE_THUMBNAIL_CANDIDATE_KIND,
 } from '@/lib/connectors/suggested-action-kinds';
@@ -47,6 +56,19 @@ const PRIMARY_ACTION_LABEL_BY_KIND: Readonly<Record<string, string>> = {
   'calendar.create_event': 'Add to calendar',
   'brand_deal.opportunity': 'Approve buyer',
   [WORKFLOW_CAPTURE_REQUEST_KIND]: 'Record',
+  [SOCIAL_REPLY_DRAFT_KIND]: 'Approve Reply',
+};
+
+const SOCIAL_REPLY_TYPE_LABEL_BY_AUTHOR_KIND: Readonly<
+  Record<SocialReplyAuthorKind, string>
+> = {
+  fan: 'Fan Reply',
+  collab: 'Collab Request',
+  booking: 'Booking Inquiry',
+  sponsorship: 'Sponsorship Offer',
+  press: 'Press',
+  playlist: 'Playlist',
+  anonymous: 'Fan Reply',
 };
 
 function primaryActionLabelFor(
@@ -139,11 +161,13 @@ export function mapSuggestedActionToInboxCard(
     row.kind,
     row.payload
   );
+  const socialReply = parseSocialReplyDraft(row.kind, row.payload);
   const signalType = classifyOpportunitySignalType(row);
   let category: OpportunityInboxCardCategory;
   if (report) category = 'report';
   else if (brandDeal) category = 'brand_deal';
   else if (youtubeThumbnail) category = 'youtube_thumbnail';
+  else if (socialReply) category = 'social_reply';
   else if (workflowCapturePayload?.success) category = 'workflow_capture';
   else category = classifySuggestedActionCategory(row);
   const title = titleFromPayload(row.payload, category);
@@ -153,10 +177,14 @@ export function mapSuggestedActionToInboxCard(
   else if (category === 'workflow_capture') typeLabel = 'Workflow';
   else if (category === 'youtube_thumbnail') typeLabel = 'YouTube Thumbnail';
   else if (category === 'brand_deal') typeLabel = 'Brand Deal';
-  else typeLabel = OPPORTUNITY_SIGNAL_TYPE_META[signalType].label;
+  else if (socialReply) {
+    typeLabel = SOCIAL_REPLY_TYPE_LABEL_BY_AUTHOR_KIND[socialReply.authorKind];
+  } else typeLabel = OPPORTUNITY_SIGNAL_TYPE_META[signalType].label;
   let why: string;
   if (brandDeal) why = formatBrandDealOpportunityMetadata(brandDeal);
-  else if (youtubeThumbnail) {
+  else if (socialReply) {
+    why = `Inbound ${socialReply.platform} message from ${socialReply.authorLabel} awaiting your reply.`;
+  } else if (youtubeThumbnail) {
     why = `YouTube API snapshot captured ${youtubeThumbnail.apiMetrics.capturedAt}. Approval records intent; publication stays blocked pending a native Studio experiment and provider readback.`;
   } else why = whyFromRow(row, category);
   return {
@@ -191,6 +219,23 @@ export function mapSuggestedActionToInboxCard(
               workflowCaptureResult.data.state === 'uploaded_needs_review'
                 ? ('uploaded_needs_review' as const)
                 : ('pending' as const),
+          },
+        }
+      : {}),
+    ...(socialReply
+      ? {
+          socialReply: {
+            platform: socialReply.platform,
+            authorLabel: socialReply.authorLabel,
+            typeLabel:
+              SOCIAL_REPLY_TYPE_LABEL_BY_AUTHOR_KIND[socialReply.authorKind],
+            inboundText: socialReply.inboundText,
+            draftedText: socialReply.draftedText,
+            sourceUrl: socialReply.sourceUrl,
+            videoTitle: socialReply.provenance?.videoTitle ?? null,
+            likeCount: socialReply.provenance?.likeCount ?? null,
+            executionState: socialReply.executionState,
+            revisionCount: socialReply.revisions.length,
           },
         }
       : {}),
@@ -236,9 +281,13 @@ export const DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS: readonly OpportunityI
 
 export function buildOpportunityInboxData(
   rows: readonly SuggestedActionRow[],
-  tourDates?: OpportunityInboxTourDates
+  tourDates?: OpportunityInboxTourDates,
+  ranking?: {
+    readonly now?: Date;
+    readonly preferences?: SocialInboxRankingPreferences;
+  }
 ): OpportunityInboxData {
-  const cards = rows.flatMap(row => {
+  const entries = rows.flatMap(row => {
     const signalType = classifyOpportunitySignalType(row);
     if (
       signalType === 'brand_deal' &&
@@ -258,21 +307,64 @@ export function buildOpportunityInboxData(
     ) {
       return [];
     }
-    return [mapSuggestedActionToInboxCard(row)];
+    if (
+      row.kind === SOCIAL_REPLY_DRAFT_KIND &&
+      !parseSocialReplyDraft(row.kind, row.payload)
+    ) {
+      return [];
+    }
+    return [{ card: mapSuggestedActionToInboxCard(row), row }];
   });
-  // Report-back cards surface at the top of the inbox (GH #13178) so the
-  // measurement loop visibly closes; relative order is otherwise preserved.
-  const reportCards = cards.filter(card => card.category === 'report');
-  const brandDealCards = cards
+  // Preserve the existing report and brand-deal lanes, then rank inbound social
+  // replies by ROI. The score stays server-internal and is never rendered.
+  const reportCards = entries
+    .map(entry => entry.card)
+    .filter(card => card.category === 'report');
+  const brandDealCards = entries
+    .map(entry => entry.card)
     .filter(card => card.category === 'brand_deal')
     .sort(
       (a, b) => (b.brandDealRankingScore ?? 0) - (a.brandDealRankingScore ?? 0)
     );
-  const otherCards = cards.filter(
-    card => card.category !== 'report' && card.category !== 'brand_deal'
-  );
+  const socialReplyCards = rankSocialInboxDrafts(
+    entries.flatMap(entry => {
+      const socialReply = parseSocialReplyDraft(
+        entry.row.kind,
+        entry.row.payload
+      );
+      return socialReply
+        ? [
+            {
+              ...socialReply,
+              id: entry.card.id,
+              card: entry.card,
+            },
+          ]
+        : [];
+    }),
+    ranking
+  ).map(entry => entry.card);
+  const otherCards = entries
+    .map(entry => entry.card)
+    .filter(
+      card =>
+        card.category !== 'report' &&
+        card.category !== 'brand_deal' &&
+        card.category !== 'social_reply'
+    );
   return {
-    cards: [...reportCards, ...brandDealCards, ...otherCards],
+    cards: [
+      ...reportCards,
+      ...brandDealCards,
+      ...socialReplyCards,
+      ...otherCards,
+    ].slice(0, 50),
+    availability: {
+      suggestedActions: 'available',
+      tourDates: tourDates
+        ? (tourDates.availability ?? 'unknown')
+        : 'not_requested',
+    },
     emptyActionCards: DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS,
     ...(tourDates ? { tourDates } : {}),
   };

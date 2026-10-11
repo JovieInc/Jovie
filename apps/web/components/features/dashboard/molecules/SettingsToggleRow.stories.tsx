@@ -34,29 +34,39 @@ type Story = StoryObj<typeof SettingsToggleRow>;
 function ControlledSettingsToggleRow(args: InteractiveSettingsToggleRowProps) {
   const [checked, setChecked] = React.useState<boolean>(args.checked ?? false);
 
+  const rowProps: InteractiveSettingsToggleRowProps = {
+    ...args,
+    checked,
+    onCheckedChange: next => {
+      setChecked(next);
+      args.onCheckedChange?.(next);
+    },
+  };
+
   return (
     <div className='max-w-xl'>
-      <SettingsToggleRow
-        {...args}
-        checked={checked}
-        onCheckedChange={next => {
-          setChecked(next);
-          args.onCheckedChange?.(next);
-        }}
-      />
+      <SettingsToggleRow {...rowProps} />
     </div>
   );
 }
 
 export const Default: Story = {
-  render: args => <ControlledSettingsToggleRow {...args} />,
+  render: args => (
+    <ControlledSettingsToggleRow
+      {...(args as InteractiveSettingsToggleRowProps)}
+    />
+  ),
 };
 
 export const WithoutDescription: Story = {
   args: {
     description: undefined,
   },
-  render: args => <ControlledSettingsToggleRow {...args} />,
+  render: args => (
+    <ControlledSettingsToggleRow
+      {...(args as InteractiveSettingsToggleRowProps)}
+    />
+  ),
 };
 
 export const Disabled: Story = {

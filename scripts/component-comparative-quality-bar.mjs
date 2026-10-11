@@ -470,12 +470,15 @@ export function runComparativeQualityBar(options = {}) {
     issues
   );
 
-  const inventory = resolveSamplesOption(
-    resolvedOptions.inventory,
-    discoverAtomMoleculeInventory(repoRoot),
-    'supplied atom/molecule inventory must be an array',
-    issues
-  );
+  const inventory =
+    resolvedOptions.inventory === undefined
+      ? discoverAtomMoleculeInventory(repoRoot)
+      : resolveSamplesOption(
+          resolvedOptions.inventory,
+          [],
+          'supplied atom/molecule inventory must be an array',
+          issues
+        );
   const trustedBaseEnrollment =
     resolvedOptions.trustedBaseEnrollment === undefined
       ? resolveTrustedBaseEnrollment(repoRoot)

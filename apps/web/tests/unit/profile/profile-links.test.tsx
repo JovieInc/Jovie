@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 /**
  * Tests for creator link display across dashboard sidebar and public profile.
  *
@@ -128,6 +130,13 @@ function createSocialLink(
 
 // ─── Sidebar: ProfileLinkList ────────────────────────────────────────────────
 
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
+
 describe('ProfileLinkList (dashboard sidebar)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -184,9 +193,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
       render(<ProfileLinkList links={links} selectedCategory='dsp' />);
 
       expect(screen.queryByTestId('social-icon-instagram')).toBeNull();
-      expect(
-        screen.getByText('No music links yet. Click + to add one.')
-      ).toBeDefined();
+      expect(screen.getByText('No music links yet.')).toBeDefined();
     });
 
     it('shows empty state when no links exist in category', async () => {
@@ -196,9 +203,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
 
       render(<ProfileLinkList links={[]} selectedCategory='social' />);
 
-      expect(
-        screen.getByText('No social links yet. Click + to add one.')
-      ).toBeDefined();
+      expect(screen.getByText('No social links yet.')).toBeDefined();
     });
   });
 
@@ -1007,5 +1012,13 @@ describe('Public profile link visibility', () => {
       expect(getPlatformCategory('youtube')).toBe('social');
       expect(getPlatformCategory('youtube_music')).toBe('dsp');
     });
+  });
+
+  it('imports LINEAR_SURFACE from the canonical token module', () => {
+    const source = readWebSource(
+      'components/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList.tsx'
+    );
+    expect(source).toContain('@/components/tokens/linear-surface');
+    expect(source).not.toContain("dashboard/tokens'");
   });
 });

@@ -221,6 +221,9 @@ const MOCK_PROFILE = {
   spotifyId: 'spotify_artist_1',
   username: 'testartist',
   usernameNormalized: 'testartist',
+  displayName: 'Test Artist',
+  isPublic: true,
+  onboardingCompletedAt: new Date('2025-01-01'),
   settings: {},
 };
 
@@ -290,7 +293,11 @@ function setupDbSelectJoinChain(result: unknown[]) {
 function setupDbUpdateChain() {
   mockDbUpdate.mockReturnValue({
     set: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
+      where: vi.fn().mockReturnValue({
+        // The archive lifecycle's update chain ends in .returning({ deletedAt });
+        // without it the delete-release case crashes before its assertions.
+        returning: vi.fn().mockResolvedValue([{ deletedAt: new Date() }]),
+      }),
     }),
   });
 }

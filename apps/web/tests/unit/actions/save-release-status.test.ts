@@ -41,7 +41,8 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-vi.mock('@/lib/db/schema/content', () => ({
+vi.mock('@/lib/db/schema/content', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/db/schema/content')>()),
   discogReleases: { id: 'id' },
   discogRecordings: { id: 'recordingId' },
   discogReleaseTracks: { releaseId: 'releaseId' },
@@ -138,9 +139,13 @@ vi.mock('@/lib/utils/redirect-error', () => ({
   throwIfRedirect: vi.fn(),
 }));
 
-vi.mock('@/constants/routes', () => ({
-  APP_ROUTES: { LIBRARY: '/app/library', RELEASES: '/dashboard/releases' },
-}));
+vi.mock('@/constants/routes', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/constants/routes')>();
+  return {
+    ...actual,
+    APP_ROUTES: { LIBRARY: '/app/library', RELEASES: '/dashboard/releases' },
+  };
+});
 
 vi.mock('@/lib/env-public', () => ({
   publicEnv: { NEXT_PUBLIC_APP_URL: 'http://localhost:3000' },

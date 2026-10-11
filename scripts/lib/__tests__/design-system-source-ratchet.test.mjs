@@ -110,7 +110,7 @@ describe('design-system source identity ratchet (JOV-5301)', () => {
       `const LINEAR_VAR = ${LINEAR_NAMESPACE_PATTERN.toString()};`
     );
     expect(LINEAR_TEST).toContain(
-      "for (const dir of ['app', 'components', 'styles'])"
+      "const SCANNED_ROOTS = ['app', 'components', 'styles'] as const;"
     );
     expect([...LINEAR_SCAN_DIRS]).toEqual(['app', 'components', 'styles']);
   });

@@ -207,7 +207,7 @@ export function ChatMerchOptionsCard({
   return (
     <section aria-label='Merch Options' className='max-w-3xl'>
       <p className='mb-3 text-xs text-secondary-token'>
-        {result.nextStep ?? 'Pick one to save it to Library'}
+        {result.nextStep ?? 'Pick one to save it to Work'}
       </p>
       <div className='grid gap-3 sm:grid-cols-3'>
         {result.options.map(option => {
@@ -353,8 +353,8 @@ export function ChatMerchSelectionCard({
           </p>
           <p className='mt-0.5 text-xs leading-5 text-secondary-token'>
             {blockedReasons.length
-              ? `${statusLabel} card is in Library as a draft until Printful and pricing checks pass.`
-              : `${statusLabel} card is now available in Library.`}
+              ? `${statusLabel} card is in Work as a draft until Printful and pricing checks pass.`
+              : `${statusLabel} card is now available in Work.`}
           </p>
           {blockedReasons.length ? (
             <p className='mt-1.5 line-clamp-2 text-2xs leading-4 text-tertiary-token'>
@@ -365,11 +365,11 @@ export function ChatMerchSelectionCard({
             <Link
               href='/app/library?view=merch'
               className={cn(
-                'inline-flex h-8 items-center rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-2',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
+                'inline-flex h-8 items-center rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-colors duration-subtle hover:border-default hover:bg-surface-2',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-border-focus)/55'
               )}
             >
-              Open Library
+              Open Work
             </Link>
             {result.publicUrl ? (
               <a
@@ -377,8 +377,8 @@ export function ChatMerchSelectionCard({
                 target='_blank'
                 rel='noreferrer'
                 className={cn(
-                  'inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-2',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
+                  'inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-colors duration-subtle hover:border-default hover:bg-surface-2',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-border-focus)/55'
                 )}
               >
                 Public Page

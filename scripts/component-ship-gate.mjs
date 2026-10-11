@@ -58,6 +58,21 @@ const CANONICAL_MARKETING_STORIES = Object.freeze([
 ]);
 const TEST_FILE_RE = /\.(?:test|spec)\.[jt]sx?$/i;
 
+// Named exemption from the story requirement below, and ONLY the story
+// requirement -- the test requirement still applies in full. Design-studio
+// components are internal tooling, not the product system, and
+// storybook-story-quality-guard.mjs's `no-design-studio-product-stories`
+// rule (see the "Design-studio section stories are not the product system"
+// check there) unconditionally bans any .stories.tsx under this exact
+// prefix. Without this exemption the two gates contradict each other for
+// every file here: this gate demands a story that the other gate then
+// rejects (JOV-6773).
+const STORY_REQUIREMENT_EXEMPT_PREFIX = 'apps/web/components/design-studio/';
+
+export function isStoryRequirementExempt(sourceRel) {
+  return sourceRel.startsWith(STORY_REQUIREMENT_EXEMPT_PREFIX);
+}
+
 function parseArgs(argv) {
   const flags = {
     diffBase: null,
@@ -161,11 +176,27 @@ function withoutTsxExtension(value) {
   return normalizeRepoPath(value).replace(/\.(?:tsx?|jsx?)$/i, '');
 }
 
+// tsconfig.json path shortcuts that drop the `components/` segment the
+// generic `@/*` -> `apps/web/*` mapping below would otherwise keep. Checked
+// longest-prefix-first so a more specific shortcut wins over the generic one.
+const ALIAS_PREFIX_REMAPS = [
+  ['@/atoms/', 'apps/web/components/atoms/'],
+  ['@/molecules/', 'apps/web/components/molecules/'],
+  ['@/organisms/', 'apps/web/components/organisms/'],
+  ['@/features/', 'apps/web/components/features/'],
+];
+
 function moduleResolvesToSource({ moduleSpecifier, importerRel, sourceRel }) {
   const sourceWithoutExtension = withoutTsxExtension(sourceRel);
   let candidate;
 
-  if (moduleSpecifier.startsWith('@/')) {
+  const aliasRemap = ALIAS_PREFIX_REMAPS.find(([prefix]) =>
+    moduleSpecifier.startsWith(prefix)
+  );
+  if (aliasRemap) {
+    const [prefix, replacement] = aliasRemap;
+    candidate = `${replacement}${moduleSpecifier.slice(prefix.length)}`;
+  } else if (moduleSpecifier.startsWith('@/')) {
     candidate = `apps/web/${moduleSpecifier.slice(2)}`;
   } else if (moduleSpecifier.startsWith('.')) {
     candidate = join(dirname(importerRel), moduleSpecifier);
@@ -568,6 +599,19 @@ const RUNTIME_COMPONENT_RENDERER_MODULES = new Map([
     ]),
   ],
   ['react-test-renderer', new Set(['create'])],
+  // Thin @testing-library/react `render()` wrappers used across apps/web's
+  // test suite (tests/utils/fast-render.ts) — each just calls the real
+  // `render` with a fixed `wrapper`, so a JSX argument reaching one of these
+  // is exactly as real as reaching `render` directly.
+  [
+    '@/tests/utils/fast-render',
+    new Set([
+      'fastRender',
+      'renderWithClerk',
+      'renderWithNextJs',
+      'renderWithHeadlessUi',
+    ]),
+  ],
 ]);
 
 const RUNTIME_COMPONENT_ELEMENT_FACTORY_MODULES = new Map([
@@ -1751,11 +1795,13 @@ export function checkChangedComponents(
     const storyRel = adjacentStoryRel ?? centralStory?.storyRel ?? null;
 
     if (!storyRel) {
-      issues.push({
-        path: sourceRel,
-        rule: 'missing-story',
-        detail: `No adjacent ${base}.stories.tsx or verified canonical marketing story`,
-      });
+      if (!isStoryRequirementExempt(sourceRel)) {
+        issues.push({
+          path: sourceRel,
+          rule: 'missing-story',
+          detail: `No adjacent ${base}.stories.tsx or verified canonical marketing story`,
+        });
+      }
       continue;
     }
 
@@ -1831,7 +1877,20 @@ function runRatchet() {
   return { ok: comparison.ok, comparison, measurement };
 }
 
-function runRenderedEvaluation({
+/**
+ * @param {{
+ *   timeoutMs?: number,
+ *   spawn?: (command: string, args: string[], options: import('node:child_process').SpawnSyncOptionsWithStringEncoding) => import('node:child_process').SpawnSyncReturns<string>,
+ *   storybookUrl: string,
+ *   captureDir?: string | null,
+ *   components: string[],
+ *   storyPaths?: string[],
+ *   expectedFamilies?: string[],
+ * }} options
+ */
+export function runRenderedEvaluation({
+  timeoutMs,
+  spawn = spawnSync,
   storybookUrl,
   captureDir,
   components,
@@ -1845,12 +1904,14 @@ function runRenderedEvaluation({
   for (const storyPath of storyPaths) args.push(`--story-path=${storyPath}`);
   for (const family of expectedFamilies)
     args.push(`--expected-family=${family}`);
-  const result = spawnSync(process.execPath, args, {
+  const result = spawn(process.execPath, args, {
     cwd: REPO_ROOT,
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024,
+    timeout: timeoutMs,
   });
-  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
+  const output =
+    `${result.error?.message ?? ''}${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
   let report = null;
   try {
     report = JSON.parse(result.stdout?.trim() ?? '');
@@ -1909,6 +1970,8 @@ export function resolveRenderedEvaluationSection({
     ...new Set(changedComponents.map(componentFamilyName).filter(Boolean)),
   ];
   const rendered = evaluateRendered({
+    // Advisory work must leave time for the required surface matrix.
+    timeoutMs: requireRendered ? undefined : 300_000,
     storybookUrl,
     captureDir,
     components: changedComponents.filter(

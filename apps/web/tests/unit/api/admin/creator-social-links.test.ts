@@ -9,8 +9,8 @@ const mockWithIdempotency = vi.hoisted(() => vi.fn());
 const mockBatchUpdateSocialLinks = vi.hoisted(() => vi.fn());
 const mockInvalidateSocialLinksCache = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: mockGetCurrentUserEntitlements,
 }));
 
 vi.mock('@/lib/db', () => ({

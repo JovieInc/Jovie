@@ -64,9 +64,16 @@ describe('BillingActionsSection', () => {
       />
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Cancel Subscription' })
-    );
+    const cancelTrigger = screen.getByRole('button', {
+      name: 'Cancel Subscription',
+    });
+    // Regression guard for JOV-6773: destructive is a value-preserving
+    // alias of error (tailwind.config.js maps both to --color-error) --
+    // this call site should stay on the canonical token, not drift back.
+    expect(cancelTrigger.className).toContain('text-error');
+    expect(cancelTrigger.className).not.toContain('text-destructive');
+
+    fireEvent.click(cancelTrigger);
 
     expect(track).toHaveBeenCalledWith('subscription_cancel_clicked', {
       source: 'billing_dashboard',

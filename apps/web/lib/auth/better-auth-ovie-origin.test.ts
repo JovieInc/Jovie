@@ -81,12 +81,14 @@ describe('Better Auth independent Ovie origin integration', () => {
   beforeEach(() => {
     mocks.env.OVIE_WEB_ORIGIN = undefined;
     mocks.env.VERCEL_ENV = 'production';
+    mocks.env.VERCEL_PROJECT_PRODUCTION_URL = undefined;
     mocks.betterAuth.mockClear();
     vi.resetModules();
   });
 
   afterEach(() => {
     mocks.env.OVIE_WEB_ORIGIN = undefined;
+    mocks.env.VERCEL_PROJECT_PRODUCTION_URL = undefined;
   });
 
   it('opts in the private host without losing existing host or origin trust', async () => {
@@ -120,6 +122,34 @@ describe('Better Auth independent Ovie origin integration', () => {
         false
       )
     ).toThrow(/not in the allowed hosts list/i);
+  });
+
+  it('trusts the Vercel project production domain when assigned', async () => {
+    mocks.env.VERCEL_PROJECT_PRODUCTION_URL = 'jovie-timwhite-jovie.vercel.app';
+    const { resolveTrustedOrigins } = await import('./better-auth');
+    const options = mocks.betterAuth.mock.calls[0]![0];
+    expect(resolveTrustedOrigins()).toContain(
+      'https://jovie-timwhite-jovie.vercel.app'
+    );
+    expect(
+      resolveBaseURL(
+        options.baseURL,
+        '/api/auth',
+        new Request('https://jovie-timwhite-jovie.vercel.app/sign-in'),
+        false
+      )
+    ).toBe('https://jovie-timwhite-jovie.vercel.app/api/auth');
+  });
+
+  it('binds production passkeys to jov.ie, not the plugin localhost fallback', async () => {
+    await import('./better-auth');
+    const options = mocks.betterAuth.mock.calls[0]![0];
+    // A dynamic baseURL makes @better-auth/passkey fall back to rpID "localhost".
+    expect(typeof options.baseURL).not.toBe('string');
+    const plugin = options.plugins?.find(entry => entry.id === 'passkey') as
+      | { options?: { rpID?: string } }
+      | undefined;
+    expect(plugin?.options?.rpID).toBe('jov.ie');
   });
 
   it('leaves private host trust disabled without configuration', async () => {

@@ -17,11 +17,39 @@ name: Marketing Certification Producer
 on:
   push:
     branches: [main]
+    # Keep in parity with CERTIFICATION_INPUT_GLOBS (producer regression test).
     paths:
       - 'apps/web/components/**'
-      - 'apps/web/data/marketing/**'
-      # @coverage-via targets: a declared test changing invalidates its entry.
-      - 'apps/web/tests/unit/marketing/**'
+      - 'apps/web/data/**'
+      - 'apps/web/styles/**'
+      - 'apps/web/lib/**'
+      - 'apps/web/hooks/**'
+      - 'apps/web/constants/**'
+      - 'apps/web/public/**'
+      - 'apps/web/app/(home)/**'
+      - 'apps/web/app/(marketing)/**'
+      - 'apps/web/app/*.*'
+      - 'apps/web/tests/**'
+      - 'apps/web/scripts/marketing-certification-producer*'
+      - 'apps/web/*.config.*'
+      - 'apps/web/tsconfig*.json'
+      - 'apps/web/package.json'
+      - 'apps/web/.storybook/**'
+      - 'packages/ui/**'
+      - 'packages/copy/**'
+      - 'canon/invariants.jsonl'
+      - 'docs/marketing/**'
+      - 'docs/design-system/molecule-ownership-receipt.json'
+      - 'scripts/agent/pen-workspace-locks.json'
+      - '.github/actions/setup-node-pnpm/**'
+      - '.nvmrc'
+      - '.node-version'
+      - 'scripts/invariants/**'
+      - 'design.tokens.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/marketing-certification-producer.yml'
   schedule:
     - cron: '41 4 * * *'
   workflow_dispatch:
@@ -66,18 +94,20 @@ jobs:
           set -euo pipefail
           out="${RUNNER_TEMP}/changed.txt"
           all=false
+          : > "$out"
           if [[ "${BEFORE:-}" =~ ^[0-9a-f]{40}$ && "$BEFORE" != "0000000000000000000000000000000000000000" ]]; then
-            if ! gh api "repos/$REPO/compare/$BEFORE...$GITHUB_SHA" --jq '.files[].filename' > "$out"; then
+            if ! gh api "repos/$REPO/compare/$BEFORE...$GITHUB_SHA" --jq '.files[] | .filename, .previous_filename // empty' > "$out"; then
               all=true
+              : > "$out"
             fi
           else
             all=true
           fi
+          # Include both names of renames so the former dependency is invalidated.
           # The compare API lists at most 300 files; a larger push could hide an
           # affected entry, so evaluate everything instead of guessing.
           if [ "$all" = true ] || [ "$(wc -l < "$out")" -ge 300 ]; then
             echo "all=true" >> "$GITHUB_OUTPUT"
-            : > "$out"
           fi
           echo "path=$out" >> "$GITHUB_OUTPUT"
           wc -l < "$out"

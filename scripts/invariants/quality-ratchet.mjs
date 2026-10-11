@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+export * from './quality-saturation.mjs';
+
 export const QUALITY_RATCHET_INVARIANT_ID = 'JOV-INV-027';
 export const QUALITY_RATCHET_SCHEMA = 'jovie-quality-ratchet/v1';
 export const QUALITY_CONTRACTS_PATH = 'canon/quality-contracts.jsonl';

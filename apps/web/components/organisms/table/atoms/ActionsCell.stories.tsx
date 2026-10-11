@@ -14,7 +14,7 @@ type Story = StoryObj<typeof ActionsCell>;
 
 export const Default: Story = {
   args: {
-    children: (
+    actions: (
       <button
         type='button'
         className='rounded-full border border-subtle bg-surface px-3 py-1 text-sm text-primary'
@@ -28,7 +28,7 @@ export const Default: Story = {
 export const DenseContextual: Story = {
   args: {
     className: 'system-b-table-contextual-action-cell',
-    children: (
+    actions: (
       <button
         type='button'
         className='rounded-full border border-subtle bg-surface px-3 py-1 text-sm text-primary'

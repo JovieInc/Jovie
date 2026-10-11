@@ -25,7 +25,11 @@ import {
 
 const NOW = new Date('2026-09-26T00:05:00.000Z');
 
-function reporter(daily: { cost: number; inputTokens: number }) {
+function reporter(daily: {
+  cost: number;
+  inputTokens: number;
+  model?: string;
+}) {
   return vi.fn(
     async (params: {
       groupBy?: string;
@@ -53,9 +57,11 @@ function reporter(daily: { cost: number; inputTokens: number }) {
       return {
         results: [
           {
-            model: 'anthropic/claude-sonnet-4-20250514',
+            model: daily.model ?? 'zai/glm-5.3',
             totalCost: monthly ? daily.cost * 30 : daily.cost,
-            inputTokens: daily.inputTokens * 10,
+            // input_tokens excludes cached tokens; half the prompt is cached.
+            inputTokens: (daily.inputTokens / 2) * 10,
+            cachedInputTokens: (daily.inputTokens / 2) * 10,
             requestCount: 10,
           },
         ],
@@ -66,6 +72,26 @@ function reporter(daily: { cost: number; inputTokens: number }) {
 
 describe('AI Gateway daily spend', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('distinguishes missing token counts from a known zero average', async () => {
+    for (const counts of [{}, { inputTokens: 0, cachedInputTokens: 0 }]) {
+      const report = vi.fn(async () => ({
+        results: [
+          {
+            model: 'zai/glm-5.3',
+            totalCost: 0,
+            requestCount: 10,
+            ...counts,
+          },
+        ],
+      }));
+      const spend = await getDailyGatewaySpend(NOW, report);
+      expect(spend.byModel[0]?.promptTokensPerRequest).toBe(
+        'inputTokens' in counts ? 0 : null
+      );
+      expect(spend.cacheShare).toBeNull();
+    }
+  });
 
   it('reads the previous UTC day by tag and model plus a 30-day total', async () => {
     const report = reporter({ cost: 2, inputTokens: 20_000 });
@@ -84,14 +110,15 @@ describe('AI Gateway daily spend', () => {
     // Tag rows overlap, so the total comes from the model grouping.
     expect(spend.totalUsd).toBe(2);
     expect(spend.observed30dUsd).toBe(60);
-    expect(spend.byModel[0]?.inputTokensPerRequest).toBe(20_000);
+    expect(spend.byModel[0]?.promptTokensPerRequest).toBe(20_000);
+    expect(spend.cacheShare).toBe(0.5);
     expect(spend.alerts).toEqual([]);
     expect(formatGatewaySpendNotes(spend)).toBe(
-      'Auto: 2026-09-25 $2.00 (jovie-chat $1.60, jovie-chat-title $0.40). Alert over $5.00/day.'
+      'Auto: 2026-09-25 $2.00 (jovie-chat $1.60, jovie-chat-title $0.40). Cache 50% of prompt tokens. Alert over $5.00/day.'
     );
   });
 
-  it('alerts over $5/day and over 150K average input tokens per request', async () => {
+  it('alerts over $5/day and over 150K average prompt tokens (input + cached) per request', async () => {
     const spend = await getDailyGatewaySpend(
       NOW,
       reporter({
@@ -102,12 +129,23 @@ describe('AI Gateway daily spend', () => {
 
     expect(spend.alerts).toEqual([
       'AI Gateway spend $6.00 on 2026-09-25 exceeds $5.00/day',
-      'anthropic/claude-sonnet-4-20250514 averaged 200000 input tokens/request on 2026-09-25',
+      'zai/glm-5.3 averaged 200000 prompt tokens/request on 2026-09-25',
+    ]);
+  });
+
+  it('alerts on any openai/* or anthropic/* spend line (JOV-7119)', async () => {
+    const spend = await getDailyGatewaySpend(
+      NOW,
+      reporter({ cost: 0.4, inputTokens: 1, model: 'openai/gpt-6-luna' })
+    );
+
+    expect(spend.alerts).toEqual([
+      'banned gateway model openai/gpt-6-luna billed $0.40 across 10 requests on 2026-09-25',
     ]);
   });
 
   it('records the admin Costs row and raises a Sentry alert when over budget', async () => {
-    await recordDailyGatewaySpend(NOW, reporter({ cost: 7, inputTokens: 1 }));
+    await recordDailyGatewaySpend(NOW, reporter({ cost: 7, inputTokens: 2 }));
 
     expect(mockSet).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -126,7 +164,7 @@ describe('AI Gateway daily spend', () => {
   });
 
   it('does not alert under budget', async () => {
-    await recordDailyGatewaySpend(NOW, reporter({ cost: 1, inputTokens: 1 }));
+    await recordDailyGatewaySpend(NOW, reporter({ cost: 1, inputTokens: 2 }));
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
 });

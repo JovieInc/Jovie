@@ -2,20 +2,14 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
 
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from '@jovie/ui';
-import { ArrowLeft, Copy, LogOut } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type PropsWithChildren, useCallback, useMemo } from 'react';
+import { type PropsWithChildren, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { toast } from '@/components/feedback';
+import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
 import {
@@ -26,14 +20,16 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   useSidebar,
-} from '@/components/organisms/Sidebar';
+} from '@/components/organisms/sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import { RailStagedContent } from '@/components/shell/RailStagedContent';
+import {
+  SHELL_RAIL_ALLOCATION,
+  SHELL_RAIL_LABEL,
+} from '@/components/shell/rail-motion';
 import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
-import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -42,13 +38,13 @@ import {
   paymentsNavItem,
   userSettingsNavigation,
 } from '@/features/dashboard/dashboard-nav/config';
+import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
-import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
@@ -57,13 +53,16 @@ import {
   isOperatorNavigationHrefActive,
   OPERATOR_NAV_SECTIONS,
 } from './operator-navigation';
-import { ProfileSwitcher } from './ProfileSwitcher';
+import { IdentitySwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
+import { WhatsNewBanner } from './whats-new/WhatsNewBanner';
 
 export interface UnifiedSidebarProps {
   readonly section: AppShellSection;
   /** Brand skin for the shell chrome. 'ov' is the internal/admin skin (JOV-4083). */
   readonly variant?: BrandVariant;
+  /** Only transfer the collapsed browser action when a header is present. */
+  readonly headerOwnsCollapsedToggle?: boolean;
 }
 
 /** Render a group of nav items */
@@ -83,46 +82,7 @@ function SettingsNavGroup({
           isItemActive?.(item) ??
           (pathname === item.href || pathname.startsWith(`${item.href}/`));
         return (
-          <ContextMenu key={item.id}>
-            <ContextMenuTrigger asChild>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive}
-                  tooltip={item.name}
-                >
-                  <Link
-                    href={item.href}
-                    aria-current={isActive ? 'page' : undefined}
-                    className='flex w-full min-w-0 items-center gap-2'
-                  >
-                    <item.icon className='size-3.5' />
-                    <span className='truncate'>{item.name}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              <ContextMenuItem
-                onSelect={async () => {
-                  const origin =
-                    globalThis.window === undefined
-                      ? BASE_URL
-                      : globalThis.location.origin;
-                  const url = `${origin}${item.href}`;
-                  const ok = await copyToClipboard(url);
-                  if (ok) {
-                    toast.success('Link copied');
-                  } else {
-                    toast.error('Failed to copy link');
-                  }
-                }}
-              >
-                <Copy className='mr-2 h-4 w-4' />
-                Copy link
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
+          <NavMenuItem key={item.id} item={item} isActive={isActive} calm />
         );
       })}
     </SidebarMenu>
@@ -134,11 +94,16 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
   return (
     <nav
       aria-label='OV Navigation'
-      className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
+      className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
     >
       {OPERATOR_NAV_SECTIONS.map(section => (
         <div key={section.label}>
-          <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
+          <span
+            className={cn(
+              'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+              SHELL_RAIL_LABEL
+            )}
+          >
             {section.label}
           </span>
           <SettingsNavGroup
@@ -206,16 +171,26 @@ function SettingsNavigation({
   return (
     <nav
       aria-label={`${section} navigation`}
-      className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
+      className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
     >
       <div>
-        <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
+        <span
+          className={cn(
+            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+            SHELL_RAIL_LABEL
+          )}
+        >
           Account
         </span>
         <SettingsNavGroup items={userItems} pathname={pathname} />
       </div>
       <div>
-        <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
+        <span
+          className={cn(
+            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+            SHELL_RAIL_LABEL
+          )}
+        >
           Artist
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
@@ -226,29 +201,35 @@ function SettingsNavigation({
 
 /** Logo (clean header) or back button for settings/library */
 function SidebarHeaderNav({
+  headerOwnsCollapsedToggle,
   isRouteSidebar,
   isOperatorSection,
   canSwitchWorkspaces,
-  hasMultipleProfiles,
+  hasMultipleIdentities,
   isDemoRoute,
   variant = 'jovie',
   routeBackHref = APP_ROUTES.DASHBOARD,
   routeBackLabel = 'Back to App',
 }: Readonly<{
+  headerOwnsCollapsedToggle: boolean;
   isRouteSidebar: boolean;
   isOperatorSection: boolean;
   canSwitchWorkspaces: boolean;
-  hasMultipleProfiles: boolean;
+  hasMultipleIdentities: boolean;
   isDemoRoute: boolean;
   variant?: BrandVariant;
   routeBackHref?: string;
   routeBackLabel?: string;
 }>) {
   const isDesktop = useIsElectronRuntime();
+  const { state, isMobile, open: pinned } = useSidebar();
+  const chromeHidden = state === 'closed' && !isMobile;
   const { inboxNavigation } = useDashboardData();
 
   return (
     <div className='flex w-full items-center' data-sidebar-brand-row='true'>
+      {/* Keep the canonical brand painted; only its labels and secondary
+          actions stage out. The icon and toggle both fit the 52px rail. */}
       <div className='min-w-0 flex-1'>
         {(() => {
           if (isRouteSidebar) {
@@ -259,14 +240,14 @@ function SidebarHeaderNav({
                   aria-label={routeBackLabel}
                   className={cn(
                     'focus-ring-themed inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
-                    'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                    'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
                   )}
                 >
                   <ArrowLeft
                     className='size-3.5 text-sidebar-item-icon'
                     aria-hidden='true'
                   />
-                  <span className='truncate group-data-[collapsible=icon]:hidden'>
+                  <span className={cn('truncate', SHELL_RAIL_LABEL)}>
                     {routeBackLabel}
                   </span>
                 </Link>
@@ -278,7 +259,7 @@ function SidebarHeaderNav({
               <div
                 className={cn(
                   'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
-                  'group-data-[collapsible=icon]:justify-center'
+                  'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
                 )}
               >
                 <BrandLogo
@@ -287,7 +268,12 @@ function SidebarHeaderNav({
                   rounded={false}
                   className='rounded-sm shrink-0'
                 />
-                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                <span
+                  className={cn(
+                    'truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+                    SHELL_RAIL_LABEL
+                  )}
+                >
                   Demo
                 </span>
               </div>
@@ -301,8 +287,8 @@ function SidebarHeaderNav({
               />
             );
           }
-          if (hasMultipleProfiles && !isOperatorSection) {
-            return <ProfileSwitcher />;
+          if (hasMultipleIdentities && !isOperatorSection) {
+            return <IdentitySwitcher />;
           }
           // Clean header: the Jovie mark is the global "Ask Jovie" entry point
           // (JOV-6569). OV skin keeps its static identity wordmark; user menu
@@ -311,19 +297,21 @@ function SidebarHeaderNav({
             <div
               className={cn(
                 'flex h-7 w-full items-center gap-1.5',
-                'group-data-[collapsible=icon]:justify-center'
+                'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
               )}
             >
               {variant === 'ov' ? (
                 <>
                   <BrandLogo
-                    size={24}
+                    size='compact'
                     tone='auto'
                     variant={variant}
                     rounded={false}
                     className='rounded-sm shrink-0'
                   />
-                  <span>{BRAND_WORDMARKS[variant]}</span>
+                  <span className={cn('truncate', SHELL_RAIL_LABEL)}>
+                    {BRAND_WORDMARKS[variant]}
+                  </span>
                 </>
               ) : (
                 <AskJovieMark variant={variant} />
@@ -333,37 +321,25 @@ function SidebarHeaderNav({
         })()}
       </div>
       {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
-        <>
+        <RailStagedContent
+          hidden={chromeHidden}
+          className='flex items-center'
+          data-sidebar-header-actions='true'
+        >
           <SidebarInboxLink availability={inboxNavigation} />
           <HeaderSearchSurfaceFromContext compact />
-        </>
+        </RailStagedContent>
       ) : null}
 
       {!isDesktop ? (
-        <SidebarCollapseButton className='ml-auto shrink-0' />
+        <RailStagedContent
+          hidden={!pinned && !isMobile && headerOwnsCollapsedToggle}
+          stage={headerOwnsCollapsedToggle}
+          className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto'
+        >
+          <SidebarCollapseButton />
+        </RailStagedContent>
       ) : null}
-    </div>
-  );
-}
-
-function OperatorSessionControls() {
-  const { signOut } = useAuthSafe();
-  const handleSignOut = useCallback(async () => {
-    await signOut({ redirectUrl: '/' });
-  }, [signOut]);
-
-  return (
-    <div className='px-2.5 py-0.5'>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton tooltip='Sign Out' onClick={handleSignOut}>
-            <LogOut className='size-3.5' aria-hidden='true' />
-            <span className='truncate group-data-[collapsible=icon]:hidden'>
-              Sign Out
-            </span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
     </div>
   );
 }
@@ -389,21 +365,33 @@ export function SidebarDock({ children }: PropsWithChildren) {
 export function UnifiedSidebar({
   section,
   variant = 'jovie',
+  headerOwnsCollapsedToggle = false,
 }: UnifiedSidebarProps) {
-  const { creatorProfiles, isAdmin: canSwitchWorkspaces } = useDashboardData();
+  const { identities, isAdmin: canSwitchWorkspaces } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
   const { state: sidebarState } = useSidebar();
+  const isElectron = useIsElectronRuntime();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
   const isOperatorSection = section === 'admin' || section === 'ov';
   const isRouteSidebar = isInSettings || sidebarOverride !== null;
-  const hasMultipleProfiles = creatorProfiles.length >= 2;
+  const hasMultipleIdentities = identities.length >= 2;
   // Read the bridge synchronously so the desktop update listener mounts on
   // the first committed sidebar render. Electron emits update events once;
   // waiting for the effect-backed runtime hook would miss a boot-time event.
 
   const { profileHref } = useProfileData(section !== 'ov');
+  const isSidebarCollapsed = sidebarState === 'closed';
+  const showWhatsNew =
+    !env.IS_TEST && !env.IS_E2E && (isElectron || section === 'ov');
+  const ambientDock = (
+    <SidebarDock>
+      {isSidebarCollapsed ? null : <UpdateAvailablePill />}
+      <WhatsNewBanner enabled={showWhatsNew} collapsed={isSidebarCollapsed} />
+      <SidebarBottomNowPlayingBridge collapsed={isSidebarCollapsed} />
+    </SidebarDock>
+  );
 
   return (
     <Sidebar
@@ -415,7 +403,7 @@ export function UnifiedSidebar({
         '[--sidebar-width:var(--app-shell-sidebar-width)]',
         // The left rail owns its internal label/icon staging while
         // AppShellFrame owns the adjacent main-plane allocation (#4522).
-        'transition-[flex-basis,width,transform,opacity] duration-cinematic ease-cinematic motion-reduce:transition-none',
+        SHELL_RAIL_ALLOCATION,
         // OV brand skin: class-based token override, same mechanism as `.dark`
         // (see design-system.css → OV MODE). Zero layout impact.
         variant === 'ov' && 'ov-mode'
@@ -424,17 +412,18 @@ export function UnifiedSidebar({
       <SidebarHeader
         data-electron-drag-region='true'
         className={cn(
-          'relative justify-center gap-0 px-(--space-2-5)',
+          'relative justify-center gap-0 px-(--space-2-5) group-data-[collapsible=icon]:px-0',
           isRouteSidebar || isOperatorSection
             ? 'h-(--app-shell-header-height) py-0.5'
             : 'h-16 pl-4 pr-3 pt-5 pb-4'
         )}
       >
         <SidebarHeaderNav
+          headerOwnsCollapsedToggle={headerOwnsCollapsedToggle}
           isRouteSidebar={isRouteSidebar}
           isOperatorSection={isOperatorSection}
           canSwitchWorkspaces={canSwitchWorkspaces}
-          hasMultipleProfiles={hasMultipleProfiles}
+          hasMultipleIdentities={hasMultipleIdentities}
           isDemoRoute={isDemoRoute}
           variant={variant}
           routeBackHref={sidebarOverride?.backHref}
@@ -452,7 +441,9 @@ export function UnifiedSidebar({
             ) : sidebarOverride ? (
               sidebarOverride.content
             ) : (
-              <DashboardNav headerOwnsInbox={!isDemoRoute}>
+              <DashboardNav
+                headerOwnsInbox={!isDemoRoute && !isOperatorSection}
+              >
                 {isDemoRoute ? (
                   <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
                 ) : null}
@@ -462,26 +453,14 @@ export function UnifiedSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      {section === 'ov' ? (
-        <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
-          <OperatorSessionControls />
-        </SidebarFooter>
-      ) : (
-        // SidebarFooter is shrink-0; with the restored full-height flex chain
-        // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
-        // absorbs free space so media and the protected account panel pin bottom.
-        <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5)'>
-          <SidebarDock>
-            <SidebarBottomNowPlayingBridge
-              collapsed={sidebarState === 'closed'}
-            />
-          </SidebarDock>
-          <SidebarIdentityGroup
-            calm={!isRouteSidebar}
-            profileHref={profileHref}
-          />
-        </SidebarFooter>
-      )}
+      <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>
+        {ambientDock}
+        <SidebarIdentityGroup
+          calm={!isRouteSidebar}
+          profileHref={section === 'ov' ? undefined : profileHref}
+          label={section === 'ov' ? 'Account' : undefined}
+        />
+      </SidebarFooter>
     </Sidebar>
   );
 }

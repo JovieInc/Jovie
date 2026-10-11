@@ -219,7 +219,7 @@ describe('auditIsAgentic', () => {
     ],
   };
 
-  it('passes above the floor and lists partial checks as warnings', () => {
+  it('passes at 100 and lists partial checks as warnings', () => {
     const checks = auditIsAgentic(parseIsAgenticReport(report));
     expect(checks.find(item => item.id === 'is-agentic-score')?.status).toBe(
       'passed'
@@ -229,12 +229,12 @@ describe('auditIsAgentic', () => {
     );
   });
 
-  it('fails below the floor, on essential failures, and closed on a missing report', () => {
+  it('fails below 100, on essential failed results, and closed on a missing report', () => {
     const low = auditIsAgentic(
       parseIsAgenticReport({
         ...report,
-        score: 70,
-        issues: [{ id: 'agent-404s', result: 'fail', tier: 'essential' }],
+        score: 99,
+        issues: [{ id: 'agent-404s', result: 'failed', tier: 'essential' }],
       })
     );
     expect(

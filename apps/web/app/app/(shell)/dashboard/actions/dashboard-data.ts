@@ -423,7 +423,7 @@ function buildProfileCompletion(
       id: 'name',
       label: 'Add Your Artist Name',
       description: 'A clear name helps fans recognize and trust your profile.',
-      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+      href: APP_ROUTES.SETTINGS_PROFILE,
     });
   }
 
@@ -432,7 +432,7 @@ function buildProfileCompletion(
       id: 'avatar',
       label: 'Add A Profile Photo',
       description: 'A recognizable photo makes your page feel personal.',
-      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+      href: APP_ROUTES.SETTINGS_PROFILE,
     });
   }
 
@@ -441,7 +441,7 @@ function buildProfileCompletion(
       id: 'email',
       label: 'Add Your Account Email',
       description: 'Email keeps your account recoverable and mission-critical.',
-      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+      href: APP_ROUTES.SETTINGS_PROFILE,
     });
   }
 
@@ -1114,15 +1114,18 @@ async function fetchTippingStatsWithSession(
       monthReceivedCents: Number(tipTotalsRaw?.monthReceived ?? 0),
     };
   } catch (error) {
-    // Query timeouts are expected during Neon cold starts — downgrade to warning.
-    // The dashboard degrades gracefully by showing empty tipping stats.
-    const level =
-      error instanceof Error &&
-      (error.name === 'QueryTimeoutError' || isPostgresTimeoutError(error))
-        ? 'warning'
-        : 'error';
+    // This supplementary read already degrades safely to empty stats. Expected
+    // Neon cold-start timeouts are infrastructure noise, not actionable Sentry
+    // issues; Drizzle's wrapper otherwise groups them by the aggregate SQL.
+    if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
+      logger.warn(
+        '[tipping-stats] tipping stats query timed out; degrading to empty stats'
+      );
+      return createEmptyTippingStats();
+    }
+
     Sentry.captureException(error, {
-      level,
+      level: 'error',
       tags: { query: 'tipping_stats', context: 'dashboard_data' },
     });
     return createEmptyTippingStats();

@@ -1,5 +1,12 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -23,15 +30,66 @@ import {
   MARKETING_CERTIFICATION_COMMAND,
   runCommandPool,
   runDesignConformance,
+  runMergeGroupGuards,
   runStructural,
+  SOURCE_GUARDS,
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
   STRUCTURAL_WEB_JOB_PREFIXES,
+  selectSourceGuards,
   stripGitFetchNoise,
   structuralConcurrency,
   structuralLocks,
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+
+describe('Shared fenced-attempt coverage contract', () => {
+  it('runs existing fenced-attempt and lane regressions in the real structural selector', () => {
+    const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
+    expect(command).toContain('scripts/tests/test_execution_attempt.py');
+    expect(command).toContain('scripts/tests/test_lane_runner.py');
+    expect(command).toContain('scripts/tests/test_design_gate.py');
+    expect(command).toContain('scripts/tests/test_disk_guard.py');
+    expect(command).toContain('scripts/tests/test_hud.py');
+    expect(command).toContain('scripts/tests/test_codex_lane.py');
+    expect(command).toContain('*/scripts/lanes/codex_lane.py" --fail-under=85');
+    expect(command).toContain('scripts/tests/test_devin_free_policy.py');
+    expect(command).toContain(
+      '*/scripts/lanes/devin_free_policy.py" --fail-under=85'
+    );
+    expect(command).toContain('scripts/tests/test_worktree_sweep.py');
+    expect(command).toContain(
+      '*/scripts/lanes/worktree_sweep.py" --fail-under=85'
+    );
+    expect(command).toContain('scripts/tests/test_continuity_clock.py');
+    expect(command).toContain('scripts/tests/test_epics.py');
+    expect(command).toContain(
+      '--include="*/scripts/lanes/epics.py" --fail-under=90'
+    );
+    expect(command).toContain('scripts/tests/test_worktree_pool.py');
+    expect(command).toContain(
+      '*/scripts/lanes/worktree_pool.py" --fail-under=85'
+    );
+    expect(command).toContain(
+      '*/scripts/lanes/dependency_diff.py" --fail-under=95'
+    );
+    expect(command).toContain('coverage run --branch -m pytest');
+  });
+  it('preserves the existing lane floor and enforces fenced-attempt coverage', () => {
+    const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
+    expect(command).toContain(
+      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85'
+    );
+    expect(command).toContain(
+      '*/scripts/lanes/execution_attempt.py\" --fail-under=85'
+    );
+    expect(command).toContain(
+      '*/scripts/lanes/merge_evidence.py" --fail-under=85'
+    );
+    expect(command).toContain(' && ');
+  });
+});
+
 import {
   ALLOWLIST_PATH as LATENCY_ALLOWLIST_PATH,
   RUNTIME_ROOTS as LATENCY_RUNTIME_ROOTS,
@@ -39,7 +97,9 @@ import {
 import {
   INVARIANT_SCANNED_PATHS,
   isInvariantScannedPath,
+  readFeedbackGuardPaths,
 } from '../../invariants/scanned-paths.mjs';
+import { classifyCiRepoLanes } from '../ci-repo-lanes.mjs';
 import { classifyProductLanes } from '../product-lane-classifier.mjs';
 
 const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
@@ -52,63 +112,94 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
   )
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
   'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
 describe('CI control selector', () => {
-  it('includes the structural execution regressions in the actual control command', () => {
-    const directory = mkdtempSync(join(tmpdir(), 'jovie-ci-control-selector-'));
-    const capture = join(directory, 'commands');
-    try {
-      writeFileSync(join(directory, 'node'), '#!/bin/sh\nexit 0\n', {
-        mode: 0o755,
-      });
-      writeFileSync(
-        join(directory, 'pnpm'),
-        '#!/bin/sh\nprintf "%s\\n" "$*" >> "$JOVIE_CI_CAPTURE"\n',
-        { mode: 0o755 }
+  it.each(['whole', 'fragmented'])(
+    'includes the structural execution regressions in the actual control command with %s capture writes',
+    captureMode => {
+      const directory = mkdtempSync(
+        join(tmpdir(), 'jovie-ci-control-selector-')
       );
+      const capture = join(directory, 'commands');
+      try {
+        mkdirSync(capture);
+        writeFileSync(join(directory, 'node'), '#!/bin/sh\nexit 0\n', {
+          mode: 0o755,
+        });
+        writeFileSync(
+          join(directory, 'pnpm'),
+          `#!${process.execPath}
+const fs = require('node:fs');
+const path = require('node:path');
+const data = Buffer.from(process.argv.slice(2).join(' ') + '\\n');
+const fd = fs.openSync(path.join(process.env.JOVIE_CI_CAPTURE, String(process.pid)), 'w');
+const chunkSize = ${captureMode === 'fragmented' ? 1024 : 65536};
+for (let offset = 0; offset < data.length; offset += chunkSize) {
+  fs.writeSync(fd, data.subarray(offset, offset + chunkSize));
+}
+fs.closeSync(fd);
+`,
+          { mode: 0o755 }
+        );
 
-      const result = spawnSync(
-        process.execPath,
-        [join(REPO_ROOT, 'scripts/run-affected-tests.mjs'), '--control'],
-        {
-          cwd: REPO_ROOT,
-          env: {
-            ...process.env,
-            PATH: `${directory}:${process.env.PATH}`,
-            JOVIE_CI_CAPTURE: capture,
-          },
-          encoding: 'utf8',
-          timeout: 10_000,
-        }
-      );
-      expect(result.status, result.stderr).toBe(0);
-      const scriptCommand = readFileSync(capture, 'utf8')
-        .split('\n')
-        // The control pool runs commands concurrently, so match the suite, not the order.
-        .find(
+        const result = spawnSync(
+          process.execPath,
+          [join(REPO_ROOT, 'scripts/run-affected-tests.mjs'), '--control'],
+          {
+            cwd: REPO_ROOT,
+            env: {
+              ...process.env,
+              PATH: `${directory}:${process.env.PATH}`,
+              JOVIE_CI_CAPTURE: capture,
+            },
+            encoding: 'utf8',
+            timeout: 10_000,
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        // Each invocation owns its record; shared append writes can interleave.
+        const capturedCommands = readdirSync(capture).map(name =>
+          readFileSync(join(capture, name), 'utf8').trim()
+        );
+        const scriptCommands = capturedCommands.filter(
           command =>
             command.startsWith('exec vitest --root scripts ') &&
             command.includes(
               'lib/__tests__/native-queue-group-evidence.test.mjs'
             )
         );
-      expect(scriptCommand).toBeDefined();
-      expect(scriptCommand.split(' ')).toContain(
-        'lib/__tests__/ci-fast-lanes.test.mjs'
-      );
-      // The structural lane relies on this run instead of repeating it.
-      expect(scriptCommand.split(' ')).toContain(
-        'lib/__tests__/merge-group-workflow-contract.test.mjs'
-      );
-      expect(scriptCommand).toContain('--coverage');
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
+        expect(scriptCommands).toHaveLength(1);
+        const [scriptCommand] = scriptCommands;
+        expect(scriptCommand.split(' ')).toContain(
+          'lib/__tests__/ci-fast-lanes.test.mjs'
+        );
+        // The structural lane relies on this run instead of repeating it.
+        expect(scriptCommand.split(' ')).toContain(
+          'lib/__tests__/merge-group-workflow-contract.test.mjs'
+        );
+        expect(scriptCommand).toContain('--coverage');
+        const productionCommands = capturedCommands.filter(command =>
+          command.includes('--coverage.include=lib/production-lane-range.mjs')
+        );
+        expect(productionCommands).toHaveLength(1);
+        expect(productionCommands[0]).toContain(
+          'lib/__tests__/production-lane-range.test.mjs'
+        );
+        expect(productionCommands[0]).toContain(
+          '--coverage.thresholds.perFile=true'
+        );
+        expect(productionCommands[0]).toContain(
+          '--coverage.thresholds.functions=90'
+        );
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
     }
-  });
+  );
 });
 
 describe('runDesignConformance', () => {
@@ -462,6 +553,27 @@ describe('runStructural screenshot contract discovery', () => {
     expect(process.env.CI_FAST_STRUCTURAL_WEB).toBeUndefined();
   });
 
+  it('shell-quotes merge-group guard tests under route groups', () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    const execute = vi.fn().mockReturnValue({ code: 0, output: '' });
+    runMergeGroupGuards({
+      execute,
+      changed: [
+        'apps/web/app/app/(shell)/library/page.test.tsx',
+        'apps/web/tests/e2e/skipped.test.ts',
+        'apps/web/gone.test.ts',
+      ],
+      exists: file => file !== 'apps/web/gone.test.ts',
+    });
+    const command = execute.mock.calls[0][0];
+    expect(command).toContain("'app/app/(shell)/library/page.test.tsx'");
+    expect(command).not.toContain('skipped.test.ts');
+    expect(command).not.toContain('gone.test.ts');
+    // The composed command must parse under /bin/sh; unquoted route-group
+    // parens used to break it with `Syntax error: "(" unexpected`.
+    expect(spawnSync('/bin/sh', ['-n'], { input: command }).status).toBe(0);
+  });
+
   it('uses the default executor on the structural skip path', async () => {
     process.env.CI_FAST_SKIP_STRUCTURAL = 'true';
 
@@ -627,6 +739,47 @@ describe('invariant-scanned structural selection', () => {
       LATENCY_ALLOWLIST_PATH,
     ]) {
       expect(isInvariantScannedPath(path), path).toBe(true);
+    }
+  });
+
+  it('isolates unavailable feedback qualification inputs from lane selection', () => {
+    const path = 'scripts/lib/__tests__/ci-fast-lanes.test.mjs';
+    const read = () =>
+      JSON.stringify({ lessons: [{ guards: [{ path }, { path: null }] }] });
+    expect(readFeedbackGuardPaths(read)).toEqual([path]);
+    for (const content of ['{', '{}', '{"lessons":[{}]}']) {
+      expect(readFeedbackGuardPaths(() => content)).toEqual([]);
+    }
+    expect(
+      readFeedbackGuardPaths(() => {
+        throw new Error('missing inventory');
+      })
+    ).toEqual([]);
+    expect(isInvariantScannedPath('scripts/invariants/validate.mjs')).toBe(
+      true
+    );
+  });
+
+  it('routes the feedback inventory to the control lane', () => {
+    const plan = classifyCiRepoLanes(['LESSONS.guards.json']);
+    expect(plan.runSymphonyControl).toBe(true);
+    expect(plan.runJovieProduct).toBe(false);
+  });
+
+  it('routes every feedback inventory and linked guard edit through invariants', async () => {
+    const paths = new Set([
+      'LESSONS.md',
+      'LESSONS.guards.json',
+      ...readFeedbackGuardPaths(),
+    ]);
+    for (const path of paths) {
+      expect(isInvariantScannedPath(path), path).toBe(true);
+      const { execute } = await runFor(
+        'pull_request',
+        [path],
+        classifyProductLanes([path]).selectedLanes
+      );
+      expect(invariantRuns(execute), path).toBe(1);
     }
   });
 
@@ -809,6 +962,9 @@ exit 0
                 scenario === 'other-lane' ? 'false' : 'true',
               CI_FAST_LANE_GROUP:
                 scenario === 'other-lane' ? 'typecheck' : 'remaining',
+              // Exercise the hosted Python job without unrelated mocked suites.
+              CI_FAST_STRUCTURAL_PYTEST:
+                scenario === 'other-lane' ? '' : 'only',
               CI_FAST_LANES_OUT: output,
               GITHUB_STEP_SUMMARY: summary,
               JOVIE_FAILURE_FIXTURE: fixture,
@@ -820,8 +976,8 @@ exit 0
         expect(result.status, result.stderr).toBe(1);
         const report = JSON.parse(readFileSync(output, 'utf8'));
         expect(report.setupError).toBeNull();
-        // The typecheck group also runs the web tests ratchet after typecheck.
-        expect(report.lanes).toHaveLength(scenario === 'other-lane' ? 2 : 1);
+        // The typecheck group also runs the web tests + stories ratchets.
+        expect(report.lanes).toHaveLength(scenario === 'other-lane' ? 3 : 1);
         expect(report.lanes[0].status).toBe('failure');
         const diagnostic = report.lanes[0].logExcerpt;
         expect(diagnostic.length).toBeLessThanOrEqual(1200);
@@ -839,6 +995,34 @@ exit 0
           expect(annotation).toContain('tail-line');
           expect(annotation).not.toContain('Structural command');
         } else {
+          // Both shards start with invariants in the existing three-slot pool.
+          // Fail-fast may leave the fourth command (control) unstarted.
+          expect(diagnostic).toContain(
+            'Structural command 3/4 failed (exit 23)'
+          );
+          const timings = [
+            ...result.stdout.matchAll(
+              /^\| \d+ \| [\d.]+s \| (pass|exit \d+) \| `([^`]+)` \|$/gmu
+            ),
+          ];
+          expect(timings.length).toBeGreaterThanOrEqual(3);
+          expect(timings.length).toBeLessThanOrEqual(4);
+          expect(timings.filter(row => row[1] === 'exit 23')).toHaveLength(2);
+          expect(timings.map(row => [row[1], row[2]])).toContainEqual([
+            'pass',
+            'pnpm invariants:check',
+          ]);
+          expect(
+            timings.every(
+              row =>
+                (row[1] === 'exit 23' && row[2].startsWith('if python3 -c ')) ||
+                (row[1] === 'pass' &&
+                  ['pnpm invariants:check', 'pnpm ci:control:test'].includes(
+                    row[2]
+                  ))
+            )
+          ).toBe(true);
+          expect(diagnostic).not.toContain('preceding successful command');
           expect(diagnostic).toContain('failed (exit 23)');
           expect(diagnostic).toContain('later unittest stderr passed');
           const expectedNode =
@@ -1706,5 +1890,162 @@ describe('failing test identities in lane excerpts', () => {
     expect(lines.every(line => line.length <= 200)).toBe(true);
     expect(extractFailureIdentities('all good\n')).toEqual([]);
     expect(extractFailureIdentities(undefined)).toEqual([]);
+  });
+});
+
+// Guards that read their inputs from disk escape PR selection by import graph
+// and structural path patterns, so the merge queue met each one first:
+// #18703 landed a cron workflow without `# clock-class:` (ci-schedule-inventory
+// ran nowhere), and node-environment-files / static-revalidate-policy ejected
+// merge groups for inputs their source PRs never checked.
+describe('source-read guard selection', () => {
+  const selected = (event, files) =>
+    selectSourceGuards(event, files).map(guard => guard.id);
+
+  it.each([['pull_request'], ['merge_group'], ['push']])(
+    'runs ci-schedule-inventory on %s when a workflow changes',
+    event => {
+      expect(
+        selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
+      ).toEqual(['ci-schedule-inventory']);
+    }
+  );
+
+  it.each([
+    ['scripts/lib/ci-schedule-inventory.mjs', ['ci-schedule-inventory']],
+    [
+      'scripts/lib/__tests__/ci-schedule-inventory.test.mjs',
+      ['ci-schedule-inventory'],
+    ],
+    ['.github/workflows/nested/not-loaded.yml', []],
+    ['.github/scripts/run-actionlint.sh', []],
+    [
+      'apps/web/tests/unit/lib/auth/redis-command-budget.test.ts',
+      ['node-environment-files'],
+    ],
+    ['apps/web/app/api/cron/example/route.test.ts', ['node-environment-files']],
+    ['apps/web/eslint-rules/rule.test.js', ['node-environment-files']],
+    ['apps/web/scripts/tool.test.mjs', ['node-environment-files']],
+    ['apps/web/tests/node-environment-files.json', ['node-environment-files']],
+    ['apps/web/tests/setup-optimized.ts', ['node-environment-files']],
+    [
+      'apps/web/vitest.config.fast.mts',
+      ['node-environment-files', 'static-revalidate-policy'],
+    ],
+    ['apps/web/lib/queries/fetch.ts', ['static-revalidate-policy']],
+    [
+      'apps/web/app/(marketing)/download/page.tsx',
+      ['static-revalidate-policy'],
+    ],
+    [
+      'apps/web/tests/unit/marketing/static-revalidate-policy.test.ts',
+      ['node-environment-files', 'static-revalidate-policy'],
+    ],
+    ['apps/web/tests/e2e/public-profile-smoke.spec.ts', []],
+    ['apps/ios/Jovie/App.swift', []],
+  ])('selects the guards that read %s on a PR', (path, guards) => {
+    expect(selected('pull_request', [path])).toEqual(guards);
+  });
+
+  it('keeps web-only guards to PRs; web merge groups already run them', () => {
+    for (const path of [
+      'apps/web/lib/queries/fetch.ts',
+      'apps/web/tests/node-environment-files.json',
+    ]) {
+      expect(classifyProductLanes([path]).selectedLanes).toContain('web');
+      expect(selected('merge_group', [path])).toEqual([]);
+      expect(selected('push', [path])).toEqual([]);
+    }
+  });
+
+  it('fails closed onto guards for manual, local, and unreadable diffs', () => {
+    const all = SOURCE_GUARDS.map(guard => guard.id);
+    // Manual dispatch runs web Unit Tests and structural, which carry the rest.
+    expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+      'ci-schedule-inventory',
+    ]);
+    expect(selected('', ['README.md'])).toEqual(all);
+    expect(selected('pull_request', null)).toEqual(all);
+    expect(selected('pull_request', [])).toEqual(all);
+    expect(selected('merge_group', null)).toEqual(['ci-schedule-inventory']);
+  });
+
+  it('points every guard at a test file that exists', () => {
+    for (const guard of SOURCE_GUARDS) {
+      const dir = guard.command.includes('@jovie/web') ? 'apps/web' : 'scripts';
+      const file = guard.command.split(' ').at(-1);
+      expect(
+        readFileSync(join(REPO_ROOT, dir, file), 'utf8'),
+        guard.id
+      ).toContain('describe(');
+    }
+  });
+});
+
+describe('document review coverage contract', () => {
+  it('runs the same document behavior tests with enforced coverage in existing script contracts', async () => {
+    const { SCRIPT_CONTRACT_VITEST_COMMAND } = await import(
+      '../../ci-fast-lanes.mjs'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      'lib/__tests__/doc-freshness.test.mjs'
+    );
+    const [contracts, coverage] = SCRIPT_CONTRACT_VITEST_COMMAND.split(' && ');
+    expect(contracts).not.toContain('--coverage');
+    expect(contracts).toContain(
+      'lib/__tests__/component-rendered-certification.test.mjs'
+    );
+    expect(coverage).toMatch(
+      /run lib\/__tests__\/doc-freshness\.test\.mjs --coverage /u
+    );
+    expect(coverage).not.toContain('component-rendered-certification.test.mjs');
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.include=lib/doc-review.mjs'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.include=lib/doc-freshness.mjs'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.thresholds.perFile=true'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.thresholds.lines=90'
+    );
+    expect(SCRIPT_CONTRACT_VITEST_COMMAND).toContain(
+      '--coverage.thresholds.branches=80'
+    );
+  });
+});
+
+describe('staging carryover coverage contract', () => {
+  it('executes the cumulative staging behavior tests once with every coverage floor enforced', async () => {
+    const previous = {
+      GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME,
+      CI_PRODUCT_LANES: process.env.CI_PRODUCT_LANES,
+      CI_FAST_SKIP_STRUCTURAL: process.env.CI_FAST_SKIP_STRUCTURAL,
+    };
+    try {
+      process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+      process.env.CI_PRODUCT_LANES = 'operations';
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi
+        .fn()
+        .mockReturnValue({ code: 0, output: 'executed\n' });
+      expect((await runStructural({ execute })).code).toBe(0);
+      const calls = execute.mock.calls.filter(([command]) =>
+        command.includes('staging-lane-carryover.test.mjs')
+      );
+      expect(calls).toHaveLength(1);
+      for (const dimension of ['lines', 'branches', 'functions'])
+        expect(calls[0][0]).toContain(`--test-coverage-${dimension}=100`);
+      expect(calls[0][0]).toContain(
+        '--test-coverage-include=.github/scripts/staging-lane-carryover.mjs'
+      );
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 });

@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGoldenPathLinearIssue } from '../golden-path-intake.mjs';
 import {
   AUTOFIX_ESCALATION_MARKER,
@@ -106,9 +106,29 @@ describe('golden-path lock evaluators', () => {
     });
   });
 
+  it('accepts the homepage link claim submitting to /start (Tim 2026-09-28)', () => {
+    const claim = `<form action="/start" method="get"><span>jov.ie/</span>
+      <input name="handle" placeholder="you" /><button type="submit">Claim</button></form>`;
+    expect(evaluateHomepageHtml(claim)).toMatchObject({
+      id: 'homepage-cta',
+      ok: true,
+      reason: expect.stringContaining('link claim'),
+    });
+    // A claim that does not submit to /start is not a conversion.
+    expect(
+      evaluateHomepageHtml(
+        '<form action="/signup"><span>jov.ie/</span><button>Claim</button></form>'
+      )
+    ).toMatchObject({ ok: false });
+    expect(
+      evaluateHomepageHtml(
+        '<form action="/start"><span>jov.ie/</span><button>Claim it now</button></form>'
+      )
+    ).toMatchObject({ ok: false });
+  });
+
   it('requires the JOV-5864 name search as the homepage conversion', () => {
-    const certified = `<a href="/start">Find yourself</a>
-      <form><input placeholder="Search your name" /><button>Find me</button></form>`;
+    const certified = `<form action="/start"><input placeholder="Search your name" /><button>Find me</button></form>`;
     expect(evaluateHomepageHtml(certified)).toMatchObject({
       id: 'homepage-cta',
       ok: true,
@@ -636,6 +656,26 @@ describe('golden-path lock autofix planner', () => {
 });
 
 describe('golden-path Linear-only intake', () => {
+  // Mocked 429s use the real persistent cooldown helper. Keep their state
+  // local to each case so repeated qualification runs still reach the mocks.
+  let cooldownStateDir;
+  let previousCooldownStateDir;
+
+  beforeEach(() => {
+    previousCooldownStateDir = process.env.LINEAR_COOLDOWN_STATE_DIR;
+    cooldownStateDir = mkdtempSync(join(tmpdir(), 'golden-path-linear-test-'));
+    process.env.LINEAR_COOLDOWN_STATE_DIR = cooldownStateDir;
+  });
+
+  afterEach(() => {
+    if (previousCooldownStateDir === undefined) {
+      delete process.env.LINEAR_COOLDOWN_STATE_DIR;
+    } else {
+      process.env.LINEAR_COOLDOWN_STATE_DIR = previousCooldownStateDir;
+    }
+    rmSync(cooldownStateDir, { recursive: true, force: true });
+  });
+
   const searchEmpty = () =>
     new Response(
       JSON.stringify({
@@ -761,7 +801,7 @@ describe('golden-path Linear-only intake', () => {
 
     expect(result).toMatchObject({
       ok: false,
-      reason: 'linear_search_429',
+      reason: 'linear_rate_limited',
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });

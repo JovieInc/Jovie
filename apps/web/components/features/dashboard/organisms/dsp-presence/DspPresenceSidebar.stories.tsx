@@ -12,16 +12,31 @@ const storyQueryClient = new QueryClient({
   },
 });
 
-const dashboardData = {
+const dashboardData: DashboardData = {
   user: { id: 'story-user' },
   creatorProfiles: [],
-  selectedProfile: { id: 'profile-123' },
+  selectedProfile: { id: 'profile-123' } as DashboardData['selectedProfile'],
   needsOnboarding: false,
   sidebarCollapsed: false,
   hasSocialLinks: false,
   hasMusicLinks: false,
   isAdmin: false,
-} as DashboardData;
+  tippingStats: {
+    tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
+    tipsSubmitted: 0,
+    totalReceivedCents: 0,
+    monthReceivedCents: 0,
+  },
+  profileCompletion: {
+    percentage: 0,
+    completedCount: 0,
+    totalCount: 6,
+    steps: [],
+    profileIsLive: false,
+  },
+};
 
 const suggestedItem: DspPresenceItem = {
   matchId: 'match-1',

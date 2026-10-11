@@ -4,7 +4,7 @@ const generateImage = vi.fn();
 vi.mock('ai', () => ({
   generateImage: (args: unknown) => generateImage(args),
 }));
-vi.mock('@ai-sdk/gateway', () => ({
+vi.mock('@/lib/ai/sdk', () => ({
   gateway: { image: (id: string) => ({ __model: id }) },
 }));
 
@@ -44,11 +44,15 @@ describe('alphaProviderOptions', () => {
     ).toBeUndefined();
   });
 
-  it('has at least two enabled native-alpha models for a real A/B', () => {
+  it('has at least one enabled native-alpha model and no banned providers', () => {
     const enabledNative = MERCH_IMAGE_MODELS.filter(
       m => m.enabled && m.alpha === 'native'
     );
-    expect(enabledNative.length).toBeGreaterThanOrEqual(2);
+    // openai/* entries were disabled under the JOV-7119 gateway ban.
+    expect(enabledNative.length).toBeGreaterThanOrEqual(1);
+    for (const m of MERCH_IMAGE_MODELS.filter(m => m.enabled)) {
+      expect(m.id).not.toMatch(/^(openai|anthropic)\//);
+    }
     for (const m of enabledNative) {
       expect(alphaProviderOptions(m)).toBeDefined();
     }

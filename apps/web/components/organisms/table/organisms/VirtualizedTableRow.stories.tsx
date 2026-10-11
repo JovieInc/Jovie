@@ -47,7 +47,7 @@ export const Default: Story = {
           rowRefsMap={new Map()}
           shouldEnableKeyboardNav={false}
           shouldVirtualize={false}
-          focusedIndex={-1}
+          isFocused={false}
           onKeyDown={() => undefined}
           onFocusChange={() => undefined}
         />

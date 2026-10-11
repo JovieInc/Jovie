@@ -179,6 +179,254 @@
           }
         }
       }
+    },
+    "/api/v1/actions/fleet.register/invoke": {
+      "post": {
+        "operationId": "invoke_fleet_register",
+        "summary": "Invoke fleet.register",
+        "description": "Implemented internal fleet dispatcher; requires explicitly enabled runtime and scoped worker identity.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/fleet.register.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/fleet.register.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/fleet.status/invoke": {
+      "post": {
+        "operationId": "invoke_fleet_status",
+        "summary": "Invoke fleet.status",
+        "description": "Implemented internal fleet dispatcher; requires explicitly enabled runtime and scoped worker identity.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/fleet.status.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/fleet.status.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/work.next/invoke": {
+      "post": {
+        "operationId": "invoke_work_next",
+        "summary": "Invoke work.next",
+        "description": "Implemented internal fleet dispatcher; requires explicitly enabled runtime and scoped worker identity.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/work-next.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/work-next.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/work.claim/invoke": {
+      "post": {
+        "operationId": "invoke_work_claim",
+        "summary": "Invoke work.claim",
+        "description": "Implemented internal fleet dispatcher; requires explicitly enabled runtime and scoped worker identity.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/work.claim.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/work.claim.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/work.report/invoke": {
+      "post": {
+        "operationId": "invoke_work_report",
+        "summary": "Invoke work.report",
+        "description": "Implemented internal fleet dispatcher; requires explicitly enabled runtime and scoped worker identity.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/work.report.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/work.report.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/defect.report/invoke": {
+      "post": {
+        "operationId": "invoke_defect_report",
+        "summary": "Invoke defect.report",
+        "description": "Implemented internal fleet dispatcher; requires explicitly enabled runtime and scoped worker identity.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/defect.report.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/defect.report.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/fleet.directory/invoke": {
+      "post": {
+        "operationId": "invoke_fleet_directory",
+        "summary": "Invoke fleet.directory",
+        "description": "Implemented internal fleet dispatcher; requires explicitly enabled runtime and scoped worker identity.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/fleet.directory.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/fleet.directory.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/work.request/invoke": {
+      "post": {
+        "operationId": "invoke_work_request",
+        "summary": "Invoke work.request",
+        "description": "Implemented internal fleet dispatcher; requires explicitly enabled runtime and scoped worker identity.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/work.request.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/work.request.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

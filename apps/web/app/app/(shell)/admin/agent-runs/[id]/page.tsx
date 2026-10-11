@@ -127,7 +127,7 @@ export default async function AgentRunDebugPage({
       {/* Error */}
       {run.error && (
         <DebugSection title='Error'>
-          <pre className='whitespace-pre-wrap rounded-md bg-surface-0 px-3 py-2.5 font-mono text-xs text-destructive'>
+          <pre className='whitespace-pre-wrap rounded-md bg-surface-0 px-3 py-2.5 font-mono text-xs text-error'>
             {run.error}
           </pre>
         </DebugSection>
@@ -147,7 +147,7 @@ function DebugSection({
     <ContentSurfaceCard
       as='section'
       surface='details'
-      className='overflow-hidden p-0'
+      className='overflow-hidden'
     >
       <ContentSectionHeader title={title} density='compact' />
       <div className='space-y-2 p-3.5'>{children}</div>

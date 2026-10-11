@@ -1,77 +1,127 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Fingerprint } from 'lucide-react';
-import { useState } from 'react';
-import { isDesktopEnvironment } from '@/lib/desktop/electron-bridge';
-import { unlockWithPasskey } from '@/lib/workspace-lock/unlock-with-passkey';
+import { ExternalLink, KeyRound } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  isDesktopEnvironment,
+  openCurrentOvieInBrowser,
+} from '@/lib/desktop/electron-bridge';
+import {
+  PasskeyStepUpError,
+  type PasskeyStepUpErrorCode,
+  unlockWithPasskey,
+} from '@/lib/workspace-lock/unlock-with-passkey';
 import { clearWorkspaceLock } from '@/lib/workspace-lock/workspace-lock';
 
 type Status = 'idle' | 'working' | 'error';
 
-/**
- * Full-area workspace lock (JOV-6829). Replaces the entire main content area
- * while the workspace is locked: a red fingerprint dead center with
- * "Unlock to continue". Clicking either runs the passkey / Touch ID step-up;
- * on success the lock cookie clears and the content renders after reload.
- */
+/** One anchored action; feedback never participates in its centering. */
 export function WorkspaceLockScreen() {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<PasskeyStepUpErrorCode | null>(
+    null
+  );
+  const attempt = useRef<AbortController | null>(null);
+  const browserRecovery = errorCode === 'unsupported' && isDesktopEnvironment();
 
-  async function unlock() {
+  useEffect(
+    () => () => {
+      attempt.current?.abort();
+      attempt.current = null;
+    },
+    []
+  );
+
+  async function activate() {
+    // The ref closes the gap before React commits the disabled state.
+    if (attempt.current) return;
+    const owner = new AbortController();
+    attempt.current = owner;
     setStatus('working');
     setMessage(null);
     try {
-      await unlockWithPasskey();
-      clearWorkspaceLock();
-      window.location.reload();
+      if (browserRecovery) {
+        const result = await openCurrentOvieInBrowser();
+        if (attempt.current !== owner || owner.signal.aborted) return;
+        setMessage(
+          result.ok
+            ? 'Continue in your browser. This desktop session stays locked.'
+            : 'Could not open your browser. Open Ovie in your browser, or try again.'
+        );
+        setStatus('error');
+      } else {
+        await unlockWithPasskey({ purpose: 'privacy', signal: owner.signal });
+        if (attempt.current !== owner || owner.signal.aborted) return;
+        clearWorkspaceLock();
+        window.location.reload();
+      }
     } catch (error) {
+      if (attempt.current !== owner || owner.signal.aborted) return;
       setStatus('error');
+      setErrorCode(
+        error instanceof PasskeyStepUpError ? error.code : 'unconfirmed'
+      );
       setMessage(
         error instanceof Error && error.message
           ? error.message
-          : 'Passkey check did not complete.'
+          : 'Could not confirm the unlock. Try again.'
       );
+    } finally {
+      if (attempt.current === owner) attempt.current = null;
     }
   }
 
+  const label = browserRecovery
+    ? status === 'working'
+      ? 'Opening browser…'
+      : 'Continue in browser'
+    : status === 'working'
+      ? 'Waiting for passkey…'
+      : 'Unlock with passkey';
+  const Glyph = browserRecovery ? ExternalLink : KeyRound;
+
   return (
-    <div
-      role='status'
+    <section
       data-workspace-lock='true'
-      className='flex h-full min-h-1/2 w-full flex-col items-center justify-center gap-4 px-6'
+      aria-label='Ovie Privacy Lock'
+      className='flex h-full min-h-1/2 w-full items-center justify-center px-6'
     >
       <div
-        aria-hidden='true'
-        className='flex h-16 w-16 items-center justify-center rounded-full border border-subtle bg-surface-1 text-destructive'
+        data-workspace-lock-anchor='true'
+        className='relative flex w-full max-w-sm justify-center'
       >
-        <Fingerprint className='h-8 w-8' />
-      </div>
-      <Button
-        variant='tertiary'
-        type='button'
-        onClick={unlock}
-        disabled={status === 'working'}
-      >
-        {status === 'working' ? 'Waiting for passkey…' : 'Unlock to continue'}
-      </Button>
-      {message ? (
-        <p role='alert' className='text-sm text-destructive'>
-          {message}
-        </p>
-      ) : null}
-      {status === 'error' && isDesktopEnvironment() ? (
         <Button
           variant='tertiary'
           type='button'
-          onClick={() =>
-            window.open(window.location.href, '_blank', 'noopener,noreferrer')
-          }
+          className='min-w-52'
+          onClick={activate}
+          disabled={status === 'working'}
+          aria-describedby='workspace-lock-status'
+          aria-busy={status === 'working'}
         >
-          Open In Browser
+          <Glyph
+            aria-hidden='true'
+            data-testid='workspace-lock-glyph'
+            className='mr-2 h-4 w-4'
+          />
+          {label}
         </Button>
-      ) : null}
-    </div>
+        <div
+          id='workspace-lock-status'
+          data-testid='workspace-lock-status'
+          className='absolute top-full w-full min-h-12 pt-4 text-center text-xs text-secondary-token'
+        >
+          <p
+            role={status === 'error' ? 'alert' : 'status'}
+            aria-atomic='true'
+            className='text-xs text-secondary-token'
+          >
+            {message}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }

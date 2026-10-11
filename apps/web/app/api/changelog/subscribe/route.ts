@@ -24,6 +24,12 @@ import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+// Per-address cooldown for confirmation re-sends. `tokenExpiresAt` is minted
+// when the confirmation email is sent, so the last send time is derivable as
+// `tokenExpiresAt - VERIFICATION_TOKEN_TTL_MS` without a schema change.
+const CONFIRMATION_RESEND_COOLDOWN_MS = 60 * 1000;
+
 function isValidEmail(email: string): boolean {
   if (email.length > 254) return false;
 
@@ -104,8 +110,33 @@ async function handleExistingSubscriber(
     );
   }
 
+  if (existing.tokenExpiresAt) {
+    const lastSentAt =
+      existing.tokenExpiresAt.getTime() - VERIFICATION_TOKEN_TTL_MS;
+    const elapsed = Date.now() - lastSentAt;
+    if (elapsed < CONFIRMATION_RESEND_COOLDOWN_MS) {
+      const retryAfterSeconds = Math.ceil(
+        (CONFIRMATION_RESEND_COOLDOWN_MS - elapsed) / 1000
+      );
+      return NextResponse.json(
+        {
+          error:
+            'Confirmation email was just sent. Please wait before resending.',
+          retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Retry-After': String(retryAfterSeconds),
+          },
+        }
+      );
+    }
+  }
+
   const verificationToken = crypto.randomUUID();
-  const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const tokenExpiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
 
   await db
     .update(productUpdateSubscribers)
@@ -218,7 +249,7 @@ export async function POST(request: NextRequest) {
   }
 
   const verificationToken = crypto.randomUUID();
-  const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const tokenExpiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
 
   await db.insert(productUpdateSubscribers).values({
     email,

@@ -1,10 +1,12 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/components/organisms/AuthShellWrapper.test.tsx
+// @coverage-via apps/web/components/organisms/AuthShellWrapper.search-state.test.tsx
 import { TooltipProvider } from '@jovie/ui';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import {
+  Activity,
   useCallback,
   useEffect,
   useMemo,
@@ -41,7 +43,6 @@ import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
 import type { AppShellMode } from '@/types/app-shell';
 import { AuthShell } from './AuthShell';
 import { CommandPalette, CommandPaletteMainSurface } from './CommandPalette';
-import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 import {
   PendingShellContext,
   type PendingShellRoute,
@@ -50,8 +51,17 @@ import {
 
 export { TableMetaProvider, usePendingShell, useTableMeta };
 
+const KeyboardShortcutsSheet = dynamic(
+  () =>
+    import('./keyboard-shortcuts-sheet').then(
+      module => module.KeyboardShortcutsSheet
+    ),
+  { ssr: false }
+);
+
 export interface AuthShellWrapperProps {
   readonly mode?: AppShellMode;
+  readonly isWorkspaceLocked?: boolean;
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
   readonly sidebarDefaultOpen?: boolean;
   readonly previewPanelDefaultOpen?: boolean;
@@ -62,10 +72,10 @@ export interface AuthShellWrapperProps {
  * KeyboardShortcutsHandler - Handles keyboard shortcuts with access to context
  */
 function KeyboardShortcutsHandler() {
-  const { open } = useKeyboardShortcuts();
+  const { open, isOpen } = useKeyboardShortcuts();
   useDashboardShortcuts({ onOpenShortcutsModal: open });
   useGlobalShortcutActions();
-  return <KeyboardShortcutsSheet />;
+  return isOpen ? <KeyboardShortcutsSheet /> : null;
 }
 
 /**
@@ -73,12 +83,14 @@ function KeyboardShortcutsHandler() {
  */
 function AuthShellWrapperInner({
   mode,
+  isWorkspaceLocked = false,
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
   children,
 }: Readonly<{
   mode: AppShellMode;
+  isWorkspaceLocked?: boolean;
   persistSidebarCollapsed?: AuthShellWrapperProps['persistSidebarCollapsed'];
   sidebarDefaultOpen?: boolean;
   previewPanelDefaultOpen?: boolean;
@@ -102,14 +114,19 @@ function AuthShellWrapperInner({
 
   // Preview panel data hydration is available on dashboard routes and artist-profile settings
   const previewEnabled =
-    config.section === 'dashboard' || config.isArtistProfileSettings;
+    config.section === 'dashboard' || config.isProfileSettings;
   const shouldDefaultOpenPreviewPanel =
     config.section === 'dashboard' &&
     !config.isChatRoute &&
     previewPanelDefaultOpen;
-  const previewPanelScope = config.isArtistProfileSettings
-    ? 'artist-profile-settings'
-    : 'app-shell';
+  // Chat gets its own rail scope: entering chat always starts with the
+  // profile rail closed — it only opens from an explicit action
+  // (rail toggle, `]`, or the ?panel=profile deep link). JOV-7150.
+  const previewPanelScope = config.isChatRoute
+    ? 'chat'
+    : config.isProfileSettings
+      ? 'artist-profile-settings'
+      : 'app-shell';
 
   const showArtistProfileRailToggle =
     previewEnabled &&
@@ -199,10 +216,21 @@ function AuthShellWrapperInner({
   );
   const shellChildren = (
     <div className='relative flex h-full min-h-0 flex-col'>
-      {headerActions.isCommandPaletteOpen ? (
-        <CommandPaletteMainSurface />
-      ) : (
+      {isWorkspaceLocked ? (
         children
+      ) : (
+        <>
+          {/* Search hides the route and suspends its effects without losing
+              selection/drafts. Locking removes this entire retained boundary. */}
+          <Activity
+            mode={headerActions.isCommandPaletteOpen ? 'hidden' : 'visible'}
+          >
+            {children}
+          </Activity>
+          {headerActions.isCommandPaletteOpen ? (
+            <CommandPaletteMainSurface />
+          ) : null}
+        </>
       )}
       {pendingShellRoute === 'releases' ? (
         <div
@@ -240,9 +268,9 @@ function AuthShellWrapperInner({
         <ComposerFocusProvider>
           <RightPanelProvider>
             <PreviewPanelProvider
-              key={previewPanelScope}
               defaultOpen={shouldDefaultOpenPreviewPanel}
               enabled={previewEnabled}
+              scope={previewPanelScope}
             >
               <RightRailKeyboardHandler />
               <AuthShell
@@ -289,6 +317,7 @@ function AuthShellWrapperInner({
  */
 export function AuthShellWrapper({
   mode = 'customer',
+  isWorkspaceLocked = false,
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
@@ -302,6 +331,7 @@ export function AuthShellWrapper({
             <ShellSidebarOverrideProvider>
               <AuthShellWrapperInner
                 mode={mode}
+                isWorkspaceLocked={isWorkspaceLocked}
                 persistSidebarCollapsed={persistSidebarCollapsed}
                 sidebarDefaultOpen={sidebarDefaultOpen}
                 previewPanelDefaultOpen={previewPanelDefaultOpen}
@@ -309,7 +339,7 @@ export function AuthShellWrapper({
                 {children}
               </AuthShellWrapperInner>
               <KeyboardShortcutsHandler />
-              <CommandPalette />
+              {!isWorkspaceLocked ? <CommandPalette /> : null}
             </ShellSidebarOverrideProvider>
           </HeaderActionsProvider>
         </FounderDoorProvider>

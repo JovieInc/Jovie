@@ -4,6 +4,7 @@ import {
   buildInvalidRequestResponse,
   updateContentPreferencesDomain,
 } from '@/lib/notifications/domain';
+import { SUBSCRIPTION_MANAGEMENT_COOKIE } from '@/lib/notifications/management-token';
 import { generalLimiter, getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import {
@@ -39,7 +40,10 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const result = await updateContentPreferencesDomain(body);
+    const result = await updateContentPreferencesDomain(body, {
+      managementToken:
+        request.cookies.get(SUBSCRIPTION_MANAGEMENT_COOKIE)?.value ?? null,
+    });
     return createNotificationJsonResponse(
       result.body,
       result.status,

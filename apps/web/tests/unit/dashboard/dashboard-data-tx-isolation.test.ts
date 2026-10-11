@@ -587,6 +587,49 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
+  it('degrades a tipping click-count timeout without emitting a Sentry issue (JOV-4458)', async () => {
+    const timeoutError = new Error(
+      "Failed query: select count(*), count(*) filter (where (\"metadata\"->>'source') = 'qr'), count(*) filter (where (\"metadata\"->>'source') = 'link') from \"click_events\"",
+      {
+        cause: Object.assign(
+          new Error('canceling statement due to statement timeout'),
+          { code: '57014' }
+        ),
+      }
+    );
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]), // settled Inbox suggested-actions count
+      ok([{ count: 0 }]), // settled Inbox tour-dates count
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      fail(timeoutError) // click-source aggregate times out
+    );
+
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+    const result = await getDashboardData();
+
+    expect(result.tippingStats).toEqual({
+      tipClicks: 0,
+      qrTipClicks: 0,
+      linkTipClicks: 0,
+      tipsSubmitted: 0,
+      totalReceivedCents: 0,
+      monthReceivedCents: 0,
+    });
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('tipping stats query timed out')
+    );
+    expect(capturedCascadeErrors()).toEqual([]);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+
   it('confines a tipping-stats failure — bio-link activation still resolves', async () => {
     const { doesTableExist } = await import('@/lib/db');
     vi.mocked(doesTableExist).mockResolvedValue(true);

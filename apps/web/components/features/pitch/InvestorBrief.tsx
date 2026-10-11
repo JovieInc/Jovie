@@ -2,7 +2,10 @@ import { Button } from '@jovie/ui';
 import { ArrowRight, Download, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/atoms/Logo';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { fundraisingRegistry } from '@/lib/investors/fundraising-registry';
+import { loadInvestorSourcedMetrics } from '@/lib/investors/sourced-metrics';
+import { buildInvestorYcDeck } from '@/lib/investors/yc-deck';
 import { PitchEngagement } from './PitchEngagement';
 
 const CONTACT_EMAIL = 't@meetjovie.com';
@@ -23,12 +26,15 @@ interface InvestorBriefProps {
 /** The investor brief. Rendered only inside the gated portal's <main>. */
 export function InvestorBrief({ investorName = null }: InvestorBriefProps) {
   const registry = fundraisingRegistry;
+  const narrativeSlides = isCodeFlagEnabled('INVESTOR_PORTAL_YC_DECK')
+    ? buildInvestorYcDeck(registry, loadInvestorSourcedMetrics())
+    : registry.coreSlides;
 
   return (
     <div className='min-h-svh bg-base text-primary-token'>
       <PitchEngagement />
 
-      <nav className='sticky top-0 z-40 border-b border-subtle bg-base/90 backdrop-blur-md'>
+      <nav className='sticky top-0 z-40 border-b border-subtle bg-(--color-bg-base)/90 backdrop-blur-md'>
         <div className='mx-auto flex h-14 max-w-6xl items-center justify-between px-5 sm:px-8'>
           <Link
             aria-label='Jovie Home'
@@ -138,7 +144,7 @@ export function InvestorBrief({ investorName = null }: InvestorBriefProps) {
           </p>
         </div>
         <ol className='divide-y divide-subtle border-y border-subtle'>
-          {registry.coreSlides.map((slide, index) => (
+          {narrativeSlides.map((slide, index) => (
             <li
               className='grid gap-5 py-10 sm:grid-cols-[3rem_1fr] sm:py-14'
               data-pitch-slide={slide.id}

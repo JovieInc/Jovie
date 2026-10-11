@@ -6,6 +6,7 @@ export type DesktopSecurityEvent =
   | 'auth-deep-link-replay-rejected'
   | 'auth-return-code-rejected'
   | 'auth-protocol-handler-repaired'
+  | 'auth-loopback-unavailable'
   | 'csp-header-missing'
   | 'csp-header-weakened'
   | 'remote-debugging-blocked'

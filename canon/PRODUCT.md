@@ -132,9 +132,34 @@ Examples:
 - Auto-importing a Linktree during onboarding: outcome-deepening.
 - An AI model picker: configurability. Held.
 - Custom analytics dashboards, per-event notification matrices, custom CSS: configurability. Held.
-- Whether biometric lock defaults on or off: taste.
+- Whether biometric lock defaults on or off: taste; the Ovie decision below settles its current default.
 
 The per-surface table-stakes checklist lives in [`docs/product/CAPABILITY_BASELINE.md`](../docs/product/CAPABILITY_BASELINE.md). "Competitor parity without customer evidence" (Anti-Goals) still applies to everything except table-stakes: table-stakes is the one place peer evidence is sufficient.
+
+### Ovie privacy lock (founder decision, 2026-09-29)
+
+**EVENT:** The additional passkey privacy lock is Ovie-only and opt-in. Ordinary
+Jovie use must not be blocked by it, including a legacy workspace-lock cookie.
+A successful unlock remains effective until an explicit re-lock or 24 hours
+after verification. Navigation, reloads, and app relaunch must not restart the
+prompt or extend that deadline. Once unlocked, the protection gets out of the way.
+
+When enabled and locked, protect private data and agent actions at the server
+boundary as well as the composed screen. Search, cached suggestions, inspectors,
+and other app-owned overlays cannot reveal protected content or replace the lock.
+Client cookies and hidden content alone are not proof of authorization. Sign-in,
+ownership, roles, and privileged-action permissions remain mandatory; privacy
+unlock never grants a role or expands an agent's authority.
+
+Keep one clear enable/disable control and one explicit lock action within Ovie.
+Store the opt-in independently from the expiring unlock receipt; expiration must
+lock an enabled workspace, not silently disable its protection. Failed verification
+or a persistence failure must not report a successful unlock.
+
+This supersedes JOV-6829's earlier extension of workspace locking to regular
+creator users. JOV-7205 owns implementation and regression evidence; JOV-6506
+owns the native sweep and exact delivered-runtime retest. These are requirements,
+not a claim that the current distributed app satisfies them.
 
 ---
 

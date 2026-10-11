@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-09-26T22:13:02.420Z",
-  "totalErrors": 119,
+  "generatedAt": "2026-10-04T02:19:21.713Z",
+  "totalErrors": 110,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -75,9 +75,6 @@
     "scripts/lib/github-update-branch.mjs": {
       "TS2339": 1
     },
-    "scripts/lib/merge-group-admission.mjs": {
-      "TS2339": 2
-    },
     "scripts/lib/merge-queue-guard.mjs": {
       "TS2339": 2,
       "TS2362": 1,
@@ -95,17 +92,11 @@
     "scripts/linear-query-todo.mjs": {
       "TS2339": 3
     },
-    "scripts/linear-transition-issue.mjs": {
-      "TS2339": 3
-    },
     "scripts/observability-issue-github.mjs": {
       "TS2345": 1
     },
     "scripts/pr-comment-retro.mjs": {
       "TS2339": 1
-    },
-    "scripts/qa-swarm/linear.mjs": {
-      "TS2339": 4
     },
     "scripts/qa-swarm/types.mjs": {
       "TS2304": 1

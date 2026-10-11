@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { RenderedFamily } from '@/.storybook/rendered-family';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -15,11 +16,20 @@ function SearchState() {
 const meta: Meta<typeof HeaderSearchSurfaceFromContext> = {
   title: 'Shell/HeaderSearchSurfaceFromContext',
   component: HeaderSearchSurfaceFromContext,
-  parameters: { layout: 'centered' },
+  parameters: { layout: 'fullscreen' },
   decorators: [
     Story => (
+      <RenderedFamily
+        name='header-search-surface-from-context'
+        owner='HeaderSearchSurfaceFromContext'
+        interactive
+      >
+        <Story />
+      </RenderedFamily>
+    ),
+    Story => (
       <HeaderActionsProvider>
-        <div className='w-64 bg-sidebar p-3'>
+        <div className='w-full max-w-64 bg-sidebar p-3'>
           <Story />
           <SearchState />
         </div>

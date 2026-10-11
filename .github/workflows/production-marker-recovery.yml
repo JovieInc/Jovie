@@ -6,8 +6,7 @@ run-name: >-
   ${{ inputs.controller_run || github.event.workflow_run.id }}
 
 on:
-  # Controller completion is the primary recovery signal. The manual input is
-  # retained as a bounded break-glass path for historical generations. This
+  # Manual input is a bounded break-glass path for historical generations. This
   # workflow never redeploys, never mutates aliases, and never rolls back: it
   # re-proves the already-deployed generation and preserves the marker only
   # while canonical production still owns it.
@@ -15,10 +14,7 @@ on:
   # accountable-writer: Shipping-Control
   # necessary-trust-boundary: Expired-marker stub deletion runs only inside the bounded recovery job after exact promotion, Sentry-gate, and skipped-rollback evidence; it removes only expired same-name artifact stubs and never mutates release state.
   # revisit-trigger: Revisit when the marker store gains atomic replace semantics so a re-proof upload cannot duplicate a marker name.
-  workflow_run:
-    workflows: [Production Controller]
-    types: [completed]
-    branches: [main]
+  # compatibility-expiry: 2026-10-31; fold this break-glass path into Production Controller.
   workflow_dispatch:
     inputs:
       sha:
@@ -96,11 +92,23 @@ jobs:
           }
 
           # The source attempt must be an exact Production Controller attempt
-          # for this generation on main.
+          # for this generation on main. A workflow_run controller carries
+          # main's head when it started, which can be a descendant of the
+          # generation it deployed. Bind that head only with the same strict
+          # ancestry proof production-marker-state uses (JOV-7724).
           run_json="$(gh api \
             "repos/$REPO/actions/runs/$SOURCE_CONTROLLER_RUN/attempts/$SOURCE_CONTROLLER_ATTEMPT")"
+          bound_head="$EXPECTED_SHA"
+          run_head="$(jq -r '.head_sha // empty' <<<"$run_json")"
+          if [ "$run_head" != "$EXPECTED_SHA" ] && [[ "$run_head" =~ ^[0-9a-f]{40}$ ]]; then
+            if gh api "repos/$REPO/compare/$EXPECTED_SHA...$run_head" |
+              jq -e '.status == "ahead" and .behind_by == 0' >/dev/null; then
+              bound_head="$run_head"
+              echo "::notice::Source controller head $run_head descends from $EXPECTED_SHA."
+            fi
+          fi
           jq -e \
-            --arg sha "$EXPECTED_SHA" \
+            --arg sha "$bound_head" \
             --arg repo "$REPO" \
             --argjson run_id "$SOURCE_CONTROLLER_RUN" \
             --argjson run_attempt "$SOURCE_CONTROLLER_ATTEMPT" '
@@ -124,7 +132,7 @@ jobs:
           jobs_json="$(gh api \
             "repos/$REPO/actions/runs/$SOURCE_CONTROLLER_RUN/attempts/$SOURCE_CONTROLLER_ATTEMPT/jobs?per_page=100")"
           recoverable_jobs=false
-          if jq -e --arg sha "$EXPECTED_SHA" '
+          if jq -e --arg sha "$bound_head" '
             type == "object" and
             (.total_count | type == "number") and
             (.jobs | type == "array") and

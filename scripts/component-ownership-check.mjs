@@ -56,12 +56,19 @@ function chromeFamilies(map) {
   return Object.entries(map.families ?? {}).flatMap(([family, entry]) => {
     const internals = [...(entry.internals ?? [])];
     const prefixes = entry.internalPrefixes ?? [];
-    if (internals.length === 0 && prefixes.length === 0) return [];
+    const duplicateConstructors = entry.duplicateConstructors ?? [];
+    if (
+      internals.length === 0 &&
+      prefixes.length === 0 &&
+      duplicateConstructors.length === 0
+    )
+      return [];
     return [
       {
         family,
         internals,
         prefixes,
+        duplicateConstructors,
         ownerFiles: new Set([entry.owner, ...(entry.ownerFiles ?? [])]),
       },
     ];
@@ -80,6 +87,10 @@ function classTokenPattern(token) {
 
 function matchingInternals(source, family) {
   const hits = new Set();
+  for (const name of family.duplicateConstructors) {
+    if (new RegExp(`\\b(?:function|const)\\s+${name}\\b`).test(source))
+      hits.add(name);
+  }
   for (const internal of family.internals) {
     if (classTokenPattern(internal).test(source)) hits.add(internal);
   }

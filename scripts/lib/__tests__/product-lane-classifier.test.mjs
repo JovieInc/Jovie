@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  classifyLockfileChange,
   classifyProductLanes,
   evaluateProductLaneResults,
   formatGitHubSummary,
+  macLockfileGraph,
   ProductLaneClassificationError,
   runProductLaneClassifier,
 } from '../product-lane-classifier.mjs';
@@ -21,6 +23,75 @@ const pkg = (before, after) =>
   });
 
 describe('product lane classifier', () => {
+  it('routes the published CLI skill artifacts through the CLI web gate and rejects unknown skill paths', () => {
+    const receipt = classifyProductLanes([
+      'skills/jovie/SKILL.md',
+      'skills/jovie/README.md',
+      'skills/jovie/LICENSE',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+    for (const path of [
+      'skills/other/SKILL.md',
+      'skills/jovie/setup.sh',
+      'skills/jovie/../private.md',
+      'skills/jovie/SKILL.md.extra',
+    ]) {
+      expect(() => classifyProductLanes([path])).toThrow(
+        ProductLaneClassificationError
+      );
+    }
+  });
+
+  it('records the bounded blog qualification without admitting mixed paths', () => {
+    const receipt = classifyProductLanes(
+      ['apps/web/content/blog/a-safe-article.md'],
+      { qualificationProfile: 'content-only' }
+    );
+
+    expect(receipt.qualificationProfile).toBe('content-only');
+    expect(receipt.requiredGates.web.tests).toContain(
+      'JOV-7396 publication contract'
+    );
+    expect(() =>
+      classifyProductLanes(
+        [
+          'apps/web/content/blog/a-safe-article.md',
+          'apps/web/lib/blog/getBlogPosts.ts',
+        ],
+        { qualificationProfile: 'content-only' }
+      )
+    ).toThrow('approved blog content paths');
+  });
+
+  it('builds and releases canonical changelog content through web while ordinary docs stay operational', () => {
+    expect(classifyProductLanes(['CHANGELOG.md']).selectedLanes).toEqual([
+      'web',
+    ]);
+    expect(
+      classifyProductLanes(['docs/changelog.md', 'README.md']).selectedLanes
+    ).toEqual(['operations']);
+  });
+  it('routes all canary OTP worker artifacts through the web gate and rejects unknown workers', () => {
+    const receipt = classifyProductLanes([
+      'workers/canary-otp/src/index.ts',
+      'workers/canary-otp/src/index.test.mjs',
+      'workers/canary-otp/package.json',
+      'workers/canary-otp/tsconfig.json',
+      'workers/canary-otp/wrangler.example.toml',
+      'workers/canary-otp/README.md',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+    expect(() =>
+      classifyProductLanes(['workers/canary-otp-other/src/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('maps shared Jev evaluator-only edits to the consuming web and contract lanes', () => {
     const receipt = classifyProductLanes([
       'packages/jev-evaluation/gateway.mjs',
@@ -65,6 +136,21 @@ describe('product lane classifier', () => {
     expect(() =>
       classifyProductLanes(['packages/copywriter/index.ts'])
     ).toThrow(ProductLaneClassificationError);
+  });
+
+  it('selects the web product lane for brand construction sources', () => {
+    const receipt = classifyProductLanes([
+      'packages/brand/font/construction.py',
+      'packages/brand/dist/geometry.json',
+      'packages/brand/svg/jovie-mark-ink.svg',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+    expect(() => classifyProductLanes(['packages/branding/index.ts'])).toThrow(
+      ProductLaneClassificationError
+    );
   });
 
   it('selects the web contract lane for release communications extraction', () => {
@@ -222,6 +308,104 @@ describe('product lane classifier', () => {
       expect(classifyProductLanes(paths).selectedLanes).not.toContain('ios');
   });
 
+  it('skips the Mac lane for lockfile changes that leave the desktop graph identical', () => {
+    // A pnpm-lock v9 excerpt: desktop links packages/ui, uses an alias, and
+    // shares `shared-dep` with web; web alone pulls `web-only`.
+    const lock = ({
+      shared = '1.0.0',
+      webOnly = '2.0.0',
+      uiDep = '3.0.0',
+      electron = '6.8.9',
+    }) =>
+      [
+        "lockfileVersion: '9.0'",
+        '',
+        'importers:',
+        '',
+        '  .:',
+        '    devDependencies:',
+        '      web-only:',
+        '        specifier: ^2.0.0',
+        `        version: ${webOnly}`,
+        '',
+        '  apps/desktop:',
+        '    dependencies:',
+        '      electron-updater:',
+        '        specifier: ^6.8.9',
+        `        version: ${electron}`,
+        '      string-width-cjs:',
+        '        specifier: npm:string-width@^4.2.0',
+        '        version: string-width@4.2.3',
+        "      '@jovie/ui':",
+        '        specifier: workspace:*',
+        '        version: link:../../packages/ui',
+        '',
+        '  packages/ui:',
+        '    dependencies:',
+        '      ui-dep:',
+        '        specifier: ^3.0.0',
+        `        version: ${uiDep}`,
+        '',
+        'packages:',
+        '',
+        `  electron-updater@${electron}:`,
+        `    resolution: {integrity: sha512-electron-${electron}}`,
+        '',
+        `  shared-dep@${shared}:`,
+        `    resolution: {integrity: sha512-shared-${shared}}`,
+        '',
+        'snapshots:',
+        '',
+        `  electron-updater@${electron}:`,
+        '    dependencies:',
+        `      shared-dep: ${shared}`,
+        '',
+        `  shared-dep@${shared}: {}`,
+        '',
+        '  string-width@4.2.3: {}',
+        '',
+        `  ui-dep@${uiDep}: {}`,
+        '',
+        `  web-only@${webOnly}:`,
+        '    dependencies:',
+        `      shared-dep: ${shared}`,
+        '',
+      ].join('\n');
+    const base = lock({});
+    expect(macLockfileGraph(base)).toContain('importer packages/ui');
+    expect(macLockfileGraph(base)).toContain('snapshot string-width@4.2.3');
+    expect(macLockfileGraph(base)).not.toContain('web-only');
+    const full = ['shared-js-lockfile', 'shared-contract', ['mac', 'web']];
+    expect(classifyLockfileChange(base, lock({ webOnly: '2.0.1' }))).toEqual([
+      'shared-js-lockfile-web-only',
+      'shared-contract',
+      ['web'],
+    ]);
+    for (const after of [
+      lock({ electron: '6.8.10' }), // direct desktop dependency
+      lock({ shared: '1.0.1' }), // transitive dependency reached from desktop
+      lock({ uiDep: '3.0.1' }), // dependency of a linked workspace package
+    ])
+      expect(classifyLockfileChange(base, after)).toEqual(full);
+    // Fails closed: missing sources, unparseable text, a dangling snapshot key.
+    expect(classifyLockfileChange(undefined, base)).toEqual(full);
+    expect(classifyLockfileChange(base, 'lockfileVersion: 9')).toEqual(full);
+    expect(
+      classifyLockfileChange(
+        base,
+        base.replace('  string-width@4.2.3: {}\n', '')
+      )
+    ).toEqual(full);
+
+    const webOnlyReceipt = classifyProductLanes(['pnpm-lock.yaml'], {
+      lockfileBefore: base,
+      lockfileAfter: lock({ webOnly: '2.0.1' }),
+    });
+    expect(webOnlyReceipt.selectedLanes).toEqual(['web', 'cross-product']);
+    expect(webOnlyReceipt.sharedContract.affectedProducts).toEqual(['web']);
+    expect(classifyProductLanes(['pnpm-lock.yaml']).selectedLanes).toEqual(JS);
+  });
+
   it('loads package changes from git refs and fails closed on a missing ref', () => {
     const root = mkdtempSync(join(tmpdir(), 'jovie-product-lane-git-'));
     const files = join(root, 'files.txt');
@@ -281,6 +465,26 @@ describe('product lane classifier', () => {
     }
   });
 
+  it('requires every product lane for release-channel contract files', () => {
+    for (const file of [
+      'index.ts',
+      'package.json',
+      'release-channel.test.ts',
+      'tsconfig.json',
+      'vitest.config.mts',
+    ]) {
+      expect(
+        classifyProductLanes([`packages/release-channel-contracts/${file}`])
+          .selectedLanes
+      ).toEqual(ALL);
+    }
+    expect(() =>
+      classifyProductLanes([
+        'packages/release-channel-contracts-extra/index.ts',
+      ])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('maps isolated, shared, and operations-only paths', () => {
     for (const [path, lanes] of /** @type {Array<[string, string[]]>} */ ([
       ['apps/ios/Jovie/App.swift', ['ios']],
@@ -299,6 +503,13 @@ describe('product lane classifier', () => {
     expect(
       classifyProductLanes(['packages/auth-routing/index.ts']).selectedLanes
     ).toEqual(ALL);
+    const releaseChannels = classifyProductLanes([
+      'packages/release-channel-contracts/index.ts',
+    ]);
+    expect(releaseChannels.selectedLanes).toEqual(ALL);
+    expect(
+      releaseChannels.requiredGates['cross-product'].tests.split(' && ')
+    ).toContain('pnpm --filter @jovie/release-channel-contracts test');
     expect(
       classifyProductLanes([
         '.github/workflows/ci.yml',

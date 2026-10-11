@@ -10,7 +10,10 @@ export const runtime = 'nodejs';
  * URL exists without copying Doppler by hand.
  */
 export async function GET() {
-  const denied = await requireAdminHudApiAccess();
+  const denied = await requireAdminHudApiAccess({
+    session: 'fresh',
+    privileged: true,
+  });
   if (denied) return denied;
 
   const token = env.HUD_KIOSK_TOKEN?.trim() || null;

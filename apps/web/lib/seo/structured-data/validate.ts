@@ -45,13 +45,11 @@ export function validateProfileRichResults(
     return ['@graph must be an array'];
   }
 
+  // MusicGroup (artists) and Person (every other creator type) are both valid.
   const artist = findInGraph(graph, 'MusicGroup', 'Person');
   errors.push(
     ...assertRequired(artist, 'Artist entity', ['name', 'url', 'sameAs'])
   );
-  if (artist && !hasType(artist, 'MusicGroup')) {
-    errors.push('Artist entity: must include MusicGroup');
-  }
 
   const events = graph.filter(
     item =>
@@ -148,10 +146,11 @@ export function validateMerchRichResults(
   }
 
   errors.push(
+    // Availability is recommended for product snippets, not required. Unknown
+    // stock must remain absent rather than be invented to satisfy validation.
     ...assertRequired(offers as SchemaNode, 'Offer', [
       'price',
       'priceCurrency',
-      'availability',
       'url',
     ])
   );

@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: mockGetCurrentUserEntitlements,
 }));
 
 vi.mock('@/lib/admin/stripe-metrics', () => ({

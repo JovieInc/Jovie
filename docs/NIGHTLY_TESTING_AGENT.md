@@ -6,20 +6,19 @@
 
 ## Purpose
 
-The nightly testing agent ranks high-risk surfaces, runs deterministic test lanes,
-optionally exercises Stryker mutation hotspots, and emits a compact daily report
+The testing agent ranks high-risk surfaces after relevant evidence changes, runs deterministic test lanes,
+optionally exercises Stryker mutation hotspots, and emits a compact report
 for the admin ops panel and `docs/NIGHTLY_TESTING_AGENT_REPORT.md`.
 
-## Schedule
+## Triggers
 
-| Workflow | Cron (PT) | Purpose |
-|----------|-----------|---------|
-| `Nightly Tests` | `30 23 * * *` | Full unit + E2E suite, Knip audit |
-| `Nightly Testing Agent` | `30 4 * * *` | Risk scoring, unit telemetry, mutation hotspots, daily report |
+| Workflow | Causal event | Purpose |
+|----------|--------------|---------|
+| `Changed-Evidence Test Suites` | Relevant web/shared/toolchain push to `main` | Full unit + E2E suite, Knip audit |
+| `Nightly Testing Agent` | Test, mutation config, or harness push to `main` | Risk scoring, unit telemetry, mutation hotspots, report |
 
-The consolidated suite starts at 23:30, clear of the fixed 09:00 UTC screenshot and
-Tuesday harness lanes. The agent then starts at 04:30 after those runners have
-drained, so fresh failures from the main suite are reflected in its context.
+Manual dispatch remains available for a bounded diagnostic run. Twenty-four hours
+without a matching input change launches neither workflow.
 
 ## Cost path (economy / deterministic)
 
@@ -33,11 +32,11 @@ This automation is intentionally **LLM-free**:
 | Report generation | $0 | Markdown + JSON from normalized telemetry |
 | Redis publish | ~$0 | One `SET` per run via existing Upstash REST |
 
-**Do not** route nightly candidate generation through premium models on schedule.
+**Do not** route candidate generation through premium models from these events.
 Candidate validation is `workflow_dispatch` only and still executes focused Vitest
 commands — no model spend.
 
-GitHub Actions runner time is the only recurring cost (~45–70 minutes/night).
+GitHub Actions runner time is incurred only for changed evidence or manual diagnostics.
 
 ## Outputs
 
@@ -47,6 +46,25 @@ GitHub Actions runner time is the only recurring cost (~45–70 minutes/night).
 | Machine-readable status | `apps/web/reports/nightly-agent/last-run.json` | Scripts, baselines |
 | Ops HUD snapshot | Redis key `nightly-agent:jovie:last_run` | `/app/admin/ops` |
 | CI artifacts | `nightly-agent-report-<run_id>` | Debugging, 90-day retention |
+
+### Reliability entropy receipt
+
+The existing `emit-delta` completion event adds `entropyProjection` to Jovie's
+`skill-delta.json`, already included in the report artifact. It composes the
+nightly detector result and the existing quarantine-ledger evaluation without
+starting another detector, job, service, or Redis write. All registered detectors
+appear in the projection; detectors without supplied execution results stay
+`unknown`. Existing detector and CI gate behavior is unchanged.
+The existing `publish-status` step refreshes that same receipt with the final
+workflow conclusion. A passing subset of tests cannot clear the nightly detector
+before workflow success; cancelled or incomplete runs remain unknown.
+
+Each result retains its source reference and observation time. Replaying old
+input cannot refresh it: results older than 30 hours, invalid/future timestamps,
+or conflicting simultaneous results stay unknown. Duplicate and out-of-order
+delivery produces the same snapshot. `attention` identifies existing failure,
+flake, or quarantine debt; its count is detector evidence, not a count of unique
+customer incidents. This receipt is not production or revenue certification.
 
 ## Local commands
 

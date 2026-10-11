@@ -15,12 +15,11 @@ type Story = StoryObj<typeof SocialLink>;
 
 const createLink = (platform: string, url: string): LegacySocialLink => ({
   id: `link-${platform}`,
+  artist_id: 'profile-1',
   platform,
   url,
-  creator_profile_id: 'profile-1',
-  sort_order: 0,
+  clicks: 0,
   created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
 });
 
 export const Spotify: Story = {

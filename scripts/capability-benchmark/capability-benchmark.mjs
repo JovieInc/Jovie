@@ -17,6 +17,20 @@ export const SOURCING_RECEIPT_SCHEMA =
   'jovie.capability-benchmark.sourcing-receipt/v1';
 export const CAPACITY_RECEIPT_SCHEMA =
   'jovie.capability-benchmark.capacity-receipt/v1';
+export const DECISION_ROUTING_BENCHMARK_SCHEMA =
+  'jovie.bounded-decision-benchmark/v1';
+
+export const DECISION_BENCHMARK_DIMENSIONS = Object.freeze([
+  'taskCorrectnessAndCalibratedAbstention',
+  'falsePositiveAndFalseNegativeCost',
+  'latencyAndAvailability',
+  'fullyLoadedCost',
+  'optionSetAndAuthoritySafety',
+  'observabilityAndProvenance',
+  'privacyAndDataHandling',
+  'portabilityAndSwitchingCost',
+  'downstreamCertifiedOutcome',
+]);
 
 /**
  * Sourcing states from JOV-2966. A decision records exactly one bounded state
@@ -49,6 +63,17 @@ export const MATERIAL_TRIGGER_CLASSES = Object.freeze([
   'customer-or-founder-reported-gap',
   'pending-decision-needs-comparison',
   'benchmark-evidence-expired',
+]);
+
+/**
+ * Candidate dispositions for the JOV-7341 decision benchmark. No status may
+ * claim production promotion: that remains gated by JOV-6414, so labels like
+ * "production" are rejected outright rather than treated as free text.
+ */
+export const DECISION_CANDIDATE_STATUSES = Object.freeze([
+  'complete',
+  'shadow-only',
+  'access-blocked',
 ]);
 
 const NON_MATERIAL_TRIGGER_CLASSES = new Set([
@@ -97,6 +122,19 @@ export function registryPath() {
     dirname(fileURLToPath(import.meta.url)),
     'capability-benchmark-registry.json'
   );
+}
+
+export function decisionRoutingBenchmarkPath() {
+  return resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    'decision-routing-benchmark.json'
+  );
+}
+
+export function loadDecisionRoutingBenchmark(
+  path = decisionRoutingBenchmarkPath()
+) {
+  return JSON.parse(readFileSync(path, 'utf8'));
 }
 
 export function loadRegistry(path = registryPath()) {
@@ -334,6 +372,140 @@ export function validateBenchmarkRegistry(registry) {
   );
   if (!registry.capacity.revenuePathBlockers.includes('JOV-5911')) {
     throw new Error('capacity.revenuePathBlockers must include JOV-5911');
+  }
+  return true;
+}
+
+/**
+ * Validate JOV-7341's recorded three-way decision benchmark. This extends the
+ * JOV-2966 receipt authority; it does not execute or route a probabilistic
+ * supplier. Missing preview access must remain explicit and resumable.
+ */
+export function validateDecisionRoutingBenchmark(report) {
+  if (!isRecord(report))
+    throw new Error('decision benchmark must be an object');
+  if (report.schema !== DECISION_ROUTING_BENCHMARK_SCHEMA) {
+    throw new Error(`schema must be ${DECISION_ROUTING_BENCHMARK_SCHEMA}`);
+  }
+  if (report.issue !== 'JOV-7341') {
+    throw new Error('report.issue must be JOV-7341');
+  }
+  requireIsoTimestamp(report.observedAt, 'report.observedAt');
+  if (
+    Object.hasOwn(report, 'aggregateScore') ||
+    Object.hasOwn(report, 'companyWinner')
+  ) {
+    throw new Error('company-wide winner and aggregate score are forbidden');
+  }
+  if (report.promotionGate !== 'JOV-6414') {
+    throw new Error('production promotion must remain gated by JOV-6414');
+  }
+  if (!isRecord(report.access)) throw new Error('report.access missing');
+  if (
+    !['available', 'limited-preview', 'unavailable'].includes(
+      report.access.status
+    )
+  ) {
+    throw new Error('report.access.status is invalid');
+  }
+  requireString(report.access.evidenceUrl, 'report.access.evidenceUrl');
+  if (report.access.status !== 'available') {
+    if (
+      report.access.resumeEventClass !==
+      'external-capability-materially-changed'
+    ) {
+      throw new Error('blocked access needs a material resume event class');
+    }
+    requireString(report.access.resumeEvent, 'report.access.resumeEvent');
+  }
+  if (!Array.isArray(report.workloads) || report.workloads.length === 0) {
+    throw new Error('report.workloads must be non-empty');
+  }
+  for (const [index, workload] of report.workloads.entries()) {
+    const field = `report.workloads[${index}]`;
+    requireString(workload.id, `${field}.id`);
+    requireString(workload.cohort?.id, `${field}.cohort.id`);
+    requireString(workload.cohort?.version, `${field}.cohort.version`);
+    if (!/^[a-f0-9]{64}$/u.test(workload.cohort?.sha256 ?? '')) {
+      throw new Error(`${field}.cohort.sha256 must be sha256`);
+    }
+    requireString(workload.cohort?.ref, `${field}.cohort.ref`);
+    for (const bypass of ['zeroOption', 'oneOption', 'deterministic']) {
+      if (workload.bypass?.[bypass]?.probabilisticCalls !== 0) {
+        throw new Error(`${field}.bypass.${bypass} must make zero calls`);
+      }
+    }
+    if (!Array.isArray(workload.candidates)) {
+      throw new Error(`${field}.candidates must be an array`);
+    }
+    const candidateIds = workload.candidates.map(candidate => candidate?.id);
+    if (new Set(candidateIds).size !== candidateIds.length) {
+      throw new Error(`${field}.candidates must not contain duplicate ids`);
+    }
+    const candidates = new Map(
+      workload.candidates.map(candidate => [candidate.id, candidate])
+    );
+    for (const id of [
+      'deterministic-baseline',
+      'typesafe-jev',
+      'openai-decisions',
+    ]) {
+      const candidate = candidates.get(id);
+      if (!candidate) throw new Error(`${field} missing candidate ${id}`);
+      if (candidate.cohortSha256 !== workload.cohort.sha256) {
+        throw new Error(`${field} candidate ${id} used a different cohort`);
+      }
+      if (!DECISION_CANDIDATE_STATUSES.includes(candidate.status)) {
+        throw new Error(
+          `${field}.candidate.${id}.status must be one of ${DECISION_CANDIDATE_STATUSES.join('|')}; promotion stays gated by JOV-6414`
+        );
+      }
+      if (candidate.status !== 'complete') {
+        if (
+          !Number.isInteger(candidate.executedComparisons) ||
+          candidate.executedComparisons !== 0
+        ) {
+          throw new Error(
+            `${field}.candidate.${id} with status ${candidate.status} must record executedComparisons: 0`
+          );
+        }
+      } else if (id === 'deterministic-baseline') {
+        if (
+          candidate.executedComparisons !== undefined &&
+          candidate.executedComparisons !== 0
+        ) {
+          throw new Error(
+            `${field}.candidate.${id} must not execute supplier comparisons`
+          );
+        }
+      } else if (
+        !Number.isInteger(candidate.executedComparisons) ||
+        candidate.executedComparisons <= 0
+      ) {
+        throw new Error(
+          `${field}.candidate.${id}.executedComparisons must be a positive integer when status is complete`
+        );
+      }
+    }
+    if (
+      report.access.status !== 'available' &&
+      candidates.get('openai-decisions').status !== 'access-blocked'
+    ) {
+      throw new Error(`${field} must preserve the Decisions API access block`);
+    }
+    for (const dimension of DECISION_BENCHMARK_DIMENSIONS) {
+      requireString(
+        workload.evidenceByDimension?.[dimension],
+        `${field}.evidenceByDimension.${dimension}`
+      );
+    }
+    if (!isRecord(workload.sourcingDecision)) {
+      throw new Error(`${field}.sourcingDecision missing`);
+    }
+    validateSourcingDecision(
+      workload.sourcingDecision,
+      `${field}.sourcingDecision`
+    );
   }
   return true;
 }

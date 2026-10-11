@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
-import { createReleaseManifest } from './pack-manifest';
+import { createReleaseManifest, resolveReleaseVersion } from './pack-manifest';
 
 const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -293,9 +293,9 @@ async function main(): Promise<void> {
   const sourceReadmePath = join(packageRoot, 'README.md');
   const sourceLicensePath = join(packageRoot, 'LICENSE');
   const sourceBuildConfigPath = join(packageRoot, 'tsconfig.build.json');
-  const releaseVersion = await readFile(
-    join(repositoryRoot, 'VERSION'),
-    'utf8'
+  const releaseVersion = resolveReleaseVersion(
+    await readFile(join(repositoryRoot, 'VERSION'), 'utf8'),
+    process.env.RELEASE_VERSION
   );
   const sourceManifest = await readFile(sourceManifestPath, 'utf8');
   const stagingRoot = await mkdtemp(join(tmpdir(), 'jovie-cli-pack-'));

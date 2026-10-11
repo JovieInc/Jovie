@@ -150,12 +150,49 @@ describe('plan-gate/v1', () => {
     );
   });
 
+  it('deliberate red: treats synthetic fixture and credential-boundary context as safe', () => {
+    const candidate = issue({
+      title: 'Exercise the LYB fixture checkout context',
+      description: `## Scope
+Use a synthetic local fixture and its generated artifact bundle to test checkout context.
+Use the fixture without credentials, secrets, API keys, or production data.
+Never read, rotate, print, or otherwise use those protected values.
+Review chat/payment/import risk cases from the iOS checkout/runner at checkout SHA.
+
+## Acceptance criteria
+The staging-only fixture remains isolated and no purchase is made.`,
+    });
+    assert.equal(planGate.validatePlanCandidate(candidate, evidence()), null);
+  });
+
+  it('keeps explicit forbidden actions blocked despite safe prose elsewhere', () => {
+    for (const description of [
+      'Use a safe synthetic fixture. Then rotate the production API key.',
+      'Never print passwords. Charge the customer card to complete checkout.',
+      'Do not deploy the fixture. Publish the result externally.',
+      'No production data is present, publish the result externally.',
+      'Do not access credentials, and publish the result externally.',
+      'Never read secrets, or deploy to production.',
+      'Implement checkout flow.',
+      'Billing integration.',
+      'Database migration.',
+    ]) {
+      assert.notEqual(
+        planGate.validatePlanCandidate(issue({ description }), evidence()),
+        null,
+        description
+      );
+    }
+  });
+
   it('fails closed for invalid, protected, synthetic, ambiguous, closed, and active-PR candidates', async () => {
     const cases = [
       ['unverified', {}, { verified: false }],
       ['protected', { labels: { nodes: [{ name: 'hold' }] } }, {}],
       ['credential', { title: 'Rotate API credential' }, {}],
       ['synthetic', { labels: { nodes: [{ name: 'synthetic' }] } }, {}],
+      ['bundle label', { labels: { nodes: [{ name: 'bundle' }] } }, {}],
+      ['synthetic evidence', {}, { synthetic: true }],
       ['ambiguous', { state: { name: 'In Progress' } }, {}],
       ['closed', { state: { name: 'Done', type: 'completed' } }, {}],
       [

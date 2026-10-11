@@ -5,14 +5,22 @@ const mocks = vi.hoisted(() => ({
   exists: vi.fn(),
   parse: vi.fn(),
   parseDocument: vi.fn(),
+  cachedSources: new Map<string, Promise<string>>(),
 }));
 vi.mock('node:fs', () => ({
   default: { readFileSync: mocks.read, existsSync: mocks.exists },
 }));
 vi.mock('next/cache', () => ({
-  unstable_cache: (load: () => Promise<string>) => {
-    let cached: Promise<string> | undefined;
-    return () => (cached ??= load());
+  unstable_cache: (load: () => Promise<string>, keys: string[]) => {
+    const key = JSON.stringify(keys);
+    return () => {
+      let cached = mocks.cachedSources.get(key);
+      if (!cached) {
+        cached = load();
+        mocks.cachedSources.set(key, cached);
+      }
+      return cached;
+    };
   },
 }));
 vi.mock('../filesystem-paths', () => ({
@@ -27,7 +35,28 @@ vi.mock('../changelog-parser', () => ({
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
+  mocks.cachedSources.clear();
   mocks.exists.mockReturnValue(true);
+});
+
+it('reads new release bytes after deployment even when the data cache survives', async () => {
+  vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'a'.repeat(40));
+  mocks.read.mockReturnValue('August source');
+  mocks.parse.mockImplementation(source => [{ version: source }]);
+  const first = await import('../changelog-source');
+  expect(await first.getChangelogReleases()).toEqual([
+    { version: 'August source' },
+  ]);
+
+  vi.resetModules();
+  vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'b'.repeat(40));
+  mocks.read.mockReturnValue('October source');
+  const second = await import('../changelog-source');
+  expect(await second.getChangelogReleases()).toEqual([
+    { version: 'October source' },
+  ]);
+  expect(mocks.read).toHaveBeenCalledTimes(2);
 });
 
 it('caches markdown but reapplies current filtering policy for every read', async () => {

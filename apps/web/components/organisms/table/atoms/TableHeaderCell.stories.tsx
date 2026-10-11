@@ -13,6 +13,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
+  args: { children: 'Title' },
   render: () => (
     <table>
       <thead>
@@ -26,6 +27,7 @@ export const Default: Story = {
 };
 
 export const Sortable: Story = {
+  args: { children: 'Release Date' },
   render: () => (
     <table>
       <thead>

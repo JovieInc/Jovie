@@ -8,13 +8,13 @@ import { batchUpdateSocialLinks, type SocialLinkUpdate } from '@/lib/db/batch';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { syncPrimaryMusicUrlsFromSocialLinks } from '@/lib/db/social-links-sync';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import {
   buildIdempotencyKey,
   IdempotencyError,
   withIdempotency,
 } from '@/lib/idempotency';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 
@@ -48,7 +48,7 @@ type SocialLinkRow = {
 
 export async function GET(request: NextRequest) {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
 
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
@@ -122,7 +122,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+    const entitlements = await getOvieOperatorEntitlements({
+      session: 'fresh',
+    });
 
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(

@@ -26,7 +26,7 @@ export function MarketingSignInLink({
         variant='primary'
         className='focus-ring-themed h-9 px-4 sm:h-10 sm:px-5 sm:text-sm'
       >
-        <Link href={APP_ROUTES.SIGNIN} prefetch>
+        <Link href={APP_ROUTES.SIGNIN} prefetch={false}>
           {label}
         </Link>
       </Button>
@@ -36,7 +36,7 @@ export function MarketingSignInLink({
   return (
     <Link
       href={APP_ROUTES.SIGNIN}
-      prefetch
+      prefetch={false}
       className={cn(
         'focus-ring-themed',
         'text-app text-neutral-700 hover:text-neutral-950 dark:text-white/60 dark:hover:text-white/90'

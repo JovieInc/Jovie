@@ -35,7 +35,7 @@ export interface DspBioUpdateTemplateData {
  * Generate the email subject line
  */
 export function getDspBioUpdateSubject(data: DspBioUpdateTemplateData): string {
-  return `Artist Bio Update Request – ${data.artistName}`;
+  return `Artist bio update request: ${data.artistName}`;
 }
 
 /**

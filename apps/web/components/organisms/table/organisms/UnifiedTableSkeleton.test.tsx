@@ -34,11 +34,11 @@ describe('UnifiedTableSkeleton', () => {
     // Skeleton rows have fixed height and live inside <tbody>.
     // UnifiedTable reserves max(skeletonRows, ceil(220px / rowHeight)) rows
     // so loading → empty → populated transitions do not shift layout
-    // (JOV-4869). Default rowHeight is 32px → ceil(220/32) = 7.
+    // (JOV-4869). Default rowHeight is 40px → ceil(220/40) = 6.
     const tbody = container.querySelector('tbody');
     expect(tbody).not.toBeNull();
     const rows = tbody?.querySelectorAll('tr') ?? [];
-    expect(rows.length).toBe(7);
+    expect(rows.length).toBe(6);
   });
 
   it('renders one <td> per column on every skeleton row', () => {
@@ -70,5 +70,39 @@ describe('UnifiedTableSkeleton', () => {
     // The internal UnifiedTable emits a sr-only caption of "Loading table data"
     // when isLoading is true. This keeps the skeleton accessible.
     expect(screen.getByText('Loading table data')).toBeInTheDocument();
+  });
+
+  it('applies the loaded table row mode so two-line rows reserve their height', () => {
+    const { container } = render(
+      <UnifiedTableSkeleton
+        columns={COLUMNS}
+        skeletonRows={1}
+        rowMode='two-line'
+      />
+    );
+
+    const table = container.querySelector('table');
+    expect(table?.style.getPropertyValue('--table-row-height')).toBe('56px');
+    expect(table?.style.getPropertyValue('--table-cell-content-height')).toBe(
+      '48px'
+    );
+  });
+
+  it('reserves the people-row face and name for a person column', () => {
+    const { container } = render(
+      <UnifiedTableSkeleton
+        columns={COLUMNS}
+        skeletonRows={1}
+        skeletonColumnConfig={[{ variant: 'person' }, { variant: 'text' }]}
+      />
+    );
+
+    const firstCell = container.querySelector('tbody tr td');
+    expect(
+      firstCell?.querySelector('.system-b-table-skeleton-person-face')
+    ).not.toBeNull();
+    expect(
+      firstCell?.querySelector('.system-b-table-skeleton-person-name')
+    ).not.toBeNull();
   });
 });

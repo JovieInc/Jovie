@@ -1261,7 +1261,7 @@ describe('proxy.ts middleware', () => {
       const location = res.headers.get('location');
       expect(location).toBeTruthy();
       const locationUrl = new URL(location ?? '', 'https://localhost');
-      expect(locationUrl.pathname).toBe('/app/settings/artist-profile');
+      expect(locationUrl.pathname).toBe('/app/settings/profile');
       expect(locationUrl.searchParams.get('tab')).toBe('earn');
       expect(locationUrl.hash).toBe('#pay');
       expect(mocks.getUserState).not.toHaveBeenCalled();
@@ -1280,7 +1280,7 @@ describe('proxy.ts middleware', () => {
       const location = res.headers.get('location');
       expect(location).toBeTruthy();
       const locationUrl = new URL(location ?? '', 'https://localhost');
-      expect(locationUrl.pathname).toBe(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+      expect(locationUrl.pathname).toBe(APP_ROUTES.SETTINGS_PROFILE);
       expect(locationUrl.searchParams.get('tab')).toBe('earn');
       expect(locationUrl.hash).toBe('#pay');
       expect(mocks.getUserState).not.toHaveBeenCalled();

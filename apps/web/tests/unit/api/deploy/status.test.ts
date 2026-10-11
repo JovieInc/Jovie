@@ -4,8 +4,8 @@ const mockRequireAdmin = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockServerFetch = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/admin', () => ({
-  requireAdmin: mockRequireAdmin,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  requireOvieApiAccess: mockRequireAdmin,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({

@@ -78,7 +78,7 @@ export function ProfileBentoView({
         </Button>
       ) : (
         <Button asChild variant='secondary' size='sm' className='w-full'>
-          <Link href={APP_ROUTES.PROFILES}>Manage In Presence</Link>
+          <Link href={APP_ROUTES.PRESENCE}>Manage In Presence</Link>
         </Button>
       )}
     </div>

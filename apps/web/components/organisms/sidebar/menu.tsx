@@ -54,11 +54,15 @@ const sidebarMenuButtonVariants = cva(
     'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
     // Menu action spacing
     'group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14',
-    // Collapsed icon mode
-    'group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-7 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center',
-    // Text truncation in collapsed mode
-    '[&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-normal [&>span:last-child]:ease-interactive',
-    'group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden',
+    // Collapsed icon mode — gap-0 keeps the icon centered while the label
+    // collapses underneath it.
+    'group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-7 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0',
+    // Rail-motion staged label exit (JOV-4522): the label stays mounted and
+    // collapses on max-width + opacity + 6px drift in lockstep with the rail
+    // allocation, so text never pops to display:none at frame one. Non-label
+    // spans still leave the layout instantly.
+    '[&>span:is(:last-child,[data-rail-label])]:truncate [&>span:is(:last-child,[data-rail-label])]:max-w-full [&>span:is(:last-child,[data-rail-label])]:overflow-hidden [&>span:is(:last-child,[data-rail-label])]:whitespace-nowrap [&>span:is(:last-child,[data-rail-label])]:transition-[max-width,opacity,transform] [&>span:is(:last-child,[data-rail-label])]:duration-cinematic [&>span:is(:last-child,[data-rail-label])]:ease-cinematic [&>span:is(:last-child,[data-rail-label])]:motion-reduce:transition-none',
+    'group-data-[collapsible=icon]:[&>span:is(:last-child,[data-rail-label])]:max-w-0 group-data-[collapsible=icon]:[&>span:is(:last-child,[data-rail-label])]:opacity-0 group-data-[collapsible=icon]:[&>span:is(:last-child,[data-rail-label])]:-translate-x-1.5 group-data-[collapsible=icon]:[&>span:is(:last-child,[data-rail-label])]:pointer-events-none group-data-[collapsible=icon]:[&>span:not(.sr-only):not(:last-child):not([data-rail-label])]:hidden',
     // Icon styling — 14px to match Linear's nav icon size
     '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3.5 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
     // Icon color snaps instantly with the row (no transition — Linear: instant for icon colors)

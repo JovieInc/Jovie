@@ -39,8 +39,8 @@ const {
   mockCreatorIngestSchemaSafeParse: vi.fn(),
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: mockGetCurrentUserEntitlements,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({

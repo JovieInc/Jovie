@@ -31,6 +31,7 @@ import {
   type SentryMode,
 } from '@/lib/sentry/init';
 import {
+  isMusicfetchCutoverCapture,
   isOpaqueUpstashErrorJsonBag,
   isSpotifyReleaseCreditBoundCapture,
   isUpstashQuotaNoise,
@@ -40,6 +41,7 @@ import {
   isRedisQuotaFailure,
   unwrapCapturedContext,
   unwrapCapturedError,
+  unwrapFailedQueryError,
 } from '@/lib/utils/errors';
 
 // NOTE: This module is used in both server and client contexts, so we read
@@ -144,8 +146,11 @@ function sendToSentry(params: {
   }
 
   try {
+    const unwrappedQueryError = unwrapFailedQueryError(error);
     const errorInstance =
-      error instanceof Error ? error : new Error(errorMessage);
+      unwrappedQueryError.error instanceof Error
+        ? unwrappedQueryError.error
+        : new Error(errorMessage);
 
     const tags: Record<string, string> = {
       severity,
@@ -171,6 +176,10 @@ function sendToSentry(params: {
       tags.error_class = context.error_class;
     }
 
+    if (typeof context?.remediation === 'string' && context.remediation) {
+      tags.remediation = context.remediation;
+    }
+
     const quotaFailure = isRedisQuotaFailure(error);
     if (quotaFailure && !tags.error_class) {
       tags.error_class = 'redis_quota_exceeded';
@@ -190,6 +199,9 @@ function sendToSentry(params: {
       extra: {
         message,
         sentryMode,
+        ...(unwrappedQueryError.wrapperMessage
+          ? { query_wrapper: unwrappedQueryError.wrapperMessage }
+          : {}),
         ...context,
       },
       level: severity === 'critical' ? 'fatal' : severity,
@@ -299,8 +311,17 @@ export async function captureError(
   const boundedCreditReceipt =
     isSpotifyReleaseCreditBoundCapture(resolvedError, resolvedContext) ||
     isSpotifyReleaseCreditBoundCapture(error, context);
+  const musicfetchCutover =
+    isMusicfetchCutoverCapture(resolvedError) ||
+    isMusicfetchCutoverCapture(message) ||
+    isMusicfetchCutoverCapture(errorData.message);
 
-  if (!opaqueBag && !quotaNoise && !boundedCreditReceipt) {
+  if (
+    !opaqueBag &&
+    !quotaNoise &&
+    !boundedCreditReceipt &&
+    !musicfetchCutover
+  ) {
     sendToSentry({
       error: resolvedError ?? message,
       errorMessage: errorData.message,

@@ -68,11 +68,26 @@ const CREATOR_SHELL_SLICE_ROUTES = [
   },
   {
     id: 'creator-contacts',
-    path: APP_ROUTES.CONTACTS,
+    path: APP_ROUTES.CONTACTS_AUDIENCE,
     measureMode: 'warm-navigation',
     warmupStrategy: 'authenticated-shell',
     primaryMetric: 'warm-shell-response',
-    navTrigger: `a[href="${APP_ROUTES.CONTACTS}"]`,
+    navTrigger: `a[href="${APP_ROUTES.CONTACTS_AUDIENCE}"]`,
+  },
+  {
+    id: 'creator-links',
+    path: APP_ROUTES.CHAT_PROFILE_PANEL,
+    measureMode: 'page-load',
+    warmupStrategy: 'authenticated-route',
+    primaryMetric: 'skeleton-to-content',
+  },
+  {
+    id: 'creator-presence',
+    path: APP_ROUTES.PRESENCE,
+    measureMode: 'warm-navigation',
+    warmupStrategy: 'authenticated-shell',
+    primaryMetric: 'warm-shell-response',
+    navTrigger: `a[href="${APP_ROUTES.PRESENCE}"]`,
   },
   {
     id: 'creator-calendar',
@@ -120,19 +135,9 @@ const CANONICAL_SHELL_PERF_PAIRS = [
     warmRouteId: 'creator-chat-nav',
   },
   {
-    itemId: 'inbox',
+    itemId: 'home',
     coldRouteId: 'creator-app-home',
     warmRouteId: 'creator-inbox-nav',
-  },
-  {
-    itemId: 'library',
-    coldRouteId: 'creator-library-cold',
-    warmRouteId: 'creator-library',
-  },
-  {
-    itemId: 'contacts',
-    coldRouteId: 'creator-contacts-cold',
-    warmRouteId: 'creator-contacts',
   },
 ] as const;
 

@@ -133,7 +133,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
       waitlist: [
         waitlistRow({
           fullName: 'Ada Lovelace',
-          emailNormalized: 'ada@example.com',
+          emailNormalized: 'ada@analytical-engine.co',
           status: 'approved',
           socialUrl: 'instagram.com/ada',
           approvedAt: NOW,
@@ -143,7 +143,7 @@ describe('canonical contacts read model (JOV-6888)', () => {
       users: [
         userRow({
           name: 'Ada Lovelace',
-          email: 'ada@example.com',
+          email: 'ada@analytical-engine.co',
           userStatus: 'active',
           isPro: true,
           plan: 'pro',
@@ -176,9 +176,11 @@ describe('canonical contacts read model (JOV-6888)', () => {
 
     const result = await getCanonicalContacts({ pageSize: 50 });
 
-    // waitlist + user + profile share the ada@example.com dedupe key.
+    // waitlist + user + profile share the ada@analytical-engine.co dedupe key.
     expect(result.total).toBe(2);
-    const ada = result.contacts.find(c => c.email === 'ada@example.com');
+    const ada = result.contacts.find(
+      c => c.email === 'ada@analytical-engine.co'
+    );
     expect(ada).toBeDefined();
     expect(ada!.stage).toBe('paying');
     expect(ada!.sources).toContain('waitlist');
@@ -247,6 +249,35 @@ describe('canonical contacts read model (JOV-6888)', () => {
     const filtered = await getCanonicalContacts({ stage: 'paying' });
     expect(filtered.total).toBe(0);
     expect(filtered.metrics.total).toBe(2);
+  });
+
+  it('never counts dogfood or comped accounts as paying (Tim 2026-09-30)', async () => {
+    seed({
+      users: [
+        userRow({
+          id: 'u_founder',
+          name: 'Founder',
+          email: 'tim@jov.ie',
+          userStatus: 'active',
+          isPro: true,
+          plan: 'pro',
+          stripeSubscriptionId: 'sub_comp',
+        }),
+        userRow({
+          id: 'u_comp',
+          name: 'Comped Artist',
+          email: 'artist@indie-label.co',
+          userStatus: 'active',
+          isPro: true,
+          plan: 'pro',
+          stripeSubscriptionId: null,
+        }),
+      ],
+    });
+
+    const result = await getCanonicalContacts({});
+
+    expect(result.metrics.paying).toBe(0);
   });
 
   it('fails soft with empty result when source reads throw', async () => {

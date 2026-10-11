@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useOnboardingClaim } from '@/components/features/onboarding/useOnboardingClaim';
 
@@ -20,8 +20,14 @@ vi.mock('@/hooks/useClerkSafe', () => ({
   }),
 }));
 
-function ClaimHarness({ trigger }: { readonly trigger: number }) {
-  const status = useOnboardingClaim(trigger);
+function ClaimHarness({
+  trigger,
+  enabled = true,
+}: {
+  readonly trigger: number;
+  readonly enabled?: boolean;
+}) {
+  const status = useOnboardingClaim(trigger, enabled);
   return <span data-testid='claim-status'>{status}</span>;
 }
 
@@ -38,10 +44,94 @@ function jsonResponse(body: unknown, init?: ResponseInit) {
 }
 
 describe('useOnboardingClaim', () => {
+  it('does not reclaim or redirect a restored account-owned conversation on mount or later turns', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { rerender } = render(<ClaimHarness trigger={0} enabled={false} />);
+    rerender(<ClaimHarness trigger={2} enabled={false} />);
+    expect(screen.getByTestId('claim-status')).toHaveTextContent('idle');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });
+
+  it('keeps conflict recovery available while a later claim check is pending', async () => {
+    let complete: (response: Response) => void = () => {};
+    const pending = new Promise<Response>(resolve => {
+      complete = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          { errorCode: 'SPOTIFY_IDENTITY_CONFLICT' },
+          { status: 409 }
+        )
+      )
+      .mockReturnValueOnce(pending);
+    vi.stubGlobal('fetch', fetchMock);
+    const { rerender } = render(renderClaimHarness(0));
+    await waitFor(() =>
+      expect(screen.getByTestId('claim-status')).toHaveTextContent(
+        'identity-conflict'
+      )
+    );
+    rerender(renderClaimHarness(1));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId('claim-status')).toHaveTextContent(
+      'identity-conflict'
+    );
+    expect(replaceMock).not.toHaveBeenCalled();
+    await act(async () =>
+      complete(
+        jsonResponse(
+          { errorCode: 'SPOTIFY_IDENTITY_CONFLICT' },
+          { status: 409 }
+        )
+      )
+    );
+    expect(screen.getByTestId('claim-status')).toHaveTextContent(
+      'identity-conflict'
+    );
+  });
+
+  it.each([true, false])(
+    'keeps an identity conflict recoverable without checkout or a false reservation (pending=%s)',
+    async pending => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(
+          pending
+            ? {
+                claimed: 1,
+                waitlist: { entryId: 'receipt' },
+                profileError: { errorCode: 'SPOTIFY_IDENTITY_CONFLICT' },
+              }
+            : { errorCode: 'SPOTIFY_IDENTITY_CONFLICT' },
+          { status: pending ? 200 : 409 }
+        )
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const { rerender } = render(renderClaimHarness(0));
+      await waitFor(() =>
+        expect(screen.getByTestId('claim-status')).toHaveTextContent(
+          'identity-conflict'
+        )
+      );
+      expect(replaceMock).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      fetchMock.mockResolvedValue(
+        jsonResponse({ claimed: 1, alreadyClaimed: true })
+      );
+      rerender(renderClaimHarness(1));
+      await waitFor(() =>
+        expect(replaceMock).toHaveBeenCalledWith('/onboarding/checkout')
+      );
+    }
+  );
 
   it('retries a signed-in dev user claim after completed chat activity', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ claimed: 0 }));

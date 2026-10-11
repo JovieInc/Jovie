@@ -99,7 +99,7 @@ describe('ErrorBoundary', () => {
         />
       );
 
-      expect(screen.getByText('App Updated')).toBeInTheDocument();
+      expect(screen.getByText('App updated')).toBeInTheDocument();
       expect(
         screen.getByText('The app was just updated. Reload to continue.')
       ).toBeInTheDocument();

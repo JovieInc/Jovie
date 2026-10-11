@@ -10,5 +10,8 @@ export default defineConfig({
     environment: 'node',
     include: ['lib/__tests__/**/*.test.mjs', 'gate-ladder/**/*.test.mjs'],
     name: 'workspace-scripts',
+    // Script contracts spawn git/node/bash. The pre-push structural lane runs
+    // them on loaded developer Macs, where 5s timed out green suites (JOV-7707).
+    testTimeout: 30_000,
   },
 });

@@ -1,19 +1,19 @@
 {
   "schema": "jovie-preview-env-exceptions/v1",
-  "updatedBy": "JOV-5941",
+  "updatedBy": "JOV-4195",
   "source": ".github/preview-env-registry.json",
   "note": "Projection of the canonical preview/ephemeral-environment registry for the Ovie HUD. Lane ids are kept in sync with the registry by scripts/lib/__tests__/preview-env-contract.test.mjs. activeExceptions is maintained by cleanup/reconciliation receipts; expired or unknown entries never count as valid certification evidence.",
   "lanes": [
     {
       "id": "ci-neon-db",
       "kind": "neon-branch",
-      "policy": "manual-dispatch",
+      "policy": "risk-selected-merge-group or manual-dispatch",
       "owner": "ci-risk-classifier / release engineering",
       "surface": "ephemeral Neon branch ci-neon-run-<run_id>-<attempt> (isolated database only)",
       "evidencePurpose": "Database-affecting proof that cannot be obtained from normal CI or the shared staging database.",
       "ttlHours": 2,
       "cleanupTrigger": "Neon branch TTL (expires_in_hours=2); neon-scheduled-cleanup daily heartbeat reconciles missed events",
-      "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
+      "costBudget": "One Neon branch with at most 2h of endpoint compute per selected run"
     },
     {
       "id": "ci-lighthouse-dashboard-neon",

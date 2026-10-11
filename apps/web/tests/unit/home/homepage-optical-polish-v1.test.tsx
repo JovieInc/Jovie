@@ -73,7 +73,7 @@ describe('homepage-optical-polish-v1', () => {
 
     const close = read('components/homepage/HomepageClose.tsx');
     expect(close).not.toContain('HeroSpotifySearch');
-    expect(close).toContain("getElementById('homepage-name-search')");
+    expect(close).toContain("getElementById('homepage-claim-handle')");
     expect(close).toContain('?.focus()');
     expect(
       findChromeOverrideViolations(

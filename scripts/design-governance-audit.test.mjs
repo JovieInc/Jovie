@@ -142,6 +142,20 @@ test('skill-symlinks FAILs when .claude/skills is missing entirely (JOV-5231)', 
   assert.equal(pins?.status, 'FAIL');
 });
 
+test('governance workflow provides typescript before the audit (JOV-7157)', () => {
+  // The audit imports component-ship-policy.mjs, which needs the TypeScript
+  // compiler; the job intentionally skips pnpm install, so the workflow must
+  // materialize typescript into node_modules before invoking the audit.
+  const workflow = readFileSync(GOVERNANCE_WORKFLOW_PATH, 'utf8');
+  const installIdx = workflow.indexOf('npm pack "typescript@');
+  const auditIdx = workflow.indexOf('node scripts/design-governance-audit.mjs');
+  assert.ok(installIdx > -1, 'workflow must install typescript');
+  assert.ok(
+    installIdx < auditIdx,
+    'typescript install must precede the audit step'
+  );
+});
+
 test('governance workflow gates PRs that touch skill plumbing (JOV-5231)', () => {
   const workflow = readFileSync(GOVERNANCE_WORKFLOW_PATH, 'utf8');
   const pullRequest = workflow.split('pull_request:')[1] ?? '';

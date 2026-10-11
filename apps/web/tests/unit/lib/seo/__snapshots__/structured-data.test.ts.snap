@@ -15,11 +15,12 @@ exports[`generateMerchStructuredData > matches golden snapshot for product + off
   "name": "Tour Tee",
   "offers": {
     "@type": "Offer",
-    "availability": "https://schema.org/InStock",
     "price": "32.00",
     "priceCurrency": "USD",
     "url": "https://jov.ie/testartist/merch/card-1",
   },
+  "sku": "card-1",
+  "url": "https://jov.ie/testartist/merch/card-1",
 }
 `;
 

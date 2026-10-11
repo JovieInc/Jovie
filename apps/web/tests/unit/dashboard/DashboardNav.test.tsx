@@ -7,6 +7,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   mockUseChatConversationsQuery,
   mockUsePathname,
+  mockUseSearchParams,
   renderDashboardNav,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
@@ -17,16 +18,22 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 }));
 
 const CANONICAL_NAV = [
-  ['Library', APP_ROUTES.LIBRARY],
-  ['Contacts', APP_ROUTES.CONTACTS],
-  ['Presence', APP_ROUTES.PROFILES],
+  ['Home', APP_ROUTES.DASHBOARD],
+  ['Identity', APP_ROUTES.PRESENCE],
+  ['Work', APP_ROUTES.LIBRARY],
+  ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
 ] as const;
 
 const FORBIDDEN_PRIMARY_LABELS = [
-  'Search',
-  'Touring',
-  'Audience',
+  'Calendar',
+  'Contacts',
+  'Events',
+  'Library',
+  'Links',
+  'Products',
   'Releases',
+  'Tasks',
+  'Videos',
 ] as const;
 
 const DASHBOARD_NAV_SOURCE =
@@ -66,6 +73,7 @@ describe('DashboardNav', () => {
   it('renders the canonical navigation in exact order and no forbidden primary rows', () => {
     const { container, getByRole, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
+      appFlags: { PROFILES_WORKSPACE: true },
     });
 
     expect(
@@ -80,9 +88,9 @@ describe('DashboardNav', () => {
       expect(queryByRole('button', { name: label })).toBeNull();
     }
 
-    expect(getByRole('link', { name: 'Presence' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Identity' })).toHaveAttribute(
       'href',
-      APP_ROUTES.PROFILES
+      APP_ROUTES.PRESENCE
     );
     expect(queryByRole('button', { name: 'Open Artist profile' })).toBeNull();
     expect(queryByRole('link', { name: 'Settings' })).toBeNull();
@@ -94,7 +102,10 @@ describe('DashboardNav', () => {
       navChildren: <button type='button'>Search</button>,
     });
 
-    const inbox = getByRole('link', { name: 'Inbox' });
+    const inbox = document.querySelector('[data-navigation-item-id="inbox"]');
+    expect(inbox).toBeInstanceOf(HTMLElement);
+    if (!(inbox instanceof HTMLElement)) return;
+    expect(inbox).toHaveAccessibleName('Home');
     const search = getByRole('button', { name: 'Search' });
     const newChat = getByRole('link', { name: 'New Chat' });
 
@@ -104,11 +115,14 @@ describe('DashboardNav', () => {
     expect(
       search.compareDocumentPosition(newChat) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(search.parentElement).toHaveClass('h-9', 'shrink-0');
+    expect(search.closest('[data-sidebar-search-slot]')).toHaveClass(
+      'h-9',
+      'shrink-0'
+    );
   });
 
-  it('keeps the canonical navigation visible without rollout state', () => {
-    const { container } = renderDashboardNav({
+  it('hides Identity when PROFILES_WORKSPACE is off so the rail cannot 404', () => {
+    const { container, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
     });
 
@@ -117,7 +131,15 @@ describe('DashboardNav', () => {
         link.textContent?.trim(),
         link.getAttribute('href'),
       ])
-    ).toEqual(CANONICAL_NAV);
+    ).toEqual([
+      ['Home', APP_ROUTES.DASHBOARD],
+      ['Work', APP_ROUTES.LIBRARY],
+      ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
+    ]);
+    expect(queryByRole('link', { name: 'Identity' })).toBeNull();
+    expect(
+      container.querySelector(`a[href="${APP_ROUTES.PRESENCE}"]`)
+    ).toBeNull();
   });
 
   it('keeps the Inbox attention center visible when it is settled empty', () => {
@@ -128,34 +150,40 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('link', { name: 'Inbox' })).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-navigation-item-id="inbox"]')
+    ).toHaveAccessibleName('Home');
     expect(getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
   });
 
-  it('keeps the Inbox attention center visible at its root destination', () => {
+  it('gives Home sole current-page ownership at the shell root', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
-    const { getByRole } = renderDashboardNav({
+    renderDashboardNav({
       renderFn: fastRender,
       overrides: {
         inboxNavigation: { state: 'empty', pendingCount: 0 },
       },
     });
 
-    expect(getByRole('link', { name: 'Inbox' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
+    expect(
+      document.querySelector('[data-navigation-item-id="home"]')
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      document.querySelector('[data-navigation-item-id="inbox"]')
+    ).not.toHaveAttribute('aria-current');
   });
 
   it('keeps Inbox visible when availability is unknown', () => {
-    const { getByRole } = renderDashboardNav({
+    renderDashboardNav({
       renderFn: fastRender,
       overrides: {
         inboxNavigation: { state: 'unknown', pendingCount: null },
       },
     });
 
-    expect(getByRole('link', { name: 'Inbox' })).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-navigation-item-id="inbox"]')
+    ).toHaveAccessibleName('Home');
   });
 
   it('keeps the exact customer IA invariant for admin users', () => {
@@ -218,6 +246,7 @@ describe('DashboardNav', () => {
     } as DashboardData['creatorProfiles'][number];
     const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
+      appFlags: { PROFILES_WORKSPACE: true },
       overrides: {
         selectedProfile,
         creatorProfiles: [
@@ -228,42 +257,48 @@ describe('DashboardNav', () => {
     });
 
     expect(container.querySelector('[aria-expanded]')).toBeNull();
-    expect(getByRole('link', { name: 'Presence' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Identity' })).toHaveAttribute(
       'href',
-      APP_ROUTES.PROFILES
+      APP_ROUTES.PRESENCE
     );
     const artistSection = container.querySelector(
       '[data-nav-section="primary"]'
     );
     expect(artistSection).not.toBeNull();
-    expect(
-      artistSection?.querySelector('a[href="/app/contacts"]')
-    ).not.toBeNull();
-    expect(getByRole('link', { name: 'Contacts' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Audience' })).toHaveAttribute(
       'href',
-      APP_ROUTES.CONTACTS
+      APP_ROUTES.CONTACTS_AUDIENCE
     );
   });
 
-  it('applies active state to the canonical library route and legacy aliases', () => {
-    for (const route of [
-      APP_ROUTES.LIBRARY,
-      APP_ROUTES.DASHBOARD_LIBRARY,
-      APP_ROUTES.DASHBOARD_RELEASES,
-      APP_ROUTES.RELEASES,
-    ]) {
-      mockUsePathname.mockReturnValue(route);
-      const view = renderDashboardNav({ renderFn: fastRender });
-      expect(view.getByRole('link', { name: 'Library' })).toHaveAttribute(
-        'aria-current',
-        'page'
-      );
-      expect(view.getByRole('link', { name: 'Library' })).toHaveAttribute(
-        'href',
-        APP_ROUTES.LIBRARY
-      );
-      view.unmount();
-    }
+  it('applies active state inside canonical top-level contexts', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.LIBRARY);
+    const work = renderDashboardNav({ renderFn: fastRender });
+    expect(work.getByRole('link', { name: 'Work' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(work.getByRole('link', { name: 'New Chat' })).not.toHaveAttribute(
+      'aria-current'
+    );
+    work.unmount();
+
+    mockUsePathname.mockReturnValue(APP_ROUTES.CONTACTS);
+    mockUseSearchParams.mockReturnValue(new URLSearchParams('tab=audience'));
+    const audience = renderDashboardNav({ renderFn: fastRender });
+    expect(audience.getByRole('link', { name: 'Audience' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    audience.unmount();
+
+    mockUsePathname.mockReturnValue(APP_ROUTES.INSIGHTS);
+    mockUseSearchParams.mockReturnValue(new URLSearchParams());
+    const insights = renderDashboardNav({ renderFn: fastRender });
+    expect(insights.getByRole('link', { name: 'Audience' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('uses New Chat consistently for the elevated nav action and page title', async () => {
@@ -367,13 +402,23 @@ describe('DashboardNav', () => {
   it('handles collapsed state without changing the canonical rows', () => {
     const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
+      appFlags: { PROFILES_WORKSPACE: true },
       sidebarProps: { defaultOpen: false },
+      navChildren: <button type='button'>Search fixture</button>,
     });
 
-    expect(primaryLinks(container)).toHaveLength(3);
-    expect(getByRole('link', { name: 'New Chat' }).parentElement).toHaveClass(
-      'group-data-[collapsible=icon]:hidden'
+    expect(primaryLinks(container)).toHaveLength(4);
+    // JOV-8017: New Chat retains command ownership in the icon rail.
+    // The composed Storybook spec verifies its painted geometry through motion.
+    expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.CHAT
     );
+    const secondary = container.querySelector(
+      '[data-sidebar-search-divider]'
+    )?.parentElement;
+    expect(secondary).toHaveAttribute('inert');
+    expect(secondary).toHaveAttribute('aria-hidden', 'true');
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,
       enabled: false,

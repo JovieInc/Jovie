@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
 import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
@@ -43,6 +44,7 @@ import {
   type ServerAnalyticsDelivery,
   trackServerEventTx,
 } from '@/lib/server-analytics';
+import { getAccountMetricCohort } from '@/lib/utils/email';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -62,7 +64,7 @@ import {
   fetchExistingUser,
   updateExistingProfile,
 } from './profile-setup';
-import type { CompletionResult } from './types';
+import type { CompletionResult, OnboardingCompletionResult } from './types';
 import { ensureEmailAvailable, ensureHandleAvailable } from './validation';
 
 function hasVerifiedTokenBackedFixtureClaim(
@@ -322,7 +324,7 @@ export async function completeOnboarding({
   displayName?: string;
   email?: string | null;
   redirectToDashboard?: boolean;
-}): Promise<CompletionResult> {
+}): Promise<OnboardingCompletionResult> {
   let pendingClaim: Awaited<ReturnType<typeof readPendingClaimContext>> = null;
 
   try {
@@ -517,6 +519,11 @@ export async function completeOnboarding({
       throw createOnboardingReceiptPendingError(error);
     }
 
+    // Passive first-touch receipt (JOV-5036): attach the pre-auth envelope
+    // exactly once. Best-effort — the helper swallows and reports failures
+    // so attribution cannot regress activation.
+    await attachFirstTouchReceipt(userId);
+
     if (pendingClaim?.mode === 'token_backed') {
       await clearPendingClaimContext();
     }
@@ -571,6 +578,7 @@ export async function completeOnboarding({
     await recordFunnelStep({
       funnel: 'artist_signup',
       step: 'claim_complete',
+      cohort: getAccountMetricCohort(userEmail),
     });
 
     // Invalidate dashboard data cache to prevent stale data causing redirect loops
@@ -583,11 +591,16 @@ export async function completeOnboarding({
 
     return completion;
   } catch (error) {
+    const claimExpired =
+      pendingClaim?.mode === 'token_backed' &&
+      error instanceof Error &&
+      error.message.startsWith('[CLAIM_EXPIRED]');
     if (
       pendingClaim &&
       error instanceof Error &&
       (error.message.includes('PROFILE_CONFLICT') ||
-        error.message.includes('CLAIM_NOT_FOUND'))
+        error.message.includes('CLAIM_NOT_FOUND') ||
+        claimExpired)
     ) {
       await clearPendingClaimContext();
     }
@@ -603,6 +616,14 @@ export async function completeOnboarding({
     await captureError('completeOnboarding failed', error, {
       route: 'onboarding',
     });
-    throw logOnboardingError(error, { username, displayName, email });
+    const loggedError = logOnboardingError(error, {
+      username,
+      displayName,
+      email,
+    });
+    // Next hides thrown Server Action messages in production. Return only the
+    // known recovery code; provider/database errors remain on the thrown path.
+    if (claimExpired) return { error: 'CLAIM_EXPIRED' };
+    throw loggedError;
   }
 }

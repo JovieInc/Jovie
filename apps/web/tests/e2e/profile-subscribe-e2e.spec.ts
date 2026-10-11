@@ -25,7 +25,7 @@ test.describe.configure({ mode: 'serial' });
 const NOTIFICATIONS_TRIGGER_SELECTOR = [
   '[data-testid="profile-inline-notifications-trigger"]',
   '[data-testid="profile-home-alerts-row"]',
-  '[data-testid="profile-home-alerts-fallback-card"]',
+  '[data-testid="profile-identity-get-updates"]',
 ].join(', ');
 const VISIBLE_EMAIL_STEP_SELECTOR =
   '[data-testid="profile-mobile-notifications-step-email"]:visible';

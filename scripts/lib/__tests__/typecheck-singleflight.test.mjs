@@ -101,6 +101,7 @@ function runWrapper(stateDir, marker, options = {}) {
       });
       child.stderr.on('data', chunk => {
         stderr += chunk.toString('utf8');
+        options.onStderr?.(stderr);
       });
     }
     child.once('exit', code =>
@@ -285,6 +286,100 @@ describe('typecheck singleflight lock recovery', () => {
 });
 
 describe('typecheck singleflight process integration', () => {
+  it.skipIf(process.platform !== 'linux')(
+    'reclaims an unreaped zombie owner without waiting for its parent',
+    async () => {
+      const stateDir = makeStateDir();
+      const marker = resolve(stateDir, 'owners.txt');
+      // waitid(WNOWAIT) proves the child has exited while deliberately retaining
+      // its PID. kill(pid, 0) still succeeds until the parent reaps it.
+      const parent = spawn(
+        'python3',
+        [
+          '-c',
+          [
+            'import os, sys',
+            'pid = os.fork()',
+            'if pid == 0: os._exit(0)',
+            'try:',
+            '    os.waitid(os.P_PID, pid, os.WEXITED | os.WNOWAIT)',
+            '    print(pid, flush=True)',
+            '    sys.stdin.buffer.read(1)',
+            'finally:',
+            '    os.waitpid(pid, 0)',
+          ].join('\n'),
+        ],
+        { stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      childProcesses.push(parent);
+      const parentExit = new Promise(resolveExit =>
+        parent.once('exit', resolveExit)
+      );
+      let deadline;
+      try {
+        const pid = await new Promise((resolvePid, rejectPid) => {
+          parent.once('error', rejectPid);
+          parent.once('exit', code =>
+            rejectPid(new Error(`Zombie fixture exited: ${code}`))
+          );
+          parent.stdout.once('data', data =>
+            resolvePid(Number(data.toString().trim()))
+          );
+        });
+        expect(pid).toBeGreaterThan(0);
+        expect(() => process.kill(pid, 0)).not.toThrow();
+        expect(readFileSync(`/proc/${pid}/status`, 'utf8')).toMatch(
+          /^State:\s+Z\s/m
+        );
+        writeLock(stateDir, {
+          pid,
+          startedAtMs: Date.now(),
+          cwd: '.',
+          command: ['tsc'],
+        });
+
+        let rejectRecovery;
+        const recoveryDeadline = new Promise((_, rejectDeadline) => {
+          rejectRecovery = rejectDeadline;
+        });
+        let recovered = false;
+        const result = await Promise.race([
+          runWrapper(stateDir, marker, {
+            durationMs: 50,
+            capture: true,
+            onStderr(stderr) {
+              if (recovered) return;
+              // Measure recovery after the wrapper starts, independently of
+              // Node startup and the dummy compiler's eventual completion.
+              deadline ??= setTimeout(
+                () =>
+                  rejectRecovery(
+                    new Error('Zombie owner blocked lock recovery')
+                  ),
+                3000
+              );
+              if (stderr.includes('reason=dead-owner')) {
+                recovered = true;
+                clearTimeout(deadline);
+              }
+            },
+          }),
+          recoveryDeadline,
+        ]);
+        expect(result.code).toBe(0);
+        expect(result.stderr).toContain('reason=dead-owner');
+        expect(maxConcurrentOwners(marker)).toBe(1);
+        expect(existsSync(resolve(stateDir, 'lock.json'))).toBe(false);
+        // The parent has not reaped the fixture: recovery came from exit state.
+        expect(() => process.kill(pid, 0)).not.toThrow();
+      } finally {
+        clearTimeout(deadline);
+        parent.stdin.end('reap');
+        await parentExit;
+      }
+    }
+  );
+
   it('never evicts a live owner solely because its lock is old', async () => {
     const stateDir = makeStateDir();
     const marker = resolve(stateDir, 'owners.txt');

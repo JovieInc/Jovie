@@ -1,5 +1,4 @@
 import {
-  Check,
   CreditCard,
   Headphones,
   Mail,
@@ -23,7 +22,7 @@ export const AUDIENCE_ICON = {
   youtube: Play,
   qr: QrCode,
   shows: MapPin,
-  subscribe: Check,
+  subscribe: Mail,
   music: Play,
   email: Mail,
   pay: CreditCard,
@@ -74,9 +73,6 @@ export function CaptureActionPill({
       >
         {isDone ? (
           <div className='flex items-center justify-center gap-2.5 px-3'>
-            <span className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-surface-0 text-primary-token'>
-              <Check className='h-3.5 w-3.5' strokeWidth={2.4} />
-            </span>
             <span className='ap-capture-tracking rounded-full bg-surface-1 px-1 text-xs font-semibold text-primary-token'>
               {capture.action.confirmedLabel}
             </span>

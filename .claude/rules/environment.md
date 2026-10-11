@@ -22,7 +22,7 @@ On Windows PowerShell, use the wrapper so Git for Windows Bash is used (not the 
 
 `setup.sh` is idempotent. It checks Node.js (24.x), pnpm (9.15.9), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
 
-Run `./scripts/setup.sh` again on every fresh Git worktree before doing anything else. Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
+Create agent worktrees with `scripts/agent/worktree-new <dir> -b <branch>`: it hands out a pre-installed, typecheck-warm worktree from the pool in `~/.cache/jovie` (~35s instead of ~5 min) and falls back to `git worktree add` + install when the pool is empty. A worktree made any other way needs `./scripts/setup.sh` before anything else, because worktrees do not share `node_modules`.
 
 ## Tool Versions (Required)
 
@@ -245,44 +245,44 @@ output-logs|outputLogs: "errors-only"|reduce log noise (full, hash-only, new-onl
 summarize|--summarize|generate JSON metadata for timing/cache analysis
 turbo-clean|pnpm turbo clean|clear local cache when debugging
 turbo-docs|turbo docs "query"|search turborepo.dev documentation from terminal (2.8+)
-worktrees|git worktree add ../dir -b branch|cache shared automatically across worktrees (2.8+)
+worktrees|scripts/agent/worktree-new ../dir -b branch|cache shared automatically across worktrees (2.8+)
 schema|$schema: turborepo.dev/schema.json|validates turbo.json in editors
 daemon|daemon: false|background process for optimization (disabled in Jovie due to gRPC issues)
 ```
 
 ## Git Worktrees for Parallel Agents
 
-Turbo 2.8 automatically shares local cache across Git worktrees.
-
 ```bash
-git worktree add ../Jovie-agent-1 -b agent/task-name
-cd ../Jovie-agent-1 && ./scripts/setup.sh && pnpm turbo build
-git worktree remove ../Jovie-agent-1
+scripts/agent/worktree-new ../Jovie-agent-1 -b agent/task-name   # fetch, take a pool slot, install
+cd ../Jovie-agent-1 && pnpm turbo build
+scripts/agent/worktree-new --recycle ../Jovie-agent-1             # clean: back to the pool; dirty/preserved: refused
 ```
 
-No configuration is needed — Turbo detects worktrees automatically. Combined with remote caching, agents in separate worktrees get near-instant cache hits.
+| Cache | Location | Shared how |
+|---|---|---|
+| Worktree pool (installed `node_modules` + warm `apps/web/.cache/tsbuildinfo`) | `~/.cache/jovie/worktree-pool/<repo>/` | `worktree-new` moves a slot to your path and refills in the background; `--status`, `--fill`, `--drain` |
+| pnpm content store | `pnpm store path` (same APFS volume) | hardlinked into each worktree; never prune it while worktrees install |
+| Turbo local cache | main checkout's `.turbo/cache` | Turbo 2.8+ resolves it through the git common dir for every worktree |
+| Git objects | main checkout's `.git` | every linked worktree shares them; `setup.sh` runs `git maintenance start` (incremental strategy, never prunes: lanes clones borrow these objects via alternates) |
 
-### Concurrent Commit Pitfall — `git stash` Races Across Worktrees
+All shared caches live under `$JOVIE_CACHE_ROOT` (default `~/.cache/jovie`). Cleanup tools must not delete that root wholesale: `worktree-new --drain` (or `disk_guard`, below the pool's 30 GiB floor) removes pool slots safely.
 
-`git stash` is **repo-global** — every worktree writes to the same `.git/refs/stash` stack. lint-staged backs up the working tree to a stash before running tasks and pops it on cleanup. When multiple worktrees invoke `git commit` concurrently, their lint-staged runs step on each other's backup stashes.
+### Concurrent Commits Across Worktrees
 
-Symptom (from a parallel swarm of worktree agents):
+`git stash` is **repo-global** — every worktree writes to the same
+`.git/refs/stash` stack. The pre-commit hook therefore runs
+`pnpm exec lint-staged --no-stash`: lint-staged still selects files from each
+worktree's staged diff, but it does not create a shared automatic-backup stash.
+Concurrent `git commit` processes in isolated worktrees are supported.
 
-```
-[STARTED] Cleaning up temporary files...
-[FAILED] lint-staged automatic backup is missing!
-husky - pre-commit script failed (code 1)
-```
+Do not replace `--no-stash` with stash cleanup or commit serialization, and
+never use `--no-verify`. When changing the hook, run
+`pnpm gate-ladder:test`; its regression creates two linked worktrees, commits in
+both at the same time, and verifies staged-only task inputs with no stash race.
 
-Important: the commit itself often **succeeds** before husky errors on cleanup. Check `git log --oneline origin/main..HEAD` before assuming the work was lost and retrying — a blind retry after "failure" is how duplicate commits get introduced.
-
-Mitigations (in priority order):
-
-1. **Serialize commits across worktrees** in the orchestrator. Don't fire `git commit` in 5 worktrees at once; queue them.
-2. Before commit, drop only the stale lint-staged backup stashes left by prior failed runs: `git stash list | grep "lint-staged automatic backup" | cut -d: -f1 | xargs -r -n1 git stash drop`. This targets the matching refs by name, so it won't clobber an unrelated stash you have on top. Run it right before the commit, not preemptively.
-3. If you're running long-lived parallel worktree agents (like `/swarm`), dispatch each agent in its own backgrounded turn so their commit windows rarely overlap.
-
-**Never** use `--no-verify` to route around this. The hook failure message is cosmetic, but the fix is coordination, not skipping validation.
+Without the automatic backup, lint-staged leaves task modifications in the
+index when a task fails. Inspect and fix that worktree before retrying the
+commit; do not assume a failed hook restored the index.
 
 ## Quick Troubleshooting
 
@@ -324,6 +324,16 @@ Three workspaces, each on a different machine, with a clear separation of concer
 
 - **Houston** (this repo, MacBook Pro 32 GB) — the **code** workspace. Default profile: `coder`. Claude Code, Codex CLI, Conductor worktrees, and Hermes issue runners all live here. PRs originate here.
 - **Raleigh** (`/Users/timwhite/conductor/workspaces/ops/raleigh`) — the **ops / FounderOS** workspace. Source of truth for `company_state.md`, daily briefings, and task routing.
-- **Hermes-Air** (MacBook Air 16 GB, dedicated) — the **always-on orchestration** node. Runs the Hermes gateway service, gbrain (as server, exposed over Tailscale), and ops crons. Ingests brain dumps (Telegram + Voice Memos) and files Linear issues consumed by Houston's runner. **Does no coding.** See [`.claude/rules/hermes-air.md`](hermes-air.md) and [`docs/HERMES_AIR.md`](../../docs/HERMES_AIR.md).
+- **Hermes-Air** (MacBook Air 16 GB, dedicated): since 2026-09-29 the fleet's always-on **Mac lane**. It hosts the heartbeat-gated self-hosted macOS Actions runner (`jovie-mac`) and a nightly Mac dogfood verifier that files `mac-dogfood` Linear issues. It is a gbrain client of the ops Mac, and the Hermes gateway is retired. **Does not author code unattended.** See [`.claude/rules/hermes-air.md`](hermes-air.md) and [`docs/HERMES_AIR.md`](../../docs/HERMES_AIR.md).
 
 The contract between Hermes-Air and Houston is Linear issues. The contract between Hermes-Air and Raleigh is gbrain over Tailscale. Keep code changes in Houston; keep orchestration on the Air; keep company-state in Raleigh.
+
+## Branch Switches And External Editors
+
+- Stop the worktree's dev server before checkout, stash or stash-pop operations.
+  If Turbopack output is stale afterwards, remove only that worktree's generated
+  `apps/web/.next` cache and restart; preserve source and other active worktrees.
+- Coordinate with another editor before editing a file it has open: close that
+  file there or disable its autosave for the edit. Verify `git diff` and reread
+  the saved file after the edit and before committing. An editor overwrite is a
+  persistence failure; resolve the competing writer before retrying.

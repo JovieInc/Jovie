@@ -65,4 +65,20 @@ describe('OpportunityInboxCard', () => {
     expect(onDismiss).toHaveBeenCalledWith('card-1');
     expect(onFeedback).toHaveBeenCalledWith('card-1', 'positive', undefined);
   });
+
+  it('renders the fan_reply signal visual', () => {
+    render(
+      <OpportunityInboxCard
+        card={{ ...CARD, signalType: 'fan_reply', typeLabel: 'Fan Reply' }}
+        onApprove={vi.fn()}
+        onDismiss={vi.fn()}
+        onFeedback={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Fan Reply')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('opportunity-inbox-signal-icon-fan_reply')
+    ).toBeInTheDocument();
+  });
 });

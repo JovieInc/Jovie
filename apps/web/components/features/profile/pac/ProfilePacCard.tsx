@@ -166,7 +166,7 @@ function getCaptureCopy(
   }
   return {
     title: `Get ${artistName} updates`,
-    body: 'New music, shows, and merch — first.',
+    body: 'New music, shows, and merch.',
     cta: 'Get Updates',
   };
 }

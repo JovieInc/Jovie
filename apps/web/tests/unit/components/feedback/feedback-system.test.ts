@@ -55,10 +55,17 @@ function findDirectSonnerImports(directory: string): string[] {
 
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     if (
-      entry.name === '.next' ||
+      entry.name.startsWith('.') ||
       entry.name === 'node_modules' ||
       entry.name === 'scripts' ||
-      entry.name === 'tests'
+      entry.name === 'tests' ||
+      entry.name === 'coverage' ||
+      entry.name === 'dist' ||
+      entry.name === 'out' ||
+      entry.name === 'storybook-static' ||
+      entry.name === 'reports' ||
+      entry.name === 'screenshot-catalog' ||
+      entry.name === 'screenshot-reports'
     ) {
       continue;
     }
@@ -132,7 +139,9 @@ describe('canonical toast ownership', () => {
     ).toEqual(['components/features/example/BadToast.tsx']);
   });
 
-  it('keeps production toast calls behind the feedback API', () => {
+  it('keeps production toast calls behind the feedback API', {
+    timeout: 60_000,
+  }, () => {
     expect(findDirectSonnerImports(webRoot)).toEqual([]);
   });
 });

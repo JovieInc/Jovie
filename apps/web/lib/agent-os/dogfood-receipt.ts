@@ -17,6 +17,13 @@
  * `deploymentId` exactly match the subject's current deploy receipt.
  */
 
+import {
+  buildFleetInvocation,
+  type FleetInvocationEvidence,
+  type FleetInvocationInput,
+  validateFleetInvocation,
+} from '@/lib/agent-os/fleet-hardening';
+
 export const JOVIE_DOGFOOD_RECEIPT_SCHEMA = 'jovie.dogfood-receipt/v1' as const;
 export const IOS_DOGFOOD_REPORT_SCHEMA = 'jovie-ios-dogfood/v1' as const;
 
@@ -106,6 +113,7 @@ export interface DogfoodReceipt {
   readonly outcome: DogfoodOutcome;
   readonly blocker: string | null;
   readonly evidenceRefs: readonly string[];
+  readonly invocation: FleetInvocationEvidence | null;
   readonly privacy: DogfoodReceiptPrivacy;
 }
 
@@ -125,6 +133,7 @@ export interface DogfoodReceiptInput {
   readonly outcome: DogfoodOutcome;
   readonly blocker?: string | null;
   readonly evidenceRefs?: readonly string[];
+  readonly invocation?: FleetInvocationEvidence | null;
   readonly privacy?: DogfoodReceiptPrivacy;
 }
 
@@ -214,6 +223,24 @@ export function validateDogfoodReceipt(value: unknown): string[] {
   ) {
     errors.push('evidenceRefs must be an array of non-empty strings');
   }
+  // Legacy v1 receipts remain readable; command adapters always add this block.
+  if (isRecord(value.invocation)) {
+    const invocation = value.invocation as unknown as FleetInvocationEvidence;
+    const invocationErrors = validateFleetInvocation(invocation);
+    errors.push(...invocationErrors);
+    if (
+      invocationErrors.length === 0 &&
+      (value.outcome !== 'passed' ||
+        invocation.workaroundUsed ||
+        invocation.bypassUsed ||
+        invocation.canonicalComparison.status === 'mismatched') &&
+      invocation.defectFingerprint === null
+    ) {
+      errors.push(
+        'failed or frictional invocations require a defect fingerprint'
+      );
+    }
+  }
   checkPrivacy(value.privacy, errors);
   return errors;
 }
@@ -235,6 +262,7 @@ export function buildDogfoodReceipt(
     environment: input.environment,
     evidenceRefs: input.evidenceRefs ?? [],
     flagCohort: input.flagCohort,
+    invocation: input.invocation ?? null,
     kind: input.kind,
     missionId: input.missionId,
     outcome: input.outcome,
@@ -294,16 +322,13 @@ export function dogfoodReceiptFromPlaywrightReport(
   timing?: { readonly startedAt?: string; readonly completedAt?: string }
 ): DogfoodReceipt {
   const stats = report.stats ?? {};
-  const attempted =
-    (stats.expected ?? 0) +
-    (stats.unexpected ?? 0) +
-    (stats.flaky ?? 0) +
-    (stats.skipped ?? 0);
+  const executed =
+    (stats.expected ?? 0) + (stats.unexpected ?? 0) + (stats.flaky ?? 0);
   const unexpected = stats.unexpected ?? 0;
 
   let outcome: DogfoodOutcome;
   let blocker: string | null = null;
-  if (attempted === 0) {
+  if (executed === 0) {
     outcome = 'blocked';
     blocker = 'playwright mission ran no tests';
   } else if (unexpected > 0) {
@@ -335,8 +360,7 @@ export function dogfoodReceiptFromPlaywrightReport(
 
 /** One read-only command execution (MCP call or `@jovie/cli` invocation). */
 export interface DogfoodCommandRun {
-  readonly command: string;
-  readonly exitCode: number | null;
+  readonly invocation: FleetInvocationInput;
   readonly startedAt: string;
   readonly completedAt: string;
   readonly blocker?: string;
@@ -349,14 +373,15 @@ export function dogfoodReceiptFromCommandRun(
 ): DogfoodReceipt {
   let outcome: DogfoodOutcome;
   let blocker: string | null = run.blocker ?? null;
-  if (run.exitCode === null) {
+  const command = run.invocation.command.redactedArgv.join(' ');
+  if (run.invocation.exitCode === null) {
     outcome = 'blocked';
-    blocker ??= `command did not complete: ${run.command}`;
-  } else if (run.exitCode === 0) {
+    blocker ??= `command did not complete: ${command}`;
+  } else if (run.invocation.exitCode === 0) {
     outcome = 'passed';
   } else {
     outcome = 'failed';
-    blocker ??= `command exited ${run.exitCode}: ${run.command}`;
+    blocker ??= `command exited ${run.invocation.exitCode}: ${command}`;
   }
 
   return buildDogfoodReceipt({
@@ -365,6 +390,11 @@ export function dogfoodReceiptFromCommandRun(
     completedAt: run.completedAt,
     driver,
     evidenceRefs: context.evidenceRefs,
+    invocation: buildFleetInvocation(
+      run.invocation,
+      run.startedAt,
+      run.completedAt
+    ),
     kind: 'agent_on_behalf',
     outcome,
     startedAt: run.startedAt,

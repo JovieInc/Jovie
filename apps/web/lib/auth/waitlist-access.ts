@@ -1,7 +1,8 @@
 import 'server-only';
 
-import { sql as drizzleSql } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { normalizeEmail } from '@/lib/utils/email';
 import type { WaitlistStatus as CanonicalWaitlistStatus } from '@/lib/waitlist/state-machine';
@@ -51,4 +52,21 @@ export async function getWaitlistAccess(
     entryId: entry.id,
     status: entry.status,
   };
+}
+
+/**
+ * Handle held by the hidden reservation profile for a waitlist entry
+ * (JOV-7204). Null when the entry has no reservation — copy must degrade
+ * rather than claim a handle that was not held.
+ */
+export async function getWaitlistReservedHandle(
+  entryId: string
+): Promise<string | null> {
+  const [row] = await db
+    .select({ username: creatorProfiles.username })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.waitlistEntryId, entryId))
+    .limit(1);
+
+  return row?.username ?? null;
 }

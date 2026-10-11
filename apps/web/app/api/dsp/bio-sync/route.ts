@@ -17,11 +17,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { CopyFloorViolationError } from '@/lib/copy/outbound-floor';
 import { getOwnedProfile } from '@/lib/dsp-bio-sync/ownership';
-import {
-  DSP_BIO_PROVIDERS,
-  getEnabledBioProviders,
-} from '@/lib/dsp-bio-sync/providers';
+import { getEnabledBioProviders } from '@/lib/dsp-bio-sync/providers';
 import { syncBioToDsps } from '@/lib/dsp-bio-sync/service';
 import { captureError } from '@/lib/error-tracking';
 
@@ -129,6 +127,17 @@ export async function POST(request: Request) {
       })),
     });
   } catch (error) {
+    if (error instanceof CopyFloorViolationError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+          rules: error.rules,
+        },
+        { status: 400 }
+      );
+    }
+
     await captureError('DSP Bio Sync failed', error, {
       route: '/api/dsp/bio-sync',
     });
@@ -149,17 +158,15 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    const providers = Object.entries(DSP_BIO_PROVIDERS).map(
-      ([id, provider]) => ({
-        id,
-        displayName: provider.displayName,
-        method: provider.method,
-        enabled: provider.enabled,
-        notes: provider.notes,
-        artistPortalUrl: provider.artistPortalUrl,
-        maxBioLength: provider.maxBioLength,
-      })
-    );
+    const providers = getEnabledBioProviders().map(([id, provider]) => ({
+      id,
+      displayName: provider.displayName,
+      method: provider.method,
+      enabled: provider.enabled,
+      notes: provider.notes,
+      artistPortalUrl: provider.artistPortalUrl,
+      maxBioLength: provider.maxBioLength,
+    }));
 
     const enabledCount = getEnabledBioProviders().length;
 

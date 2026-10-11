@@ -406,7 +406,7 @@ describe('Dependabot reconciliation workflow contract', () => {
     expect(WORKFLOW).toContain(
       'github.event.workflow_run.workflow_id == 178737329'
     );
-    expect(WORKFLOW).toContain('types: [completed]');
+    expect(WORKFLOW).not.toMatch(/\n  workflow_run:/);
     expect(WORKFLOW).toContain('scripts/dependabot-workflow-run-adapter.mjs');
     expect(WORKFLOW).toContain("steps.run-context.outputs.eligible == 'true'");
     expect(WORKFLOW).toContain('timeout-minutes: 10');
@@ -507,7 +507,9 @@ describe('Dependabot discovery contract', () => {
 
   it('does not create default reviewer requests for the founder', () => {
     const ecosystems = CONFIG.split('  - package-ecosystem:').slice(1);
-    expect(ecosystems).toHaveLength(3);
+    // 5 entries: root npm, eve-pilot npm (security-only), deepsec npm
+    // (security-only), github-actions, docker.
+    expect(ecosystems).toHaveLength(5);
     for (const ecosystem of ecosystems) {
       expect(ecosystem).not.toMatch(/^\s+reviewers:/m);
       expect(ecosystem).toContain("assignees:\n      - 'itstimwhite'");

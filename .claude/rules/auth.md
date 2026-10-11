@@ -44,7 +44,7 @@ Jovie runs **self-hosted Better Auth**, with sessions on Neon Postgres + Drizzle
 
 1. Check `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` for the active host
 2. Check Google/Apple console redirect URIs match `/api/auth/callback/*`
-3. Check `/api/health/auth` — it reports Better Auth readiness, not Clerk keys
+3. Check `/api/health/auth` with an admin session or `Authorization: Bearer $CRON_SECRET` outside production. Anonymous callers get `{healthy,timestamp}` and production returns 403 for every caller. The detailed body reports Better Auth readiness, not Clerk keys
 4. For local/E2E, debug the bypass route first (`/api/dev/test-auth/enter`)
 
 ## OAuth Provider Button Enablement (Allowlist, Not Env)

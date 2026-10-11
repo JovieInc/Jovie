@@ -11,8 +11,30 @@ const mockGetEligibleProfileCount = vi.hoisted(() => vi.fn());
 const mockDbInsert = vi.hoisted(() => vi.fn());
 
 // Mock dependencies
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
+const coldGate = vi.hoisted(() => ({ open: true }));
+// Exercise the underlying send logic as if the path were open; the closed
+// default is proven separately below (JOV-7858).
+vi.mock('@/lib/outbound/cold-claim-invites', () => ({
+  isColdClaimInviteSendOpen: () => coldGate.open,
+  COLD_CLAIM_INVITE_CLOSED_MESSAGE: 'closed',
+}));
+
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: mockGetCurrentUserEntitlements,
+  requireOvieApiAccess: vi.fn(async () => {
+    const entitlements = await mockGetCurrentUserEntitlements();
+    if (!entitlements.isAuthenticated)
+      return Response.json(
+        { error: 'Please sign in.', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    if (!entitlements.isAdmin)
+      return Response.json(
+        { error: 'Admin access required.', code: 'FORBIDDEN' },
+        { status: 403 }
+      );
+    return null;
+  }),
 }));
 
 vi.mock('@/lib/email/jobs/enqueue', () => ({
@@ -176,7 +198,7 @@ describe('POST /api/admin/creator-invite/bulk', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data.error).toBe('Unauthorized');
+    expect(data.error).toBe('Please sign in.');
   });
 
   it('returns 403 when user is not admin', async () => {
@@ -196,7 +218,7 @@ describe('POST /api/admin/creator-invite/bulk', () => {
     const data = await response.json();
 
     expect(response.status).toBe(403);
-    expect(data.error).toBe('Forbidden');
+    expect(data.error).toBe('Admin access required.');
   });
 
   it('returns 400 for invalid request body', async () => {
@@ -272,6 +294,32 @@ describe('POST /api/admin/creator-invite/bulk', () => {
     expect(data.ok).toBe(true);
     expect(data.sent).toBe(0);
     expect(data.message).toBe('No eligible profiles with contact emails found');
+  });
+
+  it('refuses a real bulk send while cold claim invites are closed', async () => {
+    coldGate.open = false;
+    try {
+      mockGetCurrentUserEntitlements.mockResolvedValue(mockEntitlementsAdmin);
+      mockFetchProfilesByFitScore.mockResolvedValue(mockEligibleProfiles);
+      const { POST } = await import(
+        '@/app/api/admin/creator-invite/bulk/route'
+      );
+      const response = await POST(
+        new Request('http://localhost/api/admin/creator-invite/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fitScoreThreshold: 50, limit: 10 }),
+        })
+      );
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'COLD_OUTBOUND_CLOSED',
+      });
+      expect(mockWithSystemIngestionSession).not.toHaveBeenCalled();
+      expect(mockEnqueueBulkClaimInviteJobs).not.toHaveBeenCalled();
+    } finally {
+      coldGate.open = true;
+    }
   });
 
   it('sends invites and enqueues jobs successfully', async () => {

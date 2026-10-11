@@ -77,6 +77,14 @@ vi.mock('@/lib/db/queries/social-links-verification', () => ({
 // Mock headers
 vi.mock('@/lib/http/headers', () => ({
   NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
+  TTL: { IDEMPOTENCY_KEY_MS: 60_000 },
+}));
+
+// Mock team approvals (owner bypasses approval checks)
+vi.mock('@/lib/team/approvals', () => ({
+  authorizeRiskyProfileAction: vi
+    .fn()
+    .mockResolvedValue({ status: 'allowed', role: 'owner' }),
 }));
 
 // Mock parseJsonBody

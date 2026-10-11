@@ -295,6 +295,13 @@ test('allows canonical assets and enforces binary byte budgets', () => {
       []
     );
 
+    const docsProof = 'apps/docs/public/proof/new.png';
+    fixtureFile(root, docsProof);
+    assert.deepEqual(
+      evaluateRepoHygiene({ addedPaths: [docsProof], root }).errors,
+      []
+    );
+
     const oversized = 'apps/web/public/video/oversized.mp4';
     const absolute = fixtureFile(root, oversized);
     truncateSync(absolute, HYGIENE_LIMITS.maxBinaryBytes + 1);

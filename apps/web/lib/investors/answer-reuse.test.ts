@@ -189,10 +189,17 @@ describe('investor answer reuse pack', () => {
       claimId: 'private-customer-example',
       revisionId: 'private-example-r1',
       kind: 'measured-outcome' as const,
+      assertion: 'observed-fact' as const,
+      subject: 'Customer Alpha private result',
       statement: 'Private customer Alpha reported an unapproved result.',
       disclosure: 'private-investor' as const,
       evidenceQuality: 'verified' as const,
       evidenceRefs: ['private/customer-alpha'],
+      asOf: '2026-09-28',
+      reviewedBy: 'Tim White',
+      reviewedAt: '2026-09-28',
+      limitations: ['Single private customer report; not a cohort result.'],
+      cohort: { label: 'Private customer Alpha', sampleSize: 1 },
       revisedAt: '2026-09-28',
     };
     const customer = pack.derivatives.find(

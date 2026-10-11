@@ -2,8 +2,8 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 import { listVisualQaReviewRuns } from '@/lib/agent-os/visual-qa/review';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -13,7 +13,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET(): Promise<Response> {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

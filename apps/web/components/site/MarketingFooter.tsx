@@ -7,9 +7,10 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
+  getMarketingFooterColumns,
+  getPublicCommercialFooterColumn,
   MARKETING_CLI_LINK,
   MARKETING_DEVELOPER_LINK,
-  MARKETING_FOOTER_COLUMNS,
   MARKETING_LEGAL_LINKS,
   type MarketingFooterLink,
 } from '@/data/marketingNavigation';
@@ -25,7 +26,7 @@ import { MarketingFooterCta } from './MarketingFooterCta';
  *
  * Visual contract:
  * - Canvas→shell linear fill + soft floating glow on noir-ion atoms.
- * - Column nav with caps eyebrows (10px / 600 / 0.22em / `$atom-text-muted`).
+ * - Column nav with Title Case labels (12px / 500 / `--mf-text-muted`).
  * - Full: chrome mark + columns, no slogan; copyright left, legal right.
  * - Compact: chrome mark in the legal row; copyright + legal right.
  * - Keep production nav from `marketingNavigation`. Do not invent columns.
@@ -66,6 +67,8 @@ interface MarketingFooterProps {
   readonly variant?: 'auto' | 'expanded' | 'minimal';
   readonly className?: string;
   readonly showCta?: boolean;
+  /** JOV-7580. Server passes the code flag. Default keeps the Music column. */
+  readonly genericCreatorNav?: boolean;
 }
 
 type ResolvedVariant = 'expanded' | 'minimal';
@@ -141,6 +144,7 @@ export function MarketingFooter({
   variant = 'auto',
   className,
   showCta = true,
+  genericCreatorNav = false,
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePathname();
   const resolvedVariant = resolveFooterVariant(variant, pathname);
@@ -150,7 +154,9 @@ export function MarketingFooter({
     (PAGE_OWNS_FINAL_CTA_PATHS.has(pathname) ||
       isEditorialFooterCtaPath(pathname));
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
-  const footerColumns = MARKETING_FOOTER_COLUMNS;
+  const footerColumns = FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH
+    ? [getPublicCommercialFooterColumn(genericCreatorNav)]
+    : getMarketingFooterColumns(genericCreatorNav);
 
   return (
     <footer
@@ -186,19 +192,22 @@ export function MarketingFooter({
 
             <nav
               className={cn(
-                'grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:gap-x-12 xl:gap-x-16',
-                footerColumns.length === 4
-                  ? 'lg:grid-cols-4'
-                  : 'lg:grid-cols-5',
+                'grid gap-x-8 gap-y-10 lg:gap-x-12 xl:gap-x-16',
+                footerColumns.length === 1
+                  ? 'grid-cols-1'
+                  : 'grid-cols-2 sm:grid-cols-3',
+                footerColumns.length === 1
+                  ? 'lg:grid-cols-1'
+                  : footerColumns.length === 4
+                    ? 'lg:grid-cols-4'
+                    : 'lg:grid-cols-5',
                 shouldShowCta && 'mt-[clamp(3.25rem,5vw,4.6rem)]'
               )}
               aria-label='Footer'
             >
               {footerColumns.map(column => (
                 <section key={column.title}>
-                  <h2 className='mf-eyebrow mf-eyebrow--caps line-clamp-2'>
-                    {column.title}
-                  </h2>
+                  <h2 className='mf-eyebrow line-clamp-2'>{column.title}</h2>
                   <ul className='flex list-none flex-col gap-3 p-0'>
                     {column.links.map(link => (
                       <li key={`${link.href}-${link.label}`}>

@@ -1,28 +1,16 @@
 // @coverage-via apps/web/tests/unit/home/HomepageIdentitySections.test.tsx
-'use client';
-
-import { Button } from '@jovie/ui/atoms/button';
+import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
-import {
-  HOMEPAGE_CERTIFIED_CONTEXT,
-  HOMEPAGE_CERTIFIED_EVENTS,
-} from '@/data/homepageCertifiedOptimization';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
-import { HomepagePrimaryAction } from './HomepagePrimaryAction';
 import './HomepageIdentity.css';
 
 /**
- * Canonical Pen v3 close (2026-09-26, dark launch): one headline and the same
- * certified name search action as the hero (JOV-5085). The open-state action
- * returns focus to search.
+ * Homepage close: one headline and the same jov.ie/you claim as the hero
+ * (Tim 2026-09-28: link claim replaces the JOV-5085 name search).
  */
 export function HomepageIdentityClose() {
   const { close } = HOMEPAGE_IDENTITY_COPY;
-
-  function focusProfileSearch() {
-    document.getElementById('homepage-name-search')?.focus();
-  }
+  const { claim } = HOMEPAGE_IDENTITY_COPY.hero;
 
   return (
     <MarketingCtaSection
@@ -42,33 +30,17 @@ export function HomepageIdentityClose() {
         >
           {close.headline}
         </h2>
-        <div className='homepage-identity-close__actions'>
-          {FEATURE_FLAGS.WAITLIST_ENABLED ? (
-            <HomepagePrimaryAction
-              appearance='editorial'
-              inputId='homepage-close-name-search'
-              placeholder={HOMEPAGE_IDENTITY_COPY.hero.search.placeholder}
-              submitLabel={HOMEPAGE_IDENTITY_COPY.hero.search.action}
-              submitTestId='homepage-close-cta'
-              submitAnalytics={{
-                eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
-                properties: {
-                  ...HOMEPAGE_CERTIFIED_CONTEXT,
-                  placement: 'close',
-                },
-              }}
-            />
-          ) : (
-            <Button
-              type='button'
-              size='marketing'
-              variant='primary'
-              onClick={focusProfileSearch}
-              data-testid='homepage-close-cta'
-            >
-              {close.action}
-            </Button>
-          )}
+        <div
+          className='homepage-identity-close__actions'
+          data-testid='homepage-close-claim'
+        >
+          <ProductClaimHandleForm
+            domain={claim.domain}
+            placeholder={claim.placeholder}
+            submitLabel={claim.action}
+            inputId='homepage-close-claim-handle'
+            testIdPrefix='homepage-close'
+          />
         </div>
       </div>
     </MarketingCtaSection>

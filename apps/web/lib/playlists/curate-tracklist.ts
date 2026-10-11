@@ -1,13 +1,14 @@
 /**
  * LLM Track Curation
  *
- * Uses Claude Sonnet to sequence candidate tracks into a cohesive playlist.
- * The LLM handles energy arc, key compatibility, and genre coherence.
+ * Uses the gateway chat model to sequence candidate tracks into a cohesive
+ * playlist. The LLM handles energy arc, key compatibility, and genre coherence.
  */
 
 import 'server-only';
 import { z } from 'zod';
-import { getAnthropicClient } from '@/lib/ai/anthropic';
+import { gateway, generateText } from '@/lib/ai/sdk';
+import { CHAT_MODEL } from '@/lib/constants/ai-models';
 import { captureError } from '@/lib/error-tracking';
 import { withTimeout } from '@/lib/resilience/primitives';
 import type { CandidateTrack } from './discover-tracks';
@@ -25,7 +26,7 @@ export interface CuratedTracklist {
 }
 
 const CURATED_TRACK_IDS_SCHEMA = z.array(z.string()).min(10).max(50);
-const ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 30_000;
 
 export function parseTrackIdsFromResponseText(responseText: string): string[] {
   const jsonStr = extractJsonPayload(responseText);
@@ -74,7 +75,7 @@ export function dedupeTrackIdsByArtist(
 // ============================================================================
 
 /**
- * Use Claude Sonnet to curate and sequence a playlist from candidate tracks.
+ * Use the gateway chat model to curate and sequence a playlist from candidate tracks.
  * Returns ordered track IDs ready for Spotify playlist creation.
  */
 export async function curateTracklist(options: {
@@ -107,7 +108,6 @@ export async function curateTracklist(options: {
     targetSize,
   });
 
-  const anthropic = getAnthropicClient();
   const validIds = new Set([
     ...candidates.map(track => track.id),
     ...jovieArtistTracks.map(track => track.spotifyTrackId),
@@ -116,25 +116,21 @@ export async function curateTracklist(options: {
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const message = await withTimeout(
-        anthropic.messages.create(
-          {
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 1500,
-            messages: [{ role: 'user', content: prompt }],
-          },
-          { timeout: ANTHROPIC_REQUEST_TIMEOUT_MS }
-        ),
+      const result = await withTimeout(
+        generateText({
+          model: gateway(CHAT_MODEL),
+          maxOutputTokens: 1500,
+          prompt,
+        }),
         {
-          timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000,
-          context: 'Anthropic curateTracklist',
+          timeoutMs: REQUEST_TIMEOUT_MS + 1_000,
+          context: 'curateTracklist',
         }
       );
 
-      const textBlock = message.content.find(block => block.type === 'text');
-      const responseText = textBlock?.type === 'text' ? textBlock.text : null;
+      const responseText = result.text;
       if (!responseText) {
-        throw new Error('No text response from Claude');
+        throw new Error('No text response from model');
       }
 
       const trackIds = parseTrackIdsFromResponseText(responseText);

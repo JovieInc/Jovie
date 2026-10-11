@@ -11,6 +11,7 @@ const previewData: PreviewPanelData = {
   genres: null,
   location: null,
   hometown: null,
+  activeSinceYear: null,
   links: [],
   profilePath: '/alex',
   dspConnections: {

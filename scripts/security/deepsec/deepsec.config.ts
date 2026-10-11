@@ -14,12 +14,14 @@ if (policy.execution.status !== 'advisory')
   );
 const root = process.env.DEEPSEC_SOURCE_ROOT;
 if (!root) throw new Error('DEEPSEC_SOURCE_ROOT is required');
-// Provider/env hygiene is enforced by deepsec-run.mjs, which starts deepsec
-// with a minimal environment; deepsec itself sets the gateway route vars.
+// Founder decision: scanners use native subscriptions. No Gateway key or
+// paid-provider fallback belongs in this workspace; admission must verify
+// the native CLI's subscription login before starting a scan.
 // A plain object: deepsec's defineConfig is an identity helper, and importing
 // it would make repo typechecks depend on the scanner's node_modules.
 export default {
-  ai: { mode: 'gateway', provider: 'vercel' },
+  ai: { mode: 'local', provider: 'local' },
+  defaultAgent: 'codex',
   dataDir: process.env.DEEPSEC_DATA_ROOT ?? join(here, 'data'),
   projects: [
     {

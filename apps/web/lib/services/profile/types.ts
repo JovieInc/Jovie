@@ -69,6 +69,7 @@ export type ProfileData = Pick<
   | 'location'
   | 'activeSinceYear'
   | 'venmoHandle'
+  | 'spotifyFollowers'
   | 'spotifyPopularity'
   | 'createdAt'
   | 'updatedAt'

@@ -1,10 +1,20 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { RenderedFamily } from '@/.storybook/rendered-family';
 import { SidebarInboxLink } from './SidebarInboxLink';
 
 const meta = {
   title: 'Shell/SidebarInboxLink',
   component: SidebarInboxLink,
   decorators: [
+    Story => (
+      <RenderedFamily
+        name='sidebar-inbox-link'
+        owner='SidebarInboxLink'
+        interactive
+      >
+        <Story />
+      </RenderedFamily>
+    ),
     Story => (
       <div className='flex items-center gap-3 p-4'>
         <Story />

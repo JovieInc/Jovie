@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolveCustomerChangelogHero } from '@/lib/customer-changelog';
 
 const getChangelogSnapshot = vi.fn();
 
@@ -24,6 +25,14 @@ const RELEASE_FIXTURE = {
   dogfood: ['Relaunch the Mac app and open the banner link'],
 };
 
+Object.assign(RELEASE_FIXTURE, {
+  customerOutcomes: Object.fromEntries(
+    Object.values(RELEASE_FIXTURE.sections)
+      .flat()
+      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  ),
+});
+
 describe('GET /changelog/whats-new.json', () => {
   beforeEach(() => {
     getChangelogSnapshot.mockResolvedValue({
@@ -46,6 +55,7 @@ describe('GET /changelog/whats-new.json', () => {
       entries: [
         {
           id: '26.9.0',
+          hero: resolveCustomerChangelogHero('26.9.0'),
           title: "What's new on Mac",
           date: '2026-09-26',
           summary: 'A banner links the changelog post.',

@@ -37,3 +37,10 @@ enum AudienceHighlightsLoadState: Equatable {
   case loaded(MobileAudienceHighlightsResponse)
   case error(String)
 }
+
+func audienceHighlightsShouldShowLoading(current: AudienceHighlightsLoadState) -> Bool {
+  if case .loaded = current {
+    return false
+  }
+  return true
+}

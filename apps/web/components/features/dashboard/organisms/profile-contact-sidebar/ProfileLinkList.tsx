@@ -9,12 +9,12 @@ import type {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
-import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { toast } from '@/components/feedback';
 import {
   DrawerLinkSection,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { PROVIDER_LABELS } from '@/features/dashboard/atoms/DspProviderIcon';
 import type { LinkSection } from '@/features/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
@@ -252,7 +252,7 @@ export function ProfileLinkList({
         return (
           <div className={cn(sectionSurfaceClassName, 'px-3 py-3')}>
             <p className='py-1 text-xs text-tertiary-token'>
-              No music links yet. Click + to add one.
+              No music links yet.{onAddLink ? ' Click + to add one.' : ''}
             </p>
           </div>
         );
@@ -275,8 +275,8 @@ export function ProfileLinkList({
       return (
         <div className={cn(sectionSurfaceClassName, 'px-3 py-3')}>
           <p className='py-1 text-xs text-tertiary-token'>
-            No {SECTION_LABELS[selectedCategory].toLowerCase()} links yet. Click
-            + to add one.
+            No {SECTION_LABELS[selectedCategory].toLowerCase()} links yet.
+            {onAddLink ? ' Click + to add one.' : ''}
           </p>
         </div>
       );

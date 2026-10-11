@@ -23,11 +23,6 @@ enum TeleprompterPresentationMode: String, Equatable, Sendable, CaseIterable {
   }
 }
 
-enum TeleprompterContentMode: String, Equatable, Sendable, CaseIterable {
-  case script
-  case prompt
-}
-
 enum TeleprompterOverlayVisibility: String, Equatable, Sendable {
   case visible
   case liveOnly

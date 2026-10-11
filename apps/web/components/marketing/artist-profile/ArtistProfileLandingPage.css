@@ -1486,7 +1486,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-pricing-hero) {
   display: flex;
-  min-height: calc(92svh - var(--system-b-header-height));
+  min-height: auto;
   align-items: center;
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-text-primary) 8%, transparent);
@@ -1750,7 +1750,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-pricing-page .marketing-pricing-plan-card__features li) {
-  grid-template-columns: var(--space-4) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   color: color-mix(in oklab, var(--system-b-text-primary) 58%, transparent);
   font-size: var(--text-sm);
@@ -1987,6 +1987,30 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-text-primary) 7%, transparent);
   padding: var(--space-3) var(--space-5);
+}
+
+:where(
+  .system-b-pricing-table-shell[data-variant="mobile"]
+    .system-b-pricing-chart-cell
+) {
+  padding: var(--space-3);
+}
+
+:where(
+  .system-b-pricing-table-shell[data-variant="mobile"]
+    .system-b-pricing-chart-cell--feature
+) {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+:where(
+  .system-b-pricing-table-shell[data-variant="mobile"]
+    .system-b-pricing-plan-price
+) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 :where(.system-b-pricing-chart-cell--feature),
@@ -2676,7 +2700,8 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-artist-notifications-hero-title) {
   max-width: 100%;
   color: var(--color-text-primary-token);
-  font-size: clamp(3rem, 15vw, 3.6rem);
+  /* JOV-7772: 48px keeps the two-line H1 contract at 390 without clipping. */
+  font-size: var(--text-5xl);
   font-weight: var(--font-weight-semibold);
   line-height: 0.92;
   letter-spacing: -0.045em;
@@ -2685,7 +2710,7 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
 @media (min-width: 640px) {
   :where(.system-b-artist-notifications-hero-title) {
     max-width: 10ch;
-    font-size: clamp(3.6rem, 8.4vw, 7.2rem);
+    font-size: clamp(3.6rem, 8.4vw, 5rem);
     line-height: 0.88;
     letter-spacing: -0.085em;
   }
@@ -2693,7 +2718,7 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
 
 @media (min-width: 1024px) {
   :where(.system-b-artist-notifications-hero-title) {
-    font-size: clamp(3.6rem, 6.25vw, 7.2rem);
+    font-size: clamp(3.5rem, 5.5vw, 5rem);
   }
 }
 

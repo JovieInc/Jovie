@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { buildClaimProfileStartHref } from '@/data/marketingCtaIntents';
@@ -56,14 +56,19 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     expect(cta).toHaveAttribute('type', 'submit');
     expect(cta).toHaveAttribute('data-primary-action', 'true');
     expect(
-      screen.getByRole('textbox', { name: 'Choose Your Handle' })
+      within(screen.getByTestId('product-claim-card')).getByRole('textbox', {
+        name: 'Choose Your Handle',
+      })
     ).toHaveAttribute('placeholder', 'you');
   });
 
   it('preserves an entered handle in the canonical claim intent', () => {
     render(<ProductLanding />);
 
-    const input = screen.getByRole('textbox', { name: 'Choose Your Handle' });
+    const input = within(screen.getByTestId('product-claim-card')).getByRole(
+      'textbox',
+      { name: 'Choose Your Handle' }
+    );
     fireEvent.change(input, { target: { value: 'fresh-handle' } });
     fireEvent.submit(screen.getByTestId('product-claim-form'));
 
@@ -75,7 +80,10 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
   it('keeps an empty claim safe and focused', () => {
     render(<ProductLanding />);
 
-    const input = screen.getByRole('textbox', { name: 'Choose Your Handle' });
+    const input = within(screen.getByTestId('product-claim-card')).getByRole(
+      'textbox',
+      { name: 'Choose Your Handle' }
+    );
     fireEvent.click(screen.getByTestId('product-claim-cta'));
 
     expect(input).toHaveFocus();
@@ -85,20 +93,26 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
   it('keeps the claim handle keyboard focus visible', () => {
     render(<ProductLanding />);
 
-    expect(
-      screen.getByRole('textbox', { name: 'Choose Your Handle' })
-    ).toHaveClass(
-      'focus-visible:border-focus',
-      'focus-visible:outline-2',
-      'focus-visible:outline-offset-2',
-      'focus-visible:outline-(--color-focus-ring)'
+    // JOV-INV-019: focus-visible:outline + focus-visible:outline-2 never
+    // actually rendered — tailwind-merge collapses them into one conflict
+    // group and keeps only the last, and outline-width without
+    // outline-style paints nothing regardless. focus-ring-themed is the
+    // shared box-shadow-based ring the rest of the app uses.
+    const input = within(screen.getByTestId('product-claim-card')).getByRole(
+      'textbox',
+      { name: 'Choose Your Handle' }
     );
+    expect(input).toHaveClass('focus-ring-themed');
+    expect(input.className).not.toMatch(/focus-visible:outline\b/);
   });
 
   it('keeps invalid handles local instead of navigating', () => {
     render(<ProductLanding />);
 
-    const input = screen.getByRole('textbox', { name: 'Choose Your Handle' });
+    const input = within(screen.getByTestId('product-claim-card')).getByRole(
+      'textbox',
+      { name: 'Choose Your Handle' }
+    );
     fireEvent.change(input, { target: { value: 'bad handle' } });
     fireEvent.submit(screen.getByTestId('product-claim-form'));
 
@@ -112,15 +126,15 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     render(<ProductLanding />);
 
     expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
-      'Your living identity on the internet.'
+      'Be found. Be understood.'
     );
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Be found. Be understood.'
+      'Your living identity on the internet.'
     );
     expect(
       screen.queryByRole('heading', {
         level: 1,
-        name: 'Your living identity on the internet.',
+        name: 'Be found. Be understood.',
       })
     ).toBeNull();
   });
@@ -138,5 +152,30 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
         .getByTestId('product-claim-card')
         .querySelector('[data-testid="product-claim-cta"]')
     ).not.toBeNull();
+  });
+
+  it('closes with the Pen editorial-search action, not a truncated link button', () => {
+    render(<ProductLanding />);
+
+    // JOV-7230: Pen dClrT/DbI9f closes /product on the two-line "See what
+    // shows up / when people search for you." headline plus the canonical
+    // handle-search action — not a "Claim your Jovie" link button.
+    const close = screen.getByTestId('product-close');
+    expect(close.tagName).toBe('SECTION');
+    expect(close).toHaveAttribute('data-marketing-variant', 'editorial-search');
+
+    const scope = within(close);
+    expect(
+      scope.getByRole('heading', {
+        name: 'See what shows up when people search for you.',
+      })
+    ).toBeVisible();
+    expect(
+      scope.getByRole('textbox', { name: 'Choose Your Handle' })
+    ).toBeInTheDocument();
+    expect(
+      scope.getByRole('button', { name: PRODUCT_COPY.claimCard.cta })
+    ).toBeInTheDocument();
+    expect(scope.queryByText('Claim your Jovie')).toBeNull();
   });
 });

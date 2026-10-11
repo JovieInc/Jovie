@@ -85,7 +85,14 @@ async function openInterceptedAuthModal(
   });
 
   if (mode === 'signin') {
-    await page.locator(`a[href="${APP_ROUTES.SIGNIN}"]`).first().click();
+    const mobileMenuButton = page.getByRole('button', { name: 'Open menu' });
+    if (await mobileMenuButton.isVisible()) {
+      await mobileMenuButton.click();
+    }
+    await page
+      .locator(`a[href="${APP_ROUTES.SIGNIN}"]:visible`)
+      .first()
+      .click();
   } else {
     const signUpCta = page.locator('[data-cta-sign-up="true"]').first();
     const signUpEntryExists = await signUpCta

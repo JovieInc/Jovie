@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 const sources = [
   'app/(marketing)/about/page.tsx',
   'components/organisms/AboutPageContent.tsx',
+  'components/organisms/AboutPageRefresh.tsx',
 ] as const;
 
 const forbiddenRouteVisualPatterns = [

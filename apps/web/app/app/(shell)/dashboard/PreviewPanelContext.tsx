@@ -8,8 +8,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
+import { useRailPreview } from '@/components/shell/useRailPreview';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 
 export interface PreviewPanelLink {
   id: string;
@@ -55,6 +58,9 @@ export interface PreviewPanelData {
 
 interface PreviewPanelStateContextValue {
   isOpen: boolean;
+  isPreview: boolean;
+  isFloating: boolean;
+  isPinned: boolean;
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -80,12 +86,20 @@ interface PreviewPanelProviderProps {
   readonly children: React.ReactNode;
   readonly defaultOpen?: boolean;
   readonly enabled?: boolean;
+  /**
+   * Identity of the rail surface (e.g. 'app-shell' vs 'chat'). When it
+   * changes, the rail returns to its closed default so an open rail never
+   * carries over into a surface where it wasn't explicitly requested
+   * (JOV-7150: empty chat must not open the profile rail unsolicited).
+   */
+  readonly scope?: string;
 }
 
 export function PreviewPanelProvider({
   children,
   defaultOpen = false,
   enabled = true,
+  scope,
 }: Readonly<PreviewPanelProviderProps>) {
   // Check if screen is large (md breakpoint: 768px).
   // Default to false during SSR to avoid hydration mismatch on mobile devices
@@ -111,7 +125,24 @@ export function PreviewPanelProvider({
 
   // Start closed to match SSR; the effect below opens on large screens after hydration
   const [isOpen, setIsOpen] = useState(false);
+  const isMobile = useBreakpointDown('lg');
+  const { isPreview, isFloating, dismissPreview } = useRailPreview({
+    side: 'right',
+    pinned: isOpen,
+    enabled: enabled && !isMobile,
+    resetKey: scope,
+  });
   const [previewData, setPreviewData] = useState<PreviewPanelData | null>(null);
+
+  // Surface change (dashboard ↔ chat ↔ artist-profile settings) resets the
+  // rail to closed — it only opens from an explicit user action afterward.
+  const previousScopeRef = useRef(scope);
+  useEffect(() => {
+    if (previousScopeRef.current === scope) return;
+    previousScopeRef.current = scope;
+    setIsOpen(false);
+    setPreviewData(null);
+  }, [scope]);
 
   // Open panel after mount on large screens when defaultOpen is requested.
   // Also close when switching to a small screen.
@@ -121,36 +152,53 @@ export function PreviewPanelProvider({
     } else if (!isLargeScreen && isOpen) {
       setIsOpen(false);
     }
-    // Intentionally omit isOpen to avoid re-triggering when user manually closes
+    // Intentionally omit isOpen to avoid re-triggering when user manually closes.
+    // `scope` is included so returning to a default-open surface (dashboard)
+    // reopens the rail after the scope reset closes it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLargeScreen, defaultOpen]);
+  }, [isLargeScreen, defaultOpen, scope]);
 
   const open = useCallback(() => {
     if (!enabled) return;
+    dismissPreview();
     setIsOpen(true);
-  }, [enabled]);
+  }, [enabled, dismissPreview]);
 
   const close = useCallback(() => {
     if (!enabled) return;
+    dismissPreview();
     setIsOpen(false);
-  }, [enabled]);
+  }, [enabled, dismissPreview]);
 
   const toggle = useCallback(() => {
     if (!enabled) return;
+    dismissPreview();
     setIsOpen(prev => !prev);
-  }, [enabled]);
+  }, [enabled, dismissPreview]);
 
-  const effectiveIsOpen = enabled ? isOpen : false;
+  const effectiveIsOpen = enabled ? isOpen || isPreview : false;
 
   // Separate memoized values for each context to prevent cascading re-renders
   const stateValue = useMemo<PreviewPanelStateContextValue>(
     () => ({
       isOpen: effectiveIsOpen,
+      isPinned: enabled && isOpen,
+      isPreview,
+      isFloating,
       open,
       close,
       toggle,
     }),
-    [effectiveIsOpen, open, close, toggle]
+    [
+      effectiveIsOpen,
+      enabled,
+      isOpen,
+      isPreview,
+      isFloating,
+      open,
+      close,
+      toggle,
+    ]
   );
 
   const dataValue = useMemo<PreviewPanelDataContextValue>(

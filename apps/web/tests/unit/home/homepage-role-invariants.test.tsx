@@ -56,7 +56,7 @@ describe('JOV-5386 homepage role and shipping invariants', () => {
     expect(liveHomepageSource).not.toContain('MarketingShippedSitesShowcase');
     expect(liveHomepageSource).not.toContain('MarketingPlatformSpecBento');
     expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
-      'Your living identity on the internet.'
+      'Be found. Be understood.'
     );
     expect(liveHomepageSource).toContain('<HomepageIdentityHero');
   });

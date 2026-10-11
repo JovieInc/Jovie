@@ -16,6 +16,9 @@ export interface AppShellRouteContext {
   readonly ok: true;
   readonly userId: string;
   readonly dashboardData: DashboardData;
+  /** Managed identity that scopes Presence, Links, Audience, and other contextual views. */
+  readonly activeIdentityId: string | null;
+  /** Persistence-layer alias retained while creator-profile call sites migrate. */
   readonly profileId: string | null;
 }
 
@@ -111,6 +114,7 @@ export async function loadAppShellRouteContext({
     ok: true,
     userId,
     dashboardData,
+    activeIdentityId: dashboardData.selectedProfile?.id ?? null,
     profileId: dashboardData.selectedProfile?.id ?? null,
   };
 }

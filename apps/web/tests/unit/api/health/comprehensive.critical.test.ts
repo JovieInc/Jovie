@@ -36,6 +36,7 @@ vi.mock('@/lib/stripe/client', () => ({
   },
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureWarning: mockCaptureWarning }));
+vi.mock('@/lib/health/detail-access', () => import('./detail-access-double'));
 
 describe('@critical GET /api/health/comprehensive', () => {
   beforeEach(() => {

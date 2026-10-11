@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
@@ -35,6 +36,11 @@ import { LibraryPageClient } from './LibraryPageClient';
 
 export const runtime = 'nodejs';
 
+export const metadata: Metadata = {
+  title: 'Work',
+  description: 'Manage what you make and put into the world',
+};
+
 export default async function LibraryPage({
   searchParams,
 }: {
@@ -47,8 +53,7 @@ export default async function LibraryPage({
     route: APP_ROUTES.LIBRARY,
     authFailure: 'notFound',
     dashboardErrorLogMessage: 'Dashboard data load failed on library page',
-    dashboardErrorMessage:
-      'Failed to load library data. Please refresh the page.',
+    dashboardErrorMessage: 'Failed to load Work. Please refresh the page.',
   });
   if (!routeContext.ok) {
     return routeContext.error;

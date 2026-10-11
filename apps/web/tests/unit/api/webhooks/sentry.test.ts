@@ -53,6 +53,73 @@ describe('POST /api/webhooks/sentry', () => {
     vi.resetModules();
   });
 
+  it('releases a previous open-event lock on resolution and dedupes late resolution retries', async () => {
+    vi.stubEnv('SUMMER_SENTRY_INTAKE_LIVE', 'true');
+    const acquired = new Set<string>();
+    mockAcquireRecentDispatch.mockImplementation(
+      async (_source: string, key: string) => {
+        if (acquired.has(key)) return { acquired: false, reason: 'duplicate' };
+        acquired.add(key);
+        return { acquired: true, reason: 'acquired' };
+      }
+    );
+    mockClearRecentDispatch.mockImplementation(
+      async (_source: string, key: string) => {
+        acquired.delete(key);
+      }
+    );
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    try {
+      const { POST } = await import('@/app/api/webhooks/sentry/route');
+      const postAction = async (action: string) => {
+        const body = JSON.stringify({
+          action,
+          data: {
+            issue: {
+              id: 'regression-123',
+              title: 'Database statement timed out',
+              culprit: 'POST /api/artist',
+              project: { slug: 'jovie-web' },
+            },
+          },
+        });
+        return POST(
+          new Request('https://example.com/api/webhooks/sentry', {
+            method: 'POST',
+            headers: { 'sentry-hook-signature': sign(body) },
+            body,
+          }) as never
+        );
+      };
+      expect((await postAction('created')).status).toBe(200);
+      expect(mockServerFetch).toHaveBeenCalledTimes(1);
+      expect(await (await postAction('resolved')).json()).toMatchObject({
+        resolved: true,
+      });
+      expect(await (await postAction('resolved')).json()).toMatchObject({
+        deduplicated: true,
+      });
+      expect((await postAction('regressed')).status).toBe(200);
+      expect(mockServerFetch).toHaveBeenCalledTimes(2);
+      // Replayed resolution cannot clear the newly acquired regression lock.
+      expect(await (await postAction('resolved')).json()).toMatchObject({
+        deduplicated: true,
+      });
+      expect(await (await postAction('regressed')).json()).toMatchObject({
+        deduplicated: true,
+      });
+      expect(mockServerFetch).toHaveBeenCalledTimes(2);
+      const keys = mockAcquireRecentDispatch.mock.calls.map(([, key]) => key);
+      expect(keys[0]).toBe(keys[3]);
+      expect(keys[1]).toBe(keys[2]);
+      expect(keys[1]).toBe(`${keys[0]}:resolved`);
+      expect(mockClearRecentDispatch).toHaveBeenCalledTimes(1);
+      expect(mockClearRecentDispatch).toHaveBeenCalledWith('sentry', keys[0]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('skips autofix for transient Degraded HTTP Operation on POST /pipeline', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,
@@ -325,6 +392,43 @@ describe('POST /api/webhooks/sentry', () => {
       received: true,
       skipped: true,
       reason: 'vercel-ipc-sock',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+
+  it('skips autofix for client-disconnect stream abort (JOV-7319)', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '7319',
+          title: 'Error: The destination stream closed early.',
+          culprit: 'GET /start',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'destination-stream-closed',
     });
     expect(mockServerFetch).not.toHaveBeenCalled();
   });
@@ -640,9 +744,11 @@ describe('POST /api/webhooks/sentry', () => {
     const firstDispatch = JSON.parse(
       String(mockServerFetch.mock.calls[0]?.[1]?.body)
     );
-    expect(Object.keys(firstDispatch.client_payload)).toHaveLength(8);
+    expect(Object.keys(firstDispatch.client_payload)).toHaveLength(10);
     expect(firstDispatch.client_payload).toMatchObject({
       issue_id: '101',
+      short_id: '',
+      linear_identifier: '',
       dedupe_key: dedupeKeys[0],
       context: {
         root_cause_fingerprint: dedupeKeys[0],

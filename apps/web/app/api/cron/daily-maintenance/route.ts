@@ -33,11 +33,16 @@ import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { cleanupFounderReviewUploadLeases } from '@/lib/founder-review/server';
+import { runMusicResolverParityCorpus } from '@/lib/music-resolver/shadow';
 import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
 import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
 import { runProfileSearchMonitoring } from '@/lib/profile-search/runner';
 import { reconcileReleaseWorkflowRunOutcomes } from '@/lib/release-to-revenue/outcome-reconciliation';
 import { logger } from '@/lib/utils/logger';
+import {
+  assertWaitlistAdmissionHealthy,
+  reconcileWaitlistAdmission,
+} from '@/lib/waitlist/admission-detector';
 import { runWaitlistAutoAccept } from '@/lib/waitlist/auto-accept';
 import { runReconciliation } from '../billing-reconciliation/route';
 import { cleanupExpiredKeys } from '../cleanup-idempotency-keys/route';
@@ -138,6 +143,12 @@ export async function GET(request: Request) {
     runWaitlistAutoAccept
   );
 
+  // 5b. Admission detector: every pending user has a waitlist entry and no
+  //     external customer waits past the review SLA (JOV-7701).
+  results.waitlistAdmission = await runSubJob('waitlistAdmission', async () =>
+    assertWaitlistAdmissionHealthy(await reconcileWaitlistAdmission())
+  );
+
   // 6. Profile search monitoring — bounded to a 90-second sub-budget.
   results.profileSearchMonitoring = await runSubJob(
     'profileSearchMonitoring',
@@ -201,10 +212,19 @@ export async function GET(request: Request) {
       day: spend.day,
       totalUsd: spend.totalUsd,
       observed30dUsd: spend.observed30dUsd,
+      cacheShare: spend.cacheShare,
       topTags: spend.byTag.slice(0, 5),
       alerts: spend.alerts,
     };
   });
+
+  // Shadow-only resolver parity: durable cache, no product reads. The parity
+  // reference is built from official DSP APIs (Spotify/Apple Music/Deezer ISRC
+  // lookups); no third-party vendor is used as a benchmark oracle (JOV-7369).
+  results.musicResolverParity = await runSubJob(
+    'musicResolverParity',
+    runMusicResolverParityCorpus
+  );
 
   // 13. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;

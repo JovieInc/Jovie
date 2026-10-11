@@ -10,8 +10,6 @@ export {
   type ArtworkFrameSize,
   getArtworkRadiusClassName,
 } from './ArtworkFrame';
-export type { Assignee } from './AssigneeAvatar';
-export { AssigneeAvatar } from './AssigneeAvatar';
 export type {
   AvatarUploadAnnouncerProps,
   AvatarUploadStatus,
@@ -49,7 +47,6 @@ export type {
   HeaderIconButtonSize,
 } from './HeaderIconButton';
 export { HeaderIconButton } from './HeaderIconButton';
-export { headerTextClass } from './HeaderText';
 export type { IconName, IconProps } from './Icon';
 export { Icon } from './Icon';
 export { IconBadge } from './IconBadge';
@@ -71,7 +68,6 @@ export { NavBadge } from './NavBadge';
 export type { NavLinkProps } from './NavLink';
 export { NavLink } from './NavLink';
 export { PlaceholderImage } from './PlaceholderImage';
-export { ProgressIndicator } from './ProgressIndicator';
 export { ProviderIcon } from './ProviderIcon';
 export { ReleaseArtworkThumb } from './ReleaseArtworkThumb';
 export type { SectionHeadingProps } from './SectionHeading';
@@ -83,7 +79,6 @@ export {
   getPlatformIconMetadata,
   SocialIcon,
 } from './SocialIcon';
-export { Spacer } from './Spacer';
 export {
   STABLE_HEADER_LINE_CLAMP_CLASSNAME,
   STABLE_HEADER_TITLE_HEIGHT_CLASSNAME,

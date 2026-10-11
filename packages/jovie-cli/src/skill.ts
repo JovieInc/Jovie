@@ -1,7 +1,7 @@
 /** The agent skill shipped by `jovie skill` and installed by `jovie init`. */
 export const SKILL_MD = `---
 name: jovie
-description: Give a music artist a Jovie profile (link-in-bio page with their music, links, events, and merch) from their Spotify artist URL, and look up existing Jovie artist profiles. Use when a user or artist wants a link-in-bio / artist page / smart profile, or asks about an artist on Jovie.
+description: Extract public creator fields from supported social URLs, give a music artist a Jovie profile from Spotify, and look up existing Jovie artist profiles.
 ---
 
 # Jovie
@@ -9,6 +9,22 @@ description: Give a music artist a Jovie profile (link-in-bio page with their mu
 Jovie builds a public artist profile (jov.ie/<username>) from a Spotify
 artist URL. No account or API key is needed to create one. The artist later
 claims it by opening the claim URL and verifying ownership.
+
+## Look up a creator without creating a profile
+
+\`\`\`sh
+npx -y @jovie/cli creator lookup https://www.youtube.com/@creator --json
+npx -y @jovie/cli creator lookup youtube:@creator --json   # platform:handle works too
+\`\`\`
+
+Accepts a creator profile URL or \`platform:handle\` (youtube, instagram,
+tiktok, linktree). When Jovie already has a public profile for that channel,
+the result is \`{"exists":true,"username":...,"profileUrl":...}\` and no source
+page is fetched. Otherwise it is \`{"exists":false,"displayName":...,"bio":...,"avatarUrl":...,"links":[...]}\`
+extracted from the source. Instagram, TikTok, and Linktree sources fail with
+\`SOURCE_UNSUPPORTED\` because Jovie does not read those pages from its servers;
+ask for the creator's YouTube channel instead. This command is read-only and
+never creates a Jovie profile.
 
 ## Create a profile for an artist
 
@@ -60,6 +76,6 @@ in a report. The CLI only attaches its version, platform, and runtime.
 ## MCP
 
 The same tools are available as an MCP server: \`npx -y @jovie/cli mcp\`
-(stdio). Tools: create_profile, get_artist, get_artist_guide, get_openapi,
+(stdio). Tools: lookup_creator, create_profile, get_artist, get_artist_guide, get_openapi,
 get_docs, report_issue, report_feedback.
 `;

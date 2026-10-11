@@ -1,11 +1,11 @@
-// Canonical Pen homepage hero (Tim direction 2026-09-26).
+// Homepage identity + link-claim hero (Tim 2026-09-28, Pen STAGING Cyuz2).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
-import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
+import { getEndUserPerfRouteById } from '@/scripts/performance-route-manifest';
 
 const { trackAction } = vi.hoisted(() => ({ trackAction: vi.fn() }));
 vi.mock('@/components/homepage/homepage-analytics', () => ({
@@ -56,83 +56,152 @@ function css(): string {
 }
 
 describe('HomepageIdentityHero', () => {
-  it('renders the canonical copy with the certified name search even when gated (JOV-5085)', () => {
+  it.each([true, false])(
+    'binds homepage performance readiness to the rendered claim with waitlist=%s',
+    waitlist => {
+      gate.WAITLIST_ENABLED = waitlist;
+      const { container } = render(
+        <HomepageIdentityHero headingId='home-hero-heading' />
+      );
+      const route = getEndUserPerfRouteById('home');
+      expect(route).toBeDefined();
+      if (!route) throw new Error('Missing home performance route');
+      const shellSelectors = route.readySelectors.shell;
+      if (!shellSelectors) {
+        throw new Error('Missing home shell readiness selectors');
+      }
+
+      // Each declared alternative must match the mounted hero, even though the
+      // performance runner accepts the first visible readiness candidate.
+      for (const selector of [
+        ...shellSelectors,
+        ...(route.readySelectors.content ?? []),
+      ]) {
+        expect(container.querySelector(selector), selector).toBeVisible();
+      }
+      const claimInput = within(
+        screen.getByTestId('homepage-claim-form')
+      ).getByRole('textbox');
+      expect(
+        route.readySelectors.content?.some(selector =>
+          claimInput.matches(selector)
+        )
+      ).toBe(true);
+      expect(container.querySelector('input#homepage-intent-input')).toBeNull();
+    }
+  );
+
+  it('renders the identity headline and the jov.ie/you link claim (Tim 2026-09-28)', () => {
     render(<HomepageIdentityHero headingId='home-hero-heading' />);
 
     const hero = screen.getByTestId('marketing-section-hero');
-    const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).toHaveTextContent('Your living identity on the internet.');
-    expect(hero).toHaveAttribute('aria-labelledby', heading.id);
-    expect(
-      screen.getByText(
-        'Your work, your links, your next chapter. Together in your Jovie profile.'
-      )
-    ).toBeInTheDocument();
-    // Pen My0zu (JOV-6914): no kicker above the headline.
-    expect(screen.queryByText('Jovie / Identity, connected')).toBeNull();
-
-    expect(screen.getByRole('combobox')).toHaveAttribute(
-      'placeholder',
-      'Search your name'
-    );
-    expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
-      'Find me'
-    );
-    expect(screen.queryByText('Request access')).not.toBeInTheDocument();
-    expect(screen.queryAllByRole('link')).toHaveLength(0);
-  });
-
-  it('keeps the name search as the only control while the waitlist is off', () => {
-    gate.WAITLIST_ENABLED = false;
-    render(<HomepageIdentityHero />);
-
-    expect(screen.getByRole('combobox')).toHaveAttribute(
-      'placeholder',
-      'Search your name'
-    );
-    expect(screen.getAllByRole('button')).toHaveLength(1);
-    expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
-      'Find me'
-    );
-    expect(screen.queryAllByRole('link')).toHaveLength(0);
-  });
-
-  it('docks the blue technical texture as the one decorative priority layer', () => {
-    render(<HomepageIdentityHero />);
-
-    const hero = screen.getByTestId('marketing-section-hero');
-    expect(hero).toHaveClass(
-      'marketing-hero-dock',
-      'marketing-hero-dock--inset'
-    );
+    expect(hero.tagName).toBe('SECTION');
     expect(hero).toHaveAttribute(
       'data-marketing-owner',
       'apps/web/components/homepage/HomepageIdentityHero.tsx'
     );
-    // Pen My0zu (JOV-6914): the hero light is pure CSS, no background image.
-    const light = screen.getByTestId('homepage-identity-hero-light');
-    expect(light).toHaveAttribute('aria-hidden', 'true');
-    expect(light).toHaveAttribute('data-hero-visual', 'ion-light');
-    expect(light.querySelector('img')).toBeNull();
-    expect(document.querySelectorAll('[data-background-image]')).toHaveLength(
-      0
+    expect(hero).toHaveAttribute('data-marketing-variant', 'split-claim-card');
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveTextContent('Be found.Be understood.');
+    expect(hero).toHaveAttribute('aria-labelledby', heading.id);
+    expect(
+      screen.getByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)
+    ).toBeInTheDocument();
+
+    const claim = screen.getByTestId('homepage-claim-form');
+    expect(claim).toHaveAttribute('action', '/start');
+    expect(within(claim).getByRole('textbox')).toHaveAttribute(
+      'placeholder',
+      'you'
     );
-    expect(hero.querySelectorAll('video, canvas')).toHaveLength(0);
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
+      'Claim'
+    );
+    // Phones: the claim leads the card so the consent banner never covers it.
+    expect(screen.getByTestId('homepage-editorial-hero-search')).toHaveClass(
+      'order-first',
+      'sm:order-none'
+    );
+    expect(screen.queryByText('Search your name')).toBeNull();
+    expect(screen.queryByText('Request access')).toBeNull();
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
   });
 
-  it("shows Tim White's real jov.ie/tim profile as first-party proof (JOV-6946)", () => {
+  it('keeps the claim as the only control whatever the waitlist gate', () => {
+    for (const waitlist of [true, false]) {
+      gate.WAITLIST_ENABLED = waitlist;
+      const { unmount } = render(<HomepageIdentityHero />);
+      expect(screen.getAllByRole('button')).toHaveLength(1);
+      expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
+        'Claim'
+      );
+      unmount();
+    }
+  });
+
+  it('proves the claim with the real jov.ie/tim profile and shows no product screenshot', () => {
     render(<HomepageIdentityHero />);
 
     const proof = screen.getByTestId('homepage-hero-real-profile');
-    const screenImage = within(proof).getByRole('img');
-    expect(screenImage).toHaveAttribute(
-      'src',
-      HOMEPAGE_MEDIA_MAP.connected.asset.publicUrl
+    expect(within(proof).getByRole('img')).toHaveAttribute(
+      'alt',
+      HOMEPAGE_IDENTITY_COPY.hero.proofAlt
     );
-    expect(screenImage.getAttribute('alt')).toContain('jov.ie/tim');
-    expect(screen.queryByTestId('homepage-profile-specimen')).toBeNull();
-    expect(screen.queryByText(/Avery|Fieldnotes|Illustrative/)).toBeNull();
-    expect(within(proof).queryByRole('link')).toBeNull();
+    expect(proof).toHaveTextContent('Tim White');
+    expect(screen.queryByText(/Avery|Illustrative/)).toBeNull();
+    expect(document.querySelectorAll('video, canvas')).toHaveLength(0);
+  });
+
+  it('keeps the claim card narrow and the role on one line at 768 (JOV-7126)', () => {
+    render(<HomepageIdentityHero />);
+
+    // Pen x4j9f (768 split): the claim card is ~340px (max-w-85), not the
+    // wider max-w-120 the split shell's half-width column at 768 can't fit
+    // alongside the headline. whitespace-nowrap keeps "Founder, Jovie" from
+    // wrapping when that column gets tight. Real layout/line-wrap coverage
+    // lives in the Playwright regression at tests/e2e/homepage.spec.ts,
+    // since jsdom does not lay out text.
+    const card = screen.getByTestId('homepage-claim-card');
+    expect(card.className).toContain('max-w-85');
+    expect(card.className).not.toContain('max-w-120');
+
+    const role = screen.getByText(HOMEPAGE_IDENTITY_COPY.hero.preview.role);
+    expect(role.className).toContain('whitespace-nowrap');
+
+    const source = css();
+    expect(source).toMatch(
+      /@media\s*\(min-width:\s*768px\)\s*and\s*\(max-width:\s*1279px\)/
+    );
+  });
+
+  it('keeps the copy and claim in the direct scoped grid slots', () => {
+    render(<HomepageIdentityHero />);
+
+    const layout = screen.getByTestId('marketing-section-hero');
+    const heading = screen.getByRole('heading', { level: 1 });
+    const copy = heading.parentElement;
+    const card = screen.getByTestId('homepage-claim-card');
+    if (!copy) throw new Error('Missing hero copy slot');
+
+    // Grid placement depends on these being direct children of the shared
+    // hero. A new wrapper must not detach either slot from its scoped rules.
+    expect(layout).toHaveClass('homepage-claim-hero__layout');
+    expect(copy).toHaveClass('homepage-claim-hero__copy');
+    expect(card).toHaveClass('homepage-claim-hero__card');
+    expect(Array.from(layout.children)).toEqual([copy, card]);
+    expect(
+      within(copy).getByText(HOMEPAGE_IDENTITY_COPY.hero.kicker)
+    ).toBeInTheDocument();
+    expect(
+      within(copy).getByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)
+    ).toBeInTheDocument();
+    expect(within(copy).queryByRole('textbox')).toBeNull();
+    expect(within(card).getByTestId('homepage-claim-form')).toContainElement(
+      screen.getByRole('textbox')
+    );
+    expect(
+      within(card).getByTestId('homepage-hero-real-profile')
+    ).toBeInTheDocument();
   });
 
   it('keeps hero copy generic and free of em dashes', () => {
@@ -142,7 +211,7 @@ describe('HomepageIdentityHero', () => {
       seo.description,
       hero.headline,
       hero.subhead,
-      hero.proofAlt,
+      ...Object.values(hero.preview),
     ];
     for (const line of copy) {
       expect(line).not.toMatch(ICP_TERMS);
@@ -153,28 +222,8 @@ describe('HomepageIdentityHero', () => {
     expect(container.textContent ?? '').not.toContain('—');
   });
 
-  it('keeps the hero light static and CSS-only (Pen My0zu, JOV-6914)', () => {
+  it('keeps the hero stylesheet tokenized', () => {
     const source = css();
-    const light = source.slice(
-      source.indexOf('.homepage-identity-hero__light {'),
-      source.indexOf('}', source.indexOf('.homepage-identity-hero__light {'))
-    );
-    expect(light).toContain('radial-gradient(');
-    expect(light).toContain('var(--color-accent-blue)');
-    expect(light).not.toMatch(/url\(|animation/);
-    expect(source).not.toContain('homepage-identity-texture-drift');
-  });
-
-  it('keeps the header and copy legible over the texture with a static scrim', () => {
-    const source = css();
-    const scrim = source.slice(
-      source.indexOf('.homepage-identity-hero::before {'),
-      source.indexOf('.homepage-identity-hero__light {')
-    );
-    expect(scrim).toContain('var(--public-shell-header-offset)');
-    expect(scrim).toContain('var(--homepage-identity-hero-ground)');
-    expect(scrim).not.toContain('animation');
-    // Tokens only: no raw colors, no linear namespace.
     expect(source).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);
     expect(source).not.toContain('var(--linear-');
     expect(source).not.toMatch(/\b(?:url|image-set)\s*\(/);

@@ -104,7 +104,8 @@ test.describe('Onboarding Performance', () => {
     expect(dbResponseTime).toBeLessThan(100); // Database health check under 100ms
 
     const health = await response.json();
-    expect(health.status).toBe('ok');
+    expect(health.healthy).toBe(true);
+    expect(health).not.toHaveProperty('details');
   });
 
   test('handle validation debouncing works efficiently', async ({ page }) => {

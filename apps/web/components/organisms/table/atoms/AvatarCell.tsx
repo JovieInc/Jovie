@@ -99,7 +99,14 @@ export const AvatarCell = React.memo(function AvatarCell({
   usernameActions,
 }: AvatarCellProps) {
   return (
-    <div className={cn('flex items-center gap-3', className)}>
+    <div
+      className={cn(
+        'flex items-center gap-3',
+        isFeatured && 'pl-1',
+        Boolean(usernameActions) && 'pr-1',
+        className
+      )}
+    >
       {/* Avatar with badges */}
       <div className='relative'>
         <AvatarUploadable
@@ -122,11 +129,11 @@ export const AvatarCell = React.memo(function AvatarCell({
       {/* Name and username */}
       <div className='min-w-0 flex-1'>
         {displayName && (
-          <div className='font-caption text-primary-token line-clamp-1 overflow-hidden text-ellipsis text-app'>
+          <div className='font-caption text-primary-token line-clamp-1 overflow-hidden text-ellipsis text-app leading-4'>
             {displayName}
           </div>
         )}
-        <div className='flex min-w-0 items-center gap-1.5'>
+        <div className='flex min-w-0 items-center gap-1.5 leading-4'>
           {disableUsernameLink ? (
             <span
               className={cn(
@@ -152,9 +159,9 @@ export const AvatarCell = React.memo(function AvatarCell({
               @{username}
             </Link>
           )}
-          {usernameActions}
         </div>
       </div>
+      {usernameActions}
     </div>
   );
 });

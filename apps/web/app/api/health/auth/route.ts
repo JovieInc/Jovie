@@ -1,20 +1,19 @@
 import { eq } from 'drizzle-orm';
-import { cookies, headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { getDbUser } from '@/lib/auth/session';
-import {
-  isTestAuthBypassEnabled,
-  resolveTestBypassUserId,
-} from '@/lib/auth/test-mode';
+import { isTestAuthBypassEnabled } from '@/lib/auth/test-mode';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureWarning } from '@/lib/error-tracking';
+import {
+  canReadHealthDetail,
+  HEALTH_DETAIL_HEADERS,
+  publicHealthLiveness,
+} from '@/lib/health/detail-access';
 import { logger } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 function resolveDevFastAuthHealthContext() {
   const authMockEnabled =
@@ -35,29 +34,22 @@ function resolveDevFastAuthHealthContext() {
   };
 }
 
-// Internal health check that validates auth.jwt()->>'sub' path
-// Only accessible in development unless a trusted test-bypass request is probing
-// preview auth during CI.
-export async function GET() {
+// Production stays closed, including for admin and test-bypass (JOV lesson).
+// Outside production, anonymous callers get liveness only. Session and profile
+// detail requires CRON_SECRET or an admin session. Test-bypass alone does not
+// unlock the detailed body.
+export async function GET(request: Request) {
   try {
     if (process.env.VERCEL_ENV === 'production') {
       return NextResponse.json(
         { ok: false, error: 'Only available in development' },
-        { status: 403, headers: NO_STORE_HEADERS }
+        { status: 403, headers: HEALTH_DETAIL_HEADERS }
       );
     }
 
-    const headerStore = await headers();
-    const cookieStore = await cookies();
-    const allowTestBypassProbe = Boolean(
-      resolveTestBypassUserId(headerStore, cookieStore)
-    );
-
-    if (process.env.NODE_ENV !== 'development' && !allowTestBypassProbe) {
-      return NextResponse.json(
-        { ok: false, error: 'Only available in development' },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
+    const authorized = await canReadHealthDetail(request, '/api/health/auth');
+    if (!authorized) {
+      return publicHealthLiveness(true);
     }
 
     const devFast = resolveDevFastAuthHealthContext();
@@ -73,7 +65,7 @@ export async function GET() {
             ? 'No session - dev-fast auth bypass active; use /api/dev/test-auth/session to probe authenticated state'
             : 'No session - this is expected for anonymous requests',
         },
-        { headers: NO_STORE_HEADERS }
+        { headers: HEALTH_DETAIL_HEADERS }
       );
     }
 
@@ -92,7 +84,7 @@ export async function GET() {
             'User authenticated but not found in database ' +
             '(expected for new users)',
         },
-        { headers: NO_STORE_HEADERS }
+        { headers: HEALTH_DETAIL_HEADERS }
       );
     }
 
@@ -117,7 +109,7 @@ export async function GET() {
           ? 'Dev-fast auth bypass + Drizzle auth validation successful'
           : 'Better Auth + Drizzle auth validation successful',
       },
-      { headers: NO_STORE_HEADERS }
+      { headers: HEALTH_DETAIL_HEADERS }
     );
   } catch (e: unknown) {
     const error = e instanceof Error ? e : new Error('Unknown error');
@@ -129,7 +121,7 @@ export async function GET() {
     });
     return NextResponse.json(
       { ok: false, error: error.message },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { status: 500, headers: HEALTH_DETAIL_HEADERS }
     );
   }
 }

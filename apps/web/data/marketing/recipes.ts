@@ -15,6 +15,7 @@
  * Post-charter stubs per ARCHITECTURE.md §15: newsletter-signup (JOV-4067).
  */
 
+import { HOMEPAGE_IDENTITY_COPY } from '../homepageIdentityCopy';
 import type { MarketingAudience, MarketingSectionId } from './sections';
 
 export type RecipeId =
@@ -161,94 +162,59 @@ export interface MarketingRecipe {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
-  // ── homepage (proven — reference: /new per codebase-baseline §2.2) ─────────
+  // ── homepage (proven — selected company-level identity route: /) ─────────
   {
     id: 'homepage',
     label: 'Homepage',
     status: 'proven',
-    referenceRoute: '/new', // richest shipped homepage composition; live '/' currently renders hero-only
+    referenceRoute: '/', // /new is a retired redirect, not a rendered reference
     audience: 'general',
-    sectionOrder: [
-      'hero',
-      'logo-cloud',
-      'feature-split', // system overview
-      'feature-split', // spotlight (adaptive)
-      'feature-split', // capture + reactivation fused
-      'spec-wall',
-      'social-proof',
-      'pricing',
-      'cta',
-    ],
+    // The selected identity homepage owns presence and structure as distinct
+    // editorial occurrences. Available FAQ/proof copy does not mount a section.
+    sectionOrder: ['hero', 'feature-split', 'feature-split', 'cta'],
     arc: [
-      { beat: 'promise', feeling: 'this is what Jovie is', section: 'hero' },
-      { beat: 'permission', feeling: 'others trust it', section: 'logo-cloud' },
+      {
+        beat: 'promise',
+        feeling: HOMEPAGE_IDENTITY_COPY.hero.headline,
+        section: 'hero',
+      },
       {
         beat: 'comprehension',
-        feeling: 'how it works at a glance',
+        feeling: HOMEPAGE_IDENTITY_COPY.sections[0].headline,
         section: 'feature-split',
       },
       {
         beat: 'depth',
-        feeling: 'I see the product in action',
+        feeling: HOMEPAGE_IDENTITY_COPY.sections[1].headline,
         section: 'feature-split',
       },
       {
-        beat: 'capability',
-        feeling: 'I could use this for capture/reactivation',
-        section: 'feature-split',
+        beat: 'action',
+        feeling: HOMEPAGE_IDENTITY_COPY.close.headline,
+        section: 'cta',
       },
-      { beat: 'detail', feeling: 'the specifics matter', section: 'spec-wall' },
-      {
-        beat: 'belief',
-        feeling: 'real artists use this',
-        section: 'social-proof',
-      },
-      { beat: 'price', feeling: 'what does it cost', section: 'pricing' },
-      { beat: 'action', feeling: 'ready to start', section: 'cta' },
     ],
     hierarchy: {
-      oneBigIdea:
-        'Jovie is the artist platform that captures every fan and reactivates them automatically',
+      oneBigIdea: HOMEPAGE_IDENTITY_COPY.hero.subhead,
       seeFirst: 'hero',
       second: 'feature-split',
-      third: 'spec-wall',
+      third: 'feature-split',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
         maxFullBleedBreaks: 1,
         maxHeroWeightProofElements: 1,
       },
       aboveTheFoldContract: {
-        desktop: ['hero'], // hero carries headline + CTA + phone media (hero-weight proof)
+        desktop: ['hero'], // identity hero carries headline + claim action + real profile proof
         mobile: ['hero'],
       },
     },
     ctaCadence: {
       strategy: 'sparse',
-      primaryLabel: 'Get started',
-      secondaryLabel: 'See a live profile',
+      primaryLabel: HOMEPAGE_IDENTITY_COPY.hero.claim.action,
       cadence: 'hero-and-close',
     },
-    substitutions: [
-      {
-        replace: 'social-proof',
-        with: 'stats',
-        when: 'socialProof verified data absent but stats aggregate verified',
-      },
-      {
-        replace: 'pricing',
-        with: 'monetization',
-        when: 'audience=artist (one-liner-link variant, not a full pricing table)',
-      },
-    ],
     fallbacks: [
-      {
-        missing: 'social-proof verified data',
-        fallback: 'omit section social-proof (zero-proof path)',
-      },
-      {
-        missing: 'stats verified data',
-        fallback: 'omit section stats (zero-proof path)',
-      },
       {
         missing: 'logo-cloud verified logos',
         fallback: 'omit section logo-cloud (zero-proof path)',
@@ -760,30 +726,30 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     status: 'proven',
     referenceRoute: '/compare/linktree', // also /alternatives/link-in-bio, /alternatives/linktree
     audience: 'general',
-    sectionOrder: ['hero', 'comparison', 'feature-grid', 'faq', 'cta'],
+    sectionOrder: ['hero', 'feature-grid', 'comparison', 'faq', 'cta'],
     arc: [
       { beat: 'frame', feeling: 'Jovie vs X', section: 'hero' },
-      { beat: 'compare', feeling: 'feature-by-feature', section: 'comparison' },
       {
         beat: 'breadth',
         feeling: 'what else Jovie does',
         section: 'feature-grid',
       },
+      { beat: 'compare', feeling: 'feature-by-feature', section: 'comparison' },
       { beat: 'objection', feeling: 'my questions', section: 'faq' },
       { beat: 'action', feeling: 'try Jovie', section: 'cta' },
     ],
     hierarchy: {
       oneBigIdea: 'Jovie beats X on these specific dimensions',
       seeFirst: 'hero',
-      second: 'comparison',
-      third: 'feature-grid',
+      second: 'feature-grid',
+      third: 'comparison',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
         maxFullBleedBreaks: 1,
         maxHeroWeightProofElements: 1,
       },
       aboveTheFoldContract: {
-        desktop: ['hero', 'comparison'], // verdict visible without scroll
+        desktop: ['hero', 'feature-grid'], // breadth frames the comparison
         mobile: ['hero'],
       },
     },
@@ -902,9 +868,14 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     label: 'Waitlist',
     status: 'stub',
     audience: 'general',
-    sectionOrder: ['hero', 'capture', 'faq', 'cta'],
+    sectionOrder: ['hero', 'feature-split', 'capture', 'faq', 'cta'],
     arc: [
       { beat: 'promise', feeling: 'early access', section: 'hero' },
+      {
+        beat: 'comprehension',
+        feeling: 'what early access makes possible',
+        section: 'feature-split',
+      },
       { beat: 'capture', feeling: 'join the waitlist', section: 'capture' },
       { beat: 'objection', feeling: 'my questions', section: 'faq' },
       { beat: 'action', feeling: 'request access', section: 'cta' },
@@ -912,16 +883,16 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     hierarchy: {
       oneBigIdea: 'Join the Jovie waitlist for early access',
       seeFirst: 'hero',
-      second: 'capture',
-      third: 'faq',
+      second: 'feature-split',
+      third: 'capture',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
         maxFullBleedBreaks: 1,
         maxHeroWeightProofElements: 1,
       },
       aboveTheFoldContract: {
-        desktop: ['hero', 'capture'], // capture form visible without scroll
-        mobile: ['hero', 'capture'],
+        desktop: ['hero', 'feature-split'], // value framing precedes the form
+        mobile: ['hero', 'feature-split'],
       },
     },
     ctaCadence: {
@@ -997,9 +968,14 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     status: 'proven',
     referenceRoute: '/blog', // also /blog/category/[slug]
     audience: 'general',
-    sectionOrder: ['hero', 'blog-feed', 'capture', 'cta'],
+    sectionOrder: ['hero', 'content-prose', 'blog-feed', 'capture', 'cta'],
     arc: [
       { beat: 'frame', feeling: 'the Jovie blog', section: 'hero' },
+      {
+        beat: 'context',
+        feeling: 'what artists and the team can learn here',
+        section: 'content-prose',
+      },
       { beat: 'browse', feeling: 'posts to read', section: 'blog-feed' },
       { beat: 'subscribe', feeling: 'get updates', section: 'capture' },
       { beat: 'action', feeling: 'next step', section: 'cta' },
@@ -1008,16 +984,16 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
       oneBigIdea:
         'The Jovie blog — posts for artists and the team behind Jovie',
       seeFirst: 'hero',
-      second: 'blog-feed',
-      third: 'capture',
+      second: 'content-prose',
+      third: 'blog-feed',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
         maxFullBleedBreaks: 1,
         maxHeroWeightProofElements: 1,
       },
       aboveTheFoldContract: {
-        desktop: ['hero', 'blog-feed'], // featured post + first row visible without scroll
-        mobile: ['hero', 'blog-feed'],
+        desktop: ['hero', 'content-prose'], // context frames the post feed
+        mobile: ['hero', 'content-prose'],
       },
     },
     ctaCadence: {
@@ -1032,7 +1008,7 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
           'fail (blog-landing requires ≥3 posts — omit the section means no blog)',
       },
     ],
-    minContent: ['hero.headline', 'blog-feed.posts'],
+    minContent: ['hero.headline', 'content-prose.body', 'blog-feed.posts'],
     maxContent: { maxSections: 6 },
     chooseWhen: 'intent=blog-index AND conversion=start OR subscribe',
     neverUse: [
@@ -1051,12 +1027,17 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     // Standalone newsletter signup page — NOT early-access waitlist (that is the
     // waitlist recipe, conversion=request-access). Before this recipe existed,
     // conversion=subscribe with intent≠blog-index fell to seo (adversarial C1).
-    sectionOrder: ['hero', 'capture', 'faq', 'cta'],
+    sectionOrder: ['hero', 'content-prose', 'capture', 'faq', 'cta'],
     arc: [
       {
         beat: 'promise',
         feeling: 'what the newsletter gives me',
         section: 'hero',
+      },
+      {
+        beat: 'context',
+        feeling: 'what makes the newsletter worth opening',
+        section: 'content-prose',
       },
       {
         beat: 'subscribe',
@@ -1073,16 +1054,16 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     hierarchy: {
       oneBigIdea: 'Subscribe to the Jovie newsletter — one email worth opening',
       seeFirst: 'hero',
-      second: 'capture',
-      third: 'faq',
+      second: 'content-prose',
+      third: 'capture',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
         maxFullBleedBreaks: 1,
         maxHeroWeightProofElements: 1,
       },
       aboveTheFoldContract: {
-        desktop: ['hero', 'capture'], // capture form visible without scroll
-        mobile: ['hero', 'capture'],
+        desktop: ['hero', 'content-prose'], // value framing precedes the form
+        mobile: ['hero', 'content-prose'],
       },
     },
     ctaCadence: {

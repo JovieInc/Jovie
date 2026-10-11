@@ -90,11 +90,13 @@ function funnel(
     timeRange: '30d',
     biggestDropOffKey,
     errors: [],
+    definitionVersion: 'founder-funnel.v2',
     stages: keys.map((key, i) => ({
       key,
       label: key,
       description: '',
       count: counts[i] ?? 0,
+      identifiable: true,
       drillDownHref: '',
       conversionRate:
         i === 0 || (counts[i - 1] ?? 0) <= 0

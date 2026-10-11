@@ -9,7 +9,6 @@ export { ArtistProfileLandingPage } from './artist-profile/ArtistProfileLandingP
 export { ArtistProfileLandingRoute } from './artist-profile/ArtistProfileLandingRoute';
 export { ArtistProfileMonetizationSection } from './artist-profile/ArtistProfileMonetizationSection';
 export { ArtistProfileOutcomesCarousel } from './artist-profile/ArtistProfileOutcomesCarousel';
-export { ArtistProfilePayFlowVideoSection } from './artist-profile/ArtistProfilePayFlowVideoSection';
 export { ArtistProfileReactivationSection } from './artist-profile/ArtistProfileReactivationSection';
 export { ArtistProfileSocialProof } from './artist-profile/ArtistProfileSocialProof';
 export { ArtistProfileSpecWall } from './artist-profile/ArtistProfileSpecWall';

@@ -45,10 +45,24 @@ export const Downloading: Story = {
     state: {
       state: 'downloading',
       percent: 42,
-      transferredBytes: 42_000_000,
-      totalBytes: 100_000_000,
-      bytesPerSecond: 1_000_000,
+      transferredBytes: 96 * 1024 * 1024,
+      totalBytes: 229 * 1024 * 1024,
+      bytesPerSecond: 14 * 1024 * 1024,
     },
+    version: '26.9.16',
+  },
+};
+
+export const DownloadingSlow: Story = {
+  args: {
+    state: {
+      state: 'downloading',
+      percent: 25,
+      transferredBytes: 128 * 1024,
+      totalBytes: 512 * 1024,
+      bytesPerSecond: 32 * 1024,
+    },
+    version: '26.9.16',
   },
 };
 
@@ -62,6 +76,29 @@ export const ErrorState: Story = {
       state: 'error',
       message: 'net::ERR_CONNECTION_REFUSED',
       retryable: true,
+    },
+  },
+};
+
+export const ErrorNotRetryable: Story = {
+  args: {
+    state: {
+      state: 'error',
+      message: 'code signature mismatch',
+      retryable: false,
+    },
+  },
+};
+
+export const AvailableLongNotes: Story = {
+  args: {
+    state: AVAILABLE,
+    notes: {
+      summary: 'Touch ID sign-in, a steadier release pipeline and table fixes.',
+      items: Array.from(
+        { length: 14 },
+        (_, i) => `Release note line ${i + 1} with enough words to wrap once`
+      ),
     },
   },
 };

@@ -22,8 +22,8 @@ vi.mock('@/lib/agent-os/workflows', () => ({
   areAgentOsWorkflowsEnabled: mockAreAgentOsWorkflowsEnabled,
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: mockGetCurrentUserEntitlements,
 }));
 
 vi.mock('workflow/api', () => ({

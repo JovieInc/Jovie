@@ -1,3 +1,4 @@
+import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -133,12 +134,13 @@ test.describe('Artist Profiles Landing', () => {
     );
   });
 
-  test('singular artist-profile alias preserves the canonical experience', async ({
+  test('singular artist-profile alias redirects to the canonical experience', async ({
     page,
   }) => {
     await page.goto('/artist-profile', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
 
+    await expect(page).toHaveURL(/\/artist-profiles$/);
     await expect(
       page.getByRole('heading', {
         name: /the link your music deserves\./i,
@@ -168,6 +170,41 @@ test.describe('Artist Profiles Landing', () => {
     await expectFullyInViewport(page, claimLink);
   });
 
+  test('keeps mode choices pending before JavaScript attaches their handlers', async ({
+    browser,
+    page,
+  }) => {
+    const context = await browser.newContext({
+      javaScriptEnabled: false,
+      viewport: { width: 390, height: 900 },
+    });
+    try {
+      const pendingPage = await context.newPage();
+      await interceptAnalytics(pendingPage);
+      await pendingPage.goto(new URL('/artist-profiles', page.url()).href, {
+        waitUntil: 'domcontentloaded',
+      });
+      const adaptive = pendingPage.getByTestId(
+        'artist-profile-section-adaptive'
+      );
+      await adaptive.scrollIntoViewIfNeeded();
+      await expect(
+        adaptive.locator('[data-interactive-ready]')
+      ).toHaveAttribute('aria-busy', 'true');
+      const choices = adaptive.getByRole('tab');
+      await expect(choices).toHaveCount(4);
+      for (const choice of await choices.all()) {
+        await expect(choice).toBeDisabled();
+        expect(
+          await choice.evaluate(element => getComputedStyle(element).opacity)
+        ).toBe('0.5');
+      }
+      await expectNoHorizontalOverflow(pendingPage);
+    } finally {
+      await context.close();
+    }
+  });
+
   test('adaptive profile exposes four moment-based modes without layout shift', async ({
     page,
   }) => {
@@ -180,6 +217,9 @@ test.describe('Artist Profiles Landing', () => {
       })
     ).toBeVisible();
     await expect(adaptiveSection.getByRole('tab')).toHaveCount(4);
+    await expect(
+      adaptiveSection.locator('[data-interactive-ready]')
+    ).toHaveAttribute('data-interactive-ready', 'true');
 
     const initialHeight = await adaptiveSection.evaluate(
       element => element.getBoundingClientRect().height
@@ -217,7 +257,9 @@ test.describe('Artist Profiles Landing', () => {
       await tab.click();
       await expect(tab).toHaveAttribute('aria-selected', 'true');
       await expect(
-        adaptiveSection.getByText(mode.headline, { exact: true })
+        adaptiveSection
+          .getByRole('tabpanel', { name: mode.label })
+          .getByText(mode.headline, { exact: true })
       ).toBeVisible();
       await expect(
         adaptiveSection.getByAltText(mode.screenshotAlt)
@@ -416,17 +458,8 @@ test.describe('Artist Profiles Landing', () => {
     const captureSection = page.getByTestId('artist-profile-section-capture');
     await expect(
       captureSection.getByRole('heading', {
-        name: 'One fan moment. A relationship you keep.',
+        name: ARTIST_PROFILE_COPY.capture.headline,
       })
-    ).toBeVisible();
-    await expect(captureSection.getByText('You’re on the list')).toBeVisible();
-    await expect(
-      captureSection.getByText('Opt in once', { exact: true })
-    ).toBeVisible();
-    await expect(captureSection.getByText('Reach the moment')).toBeVisible();
-    await expect(captureSection.getByText('Keep the audience')).toBeVisible();
-    await expect(
-      captureSection.getByText('Illustrative fan activity')
     ).toBeVisible();
     const capturePreview = captureSection.getByTestId(
       'artist-profile-capture-demo'

@@ -1,11 +1,20 @@
+import type { PublishedClaimId } from '../published-claims';
+
 export interface AlternativeHighlight {
   title: string;
   description: string;
+  claimIds: readonly PublishedClaimId[];
 }
 
 export interface AlternativeFaq {
   question: string;
   answer: string;
+  claimIds: readonly PublishedClaimId[];
+}
+
+export interface AlternativeReason {
+  text: string;
+  claimIds: readonly PublishedClaimId[];
 }
 
 export interface AlternativeHeroImage {
@@ -23,7 +32,9 @@ export interface AlternativeData {
   heroSubheadline: string;
   /** Low-opacity dark-underlay hero background; never a person photo. */
   heroImage: AlternativeHeroImage;
-  whySwitch: string[];
+  whySwitch: AlternativeReason[];
   highlights: AlternativeHighlight[];
   faq: AlternativeFaq[];
+  /** Claims covering page-level metadata and hero copy. */
+  claimIds: readonly PublishedClaimId[];
 }

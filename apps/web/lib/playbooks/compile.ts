@@ -27,7 +27,7 @@ export type PlaybookCompileResult =
   | { readonly ok: true; readonly skill: SkillDefinition }
   | { readonly ok: false; readonly errors: PlaybookCompileError[] };
 
-const DEFAULT_PLAYBOOK_MODEL = 'anthropic/claude-haiku-4-5-20251001';
+const DEFAULT_PLAYBOOK_MODEL = 'zai/glm-5.3-flash';
 const DEFAULT_PLAYBOOK_ENTITLEMENT: BooleanEntitlement = 'aiCanUseTools';
 
 const BOOLEAN_ENTITLEMENTS = new Set<string>([

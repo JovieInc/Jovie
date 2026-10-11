@@ -2,6 +2,16 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Search } from 'lucide-react';
 import { EmptyState } from './EmptyState';
 
+const disabledAction: {
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+} = {
+  label: 'Preparing…',
+  onClick: () => undefined,
+  disabled: true,
+};
+
 const meta: Meta<typeof EmptyState> = {
   title: 'UI/Molecules/EmptyState',
   component: EmptyState,
@@ -36,11 +46,12 @@ export const Workspace: Story = {
 export const DisabledAction: Story = {
   args: {
     heading: 'Preparing Contacts',
-    description: 'Your contacts will be ready shortly.',
-    action: {
-      label: 'Preparing…',
-      onClick: () => undefined,
-      disabled: true,
-    },
   },
+  render: () => (
+    <EmptyState
+      heading='Preparing Contacts'
+      description='Your contacts will be ready shortly.'
+      action={disabledAction}
+    />
+  ),
 };

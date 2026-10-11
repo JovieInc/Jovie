@@ -124,7 +124,7 @@ const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
         ref={ref}
         data-content-length={isLongContent ? 'long' : undefined}
         className={cn(
-          'text-base font-semibold leading-none tracking-tight text-primary-token',
+          'text-(length:--text-base) font-semibold leading-none tracking-tight text-primary-token',
           truncate && 'truncate',
           maxLines === 2 && 'line-clamp-2 leading-snug',
           maxLines === 3 && 'line-clamp-3 leading-snug',

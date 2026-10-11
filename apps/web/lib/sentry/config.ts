@@ -54,6 +54,10 @@
 
 import type * as Sentry from '@sentry/nextjs';
 import {
+  getWorktreeSentryOptions,
+  type WorktreeSentryOptions,
+} from '@/lib/observability/worktree-runtime';
+import {
   isNonActionableLoopbackBetterAuthHostEvent,
   isNonActionableSpotifyReleaseCreditBoundEvent,
   isNonActionableUpstashErrorBagEvent,
@@ -385,7 +389,7 @@ export function isNonProductionServerNoise(event: SentryEvent): boolean {
 /**
  * PII Collection Notice (for documentation purposes):
  *
- * When sendDefaultPii is enabled, Sentry may collect:
+ * When user data collection is enabled, Sentry may collect:
  * - User IP addresses (anonymized via beforeSend)
  * - User IDs (Clerk user IDs only, no emails)
  * - Request headers (sensitive headers scrubbed)
@@ -576,12 +580,13 @@ export function createBeforeSendHook(
  * - Lite SDK: Adds minimal breadcrumb integration
  * - Full SDK: Adds Replay, enhanced breadcrumbs, and profiling
  */
-export interface BaseSentryClientConfig {
+export interface BaseSentryClientConfig extends WorktreeSentryOptions {
   dsn: string | undefined;
   release: string | undefined;
   tracesSampleRate: number;
-  enableLogs: boolean;
-  sendDefaultPii: boolean;
+  dataCollection: NonNullable<
+    Parameters<typeof Sentry.init>[0]
+  >['dataCollection'];
   beforeSend: (
     event: SentryEvent,
     hint?: SentryEventHint
@@ -601,8 +606,8 @@ export interface BaseSentryClientConfig {
  *
  * - **DSN**: Uses `NEXT_PUBLIC_SENTRY_DSN` for client-side initialization
  * - **Trace Sampling**: Uses the shared `TRACES_SAMPLE_RATE` constant
- * - **Log Enablement**: Always enabled for error breadcrumbs
- * - **PII Handling**: `sendDefaultPii` disabled; user context set server-side only
+ * - **Logs**: Captured when callers use the Sentry logging API
+ * - **PII Handling**: explicit restrictive collection; user context set server-side only
  * - **Before Send**: Applies `scrubPii` to filter sensitive data and drop
  *   client object-capture UpstashError bags (JOV-5186 / JOV-5187)
  *
@@ -629,11 +634,25 @@ export interface BaseSentryClientConfig {
  */
 export function getBaseClientConfig(): BaseSentryClientConfig {
   return {
+    ...getWorktreeSentryOptions(),
     dsn: SENTRY_DSN_CLIENT,
     release: SENTRY_RELEASE,
     tracesSampleRate: TRACES_SAMPLE_RATE,
-    enableLogs: true,
-    sendDefaultPii: false, // Disabled on client - user context set server-side only
+    // Preserve the v10 sendDefaultPii:false boundary; v11 defaults collect more.
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: {
+        request: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+        response: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+      },
+      httpBodies: [],
+      urlQueryParams: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      queues: false,
+      graphQL: { document: false, variables: false },
+    },
     beforeSend: scrubPii,
     ignoreErrors: [
       ...UPSTASH_QUOTA_IGNORE_ERRORS,
@@ -654,15 +673,16 @@ export function getBaseClientConfig(): BaseSentryClientConfig {
  *
  * Server configuration differs from client in that it:
  * - Uses the private `SENTRY_DSN` (not exposed to browser)
- * - Enables `sendDefaultPii` for richer error context (safely scrubbed)
+ * - Enables user context for richer errors (safely scrubbed)
  * - Does not have Replay (server-side rendering cannot record sessions)
  */
-export interface BaseSentryServerConfig {
+export interface BaseSentryServerConfig extends WorktreeSentryOptions {
   dsn: string | undefined;
   release: string | undefined;
   tracesSampleRate: number;
-  enableLogs: boolean;
-  sendDefaultPii: boolean;
+  dataCollection: NonNullable<
+    Parameters<typeof Sentry.init>[0]
+  >['dataCollection'];
   debug: boolean;
   beforeSend: (
     event: SentryEvent,
@@ -680,7 +700,7 @@ export interface BaseSentryServerConfig {
  * ## Key Differences from Client Config
  *
  * - **DSN**: Uses private `SENTRY_DSN` (never exposed to browser)
- * - **PII**: `sendDefaultPii` is enabled since it's safely scrubbed via `beforeSend`
+ * - **PII**: user context is enabled and safely scrubbed via `beforeSend`
  *   and provides valuable debugging context for server errors
  * - **Debug**: Disabled to suppress initialization timeout warnings in production
  *
@@ -689,11 +709,15 @@ export interface BaseSentryServerConfig {
  */
 export function getBaseServerConfig(): BaseSentryServerConfig {
   return {
+    ...getWorktreeSentryOptions(),
     dsn: SENTRY_DSN_SERVER,
     release: SENTRY_RELEASE,
     tracesSampleRate: TRACES_SAMPLE_RATE,
-    enableLogs: true,
-    sendDefaultPii: true, // Enabled on server - scrubbed via beforeSend hook
+    // Retain server debugging context and keep prompts/model replies private.
+    dataCollection: {
+      userInfo: true,
+      genAI: { inputs: false, outputs: false },
+    },
     debug: false, // Suppress initialization timeout warnings
     beforeSend: scrubPii,
   };

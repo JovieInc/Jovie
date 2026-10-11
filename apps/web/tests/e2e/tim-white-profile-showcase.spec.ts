@@ -28,10 +28,12 @@ test.describe('Tim White Profile Showcase', () => {
     await expect(
       page.getByTestId('tim-white-cards-playlist-fallback')
     ).toHaveAttribute('data-state', 'playlist_fallback');
+    // JOV-7123: the alerts fallback surface is the featured card itself —
+    // capture lives inside it, not in a trailing carousel card.
     await expect(
       page
         .getByTestId('tim-white-cards-alerts-fallback')
-        .getByTestId('profile-home-alerts-fallback-card')
+        .getByTestId('profile-pac')
     ).toBeVisible();
   });
 
@@ -85,7 +87,7 @@ test.describe('Tim White Profile Showcase', () => {
     await expect(
       page
         .getByTestId('homepage-phone-state-mock-home')
-        .getByTestId('profile-home-carousel')
+        .getByTestId('profile-pac')
     ).toBeVisible();
   });
 });

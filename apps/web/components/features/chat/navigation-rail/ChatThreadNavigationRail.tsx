@@ -1,10 +1,12 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/chat/chat-thread-navigation-rail.test.tsx
+
 import { Button } from '@jovie/ui';
 import type { Virtualizer } from '@tanstack/react-virtual';
-import { type RefObject, useCallback, useMemo, useState } from 'react';
+import { memo, type RefObject, useCallback, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { deriveThreadTurns } from './derive-thread-turns';
+import { createThreadTurnProjector } from './derive-thread-turns';
 import type { ChatNavMessage, ThreadTurn } from './types';
 
 /** Matches `VIRTUALIZATION_THRESHOLD` in `JovieChat` — rail only helps long threads. */
@@ -17,6 +19,7 @@ interface ChatThreadNavigationRailProps {
   readonly scrollContainerRef: RefObject<HTMLDivElement | null>;
   readonly shouldVirtualizeMessages: boolean;
   readonly virtualizer: Virtualizer<HTMLDivElement, Element>;
+  readonly scopeKey?: string | null;
 }
 
 function markerTopPercent(messageIndex: number, messageCount: number): number {
@@ -32,9 +35,13 @@ export function ChatThreadNavigationRail({
   scrollContainerRef,
   shouldVirtualizeMessages,
   virtualizer,
+  scopeKey = null,
 }: ChatThreadNavigationRailProps) {
-  const turns = useMemo(() => deriveThreadTurns(messages), [messages]);
-  const [hoveredTurnId, setHoveredTurnId] = useState<string | null>(null);
+  const projectTurns = useMemo(() => createThreadTurnProjector(), []);
+  const turns = useMemo(
+    () => projectTurns(messages, scopeKey),
+    [messages, projectTurns, scopeKey]
+  );
 
   const jumpToTurn = useCallback(
     (turn: ThreadTurn) => {
@@ -61,6 +68,29 @@ export function ChatThreadNavigationRail({
   ) {
     return null;
   }
+
+  return (
+    <ThreadNavigationMarkers
+      key={scopeKey}
+      turns={turns}
+      messageCount={messages.length}
+      onJumpToTurn={jumpToTurn}
+    />
+  );
+}
+
+// Only immutable projection data crosses this boundary. The live virtualizer
+// stays in the imperative jump callback; no virtual row measurements are cached.
+const ThreadNavigationMarkers = memo(function ThreadNavigationMarkers({
+  turns,
+  messageCount,
+  onJumpToTurn,
+}: {
+  readonly turns: readonly ThreadTurn[];
+  readonly messageCount: number;
+  readonly onJumpToTurn: (turn: ThreadTurn) => void;
+}) {
+  const [hoveredTurnId, setHoveredTurnId] = useState<string | null>(null);
 
   return (
     <div
@@ -90,13 +120,13 @@ export function ChatThreadNavigationRail({
                 isHovered && 'is-hovered'
               )}
               style={{
-                top: `${markerTopPercent(turn.messageIndex, messages.length)}%`,
+                top: `${markerTopPercent(turn.messageIndex, messageCount)}%`,
               }}
               onMouseEnter={() => setHoveredTurnId(turn.id)}
               onMouseLeave={() => setHoveredTurnId(null)}
               onFocus={() => setHoveredTurnId(turn.id)}
               onBlur={() => setHoveredTurnId(null)}
-              onClick={() => jumpToTurn(turn)}
+              onClick={() => onJumpToTurn(turn)}
               aria-label={`Jump to turn ${turn.turnNumber}: ${turn.preview}`}
             >
               {isHovered ? (
@@ -118,4 +148,4 @@ export function ChatThreadNavigationRail({
       </nav>
     </div>
   );
-}
+});

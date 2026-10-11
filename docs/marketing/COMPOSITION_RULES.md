@@ -245,6 +245,71 @@ FAQPage schema is required (the whole point of this recipe is structured
 data). ≤2 `content-prose` beats. The `structured-data-list` variant of `faq`
 is the SEO default.
 
+## About pages and search evidence
+
+Owner: JOV-7429. Verified 2026-10-02. Applies to company `/about`, artist
+`/[username]/about`, public profiles, and shared marketing navigation where
+relevant. Extend existing owners: `companyIdentity.ts`, `aboutCopy.ts`,
+`marketingNavigation.ts`, `data/product-truth`, `data/marketing/copy.ts`,
+`lib/seo`, and Search Console JOV-4957 / artist visibility JOV-7345. No second
+SEO framework, claim store, review path, or acquisition controller.
+
+Source: [Borja's About article](https://x.com/borjafat/status/2104896885173436464),
+2026-09-29, identified by Tim on 2026-10-01. Its remembered Google Doc was not
+recovered. The following classification supersedes treating that article's
+counts or cadence as Google requirements. Confidence describes the guidance,
+not a forecast of ranking gains.
+
+| Classification | Guidance and scope | Acceptance / revisit |
+| --- | --- | --- |
+| Supported constraint, high confidence | Claims and structured data describe actual, current visible content; correct identity, credits, offers, and affiliation. All About/profile families. | Resolve claims to existing evidence, omit unsupported claims, inspect delivered HTML and expanded states, and validate applicable schema. Recheck when source facts, ownership or schema guidance change. |
+| Supported constraint, high confidence | Discovery links use real crawlable anchors and descriptive text. Shared footer and contextual body links. | Check rendered `a[href]`, destination eligibility and responses, keyboard access, and mobile layout. Recheck after navigation/template changes. |
+| Editorial recipe, medium confidence | Company opening explains company/category/job/audience, then real workflow, checkable differences and factual team expertise. | First screen answers what it does and for whom using registered claims; meaningful sections and links serve the visitor. Retain broad company audience and labeled music examples. Revisit with copy review and visitor evidence. |
+| Editorial recipe, medium confidence | Prioritize relevant commercial footer destinations; use contextual links where they help. | Consume `marketingNavigation` and feature eligibility, with one shared footer owner. Borja's 4–6 destinations are a heuristic, not a universal minimum/maximum or ranking gate. Revisit when product availability or IA changes. |
+| Editorial recipe, medium confidence | Publish research only when useful substantiated findings exist, with source, method, sample/unit, timeframe, limitations and attribution. | Selectable content and checkable calculations; no invented statistics or research page to fill a template. Quarterly review is a suggested freshness check, not Google's required schedule. Revisit on new data or source changes. |
+| Measured hypothesis, outcome unknown | Better artist facts, usable profiles and relevant links may improve discovery and qualified profile claims. | Baseline → exact intervention/build → recrawl/re-observation → impressions/clicks/CTR and localized sampled position → attributed visits/claims. JOV-7345 consumes JOV-4957; record missing data and observation delay. Revisit after a sufficient measured window. |
+| Rejected | Guaranteed #1 rank, arbitrary word/H2/link counts as Google law, fabricated clients/credentials/endorsements, keyword stuffing or low-value scaled pages. | Never use as claims, ranking gates or certification substitutes. Reconsider only on contrary primary evidence and an explicit scoped decision. |
+
+Primary verification, accessed 2026-10-02:
+
+- [Google helpful content](https://developers.google.com/search/docs/fundamentals/creating-helpful-content)
+  supports useful original information, factual expertise and clear sourcing;
+  it explicitly rejects a preferred word count and deceptive credentials.
+- [Google crawlable links](https://developers.google.com/search/docs/crawling-indexing/links-crawlable)
+  explains anchor discovery and descriptive context.
+- [Google structured-data policies](https://developers.google.com/search/docs/appearance/structured-data/sd-policies)
+  require representative, truthful markup; validation does not guarantee a
+  search feature.
+- [Google ProfilePage guidance](https://developers.google.com/search/docs/appearance/structured-data/profile-page)
+  has a specific creator/affiliation scope, required `mainEntity` and identity
+  properties. Schema.org validity alone does not establish Google eligibility.
+- [Google canonicalization](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls)
+  describes canonical signals. A declared canonical is not proof Google chose it.
+- [Google SEO starter guide](https://developers.google.com/search/docs/fundamentals/seo-starter-guide)
+  separates technical help from ranking guarantees and warns that observation
+  takes time.
+
+Artist About pages share factuality, identity and link rules, not the company
+section recipe. A visitor needs the actual biography, releases, credited work,
+official source links and a truthful next action. Keep sparse states sparse.
+Use existing structured credit edges and identity resolution; a name mention
+is not a collaboration. Preserve claimed/unclaimed and verification meanings.
+Do not imply an artist endorses, owns or officially publishes an unclaimed page.
+Assess `ProfilePage` eligibility for its actual publisher/affiliation, especially
+on unclaimed directory entries; do not add that markup merely for ranking.
+
+Company founder facts remain JOV-7164 comment `23a2eb64-426e-43ff-a9c5-5311a40a99e9`
+and the landed JOV-7279 rewrite. Never restore false Tory Lanez/Megan Thee
+Stallion claims or marketing-veteran framing. Keep health data and unnecessary
+legal/incorporation/founding/trademark chronology out of public discovery.
+
+Certification receipts remain separate: source/claim fidelity, local execution
+and coverage, hosted CI, queue/merge, deployed build, fresh rendered routes,
+Google crawl/index observations, and business outcomes. Green tests, JSON-LD,
+an HTTP200 or a screenshot cannot substitute for the later receipts. Record
+source/date/scope/confidence, affected route family, measurable acceptance and
+revisit trigger whenever new external advice enters these canonical rules.
+
 ## Rules for campaign pages
 
 `launch` recipe: long-form narrative; date-stamped announcement; up to 14

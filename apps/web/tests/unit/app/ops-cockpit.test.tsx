@@ -1,10 +1,15 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HudBottlenecksCard } from '@/components/features/admin/hud/HudBottlenecksCard';
 import { HudCompanyMetricCards } from '@/components/features/admin/hud/HudCompanyMetricCards';
 import { HudExceptionsStrip } from '@/components/features/admin/hud/HudExceptionsStrip';
 import { HudShippingStrip } from '@/components/features/admin/hud/HudShippingStrip';
 import { cockpitMetrics, cockpitShipping } from '@/tests/fixtures/hud-cockpit';
+
+beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-28T12:00:00.000Z'));
+});
+afterEach(() => vi.restoreAllMocks());
 
 describe('Ops cockpit sections', () => {
   it('renders the four compact company metric cards', () => {

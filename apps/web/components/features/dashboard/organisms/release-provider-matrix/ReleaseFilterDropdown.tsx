@@ -24,7 +24,7 @@ import {
   FilterSearchInput,
 } from '@/components/molecules/filters';
 import { PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS } from '@/components/organisms/table';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import type { ReleaseType } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { FilterSubmenu } from './FilterSubmenu';

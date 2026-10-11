@@ -27,6 +27,7 @@ import {
 } from '@/lib/profile/opaque-internal-profile-handle';
 import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
 import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
+import { isRenderFixtureEnabled } from '@/lib/render-fixture-policy';
 import { generateMusicStructuredData } from '@/lib/seo/structured-data';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
@@ -37,8 +38,30 @@ import {
   getFeaturedTrackStaticParams,
   getTrackBySlugInRelease,
 } from '../_lib/data';
+import {
+  SCREEN_CERT_SMARTLINK_FIXTURE_CREATOR,
+  SCREEN_CERT_SMARTLINK_RELEASE_CONTENT,
+  SCREEN_CERT_SMARTLINK_RELEASE_SLUG,
+  SCREEN_CERT_SMARTLINK_TRACK_CONTENT,
+  SCREEN_CERT_SMARTLINK_TRACK_SLUG,
+  SCREEN_CERT_SMARTLINK_USERNAME,
+} from '../_lib/screen-cert-fixture';
 
 export const revalidate = 300;
+
+/**
+ * True only for the reserved screen-certification fixture handle, and only
+ * when the shared render-fixture gate admits it (never on a real production
+ * deployment — see `_lib/screen-cert-fixture.ts`).
+ */
+function isScreenCertSmartLinkFixtureRequest(
+  normalizedUsername: string
+): boolean {
+  return (
+    normalizedUsername === SCREEN_CERT_SMARTLINK_USERNAME &&
+    isRenderFixtureEnabled()
+  );
+}
 
 export async function generateStaticParams() {
   return await getFeaturedTrackStaticParams();
@@ -87,19 +110,35 @@ export default async function TrackDeepLinkPage({
     );
   }
 
-  const creator = await getCreatorByUsername(normalizedUsername);
+  const isFixtureRequest =
+    isScreenCertSmartLinkFixtureRequest(normalizedUsername);
+  if (
+    isFixtureRequest &&
+    (slug !== SCREEN_CERT_SMARTLINK_RELEASE_SLUG ||
+      trackSlug !== SCREEN_CERT_SMARTLINK_TRACK_SLUG)
+  ) {
+    notFound();
+  }
+
+  const creator = isFixtureRequest
+    ? SCREEN_CERT_SMARTLINK_FIXTURE_CREATOR
+    : await getCreatorByUsername(normalizedUsername);
   if (!creator) {
     notFound();
   }
 
   // Resolve the parent release by slug
-  const releaseContent = await getContentBySlug(creator.id, slug);
+  const releaseContent = isFixtureRequest
+    ? SCREEN_CERT_SMARTLINK_RELEASE_CONTENT
+    : await getContentBySlug(creator.id, slug);
   if (releaseContent?.type !== 'release') {
     notFound();
   }
 
   // Resolve the track within this specific release
-  const track = await getTrackBySlugInRelease(releaseContent.id, trackSlug);
+  const track = isFixtureRequest
+    ? SCREEN_CERT_SMARTLINK_TRACK_CONTENT
+    : await getTrackBySlugInRelease(releaseContent.id, trackSlug);
   if (!track) {
     notFound();
   }

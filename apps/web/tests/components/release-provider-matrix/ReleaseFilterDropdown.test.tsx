@@ -258,6 +258,13 @@ function renderDropdown(
 // Tests
 // ---------------------------------------------------------------------------
 
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
+
 describe('ReleaseFilterDropdown', () => {
   describe('type toggle', () => {
     it('calls onFiltersChange with added type when toggling on', async () => {
@@ -433,6 +440,14 @@ describe('ReleaseFilterDropdown', () => {
         labels: [],
       });
     });
+  });
+
+  it('imports LINEAR_SURFACE from the canonical token module', () => {
+    const source = readWebSource(
+      'components/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown.tsx'
+    );
+    expect(source).toContain('@/components/tokens/linear-surface');
+    expect(source).not.toContain("from '@/features/dashboard/tokens'");
   });
 });
 

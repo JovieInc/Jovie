@@ -1,6 +1,10 @@
+import { isPresenceObservationStale } from '@/components/features/presence/evidence';
 import { getDspDisplayName } from '@/lib/dsp-registry';
 
-export const PRESENCE_STALE_AFTER_MS = 14 * 24 * 60 * 60 * 1000;
+export {
+  isPresenceObservationStale,
+  PRESENCE_STALE_AFTER_MS,
+} from '@/components/features/presence/evidence';
 
 export type PresenceIdentityPhotoKind = 'profile' | 'generic' | 'missing';
 export type PresenceIdentityPhotoSource =
@@ -29,6 +33,14 @@ export interface PresenceIdentityPhoto {
   readonly observedAt: string | null;
   readonly freshness: PresenceIdentityPhotoFreshness;
   readonly verified: boolean;
+}
+
+export interface SourceIdentity {
+  readonly status: 'available' | 'unavailable' | 'unsupported';
+  readonly displayName: string | null;
+  readonly pageTitle: string | null;
+  readonly photo: PresenceIdentityPhoto;
+  readonly sourceUrl: string;
 }
 
 export interface PresenceIdentitySubject {
@@ -101,16 +113,6 @@ function metadataUrl(
     if (url) return url;
   }
   return null;
-}
-
-export function isPresenceObservationStale(
-  observedAt: string | null | undefined,
-  now: Date = new Date()
-): boolean {
-  if (!observedAt) return false;
-  const observed = Date.parse(observedAt);
-  if (Number.isNaN(observed)) return false;
-  return now.getTime() - observed > PRESENCE_STALE_AFTER_MS;
 }
 
 export function identityPhotoFreshness(
@@ -461,5 +463,29 @@ export function isPhotoStripRow(
     subject.kind === 'website' ||
     subject.kind === 'dsp' ||
     subject.kind === 'social'
+  );
+}
+
+/** A platform match alone can point at a different artist. Bind photos to the exact source. */
+export function findSurfaceDspMatch<
+  T extends {
+    readonly providerId: string;
+    readonly externalArtistUrl: string | null;
+    readonly externalArtistId: string | null;
+  },
+>(
+  surface: {
+    readonly platform: string;
+    readonly url: string;
+    readonly externalId: string | null;
+  },
+  matches: readonly T[]
+): T | undefined {
+  return matches.find(
+    match =>
+      match.providerId === surface.platform &&
+      (match.externalArtistUrl === surface.url ||
+        (surface.externalId !== null &&
+          match.externalArtistId === surface.externalId))
   );
 }

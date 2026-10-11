@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { track } from '@/lib/analytics';
 
 interface LandingCTAButtonProps {
@@ -33,7 +34,11 @@ export function LandingCTAButton({
         track(eventName, { section });
       }}
     >
-      <Link href={href} className={className}>
+      <Link
+        href={href}
+        prefetch={resolveMarketingAuthPrefetch(href)}
+        className={className}
+      >
         {label}
       </Link>
     </Button>

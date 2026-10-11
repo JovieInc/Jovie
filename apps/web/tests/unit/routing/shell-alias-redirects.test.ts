@@ -32,6 +32,22 @@ beforeEach(() => {
 });
 
 describe('shell alias redirects', () => {
+  it('redirects the legacy appearance alias to Account without a page stub', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const redirects = (await nextConfig.redirects()) as RedirectRule[];
+
+    expect(
+      redirects.find(
+        redirect => redirect.source === APP_ROUTES.SETTINGS_APPEARANCE
+      )
+    ).toEqual({
+      source: APP_ROUTES.SETTINGS_APPEARANCE,
+      destination: APP_ROUTES.SETTINGS_ACCOUNT,
+      permanent: false,
+    });
+  });
+
   it('redirects the releases alias before rendering the authenticated shell', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
@@ -88,15 +104,17 @@ describe('shell alias redirects', () => {
   });
 
   it('routes profile aliases through shell pages to the chat profile panel', () => {
-    for (const Page of [
-      CanonicalProfilePage,
-      DashboardLinksPage,
-      DashboardProfilePage,
-    ]) {
+    for (const Page of [CanonicalProfilePage, DashboardProfilePage]) {
       expect(() => Page()).toThrow(`REDIRECT:${APP_ROUTES.CHAT_PROFILE_PANEL}`);
     }
 
-    expect(redirectMock).toHaveBeenCalledTimes(3);
+    expect(redirectMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('routes the legacy dashboard links alias to the canonical Links workspace', () => {
+    expect(() => DashboardLinksPage()).toThrow(`REDIRECT:${APP_ROUTES.LINKS}`);
+
+    expect(redirectMock).toHaveBeenCalledTimes(1);
   });
 
   it('routes tipping aliases through shell pages to artist pay settings', () => {
@@ -104,7 +122,7 @@ describe('shell alias redirects', () => {
 
     for (const Page of [CanonicalTippingPage, DashboardTippingPage]) {
       expect(() => Page()).toThrow(
-        `REDIRECT:${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
+        `REDIRECT:${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`
       );
     }
 
@@ -113,7 +131,7 @@ describe('shell alias redirects', () => {
       redirectMock.mock.calls[0]?.[0] ?? '',
       'https://jov.ie'
     );
-    expect(destination.pathname).toBe(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    expect(destination.pathname).toBe(APP_ROUTES.SETTINGS_PROFILE);
     expect(destination.searchParams.get('tab')).toBe('earn');
     expect(destination.hash).toBe('#pay');
   });

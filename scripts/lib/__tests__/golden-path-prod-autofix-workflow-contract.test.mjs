@@ -24,9 +24,9 @@ const CI_WORKFLOW = readFileSync(
 );
 
 describe('Golden Path prod autofix workflow contract', () => {
-  it('is event-driven off Production Controller, not a cron', () => {
-    expect(WORKFLOW).toContain('workflows: [Production Controller]');
-    expect(WORKFLOW).toContain('types: [completed]');
+  it('is a bounded manual fallback, not a recursive observer', () => {
+    expect(WORKFLOW).toContain('workflow_dispatch:');
+    expect(WORKFLOW).not.toContain('workflow_run:');
     expect(WORKFLOW).not.toMatch(/^\s*schedule:/m);
     expect(WORKFLOW).not.toContain('cron:');
   });
@@ -281,7 +281,7 @@ describe('Golden Path Lock merge-gate contract', () => {
     expect(CI_WORKFLOW).toContain('  ci-golden-path-lock:');
     expect(CI_WORKFLOW).toContain('name: Golden Path Lock');
     expect(CI_WORKFLOW).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]'
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]'
     );
     expect(CI_WORKFLOW).toContain('ci-golden-path-lock,');
     expect(CI_WORKFLOW).toContain(

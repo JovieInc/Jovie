@@ -40,6 +40,7 @@ export type MarketingSectionId =
   | 'faq'
   | 'cta'
   // ── Jovie deltas (no clean industry equivalent) ─────────────────────────────
+  | 'product-gallery'
   | 'spec-wall' // dense compact feature grid; "Details That Matter"
   | 'capture' // fan-capture product demo (not just an email form)
   | 'monetization' // monetization pitch + take-rate transparency
@@ -48,7 +49,7 @@ export type MarketingSectionId =
   | 'content-prose' // article body / long-form prose (SEO, founder-letter, release-notes)
   | 'blog-feed'; // featured post + grid (blog-landing, blog-category)
 
-/** 17 sections. Asserted by the manifest gate (count floor). */
+/** 18 sections. Asserted by the manifest gate (count floor). */
 export const MARKETING_SECTION_IDS: readonly MarketingSectionId[] = [
   'hero',
   'logo-cloud',
@@ -61,6 +62,7 @@ export const MARKETING_SECTION_IDS: readonly MarketingSectionId[] = [
   'comparison',
   'faq',
   'cta',
+  'product-gallery',
   'spec-wall',
   'capture',
   'monetization',
@@ -230,6 +232,8 @@ export interface MarketingSection {
   readonly illegalAfter?: readonly MarketingSectionId[];
   /** Sections that MUST appear before this one (provenance precondition). */
   readonly requiresPrior?: readonly MarketingSectionId[];
+  /** Each group requires at least one matching semantic predecessor. */
+  readonly requiresPriorAnyOf?: readonly (readonly MarketingSectionId[])[];
   /** Per-slot content budgets. Over-budget = check failure. */
   readonly contentBudgets: readonly ContentBudget[];
   /**
@@ -469,6 +473,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'active',
       },
       {
+        id: 'split-claim-card',
+        layout: 'split',
+        media: 'none',
+        mediaPosition: 'right',
+        alignment: 'left',
+        chooseWhen:
+          'recipe=homepage AND conversion=claim-handle: identity headline left, illustrative jov.ie/you claim card right (Tim 2026-09-28)',
+        exemplar: { route: '/', section: 'hero' },
+        status: 'active',
+      },
+      {
         id: 'centered-none',
         layout: 'centered',
         media: 'none',
@@ -477,16 +492,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
           'recipe=seo OR recipe=blog-landing (interior hero) OR no asset available',
         exemplar: { route: '/about', section: 'hero' },
         status: 'active',
-      },
-      {
-        id: 'centered-video',
-        layout: 'centered',
-        media: 'video',
-        alignment: 'centered',
-        chooseWhen:
-          'recipe=launch AND cinematicMomentBudget=available (max 1/page)',
-        exemplar: { route: '/launch', section: 'hero' },
-        status: 'unproven',
       },
     ],
     defaultVariant: 'centered-none',
@@ -781,6 +786,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'active',
       },
       {
+        id: 'phone-left',
+        layout: 'split',
+        media: 'phone',
+        mediaPosition: 'left',
+        alignment: 'left',
+        chooseWhen:
+          'explicit source-owned annotated profile with media left; no automatic selection',
+        exemplar: { route: '/artist-profiles', section: 'annotated-truth' },
+        status: 'active',
+      },
+      {
         id: 'screenshot-right',
         layout: 'split',
         media: 'screenshot',
@@ -871,6 +887,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     requiredInputs: ['steps'],
     optionalInputs: ['eyebrow', 'title', 'lede'],
     variants: [
+      {
+        id: 'split-setup',
+        layout: 'split',
+        media: 'screenshot',
+        mediaPosition: 'right',
+        alignment: 'left',
+        chooseWhen:
+          'explicit source-owned setup copy with screenshot rail right; no automatic selection',
+        exemplar: { route: '/artist-profiles', section: 'how-it-works' },
+        status: 'active',
+      },
       {
         id: '3-step-strip',
         layout: 'contained',
@@ -1003,7 +1030,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     proofClass: 'proof', // zero-proof gated — the load-bearing legality
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero'], // proof belongs after value/feature, never immediately after hero (B2B C4: proof is a gradient, not a top beat)
-    requiresPrior: ['hero', 'feature-grid'], // credibility preconditions
+    requiresPrior: ['hero'], // credibility preconditions
+    requiresPriorAnyOf: [['feature-grid', 'feature-split', 'how-it-works']],
     contentBudgets: [
       {
         slot: 'quote',
@@ -1091,7 +1119,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     proofClass: 'proof', // zero-proof gated — every metric must be specific and attributable (B2B C4)
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero', 'how-it-works'],
-    requiresPrior: ['hero', 'feature-grid'],
+    requiresPrior: ['hero'],
+    requiresPriorAnyOf: [['feature-grid', 'feature-split', 'how-it-works']],
     contentBudgets: [
       {
         slot: 'stat-value',
@@ -1280,7 +1309,10 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     illegalAfter: ['hero', 'cta'], // comparison needs value framing first; never as a closing beat
-    requiresPrior: ['hero', 'feature-grid'],
+    requiresPrior: ['hero'],
+    requiresPriorAnyOf: [
+      ['feature-grid', 'feature-split', 'how-it-works', 'content-prose'],
+    ],
     contentBudgets: [
       {
         slot: 'feature-name',
@@ -1350,7 +1382,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero'], // FAQ never immediately after hero — it handles objections that arise after value/proof
-    requiresPrior: ['hero', 'feature-grid'],
+    requiresPrior: ['hero'],
+    requiresPriorAnyOf: [
+      [
+        'feature-grid',
+        'feature-split',
+        'how-it-works',
+        'content-prose',
+        'pricing',
+        'blog-feed',
+      ],
+    ],
     contentBudgets: [
       {
         slot: 'question',
@@ -1436,6 +1478,16 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'active',
       },
       {
+        id: 'plan-actions',
+        layout: 'contained',
+        media: 'none',
+        alignment: 'centered',
+        chooseWhen:
+          'explicit PricingRecipeBody source binding: free claim, limited Pro request, and Enterprise contact; no automatic selection',
+        exemplar: { route: '/pricing', section: 'get-started' },
+        status: 'active',
+      },
+      {
         id: 'included-single',
         layout: 'contained',
         media: 'none',
@@ -1450,7 +1502,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero'], // hero has its own CTA; mid-page terminal only after proof
-    requiresPrior: ['hero', 'feature-grid'], // CTA before value is B2B anti-pattern #7
+    requiresPrior: ['hero'], // CTA before value is B2B anti-pattern #7
+    requiresPriorAnyOf: [
+      [
+        'feature-grid',
+        'feature-split',
+        'how-it-works',
+        'content-prose',
+        'pricing',
+        'blog-feed',
+      ],
+    ],
     contentBudgets: [
       {
         slot: 'headline',
@@ -1491,6 +1553,70 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'Immediately after hero (illegalAfter; hero owns the first CTA)',
       'Before any proof beat (mid-page CTAs only after proof — B2B C6)',
       'With multiple distinct primary CTA verbs on one page (one primary label repeated — B2B C6 invariant)',
+    ],
+    status: 'approved',
+  },
+
+  {
+    id: 'product-gallery',
+    label: 'Product Gallery',
+    requiredInputs: ['items'],
+    optionalInputs: ['title', 'lede'],
+    variants: [
+      {
+        id: 'profile-grid',
+        layout: 'contained',
+        media: 'screenshot',
+        columns: 3,
+        density: 'large',
+        alignment: 'left',
+        chooseWhen:
+          'explicit source-owned demonstration gallery; no automatic selection',
+        exemplar: { route: '/artist-profiles', section: 'product-examples' },
+        status: 'active',
+      },
+      {
+        id: 'release-rail',
+        layout: 'contained',
+        media: 'screenshot',
+        columns: 3,
+        density: 'large',
+        alignment: 'left',
+        chooseWhen:
+          'explicit three-moment source-owned demonstration rail; no automatic selection',
+        exemplar: { route: '/artist-profiles', section: 'release-cycle' },
+        status: 'active',
+      },
+    ],
+    defaultVariant: 'profile-grid',
+    proofClass: 'none',
+    audienceLegality: [{ legal: true }],
+    requiresPrior: ['hero'],
+    contentBudgets: [
+      {
+        slot: 'title',
+        maxCharsDesktop: 60,
+        maxCharsMobile: 44,
+        overflowStrategy: 'shrink-tier',
+      },
+    ],
+    responsiveContract:
+      'profile-grid: 3 columns at xl, 2 at sm, 1 narrow; release-rail: three large figures, narrow horizontal snap with reversible controls',
+    accessibility: {
+      keyboard:
+        'Real links; rail controls and keyboard navigation remain reversible.',
+      contrast: 'Captions meet AA against the canonical surface.',
+      touchTarget: 'Rail controls and links expose 44px hit areas.',
+      reducedMotion: 'Scroll resolves immediately under reduced motion.',
+    },
+    component: 'components/marketing/MarketingShippedSitesShowcase',
+    failureModes: [
+      'Unloaded or broken captures',
+      'Demo captures presented as live customer or adoption evidence',
+      'Links assigned to a different identity',
+    ],
+    neverUse: [
+      'As social proof, revenue lift, account persistence, or current customer outcome certification.',
     ],
     status: 'approved',
   },
@@ -1542,7 +1668,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero', 'cta'],
-    requiresPrior: ['hero', 'feature-grid'], // spec-wall is depth after breadth
+    requiresPrior: ['hero'], // spec-wall is depth after breadth
+    requiresPriorAnyOf: [['feature-grid', 'feature-split', 'how-it-works']],
     contentBudgets: [
       {
         slot: 'tile-title',
@@ -1603,14 +1730,24 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'centered',
         chooseWhen:
           'audience=general OR recipe=waitlist OR recipe=blog-landing OR recipe=newsletter-signup (newsletter signup)',
-        status: 'unproven',
+        exemplar: { route: '/pricing', section: 'product-updates' },
+        status: 'active',
       },
     ],
     defaultVariant: 'product-demo',
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero', 'cta'],
-    requiresPrior: ['hero', 'feature-grid'],
+    requiresPrior: ['hero'],
+    requiresPriorAnyOf: [
+      [
+        'feature-grid',
+        'feature-split',
+        'how-it-works',
+        'content-prose',
+        'blog-feed',
+      ],
+    ],
     contentBudgets: [
       {
         slot: 'headline',
@@ -1976,9 +2113,14 @@ export function hasRequiredPrior(
   priorSections: readonly MarketingSectionId[]
 ): boolean {
   const def = getMarketingSection(section);
-  return (def.requiresPrior ?? []).every(required =>
+  const allRequiredPresent = (def.requiresPrior ?? []).every(required =>
     priorSections.includes(required)
   );
+  const everyAlternativeGroupSatisfied = (def.requiresPriorAnyOf ?? []).every(
+    alternatives =>
+      alternatives.some(alternative => priorSections.includes(alternative))
+  );
+  return allRequiredPresent && everyAlternativeGroupSatisfied;
 }
 
 export function isLegalForAudience(

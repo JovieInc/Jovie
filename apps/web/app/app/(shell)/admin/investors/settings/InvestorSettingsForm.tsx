@@ -265,7 +265,7 @@ export function InvestorSettingsForm() {
         <div className='space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
           <DrawerFormField
             label='Book A Call URL'
-            helperText='Link to your Calendly, Cal.com, or scheduling page.'
+            helperText='Stored only. The portal records a call request and does not open a scheduling page.'
           >
             <Input
               type='url'
@@ -371,13 +371,13 @@ export function InvestorSettingsForm() {
           {error && (
             <DrawerSurfaceCard
               variant='card'
-              className='flex items-center gap-2 border-destructive/20 bg-destructive/8 px-3 py-2'
+              className='flex items-center gap-2 border-error/20 bg-error/8 px-3 py-2'
             >
               <Icon
                 name='XCircle'
-                className='h-3.5 w-3.5 shrink-0 text-destructive'
+                className='h-3.5 w-3.5 shrink-0 text-error'
               />
-              <p className='text-xs font-medium text-destructive'>{error}</p>
+              <p className='text-xs font-medium text-error'>{error}</p>
             </DrawerSurfaceCard>
           )}
           {success && (

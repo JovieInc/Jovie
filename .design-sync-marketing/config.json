@@ -23,7 +23,6 @@
     "ArtistProfileOutcomesCarousel": "artist-profile/ArtistProfileOutcomesCarousel.tsx",
     "ArtistProfileCaptureSection": "artist-profile/ArtistProfileCaptureSection.tsx",
     "ArtistProfileReactivationSection": "artist-profile/ArtistProfileReactivationSection.tsx",
-    "ArtistProfilePayFlowVideoSection": "artist-profile/ArtistProfilePayFlowVideoSection.tsx",
     "ArtistProfileMonetizationSection": "artist-profile/ArtistProfileMonetizationSection.tsx",
     "ArtistProfileSpecWall": "artist-profile/ArtistProfileSpecWall.tsx",
     "ArtistProfileHowItWorks": "artist-profile/ArtistProfileHowItWorks.tsx",

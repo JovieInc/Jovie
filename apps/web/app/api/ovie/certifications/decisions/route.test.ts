@@ -1,3 +1,7 @@
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  requireOvieApiAccess: vi.fn(async () => null),
+}));
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildCertificationDecisionDigest } from '@/lib/agent-os/certification';
 import {

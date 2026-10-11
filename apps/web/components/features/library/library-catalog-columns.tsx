@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/library/LibraryCatalogWaveformCell.test.tsx
 
+import { StatusGlyph, type StatusGlyphState } from '@jovie/ui';
 import { memo, useMemo } from 'react';
 import { LibraryMediaThumbnail } from '@/app/app/(shell)/library/LibraryMediaThumbnail';
 import {
@@ -16,9 +17,7 @@ import {
   DspAvatarStack,
 } from '@/components/shell/DspAvatarStack';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
-import { releaseStatusClasses } from '@/lib/library/release-status';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
-import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 
 // ---------------------------------------------------------------------------
@@ -37,7 +36,8 @@ export function formatReleaseType(
 
 export function formatLibraryItemType(asset: LibraryReleaseAsset): string {
   if (asset.itemKind === 'merch') {
-    return asset.productType?.trim() || 'Merch';
+    const productType = asset.productType?.trim();
+    return productType ? capitalizeFirst(productType) : 'Merch';
   }
   if (asset.itemKind === 'document') {
     return asset.itemStatusLabel ?? 'Document';
@@ -57,22 +57,80 @@ export function formatLibraryStatus(asset: LibraryReleaseAsset): string {
   return asset.itemStatusLabel ?? formatReleaseStatus(asset.status);
 }
 
+export interface LibraryStatusGlyphSpec {
+  readonly state: StatusGlyphState;
+  /** One phrase for both axes; the tooltip and accessible name. */
+  readonly label: string;
+}
+
+/**
+ * Folds release status and approval into one Linear-style glyph so a tile
+ * never shows two stacked "Draft" words (#10384 / JOV-3333). Progress reads
+ * left to right: empty ring (draft), half (scheduled), check (out). Review is
+ * the one approval state that needs attention, so it owns the glyph; any
+ * other approval state only qualifies the label.
+ */
+export function resolveLibraryStatusGlyph(
+  asset: LibraryReleaseAsset
+): LibraryStatusGlyphSpec {
+  if (
+    asset.lifecycleStatus === 'archived' ||
+    asset.approvalStatus === 'archived'
+  ) {
+    return { state: 'canceled', label: 'Archived' };
+  }
+  const status = formatLibraryStatus(asset);
+  if (asset.approvalStatus === 'needs_review') {
+    return { state: 'in_review', label: `${status} · Needs review` };
+  }
+  const state: StatusGlyphState =
+    asset.status === 'released'
+      ? 'done'
+      : asset.status === 'scheduled'
+        ? 'in_progress'
+        : 'todo';
+  if (asset.approvalStatus === 'approved') {
+    return { state, label: `${status} · Approved` };
+  }
+  // An unapproved draft has nothing to approve yet; say it once.
+  return {
+    state,
+    label: asset.status === 'draft' ? status : `${status} · Not approved`,
+  };
+}
+
+/** The one status mark for tile, row, table and inspector. */
+export const LibraryStatusGlyph = memo(function LibraryStatusGlyph({
+  asset,
+  showLabel = false,
+  className,
+}: {
+  readonly asset: LibraryReleaseAsset;
+  /** Visible words, for the inspector only; elsewhere the glyph speaks. */
+  readonly showLabel?: boolean;
+  readonly className?: string;
+}) {
+  const { state, label } = resolveLibraryStatusGlyph(asset);
+  return (
+    <StatusGlyph
+      state={state}
+      size='md'
+      tooltipLabel={label}
+      label={showLabel ? label : undefined}
+      data-testid={`library-status-glyph-${asset.id}`}
+      className={className}
+    />
+  );
+});
+
 export const LibraryCatalogStatusCell = memo(function LibraryCatalogStatusCell({
   asset,
 }: {
   readonly asset: LibraryReleaseAsset;
 }) {
   return (
-    <span
-      role='status'
-      className={cn(
-        'system-b-library-status-pill inline-flex h-6 w-fit max-w-full items-center truncate rounded-full border px-2 leading-4',
-        releaseStatusClasses(asset.status)
-      )}
-      data-testid={`library-release-status-${asset.id}`}
-      aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
-    >
-      {formatLibraryStatus(asset)}
+    <span className='flex h-6 items-center'>
+      <LibraryStatusGlyph asset={asset} />
     </span>
   );
 });
@@ -87,7 +145,7 @@ export const LibraryCatalogArtworkCell = memo(
       <LibraryMediaThumbnail
         asset={asset}
         size='row'
-        className='system-b-library-artwork-shell block h-9 w-9'
+        className='system-b-library-artwork-shell block h-6 w-6'
       />
     );
   }
@@ -147,7 +205,8 @@ export const LibraryCatalogProvidersCell = memo(
 /**
  * Placeholder for catalog metrics the production schema does not carry yet
  * (BPM, musical key, energy, rating). Fixed-size em-dash so the dense row
- * never shifts when real values land.
+ * never shifts when real values land. Hidden metric columns leave no compact
+ * form behind: a run of dashes beside the title says nothing.
  */
 export type LibraryCatalogMetric = 'bpm' | 'key' | 'energy' | 'rating';
 
@@ -292,56 +351,82 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     id: 'status',
     header: 'Status',
     cell: ({ row }) => <LibraryCatalogStatusCell asset={row.original} />,
-    size: 112,
-    minSize: 96,
-    meta: { className: alignment.workspaceSeamX },
+    size: 44,
+    minSize: 44,
+    enableSorting: false,
+    meta: {
+      className: alignment.workspaceSeamX,
+      minWidth: 44,
+      headerVisibility: 'sr-only',
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'artwork',
     header: 'Artwork',
     cell: ({ row }) => <LibraryCatalogArtworkCell asset={row.original} />,
-    size: 56,
-    minSize: 56,
+    size: 40,
+    minSize: 40,
     enableSorting: false,
-    meta: { className: 'px-2' },
+    // 24px art plus the canonical cell padding; the title names the item.
+    meta: { className: 'px-2', minWidth: 40, headerVisibility: 'sr-only' },
   }),
   libraryCatalogColumnHelper.accessor('title', {
     id: 'title',
     header: 'Title',
     cell: ({ row }) => (
-      <span className='system-b-library-release-title block truncate'>
+      // Fluid cell: no min-content width, so the auto-layout table shrinks
+      // this column and long titles truncate instead of pushing trailing
+      // columns out of the container.
+      <span
+        title={row.original.title}
+        className='system-b-library-release-title system-b-library-fluid-cell block truncate'
+      >
         {row.original.title}
       </span>
     ),
     minSize: 180,
     size: 9999,
     enableSorting: false,
-    meta: { className: 'px-2' },
+    meta: { className: 'px-2', primary: true, minWidth: 180 },
   }),
   libraryCatalogColumnHelper.accessor('artist', {
     id: 'artist',
     header: 'Artist',
     cell: ({ row }) => (
-      <span className='system-b-library-meta-text block truncate text-tertiary-token'>
+      <span
+        title={row.original.artist}
+        className='system-b-library-meta-text system-b-library-fluid-cell block truncate text-tertiary-token'
+      >
         {row.original.artist}
       </span>
     ),
     size: 160,
     minSize: 120,
     enableSorting: false,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 5,
+      minWidth: 160,
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'type',
     header: 'Type',
     cell: ({ row }) => (
-      <span className='system-b-library-meta-text truncate text-tertiary-token'>
+      <span
+        title={formatLibraryItemType(row.original)}
+        className='system-b-library-meta-text system-b-library-fluid-cell block truncate text-tertiary-token'
+      >
         {formatLibraryItemType(row.original)}
       </span>
     ),
     size: 120,
     minSize: 96,
-    meta: { className: 'hidden sm:table-cell pl-2 pr-3' },
+    meta: {
+      className: 'pl-2 pr-3',
+      priority: 6,
+      minWidth: 120,
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'bpm',
@@ -351,7 +436,11 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     ),
     size: 72,
     minSize: 64,
-    meta: { className: 'hidden lg:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 4,
+      minWidth: 72,
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'key',
@@ -361,7 +450,11 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     ),
     size: 72,
     minSize: 64,
-    meta: { className: 'hidden lg:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 4,
+      minWidth: 72,
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'energy',
@@ -371,7 +464,11 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     ),
     size: 80,
     minSize: 72,
-    meta: { className: 'hidden xl:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 3,
+      minWidth: 80,
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'rating',
@@ -381,7 +478,11 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     ),
     size: 88,
     minSize: 80,
-    meta: { className: 'hidden xl:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 3,
+      minWidth: 88,
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'length',
@@ -389,7 +490,11 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     cell: ({ row }) => <LibraryCatalogLengthCell asset={row.original} />,
     size: 80,
     minSize: 72,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 5,
+      minWidth: 80,
+    },
   }),
   libraryCatalogColumnHelper.display({
     id: 'waveform',
@@ -398,7 +503,7 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     size: 176,
     minSize: 176,
     enableSorting: false,
-    meta: { className: 'hidden xl:table-cell px-2' },
+    meta: { className: 'px-2', priority: 1, minWidth: 176 },
   }),
   libraryCatalogColumnHelper.display({
     id: 'providers',
@@ -406,6 +511,19 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     cell: ({ row }) => <LibraryCatalogProvidersCell asset={row.original} />,
     size: 120,
     minSize: 96,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: {
+      className: 'px-2',
+      priority: 5,
+      minWidth: 120,
+    },
   }),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
+
+/** Keep the default scan useful; technical fields stay an explicit choice. */
+export const LIBRARY_CATALOG_DEFAULT_COLUMNS =
+  LIBRARY_CATALOG_TABLE_COLUMNS.filter(
+    column =>
+      !['bpm', 'key', 'energy', 'rating', 'waveform', 'providers'].includes(
+        column.id ?? ''
+      )
+  );

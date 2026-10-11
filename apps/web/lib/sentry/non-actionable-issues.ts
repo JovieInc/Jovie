@@ -81,6 +81,18 @@ export const VERCEL_IPC_SOCK_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
 ];
 
 /**
+ * React Fizz aborts an in-flight render with `Error: The destination stream
+ * closed early.` (or `... errored while writing data.`) when the client
+ * socket closes before the streamed response finishes — tab close,
+ * navigation, prefetch cancel. Same client-disconnect class as EPIPE /
+ * ECONNRESET (JOV-7319). Not an application defect; drop at capture and
+ * webhook so it does not file Linear.
+ */
+export const DESTINATION_STREAM_CLOSED_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
+  /The destination stream (?:closed early|errored while writing data)\./,
+];
+
+/**
  * Better Auth host allowlist throws when a loopback Host header is not in
  * the frozen list (JOV-5843 / JOV-4381 / JOV-4384). That is local/synthetic
  * traffic, including requests that reach prod Sentry with a localhost Host
@@ -89,6 +101,20 @@ export const VERCEL_IPC_SOCK_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
 export const LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
   /Host "(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?" is not in the allowed hosts list/i,
 ];
+
+/**
+ * MusicFetch is unpaid. A 401 "subscription not active" is the JOV-7323
+ * cutover, not a renewal. Drop the event so autofix does not file a new issue.
+ */
+export const MUSICFETCH_CUTOVER_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
+  /subscription not active/i,
+  /remediation:musicfetch-/,
+];
+
+export const MUSICFETCH_REMEDIATION_FINGERPRINT_PREFIX =
+  'remediation:musicfetch-' as const;
+
+export const MUSICFETCH_REMEDIATION_ISSUE = 'JOV-7323' as const;
 
 function isSpotifyReleaseCreditBoundBag(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
@@ -384,6 +410,53 @@ export function isNonActionableVercelIpcEvent(
   return collectSentryEventCaptureValues(event).some(
     value => typeof value === 'string' && isVercelIpcSockText(value)
   );
+}
+
+function isDestinationStreamClosedText(
+  value: string | null | undefined
+): boolean {
+  if (!value) return false;
+  return DESTINATION_STREAM_CLOSED_IGNORE_ERRORS.some(pattern =>
+    pattern.test(value)
+  );
+}
+
+/**
+ * True when a Sentry/Linear title is the JOV-7319 client-disconnect abort.
+ */
+export function isNonActionableDestinationStreamIssue(
+  issue: SentryIssueSummary
+): boolean {
+  return (
+    isDestinationStreamClosedText(issue.title) ||
+    isDestinationStreamClosedText(issue.culprit)
+  );
+}
+
+/**
+ * True when a Sentry event is the JOV-7319 client-disconnect abort.
+ */
+export function isNonActionableDestinationStreamEvent(
+  event: SentryExceptionLike
+): boolean {
+  return collectSentryEventCaptureValues(event).some(
+    value => typeof value === 'string' && isDestinationStreamClosedText(value)
+  );
+}
+
+function isMusicfetchCutoverText(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return MUSICFETCH_CUTOVER_IGNORE_ERRORS.some(pattern => pattern.test(value));
+}
+
+/**
+ * True when a capture is an unpaid MusicFetch failure. Route it to JOV-7323.
+ * Do not open a renewal issue.
+ */
+export function isMusicfetchCutoverCapture(value: unknown): boolean {
+  if (typeof value === 'string') return isMusicfetchCutoverText(value);
+  if (value instanceof Error) return isMusicfetchCutoverText(value.message);
+  return false;
 }
 
 function isLoopbackBetterAuthHostText(

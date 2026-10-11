@@ -1,0 +1,8 @@
+/* Deliberate-red fixture: a modal layer below the sheet it opens from. */
+@theme {
+  --z-index-banner: 60;
+  --z-index-sheet: 65;
+  --z-index-modal: 50;
+  --z-index-popover: 80;
+  --z-index-tooltip: 150;
+}

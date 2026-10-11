@@ -8,6 +8,14 @@ import {
   parseShippingCockpitProjection,
   type ShippingCockpitProjection,
 } from '@/lib/ovie/shipping-state/client';
+import { SHIPPING_STATE_FRESHNESS_MS } from '@/lib/ovie/shipping-state/contract';
+
+/**
+ * Observations expire SHIPPING_STATE_FRESHNESS_MS after they are taken and the
+ * table re-checks freshness every second, so without a timed refetch every
+ * count flipped to "stale / unavailable" ~10 s after load and stayed there.
+ */
+export const SHIPPING_STATE_REFETCH_MS = SHIPPING_STATE_FRESHNESS_MS / 2;
 
 export function pipelineRows(
   projection: ShippingCockpitProjection | undefined,
@@ -72,6 +80,7 @@ export function ShippingStatistics() {
     gcTime: 60 * 1000,
     retry: false,
     refetchOnWindowFocus: true,
+    refetchInterval: SHIPPING_STATE_REFETCH_MS,
   });
   const rows = pipelineRows(query.data, now);
   const current =

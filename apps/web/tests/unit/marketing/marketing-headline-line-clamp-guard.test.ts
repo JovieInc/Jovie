@@ -37,7 +37,6 @@ const HEADLINE_CLAMP_BASELINE: Readonly<Record<string, number>> = {
   'components/marketing/artist-profile/ArtistProfileMonetizationSection.tsx': 1,
   'components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx': 1,
   'components/marketing/artist-profile/ArtistProfileOutcomeDuo.tsx': 1,
-  'components/marketing/artist-profile/ArtistProfileSectionHeader.tsx': 1,
   'components/marketing/changelog/ChangelogTimeline.tsx': 1,
   'components/marketing/engineering/EngineeringPublication.tsx': 3,
   'components/marketing/friday-rhythm-section.tsx': 1,
@@ -51,15 +50,14 @@ const HEADLINE_CLAMP_BASELINE: Readonly<Record<string, number>> = {
   [join('app', '(marketing)', 'blog', 'BlogFeed.tsx')]: 2,
   [join('app', '(marketing)', 'blog', 'components', 'BlogAuthorCard.tsx')]: 1,
   [join('app', '(marketing)', 'blog', 'components', 'BlogRelatedPosts.tsx')]: 1,
-  [join('app', '(marketing)', 'card', 'JovieCardLanding.tsx')]: 3,
   [join('app', '(marketing)', 'changelog', 'ChangelogEmailSignup.tsx')]: 1,
   [join('app', '(marketing)', 'changelog', '[version]', 'page.tsx')]: 2,
   [join('app', '(marketing)', 'changelog', 'page.tsx')]: 1,
   [join('app', '(marketing)', 'compare', 'page.tsx')]: 2,
   [join('app', '(marketing)', 'developers', 'page.tsx')]: 5,
-  [join('app', '(marketing)', 'download', 'page.tsx')]: 4,
+  [join('app', '(marketing)', 'download', 'page.tsx')]: 1,
   [join('app', '(marketing)', 'instant-merch', 'InstantMerchLanding.tsx')]: 3,
-  [join('app', '(marketing)', 'launch', 'page.tsx')]: 4,
+  [join('app', '(marketing)', 'launch', 'page.tsx')]: 1,
   [join('app', '(marketing)', 'not-found.tsx')]: 1,
   [join('app', '(marketing)', 'product', 'ProductLanding.tsx')]: 1,
   [join('app', '(marketing)', 'renders', '[state]', 'page.tsx')]: 1,
@@ -125,9 +123,14 @@ describe('marketing headline line-clamp guard', () => {
     ).toBeUndefined();
   });
 
-  it('keeps the JOV-6906 fixed owners free of clamped headings', () => {
+  it('keeps repaired shared owners free of clamped headings', () => {
     const counts = collectClampedHeadlineCounts();
     expect(counts.has('components/marketing/FaqSection.tsx')).toBe(false);
+    expect(
+      counts.has(
+        'components/marketing/artist-profile/ArtistProfileSectionHeader.tsx'
+      )
+    ).toBe(false);
     expect(
       counts.has(
         'components/marketing/artist-notifications/ArtistNotificationsHero.tsx'

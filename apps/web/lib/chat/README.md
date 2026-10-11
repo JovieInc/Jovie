@@ -33,7 +33,7 @@ Tools are NOT defined here. They are built in the route (`buildFreeChatTools`, `
 
 ## AI SDK Entry Point
 
-`streamText`, `generateText`, `generateObject`, and `streamObject` are re-exported from `@/lib/ai/sdk` (leak-guard wrapped). Any new AI SDK caller must import from `@/lib/ai/sdk`, not directly from `'ai'`, so leak-guard output filtering applies uniformly. Direct Anthropic SDK callers use `getAnthropicClient()` from `@/lib/ai/anthropic`.
+`streamText`, `generateText`, `generateObject`, and `streamObject` are re-exported from `@/lib/ai/sdk` (leak-guard wrapped). Any new AI SDK caller must import from `@/lib/ai/sdk`, not directly from `'ai'`, so leak-guard output filtering applies uniformly. OpenAI/Anthropic models are banned on the AI Gateway (JOV-7119) — the selector throws on `openai/*` and `anthropic/*` ids.
 
 ## Telemetry contract
 

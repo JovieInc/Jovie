@@ -15,21 +15,61 @@
 //     [--enable-missing]
 //
 // `--enable-missing` first enables auto-merge (squash) on every open,
-// non-draft, same-repo PR that lacks it — this covers drafts that went
-// ready (ready_for_review is reserved for merge-queue-autoenroll.yml per
-// trigger-hygiene rule 3) and any missed enable events.
+// non-draft, same-repo PR that lacks it — backstop for a missed opened,
+// reopened, or ready_for_review event. auto-merge-default.yml is the sole
+// ready_for_review subscriber (trigger-hygiene rule 3 / JOV-INV-029).
 
 const { execFileSync } = require('node:child_process');
+const {
+  finishCustomerNotes,
+  BLOCKING_LABELS,
+} = require('./customer-notes-ready');
 
 const COMMENT_MARKER = '<!-- auto-merge-stuck-triage -->';
 const ISSUE_MARKER = '<!-- auto-merge-stuck-tracker -->';
 const TRACKING_ISSUE_TITLE = 'Auto-merge stuck PRs — diagnostic tracker';
+const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
+const FAILURE_DESCRIPTION =
+  /^class=(deterministic-source|retryable-product|transient-infrastructure|unclassified);n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*$/;
+const BASE_BRANCH_DESCRIPTION =
+  /^class=base-branch;n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*;main=([0-9a-f]{40})$/;
 
-function gh(args) {
-  return execFileSync('gh', args, {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+const GH_MAX_ATTEMPTS = 4;
+const TRANSIENT_GH_ERROR =
+  /HTTP 5\d\d|connection (?:reset|refused|timed? ?out)|i\/o timeout|TLS handshake timeout|EOF|Bad Gateway/i;
+
+function isTransientGhError(err) {
+  const text = `${err?.stderr ?? ''}\n${err?.stdout ?? ''}\n${err?.message ?? ''}`;
+  return TRANSIENT_GH_ERROR.test(text);
+}
+
+function defaultSleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+// GitHub's API occasionally returns transient 5xx mid-sweep; a single retry
+// usually clears it, so scheduled triage must not die on the first blip.
+function gh(
+  args,
+  { attempts = GH_MAX_ATTEMPTS, exec = execFileSync, sleep = defaultSleep } = {}
+) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return exec('gh', args, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      if (attempt === attempts || !isTransientGhError(err)) throw err;
+      const delayMs = 1000 * 2 ** (attempt - 1);
+      console.error(
+        `gh ${args.slice(0, 2).join(' ')} failed transiently ` +
+          `(attempt ${attempt}/${attempts}); retrying in ${delayMs}ms.`
+      );
+      sleep(delayMs);
+    }
+  }
+  return undefined;
 }
 
 function ghJson(args) {
@@ -81,6 +121,9 @@ query($owner: String!, $name: String!, $cursor: String) {
         mergeStateStatus
         isCrossRepository
         headRefOid
+        headRefName
+        baseRefName
+        files(first: 2) { totalCount nodes { path } }
         autoMergeRequest { enabledAt mergeMethod }
         labels(first: 30) { nodes { name } }
         comments(last: 100) {
@@ -117,6 +160,42 @@ function listCheckRuns(repo, sha) {
     page += 1;
   }
   return runs;
+}
+
+function listCommitStatuses(repo, sha) {
+  const statuses = [];
+  for (let page = 1; page <= 30; page += 1) {
+    const batch = ghJson([
+      'api',
+      `repos/${repo}/commits/${sha}/statuses?per_page=100&page=${page}`,
+    ]);
+    if (!Array.isArray(batch))
+      throw new Error('Commit statuses are malformed.');
+    statuses.push(...batch);
+    if (batch.length < 100) return statuses;
+  }
+  throw new Error('Commit status pagination exceeded the safety limit.');
+}
+
+function hasRevisionFailureHold(statuses, repo) {
+  const prefix = `https://github.com/${repo}/actions/runs/`;
+  return statuses.some(status => {
+    if (
+      status?.context !== FAILURE_HOLD_CONTEXT ||
+      status.state !== 'success' ||
+      status.creator?.type !== 'Bot' ||
+      status.creator?.login !== 'jovie-bot[bot]'
+    ) {
+      return false;
+    }
+    const base = BASE_BRANCH_DESCRIPTION.exec(status.description ?? '');
+    if (base && status.target_url === `${prefix}${base[1]}`) {
+      // Only queue enrollment may reserve the bounded retry after main moves.
+      return true;
+    }
+    const match = FAILURE_DESCRIPTION.exec(status.description ?? '');
+    return Boolean(match && status.target_url === `${prefix}${match[2]}`);
+  });
 }
 
 // Pure: given a PR node and its head check runs, explain why it has not merged.
@@ -289,42 +368,68 @@ function upsertTrackingIssue(repo, stuck, dryRun) {
 
 // Same set merge-queue-green-enroll.yml refuses. On a merge-queue repo,
 // enabling auto-merge on a CLEAN PR enqueues it at once, so a held PR must be skipped.
-const BLOCKING_LABELS = new Set([
-  'hold',
-  'gated',
-  'incident',
-  'do-not-merge',
-  'queue-poison',
-]);
-
 // Pure: a PR needs the enable pass when it is open, not a draft, lives in
 // this repo (fork tokens are read-only), carries no blocking label, and has no
 // autoMergeRequest yet.
-function needsAutoMergeEnable(pr) {
+function needsAutoMergeEnable(pr, statuses = [], repo = '') {
   const held = (pr.labels?.nodes ?? []).some(l =>
     BLOCKING_LABELS.has(l.name.toLowerCase())
   );
-  return !pr.isDraft && !pr.isCrossRepository && !held && !pr.autoMergeRequest;
+  return (
+    !pr.isDraft &&
+    !pr.isCrossRepository &&
+    !held &&
+    !pr.autoMergeRequest &&
+    !hasRevisionFailureHold(statuses, repo)
+  );
 }
 
-function enableMissingAutoMerge(repo, prs, dryRun) {
+function enableMissingAutoMerge(
+  repo,
+  prs,
+  dryRun,
+  command = gh,
+  readStatuses = listCommitStatuses
+) {
+  const failures = [];
   for (const pr of prs) {
-    if (!needsAutoMergeEnable(pr)) continue;
+    if (pr.isDraft || pr.isCrossRepository || pr.autoMergeRequest) continue;
+    if (!/^[a-f0-9]{40}$/.test(pr.headRefOid ?? '')) continue;
+    const statuses = readStatuses(repo, pr.headRefOid);
+    if (!needsAutoMergeEnable(pr, statuses, repo)) continue;
     if (dryRun) {
       console.log(`[dry-run] would enable auto-merge on PR #${pr.number}`);
       continue;
     }
-    gh([
-      'pr',
-      'merge',
-      String(pr.number),
-      '--repo',
-      repo,
-      '--auto',
-      '--squash',
-    ]);
+    // One PR GitHub refuses (e.g. a workflow-file head) must not abort the
+    // sweep for every other PR; the caller reports failures after the pass.
+    try {
+      command([
+        'pr',
+        'merge',
+        String(pr.number),
+        '--repo',
+        repo,
+        '--auto',
+        '--squash',
+        ...(pr.customerNotesReadyHead
+          ? ['--match-head-commit', pr.customerNotesReadyHead]
+          : []),
+      ]);
+    } catch (err) {
+      const detail = String(err?.stderr || err?.message || err)
+        .trim()
+        .split('\n')
+        .pop();
+      console.log(
+        `::warning::PR #${pr.number}: enabling auto-merge failed: ${detail}`
+      );
+      failures.push(pr.number);
+      continue;
+    }
     console.log(`PR #${pr.number}: enabled auto-merge (squash).`);
   }
+  return failures;
 }
 
 function main() {
@@ -332,8 +437,15 @@ function main() {
   const cutoffMs = Date.now() - opts.thresholdHours * 3600 * 1000;
 
   const openPrs = listOpenPrs(opts.repo);
+  let enableFailures = [];
   if (opts.enableMissing) {
-    enableMissingAutoMerge(
+    finishCustomerNotes(
+      opts.repo,
+      opts.pr ? openPrs.filter(pr => pr.number === opts.pr) : openPrs,
+      opts.dryRun,
+      gh
+    );
+    enableFailures = enableMissingAutoMerge(
       opts.repo,
       opts.pr ? openPrs.filter(pr => pr.number === opts.pr) : openPrs,
       opts.dryRun
@@ -384,6 +496,12 @@ function main() {
     upsertTrackingIssue(opts.repo, stuck, opts.dryRun);
   }
   console.log(`Triage complete. Stuck PRs: ${stuck.length}.`);
+  if (enableFailures.length > 0) {
+    console.error(
+      `Auto-merge enable failed for: ${enableFailures.map(n => `#${n}`).join(', ')}`
+    );
+    process.exitCode = 1;
+  }
 }
 
 if (require.main === module) {
@@ -395,9 +513,13 @@ module.exports = {
   ISSUE_MARKER,
   TRACKING_ISSUE_TITLE,
   parseArgs,
+  gh,
+  isTransientGhError,
   diagnoseStuckPr,
   buildCommentBody,
   buildIssueBody,
   findMarkerComment,
+  hasRevisionFailureHold,
   needsAutoMergeEnable,
+  enableMissingAutoMerge,
 };

@@ -67,6 +67,20 @@ export type RecordBackend = {
     nextValue: unknown,
     ttlSeconds: number
   ): Promise<boolean>;
+  /** Atomic CAS plus immutable records; a miss writes nothing, a conflict throws. */
+  compareAndSetWithRecords?(
+    key: string,
+    expectedValue: unknown,
+    nextValue: unknown,
+    records: Array<{ key: string; value: unknown }>,
+    ttlSeconds: number
+  ): Promise<boolean>;
+  /** Lexically ordered records confined to prefix, exclusive of after. */
+  listRecords?(
+    prefix: string,
+    after: string | undefined,
+    limit: number
+  ): Promise<Array<{ key: string; value: unknown }>>;
   lpush(key: string, value: string): Promise<void>;
   lrange(key: string, start: number, stop: number): Promise<string[]>;
 };

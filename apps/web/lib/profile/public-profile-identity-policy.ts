@@ -17,7 +17,8 @@ export type PublicProfileIdentityExclusionReason =
   | 'fabricated_identity_fixture'
   | 'legacy_claim_fixture'
   | 'production_canary'
-  | 'qa_auth_fixture';
+  | 'qa_auth_fixture'
+  | 'screen_cert_fixture';
 
 const EXCLUDED_HANDLES_BY_REASON = {
   claim_flow_fixture: ['e2eclaimartist'],
@@ -29,6 +30,7 @@ const EXCLUDED_HANDLES_BY_REASON = {
   ],
   legacy_claim_fixture: ['testartist'],
   production_canary: ['authqaprod'],
+  screen_cert_fixture: ['jovie-screen-fixture'],
   qa_auth_fixture: [
     'authiosprod',
     'authiosstaging',

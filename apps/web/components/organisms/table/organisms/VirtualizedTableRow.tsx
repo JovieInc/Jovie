@@ -1,11 +1,16 @@
 'use client';
 
-import React, { memo, useCallback, useEffect, useRef } from 'react';
+import { td as MotionTableCell } from 'motion/react-m';
+import React, { memo, useCallback, useContext, useEffect, useRef } from 'react';
 // @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableRow.test.tsx
 import type { Row, RowData } from '@/lib/tanstack-table';
 import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
+import { TABLE_CELL_CONTENT_CLASSNAME } from '../atoms/TableCell';
+import { ColumnSnapReducedMotionContext } from '../ColumnSnapMotion';
+import { usePrimaryColumnCompacts } from '../column-priority-context';
+import { columnSnapTransition } from '../column-snap';
 import { presets, rowState, tableAlignment } from '../table.styles';
 
 /**
@@ -24,12 +29,14 @@ type ManagedTrProps =
 
 export interface VirtualizedTableRowProps<TData extends RowData> {
   readonly row: Row<TData>;
+  /** TanStack rows retain identity when visibility changes; cells must invalidate memoization. */
+  readonly visibleCells?: ReturnType<Row<TData>['getVisibleCells']>;
   readonly rowIndex: number;
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
   readonly shouldEnableKeyboardNav: boolean;
   readonly shouldVirtualize: boolean;
-  readonly virtualStart?: number;
-  readonly focusedIndex: number;
+  /** Roving-tabindex owner. A boolean keeps j/k from re-rendering every row. */
+  readonly isFocused: boolean;
   /** Consumer-owned selected state, composed with TanStack selection. */
   readonly isSelected?: boolean;
   readonly onRowClick?: (row: TData) => void;
@@ -50,6 +57,14 @@ export interface VirtualizedTableRowProps<TData extends RowData> {
    * @param rowData  - The data of the clicked row
    */
   readonly onRowShiftClick?: (rowIndex: number, rowData: TData) => void;
+  /**
+   * Layout-snap cells when columns appear or disappear.
+   * UnifiedTable turns this on unless the table opts out or motion is reduced.
+   * @default false
+   */
+  readonly columnSnap?: boolean;
+  /** Index among currently rendered rows. Stagger is capped in columnSnapTransition. */
+  readonly columnSnapOrder?: number;
 }
 
 /**
@@ -57,7 +72,7 @@ export interface VirtualizedTableRowProps<TData extends RowData> {
  *
  * Features:
  * - Memoization to prevent unnecessary re-renders
- * - Virtualization support with absolute positioning
+ * - Virtualization support (in-flow rows between spacer rows)
  * - Keyboard navigation support
  * - Context menu support
  * - Dynamic row measurement for variable heights
@@ -68,12 +83,12 @@ export interface VirtualizedTableRowProps<TData extends RowData> {
  */
 function VirtualizedTableRowComponent<TData extends RowData>({
   row,
+  visibleCells = row.getVisibleCells(),
   rowIndex,
   rowRefsMap,
   shouldEnableKeyboardNav,
   shouldVirtualize,
-  virtualStart,
-  focusedIndex,
+  isFocused,
   isSelected = false,
   onRowClick,
   onRowContextMenu,
@@ -83,11 +98,15 @@ function VirtualizedTableRowComponent<TData extends RowData>({
   getRowTestId,
   measureElement,
   onRowShiftClick,
+  columnSnap = false,
+  columnSnapOrder = 0,
   ...htmlProps
 }: VirtualizedTableRowProps<TData> &
   Omit<React.ComponentPropsWithoutRef<'tr'>, ManagedTrProps>) {
+  const reducedMotion = useContext(ColumnSnapReducedMotionContext);
   const rowData = row.original as TData;
   const isRowSelected = (row.getIsSelected?.() ?? false) || isSelected;
+  const { primaryId, node: compactNode } = usePrimaryColumnCompacts(rowData);
 
   // Keep a ref to the forwarded onContextMenu so we can compose it without
   // breaking memoisation of handleContextMenu.
@@ -159,13 +178,7 @@ function VirtualizedTableRowComponent<TData extends RowData>({
       ref={handleRef}
       data-index={rowIndex}
       data-testid={getRowTestId?.(rowData, rowIndex)}
-      tabIndex={
-        shouldEnableKeyboardNav
-          ? focusedIndex === rowIndex
-            ? 0
-            : -1
-          : undefined
-      }
+      tabIndex={shouldEnableKeyboardNav ? (isFocused ? 0 : -1) : undefined}
       aria-selected={isRowSelected || htmlProps['aria-selected']}
       className={cn(
         presets.tableRow,
@@ -178,40 +191,67 @@ function VirtualizedTableRowComponent<TData extends RowData>({
       onKeyDown={handleKeyDown}
       onFocus={handleFocusChange}
       onContextMenu={handleContextMenu}
-      style={
-        shouldVirtualize && virtualStart !== undefined
-          ? {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              transform: `translateY(${virtualStart}px)`,
-            }
-          : undefined
-      }
     >
-      {row.getVisibleCells().map(cell => {
+      {visibleCells.map(cell => {
         const meta = cell.column.columnDef.meta;
         const metaClassName = meta?.className;
         const align = meta?.align ?? 'left';
-        return (
-          <td
-            key={cell.id}
+        const showCompacts =
+          compactNode != null && cell.column.id === primaryId;
+        const cellClassName = cn(
+          presets.tableCell,
+          tableAlignment.text[align],
+          meta?.actionVisibility === 'contextual' &&
+            'system-b-table-contextual-action-cell',
+          metaClassName
+        );
+        const cellStyle = {
+          width:
+            cell.column.getSize() === 150 ? undefined : cell.column.getSize(),
+        };
+        const cellContent = (
+          <div
             className={cn(
-              presets.tableCell,
-              tableAlignment.text[align],
-              meta?.actionVisibility === 'contextual' &&
-                'system-b-table-contextual-action-cell',
-              metaClassName
+              TABLE_CELL_CONTENT_CLASSNAME,
+              meta?.cellContentClassName,
+              showCompacts && 'flex items-center gap-2'
             )}
-            style={{
-              width:
-                cell.column.getSize() === 150
-                  ? undefined
-                  : cell.column.getSize(),
-            }}
+            data-table-cell-content='stable'
           >
-            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            {showCompacts ? (
+              <div className='min-w-0 flex-1 overflow-hidden'>
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </div>
+            ) : (
+              flexRender(cell.column.columnDef.cell, cell.getContext())
+            )}
+            {showCompacts ? compactNode : null}
+          </div>
+        );
+        if (columnSnap) {
+          return (
+            <MotionTableCell
+              key={cell.id}
+              layout={!reducedMotion}
+              transition={
+                reducedMotion
+                  ? undefined
+                  : columnSnapTransition(columnSnapOrder)
+              }
+              data-column-snap={reducedMotion ? undefined : 'on'}
+              data-column-snap-order={
+                reducedMotion ? undefined : columnSnapOrder
+              }
+              className={cellClassName}
+              style={cellStyle}
+            >
+              {cellContent}
+            </MotionTableCell>
+          );
+        }
+        return (
+          <td key={cell.id} className={cellClassName} style={cellStyle}>
+            {cellContent}
           </td>
         );
       })}

@@ -506,6 +506,27 @@ const rule = require('./no-hardcoded-theme-colors.js');`,
     expect(sourceReady).toContain('COVERAGE_RESULT" != "success"');
   });
 
+  it('deliberate red: source-validation.yml reads the current plan field name', () => {
+    // Regression for a real break: the planner's output field was renamed
+    // include -> coverageInclude (see the "serializes coverageInclude..."
+    // test above and ci.yml's `.coverageInclude // [] | .[]` usage), but
+    // .github/workflows/source-validation.yml's own "Exact-head Coverage"
+    // job still read the old `.include[]`. `jq` throws on a null `.include`
+    // (exit 5) for any PR with an applicable plan, failing every PR's
+    // merge-queue entry behind the one that introduced the rename until
+    // this was caught (JOV-7126 PR #19508, blocked behind #19436).
+    const workflow = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../.github/workflows/source-validation.yml'
+      ),
+      'utf8'
+    );
+    expect(workflow).toContain('JOVIE_COVERAGE_INCLUDE');
+    expect(workflow).toContain('.coverageInclude // [] | .[]');
+    expect(workflow).not.toContain(String.raw`jq -r '.include[]'`);
+  });
+
   it('deliberate red: the gate merges exactly one coverage report per shard', () => {
     const workflow = readFileSync(
       resolve(import.meta.dirname, '../../../.github/workflows/ci.yml'),

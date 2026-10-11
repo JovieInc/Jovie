@@ -1,15 +1,22 @@
 'use client';
 
+import { useMemo, useState } from 'react';
+import { columnPrioritySpecsFromDefs } from '@/components/organisms/table/column-priority';
+import { useColumnPriorityLayout } from '@/components/organisms/table/hooks/useColumnPriorityLayout';
 import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
 import { UnifiedTableSkeleton } from '@/components/organisms/table/organisms/UnifiedTableSkeleton';
-import { alignment } from '@/components/organisms/table/table.styles';
+import {
+  alignment,
+  type TableRowMode,
+} from '@/components/organisms/table/table.styles';
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
+import { LIBRARY_LIFECYCLE_STAGES } from '@/lib/library/lifecycle-stage';
 import type { ColumnDef } from '@/lib/tanstack-table';
-import type { LibraryReleaseAsset, LibraryView } from './library-data';
+import type { LibraryReleaseAsset } from './library-data';
 
 /**
- * Library loading skeleton.
+ * Work loading skeleton.
  *
  * The app shell layout renders this as the first-boot fallback for every
  * authed route, so it must not import `LibrarySurface`: that module is the
@@ -18,19 +25,19 @@ import type { LibraryReleaseAsset, LibraryView } from './library-data';
  * skeleton reads. `LibraryLoadingState.test.ts` pins them to the live table.
  */
 
-export const LIBRARY_TABLE_ROW_HEIGHT = 56;
+/**
+ * List rows carry two lines (title + artist), so they use the canonical
+ * two-line row mode. A bare `rowHeight` sizes virtualization only; the 40px
+ * row class and 32px cell clamp still apply, which clipped the artist line.
+ */
+export const LIBRARY_LIST_ROW_MODE = 'two-line' satisfies TableRowMode;
+export const LIBRARY_CATALOG_ROW_MODE = 'dense' satisfies TableRowMode;
 export const LIBRARY_TABLE_MIN_WIDTH = '0';
 
-export const LIBRARY_VIEW_FILTER_CHIP_KEYS: readonly LibraryView[] = [
+export const LIBRARY_STAGE_CHIP_KEYS = [
   'all',
-  'releases',
-  'merch',
-  'images',
-  'videos',
-  'audio',
-  'documents',
-  'archived',
-];
+  ...LIBRARY_LIFECYCLE_STAGES,
+] as const;
 
 export const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
   readonly width?: string;
@@ -43,8 +50,8 @@ export const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
     | 'meta';
 }> = [
   { variant: 'release', width: '100%' },
-  { variant: 'badge', width: '108px' },
-  { variant: 'badge', width: '92px' },
+  { variant: 'meta', width: '72px' },
+  { variant: 'avatar', width: '16px' },
   { variant: 'text', width: '88px' },
   { variant: 'meta', width: '72px' },
   { variant: 'text', width: '96px' },
@@ -56,49 +63,42 @@ export const LIBRARY_TABLE_SKELETON_COLUMNS = [
     header: 'Item',
     minSize: 220,
     size: 9999,
-    meta: { className: alignment.workspaceSeamX },
+    meta: { className: alignment.workspaceSeamX, primary: true, minWidth: 220 },
   },
   {
     id: 'releaseDate',
     header: 'Release Date',
     size: 112,
     minSize: 96,
-    meta: { className: 'pl-2 pr-3' },
+    meta: { className: 'pl-2 pr-3', priority: 5, minWidth: 112 },
   },
   {
     id: 'status',
-    header: 'Release',
-    size: 112,
-    minSize: 96,
-    meta: { className: 'hidden md:table-cell px-2' },
-  },
-  {
-    id: 'approval',
-    header: 'Approval',
-    size: 128,
-    minSize: 108,
-    meta: { className: 'hidden md:table-cell px-2' },
+    header: 'Status',
+    size: 40,
+    minSize: 40,
+    meta: { className: 'px-2', minWidth: 40, headerVisibility: 'sr-only' },
   },
   {
     id: 'type',
     header: 'Type',
     size: 104,
     minSize: 88,
-    meta: { className: 'hidden lg:table-cell px-2' },
+    meta: { className: 'px-2', priority: 2, minWidth: 104 },
   },
   {
     id: 'providers',
     header: 'Providers',
     size: 120,
     minSize: 96,
-    meta: { className: 'hidden md:table-cell px-2' },
+    meta: { className: 'px-2', priority: 3, minWidth: 120 },
   },
   {
     id: 'shareUrl',
     header: 'Share URL',
     size: 220,
     minSize: 180,
-    meta: { className: 'hidden lg:table-cell px-2' },
+    meta: { className: 'px-2', priority: 1, minWidth: 220 },
   },
   {
     id: 'actions',
@@ -113,11 +113,98 @@ export const LIBRARY_TABLE_SKELETON_COLUMNS = [
   },
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
+// Geometry only: importing the feature columns here would load the whole
+// catalog graph into the shell fallback. The parity test pins this projection.
+export const LIBRARY_CATALOG_SKELETON_COLUMNS = [
+  {
+    id: 'status',
+    header: 'Status',
+    size: 44,
+    minSize: 44,
+    meta: {
+      className: alignment.workspaceSeamX,
+      minWidth: 44,
+      headerVisibility: 'sr-only',
+    },
+  },
+  {
+    id: 'artwork',
+    header: 'Artwork',
+    size: 40,
+    minSize: 40,
+    meta: { className: 'px-2', minWidth: 40, headerVisibility: 'sr-only' },
+  },
+  {
+    id: 'title',
+    header: 'Title',
+    minSize: 180,
+    size: 9999,
+    meta: { className: 'px-2', primary: true, minWidth: 180 },
+  },
+  {
+    id: 'artist',
+    header: 'Artist',
+    size: 160,
+    minSize: 120,
+    meta: { className: 'px-2', priority: 5, minWidth: 160 },
+  },
+  {
+    id: 'type',
+    header: 'Type',
+    size: 120,
+    minSize: 96,
+    meta: { className: 'pl-2 pr-3', priority: 6, minWidth: 120 },
+  },
+  {
+    id: 'length',
+    header: 'Length',
+    size: 80,
+    minSize: 72,
+    meta: { className: 'px-2', priority: 5, minWidth: 80 },
+  },
+  LIBRARY_TABLE_SKELETON_COLUMNS[6],
+] as ColumnDef<LibraryReleaseAsset, unknown>[];
+
+export const LIBRARY_CATALOG_SKELETON_CONFIG: typeof LIBRARY_TABLE_SKELETON_CONFIG =
+  [
+    { variant: 'text', width: '16px' },
+    { variant: 'badge', width: '24px' },
+    { variant: 'text', width: '100%' },
+    { variant: 'text', width: '96px' },
+    { variant: 'text', width: '72px' },
+    { variant: 'text', width: '48px' },
+    { variant: 'text', width: '24px' },
+  ];
+
+const CATALOG_PRIORITY_SPECS = columnPrioritySpecsFromDefs(
+  LIBRARY_CATALOG_SKELETON_COLUMNS
+);
+
 export function LibraryLoadingState() {
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const { hiddenIds } = useColumnPriorityLayout(
+    CATALOG_PRIORITY_SPECS,
+    container
+  );
+  // The shared skeleton body consumes every supplied column. Apply the same
+  // fit policy to columns and placeholders so hidden headers have no body cell.
+  const { columns, config } = useMemo(() => {
+    const visibleIndexes = LIBRARY_CATALOG_SKELETON_COLUMNS.flatMap(
+      (column, index) => (hiddenIds.includes(column.id ?? '') ? [] : [index])
+    );
+    return {
+      columns: visibleIndexes.map(
+        index => LIBRARY_CATALOG_SKELETON_COLUMNS[index]
+      ),
+      config: visibleIndexes.map(
+        index => LIBRARY_CATALOG_SKELETON_CONFIG[index]
+      ),
+    };
+  }, [hiddenIds]);
   return (
     <WorkspacePage
       aria-busy='true'
-      aria-label='Loading Library'
+      aria-label='Loading Work'
       frame='content-container'
       contentPadding='none'
       surfaceMode='table'
@@ -129,7 +216,7 @@ export function LibraryLoadingState() {
               className='flex min-w-0 flex-wrap items-center gap-1'
               data-testid='library-view-filter-chips'
             >
-              {LIBRARY_VIEW_FILTER_CHIP_KEYS.map(key => (
+              {LIBRARY_STAGE_CHIP_KEYS.map(key => (
                 <span
                   key={key}
                   className='inline-block h-8 w-16 rounded-full skeleton motion-reduce:animate-none'
@@ -141,15 +228,16 @@ export function LibraryLoadingState() {
         />
       }
     >
-      <UnifiedTableSkeleton<LibraryReleaseAsset>
-        columns={LIBRARY_TABLE_SKELETON_COLUMNS}
-        hideHeader
-        rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
-        minWidth={LIBRARY_TABLE_MIN_WIDTH}
-        skeletonRows={SKELETON_ROW_COUNT.TABLE}
-        skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
-        containerClassName='h-full'
-      />
+      <div ref={setContainer} className='h-full min-w-0'>
+        <UnifiedTableSkeleton<LibraryReleaseAsset>
+          columns={columns}
+          rowMode={LIBRARY_CATALOG_ROW_MODE}
+          minWidth={LIBRARY_TABLE_MIN_WIDTH}
+          skeletonRows={SKELETON_ROW_COUNT.TABLE}
+          skeletonColumnConfig={config}
+          containerClassName='h-full'
+        />
+      </div>
     </WorkspacePage>
   );
 }

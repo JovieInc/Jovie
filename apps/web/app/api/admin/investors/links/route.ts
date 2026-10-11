@@ -3,15 +3,10 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/middleware';
 import { db } from '@/lib/db';
 import { investorLinks } from '@/lib/db/schema/investors';
-
-/** Generate a URL-safe random token (21 chars, similar to nanoid) */
-function generateToken(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, b => b.toString(36).padStart(2, '0'))
-    .join('')
-    .slice(0, 21);
-}
+import {
+  generateInvestorClaimToken,
+  investorClaimExpiresAt,
+} from '@/lib/investors/claim-token';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,7 +44,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Label is required' }, { status: 400 });
   }
 
-  const token = generateToken();
+  const token = generateInvestorClaimToken();
 
   const [link] = await db
     .insert(investorLinks)
@@ -58,6 +53,7 @@ export async function POST(request: Request) {
       label: trimmedLabel,
       investorName: investorName?.trim() || null,
       email: email?.trim() || null,
+      expiresAt: investorClaimExpiresAt(),
     })
     .returning();
 

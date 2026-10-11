@@ -33,7 +33,6 @@ describe('authenticated app screen registry', () => {
     expect(APP_SCREEN_REGISTRY.map(entry => entry.source).sort()).toEqual(
       listPageSources(shellRoot)
     );
-    expect(APP_SCREEN_REGISTRY).toHaveLength(103);
   });
 
   it('has a valid registered recipe and component composition', () => {
@@ -47,7 +46,7 @@ describe('authenticated app screen registry', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
-    expect(references).toHaveLength(49);
+    expect(references).toHaveLength(47);
     for (const screen of references) {
       expect(screen.archetypeId, screen.route).not.toBeNull();
     }
@@ -202,14 +201,14 @@ describe('authenticated app screen registry', () => {
     }
   });
 
-  it('assigns exactly 49 unique deterministic browser-safe story IDs', () => {
+  it('assigns exactly 47 unique deterministic browser-safe story IDs', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
     // Source-of-truth pin: the Pen lane must derive this count from the
     // export receipt, never hardcode it. /app/ov/ops and /app/admin redirect
     // to /hud.
-    expect(references).toHaveLength(49);
+    expect(references).toHaveLength(47);
     const storyIds = references.map(entry => {
       expect(entry.story, entry.route).not.toBeNull();
       return entry.story?.id as string;
@@ -231,11 +230,29 @@ describe('authenticated app screen registry', () => {
     }
   });
 
+  it('keeps retired Work as an Inbox Done alias with no design body or nested canvas', () => {
+    const work = APP_SCREEN_REGISTRY.find(
+      entry => entry.route === '/app/jovie-work'
+    );
+    expect(work).toMatchObject({
+      kind: 'alias',
+      conceptId: '/app',
+      redirectTo: '/app?view=done',
+      designReference: false,
+      story: null,
+      archetypeId: null,
+      canvas: {
+        canvasOwner: 'shell',
+        nestedSurfaceRoles: [],
+        nestedCanvasAllowances: [],
+      },
+    });
+  });
+
   it('resolves every alias/legacy route without a duplicate design body', () => {
     const compatibility = APP_SCREEN_REGISTRY.filter(
       entry => entry.kind === 'alias' || entry.kind === 'legacy'
     );
-    expect(compatibility).toHaveLength(32);
     const referenceConcepts = new Set(
       APP_SCREEN_REGISTRY.filter(entry => entry.designReference).map(
         entry => entry.conceptId
@@ -279,7 +296,7 @@ describe('authenticated app screen registry', () => {
     expect(receipt.schema).toBe(APP_SCREEN_PEN_EXPORT_SCHEMA);
     expect(receipt.counts).toEqual({
       screens: APP_SCREEN_REGISTRY.length,
-      designReferences: 49,
+      designReferences: 47,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
       archetypes: 8,

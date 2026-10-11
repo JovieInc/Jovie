@@ -5,12 +5,37 @@ import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardData
 import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
 import { AccountSettingsSection } from './AccountSettingsSection';
 
-const DASHBOARD_DATA = {
+const DASHBOARD_DATA: DashboardData = {
+  user: { id: 'story-user' },
+  creatorProfiles: [],
   selectedProfile: {
     id: 'story-profile',
-    settings: { require_double_opt_in: true },
+    username: 'storyprofile',
+    usernameNormalized: 'storyprofile',
+    displayName: 'Story Profile',
+    avatarUrl: null,
+  } as DashboardData['selectedProfile'],
+  needsOnboarding: false,
+  sidebarCollapsed: false,
+  hasSocialLinks: false,
+  hasMusicLinks: false,
+  isAdmin: false,
+  tippingStats: {
+    tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
+    tipsSubmitted: 0,
+    totalReceivedCents: 0,
+    monthReceivedCents: 0,
   },
-} as DashboardData;
+  profileCompletion: {
+    percentage: 0,
+    completedCount: 0,
+    totalCount: 6,
+    steps: [],
+    profileIsLive: false,
+  },
+};
 
 const meta = {
   title: 'Dashboard/Organisms/AccountSettings/AccountSettingsSection',

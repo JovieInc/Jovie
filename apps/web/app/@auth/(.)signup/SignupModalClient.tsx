@@ -4,12 +4,14 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
+import { AuthOfferSummary } from '@/components/features/auth/AuthOfferSummary';
 import { AuthShell } from '@/components/features/auth/AuthShell';
 import {
   HOMEPAGE_PROMPT_HINT_TRUNCATE,
   readHomepageIntent,
 } from '@/components/homepage/intent-store';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveAuthShellBackLink } from '@/lib/auth/auth-shell-intent';
 import {
   buildAuthRouteUrl,
   getDefaultSignUpFallbackRedirectUrl,
@@ -28,7 +30,11 @@ import { sanitizeRedirectUrl } from '@/lib/auth/constants';
  * Refresh on /signup renders the full-page /signup instead (intercepts
  * don't survive reload).
  */
-export function SignupModalClient() {
+export function SignupModalClient({
+  showOfferSummary = false,
+}: Readonly<{
+  readonly showOfferSummary?: boolean;
+}> = {}) {
   const searchParams = useSearchParams();
   const [promptHint, setPromptHint] = useState<string | null>(null);
 
@@ -58,6 +64,14 @@ export function SignupModalClient() {
   const redirectUrl =
     sanitizeRedirectUrl(searchParams.get('redirect_url')) ??
     getDefaultSignUpFallbackRedirectUrl();
+  // JOV-6225: the visible back control must go where its label promises.
+  // Resolve the validated entry context once and derive both the label and
+  // the destination from it — history alone is never the authority.
+  const backLink = resolveAuthShellBackLink(searchParams);
+  const backLabel =
+    backLink?.label ?? (promptHint ? 'Back to chat' : 'Back to homepage');
+  const backDestination =
+    backLink?.href ?? (promptHint ? APP_ROUTES.START : APP_ROUTES.HOME);
 
   const statusRow = promptHint ? (
     <p aria-live='polite' className='truncate' title={promptHint}>
@@ -74,8 +88,10 @@ export function SignupModalClient() {
       <AuthModalShell
         ariaLabel='Continue to Jovie'
         statusRow={statusRow}
-        backButtonLabel={promptHint ? 'Back to chat' : 'Back to homepage'}
+        backButtonLabel={backLabel}
+        backDestination={backDestination}
       >
+        {showOfferSummary ? <AuthOfferSummary mode='sign-up' enabled /> : null}
         <AuthShell
           mode='sign-up'
           compact

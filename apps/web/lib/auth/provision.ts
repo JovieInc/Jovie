@@ -7,6 +7,7 @@ import { captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
+import { ensureSignupWaitlistEntry } from '@/lib/waitlist/signup-entry';
 import { isWaitlistApprovedStatus } from '@/lib/waitlist/state-machine';
 import { determineUserStatus } from './user-status';
 import { getWaitlistAccess } from './waitlist-access';
@@ -126,7 +127,16 @@ export async function provisionAppUser(
       })
       .onConflictDoNothing()
       .returning({ id: users.id });
-    if (inserted) return inserted.id;
+    if (inserted) {
+      // Every gated sign-up gets a waitlist entry, so review and auto-accept
+      // can see it even if the intake chat is abandoned. It is deliberately
+      // not linked on users.waitlist_entry_id: routing keeps sending the user
+      // to the /start intake chat until they submit.
+      if (userStatus === 'waitlist_pending') {
+        await ensureSignupWaitlistEntry(normalizedEmail || email);
+      }
+      return inserted.id;
+    }
 
     // 4. Lost a race (unique conflict on email or better_auth_user_id):
     //    converge on whichever writer won.

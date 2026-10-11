@@ -35,7 +35,7 @@ function Note({
   return (
     <p
       className={`mb-4 text-xs ${
-        tone === 'banned' ? 'text-destructive' : 'text-secondary-token'
+        tone === 'banned' ? 'text-error' : 'text-secondary-token'
       }`}
     >
       {children}

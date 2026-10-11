@@ -4,7 +4,7 @@
  * Database operations for track-artist junction table.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { admitArtistCredit } from '@/lib/canonical/artist-credit';
 import { SemanticContractError } from '@/lib/canonical/semantic-contract';
 import { type DbOrTransaction, db } from '@/lib/db';
@@ -83,7 +83,10 @@ export async function upsertTrackArtist(
   if (input.position !== undefined) updateSet.position = input.position;
   if (input.isPrimary !== undefined) updateSet.isPrimary = input.isPrimary;
   if (input.sourceType !== undefined) updateSet.sourceType = input.sourceType;
-  if (input.metadata !== undefined) updateSet.metadata = input.metadata;
+  const metadataUpdate =
+    input.metadata === undefined
+      ? undefined
+      : drizzleSql`COALESCE(${trackArtists.metadata}, '{}'::jsonb) || ${JSON.stringify(input.metadata)}::jsonb`;
 
   const [result] = await database
     .insert(trackArtists)
@@ -91,8 +94,11 @@ export async function upsertTrackArtist(
     .onConflictDoUpdate({
       target: [trackArtists.trackId, trackArtists.artistId, trackArtists.role],
       set:
-        Object.keys(updateSet).length > 0
-          ? updateSet
+        Object.keys(updateSet).length > 0 || metadataUpdate
+          ? {
+              ...updateSet,
+              ...(metadataUpdate && { metadata: metadataUpdate }),
+            }
           : { creditName: insertData.creditName },
     })
     .returning();

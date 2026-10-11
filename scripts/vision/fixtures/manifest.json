@@ -1,0 +1,66 @@
+{
+  "schema": "jovie-vision-art-eval-fixtures/v1",
+  "issue": "JOV-6918",
+  "note": "Fixture images are synthesized deterministically by art-evaluator.test.mjs (repo hygiene forbids binary additions under scripts/). The verdict beside each file is the one a compliant subscription-lane vision judge must return; tests bind judge output by file basename and live judge calls happen outside CI.",
+  "focal": [
+    {
+      "file": "clean-hero.png",
+      "expect": "pass",
+      "verdict": {
+        "status": "pass",
+        "focalPoint": "copy zone upper-left",
+        "competing": [],
+        "identityDrift": [],
+        "notes": "quiet atmosphere, no competing subject"
+      }
+    },
+    {
+      "file": "glass-ball-hero.png",
+      "expect": "fail",
+      "verdict": {
+        "status": "fail",
+        "focalPoint": "specular sphere center-frame",
+        "competing": ["literal-sphere-or-glass-ball"],
+        "identityDrift": [],
+        "notes": "glass ball steals the eye before the copy zone"
+      }
+    }
+  ],
+  "identity": {
+    "modelId": "C05",
+    "comps": [
+      "c05-comp-headshot.png",
+      "c05-comp-three-quarter.png",
+      "c05-comp-full-body-front.png",
+      "c05-comp-profile.png"
+    ],
+    "renders": [
+      {
+        "file": "c05-render-on-identity.png",
+        "expect": "pass",
+        "verdict": {
+          "status": "pass",
+          "focalPoint": null,
+          "competing": [],
+          "identityDrift": [],
+          "notes": "ice-blonde hair, grey-blue eyes and facial structure match the comp sheet"
+        }
+      },
+      {
+        "file": "c05-render-drifted.png",
+        "expect": "fail",
+        "verdict": {
+          "status": "fail",
+          "focalPoint": null,
+          "competing": [],
+          "identityDrift": [
+            "hair reads warm brown, passport requires pale ice blonde fading to soft blue",
+            "eye color reads hazel, passport requires grey-blue",
+            "skin tone and facial structure do not match the comp sheet"
+          ],
+          "notes": "different person from the approved C05 comp sheet"
+        }
+      }
+    ]
+  }
+}

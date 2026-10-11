@@ -14,6 +14,9 @@ type Story = StoryObj<typeof meta>;
 // No window.jovieDesktop bridge in Storybook: the provider reports
 // 'unsupported', renders children untouched, and mounts no modal.
 export const Unsupported: Story = {
+  args: {
+    children: null,
+  },
   render: () => (
     <DesktopUpdateProvider>
       <p className='p-4 text-sm text-secondary-token'>

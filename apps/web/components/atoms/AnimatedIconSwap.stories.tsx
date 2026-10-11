@@ -23,6 +23,11 @@ export const MenuIcon: Story = {
 };
 
 export const CopyState: Story = {
+  args: {
+    activeKey: 'copy',
+    children: <Copy className='size-4' aria-hidden='true' />,
+    className: 'size-5',
+  },
   render: () => (
     <AnimatedIconSwap activeKey='copy' className='size-5'>
       <Copy className='size-4' aria-hidden='true' />
@@ -31,6 +36,11 @@ export const CopyState: Story = {
 };
 
 export const CheckState: Story = {
+  args: {
+    activeKey: 'check',
+    children: <Check className='size-4' aria-hidden='true' />,
+    className: 'size-5',
+  },
   render: () => (
     <AnimatedIconSwap activeKey='check' className='size-5'>
       <Check className='size-4' aria-hidden='true' />

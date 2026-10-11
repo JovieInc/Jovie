@@ -5,9 +5,25 @@ import {
   type TrustLogoAssetId,
 } from '@/components/media/trustLogoAssets';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import {
+  type LogoPermission,
+  type LogoPlacement,
+  permittedLogoAssetIds,
+} from '@/data/product-truth/logo-permissions';
 import { cn } from '@/lib/utils';
 
 interface HomeTrustSectionProps {
+  /**
+   * Where the strip renders. Only logos with an active permission covering
+   * this placement render (JOV-7795); with none, the section renders nothing.
+   */
+  readonly placement: LogoPlacement;
+  /**
+   * Stories and tests only: grants to evaluate instead of the registry. The
+   * logo-permission gate rejects this prop anywhere else.
+   */
+  readonly fixturePermissions?: readonly LogoPermission[];
+  readonly sectionVariant?: string;
   readonly variant?: 'default' | 'compact';
   readonly className?: string;
   readonly presentation?: 'card' | 'inline-strip' | 'artist-profile';
@@ -41,6 +57,7 @@ function getLabelMarginClass(
 function getSlotClass(isInlineStrip: boolean, slotName: string): string {
   return cn(
     'flex min-w-0 items-center justify-center',
+    !isInlineStrip && 'w-full sm:w-auto',
     isInlineStrip &&
       `homepage-trust-logo-slot homepage-trust-logo-slot--${slotName} system-b-mounted-home-trust-strip-logo-slot system-b-mounted-home-trust-strip-logo-slot--${slotName}`
   );
@@ -53,6 +70,9 @@ export function HomeTrustSection({
   label,
   ariaLabel,
   logoIds,
+  sectionVariant,
+  placement,
+  fixturePermissions,
 }: Readonly<HomeTrustSectionProps>) {
   const isInlineStrip = presentation === 'inline-strip';
   const accessibleLabel =
@@ -60,15 +80,30 @@ export function HomeTrustSection({
   const logoTone = isInlineStrip ? '' : 'text-white/55';
   const innerBoxClass = getInnerBoxClass(isInlineStrip, variant);
   const labelMarginClass = getLabelMarginClass(isInlineStrip, variant);
-  const assets = logoIds
-    ? TRUST_LOGO_ASSETS.filter(asset => logoIds.includes(asset.id))
-    : TRUST_LOGO_ASSETS;
+  const permitted = permittedLogoAssetIds(placement, {
+    permissions: fixturePermissions,
+  });
+  const assets = TRUST_LOGO_ASSETS.filter(
+    asset =>
+      permitted.includes(asset.id) && (!logoIds || logoIds.includes(asset.id))
+  );
+  if (assets.length === 0) return null;
 
   if (presentation === 'artist-profile') {
     return (
       <section
         data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.logoCloud}
-        data-testid='artist-profile-logo-bar'
+        data-testid={
+          sectionVariant
+            ? 'marketing-section-logo-cloud'
+            : 'artist-profile-logo-bar'
+        }
+        data-marketing-owner={
+          sectionVariant
+            ? 'apps/web/components/features/home/HomeTrustSection.tsx'
+            : undefined
+        }
+        data-marketing-variant={sectionVariant}
         data-presentation={presentation}
         className={cn(
           'flex w-full flex-wrap items-center justify-center gap-x-11 gap-y-6 text-primary-token/72',
@@ -90,7 +125,15 @@ export function HomeTrustSection({
   return (
     <section
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.logoCloud}
-      data-testid='homepage-trust'
+      data-testid={
+        sectionVariant ? 'marketing-section-logo-cloud' : 'homepage-trust'
+      }
+      data-marketing-owner={
+        sectionVariant
+          ? 'apps/web/components/features/home/HomeTrustSection.tsx'
+          : undefined
+      }
+      data-marketing-variant={sectionVariant}
       data-presentation={presentation}
       className={cn(
         isInlineStrip

@@ -14,7 +14,7 @@ readable. The runtime masters cited below were read with `Get` only.
 | Drift class | Count (authed surface: `components/features`, `components/jovie`, `app/app`, 1,059 files) | Guardrail today |
 |---|---|---|
 | Pen identity unbound: app-screen components with `penRootId: null` while a Pen runtime master exists | 7 of 7 app-screen components, 11 of 11 DS atoms (Button is bound per variant) | None. No Pen-vs-code parity check for the authed app. |
-| Retired shims and forks still importable | 5 retired in this PR (25 consumers migrated) | **New:** `retired-modules.json` gate + ESLint |
+| Retired shims and forks still importable | 4 retired in this PR (25 consumers migrated); `features/dashboard/tokens` barrel still has 8 consumers | **New:** `retired-modules.json` gate + ESLint |
 | Raw Tailwind palette utilities (`text-amber-700`, `bg-white`, hex) | 765 occurrences in 139 files | Contrast ratchet (shrink-only), `no-hardcoded-theme-colors` |
 | Arbitrary values (`w-[327px]`, `leading-[18px]`) | 999 in 272 files | Arbitrary-values ratchet (shrink-only) |
 | Raw `<button>` | 293 in 175 files | Raw-button ratchet |
@@ -116,6 +116,13 @@ Proposed next (tracked in Linear under the `ds-drift` label: JOV-6772, JOV-6773,
   padding, radius) disagree with the source contract.
 - **Component-family ratchet extension:** add `*StatusPill|*StatusBadge|
   *StatusDot|*Glyph` and `*Header` (entity) families.
+- **Finish the `features/dashboard/tokens` barrel retirement:** 10 of 18
+  consumers now import `@/components/tokens/linear-surface`. The remaining 8
+  (three of them shared organisms, which inverts the dependency direction)
+  carry pre-existing whole-file lint debt (`shadcn/no-restyle` outside the
+  baseline, a react-compiler ref write, and label casing), so touching their
+  import line fails pre-commit. Clear that debt first, then delete the barrel
+  and add a `retired-modules.json` row.
 - **Alias convergence:** retire `destructive` and bare `red` colour
   utilities in `apps/web` in favour of `error` (value-preserving), then ban
   them.

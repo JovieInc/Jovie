@@ -13,6 +13,7 @@ export const adminPeopleViews = [
   'releases',
   'assets',
   'feedback',
+  'recovery',
 ] as const;
 
 export type AdminPeopleView = (typeof adminPeopleViews)[number];
@@ -40,8 +41,11 @@ export type AdminWorkspaceId =
   | 'ops'
   | 'shipping'
   | 'people'
+  | 'interviews'
   | 'growth'
   | 'platform_connections'
+  | 'playlists'
+  | 'presence'
   | 'activity'
   | 'investors'
   | 'feature_registry'
@@ -75,15 +79,16 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'certifications',
   'shipping',
   'people',
+  'interviews',
   'platform_connections',
+  'playlists',
+  'presence',
   'activity',
   'investors',
   'feature_registry',
-  'screenshots',
   'share_studio',
   'costs',
   'revenue_lift',
-  'system_map',
   'features',
 ] as const satisfies readonly AdminWorkspaceId[];
 
@@ -155,10 +160,31 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
+    id: 'interviews',
+    label: 'Interviews',
+    href: APP_ROUTES.ADMIN_INTERVIEWS,
+    description: 'Review post-onboarding interview transcripts and summaries',
+    section: 'utilities',
+  },
+  {
     id: 'platform_connections',
     label: 'Platform Connections',
     href: APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS,
     description: 'Spotify publisher and playlist generation controls',
+    section: 'utilities',
+  },
+  {
+    id: 'playlists',
+    label: 'Playlists',
+    href: APP_ROUTES.ADMIN_PLAYLISTS,
+    description: 'Review and publish generated playlists',
+    section: 'utilities',
+  },
+  {
+    id: 'presence',
+    label: 'Presence',
+    href: APP_ROUTES.ADMIN_PRESENCE,
+    description: 'Inspect indexing, SEO, copy, and Lighthouse health',
     section: 'utilities',
   },
   {
@@ -180,13 +206,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Feature Registry',
     href: APP_ROUTES.ADMIN_FEATURE_REGISTRY,
     description: 'Founder review packets for canonical product capabilities',
-    section: 'utilities',
-  },
-  {
-    id: 'screenshots',
-    label: 'Screenshots',
-    href: APP_ROUTES.ADMIN_SCREENSHOTS,
-    description: 'Generated docs and QA screenshots',
     section: 'utilities',
   },
   {
@@ -213,13 +232,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
-    id: 'system_map',
-    label: 'System Map',
-    href: APP_ROUTES.ADMIN_SYSTEM,
-    description: 'Read-only map of skills, connectors, tools, and memory',
-    section: 'utilities',
-  },
-  {
     id: 'features',
     label: 'Features',
     href: APP_ROUTES.ADMIN_FEATURES,
@@ -236,6 +248,7 @@ export const ADMIN_PEOPLE_VIEW_LABELS: Record<AdminPeopleView, string> = {
   releases: 'Releases',
   assets: 'Assets',
   feedback: 'Feedback',
+  recovery: 'Recovery',
 };
 
 export const ADMIN_GROWTH_VIEW_LABELS: Record<AdminGrowthView, string> = {

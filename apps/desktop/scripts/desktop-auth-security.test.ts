@@ -226,13 +226,23 @@ test('desktop permission matrix grants only trusted audio requests', () => {
 test('HUD screen capture is granted only on /hud from the app origin', () => {
   const appOrigin = 'https://jov.ie';
   const parseUrl = parseTestUrl;
+  const hudUrl = `${appOrigin}/hud`;
+  const hudContents = {
+    getURL: () => hudUrl,
+    isDestroyed: () => false,
+  } as never;
+  const hudDetails = {
+    requestingUrl: hudUrl,
+    securityOrigin: appOrigin,
+    isMainFrame: true,
+  };
 
   expect(
     shouldGrantTrustedHudScreenPermission({
       permission: 'display-capture',
-      details: { mediaTypes: ['video', 'audio'] },
-      webContents: null,
-      requestingOrigin: `${appOrigin}/hud`,
+      details: { ...hudDetails, mediaTypes: ['video', 'audio'] },
+      webContents: hudContents,
+      requestingOrigin: hudUrl,
       parseUrl,
       appOrigin,
     })
@@ -241,8 +251,11 @@ test('HUD screen capture is granted only on /hud from the app origin', () => {
   expect(
     shouldGrantTrustedHudScreenPermission({
       permission: 'media',
-      details: { mediaTypes: ['video'] },
-      webContents: null,
+      details: { ...hudDetails, mediaTypes: ['video'] },
+      webContents: {
+        getURL: () => `${appOrigin}/app/chat`,
+        isDestroyed: () => false,
+      } as never,
       requestingOrigin: `${appOrigin}/app/chat`,
       parseUrl,
       appOrigin,
@@ -252,9 +265,9 @@ test('HUD screen capture is granted only on /hud from the app origin', () => {
   expect(
     shouldGrantTrustedHudScreenPermissionCheck({
       permission: 'display-capture',
-      details: { mediaType: 'video' },
-      webContents: null,
-      requestingOrigin: `${appOrigin}/hud`,
+      details: { ...hudDetails, mediaType: 'video' },
+      webContents: hudContents,
+      requestingOrigin: hudUrl,
       parseUrl,
       appOrigin,
     })

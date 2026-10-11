@@ -33,3 +33,12 @@ The review result is **prepared drafts, no distribution authority**. Exact deriv
 ## Correction behavior
 
 A source revision or evidence change selects derivatives by their exact claim bindings, changes their review state to `needs-review`, revokes granted distribution approvals, and records a history event. A published derivative becomes `correction-required` and returns an action for the existing release process. Withdrawal or a privacy-sensitive correction returns a privacy-safe removal action. Until correction lands, stale content is omitted from editorial, sitemap, and agent projections.
+
+## Claim freshness (JOV-5024)
+
+Every canonical claim carries an assertion type (`observed-fact`, `founder-attested`, `hypothesis`, `plan`, `forecast`), subject, as-of date, dated accountable reviewer, limitations, and an optional freshness window. Validation fails closed:
+
+- hypotheses, plans, and forecasts can never carry verified or canonical evidence quality; forecasts require an explicit `expiresAt`;
+- measured-outcome claims must keep their cohort label and sample size attached;
+- availability claims must bind a `featureAvailability` capability id (JOV-6216) — unknown ids, non-public capabilities in public claims, and unusable capabilities stated as fact are all rejected;
+- an `evaluatedAt` option marks claims past `expiresAt` as `expired-claim-evidence` per derivative, so stale evidence withdraws only the artifacts that use it.

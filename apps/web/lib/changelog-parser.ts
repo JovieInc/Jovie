@@ -23,6 +23,7 @@
  *   never customer changelog entries and never make a release public.
  */
 
+import { z } from 'zod';
 import { isInternalEntry } from './changelog-filter-rules';
 
 export interface ChangelogSection {
@@ -50,6 +51,16 @@ export interface ChangelogRelease {
   sections: ChangelogSection;
   /** Optional `### Dogfood` bullets; absent when the release has none. */
   dogfood?: string[];
+  /** Reviewed customer copy from a verified daily publication receipt. */
+  customerOutcomes?: Record<
+    string,
+    {
+      availability: 'ga' | 'preview' | 'limited' | 'unverified';
+      prerequisites: string[];
+      supporting?: string[];
+      action?: { label: string; href: string };
+    }
+  >;
 }
 
 const DAILY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -378,6 +389,8 @@ function processChangelogLine(
 
   if (!current) return { current, currentSection, summaryConsumed };
 
+  readCustomerPublication(line, current);
+
   const summaryState = tryParseSummary(
     line,
     current,
@@ -391,4 +404,120 @@ function processChangelogLine(
 
   tryParseBullet(line, current, currentSection);
   return { current, currentSection, summaryConsumed };
+}
+
+const SAFE_ACTION_HOSTS = new Set(['jov.ie', 'docs.jov.ie']);
+
+/**
+ * Next-step destinations must stay customer-reachable: internal paths or
+ * https on first-party hosts. Anything else fails closed, never rendered.
+ */
+export function isSafeChangelogActionHref(href: string): boolean {
+  if (/^\/(?!\/)\S*$/.test(href)) return true;
+  try {
+    const url = new URL(href);
+    return (
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      SAFE_ACTION_HOSTS.has(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+const PublicationReceiptSchema = z.object({
+  schema: z.literal('daily-changelog-receipt/v1'),
+  window: z.object({ key: z.string() }),
+  publicationHead: z.string().regex(/^[a-f0-9]{40}$/),
+  sourceReceiptIds: z.array(z.string()).min(1),
+  deployments: z.array(z.object({ sha: z.string(), id: z.string() })).min(1),
+  runtimeEvidence: z
+    .array(
+      z.object({
+        passed: z.boolean(),
+        status: z.number(),
+        sha256: z.string(),
+      })
+    )
+    .min(1),
+  stories: z
+    .array(
+      z.object({
+        summary: z.string().min(1),
+        section: z.enum(['Added', 'Changed', 'Fixed', 'Removed']),
+        sourceIds: z.array(z.string()).min(1),
+        bullets: z.array(z.string().trim().min(1)).max(5).optional(),
+        action: z
+          .object({
+            label: z.string().trim().min(1).max(80),
+            href: z.string().trim().min(1).max(400),
+          })
+          .refine(value => isSafeChangelogActionHref(value.href))
+          .optional()
+          .catch(undefined),
+        availability: z
+          .object({
+            status: z.enum(['ga', 'preview', 'limited']),
+            prerequisites: z.array(z.string().trim().min(1)).max(5),
+          })
+          .refine(
+            value =>
+              value.status !== 'limited' || value.prerequisites.length > 0
+          )
+          .optional()
+          .catch(undefined),
+      })
+    )
+    .max(3),
+});
+
+/** Engineering history remains readable; only receipted copy becomes a card. */
+function readCustomerPublication(
+  line: string,
+  release: ChangelogRelease
+): void {
+  const match = /^<!-- daily-changelog-receipt\/v1 (.+) -->$/.exec(line);
+  if (!match) return;
+  try {
+    const parsed = PublicationReceiptSchema.safeParse(JSON.parse(match[1]));
+    if (!parsed.success) return;
+    const receipt = parsed.data;
+    if (
+      receipt.window.key !== release.version ||
+      !receipt.deployments.some(
+        deployment =>
+          deployment.sha === receipt.publicationHead &&
+          /^dpl_[A-Za-z0-9]+$/.test(deployment.id)
+      ) ||
+      !receipt.runtimeEvidence.some(
+        evidence =>
+          evidence.passed &&
+          evidence.status === 200 &&
+          /^[a-f0-9]{64}$/.test(evidence.sha256)
+      )
+    )
+      return;
+    const outcomes: NonNullable<ChangelogRelease['customerOutcomes']> = {};
+    for (const story of receipt.stories) {
+      if (
+        !story.sourceIds.every(id => receipt.sourceReceiptIds.includes(id)) ||
+        !release.sections[
+          story.section.toLowerCase() as keyof ChangelogSection
+        ].includes(story.summary)
+      )
+        continue;
+      outcomes[story.summary] = {
+        availability: story.availability?.status ?? 'unverified',
+        prerequisites: story.availability?.prerequisites ?? [],
+        supporting: story.bullets ?? [],
+        ...(story.action ? { action: story.action } : {}),
+      };
+    }
+    release.customerOutcomes = outcomes;
+  } catch {
+    // Corrupt/legacy receipts cannot silently approve engineering bullets.
+  }
 }

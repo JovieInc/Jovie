@@ -222,6 +222,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/admin/campaigns/page.tsx',
   'apps/web/app/app/(shell)/admin/certifications/page.tsx',
   'apps/web/app/app/(shell)/admin/chat/page.tsx',
+  'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
   'apps/web/app/app/(shell)/admin/costs/page.tsx',
   'apps/web/app/app/(shell)/admin/creators/page.tsx',
   'apps/web/app/app/(shell)/admin/feature-registry/page.tsx',
@@ -258,6 +259,8 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/admin/system/page.tsx',
   'apps/web/app/app/(shell)/admin/users/page.tsx',
   'apps/web/app/app/(shell)/admin/waitlist/page.tsx',
+  'apps/web/app/app/(shell)/admin/wiki/[...slug]/page.tsx',
+  'apps/web/app/app/(shell)/admin/wiki/page.tsx',
   'apps/web/app/app/(shell)/audience/page.tsx',
   'apps/web/app/app/(shell)/calendar/page.tsx',
   'apps/web/app/app/(shell)/chat/[id]/page.tsx',
@@ -288,6 +291,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/insights/page.tsx',
   'apps/web/app/app/(shell)/jovie-work/page.tsx',
   'apps/web/app/app/(shell)/library/page.tsx',
+  'apps/web/app/app/(shell)/links/page.tsx',
   'apps/web/app/app/(shell)/lyrics/[trackId]/page.tsx',
   'apps/web/app/app/(shell)/page.tsx',
   'apps/web/app/app/(shell)/presence/page.tsx',
@@ -298,7 +302,6 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/settings/account/page.tsx',
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
   'apps/web/app/app/(shell)/settings/analytics/page.tsx',
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx',
   'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
   'apps/web/app/app/(shell)/settings/audience/page.tsx',
   'apps/web/app/app/(shell)/settings/billing/page.tsx',
@@ -309,8 +312,6 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/settings/page.tsx',
   'apps/web/app/app/(shell)/settings/payments/page.tsx',
   'apps/web/app/app/(shell)/settings/profile/page.tsx',
-  'apps/web/app/app/(shell)/settings/referral/page.tsx',
-  'apps/web/app/app/(shell)/settings/retargeting-ads/page.tsx',
   'apps/web/app/app/(shell)/settings/touring/page.tsx',
   'apps/web/app/app/(shell)/settings/usage/page.tsx',
   'apps/web/app/app/(shell)/tasks/page.tsx',
@@ -327,7 +328,7 @@ const LEGACY_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/audience/page.tsx',
   'apps/web/app/app/(shell)/contact/page.tsx',
   'apps/web/app/app/(shell)/feature-flags/page.tsx',
-  'apps/web/app/app/(shell)/presence/page.tsx',
+  'apps/web/app/app/(shell)/profiles/page.tsx',
   'apps/web/app/app/(shell)/profile/page.tsx',
   'apps/web/app/app/(shell)/releases/page.tsx',
   'apps/web/app/app/(shell)/threads/page.tsx',
@@ -336,17 +337,18 @@ const LEGACY_SOURCES = new Set<string>([
 ]);
 
 const ALIAS_SOURCES = new Set<string>([
+  'apps/web/app/app/(shell)/jovie-work/page.tsx',
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx',
+  'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx',
   'apps/web/app/app/(shell)/settings/page.tsx',
-  'apps/web/app/app/(shell)/settings/profile/page.tsx',
 ]);
 
 /** Conservative: a redirecting source is never eligible as a visual reference. */
 const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/admin/algorithm-health/page.tsx',
   'apps/web/app/app/(shell)/admin/campaigns/page.tsx',
+  'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
   'apps/web/app/app/(shell)/admin/creators/page.tsx',
   'apps/web/app/app/(shell)/admin/feedback/page.tsx',
   'apps/web/app/app/(shell)/admin/growth/yc-metrics/page.tsx',
@@ -366,6 +368,8 @@ const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/admin/shipping/page.tsx',
   'apps/web/app/app/(shell)/admin/users/page.tsx',
   'apps/web/app/app/(shell)/admin/waitlist/page.tsx',
+  'apps/web/app/app/(shell)/admin/wiki/[...slug]/page.tsx',
+  'apps/web/app/app/(shell)/admin/wiki/page.tsx',
   'apps/web/app/app/(shell)/audience/page.tsx',
   'apps/web/app/app/(shell)/contact/page.tsx',
   'apps/web/app/app/(shell)/dashboard/audience/page.tsx',
@@ -382,15 +386,14 @@ const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/dashboard/tipping/page.tsx',
   'apps/web/app/app/(shell)/dashboard/tour-dates/page.tsx',
   'apps/web/app/app/(shell)/feature-flags/page.tsx',
-  'apps/web/app/app/(shell)/presence/page.tsx',
+  'apps/web/app/app/(shell)/profiles/page.tsx',
   'apps/web/app/app/(shell)/profile/page.tsx',
   'apps/web/app/app/(shell)/releases/page.tsx',
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx',
+  'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx',
   'apps/web/app/app/(shell)/settings/page.tsx',
   'apps/web/app/app/(shell)/settings/payments/page.tsx',
-  'apps/web/app/app/(shell)/settings/profile/page.tsx',
   'apps/web/app/app/(shell)/threads/page.tsx',
   'apps/web/app/app/(shell)/tipping/page.tsx',
   'apps/web/app/app/(shell)/tracks/page.tsx',
@@ -421,13 +424,17 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     conceptId: '/app/settings/contacts',
     redirectTo: '/app/settings/contacts',
   },
+  'apps/web/app/app/(shell)/jovie-work/page.tsx': {
+    conceptId: '/app',
+    redirectTo: '/app?view=done',
+  },
   'apps/web/app/app/(shell)/feature-flags/page.tsx': {
     conceptId: '/app/admin/features',
     redirectTo: '/app/ov/features',
   },
-  'apps/web/app/app/(shell)/presence/page.tsx': {
-    conceptId: '/app/profiles',
-    redirectTo: '/app/profiles',
+  'apps/web/app/app/(shell)/profiles/page.tsx': {
+    conceptId: '/app/presence',
+    redirectTo: '/app/presence',
   },
   'apps/web/app/app/(shell)/profile/page.tsx': {
     conceptId: '/app/chat',
@@ -442,8 +449,8 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/chats',
   },
   'apps/web/app/app/(shell)/tipping/page.tsx': {
-    conceptId: '/app/settings/artist-profile',
-    redirectTo: '/app/settings/artist-profile?tab=earn#pay',
+    conceptId: '/app/settings/profile',
+    redirectTo: '/app/settings/profile?tab=earn#pay',
   },
   'apps/web/app/app/(shell)/tracks/page.tsx': {
     conceptId: '/app/library',
@@ -454,7 +461,7 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/audience',
   },
   'apps/web/app/app/(shell)/dashboard/catalog-scan/page.tsx': {
-    conceptId: '/app/profiles',
+    conceptId: '/app/presence',
     redirectTo: '/app/presence',
   },
   'apps/web/app/app/(shell)/dashboard/chat/page.tsx': {
@@ -466,8 +473,8 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/settings/contacts',
   },
   'apps/web/app/app/(shell)/dashboard/earnings/page.tsx': {
-    conceptId: '/app/settings/artist-profile',
-    redirectTo: '/app/settings/artist-profile?tab=earn#pay',
+    conceptId: '/app/settings/profile',
+    redirectTo: '/app/settings/profile?tab=earn#pay',
   },
   'apps/web/app/app/(shell)/dashboard/insights/page.tsx': {
     conceptId: '/app/insights',
@@ -478,16 +485,16 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/library',
   },
   'apps/web/app/app/(shell)/dashboard/links/page.tsx': {
-    conceptId: '/app/chat',
-    redirectTo: '/app/chat?panel=profile',
+    conceptId: '/app/links',
+    redirectTo: '/app/links',
   },
   'apps/web/app/app/(shell)/dashboard/page.tsx': {
     conceptId: '/app',
     redirectTo: '/app',
   },
   'apps/web/app/app/(shell)/dashboard/presence/page.tsx': {
-    conceptId: '/app/profiles',
-    redirectTo: '/app/profiles',
+    conceptId: '/app/presence',
+    redirectTo: '/app/presence',
   },
   'apps/web/app/app/(shell)/dashboard/profile/page.tsx': {
     conceptId: '/app/chat',
@@ -520,20 +527,16 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/tasks',
   },
   'apps/web/app/app/(shell)/dashboard/tipping/page.tsx': {
-    conceptId: '/app/settings/artist-profile',
-    redirectTo: '/app/settings/artist-profile?tab=earn#pay',
+    conceptId: '/app/settings/profile',
+    redirectTo: '/app/settings/profile?tab=earn#pay',
   },
   'apps/web/app/app/(shell)/dashboard/tour-dates/page.tsx': {
     conceptId: '/app/tour-dates',
     redirectTo: '/app/tour-dates',
   },
   'apps/web/app/app/(shell)/settings/admin/page.tsx': {
-    conceptId: '/app/settings/artist-profile',
-    redirectTo: '/app/settings/artist-profile',
-  },
-  'apps/web/app/app/(shell)/settings/appearance/page.tsx': {
-    conceptId: '/app/settings/account',
-    redirectTo: '/app/settings/account',
+    conceptId: '/app/settings/profile',
+    redirectTo: '/app/settings/profile',
   },
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx': {
     conceptId: '/app/settings/data-privacy',
@@ -543,9 +546,9 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     conceptId: '/app/settings/account',
     redirectTo: '/app/settings/account',
   },
-  'apps/web/app/app/(shell)/settings/profile/page.tsx': {
-    conceptId: '/app/settings/artist-profile',
-    redirectTo: '/app/settings/artist-profile',
+  'apps/web/app/app/(shell)/settings/artist-profile/page.tsx': {
+    conceptId: '/app/settings/profile',
+    redirectTo: '/app/settings/profile',
   },
 };
 
@@ -611,9 +614,7 @@ export function appScreenConceptToStoryId(conceptId: string): string {
   return `app-screens-${slug}--reference`;
 }
 
-const RECIPE_BY_ID: Readonly<
-  Record<AppScreenRecipeId, AppScreenRecipeRegistryEntry>
-> = Object.fromEntries(
+const RECIPE_BY_ID = new Map<AppScreenRecipeId, AppScreenRecipeRegistryEntry>(
   APP_SCREEN_RECIPE_REGISTRY.map(recipe => [recipe.id, recipe])
 );
 
@@ -630,7 +631,8 @@ export const APP_SCREEN_REGISTRY: readonly AppScreenRegistryEntry[] =
       kind === 'alias' || kind === 'legacy'
         ? ALIAS_LEGACY_CONCEPT_MAP[source]
         : undefined;
-    const recipe = RECIPE_BY_ID[recipeId];
+    const recipe = RECIPE_BY_ID.get(recipeId);
+    if (!recipe) throw new Error(`Missing app-screen recipe: ${recipeId}`);
     return {
       id: routeToId(route),
       route,

@@ -32,8 +32,8 @@ const libraryFacts = [
   { label: 'Stats', value: 'Not connected' },
 ] as const;
 
-describe('ToolPartsRenderer library opportunities', () => {
-  it('reserves the presence artifact slot while Library lookup is running', () => {
+describe('ToolPartsRenderer work opportunities', () => {
+  it('reserves the presence artifact slot while Work lookup is running', () => {
     render(
       <ToolPartsRenderer
         variant='chat'
@@ -44,22 +44,22 @@ describe('ToolPartsRenderer library opportunities', () => {
     expect(
       screen.getByTestId('chat-generation-artifact-surface')
     ).toBeInTheDocument();
-    expect(screen.getByText('Library opportunities')).toBeInTheDocument();
+    expect(screen.getByText('Work opportunities')).toBeInTheDocument();
     const loading = screen.getByTestId('chat-presence-artifact-loading');
     expect(loading).toHaveClass('min-h-16');
     expect(screen.getByText('Running…')).toBeInTheDocument();
   });
 
-  it('renders truthful Library facts without sending or inventing stats', () => {
+  it('renders truthful Work facts without sending or inventing stats', () => {
     render(
       <ToolPartsRenderer
         variant='chat'
         parts={[
           toolEventToMessagePart(
             buildSucceededToolEvent(LIBRARY_STEP, {
-              title: 'Library opportunities',
+              title: 'Work opportunities',
               summary:
-                'Your Library presence queue is ready. Findings stay local and nothing was sent.',
+                'Your Work opportunity queue is ready. Findings stay local and nothing was sent.',
               facts: [...libraryFacts],
             })
           ),
@@ -77,30 +77,72 @@ describe('ToolPartsRenderer library opportunities', () => {
     expect(success.textContent).not.toMatch(/streams|revenue|license/i);
   });
 
-  it('keeps the failed Library artifact in the same card family', () => {
+  it('keeps the failed Work artifact in the same card family', () => {
     render(
       <ToolPartsRenderer
         variant='chat'
         parts={[
           toolEventToMessagePart(
-            buildFailedToolEvent(
-              LIBRARY_STEP,
-              'Library presence lookup failed.'
-            )
+            buildFailedToolEvent(LIBRARY_STEP, 'Work presence lookup failed.')
           ),
         ]}
       />
     );
 
+    expect(screen.getByText('Work opportunities failed')).toBeInTheDocument();
     expect(
-      screen.getByText('Library opportunities failed')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Library presence lookup failed.')
+      screen.getByText('Work presence lookup failed.')
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Try again' })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('ToolPartsRenderer link check', () => {
+  it('renders sourced link-drift findings in the presence artifact card', () => {
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={[
+          toolEventToMessagePart(
+            buildSucceededToolEvent('check_link_drift', {
+              title: 'Link check',
+              summary: 'Found 1 thing on your link-in-bio page to fix.',
+              facts: [
+                {
+                  label: 'Bio link',
+                  value:
+                    'Points to “Old Single” (Mar 2025). Your latest, “New Single”, came out Sep 2026.',
+                  source:
+                    'https://bio.example/a vs https://open.spotify.com/artist/x',
+                  observedAt: '2026-10-04T00:00:00.000Z',
+                },
+              ],
+            })
+          ),
+        ]}
+      />
+    );
+
+    const success = screen.getByTestId('chat-presence-artifact-success');
+    expect(screen.getByText('Link check')).toBeInTheDocument();
+    expect(screen.getByText('Bio link')).toBeInTheDocument();
+    expect(success).toHaveTextContent('Your latest, “New Single”');
+  });
+
+  it('shows the link check loading state in the same reserved slot', () => {
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={[
+          toolEventToMessagePart(buildRunningToolEvent('check_link_drift')),
+        ]}
+      />
+    );
+    expect(screen.getByTestId('chat-presence-artifact-loading')).toHaveClass(
+      'min-h-16'
+    );
   });
 });
 

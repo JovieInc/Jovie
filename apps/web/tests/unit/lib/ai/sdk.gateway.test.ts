@@ -30,15 +30,40 @@ describe('lib/ai/sdk gateway routing', () => {
     delete process.env.HELICONE_API_KEY;
 
     const { gateway } = await import('@/lib/ai/sdk');
-    const model = gateway('anthropic/claude-haiku-4-5-20251001');
+    const model = gateway('zai/glm-5.3');
 
     expect(mockCreateGateway).toHaveBeenCalledWith({ apiKey: 'gateway-key' });
-    expect(mockGatewayModel).toHaveBeenCalledWith(
-      'anthropic/claude-haiku-4-5-20251001'
-    );
+    expect(mockGatewayModel).toHaveBeenCalledWith('zai/glm-5.3');
     expect(model).toEqual({
-      __model: 'anthropic/claude-haiku-4-5-20251001',
+      __model: 'zai/glm-5.3',
     });
+  });
+
+  it('fails fast on banned openai/anthropic model ids (JOV-7119)', async () => {
+    process.env.AI_GATEWAY_API_KEY = 'gateway-key';
+    const { gateway } = await import('@/lib/ai/sdk');
+
+    expect(() => gateway('openai/gpt-6-sol')).toThrow(/banned provider/);
+    expect(() => gateway('anthropic/claude-haiku-4-5-20251001')).toThrow(
+      /banned provider/
+    );
+    expect(mockGatewayModel).not.toHaveBeenCalled();
+  });
+
+  it('fails fast on banned image model ids (JOV-7119)', async () => {
+    process.env.AI_GATEWAY_API_KEY = 'gateway-key';
+    const image = vi.fn((modelId: string) => ({ __image: modelId }));
+    const provider = Object.assign(
+      vi.fn((modelId: string) => ({ __model: modelId })),
+      { image }
+    );
+    mockCreateGateway.mockReturnValue(provider);
+
+    const { gateway } = await import('@/lib/ai/sdk');
+    expect(() => gateway.image('openai/gpt-image-1.5')).toThrow(
+      /banned provider/
+    );
+    expect(image).not.toHaveBeenCalled();
   });
 
   it('routes through Helicone proxy when base URL is configured', async () => {
@@ -48,7 +73,7 @@ describe('lib/ai/sdk gateway routing', () => {
     process.env.HELICONE_API_KEY = 'helicone-key';
 
     const { gateway } = await import('@/lib/ai/sdk');
-    gateway('openai/gpt-4o-mini');
+    gateway('zai/glm-5.3-flash');
 
     expect(mockCreateGateway).toHaveBeenCalledWith({
       apiKey: 'gateway-key',
@@ -57,7 +82,7 @@ describe('lib/ai/sdk gateway routing', () => {
         'Helicone-Auth': 'Bearer helicone-key',
       },
     });
-    expect(mockGatewayModel).toHaveBeenCalledWith('openai/gpt-4o-mini');
+    expect(mockGatewayModel).toHaveBeenCalledWith('zai/glm-5.3-flash');
   });
 
   it('omits Helicone auth header when API key is unset', async () => {
@@ -68,7 +93,7 @@ describe('lib/ai/sdk gateway routing', () => {
     delete process.env.AI_GATEWAY_API_KEY;
 
     const { gateway } = await import('@/lib/ai/sdk');
-    gateway('openai/gpt-4o-mini');
+    gateway('zai/glm-5.3-flash');
 
     expect(mockCreateGateway).toHaveBeenCalledWith({
       apiKey: undefined,

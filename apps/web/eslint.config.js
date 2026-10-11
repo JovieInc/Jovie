@@ -25,6 +25,16 @@ const noDirectStripeClientRule = require('./eslint-rules/no-direct-stripe-client
 const { plugin: shadcn } = require('@shadcn/lint');
 const shadcnNoRestyleBaseline = require('./tests/unit/design-system/shadcn-no-restyle.baseline.json');
 const shadcnNoRestyleOptions = require('./eslint-rules/shadcn-no-restyle.options.json');
+const retiredDesignSystemModules = require('./data/designSystem/retired-modules.json');
+
+// Retired DS forks/shims (CI gate: tests/unit/design-system/retired-modules.test.ts).
+const retiredDesignSystemImportPaths =
+  retiredDesignSystemModules.modules.flatMap(entry =>
+    entry.specifiers.map(name => ({
+      name,
+      message: `Retired design-system module. Use ${entry.replacement} instead. ${entry.reason}`,
+    }))
+  );
 
 const shadcnNoRestyleBaselineFiles = Object.keys(
   shadcnNoRestyleBaseline.files
@@ -116,6 +126,7 @@ const baseConfig = {
             message:
               "Use DropdownMenu components from '@jovie/ui' instead of local atoms.",
           },
+          ...retiredDesignSystemImportPaths,
           // Block barrel imports (index.ts) for better build performance
           {
             name: '@/components/atoms',
@@ -394,7 +405,6 @@ module.exports = [
       'components/atoms/**',
       'app/(marketing)/changelog/feed.xml/route.ts',
       'app/api/health/build-info/route.ts',
-      'components/features/home/RecentlyShippedSection.tsx',
       'lib/a11y-gates/contrast-engine.ts',
       'lib/a11y-gates/touch-target-engine.ts',
       'lib/changelog-source.ts',
@@ -404,6 +414,7 @@ module.exports = [
       'lib/hud/shipper-state.ts',
       'lib/library-share/passphrase.ts',
       'lib/merch/artwork.ts',
+      'lib/recent-releases.ts',
       'lib/ovie/identity.ts',
       'lib/ovie/mcp/artist-profile-inventory.ts',
       'lib/seo/ratchet.ts',

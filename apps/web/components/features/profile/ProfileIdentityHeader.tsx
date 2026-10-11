@@ -1,4 +1,3 @@
-import { Button } from '@jovie/ui';
 import { Bell, Check } from 'lucide-react';
 import Link from 'next/link';
 import type { MouseEvent } from 'react';
@@ -50,16 +49,18 @@ export interface ProfileIdentityHeaderProps {
 }
 
 const PILL_FACE_CLASS_NAME =
-  'profile-glass-pill profile-glass-pill--flat flex h-7 w-full items-center justify-center gap-1.5 text-mid font-medium leading-none group-focus-visible:ring-2 group-focus-visible:ring-focus';
+  'profile-glass-pill profile-glass-pill--flat flex h-7 w-full items-center justify-center gap-1.5 text-mid font-medium leading-none transition-colors duration-subtle group-hover:bg-interactive-hover group-focus-visible:ring-2 group-focus-visible:ring-focus';
 
 /**
- * 44px hit slot for the 28px pill face. The canonical Button is a transparent
- * overlay (layout-only classes — shadcn/no-restyle forbids visual overrides)
- * so the row adds no raw button element; the pill face owns the look.
+ * 44px hit slot for the 28px pill face. The trigger is a plain layout-only
+ * overlay button — the canonical Button's ghost hover fill would paint the
+ * full slot and render the control larger than its 28px rest state. The pill
+ * face owns the rest-state look; the overlay carries the focus ring.
  */
 const PILL_HIT_SLOT_CLASS_NAME =
-  'relative flex h-11 min-w-0 flex-1 touch-manipulation items-center';
-const PILL_HIT_OVERLAY_CLASS_NAME = 'absolute inset-0';
+  'group relative flex h-11 min-w-0 flex-1 touch-manipulation items-center';
+const PILL_HIT_OVERLAY_CLASS_NAME =
+  'absolute inset-0 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 
 const SOCIAL_ICON_CLASS_NAME =
   'inline-flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
@@ -157,9 +158,8 @@ export function ProfileIdentityHeader({
               )}
               {isSubscribed ? 'Updates On' : 'Get Updates'}
             </span>
-            <Button
+            <button
               type='button'
-              variant='ghost'
               aria-label={isSubscribed ? 'Updates On' : 'Get Updates'}
               onClick={onGetUpdatesClick}
               className={PILL_HIT_OVERLAY_CLASS_NAME}

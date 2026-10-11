@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { getAuthenticatedAuthEntryRedirectFromParams } from '@/lib/auth/access-route-redirect';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { SignupModalClient } from './SignupModalClient';
 
 export default async function SignupModalPage({
@@ -24,7 +25,9 @@ export default async function SignupModalPage({
 
   return (
     <Suspense fallback={<AuthFormSkeleton />}>
-      <SignupModalClient />
+      <SignupModalClient
+        showOfferSummary={isCodeFlagEnabled('AUTH_OFFER_SUMMARY')}
+      />
     </Suspense>
   );
 }

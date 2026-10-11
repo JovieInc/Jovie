@@ -30,6 +30,10 @@ export const FEATURE_FLAGS = {
   // to open the doors. /waitlist remains the pending-receipt route.
   WAITLIST_ENABLED: true,
   SHOW_HOMEPAGE_V2_FOOTER_LINKS: true,
+  // JOV-7208 founder gate: keep the product demo video dark until the media is
+  // a JOV-6251 approved master, JOV-6220 mobile/desktop render + playback
+  // certification is recorded, and Tim approves the video on the unflag PR.
+  SHOW_PRODUCT_DEMO_VIDEO: false,
   SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO: true,
   SHOW_FORGEUI_MARKETING_UPDATES: true,
   SHOW_HOMEPAGE_AI_COMPOSER_SECTION: true,
@@ -45,6 +49,9 @@ export const FEATURE_FLAGS = {
   // hero + sections that same PR enabled. Restore the pre-#11484 known-good state.
   SHOW_HOME_V1_DESIGN: false,
   SHOW_PUBLIC_PROFILE_V1_DESIGN: false,
+  // Public About body and commercial footer links. Stays off so production
+  // keeps the current page until this refresh is explicitly flipped.
+  SHOW_PUBLIC_ABOUT_FOOTER_REFRESH: false,
 } as const;
 
 export type MarketingStaticFlagName = keyof typeof FEATURE_FLAGS;

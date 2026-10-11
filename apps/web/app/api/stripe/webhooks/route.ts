@@ -33,11 +33,10 @@ import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import {
-  getHandler,
   getStripeObjectId,
   stripeTimestampToDate,
-  type WebhookContext,
 } from '@/lib/stripe/webhooks';
+import { processStripeWebhookEvent } from '@/lib/stripe/webhooks/process-event';
 import { logger } from '@/lib/utils/logger';
 
 // Force Node.js runtime for Stripe SDK compatibility
@@ -245,7 +244,7 @@ export async function POST(request: NextRequest) {
       leaseClaimed = true;
 
       // Process the event (handlers throw on failure)
-      await processWebhookEvent(event, stripeCreatedAt);
+      await processStripeWebhookEvent(event, stripeCreatedAt);
 
       // Mark event as processed
       const [processedRecord] = await db
@@ -311,60 +310,6 @@ export async function POST(request: NextRequest) {
       { error: 'Webhook processing failed' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
-  }
-}
-
-/**
- * Process a webhook event by delegating to the appropriate handler.
- *
- * Uses the handler registry to find the correct domain-specific handler
- * for the event type. Unhandled events are acknowledged but not processed.
- *
- * @param event - The Stripe webhook event
- * @param stripeCreatedAt - When Stripe created the event (for event ordering)
- * @throws If the handler throws (leaves event unprocessed for Stripe retry)
- */
-async function processWebhookEvent(
-  event: Stripe.Event,
-  stripeCreatedAt: Date
-): Promise<void> {
-  // Get the handler for this event type
-  const handler = getHandler(event.type);
-
-  if (!handler) {
-    // Unhandled event types are expected - Stripe sends many event types
-    // Log unexpected events to help detect configuration issues or new event types
-    logger.warn(
-      `[Stripe Webhook] Received unexpected event type: ${event.type}`,
-      { eventId: event.id, eventType: event.type }
-    );
-    // We acknowledge them but don't process (return 200 to Stripe)
-    return;
-  }
-
-  // Create the context for the handler
-  const context: WebhookContext = {
-    event,
-    stripeEventId: event.id,
-    stripeEventTimestamp: stripeCreatedAt,
-  };
-
-  // Delegate to the domain-specific handler
-  // Handlers throw on unrecoverable errors, leaving the event unprocessed for retry
-  const result = await handler.handle(context);
-
-  // If the handler returned an error (not thrown), log it
-  if (!result.success && !result.skipped && result.error) {
-    await captureCriticalError(
-      `Handler failed for ${event.type}`,
-      new Error(result.error),
-      {
-        route: '/api/stripe/webhooks',
-        eventId: event.id,
-        eventType: event.type,
-      }
-    );
-    throw new Error(result.error);
   }
 }
 

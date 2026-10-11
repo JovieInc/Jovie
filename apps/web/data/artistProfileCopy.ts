@@ -271,13 +271,6 @@ export interface ArtistProfileLandingCopy {
       ];
     };
   };
-  readonly payFlowVideo: {
-    readonly headline: string;
-    readonly subhead: string;
-    readonly ariaLabel: string;
-    readonly posterAlt: string;
-    readonly playLabel: string;
-  };
   readonly capture: {
     readonly headline: string;
     readonly subhead: string;
@@ -436,7 +429,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     eyebrow: '',
     headline: 'The link your music deserves.',
     subhead:
-      'One profile that puts the right action first—from release alerts and release day to nearby shows, support, and fan follow-up.',
+      'One profile that puts the right action first for release alerts, launch day, nearby shows, support, and fan follow-up.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
     proofWhisper: 'Used by artists on',
@@ -779,7 +772,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   opinionated: {
     headline: 'Stop designing your link-in-bio.',
-    body: 'Jovie leads with the next action a fan needs—not a page of choices for you to keep redesigning. Make music. Jovie turns attention into action.',
+    body: 'Jovie leads with the next action a fan needs. You get a clear path without redesigning the page. Make music. Jovie turns attention into action.',
     principle: 'One profile. Built to convert.',
   },
   outcomeDuo: {
@@ -910,15 +903,6 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         },
       ],
     },
-  },
-  payFlowVideo: {
-    headline: 'One scan. A fan for life.',
-    subhead: 'Watch a $10 sidewalk tip turn into a fan you can reach again.',
-    ariaLabel:
-      'Short looping video of a fan scanning an artist QR code, paying $10 with Apple Pay, and the artist receiving a thank-you notification.',
-    posterAlt:
-      'Artist profile open on an iPhone, ready for a fan to send a tip.',
-    playLabel: 'Play pay flow',
   },
   capture: {
     headline: 'Capture every fan.',
@@ -1081,7 +1065,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         body: 'Music, shows, support, and updates stay in one place.',
       },
     ],
-    relatedHeadline: 'Built to be found—and to turn discovery into action.',
+    relatedHeadline: 'Help people find you and take the next step.',
     relatedFeatures: [
       {
         id: 'search-answer-visibility',
@@ -1091,7 +1075,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       {
         id: 'audience-quality',
         title: 'Audience Quality Filtering',
-        body: 'Use source, segment, consent, and engagement signals to separate casual traffic from the fans most likely to act.',
+        body: 'Use source, segment, consent, and engagement signals to identify the fans most likely to act.',
       },
       {
         id: 'fan-notifications',

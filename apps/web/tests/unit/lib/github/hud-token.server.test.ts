@@ -78,6 +78,7 @@ describe('resolveHudGithubToken', () => {
       actions: 'read',
       checks: 'read',
       contents: 'read',
+      issues: 'read',
       metadata: 'read',
       pull_requests: 'read',
     });

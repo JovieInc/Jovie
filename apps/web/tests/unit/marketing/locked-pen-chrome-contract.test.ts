@@ -92,8 +92,16 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     expect(footerCss).toContain('var(--noir-ion-floating)');
     expect(footerCss).toContain('--mf-hairline: var(--noir-ion-border-subtle)');
     expect(footerCss).toContain('--mf-text: var(--noir-ion-text-primary)');
-    expect(footerCss).toContain('font-size: 0.625rem');
-    expect(footerCss).toContain('letter-spacing: 0.22em');
+    const eyebrowRule = footerCss.match(
+      /\.marketing-footer-premium \.mf-eyebrow\s*\{([^}]*)\}/
+    )?.[1];
+    expect(eyebrowRule).toBeDefined();
+    expect(eyebrowRule).toContain('font-size: 0.75rem');
+    expect(eyebrowRule).toContain('font-weight: 500');
+    expect(eyebrowRule).not.toContain('text-transform: uppercase');
+    expect(eyebrowRule).not.toContain('letter-spacing');
+    expect(footerCss).not.toContain('.mf-eyebrow--caps');
+    expect(footer).not.toContain('mf-eyebrow--caps');
     expect(footerCss).toContain('outline: 2px solid var(--noir-ion-ion)');
     expect(footerCss).not.toContain('#06070a');
     expect(footerCss).not.toContain('rgba(255, 255, 255, 0.07)');

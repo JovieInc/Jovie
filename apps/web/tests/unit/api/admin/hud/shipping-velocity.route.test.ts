@@ -7,7 +7,7 @@ interface ShippingVelocityRedisStub {
 }
 
 const hoisted = vi.hoisted(() => ({
-  getCurrentUserEntitlements: vi.fn(),
+  getOvieOperatorEntitlements: vi.fn(),
   checkAdminRole: vi.fn(),
   env: {
     HUD_GITHUB_TOKEN: undefined as string | undefined,
@@ -21,8 +21,8 @@ const hoisted = vi.hoisted(() => ({
   logger: { error: vi.fn(), warn: vi.fn() },
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: hoisted.getCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: hoisted.getOvieOperatorEntitlements,
 }));
 
 vi.mock('@/lib/admin/roles', () => ({
@@ -52,7 +52,7 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
     hoisted.env.HUD_GITHUB_OWNER = undefined;
     hoisted.env.HUD_GITHUB_REPO = undefined;
     hoisted.getRedis.mockReturnValue(null);
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: true,
       userId: 'admin-test',
       isAdmin: false,
@@ -729,7 +729,7 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
   });
 
   it('returns 401 for signed-out users', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: false,
       userId: null,
       isAdmin: false,
@@ -744,7 +744,7 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
   });
 
   it('returns 401 when authentication has no stable user id', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: true,
       userId: null,
       isAdmin: true,
@@ -762,7 +762,7 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
   });
 
   it('returns 403 for authenticated non-admin users', async () => {
-    hoisted.getCurrentUserEntitlements.mockResolvedValue({
+    hoisted.getOvieOperatorEntitlements.mockResolvedValue({
       isAuthenticated: true,
       userId: 'creator-test',
       isAdmin: false,

@@ -16,10 +16,7 @@ import {
   useRowSelection,
   type ViewMode,
 } from '@/components/organisms/table';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
+import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import {
   KanbanBoard,
@@ -288,70 +285,67 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         className='rounded-none border-0'
         toolbar={
           <>
-            {/* Bulk actions toolbar (shows when rows selected) */}
-            {viewMode === 'list' && (
-              <TableBulkActionsToolbar
-                selectedCount={selectedCount}
-                onClearSelection={clearSelection}
-                actions={bulkActions}
-              />
-            )}
-
-            {/* Main toolbar (always visible) */}
-            <AdminTableHeader
-              title='Waitlist'
-              subtitle='Track pipeline state and move prospects from new to claimed.'
-            />
             {integrity ? (
               <WaitlistIntegrityStatus integrity={integrity} />
             ) : null}
-            <AdminTableSubheader
-              start={
-                <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-                  Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                  {total.toLocaleString()} entries
-                </div>
-              }
-              end={
-                <>
-                  <ExportCSVButton<WaitlistEntryRow>
-                    getData={() => entries}
-                    columns={waitlistCSVColumns}
-                    filename={WAITLIST_CSV_FILENAME_PREFIX}
-                    disabled={entries.length === 0}
-                    ariaLabel='Export waitlist to CSV file'
-                    chrome='page-toolbar'
-                    label='Export'
-                    iconOnly
-                    tooltipLabel='Export'
-                  />
-                  <DisplayMenuDropdown
-                    trigger={
-                      <PageToolbarActionButton
-                        label='Display'
-                        icon={
-                          <Icon
-                            name='SlidersHorizontal'
-                            className={PAGE_TOOLBAR_ICON_CLASS}
-                            strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
-                          />
-                        }
-                        active={viewMode !== 'list' || groupingEnabled}
-                        iconOnly
-                        tooltipLabel='Display'
-                        tooltipShortcut={`${GLYPH_SHIFT}V`}
-                      />
-                    }
-                    viewMode={viewMode}
-                    availableViewModes={['list', 'board']}
-                    onViewModeChange={setViewMode}
-                    groupingEnabled={groupingEnabled}
-                    onGroupingToggle={setGroupingEnabled}
-                    groupingLabel='Group by status'
-                  />
-                </>
-              }
-            />
+            <div className='relative'>
+              {/* The selection overlay replaces only the table action strip. */}
+              {viewMode === 'list' && (
+                <TableBulkActionsToolbar
+                  selectedCount={selectedCount}
+                  onClearSelection={clearSelection}
+                  actions={bulkActions}
+                />
+              )}
+              <AdminTableSubheader
+                inert={viewMode === 'list' && selectedCount > 0}
+                start={
+                  <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+                    Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                    {total.toLocaleString()} entries
+                  </div>
+                }
+                end={
+                  <>
+                    <ExportCSVButton<WaitlistEntryRow>
+                      getData={() => entries}
+                      columns={waitlistCSVColumns}
+                      filename={WAITLIST_CSV_FILENAME_PREFIX}
+                      disabled={entries.length === 0}
+                      ariaLabel='Export waitlist to CSV file'
+                      chrome='page-toolbar'
+                      label='Export'
+                      iconOnly
+                      tooltipLabel='Export'
+                    />
+                    <DisplayMenuDropdown
+                      trigger={
+                        <PageToolbarActionButton
+                          label='Display'
+                          icon={
+                            <Icon
+                              name='SlidersHorizontal'
+                              className={PAGE_TOOLBAR_ICON_CLASS}
+                              strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+                            />
+                          }
+                          active={viewMode !== 'list' || groupingEnabled}
+                          iconOnly
+                          tooltipLabel='Display'
+                          tooltipShortcut={`${GLYPH_SHIFT}V`}
+                        />
+                      }
+                      viewMode={viewMode}
+                      availableViewModes={['list', 'board']}
+                      onViewModeChange={setViewMode}
+                      groupingEnabled={groupingEnabled}
+                      onGroupingToggle={setGroupingEnabled}
+                      groupingLabel='Group by status'
+                    />
+                  </>
+                }
+              />
+            </div>
           </>
         }
       >

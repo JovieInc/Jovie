@@ -21,13 +21,15 @@ export const waitlistEntries = pgTable(
   'waitlist_entries',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    fullName: text('full_name').notNull(),
+    // Nullable: a sign-up entry (source 'signup') exists before the intake
+    // chat collects a name and a public link.
+    fullName: text('full_name'),
     email: text('email').notNull(),
     emailNormalized: text('email_normalized').notNull(),
     emailHash: text('email_hash'),
-    primarySocialUrl: text('primary_social_url').notNull(),
-    primarySocialPlatform: text('primary_social_platform').notNull(),
-    primarySocialUrlNormalized: text('primary_social_url_normalized').notNull(),
+    primarySocialUrl: text('primary_social_url'),
+    primarySocialPlatform: text('primary_social_platform'),
+    primarySocialUrlNormalized: text('primary_social_url_normalized'),
     spotifyUrl: text('spotify_url'),
     spotifyUrlNormalized: text('spotify_url_normalized'),
     spotifyArtistName: text('spotify_artist_name'),

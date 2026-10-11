@@ -131,7 +131,7 @@ export function ChatVideoRecordingProposalCard({
       >
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' aria-hidden='true' />
-          <span className='text-sm font-medium'>Video uploaded to Library</span>
+          <span className='text-sm font-medium'>Video uploaded to Work</span>
         </div>
       </ContentSurfaceCard>
     );

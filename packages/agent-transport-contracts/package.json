@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./work-order": "./work-order.ts",
+    "./work-order-adapters": "./work-order-adapters.ts"
   },
   "dependencies": {
     "zod": "^4.6.5"

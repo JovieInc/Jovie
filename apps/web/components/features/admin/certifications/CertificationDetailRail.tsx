@@ -1,7 +1,12 @@
 'use client';
 
 import { Button, ConfirmDialog, Textarea } from '@jovie/ui';
-import { ClipboardCopy, ExternalLink, ShieldCheck } from 'lucide-react';
+import {
+  ClipboardCopy,
+  ExternalLink,
+  MonitorPlay,
+  ShieldCheck,
+} from 'lucide-react';
 import { useId, useState } from 'react';
 import { toast } from '@/components/feedback';
 import {
@@ -21,6 +26,10 @@ import {
   type OvieCertificationDecisionKind,
   type OvieCertificationRow,
 } from '@/lib/ovie/certifications/types';
+import {
+  canStartWalkthrough,
+  walkthroughEvidenceHref,
+} from '@/lib/ovie/certifications/walkthrough';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import {
   CertificationStateGlyph,
@@ -34,13 +43,14 @@ export interface CertificationDecisionHandler {
   (
     decision: OvieCertificationDecisionKind,
     notes: string | null
-  ): Promise<void>;
+  ): Promise<boolean | void>;
 }
 
 interface CertificationDetailRailProps {
   readonly row: OvieCertificationRow | null;
   readonly onClose: () => void;
   readonly onDecide: CertificationDecisionHandler;
+  readonly onWalkthrough?: () => void;
   readonly pendingDecision: OvieCertificationDecisionKind | null;
   readonly decisionError: string | null;
 }
@@ -96,30 +106,33 @@ function EvidenceSection({ row }: { readonly row: OvieCertificationRow }) {
               </div>
               {items.length > 0 ? (
                 <ul className='space-y-1 pl-4.5'>
-                  {items.map(item => (
-                    <li
-                      key={`${item.tier}:${item.id}`}
-                      className='flex min-w-0 items-start gap-2'
-                    >
-                      <CertificationTierGlyph
-                        tier={item.tier}
-                        status={item.status}
-                        className='mt-1'
-                      />
-                      <div className='min-w-0 flex-1'>
-                        <p className='text-xs leading-4 text-secondary-token'>
-                          {item.summary || item.id}
-                        </p>
-                        {item.href ? (
-                          <EvidenceLink href={item.href} label={item.ref} />
-                        ) : item.ref ? (
-                          <p className='truncate text-2xs text-tertiary-token'>
-                            {item.ref}
+                  {items.map(item => {
+                    const href = walkthroughEvidenceHref(item);
+                    return (
+                      <li
+                        key={`${item.tier}:${item.id}`}
+                        className='flex min-w-0 items-start gap-2'
+                      >
+                        <CertificationTierGlyph
+                          tier={item.tier}
+                          status={item.status}
+                          className='mt-1'
+                        />
+                        <div className='min-w-0 flex-1'>
+                          <p className='text-xs leading-4 text-secondary-token'>
+                            {item.summary || item.id}
                           </p>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
+                          {href ? (
+                            <EvidenceLink href={href} label={item.ref} />
+                          ) : item.ref ? (
+                            <p className='truncate text-2xs text-tertiary-token'>
+                              {item.ref}
+                            </p>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : null}
             </li>
@@ -176,6 +189,7 @@ function HistorySection({ row }: { readonly row: OvieCertificationRow }) {
   return (
     <DrawerSection
       title='History'
+      defaultOpen={false}
       surface='card'
       testId='certification-history'
     >
@@ -211,7 +225,7 @@ function HistorySection({ row }: { readonly row: OvieCertificationRow }) {
 
 function SourceSection({ row }: { readonly row: OvieCertificationRow }) {
   return (
-    <DrawerSection title='Source' surface='card'>
+    <DrawerSection title='Source' surface='card' defaultOpen={false}>
       <div className='space-y-1'>
         <DrawerPropertyRow
           label='Subject'
@@ -236,11 +250,13 @@ function SourceSection({ row }: { readonly row: OvieCertificationRow }) {
 function DecisionFooter({
   row,
   onDecide,
+  onWalkthrough,
   pendingDecision,
   decisionError,
 }: {
   readonly row: OvieCertificationRow;
   readonly onDecide: CertificationDecisionHandler;
+  readonly onWalkthrough?: () => void;
   readonly pendingDecision: OvieCertificationDecisionKind | null;
   readonly decisionError: string | null;
 }) {
@@ -266,6 +282,19 @@ function DecisionFooter({
 
   return (
     <div className='space-y-2' data-testid='certification-decision'>
+      {onWalkthrough && canStartWalkthrough(row) ? (
+        <Button
+          size='sm'
+          variant='secondary'
+          className='w-full'
+          disabled={busy}
+          data-testid='certification-walkthrough-action'
+          onClick={onWalkthrough}
+        >
+          <MonitorPlay className='h-3.5 w-3.5' aria-hidden='true' />
+          Walkthrough
+        </Button>
+      ) : null}
       <label htmlFor={notesId} className='sr-only'>
         Note for the worker
       </label>
@@ -337,6 +366,7 @@ export function CertificationDetailRail({
   row,
   onClose,
   onDecide,
+  onWalkthrough,
   pendingDecision,
   decisionError,
 }: CertificationDetailRailProps) {
@@ -407,6 +437,7 @@ export function CertificationDetailRail({
             key={`${row.id}:${row.decision.evidenceDigest ?? 'none'}`}
             row={row}
             onDecide={onDecide}
+            onWalkthrough={onWalkthrough}
             pendingDecision={pendingDecision}
             decisionError={decisionError}
           />

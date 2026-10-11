@@ -1,0 +1,209 @@
+#!/usr/bin/env node
+/** Exact Production Verified artifact → curated release PR. No email sends. */
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { collectCustomerCandidates } from './lib/daily-changelog-collector.mjs';
+import {
+  checkPublicationBinding,
+  isTrustedControllerRun,
+  planDailyPublication,
+} from './lib/daily-changelog-publication.mjs';
+import { isStampAllowedBranch } from './version-fanout-guard.mjs';
+
+const option = name => process.argv[process.argv.indexOf(name) + 1];
+const markerPath = process.argv.includes('--marker')
+  ? option('--marker')
+  : null;
+if (!markerPath)
+  throw new Error(
+    'Usage: publish-daily-changelog.mjs --marker FILE --output DIRECTORY [--seed FILE] [--write]'
+  );
+const output = resolve(
+  process.argv.includes('--output')
+    ? option('--output')
+    : '.artifacts/daily-changelog'
+);
+mkdirSync(output, { recursive: true });
+const git = async (args, options = {}) => {
+  try {
+    const result = execFileSync('git', args, { encoding: 'utf8' });
+    return options.status ? 0 : result;
+  } catch (error) {
+    if (options.status) return error.status;
+    throw error;
+  }
+};
+const gh = args =>
+  JSON.parse(
+    execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+  );
+// Never follow redirects outside the allowlisted public evidence origin.
+const fetchPage = url =>
+  fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
+const marker = JSON.parse(readFileSync(markerPath, 'utf8'));
+if (
+  !/^\d+$/.test(marker.controllerRun ?? '') ||
+  !/^\d+$/.test(marker.controllerAttempt ?? '')
+)
+  throw new Error('Invalid controller run');
+const run = gh([
+  'api',
+  `repos/JovieInc/Jovie/actions/runs/${marker.controllerRun}/attempts/${marker.controllerAttempt}`,
+]);
+const headCompare =
+  /^[0-9a-f]{40}$/.test(run.head_sha ?? '') &&
+  /^[0-9a-f]{40}$/.test(marker.sha ?? '') &&
+  run.head_sha !== marker.sha
+    ? gh([
+        'api',
+        `repos/JovieInc/Jovie/compare/${marker.sha}...${run.head_sha}`,
+      ])
+    : null;
+if (!isTrustedControllerRun(run, marker, headCompare))
+  throw new Error('Untrusted controller run');
+const jobs = gh([
+  'api',
+  `repos/JovieInc/Jovie/actions/runs/${marker.controllerRun}/attempts/${marker.controllerAttempt}/jobs?per_page=100`,
+]);
+const controller = {
+  runId: run.id,
+  attempt: run.run_attempt,
+  verified: jobs.jobs.some(
+    job => job.name === 'Production Verified' && job.conclusion === 'success'
+  ),
+};
+const observedAt = new Date().toISOString();
+// The public readback and its binding proof are re-checked on failure with
+// bounded backoff (JOV-8013): run 37798337152 failed once when the readback
+// served an unexpected identity seconds after the alias gate re-proved it,
+// while the marker stayed verified. Run 37812630550 (JOV-8016) then showed
+// the PLAIN binding error is transient too — the live readback's VERCEL_ENV
+// identity (or the recomputed controller-jobs read) can diverge for seconds
+// around a promote — so the plain error retries as well and only fails
+// closed after the final attempt, with the observed identities in the
+// message. Deferred bindings (a genuinely newer public generation) still
+// exit 0; a persistent binding failure still fails the step.
+const maxBindingAttempts = 6;
+/** @type {null | { status: string, [key: string]: unknown }} */
+let binding = null;
+/** @type {null | { environment?: unknown, commitSha?: unknown, deploymentId?: unknown, [key: string]: unknown }} */
+let buildInfo = null;
+/** @type {null | Error} */
+let lastBindingError = null;
+for (let attempt = 1; attempt <= maxBindingAttempts; attempt += 1) {
+  const buildResponse = await fetchPage('https://jov.ie/api/health/build-info');
+  if (!buildResponse.ok) throw new Error('Public build identity unavailable');
+  buildInfo = /** @type {NonNullable<typeof buildInfo>} */ (
+    await buildResponse.json()
+  );
+  try {
+    const candidate = checkPublicationBinding(marker, buildInfo, controller);
+    if (candidate.status !== 'deferred') {
+      binding = candidate;
+      lastBindingError = null;
+      break;
+    }
+    binding = candidate;
+  } catch (error) {
+    // Plain binding errors are transient candidates too (JOV-8016): the live
+    // readback's VERCEL_ENV identity or the recomputed controller-jobs read
+    // can diverge for seconds around a promote. Remember the observed
+    // identities for the final failure; keep retrying.
+    lastBindingError =
+      error instanceof Error ? error : new Error(String(error));
+    binding = { status: 'unbound' };
+  }
+  if (attempt < maxBindingAttempts) {
+    console.error(
+      `Public readback not bound to the verified generation yet (attempt ${attempt}/${maxBindingAttempts})${
+        lastBindingError ? `: ${lastBindingError.message}` : '; retrying'
+      }`
+    );
+    await new Promise(resolve => setTimeout(resolve, attempt * 5_000));
+  }
+}
+if (binding?.status === 'deferred') {
+  writeFileSync(
+    resolve(output, 'plan.json'),
+    `${JSON.stringify({ ...binding, observedAt }, null, 2)}\n`
+  );
+  process.stdout.write(`${JSON.stringify(binding)}\n`);
+  process.exit(0);
+}
+if (lastBindingError) {
+  // Fail closed after every attempt observed an unbound identity — with the
+  // observed (non-secret) identities in the message so the next failure is
+  // diagnosable without job-log access.
+  throw Object.assign(
+    new Error(
+      `${lastBindingError.message} [observed marker.sha=${marker?.sha ?? 'none'} terminalReason=${String(marker?.terminalReason)} authSmoke=${String(marker?.authSmoke)} lanes=${JSON.stringify(marker?.selectedLanes ?? null)} deploymentId=${String(marker?.deploymentId)}; readback.environment=${String(buildInfo?.environment)} commitSha=${String(buildInfo?.commitSha)} deploymentId=${String(buildInfo?.deploymentId)}; controller.verified=${String(controller?.verified)} runId=${String(controller?.runId)} attempt=${String(controller?.attempt)}]`
+    ),
+    { cause: lastBindingError }
+  );
+}
+const markdown = readFileSync('CHANGELOG.md', 'utf8');
+const seed = process.argv.includes('--seed')
+  ? JSON.parse(readFileSync(option('--seed'), 'utf8'))
+  : [];
+const candidates = await collectCustomerCandidates({
+  markdown,
+  marker,
+  seed,
+  git,
+  observedAt,
+  fetchPage,
+  graphql: async query =>
+    JSON.parse(
+      execFileSync('gh', ['api', 'graphql', '--input', '-'], {
+        input: JSON.stringify({ query }),
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
+      })
+    ),
+});
+// Large recovery scans can span a production handoff. Bind again before output.
+const finalResponse = await fetchPage('https://jov.ie/api/health/build-info');
+if (!finalResponse.ok)
+  throw new Error('Final public build identity unavailable');
+const finalBinding = checkPublicationBinding(
+  marker,
+  await finalResponse.json(),
+  controller
+);
+if (finalBinding.status === 'deferred') {
+  writeFileSync(
+    resolve(output, 'plan.json'),
+    `${JSON.stringify({ ...finalBinding, observedAt }, null, 2)}\n`
+  );
+  process.stdout.write(`${JSON.stringify(finalBinding)}\n`);
+  process.exit(0);
+}
+const plan = planDailyPublication({
+  markdown,
+  marker,
+  buildInfo,
+  controller,
+  candidates,
+  windowKey: observedAt.slice(0, 10),
+  observedAt,
+});
+writeFileSync(
+  resolve(output, 'plan.json'),
+  `${JSON.stringify({ ...plan, content: undefined }, null, 2)}\n`
+);
+writeFileSync(resolve(output, 'CHANGELOG.md'), plan.content);
+process.stdout.write(
+  `${JSON.stringify({ status: plan.status, outcomes: plan.result.stories.length, audit: plan.audit.length, deferred: plan.deferred.length, output })}\n`
+);
+if (process.argv.includes('--write') && plan.status === 'publish') {
+  const branch = (await git(['branch', '--show-current'])).trim();
+  if (
+    !branch.startsWith('release/daily-changelog-') ||
+    !isStampAllowedBranch(branch)
+  )
+    throw new Error('Only the dedicated release branch may publish notes');
+  if ((await git(['status', '--porcelain'])).trim())
+    throw new Error('Publisher requires a clean release checkout');
+  writeFileSync('CHANGELOG.md', plan.content);
+}

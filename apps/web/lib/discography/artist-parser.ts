@@ -41,6 +41,12 @@ export interface ParsedArtistCredit {
   isPrimary: boolean;
   /** Spotify ID if available */
   spotifyId?: string;
+  /** Apple Music ID if available */
+  appleMusicId?: string;
+  /** Provider role before an explicit title role resolved the canonical role. */
+  observedRole?: ArtistRole;
+  /** Evidence used to resolve the canonical role. */
+  roleSource?: 'provider_artist' | 'title';
   /** Image URL if available */
   imageUrl?: string;
 }
@@ -273,26 +279,42 @@ function extractValidRemixerName(segment: string): string | null {
   return cleanedPart;
 }
 
-function appendUniqueCredits(
-  existingCredits: ParsedArtistCredit[],
-  nextCredits: ParsedArtistCredit[],
-  startPosition: number
-): number {
-  const existingNormalized = new Set(
-    existingCredits.map(a => normalizeArtistName(a.name))
+function applyExplicitRoles(
+  mainCredits: ParsedArtistCredit[],
+  explicitCredits: ParsedArtistCredit[]
+): ParsedArtistCredit[] {
+  const explicitNames = new Set(
+    explicitCredits.map(credit => normalizeArtistName(credit.name))
   );
+  const mainIdentityByName = new Map(
+    mainCredits.map(credit => [normalizeArtistName(credit.name), credit])
+  );
+  const keptMainCredits = mainCredits.filter(
+    credit => !explicitNames.has(normalizeArtistName(credit.name))
+  );
+  const seenExplicitRoles = new Set<string>();
+  const keptExplicitCredits: ParsedArtistCredit[] = [];
 
-  let nextPosition = startPosition;
-  for (const credit of nextCredits) {
-    const normalized = normalizeArtistName(credit.name);
-    if (existingNormalized.has(normalized)) continue;
+  for (const credit of explicitCredits) {
+    const normalizedName = normalizeArtistName(credit.name);
+    const mainCredit = mainIdentityByName.get(normalizedName);
+    const identity =
+      mainCredit?.spotifyId ?? mainCredit?.appleMusicId ?? normalizedName;
+    const roleKey = `${credit.role}:${identity}`;
+    if (seenExplicitRoles.has(roleKey)) continue;
+    seenExplicitRoles.add(roleKey);
 
-    existingNormalized.add(normalized);
-    credit.position = nextPosition++;
-    existingCredits.push(credit);
+    keptExplicitCredits.push({
+      ...credit,
+      spotifyId: mainCredit?.spotifyId ?? credit.spotifyId,
+      appleMusicId: mainCredit?.appleMusicId ?? credit.appleMusicId,
+      observedRole: mainCredit ? 'main_artist' : credit.observedRole,
+    });
   }
 
-  return nextPosition;
+  return [...keptMainCredits, ...keptExplicitCredits].map(
+    (credit, position) => ({ ...credit, position })
+  );
 }
 
 // ============================================================================
@@ -427,14 +449,51 @@ export function extractWith(title: string): ParsedArtistCredit[] {
   return withArtists;
 }
 
+function comparableArtistName(name: string): string {
+  return name.trim().toLowerCase().replaceAll(/\s+/g, ' ');
+}
+
+function knownProviderArtistNames(
+  names: readonly string[] | undefined
+): ReadonlySet<string> | undefined {
+  if (!names || names.length === 0) return undefined;
+  const known = new Set<string>();
+  for (const name of names) {
+    const comparable = comparableArtistName(name);
+    if (comparable) known.add(comparable);
+  }
+  return known.size > 0 ? known : undefined;
+}
+
+function matchesKnownProviderArtist(
+  name: string,
+  known: ReadonlySet<string> | undefined
+): boolean {
+  if (!known) return false;
+  return known.has(comparableArtistName(name));
+}
+
 /**
  * Split artist name string by conjunction patterns (& / and / x)
+ *
+ * A whole name that matches a known provider artist stays intact. "Tones And I"
+ * is one artist; "Artist A & Artist B" still splits when that full string is
+ * not itself a provider artist.
  *
  * @example
  * splitByConjunction("Artist A & Artist B")
  * // Returns: ["Artist A", "Artist B"]
  */
-export function splitByConjunction(artistString: string): string[] {
+export function splitByConjunction(
+  artistString: string,
+  knownProviderArtists?: readonly string[]
+): string[] {
+  const trimmed = artistString.trim();
+  const known = knownProviderArtistNames(knownProviderArtists);
+  if (trimmed && matchesKnownProviderArtist(trimmed, known)) {
+    return [trimmed];
+  }
+
   // Split by & , "and", or standalone "x"
   return artistString
     .split(/ *(?:&|,|\band\b|\bx\b) */i)
@@ -451,8 +510,14 @@ function splitVsName(name: string): string[] | null {
     .filter(Boolean);
 }
 
-// Helper to split conjunction pattern in artist name
-function splitMainConjunctionName(name: string): string[] | null {
+// Helper to split conjunction pattern in artist name.
+// Provider artist objects are already identities. Do not split "and" / "&"
+// when the whole name is one of those artists ("Tones And I").
+function splitMainConjunctionName(
+  name: string,
+  knownProviderArtists?: ReadonlySet<string>
+): string[] | null {
+  if (matchesKnownProviderArtist(name, knownProviderArtists)) return null;
   if (!AND_SEPARATOR_PATTERN.test(name)) return null;
 
   const parts = name
@@ -531,6 +596,9 @@ export function parseMainArtists(
 ): ParsedArtistCredit[] {
   const credits: ParsedArtistCredit[] = [];
   let position = 0;
+  const knownProviderArtists = knownProviderArtistNames(
+    spotifyArtists.flatMap(artist => (artist?.name ? [artist.name] : []))
+  );
 
   for (const artist of spotifyArtists) {
     if (!artist) continue;
@@ -544,7 +612,10 @@ export function parseMainArtists(
       continue;
     }
 
-    const conjunctionParts = splitMainConjunctionName(artistName);
+    const conjunctionParts = splitMainConjunctionName(
+      artistName,
+      knownProviderArtists
+    );
     if (conjunctionParts) {
       position = processConjunctionParts(
         conjunctionParts,
@@ -596,22 +667,34 @@ export function parseArtistCredits(
   trackTitle: string,
   spotifyArtists: SpotifyArtistInput[]
 ): ParsedArtistCredit[] {
-  const allCredits = parseMainArtists(spotifyArtists);
+  const mainCredits = parseMainArtists(spotifyArtists).map(credit => ({
+    ...credit,
+    roleSource: 'provider_artist' as const,
+  }));
+  const explicitCredits = [
+    ...extractFeatured(trackTitle),
+    ...extractWith(trackTitle),
+    ...extractRemixers(trackTitle),
+  ].map(credit => ({ ...credit, roleSource: 'title' as const }));
 
-  let nextPosition = allCredits.length;
-  nextPosition = appendUniqueCredits(
-    allCredits,
-    extractFeatured(trackTitle),
-    nextPosition
-  );
-  nextPosition = appendUniqueCredits(
-    allCredits,
-    extractWith(trackTitle),
-    nextPosition
-  );
-  appendUniqueCredits(allCredits, extractRemixers(trackTitle), nextPosition);
+  return applyExplicitRoles(mainCredits, explicitCredits);
+}
 
-  return allCredits;
+/**
+ * Normalize a provider display artist line together with its title roles.
+ * The provider line has no stable per-artist IDs, so exact title-role evidence
+ * determines role without inventing an identity or using fuzzy name matching.
+ */
+export function parseArtistCreditsFromArtistLine(
+  trackTitle: string,
+  artistLine: string
+): ParsedArtistCredit[] {
+  return parseArtistCredits(
+    trackTitle,
+    splitByConjunction(artistLine).map(name => ({ id: '', name }))
+  ).map(({ spotifyId, ...credit }) =>
+    spotifyId ? { ...credit, spotifyId } : credit
+  );
 }
 
 /**

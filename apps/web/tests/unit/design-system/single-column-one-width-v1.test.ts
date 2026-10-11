@@ -17,13 +17,13 @@ import {
  * are red.
  *
  * Detector (source contract, fail closed): the empty-chat column is composed
- * in `components/jovie/JovieChat.tsx` — the prompt-suggest slot, the
- * starter-action slot, and the composer all dock into the single 45rem
- * content shell (`CHAT_CONTENT_SHELL_CLASSNAME`). A column layer that sets
- * its own arbitrary max-width (`max-w-[...]`) re-creates the Exhibit A
- * three-width stack, so any arbitrary max-width in the composition root is a
- * violation. Locked atoms (28rem starter/opportunity cards, sample bubbles)
- * live in their own components and are out of scope — atoms stay.
+ * in `components/jovie/JovieChat.tsx` — the greeting layer and the composer
+ * dock into the single 45rem content shell (`CHAT_CONTENT_SHELL_CLASSNAME`)
+ * via the shared composer region. A column layer that sets its own arbitrary
+ * max-width (`max-w-[...]`) re-creates the Exhibit A three-width stack, so
+ * any arbitrary max-width in the composition root is a violation. Locked
+ * atoms (28rem cards, sample bubbles) live in their own components and are
+ * out of scope — atoms stay.
  *
  * Fail-closed: the composition root must exist and must still render the
  * empty-state slots, or the detector is blind and the test is red.
@@ -31,8 +31,8 @@ import {
 
 const COMPOSITION_ROOT = join(WEB_ROOT, 'components', 'jovie', 'JovieChat.tsx');
 const EMPTY_STATE_SLOTS = [
-  'chat-empty-state-soft-suggestions-slot',
-  'chat-empty-state-action-card-slot',
+  'ChatEmptyStateGreeting',
+  'ChatEmptyStateComposerRegion',
   'chat-empty-state-viewport',
 ];
 const ARBITRARY_MAX_WIDTH = /max-w-\[/g;

@@ -7,9 +7,9 @@ import {
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
-import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PAGE_TOOLBAR_MENU_TRIGGER_CLASS,
@@ -17,6 +17,7 @@ import {
   PageToolbarActionButton,
   PageToolbarTabButton,
   rowState,
+  TableEmptyState,
 } from '@/components/organisms/table';
 import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
@@ -48,6 +49,7 @@ import {
   CertificationStateGlyph,
   CertificationTierGlyph,
 } from './CertificationGlyphs';
+import { CertificationWalkthrough } from './CertificationWalkthrough';
 import {
   CERTIFICATION_STATE_FILTERS,
   CERTIFICATION_STATE_RANK,
@@ -319,18 +321,27 @@ function FreshnessMeta({
 
 export function OvieCertificationsWorkspace() {
   const query = useOvieCertificationsQuery();
-  const decision = useOvieCertificationDecisionMutation();
+  // useMutation returns a new object every render; only the stable
+  // mutateAsync may feed memoized callbacks, or the registered right panel
+  // changes identity on every render and re-renders its host forever.
+  const { mutateAsync: submitDecision } =
+    useOvieCertificationDecisionMutation();
   const [stateFilter, setStateFilter] =
     useState<CertificationStateFilter>('all');
   const [domainFilter, setDomainFilter] =
     useState<CertificationDomainFilter>('all');
+  // Needs You judgment cards deep-link here with ?row=<rowId> so the founder
+  // lands on the exact evidence rail, not a re-search.
+  const linkedRowId = useSearchParams().get('row');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => setSelectedId(linkedRowId), [linkedRowId]);
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'state', desc: false },
   ]);
   const [pendingDecision, setPendingDecision] =
     useState<OvieCertificationDecisionKind | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
 
   const inventory = query.data;
   const allRows = useMemo(() => inventory?.rows ?? [], [inventory]);
@@ -359,11 +370,11 @@ export function OvieCertificationsWorkspace() {
 
   const handleDecide = useCallback(
     async (kind: OvieCertificationDecisionKind, notes: string | null) => {
-      if (!selected?.decision.evidenceDigest) return;
+      if (!selected?.decision.evidenceDigest) return false;
       setPendingDecision(kind);
       setDecisionError(null);
       try {
-        await decision.mutateAsync({
+        await submitDecision({
           rowId: selected.id,
           evidenceDigest: selected.decision.evidenceDigest,
           decision: kind,
@@ -371,13 +382,15 @@ export function OvieCertificationsWorkspace() {
           actionId: crypto.randomUUID(),
         });
         toast.success(DECISION_TOASTS[kind]);
+        return true;
       } catch (error) {
         setDecisionError(getCertificationDecisionErrorMessage(error));
+        return false;
       } finally {
         setPendingDecision(null);
       }
     },
-    [decision, selected]
+    [submitDecision, selected]
   );
 
   // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
@@ -408,6 +421,7 @@ export function OvieCertificationsWorkspace() {
         row={selected}
         onClose={() => setSelectedId(null)}
         onDecide={handleDecide}
+        onWalkthrough={() => setWalkthroughOpen(true)}
         pendingDecision={pendingDecision}
         decisionError={decisionError}
       />
@@ -419,32 +433,36 @@ export function OvieCertificationsWorkspace() {
   const loadFailed = query.isError && !inventory;
   const refreshFailed = query.isError && Boolean(inventory);
   const filtersActive = stateFilter !== 'all' || domainFilter !== 'all';
+  const domainLoadFailed = Boolean(
+    inventory?.domains.some(
+      domain =>
+        domain.status === 'error' &&
+        (domainFilter === 'all' || domain.domain === domainFilter)
+    )
+  );
 
   let emptyState = (
-    <EmptyState
+    <TableEmptyState
       icon={<ShieldCheck className='h-5 w-5' aria-hidden='true' />}
       heading='No certification items yet'
       description='Connected domains have no packets. Overnight workers add items as they land evidence.'
-      presentation='workspace'
     />
   );
-  if (loadFailed) {
+  if (loadFailed || domainLoadFailed || refreshFailed) {
     emptyState = (
-      <EmptyState
+      <TableEmptyState
         icon={<AlertTriangle className='h-5 w-5' aria-hidden='true' />}
         heading='Certifications unavailable'
-        description='The certification inventory could not load. Nothing here means zero items.'
+        description='Some certification sources could not load. Retry to check for items.'
         variant='error'
-        presentation='workspace'
         action={{ label: 'Retry', onClick: () => void query.refetch() }}
       />
     );
   } else if (filtersActive && allRows.length > 0) {
     emptyState = (
-      <EmptyState
+      <TableEmptyState
         icon={<ShieldCheck className='h-5 w-5' aria-hidden='true' />}
         heading='No items match these filters'
-        presentation='workspace'
         action={{
           label: 'Clear Filters',
           onClick: () => {
@@ -464,7 +482,6 @@ export function OvieCertificationsWorkspace() {
       data-testid='ovie-certifications-page'
       contentClassName='min-h-0'
     >
-      <h1 className='sr-only'>Certifications</h1>
       <div className='flex h-full min-h-0 flex-col'>
         <AdminTableSubheader
           className='border-b border-(--app-shell-frame-seam)'
@@ -547,14 +564,17 @@ export function OvieCertificationsWorkspace() {
               getRowTestId={row => `certification-row-${row.id}`}
               onRowClick={row => setSelectedId(row.id)}
               onFocusedRowChange={handleFocusedRowChange}
-              emptyState={
-                <div className='flex min-h-55 flex-1 flex-col items-center justify-center border-t border-subtle bg-surface-0 px-4 py-6 text-center'>
-                  {emptyState}
-                </div>
-              }
+              emptyState={emptyState}
             />
           )}
         </AdminTableShell>
+        <CertificationWalkthrough
+          row={selected}
+          open={walkthroughOpen}
+          onOpenChange={setWalkthroughOpen}
+          onDecide={handleDecide}
+          pendingDecision={pendingDecision}
+        />
       </div>
     </PageShell>
   );

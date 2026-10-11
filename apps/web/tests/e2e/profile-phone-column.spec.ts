@@ -29,18 +29,27 @@ for (const viewport of PHONE_COLUMN_VIEWPORTS) {
 
     const surface = page.getByTestId('profile-compact-surface').first();
     const content = page.getByTestId('profile-content-scroll').first();
+    const navigation = page.getByTestId('profile-bottom-nav').first();
     await expect(content).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    await expect(navigation).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
-    const [surfaceBox, contentBox] = await Promise.all([
+    const [surfaceBox, contentBox, navigationBox] = await Promise.all([
       surface.boundingBox(),
       content.boundingBox(),
+      navigation.boundingBox(),
     ]);
-    expect(surfaceBox && contentBox).toBeTruthy();
-    if (!surfaceBox || !contentBox) return;
+    expect(surfaceBox && contentBox && navigationBox).toBeTruthy();
+    if (!surfaceBox || !contentBox || !navigationBox) return;
     expect(
       contentBox.y + contentBox.height,
       'content region must end inside the phone card'
     ).toBeLessThanOrEqual(surfaceBox.y + surfaceBox.height + 1);
+    expect(
+      contentBox.y + contentBox.height,
+      'the floating dock must not cover the visible content scroll box'
+    ).toBeLessThanOrEqual(navigationBox.y + 1);
 
     // Whatever overflows the card must be reachable by scrolling it.
     const { clientHeight, scrollHeight, overflowY } = await content.evaluate(

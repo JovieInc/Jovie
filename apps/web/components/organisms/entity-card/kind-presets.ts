@@ -6,6 +6,7 @@ import {
   Play,
   ShoppingBag,
   Ticket,
+  UserRound,
 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import type { EntityAccent, EntityKind, EntityStatusTone } from './types';
@@ -25,7 +26,7 @@ export const KIND_PRESETS: Record<EntityKind, KindPreset> = {
     icon: ShoppingBag,
     accent: 'green',
     fallbackVariant: 'generic',
-    ctaLabel: 'Buy',
+    ctaLabel: 'Shop',
   },
   music: {
     eyebrow: 'Music',
@@ -47,6 +48,13 @@ export const KIND_PRESETS: Record<EntityKind, KindPreset> = {
     accent: 'blue',
     fallbackVariant: 'generic',
     ctaLabel: 'Tickets',
+  },
+  person: {
+    eyebrow: 'Person',
+    icon: UserRound,
+    accent: 'teal',
+    fallbackVariant: 'avatar',
+    ctaLabel: 'View',
   },
   ai: {
     eyebrow: 'AI Visibility',

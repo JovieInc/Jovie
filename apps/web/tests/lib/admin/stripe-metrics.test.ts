@@ -218,6 +218,90 @@ describe('getAdminStripeOverviewMetrics', () => {
     expect(metrics.activeSubscribers).toBe(1);
   });
 
+  it('asks Stripe to expand coupons so discounts are really netted (JOV-1089)', async () => {
+    listMock.mockResolvedValue({ data: [], has_more: false });
+    await getAdminStripeOverviewMetrics();
+    expect(listMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expand: expect.arrayContaining([
+          'data.discounts',
+          'data.discounts.source.coupon',
+        ]),
+      })
+    );
+  });
+
+  it('counts a 100%-off forever comp as $0 MRR, not list price', async () => {
+    const items = {
+      data: [
+        {
+          price: {
+            currency: 'usd',
+            unit_amount: 19900,
+            recurring: { interval: 'month', interval_count: 1 },
+          },
+          quantity: 1,
+        },
+      ],
+    } as Stripe.ApiList<Stripe.SubscriptionItem>;
+    listMock.mockResolvedValue({
+      data: [
+        {
+          ...makeSubscription({ id: 'sub_comp', status: 'active', items }),
+          customer: { id: 'cus_ext', email: 'artist@example-label.com' },
+          discounts: [
+            {
+              source: {
+                coupon: { percent_off: 100, duration: 'forever' },
+                type: 'coupon',
+              },
+            },
+          ],
+        } as unknown as Stripe.Subscription,
+      ],
+      has_more: false,
+    });
+
+    const metrics = await getAdminStripeOverviewMetrics();
+
+    expect(metrics.mrrUsd).toBe(0);
+  });
+
+  it('excludes internal/dogfood customers by default, with no classifier passed', async () => {
+    const items = {
+      data: [
+        {
+          price: {
+            currency: 'usd',
+            unit_amount: 19900,
+            recurring: { interval: 'month', interval_count: 1 },
+          },
+          quantity: 1,
+        },
+      ],
+    } as Stripe.ApiList<Stripe.SubscriptionItem>;
+    listMock.mockResolvedValue({
+      data: [
+        {
+          ...makeSubscription({ id: 'sub_founder', status: 'active', items }),
+          customer: { id: 'cus_founder', email: 'tim@jov.ie' },
+        } as unknown as Stripe.Subscription,
+      ],
+      has_more: false,
+    });
+
+    const metrics = await getAdminStripeOverviewMetrics();
+
+    expect(metrics.mrrUsd).toBe(0);
+    expect(metrics.activeSubscribers).toBe(0);
+    expect(metrics.excludedInternalSubscribers).toBe(1);
+    expect(listMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expand: expect.arrayContaining(['data.customer']),
+      })
+    );
+  });
+
   it('subtracts fixed amount coupon discount from MRR (JOV-1089)', async () => {
     const items = {
       data: [

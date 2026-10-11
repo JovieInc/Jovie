@@ -12,13 +12,14 @@ This document tracks required privilege levels by API namespace so new routes ar
 | `/api/dashboard/**` | Authenticated user | Must scope all reads/writes to the current authenticated user. |
 | `/api/account/**` | Authenticated user | User self-service only; never accept arbitrary target user IDs without ownership checks. |
 | `/api/v1/actions` | Authenticated user | Read-only discovery. Must prove profile ownership and must not write. Invoke paths are not live. |
-| `/api/billing/**` | Authenticated user | Return only caller billing context; no cross-user lookup by untrusted input. |
+| `/api/billing/**` | Authenticated user | Return only caller billing context; no cross-user lookup by untrusted input. `/api/billing/health` is the exception: anonymous callers get `{healthy, timestamp}` only; sync counts and check details require an admin session or `CRON_SECRET`. |
 | `/api/analytics/navigation` | Authenticated user (POST); admin-only (GET) | POST uses authenticated identity only as a rate-limit key, then discards it before aggregate storage. Payloads are strict low-cardinality buckets; GET returns only privacy-suppressed aggregate baselines. |
 | `/api/dev/**` | Authenticated user (dev-only behavior where applicable) | Non-production test and developer utilities. |
 | `/api/cron/**` | Cron secret | Must validate `CRON_SECRET` before execution. |
 | `/api/webhooks/**` | Signed provider webhook | Must validate provider signature/token. |
 | `/api/mobile/**` | Authenticated mobile session | Native iOS session via `getMobileSessionUserId`. Summer/OV destinations additionally require admin (`canUseOvChatMode`) on the server. |
 | `/api/ovie/summer/reconcile` | Authenticated configured founder only | GET-only, source-bound recovery of one immutable Summer event. Must validate the app UUID with `authorizeFounderSummerUser`, obtain Vercel OIDC server-side, reject result-binding drift, and persist nothing before exact terminal validation. |
+| `/api/health` and `/api/health/{db,db/performance,env,comprehensive,keys,deploy,homepage,auth}` | Public liveness | Anonymous body is `{healthy,timestamp}` (root success stays `{status:"ok"}`). Full detail requires an admin session or `Authorization: Bearer $CRON_SECRET` via `verifyCronRequest`. Responses are `private, no-store` and `Vary: Authorization, Cookie`. `/api/health/redis` stays admin or cron. `/api/health/build-info` stays public deploy identity. Production `/api/health/auth` stays 403 for every caller. |
 | `/api/**` public endpoints (trackers, opt-ins, status probes, etc.) | Public | Must avoid exposing private user/admin data. |
 
 ## Audit Findings (JOV-1692)

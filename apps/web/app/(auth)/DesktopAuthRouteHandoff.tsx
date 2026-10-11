@@ -52,11 +52,11 @@ export function DesktopAuthRouteHandoff() {
       testId='desktop-auth-route-handoff'
       shellKind={AUTH_SHELL_KIND.desktopReturnHandoff}
     >
-      <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-16 text-center'>
-        <h1 className='sr-only'>Sign In To Jovie</h1>
+      <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-4 text-center'>
         <DesktopAuthHandoffActions
           onOpenStateChange={setOpenState}
           resolveAuthUrl={resolveAuthUrl}
+          showCancelSignIn
         />
       </section>
     </MacCinematicSurface>

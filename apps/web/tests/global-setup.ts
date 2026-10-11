@@ -1,7 +1,9 @@
+import type { FullConfig } from '@playwright/test';
 import { config } from 'dotenv';
 import path from 'path';
 import { APP_ROUTES } from '../constants/routes';
 import { TEST_AUTH_BYPASS_MODE, TEST_MODE_HEADER } from '../lib/auth/test-mode';
+import { verifyWorktreeApp } from '../scripts/playwright-worktree';
 import { resolveWebServerWarmupProfile } from './e2e/utils/warmup-profile';
 import {
   ensureDevTestAuthPersona,
@@ -25,7 +27,8 @@ const isCI = !!process.env.CI;
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const webServerWarmupProfile = resolveWebServerWarmupProfile({ isCI });
 
-async function globalSetup() {
+async function globalSetup(config: FullConfig) {
+  await verifyWorktreeApp(config);
   const startTime = Date.now();
   const profileCtaPreflight =
     process.env.PROFILE_CTA_TEST_FILTER === PROFILE_CTA_SPEC;

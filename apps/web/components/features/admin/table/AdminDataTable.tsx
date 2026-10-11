@@ -20,12 +20,14 @@ export function AdminDataTable<TData extends RowData>({
   enableVirtualization = true,
   rowHeight = 40,
   minWidth = `${TABLE_MIN_WIDTHS.MEDIUM}px`,
+  columnSnap = false,
   ...props
 }: Readonly<AdminDataTableProps<TData>>) {
   return (
     <UnifiedTable<TData>
       {...props}
       className={cn(ADMIN_DATA_TABLE_CLASSNAME, className)}
+      columnSnap={columnSnap}
       enableVirtualization={enableVirtualization}
       rowHeight={rowHeight}
       minWidth={minWidth}

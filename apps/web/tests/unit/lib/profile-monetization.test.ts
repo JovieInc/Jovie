@@ -20,7 +20,7 @@ describe('resolveProfileMonetizationSummary', () => {
 
     expect(summary.paymentState).toBe('needs_profile_url');
     expect(summary.provider).toBe('none');
-    expect(summary.manageHref).toBe(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    expect(summary.manageHref).toBe(APP_ROUTES.SETTINGS_PROFILE);
     expect(summary.tipUrl).toBeNull();
   });
 

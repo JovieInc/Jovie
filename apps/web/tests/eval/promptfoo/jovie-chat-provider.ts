@@ -28,6 +28,7 @@ import {
   PROMPT_LEAK_CANARY,
 } from '@/lib/chat/prompt-disclosure-guard';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
+import { checkOnboardingPromptContract } from '@/lib/chat/prompts/onboarding-contract';
 import {
   canUseLightModel,
   executeChatTurn,
@@ -35,6 +36,7 @@ import {
 } from '@/lib/chat/run';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
+import { conversationTitleSource } from '@/lib/chat/title-source';
 import {
   extractSkill,
   parseTokens,
@@ -516,6 +518,13 @@ const ADVANCED_TOOL_SCHEMAS = {
       stepId: z.string().optional(),
     }),
   },
+  checkLinkDrift: {
+    description:
+      'Onboarding presence-build link-drift artifact. System-emitted tool event, not a model-invoked chat tool.',
+    inputSchema: z.object({
+      stepId: z.string().optional(),
+    }),
+  },
   surfaceLibraryOpportunities: {
     description:
       'Onboarding presence-build Library opportunities artifact. System-emitted tool event, not a model-invoked chat tool.',
@@ -594,6 +603,7 @@ const ALWAYS_PAID_TOOL_NAMES = [
   'formatLyrics',
   'proposeVideoRecording',
   'researchArtistPresence',
+  'checkLinkDrift',
   'surfaceLibraryOpportunities',
   'assembleArtistProfile',
   'generateSmartLink',
@@ -664,16 +674,22 @@ const REQUIRED_MODEL_ROUTING_SCENARIOS = [
   'simple-pro-tool-light',
 ] as const;
 const REQUIRED_ONBOARDING_STATE_CASES = [
-  'latest-signal-instant-access',
+  'latest-signal-needs-more-info',
   'spotify-followers-instant-access',
   'weak-signal-force-waitlist',
   'weak-signal-needs-more-info',
 ] as const;
 const REQUIRED_ONBOARDING_TOOL_SEQUENCE_CASES = [
+  'bot-input-replay',
   'checkout-blocked-before-instant-access',
+  'icp-emerging-artist-replay',
+  'icp-established-artist-replay',
   'instant-access-next-step-before-checkout',
+  'objection-handling-replay',
   'premature-next-step-blocked-before-identity',
+  'prompt-injection-replay',
   'spotify-confirmation-observation-next-step',
+  'spotify-outage-replay',
   'waitlist-outcome-no-checkout',
 ] as const;
 const REQUIRED_WELCOME_CHAT_CASES = [
@@ -828,6 +844,7 @@ const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
   unpauseMerchCard: ['success', 'action', 'merchCardId'],
   writeWorldClassBio: ['success', 'action', 'bio', 'summary'],
   researchArtistPresence: ['action', 'stepId', 'title', 'summary'],
+  checkLinkDrift: ['action', 'stepId', 'title', 'summary'],
   surfaceLibraryOpportunities: ['action', 'stepId', 'title', 'summary'],
   assembleArtistProfile: ['action', 'stepId', 'title', 'summary'],
   generateSmartLink: ['action', 'stepId', 'title', 'summary'],
@@ -4400,6 +4417,7 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
         summary: 'Pitch ready.',
       };
     case 'researchArtistPresence':
+    case 'checkLinkDrift':
     case 'surfaceLibraryOpportunities':
     case 'assembleArtistProfile':
     case 'generateSmartLink':
@@ -4573,10 +4591,19 @@ function evaluateOnboardingStateContract(vars: EvalVars) {
 
 function executeSequenceSpotifyConfirmation(
   state: EvalOnboardingState,
-  spotifyArtistId = 'spotify-luna-123'
+  spotifyArtistId = 'spotify-luna-123',
+  artistOverrides: Record<string, unknown> = {}
 ): ToolExecution {
   const input = { spotifyArtistId };
-  const output = defaultToolResult('confirmSpotifyArtist', input);
+  const output = {
+    ...toObject(defaultToolResult('confirmSpotifyArtist', input)),
+    artist: {
+      ...toObject(
+        toObject(defaultToolResult('confirmSpotifyArtist', input)).artist
+      ),
+      ...artistOverrides,
+    },
+  };
   const artist = toObject(toObject(output).artist);
 
   state.spotifyArtistId = spotifyArtistId;
@@ -4685,10 +4712,162 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
     readonly toolName: string;
     readonly reason: string;
   }> = [];
+  // Deterministic replay copy: one assistant text per turn. assertOnboarding-
+  // SequenceOrder enforces grounding, true price, one question per turn, and
+  // voice on these — the same bar promoted script lines must clear.
+  const assistantTurns: Array<{ stepId: string; text: string }> = [];
   let collapsedSignal: EvalInterviewSignal = {};
   let nextStepDecision: ReturnType<typeof evaluateAccessSignal> | null = null;
 
-  if (sequenceCase === 'premature-next-step-blocked-before-identity') {
+  if (sequenceCase === 'bot-input-replay') {
+    // Gibberish/bot input: no tools fire, one clarifying question.
+    assistantTurns.push({
+      stepId: 'greet',
+      text: 'I did not catch that — are you setting up your Jovie profile?',
+    });
+  } else if (sequenceCase === 'spotify-outage-replay') {
+    // Upstream Spotify outage: search reports unavailable, nothing is
+    // confirmed, and copy refuses to invent numbers.
+    toolExecutions.push({
+      name: 'searchSpotifyArtist',
+      input: { query: 'Luna Waves' },
+      output: {
+        action: 'spotify_search_unavailable',
+        query: 'Luna Waves',
+        candidates: [],
+        summary: 'Spotify lookup is unavailable right now.',
+      },
+    });
+    toolExecutions.push(
+      executeSequenceSignal(state, { audienceBand: 'under_500' })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+    assistantTurns.push(
+      {
+        stepId: 'get_artist',
+        text: 'Spotify lookup is down right now, so I will not guess numbers.',
+      },
+      {
+        stepId: 'ask_audience',
+        text: 'Roughly how many listeners do you reach each month?',
+      }
+    );
+  } else if (sequenceCase === 'prompt-injection-replay') {
+    // Injection-shaped user text must not steer tools or leak internals:
+    // the sequence is identical to the ordinary confirmed-artist flow.
+    toolExecutions.push(executeSequenceSpotifyConfirmation(state));
+    toolExecutions.push(
+      executeSequenceSignal(state, { audienceBand: '5k_to_50k' })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+    assistantTurns.push(
+      {
+        stepId: 'confirm_artist',
+        text: 'Luna Waves is matched — 12,500 followers on Spotify.',
+      },
+      {
+        stepId: 'instant_access',
+        text: 'That is enough signal — you are in. Want the tour?',
+      }
+    );
+  } else if (sequenceCase === 'icp-emerging-artist-replay') {
+    // Emerging ICP: tiny verified audience — ask more, never oversell.
+    toolExecutions.push(
+      executeSequenceSpotifyConfirmation(state, 'spotify-emerging-1', {
+        id: 'spotify-emerging-1',
+        name: 'Sleep Signals',
+        followers: 320,
+        popularity: 8,
+        genres: ['bedroom pop'],
+      })
+    );
+    toolExecutions.push(
+      executeSequenceSignal(state, {
+        releaseStage: 'pre_announce',
+        audienceBand: 'under_500',
+      })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+    assistantTurns.push(
+      {
+        stepId: 'confirm_artist',
+        text: 'Sleep Signals is matched — 320 followers on Spotify so far.',
+      },
+      {
+        stepId: 'ask_audience',
+        text: 'What are listeners doing today when a song lands?',
+      }
+    );
+  } else if (sequenceCase === 'icp-established-artist-replay') {
+    // Established ICP: verified scale routes to instant access + checkout,
+    // and the only price quoted is the real one.
+    toolExecutions.push(
+      executeSequenceSpotifyConfirmation(state, 'spotify-established-1', {
+        id: 'spotify-established-1',
+        name: 'Northern Range',
+        followers: 240000,
+        popularity: 71,
+        genres: ['alt country', 'americana'],
+      })
+    );
+    toolExecutions.push(
+      executeSequenceSignal(state, {
+        releaseStage: 'announced_unreleased',
+        audienceBand: 'over_500k',
+      })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+    if (nextStepDecision.kind === 'instant_access') {
+      toolExecutions.push(executeSequenceCheckout('pro'));
+    }
+    assistantTurns.push(
+      {
+        stepId: 'confirm_artist',
+        text: 'Northern Range is matched — 240,000 followers on Spotify.',
+      },
+      {
+        stepId: 'instant_access',
+        text: 'Pro is $199 a month with a 14-day trial and no card required.',
+      }
+    );
+  } else if (sequenceCase === 'objection-handling-replay') {
+    // Priced-out objection: acknowledge honestly, keep the free lane open.
+    toolExecutions.push(executeSequenceSpotifyConfirmation(state));
+    toolExecutions.push(
+      executeSequenceSignal(state, {
+        objection: {
+          category: 'price',
+          text: 'another subscription feels expensive right now',
+        },
+      })
+    );
+    const nextStep = executeSequenceNextStep(state);
+    collapsedSignal = nextStep.collapsedSignal;
+    nextStepDecision = nextStep.nextStepDecision;
+    toolExecutions.push(nextStep.execution);
+    assistantTurns.push(
+      {
+        stepId: 'confirm_artist',
+        text: 'Luna Waves is matched — 12,500 followers on Spotify.',
+      },
+      {
+        stepId: 'ask_audience',
+        text: 'Fair. Your Jovie profile stays free forever either way — want it claimed while you decide?',
+      }
+    );
+  } else if (sequenceCase === 'premature-next-step-blocked-before-identity') {
     blockedSteps.push({
       toolName: 'proposeNextStep',
       reason: 'spotify_identity_missing',
@@ -4697,6 +4876,10 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
       name: 'searchSpotifyArtist',
       input: { query: 'Luna Waves' },
       output: defaultToolResult('searchSpotifyArtist', { query: 'Luna Waves' }),
+    });
+    assistantTurns.push({
+      stepId: 'get_artist',
+      text: 'Before we pick a next step, which Spotify artist is yours?',
     });
   } else if (sequenceCase === 'checkout-blocked-before-instant-access') {
     state.spotifyArtistId = 'spotify-luna-early';
@@ -4718,6 +4901,10 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
       toolName: 'proposeCheckout',
       reason: `next_step_${nextStepDecision.kind}`,
     });
+    assistantTurns.push({
+      stepId: 'ask_audience',
+      text: 'Understood — no pressure to decide today.',
+    });
   } else if (sequenceCase === 'waitlist-outcome-no-checkout') {
     state.turnCount = MAX_INTERVIEW_TURNS_BEFORE_FORCE;
     toolExecutions.push(
@@ -4727,6 +4914,10 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
     collapsedSignal = nextStep.collapsedSignal;
     nextStepDecision = nextStep.nextStepDecision;
     toolExecutions.push(nextStep.execution);
+    assistantTurns.push({
+      stepId: 'waitlist',
+      text: 'You are on the early list — real spots open weekly and your place is saved.',
+    });
   } else {
     toolExecutions.push(executeSequenceSpotifyConfirmation(state));
 
@@ -4758,6 +4949,22 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
     ) {
       toolExecutions.push(executeSequenceCheckout('pro'));
     }
+    assistantTurns.push(
+      {
+        stepId: 'confirm_artist',
+        text: 'Luna Waves is matched — 12,500 followers on Spotify.',
+      },
+      {
+        stepId:
+          sequenceCase === 'instant-access-next-step-before-checkout'
+            ? 'instant_access'
+            : 'ask_audience',
+        text:
+          sequenceCase === 'instant-access-next-step-before-checkout'
+            ? 'You qualify for instant access — checkout is ready when you are.'
+            : 'How big is the audience you reach each month?',
+      }
+    );
   }
 
   const toolCallOrder = toolExecutions.map(execution => execution.name);
@@ -4778,6 +4985,7 @@ function evaluateOnboardingToolSequenceContract(vars: EvalVars) {
     stateBefore,
     stateAfter: cloneJson(state),
     blockedSteps,
+    assistantTurns,
     toolCallOrder,
     collapsedSignal,
     nextStepDecision,
@@ -5040,6 +5248,7 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
           'Hey everyone, Neon Reef is out now. Thank you so much for listening.',
       };
     case 'researchArtistPresence':
+    case 'checkLinkDrift':
     case 'surfaceLibraryOpportunities':
     case 'assembleArtistProfile':
     case 'generateSmartLink':
@@ -7031,22 +7240,24 @@ function evaluateInterviewSummaryContract(vars: EvalVars) {
       "text.indexOf('{')",
       "text.lastIndexOf('}')",
     ]),
-    requiresTextBlockBeforeParsing: textIncludesAll(summarizerSource, [
-      "message.content.find(block => block.type === 'text')",
-      'No text response from Claude',
+    requiresTextBeforeParsing: textIncludesAll(summarizerSource, [
+      'result.text',
+      'No text response from model',
     ]),
   };
   const costSafetyFacts = {
-    usesHaikuModel: textIncludesAll(summarizerSource, [
-      "const MODEL_ID = 'claude-haiku-4-5-20251001'",
-      'model: MODEL_ID',
+    usesGatewayModel: textIncludesAll(summarizerSource, [
+      'const MODEL_ID = CHAT_MODEL_LIGHT',
+      'model: gateway(MODEL_ID)',
     ]),
-    capsOutputTokens: textIncludesAll(summarizerSource, ['max_tokens: 800']),
-    usesBoundedAnthropicTimeout: textIncludesAll(summarizerSource, [
-      'ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000',
+    capsOutputTokens: textIncludesAll(summarizerSource, [
+      'maxOutputTokens: 800',
+    ]),
+    usesBoundedTimeout: textIncludesAll(summarizerSource, [
+      'REQUEST_TIMEOUT_MS = 30_000',
       'withTimeout',
-      'timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000',
-      "context: 'Anthropic summarizeInterview'",
+      'timeoutMs: REQUEST_TIMEOUT_MS + 1_000',
+      "context: 'summarizeInterview'",
     ]),
     cronLimitsBatchAndAttempts: textIncludesAll(cronRouteSource, [
       'MAX_INTERVIEWS_PER_RUN = 10',
@@ -7097,9 +7308,9 @@ function evaluateInterviewSummaryContract(vars: EvalVars) {
     cronRouteSourcePath,
     summarizerSourceLength: summarizerSource.length,
     cronRouteSourceLength: cronRouteSource.length,
-    modelId: 'claude-haiku-4-5-20251001',
+    modelId: 'zai/glm-5.3-flash',
     maxTokens: 800,
-    anthropicRequestTimeoutMs: 30_000,
+    requestTimeoutMs: 30_000,
     wrapperTimeoutMs: 31_000,
     promptFacts,
     missingPromptFacts: Object.entries(promptFacts)
@@ -7349,18 +7560,18 @@ function evaluatePlaylistGenerationContract(vars: EvalVars) {
       'playlistCount % GENRE_ROTATION.length',
       'playlistCount % CATEGORY_ROTATION.length',
     ]),
-    usesHaikuModel: textIncludesAll(conceptSource, [
-      "model: 'claude-haiku-4-5-20251001'",
-      'max_tokens: 2000',
+    usesGatewayModel: textIncludesAll(conceptSource, [
+      'model: gateway(CHAT_MODEL_LIGHT)',
+      'maxOutputTokens: 2000',
     ]),
-    usesBoundedAnthropicTimeout: textIncludesAll(conceptSource, [
-      'ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000',
+    usesBoundedTimeout: textIncludesAll(conceptSource, [
+      'REQUEST_TIMEOUT_MS = 30_000',
       'withTimeout',
-      'timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000',
-      "context: 'Anthropic generatePlaylistConcept'",
+      'timeoutMs: REQUEST_TIMEOUT_MS + 1_000',
+      "context: 'generatePlaylistConcept'",
     ]),
     parsesJsonThenSchema: textIncludesAll(conceptSource, [
-      'extractJsonPayload(textBlock.text)',
+      'extractJsonPayload(result.text)',
       'JSON.parse(jsonStr)',
       'PlaylistConceptSchema.parse(parsed)',
     ]),
@@ -7414,15 +7625,15 @@ function evaluatePlaylistGenerationContract(vars: EvalVars) {
       'CURATED_TRACK_IDS_SCHEMA = z.array(z.string()).min(10).max(50)',
       'CURATED_TRACK_IDS_SCHEMA.parse(parsed)',
     ]),
-    usesSonnetModel: textIncludesAll(curationSource, [
-      "model: 'claude-sonnet-4-20250514'",
-      'max_tokens: 1500',
+    usesGatewayModel: textIncludesAll(curationSource, [
+      'model: gateway(CHAT_MODEL)',
+      'maxOutputTokens: 1500',
     ]),
-    usesBoundedAnthropicTimeout: textIncludesAll(curationSource, [
-      'ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000',
+    usesBoundedTimeout: textIncludesAll(curationSource, [
+      'REQUEST_TIMEOUT_MS = 30_000',
       'withTimeout',
-      'timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000',
-      "context: 'Anthropic curateTracklist'",
+      'timeoutMs: REQUEST_TIMEOUT_MS + 1_000',
+      "context: 'curateTracklist'",
     ]),
     parsesJsonPayload: textIncludesAll(curationSource, [
       'extractJsonPayload(responseText)',
@@ -7511,14 +7722,14 @@ function evaluatePlaylistGenerationContract(vars: EvalVars) {
       pipeline: pipelineSource.length,
     },
     modelIds: {
-      concept: 'claude-haiku-4-5-20251001',
-      curation: 'claude-sonnet-4-20250514',
+      concept: 'zai/glm-5.3-flash',
+      curation: 'zai/glm-5.3',
     },
     maxTokens: {
       concept: 2000,
       curation: 1500,
     },
-    anthropicRequestTimeoutMs: 30_000,
+    requestTimeoutMs: 30_000,
     wrapperTimeoutMs: 31_000,
     promptLengths: {
       concept: conceptPrompt.length,
@@ -7586,90 +7797,7 @@ function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
       index: quotedIndex >= 0 ? quotedIndex : prompt.indexOf(name),
     };
   });
-  const toolOrderValid = toolOrder.every((item, index) => {
-    if (item.index < 0) return false;
-    const previous = toolOrder[index - 1];
-    return !previous || previous.index < item.index;
-  });
-  const promptFacts = {
-    identifiesUnauthenticatedVisitor: textIncludesAll(prompt, [
-      'musician just landed',
-      'visitor is unauthenticated',
-      'no account yet',
-    ]),
-    preservesFirstBubblePrivacyDisclosure: textIncludesAll(prompt, [
-      'FIRST chat bubble',
-      'conversation is remembered',
-      'help personalize',
-    ]),
-    keepsOnboardingVoiceConstraints: textIncludesAll(prompt, [
-      'Sharp friend over iMessage',
-      'Use normal sentence case',
-      'capitalize proper nouns',
-      'NO emoji',
-      'NO customer-service polite',
-    ]),
-    requiresShortConcreteReplies: textIncludesAll(prompt, [
-      'Short messages',
-      'No bullet lists',
-      'no markdown',
-      'concrete numbered plan',
-    ]),
-    enforcesOneQuestionPerTurn: textIncludesAll(prompt, [
-      'One question per turn',
-      'Never two',
-      'Never "first, then, then"',
-    ]),
-    requiresSpotifyIdentityBeforeSetup: textIncludesAll(prompt, [
-      'Get their Spotify identity',
-      'searchSpotifyArtist',
-      'confirmSpotifyArtist',
-    ]),
-    requiresDataObservationAfterSpotifyConfirmation: textIncludesAll(prompt, [
-      'confirmSpotifyArtist',
-      'MUST make an observation',
-      'BEFORE asking the next question',
-      'wow moment',
-    ]),
-    gatesAccessThroughNextStepDecision: textIncludesAll(prompt, [
-      'proposeNextStep',
-      'instant_access',
-      'waitlist',
-      'needs_more_info',
-    ]),
-    blocksCheckoutUntilInstantAccess: textIncludesAll(prompt, [
-      'If instant_access',
-      'proposeCheckout',
-      'Never promise instant access',
-    ]),
-    keepsPricingLate: textIncludesAll(prompt, [
-      'Pricing',
-      'reveal LATE',
-      'Do NOT lead with pricing',
-      'Pro is $39/mo',
-      'Max is $149/mo',
-      '14-day reverse trial',
-    ]),
-    forbidsInventedStatsAndPrematureLiveClaims: textIncludesAll(prompt, [
-      'Never invent stats',
-      'customer counts',
-      'testimonials',
-      'Never claim a profile is "live"',
-    ]),
-    recordsSignalsSilently: textIncludesAll(prompt, [
-      'recordInterviewSignal',
-      'every signal',
-      'Silent, no UI',
-      'objection',
-    ]),
-    redirectsGeneralSupportIntoIntake: textIncludesAll(prompt, [
-      'access-intake flow',
-      'redirect to the intake',
-      'By your second assistant reply',
-      'searchSpotifyArtist',
-    ]),
-    preservesToolSequence: toolOrderValid,
-  };
+  const promptFacts = checkOnboardingPromptContract(prompt);
 
   return {
     target: 'onboarding-system-prompt-contract',
@@ -7690,7 +7818,7 @@ function evaluateOnboardingSystemPromptContract(vars: EvalVars) {
       .filter(([, passed]) => !passed)
       .map(([name]) => name),
     toolOrder,
-    toolOrderValid,
+    toolPrerequisitesValid: promptFacts.preservesToolPrerequisites,
     promptLeakPatterns: promptLeakPatterns(prompt),
     toolCalls: [],
     toolResults: [],
@@ -7767,6 +7895,17 @@ function evaluateChatTitleContract(vars: EvalVars) {
   );
   const fallbackTitle = sanitizeConversationTitle(sourceTitle, 50);
   const generatedTitle = sanitizeConversationTitle('"Neon Reef Launch Plan"');
+  const workTitle = conversationTitleSource(
+    'Help me with this work.\n' +
+      JSON.stringify({
+        workId: '808c9f4d-505c-4000-8000-000000000000',
+        workTitle: 'Seaside Heights',
+        revision: 'Keep the reply short.',
+      })
+  );
+  const probeTitle = conversationTitleSource(
+    'Prod health check: reply with one short sentence.'
+  );
   const sourceFacts = {
     importsUserFacingRouteDependencies: textIncludesAll(routeSource, [
       "import { gateway, generateText } from '@/lib/ai/sdk'",
@@ -7799,23 +7938,38 @@ function evaluateChatTitleContract(vars: EvalVars) {
         'recordOutputs: options.recordOutputs ?? false',
       ]),
     sanitizesAllTitleInputsAndOutputs: textIncludesAll(routeSource, [
-      'sanitizeConversationTitle(userMessage?.content, 200)',
-      'sanitizeConversationTitle(m.content, 200)',
+      'conversationTitleSource(',
+      'userMessage?.content',
+      'conversationTitleSource(m.content).text',
       'sanitizeConversationTitle(text)',
     ]),
-    guardsGeneratedAndFallbackUpdates: guardedNullUpdateCount >= 2,
+    guardsGeneratedAndFallbackUpdates:
+      guardedNullUpdateCount === 1 &&
+      textIncludesAll(routeSource, [
+        'const saveTitle = (title: string)',
+        'eq(chatConversations.id, conversationId)',
+        'eq(chatConversations.creatorProfileId, identity.creatorProfileId)',
+        'await saveTitle(titleSource)',
+        'await saveTitle(title)',
+        'await saveTitle(fallback)',
+      ]),
     fallsBackToSanitizedUserMessage: textIncludesAll(routeSource, [
       'const fallback = sanitizeConversationTitle(titleSource, 50)',
       'if (!fallback) return',
     ]),
     schedulesTitleGenerationAfterPersistence: textIncludesAll(routeSource, [
       'const titlePending = hasUserMessage && !conversation.title',
-      'after(async () =>',
+      'scheduleAfter(async () =>',
       'await maybeGenerateTitle(conversationId, messagesToInsert,',
       'userId: clerkUserId',
+      'creatorProfileId: profile.id',
     ]),
   };
   const runtimeFacts = {
+    machineWorkTitleUsesSubjectOnly:
+      workTitle.deterministic && workTitle.text === 'Seaside Heights',
+    probeTitleExcludesExecutionInstructions:
+      probeTitle.deterministic && probeTitle.text === 'Prod health check',
     syntheticGeneratedTitleSanitized:
       generatedTitle === 'Neon Reef Launch Plan',
     syntheticFallbackExists: typeof fallbackTitle === 'string',
@@ -7862,6 +8016,8 @@ function evaluateChatTitleContract(vars: EvalVars) {
       generatedTitle,
       sourceTitle,
       fallbackTitle,
+      workTitle,
+      probeTitle,
     },
     promptLeakPatterns: titlePromptLeakPatterns,
     toolCalls: [],

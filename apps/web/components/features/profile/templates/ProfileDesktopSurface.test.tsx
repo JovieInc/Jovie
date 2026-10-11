@@ -452,6 +452,31 @@ describe('ProfileDesktopSurface', () => {
     expect(screen.getByTestId('profile-desktop-surface')).toBeInTheDocument();
   });
 
+  // JOV-7412: the document scrolls at desktop widths, so the card's inner
+  // scroll pane must chain overscroll to the page instead of trapping the
+  // wheel at its own edges.
+  it('chains overscroll to the document instead of trapping the wheel', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+      />
+    );
+
+    const scrollPane = screen.getByTestId('profile-desktop-content-scroll');
+    expect(scrollPane).toHaveClass('overflow-y-auto', 'overscroll-auto');
+    expect(scrollPane.className).not.toMatch(/\boverscroll-contain\b/);
+  });
+
   // JOV-6453: while the AnonCookieBootstrap fetch is still in flight the
   // variant-dependent hero CTA stays inert so it cannot morph post-paint.
   it('holds the hero subscribe CTA inert while the visitor assignment resolves', () => {
@@ -749,6 +774,71 @@ describe('ProfileDesktopSurface', () => {
       expect(screen.getByText('Sep')).toBeVisible();
       expect(screen.getByText('23')).toBeVisible();
       expect(screen.queryByText('24')).toBeNull();
+    }
+  );
+
+  // JOV-4429: tour lists often reuse one ticketing URL for every date, so
+  // each Tickets link needs a unique accessible name (WCAG 2.4.4).
+  it.each(['profile', 'tour'] as const)(
+    'gives per-event Tickets links unique accessible names in %s mode',
+    activeMode => {
+      const makeShow = (
+        id: string,
+        venueName: string,
+        startDate: string
+      ): TourDateViewModel => ({
+        id,
+        profileId: artist.id,
+        externalId: null,
+        provider: 'manual',
+        eventType: 'tour',
+        confirmationStatus: 'confirmed',
+        reviewedAt: '2026-01-01T00:00:00.000Z',
+        title: null,
+        venueName,
+        city: 'Los Angeles',
+        region: 'CA',
+        country: 'US',
+        startDate,
+        startTime: null,
+        timezone: 'America/Chicago',
+        latitude: null,
+        longitude: null,
+        ticketUrl: 'https://tickets.example.com/tour',
+        ticketStatus: 'available',
+        lastSyncedAt: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      });
+
+      render(
+        <ProfileDesktopSurface
+          artist={artist}
+          socialLinks={[]}
+          contacts={contacts}
+          photoDownloadSizes={[]}
+          tourDates={[
+            makeShow('show-1', 'The Echo', '2030-09-24T03:00:00Z'),
+            makeShow('show-2', 'The Wiltern', '2030-09-26T03:00:00Z'),
+          ]}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode={activeMode}
+          onModeSelect={vi.fn()}
+          onDrawerOpenChange={vi.fn()}
+          onDrawerViewChange={vi.fn()}
+          onOpenMenu={vi.fn()}
+          onPlayClick={vi.fn()}
+          profileHref='/timwhite'
+        />
+      );
+
+      expect(
+        screen.getByRole('link', { name: 'Tickets for The Echo on Sep 23' })
+      ).toHaveAttribute('href', 'https://tickets.example.com/tour');
+      expect(
+        screen.getByRole('link', { name: 'Tickets for The Wiltern on Sep 25' })
+      ).toHaveAttribute('href', 'https://tickets.example.com/tour');
     }
   );
 

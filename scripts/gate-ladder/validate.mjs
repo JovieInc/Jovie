@@ -62,8 +62,10 @@ function main() {
       '.husky/pre-commit must invoke scripts/check-conflict-markers.sh'
     );
   }
-  if (!preCommit.includes('lint-staged')) {
-    errors.push('.husky/pre-commit must invoke lint-staged (format/lint)');
+  if (!preCommit.includes('pnpm exec lint-staged --no-stash')) {
+    errors.push(
+      '.husky/pre-commit must invoke lint-staged with --no-stash (format/lint)'
+    );
   }
 
   const prePush = existsSync(resolve(REPO_ROOT, '.husky/pre-push'))

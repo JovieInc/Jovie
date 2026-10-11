@@ -29,6 +29,7 @@ These cookies are required for basic site functionality and cannot be disabled.
 | `jovie_pending_claim` | Maintains a profile claim flow while account creation completes | 7 days |
 | `jovie_plan_intent` | Stores selected signup plan long enough to complete checkout | 30 minutes |
 | `jv_tracking_consent` | Stores legacy tracking consent preferences | 1 year |
+| `jv_sub_mgmt` | Proves mailbox control after notification email verification so only the subscriber can enable notification categories | 1 hour |
 
 ### Preference Cookies
 

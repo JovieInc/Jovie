@@ -19,6 +19,9 @@ export class IssueClassification {
     this.identifier = issue.identifier;
     this.title = issue.title;
     this.state = issue.state?.name;
+    this.labels = (issue.labels?.nodes || [])
+      .map(label => label?.name)
+      .filter(Boolean);
     this.fingerprint = this.#computeFingerprint(issue);
     this.category = null; // canonical | duplicate | superseded | obsolete | blocked | triageable
     this.mrrCategory = null; // acquisition | activation | paid | retention | expansion | revenue-protection | throughput | reliability | unknown

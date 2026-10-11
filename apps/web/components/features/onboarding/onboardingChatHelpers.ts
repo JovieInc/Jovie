@@ -6,8 +6,15 @@ import type { ChatErrorType, MessagePart } from '@/components/jovie/types';
 import {
   GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
   GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
+  GATEWAY_INSUFFICIENT_FUNDS_ERROR_CODE,
+  GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE,
   isGatewayBudgetExceededError,
+  isGatewayInsufficientFundsError,
 } from '@/lib/ai/gateway-errors';
+import {
+  type OnboardingWidgetEventType,
+  parseWidgetEventFromMetadata,
+} from '@/lib/chat/onboarding-script/widget-events';
 import { type CheckoutCardPayload } from './ChatProposeCheckoutCard';
 import { type NextStepCardPayload } from './ChatProposeNextStepCard';
 import type {
@@ -130,6 +137,36 @@ export function getInputQuery(part: ToolPart): string | null {
   return typeof input?.query === 'string' ? input.query : null;
 }
 
+/** True when any message carries a tool output with the given `action`. */
+export function hasToolOutputAction(
+  messages: readonly UIMessage[],
+  action: string
+): boolean {
+  for (const message of messages) {
+    for (const part of getToolParts(message)) {
+      if (asRecord(part.output)?.action === action) return true;
+    }
+  }
+  return false;
+}
+
+/** True when any user message carries the given widget event metadata. */
+export function hasWidgetEvent(
+  messages: readonly UIMessage[],
+  eventType: OnboardingWidgetEventType
+): boolean {
+  for (const message of messages) {
+    if (message.role !== 'user') continue;
+    if (
+      parseWidgetEventFromMetadata(message.metadata)?.onboardingEvent ===
+      eventType
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function findLastAssistantMessageId(messages: readonly UIMessage[]) {
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i];
@@ -170,6 +207,8 @@ export function getOnboardingErrorMessage(
     case 'ONBOARDING_CHAT_PERSISTENCE_FAILED':
     case 'INTERNAL_ERROR':
       return 'Chat is temporarily unavailable. Try again in a moment.';
+    case GATEWAY_INSUFFICIENT_FUNDS_ERROR_CODE:
+      return GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE;
     case GATEWAY_BUDGET_EXCEEDED_ERROR_CODE:
       return GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE;
     default:
@@ -187,6 +226,9 @@ export function getOnboardingErrorMessage(
   }
   if (/unauthorized|authentication required|auth_required/i.test(message)) {
     return 'Sign in to continue this chat.';
+  }
+  if (isGatewayInsufficientFundsError(message)) {
+    return GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE;
   }
   if (isGatewayBudgetExceededError(message)) {
     return GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE;

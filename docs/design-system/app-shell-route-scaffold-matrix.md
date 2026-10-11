@@ -25,16 +25,15 @@ Routes mount inside `AppShellFrame` via `app/app/(shell)/layout.tsx` → `AuthSh
 | --- | --- | --- | --- | --- | --- |
 | `/app/dashboard` (chat) | `ChatWorkspaceSurface` → PageShell | `none` | `none` | `panel` | Full-bleed chat plane; ambient gradient owned by frame. |
 | `/app/chats` (`/app/threads`) | `ThreadsPageClient` → PageShell | `content-container` | `none` | `panel` | |
-| `/app/library` | `LibrarySurface` → PageShell | `content-container` | `none` | `panel` | `surfaceMode='table'`. |
+| `/app/library` | `LibrarySurface` → PageShell | `content-container` | `none` | `panel` | Visible concept: Work. Stable implementation route and `surfaceMode='table'`. |
 | `/app/calendar` | `CalendarPageClient` → PageShell | `none` | `none` | `panel` | Toolbar slot for month nav. |
 | `/app/tasks` | `TasksPageClient` → PageShell | `none` | `none` | `panel` | Absolute-inset workspace. |
 | `/app/insights` | `InsightsPanel` → PageShell | `none` | `none` | `panel` | |
-| `/app/presence` | `DspPresenceView` → PageShell | `none` | `none` | `panel` | |
+| `/app/presence` | `ProfilesWorkspace` → PageShell | `none` | `none` | `panel` | Visible concept: Identity. `surfaceMode='table'` when populated. `/app/profiles` redirects here. |
 | `/app/audience` | `DashboardAudienceTableUnified` → PageShell | `none` | `none` | `panel` | `surfaceMode='table'`. |
 | `/app/releases` | `ReleaseProviderMatrix` → PageShell | `none` | `none` | `panel` | |
 | `/app/releases/[id]/tasks` | `ReleaseTaskPage` → PageShell | `content-container` | `none` | `panel` | |
 | `/app/tour-dates` | `TourDatesPageClient` → PageShell | `none` | `none` | `panel` | `surfaceMode='table'`. |
-| `/app/profiles` | `ProfilesWorkspace` → PageShell | `none` | `none` | `panel` | `surfaceMode='table'` when populated. |
 | `/app/earnings` | `DashboardPay` → PageShell | `none` | `compact` | `panel` | `maxWidth='wide'`. |
 | `/app/dashboard/release-plan` | route page → PageShell | `none` | `default` | `panel` | |
 | `/app/settings/*` | `settings/layout.tsx` → PageShell | `none` | `none` | `page` | Page-level scroll owner; `maxWidth='wide'`. |

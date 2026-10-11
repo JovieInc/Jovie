@@ -28,8 +28,9 @@ export function renderAvatarCell({
       isFeatured={profile.isFeatured}
       disableUsernameLink
       usernameActions={
-        <span className='flex shrink-0 items-center gap-0.5'>
+        <span className='flex shrink-0 items-center gap-5'>
           <InlineIconButton
+            size='xs'
             aria-label={`Copy link for @${profile.username}`}
             fadeOnParentHover
             className='[&_svg]:h-3 [&_svg]:w-3'
@@ -47,6 +48,7 @@ export function renderAvatarCell({
             <Copy className='h-3 w-3' />
           </InlineIconButton>
           <InlineIconButton
+            size='xs'
             href={profileUrl}
             target='_blank'
             rel='noopener noreferrer'

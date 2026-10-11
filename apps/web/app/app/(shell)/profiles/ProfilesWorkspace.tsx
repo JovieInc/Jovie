@@ -40,6 +40,18 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActio
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import {
+  PresenceSignalList,
+  PresenceStatusBadge,
+} from '@/components/features/presence/PresenceStatusParts';
+import styles from '@/components/features/presence/presence-workspace.module.css';
+import { CREATOR_PRESENCE_ADAPTER } from '@/components/features/presence/workspace-adapters';
+import {
+  PresenceWorkspaceBoundary,
+  type PresenceWorkspaceScope,
+  presenceWorkspaceScopeKey,
+  usePresenceWorkspaceController,
+} from '@/components/features/presence/workspace-controller';
+import {
   DrawerAnalyticsSummaryCard,
   DrawerSection,
   EntityHeader,
@@ -67,13 +79,11 @@ import {
   getPresencePlatformLabel,
 } from '@/lib/profile-surfaces/presence-identity';
 import {
-  filterProfileWorkspaceRows,
   formatProfileRankChange,
   getConnectionPrimaryAction,
   getConnectionStatus,
   getPresenceSignals,
   selectPresenceReviewRows,
-  sortProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
 import {
   FetchError,
@@ -104,8 +114,6 @@ import {
   PresenceOutcomeStrip as PresenceOutcomeBoard,
   presenceFilterForGroup,
 } from './PresenceOutcomes';
-import { PresenceSignalList, PresenceStatusBadge } from './PresenceStatusParts';
-import styles from './profiles-workspace.module.css';
 
 const columnHelper = createColumnHelper<ProfileWorkspaceRow>();
 type ProfilesWorkspaceView = ProfilesWorkspaceFilter | 'suggested' | 'review';
@@ -149,6 +157,13 @@ interface SuggestionMutationResponse {
   readonly error?: string;
 }
 
+interface IdentityDecisionResponse {
+  readonly ok: boolean;
+  readonly error?: string;
+}
+
+type IdentityDecision = 'yes' | 'no' | 'unsure';
+
 type SuggestionAction = 'accept' | 'reject';
 
 const CONNECTION_SUGGESTION_PLATFORM_PRIORITY: Readonly<
@@ -174,8 +189,15 @@ const SUGGESTED_CONNECTION_SKELETON_IDS = [
   'suggested-connection-loading-3',
 ] as const;
 
-function connectionSuggestionsQueryKey(profileId: string) {
-  return [...queryKeys.suggestions.list(profileId), 'connections-review'];
+function connectionSuggestionsQueryKey(
+  profileId: string,
+  scope: PresenceWorkspaceScope
+) {
+  return [
+    ...queryKeys.suggestions.list(profileId),
+    'connections-review',
+    presenceWorkspaceScopeKey(scope),
+  ];
 }
 
 function isConnectionSuggestion(
@@ -589,11 +611,16 @@ function ConnectionRail({
   data,
   row,
   onClose,
+  onIdentityDecision,
   contextMenuItems,
 }: Readonly<{
   data: ProfilesWorkspaceData;
   row: ProfileWorkspaceRow | null;
   onClose: () => void;
+  onIdentityDecision: (
+    surfaceId: string,
+    decision: IdentityDecision
+  ) => Promise<void>;
   contextMenuItems: CommonDropdownItem[];
 }>) {
   const primaryAction = row ? getConnectionPrimaryAction(row) : null;
@@ -708,6 +735,14 @@ function ConnectionRail({
             row={row}
             providerAvailable={data.providerAvailable}
           />
+          {row.rowType === 'surface' &&
+          (row.qualificationStatus === 'suggested' ||
+            row.qualificationStatus === 'conflicting') ? (
+            <IdentityConfirmationSection
+              row={row}
+              onDecision={onIdentityDecision}
+            />
+          ) : null}
           <DrawerSection sectionKind='details'>
             <div
               className={cn(
@@ -739,7 +774,7 @@ function ConnectionRail({
                         ? APP_ROUTES.SETTINGS_BILLING
                         : row.rowType === 'connector'
                           ? APP_ROUTES.SETTINGS_CONNECTORS
-                          : APP_ROUTES.SETTINGS_ARTIST_PROFILE
+                          : APP_ROUTES.SETTINGS_PROFILE
                     }
                   >
                     {primaryAction === 'upgrade'
@@ -757,6 +792,95 @@ function ConnectionRail({
         </div>
       ) : null}
     </EntitySidebarShell>
+  );
+}
+
+const IDENTITY_SOURCE_LABELS: Readonly<Record<string, string>> = {
+  creator_profile: 'Jovie profile',
+  dsp_match: 'DSP match',
+  identity_link: 'public identity link',
+  social_link: 'linked social profile',
+};
+
+function IdentityConfirmationSection({
+  row,
+  onDecision,
+}: Readonly<{
+  row: ProfileWorkspaceSurfaceRow;
+  onDecision: (surfaceId: string, decision: IdentityDecision) => Promise<void>;
+}>) {
+  const [pendingDecision, setPendingDecision] =
+    useState<IdentityDecision | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const evidence = row.identityEvidence ?? {
+    sourceCount: 0,
+    sourceTypes: [],
+    confidence: null,
+  };
+  const sourceSummary = evidence.sourceTypes
+    .map(
+      sourceType =>
+        IDENTITY_SOURCE_LABELS[sourceType] ?? sourceType.replaceAll('_', ' ')
+    )
+    .join(', ');
+  const confidence =
+    evidence.confidence === null
+      ? null
+      : `${Math.round(evidence.confidence * 100)}% match`;
+  const evidenceSummary =
+    evidence.sourceCount === 0
+      ? 'No live source claim is currently available.'
+      : [
+          `${evidence.sourceCount} live ${evidence.sourceCount === 1 ? 'source' : 'sources'}`,
+          sourceSummary,
+          confidence,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+
+  const decide = async (decision: IdentityDecision) => {
+    setPendingDecision(decision);
+    setError(null);
+    try {
+      await onDecision(row.id, decision);
+    } catch {
+      setError('Could not save your answer. Try again.');
+    } finally {
+      setPendingDecision(null);
+    }
+  };
+
+  return (
+    <DrawerSection title='Identity Check' sectionKind='details'>
+      <div className='space-y-3 px-1'>
+        <div className='space-y-1'>
+          <p className='text-sm font-medium text-primary-token'>Is this you?</p>
+          <p className='text-xs text-tertiary-token'>{evidenceSummary}</p>
+        </div>
+        <div className='grid grid-cols-3 gap-2'>
+          {(['yes', 'no', 'unsure'] as const).map(decision => (
+            <Button
+              key={decision}
+              type='button'
+              size='sm'
+              variant={decision === 'yes' ? 'primary' : 'secondary'}
+              loading={pendingDecision === decision}
+              disabled={pendingDecision !== null}
+              onClick={() => void decide(decision)}
+            >
+              {decision === 'yes' ? 'Yes' : decision === 'no' ? 'No' : 'Unsure'}
+            </Button>
+          ))}
+        </div>
+        <p
+          className='min-h-4 text-xs text-error'
+          role={error ? 'alert' : 'status'}
+          aria-live='polite'
+        >
+          {error}
+        </p>
+      </div>
+    </DrawerSection>
   );
 }
 
@@ -1060,11 +1184,25 @@ function SuggestedConnectionsReview({
 
 export function ProfilesWorkspace({
   data,
-}: Readonly<{ data: ProfilesWorkspaceData | null }>) {
-  const [filter, setFilter] = useState<ProfilesWorkspaceView>(() =>
-    selectPresenceReviewRows(data?.rows ?? []).length > 0 ? 'review' : 'all'
+  scope,
+}: Readonly<{
+  data: ProfilesWorkspaceData | null;
+  scope: PresenceWorkspaceScope;
+}>) {
+  return (
+    <PresenceWorkspaceBoundary scope={scope}>
+      <ProfilesWorkspaceContent data={data} scope={scope} />
+    </PresenceWorkspaceBoundary>
   );
-  const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(null);
+}
+
+function ProfilesWorkspaceContent({
+  data,
+  scope,
+}: Readonly<{
+  data: ProfilesWorkspaceData | null;
+  scope: PresenceWorkspaceScope;
+}>) {
   const [isAddConnectionOpen, setIsAddConnectionOpen] = useState(false);
   const [pendingCandidate, setPendingCandidate] =
     useState<ConnectionIntakeCandidate | null>(null);
@@ -1073,6 +1211,55 @@ export function ProfilesWorkspace({
   const [acceptedSuggestionRows, setAcceptedSuggestionRows] = useState<
     ProfileWorkspaceSurfaceRow[]
   >([]);
+  const persistedAcceptedRows = useMemo(() => {
+    const currentSurfaceKeys = new Set(
+      (data?.rows ?? [])
+        .filter(row => row.rowType === 'surface')
+        .map(row => `${row.platform}:${row.url}`)
+    );
+
+    return acceptedSuggestionRows.filter(
+      row => !currentSurfaceKeys.has(`${row.platform}:${row.url}`)
+    );
+  }, [acceptedSuggestionRows, data?.rows]);
+  const pendingRow = useMemo<ProfileWorkspaceRow | null>(() => {
+    if (!pendingCandidate) return null;
+    return {
+      id: `preview:${pendingCandidate.id}`,
+      rowType: 'surface',
+      kind:
+        pendingCandidate.category === 'website'
+          ? 'website'
+          : pendingCandidate.category,
+      platform: pendingCandidate.platformId,
+      label: pendingCandidate.title,
+      handle: 'Preview only · not saved',
+      url: pendingCandidate.url,
+      trackedUrl: null,
+      qualificationStatus: 'suggested',
+      isOfficial: false,
+      monitoringState: 'unavailable',
+      rank: null,
+      previousRank: null,
+      lastObservedAt: null,
+    };
+  }, [pendingCandidate]);
+  const sourceRows = useMemo(
+    () =>
+      pendingRow
+        ? [pendingRow, ...persistedAcceptedRows, ...(data?.rows ?? [])]
+        : [...persistedAcceptedRows, ...(data?.rows ?? [])],
+    [pendingRow, persistedAcceptedRows, data?.rows]
+  );
+  const { filter, setFilter, selected, setSelected, rows } =
+    usePresenceWorkspaceController({
+      sourceRows,
+      adapter: CREATOR_PRESENCE_ADAPTER,
+      initialFilter:
+        selectPresenceReviewRows(data?.rows ?? []).length > 0
+          ? 'review'
+          : 'all',
+    });
   const suggestionActionRefs = useRef(new Map<string, HTMLButtonElement>());
   const suggestedRegionRef = useRef<HTMLDivElement>(null);
   const pendingSuggestionFocusTargetRef = useRef<string | null>(null);
@@ -1081,8 +1268,8 @@ export function ProfilesWorkspace({
   const queryClient = useQueryClient();
   const profileId = data?.profileId ?? null;
   const connectionSuggestionKey = useMemo(
-    () => connectionSuggestionsQueryKey(profileId ?? ''),
-    [profileId]
+    () => connectionSuggestionsQueryKey(profileId ?? '', scope),
+    [profileId, scope]
   );
   const connectionSuggestionsQuery = useQuery({
     ...STANDARD_CACHE,
@@ -1121,8 +1308,8 @@ export function ProfilesWorkspace({
     setPendingCandidate(null);
     setIsAddConnectionOpen(false);
     setFilter('suggested');
-    router.replace(APP_ROUTES.PROFILES);
-  }, [router, searchParams]);
+    router.replace(APP_ROUTES.PRESENCE);
+  }, [router, searchParams, setFilter, setSelected]);
   useEffect(() => {
     const target = pendingSuggestionFocusTargetRef.current;
     if (!target) return;
@@ -1148,17 +1335,6 @@ export function ProfilesWorkspace({
       },
     []
   );
-  const persistedAcceptedRows = useMemo(() => {
-    const currentSurfaceKeys = new Set(
-      (data?.rows ?? [])
-        .filter(row => row.rowType === 'surface')
-        .map(row => `${row.platform}:${row.url}`)
-    );
-
-    return acceptedSuggestionRows.filter(
-      row => !currentSurfaceKeys.has(`${row.platform}:${row.url}`)
-    );
-  }, [acceptedSuggestionRows, data?.rows]);
   const handleSuggestionAction = useCallback(
     async (suggestion: ConnectionSuggestion, action: SuggestionAction) => {
       if (!profileId) return;
@@ -1233,44 +1409,29 @@ export function ProfilesWorkspace({
       router,
     ]
   );
-  const pendingRow = useMemo<ProfileWorkspaceRow | null>(() => {
-    if (!pendingCandidate) return null;
-    return {
-      id: `preview:${pendingCandidate.id}`,
-      rowType: 'surface',
-      kind:
-        pendingCandidate.category === 'website'
-          ? 'website'
-          : pendingCandidate.category,
-      platform: pendingCandidate.platformId,
-      label: pendingCandidate.title,
-      handle: 'Preview only · not saved',
-      url: pendingCandidate.url,
-      trackedUrl: null,
-      qualificationStatus: 'suggested',
-      isOfficial: false,
-      monitoringState: 'unavailable',
-      rank: null,
-      previousRank: null,
-      lastObservedAt: null,
-    };
-  }, [pendingCandidate]);
-  const rows = useMemo(() => {
-    if (filter === 'suggested') return [];
-    const sourceRows = pendingRow
-      ? [pendingRow, ...persistedAcceptedRows, ...(data?.rows ?? [])]
-      : [...persistedAcceptedRows, ...(data?.rows ?? [])];
-    return sortProfileWorkspaceRows(
-      filter === 'review'
-        ? selectPresenceReviewRows(sourceRows)
-        : filterProfileWorkspaceRows(sourceRows, filter)
-    );
-  }, [data?.rows, filter, pendingRow, persistedAcceptedRows]);
+  const handleIdentityDecision = useCallback(
+    async (surfaceId: string, decision: IdentityDecision) => {
+      const response = await fetchWithTimeout<IdentityDecisionResponse>(
+        `/api/profile-surfaces/${encodeURIComponent(surfaceId)}/qualification`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error(response.error ?? 'Unable to save identity decision');
+      }
+      setSelected(null);
+      router.refresh();
+    },
+    [router, setSelected]
+  );
   const handleAddConnection = useCallback(() => {
     setSelected(null);
     setPendingCandidate(null);
     setIsAddConnectionOpen(true);
-  }, []);
+  }, [setSelected]);
   const headerActions = useMemo(
     () => (
       <DashboardHeaderActionGroup>
@@ -1310,12 +1471,12 @@ export function ProfilesWorkspace({
               ? APP_ROUTES.SETTINGS_BILLING
               : connection.rowType === 'connector'
                 ? APP_ROUTES.SETTINGS_CONNECTORS
-                : APP_ROUTES.SETTINGS_ARTIST_PROFILE
+                : APP_ROUTES.SETTINGS_PROFILE
           );
         },
       });
     },
-    [router]
+    [router, setSelected]
   );
   const columns = useMemo(
     () => [
@@ -1512,6 +1673,7 @@ export function ProfilesWorkspace({
           data={data}
           row={selected}
           onClose={() => setSelected(null)}
+          onIdentityDecision={handleIdentityDecision}
           contextMenuItems={convertToCommonDropdownItems(
             getContextMenuItems(selected)
           )}
@@ -1529,12 +1691,12 @@ export function ProfilesWorkspace({
       >
         <EmptyState
           icon={<UserRound className='h-5 w-5' aria-hidden />}
-          heading='No Artist Profile Selected'
-          description='Set up an artist profile to monitor its presence.'
+          heading='No Identity Selected'
+          description='Set up an identity to manage its presence.'
           presentation='workspace'
           action={{
-            label: 'Set Up Artist Profile',
-            href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+            label: 'Set Up Identity',
+            href: APP_ROUTES.SETTINGS_PROFILE,
           }}
           testId='profiles-workspace-empty-state'
           className='min-h-75'
@@ -1606,7 +1768,7 @@ export function ProfilesWorkspace({
             }
           }}
           getContextMenuItems={getContextMenuItems}
-          rowHeight={56}
+          rowMode='two-line'
           containerClassName='min-h-0 flex-1'
           minWidth='0'
           className={styles.table}

@@ -15,15 +15,31 @@ import {
   type Request,
   test,
 } from '@playwright/test';
+import { UX_LATENCY_STORAGE_KEY } from '@/lib/monitoring/interaction-latency';
 import {
   buildInteractionLatencyReport,
   type InteractionLatencySample,
 } from '@/scripts/performance-interaction-report';
 import { setTestAuthBypassSession } from '../helpers/auth';
+import {
+  installBrowserChatProbe,
+  roundTripCopy,
+  roundTripFromRequest,
+} from '../helpers/chat-performance-probe';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 const CONVERSATION_ID = 'conv-chat-performance';
 const SAMPLE_COUNT = 5;
+/**
+ * Cold `/app/chat` mounts on CI decay across the first few full reloads
+ * (route compile and hydration). Five samples make p95 the worst sample, so
+ * scoring those cold mounts fails a steady-state budget the warm samples
+ * already meet. Discard this many unmeasured round trips, then score the
+ * same five-sample p50/p95 budgets. A hot-path regression still fails.
+ *
+ * Oct 2 Extended Smoke knee (usable ms): 580, 314, 273, then 142 and 148.
+ */
+const WARMUP_ROUND_TRIPS = 3;
 
 interface PersistedMessage {
   readonly id: string;
@@ -102,10 +118,9 @@ async function mockChatBackend(page: Page) {
 
   await page.route('**/api/chat', async route => {
     const currentRun = runIndex;
-    const userText = `Performance message ${currentRun + 1}`;
-    const assistantText =
-      `Performance reply ${currentRun + 1}. ` +
-      'This deterministic response is long enough to exercise the real message list layout.';
+    const { userText, assistantText } = roundTripFromRequest(
+      route.request().postDataJSON()
+    );
     const turnId = `turn-chat-performance-${currentRun}`;
     const createdAt = new Date(
       Date.UTC(2026, 6, 23, 0, 0, currentRun * 2)
@@ -164,92 +179,10 @@ async function installChatProbe(
   userText: string,
   assistantText: string
 ) {
-  await page.evaluate(
-    ({ assistant, user }) => {
-      const probeWindow = window as Window & {
-        __jovieChatPerformanceProbe?: {
-          dataReadyMs?: number;
-          fetchStartedMs?: number;
-          firstFeedbackMs?: number;
-          longTaskDurations: number[];
-          longTaskObserver?: PerformanceObserver;
-          observer: MutationObserver;
-          originalFetch: typeof window.fetch;
-          renderToInteractiveMs?: number;
-          start: number;
-          usableStateMs?: number;
-        };
-      };
-      probeWindow.__jovieChatPerformanceProbe?.observer.disconnect();
-
-      const start = performance.now();
-      const probe = {
-        start,
-        observer: undefined as unknown as MutationObserver,
-        longTaskDurations: [],
-        originalFetch: window.fetch,
-      } as NonNullable<typeof probeWindow.__jovieChatPerformanceProbe>;
-      try {
-        probe.longTaskObserver = new PerformanceObserver(list => {
-          probe.longTaskDurations.push(
-            ...list.getEntries().map(entry => entry.duration)
-          );
-        });
-        probe.longTaskObserver.observe({ type: 'longtask' });
-      } catch {
-        // Long-task entries are unavailable in some browser engines.
-      }
-      const originalFetch = window.fetch.bind(window);
-      window.fetch = (input, init) => {
-        const url =
-          typeof input === 'string'
-            ? input
-            : input instanceof URL
-              ? input.href
-              : input.url;
-        if (
-          probe.fetchStartedMs === undefined &&
-          new URL(url, window.location.origin).pathname === '/api/chat'
-        ) {
-          probe.fetchStartedMs = performance.now() - start;
-        }
-        return originalFetch(input, init);
-      };
-
-      const observer = new MutationObserver(() => {
-        const bodyText = document.body.textContent ?? '';
-        const now = performance.now();
-
-        if (probe.firstFeedbackMs === undefined && bodyText.includes(user)) {
-          probe.firstFeedbackMs = now - start;
-        }
-
-        if (probe.usableStateMs === undefined && bodyText.includes(assistant)) {
-          probe.usableStateMs = now - start;
-          const renderStart = now;
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              const composer = document.querySelector<HTMLTextAreaElement>(
-                'textarea[aria-label="Chat Message Input"]'
-              );
-              if (composer && !composer.disabled) {
-                probe.renderToInteractiveMs = performance.now() - renderStart;
-              }
-            });
-          });
-        }
-      });
-
-      probe.observer = observer;
-      probeWindow.__jovieChatPerformanceProbe = probe;
-      observer.observe(document.body, {
-        childList: true,
-        characterData: true,
-        subtree: true,
-      });
-    },
-    { assistant: assistantText, user: userText }
-  );
+  await page.evaluate(installBrowserChatProbe, {
+    assistant: assistantText,
+    user: userText,
+  });
 }
 
 async function triggerMeasuredSend(
@@ -280,6 +213,7 @@ async function readChatProbe(page: Page) {
       __jovieChatPerformanceProbe?: {
         dataReadyMs?: number;
         fetchStartedMs?: number;
+        frameId?: number;
         firstFeedbackMs?: number;
         longTaskDurations: number[];
         renderToInteractiveMs?: number;
@@ -299,6 +233,7 @@ async function readChatProbe(page: Page) {
       __jovieChatPerformanceProbe?: {
         dataReadyMs?: number;
         fetchStartedMs?: number;
+        frameId?: number;
         firstFeedbackMs?: number;
         longTaskDurations: number[];
         longTaskObserver?: PerformanceObserver;
@@ -318,6 +253,7 @@ async function readChatProbe(page: Page) {
       throw new Error('Chat performance probe did not collect every metric');
     }
     probe.observer.disconnect();
+    if (probe.frameId !== undefined) cancelAnimationFrame(probe.frameId);
     probe.longTaskObserver?.disconnect();
     window.fetch = probe.originalFetch;
     return {
@@ -443,6 +379,38 @@ async function waitForChatRouteReady(
     .toBe(0);
 }
 
+async function remountChatRoute(
+  page: Page,
+  chatContent: Locator,
+  composer: Locator,
+  chatApi: ReturnType<typeof trackChatApiRequests>
+): Promise<void> {
+  // A full route mount makes each sample independent and resets the
+  // intentional one-message-per-second composer pacer without sleeping.
+  await page.goto('/app/chat', { waitUntil: 'domcontentloaded' });
+  await waitForChatRouteReady(page, chatContent, composer, chatApi);
+}
+
+async function exchangeChatRoundTrip(
+  page: Page,
+  composer: Locator,
+  sendButton: Locator,
+  userText: string,
+  assistantText: string
+) {
+  await expect(composer).toBeEnabled();
+  await composer.fill(userText);
+  await installChatProbe(page, userText, assistantText);
+  await triggerMeasuredSend(sendButton);
+  await expect(
+    page.getByTestId('chat-user-bubble').filter({ hasText: userText })
+  ).toBeVisible();
+  await expect(
+    page.getByTestId('chat-message-reply').filter({ hasText: assistantText })
+  ).toBeVisible();
+  return readChatProbe(page);
+}
+
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test('chat route stays within the deploy-gating responsiveness budget', async ({
@@ -452,7 +420,7 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
   );
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   await page.setViewportSize({ width: 1280, height: 480 });
 
   await mockChatBackend(page);
@@ -468,33 +436,44 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
     name: /send message/i,
   });
   await waitForChatRouteReady(page, chatContent, composer, chatApi);
+
+  for (
+    let warmupIndex = 0;
+    warmupIndex < WARMUP_ROUND_TRIPS;
+    warmupIndex += 1
+  ) {
+    if (warmupIndex > 0) {
+      await remountChatRoute(page, chatContent, composer, chatApi);
+    }
+    const copy = roundTripCopy('Warmup', warmupIndex);
+    await exchangeChatRoundTrip(
+      page,
+      composer,
+      sendButton,
+      copy.userText,
+      copy.assistantText
+    );
+  }
+
+  // Warmup sends are real product interactions and land in the UX latency
+  // store. Drop them so the assertion below still proves exactly the scored
+  // samples were recorded.
+  await page.evaluate(storageKey => {
+    localStorage.removeItem(storageKey);
+  }, UX_LATENCY_STORAGE_KEY);
+
   const samples: InteractionLatencySample[] = [];
 
   for (let runIndex = 0; runIndex < SAMPLE_COUNT; runIndex += 1) {
-    if (runIndex > 0) {
-      // A full route mount makes each sample independent and resets the
-      // intentional one-message-per-second composer pacer without sleeping.
-      await page.goto('/app/chat', { waitUntil: 'domcontentloaded' });
-      await waitForChatRouteReady(page, chatContent, composer, chatApi);
-    }
-
-    const userText = `Performance message ${runIndex + 1}`;
-    const assistantText =
-      `Performance reply ${runIndex + 1}. ` +
-      'This deterministic response is long enough to exercise the real message list layout.';
-
-    await expect(composer).toBeEnabled();
-    await composer.fill(userText);
-    await installChatProbe(page, userText, assistantText);
-    await triggerMeasuredSend(sendButton);
-    await expect(
-      page.getByTestId('chat-user-bubble').filter({ hasText: userText })
-    ).toBeVisible();
-    await expect(
-      page.getByTestId('chat-message-reply').filter({ hasText: assistantText })
-    ).toBeVisible();
-
-    const timings = await readChatProbe(page);
+    await remountChatRoute(page, chatContent, composer, chatApi);
+    const copy = roundTripCopy('Performance', runIndex);
+    const timings = await exchangeChatRoundTrip(
+      page,
+      composer,
+      sendButton,
+      copy.userText,
+      copy.assistantText
+    );
     samples.push({
       ...timings,
       runIndex,
@@ -516,10 +495,10 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
 
   expect(report.status, JSON.stringify(report.summaries, null, 2)).toBe('pass');
 
-  const uxLatencyStore = await page.evaluate(() => {
-    const raw = localStorage.getItem('jovie:ux-latency:v1');
+  const uxLatencyStore = await page.evaluate(storageKey => {
+    const raw = localStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : null;
-  });
+  }, UX_LATENCY_STORAGE_KEY);
   expect(uxLatencyStore).toMatchObject({
     version: 1,
     samples: {

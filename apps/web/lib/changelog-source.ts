@@ -31,7 +31,15 @@ const getChangelogMarkdown = unstable_cache(
       return '';
     }
   },
-  ['changelog-markdown'],
+  // The Data Cache survives deployments. Never bind a new build to the
+  // previous release's bytes under a permanent shared key.
+  [
+    'changelog-markdown',
+    process.env.NEXT_PUBLIC_BUILD_SHA ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.VERCEL_DEPLOYMENT_ID ||
+      'local',
+  ],
   { revalidate: false, tags: ['changelog'] }
 );
 

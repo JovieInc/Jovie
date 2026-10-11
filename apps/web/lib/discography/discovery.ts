@@ -9,12 +9,15 @@
  * - Search URL fallbacks for any DSPs not resolved by the above
  */
 
+import { invalidateSmartLinkContentCache } from '@/lib/cache/releases';
 import {
   getAlbum,
   isAppleMusicAvailable,
   lookupByIsrc as musicKitLookupByIsrc,
 } from '@/lib/dsp-enrichment/providers/apple-music';
 
+import { parseArtistCreditsFromArtistLine } from './artist-parser';
+import { processProviderRecordingArtistCredits } from './artist-queries';
 import {
   isMusicfetchAvailable,
   lookupByIsrc as musicfetchLookupByIsrc,
@@ -44,9 +47,28 @@ export interface DiscoveryResult {
   }[];
   previewsBackfilled: number;
   errors: string[];
+  /** Recording evidence is distinct from release/edition destination proof. */
+  recordings: RecordingDiscoveryEvidence[];
+  /** Candidates that must not be published as release destinations. */
+  recordingCandidates: DiscoveryResult['discovered'];
+  releaseEditionUnverified: boolean;
+}
+
+export interface RecordingDiscoveryEvidence {
+  trackIds: string[];
+  isrc: string | null;
+  status:
+    | 'resolved'
+    | 'review_required'
+    | 'unresolved'
+    | 'unknown'
+    | 'unsearched';
+  destinations: DiscoveryResult['discovered'];
 }
 
 export interface DiscoverLinksOptions {
+  /** Bound work per run; omitted recordings remain explicitly unsearched. */
+  maxRecordings?: number;
   /** Skip providers that already have links */
   skipExisting?: boolean;
   /** Apple Music storefront code (default: 'us') */
@@ -141,6 +163,8 @@ async function lookupAppleMusic(
   externalId: string | null;
   source: string;
   previewUrl: string | null;
+  trackName: string | null;
+  artistName: string | null;
 } | null> {
   // Try MusicKit API first (officially supports ISRC filtering)
   if (isAppleMusicAvailable()) {
@@ -159,6 +183,8 @@ async function lookupAppleMusic(
             track.attributes.previews?.find(preview =>
               preview.url?.startsWith('https://')
             )?.url ?? null,
+          trackName: track.attributes.name ?? null,
+          artistName: track.attributes.artistName ?? null,
         };
       }
     } catch {
@@ -175,6 +201,8 @@ async function lookupAppleMusic(
         externalId: itunesResult.trackId,
         source: 'itunes_isrc',
         previewUrl: itunesResult.previewUrl,
+        trackName: itunesResult.trackName,
+        artistName: itunesResult.artistName,
       };
     }
   } catch {
@@ -207,6 +235,14 @@ async function saveDiscoveredLink(opts: {
     result,
     extraMetadata,
   } = opts;
+  if (result.releaseEditionUnverified) {
+    result.recordingCandidates.push({
+      provider: providerId,
+      url,
+      quality: 'canonical',
+    });
+    return;
+  }
   await upsertProviderLink({
     releaseId,
     providerId,
@@ -225,18 +261,110 @@ async function saveDiscoveredLink(opts: {
 }
 
 /**
- * Discover cross-platform links for a release using track ISRCs
- *
- * Strategy:
- * 1. Get tracks for the release
- * 2. Find the first track with an ISRC (usually track 1)
- * 3. Look up Apple Music, Deezer, and all other DSPs (via Musicfetch) using that ISRC
- * 4. Save discovered links to the database
+ * Inspect each distinct recording, without inferring an EP/album edition from
+ * its first song. Existing release links survive; multi-track candidates need
+ * release-level confirmation before publication.
  */
 export async function discoverLinksForRelease(
   releaseId: string,
   existingProviders: string[] = [],
   options: DiscoverLinksOptions = {}
+): Promise<DiscoveryResult> {
+  const tracks = await getTracksForRelease(releaseId);
+  const result: DiscoveryResult = {
+    releaseId,
+    discovered: [],
+    previewsBackfilled: 0,
+    errors: [],
+    recordings: [],
+    recordingCandidates: [],
+    releaseEditionUnverified: tracks.length > 1,
+  };
+  if (tracks.length === 0) {
+    result.errors.push('No tracks found for release');
+    return result;
+  }
+  const grouped = new Map<string, typeof tracks>();
+  for (const track of tracks) {
+    const isrc = track.isrc?.trim().toUpperCase();
+    if (!isrc || !/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(isrc)) {
+      result.recordings.push({
+        trackIds: [track.id],
+        isrc: null,
+        status: 'unknown',
+        destinations: [],
+      });
+      continue;
+    }
+    const group = grouped.get(isrc) ?? [];
+    group.push(track);
+    grouped.set(isrc, group);
+  }
+  if (grouped.size === 0) {
+    result.errors.push('No ISRC found on any track');
+    return result;
+  }
+  const limit =
+    Number.isSafeInteger(options.maxRecordings) &&
+    (options.maxRecordings ?? 0) > 0
+      ? Math.min(options.maxRecordings!, 100)
+      : 25;
+  let searched = 0;
+  for (const [isrc, group] of grouped) {
+    const trackIds = group.map(track => track.id);
+    if (searched++ >= limit) {
+      result.recordings.push({
+        trackIds,
+        isrc,
+        status: 'unsearched',
+        destinations: [],
+      });
+      result.errors.push(`Recording discovery limit reached: ${isrc}`);
+      continue;
+    }
+    const trackResult = await discoverLinksForTrack(
+      releaseId,
+      { ...group[0]!, isrc },
+      existingProviders,
+      options,
+      result.releaseEditionUnverified
+    );
+    const destinations = [
+      ...trackResult.discovered,
+      ...trackResult.recordingCandidates,
+    ].filter(link => link.quality === 'canonical');
+    result.recordings.push({
+      trackIds,
+      isrc,
+      destinations,
+      status:
+        destinations.length === 0
+          ? 'unresolved'
+          : result.releaseEditionUnverified
+            ? 'review_required'
+            : 'resolved',
+    });
+    result.discovered.push(...trackResult.discovered);
+    result.recordingCandidates.push(...trackResult.recordingCandidates);
+    result.previewsBackfilled += trackResult.previewsBackfilled;
+    result.errors.push(...trackResult.errors);
+  }
+  if (result.recordingCandidates.length > 0) {
+    result.errors.push(
+      'Release edition unverified: recording destinations require release-level confirmation'
+    );
+  }
+  return result;
+}
+
+async function discoverLinksForTrack(
+  releaseId: string,
+  trackWithIsrc: Awaited<ReturnType<typeof getTracksForRelease>>[number] & {
+    isrc: string;
+  },
+  existingProviders: string[],
+  options: DiscoverLinksOptions,
+  releaseEditionUnverified: boolean
 ): Promise<DiscoveryResult> {
   const { skipExisting = true, storefront = 'us' } = options;
 
@@ -245,23 +373,10 @@ export async function discoverLinksForRelease(
     discovered: [],
     previewsBackfilled: 0,
     errors: [],
+    recordings: [],
+    recordingCandidates: [],
+    releaseEditionUnverified,
   };
-
-  // Get tracks to find an ISRC
-  const tracks = await getTracksForRelease(releaseId);
-
-  if (tracks.length === 0) {
-    result.errors.push('No tracks found for release');
-    return result;
-  }
-
-  // Find the first track with an ISRC (prefer track 1)
-  const trackWithIsrc = tracks.find(t => t.isrc) ?? null;
-
-  if (!trackWithIsrc?.isrc) {
-    result.errors.push('No ISRC found on any track');
-    return result;
-  }
 
   const isrc = trackWithIsrc.isrc;
   const existingSet = new Set(existingProviders);
@@ -274,22 +389,52 @@ export async function discoverLinksForRelease(
   const lookupPromises: Promise<void>[] = [];
 
   // Apple Music lookup — prefer MusicKit API (reliable), fall back to iTunes
-  if (!skipExisting || !existingSet.has('apple_music')) {
+  const needsAppleLookup =
+    !skipExisting ||
+    !existingSet.has('apple_music') ||
+    Boolean(trackWithIsrc.creatorProfileId);
+  if (needsAppleLookup) {
     attemptedPreviewSources.push('apple_music');
     lookupPromises.push(
       lookupAppleMusic(isrc, storefront)
         .then(async match => {
           if (match) {
             appleMusicPreviewUrl = match.previewUrl;
-            await saveDiscoveredLink({
-              releaseId,
-              providerId: 'apple_music',
-              url: match.url,
-              externalId: match.externalId,
-              source: match.source,
-              isrc,
-              result,
-            });
+            if (!existingSet.has('apple_music')) {
+              await saveDiscoveredLink({
+                releaseId,
+                providerId: 'apple_music',
+                url: match.url,
+                externalId: match.externalId,
+                source: match.source,
+                isrc,
+                result,
+              });
+            }
+
+            if (match.trackName && match.artistName) {
+              try {
+                const stored = await processProviderRecordingArtistCredits({
+                  creatorProfileId: trackWithIsrc.creatorProfileId,
+                  isrc,
+                  provider: 'apple_music',
+                  sourceEntityId: match.externalId,
+                  credits: parseArtistCreditsFromArtistLine(
+                    match.trackName,
+                    match.artistName
+                  ),
+                });
+                if (stored) {
+                  invalidateSmartLinkContentCache(
+                    trackWithIsrc.creatorProfileId
+                  );
+                }
+              } catch (error) {
+                result.errors.push(
+                  `Apple Music credit reconciliation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+                );
+              }
+            }
           }
         })
         .catch(error => {
@@ -354,6 +499,15 @@ export async function discoverLinksForRelease(
       musicfetchLookupByIsrc(isrc, { withLyrics: true })
         .then(async musicfetchResult => {
           if (!musicfetchResult) return;
+          const matchedIsrc = musicfetchResult.raw.isrc?.trim().toUpperCase();
+          if (!matchedIsrc || matchedIsrc !== isrc) {
+            result.errors.push(
+              matchedIsrc
+                ? `Musicfetch ISRC mismatch: ${isrc}`
+                : `Musicfetch ISRC unverified: ${isrc}`
+            );
+            return;
+          }
 
           // Persist lyrics to the track if returned
           if (musicfetchResult.lyrics && trackWithIsrc.id) {
@@ -366,7 +520,11 @@ export async function discoverLinksForRelease(
             // Skip providers already discovered by custom lookups above
             if (existingSet.has(providerKey)) continue;
             // Skip providers already discovered in this run
-            if (result.discovered.some(d => d.provider === providerKey))
+            if (
+              [...result.discovered, ...result.recordingCandidates].some(
+                d => d.provider === providerKey
+              )
+            )
               continue;
 
             await saveDiscoveredLink({
@@ -478,7 +636,7 @@ export async function discoverLinksForRelease(
     p => !discoveredProviders.has(p) && (!skipExisting || !existingSet.has(p))
   );
 
-  if (undiscovered.length > 0) {
+  if (!releaseEditionUnverified && undiscovered.length > 0) {
     const release = await getReleaseById(releaseId);
     const artistName =
       extractArtistNameFromMetadata(release?.metadata ?? null) ?? '';

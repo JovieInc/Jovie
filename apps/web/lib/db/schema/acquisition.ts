@@ -12,12 +12,21 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { users } from './auth';
 
 export interface AcquisitionFirstTouch {
+  /**
+   * Normalized channel bucket. `campaign`/`referral`/`direct` come from the
+   * signed first-touch envelope; `unknown` means no usable evidence existed
+   * at activation (missing, expired, or tampered cookie).
+   */
+  channel?: 'campaign' | 'referral' | 'direct' | 'unknown';
   source?: string;
   medium?: string;
   campaign?: string;
   term?: string;
   content?: string;
+  /** External referrer hostname only — path, query, and fragment stripped. */
   referrer?: string;
+  /** Originating Jovie route kind (`signup`, `waitlist`, `profile`, …). */
+  routeKind?: string;
   landingPath?: string;
   claimId?: string;
   runId?: string;

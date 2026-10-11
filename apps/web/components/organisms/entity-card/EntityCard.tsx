@@ -365,8 +365,13 @@ export function EntityCard({
               fallbackClassName='bg-transparent'
             />
           ) : model.datePill ? (
-            <div className='flex flex-col items-center justify-center text-primary-token'>
-              <span className='text-2xs font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+            // Solid surface, not a translucent one: this pill sits on the
+            // card's own gradient artStyle background, whose brightness
+            // varies with the assigned accent, so the date text needs a
+            // guaranteed-opaque well underneath rather than a token bump
+            // (JOV-INV-019 image-contrast).
+            <div className='flex flex-col items-center justify-center rounded-lg bg-surface-0 px-4 py-3 text-primary-token'>
+              <span className='text-2xs font-semibold uppercase tracking-[0.12em] text-primary-token'>
                 {model.datePill.month}
               </span>
               <span className='text-[34px] font-bold leading-none tracking-tighter tabular-nums'>

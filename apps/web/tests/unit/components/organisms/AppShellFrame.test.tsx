@@ -15,10 +15,16 @@ describe('AppShellFrame', () => {
     );
 
     const mainContent = screen.getByRole('main');
+    const appShellFrame = mainContent.closest('[data-app-shell-frame]');
+    const desktopTitlebar = screen.getByTestId('electron-titlebar-row');
 
     expect(mainContent).toHaveAttribute('id', 'main-content');
     expect(mainContent).not.toHaveAttribute('tabindex');
-    expect(mainContent.closest('[data-app-shell-frame]')).toBeInTheDocument();
+    expect(appShellFrame).toBeInTheDocument();
+    expect(appShellFrame).toContainElement(desktopTitlebar);
+    expect(
+      appShellFrame?.querySelectorAll('[data-testid="electron-titlebar-row"]')
+    ).toHaveLength(1);
     const shellBody = mainContent.closest('[data-app-shell-body]');
     expect(shellBody).toHaveAttribute('data-shell-rail-motion', 'coordinated');
     expect(shellBody).toHaveAttribute(
@@ -43,7 +49,13 @@ describe('AppShellFrame', () => {
     const routeContent = mainContent.querySelector(
       '[data-app-shell-main-content]'
     );
-    expect(routeContent).toHaveClass('p-(--app-shell-content-inset)');
+    // The content inset belongs to the scroll wrapper, not the shared
+    // header+route column: the header spans the panel edge-to-edge so the
+    // top row reads as one clipped plane (JOV-7207).
+    expect(routeContent).not.toHaveClass('p-(--app-shell-content-inset)');
+    expect(
+      mainContent.querySelector('[data-app-shell-content-inset]')
+    ).toHaveClass('p-(--app-shell-content-inset)');
     expect(mainContent.closest('[data-app-shell-main-plane]')).not.toHaveClass(
       'lg:gap-(--app-shell-gap)'
     );
@@ -56,7 +68,26 @@ describe('AppShellFrame', () => {
     expect(mainContent).toContainElement(headers[0] as HTMLElement);
   });
 
-  it('allocates the right rail beside the main column instead of overlaying it', () => {
+  it('keeps the header and route on the same token-owned paint plane', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main content</div>}
+      />
+    );
+
+    const plane = screen.getByRole('main');
+    // A white blend overlay brightened only the route while the opaque
+    // header masked it, creating an extra elevation despite identical tokens.
+    const decorativePaint = Array.from(
+      plane.querySelectorAll<HTMLElement>('*')
+    ).filter(element => element.style.mixBlendMode === 'overlay');
+    expect(decorativePaint).toHaveLength(0);
+    expect(plane).toHaveClass('bg-(--app-shell-content-surface)');
+  });
+
+  it('contains the right overlay inside the main route without allocating a column', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -79,18 +110,15 @@ describe('AppShellFrame', () => {
     expect(mainPlane).toHaveAttribute('data-app-shell-main-plane', 'true');
     expect(mainPlane).toContainElement(main);
     expect(mainPlane).toContainElement(rightRail);
-    // The rail is a sibling of the main column (not clipped inside <main>) so
-    // it spans the full column height and stays above the audio dock — L3
-    // over L1 on the elevation ladder (JOV-6680).
-    expect(main).not.toContainElement(rightRail);
+    expect(main).toContainElement(rightRail);
     expect(main).toContainElement(routeContent as HTMLElement);
-    expect(rightRail.parentElement).toBe(mainPlane);
+    expect(rightRail.parentElement).toBe(routeContent);
     expect(routeContent?.parentElement).toBe(main);
     expect(scrollPane).not.toContainElement(rightRail);
     expect(rightRail).toContainElement(
       screen.getByTestId('fixture-right-rail')
     );
-    expect(rightRail).toHaveClass('lg:sticky', 'lg:top-0');
+    expect(rightRail).toHaveClass('shell-inspector-overlay');
     expect(mainPlane).toHaveClass(
       'transition-[flex-basis,width]',
       'duration-cinematic',
@@ -161,7 +189,7 @@ describe('AppShellFrame', () => {
     const mount = screen.getByTestId('app-shell-sidebar-mount');
     expect(mount).toHaveClass('h-full', 'min-h-0', 'flex', 'flex-col');
     expect(mount).toHaveClass(
-      'transition-[flex-basis,width,opacity,transform]',
+      'transition-shell-rail-allocation',
       'duration-cinematic',
       'ease-cinematic',
       'motion-reduce:transition-none'
@@ -181,6 +209,28 @@ describe('AppShellFrame', () => {
       'data-app-shell-sidebar-mount',
       'true'
     );
+  });
+
+  it('composes the shared rail-motion tokens on every shell allocation slot (JOV-4522)', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        rightPanel={<div>Right rail</div>}
+      />
+    );
+
+    // The allocation and main-plane slots must not re-declare ad-hoc
+    // duration/easing pairs — they all compose rail-motion.ts constants.
+    const frameSource = readFileSync(
+      resolve(process.cwd(), 'components/organisms/AppShellFrame.tsx'),
+      'utf8'
+    );
+    expect(frameSource).toContain('SHELL_RAIL_ALLOCATION');
+    expect(frameSource).toContain('SHELL_RAIL_MAIN_PLANE');
+    expect(frameSource).toContain('SHELL_RAIL_FRAME_GAP');
+    expect(frameSource).not.toMatch(/className='[^']*duration-cinematic/);
   });
 
   it('keeps main-plane geometry on the same reduced-motion-safe rail contract', () => {
@@ -232,21 +282,17 @@ describe('AppShellFrame', () => {
     const gradient = screen.getByTestId('chat-ambient-gradient');
     const header = screen.getByTestId('fixture-header');
 
-    // The gradient is a direct child of the route content column, spanning its
-    // full box (inset-0) — its top edge is the top of the panel, above the
-    // header band, not below it (#13386).
-    const routeContent = mainContent.querySelector(
-      '[data-app-shell-main-content]'
-    );
-    expect(gradient.parentElement).toBe(routeContent);
+    // Sharing the panel's positioning context keeps the wash behind both the
+    // header and route, even when the inspector is isolated below the header.
+    expect(gradient.parentElement).toBe(mainContent);
     expect(gradient).toHaveClass('absolute', 'inset-0', 'pointer-events-none');
     // Stacking guard: the wash is opaque, so it MUST paint beneath the
     // in-flow header — that requires a negative z-index inside an isolated
-    // isolated route column (an absolute z-auto sibling would paint on top of static
+    // panel (an absolute z-auto sibling would paint on top of static
     // content regardless of DOM order). jsdom can't compute stacking, so pin
     // the classes that make it correct.
     expect(gradient).toHaveClass('-z-10');
-    expect(routeContent).toHaveClass('isolate');
+    expect(mainContent).toHaveClass('isolate');
     expect(mainContent).toContainElement(header);
     expect(gradient.style.backgroundImage).toContain('radial-gradient');
   });
@@ -293,7 +339,7 @@ describe('AppShellFrame', () => {
     expect(tray).toHaveClass('shrink-0');
   });
 
-  it('keeps the right rail above the audio dock (rail spans full column height)', () => {
+  it('keeps the inspector within main while the audio dock retains the same column', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -308,16 +354,14 @@ describe('AppShellFrame', () => {
     const rail = screen.getByTestId('app-shell-right-rail');
     const tray = screen.getByTestId('app-shell-audio-tray');
 
-    // The rail is a sibling of the main column — not clipped inside <main> —
-    // so it elevates above the dock while the dock matches panel width.
-    expect(main).not.toContainElement(rail);
+    expect(main).toContainElement(rail);
     expect(rail).not.toContainElement(tray);
     expect(tray.parentElement).toHaveAttribute(
       'data-app-shell-main-column',
       'true'
     );
     expect(rail.parentElement).toHaveAttribute(
-      'data-app-shell-main-plane',
+      'data-app-shell-main-content',
       'true'
     );
   });

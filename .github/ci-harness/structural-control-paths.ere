@@ -56,3 +56,4 @@
 # Inputs apps/web/tests/unit/ci reads beyond .github/: web Unit Tests
 # skip PRs, so these contracts run here (#18718).
 ^(\.env\.example|\.nvmrc|config/node-runtime-policy\.json|docs/REPO-POLICY\.md|scripts/(ci/|node-runtime-policy\.mjs$|lib/playwright-png\.mjs$)|apps/web/(next\.config\.js|vercel\.json|vitest\.config[^/]*\.mts|playwright[^/]*\.config[^/]*\.ts)$)
+^scripts/(lib/)?publish-coverage-report(\.test)?\.mjs$

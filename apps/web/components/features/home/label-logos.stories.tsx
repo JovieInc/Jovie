@@ -22,6 +22,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const LogoBar: Story = {
+  args: { id: 'awal' },
   render: () => (
     <div className='flex flex-wrap items-center justify-center gap-x-10 gap-y-6 p-10 text-white/55'>
       {TRUST_LOGO_ASSETS.map(asset => (

@@ -673,6 +673,7 @@ export const tipStatusEnum = pgEnum('tip_status', [
 export const profileClaimRoleEnum = pgEnum('profile_claim_role', [
   'owner',
   'manager',
+  'assistant',
   'viewer',
 ]);
 
@@ -682,6 +683,32 @@ export const profileOwnershipActionEnum = pgEnum('profile_ownership_action', [
   'unlinked',
   'transferred',
   'role_changed',
+]);
+
+// Profile Team Approval Enums (JOV-6601 least-privilege team roles)
+export const profileRiskyActionEnum = pgEnum('profile_risky_action', [
+  'links.mutate',
+  'handle.change',
+  'auth.change',
+  'membership.manage',
+  'broadcast.send',
+]);
+
+export const profileApprovalStatusEnum = pgEnum('profile_approval_status', [
+  'pending',
+  'approved',
+  'rejected',
+  'expired',
+  'revoked',
+]);
+
+export const profileApprovalEventEnum = pgEnum('profile_approval_event', [
+  'requested',
+  'approved',
+  'rejected',
+  'expired',
+  'revoked',
+  'consumed',
 ]);
 
 // Release Task Enums

@@ -465,6 +465,10 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   'Log in': ['SIGNIN'],
   'Find yourself': ['START'],
   'Music Smart Links': ['SMART_LINKS'],
+  // JOV-7580: generic creator labels behind MARKETING_GENERIC_CREATOR_NAV.
+  'Smart Links': ['SMART_LINKS'],
+  'Audience Capture': ['ARTIST_PROFILES'],
+  'Audience Reactivation': ['ARTIST_PROFILES'],
   'Fan Notifications': ['ARTIST_NOTIFICATIONS'],
   Notifications: ['ARTIST_NOTIFICATIONS'],
   'Instant Merch': ['INSTANT_MERCH'],
@@ -481,12 +485,13 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   'Artist Directory': ['ARTISTS'],
   About: ['ABOUT'],
   Blog: ['BLOG'],
+  Engineering: ['ENGINEERING'],
+  'AI Operating System': ['AI'],
   Changelog: ['CHANGELOG'],
   Support: ['SUPPORT'],
   Contact: ['SUPPORT'],
   Compare: ['COMPARE'],
   Alternatives: ['ALTERNATIVES'],
-  Status: ['https://status.jov.ie'],
   Instagram: ['https://instagram.com/meetjovie'],
   X: ['https://x.com/meetjovie'],
   Privacy: ['LEGAL_PRIVACY'],
@@ -1019,6 +1024,14 @@ export function validateDesignSurfacesContract(registry, options = {}) {
     );
   }
   errors.push(...certifyVisualRules(policy, options).errors);
+  if (
+    policy.sharedInteractionOwners !==
+    'docs/design-system/component-ownership.json'
+  ) {
+    errors.push(
+      'sharedInteractionOwners must bind the existing component ownership map'
+    );
+  }
   return errors;
 }
 

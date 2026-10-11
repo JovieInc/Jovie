@@ -16,6 +16,7 @@ const READ_ONLY_PERMISSIONS = {
   actions: 'read',
   checks: 'read',
   contents: 'read',
+  issues: 'read',
   metadata: 'read',
   pull_requests: 'read',
 } as const;

@@ -1,11 +1,17 @@
 ---
+id: the-myspace-problem
+slug: the-myspace-problem
 title: The MySpace Problem
+description: When I was a teenager, everyone had a MySpace.
 date: 2025-02-03
 author: Tim White
 authorUsername: tim
 authorTitle: Founder at Jovie
+authorProfile: /tim
 category: Inbound Marketing
 tags: MySpace, Facebook, platform design, simplicity, artist pages
+image: /images/blog/myspace-problem.svg
+imageAlt: Abstract artwork for The MySpace Problem.
 ---
 
 # The MySpace Problem
@@ -16,7 +22,7 @@ It wasn’t optional. If you wanted to exist, you had a MySpace. And if you were
 
 Early MySpace was actually pretty simple. Profiles were mostly uniform. But MySpace didn’t lock things down. You could inject HTML and CSS. People started hacking layouts. Then themes emerged. Then full-blown custom pages.
 
-Over time, profiles became louder, slower, and harder to use. Text blended into backgrounds. Music auto-played. Navigation changed from page to page. Each profile required you to re-learn how to interact with it.
+Over time, profiles became louder, slower, and harder to use. Text blended into backgrounds. Music auto-played. Navigation changed on every profile. Each one required you to re-learn how to interact with it.
 
 I’m not claiming this killed MySpace. But the timing is hard to ignore: as customization increased, usability collapsed.
 
@@ -32,9 +38,9 @@ This pattern keeps repeating.
 
 In the early 2000s, the assumption was that more choice was always better. AIM let you customize fonts, colors, sounds, away messages. Android let you tweak nearly every part of the interface.
 
-Twenty years later, technology is vastly more advanced—and yet most successful products allow less customization, not more.
+Twenty years later, technology is vastly more advanced. Most successful products now allow less customization.
 
-That’s not because designers got lazy. It’s because they figured something out.
+Designers learned that clear constraints make products easier to use.
 
 Apple understood this early. iOS doesn’t let you change much of anything. Android gives you total control. The result? iOS updates hit 90% adoption within months. Android fragments across thousands of device configurations and averages under 30%. Every custom configuration is someone’s perfect setup and everyone else’s edge case.
 
@@ -42,15 +48,15 @@ Tony Fadell talks about this with the iPod. The market was full of MP3 players c
 
 The iPod replaced all of that with a wheel.
 
-That wasn’t about aesthetics. It was about abstraction. The interface disappeared so the music could take center stage. The other players vanished. The iPod didn’t.
+The iPod used abstraction to make the interface disappear so the music could take center stage. The other players vanished. The iPod didn’t.
 
-You see the same thing in software. Tinder exploded not because it had more features, but because it had fewer. Swipe left. Swipe right. That was basically it. Meanwhile, competitors added filters, prompts, video, modes, games—and none of them reached the same scale.
+You see the same thing in software. A single clear gesture helped Tinder explode: swipe left or swipe right. Meanwhile, competitors added filters, prompts, video, modes, and games without reaching the same scale.
 
 Clarity spreads. Options don’t.
 
 And if this matters for general consumer products, it matters especially for artists.
 
-When you release music on Spotify or Apple Music, you pour everything into the song and the album art. That’s the creative work. The two pieces are packaged together—your sound and your visual identity.
+When you release music on Spotify or Apple Music, you pour everything into the song and the album art. That’s the creative work. The two pieces package your sound and visual identity together.
 
 But the page where people actually *listen*? That should disappear.
 
@@ -60,9 +66,9 @@ Music should work the same way.
 
 When you share your music on Instagram or Facebook, you’re not trying to give someone a Choose Your Own Adventure. You want clarity: this is who I am, I make music, here’s the song I think you’ll like.
 
-Most people won’t read past the first thing they see. They’ll barely read the first thing. So if you send them to a page with ten links stacked vertically—Spotify, Apple Music, YouTube, SoundCloud, Bandcamp, Patreon, merch store, mailing list, TikTok, Instagram—they’re gone.
+Most people won’t read past the first thing they see. They’ll barely read the first thing. Send them to ten equally weighted links and they’re gone.
 
-But if you send them somewhere clean—great photo, clear identity, one obvious next step—they’ll click. They’ll listen. They’ll become fans.
+Send them somewhere with a great photo, a clear identity, and one obvious next step, and they’ll click. They’ll listen. They’ll become fans.
 
 That’s the difference between a stack of links and an actual funnel.
 
@@ -74,7 +80,7 @@ Pretty pages get admired. Clear pages get clicked.
 
 This is the modern version of the MySpace problem.
 
-I spent 15 years in music marketing. Worked with Armada, Universal, artists like Tory Lanez. Drove tens of millions of streams. Ran digital campaigns at scale for brands like Google and the NFL. All of that taught me one thing: artists shouldn’t be doing this work.
+I spent 15 years in music marketing. Worked with Armada, Universal, and recording artists at every level. Drove tens of millions of streams. Ran digital campaigns at scale for brands like Google and the NFL. All of that taught me one thing: artists shouldn’t be doing this work.
 
 Musicians should be making music. Not learning CSS. Not debating whether their CTA button should be blue or green. Not manually updating tour dates across six platforms. Not running their own A/B tests to figure out which headline gets the most clicks.
 
@@ -82,17 +88,17 @@ When I started building Jovie, the core insight was simple: the link isn’t the
 
 Kaskade said it best: “Let the music speak.”
 
-He doesn’t talk over the set. He doesn’t hype between tracks. He just plays. The music does the work. That restraint isn’t laziness—it’s respect for the craft.
+He doesn’t talk over the set. He doesn’t hype between tracks. He just plays. The music does the work. That restraint shows respect for the craft.
 
-The same principle applies to conversion. Look at Amazon checkout. Stripe’s payment flow. The best-performing Shopify stores. They all do the same thing: remove everything that isn’t the decision. No sidebars. No competing CTAs. No visual noise. The pages that convert highest aren’t the most customizable—they’re the most focused.
+The same principle applies to conversion. Look at Amazon checkout. Stripe’s payment flow. The best-performing Shopify stores. They all remove everything outside the decision. No sidebars. No competing CTAs. No visual noise. The highest-converting pages are the most focused.
 
 Jovie is opinionated by design. One profile photo. One primary call to action. Dark mode and light mode that actually work on every device. No HTML. No layout options. No font picker.
 
-That’s not restriction—it’s leverage.
+Clear defaults give artists more time to make music.
 
 Behind the scenes, we use AI to optimize every page for every user on every visit. Which CTA performs better for *your* audience. Which profile photo converts. Which layout hierarchy gets more clicks. The system learns, tests, and improves while you sleep.
 
-That’s how AI should work. Empowering creativity, not replacing it.
+AI should protect the time artists spend creating.
 
 Design decisions are centralized so they can improve over time. The artist uploads music, books shows, and moves on. The page handles the rest.
 

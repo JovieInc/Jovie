@@ -12,6 +12,12 @@ interface SuggestedActionMutationResponse {
   readonly error?: string;
 }
 
+interface ReviseSocialReplyInput {
+  readonly id: string;
+  readonly comment: string;
+  readonly draftedText?: string;
+}
+
 interface OpportunityInboxFeedbackInput {
   readonly suggestedActionId: string;
   readonly rating: OpportunityInboxFeedbackRating;
@@ -111,6 +117,39 @@ export function useOpportunityInboxMutations() {
     },
   });
 
+  const reviseMutation = useMutation({
+    mutationFn: async (input: ReviseSocialReplyInput) => {
+      const response = await fetch(
+        `/api/connectors/suggested-actions/${input.id}/revise`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            comment: input.comment,
+            ...(input.draftedText ? { draftedText: input.draftedText } : {}),
+          }),
+        }
+      );
+
+      const body = (await response.json()) as SuggestedActionMutationResponse;
+
+      if (!response.ok) {
+        throw new Error(body.error ?? 'Unable to request revision');
+      }
+
+      return body;
+    },
+    onSuccess: () => {
+      toast.success('Revision requested — a new draft is on its way.');
+      router.refresh();
+    },
+    onError: error => {
+      toast.error(
+        error instanceof Error ? error.message : 'Unable to request revision'
+      );
+    },
+  });
+
   const nextStepMutation = useMutation({
     mutationFn: (id: string) => postSuggestedAction(id, 'next-step'),
     onSuccess: () => {
@@ -128,6 +167,7 @@ export function useOpportunityInboxMutations() {
     approveMutation,
     dismissMutation,
     feedbackMutation,
+    reviseMutation,
     nextStepMutation,
   };
 }

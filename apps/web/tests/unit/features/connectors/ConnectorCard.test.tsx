@@ -125,12 +125,12 @@ describe('ConnectorCard', () => {
     expect(screen.getByRole('button', { name: 'Disconnect' })).toBeDisabled();
   });
 
-  it('shows connected email or recovery detail in one stable status slot', () => {
+  it('shows connected account or recovery detail in one stable status slot', () => {
     const { rerender } = render(
       <ConnectorCard
         provider='gmail'
         status='connected'
-        email='artist@example.com'
+        accountLabel='artist@example.com'
         errorMessage='This should stay hidden.'
       />
     );
@@ -143,7 +143,7 @@ describe('ConnectorCard', () => {
       <ConnectorCard
         provider='gmail'
         status='error'
-        email='artist@example.com'
+        accountLabel='artist@example.com'
         errorMessage='Google rejected the connection.'
       />
     );

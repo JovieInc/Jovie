@@ -554,12 +554,13 @@ test('registry-source-drift: export identities must equal code-derived identitie
   assert.match(drift.detail, /shell\.marketingcontainer\.prose/);
 });
 
-test('code registry derivation reads the exact current code: 37 identities', () => {
+test('code registry derivation reads the exact current code: 38 identities', () => {
   const derived = deriveCodeRegisteredIdentities({
     cwd: join(HERE, '..', '..'),
   });
-  assert.equal(derived.total, 37);
-  assert.deepEqual(derived.byKind, { shell: 8, section: 17, recipe: 12 });
+  assert.equal(derived.total, 38);
+  assert.deepEqual(derived.byKind, { shell: 8, section: 18, recipe: 12 });
+  assert.ok(derived.ids.includes('section.product-gallery'));
   assert.ok(derived.ids.includes('shell.footer-cta'));
   assert.ok(derived.ids.includes('shell.final-cta'));
   for (const stale of [
@@ -597,10 +598,10 @@ test('CLI --code-registry: live export drift fails, converged export passes', ()
     assert.equal(result.status, 0, result.stdout + result.stderr);
     const receipt = JSON.parse(result.stdout);
     assert.equal(receipt.verdict, 'pass');
-    assert.equal(receipt.registeredIdentities, 37);
-    assert.equal(receipt.codeRegisteredIdentities, 37);
-    assert.equal(receipt.denominator.total, 37);
-    assert.match(result.stderr, /37 registered identities/);
+    assert.equal(receipt.registeredIdentities, 38);
+    assert.equal(receipt.codeRegisteredIdentities, 38);
+    assert.equal(receipt.denominator.total, 38);
+    assert.match(result.stderr, /38 registered identities/);
   });
 
   const drifted = ledger({

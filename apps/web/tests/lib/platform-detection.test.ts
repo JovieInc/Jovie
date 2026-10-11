@@ -1,11 +1,44 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canonicalIdentity,
   detectPlatform,
   detectPlatformByHost,
   normalizeUrl,
 } from '@/lib/utils/platform-detection';
 
 describe('Platform Detection', () => {
+  describe('Beatport destinations (Tim White dogfood)', () => {
+    it('recognizes the verified artist profile as a DSP', () => {
+      const link = detectPlatform(
+        'https://www.beatport.com/artist/tim-white/410907'
+      );
+      expect(link.isValid).toBe(true);
+      expect(link.platform).toMatchObject({ id: 'beatport', category: 'dsp' });
+    });
+
+    it('uses the exact artist ID rather than a same-name slug', () => {
+      const original = detectPlatform(
+        'https://www.beatport.com/artist/tim-white/410907'
+      );
+      const renamed = detectPlatform(
+        'https://www.beatport.com/artist/renamed/410907'
+      );
+      const namesake = detectPlatform(
+        'https://www.beatport.com/artist/tim-white/999999'
+      );
+      expect(canonicalIdentity(original)).toBe(canonicalIdentity(renamed));
+      expect(canonicalIdentity(original)).not.toBe(canonicalIdentity(namesake));
+    });
+
+    it.each([
+      'https://beatport.com.evil.test/artist/tim-white/410907',
+      'https://evil.test/beatport.com/artist/tim-white/410907',
+      'https://www.beatport.com/search?q=Tim+White',
+      'https://www.beatport.com/artist/tim-white',
+    ])('rejects a noncanonical destination: %s', url => {
+      expect(detectPlatform(url).isValid).toBe(false);
+    });
+  });
   describe('Unsafe inputs', () => {
     it('rejects dangerous schemes', () => {
       const inputs = [

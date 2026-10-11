@@ -28,13 +28,13 @@ export interface PlatformSpecTile {
 const LIVE_PROFILE_HREF = TIM_WHITE_PROFILE.publicProfilePath;
 
 export const SHIPPED_SITES_SHOWCASE_COPY = {
-  headline: 'Live Artist Sites',
-  body: 'Real Jovie profiles already shipping. Open one and see the same link change with the moment.',
+  headline: 'The profile in action.',
+  body: 'Demonstration profiles and product views. Open Tim White’s public profile to see what is live now.',
 } as const;
 
 export const PLATFORM_SPEC_BENTO_COPY = {
   headline: 'The Artist Platform',
-  body: 'Profiles, capture, routing, and audience signal. Dark product surfaces, Jovie accents only.',
+  body: 'Profiles, capture, routing, and audience signal.',
 } as const;
 
 export const SHIPPED_SITE_TILES: readonly ShippedSiteTile[] = [
@@ -45,7 +45,7 @@ export const SHIPPED_SITE_TILES: readonly ShippedSiteTile[] = [
     href: LIVE_PROFILE_HREF,
     label: 'Latest Release',
     scenarioId: 'tim-white-profile-live-mobile',
-    alt: "Tim White's live Jovie artist profile with the current release first.",
+    alt: "Demo of Tim White's Jovie artist profile with a release first.",
     kind: 'phone',
   },
   {
@@ -94,8 +94,8 @@ export const SHIPPED_SITE_TILES: readonly ShippedSiteTile[] = [
     handle: TIM_WHITE_PROFILE.publicProfileDisplay,
     href: LIVE_PROFILE_HREF,
     label: 'Desktop Site',
-    scenarioId: 'public-profile-desktop',
-    alt: "Tim White's public Jovie artist site on desktop.",
+    scenarioId: 'tim-white-profile-live-desktop',
+    alt: "Demo of Tim White's Jovie artist profile on desktop.",
     kind: 'desktop',
   },
   {
@@ -115,8 +115,8 @@ export const PLATFORM_SPEC_TILES: readonly PlatformSpecTile[] = [
     title: 'One Adaptive Profile',
     body: 'The same artist site puts the right action first as the release moment changes.',
     accent: 'purple',
-    scenarioId: 'public-profile-desktop',
-    alt: 'Jovie public artist profile on desktop with the live release in view.',
+    scenarioId: 'tim-white-profile-live-desktop',
+    alt: "Demo of Tim White's Jovie artist profile on desktop.",
     layoutClassName: 'xl:col-span-8 xl:row-span-2',
     kind: 'desktop',
   },

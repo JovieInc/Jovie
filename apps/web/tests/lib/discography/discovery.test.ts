@@ -56,6 +56,21 @@ vi.mock('@/lib/discography/provider-links', () => ({
     mockBuildSearchUrl(provider, track, opts),
 }));
 
+const mockProcessProviderRecordingArtistCredits = vi
+  .fn()
+  .mockResolvedValue(true);
+const mockInvalidateSmartLinkContentCache = vi.fn();
+
+vi.mock('@/lib/discography/artist-queries', () => ({
+  processProviderRecordingArtistCredits: (...args: unknown[]) =>
+    mockProcessProviderRecordingArtistCredits(...args),
+}));
+
+vi.mock('@/lib/cache/releases', () => ({
+  invalidateSmartLinkContentCache: (...args: unknown[]) =>
+    mockInvalidateSmartLinkContentCache(...args),
+}));
+
 // Queries
 const mockGetTracksForRelease = vi.fn();
 const mockUpsertProviderLink = vi.fn().mockResolvedValue({ id: 'link-1' });
@@ -152,9 +167,174 @@ describe('discovery', () => {
     mockBuildSearchUrl.mockImplementation(
       (provider: string) => `https://search.example.com/${provider}`
     );
+    mockProcessProviderRecordingArtistCredits.mockResolvedValue(true);
   });
 
   describe('discoverLinksForRelease', () => {
+    it('finds a verified destination on a later EP recording when the first has no match', async () => {
+      mockGetTracksForRelease.mockResolvedValue([
+        makeTrack({ id: 'first', isrc: 'QMT671400007' }),
+        makeTrack({ id: 'later', isrc: 'QMT671400008' }),
+      ]);
+      mockMusicfetchLookupByIsrc.mockImplementation(async (isrc: string) =>
+        isrc.endsWith('7')
+          ? null
+          : {
+              links: {
+                beatport: 'https://www.beatport.com/track/club-mix/102',
+              },
+              raw: { isrc },
+            }
+      );
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+      const result = await discoverLinksForRelease('release-1');
+      expect(result.recordings.map(recording => recording.status)).toEqual([
+        'unresolved',
+        'review_required',
+      ]);
+      expect(result.recordingCandidates).toContainEqual({
+        provider: 'beatport',
+        url: 'https://www.beatport.com/track/club-mix/102',
+        quality: 'canonical',
+      });
+      expect(mockUpsertProviderLink).not.toHaveBeenCalled();
+    });
+
+    it('bounds recording lookups and labels the remainder unsearched', async () => {
+      mockGetTracksForRelease.mockResolvedValue([
+        makeTrack({ id: 'first' }),
+        makeTrack({ id: 'later', isrc: 'QMT671400008' }),
+      ]);
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+      const result = await discoverLinksForRelease('release-1', [], {
+        maxRecordings: 1,
+      });
+      expect(mockMusicfetchLookupByIsrc).toHaveBeenCalledTimes(1);
+      expect(result.recordings).toContainEqual({
+        trackIds: ['later'],
+        isrc: 'QMT671400008',
+        status: 'unsearched',
+        destinations: [],
+      });
+    });
+    it('inspects every distinct EP recording and keeps the edition unresolved', async () => {
+      mockGetTracksForRelease.mockResolvedValue([
+        makeTrack({ id: 'radio', isrc: 'QMT671400007' }),
+        makeTrack({ id: 'club', isrc: 'QMT671400008' }),
+        makeTrack({ id: 'duplicate', isrc: 'QMT671400007' }),
+        makeTrack({ id: 'unknown', isrc: null }),
+      ]);
+      mockMusicfetchLookupByIsrc.mockImplementation(async (isrc: string) => ({
+        links: {
+          beatport: `https://www.beatport.com/track/version/${isrc.endsWith('7') ? '101' : '102'}`,
+        },
+        raw: { isrc, name: 'Take Me Over' },
+      }));
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+      const result = await discoverLinksForRelease('release-1', [
+        'spotify',
+        'apple_music',
+        'deezer',
+      ]);
+      expect(
+        mockMusicfetchLookupByIsrc.mock.calls.map(call => call[0])
+      ).toEqual(['QMT671400007', 'QMT671400008']);
+      expect(result.recordings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            isrc: 'QMT671400007',
+            status: 'review_required',
+            trackIds: ['radio', 'duplicate'],
+          }),
+          expect.objectContaining({
+            isrc: 'QMT671400008',
+            status: 'review_required',
+          }),
+          expect.objectContaining({
+            isrc: null,
+            status: 'unknown',
+            trackIds: ['unknown'],
+          }),
+        ])
+      );
+      expect(mockUpsertProviderLink).not.toHaveBeenCalled();
+      expect(result.discovered).toEqual([]);
+    });
+
+    it('rejects a same-name Musicfetch recording with a different ISRC', async () => {
+      mockMusicfetchLookupByIsrc.mockResolvedValue({
+        links: { beatport: 'https://www.beatport.com/track/tim-white/123' },
+        raw: {
+          isrc: 'FOREIGN000001',
+          name: 'Pray On My Child',
+          artists: [{ name: 'Tim White' }],
+        },
+      });
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+      const result = await discoverLinksForRelease('release-1');
+      expect(result.discovered.some(link => link.provider === 'beatport')).toBe(
+        false
+      );
+      expect(result.errors.some(error => error.includes('ISRC mismatch'))).toBe(
+        true
+      );
+    });
+
+    it('does not certify a Musicfetch result with missing recording evidence', async () => {
+      mockMusicfetchLookupByIsrc.mockResolvedValue({
+        links: { beatport: 'https://www.beatport.com/track/tim-white/123' },
+        raw: {},
+      });
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+      const result = await discoverLinksForRelease('release-1');
+      expect(result.discovered.some(link => link.provider === 'beatport')).toBe(
+        false
+      );
+      expect(
+        result.errors.some(error => error.includes('ISRC unverified'))
+      ).toBe(true);
+    });
+
+    it('preserves existing verified destinations even during a refresh', async () => {
+      mockMusicfetchLookupByIsrc.mockResolvedValue({
+        links: {
+          beatport: 'https://www.beatport.com/track/different-edition/123',
+        },
+        raw: { isrc: 'USUM72212345' },
+      });
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+      await discoverLinksForRelease('release-1', ['beatport'], {
+        skipExisting: false,
+      });
+      expect(
+        mockUpsertProviderLink.mock.calls.some(
+          call => call[0].providerId === 'beatport'
+        )
+      ).toBe(false);
+    });
+
+    it('reports a provider miss as unresolved, never confirmed absence', async () => {
+      mockIsMusicfetchAvailable.mockReturnValue(false);
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+      const result = await discoverLinksForRelease('release-1');
+      expect(result.recordings).toEqual([
+        expect.objectContaining({ isrc: 'USUM72212345', status: 'unresolved' }),
+      ]);
+    });
     it('discovers Apple Music, Deezer, and MusicFetch links in parallel', async () => {
       // Apple Music via MusicKit
       mockMusicKitLookupByIsrc.mockResolvedValue({
@@ -180,7 +360,7 @@ describe('discovery', () => {
           amazon_music: 'https://music.amazon.com/albums/ghi',
           soundcloud: 'https://soundcloud.com/ts/anti-hero',
         },
-        raw: {},
+        raw: { isrc: 'USUM72212345' },
       });
 
       const { discoverLinksForRelease } = await import(
@@ -221,10 +401,60 @@ describe('discovery', () => {
       );
     });
 
+    it('merges Apple primary + featured + remixer evidence into canonical recording credits', async () => {
+      mockMusicKitLookupByIsrc.mockResolvedValue({
+        id: 'apple-track-take-me-over-remix',
+        attributes: {
+          url: 'https://music.apple.com/us/song/take-me-over/123',
+          name: 'Take Me Over (feat. Erica Gibson) [Austin Leeds Remix]',
+          artistName: 'Tim White & Austin Leeds',
+        },
+      });
+
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+      const result = await discoverLinksForRelease('release-1', [
+        'apple_music',
+      ]);
+
+      expect(mockProcessProviderRecordingArtistCredits).toHaveBeenCalledWith({
+        creatorProfileId: 'profile-1',
+        isrc: 'USUM72212345',
+        provider: 'apple_music',
+        sourceEntityId: 'apple-track-take-me-over-remix',
+        credits: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'Tim White',
+            role: 'main_artist',
+            isPrimary: true,
+          }),
+          expect.objectContaining({
+            name: 'Erica Gibson',
+            role: 'featured_artist',
+            isPrimary: false,
+          }),
+          expect.objectContaining({
+            name: 'Austin Leeds',
+            role: 'remixer',
+            isPrimary: false,
+          }),
+        ]),
+      });
+      expect(mockInvalidateSmartLinkContentCache).toHaveBeenCalledWith(
+        'profile-1'
+      );
+      expect(result.discovered).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ provider: 'apple_music' }),
+        ])
+      );
+    });
+
     it('backfills the preview from Spotify when MusicFetch has no usable preview', async () => {
       mockMusicfetchLookupByIsrc.mockResolvedValue({
         links: {},
-        raw: {},
+        raw: { isrc: 'USUM72212345' },
       });
       mockLookupSpotifyByIsrc.mockResolvedValue({
         url: 'https://open.spotify.com/track/123',
@@ -260,7 +490,7 @@ describe('discovery', () => {
       });
       mockMusicfetchLookupByIsrc.mockResolvedValue({
         links: {},
-        raw: {},
+        raw: { isrc: 'USUM72212345' },
       });
       mockLookupSpotifyByIsrc.mockResolvedValue({
         url: 'https://open.spotify.com/track/123',
@@ -286,7 +516,7 @@ describe('discovery', () => {
     it('does not overwrite preview-resolution metadata when the preview URL was not stored', async () => {
       mockMusicfetchLookupByIsrc.mockResolvedValue({
         links: {},
-        raw: {},
+        raw: { isrc: 'USUM72212345' },
       });
       mockLookupSpotifyByIsrc.mockResolvedValue({
         url: 'https://open.spotify.com/track/123',
@@ -323,6 +553,7 @@ describe('discovery', () => {
           youtube: 'https://music.youtube.com/watch?v=abc',
         },
         raw: {
+          isrc: 'USUM72212345',
           previewUrl: 'https://musicfetch.example.com/preview.m4a',
         },
       });
@@ -611,7 +842,7 @@ describe('discovery', () => {
           apple_music: 'https://music.apple.com/us/album/existing/1',
           youtube: 'https://music.youtube.com/watch?v=new',
         },
-        raw: {},
+        raw: { isrc: 'USUM72212345' },
       });
 
       const { discoverLinksForRelease } = await import(

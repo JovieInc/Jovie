@@ -25,6 +25,7 @@ import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { tasks } from '@/lib/db/schema/tasks';
 import { requireTasksWorkspaceAccess } from '@/lib/entitlements/tasks-gate';
+import { isScreenCertAppShellFixtureProfile } from '@/lib/screen-cert/app-shell-fixture-gate';
 import { dedupeReleaseTasks } from '@/lib/tasks/dedupe-release-tasks';
 import { isTaskStatus, TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
 import { sanitizeTaskDueAt } from '@/lib/tasks/task-due-date';
@@ -46,6 +47,10 @@ import type {
   UpdateTaskInput,
 } from '@/lib/tasks/types';
 import { requireProfileId } from '../requireProfileId';
+import {
+  getScreenCertTaskById,
+  getScreenCertTasksFixture,
+} from './_lib/screen-cert-fixture';
 
 const DEFAULT_TASK_LIMIT = 50;
 const MAX_TASK_LIMIT = 100;
@@ -429,8 +434,19 @@ function getTaskMoveUpdates({
 }
 
 export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
-  await requireTasksWorkspaceAccess();
+  // Screen-cert fixture (tasks producer): resolve profileId first so the
+  // reserved-fixture check can run before requireTasksWorkspaceAccess()'s
+  // real entitlements/billing lookup, which has no noop-DB fallback of its
+  // own. See screen-cert-fixture.ts and app-shell-fixture-gate.ts.
   const profileId = await requireProfileId();
+  if (isScreenCertAppShellFixtureProfile(profileId)) {
+    // The fixture ignores `filters`: TasksRoute's own prefetch only ever
+    // calls this with DEFAULT_TASK_WORKSPACE_FILTERS (limit only, no
+    // status/search/cursor), so a filtered result is never observed by
+    // the producer this fixture serves.
+    return getScreenCertTasksFixture();
+  }
+  await requireTasksWorkspaceAccess();
   const limit = clampLimit(filters?.limit);
 
   const rows = await db
@@ -550,8 +566,16 @@ export async function getTaskBoard(
 }
 
 export async function getTask(taskId: string): Promise<TaskView> {
-  await requireTasksWorkspaceAccess();
+  // Screen-cert fixture (tasks producer): see getTasks() above.
   const profileId = await requireProfileId();
+  if (isScreenCertAppShellFixtureProfile(profileId)) {
+    const fixtureTask = getScreenCertTaskById(taskId);
+    if (!fixtureTask) {
+      throw new Error('Task not found or access denied');
+    }
+    return fixtureTask;
+  }
+  await requireTasksWorkspaceAccess();
 
   const [row] = await db
     .select({

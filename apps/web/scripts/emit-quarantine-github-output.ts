@@ -26,11 +26,15 @@ function main() {
     .map(path => `--exclude=${path}`)
     .join(' ');
   const e2eFiles = parsed.e2ePaths.join(' ');
+  const unitIssueUrls = parsed.unitIssueUrls.join(' ');
+  const e2eIssueUrls = parsed.e2eIssueUrls.join(' ');
 
   const lines = [
     `unit_files=${unitFiles}`,
     `unit_excludes=${unitExcludes}`,
+    `unit_issue_urls=${unitIssueUrls}`,
     `e2e_files=${e2eFiles}`,
+    `e2e_issue_urls=${e2eIssueUrls}`,
     `has_unit=${parsed.unitPaths.length > 0 ? 'true' : 'false'}`,
     `has_quarantine=${parsed.e2ePaths.length > 0 ? 'true' : 'false'}`,
     `quarantined_specs=${e2eFiles}`,

@@ -8,6 +8,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 
 // Hoisted mocks for database operations
 const {
@@ -89,9 +90,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
 
   describe('Event Ordering', () => {
     it('updates the resolved app user id for Better Auth Stripe metadata', async () => {
-      const { updateUserBillingStatus } = await import(
-        '@/lib/stripe/customer-sync'
-      );
       mockDbSelect.mockReturnValue({
         from: () => ({
           where: () => ({
@@ -129,10 +127,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
     });
 
     it('should skip events older than lastBillingEventAt', async () => {
-      const { updateUserBillingStatus } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const lastEventTime = new Date('2024-01-15T12:00:00Z');
       const olderEventTime = new Date('2024-01-15T11:00:00Z'); // 1 hour earlier
 
@@ -172,10 +166,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
     });
 
     it('should process events newer than lastBillingEventAt', async () => {
-      const { updateUserBillingStatus } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       const lastEventTime = new Date('2024-01-15T12:00:00Z');
       const newerEventTime = new Date('2024-01-15T13:00:00Z'); // 1 hour later
 
@@ -214,10 +204,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
     });
 
     it('should process events when no prior lastBillingEventAt exists', async () => {
-      const { updateUserBillingStatus } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       // Mock user without lastBillingEventAt
       mockDbSelect.mockReturnValue({
         from: () => ({
@@ -253,9 +239,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
     });
 
     it('returns a skipped success when the Stripe event was already applied', async () => {
-      const { updateUserBillingStatus } = await import(
-        '@/lib/stripe/customer-sync'
-      );
       mockDbSelect.mockReturnValue({
         from: () => ({
           where: () => ({
@@ -303,10 +286,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       vi.useFakeTimers();
 
       try {
-        const { updateUserBillingStatus } = await import(
-          '@/lib/stripe/customer-sync'
-        );
-
         let selectCallCount = 0;
         let updateCallCount = 0;
 
@@ -367,10 +346,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       vi.useFakeTimers();
 
       try {
-        const { updateUserBillingStatus } = await import(
-          '@/lib/stripe/customer-sync'
-        );
-
         // Mock user
         mockDbSelect.mockReturnValue({
           from: () => ({
@@ -414,10 +389,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
 
   describe('Audit Logging', () => {
     it('should write to audit log on successful update', async () => {
-      const { updateUserBillingStatus } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       // Mock user
       mockDbSelect.mockReturnValue({
         from: () => ({
@@ -479,10 +450,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
     });
 
     it('delegates the identity and expected version to the atomic writer', async () => {
-      const { updateUserBillingStatus } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       // Mock user
       mockDbSelect.mockReturnValue({
         from: () => ({
@@ -520,10 +487,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
 
   describe('Error Handling', () => {
     it('returns failure when the atomic entitlement and audit statement fails', async () => {
-      const { updateUserBillingStatus } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       mockDbSelect.mockReturnValue({
         from: () => ({
           where: () => ({
@@ -567,10 +530,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
     });
 
     it('should return error when user not found', async () => {
-      const { updateUserBillingStatus } = await import(
-        '@/lib/stripe/customer-sync'
-      );
-
       // Mock user not found
       mockDbSelect.mockReturnValue({
         from: () => ({

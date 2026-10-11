@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/tour-date-sidebar-analytics.test.tsx
+
 import {
   Button,
   type CommonDropdownItem,
@@ -7,12 +9,7 @@ import {
   Input,
   Label,
 } from '@jovie/ui';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@jovie/ui/atoms/popover';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { CalendarIcon, Globe, MapPin } from 'lucide-react';
 import {
   type ComponentType,
@@ -21,9 +18,9 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { Calendar } from '@/components/atoms/Calendar';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
+import { DatePicker } from '@/components/molecules/DatePicker';
 import {
   DrawerAnalyticsSummaryCard,
   DrawerCardActionBar,
@@ -195,11 +192,6 @@ export function TourDateSidebar({
   }, [tourDate, deleteMutation, onClose]);
 
   const isPending = updateMutation.isPending || deleteMutation.isPending;
-  const parsedStartDate = useMemo(() => {
-    if (!formData.startDate) return null;
-    const parsedDate = parseISO(formData.startDate);
-    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
-  }, [formData.startDate]);
 
   // Build sidebar overflow menu from canonical tour date actions
   const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
@@ -387,39 +379,14 @@ export function TourDateSidebar({
               <div className='grid grid-cols-2 gap-2'>
                 <div className='space-y-1.5'>
                   <Label htmlFor='startDate'>Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id='startDate'
-                        type='button'
-                        variant='outline'
-                        disabled={isPending}
-                        className={cn(
-                          'w-full justify-start gap-2 font-normal',
-                          !formData.startDate && 'text-tertiary-token'
-                        )}
-                      >
-                        <CalendarIcon className='h-3.5 w-3.5' />
-                        {parsedStartDate
-                          ? format(parsedStartDate, 'MMM d, yyyy')
-                          : 'Pick a date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className='w-auto p-0' align='start'>
-                      <Calendar
-                        mode='single'
-                        selected={parsedStartDate ?? undefined}
-                        onSelect={date => {
-                          if (!date) return;
-                          setFormData(prev => ({
-                            ...prev,
-                            startDate: format(date, 'yyyy-MM-dd'),
-                          }));
-                        }}
-                        autoFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DatePicker
+                    id='startDate'
+                    value={formData.startDate}
+                    onChange={next =>
+                      setFormData(prev => ({ ...prev, startDate: next }))
+                    }
+                    disabled={isPending}
+                  />
                 </div>
                 <div className='space-y-1.5'>
                   <Label htmlFor='startTime'>Time</Label>

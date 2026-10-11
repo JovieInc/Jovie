@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChangelogRelease } from './changelog-parser';
+import { resolveCustomerChangelogHero } from './customer-changelog';
 import {
   parseWhatsNewFeed,
   projectWhatsNew,
@@ -14,7 +15,7 @@ function release(
   version: string,
   overrides: Partial<ChangelogRelease> = {}
 ): ChangelogRelease {
-  return {
+  const value: ChangelogRelease = {
     version,
     kind: 'release',
     date: '2026-09-01',
@@ -28,6 +29,12 @@ function release(
     },
     ...overrides,
   };
+  value.customerOutcomes = Object.fromEntries(
+    Object.values(value.sections)
+      .flat()
+      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  );
+  return value;
 }
 
 function entry(id: string): WhatsNewEntry {
@@ -39,6 +46,7 @@ function entry(id: string): WhatsNewEntry {
     url: `${BASE_URL}/changelog/${id}`,
     highlights: [],
     dogfood: [],
+    hero: null,
   };
 }
 
@@ -60,7 +68,7 @@ describe('projectWhatsNew', () => {
             featured: ['**Chat is home:** Ask first.'],
             added: ['**Library filters:** One catalog.'],
             changed: ['Buttons use a lighter label'],
-            fixed: ['Sign-in recovers (JOV-123)'],
+            fixed: ['Sign-in recovers'],
             removed: ['Old tab bar'],
           },
           dogfood: ['Open **Chat** and ask about a `release`'],
@@ -75,6 +83,7 @@ describe('projectWhatsNew', () => {
       entries: [
         {
           id: '3.0.0',
+          hero: resolveCustomerChangelogHero('3.0.0'),
           title: 'Chat is home',
           date: '2026-09-01',
           summary: 'A bigger release.',
@@ -90,6 +99,32 @@ describe('projectWhatsNew', () => {
     });
   });
 
+  it('keeps the daily title and explanation on the same outcome with one dismissal identity', () => {
+    const result = projectWhatsNew(
+      [
+        release('2026-10-02', {
+          kind: 'daily',
+          date: '2026-10-02',
+          summary: 'Get updates from an artist: Open the signup form.',
+          sections: {
+            featured: [],
+            added: ['**Choose your Jovie link:** Start on the homepage.'],
+            changed: ['**Get artist updates:** Open the signup form.'],
+            fixed: [],
+            removed: [],
+          },
+        }),
+      ],
+      BASE_URL
+    );
+    expect(result.entries[0]).toMatchObject({
+      id: '2026-10-02',
+      title: 'Choose your Jovie link',
+      summary: 'Start on the homepage.',
+      highlights: ['Get artist updates'],
+    });
+    expect(resolveUnseenWhatsNew(result, '2026-10-02')).toBeNull();
+  });
   it('falls back to the lead outcome summary and an empty dogfood list', () => {
     const [only] = projectWhatsNew([release('2.0.0')], BASE_URL).entries;
     expect(only?.summary).toBe('It does the thing.');
@@ -171,5 +206,44 @@ describe('parseWhatsNewFeed', () => {
       ],
     });
     expect(parsed?.entries.map(e => e.id)).toEqual(['3']);
+  });
+});
+
+describe('published hero inheritance', () => {
+  it('round trips the post authority through the real feed parser', () => {
+    const projected = projectWhatsNew([release('2026-10-02')], BASE_URL);
+    const parsed = parseWhatsNewFeed(JSON.parse(JSON.stringify(projected)));
+    expect(parsed?.entries[0]?.hero).toEqual(
+      resolveCustomerChangelogHero('2026-10-02')
+    );
+    expect(parsed?.entries[0]?.url).toBe('https://jov.ie/changelog/2026-10-02');
+  });
+  it.each([
+    undefined,
+    null,
+    {},
+    { kind: 'video', src: 'javascript:alert(1)' },
+    { ...resolveCustomerChangelogHero('old'), postId: 'old' },
+    { ...resolveCustomerChangelogHero('3'), src: '/invented.webp' },
+  ])('retains text and link for missing, malformed or stale hero %j', hero => {
+    const original = entry('3');
+    const parsed = parseWhatsNewFeed({
+      ...feed(['3']),
+      entries: [{ ...original, hero }],
+    });
+    expect(parsed?.entries[0]).toEqual({ ...original, hero: null });
+  });
+  it('does not associate media with a different post destination', () => {
+    const parsed = parseWhatsNewFeed({
+      ...feed(['3']),
+      entries: [
+        {
+          ...entry('3'),
+          url: BASE_URL + '/changelog/old',
+          hero: resolveCustomerChangelogHero('3'),
+        },
+      ],
+    });
+    expect(parsed?.entries[0]?.hero).toBeNull();
   });
 });

@@ -1,0 +1,1104 @@
+{
+  "title": "fleet.directory result v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "completed"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "entityRef": {
+          "type": "object",
+          "properties": {
+            "entityType": {
+              "type": "string",
+              "minLength": 1
+            },
+            "entityId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "entityType",
+            "entityId"
+          ],
+          "additionalProperties": false
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "workers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "workerId": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{2,63}$"
+                  },
+                  "runtimeClass": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "capabilities": {
+                    "maxItems": 32,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "tools": {
+                    "maxItems": 32,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "connectors": {
+                    "maxItems": 32,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "availability": {
+                    "type": "string",
+                    "enum": [
+                      "available",
+                      "busy",
+                      "offline"
+                    ]
+                  },
+                  "specialization": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "fleet:register",
+                        "fleet:read",
+                        "work:next",
+                        "work:claim",
+                        "work:report",
+                        "defect:report",
+                        "fleet:discover",
+                        "work:request"
+                      ]
+                    }
+                  },
+                  "registeredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "revoked": {
+                    "type": "boolean"
+                  },
+                  "authority": {
+                    "type": "object",
+                    "properties": {
+                      "identity": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "accountRef": {
+                            "type": "string",
+                            "pattern": "^urn:[a-z0-9][a-z0-9:._-]{2,180}$"
+                          },
+                          "runtimeRef": {
+                            "type": "string",
+                            "pattern": "^urn:[a-z0-9][a-z0-9:._-]{2,180}$"
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "operator",
+                              "customer"
+                            ]
+                          },
+                          "attestationRef": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "accountRef",
+                          "runtimeRef",
+                          "displayName",
+                          "role",
+                          "attestationRef"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "visibility": {
+                        "type": "string",
+                        "enum": [
+                          "operators",
+                          "fleet"
+                        ]
+                      },
+                      "allowedCommands": {
+                        "minItems": 1,
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "artist.get",
+                            "artist.llms",
+                            "api.openapi",
+                            "docs.llms"
+                          ]
+                        }
+                      },
+                      "allowedTools": {
+                        "maxItems": 32,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        }
+                      },
+                      "allowedConnectors": {
+                        "maxItems": 32,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        }
+                      },
+                      "maxDurationSeconds": {
+                        "type": "integer",
+                        "minimum": 30,
+                        "maximum": 3600
+                      },
+                      "maxConcurrentLeases": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "spendUsd": {
+                        "type": "number",
+                        "const": 0
+                      }
+                    },
+                    "required": [
+                      "identity",
+                      "visibility",
+                      "allowedCommands",
+                      "allowedTools",
+                      "allowedConnectors",
+                      "maxDurationSeconds",
+                      "maxConcurrentLeases",
+                      "spendUsd"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "workerId",
+                  "runtimeClass",
+                  "capabilities",
+                  "tools",
+                  "connectors",
+                  "availability",
+                  "scopes",
+                  "registeredAt",
+                  "updatedAt",
+                  "revoked"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "refreshedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "maxPendingRequests": {
+                  "type": "number",
+                  "const": 5
+                },
+                "maxRequestHorizonSeconds": {
+                  "type": "number",
+                  "const": 86400
+                },
+                "heartbeatMaxAgeSeconds": {
+                  "type": "number",
+                  "const": 300
+                }
+              },
+              "required": [
+                "maxPendingRequests",
+                "maxRequestHorizonSeconds",
+                "heartbeatMaxAgeSeconds"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "workers",
+            "refreshedAt",
+            "limits"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "status",
+        "receipt",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "handoff"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "handoff": {
+          "type": "object",
+          "properties": {
+            "target": {
+              "type": "string",
+              "minLength": 1
+            },
+            "labelKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "target"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "status",
+        "receipt",
+        "handoff"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "requires_input"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "missingFields": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "status",
+        "receipt",
+        "missingFields"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "in_progress"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "retryAfterMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "status",
+        "receipt"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "unavailable"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "AUTH_REQUIRED",
+                "PROFILE_REQUIRED",
+                "FORBIDDEN",
+                "ENTITLEMENT_REQUIRED",
+                "ENTITLEMENT_UNVERIFIED",
+                "QUOTA_EXHAUSTED",
+                "FEATURE_DISABLED",
+                "PROVIDER_UNAVAILABLE",
+                "CLIENT_UPGRADE_REQUIRED",
+                "VALIDATION_FAILED",
+                "REQUIRES_INPUT",
+                "CONFIRMATION_REQUIRED",
+                "CONFLICT",
+                "IN_PROGRESS",
+                "RATE_LIMITED",
+                "TEMPORARILY_UNAVAILABLE",
+                "INTERNAL"
+              ]
+            },
+            "messageKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "fieldIssues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "messageKey": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "path",
+                  "messageKey"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "upgrade": {
+              "type": "object",
+              "properties": {
+                "eligible": {
+                  "type": "boolean"
+                },
+                "routeRef": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "eligible"
+              ],
+              "additionalProperties": false
+            },
+            "handoff": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "labelKey": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "target"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "code",
+            "messageKey",
+            "retryable"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "status",
+        "receipt",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "failed"
+        },
+        "receipt": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "schemaVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "web",
+                "ios",
+                "electron",
+                "app_intent",
+                "widget",
+                "cli",
+                "mcp",
+                "chat_tool",
+                "extension"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "handoff",
+                "requires_input",
+                "in_progress",
+                "unavailable",
+                "failed"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "entityRef": {
+              "type": "object",
+              "properties": {
+                "entityType": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entityId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "entityType",
+                "entityId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionId",
+            "requestId",
+            "actionId",
+            "schemaVersion",
+            "channel",
+            "status",
+            "startedAt"
+          ],
+          "additionalProperties": false
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "AUTH_REQUIRED",
+                "PROFILE_REQUIRED",
+                "FORBIDDEN",
+                "ENTITLEMENT_REQUIRED",
+                "ENTITLEMENT_UNVERIFIED",
+                "QUOTA_EXHAUSTED",
+                "FEATURE_DISABLED",
+                "PROVIDER_UNAVAILABLE",
+                "CLIENT_UPGRADE_REQUIRED",
+                "VALIDATION_FAILED",
+                "REQUIRES_INPUT",
+                "CONFIRMATION_REQUIRED",
+                "CONFLICT",
+                "IN_PROGRESS",
+                "RATE_LIMITED",
+                "TEMPORARILY_UNAVAILABLE",
+                "INTERNAL"
+              ]
+            },
+            "messageKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "fieldIssues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "messageKey": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "path",
+                  "messageKey"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "upgrade": {
+              "type": "object",
+              "properties": {
+                "eligible": {
+                  "type": "boolean"
+                },
+                "routeRef": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "eligible"
+              ],
+              "additionalProperties": false
+            },
+            "handoff": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "labelKey": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "target"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "code",
+            "messageKey",
+            "retryable"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "status",
+        "receipt",
+        "error"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

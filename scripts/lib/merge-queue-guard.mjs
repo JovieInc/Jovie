@@ -61,13 +61,17 @@ export function isPendingNativeCohortCutoverField(field) {
 }
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
-  // JOV-6107: measured peak 19 hosted jobs/group plus >=7 background jobs on
-  // Team's 60-job budget permits two groups (45), not three (64). Preserve
-  // ALLGREEN. The prior 20-minute response deadline is shorter than the
-  // 30/40-minute required CI paths; source targets 60 minutes.
+  // JOV-6107 measured peak 19 hosted jobs/group plus >=7 background jobs on
+  // Team's 60-job budget permits two groups (45), not three (64). JOV-6815:
+  // a ruleset admin raised live build concurrency to GitHub's 10-group
+  // ceiling on 2026-09-25 (production-freeze incident window); source syncs
+  // to the applied live value and every lower live count stays supported
+  // for rollback. Re-evaluate against measured runner saturation if deep
+  // queues starve required CI. Preserve ALLGREEN. The 60-minute response
+  // budget covers the 30/40-minute required CI paths.
   check_response_timeout_minutes: 60,
   grouping_strategy: 'ALLGREEN',
-  max_entries_to_build: 2,
+  max_entries_to_build: 10,
   max_entries_to_merge: 5,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
@@ -509,6 +513,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Path Changes',
   'CI / ci-fast',
   'ci-fast',
+  'CI / Blog Content Qualification',
+  'Blog Content Qualification',
   'CI / Typecheck',
   'Typecheck',
   'CI / Lint',
@@ -555,6 +561,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Promptfoo Evals (deterministic)',
   'CI / Golden Eval Set (deterministic)',
   'Golden Eval Set (deterministic)',
+  'CI / Database Certification (isolated Neon)',
+  'Database Certification (isolated Neon)',
   // Harness evidence jobs (must stay aggregated under PR Ready / never pin solo)
   'CI / Lighthouse (public routes manual)',
   'Lighthouse (public routes manual)',
@@ -2001,6 +2009,12 @@ export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
   'Run Knip (unused files, deps & exports)',
   'Run deterministic layout behavior guard',
   'Run static mobile overflow guard',
+  // Static checks over the exact combined build output. An unchanged head
+  // fails them again on retry and rebuilds every group behind it (#20958 on
+  // 2026-10-11: run 38167113928 failed SEO certification, was retried 44s
+  // later as "unclassified", and failed the same way).
+  'Certify marketing SEO against prerendered HTML',
+  'Certify marketing route DOM invariants',
 ]);
 export const RETRYABLE_PRODUCT_FAILURE_STEPS = new Set([
   'Run unit tests',

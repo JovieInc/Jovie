@@ -281,6 +281,8 @@ function pricingSection(
  * The reviewed candidate for `/pricing`: a frozen snapshot of the words the
  * page was certified to render. It intentionally quotes offer truth rather
  * than deriving from it — a drifted render must fail, not move the target.
+ * Tim approved the centered hero on September 29, removing its redundant
+ * story card; centered-v2 retains both actions and all offer claims.
  */
 export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
   return {
@@ -289,26 +291,17 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
     sections: [
       pricingSection({
         sectionId: 'hero',
-        candidateId: 'pricing-hero-v1',
+        candidateId: 'pricing-hero-centered-v2',
         controlHeadline: 'Plans and pricing',
         headline: 'Pricing',
         body: 'Jovie profiles are free forever. Artist Visibility Pro is $199/month with limited access.',
-        supportingText: [
-          'Claim my free profile',
-          'Explore Jovie Profiles',
-          'Profile',
-          'Public Jovie profile and audience capture',
-          'Claim profile same day.',
-        ],
+        supportingText: ['Claim my free profile', 'Explore Jovie Profiles'],
         claimIds: ['free-forever', 'pro-price'],
         lineBindings: [
           ['headline', { outcome: 'choose-plan' }],
           ['body', { claims: ['free-forever', 'pro-price'] }],
           ['supporting:0', { action: 'claim-free' }],
           ['supporting:1', { action: 'explore-profiles' }],
-          ['supporting:2', { outcome: 'choose-plan' }],
-          ['supporting:3', { claim: 'free-forever' }],
-          ['supporting:4', { action: 'claim-free' }],
         ],
       }),
       pricingSection({

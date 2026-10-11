@@ -69,8 +69,9 @@ export function nightlyUpdateMinute(appEnv: DesktopAppEnv): number | null {
 export function shouldInstallDownloadedUpdateNow(input: {
   readonly nightlyLaunch: boolean;
   readonly hasVisibleWindow: boolean;
+  readonly workStateSafe: boolean;
 }): boolean {
-  return input.nightlyLaunch && !input.hasVisibleWindow;
+  return input.nightlyLaunch && !input.hasVisibleWindow && input.workStateSafe;
 }
 
 export type DesktopUpdateCheckOutcome = 'not-available' | 'error';
@@ -188,12 +189,14 @@ export function shouldInstallDownloadedUpdateWhileRunning(input: {
   readonly systemIdleSeconds: number;
   readonly audible: boolean;
   readonly hasUnsentInput: boolean;
+  readonly workStateSafe: boolean;
 }): boolean {
   return (
     input.updateReadyToInstall &&
     input.localHour >= IDLE_UPDATE_INSTALL_WINDOW.startHour &&
     input.localHour < IDLE_UPDATE_INSTALL_WINDOW.endHour &&
     !input.audible &&
+    input.workStateSafe &&
     !input.hasUnsentInput &&
     input.systemIdleSeconds >= IDLE_UPDATE_INSTALL_SECONDS
   );

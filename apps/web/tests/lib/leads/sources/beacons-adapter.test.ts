@@ -6,14 +6,14 @@ const {
   detectBeaconsPaidTierMock,
   isBeaconsUrlMock,
   extractBeaconsHandleMock,
-  searchGoogleCSEWithStatusMock,
+  searchWebWithStatusMock,
 } = vi.hoisted(() => ({
   fetchBeaconsDocumentMock: vi.fn(),
   extractBeaconsMock: vi.fn(),
   detectBeaconsPaidTierMock: vi.fn(),
   isBeaconsUrlMock: vi.fn(),
   extractBeaconsHandleMock: vi.fn(),
-  searchGoogleCSEWithStatusMock: vi.fn(),
+  searchWebWithStatusMock: vi.fn(),
 }));
 
 vi.mock('@/lib/ingestion/strategies/beacons', () => ({
@@ -26,7 +26,7 @@ vi.mock('@/lib/ingestion/strategies/beacons', () => ({
 }));
 
 vi.mock('@/lib/leads/google-cse', () => ({
-  searchGoogleCSEWithStatus: searchGoogleCSEWithStatusMock,
+  searchWebWithStatus: searchWebWithStatusMock,
 }));
 
 import { BeaconsDiscoveryAdapter } from '@/lib/leads/sources/beacons-adapter';
@@ -63,9 +63,9 @@ describe('BeaconsDiscoveryAdapter', () => {
       isBeaconsUrlMock.mockImplementation((url: string) =>
         url.includes('beacons.ai')
       );
-      searchGoogleCSEWithStatusMock.mockResolvedValue({
+      searchWebWithStatusMock.mockResolvedValue({
         status: 'ok',
-        provider: 'google_cse',
+        provider: 'exa',
         results: [
           { link: 'https://beacons.ai/a' },
           { link: 'https://linktr.ee/b' },
@@ -78,9 +78,9 @@ describe('BeaconsDiscoveryAdapter', () => {
     });
 
     it('returns [] when the provider fails (not disguised as demand)', async () => {
-      searchGoogleCSEWithStatusMock.mockResolvedValue({
+      searchWebWithStatusMock.mockResolvedValue({
         status: 'quota_exceeded',
-        provider: 'google_cse',
+        provider: 'exa',
         results: [],
         error: 'quota',
       });
@@ -89,7 +89,7 @@ describe('BeaconsDiscoveryAdapter', () => {
 
     it('returns [] with no keywords', async () => {
       expect(await adapter.discover({ keywords: [] })).toEqual([]);
-      expect(searchGoogleCSEWithStatusMock).not.toHaveBeenCalled();
+      expect(searchWebWithStatusMock).not.toHaveBeenCalled();
     });
   });
 
