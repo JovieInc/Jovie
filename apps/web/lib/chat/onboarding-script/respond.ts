@@ -16,7 +16,11 @@ import type { FallbackTurn } from './engine';
  * identically (text + tool cards).
  */
 
-export type FallbackReason = 'llm_error' | 'kill_switch' | 'injected';
+export type FallbackReason =
+  | 'llm_error'
+  | 'kill_switch'
+  | 'injected'
+  | 'ownership_conflict';
 
 export interface ScriptedFallbackResponseInput {
   readonly turn: FallbackTurn;

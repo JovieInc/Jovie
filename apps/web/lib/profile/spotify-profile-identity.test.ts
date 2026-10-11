@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DbOrTransaction } from '@/lib/db';
-import { assertSpotifyProfileIdentityAvailable } from './spotify-profile-identity';
+import {
+  assertSpotifyProfileIdentityAvailable,
+  hasSpotifyProfileIdentityConflict,
+} from './spotify-profile-identity';
 
 // Ownership/uniqueness is a producer contract, separate from the JOV-6543
 // shape admission contract: plausible IDs never authorize profile adoption.
@@ -52,5 +55,88 @@ describe('Spotify profile identity admission (JOV-7504)', () => {
         null
       )
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('Read-only onboarding ownership admission', () => {
+  const artistId = '0000000000000000000001';
+  it.each([
+    { owner: null, existing: [], conflicts: [], blocked: false },
+    { owner: null, existing: [], conflicts: [{ id: 'public' }], blocked: true },
+    { owner: 'owner', existing: [], conflicts: [], blocked: false },
+    {
+      owner: 'owner',
+      existing: [],
+      conflicts: [{ id: 'unclaimed' }],
+      blocked: true,
+    },
+    {
+      owner: 'owner',
+      existing: [{ id: 'mine', spotifyId: artistId }],
+      conflicts: [],
+      blocked: false,
+    },
+    {
+      owner: 'owner',
+      existing: [{ id: 'mine', spotifyId: 'other-artist' }],
+      conflicts: [],
+      blocked: true,
+    },
+    {
+      owner: 'owner',
+      existing: [{ id: 'mine', spotifyId: null }],
+      conflicts: [],
+      blocked: false,
+    },
+    {
+      owner: 'owner',
+      existing: [{ id: 'mine', spotifyId: null }],
+      conflicts: [{ id: 'different-owner' }],
+      blocked: true,
+    },
+    {
+      owner: 'owner',
+      existing: [{ id: 'mine', spotifyId: null }],
+      conflicts: [{ id: 'same-owner-other-profile' }],
+      blocked: true,
+    },
+  ])(
+    'mirrors mutation admission without ownership changes: %j',
+    async ({ owner, existing, conflicts, blocked }) => {
+      const limit = vi.fn();
+      if (owner) limit.mockResolvedValueOnce(existing);
+      limit.mockResolvedValueOnce(conflicts);
+      const orderBy = vi.fn(() => ({ limit }));
+      const tx = {
+        select: () => ({ from: () => ({ where: () => ({ limit, orderBy }) }) }),
+        execute: vi.fn(),
+        update: vi.fn(),
+      };
+      await expect(
+        hasSpotifyProfileIdentityConflict(
+          tx as unknown as DbOrTransaction,
+          artistId,
+          owner
+        )
+      ).resolves.toBe(blocked);
+      expect(tx.execute).not.toHaveBeenCalled();
+      expect(tx.update).not.toHaveBeenCalled();
+      expect(orderBy).toHaveBeenCalledTimes(owner ? 1 : 0);
+    }
+  );
+
+  it('propagates a failed ownership lookup instead of treating it as free', async () => {
+    const tx = {
+      select: () => {
+        throw new Error('db unavailable');
+      },
+    };
+    await expect(
+      hasSpotifyProfileIdentityConflict(
+        tx as unknown as DbOrTransaction,
+        artistId,
+        'owner'
+      )
+    ).rejects.toThrow('db unavailable');
   });
 });

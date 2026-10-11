@@ -534,7 +534,8 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       );
       const response = await POST(makeRequest());
       const body = await response.json();
-      expect(response.status).toBe(pending ? 200 : 409);
+      expect(response.status).toBe(409);
+      expect(body.errorCode).toBe('SPOTIFY_IDENTITY_CONFLICT');
       expect(body).not.toHaveProperty('profile');
       if (pending) {
         expect(body).toMatchObject({
@@ -543,6 +544,38 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
         });
       } else expect(body.errorCode).toBe('SPOTIFY_IDENTITY_CONFLICT');
       expect(mockCaptureError).not.toHaveBeenCalled();
+      expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['recovered', 'race'] as const)(
+    'keeps a repeated %s claim conflict at 409 and preserves recovery context',
+    async mode => {
+      if (mode === 'recovered') {
+        setupRecoveredClaim('conv_conflict', waitlistDecisionMessageRows());
+      } else {
+        setupDbSelectForCandidates(
+          [{ id: 'conv_conflict', createdAt: new Date() }],
+          waitlistDecisionMessageRows()
+        );
+        setupUpdateForPrimary(0);
+        setupOwnedConversation('conv_conflict', true);
+      }
+      const { SpotifyProfileIdentityConflictError } = await import(
+        '@/lib/profile/spotify-profile-identity'
+      );
+      mockMaterializeClaimedOnboardingProfile.mockRejectedValue(
+        new SpotifyProfileIdentityConflictError()
+      );
+      const response = await POST(makeRequest());
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        errorCode: 'SPOTIFY_IDENTITY_CONFLICT',
+        alreadyClaimed: true,
+        conversationId: 'conv_conflict',
+        waitlist: { entryId: 'entry-1' },
+        profileError: { errorCode: 'SPOTIFY_IDENTITY_CONFLICT' },
+      });
       expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
     }
   );
