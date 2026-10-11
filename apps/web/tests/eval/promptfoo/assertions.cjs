@@ -4462,8 +4462,8 @@ function assertOnboardingSystemPromptContractCovered(output) {
       `onboarding system prompt missing facts: ${missingPromptFacts.join(', ')}`
     );
   }
-  if (payload.toolOrderValid !== true) {
-    return fail('onboarding system prompt tool order is invalid');
+  if (payload.toolPrerequisitesValid !== true) {
+    return fail('onboarding system prompt tool prerequisites are invalid');
   }
   const toolOrder = Array.isArray(payload.toolOrder) ? payload.toolOrder : [];
   for (const name of [
