@@ -14,7 +14,7 @@
 
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render } from '@testing-library/react';
+import { render, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
@@ -218,6 +218,40 @@ describe('product-evidence contract (JOV-6917)', () => {
       expect(issue, issue ?? '').toBeNull();
     }
   );
+
+  it('binds Smart Links to its outer section jobs without counting hero media as another section', () => {
+    const entry = MARKETING_ROUTE_MANIFEST.find(
+      route => route.url === '/smart-links'
+    )!;
+    const { container } = render(<SmartLinksLanding />);
+    const root = container.querySelector('main') ?? container;
+    const sections = [...root.querySelectorAll('section')].filter(
+      section => !section.parentElement?.closest('section')
+    );
+    const [hero, howItWorks, close] = sections;
+    expect(sections).toHaveLength(3);
+    expect(
+      within(hero!).getByRole('heading', { level: 1 })
+    ).toBeInTheDocument();
+    expect(
+      within(hero!).getByTestId(entry.productEvidence!.testId)
+    ).toBeInTheDocument();
+    expect(howItWorks).toHaveAttribute('id', 'how-it-works');
+    expect(within(howItWorks!).getAllByRole('article')).toHaveLength(3);
+    expect(within(close!).getByRole('link')).toHaveAttribute(
+      'href',
+      '/signup?source=smart-links&intent=create'
+    );
+    expect(
+      entry.renderedSections.map(binding =>
+        binding.kind === 'approved-section'
+          ? binding.sectionId
+          : binding.proposalId
+      )
+    ).toEqual(['hero', 'how-it-works', 'cta']);
+    // This proves local source semantics, not native save/visual acceptance.
+    expect(entry.bindingEvidence.status).toBe('unverified');
+  });
 
   it('fails the declaration gate for a product route with no evidence (deliberate red)', () => {
     expect(isProductRouteEntry(COPY_ONLY_FIXTURE_ENTRY)).toBe(true);
