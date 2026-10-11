@@ -6,6 +6,8 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import fcntl
 import concurrent.futures
 import io
 import signal
@@ -8062,3 +8064,226 @@ print(headers + '\\r\\n\\r\\n' + json.dumps(data))
                     if blocker != "evidence-unavailable":
                         self.assertEqual((receipt["headSha"], receipt["prNumber"]), (("a" * 40), 5))
             self.assertIn("page=2", (root / "requests").read_text())
+
+
+class OperatorInstallerGlueTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="operator-installer-glue-")
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
+        self.host = SimpleNamespace(state=self.root / "state", repo=self.root / "repo")
+        self.host.state.mkdir()
+        self.host.repo.mkdir()
+        self.environment = patch.dict(os.environ, {"PATH": os.defpath}, clear=True)
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+        # Tiny Git-compatible objects; no git process or dependency restoration.
+        self.mesh_sources = ["scripts/lanes/mesh-host-ack.mjs", "scripts/lanes/mesh-native-terminal.mjs",
+                             "packages/agent-transport-contracts/work-order.ts",
+                             "scripts/backlog-orchestrator/summer-triage-assessment-client.mjs"]
+        paths = {"scripts/lanes/lane_runner.py", *lane.LANE_TESTS, *lane.RELEASE_EXTRAS, *self.mesh_sources}
+        for relative in paths:
+            path = self.host.repo / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# fixture source\n")
+        (self.host.repo / ".nvmrc").write_text("24.21.0\n")
+        (self.host.repo / "pnpm-lock.yaml").write_text("# inert exact fixture pins\n")
+        objects = {relative: self.git_object(self.host.repo / relative)
+                   for relative in {"scripts/lanes", *lane.LANE_TESTS, *lane.RELEASE_EXTRAS}}
+        self.manifest = {"schema": "jovie-lane-release-bundle/v1", "sourceCommit": "a" * 40,
+                         "objects": objects, "bundleDigest": hashlib.sha256(json.dumps(
+                             objects, sort_keys=True, separators=(",", ":")).encode()).hexdigest()}
+        self.commands = []
+        self.proofs = []
+        self.proof_code = 0
+        self.patches = [patch.object(lane, "sh", return_value=subprocess.CompletedProcess([], 0, stdout="", stderr="")),
+                        patch.object(lane, "release_identity", return_value=self.manifest),
+                        patch.object(lane.lifecycle, "run", side_effect=self.command)]
+        for item in self.patches:
+            item.start()
+            self.addCleanup(item.stop)
+
+    def git_object(self, path):
+        if path.is_file():
+            data = path.read_bytes(); kind = b"blob"
+        else:
+            entries = []
+            for child in path.iterdir():
+                directory = child.is_dir()
+                mode = b"40000" if directory else (b"100755" if child.stat().st_mode & 0o111 else b"100644")
+                name = os.fsencode(child.name)
+                entries.append((name + (b"/" if directory else b""), mode + b" " + name + b"\0" + bytes.fromhex(self.git_object(child))))
+            data = b"".join(value for _, value in sorted(entries)); kind = b"tree"
+        return hashlib.sha1(kind + b" " + str(len(data)).encode() + b"\0" + data).hexdigest()
+
+    def mesh(self, root):
+        target = root / "scripts/lanes/.mesh-runtime"
+        target.mkdir(mode=0o700)
+        outputs = {}
+        for name in ["receiver.mjs", "terminal.mjs"]:
+            data = ("// inert fresh " + name + "\n").encode()
+            path = target / name; path.write_bytes(data); path.chmod(0o600)
+            outputs[name] = {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+        manifest = {"schema": "jovie.mesh-managed-runtime/v1", "node": "24.21.0", "compiler": "0.28.2", "zod": "4.6.5",
+                    "lockfileSha256": hashlib.sha256((root / "pnpm-lock.yaml").read_bytes()).hexdigest(),
+                    "dependencyPins": {name: ["d" * 64, "e" * 64] for name in ["esbuild@0.28.2", "zod@4.6.5", "@esbuild/darwin-arm64@0.28.2"]},
+                    "compilerBinary": {"package": "@esbuild/darwin-arm64", "version": "0.28.2", "sha256": "f" * 64},
+                    "sourceFiles": {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in self.mesh_sources},
+                    "outputs": outputs, "externalImports": ["node:fs"], "isolatedImportPassed": True, "recipientAdmission": False}
+        (target / "manifest.json").write_text(json.dumps(manifest, sort_keys=True))
+        (target / "manifest.json").chmod(0o600)
+
+    def command(self, argv, **kwargs):
+        self.commands.append(argv)
+        if argv[:2] == ["git", "archive"]:
+            self.assertEqual(argv[2], self.manifest["sourceCommit"])
+            return subprocess.CompletedProcess(argv, 0, stdout=b"inert archive")
+        if argv[:2] == ["tar", "-x"]:
+            shutil.copytree(self.host.repo, Path(argv[-1]), dirs_exist_ok=True)
+            return subprocess.CompletedProcess(argv, 0)
+        if argv[-2:] and "prove-staging" in argv:
+            stage = Path(argv[-1]); private = Path(kwargs["env"]["LANES_STATE"])
+            self.assertEqual(kwargs["timeout"], 60 + lane.UPDATE_TEST_TIMEOUT_S)
+            self.assertNotEqual(private, self.host.state)
+            self.assertEqual(private, stage / ".staging-proof-state")
+            self.assertTrue(lane.lifecycle.active())
+            self.assertEqual(lane.lifecycle._active.state, private)
+            self.assertNotIn(lane.lifecycle.FD_ENV, kwargs["env"])
+            self.assertEqual(private.stat().st_mode & 0o777, 0o700)
+            # Independent descriptor cannot acquire SH at any proof boundary.
+            fd = os.open(self.host.state / "lifecycle.lock", os.O_RDWR)
+            try:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            finally:
+                os.close(fd)
+            self.proofs.append(stage)
+            if self.proof_code == 0:
+                self.mesh(stage)
+            return subprocess.CompletedProcess(argv, self.proof_code,
+                                               stdout="fixture test refusal\n" if self.proof_code else "", stderr="")
+        raise AssertionError(f"unexpected mocked command: {argv!r}")
+
+    def install(self):
+        return lane.operator_install(self.host, self.manifest, owner="fixture-owner", operation_id="fixture-glue",
+                                     admission_check=lambda: None)
+
+    def retained_release(self, current=False):
+        release = self.host.state / "releases" / self.manifest["bundleDigest"]
+        shutil.copytree(self.host.repo, release)
+        lanes = release / "scripts/lanes"
+        (lanes / ".release.json").write_text(json.dumps(self.manifest))
+        (lanes / ".bundle").write_text(self.manifest["bundleDigest"])
+        (lanes / ".tree").write_text(self.manifest["objects"]["scripts/lanes"])
+        self.mesh(release)
+        old = self.host.state / "old/scripts/lanes"; old.mkdir(parents=True)
+        (old / ".bundle").write_text("older")
+        (self.host.state / "current").symlink_to(lanes if current else old)
+        return release
+
+    def snapshot(self, root):
+        return {str(path.relative_to(root)): (path.read_bytes(), path.stat().st_mode & 0o777)
+                for path in root.rglob("*") if path.is_file()}
+
+    def test_new_release_private_proof_keeps_canonical_EX_and_owned_drain(self):
+        self.assertEqual(self.install(), 0)
+        self.assertEqual(len(self.proofs), 1)
+        self.assertTrue(lane.lifecycle.draining(self.host.state))
+        with self.assertRaises(lane.lifecycle.AdmissionHeld):
+            lane.lifecycle.Guard(self.host.state).__enter__()
+
+    def test_current_reuse_requires_fresh_private_proof(self):
+        release = self.retained_release(current=True)
+        before = self.snapshot(release)
+        self.assertEqual(self.install(), 0)
+        self.assertEqual(len(self.proofs), 1, "matching .bundle is not a fresh runtime proof")
+        self.assertEqual(self.snapshot(release), before, "immutable release must never be repaired in place")
+        self.assertTrue(lane.lifecycle.draining(self.host.state))
+
+    def test_existing_reuse_requires_fresh_private_proof(self):
+        release = self.retained_release(current=False)
+        before = self.snapshot(release)
+        self.assertEqual(self.install(), 0)
+        self.assertEqual(len(self.proofs), 1, "existing directory is not a fresh runtime proof")
+        self.assertEqual(self.snapshot(release), before)
+        self.assertEqual((self.host.state / "current").resolve(), release / "scripts/lanes")
+        self.assertTrue(lane.lifecycle.draining(self.host.state))
+
+    def test_existing_corrupt_even_self_consistent_runtime_refuses_without_rewrite(self):
+        release = self.retained_release(current=False)
+        runtime = release / "scripts/lanes/.mesh-runtime"
+        data = b"// corrupt but self-consistent stored runtime\n"
+        (runtime / "receiver.mjs").write_bytes(data)
+        saved = json.loads((runtime / "manifest.json").read_text())
+        saved["outputs"]["receiver.mjs"] = {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+        (runtime / "manifest.json").write_text(json.dumps(saved, sort_keys=True))
+        before = self.snapshot(release); current = (self.host.state / "current").readlink()
+        try:
+            code = self.install()
+        except (lane.lifecycle.AdmissionHeld, RuntimeError, OSError):
+            code = 1
+        self.assertNotEqual(code, 0)
+        self.assertEqual(len(self.proofs), 1, "stored manifest hashes alone cannot bind generated runtime")
+        self.assertEqual(self.snapshot(release), before)
+        self.assertEqual((self.host.state / "current").readlink(), current)
+        self.assertTrue(lane.lifecycle.draining(self.host.state))
+
+    def test_fetched_manifest_mismatch_refuses_before_proof_or_current_change(self):
+        with patch.object(lane, "release_identity", return_value={**self.manifest, "sourceCommit": "b" * 40}):
+            with self.assertRaises(lane.lifecycle.AdmissionHeld):
+                self.install()
+        self.assertEqual(self.commands, [])
+        self.assertFalse((self.host.state / "current").exists())
+        self.assertTrue(lane.lifecycle.draining(self.host.state))
+
+    def test_failed_private_proof_preserves_current_owned_drain_and_backoff(self):
+        old = self.host.state / "old/scripts/lanes"; old.mkdir(parents=True)
+        (old / ".bundle").write_text("older")
+        current = self.host.state / "current"; current.symlink_to(old)
+        self.proof_code = 1
+        self.assertEqual(self.install(), 1)
+        self.assertEqual(current.readlink(), old)
+        self.assertTrue(lane.lifecycle.draining(self.host.state))
+        refused = json.loads((self.host.state / "update-refused.json").read_text())
+        self.assertEqual(refused["tree"], self.manifest["bundleDigest"])
+        self.assertEqual(refused["why"], "fixture test refusal")
+        self.assertGreater(refused["at"], 0)
+
+    def test_private_proof_CLI_never_loads_credentials(self):
+        with patch.object(lane, "Host", return_value=self.host), patch.object(lane, "prove_staging", return_value=None), \
+                patch.object(lane, "load_github_env", side_effect=AssertionError("credential loading during private proof")) as credentials:
+            self.assertEqual(lane.guarded_main(["prove-staging", str(self.root / "stage")]), 0)
+            credentials.assert_not_called()
+
+    def test_full_mandatory_selector_and_failure_diagnostic_outlive_console_tail(self):
+        stage = self.root / "stage"; stage.mkdir()
+        stderr = "FAIL: test_bound (scripts.tests.test_fixture.Example)\n" + "x" * 4000
+        replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                   subprocess.CompletedProcess([], 1, stdout="", stderr=stderr)]
+        with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+                patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                patch.object(lane.lifecycle, "run", side_effect=replies) as run, contextlib.redirect_stderr(io.StringIO()) as console:
+            self.assertEqual(lane.prove_staging(self.host, stage), "release tests failed")
+        self.assertEqual(run.call_args_list[1].args[0], [sys.executable, "-m", "unittest", "-q", *lane.LANE_TESTS])
+        diagnostic = json.loads((stage / ".selftest-diagnostic.json").read_text())
+        self.assertEqual(diagnostic["failedSelectors"], ["test_bound (scripts.tests.test_fixture.Example)"])
+        self.assertEqual(diagnostic["stderrSha256"], hashlib.sha256(stderr.encode()).hexdigest())
+        self.assertEqual(diagnostic["stderrBytes"], len(stderr.encode()))
+        self.assertEqual((stage / ".selftest-stderr.log").read_text(), stderr)
+        self.assertNotIn("test_bound", console.getvalue())
+        for name in [".selftest-diagnostic.json", ".selftest-stderr.log"]:
+            self.assertEqual((stage / name).stat().st_mode & 0o777, 0o600)
+
+    def test_selftest_timeout_retains_captured_selector_and_bounded_diagnostic(self):
+        # This is a red regression on a282c4f1: current timeout path discards it.
+        stage = self.root / "stage"; stage.mkdir()
+        stderr = b"FAIL: test_partial (scripts.tests.test_fixture.Example)\n" + b"x" * 4000
+        replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                   subprocess.TimeoutExpired("fixture", lane.UPDATE_TEST_TIMEOUT_S, stderr=stderr)]
+        with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+                patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                patch.object(lane.lifecycle, "run", side_effect=replies):
+            self.assertEqual(lane.prove_staging(self.host, stage), f"self-test timeout {lane.UPDATE_TEST_TIMEOUT_S}s")
+        diagnostic = json.loads((stage / ".selftest-diagnostic.json").read_text())
+        self.assertEqual(diagnostic["failedSelectors"], ["test_partial (scripts.tests.test_fixture.Example)"])
+        self.assertEqual((stage / ".selftest-stderr.log").read_bytes(), stderr)

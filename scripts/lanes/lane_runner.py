@@ -92,7 +92,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
+LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -6392,6 +6392,22 @@ def mesh_dependency_root(host: Host) -> Path | None:
     return next((slot for slot in slots if installed(slot)), None)
 
 
+def retain_selftest_diagnostic(staging: Path, stderr, returncode, *, timed_out=False) -> None:
+    raw = stderr if isinstance(stderr, bytes) else (stderr or "").encode()
+    diagnostic = {"schema": "jovie-lane-selftest-diagnostic/v1", "returncode": returncode,
+                  "timedOut": timed_out, "observedAt": now_iso(),
+                  "failedSelectors": re.findall(r"^(?:FAIL|ERROR): ([A-Za-z0-9_.]+ \([A-Za-z0-9_.]+\))",
+                                                raw.decode(errors="replace"), re.MULTILINE),
+                  "stderrSha256": hashlib.sha256(raw).hexdigest(), "stderrBytes": len(raw)}
+    for filename, content in ((".selftest-diagnostic.json", json.dumps(diagnostic).encode()),
+                              (".selftest-stderr.log", raw[:4 * 1024 * 1024])):
+        fd = os.open(staging / filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+
+
 def prove_staging(host: Host, staging: Path) -> str | None:
     """Compile the mesh runtime and run the release self-test inside a staged tree. Returns the
     refusal reason, or None when the tree may be activated. Writes only under `staging`."""
@@ -6418,24 +6434,64 @@ def prove_staging(host: Host, staging: Path) -> str | None:
         test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
                               cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
                               env=selftest_env(scratch))
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as error:
+        retain_selftest_diagnostic(staging, error.stderr, None, timed_out=True)
         return f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s"
+    # Retain the original proof diagnostic privately; console truncation must not
+    # lose a failing selector or force repeated release attempts to diagnose it.
+    retain_selftest_diagnostic(staging, test.stderr, test.returncode)
     if test.returncode != 0:
         print(test.stderr[-2000:], file=sys.stderr)
         return "release tests failed"
     return None
 
 
+def operator_install(host: Host, expected: dict, *, owner: str, operation_id: str, admission_check) -> int:
+    """Supported exact release install; retain the owned drain for fleet acceptance.
+
+    The caller's reviewed participant check must exclude every independent launch
+    route. Installation alone never authorizes resuming writers or reconciliation.
+    """
+    with lifecycle.OperatorGuard(host.state, owner=owner, operation_id=operation_id,
+                                 manifest=expected, admission_check=admission_check) as operator:
+        return install_release(host, operator=operator)
 
 
-def install_release(host: Host) -> int:
+def verify_generated_runtime(proven: Path, existing: Path) -> None:
+    """Bind immutable generated outputs to an actual fresh exact-source proof."""
+    def runtime(root):
+        path = root / "scripts/lanes/.mesh-runtime"
+        if path.is_symlink() or not path.is_dir():
+            raise lifecycle.AdmissionHeld("generated runtime directory differs")
+        raw, _ = lifecycle._read_regular(path / "manifest.json", 65536)
+        return path, json.loads(raw)
+    reference, expected = runtime(proven)
+    actual, observed = runtime(existing)
+    if (expected != observed or expected.get("schema") != "jovie.mesh-managed-runtime/v1"
+            or expected.get("isolatedImportPassed") is not True or expected.get("recipientAdmission") is not False
+            or set(expected.get("outputs", {})) != {"receiver.mjs", "terminal.mjs"}):
+        raise lifecycle.AdmissionHeld("generated runtime differs from fresh qualified proof")
+    for name, row in expected["outputs"].items():
+        for directory in (reference, actual):
+            raw, _ = lifecycle._read_regular(directory / name)
+            if len(raw) != row.get("bytes") or hashlib.sha256(raw).hexdigest() != row.get("sha256"):
+                raise lifecycle.AdmissionHeld("generated runtime output differs from fresh proof")
+
+
+def install_release(host: Host, *, operator=None) -> int:
+    if operator is not None:
+        if not isinstance(operator, lifecycle.OperatorGuard) or operator.state != host.state.resolve():
+            raise lifecycle.AdmissionHeld("operator installation owner differs")
+        operator.validate()
     if sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo).returncode:
         raise RuntimeError("release-source-fetch-failed")
     bundle = release_identity(host)
+    if operator is not None and bundle != operator.manifest:
+        raise lifecycle.AdmissionHeld("fetched release differs from qualified operator manifest")
     tree = bundle["bundleDigest"]
     current = host.state / "current"
     marker = current / ".bundle"
-    if not needs_update(marker.read_text().strip() if marker.exists() else None, tree):
+    if operator is None and not needs_update(marker.read_text().strip() if marker.exists() else None, tree):
         return 0
     release = host.state / "releases" / tree
     refused_path = host.state / "update-refused.json"
@@ -6443,10 +6499,13 @@ def install_release(host: Host) -> int:
     if not release.exists() and refused.get("tree") == tree and time.time() - refused.get("at", 0) < UPDATE_RETRY_S:
         print(f"lane update backing off: tree {tree[:7]} was refused {refused.get('why')}", file=sys.stderr)
         return 1
-    if not release.exists():
+    if operator is not None or not release.exists():
         staging = host.state / "releases" / f".{tree}.tmp"
-        shutil.rmtree(staging, ignore_errors=True)
-        staging.mkdir(parents=True)
+        if operator is None:
+            shutil.rmtree(staging, ignore_errors=True)
+        elif staging.exists() or staging.is_symlink():
+            raise lifecycle.AdmissionHeld("operator proof staging already exists; reconcile its owner")
+        staging.mkdir(parents=True, mode=0o700)
         archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
                                  cwd=host.repo, capture_output=True, check=True)
         lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
@@ -6458,16 +6517,18 @@ def install_release(host: Host) -> int:
         # dependency root; the fix was on main but could never run. An older staged tree
         # without the subcommand is proven by this copy, as before.
         try:
-            proof = lifecycle.run([sys.executable, str(staging / "scripts/lanes/lane_runner.py"),
-                                   "prove-staging", str(staging)],
-                                  cwd=staging, capture_output=True, text=True,
-                                  timeout=60 + UPDATE_TEST_TIMEOUT_S,
-                                  # The staged installer must see this host, not the process defaults.
-                                  env={**os.environ, "LANES_STATE": str(host.state), "LANES_REPO": str(host.repo)})
+            if operator is not None:
+                proof = operator.prove_staging(staging.resolve(), host.repo, timeout=60 + UPDATE_TEST_TIMEOUT_S)
+            else:
+                proof = lifecycle.run([sys.executable, str(staging / "scripts/lanes/lane_runner.py"),
+                                       "prove-staging", str(staging)],
+                                      cwd=staging, capture_output=True, text=True,
+                                      timeout=60 + UPDATE_TEST_TIMEOUT_S,
+                                      env={**os.environ, "LANES_STATE": str(host.state), "LANES_REPO": str(host.repo)})
         except subprocess.TimeoutExpired:
             refuse(f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s")
             raise
-        if proof.returncode == 2 and "invalid choice" in proof.stderr:
+        if operator is None and proof.returncode == 2 and "invalid choice" in proof.stderr:
             why = prove_staging(host, staging)
         else:
             why = None if proof.returncode == 0 else (proof.stdout.strip().splitlines() or ["staging proof failed"])[-1]
@@ -6479,7 +6540,23 @@ def install_release(host: Host) -> int:
         (staging / "scripts/lanes/.tree").write_text(bundle["objects"]["scripts/lanes"])
         (staging / "scripts/lanes/.bundle").write_text(tree)
         (staging / "scripts/lanes/.release.json").write_text(json.dumps(bundle, sort_keys=True))
-        staging.rename(release)
+        if operator is not None:
+            operator.validate()
+            lifecycle.validate_release(staging, bundle)
+            verify_generated_runtime(staging, release if release.exists() else staging)
+        if operator is not None and release.exists():
+            # Retain the fresh proof artifact without rewriting the running tree.
+            retained = host.state / "releases" / f".{tree}.proof-{operator.request['operationId']}"
+            if retained.exists() or retained.is_symlink():
+                raise lifecycle.AdmissionHeld("operator proof receipt already exists")
+            staging.rename(retained)
+        else:
+            staging.rename(release)
+    if operator is not None:
+        operator.validate()
+        lifecycle.validate_release(release.resolve(), bundle)
+        if current.is_symlink() and current.resolve() == release / "scripts/lanes":
+            return 0
     link = host.state / ".current.tmp"
     if link.is_symlink() or link.exists():
         link.unlink()
@@ -6612,16 +6689,16 @@ def guarded_main(argv: list[str] | None = None) -> int:
                           "sha256": hashlib.sha256(generated.encode("utf-8")).hexdigest(),
                           "written": args.write, "matched": matched}, sort_keys=True))
         return 0 if matched else 1
-    load_github_env()
     host = Host()
-    if args.command == "update":
-        return update(host)
     if args.command == "prove-staging":
         why = prove_staging(host, Path(args.staging))
         if why:
             print(why)
             return 1
         return 0
+    load_github_env()
+    if args.command == "update":
+        return update(host)
     if args.command == "worker":
         return worker(host, args.provider)
     return dispatch(host)
