@@ -347,6 +347,49 @@ jobs:
             }
             core.info(`enqueued=${enqueued}`);
 
+  # Hold contract (scripts/hold-contract.mjs, jovie-hold/v1): a `hold` needs a
+  # receipt comment naming an owner plus an expiry or a head-change release.
+  # Ownerless holds past their grace period and expired or released receipts
+  # are removed with one comment. The Jovie Bot unlabel event then wakes the
+  # enroll job above; required checks still gate admission.
+  enforce-hold-contract:
+    name: Release ownerless or expired holds
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout trusted hold contract
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/hold-contract.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Generate Jovie Bot hold-contract token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Enforce the hold contract
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: node scripts/hold-contract.mjs
+
   # A blocking label on a queued PR fails Fork PR Gate and PR Size Guard for
   # every merge group containing it, so the whole queue behind it is rebuilt
   # (2026-10-04: #20442, #20381, #20398). Remove just that PR instead. This is
