@@ -1,15 +1,11 @@
 import { createHash } from 'node:crypto';
+import { denyAudienceEffect } from './audience-effect-policy';
 
 /**
- * Founder outbound approval (Tim, 2026-10-04: "Outbound needs my approval on
- * every copy and target").
- *
- * Approval is recorded per target revision and per copy revision as
- * append-only rows in `contact_evidence_reviews` (the JOV-7321 Yes / No /
- * Unsure ledger). A send is allowed only when the newest target row and the
- * newest copy row are both founder `yes` decisions bound to the target as it
- * is right now, and the copy row carries the exact text being sent. Editing
- * copy appends an `unsure` draft row, so the edit itself withdraws approval.
+ * Founder approval is append-only review evidence bound to target and copy
+ * revisions. Current audience/acquisition delivery remains disabled even when
+ * both newest rows are founder yes decisions. Ledger helpers support review
+ * and drafting; only the deterministic policy governs dispatch refusal.
  */
 
 export const OUTBOUND_CHANNELS = ['email', 'dm'] as const;
@@ -124,7 +120,7 @@ export interface OutboundApprovalState {
   readonly copy: OutboundCopyState;
   /** Newest copy on file for this target, approved or not. */
   readonly latestCopy: (OutboundCopy & { readonly revision: string }) | null;
-  /** The copy a send may use. Null unless both target and copy are approved. */
+  /** Exact approved copy for review; this does not grant delivery permission. */
   readonly sendableCopy: (OutboundCopy & { readonly revision: string }) | null;
   readonly approvedAt: string | null;
   readonly approvedBy: string | null;
@@ -232,6 +228,7 @@ export function resolveOutboundApproval(
 }
 
 export type OutboundSendRefusal =
+  | 'audience_delivery_disabled'
   | 'target_not_approved'
   | 'copy_not_approved'
   | 'channel_mismatch';
@@ -244,22 +241,72 @@ export type OutboundSendPermission =
   | { readonly allowed: false; readonly reason: OutboundSendRefusal };
 
 /**
- * The never-auto-send guard. Every send path calls this with the target as
- * it is at send time; anything not approved at that exact revision is refused.
+ * Current audience/acquisition delivery is disabled. Approval rows remain
+ * review evidence; even exact approved revisions cannot authorize sending.
  */
 export function evaluateOutboundSend(input: {
   readonly target: OutboundTarget;
   readonly channel: OutboundChannel;
   readonly rows: readonly OutboundLedgerRow[];
 }): OutboundSendPermission {
+  const policy = denyAudienceEffect(
+    input.channel === 'email' ? 'audience.email.send' : 'audience.dm.send'
+  );
+  return {
+    allowed: policy.dispatchAllowed,
+    reason: 'audience_delivery_disabled',
+  };
+}
+
+export type OutboundHistoryRecordPermission =
+  | {
+      readonly historyRecordAllowed: true;
+      readonly dispatchAllowed: false;
+      readonly copy: OutboundCopy & { readonly revision: string };
+    }
+  | {
+      readonly historyRecordAllowed: false;
+      readonly dispatchAllowed: false;
+      readonly reason: OutboundSendRefusal;
+    };
+
+/**
+ * Review eligibility for recording an operator's manual contact history.
+ * This local activity never authorizes delivery or verifies an external send.
+ * Callers must independently authenticate the operator and label provenance.
+ */
+export function evaluateOutboundHistoryRecord(input: {
+  readonly target: OutboundTarget;
+  readonly channel: OutboundChannel;
+  readonly rows: readonly OutboundLedgerRow[];
+}): OutboundHistoryRecordPermission {
   const state = resolveOutboundApproval(input.target, input.rows);
-  if (state.target !== 'approved')
-    return { allowed: false, reason: 'target_not_approved' };
-  if (!state.sendableCopy)
-    return { allowed: false, reason: 'copy_not_approved' };
-  if (state.sendableCopy.channel !== input.channel)
-    return { allowed: false, reason: 'channel_mismatch' };
-  return { allowed: true, copy: state.sendableCopy };
+  if (state.target !== 'approved') {
+    return {
+      historyRecordAllowed: false,
+      dispatchAllowed: false,
+      reason: 'target_not_approved',
+    };
+  }
+  if (!state.sendableCopy) {
+    return {
+      historyRecordAllowed: false,
+      dispatchAllowed: false,
+      reason: 'copy_not_approved',
+    };
+  }
+  if (state.sendableCopy.channel !== input.channel) {
+    return {
+      historyRecordAllowed: false,
+      dispatchAllowed: false,
+      reason: 'channel_mismatch',
+    };
+  }
+  return {
+    historyRecordAllowed: true,
+    dispatchAllowed: false,
+    copy: state.sendableCopy,
+  };
 }
 
 /** Creator-generic first touch. Claims only what the pipeline has built. */

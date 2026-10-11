@@ -1,0 +1,72 @@
+name: Unstack Merged Parent
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A hosted App-token writer must rewrite a stacked PR branch after its parent squash-merges; GitHub retargets the base but keeps the parent's original commits, which re-inflates the diff and strands the PR.
+# revisit-trigger: Remove when GitHub rebases stacked PRs off a squash-merged parent natively.
+#
+# A stacked PR whose parent merged is rebased onto main with only its own
+# commits, retargeted to main, and its open descendants are restacked on the
+# rewritten branch. See scripts/unstack-merged-parent.sh. Never closes a PR,
+# never enables auto-merge, never touches held/gated PRs.
+#
+# Wakes: GitHub retargets a child to main when delete_branch_on_merge removes
+# its merged parent's branch; that emits pull_request_target `edited` with the
+# old base in `changes.base.ref.from`. Manual dispatch covers children of
+# parents merged before the setting was on (their base branch still exists).
+
+on:
+  pull_request_target:
+    types: [edited]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Stacked PR whose parent PR already merged'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  unstack:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.changes.base.ref.from != '' &&
+        github.event.pull_request.base.ref == 'main' &&
+        github.event.pull_request.state == 'open' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    concurrency:
+      group: unstack-merged-parent-${{ github.event.inputs.pr_number || github.event.pull_request.number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Generate short-lived Jovie App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout main policy code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Trusted main only; PR branches are fetched as data and rebased,
+          # never executed.
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Unstack
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          GH_RETRY_ATTEMPTS: 8
+          GH_RETRY_MAX_DELAY: 60
+          CHILD_PR: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
+          OLD_BASE_REF: ${{ github.event.changes.base.ref.from || '' }}
+        run: bash scripts/unstack-merged-parent.sh
