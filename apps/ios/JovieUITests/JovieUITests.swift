@@ -400,10 +400,15 @@ final class JovieUITests: XCTestCase {
       pendingLogoutButton.isEnabled,
       "Pending logout must reject duplicate submission."
     )
-    XCTAssertEqual(pendingLogoutButton.frame.minX, idleFrame.minX, accuracy: 1)
-    XCTAssertEqual(pendingLogoutButton.frame.minY, idleFrame.minY, accuracy: 1)
-    XCTAssertEqual(pendingLogoutButton.frame.width, idleFrame.width, accuracy: 1)
-    XCTAssertEqual(pendingLogoutButton.frame.height, idleFrame.height, accuracy: 1)
+    // Read one accessibility frame while the pending control exists. Separate
+    // frame queries can straddle fixture completion and combine two lifetimes.
+    let pendingFrame = pendingLogoutButton.frame
+    XCTAssertGreaterThan(pendingFrame.width, 0, "Pending logout must have a visible frame.")
+    XCTAssertGreaterThan(pendingFrame.height, 0, "Pending logout must have a visible frame.")
+    XCTAssertEqual(pendingFrame.minX, idleFrame.minX, accuracy: 1)
+    XCTAssertEqual(pendingFrame.minY, idleFrame.minY, accuracy: 1)
+    XCTAssertEqual(pendingFrame.width, idleFrame.width, accuracy: 1)
+    XCTAssertEqual(pendingFrame.height, idleFrame.height, accuracy: 1)
 
     XCTAssertTrue(
       app.buttons["Continue to Jovie"].waitForExistence(timeout: 5),
