@@ -3,12 +3,12 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38092140742)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38096418203)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-10-10T22:57:54.442Z
+Generated: 2026-10-11T00:30:56.653Z
 Workflow conclusion: failure
 
 ## Evidence warnings
@@ -20,9 +20,9 @@ Workflow conclusion: failure
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
 | unit | 7926 | 7891 | 2 | 0 | 33 |
-| unit | 7799 | 7782 | 0 | 0 | 17 |
+| unit | 7800 | 7783 | 0 | 0 | 17 |
 | unit | 10139 | 10128 | 0 | 0 | 11 |
-| unit | 8368 | 8325 | 0 | 0 | 43 |
+| unit | 8376 | 8333 | 0 | 0 | 43 |
 
 ## Selected Targets
 
@@ -46,5 +46,5 @@ Workflow conclusion: failure
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-tqAxZr/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-eC43ZU/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-PdmTHi/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-7LbryX/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |

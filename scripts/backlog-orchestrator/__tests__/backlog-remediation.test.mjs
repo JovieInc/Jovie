@@ -226,15 +226,23 @@ describe('official Symphony backlog remediation', () => {
     for (const candidate of [
       issue('JOV-19', { title: 'Founder steering on brand voice' }),
       issue('JOV-20', { labels: ['needs-decision', 'needs:taste'] }),
-      issue('JOV-18', {
-        title: 'Founder steering on visual identity',
-        assignee: { id: 'tim', name: 'Tim White' },
-      }),
     ]) {
       const result = classifyRemediationCandidate(candidate, { now: NOW });
       assert.equal(result.selected, true, result.reason);
       assert.notEqual(result.reason, 'human-taste-or-steering');
     }
+    // Symphony Owner 2026-10-10: an ASSIGNED issue (founder-steering or
+    // otherwise) is one the bridge can't hand off, so it is excluded at
+    // selection — the slot goes to the next eligible issue.
+    const assigned = classifyRemediationCandidate(
+      issue('JOV-18', {
+        title: 'Founder steering on visual identity',
+        assignee: { id: 'tim', name: 'Tim White' },
+      }),
+      { now: NOW }
+    );
+    assert.equal(assigned.selected, false);
+    assert.equal(assigned.reason, 'not-handoffable:assigned');
     assert.doesNotMatch(MODULE, /human-taste-or-steering/);
 
     /** @type {Array<[object, string]>} */
@@ -1114,6 +1122,122 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
   });
 });
 
+describe('selection exclusions for shipped and unhandoffable work (JOV-8000 follow-up 42)', () => {
+  it('excludes an issue whose work already shipped (a merged PR carries its id) and selects the next candidate', () => {
+    const shipped = issue('JOV-6022');
+    const next = issue('JOV-7000');
+    const built = receiptFor([shipped, next], {
+      pullRequests: [
+        {
+          number: 17244,
+          state: 'MERGED',
+          mergedAt: NOW,
+          title: 'ship it',
+          body: 'linear-issue-id:JOV-6022',
+        },
+      ],
+    });
+    const byId = Object.fromEntries(
+      built.matrix.map(item => [item.identifier, item])
+    );
+    assert.equal(byId['JOV-6022'].outcome, 'superseded');
+    assert.equal(byId['JOV-6022'].reason, 'merged-pr-still-open-in-linear');
+    assert.deepEqual(
+      built.cohort.selected.map(item => item.identifier),
+      ['JOV-7000']
+    );
+  });
+
+  it('excludes an assigned issue at selection so the bridge never sees it', () => {
+    const assigned = issue('JOV-7001', {
+      assignee: { id: 'u1', name: 'Someone' },
+    });
+    const eligible = issue('JOV-7002');
+    const built = receiptFor([assigned, eligible], {
+      capacitySignals: healthySignals({
+        workers: { running: 0, retrying: 0, maxConcurrent: 4 },
+      }),
+    });
+    const byId = Object.fromEntries(
+      built.matrix.map(item => [item.identifier, item])
+    );
+    assert.equal(byId['JOV-7001'].outcome, 'blocked');
+    assert.equal(byId['JOV-7001'].reason, 'already-assigned');
+    assert.deepEqual(
+      built.cohort.selected.map(item => item.identifier),
+      ['JOV-7002']
+    );
+  });
+
+  it('the bridge handoff guard and the selection guard are the same function', async () => {
+    const { selectionHandoffExclusion } = await import(
+      '../backlog-remediation.mjs'
+    );
+    const assigned = issue('JOV-7003', {
+      assignee: { id: 'u1', name: 'Someone' },
+    });
+    assert.equal(selectionHandoffExclusion(assigned), 'assigned');
+    assert.equal(
+      selectionHandoffExclusion(issue('JOV-7004', { state: 'In Progress' })),
+      'not-todo'
+    );
+    assert.equal(
+      selectionHandoffExclusion(issue('JOV-7005', { labels: ['protected'] })),
+      'protected-label'
+    );
+    assert.equal(selectionHandoffExclusion(issue('JOV-7006')), null);
+  });
+});
+
+describe('capacity workers observability (JOV-8000 follow-up 40)', () => {
+  it('carries measured worker running/max/source/observedAt onto the receipt', () => {
+    const built = buildRemediationReceipt({
+      issues: [],
+      pullRequests: [],
+      mainSha: MAIN,
+      capacitySignals: healthySignals({
+        workers: { running: 2, retrying: 0, maxConcurrent: 4 },
+        workersSource: 'lanes-doctor-report',
+        workersObservedAt: '2026-10-10T15:00:00.000Z',
+      }),
+      previousCleanStreak: CLEAN_STREAK_REQUIRED,
+      now: NOW,
+    });
+    assert.deepEqual(built.workers, {
+      running: 2,
+      maxConcurrent: 4,
+      source: 'lanes-doctor-report',
+      observedAt: '2026-10-10T15:00:00.000Z',
+    });
+  });
+
+  it('a fresh doctor report with running==maxConcurrent still yields workers-saturated and the counts on the line', () => {
+    const gate = evaluateRuntimeCapacity(
+      healthySignals({
+        workers: { running: 4, retrying: 0, maxConcurrent: 4 },
+        workersSource: 'lanes-doctor-report',
+        workersObservedAt: NOW,
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(gate.allowed, false);
+    assert.equal(gate.reason, 'workers-saturated');
+    assert.equal(gate.remaining, 0);
+  });
+
+  it('a stale/absent workers signal fails closed as capacity-evidence missing (workers)', () => {
+    const missing = evaluateRuntimeCapacity(
+      { schema: CAPACITY_SCHEMA, observedAt: NOW },
+      { now: NOW }
+    );
+    assert.match(
+      missing.reason,
+      /capacity-evidence-missing-malformed-or-stale/
+    );
+    assert.ok(missing.gaps.includes('workers'));
+  });
+});
+
 describe('selected-to-lanes bridge (JOV-8000 follow-up 38)', () => {
   const AGENT_READY = { id: 'label-agent-ready', name: 'agent-ready' };
   const TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
@@ -1222,7 +1346,7 @@ describe('selected-to-lanes bridge (JOV-8000 follow-up 38)', () => {
       agentReadyLabel: AGENT_READY,
       inventory: {},
     });
-    assert.match(receipt.outcome, /^skipped:state-/);
+    assert.match(receipt.outcome, /^skipped:not-todo$/);
     assert.equal(client.calls.updates.length, 0);
     // protected label
     const protectedIssue = selectedIssue({
