@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { ProviderKey, TrackViewModel } from '@/lib/discography/types';
-import { TrackRow } from './TrackRow';
+import { TrackRow, TrackRowsContainer } from './TrackRow';
 
 const allProviders: ProviderKey[] = ['spotify', 'apple_music', 'youtube_music'];
 
@@ -127,5 +127,23 @@ export const StackExplicitNoLinks: Story = {
     <div className='w-96'>
       <TrackRow {...args} />
     </div>
+  ),
+};
+
+export const ExpandedRelease: Story = {
+  render: args => (
+    <table className='w-full'>
+      <tbody>
+        <TrackRowsContainer
+          tracks={[
+            args.track,
+            { ...args.track, id: 'track-2', trackNumber: 2 },
+          ]}
+          providerConfig={args.providerConfig}
+          allProviders={args.allProviders}
+          columnCount={args.columnCount}
+        />
+      </tbody>
+    </table>
   ),
 };

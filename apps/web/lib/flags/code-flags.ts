@@ -34,12 +34,12 @@ export const CODE_FLAGS = {
   // umbrella override while the family-specific flags soak independently.
   IN_HOUSE_RESOLVER: false,
   // JOV-7580 / JOV-7579: generic creator marketing labels and the
-  // /smart-links hero. Default off, so the Music footer and the current
-  // smart-link headline stay. FEATURE_MARKETING_GENERIC_CREATOR_NAV=true
-  // uses audience wording and frames a release as the worked example.
-  // Does not certify smart links beyond music. Static pages pick this up
-  // at build time.
-  MARKETING_GENERIC_CREATOR_NAV: false,
+  // /smart-links hero. On: audience wording, with a release as the worked
+  // example. FEATURE_MARKETING_GENERIC_CREATOR_NAV=false is the kill switch
+  // back to the Music footer and the music smart-link headline. Does not
+  // certify smart links beyond music. Static pages pick this up at build
+  // time.
+  MARKETING_GENERIC_CREATOR_NAV: true,
   // gh-9869: v0 studio-session memory loop (creator tag photo → person/context → studio-session → approval-gated opportunity).
   MEMORY_STUDIO_SESSION_V0: true,
   // Final JOV-7323 vendor switch. Vendor-off becomes effective only after

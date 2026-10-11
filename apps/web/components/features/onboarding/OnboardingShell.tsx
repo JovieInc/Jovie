@@ -2,7 +2,8 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
-import { Skeleton } from '@jovie/ui';
+import { Button, Skeleton } from '@jovie/ui';
+import type { UIMessage } from 'ai';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
@@ -15,7 +16,7 @@ import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import type { StartEntryProfile } from '@/lib/onboarding/start-entry-profile';
 import {
   getBrowserTurnstileHostname,
-  resolveTurnstileSiteKey,
+  resolveOnboardingTurnstileSiteKey,
 } from '@/lib/turnstile/keys';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
@@ -37,7 +38,16 @@ import { useOnboardingClaim } from './useOnboardingClaim';
  *
  * Holds the Turnstile token until the chat client wires its first request.
  */
-interface OnboardingShellProps {
+export interface OnboardingShellProps {
+  readonly initialMessages?: UIMessage[];
+  readonly conversationId?: string | null;
+  readonly resumeOwnedConversation?: boolean;
+  readonly onRestart?: () => void;
+  readonly onLogout?: () => void;
+  readonly actionPending?: boolean;
+  readonly controlsDisabled?: boolean;
+  readonly actionError?: string | null;
+  readonly onBusyChange?: (busy: boolean) => void;
   /** Whether the server resolved a verified account for this request. */
   readonly isSignedIn?: boolean;
   /** First 8 chars of the session id. Debug breadcrumb only — not sensitive. */
@@ -46,6 +56,11 @@ interface OnboardingShellProps {
   readonly intentId?: string;
   /** Validated URL-provided context for an automatic first message. */
   readonly starterHandoff?: StartEntryHandoff | null;
+  /**
+   * Server-resolved synthetic principal passage (JOV-7697): mount the
+   * Cloudflare test sitekey. Never derived from client input.
+   */
+  readonly turnstileTestMode?: boolean;
   /** The real page behind `?handle=`, shown before the visitor types. */
   readonly entryProfile?: StartEntryProfile | null;
 }
@@ -76,7 +91,17 @@ export function OnboardingShell({
   intentId,
   sessionLabel,
   starterHandoff,
+  turnstileTestMode = false,
   entryProfile,
+  initialMessages = [],
+  conversationId = null,
+  resumeOwnedConversation = false,
+  onRestart,
+  onLogout,
+  actionPending = false,
+  controlsDisabled = false,
+  actionError = null,
+  onBusyChange,
 }: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [profileBuilderState, setProfileBuilderState] =
@@ -148,14 +173,16 @@ export function OnboardingShell({
       instruction={turnstileInstruction}
       focusSignal={turnstileFocusSignal}
       resetSignal={turnstileResetSignal}
+      testMode={turnstileTestMode}
     />
   );
   const turnstilePanelVisible = isOnboardingTurnstilePanelVisible(
     turnstileState,
     turnstileInstruction,
-    resolveTurnstileSiteKey(
+    resolveOnboardingTurnstileSiteKey(
       getBrowserTurnstileHostname(),
-      publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+      publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+      turnstileTestMode
     )
   );
 
@@ -184,7 +211,10 @@ export function OnboardingShell({
   // authenticated, then retry after completed chat turns. Durable waitlist
   // receipts route to /waitlist; admitted users go to checkout; missing
   // artist identity stays in this chat.
-  const claimStatus = useOnboardingClaim(claimTrigger);
+  const claimStatus = useOnboardingClaim(
+    claimTrigger,
+    !resumeOwnedConversation || claimTrigger > 0
+  );
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
   const entryBuilderState = useMemo(
@@ -207,61 +237,99 @@ export function OnboardingShell({
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'
         main={
-          <div
-            className='relative flex min-h-0 flex-1 flex-col'
-            data-onboarding-session={sessionLabel}
-          >
-            {!isSignedIn ? (
-              <div
-                className='flex min-h-11 shrink-0 items-center justify-end px-3 sm:px-4'
-                data-testid='onboarding-sign-in-header'
-              >
-                <Link
-                  className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
-                  href={APP_ROUTES.SIGNIN}
+          <div className='flex min-h-0 min-w-0 flex-1'>
+            <div
+              className='relative flex min-h-0 min-w-0 flex-1 flex-col'
+              data-onboarding-session={sessionLabel}
+            >
+              {onRestart || onLogout || !isSignedIn ? (
+                <div
+                  className='flex min-h-11 shrink-0 items-center justify-end gap-2 px-3 sm:px-4'
+                  data-testid='onboarding-sign-in-header'
                 >
-                  Sign in
-                </Link>
-              </div>
-            ) : null}
-            <OnboardingChat
-              headerOverlay={!isSignedIn}
-              intentId={intentId}
-              onConversationActivity={handleConversationActivity}
-              onProfileBuilderChange={setProfileBuilderState}
-              starterHandoff={starterHandoff}
-              entryProfile={entryProfile}
-              turnstileToken={turnstileToken}
-              turnstileStatus={turnstileState.status}
-              turnstilePanel={turnstilePanel}
-              turnstilePanelVisible={turnstilePanelVisible}
-              onTurnstileRequired={handleTurnstileRequired}
-              onTurnstileRejected={handleTurnstileRejected}
-            />
+                  {onRestart ? (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='shrink-0 whitespace-nowrap'
+                      disabled={actionPending || controlsDisabled}
+                      onClick={onRestart}
+                    >
+                      Start Over
+                    </Button>
+                  ) : null}
+                  {isSignedIn && onLogout ? (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='shrink-0 whitespace-nowrap'
+                      disabled={actionPending || controlsDisabled}
+                      onClick={onLogout}
+                    >
+                      Log Out
+                    </Button>
+                  ) : null}
+                  {!isSignedIn ? (
+                    <Link
+                      className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
+                      href={APP_ROUTES.SIGNIN}
+                    >
+                      Sign in
+                    </Link>
+                  ) : null}
+                </div>
+              ) : null}
+              <OnboardingChat
+                initialMessages={initialMessages}
+                conversationId={conversationId}
+                interactionDisabled={actionPending}
+                onBusyChange={onBusyChange}
+                headerOverlay={!isSignedIn}
+                intentId={intentId}
+                onConversationActivity={handleConversationActivity}
+                onProfileBuilderChange={setProfileBuilderState}
+                starterHandoff={starterHandoff}
+                entryProfile={entryProfile}
+                turnstileToken={turnstileToken}
+                turnstileStatus={turnstileState.status}
+                turnstilePanel={turnstilePanel}
+                turnstilePanelVisible={turnstilePanelVisible}
+                onTurnstileRequired={handleTurnstileRequired}
+                onTurnstileRejected={handleTurnstileRejected}
+              />
 
-            <OnboardingShellStatus
-              kind='error'
-              message='This Spotify artist already has a Jovie profile. Sign in with the original account or use the verified profile claim flow. Choosing another handle will not resolve this conflict.'
-              visible={claimStatus === 'identity-conflict'}
-            />
-            <OnboardingShellStatus
-              kind='error'
-              message={turnstileFailureMessage}
-              visible={Boolean(turnstileFailureMessage)}
-            />
-            <OnboardingShellStatus
-              kind='status'
-              message='Linking your conversation...'
-              visible={isLinking}
-            />
-            <OnboardingShellStatus
-              kind='error'
-              message="We couldn't save your request. Refresh this page to try again."
-              visible={claimStatus === 'error'}
-            />
+              <OnboardingShellStatus
+                kind='error'
+                message={actionError}
+                visible={Boolean(actionError)}
+              />
+
+              <OnboardingShellStatus
+                kind='error'
+                message='This Spotify artist already has a Jovie profile. Sign in with the original account or use the verified profile claim flow. Choosing another handle will not resolve this conflict.'
+                visible={claimStatus === 'identity-conflict'}
+              />
+              <OnboardingShellStatus
+                kind='error'
+                message={turnstileFailureMessage}
+                visible={Boolean(turnstileFailureMessage)}
+              />
+              <OnboardingShellStatus
+                kind='status'
+                message='Linking your conversation...'
+                visible={isLinking}
+              />
+              <OnboardingShellStatus
+                kind='error'
+                message="We couldn't save your request. Refresh this page to try again."
+                visible={claimStatus === 'error'}
+              />
+            </div>
+            {sideProfileRail ? (
+              <div className='hidden shrink-0 lg:flex'>{sideProfileRail}</div>
+            ) : null}
           </div>
         }
-        rightPanel={sideProfileRail}
       />
     </SidebarProvider>
   );

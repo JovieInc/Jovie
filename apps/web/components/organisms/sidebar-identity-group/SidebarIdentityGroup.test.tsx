@@ -322,7 +322,7 @@ describe('UnifiedSidebar identity composition contract', () => {
     );
 
     expect(source).toMatch(
-      /<SidebarIdentityGroup\s+calm=\{!isRouteSidebar\}\s+profileHref=\{profileHref\}\s*\/>/
+      /<SidebarIdentityGroup\s+calm=\{!isRouteSidebar\}\s+profileHref=\{section === 'ov' \? undefined : profileHref\}/
     );
     expect(source).not.toContain("tooltip='Public Profile'");
     expect(source).not.toContain('CustomerUserPanel');

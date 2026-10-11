@@ -8,6 +8,7 @@
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { FileAudio2, Paperclip } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CHAT_COMPOSER_UPLOAD_AUDIO_HINT,
@@ -74,12 +75,20 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
 }));
 
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
-  useArtistSearchQuery: () => ({
-    results: [],
-    state: 'idle',
-    search: vi.fn(),
-    clear: vi.fn(),
-  }),
+  useArtistSearchQuery: () => {
+    const [query, setQuery] = useState('');
+    const clear = useCallback(() => setQuery(''), []);
+    return {
+      results: [],
+      state: 'idle',
+      error: null,
+      query,
+      isPending: false,
+      search: setQuery,
+      searchImmediate: setQuery,
+      clear,
+    };
+  },
 }));
 
 vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
@@ -430,10 +439,15 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     pushMock.mockClear();
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
 
-    fireEvent.keyDown(globalThis, { key, metaKey: true });
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    input.focus();
+    fireEvent.keyDown(input, { key, metaKey: true });
 
     const rows = screen.getAllByRole('option');
     expect(rows[rowIndex]).toHaveAttribute('aria-selected', 'true');
+    expect(input).toHaveFocus();
     expect(pushMock).not.toHaveBeenCalled();
   });
 

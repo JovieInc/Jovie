@@ -156,6 +156,21 @@ describe('OvieCertificationsWorkspace', () => {
     ).toBeDisabled();
   });
 
+  it('keeps the registered rail stable across host re-renders', () => {
+    // The mutation hook returns a fresh object every render, like useMutation.
+    // A rail that changed identity per render made a panel-consuming host
+    // re-render forever (Maximum update depth in the Storybook a11y lane).
+    mockQuery({ data: fixtureInventory() });
+    const { rerender } = render(<OvieCertificationsWorkspace />);
+    const first = mocks.panels.at(-1);
+    rerender(
+      <TooltipProvider>
+        <OvieCertificationsWorkspace />
+      </TooltipProvider>
+    );
+    expect(mocks.panels.at(-1)).toBe(first);
+  });
+
   it('shows an explicit error state with retry when the first load fails', () => {
     mockQuery({ isError: true });
     render(<OvieCertificationsWorkspace />);
@@ -329,6 +344,10 @@ describe('OvieCertificationsWorkspace', () => {
     act(() => latestRailProps().onWalkthrough?.());
 
     expect(screen.getByTestId('certification-walkthrough')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Certify' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
+    expect(mocks.mutateAsync).not.toHaveBeenCalled();
+    fireEvent.load(screen.getByTestId('walkthrough-image'));
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
     });

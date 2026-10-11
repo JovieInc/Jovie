@@ -79,6 +79,25 @@ function artifactKind(ref: string): WalkthroughEvidenceKind | null {
   return null;
 }
 
+/** Accept explicit web URLs or same-origin public paths, never local files. */
+export function walkthroughEvidenceHref(
+  evidence: OvieCertificationEvidence
+): string | null {
+  const value = evidence.href ?? evidence.ref;
+  if (!value || /[\\\s]/.test(value)) return null;
+  if (value.startsWith('/') && !value.startsWith('//')) return value;
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'https:' || url.protocol === 'http:') &&
+      !url.username &&
+      !url.password
+      ? value
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function toArtifact(
   evidence: OvieCertificationEvidence,
   kind: WalkthroughEvidenceKind
@@ -86,7 +105,7 @@ function toArtifact(
   return {
     evidenceId: evidence.id,
     kind,
-    href: evidence.href,
+    href: walkthroughEvidenceHref(evidence),
     ref: evidence.ref,
     label: evidence.summary || evidence.id,
   };
@@ -100,7 +119,8 @@ function toArtifact(
 export function pickWalkthroughArtifact(
   row: OvieCertificationRow
 ): WalkthroughArtifact | null {
-  const media = row.evidence.filter(item => {
+  const passed = row.evidence.filter(item => item.status === 'passed');
+  const media = passed.filter(item => {
     const kind = artifactKind(item.href ?? item.ref);
     return kind !== null;
   });
@@ -112,9 +132,12 @@ export function pickWalkthroughArtifact(
       artifactKind(first.href ?? first.ref) ?? 'receipt'
     );
   }
-  const text = row.evidence.find(item => item.summary.trim().length > 0);
+  // A failed media receipt cannot be replaced by an unrelated source/test summary.
+  if (row.evidence.some(item => artifactKind(item.href ?? item.ref) !== null))
+    return null;
+  const text = passed.find(item => item.summary.trim().length > 0);
   if (text) return toArtifact(text, 'text');
-  const receipt = row.evidence[0];
+  const receipt = passed[0];
   return receipt ? toArtifact(receipt, 'receipt') : null;
 }
 
@@ -149,7 +172,12 @@ export function isWalkthroughReviewStale(
   review: CertificationWalkthroughReview,
   row: OvieCertificationRow | null
 ): boolean {
-  return !row || row.decision.evidenceDigest !== review.evidenceDigest;
+  return (
+    !row ||
+    row.id !== review.rowId ||
+    !row.decision.available ||
+    row.decision.evidenceDigest !== review.evidenceDigest
+  );
 }
 
 export function appendTranscriptSegment(

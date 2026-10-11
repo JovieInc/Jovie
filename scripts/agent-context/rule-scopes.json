@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "c8f21e6b30a961274109217859deaf8a58f2f3b141d2620d21540a584c63596a"
+    "bodySha256": "25164713a8fc910f61d565914dab8132b9fb0b8de38f55876df58ebd672e3364"
   },
   {
     "file": ".claude/rules/db.md",
@@ -68,7 +68,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "0ff52c7e350e9a503ca57dc606abf864827facfaa55a8fadd1376d3a0ee7190e"
+    "bodySha256": "236b84e3b2ed38cb4fdf1723abff6bd04165cbc5fc669f21940f4c9759c89714"
   },
   {
     "file": ".claude/rules/macos.md",

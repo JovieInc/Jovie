@@ -76,6 +76,14 @@ async function gotoShellRoute(
   }
 }
 
+// Streaming can briefly hold a suspended copy of the shell next to the
+// resolved one; geometry is only meaningful once exactly one frame remains.
+async function waitForSettledShell(page: Page): Promise<void> {
+  const frame = page.locator('[data-app-shell-frame="true"]');
+  await expect(frame).toHaveCount(1, { timeout: 30_000 });
+  await expect(frame).toBeVisible();
+}
+
 async function assertElectronShellControls(
   page: Page,
   expectedNewChatRows: 0 | 1
@@ -106,9 +114,7 @@ test('titlebar DOM has a single sidebar toggle and no second main-cell band', as
   await gotoShellRoute(page);
 
   // Wait for shell frame to be present
-  await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible({
-    timeout: 30_000,
-  });
+  await waitForSettledShell(page);
 
   // The titlebar row is hidden in the browser (display:none unless inside Electron).
   // Verify structural correctness by checking the DOM regardless of visibility.
@@ -158,9 +164,7 @@ test('no duplicate sidebar dock button and titlebar toggle on the same page', as
   await installElectronRuntime(page);
   await gotoShellRoute(page);
 
-  await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible({
-    timeout: 30_000,
-  });
+  await waitForSettledShell(page);
 
   await expect(page.locator('[data-sidebar="trigger"]')).toHaveCount(0);
   await expect(
@@ -192,9 +196,7 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
   await installElectronRuntime(page);
   await gotoShellRoute(page);
 
-  await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible({
-    timeout: 30_000,
-  });
+  await waitForSettledShell(page);
 
   const tokens = await page.evaluate(() => {
     const rootStyle = getComputedStyle(document.documentElement);
@@ -236,12 +238,21 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
     ).toBeGreaterThan(0);
 
     if (box !== null) {
-      // Inside Electron, the titlebar IS visible — verify the sidebar-cell width
-      // matches the token value within 1px tolerance (allows for sub-pixel rounding).
+      // Inside Electron the titlebar is visible. The row spans exactly the
+      // sidebar column; its shell-gap padding insets the cell to the rail's
+      // own content edge, so measure the row's border box against the token.
+      const rowBox = await page
+        .locator('[data-testid="electron-titlebar-row"]')
+        .boundingBox();
+      expect(rowBox).not.toBeNull();
       expect(
-        Math.abs(box.width - tokens.sidebarWidth),
-        `titlebar sidebar-cell width (${box.width}px) matches sidebar-width token (${tokens.sidebarWidth}px)`
+        Math.abs((rowBox?.width ?? 0) - tokens.sidebarWidth),
+        `titlebar row width (${rowBox?.width}px) matches sidebar-width token (${tokens.sidebarWidth}px)`
       ).toBeLessThanOrEqual(1);
+      expect(
+        box.width,
+        'sidebar cell stays inside the sidebar column'
+      ).toBeLessThanOrEqual(tokens.sidebarWidth);
     }
   }
 });
@@ -308,9 +319,11 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
 
   for (const { route, persona, expectedNewChatRows } of routeChecks) {
     await gotoShellRoute(page, route, persona);
+    // Streaming can briefly hold suspended copies of the shell; once the
+    // route settles there must be exactly one titlebar row.
     await expect(
       page.locator('[data-testid="electron-titlebar-row"]')
-    ).toBeAttached({ timeout: 30_000 });
+    ).toHaveCount(1, { timeout: 30_000 });
     await assertElectronShellControls(page, expectedNewChatRows);
 
     const geometry = await page.evaluate(() => {
@@ -347,8 +360,11 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         bodyTop: bodyBox.top,
         sidebarTop: sidebarBox.top,
         mainPlaneTop: mainPlaneBox.top,
-        mainPlaneCenterX: mainPlaneBox.left + mainPlaneBox.width / 2,
         settingsShellTop: settingsShellBox?.top ?? null,
+        settingsShellCenterX:
+          settingsShellBox === undefined
+            ? null
+            : settingsShellBox.left + settingsShellBox.width / 2,
         settingsColumnTop: settingsColumnBox?.top ?? null,
         settingsColumnCenterX:
           settingsColumnBox === undefined
@@ -379,9 +395,11 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       expect(
         Math.abs(
           (geometry?.settingsColumnCenterX ?? 0) -
-            (geometry?.mainPlaneCenterX ?? 0)
+            (geometry?.settingsShellCenterX ?? 0)
         ),
-        `${route} centers its shared column in the post-sidebar main pane`
+        // The route pane, not the main plane: an open inspector (the
+        // artist-profile preview rail) is a sibling that narrows the pane.
+        `${route} centers its shared column in the settings route pane`
       ).toBeLessThanOrEqual(1);
       expect(
         (geometry?.settingsColumnTop ?? 0) - (geometry?.settingsShellTop ?? 0),
@@ -390,37 +408,45 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
     }
 
     if (route === APP_ROUTES.CHAT) {
-      await expect(
-        page.locator('[data-chat-grid-anchor="starter"]')
-      ).toBeVisible({ timeout: 30_000 });
-      await expect(
-        page.locator('[data-chat-grid-anchor="composer"]')
-      ).toBeVisible({ timeout: 30_000 });
-      const chatGrid = await page.evaluate(() => {
-        const starter = document
-          .querySelector<HTMLElement>('[data-chat-grid-anchor="starter"]')
-          ?.getBoundingClientRect();
-        const composer = document
-          .querySelector<HTMLElement>('[data-chat-grid-anchor="composer"]')
-          ?.getBoundingClientRect();
-        if (!starter || !composer) return null;
-        return {
-          starterLeft: starter.left,
-          starterRight: starter.right,
-          composerLeft: composer.left,
-          composerRight: composer.right,
-        };
+      // The greeting and the composer share one centered column; the
+      // greeting text sits on the composer's inner edge, never outside it.
+      const starterSelector =
+        '[data-testid="chat-empty-state-greeting-region"]';
+      const composerSelector = '[data-testid="chat-composer-surface"]';
+      await expect(page.locator(starterSelector)).toBeVisible({
+        timeout: 30_000,
       });
+      await expect(page.locator(composerSelector)).toBeVisible({
+        timeout: 30_000,
+      });
+      const chatGrid = await page.evaluate(
+        ([starterSel, composerSel]) => {
+          const starter = document
+            .querySelector<HTMLElement>(starterSel)
+            ?.getBoundingClientRect();
+          const composer = document
+            .querySelector<HTMLElement>(composerSel)
+            ?.getBoundingClientRect();
+          if (!starter || !composer) return null;
+          return {
+            centerDelta: Math.abs(
+              starter.left +
+                starter.width / 2 -
+                (composer.left + composer.width / 2)
+            ),
+            starterLeftInset: starter.left - composer.left,
+            starterRightInset: composer.right - starter.right,
+          };
+        },
+        [starterSelector, composerSelector] as const
+      );
       expect(
         chatGrid,
-        'New Chat exposes both canonical grid anchors'
+        'New Chat renders both the greeting and the composer'
       ).not.toBeNull();
-      expect(
-        Math.abs((chatGrid?.starterLeft ?? 0) - (chatGrid?.composerLeft ?? 0))
-      ).toBeLessThanOrEqual(1);
-      expect(
-        Math.abs((chatGrid?.starterRight ?? 0) - (chatGrid?.composerRight ?? 0))
-      ).toBeLessThanOrEqual(1);
+      expect(chatGrid?.centerDelta ?? 99).toBeLessThanOrEqual(1);
+      expect(chatGrid?.starterLeftInset ?? -1).toBeGreaterThanOrEqual(0);
+      expect(chatGrid?.starterRightInset ?? -1).toBeGreaterThanOrEqual(0);
     }
   }
 });
@@ -461,9 +487,16 @@ test('settings shell keeps compact, 200% zoom, keyboard, and collapsed-sidebar c
       '[data-electron-titlebar="true"]'
     );
     if (!mainPlane || !column || !titlebar) return null;
+    const header = column.querySelector<HTMLElement>(
+      '[data-top-spacing-owner="shell-header"]'
+    );
+    const title = header?.querySelector<HTMLElement>('h1');
+    if (!header || !title) return null;
     const mainBox = mainPlane.getBoundingClientRect();
     const columnBox = column.getBoundingClientRect();
     const titlebarBox = titlebar.getBoundingClientRect();
+    const headerBox = header.getBoundingClientRect();
+    const titleBox = title.getBoundingClientRect();
     return {
       centeredDelta: Math.abs(
         columnBox.left +
@@ -471,15 +504,28 @@ test('settings shell keeps compact, 200% zoom, keyboard, and collapsed-sidebar c
           (mainBox.left + mainBox.width / 2)
       ),
       horizontalOverflow: column.scrollWidth - column.clientWidth,
+      titlebarTop: titlebarBox.top,
       titlebarBottom: titlebarBox.bottom,
-      columnTop: columnBox.top,
+      titlebarRight: titlebarBox.right,
+      headerTop: headerBox.top,
+      headerBottom: headerBox.bottom,
+      titleLeft: titleBox.left,
     };
   });
 
   expect(geometry).not.toBeNull();
   expect(geometry?.centeredDelta).toBeLessThanOrEqual(1);
   expect(geometry?.horizontalOverflow).toBeLessThanOrEqual(0);
-  expect(geometry?.columnTop ?? 0).toBeGreaterThanOrEqual(
-    geometry?.titlebarBottom ?? 0
+  // Settings supplies the shared desktop header (#20269): it shares the
+  // window-control row instead of starting below it, and its title must
+  // clear the controls.
+  expect(
+    Math.abs((geometry?.headerTop ?? -1) - (geometry?.titlebarTop ?? 0))
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs((geometry?.headerBottom ?? -1) - (geometry?.titlebarBottom ?? 0))
+  ).toBeLessThanOrEqual(1);
+  expect(geometry?.titleLeft ?? 0).toBeGreaterThanOrEqual(
+    geometry?.titlebarRight ?? Number.POSITIVE_INFINITY
   );
 });

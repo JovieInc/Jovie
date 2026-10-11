@@ -1,6 +1,6 @@
 {
   "name": "@jovie/docs",
-  "version": "26.10.0",
+  "version": "26.10.1",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.52.0",
     "next": "16.3.8",
     "next-themes": "^0.4.6",
     "nextra": "^4.6.1",

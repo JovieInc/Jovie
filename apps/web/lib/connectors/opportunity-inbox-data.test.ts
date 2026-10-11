@@ -46,6 +46,9 @@ function expectConsumerQuery(call: number) {
     'owner',
     'pending',
     'workflow_capture.request',
+    'founder.%',
+    'ops.%',
+    'ovie.%',
   ]);
 }
 
@@ -197,4 +200,39 @@ describe('consumer opportunity storage boundary', () => {
       (await loadOpportunityInboxTourDateSections('profile-1')).availability
     ).toBe('available');
   });
+});
+
+describe('explicit operator provenance', () => {
+  it.each([false, true])(
+    'keeps operator sources out of creator payloads for admin=%s without keyword filtering history',
+    async isAdmin => {
+      mocks.user.mockResolvedValue({ id: 'owner', isAdmin });
+      const kinds = [
+        'calendar.create_event',
+        'founder.brain_dump',
+        'ops.healthcheck',
+        'ovie.review',
+        'healthcheck.legacy_customer',
+      ];
+      mocks.limit.mockResolvedValue(
+        kinds.map(kind => ({
+          id: kind,
+          kind,
+          payload: { title: kind },
+          rationale: null,
+          createdAt: new Date(),
+        }))
+      );
+      const response = await GET();
+      expect(response.status).toBe(200);
+      expect(
+        (await response.json()).cards.map((card: { id: string }) => card.id)
+      ).toEqual(['calendar.create_event', 'healthcheck.legacy_customer']);
+      const query = new PgDialect().sqlToQuery(mocks.where.mock.calls[0][0]);
+      expect(query.params).toContain('owner');
+      expect(query.params).toContain('founder.%');
+      expect(query.params).toContain('ops.%');
+      expect(query.params).toContain('ovie.%');
+    }
+  );
 });

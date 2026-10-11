@@ -279,6 +279,16 @@ jobs:
                   )
               ] | length
             ' <<<"$jobs_json")"
+            verified_skipped="$(jq --arg sha "$release_sha" '
+              [
+                .[].jobs[]?
+                | select(
+                    .name == "Production Verified" and
+                    .head_sha == $sha and
+                    .conclusion == "skipped"
+                  )
+              ] | length
+            ' <<<"$jobs_json")"
             if [ "$verified_count" = "1" ]; then
               production_proven=true
             fi
@@ -288,6 +298,14 @@ jobs:
             if prove_existing_production_marker "$release_sha"; then
               production_proven=true
               echo "Existing exact Production Verified marker authorized $release_sha."
+            elif [ "${verified_skipped:-0}" = "1" ]; then
+              # The controller concluded success with Production Verified
+              # skipped only when it deliberately yielded the release lease —
+              # for example when the fleet gate held deployment. Nothing was
+              # verified, so this observer has nothing to release and must not
+              # fail main.
+              echo "::notice::Production Verified was skipped for $release_sha because the controller yielded the release lease; no TestFlight release is due."
+              exit 0
             else
               echo "::error::Current main lacks exact successful Production Verified evidence."
               exit 1
@@ -729,7 +747,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
         with:
-          ruby-version: "3.1"
+          ruby-version: "3.3"
           bundler-cache: true
 
       - name: Validate TestFlight secrets

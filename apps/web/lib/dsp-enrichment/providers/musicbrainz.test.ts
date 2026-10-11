@@ -268,7 +268,7 @@ describe('MusicBrainz Provider', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('waits once for a chained quota window, then respects the distributed decision', async () => {
+  it('waits once for a chained quota interval, then respects the distributed decision', async () => {
     vi.useFakeTimers();
     mockLimit.mockResolvedValueOnce({
       success: false,
@@ -351,15 +351,14 @@ describe('MusicBrainz Provider', () => {
           ok: true,
           status: 200,
           json: () =>
-            new Promise((_resolve, reject) =>
-              init?.signal?.addEventListener('abort', () =>
+            new Promise((_resolve, reject) => {
+              (init?.signal as AbortSignal).onabort = () =>
                 reject(
                   Object.assign(new Error('aborted body'), {
                     name: 'AbortError',
                   })
-                )
-              )
-            ),
+                );
+            }),
         }) as Response
     );
     const result = expect(getMusicBrainzArtist(TIM_ID)).rejects.toMatchObject({

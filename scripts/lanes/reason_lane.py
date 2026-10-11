@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 JOB_SCHEMA = "summer.reasoning-job/v1"
 RESULT_SCHEMA = "summer.reasoning-result/v1"
 PRIOR_ART_SCHEMA = "summer.business-prior-art/v1"
@@ -148,7 +151,7 @@ def expired(job: dict, now: float | None = None) -> bool:
 OPEN_PRIORITY = re.compile(r"^linear:open-p0-p(?P<max>[0-3])$")
 
 
-def gather_context(job: dict, linear, run=subprocess.run, limit: int = 60000) -> str:
+def gather_context(job: dict, linear, run=lifecycle.run, limit: int = 60000) -> str:
     """Deterministic context pack; every section is labeled untrusted data."""
     sections = []
     for ref in job["contextRefs"]:
@@ -191,15 +194,30 @@ def search_slugs(raw: str) -> list[str]:
 
 def page_precedent(slug: str, raw: str) -> dict:
     document = raw or ""
+    metadata = {}
     try:
         parsed = json.loads(document)
-        page = parsed.get("page", parsed.get("data", parsed))
-        document = page.get("compiled_truth") or page.get("compiledTruth") or page.get("body") or ""
-        title = page.get("title")
-    except (json.JSONDecodeError, AttributeError, TypeError):
+    except json.JSONDecodeError:
         title = None
+    else:
+        if not isinstance(parsed, dict):
+            raise ValueError("prior-art response is not a page")
+        page = parsed.get("page", parsed.get("data", parsed))
+        if not isinstance(page, dict):
+            raise ValueError("prior-art response is not a page")
+        document = page.get("compiled_truth") or page.get("compiledTruth") or page.get("body") or page.get("content") or ""
+        title = page.get("title")
+        metadata = page.get("frontmatter") if isinstance(page.get("frontmatter"), dict) else {}
+    if not isinstance(document, str):
+        raise ValueError("prior-art body is not text")
+    body = re.sub(r"\A---\s*\n.*?\n---\s*(?:\n|$)", "", document, flags=re.S).strip()
+    substantive = re.sub(r"^#{1,6}\s+.*$", "", body, flags=re.M).strip()
+    if not substantive or body.lower().rstrip(".") in {"0 results", "no results", "not found"}:
+        raise ValueError("empty prior-art body")
 
     def field(name: str) -> str | None:
+        if isinstance(metadata.get(name), (str, int, float)):
+            return str(metadata[name])
         match = re.search(rf"^{re.escape(name)}:\s*(.+)$", document, re.M)
         if not match:
             return None
@@ -211,17 +229,31 @@ def page_precedent(slug: str, raw: str) -> dict:
             return value.strip("'\"")
 
     heading = re.search(r"^#\s+(.+)$", document, re.M)
-    applicability = re.search(r"^## Applicability\s+(.+?)(?=\n## |\Z)", document, re.M | re.S)
+    applicability = re.search(r"^## Applicability[ \t]*\n(.*?)(?=^## |\Z)", document, re.M | re.S)
     source_url = field("source_url")
     return {"slug": slug, "sourceKind": "yc-prior-art" if slug.startswith("knowledge/external/yc/") else "internal",
             "title": title or field("title") or (heading.group(1).strip() if heading else slug),
             "sourceUrl": source_url,
             "publishedAt": field("published_at") or field("updated_at") or field("compiled_at") or "unknown",
+            "excerpt": document[:2500],
             "applicability": re.sub(r"\s+", " ", applicability.group(1)).strip()[:500]
             if applicability else "Evaluate against the current Jovie evidence and constraints."}
 
 
-def retrieve_business_prior_art(job: dict, run=subprocess.run, limit: int = 3) -> dict:
+def catalog_command(slug: str) -> list[str]:
+    """Compose the installed authenticated adapter only for the known YC catalog.
+
+    The global CLI keeps its existing routing. Hosts without the matched helper
+    keep the native command; adapter failures never fall back to another authority.
+    """
+    executable = shutil.which("gbrain")
+    helper = Path(executable).resolve().with_name("gbrain_loopback.py") if executable else None
+    if helper and helper.is_file():
+        return [sys.executable, str(HERE / "gbrain_catalog.py"), str(helper), slug]
+    return ["gbrain", "get", slug]
+
+
+def retrieve_business_prior_art(job: dict, run=lifecycle.run, limit: int = 3) -> dict:
     topic = business_topic(job["question"])
     receipt = {"schema": PRIOR_ART_SCHEMA, "topic": topic, "retrievedAt": now_iso(),
                "status": "not-applicable", "queries": [], "precedents": [], "failure": None}
@@ -231,25 +263,42 @@ def retrieve_business_prior_art(job: dict, run=subprocess.run, limit: int = 3) -
     receipt["queries"] = queries
     slugs: list[str] = []
     try:
+        # The existing YC corpus owns one known playbook per exact topic token.
+        # Read it before discovery; an empty historical page is evidence missing,
+        # never a precedent. The original reasoning question remains unchanged.
+        catalog_slug = f"knowledge/external/yc/playbook/{topic}"
+        receipt.update(catalogSlug=catalog_slug, retrievalPath="discovery")
+        catalog = run(catalog_command(catalog_slug), capture_output=True, text=True, timeout=20)
+        if catalog.returncode == 0:
+            try:
+                precedent = page_precedent(catalog_slug, catalog.stdout)
+                applicability = re.search(r"^## Applicability[ \t]*\n(.*?)(?=^## |\Z)",
+                                          precedent["excerpt"], re.M | re.S)
+                if not applicability or not applicability.group(1).strip():
+                    raise ValueError("catalog applicability missing")
+            except ValueError:
+                receipt["catalogStatus"] = "empty"
+            else:
+                receipt.update(status="found", catalogStatus="verified", retrievalPath="known-catalog",
+                               queries=[], precedents=[precedent])
+                return receipt
+        elif re.search(r"(?:page[_ ]not[_ ]found|not found)",
+                       f"{catalog.stdout}\n{catalog.stderr}", re.I):
+            receipt["catalogStatus"] = "missing"
+        else:
+            raise RuntimeError((catalog.stderr or "catalog read failed")[-300:])
         for query in queries:
-            keyword = run(["gbrain", "search", query, "--limit", str(limit)], capture_output=True,
-                          text=True, timeout=20)
-            if keyword.returncode != 0:
-                raise RuntimeError((keyword.stderr or "keyword search failed")[-300:])
-            found = search_slugs(keyword.stdout)
-            if not found:
-                semantic = run(["gbrain", "query", query, "--limit", str(limit)], capture_output=True,
-                               text=True, timeout=20)
-                if semantic.returncode != 0:
-                    raise RuntimeError((semantic.stderr or "semantic query failed")[-300:])
-                found = search_slugs(semantic.stdout)
-            slugs.extend(found)
+            semantic = run(["gbrain", "query", query, "--limit", str(limit)], capture_output=True,
+                           text=True, timeout=20)
+            if semantic.returncode != 0:
+                raise RuntimeError((semantic.stderr or "semantic query failed")[-300:])
+            slugs.extend(search_slugs(semantic.stdout))
         for slug in list(dict.fromkeys(slugs))[:limit * 2]:
             page = run(["gbrain", "get", slug], capture_output=True, text=True, timeout=30)
             if page.returncode != 0:
                 raise RuntimeError(f"get {slug}: {(page.stderr or 'failed')[-200:]}")
             receipt["precedents"].append(page_precedent(slug, page.stdout))
-    except (OSError, subprocess.SubprocessError, RuntimeError) as error:
+    except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as error:
         receipt.update(status="retrieval-failed", failure=f"{type(error).__name__}: {error}"[:500])
         return receipt
     receipt["status"] = "found" if receipt["precedents"] else "no sufficiently applicable precedent"
@@ -435,7 +484,7 @@ def load_env_file(path: str | None) -> dict:
     return extra
 
 
-def healthy(spec: dict, run=subprocess.run) -> bool:
+def healthy(spec: dict, run=lifecycle.run) -> bool:
     try:
         result = run(spec["health"], capture_output=True, text=True, timeout=60,
                      env={**os.environ, **load_env_file(spec.get("env"))})
@@ -444,7 +493,7 @@ def healthy(spec: dict, run=subprocess.run) -> bool:
     return result.returncode == 0 and re.search(spec.get("healthy", "."), result.stdout + result.stderr, re.I) is not None
 
 
-def run_model(spec: dict, prompt: str, schema: dict | None, required: tuple[str, ...], run=subprocess.run) -> dict:
+def run_model(spec: dict, prompt: str, schema: dict | None, required: tuple[str, ...], run=lifecycle.run) -> dict:
     """One CLI call. Returns {"ok", "value", "error", "limited", "raw"}; never raises."""
     with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
         handle.write(prompt)
@@ -628,7 +677,7 @@ def render_comment(record: dict, proposal: dict | None, review: dict | None, res
     return "\n".join(lines)
 
 
-def write_gbrain(slug: str, title: str, body: str, run=subprocess.run) -> bool:
+def write_gbrain(slug: str, title: str, body: str, run=lifecycle.run) -> bool:
     """Stored means read back with the body in it (JOV-7715). The page goes on stdin, which
     both the gbrain CLI and Gem's MCP wrapper read (the wrapper ignored `--content` and stored
     an empty page). Exit codes are advisory: the wrapper exits 0 on a failed call and the CLI
@@ -653,7 +702,7 @@ def write_gbrain(slug: str, title: str, body: str, run=subprocess.run) -> bool:
 
 # ---------------------------------------------------------------- one job
 
-def execute(job: dict, config: dict, context: str, state: Path, run=subprocess.run,
+def execute(job: dict, config: dict, context: str, state: Path, run=lifecycle.run,
             prior_art: dict | None = None) -> dict:
     """Model work only (no Linear writes). Returns {record, comment}."""
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -702,7 +751,7 @@ def execute(job: dict, config: dict, context: str, state: Path, run=subprocess.r
             "proposal": proposal, "review": review}
 
 
-def run_research(spec: dict, prompt: str, run=subprocess.run) -> dict:
+def run_research(spec: dict, prompt: str, run=lifecycle.run) -> dict:
     """The research backend answers in prose: the wrapper's {"ok","text"} envelope, or raw text."""
     try:
         result = run([arg.format(prompt=prompt) for arg in spec["cmd"]], capture_output=True, text=True,
@@ -732,7 +781,7 @@ def queued_jobs(linear, label: str) -> list[dict]:
     return lane.shared(f"claim-reason-jobs-{lane._cache_token(label)}", lane.CLAIM_SCAN_TTL_S, fetch) or []
 
 
-def one_job(linear, issue: dict, config: dict, state: Path, run=subprocess.run) -> dict:
+def one_job(linear, issue: dict, config: dict, state: Path, run=lifecycle.run) -> dict:
     job = parse_job(issue["identifier"], issue["title"], issue.get("description") or "")
     if expired(job):
         record = result_record(job, {"confidence": "failed", "agreement": 0.0, "reasons": ["deadline passed"]},
@@ -796,7 +845,7 @@ def record_failure(state: Path, identifier: str, count: int) -> None:
     path.write_text(json.dumps(data))
 
 
-def drain(host, lane, config: dict | None = None, run=subprocess.run) -> dict:
+def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
     """One job at a time per host (flock); stops when the queue, the budget or the proposer is out."""
     config = config or load_config()
     lock = lane.Locked(host.state / "reason.lock", blocking=False)
@@ -814,6 +863,8 @@ def drain(host, lane, config: dict | None = None, run=subprocess.run) -> dict:
             research = parse_job(job["identifier"], job["title"], job.get("description") or "")["decisionType"] == "research"
             return ready["research" if research else "decision"] and budget_allows(host.state, config, research)
         while True:
+            if lifecycle.draining(host.state):
+                return {"status": "operator-draining", "done": done}
             jobs = queued_jobs(linear, config["label"])
             issue = next((job for job in jobs if job["identifier"] not in attempted and runnable(job)), None)
             if issue is None:
@@ -821,6 +872,8 @@ def drain(host, lane, config: dict | None = None, run=subprocess.run) -> dict:
                 return {"status": "budget-exhausted" if waiting else "idle", "done": done}
             claim = lane.Locked(host.state / "claim.lock", blocking=True)
             try:
+                if lifecycle.draining(host.state):
+                    return {"status": "operator-draining", "done": done}
                 if linear.state_of(issue["id"]) != "Todo":
                     attempted.add(issue["identifier"])
                     continue  # another host took it; a cached queue must not spin on it
@@ -850,11 +903,12 @@ def tick(host, lane, linear_factory, config: dict | None = None, spawn=subproces
     if not jobs:
         return {"status": "idle"}
     spawn([sys.executable, str(HERE / "reason_lane.py"), "drain"], stdin=subprocess.DEVNULL,
-          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
+          **lifecycle.spawn_kwargs())
     return {"status": "spawned", "queued": len(jobs)}
 
 
-def main(argv: list[str] | None = None) -> int:
+def guarded_main(argv: list[str] | None = None) -> int:
     import argparse
     import lane_runner as lane  # sibling module of the release
     lane.load_github_env()
@@ -876,6 +930,16 @@ def main(argv: list[str] | None = None) -> int:
     linear.move(node["id"], "In Progress")
     print(json.dumps(one_job(linear, node, config, host.state), indent=1))
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    import lane_runner as lane
+    try:
+        with lifecycle.Guard(lane.Host().state):
+            return guarded_main(argv)
+    except lifecycle.AdmissionHeld as error:
+        print(f"lifecycle admission held: {error}", file=sys.stderr)
+        return 75
 
 
 if __name__ == "__main__":

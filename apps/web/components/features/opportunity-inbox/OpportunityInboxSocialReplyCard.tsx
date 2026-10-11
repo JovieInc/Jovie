@@ -49,8 +49,6 @@ export function OpportunityInboxSocialReplyCard({
 
   const submitRevision = () => {
     onRevise(card.id, comment.trim());
-    setReviseOpen(false);
-    setComment('');
   };
 
   return (
@@ -180,6 +178,8 @@ export function OpportunityInboxSocialReplyCard({
         </label>
         <textarea
           id={commentFieldId}
+          name='revisionFeedback'
+          autoComplete='off'
           className='system-b-opportunity-inbox-comment-input'
           rows={2}
           value={comment}

@@ -98,6 +98,32 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
           node "$guard_root/scripts/changelog-source-guard.mjs"
+      - name: Validate disk-read source contracts from trusted base
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          guard_root="$(mktemp -d "$RUNNER_TEMP/source-read-guard.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
+          export SOURCE_GUARD_MODULE="$guard_root/scripts/ci-fast-lanes.mjs"
+          node --input-type=module -e '
+            import { spawnSync } from "node:child_process";
+            const { selectSourceGuards, listAllChangedFiles } = await import(process.env.SOURCE_GUARD_MODULE);
+            const guards = selectSourceGuards(process.env.GITHUB_EVENT_NAME, listAllChangedFiles(process.cwd()));
+            let exitCode = 0;
+            for (const guard of guards) {
+              const result = spawnSync(guard.command, { shell: true, cwd: process.cwd(), stdio: "inherit" });
+              const code = result.status ?? 1;
+              console.log(`[source-guards] ${guard.id}: exit ${code}`);
+              if (code !== 0 && exitCode === 0) exitCode = code;
+            }
+            process.exitCode = exitCode;
+          '
       - name: Check agent-context size after merge onto base
         shell: bash
         env:
@@ -197,12 +223,17 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
       - name: Scan the exact source diff
         if: steps.reuse.outputs.reuse != 'true'
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
         run: |
           git fetch --no-tags origin "${{ github.base_ref }}"
           base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
           ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
           ./scripts/security/verify-gitleaks-coverage.sh
           node scripts/golden-path-lock.mjs merge-gate
+          git diff --name-only "$base_sha" HEAD > "$RUNNER_TEMP/security-gate-files.txt"
+          node scripts/security/security-gate.mjs --changed-files "$RUNNER_TEMP/security-gate-files.txt"
   migration:
     name: Migration Guard
     runs-on: ubuntu-latest

@@ -115,6 +115,22 @@ export function resolveTurnstileSiteKey(
 }
 
 /**
+ * Sitekey for the onboarding widget. `testMode` is set only by the server
+ * when it resolved an approved synthetic principal for the signed-in session
+ * (JOV-7697); the widget then mints Cloudflare's dummy token, which
+ * `/api/chat` accepts only after re-checking passage on its own. A client
+ * that forces test mode gets a dummy token the production key rejects.
+ */
+export function resolveOnboardingTurnstileSiteKey(
+  hostname: string | null | undefined,
+  configuredSiteKey: string | null | undefined,
+  testMode = false
+): string | undefined {
+  if (testMode) return TURNSTILE_ALWAYS_PASS_SITE_KEY;
+  return resolveTurnstileSiteKey(hostname, configuredSiteKey);
+}
+
+/**
  * Resolve the secret used for Cloudflare siteverify.
  * Must pair with {@link resolveTurnstileSiteKey} for the same hostname.
  */

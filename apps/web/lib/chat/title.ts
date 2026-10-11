@@ -2,6 +2,9 @@ import { skillById } from '@/lib/commands/registry';
 import { parseTokens } from './tokens';
 
 const DEFAULT_MAX_TITLE_LENGTH = 80;
+const titleSegments = new Intl.Segmenter(undefined, {
+  granularity: 'grapheme',
+});
 
 interface ConversationTitleRecord {
   readonly title: string | null;
@@ -30,8 +33,16 @@ function stripResidualTokenSyntax(value: string): string {
 }
 
 function truncateTitle(value: string, maxLength: number): string {
-  if (value.length <= maxLength) return value;
-  return `${value.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+  const segments = Array.from(
+    titleSegments.segment(value),
+    part => part.segment
+  );
+  if (segments.length <= maxLength) return value;
+  const ellipsis = '...'.slice(0, Math.max(0, maxLength));
+  return `${segments
+    .slice(0, Math.max(0, maxLength - ellipsis.length))
+    .join('')
+    .trimEnd()}${ellipsis}`;
 }
 
 export function sanitizeConversationTitle(
@@ -51,11 +62,16 @@ export function sanitizeConversationTitle(
 
   const normalized = stripResidualTokenSyntax(rendered)
     .replaceAll(/\s+/g, ' ')
-    .trim()
-    .replaceAll(/(?:^["'])|(?:["']$)/g, '');
+    .trim();
+  const unwrapped =
+    normalized.length > 1 &&
+    ['"', "'"].includes(normalized[0]) &&
+    normalized.at(-1) === normalized[0]
+      ? normalized.slice(1, -1)
+      : normalized;
 
-  if (!normalized) return null;
-  return truncateTitle(normalized, maxLength);
+  if (!unwrapped) return null;
+  return truncateTitle(unwrapped, maxLength);
 }
 
 export function withSanitizedConversationTitle<

@@ -43,15 +43,9 @@ describe('OpportunityInboxEmptyState', () => {
     );
   });
 
-  it('turns the canonical empty state into a founder brain-dump session', () => {
-    render(<OpportunityInboxEmptyState founderMode />);
-
-    expect(screen.getByText('Start A Brain Dump')).toBeVisible();
-    expect(screen.getByTestId('founder-recorder')).toBeVisible();
-    expect(
-      screen.getByText(
-        /Saving a note does not give Jovie permission to publish it/
-      )
-    ).toBeVisible();
+  it('keeps the empty creator home free of founder capture', () => {
+    render(<OpportunityInboxEmptyState />);
+    expect(screen.queryByTestId('founder-recorder')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toBeVisible();
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "@jovie/release-channel-contracts",
-  "version": "26.10.0",
+  "version": "26.10.1",
   "private": true,
   "type": "module",
   "main": "./index.ts",
@@ -14,6 +14,6 @@
   },
   "devDependencies": {
     "typescript": "^6.0.3",
-    "vitest": "5.0.2"
+    "vitest": "5.0.3"
   }
 }

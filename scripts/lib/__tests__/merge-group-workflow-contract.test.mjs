@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { load } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CI_RESERVED_MS } from '../../../apps/web/scripts/vitest-duration-sequencer.mjs';
@@ -674,6 +675,46 @@ describe('merge_group workflow contract', () => {
     expect(Object.keys(CI_RESERVED_MS)).not.toContain('packages/ui');
   });
 
+  it('keeps Codecov reporting outages advisory without masking test or coverage failures', () => {
+    /** @typedef {{ name?: string, 'continue-on-error'?: boolean, if?: string, with?: { fail_ci_if_error?: boolean } }} ReportingStep */
+    const jobs =
+      /** @type {{ jobs: Record<string, { 'continue-on-error'?: boolean, steps: ReportingStep[] }> }} */ (
+        load(CI_WORKFLOW)
+      ).jobs;
+    const units = jobs['ci-unit-tests'];
+    const step = name => {
+      const match = units.steps.find(candidate => candidate.name === name);
+      expect(match, name).toBeDefined();
+      return match;
+    };
+    // Bootstrap/download failures happen before fail_ci_if_error takes effect.
+    const report = step('Upload test results to Codecov');
+    expect(report['continue-on-error']).toBe(true);
+    expect(report.with?.fail_ci_if_error).toBe(false);
+    expect(report.if).toContain("github.event_name != 'merge_group'");
+    expect(units['continue-on-error']).toBeUndefined();
+    for (const name of [
+      'Run unit tests',
+      'Run Ovie route and private-boundary coverage',
+      'Run packages/ui unit tests',
+      'Preserve completed unit-shard diagnosis',
+    ]) {
+      expect(step(name)['continue-on-error'], name).toBeUndefined();
+    }
+    for (const job of [
+      'ci-exact-head-coverage-shard',
+      'ci-exact-head-coverage',
+    ]) {
+      expect(jobs[job]['continue-on-error'], job).toBeUndefined();
+      for (const requiredStep of jobs[job].steps) {
+        expect(
+          requiredStep['continue-on-error'],
+          requiredStep.name
+        ).toBeUndefined();
+      }
+    }
+  });
+
   it('requires Ovie coverage and an independent build in the selected web gate', () => {
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     const build = getJobBlock(CI_WORKFLOW, 'ci-build-ovie');
@@ -971,7 +1012,19 @@ describe('merge_group workflow contract', () => {
     );
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
-    expect(macos).toContain('runs-on: macos-26');
+    // Self-hosted jovie-mac when the heartbeat is fresh; hosted GA image
+    // otherwise (macos-26 pickup waited 8-68 min per merge group, 2026-10-10).
+    expect(macos).toContain(
+      `runs-on: \${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+    );
+    expect(macos).not.toContain('runs-on: macos-26');
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    expect(pathChanges).toContain(
+      "mac_runner_class: ${{ steps.mac-route.outputs.runner_class || 'hosted' }}"
+    );
+    expect(pathChanges).toContain(
+      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
+    );
     expect(macos).toContain(
       "format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number)"
     );
@@ -1785,6 +1838,151 @@ ${selectedGateScript}`,
     );
   });
 
+  it.each([
+    [
+      'admitted queue',
+      'merge_group',
+      'refs/heads/main',
+      'success',
+      'false',
+      'success',
+      'true',
+      true,
+    ],
+    [
+      'denied queue',
+      'merge_group',
+      'refs/heads/main',
+      'success',
+      'false',
+      'success',
+      'false',
+      false,
+    ],
+    [
+      'failed admission',
+      'merge_group',
+      'refs/heads/main',
+      'success',
+      'false',
+      'failure',
+      'true',
+      false,
+    ],
+    [
+      'skipped admission',
+      'merge_group',
+      'refs/heads/main',
+      'success',
+      'false',
+      'skipped',
+      '',
+      false,
+    ],
+    [
+      'main fallback',
+      'push',
+      'refs/heads/main',
+      'success',
+      'false',
+      'skipped',
+      '',
+      true,
+    ],
+    [
+      'queue-proven main',
+      'push',
+      'refs/heads/main',
+      'skipped',
+      '',
+      'skipped',
+      '',
+      false,
+    ],
+    [
+      'failed path intake',
+      'push',
+      'refs/heads/main',
+      'failure',
+      'false',
+      'skipped',
+      '',
+      false,
+    ],
+    [
+      'no-op queue',
+      'merge_group',
+      'refs/heads/main',
+      'success',
+      'true',
+      'success',
+      'true',
+      false,
+    ],
+    [
+      'feature push',
+      'push',
+      'refs/heads/feature',
+      'success',
+      'false',
+      'skipped',
+      '',
+      false,
+    ],
+    [
+      'manual dispatch',
+      'workflow_dispatch',
+      'refs/heads/main',
+      'success',
+      'false',
+      'skipped',
+      '',
+      false,
+    ],
+    [
+      'source PR',
+      'pull_request',
+      'refs/pull/1/merge',
+      'success',
+      'false',
+      'skipped',
+      '',
+      false,
+    ],
+  ])(
+    'selects the required product-lane receipt for %s',
+    (_name, event, ref, paths, noop, admission, admitted, expected) => {
+      const workflow = /** @type {{ jobs: Record<string, { if: string }> }} */ (
+        load(CI_WORKFLOW)
+      );
+      // This predicate uses only boolean operators and string equality, whose
+      // semantics match Actions here. Bracket notation preserves hyphenated IDs.
+      const predicate = workflow.jobs['ci-product-lane-receipt'].if.replace(
+        /needs\.([a-z0-9-]+)/g,
+        'needs["$1"]'
+      );
+      const selected = runInNewContext(
+        predicate,
+        {
+          always: () => true,
+          github: { event_name: event, ref },
+          needs: {
+            'ci-path-changes': {
+              result: paths,
+              outputs: { is_noop_merge_group: noop },
+            },
+            'ci-merge-group-admission': {
+              result: admission,
+              outputs: { admitted },
+            },
+          },
+        },
+        { timeout: 1000 }
+      );
+      expect(selected).toBe(expected);
+    }
+  );
+
   it('builds the exact product-lane receipt with a valid immutable run URL', () => {
     const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
     expect(receipt).toContain(
@@ -1821,9 +2019,32 @@ ${selectedGateScript}`,
         '--arg',
         'run',
         runUrl,
+        '--arg',
+        'risk_level',
+        'medium',
+        '--arg',
+        'rules',
+        'api-write',
+        '--argjson',
+        'requires_smoke',
+        'true',
+        '--argjson',
+        'requires_preview',
+        'false',
+        '--argjson',
+        'blocks_unattended',
+        'false',
         query,
       ],
-      { encoding: 'utf8' }
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_SHA: 'a'.repeat(40),
+          GITHUB_RUN_ID: '7',
+          GITHUB_RUN_ATTEMPT: '1',
+        },
+      }
     );
     expect(
       result.status,
@@ -1835,6 +2056,7 @@ ${selectedGateScript}`,
       lanes: {
         web: ['success', 'success', 'success'],
       },
+      riskReceipt: { risk_level: 'medium', requires_smoke: true },
     });
   });
 

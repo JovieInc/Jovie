@@ -31,7 +31,7 @@ const hoisted = vi.hoisted(() => {
   const insertOnConflictDoNothingMock = vi.fn((_config?: unknown) => ({
     returning: insertReturningMock,
   }));
-  const insertValuesMock = vi.fn(() => ({
+  const insertValuesMock = vi.fn((_value: unknown) => ({
     onConflictDoNothing: insertOnConflictDoNothingMock,
     returning: insertReturningMock,
   }));
@@ -243,6 +243,37 @@ describe('chat turn service', () => {
       expect.objectContaining({
         where: expect.anything(),
       })
+    );
+  });
+
+  it('stores the actual work subject as its title while preserving the complete user message', async () => {
+    const userMessage = `Help me with this work.\n${JSON.stringify({ workId: '808c9f4d-505c-4000-8000-000000000001', workTitle: 'Midnight Drive', artist: 'Artist', revision: null })}`;
+    hoisted.selectLimitMock.mockResolvedValueOnce([]);
+    hoisted.insertReturningMock
+      .mockResolvedValueOnce([{ id: 'conv-new' }])
+      .mockResolvedValueOnce([
+        { id: 'turn-new', conversationId: 'conv-new', status: 'reserved' },
+      ]);
+    const { reserveChatTurn } = await import('@/lib/chat/turns');
+    await reserveChatTurn({
+      conversationId: null,
+      clientTurnId: 'client-new',
+      clientMessageId: 'message-new',
+      source: 'quick_action',
+      toolIntent: null,
+      userMessage,
+      userId: 'user-1',
+      creatorProfileId: 'profile-1',
+    });
+    expect(hoisted.insertValuesMock.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        title: 'Midnight Drive',
+        userId: 'user-1',
+        creatorProfileId: 'profile-1',
+      })
+    );
+    expect(hoisted.insertValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({ content: userMessage, role: 'user' })
     );
   });
 

@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  classifyLockfileChange,
   classifyProductLanes,
   evaluateProductLaneResults,
   formatGitHubSummary,
+  macLockfileGraph,
   ProductLaneClassificationError,
   runProductLaneClassifier,
 } from '../product-lane-classifier.mjs';
@@ -134,6 +136,21 @@ describe('product lane classifier', () => {
     expect(() =>
       classifyProductLanes(['packages/copywriter/index.ts'])
     ).toThrow(ProductLaneClassificationError);
+  });
+
+  it('selects the web product lane for brand construction sources', () => {
+    const receipt = classifyProductLanes([
+      'packages/brand/font/construction.py',
+      'packages/brand/dist/geometry.json',
+      'packages/brand/svg/jovie-mark-ink.svg',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(
+      receipt.classifications.every(item => item.rule === 'web-product')
+    ).toBe(true);
+    expect(() => classifyProductLanes(['packages/branding/index.ts'])).toThrow(
+      ProductLaneClassificationError
+    );
   });
 
   it('selects the web contract lane for release communications extraction', () => {
@@ -289,6 +306,104 @@ describe('product lane classifier', () => {
       ['apps/web/package.json', 'pnpm-lock.yaml'],
     ])
       expect(classifyProductLanes(paths).selectedLanes).not.toContain('ios');
+  });
+
+  it('skips the Mac lane for lockfile changes that leave the desktop graph identical', () => {
+    // A pnpm-lock v9 excerpt: desktop links packages/ui, uses an alias, and
+    // shares `shared-dep` with web; web alone pulls `web-only`.
+    const lock = ({
+      shared = '1.0.0',
+      webOnly = '2.0.0',
+      uiDep = '3.0.0',
+      electron = '6.8.9',
+    }) =>
+      [
+        "lockfileVersion: '9.0'",
+        '',
+        'importers:',
+        '',
+        '  .:',
+        '    devDependencies:',
+        '      web-only:',
+        '        specifier: ^2.0.0',
+        `        version: ${webOnly}`,
+        '',
+        '  apps/desktop:',
+        '    dependencies:',
+        '      electron-updater:',
+        '        specifier: ^6.8.9',
+        `        version: ${electron}`,
+        '      string-width-cjs:',
+        '        specifier: npm:string-width@^4.2.0',
+        '        version: string-width@4.2.3',
+        "      '@jovie/ui':",
+        '        specifier: workspace:*',
+        '        version: link:../../packages/ui',
+        '',
+        '  packages/ui:',
+        '    dependencies:',
+        '      ui-dep:',
+        '        specifier: ^3.0.0',
+        `        version: ${uiDep}`,
+        '',
+        'packages:',
+        '',
+        `  electron-updater@${electron}:`,
+        `    resolution: {integrity: sha512-electron-${electron}}`,
+        '',
+        `  shared-dep@${shared}:`,
+        `    resolution: {integrity: sha512-shared-${shared}}`,
+        '',
+        'snapshots:',
+        '',
+        `  electron-updater@${electron}:`,
+        '    dependencies:',
+        `      shared-dep: ${shared}`,
+        '',
+        `  shared-dep@${shared}: {}`,
+        '',
+        '  string-width@4.2.3: {}',
+        '',
+        `  ui-dep@${uiDep}: {}`,
+        '',
+        `  web-only@${webOnly}:`,
+        '    dependencies:',
+        `      shared-dep: ${shared}`,
+        '',
+      ].join('\n');
+    const base = lock({});
+    expect(macLockfileGraph(base)).toContain('importer packages/ui');
+    expect(macLockfileGraph(base)).toContain('snapshot string-width@4.2.3');
+    expect(macLockfileGraph(base)).not.toContain('web-only');
+    const full = ['shared-js-lockfile', 'shared-contract', ['mac', 'web']];
+    expect(classifyLockfileChange(base, lock({ webOnly: '2.0.1' }))).toEqual([
+      'shared-js-lockfile-web-only',
+      'shared-contract',
+      ['web'],
+    ]);
+    for (const after of [
+      lock({ electron: '6.8.10' }), // direct desktop dependency
+      lock({ shared: '1.0.1' }), // transitive dependency reached from desktop
+      lock({ uiDep: '3.0.1' }), // dependency of a linked workspace package
+    ])
+      expect(classifyLockfileChange(base, after)).toEqual(full);
+    // Fails closed: missing sources, unparseable text, a dangling snapshot key.
+    expect(classifyLockfileChange(undefined, base)).toEqual(full);
+    expect(classifyLockfileChange(base, 'lockfileVersion: 9')).toEqual(full);
+    expect(
+      classifyLockfileChange(
+        base,
+        base.replace('  string-width@4.2.3: {}\n', '')
+      )
+    ).toEqual(full);
+
+    const webOnlyReceipt = classifyProductLanes(['pnpm-lock.yaml'], {
+      lockfileBefore: base,
+      lockfileAfter: lock({ webOnly: '2.0.1' }),
+    });
+    expect(webOnlyReceipt.selectedLanes).toEqual(['web', 'cross-product']);
+    expect(webOnlyReceipt.sharedContract.affectedProducts).toEqual(['web']);
+    expect(classifyProductLanes(['pnpm-lock.yaml']).selectedLanes).toEqual(JS);
   });
 
   it('loads package changes from git refs and fails closed on a missing ref', () => {

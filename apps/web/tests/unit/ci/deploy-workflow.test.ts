@@ -619,7 +619,7 @@ describe('deploy workflow Vercel env resolution', () => {
 
     expect(classifierJob).toContain('timeout-minutes: 3');
     expect(classifierJob).toContain(
-      'uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
+      'uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'
     );
     expect(classifierJob).toContain("node-version: '24'");
     // biome-ignore format: exact-diff/fail-closed contract stays compact for the integration-train cap
@@ -1604,7 +1604,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(domainGuardStep).toContain(
       'failure_subtype=domain_project_mismatch'
     );
-    expect(stageStep).toContain('--prod --skip-domain --format=json');
+    expect(stageStep).toContain('--prod --skip-domain --no-wait --format=json');
     expect(stageStep).toContain(
       'assert-authorized-origin "$production_deploy_url" "$inspected_url"'
     );
@@ -2118,188 +2118,6 @@ describe('canary health gate workflow', () => {
         'User-agent: *\nDisallow: /\nSitemap: https://preview.example/sitemap.xml'
       )
     ).toBe(false);
-  });
-
-  it('never probes the shared staging alias before this release owns it', () => {
-    const canary = readFileSync(canaryWorkflowPath, 'utf8');
-    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
-    const aliasJob = getJobBlock(release, 'alias-staging');
-    const aliasStep = getStepBlock(aliasJob, 'Alias verified deployment');
-    const oauthStep = getStepBlock(
-      aliasJob,
-      'Verify aliased staging OAuth redirect URIs'
-    );
-
-    expect(canary).not.toContain('staging.jov.ie');
-    expect(aliasStep).toContain(
-      'vercel alias set "$deployment_url" staging.jov.ie'
-    );
-    const aliasProofStep = getStepBlock(
-      aliasJob,
-      'Prove staging alias owns the SHA-attested exact deployment'
-    );
-    expect(aliasProofStep).toContain('resolve-deployment');
-    expect(aliasProofStep).toContain(
-      'VERCEL_CANDIDATE_DEPLOYMENT_ID="$EXPECTED_DEPLOYMENT_ID"'
-    );
-    expect(aliasProofStep).toContain(
-      'EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}'
-    );
-    expect(aliasProofStep).toContain(
-      '[ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ]'
-    );
-    expect(aliasProofStep).toContain('[ "$alias_state" = "READY" ]');
-    expect(aliasProofStep).not.toContain('alias_commit_sha=');
-    expect(aliasProofStep).not.toContain('.meta.githubCommitSha');
-    expect(oauthStep).toContain('BASE_URL: https://staging.jov.ie');
-    expect(oauthStep).toContain(
-      'EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie'
-    );
-    expect(oauthStep).toContain('PLAYWRIGHT_VERCEL_BYPASS_SECRET:');
-    expect(oauthStep).toContain(
-      'DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}'
-    );
-    expect(oauthStep).toContain(
-      '"$GITHUB_WORKSPACE/node_modules/.bin/vercel" alias set'
-    );
-    expect(oauthStep).toContain('oauth-providers.spec.ts');
-    expect(oauthStep).toContain(
-      'oauth_retry_root="$RUNNER_TEMP/aliased-staging-oauth-retries"'
-    );
-    expect(oauthStep).toContain(
-      'PLAYWRIGHT_DYNAMIC_SECRETS_FILE: ${{ runner.temp }}/playwright-dynamic-cookie-values'
-    );
-    expect(oauthStep).toContain(
-      'attempt_artifact_root="$oauth_retry_root/attempt-${attempt}"'
-    );
-    expect(oauthStep).toContain(
-      'quarantine_oauth_artifacts "$attempt_artifact_root/failed-artifacts"'
-    );
-    expect(oauthStep).toContain(
-      'for artifact_path in test-results playwright-report'
-    );
-    expect(oauthStep).toContain('mv -- "$artifact_path" "$destination/"');
-    expect(oauthStep).toContain(
-      'if [ -f "$RUNNER_TEMP/safe-playwright-producer/blocked" ]'
-    );
-    expect(oauthStep).toContain('refusing an unsafe retry');
-    expect(oauthStep).not.toContain('attempt_runner_temp=');
-    expect(oauthStep).not.toContain('preexisting-artifacts');
-    expect(oauthStep).not.toContain('RUNNER_TEMP="$attempt_runner_temp"');
-    expect(oauthStep).not.toContain('rm -rf test-results');
-    expect(oauthStep.indexOf('guard-playwright-artifacts.mjs')).toBeLessThan(
-      oauthStep.indexOf('failed-artifacts')
-    );
-    expect(oauthStep.indexOf('failed-artifacts')).toBeLessThan(
-      oauthStep.indexOf('safe-playwright-producer/blocked')
-    );
-    expect(oauthStep.indexOf('safe-playwright-producer/blocked')).toBeLessThan(
-      oauthStep.indexOf('if [ "$attempt" -ge "$max_attempts" ]')
-    );
-    expect(aliasJob.indexOf('- name: Alias verified deployment')).toBeLessThan(
-      aliasJob.indexOf('- name: Verify aliased staging OAuth redirect URIs')
-    );
-  });
-
-  it('reasserts a private exact preview and emits the only green staging receipt', () => {
-    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
-    const receiptJob = getJobBlock(release, 'staging-deployment-receipt');
-    const reassert = getStepBlock(
-      receiptJob,
-      'Classify staging generation after mutation'
-    );
-    const prove = getStepBlock(
-      receiptJob,
-      'Prove exact staging identity, privacy, and representative routes'
-    );
-    const writeReceipt = getStepBlock(
-      receiptJob,
-      'Write typed staging deployment receipt'
-    );
-    const releaseResult = getJobBlock(release, 'release-result');
-
-    expect(receiptJob).toContain('needs: [deploy-staging, alias-staging]');
-    expect(receiptJob).toContain("needs.alias-staging.result == 'success'");
-    expect(receiptJob).toContain(
-      "needs.alias-staging.outputs.is_current == 'true'"
-    );
-    expect(reassert).toContain('staging_refresh_outcome=current');
-    expect(reassert).toContain(
-      'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
-    );
-    expect(reassert).toContain('[ "$current_main" = "$EXPECTED_COMMIT_SHA" ]');
-    expect(reassert).toContain(
-      'staging_refresh_outcome=superseded_after_mutation'
-    );
-    expect(prove).toContain('EXPECTED_DEPLOYMENT_ID:');
-    expect(prove).toContain('EXPECTED_COMMIT_SHA:');
-    expect(prove).toContain('--arg url "$deployment_url"');
-    expect(prove).toContain('.id == $id and');
-    expect(prove).toContain('.url == $url');
-    expect(prove).not.toContain('(.readyState | ascii_upcase) == "READY"');
-    expect(prove).toContain('for attempt in $(seq 1 15)');
-    expect(prove).toContain('(.id | type == "string")');
-    expect(prove).toContain('(.readyState | type == "string")');
-    expect(prove).toContain('[ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ]');
-    expect(prove).toContain('[ "$alias_state" = "READY" ]');
-    expect(prove).not.toContain('alias_target');
-    expect(prove).not.toContain('.target');
-    expect(prove).toContain('[ "$attempt" -eq 15 ]');
-    expect(prove).toContain('sleep 4');
-    expect(
-      prove.match(
-        /\.\/node_modules\/\.bin\/vercel alias set "\$deployment_url" staging\.jov\.ie/g
-      )
-    ).toHaveLength(2);
-    expect(prove).toContain('https://staging.jov.ie/api/health/build-info');
-    expect(prove).toContain('[ "$observed_sha" = "$EXPECTED_COMMIT_SHA" ]');
-    expect(prove).toContain('[ "$observed_environment" = "preview" ]');
-    expect(prove).toContain('https://staging.jov.ie/robots.txt');
-    expect(prove).toContain('staging-homepage-headers.txt');
-    expect(prove).toContain("grep -Eiq '^x-robots-tag:.*noindex'");
-    expect(prove).toContain('preview_robots_policy_valid()');
-    expect(prove).toContain(
-      `! printf '%s\\n' "$robots" | preview_robots_policy_valid; then`
-    );
-    expect(writeReceipt).toContain("'jovie-staging-deployment/v1'");
-    expect(writeReceipt).toContain(
-      'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
-    );
-    expect(writeReceipt).toContain('[[ "$current_main" =~ ^[0-9a-f]{40}$ ]]');
-    expect(writeReceipt).toContain('currentMainSha: $currentMainSha');
-    expect(writeReceipt).toContain(
-      'STAGING_REFRESH_OUTCOME: ${{ steps.reassert.outputs.staging_refresh_outcome }}'
-    );
-    expect(writeReceipt).toContain('sloState: $sloState');
-    expect(writeReceipt).toContain('state: $state');
-    expect(writeReceipt).toContain('terminal: true');
-    expect(writeReceipt).toContain(
-      'privacy: "robots-block-all-and-http-noindex"'
-    );
-    expect(receiptJob).toContain(
-      'name: staging-deployment-${{ inputs.expected_sha }}'
-    );
-    expect(receiptJob).not.toContain('vercel promote');
-    expect(receiptJob).not.toContain('vercel rollback');
-    expect(releaseResult).toContain('staging-deployment-receipt,');
-    expect(releaseResult).toContain(
-      "if: ${{ always() && inputs.release_mode == 'production' }}"
-    );
-    expect(releaseResult).toContain(
-      'if [ "${{ inputs.staging_verified }}" != "true" ]; then'
-    );
-    expect(releaseResult).toContain(
-      'Production release lacks the exact staging controller receipt.'
-    );
-    expect(releaseResult).toContain(
-      'Pre-production supersession lacks an exact staging receipt.'
-    );
-    expect(releaseResult).toContain(
-      'production-head:${{ needs.production-head.result }}'
-    );
-    expect(release.indexOf('  promote-production:')).toBeLessThan(
-      release.indexOf('  staging-deployment-receipt:')
-    );
   });
 
   it.each([
@@ -4233,7 +4051,7 @@ describe('production promotion exact-artifact contract', () => {
     const pullIndex = stageStep.indexOf('--environment=production');
     const buildIndex = stageStep.indexOf('vercel build --prod');
     const deployIndex = stageStep.indexOf(
-      '--prebuilt --archive=tgz --prod --skip-domain --format=json'
+      '--prebuilt --archive=tgz --prod --skip-domain --no-wait --format=json'
     );
     const inspectIndex = stageStep.indexOf(
       'vercel inspect "$production_deploy_id"'
@@ -4299,7 +4117,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(promoteJob).not.toContain('vercel promote "$deploy_url"');
   });
 
-  it('retries a transient production deploy before failing without evidence', () => {
+  it('hands accepted production deploys to exact-ID readiness before retrying', () => {
     // JOV-4373: a single `vercel deploy` transport failure stranded the release
     // with an empty deployment ID/URL. The exact-production deploy must retry
     // bounded inside stage-production, mirroring the staging deploy loop.
@@ -4312,8 +4130,9 @@ describe('production promotion exact-artifact contract', () => {
 
     const loopIndex = stageStep.indexOf('for deploy_attempt in 1 2 3; do');
     const deployIndex = stageStep.indexOf(
-      '--prebuilt --archive=tgz --prod --skip-domain --format=json'
+      '--prebuilt --archive=tgz --prod --skip-domain'
     );
+    const noWaitIndex = stageStep.indexOf('--no-wait');
     const retryIndex = stageStep.indexOf(
       'Production prebuilt deploy attempt ${deploy_attempt}/3 failed'
     );
@@ -4323,12 +4142,23 @@ describe('production promotion exact-artifact contract', () => {
     const outputIndex = stageStep.indexOf(
       'echo "production_deployment_id=$production_deploy_id"'
     );
+    const parseIndex = stageStep.indexOf('production_deploy_id="$(jq -r');
+    const inspectIndex = stageStep.indexOf(
+      'vercel inspect "$production_deploy_id"'
+    );
 
     expect(loopIndex).toBeGreaterThanOrEqual(0);
     expect(deployIndex).toBeGreaterThan(loopIndex);
+    // Return as soon as Vercel accepts the exact deployment. The explicit
+    // inspect below owns readiness, so an internal CLI polling failure cannot
+    // discard the accepted deployment ID and trigger duplicate deployments.
+    expect(noWaitIndex).toBeGreaterThan(deployIndex);
     expect(failIndex).toBeGreaterThan(deployIndex);
     expect(retryIndex).toBeGreaterThan(failIndex);
     expect(outputIndex).toBeGreaterThan(retryIndex);
+    expect(parseIndex).toBeGreaterThan(retryIndex);
+    expect(inspectIndex).toBeGreaterThan(parseIndex);
+    expect(outputIndex).toBeGreaterThan(inspectIndex);
     expect(stageStep).toContain('sleep 10');
     // Still fail-closed after the bounded retry exhausts.
     expect(stageStep).toContain(

@@ -421,7 +421,7 @@ def _validate_hold_intake_projection(projected: dict[str, Any]) -> None:
         or signals["main"]["status"] != "green"
         or signals["production"]["status"] != "green"
         or signals["integrity"]["status"] not in {"clear", "resolved"}
-        or signals.get("controller", {}).get("status") not in {"green", "failed"}
+        or signals.get("controller", {}).get("status") not in {"green", "failed", "parked"}
         or projected["promotionAdmission"]["allowed"]
         or projected["isolatedPromotionAdmission"]["allowed"]
     ):

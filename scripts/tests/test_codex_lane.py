@@ -12,6 +12,8 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import ANY, patch
+from types import SimpleNamespace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +36,11 @@ def rate_snapshot(now=1_000_000, credits=None, secondary=True) -> dict:
     return {"account": {"account": {"type": "chatgpt", "planType": "pro"}},
             "rateLimits": {"rateLimits": limits, "rateLimitResetCredits": credits},
             "messages": {"messages": []}}
+
+
+def current_snapshot(now=1_000_000):
+    return {**rate_snapshot(now), "models": {"data": [{"id": "gpt-6.1-sol", "hidden": False}],
+                                             "nextCursor": None}}
 
 
 class Isolated(unittest.TestCase):
@@ -81,6 +88,374 @@ class AccountsTest(Isolated):
         second.close()
         again, handle = codex.pick({}, 1.0)
         self.assertIsNotNone(again)
+        handle.close()
+
+
+class CurrentLoginTest(Isolated):
+    def setUp(self):
+        super().setUp()
+        self.root = Path(self.tmp.name)
+        self.cli = self.root / "codex"
+        self.env = patch.dict(os.environ, {
+            "CODEX_LANE_AUTH_MODE": "current-login", "CODEX_LANE_CLI": str(self.cli),
+            "CODEX_HOME": str(self.root / "existing-login"), "OPENAI_API_KEY": "must-not-reach-child",
+            "OPENAI_BASE_URL": "https://unavailable.invalid", "CODEX_API_KEY": "must-not-reach-child",
+        })
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def fake_cli(self, output="OK", code=0, auth="Logged in using ChatGPT", auth_code=0):
+        self.cli.write_text(
+            f"#!{sys.executable}\nimport json,os,sys\nfrom pathlib import Path\n"
+            f"root=Path({str(self.root)!r})\n"
+            f"if sys.argv[1:]==['login','status']:\n print({auth!r}); sys.exit({auth_code})\n"
+            "if '--approve-for-me' in sys.argv:\n print(\"error: unexpected argument '--approve-for-me' found\"); sys.exit(2)\n"
+            "assert not any(k in os.environ for k in ['OPENAI_API_KEY','OPENAI_BASE_URL','CODEX_API_KEY'])\n"
+            "assert os.environ['CODEX_HOME'].endswith('existing-login')\n"
+            "(root/'launch.json').write_text(json.dumps(sys.argv))\n"
+            f"sys.stdin.read(); print({output!r}); sys.exit({code})\n")
+        self.cli.chmod(0o700)
+
+    def invoke(self):
+        prompt = self.root / "prompt.txt"
+        prompt.write_text("Implement the assigned issue")
+        return codex.run(SimpleNamespace(prompt_file=str(prompt), receipt_file=str(self.root / "receipt.jsonl"),
+                                        cwd=str(self.root), model=None, reasoning_effort="high"))
+
+    def test_existing_cli_login_without_opening_credentials_or_scanning_profiles(self):
+        self.fake_cli()
+        with patch.object(Path, "glob", side_effect=AssertionError("profile discovery")):
+            self.assertEqual(codex.accounts(), ["current-login"])
+        self.assertEqual(self.invoke(), 0)
+        argv = json.loads((self.root / "launch.json").read_text())
+        self.assertIn('forced_login_method="chatgpt"', argv)
+        self.assertIn('model_provider="openai"', argv)
+        self.assertEqual(argv[argv.index('--sandbox') + 1], 'workspace-write')
+        self.assertIn('approval_policy="on-request"', argv)
+        self.assertIn('approvals_reviewer="auto_review"', argv)
+        self.assertNotIn("--approve-for-me", argv)
+        self.assertNotIn('approval_policy="never"', argv)
+        self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", argv)
+        self.assertEqual([json.loads(row)["account"] for row in (self.root / "receipt.jsonl").read_text().splitlines()],
+                         ["current-login", "current-login"])
+
+    def test_missing_broken_api_or_unknown_login_never_launches_inference(self):
+        for auth, code in [("Logged in using an API key", 0), ("unknown", 0), ("Logged in using ChatGPT", 1)]:
+            with self.subTest(auth=auth, code=code):
+                self.fake_cli(auth=auth, auth_code=code)
+                self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+                self.assertFalse((self.root / "launch.json").exists())
+        self.cli.unlink()
+        self.assertEqual(codex.accounts(), [])
+
+    def test_auth_probe_timeout_fails_closed(self):
+        with patch.object(codex.subprocess, "run", side_effect=codex.subprocess.TimeoutExpired("codex", 10)):
+            self.assertEqual(codex.accounts(), [])
+
+    def test_one_exclusive_lease_and_no_duplicate_launch(self):
+        self.fake_cli()
+        name, handle = codex.pick({}, time.time())
+        self.assertEqual(name, "current-login")
+        try:
+            self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+            self.assertFalse((self.root / "launch.json").exists())
+        finally:
+            handle.close()
+        self.assertEqual(self.invoke(), 0)
+
+    def test_limit_banks_single_login_without_rotation_or_credit_redemption(self):
+        self.fake_cli("You've hit your usage limit. Try again in 2 hours.", 1)
+        with patch.object(codex, "maybe_redeem", side_effect=AssertionError("credit redemption")), \
+                patch.object(codex.time, "sleep", side_effect=AssertionError("rotation")):
+            self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+        state = codex.read_state()
+        self.assertEqual(list(state), ["current-login"])
+        self.assertEqual(state["current-login"]["lastKind"], "limit")
+        self.assertEqual(state["current-login"]["runs"], 1)
+        self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+        self.assertEqual(codex.read_state()["current-login"]["runs"], 1)
+        name, handle = codex.pick(state, state["current-login"]["exhaustedUntil"] + 1)
+        self.assertEqual(name, "current-login")
+        handle.close()
+
+    def test_rate_and_auth_failures_release_lease_and_bank_without_retry(self):
+        for output, kind in [("error: 429 Too Many Requests", "rate"), ("error: login required", "auth")]:
+            with self.subTest(kind=kind):
+                codex.write_state({})
+                self.fake_cli(output, 1)
+                self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+                self.assertEqual(codex.read_state()["current-login"]["lastKind"], kind)
+                handle = codex.lease("current-login")
+                self.assertIsNotNone(handle)
+                handle.close()
+
+    def test_reconciliation_uses_only_public_current_login_metadata(self):
+        replies = [current_snapshot()[key] for key in ("account", "rateLimits", "models")]
+        with patch.object(codex, "app_server_calls", return_value=replies) as calls, \
+                patch.object(codex, "accounts", side_effect=AssertionError("profile enumeration")), \
+                patch.object(codex, "maybe_redeem", side_effect=AssertionError("credit redemption")):
+            self.assertTrue(codex.reconcile(1_000_000, 0)["reconciled"])
+        calls.assert_called_once_with('current-login', [
+            ('account/read', {'refreshToken': False}), ('account/rateLimits/read', None),
+            ('model/list', {'limit': 100, 'includeHidden': False})], lease_handle=ANY)
+        value = codex.read_state()['current-login']['capacityLease']
+        self.assertEqual(value['usableCapacityRemaining']['primary']['remainingPercent'], 50)
+        self.assertEqual(value['compatibility']['models'], ['gpt-6.1-sol'])
+        self.assertEqual(value['sources']['announcements']['reconciliation'], 'not-requested')
+
+    def test_metadata_transport_forces_subscription_and_rejects_private_methods(self):
+        trace = self.root / 'metadata.json'
+        self.cli.write_text(f'''#!{sys.executable}
+import json, os, sys
+from pathlib import Path
+seen = []
+replies = {current_snapshot()!r}
+for line in sys.stdin:
+    request = json.loads(line)
+    if 'id' not in request:
+        continue
+    seen.append(request)
+    method = request['method']
+    value = {{'account/read': replies['account'], 'account/rateLimits/read': replies['rateLimits'],
+             'model/list': replies['models']}}.get(method, {{}})
+    Path({str(trace)!r}).write_text(json.dumps({{'requests': seen, 'argv': sys.argv[1:],
+        'home': os.environ['CODEX_HOME'], 'apiEnvPresent': any(k in os.environ for k in
+        ['OPENAI_API_KEY', 'CODEX_API_KEY', 'OPENAI_BASE_URL', 'AZURE_OPENAI_API_KEY'])}}))
+    print(json.dumps({{'id': request['id'], 'result': value}}), flush=True)
+''')
+        self.cli.chmod(0o755)
+        self.assertTrue(codex.reconcile(1_000_000, 0)['reconciled'])
+        captured = json.loads(trace.read_text())
+        self.assertEqual(captured['home'], str(self.root / 'existing-login'))
+        self.assertFalse(captured['apiEnvPresent'])
+        self.assertIn('forced_login_method="chatgpt"', captured['argv'])
+        self.assertEqual(captured['requests'][0]['params']['capabilities'], {'experimentalApi': False})
+        self.assertEqual([r['method'] for r in captured['requests']],
+                         ['initialize', 'account/read', 'account/rateLimits/read', 'model/list'])
+        for name, calls in [('current-login', [('account/workspaceMessages/read', None)]),
+                            ('alpha', codex.CURRENT_METADATA_CALLS),
+                            ('current-login', [('account/rateLimitResetCredits/redeem', {'id': 'x'})])]:
+            with self.subTest(name=name, calls=calls), \
+                    patch.object(codex.subprocess, 'Popen', side_effect=AssertionError('private launch')):
+                with self.assertRaises(ValueError):
+                    codex.app_server_calls(name, calls)
+
+    def test_observer_preserves_all_auth_quota_and_execution_banks(self):
+        before = {'exhaustedUntil': 1_100_000, 'lastKind': 'auth', 'runs': 12, 'lastUsed': 999_999,
+                  'pendingReset': {'before': 'protected'}, 'lifecycle': {'source': 'existing'}}
+        codex.write_state({'current-login': before, 'other-existing-row': {'exhaustedUntil': 2_000_000}})
+        codex.reconcile(1_000_000, 0, lambda _: current_snapshot())
+        after = codex.read_state()
+        self.assertEqual({k: after['current-login'][k] for k in before}, before)
+        self.assertEqual(after['other-existing-row'], {'exhaustedUntil': 2_000_000})
+        self.assertFalse(codex.available('current-login', after, 1_000_000))
+        self.assertEqual(len((codex.STATE.parent / 'capacity-events.jsonl').read_text().splitlines()), 1)
+
+    def test_active_execution_lease_prevents_any_metadata_call(self):
+        handle = codex.lease('current-login')
+        try:
+            with patch.object(codex, 'current_subscription_snapshot', side_effect=AssertionError('active execution')):
+                self.assertEqual(codex.reconcile(1_000_000, 0),
+                                 {'reconciled': False, 'reason': 'account-lease-busy'})
+            self.assertEqual(codex.read_state(), {})
+        finally:
+            handle.close()
+
+    def test_unknown_metadata_is_bounded_by_cadence_and_never_certifies_capacity(self):
+        for snapshot in [None, {}, {**current_snapshot(), 'account': {'account': {'type': 'apiKey'}}},
+                         {**current_snapshot(), 'rateLimits': {}},
+                         {**current_snapshot(), 'models': {'data': [], 'nextCursor': 'more'}}]:
+            with self.subTest(snapshot=snapshot):
+                codex.write_state({'current-login': {'exhaustedUntil': 1_100_000, 'lastKind': 'limit'}})
+                with patch.object(codex, 'current_subscription_snapshot', return_value=snapshot) as fetch:
+                    self.assertFalse(codex.reconcile(1_000_000)['reconciled'])
+                    self.assertEqual(codex.reconcile(1_000_001), {'reconciled': False, 'reason': 'cadence'})
+                    fetch.assert_called_once()
+                self.assertNotIn('capacityLease', codex.read_state()['current-login'])
+                self.assertEqual(codex.read_state()['current-login']['exhaustedUntil'], 1_100_000)
+                handle = codex.lease('current-login')
+                self.assertIsNotNone(handle)
+                handle.close()
+
+    def test_invalid_or_expired_capacity_and_ambiguous_models_stay_unknown(self):
+        for field, value in [('usedPercent', True), ('usedPercent', float('nan')),
+                             ('usedPercent', -1), ('usedPercent', 101), ('resetsAt', 999_999)]:
+            snapshot = current_snapshot()
+            snapshot['rateLimits']['rateLimits']['primary'][field] = value
+            with self.subTest(field=field, value=value):
+                self.assertFalse(codex.reconcile(1_000_000, 0, lambda _: snapshot)['reconciled'])
+        snapshot = current_snapshot()
+        snapshot['models']['data'] = [None]
+        self.assertFalse(codex.reconcile(1_000_000, 0, lambda _: snapshot)['reconciled'])
+
+    def test_storage_failure_before_attempt_prevents_provider_access(self):
+        with patch.object(codex, 'update_state', side_effect=OSError('disk full')), \
+                patch.object(codex, 'current_subscription_snapshot') as fetch:
+            self.assertFalse(codex.reconcile(1_000_000)['reconciled'])
+            fetch.assert_not_called()
+        handle = codex.lease('current-login')
+        self.assertIsNotNone(handle)
+        handle.close()
+
+    def test_corrupt_existing_banking_state_is_preserved_without_metadata_access(self):
+        for raw in ('{"current-login":{"exhaustedUntil":', '[]',
+                    '{"current-login":null}', '{"_ledger":[]}'):
+            with self.subTest(raw=raw):
+                codex.STATE.parent.mkdir(parents=True, exist_ok=True)
+                codex.STATE.write_text(raw)
+                with patch.object(codex, 'current_subscription_snapshot') as fetch:
+                    self.assertEqual(codex.reconcile(1_000_000),
+                                     {'reconciled': False, 'reason': 'banking-state-unreadable'})
+                    fetch.assert_not_called()
+                self.assertEqual(codex.STATE.read_text(), raw)
+
+    def test_unreadable_banking_state_does_not_bootstrap_empty_state(self):
+        read = Path.read_text
+        def deny(path, *args, **kwargs):
+            if path == codex.STATE:
+                raise PermissionError('denied')
+            return read(path, *args, **kwargs)
+        with patch.object(Path, 'read_text', deny), \
+                patch.object(codex, 'current_subscription_snapshot') as fetch:
+            self.assertEqual(codex.reconcile(1_000_000),
+                             {'reconciled': False, 'reason': 'banking-state-unreadable'})
+            fetch.assert_not_called()
+        self.assertFalse(codex.STATE.exists())
+
+    def test_concurrent_corruption_under_state_lock_prevents_prestamp_and_request(self):
+        original = codex.update_state
+        def corrupt_then_update(change):
+            codex.STATE.parent.mkdir(parents=True, exist_ok=True)
+            codex.STATE.write_text('{"current-login":')
+            return original(change)
+        with patch.object(codex, 'update_state', side_effect=corrupt_then_update), \
+                patch.object(codex, 'current_subscription_snapshot') as fetch:
+            self.assertFalse(codex.reconcile(1_000_000)['reconciled'])
+            fetch.assert_not_called()
+        self.assertEqual(codex.STATE.read_text(), '{"current-login":')
+
+    def test_real_metadata_child_retains_lease_until_delayed_reap(self):
+        # The child needs no model calls: EOF ends the fake public protocol.
+        self.cli.write_text(f'''#!{sys.executable}
+import json, sys
+for line in sys.stdin:
+    request = json.loads(line)
+    if 'id' in request:
+        print(json.dumps({{'id': request['id'], 'result': {{}}}}), flush=True)
+''')
+        self.cli.chmod(0o755)
+        original = codex.subprocess.Popen
+        waits = []
+        def tracked(*args, **kwargs):
+            proc = original(*args, **kwargs)
+            wait, kill = proc.wait, proc.kill
+            proc.terminate = lambda: None
+            def delay_wait(*args, **kwargs):
+                self.assertIsNone(codex.lease('current-login'))
+                waits.append(proc.pid)
+                if len(waits) < 3:
+                    raise codex.subprocess.TimeoutExpired('metadata', 2)
+                return wait(*args, **kwargs)
+            proc.wait = delay_wait
+            proc.kill = lambda: kill() if len(waits) >= 2 else None
+            return proc
+        handle = codex.lease('current-login')
+        try:
+            with patch.object(codex.subprocess, 'Popen', side_effect=tracked):
+                codex.current_subscription_snapshot('current-login', lease_handle=handle)
+            self.assertEqual(len(waits), 3)
+            self.assertIsNone(codex.lease('current-login'))
+        finally:
+            handle.close()
+        again = codex.lease('current-login')
+        self.assertIsNotNone(again)
+        again.close()
+
+    def test_interruption_during_cleanup_reaps_before_propagating(self):
+        proc = SimpleNamespace(poll=lambda: None, terminate=lambda: None, kill=lambda: None)
+        proc.wait = unittest.mock.Mock(side_effect=[KeyboardInterrupt(), 0])
+        with self.assertRaises(KeyboardInterrupt):
+            codex.reap_current_metadata(proc)
+        self.assertEqual(proc.wait.call_count, 2)
+
+    @unittest.skipUnless(os.name == 'posix', 'flock descriptor inheritance is POSIX')
+    def test_parent_death_does_not_release_live_metadata_child_account_lease(self):
+        import signal
+        ready = self.root / 'metadata-child.pid'
+        self.cli.write_text(f'''#!{sys.executable}
+import os, time
+from pathlib import Path
+Path({str(ready)!r}).write_text(str(os.getpid()))
+time.sleep(30)
+''')
+        self.cli.chmod(0o755)
+        code = f'''import importlib.util
+from pathlib import Path
+s=importlib.util.spec_from_file_location('child_observer', {str(ROOT / 'scripts/lanes/codex_lane.py')!r})
+m=importlib.util.module_from_spec(s); s.loader.exec_module(m)
+m.STATE=Path({str(codex.STATE)!r})
+m.reconcile(1_000_000, 0)
+'''
+        parent = codex.subprocess.Popen([sys.executable, '-c', code],
+                                        stdout=codex.subprocess.DEVNULL, stderr=codex.subprocess.DEVNULL)
+        child = None
+        try:
+            deadline = time.monotonic() + 5
+            while not ready.exists() and time.monotonic() < deadline:
+                time.sleep(.01)
+            self.assertTrue(ready.exists(), 'metadata process did not start')
+            child = int(ready.read_text())
+            parent.kill()
+            parent.wait(timeout=2)
+            self.assertIsNone(codex.lease('current-login'), 'live child lost inherited account lease')
+        finally:
+            if parent.poll() is None:
+                parent.kill()
+                parent.wait(timeout=2)
+            if child is not None:
+                try:
+                    os.kill(child, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        deadline = time.monotonic() + 5
+        handle = None
+        while handle is None and time.monotonic() < deadline:
+            handle = codex.lease('current-login')
+            if handle is None:
+                time.sleep(.01)
+        self.assertIsNotNone(handle, 'drained metadata process kept account lease')
+        handle.close()
+
+    def test_concurrent_corruption_before_final_merge_is_preserved(self):
+        def corrupt_after_metadata(_):
+            codex.STATE.write_text('{"current-login":')
+            return current_snapshot()
+        self.assertFalse(codex.reconcile(1_000_000, 0, corrupt_after_metadata)['reconciled'])
+        self.assertEqual(codex.STATE.read_text(), '{"current-login":')
+
+    def test_failed_observation_write_keeps_attempt_cadence(self):
+        update = codex.update_state
+        calls = []
+        def fail_after_stamp(mutate):
+            calls.append(mutate)
+            if len(calls) > 1:
+                raise OSError('disk full')
+            return update(mutate)
+        with patch.object(codex, 'update_state', side_effect=fail_after_stamp), \
+                patch.object(codex, 'current_subscription_snapshot', return_value=current_snapshot()) as fetch:
+            self.assertFalse(codex.reconcile(1_000_000)['reconciled'])
+            self.assertEqual(codex.reconcile(1_000_001), {'reconciled': False, 'reason': 'cadence'})
+            fetch.assert_called_once()
+        self.assertNotIn('current-login', codex.read_state())
+
+    def test_interrupted_provider_read_keeps_durable_cadence_and_releases_lease(self):
+        with patch.object(codex, 'current_subscription_snapshot', side_effect=KeyboardInterrupt) as fetch:
+            with self.assertRaises(KeyboardInterrupt):
+                codex.reconcile(1_000_000)
+            self.assertEqual(codex.reconcile(1_000_001), {'reconciled': False, 'reason': 'cadence'})
+            fetch.assert_called_once()
+        handle = codex.lease('current-login')
+        self.assertIsNotNone(handle)
         handle.close()
 
 
@@ -288,7 +663,8 @@ class RunTest(Isolated):
                 receipt = Path(cwd) / "provider.jsonl"
                 code = codex.main(["run", "--prompt-file", prompt.name, "--receipt-file", str(receipt),
                                    "--cwd", cwd])
-                self.lease_events = [json.loads(line) for line in receipt.read_text().splitlines()]
+                self.lease_events = [row for line in receipt.read_text().splitlines()
+                                     if (row := json.loads(line)).get("event") == "account-leased"]
                 return code
         finally:
             os.environ["PATH"] = saved
@@ -314,6 +690,165 @@ class RunTest(Isolated):
         self.assertTrue(all(row["schema"] == "jovie-provider-lease/v1" and
                             row["accountClass"] == "chatgpt-oauth" and
                             row["event"] == "account-leased" for row in self.lease_events))
+
+
+class LaunchIdentityTest(Isolated):
+    """Exercise the real pipe/receipt boundary with a model-free CLI stand-in."""
+    SESSION = "01a10a2c-4cd3-7150-b5dd-575434d84155"
+    OTHER_SESSION = "01a10a2d-ef53-7272-867c-8997a1de59ab"
+
+    def header(self, *, model="gpt-5.6-sol", session=None, cwd=None, version="0.147.0"):
+        return (f"OpenAI Codex v{version}\n--------\n"
+                f"workdir: {cwd or self.tmp.name}\nmodel: {model}\nprovider: openai\n"
+                "approval: never\nsandbox: workspace-write\n"
+                "reasoning effort: xhigh\nreasoning summaries: none\n"
+                f"session id: {session or self.SESSION}\n--------\nuser\n")
+
+    def invoke(self, output, *, account="alpha", code=0, receipt=None, require_launch=True):
+        import contextlib
+        import io
+        from unittest.mock import patch
+        root = Path(self.tmp.name)
+        script = root / "fake_cli.py"
+        script.write_text("import sys\nsys.stdin.read()\nsys.stdout.write(" + repr(output) +
+                          ")\nsys.stdout.flush()\nsys.exit(" + str(code) + ")\n")
+        receipt = receipt or root / "attempt.provider.jsonl"
+        previous = [json.loads(line) for line in receipt.read_text().splitlines()] if receipt.exists() else []
+        prior_launches = sum(row.get("event") == "cli-launch" for row in previous)
+        cmd = [sys.executable, "-u", str(script), "-m", "configured-alias", "-c",
+               'model_reasoning_effort="high"']
+        handle = codex.lease(account)
+        with contextlib.redirect_stdout(io.StringIO()), patch.object(codex, "maybe_redeem", return_value=False):
+            result = codex.run_account(account, handle, cmd, "private prompt", self.tmp.name,
+                                       time.time(), str(receipt))
+        rows = [json.loads(line) for line in receipt.read_text().splitlines()]
+        launches = [row for row in rows if row.get("event") == "cli-launch"]
+        if require_launch:
+            self.assertEqual(len(launches), prior_launches + 1,
+                             "every spawned CLI must leave a new launch identity or explicit unknown")
+        return launches[-1] if launches else None, result
+
+    def test_requested_and_cli_reported_identity_are_separate(self):
+        row, result = self.invoke(self.header() + "private prompt\ncodex\nDone\n")
+        self.assertEqual(result, (0, "ok", None))
+        self.assertEqual(row["identityState"], "reported")
+        self.assertEqual(row["requested"], {"model": "configured-alias", "provider": None,
+                                           "reasoningEffort": "high"})
+        self.assertEqual(row["cliReported"], {"model": "gpt-5.6-sol", "provider": "openai",
+                                             "reasoningEffort": "xhigh", "sessionId": self.SESSION})
+        self.assertEqual(row["provenance"], "codex-cli-startup-header")
+        self.assertEqual(row["reasoningEffortSource"], "cli-resolved-configuration")
+        self.assertFalse(row["providerAttested"])
+        self.assertGreater(row["pid"], 0)
+        self.assertEqual(len(row["adapterSha256"]), 64)
+        self.assertEqual(row["worktree"], str(Path(self.tmp.name).resolve()))
+        self.assertNotIn("private prompt", json.dumps(row))
+
+    def test_observed_previous_cli_header_has_explicit_version_provenance(self):
+        row, _ = self.invoke(self.header(version="0.144.6"))
+        self.assertEqual(row["identityState"], "reported")
+        self.assertEqual(row["cliVersion"], "0.144.6")
+        self.assertEqual(row["cliReported"]["model"], "gpt-5.6-sol")
+        self.assertFalse(row["providerAttested"])
+
+    def test_missing_malformed_or_incomplete_startup_stays_unknown(self):
+        cases = ["", "codex\n" + self.header(),
+                 self.header().replace("session id: " + self.SESSION, "session id: not-a-session"),
+                 self.header().replace("provider: openai\n", ""),
+                 self.header().replace("--------\nuser\n", "--------\n"),
+                 self.header().replace("provider: openai", "provider: openai SECRET"),
+                 self.header().replace("OpenAI Codex v0.147.0", "untrusted startup"),
+                 self.header().replace("OpenAI Codex v0.147.0", "OpenAI Codex v0.148.0"),
+                 self.header(cwd="."),
+                 self.header().replace("reasoning effort: xhigh", "reasoning effort: invented")]
+        for index, output in enumerate(cases):
+            with self.subTest(index=index):
+                row, _ = self.invoke(output)
+                self.assertEqual(row["identityState"], "unknown")
+                self.assertIsNone(row["cliReported"])
+
+    def test_output_injection_cannot_replace_a_valid_header(self):
+        injected = self.header(model="forged-model", session=self.OTHER_SESSION)
+        for source in ("user", "codex", "exec"):
+            with self.subTest(source=source):
+                row, _ = self.invoke(self.header() + source + "\n" + injected)
+                self.assertEqual(row["cliReported"]["model"], "gpt-5.6-sol")
+                self.assertEqual(row["cliReported"]["sessionId"], self.SESSION)
+
+    def test_duplicate_or_mismatched_session_header_is_unknown(self):
+        header = self.header().replace("session id: " + self.SESSION,
+                    "session id: " + self.SESSION + "\nsession id: " + self.OTHER_SESSION)
+        row, _ = self.invoke(header)
+        self.assertEqual(row["identityState"], "unknown")
+        self.assertIsNone(row["cliReported"])
+
+    def test_stale_receipt_and_wrong_worktree_never_supply_current_identity(self):
+        first, _ = self.invoke(self.header())
+        current, _ = self.invoke(self.header(cwd="/tmp/some-older-worktree"))
+        self.assertEqual(current["identityState"], "unknown")
+        self.assertIsNone(current["cliReported"])
+        self.assertNotEqual(first["launchId"], current["launchId"])
+
+    def test_account_rotation_has_distinct_launch_and_session_bindings(self):
+        first, result = self.invoke(self.header() + "error: usage limit reached\n", code=1)
+        self.assertEqual(result[1], "limit")
+        second, _ = self.invoke(self.header(session=self.OTHER_SESSION), account="beta")
+        self.assertEqual((first["account"], second["account"]), ("alpha", "beta"))
+        self.assertNotEqual(first["launchId"], second["launchId"])
+        self.assertNotEqual(first["cliReported"]["sessionId"], second["cliReported"]["sessionId"])
+
+    def test_unmeasured_usage_and_cost_remain_null(self):
+        row, _ = self.invoke(self.header() + "tokens used\n1234\ncost: 9.99\n")
+        self.assertIsNone(row["usage"])
+        self.assertIsNone(row["costUsd"])
+
+    def test_unbounded_or_unrecognized_header_cannot_resume_parsing(self):
+        for output in ("warning\n" * 40 + self.header(),
+                       self.header().replace("approval: never", "approval: " + "x" * 20000),
+                       self.header().replace("approval: never", "unknown field: ignored")):
+            with self.subTest(size=len(output)):
+                row, _ = self.invoke(output)
+                self.assertEqual(row["identityState"], "unknown")
+                self.assertIsNone(row["cliReported"])
+
+
+    def test_identity_write_failure_does_not_change_child_outcome_or_lease(self):
+        import builtins
+        import contextlib
+        import io
+        from unittest.mock import patch
+        receipt = Path(self.tmp.name) / "failed-telemetry.provider.jsonl"
+        writes = 0
+
+        def failing_append(path, mode="r", *args, **kwargs):
+            nonlocal writes
+            if Path(path) == receipt and mode == "a":
+                writes += 1
+                if writes > 1:
+                    raise OSError("private failure detail")
+            return builtins.open(path, mode, *args, **kwargs)
+
+        errors = io.StringIO()
+        with patch.object(codex, "open", side_effect=failing_append, create=True), contextlib.redirect_stderr(errors):
+            row, result = self.invoke(self.header(), receipt=receipt, require_launch=False)
+        self.assertIsNone(row)
+        self.assertEqual(result, (0, "ok", None))
+        self.assertEqual(codex.read_state()["alpha"]["lastKind"], "ok")
+        self.assertEqual([json.loads(line)["event"] for line in receipt.read_text().splitlines()], ["account-leased"])
+        self.assertIn("launch evidence unavailable (OSError)", errors.getvalue())
+        self.assertNotIn("private failure detail", errors.getvalue())
+
+    def test_launch_identity_does_not_inflate_account_lease_metrics(self):
+        # Import the existing consumer without touching its separately owned test file.
+        spec = importlib.util.spec_from_file_location("lane_runner", ROOT / "scripts/lanes/lane_runner.py")
+        lane = importlib.util.module_from_spec(spec)
+        sys.modules["lane_runner"] = lane
+        spec.loader.exec_module(lane)
+        events = [{"provider": "codex", "event": event}
+                  for event in ("account-leased", "cli-launch", "future-event", None)]
+        rows = [{"provider": "codex", "providerEvidence": events}]
+        report = lane.provider_throughput(rows, ["codex"])
+        self.assertEqual(report["providers"]["codex"]["accountLeases"], 1)
 
 
 if __name__ == "__main__":
