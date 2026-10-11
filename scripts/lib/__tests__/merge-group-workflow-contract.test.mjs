@@ -3332,6 +3332,9 @@ describe('merge-group supersede one-shot', () => {
     run(806, branch(`${PR}1`, '6')), // PR number prefix collision: keep
   ];
 
+  /**
+   * @param {{ queueRef?: string, readToken?: string, list?: { status?: number, body: unknown }, liveRefs?: string[] | null }} [opts]
+   */
   async function runSupersede({
     queueRef = `refs/heads/${OWN}`,
     readToken = 'app-read-token',
@@ -3405,8 +3408,12 @@ ${
     expect(mint['continue-on-error']).toBe(true);
     expect(mint.with?.['permission-actions']).toBe('read');
     expect(cancel.run).not.toMatch(/\bsleep\b|\bwhile\s+(true|\(\()|\buntil\b/);
-    expect(load(CI_WORKFLOW).jobs['ci-merge-group-watchdog']).toBeUndefined();
-    for (const [id, other] of Object.entries(load(CI_WORKFLOW).jobs)) {
+    const { jobs } =
+      /** @type {{ jobs: Record<string, { needs?: string | string[] }> }} */ (
+        load(CI_WORKFLOW)
+      );
+    expect(jobs['ci-merge-group-watchdog']).toBeUndefined();
+    for (const [id, other] of Object.entries(jobs)) {
       const needs = [other.needs ?? []].flat();
       expect(needs, id).not.toContain('ci-merge-group-supersede');
     }
