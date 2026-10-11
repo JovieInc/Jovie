@@ -8881,6 +8881,36 @@ class RepositoryBindingTest(unittest.TestCase):
         self.assertEqual(lane.bindings.refusal(lane, binding, self.lyb("LYB-1", labels=()), {}, time.time(),
                                                frozenset()), "LYB:missing-label:symphony")
 
+    @staticmethod
+    def node(pr, required=False):
+        """A GraphQL open-PR node for a test PR dict (the shape `bindings.open_prs` reads)."""
+        checks = pr.get("statusCheckRollup", [])
+        red = any((check.get("conclusion") or "").upper() in lane.RED for check in checks)
+        return {"id": f"PR_{pr['number']}", "number": pr["number"], "title": pr.get("title", "t"),
+                "url": f"https://github.com/JovieInc/LogYourBody/pull/{pr['number']}",
+                "isDraft": pr.get("isDraft", False), "isCrossRepository": pr.get("crossRepository", False),
+                "headRefName": pr["headRefName"], "headRefOid": pr["headRefOid"],
+                "mergeStateStatus": pr.get("mergeStateStatus"), "reviewDecision": pr.get("reviewDecision"),
+                "body": pr.get("body", ""), "author": {"login": pr.get("author", "itstimwhite")},
+                "labels": {"nodes": [{"name": name} for name in pr.get("labels", ())]},
+                "mergeQueueEntry": pr.get("queue"),
+                "commits": {"nodes": [{"commit": {"committedDate": pr.get("committedAt", "2026-10-01T00:00:00Z"),
+                                                  "statusCheckRollup": {"state": "FAILURE" if red else "SUCCESS",
+                                                                        "contexts": {"nodes": [
+                                                                            {"__typename": "CheckRun", **check}
+                                                                            for check in checks]}}}}]},
+                "timelineItems": {"nodes": [{"createdAt": at, "reason": reason}
+                                            for reason, at in pr.get("removed", ())]}}
+
+    def row(self, number, **fields):
+        """A normalized LYB PR row (required check CI Summary) for the maintenance helpers."""
+        green = fields.pop("green", True)
+        pr = {"number": number, "headRefName": fields.pop("branch", f"fix/thing-{number}"),
+              "headRefOid": fields.pop("head", "a" * 40), "mergeStateStatus": fields.pop("state", "CLEAN"),
+              "statusCheckRollup": [{"name": "CI Summary", "status": "COMPLETED",
+                                     "conclusion": "SUCCESS" if green else "FAILURE"}], **fields}
+        return lane.bindings.pr_row(self.node(pr), ["CI Summary"])
+
     def claim(self, issues, prs, run_receipt=None, states=None):
         linear = FakeLinear([])
         linear.key = "lin_test"
@@ -8889,13 +8919,15 @@ class RepositoryBindingTest(unittest.TestCase):
                  "priority": i.priority, "createdAt": i.created_at,
                  "labels": {"nodes": [{"name": name} for name in i.labels]}} for i in issues]
         linear._bounded_lane_nodes = Mock(return_value=rows)
-        light = [{key: value for key, value in pr.items() if key != "statusCheckRollup"} for pr in prs]
+        page = {"data": {"repository": {"pullRequests": {
+            "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [self.node(pr) for pr in prs]}}}}
 
         def gh(args, *rest, **kwargs):
-            if args[:3] == ["gh", "pr", "view"]:
-                rollup = next(pr for pr in prs if pr["number"] == int(args[3])).get("statusCheckRollup", [])
-                return SimpleNamespace(returncode=0, stdout=json.dumps({"statusCheckRollup": rollup}), stderr="")
-            return SimpleNamespace(returncode=0, stdout=json.dumps(light), stderr="")
+            if args[:3] == ["gh", "api", "graphql"] and args[4].startswith("query=query"):
+                return SimpleNamespace(returncode=0, stdout=json.dumps(page), stderr="")
+            if args[:2] == ["gh", "api"] and args[2].endswith("/rules/branches/main"):
+                return SimpleNamespace(returncode=0, stdout="[]", stderr="")  # gate = the aggregate rollup
+            return SimpleNamespace(returncode=0, stdout="{}", stderr="")
         receipt = run_receipt or {"verdict": "pr-opened", "prUrl": "https://github.com/JovieInc/LogYourBody/pull/9"}
         with patch.object(lane, "Linear", return_value=linear), patch.object(lane, "sh", side_effect=gh), \
                 patch.object(lane.bindings, "run", return_value=receipt) as run, \
@@ -8977,19 +9009,121 @@ class RepositoryBindingTest(unittest.TestCase):
         run.assert_not_called()
         self.assertEqual(status["outcome"], "claim-raced")
 
-    def test_red_or_behind_lyb_lane_pr_is_repaired_at_most_twice_per_head(self):
+    def test_red_or_behind_lyb_pr_is_repaired_at_most_twice_per_head_lane_prs_first(self):
         red = {"number": 41, "headRefName": "devin/lyb-9-20261011t000000", "headRefOid": "b" * 40, "title": "t",
                "mergeStateStatus": "BLOCKED", "statusCheckRollup": [{"name": "iOS", "conclusion": "FAILURE"}]}
-        human = {**red, "number": 42, "headRefName": "tim/lyb-9-20261011-fix"}  # not a lane
-        for _ in range(lane.MAX_FIX_ATTEMPTS):
-            verdict, _, run, _ = self.claim([], [human, red], run_receipt={"verdict": "pushed"})
+        human = {**red, "number": 40, "headRefName": "tim/lyb-9-20261011-fix"}  # not a lane: repaired too
+        for expected in [41] * lane.MAX_FIX_ATTEMPTS + [40] * lane.MAX_FIX_ATTEMPTS:
+            verdict, _, run, status = self.claim([], [human, red], run_receipt={"verdict": "pushed"})
             self.assertEqual(verdict, "pushed")
-            self.assertEqual(run.call_args.kwargs["pr"]["number"], 41)
+            self.assertEqual(run.call_args.kwargs["pr"]["number"], expected)
+            self.assertEqual(status["reasons"], ["red-checks"])
         verdict, _, run, _ = self.claim([], [human, red])
         run.assert_not_called()
+        # A day later the same head may be tried again.
+        path = self.host.state / "bindings" / "LYB" / "fix-attempts.json"
+        attempts = json.loads(path.read_text())
+        path.write_text(json.dumps({key: {**value, "at": value["at"] - lane.bindings.ATTEMPT_RESET_S - 1}
+                                    for key, value in attempts.items()}))
+        verdict, _, run, _ = self.claim([], [human, red], run_receipt={"verdict": "pushed"})
+        self.assertEqual(run.call_args.kwargs["pr"]["number"], 41)
         behind = {**red, "number": 43, "headRefName": "codex/lyb-10-20261011t000000",
                   "statusCheckRollup": [], "mergeStateStatus": "BEHIND"}
         self.assertEqual(lane.bindings.repair_candidate(lane, self.binding, [behind], {})["number"], 43)
+
+    def test_gate_is_the_repo_required_checks_not_any_red_check(self):
+        advisory = self.row(5, statusCheckRollup=[{"name": "CI Summary", "conclusion": "SUCCESS"},
+                                                  {"name": "Advisory AI Review", "conclusion": "FAILURE"}])
+        self.assertEqual(advisory["gate"], "green")
+        self.assertFalse(lane.bindings.is_red(lane, advisory))
+        self.assertEqual(self.row(6, green=False)["gate"], "red")
+        missing = lane.bindings.pr_row(self.node({"number": 7, "headRefName": "x", "headRefOid": "a" * 40,
+                                                  "statusCheckRollup": [{"name": "iOS", "conclusion": "SUCCESS"}]}),
+                                       ["CI Summary"])
+        self.assertEqual(missing["gate"], "pending")
+        rerun = self.row(8, statusCheckRollup=[{"name": "CI Summary", "conclusion": "FAILURE"},
+                                               {"name": "CI Summary", "conclusion": "SUCCESS"}])
+        self.assertEqual(rerun["gate"], "green")  # the latest run of a required check counts
+
+    def test_any_open_lyb_pr_qualifies_for_repair_but_a_live_session_keeps_its_own(self):
+        now = time.time()
+        recent = datetime.fromtimestamp(now - 600, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        conflict = self.row(10, state="DIRTY")
+        fresh = self.row(9, state="DIRTY", committedAt=recent)
+        queued = self.row(8, green=False, queue={"state": "QUEUED", "enqueuer": {"login": "itstimwhite"}})
+        fork = self.row(7, green=False, crossRepository=True)
+        held = self.row(6, green=False, labels=("hold",))
+        bump = self.row(5, state="DIRTY", author="dependabot", branch="dependabot/npm/x")
+        changes = self.row(11, reviewDecision="CHANGES_REQUESTED")
+        prs = [conflict, fresh, queued, fork, held, bump, changes]
+        picked = lane.bindings.repair_candidate(lane, self.binding, prs, {}, now=now)
+        self.assertEqual((picked["number"], picked["repairReasons"]), (10, ["conflict"]))
+        picked = lane.bindings.repair_candidate(lane, self.binding, [fresh, changes], {}, now=now)
+        self.assertEqual((picked["number"], picked["repairReasons"]), (11, ["changes-requested"]))
+        self.assertIsNone(lane.bindings.repair_candidate(lane, self.binding, [fresh, queued, fork, held, bump], {},
+                                                         now=now))
+        prompt = lane.bindings.render_prompt(self.binding, "fix/thing-11", pr=picked)
+        self.assertIn("Repair reasons: changes-requested", prompt)
+        self.assertIn("gh pr view 11 --repo JovieInc/LogYourBody --comments", prompt)
+
+    def test_queue_poison_guard_stops_enqueue_and_hands_the_head_to_repair(self):
+        after = "2026-10-02T00:00:00Z"
+        once = self.row(20, removed=[("failed_checks", after)])
+        twice = self.row(21, removed=[("failed_checks", after), ("failed_checks", "2026-10-03T00:00:00Z")])
+        older = self.row(22, removed=[("failed_checks", "2026-09-01T00:00:00Z")] * 2)  # before this head
+        timeouts = self.row(23, removed=[("checks_timed_out", after)] * 5)  # capacity, never poison
+        actions = lane.bindings.maintenance_actions(self.binding, [once, twice, older, timeouts], time.time())
+        self.assertEqual([(kind, pr["number"]) for kind, pr in actions],
+                         [("enqueue", 20), ("enqueue", 22), ("enqueue", 23)])
+        self.assertEqual(lane.bindings.repair_reasons(lane, self.binding, twice), ["merge-group-failed"])
+        prompt = lane.bindings.render_prompt(self.binding, "fix/thing-21",
+                                             pr={**twice, "repairReasons": ["merge-group-failed"]})
+        self.assertIn("--event merge_group", prompt)
+
+    def test_maintenance_actions_cover_dropped_token_draft_and_dependabot_prs(self):
+        now = time.time()
+        recent = datetime.fromtimestamp(now - 600, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        rows = [
+            self.row(1, queue={"state": "AWAITING_CHECKS", "enqueuer": {"login": "github-actions"}}),
+            self.row(2, queue={"state": "QUEUED", "enqueuer": {"login": "itstimwhite"}}),
+            self.row(3),                                                     # dropped, green, ready
+            self.row(4, removed=[("manual", recent)]),                       # someone just dequeued it
+            self.row(5, isDraft=True),                                       # idle draft past the SLO
+            self.row(6, isDraft=True, committedAt=recent),                   # fresh draft
+            self.row(7, isDraft=True, body="Release dependency: #3 must be merged first."),
+            self.row(8, state="DIRTY", author="dependabot", branch="dependabot/npm/x"),
+            self.row(9, green=False),
+            self.row(10, state="BEHIND"),
+            self.row(11, state="UNKNOWN"),
+        ]
+        actions = lane.bindings.maintenance_actions(self.binding, rows, now)
+        self.assertEqual([(kind, pr["number"]) for kind, pr in actions],
+                         [("requeue", 1), ("enqueue", 3), ("ready", 5), ("rebase", 8)])
+
+    def test_maintain_writes_once_per_head_and_retries_a_failed_write_later(self):
+        (self.host.state / "bindings" / "LYB").mkdir(parents=True)
+        rows = [self.row(3), self.row(1, queue={"state": "QUEUED", "enqueuer": {"login": "github-actions[bot]"}})]
+
+        def gh(args, *rest, **kwargs):
+            if "dequeuePullRequest" in args[4]:
+                return SimpleNamespace(returncode=0, stdout="{}", stderr="")
+            return SimpleNamespace(returncode=1 if args[args.index("-f", 5) + 1] == "id=PR_3" else 0,
+                                   stdout="", stderr="")
+        now = time.time()
+        with patch.object(lane, "sh", side_effect=gh) as sh:
+            self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, rows, now=now),
+                             {"requeue": 1, "enqueue-failed": 1})
+            self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, rows, now=now + 60), {})
+            self.assertEqual(sh.call_count, 3)  # enqueue #3, dequeue + enqueue #1
+            self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, rows,
+                                                    now=now + lane.bindings.ACTION_RETRY_S + 1),
+                             {"enqueue-failed": 1})
+            moved = self.row(3, head="c" * 40)  # a new head is new work
+            self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, [moved], now=now + 120),
+                             {"enqueue-failed": 1})
+        enqueue = next(args for args in [call.args[0] for call in sh.call_args_list] if "id=PR_1" in args
+                       and "enqueuePullRequest" in args[4])
+        self.assertIn("head=" + "a" * 40, enqueue)  # exact-head proof on every enqueue
 
     def test_lyb_has_no_own_cap_and_two_seats_never_repair_one_pr(self):
         first = lane.bindings.take_seat(lane, self.host, self.binding)
