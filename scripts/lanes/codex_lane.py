@@ -37,6 +37,12 @@ LIMIT = re.compile(r"usage limit|rate limit|too many requests|\b429\b|quota", re
 USAGE = re.compile(r"usage limit|quota|insufficient", re.I)
 RATE_BACKOFF_S = int(os.environ.get("CODEX_RATE_BACKOFF_S", 120))
 ROTATE_PAUSE_S = float(os.environ.get("CODEX_ROTATE_PAUSE_S", 20))
+# An account leased by another run is busy, not spent. On Gem (one current-login lease) three
+# runs started within two minutes on 2026-10-11; the losers exited NO_ACCOUNT_EXIT, which the
+# lane reads as provider failure: a fix attempt was charged and codex cooled down. A run now
+# waits (bounded) for a busy lease; only exhausted accounts end it early.
+LEASE_WAIT_S = int(os.environ.get("CODEX_LEASE_WAIT_S", 1800))
+LEASE_POLL_S = float(os.environ.get("CODEX_LEASE_POLL_S", 15))
 LEDGER_SCHEMA = "jovie.capacity-lease/v1"
 LEDGER_CADENCE_S = 3600
 EVIDENCE_MAX_AGE_S = 2 * 3600
@@ -839,11 +845,23 @@ def run(args) -> int:
     base.append("-")
     tried: list[str] = []
     attempted = False
+    wait_until, waiting = time.time() + LEASE_WAIT_S, False
     while True:
         now = time.time()
-        name, handle = pick(read_state(), now, [n for n in accounts() if n not in tried])
+        candidates = [n for n in accounts() if n not in tried]
+        state = read_state()
+        name, handle = pick(state, now, candidates)
         if name is None:
-            print("codex-lane: no available account (all exhausted or leased)", file=sys.stderr)
+            busy = [n for n in candidates if available(n, state, now)]
+            if busy and now < wait_until:
+                if not waiting:
+                    print(f"codex-lane: account lease busy ({', '.join(busy)}); waiting up to {LEASE_WAIT_S}s",
+                          file=sys.stderr, flush=True)
+                    waiting = True
+                time.sleep(LEASE_POLL_S)
+                continue
+            why = "leased by other runs past the wait" if busy else "all exhausted"
+            print(f"codex-lane: no available account ({why})", file=sys.stderr)
             return NO_ACCOUNT_EXIT
         tried.append(name)
         text = prompt if not attempted else (
@@ -901,6 +919,8 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
                 entry.update(exhaustedUntil=until, lastError=(LIMIT.search(output) or AUTH.search(output)).group(0)[:80])
             else:
                 entry.pop("exhaustedUntil", None)
+            if kind == "ok":
+                entry.pop("lastError", None)  # a working run disproves the last failure
         update_state(record)
         if kind == "limit" and not current_login_mode() and maybe_redeem(name, handle, time.time()):
             return 0, "reset-credit", None

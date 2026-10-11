@@ -164,9 +164,15 @@ class AutoscaleTest(unittest.TestCase):
                          (5, "sustained-demand", 0))
         seen, host = obs(runningByProvider={"devin": 4}), sample(); state, when = ticks(29, None, seen, host, bases, options, NOW); state = decide(state, obs(unhealthy=["devin"], runningByProvider={"devin": 4}), host, bases, options, when + 60); self.assertEqual((self.lane(state, "devin")["upStreak"], self.lane(state, "devin")["effective"]), (0, 4)); state, when = ticks(29, state, seen, host, bases, options, when + 120); self.assertEqual(self.lane(state, "devin")["effective"], 4)
         held = decide(state, budget_at(seen, when + 60), host, bases, options, when + 60); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (5, "sustained-demand")); both = {"devin": 4, "codex": 3}; state = decide(None, obs(), host, both, cfg(intervalS=60), NOW)
-        self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "codex")["effective"], self.lane(state, "devin")["lastReason"]), (5, 3, "sustained-demand"))
+        # Every lane with sustained demand grows in the same tick while the host has headroom
+        # (2026-10-11: one lane per tick was an artificial bottleneck, not a compute limit).
+        self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "codex")["effective"], self.lane(state, "devin")["lastReason"]), (5, 4, "sustained-demand"))
         ranked = decide(None, obs(eligiblePoolByProvider={"devin": 1, "codex": 9}), sample(), both, cfg(intervalS=60), NOW)
-        self.assertEqual((self.lane(ranked, "codex")["effective"], self.lane(ranked, "devin")["effective"]), (4, 4))
+        self.assertEqual((self.lane(ranked, "codex")["effective"], self.lane(ranked, "devin")["effective"]), (5, 5),
+                         "codex demand 9 > 2 x 3 surges to its lease ceiling; devin still grows by one")
+        tight = decide(None, obs(eligiblePoolByProvider={"devin": 1, "codex": 9}), sample(cpuCount=8), both, cfg(intervalS=60), NOW)
+        self.assertEqual((self.lane(tight, "codex")["effective"], self.lane(tight, "devin")["effective"], self.lane(tight, "devin")["lastReason"]),
+                         (4, 4, "hold:host-ceiling"), "the host compute cap still bounds the sum; highest demand ratio first")
     def test_wip_hold_keeps_maintenance_capacity_and_can_grow(self):
         for hold in ("over-budget", "terminal-pr-backlog"):
             with self.subTest(hold=hold):
@@ -209,7 +215,10 @@ class AutoscaleTest(unittest.TestCase):
             path = root / "maintenance-demand.json"
             path.write_text(json.dumps(census))
             self.assertEqual(A._demand("devin", A.collect(root, {}, NOW)), 3)
-            for stamp, count in ((NOW - 121, 3), (NOW + 1, 3), (NOW, True), (NOW, -1), (NOW, None)):
+            census["lanes"]["devin"] = {"observedAt": NOW - 3 * 60 - 55, "pending": 3}  # oldest a census may carry, next tick
+            path.write_text(json.dumps(census))
+            self.assertEqual(A._demand("devin", A.collect(root, {}, NOW)), 3)
+            for stamp, count in ((NOW - A.MAINTENANCE_DEMAND_STALE_S - 1, 3), (NOW + 1, 3), (NOW, True), (NOW, -1), (NOW, None)):
                 census["lanes"]["devin"] = {"observedAt": stamp, "pending": count}
                 path.write_text(json.dumps(census))
                 self.assertIsNone(A._demand("devin", A.collect(root, {}, NOW)))
@@ -270,7 +279,7 @@ class AutoscaleTest(unittest.TestCase):
         self.assertEqual((legacy["lanes"]["devin"]["effective"], legacy["lanes"]["devin"]["intakeEffective"]), (5, 0))
         boundary = {name: {**row, "remaining": row["limit"] // 4} for name, row in seen["linearDimensions"].items()}
         allowed = decide(None, {**seen, "linearDimensions": boundary}, sample(), {"devin": 4}, cfg(intervalS=60), NOW)
-        self.assertEqual(allowed["lanes"]["devin"]["intakeEffective"], 5)
+        self.assertEqual(allowed["lanes"]["devin"]["intakeEffective"], 8, "demand 16 > 2 x 4 seats doubles in one step")
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "doctor.json").write_text(json.dumps({"observed": {"now": NOW}}))
@@ -390,7 +399,7 @@ class AutoscaleTest(unittest.TestCase):
                 "remaining": 2000, "limit": 2500, "observedAt": NOW, "rateLimitedAt": None,
                 "dimensions": state["apiBudget"]["linearDimensions"]}))
             self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 5)
-            self.assertEqual(A.host_ceiling(root, NOW), 8)
+            self.assertEqual(A.host_ceiling(root, NOW), 16)  # compute cap: cpuCount, not 2x base
             self.assertEqual(A.intake_slots(root, "devin", 0, NOW), 0)
             for change in ({"mode": "observe"}, {"mode": None}, {"observedAt": NOW - 601},
                            {"observedAt": NOW + 1}, {"observedAt": True}, {"observedAt": float("nan")},
@@ -492,10 +501,10 @@ class AutoscaleTest(unittest.TestCase):
                 ("host-pressure", obs(), sample(memAvailableBytes=6 * GIB)),
                 ("host-pressure", obs(disk={"admitted": True, "freePct": 9}), sample()),
                 ("gate-pressure", obs(alerts=["gate-timeouts"]), sample()),
-                ("gate-pressure", obs(alerts=["failed-runs"]), sample()),
+                ("gate-pressure", obs(currentRunFailures={"failed": 4, "runs": 8}), sample()),
                 ("gate-pressure", obs(gateWaitMedianS24h=1201), sample())):
             state = decide({"mode": "apply", "lanes": {"devin": {"effective": 4}}}, seen, host, {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (3, reason))
-        held = decide(hot, obs(alerts=["failed-runs"]), sample(), {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (4, "hold:host-cooldown"))
+        held = decide(hot, obs(currentRunFailures={"failed": 4, "runs": 8}), sample(), {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (4, "hold:host-cooldown"))
     def test_merge_throughput_is_diagnostic_and_cannot_throttle_healthy_workers(self):
         # A faulty queue must not suppress the workers that can repair it.
         deficit = obs(mergeThroughput={"queueDepth": 30, "queueWaitP50Minutes": 22, "mergedPerHour": 6,
@@ -522,7 +531,7 @@ class AutoscaleTest(unittest.TestCase):
                                       mergeThroughput=deficit["mergeThroughput"]),
                          sample(), bases, options, NOW)
         self.assertEqual((self.lane(rescued, "devin")["effective"], self.lane(rescued, "devin")["lastReason"]),
-                         (3, "sustained-demand"))
+                         (4, "sustained-demand"), "demand 8 > 2 x 2 seats doubles")
         wait = obs(mergeThroughput={"queueDepth": 12, "queueWaitP50Minutes": A.MERGE_QUEUE_WAIT_BRAKE_MIN,
                                    "mergedPerHour": 40, "openedPerHour": 20, "ejectionRate": 0.2})
         waited = decide(None, wait, sample(), bases, options, NOW)
@@ -555,6 +564,140 @@ class AutoscaleTest(unittest.TestCase):
         self.assertEqual((self.lane(small, "devin")["effective"], self.lane(small, "codex")["effective"], self.lane(small, "devin")["lastReason"]),
                          (1, 1, "hold:host-ceiling"))
         self.assertEqual(small["host"]["ceiling"], 2)
+    def test_lane_ceiling_is_compute_and_credits_not_twice_base(self):
+        # Tim 2026-10-11: lanes are capped only by compute and credits.
+        state = decide(None, obs(), sample(cpuCount=16), {"devin": 2}, cfg(intervalS=60), NOW)
+        self.assertEqual((self.lane(state, "devin")["ceiling"], state["host"]["ceiling"]), (16, 16))
+        credits = decide(None, obs(runningByProvider={"codex": 1}, codexUnleasedAvailable=0), sample(cpuCount=16),
+                         {"codex": 3}, cfg(intervalS=60), NOW)
+        self.assertEqual(self.lane(credits, "codex")["ceiling"], 1, "codex stays bound by its leases")
+        operator = decide(None, obs(), sample(cpuCount=16), {"devin": 2}, cfg(intervalS=60, hostMax=6), NOW)
+        self.assertEqual(operator["host"]["ceiling"], 6, "an explicit host max still wins")
+    def test_credit_ceiling_dip_does_not_ratchet_the_lane_to_zero(self):
+        # Gem 2026-10-11 18:45: a codex lease dip set the ceiling to 0 for one tick; the clamp
+        # became the next level, so codex spawned nothing (no repairs, no demand census) after
+        # its account was free again.
+        bases, options = {"codex": 3}, cfg(intervalS=60)
+        dip = decide(None, obs(runningByProvider={"codex": 0}, codexUnleasedAvailable=0), sample(), bases, options, NOW)
+        row = self.lane(dip, "codex")
+        self.assertEqual((row["effective"], row["ceiling"], row["lastReason"]), (0, 0, "hold:lane-ceiling"))
+        self.assertEqual(row["target"], 3, "the clamp is published, not adopted as the AIMD level")
+        unknown_demand = obs(runningByProvider={"codex": 0}, codexUnleasedAvailable=1,
+                             eligiblePoolByProvider={"codex": 0}, maintenanceQueueByProvider={})
+        back = decide(dip, unknown_demand, sample(), bases, options, NOW + 60)
+        self.assertEqual((self.lane(back, "codex")["effective"], self.lane(back, "codex")["ceiling"]), (1, 1),
+                         "the seat returns with the credit, even before the lane can publish demand")
+    def test_large_proven_demand_ramps_in_minutes_not_hours(self):
+        # Gem 19:50Z: devin at 1 seat with ~300 eligible issues and a 16-seat ceiling; one seat per
+        # 30 min made the ramp ~7.5 h on a healthy host.
+        seen = obs(eligiblePoolByProvider={"devin": 300}, maintenanceQueueByProvider={"devin": 2})
+        state, now, path = {"mode": "apply", "lanes": {"devin": {"base": 2, "effective": 1, "lastChangeAt": NOW - 3600}},
+                            "host": {"lastChangeAt": NOW - 3600}}, NOW, []
+        for _ in range(60):
+            running = self.lane(state, "devin")["effective"] if "schema" in state else 1
+            state = decide(state, budget_at({**seen, "runningByProvider": {"devin": running}}, now), sample(), {"devin": 2}, cfg(), now)
+            path.append(self.lane(state, "devin")["effective"]); now += 60
+        self.assertEqual(max(path), self.lane(state, "devin")["ceiling"])
+        self.assertLessEqual(path.index(max(path)), 30, "ceiling reached within ~30 minutes")
+        self.assertTrue(all(b - a in (0,) or b <= 2 * a for a, b in zip(path, path[1:])), "at most doubling per step")
+        hot = decide(state, budget_at({**seen, "runningByProvider": {"devin": path[-1]}}, now),
+                     sample(psi={"cpuSomeAvg10": 50.0, "memoryFullAvg10": 0.0, "ioFullAvg10": 0.0}), {"devin": 2}, cfg(), now)
+        self.assertEqual((self.lane(hot, "devin")["effective"], self.lane(hot, "devin")["lastReason"]),
+                         (path[-1] // 2, "host-pressure"), "pressure still halves")
+    def test_fixed_failures_stop_limiting_capacity_and_current_ones_back_off(self):
+        # Gem 21:38Z: "11 harness-failed runs in 24h" (lease collisions, cleanup-locked branches
+        # fixed that afternoon) held every lane on gate-pressure with gate wait 0 and a calm host.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); (root / "runs").mkdir(); release = root / "releases/r1/scripts/lanes"; release.mkdir(parents=True)
+            (root / "current").symlink_to(release)
+            def install(at):
+                os.utime(root / "current", (at, at), follow_symlinks=False)
+            def ledger(rows):
+                (root / "runs" / "ledger.jsonl").write_text("".join(json.dumps(
+                    {"verdict": verdict, "startedAt": A._iso(NOW - age - 60), "endedAt": A._iso(NOW - age)}) + "\n" for age, verdict in rows))
+                return A.current_run_failures(root)
+            def scaled(failures):
+                state = decide({"mode": "apply", "lanes": {"devin": {"effective": 4}}}, obs(alerts=["failed-runs"], currentRunFailures=failures),
+                               sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+                return self.lane(state, "devin")
+            install(NOW - 7 * 3600)
+            # 11 failures 6 h ago, then successes on the same release: the rate clears them.
+            healed = ledger([(6 * 3600, "failed")] * 11 + [(600, "landing")] * 5 + [(300, "verified-not-queued")] * 3)
+            self.assertEqual((healed["failed"], healed["runs"]), (0, 8))
+            self.assertNotIn("gate-pressure", scaled(healed)["blockers"])
+            self.assertEqual(scaled(healed)["effective"], 5, "the 24 h alert alone never freezes scaling")
+            # Failures only before the fix was installed do not count at all.
+            install(NOW - 3600)
+            fixed = ledger([(2 * 3600, "failed")] * 11)
+            self.assertEqual((fixed["failed"], fixed["runs"]), (0, 0))
+            self.assertNotEqual(scaled(fixed)["lastReason"], "gate-pressure")
+            # Current failures on this release still back off.
+            current = ledger([(2 * 3600, "failed")] * 11 + [(900, "landing"), (600, "failed"), (300, "failed")])
+            self.assertEqual((current["failed"], current["runs"]), (2, 3))
+            self.assertEqual((scaled(current)["effective"], scaled(current)["lastReason"]), (3, "gate-pressure"))
+            one = ledger([(600, "failed")])
+            self.assertNotEqual(scaled(one)["lastReason"], "gate-pressure", "a single failure is not a rate")
+            gated = decide({"mode": "apply", "lanes": {"devin": {"effective": 4}}}, obs(alerts=["gate-timeouts"]), sample(), {"devin": 4}, cfg(), NOW)
+            self.assertEqual(self.lane(gated, "devin")["lastReason"], "gate-pressure", "gate timeouts still decrease")
+    def test_repair_seats_ramp_while_new_work_intake_is_held(self):
+        held = obs(newIssueBudgetByProvider={"devin": {"reason": "over-budget"}}, eligiblePoolByProvider={"devin": 300},
+                   maintenanceQueueByProvider={"devin": 9}, runningByProvider={"devin": 2})
+        state = decide({"mode": "apply", "lanes": {"devin": {"base": 2, "effective": 2, "target": 2, "lastChangeAt": NOW - 3600}},
+                        "host": {"lastChangeAt": NOW - 3600}}, held, sample(), {"devin": 2}, cfg(), NOW + 300)
+        state, _ = ticks(5, state, held, sample(), {"devin": 2}, cfg(), NOW + 360)
+        row = self.lane(state, "devin")
+        self.assertGreaterEqual(row["effective"], 4, "proven repair demand 9 ramps repair seats while intake is over budget")
+        self.assertEqual(A._demand("devin", held, NOW), 9, "held intake counts only repair demand")
+    def test_saturated_lane_ramps_on_recent_positive_demand(self):
+        # Gem 21:11Z: devin's one seat was in a 30+ min run, so no devin claim scan refreshed
+        # the census (6 pending at 21:06:57) and autoscale held it at 1 on unknown-demand.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "doctor.json").write_text(json.dumps({"observed": {"now": NOW, "githubRemaining": 4000,
+                "eligiblePoolByProvider": {"devin": 0}, "newIssueBudgetByProvider": {"devin": {"reason": "over-budget"}},
+                "capacityByProvider": {"devin": {"running": 1}}}}))
+            def census(age, pending=6):
+                (root / "maintenance-demand.json").write_text(json.dumps({"schema": "symphony-lanes-maintenance-demand/v1",
+                    "lanes": {"devin": {"observedAt": NOW - age, "pending": pending}}}))
+                return {**obs(), **{key: value for key, value in A.collect(root, {}, NOW).items()
+                                    if key in ("maintenanceQueueByProvider", "recentPositiveDemandByProvider",
+                                               "newIssueBudgetByProvider", "eligiblePoolByProvider", "runningByProvider")}}
+            previous = {"mode": "apply", "lanes": {"devin": {"base": 2, "effective": 1, "target": 1, "lastChangeAt": NOW - 3600}},
+                        "host": {"lastChangeAt": NOW - 3600}}
+            seen = census(254)
+            self.assertIsNone(A._demand("devin", seen, NOW), "past the fresh window on its own")
+            grown = decide(previous, seen, sample(), {"devin": 2}, cfg(intervalS=60), NOW)
+            self.assertEqual((self.lane(grown, "devin")["effective"], self.lane(grown, "devin")["lastReason"]), (2, "sustained-demand"))
+            idle = decide(previous, {**seen, "runningByProvider": {"devin": 0}}, sample(), {"devin": 2}, cfg(intervalS=60), NOW)
+            self.assertEqual((self.lane(idle, "devin")["effective"], self.lane(idle, "devin")["lastReason"]), (1, "hold:not-saturated"),
+                             "an idle seat rescans; it does not borrow old demand")
+            for age, pending in ((A.BUSY_DEMAND_STALE_S + 1, 6), (254, 0)):
+                stale = decide(previous, census(age, pending), sample(), {"devin": 2}, cfg(intervalS=60), NOW)
+                self.assertEqual(self.lane(stale, "devin")["effective"], 1, (age, pending))
+    def test_unhealthy_lane_takes_no_host_share(self):
+        both = {"devin": 4, "hyperagent": 4}
+        seen = obs(unhealthy=["hyperagent"], runningByProvider={"devin": 4, "hyperagent": 0},
+                   eligiblePoolByProvider={"devin": 0, "hyperagent": 0}, maintenanceQueueByProvider={"devin": 0, "hyperagent": 0},
+                   newIssueBudgetByProvider={"devin": {"reason": "within-budget"}, "hyperagent": {"reason": "within-budget"}})
+        state = decide(None, seen, sample(cpuCount=4), both, cfg(), NOW)
+        self.assertEqual(self.lane(state, "devin")["effective"], 4, "a provider that spawns nothing reserves no compute")
+        self.assertEqual(self.lane(state, "hyperagent")["intakeEffective"], 0)
+    def test_legacy_ceiling_clamped_receipt_recovers_to_base(self):
+        legacy = {"mode": "apply", "lanes": {"codex": {"base": 3, "effective": 0, "ceiling": 0, "lastReason": "hold:lane-ceiling"}}}
+        state = decide(legacy, obs(runningByProvider={"codex": 0}, codexUnleasedAvailable=1, eligiblePoolByProvider={"codex": 0},
+                                   maintenanceQueueByProvider={}), sample(), {"codex": 3}, cfg(intervalS=60), NOW)
+        self.assertEqual((self.lane(state, "codex")["effective"], self.lane(state, "codex")["target"]), (1, 3))
+        # Gem 19:45Z: the clamp was followed by unknown-demand/psi-high ticks, so the stored
+        # reason no longer named the ceiling; a zero level still returns to the floor.
+        later = {"mode": "apply", "lanes": {"codex": {"base": 3, "effective": 0, "ceiling": 1,
+                                                    "lastReason": "hold:unknown-demand", "blockers": ["unknown-demand", "psi-high"]}}}
+        floor = decide(later, obs(runningByProvider={"codex": 0}, codexUnleasedAvailable=1, eligiblePoolByProvider={"codex": 0},
+                                  maintenanceQueueByProvider={}), sample(psi={"cpuSomeAvg10": 1.0, "memoryFullAvg10": 0.0, "ioFullAvg10": 14.0}),
+                       {"codex": 3}, cfg(intervalS=60), NOW)
+        self.assertEqual(self.lane(floor, "codex")["effective"], 1)
+        idle = {"mode": "apply", "lanes": {"devin": {"base": 4, "effective": 2, "lastReason": "idle-decay"}}}
+        kept = decide(idle, obs(runningByProvider={"devin": 2}), sample(), {"devin": 4}, cfg(), NOW)
+        self.assertEqual(self.lane(kept, "devin")["effective"], 2, "a decayed level is not a ceiling clamp")
     def test_fail_safe_collect_and_linear_capture(self):
         state = decide({"mode": "apply", "lanes": {"devin": {"effective": 8}, "claude": {"effective": 2}}}, obs(doctorFresh=False), sample(),
                        {"devin": 4, "claude": 0}, cfg(intervalS=60), NOW)
@@ -636,7 +779,7 @@ class AutoscaleTest(unittest.TestCase):
                 self.assertEqual(lane.dispatch(host), 0)
             tick = json.loads((host.state / "tick.json").read_text())
             self.assertIn("boom", tick["autoscaleError"])
-            self.assertEqual(tick["spawned"], ["devin", "devin", "devin", "devin", "codex", "codex", "codex", "claude", "claude", "hyperagent", "hyperagent"])
+            self.assertEqual(tick["spawned"], ["devin", "devin", "devin", "devin", "codex", "codex", "codex", "claude", "claude", "hyperagent", "hyperagent", "grok"])
             self.assertEqual(spawned, tick["spawned"])
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
             root = Path(tmp)

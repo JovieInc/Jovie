@@ -19,6 +19,7 @@ import statistics
 import subprocess
 import sys
 import time
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -46,6 +47,10 @@ POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
 GATE_TIMEOUT_ALERT = 5
 FAILED_RUN_ALERT = 10
+# Repairs that ended before any agent work: each still spends one of the PR's bounded fix
+# attempts (no refunds, by design), so a run of them exhausts PRs on infrastructure alone.
+NO_WORK_REPAIR_VERDICTS = frozenset({"recovery-handoff", "reconcile-unavailable", "skipped"})
+NO_WORK_REPAIR_ALERT = 6
 DISK_MIN_PCT = 10
 DISK_CRIT_PCT = 5
 GITHUB_MIN_REMAINING = gh_app_token.FLOOR
@@ -191,7 +196,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             (qualified_by_provider, candidate_pool, candidate_counts,
              rejected, rejected_issues) = qualified_pool(host, lane, capacity_by_provider, now)
             design_census = design_gate.apply_to_pool(
-                qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo), now=now)
+                qualified_by_provider, read_text=design_gate.repo_reader(host.repo))
             eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
             eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
             budgets = {name: lane.read_new_issue_budget(name, seats.get("base", seats["slots"]))
@@ -248,6 +253,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "gateWaitMedianS24h": int(statistics.median(gate_waits)) if gate_waits else None,
         "gateWaitMaxS24h": int(max(gate_waits)) if gate_waits else None,
         "failed24h": sum(1 for r in receipts if r.get("verdict") == "failed"),
+        "noWorkRepairs24h": dict(Counter(
+            (r.get("reasons") or ["?"])[0].split(":", 1)[0] for r in receipts
+            if r.get("kind") == "fix-red" and r.get("verdict") in NO_WORK_REPAIR_VERDICTS)),
         "lastLandingAge": min(landings) if landings else None, "runs24h": len(receipts),
         "lastWorkAge": min((age_s(r.get("endedAt"), now) for r in receipts if r.get("kind") != "sync-main"), default=None),
         # Per-provider age of the last clean claim-scan exit: proves spawned workers reach the
@@ -698,15 +706,13 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
         alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
-    stale_briefs = (obs.get("designGate") or {}).get("stale") or []
-    if stale_briefs:
-        alerts["design-brief-stale"] = (f"{len(stale_briefs)} needs-design-brief issue(s) held past 24h "
-                                        f"without a build claim ({', '.join(stale_briefs[:5])})")
-    elif obs.get("designGate") is None:
-        # A failed/cooldown census cannot prove recovery of a previously observed alarm.
-        prior_alarm = ((previous or {}).get("alerts") or {}).get("design-brief-stale")
-        if prior_alarm:
-            alerts["design-brief-stale"] = prior_alarm
+    no_work = obs.get("noWorkRepairs24h") or {}
+    if sum(no_work.values()) >= NO_WORK_REPAIR_ALERT:
+        causes = ", ".join(f"{reason} {count}" for reason, count in sorted(no_work.items(), key=lambda kv: -kv[1])[:3])
+        alerts["repairs-without-work"] = (f"{sum(no_work.values())} PR repairs in 24h spent a fix attempt before any "
+                                          f"agent work ({causes}); infrastructure, not the PRs, is exhausting them")
+    # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
+    # claiming run writes it), so a held brief is no longer a condition to watch.
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
@@ -795,8 +801,6 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                  else float((previous.get("providerIdleSince") or {}).get(provider, now)))
         source_status = "unknown" if key == "linear-down" else "stale" if key == "hud-stale" else "degraded"
         if key == "delivery-stalled" and (obs.get("delivery") or {}).get("state") in ("unknown", "controller-held"):
-            source_status = "unknown"
-        if key == "design-brief-stale" and obs.get("designGate") is None:
             source_status = "unknown"
         if key == "admission-repair-needed" and (obs.get("eligiblePool") is None or obs.get("pool") is None
                 or any(row.get("reason") == "pr-inventory-unavailable"
