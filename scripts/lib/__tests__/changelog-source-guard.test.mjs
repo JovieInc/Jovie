@@ -133,21 +133,14 @@ describe('GitHub quota is never a changelog verdict', () => {
     expect(result.code).toBe(0);
     expect(JSON.parse(result.stdout)).toMatchObject({ passed: true });
   });
-  it('waits out an exhausted installation quota on a re-run, then evaluates', async () => {
+  it('defers at once on a re-run that hits the exhausted quota, holding no runner', async () => {
     const result = await run(
       [quotaExhausted, current()],
       { GITHUB_RUN_ATTEMPT: '2' },
-      resetIn(1)
-    );
-    expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout)).toMatchObject({ passed: true });
-    expect(result.stderr).toContain('primary-rate-limit on attempt 1');
-  }, 30_000);
-  it('defers instead of judging when the reset is past the wait budget', async () => {
-    const result = await run(
-      [quotaExhausted],
-      { GITHUB_RUN_ATTEMPT: '2', GITHUB_QUOTA_MAX_WAIT_SECONDS: '0' },
       resetIn(3000)
+    );
+    expect(result.requests.filter(r => !r.endsWith('rate_limit'))).toHaveLength(
+      1
     );
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('github-quota-deferred');
