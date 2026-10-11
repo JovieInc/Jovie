@@ -623,12 +623,96 @@ def resolve_ci_pr(payload: dict, sh=run) -> dict:
     return {**payload, "workflow_run": {**workflow, "pull_requests": [{"number": pr["number"]}]}}
 
 
+RATE_LIMIT_HELPER = HERE.parent / "lib" / "github-rate-limit.mjs"
+# A quota-red run is re-run (its quota-sensitive steps wait out the reset) up to this attempt;
+# past it the failure is queued as ordinary repair work so a PR never sits red without an owner.
+INFRA_RERUN_MAX_ATTEMPT = 4
+RUNNER_EXIT = re.compile(r"##\[error\]Process completed with exit code \d+\.")
+
+
+def classify_github_failure(text: str) -> str | None:
+    """The shared classifier's kind (scripts/lib/github-rate-limit.mjs), or None without it."""
+    if not RATE_LIMIT_HELPER.exists():
+        return None
+    try:
+        done = subprocess.run(["node", str(RATE_LIMIT_HELPER), "classify"], input=text,
+                              capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    kind = (done.stdout or "").strip()
+    return kind if done.returncode == 0 and kind else None
+
+
+def failed_step_text(log: str) -> str:
+    """The failing step's slice of a job log: from its `##[group]Run` to the runner's exit line."""
+    lines = (log or "").splitlines()
+    end = next((i for i, line in enumerate(lines) if RUNNER_EXIT.search(line)), None)
+    if end is None:
+        return ""
+    start = max((i for i in range(end) if "##[group]Run " in lines[i]), default=0)
+    return "\n".join(lines[start:end + 1])
+
+
+def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
+    """The GitHub failure kind when every failed job of this run failed only on a GitHub
+    quota/abuse limit or a transient 5xx (2026-10-11 20:07Z: PR Size Guard and Source
+    Validation went red on the repo's exhausted GITHUB_TOKEN and were queued as lane-fix-red).
+    Any real error line, an unreadable log or a missing classifier keeps the red signal."""
+    classify = classify or classify_github_failure
+    run_id = workflow_run.get("id")
+    if not isinstance(run_id, int) or run_id <= 0:
+        return None
+    jobs = sh(["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/jobs?filter=latest&per_page=100",
+               "--jq", '[.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out") | .id]'])
+    if jobs.returncode != 0:
+        # The relay's own read hitting the exhausted quota is the same outage.
+        kind = classify(f"{jobs.stderr or ''}\n{jobs.stdout or ''}")
+        return kind if kind not in (None, "none") else None
+    try:
+        ids = json.loads(jobs.stdout or "[]")
+    except ValueError:
+        return None
+    if not isinstance(ids, list) or not ids or len(ids) > 3:
+        return None
+    kinds = set()
+    for job_id in ids:
+        log = sh(["gh", "api", f"repos/{REPO}/actions/jobs/{int(job_id)}/logs"], timeout=60)
+        if log.returncode != 0:
+            return None
+        step = failed_step_text(log.stdout or "")
+        errors = [line for line in step.splitlines() if "##[error]" in line and not RUNNER_EXIT.search(line)]
+        if not step or any(classify(line) in (None, "none") for line in errors):
+            return None
+        kind = classify(step)
+        if kind in (None, "none"):
+            return None
+        kinds.add(kind)
+    return sorted(kinds)[0]
+
+
+def rerun_after_quota(workflow_run: dict, kind: str, sh=run) -> bool:
+    """Re-run the failed jobs instead of queueing repair; False past the attempt cap."""
+    attempt = workflow_run.get("run_attempt")
+    if not isinstance(attempt, int) or attempt >= INFRA_RERUN_MAX_ATTEMPT:
+        return False
+    rerun = sh(["gh", "api", "-X", "POST", f"repos/{REPO}/actions/runs/{workflow_run['id']}/rerun-failed-jobs"])
+    print(f"run {workflow_run['id']} attempt {attempt} failed on GitHub {kind}: "
+          f"{'re-ran failed jobs' if rerun.returncode == 0 else 'rerun request failed'}; not repair work")
+    return True
+
+
 def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -> list[tuple[int, str]]:
     disabled = disabled_lanes() if disabled is None else disabled
     if event == "workflow_run":
         payload = resolve_ci_pr(payload, sh)
     added = []
-    for number, kind, sha in relay_targets(event, payload):
+    targets = relay_targets(event, payload)
+    if event == "workflow_run" and any(kind == "red" for _, kind, _ in targets):
+        workflow_run = payload.get("workflow_run") or {}
+        infra = quota_failure(workflow_run, sh)
+        if infra and rerun_after_quota(workflow_run, infra, sh):
+            targets = [target for target in targets if target[1] != "red"]
+    for number, kind, sha in targets:
         viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
                      "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
         if viewed.returncode != 0:

@@ -29,6 +29,7 @@ import socket
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -49,6 +50,7 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
+import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
@@ -108,7 +110,7 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
-              "scripts/tests/test_gh_app_token.py",
+              "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
               "scripts/tests/test_worktree_pool.py",
@@ -1251,7 +1253,9 @@ LINEAR_BUDGET_HEADERS = (
     ("X-RateLimit-Requests-Remaining", "X-RateLimit-Requests-Limit", "X-RateLimit-Requests-Reset"),
     ("X-RateLimit-Complexity-Remaining", "X-RateLimit-Complexity-Limit", "X-RateLimit-Complexity-Reset"),
 )
-LINEAR_RESET_HEADERS = ("X-RateLimit-Requests-Reset", "X-RateLimit-Complexity-Reset")
+# Endpoint-specific limits carry their own reset; a rate limit waits for the latest one.
+LINEAR_RESET_HEADERS = ("X-RateLimit-Requests-Reset", "X-RateLimit-Complexity-Reset",
+                        "X-RateLimit-Endpoint-Requests-Reset")
 
 
 class LaneInventoryUnknown(RuntimeError):
@@ -1375,6 +1379,9 @@ def record_linear_usage(key: str, family: str, outcome: str, headers=None, *, at
             if type(row.get(count)) is not int or row[count] < 0:
                 return
         row["httpAttempts" if attempted else "cooldownSkips"] += 1
+        cost = _header_number(headers, "X-Complexity")
+        if cost is not None and cost >= 0:  # Linear's own per-query complexity for this response
+            row["complexityConsumed"] = (row.get("complexityConsumed") or 0) + cost
         if attempted:
             row["successes" if outcome == "success" else "errors"] += 1
         if outcome == "rate-limited":
@@ -1595,13 +1602,23 @@ def linear_cooldown_until(key: str, now: float | None = None) -> float | None:
     root = linear_cooldown_root()
     now = time.time() if now is None else now
     now_ms = int(now * 1000)
+    scope_id = _linear_scope_id(key)
     latest = 0
     if root is not None:
-        scope = root / _linear_scope_id(key)
+        scope = root / scope_id
         latest = max(latest, _scan_scope(scope, now_ms), _legacy_file_reset_ms(root, key, now_ms))
     for legacy in _legacy_cooldown_roots(root):
-        latest = max(latest, _scan_scope(legacy / _linear_scope_id(key), now_ms),
+        latest = max(latest, _scan_scope(legacy / scope_id, now_ms),
                      _legacy_file_reset_ms(legacy, key, now_ms))
+    # Fallbacks written when the shared dir rejected a publish (JOV-7577).
+    latest = max(latest, _scan_scope(_tmp_cooldown_root() / scope_id, now_ms))
+    local = _PROCESS_LINEAR_COOLDOWNS.get(scope_id)
+    if local is not None:
+        local_ms = int(local * 1000)
+        if local_ms > now_ms:
+            latest = max(latest, local_ms)
+        else:
+            del _PROCESS_LINEAR_COOLDOWNS[scope_id]
     if latest <= now_ms:
         return None
     return latest / 1000
@@ -1622,6 +1639,60 @@ def _chmod_private(path: Path, mode: int) -> None:
         os.chmod(path, mode)
     except OSError:
         pass
+
+
+# Cooldowns this process failed to persist to the shared dir, keyed by scope hash.
+# An unwritable canonical dir used to mean every sibling process re-hit Linear;
+# the in-process and tmp fallbacks keep the backoff alive until a write succeeds.
+_PROCESS_LINEAR_COOLDOWNS: dict[str, float] = {}
+_COOLDOWN_UNWRITABLE_EVENT_FIRED = False
+
+
+def _tmp_cooldown_root() -> Path:
+    uid = os.getuid() if hasattr(os, "getuid") else "shared"
+    return Path(tempfile.gettempdir()) / f"jovie-linear-cooldown-{uid}"
+
+
+def _tmp_fallback_publish(scope_id: str, reset_s: float) -> None:
+    """Best-effort record under tmp so sibling processes still back off."""
+    try:
+        scope = _tmp_cooldown_root() / scope_id
+        scope.mkdir(parents=True, exist_ok=True)
+        _chmod_private(scope, 0o700)
+        reset_ms = int(reset_s * 1000)
+        record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
+        record.write_text(json.dumps({"schema": 1, "resetAt": reset_ms}))
+        _chmod_private(record, 0o600)
+    except OSError:
+        pass
+
+
+def _emit_cooldown_unwritable_event(root: Path, error: Exception) -> None:
+    """One remediation intake per process; Linear is cooled down, so file via gh."""
+    global _COOLDOWN_UNWRITABLE_EVENT_FIRED
+    if _COOLDOWN_UNWRITABLE_EVENT_FIRED:
+        return
+    _COOLDOWN_UNWRITABLE_EVENT_FIRED = True
+    try:
+        pr_events.upsert_intake(remediation.remediation_event(
+            source="lanes",
+            fingerprint="linear-cooldown-unwritable",
+            subject={"cooldown_root": str(root)},
+            evidence={"excerpt": f"shared Linear cooldown write failed: {type(error).__name__}: {error}"},
+            ws="ci",
+            first_seen=remediation.now_iso()))
+    except Exception:
+        pass
+
+
+def _cooldown_write_failed(root: Path, scope_id: str, reset_s: float, error: Exception) -> None:
+    print(json.dumps({"schema": "jovie.linear-cooldown-write-failure/v1",
+                      "fingerprint": "linear-cooldown-unwritable", "root": str(root),
+                      "error": f"{type(error).__name__}: {error}"}),
+          file=sys.stderr, flush=True)
+    _PROCESS_LINEAR_COOLDOWNS[scope_id] = max(reset_s, _PROCESS_LINEAR_COOLDOWNS.get(scope_id, 0))
+    _tmp_fallback_publish(scope_id, reset_s)
+    _emit_cooldown_unwritable_event(root, error)
 
 
 def publish_linear_cooldown(key: str, headers, now: float | None = None) -> float:
@@ -1653,8 +1724,8 @@ def publish_linear_cooldown(key: str, headers, now: float | None = None) -> floa
                 _chmod_private(record, 0o600)
             finally:
                 fcntl.flock(handle, fcntl.LOCK_UN)
-    except Exception:
-        return reset_s
+    except Exception as error:
+        _cooldown_write_failed(root, scope.name, reset_s, error)
     return reset_s
 
 
@@ -1691,14 +1762,27 @@ def _body_is_rate_limited(status: int, raw: bytes) -> bool:
 
 
 class Linear:
-    def __init__(self, env_file: Path):
-        key = ""
-        for line in env_file.read_text().splitlines():
-            if line.strip().startswith(("LINEAR_API_KEY=", "export LINEAR_API_KEY=")):
-                key = line.split("=", 1)[1].strip().strip('"').strip("'")
+    def __init__(self, env_file: Path, app_env: Path | None = None):
+        # The Jovie Lanes app (own quota) when its credentials are installed; Tim's personal
+        # key only when they are absent. `key` scopes cooldowns and caches: for the app it is
+        # the app identity, never the rotating token, so a re-mint keeps the same cooldown.
+        self.app = linear_app_token.credentials(app_env if app_env is not None else linear_app_token.default_path())
+        if self.app:
+            self.key = f"linear-app:{self.app[0]}"
+            return
+        key = linear_app_token.env_values(env_file).get("LINEAR_API_KEY", "")
         if not key:
             raise SystemExit(f"no LINEAR_API_KEY in {env_file}")
         self.key = key
+
+    def _authorization(self, rejected: str | None = None) -> tuple[str, str | None]:
+        if not getattr(self, "app", None):
+            return self.key, None
+        try:
+            access = linear_app_token.token(*self.app, lane_state_dir(), rejected=rejected)
+        except linear_app_token.TokenUnavailable as error:
+            raise LinearRateLimited(error.retry_at) from None
+        return f"Bearer {access}", access
 
     def gql(self, query: str, variables: dict) -> dict:
         family = _linear_operation_family(query)
@@ -1706,13 +1790,25 @@ class Linear:
         if cooling is not None:
             record_linear_usage(self.key, family, "cooldown", attempted=False)
             raise LinearRateLimited(cooling)
-        request = urllib.request.Request(
-            LINEAR_API_URL, data=json.dumps({"query": query, "variables": variables}).encode(),
-            headers={"Content-Type": "application/json", "Authorization": self.key})
+        try:
+            authorization, access = self._authorization()
+        except LinearRateLimited:
+            record_linear_usage(self.key, family, "cooldown", attempted=False)
+            raise
         outcome, headers = "transport-error", None
         try:
+            body = json.dumps({"query": query, "variables": variables}).encode()
+            request = lambda auth: urllib.request.Request(
+                LINEAR_API_URL, data=body, headers={"Content-Type": "application/json", "Authorization": auth})
             try:
-                response = urllib.request.urlopen(request, timeout=30)
+                try:
+                    response = urllib.request.urlopen(request(authorization), timeout=30)
+                except urllib.error.HTTPError as error:
+                    if error.code != 401 or access is None:
+                        raise
+                    # Revoked or expired app token: one re-mint (or a sibling's), one retry.
+                    authorization, access = self._authorization(rejected=access)
+                    response = urllib.request.urlopen(request(authorization), timeout=30)
             except urllib.error.HTTPError as error:
                 headers, raw = getattr(error, "headers", None), b""
                 try:

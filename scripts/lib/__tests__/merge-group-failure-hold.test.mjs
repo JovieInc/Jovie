@@ -669,6 +669,26 @@ describe('failure classification and revision-scoped suppression', () => {
       'deterministic-source'
     );
     expect(classify('failure', ['Run unit tests'])).toBe('retryable-product');
+    // #20958 (run 38167113928): static build-output certification is not
+    // retried on an unchanged head.
+    for (const step of [
+      'Certify marketing SEO against prerendered HTML',
+      'Certify marketing route DOM invariants',
+    ]) {
+      expect(
+        classify('failure', [
+          step,
+          'Join exact lane results',
+          'Evaluate combined-head checks',
+        ])
+      ).toBe('deterministic-source');
+    }
+    expect(
+      classify('failure', [
+        'Run ./.github/actions/setup-node-pnpm',
+        'Join exact lane results',
+      ])
+    ).toBe('unclassified');
     expect(classify('startup_failure')).toBe('transient-infrastructure');
   });
 
@@ -958,6 +978,8 @@ describe('terminal failure hold application', () => {
       'Process completed with exit code 1.\nGitHub API 503 for /graphql: Service Unavailable',
       'GitHub API request failed for /graphql: The operation was aborted due to timeout',
       'GitHub API 403 for /repos/x/y/commits/z/check-runs: API rate limit exceeded for installation',
+      // Run 38171069689 (2026-10-11): reset later than the admission deadline.
+      'GitHub rate-limit recovery does not fit within the admission budget\nProcess completed with exit code 1.',
     ]) {
       expect(
         classifyMergeGroupFailure({
