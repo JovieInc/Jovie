@@ -223,12 +223,17 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
       - name: Scan the exact source diff
         if: steps.reuse.outputs.reuse != 'true'
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
         run: |
           git fetch --no-tags origin "${{ github.base_ref }}"
           base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
           ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
           ./scripts/security/verify-gitleaks-coverage.sh
           node scripts/golden-path-lock.mjs merge-gate
+          git diff --name-only "$base_sha" HEAD > "$RUNNER_TEMP/security-gate-files.txt"
+          node scripts/security/security-gate.mjs --changed-files "$RUNNER_TEMP/security-gate-files.txt"
   migration:
     name: Migration Guard
     runs-on: ubuntu-latest

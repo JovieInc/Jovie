@@ -2009,6 +2009,12 @@ export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
   'Run Knip (unused files, deps & exports)',
   'Run deterministic layout behavior guard',
   'Run static mobile overflow guard',
+  // Static checks over the exact combined build output. An unchanged head
+  // fails them again on retry and rebuilds every group behind it (#20958 on
+  // 2026-10-11: run 38167113928 failed SEO certification, was retried 44s
+  // later as "unclassified", and failed the same way).
+  'Certify marketing SEO against prerendered HTML',
+  'Certify marketing route DOM invariants',
 ]);
 export const RETRYABLE_PRODUCT_FAILURE_STEPS = new Set([
   'Run unit tests',

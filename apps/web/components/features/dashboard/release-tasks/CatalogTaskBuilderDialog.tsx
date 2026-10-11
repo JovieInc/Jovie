@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { useCallback, useMemo, useState, useTransition } from 'react';
 import { addCatalogTaskToRelease } from '@/app/app/(shell)/dashboard/releases/catalog-task-actions';
 import { toast } from '@/components/feedback';
@@ -128,14 +128,13 @@ export function CatalogTaskBuilderDialog({
       </DialogDescription>
       <DialogBody>
         <div className='space-y-3'>
-          <input
+          <Input
             type='search'
             value={query}
             onChange={e => startTransition(() => setQuery(e.target.value))}
             placeholder='Search tasks'
             aria-label='Search Tasks'
             data-testid='catalog-search'
-            className='w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm'
           />
           <div
             className='max-h-[60vh] overflow-y-auto space-y-4'

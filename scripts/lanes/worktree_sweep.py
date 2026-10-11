@@ -44,7 +44,8 @@ LOW_INTERVAL_S = 600
 # Regenerable output, plus per-checkout pnpm stores (never the shared store, which lives outside checkouts).
 BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".build", "DerivedData",
                         ".pnpm-store", ".pnpm-store-private"})
-EXCLUDE = [f":(exclude,glob)**/{name}/**" for name in sorted(BUILD_DIRS)] + [f":(exclude){PRESERVED_REPAIR}"]
+EXCLUDE = [f":(exclude,glob)**/{name}/**" for name in sorted(BUILD_DIRS)] + [f":(exclude){PRESERVED_REPAIR}",
+                                                                          ":(exclude).codex-last-message.txt"]
 
 
 def default_roots(home: Path, state: Path) -> list[Path]:
@@ -189,6 +190,16 @@ def preserved_age(path: Path, now: float) -> float | None:
         return None
 
 
+def cleanup_preserved(path: Path) -> bool:
+    """A marker written by cleanup (reasons all `cleanup-*`), not by a cancelled repair."""
+    try:
+        reasons = json.loads((path / PRESERVED_REPAIR).read_text()).get("reason")
+    except (OSError, ValueError, AttributeError):
+        return False
+    return isinstance(reasons, list) and bool(reasons) and all(
+        isinstance(reason, str) and reason.startswith("cleanup-") for reason in reasons)
+
+
 def decide(path: Path, branch: str | None, info: dict, now: float, closed: set[str], *,
            idle_s: float, preserved_ttl_s: float) -> str | None:
     """Why this checkout may retire now, or None to keep it."""
@@ -198,6 +209,10 @@ def decide(path: Path, branch: str | None, info: dict, now: float, closed: set[s
     if age is not None:
         if closed_pr and idle >= CLOSED_GRACE_S:
             return "preserved-pr-closed"
+        # Cleanup preserved it only because its source looked unverified; once it is provably
+        # clean and published, keeping it just locks the PR branch against every repair.
+        if cleanup_preserved(path) and info["dirty"] == 0 and info["unpushed"] == "0" and idle >= CLOSED_GRACE_S:
+            return "preserved-clean"
         return "preserved-expired" if age >= preserved_ttl_s and idle >= idle_s else None
     if closed_pr and idle >= CLOSED_GRACE_S:
         return "pr-closed"

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockTransaction,
@@ -114,218 +114,78 @@ function approvedLedger(lead = makeLead()) {
 describe('processOutreachBatch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', 'true');
     mockReadOutboundLedger.mockResolvedValue(approvedLedger().ledger);
+    mockPushLeadToInstantly.mockResolvedValue('would-send-if-called');
+    mockDbSelect.mockReturnValue({
+      from: () => ({ where: () => Promise.resolve([{ total: 2 }]) }),
+    });
   });
 
-  it('does not claim or push leads when Instantly outbound is off', async () => {
-    vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', '');
+  afterEach(() => vi.unstubAllEnvs());
 
+  it.each([
+    ['', false],
+    ['true', false],
+    ['true', true],
+    ['1', true],
+  ])(
+    'blocks before claims with provider flag %s and bypass %s',
+    async (flag, bypass) => {
+      vi.stubEnv('FEATURE_INSTANTLY_OUTBOUND', flag);
+      const { processOutreachBatch } = await import(
+        '@/lib/leads/outreach-batch'
+      );
+      const result = await processOutreachBatch(100, {
+        ignorePipelineEnabled: bypass,
+      });
+
+      expect(result).toMatchObject({
+        attempted: 0,
+        queued: 0,
+        failed: 0,
+        dismissed: 0,
+        unapproved: 0,
+        remainingPending: 2,
+        policyBlocked: {
+          decision: 'blocked',
+          dispatchAllowed: false,
+          retryable: false,
+          queueDisposition: 'do_not_enqueue_or_retry',
+          reason: 'audience_delivery_disabled',
+        },
+      });
+      expect(mockDbSelect).toHaveBeenCalledTimes(1);
+      expect(mockTransaction).not.toHaveBeenCalled();
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect(mockReadOutboundLedger).not.toHaveBeenCalled();
+      expect(mockIsEmailSuppressed).not.toHaveBeenCalled();
+      expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+      expect(mockRecordLeadFunnelEvent).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps repeated cron/manual triggers read-only', async () => {
     const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
-    const result = await processOutreachBatch(10);
-
-    expect(result).toEqual({
-      attempted: 0,
-      queued: 0,
-      failed: 0,
-      dismissed: 0,
-      unapproved: 0,
-      remainingPending: 0,
-    });
+    await processOutreachBatch(10);
+    await processOutreachBatch(10, { ignorePipelineEnabled: true });
+    expect(mockDbSelect).toHaveBeenCalledTimes(2);
     expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(mockReadOutboundLedger).not.toHaveBeenCalled();
     expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+    expect(mockRecordLeadFunnelEvent).not.toHaveBeenCalled();
   });
 
-  it('skips send for suppressed leads (Fix #1)', async () => {
-    const lead = makeLead();
-    // Claim phase: return one lead
-    mockTransaction.mockResolvedValue([{ ...lead, claimedAt: new Date() }]);
-
-    // Pipeline still enabled at send-phase re-check
+  it('does not report an empty successful queue when the read-only count fails', async () => {
     mockDbSelect.mockReturnValue({
       from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve([{ enabled: true }]),
-        }),
+        where: () => Promise.reject(new Error('count unavailable')),
       }),
     });
-
-    // Suppressed
-    mockIsEmailSuppressed.mockResolvedValue({
-      suppressed: true,
-      reason: 'user_request',
-    });
-
-    // db.update().set().where() chain for marking dismissed + final remaining count
-    const updateChain = {
-      set: () => ({ where: () => Promise.resolve(undefined) }),
-    };
-    mockDbUpdate.mockReturnValue(updateChain);
-
-    // remainingPending count
-    const countChain = {
-      from: () => ({
-        where: () => Promise.resolve([{ total: 0 }]),
-      }),
-    };
-    mockDbSelect.mockReturnValueOnce({
-      from: () => ({
-        where: () => ({ limit: () => Promise.resolve([{ enabled: true }]) }),
-      }),
-    });
-    mockDbSelect.mockReturnValueOnce(countChain);
-
     const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
-    const result = await processOutreachBatch(10);
-
-    expect(mockIsEmailSuppressed).toHaveBeenCalledWith('artist@example.com');
+    await expect(processOutreachBatch(10)).rejects.toThrow('count unavailable');
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
     expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
-    expect(result.dismissed).toBe(1);
-    expect(result.queued).toBe(0);
-  });
-
-  it('skips send and releases claim when pipeline is disabled mid-batch (Fix #3)', async () => {
-    const lead = { ...makeLead(), claimedAt: new Date() };
-    mockTransaction.mockResolvedValue([lead]);
-
-    // First select = per-iteration enabled re-check → false (kill switch flipped).
-    // Second select = remainingPending count at the end.
-    mockDbSelect
-      .mockReturnValueOnce({
-        from: () => ({
-          where: () => ({ limit: () => Promise.resolve([{ enabled: false }]) }),
-        }),
-      })
-      .mockReturnValueOnce({
-        from: () => ({
-          where: () => Promise.resolve([{ total: 0 }]),
-        }),
-      });
-
-    mockDbUpdate.mockReturnValue({
-      set: () => ({ where: () => Promise.resolve(undefined) }),
-    });
-
-    const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
-    const result = await processOutreachBatch(10);
-
-    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
-    expect(mockIsEmailSuppressed).not.toHaveBeenCalled();
-    expect(mockDbUpdate).toHaveBeenCalled(); // releaseClaim ran
-    expect(result.attempted).toBe(0);
-  });
-
-  it('acquires advisory lock and short-circuits when another batch holds it (Fix #2)', async () => {
-    // Simulate advisory lock rejected → transaction returns []
-    mockTransaction.mockResolvedValue([]);
-
-    mockDbSelect.mockReturnValue({
-      from: () => ({
-        where: () => Promise.resolve([{ total: 0 }]),
-      }),
-    });
-
-    const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
-    const result = await processOutreachBatch(10);
-
-    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
-    expect(result).toEqual({
-      attempted: 0,
-      queued: 0,
-      failed: 0,
-      dismissed: 0,
-      unapproved: 0,
-      remainingPending: 0,
-    });
-  });
-
-  it('never pushes a lead Tim has not approved, and releases its claim', async () => {
-    const lead = { ...makeLead(), claimedAt: new Date() };
-    mockTransaction.mockResolvedValue([lead]);
-    mockReadOutboundLedger.mockResolvedValue(new Map());
-    mockDbSelect
-      .mockReturnValueOnce({
-        from: () => ({
-          where: () => ({ limit: () => Promise.resolve([{ enabled: true }]) }),
-        }),
-      })
-      .mockReturnValueOnce({
-        from: () => ({ where: () => Promise.resolve([{ total: 1 }]) }),
-      });
-    const set = vi.fn(() => ({ where: () => Promise.resolve(undefined) }));
-    mockDbUpdate.mockReturnValue({ set });
-
-    const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
-    const result = await processOutreachBatch(10);
-
-    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
-    expect(mockIsEmailSuppressed).not.toHaveBeenCalled();
-    expect(set).toHaveBeenCalledWith(
-      expect.objectContaining({ outreachQueuedAt: null })
-    );
-    expect(result.unapproved).toBe(1);
-    expect(result.attempted).toBe(0);
-  });
-
-  it('refuses a lead whose email changed after Tim approved it', async () => {
-    const approved = approvedLedger();
-    const lead = {
-      ...makeLead({ contactEmail: 'new@example.com' }),
-      claimedAt: new Date(),
-    };
-    mockTransaction.mockResolvedValue([lead]);
-    mockReadOutboundLedger.mockResolvedValue(approved.ledger);
-    mockDbSelect
-      .mockReturnValueOnce({
-        from: () => ({
-          where: () => ({ limit: () => Promise.resolve([{ enabled: true }]) }),
-        }),
-      })
-      .mockReturnValueOnce({
-        from: () => ({ where: () => Promise.resolve([{ total: 1 }]) }),
-      });
-    mockDbUpdate.mockReturnValue({
-      set: () => ({ where: () => Promise.resolve(undefined) }),
-    });
-
-    const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
-    const result = await processOutreachBatch(10);
-
-    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
-    expect(result.unapproved).toBe(1);
-  });
-
-  it('sends exactly the approved copy revision', async () => {
-    const approved = approvedLedger();
-    const lead = { ...makeLead(), claimedAt: new Date() };
-    mockTransaction.mockResolvedValue([lead]);
-    mockIsEmailSuppressed.mockResolvedValue({ suppressed: false });
-    mockPushLeadToInstantly.mockResolvedValue('instantly-1');
-    mockDbSelect
-      .mockReturnValueOnce({
-        from: () => ({
-          where: () => ({ limit: () => Promise.resolve([{ enabled: true }]) }),
-        }),
-      })
-      // duplicate-email check
-      .mockReturnValueOnce({
-        from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
-      })
-      .mockReturnValueOnce({
-        from: () => ({ where: () => Promise.resolve([{ total: 0 }]) }),
-      });
-    mockDbUpdate.mockReturnValue({
-      set: () => ({ where: () => Promise.resolve(undefined) }),
-    });
-
-    const { processOutreachBatch } = await import('@/lib/leads/outreach-batch');
-    const result = await processOutreachBatch(10);
-
-    expect(result.queued).toBe(1);
-    expect(mockPushLeadToInstantly).toHaveBeenCalledWith(
-      expect.objectContaining({
-        approvedCopy: { ...approved.copy, revision: approved.revision },
-      })
-    );
   });
 });
