@@ -296,6 +296,7 @@ test('source admission loads the actual changelog guard from trusted base when a
     for (const file of [
       'scripts/changelog-source-guard.mjs',
       'scripts/lib/gh-retry.sh',
+      'scripts/lib/github-rate-limit.mjs',
       'scripts/lib/daily-changelog-publication.mjs',
       'scripts/lib/daily-changelog.mjs',
       'scripts/lib/changelog-filter-rules.mjs',
