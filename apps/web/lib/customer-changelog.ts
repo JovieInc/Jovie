@@ -53,13 +53,14 @@ export const CUSTOMER_CHANGELOG_AVAILABILITY = [
 export type CustomerChangelogAvailability =
   (typeof CUSTOMER_CHANGELOG_AVAILABILITY)[number];
 
-export const CustomerChangelogMediaSchema = z
-  .object({
-    kind: z.enum(['image', 'video']),
-    src: z.string().min(1),
-    alt: z.string(),
-  })
-  .nullable();
+export const CustomerChangelogMediaSchema = /* @__PURE__ */ (() =>
+  z
+    .object({
+      kind: z.enum(['image', 'video']),
+      src: z.string().min(1),
+      alt: z.string(),
+    })
+    .nullable())();
 
 /** The existing version-post hero authority; consumers inherit, never select. */
 const CHANGELOG_POST_HERO = {
@@ -70,14 +71,9 @@ const CHANGELOG_POST_HERO = {
   objectPosition: 'center',
 } as const;
 
-export const CustomerChangelogHeroSchema =
-  CustomerChangelogMediaSchema.unwrap().extend({
-    postId: z.string().min(1),
-    kind: z.literal('image'),
-    objectFit: z.literal('cover'),
-    objectPosition: z.literal('center'),
-  });
-export type CustomerChangelogHero = z.infer<typeof CustomerChangelogHeroSchema>;
+export type CustomerChangelogHero = Readonly<
+  { postId: string } & typeof CHANGELOG_POST_HERO
+>;
 
 /** Call only for a known published release (the post route already resolves it). */
 export function resolveCustomerChangelogHero(
@@ -108,37 +104,43 @@ export function parseCustomerChangelogHero(
   value: unknown,
   postId: string
 ): CustomerChangelogHero | null {
-  const result = CustomerChangelogHeroSchema.safeParse(value);
-  if (!result.success || result.data.postId !== postId) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const hero = value as Record<string, unknown>;
+  if (!postId || hero.postId !== postId) return null;
   const expected = resolveCustomerChangelogHero(postId);
-  return result.data.src === expected.src && result.data.alt === expected.alt
-    ? result.data
+  return hero.kind === expected.kind &&
+    hero.src === expected.src &&
+    hero.alt === expected.alt &&
+    hero.objectFit === expected.objectFit &&
+    hero.objectPosition === expected.objectPosition
+    ? expected
     : null;
 }
 
-export const CustomerChangelogEntrySchema = z.object({
-  title: z.string().min(1),
-  slug: z.string().min(1),
-  date: z.string(),
-  summary: z.string(),
-  category: z.enum(CUSTOMER_CHANGELOG_CATEGORIES),
-  capabilities: z.array(z.string()),
-  surfaces: z.array(z.string()),
-  availability: z.enum(CUSTOMER_CHANGELOG_AVAILABILITY),
-  prerequisites: z.array(z.string()).optional(),
-  action: z
-    .object({
-      label: z.string().min(1),
-      href: z.string().min(1),
-    })
-    .nullable(),
-  media: CustomerChangelogMediaSchema,
-  technicalVersion: z.string().min(1),
-  explanation: z.string(),
-  supporting: z.array(z.string()),
-  technical: z.array(z.string()),
-  prominence: z.enum(CUSTOMER_CHANGELOG_PROMINENCE),
-});
+export const CustomerChangelogEntrySchema = /* @__PURE__ */ (() =>
+  z.object({
+    title: z.string().min(1),
+    slug: z.string().min(1),
+    date: z.string(),
+    summary: z.string(),
+    category: z.enum(CUSTOMER_CHANGELOG_CATEGORIES),
+    capabilities: z.array(z.string()),
+    surfaces: z.array(z.string()),
+    availability: z.enum(CUSTOMER_CHANGELOG_AVAILABILITY),
+    prerequisites: z.array(z.string()).optional(),
+    action: z
+      .object({
+        label: z.string().min(1),
+        href: z.string().min(1),
+      })
+      .nullable(),
+    media: CustomerChangelogMediaSchema,
+    technicalVersion: z.string().min(1),
+    explanation: z.string(),
+    supporting: z.array(z.string()),
+    technical: z.array(z.string()),
+    prominence: z.enum(CUSTOMER_CHANGELOG_PROMINENCE),
+  }))();
 
 export type CustomerChangelogEntry = z.infer<
   typeof CustomerChangelogEntrySchema
