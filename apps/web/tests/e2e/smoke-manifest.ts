@@ -38,6 +38,7 @@ export const DESKTOP_SMOKE_SPECS = [
 ] as const;
 
 export const MOBILE_SMOKE_SPECS = [
+  'chat-composer-draft-mobile.spec.ts',
   'mobile-overflow.spec.ts',
   'profile-mobile-viewport-stability.spec.ts',
 ] as const;
