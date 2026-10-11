@@ -11,8 +11,8 @@ import {
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
-  net,
   Notification,
+  net,
   powerMonitor,
   type Session,
   screen,
@@ -21,7 +21,7 @@ import {
   type WebContents,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
-import { openCurrentOvieInBrowser } from './ovie-browser-recovery';
+import { authHandoffWindowBounds } from './auth-handoff-window';
 import {
   OPERATOR_SPAWN_TIMEOUT_MS,
   runBoundedProcess,
@@ -52,13 +52,6 @@ import {
 } from './desktop-auth-handback';
 import { startDesktopAuthLoopbackServer } from './desktop-auth-loopback';
 import {
-  applyDesktopPasskeyStateUpdate,
-  type DesktopPasskeyState,
-  describeWebAuthnAccounts,
-  parseDesktopPasskeyState,
-  resolveDesktopWebAuthnConfig,
-} from './desktop-passkey';
-import {
   bindPendingDesktopAuthCompletion,
   DESKTOP_AUTH_FLOW_PARAM,
   type PendingDesktopAuthPkce,
@@ -79,6 +72,7 @@ import {
   shouldRunWakeUpdateCheck,
   shouldScheduleDesktopAutoUpdate,
 } from './desktop-auto-update';
+import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
 import {
   createDesktopLaunchReadiness,
   createLaunchReadinessWriter,
@@ -86,11 +80,17 @@ import {
   DESKTOP_LAUNCH_READINESS_FILE,
   type ReadinessSender,
 } from './desktop-launch-readiness';
-import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
 import {
   parseDesktopNotificationRequest,
   resolveDesktopNotificationClickAction,
 } from './desktop-notifications';
+import {
+  applyDesktopPasskeyStateUpdate,
+  type DesktopPasskeyState,
+  describeWebAuthnAccounts,
+  parseDesktopPasskeyState,
+  resolveDesktopWebAuthnConfig,
+} from './desktop-passkey';
 import {
   shouldGrantTrustedAudioPermission,
   shouldGrantTrustedAudioPermissionCheck,
@@ -109,19 +109,11 @@ import {
 } from './hud-build-reload';
 import { resolveIpcSenderUrl } from './ipc-sender';
 import {
-  probeAllWindowWorkSafety,
-  probeSessionWorkSafety,
-  singleFlight,
-} from './session-work-state';
-import {
-  type MainLivenessMonitor,
   createMainLivenessMonitor,
+  type MainLivenessMonitor,
   spawnMainLivenessWorker,
   summarizeUnhandledRejection,
 } from './main-liveness';
-import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
-import { DesktopNavigationCoordinator } from './navigation-coordinator';
-import { createStartupMaintenanceGate } from './startup-maintenance';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -130,11 +122,14 @@ import {
   parseUrl,
   type UrlDisposition,
 } from './navigation';
+import { DesktopNavigationCoordinator } from './navigation-coordinator';
+import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
 import {
   decideOperatorLaunch,
   parseOperatorLaunchRequest,
   terminalLaunchSpec,
 } from './operator-launch';
+import { openCurrentOvieInBrowser } from './ovie-browser-recovery';
 import {
   packagedDesktopAppId,
   packagedUsesCompetingStagingShell,
@@ -165,10 +160,15 @@ import {
   shouldSkipRendererWatchdogForAuthHandoff,
 } from './renderer-recovery';
 import {
+  probeAllWindowWorkSafety,
+  probeSessionWorkSafety,
+  singleFlight,
+} from './session-work-state';
+import { createStartupMaintenanceGate } from './startup-maintenance';
+import {
   createSummerRuntimeBridge,
   type SummerRuntimeBridge,
 } from './summer-runtime-bridge';
-import { authHandoffWindowBounds } from './auth-handoff-window';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import {
   isTrayAppState,
@@ -177,16 +177,16 @@ import {
   type TrayStatePayload,
 } from './tray';
 import {
-  persistNativeFullscreen,
-  shouldRestoreNativeFullscreen,
-  type WindowState,
-} from './window-state';
-import {
   GET_VISUAL_ACTIVITY_CHANNEL,
   observeWindowVisualActivity,
   trustedVisualActivityRequest,
   VISUAL_ACTIVITY_CHANNEL,
 } from './visual-activity';
+import {
+  persistNativeFullscreen,
+  shouldRestoreNativeFullscreen,
+  type WindowState,
+} from './window-state';
 import {
   createWindowStateStore,
   WINDOW_STATE_SHUTDOWN_FLUSH_MS,
@@ -312,10 +312,6 @@ const CLIENT_NAVIGATION_CHANNEL = 'desktop-client-navigation';
 const CLIENT_NAVIGATION_READY_CHANNEL = 'desktop-client-navigation-ready';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
-type UpdateChannel =
-  | typeof UPDATE_AVAILABLE_CHANNEL
-  | typeof UPDATE_DOWNLOADED_CHANNEL;
-
 interface NavState {
   canGoBack: boolean;
   canGoForward: boolean;
@@ -363,6 +359,24 @@ let desktopUpdatePhase: DesktopUpdatePhase = DESKTOP_UPDATE_INITIAL_STATE;
 // (up to date / error) shows a dialog; silent background checks stay silent.
 let pendingManualUpdateCheck = false;
 let mainWindow: BrowserWindow | null = null;
+function getWindowContents(win: BrowserWindow): WebContents {
+  return win.webContents;
+}
+
+function appDocuments(): { win: BrowserWindow; contents: WebContents }[] {
+  return BrowserWindow.getAllWindows()
+    .filter(win => !win.isDestroyed() && !win.webContents.isDestroyed())
+    .map(win => ({ win, contents: win.webContents }));
+}
+
+function isMainPageContents(contents: WebContents): boolean {
+  return Boolean(
+    mainWindow &&
+      !mainWindow.isDestroyed() &&
+      mainWindow.webContents === contents
+  );
+}
+
 const desktopNavigation = new DesktopNavigationCoordinator();
 const visualActivityReaders = new Map<number, () => boolean>();
 let publicProfilePreviewWindow: BrowserWindow | null = null;
@@ -1002,16 +1016,24 @@ function restoreMainWindowAfterAuthHandoff(): void {
   if (!mainWindowHiddenForAuthHandoff) return;
   mainWindowHiddenForAuthHandoff = false;
   if (mainWindow && !mainWindow.isDestroyed()) {
-    const recovery = authNavigationRecoveries.get(mainWindow.webContents.id);
+    const recovery = authNavigationRecoveries.get(
+      getWindowContents(mainWindow).id
+    );
     const interruptedTarget = recovery?.cancel();
     if (interruptedTarget) {
       const completed = recovery!.navigationCompletion();
-      void mainWindow.loadURL(interruptedTarget).then(completed, () => {});
+      void getWindowContents(mainWindow)
+        .loadURL(interruptedTarget)
+        .then(completed, () => {});
     } else if (
-      shouldRecoverAuthHandoffToCanonicalShell(mainWindow.webContents.getURL())
+      shouldRecoverAuthHandoffToCanonicalShell(
+        getWindowContents(mainWindow).getURL()
+      )
     ) {
       const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
-      void mainWindow.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+      void getWindowContents(mainWindow).loadURL(
+        buildDesktopAuthHandoffUrl(authUrl)
+      );
     }
     showWindow(mainWindow);
   }
@@ -1102,10 +1124,10 @@ function loadAuthCompletion(completion: DesktopAuthCompletion): void {
       : createWindow(targetUrl);
   // Successful auth owns its returned route; cancellation recovery must not
   // replay the earlier interrupted navigation when the handoff closes.
-  authNavigationRecoveries.get(win.webContents.id)?.clear();
+  authNavigationRecoveries.get(getWindowContents(win).id)?.clear();
 
-  if (win.webContents.getURL() !== targetUrl) {
-    void win.loadURL(targetUrl);
+  if (getWindowContents(win).getURL() !== targetUrl) {
+    void getWindowContents(win).loadURL(targetUrl);
   }
 
   if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
@@ -1224,7 +1246,9 @@ async function configureDesktopWebAuthn(): Promise<void> {
     isPackaged: app.isPackaged,
     appEnv: APP_ENV,
     hasEmbeddedProvisioningProfile: await fs.promises
-      .access(path.join(process.resourcesPath, '..', 'embedded.provisionprofile'))
+      .access(
+        path.join(process.resourcesPath, '..', 'embedded.provisionprofile')
+      )
       .then(
         () => true,
         () => false
@@ -1286,9 +1310,9 @@ function loadReturnedRoute(route: string): void {
       : createWindow(targetUrl);
 
   // Successful handback owns its returned route, not the interrupted old one.
-  authNavigationRecoveries.get(win.webContents.id)?.clear();
-  if (win.webContents.getURL() !== targetUrl) {
-    void win.loadURL(targetUrl);
+  authNavigationRecoveries.get(getWindowContents(win).id)?.clear();
+  if (getWindowContents(win).getURL() !== targetUrl) {
+    void getWindowContents(win).loadURL(targetUrl);
   }
 
   if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
@@ -1403,7 +1427,9 @@ function showDesktopAuthHandoff(
     // The handoff installed deny-all permission handlers on the shared default
     // session; restore the main window's trusted-audio policy.
     if (mainWindow && !mainWindow.isDestroyed()) {
-      registerMainWindowPermissionHandlers(mainWindow.webContents.session);
+      registerMainWindowPermissionHandlers(
+        getWindowContents(mainWindow).session
+      );
     }
   });
 
@@ -1445,18 +1471,21 @@ function maybeShowDesktopAuthHandoff(urlString: string): boolean {
 
 function interceptMainWindowAuthNavigation(
   win: BrowserWindow,
-  url: string
+  url: string,
+  contents: WebContents = getWindowContents(win)
 ): boolean {
   const authUrl = buildDesktopBrowserAuthUrl(url);
   if (!authUrl) return false;
-  const recovery = authNavigationRecoveries.get(win.webContents.id);
+  const recovery = authNavigationRecoveries.get(contents.id);
   const action = recovery?.authIntercepted();
   if (action === 'ignore') return true;
   if (action === 'canonical-auth-shell') {
     // A failed one-shot retry remains recoverable in this window, not a loop
     // of newly opened handoffs. Existing server auth checks remain authority.
     const completed = recovery!.navigationCompletion();
-    void win.loadURL(buildDesktopAuthHandoffUrl(authUrl)).then(completed, () => {});
+    void contents
+      .loadURL(buildDesktopAuthHandoffUrl(authUrl))
+      .then(completed, () => {});
     showWindow(win);
   } else {
     showDesktopAuthHandoff(authUrl);
@@ -1692,19 +1721,23 @@ function showDesktopAboutWindow(): void {
   void aboutWindow.loadURL(buildDesktopAboutUrl());
 }
 
-function loadHostedUrlAfterSplash(win: BrowserWindow, hostedUrl: string): void {
+function loadHostedUrlAfterSplash(
+  win: BrowserWindow,
+  hostedUrl: string,
+  contents: WebContents = getWindowContents(win)
+): void {
   const navigateToHosted = (): void => {
-    if (win.isDestroyed()) return;
-    void win.loadURL(hostedUrl);
+    if (win.isDestroyed() || contents.isDestroyed()) return;
+    void contents.loadURL(hostedUrl);
   };
 
-  if (win.webContents.getURL().startsWith('data:text/html')) {
+  if (contents.getURL().startsWith('data:text/html')) {
     navigateToHosted();
     return;
   }
 
-  win.webContents.once('did-finish-load', navigateToHosted);
-  void win.loadURL(buildDesktopBootSplashUrl());
+  contents.once('did-finish-load', navigateToHosted);
+  void contents.loadURL(buildDesktopBootSplashUrl());
 }
 
 function showDesktopLoadFailure(
@@ -1712,11 +1745,12 @@ function showDesktopLoadFailure(
   failure: DesktopLoadFailureView = describeDesktopLoadFailure(
     'unknown',
     APP_URL
-  )
+  ),
+  contents: WebContents = getWindowContents(win)
 ): void {
-  if (win.isDestroyed()) return;
-  void win.loadURL(buildDesktopLoadFailureUrl(failure));
-  rendererBootControllers.get(win.webContents.id)?.beginRecoveryUnlatch();
+  if (win.isDestroyed() || contents.isDestroyed()) return;
+  void contents.loadURL(buildDesktopLoadFailureUrl(failure));
+  rendererBootControllers.get(contents.id)?.beginRecoveryUnlatch();
 }
 
 async function probeAppUrl(url: string): Promise<boolean> {
@@ -1778,7 +1812,7 @@ function resolveLoadFailureView(
 
 function isHudWindow(win: BrowserWindow): boolean {
   if (win.isDestroyed()) return false;
-  const parsed = parseUrl(win.webContents.getURL());
+  const parsed = parseUrl(getWindowContents(win).getURL());
   return parsed?.origin === APP_ORIGIN && isHudRoutePath(parsed.pathname);
 }
 
@@ -1808,32 +1842,29 @@ async function fetchHudBuildFingerprint(): Promise<string | null> {
 
 function isWebBuildReloadWindow(win: BrowserWindow): boolean {
   if (win.isDestroyed()) return false;
-  const parsed = parseUrl(win.webContents.getURL());
-  return (
-    parsed?.origin === APP_ORIGIN && isWebBuildReloadPath(parsed.pathname)
-  );
+  const parsed = parseUrl(getWindowContents(win).getURL());
+  return parsed?.origin === APP_ORIGIN && isWebBuildReloadPath(parsed.pathname);
 }
 
 /** Auth remains main-owned even when the chat renderer is hidden or idle. */
 function hasPendingDesktopAuthentication(): boolean {
   return Boolean(
     isAuthHandoffOpen() ||
-    desktopBrowserAuthRouteState.pendingPkce ||
-    desktopBrowserAuthRouteState.recoveryNavigationPending ||
-    pendingAuthCompletion ||
-    pendingLegacyAuthReturnRoute
+      desktopBrowserAuthRouteState.pendingPkce ||
+      desktopBrowserAuthRouteState.recoveryNavigationPending ||
+      pendingAuthCompletion ||
+      pendingLegacyAuthReturnRoute
   );
 }
 
 /** Unknown state, draft probe failures and navigation during a probe block reload. */
-async function windowWorkStateSafe(win: BrowserWindow): Promise<boolean> {
-  if (win.isDestroyed() || win.webContents.isLoadingMainFrame()) return false;
-  const contents = win.webContents;
+async function contentsWorkStateSafe(contents: WebContents): Promise<boolean> {
+  if (contents.isDestroyed() || contents.isLoadingMainFrame()) return false;
   const generation = workDocumentGenerations.get(contents);
   return probeSessionWorkSafety({
     read: () => contents.executeJavaScript(SESSION_WORK_PROBE),
     isCurrentDocument: () =>
-      !win.isDestroyed() &&
+      !contents.isDestroyed() &&
       !contents.isLoadingMainFrame() &&
       generation === workDocumentGenerations.get(contents),
     isAuthenticating: hasPendingDesktopAuthentication,
@@ -1843,76 +1874,78 @@ async function windowWorkStateSafe(win: BrowserWindow): Promise<boolean> {
 
 function allWindowWorkStateSafe(): Promise<boolean> {
   return probeAllWindowWorkSafety({
-    getWindows: () => BrowserWindow.getAllWindows().filter(
-      win => win === mainWindow || isWebBuildReloadWindow(win)
-    ),
-    getGeneration: win => workDocumentGenerations.get(win.webContents),
-    isLoading: win => win.isDestroyed() || win.webContents.isLoadingMainFrame(),
-    probe: windowWorkStateSafe,
+    getWindows: () =>
+      appDocuments()
+        .filter(
+          ({ win, contents }) =>
+            win === mainWindow || isReloadableDocument(contents)
+        )
+        .map(({ contents }) => contents),
+    getGeneration: contents => workDocumentGenerations.get(contents),
+    isLoading: contents =>
+      contents.isDestroyed() || contents.isLoadingMainFrame(),
+    probe: contentsWorkStateSafe,
     isAuthenticating: hasPendingDesktopAuthentication,
   });
 }
 
+function isReloadableDocument(contents: WebContents): boolean {
+  if (contents.isDestroyed()) return false;
+  const parsed = parseUrl(contents.getURL());
+  return parsed?.origin === APP_ORIGIN && isWebBuildReloadPath(parsed.pathname);
+}
+
 function anyWindowAudible(): boolean {
-  return BrowserWindow.getAllWindows().some(
-    win => !win.isDestroyed() && win.webContents.isCurrentlyAudible()
-  );
+  return appDocuments().some(({ contents }) => contents.isCurrentlyAudible());
 }
 
 async function reloadIdleWindowsForWebBuildChange(): Promise<void> {
   const liveIds = new Set<number>();
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!isWebBuildReloadWindow(win)) continue;
-    const id = win.webContents.id;
+  for (const { win, contents } of appDocuments()) {
+    if (!isReloadableDocument(contents)) continue;
+    const id = contents.id;
     liveIds.add(id);
     if (!webBuildReloadPending.has(id)) continue;
-
-    const workStateSafe = await windowWorkStateSafe(win);
-    if (win.isDestroyed()) continue;
-    const isHud = isHudWindow(win);
+    const workStateSafe = await contentsWorkStateSafe(contents);
+    if (win.isDestroyed() || contents.isDestroyed()) continue;
+    const selected = getWindowContents(win) === contents;
     const reload = shouldReloadWindowForWebBuild({
-      isHud,
-      visible: win.isVisible() && !win.isMinimized(),
-      focused: win.isFocused(),
-      audible: win.webContents.isCurrentlyAudible(),
-      hasUnsentInput: false, // Included in the request-time work probe.
+      isHud: isHudWindow(win),
+      visible: selected && win.isVisible() && !win.isMinimized(),
+      focused: selected && win.isFocused(),
+      audible: contents.isCurrentlyAudible(),
+      hasUnsentInput: false,
       workStateSafe,
       systemIdleSeconds: powerMonitor.getSystemIdleTime(),
     });
-    if (reload && !win.isDestroyed()) {
+    if (reload && !contents.isDestroyed()) {
       webBuildReloadPending.delete(id);
-      win.webContents.reload();
+      contents.reload();
     }
   }
-  for (const id of webBuildReloadPending) {
+  for (const id of webBuildReloadPending)
     if (!liveIds.has(id)) webBuildReloadPending.delete(id);
-  }
 }
 
 const checkHudBuildAndReload = singleFlight(async () => {
-  const reloadable = BrowserWindow.getAllWindows().filter(
-    isWebBuildReloadWindow
+  const reloadable = appDocuments().filter(({ contents }) =>
+    isReloadableDocument(contents)
   );
   if (reloadable.length === 0) {
     webBuildReloadPending.clear();
     return;
   }
-
   const nextFingerprint = await fetchHudBuildFingerprint();
   const decision = decideHudBuildReload({
     currentFingerprint: currentHudBuildFingerprint,
     nextFingerprint,
   });
   currentHudBuildFingerprint = decision.nextFingerprint;
-
-  if (decision.shouldReload) {
-    for (const win of reloadable) {
-      if (!win.isDestroyed()) webBuildReloadPending.add(win.webContents.id);
-    }
-  }
-  if (webBuildReloadPending.size > 0) {
+  if (decision.shouldReload)
+    for (const { contents } of reloadable)
+      webBuildReloadPending.add(contents.id);
+  if (webBuildReloadPending.size > 0)
     await reloadIdleWindowsForWebBuildChange();
-  }
 });
 
 function showPublicProfilePreview(urlString: string): boolean {
@@ -2003,7 +2036,8 @@ function attachRendererRecovery(
   options: {
     readonly shouldSkipWatchdog: () => boolean;
     readonly onAbortedMainFrame?: (validatedURL: string) => boolean;
-  }
+  },
+  contents: WebContents = getWindowContents(win)
 ): void {
   let rendererCrashReloadCount = 0;
   let hostedLoadRetryCount = 0;
@@ -2015,13 +2049,13 @@ function attachRendererRecovery(
   let loadWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
   let recoveryUnlatchTimer: ReturnType<typeof setTimeout> | null = null;
   const armWatchdogs = shouldArmRendererWatchdogsForAppEnv(APP_ENV);
-  const webContentsId = win.webContents.id;
+  const webContentsId = contents.id;
   const localHostedLoadRecovery = createLocalHostedLoadRetryController({
     retry: retryUrl => {
-      if (win.isDestroyed()) return;
-      void win.loadURL(retryUrl);
+      if (win.isDestroyed() || contents.isDestroyed()) return;
+      void contents.loadURL(retryUrl);
     },
-    isWindowDestroyed: () => win.isDestroyed(),
+    isWindowDestroyed: () => win.isDestroyed() || contents.isDestroyed(),
   });
 
   const clearBootWatchdog = (): void => {
@@ -2056,27 +2090,26 @@ function attachRendererRecovery(
     // PT had :3100 already warm while the recovery shell stayed latched.
     let recoveryArmed = true;
     const poll = (): void => {
-      if (win.isDestroyed() || rendererBooted) {
+      if (win.isDestroyed() || contents.isDestroyed() || rendererBooted) {
         stopRecoveryUnlatch();
         return;
       }
       void findReachableHostedUrl(lastHostedUrl).then(reachableHostedUrl => {
-        if (win.isDestroyed() || rendererBooted) {
+        if (win.isDestroyed() || contents.isDestroyed() || rendererBooted) {
           stopRecoveryUnlatch();
           return;
         }
         const action = decideRecoveryUnlatch({
           showingFailurePage:
-            recoveryArmed ||
-            win.webContents.getURL().startsWith('data:text/html'),
+            recoveryArmed || contents.getURL().startsWith('data:text/html'),
           booted: rendererBooted,
-          windowDestroyed: win.isDestroyed(),
+          windowDestroyed: win.isDestroyed() || contents.isDestroyed(),
           reachableHostedUrl,
         });
         if (action === 'reload-hosted' && reachableHostedUrl) {
           recoveryArmed = false;
           lastHostedUrl = reachableHostedUrl;
-          void win.loadURL(reachableHostedUrl);
+          void contents.loadURL(reachableHostedUrl);
           return;
         }
         recoveryUnlatchTimer = setTimeout(poll, RECOVERY_UNLATCH_POLL_MS);
@@ -2092,20 +2125,23 @@ function attachRendererRecovery(
       readonly hostReachable?: boolean;
     } = {}
   ): void => {
-    if (rendererBooted || win.isDestroyed()) return;
+    if (rendererBooted || win.isDestroyed() || contents.isDestroyed()) return;
     const failure = resolveLoadFailureView(reason, failureOptions);
     const retryAction = decideHostedLoadRetry({
       kind: failure.kind,
       retryCount: hostedLoadRetryCount,
       maxRetries: MAX_HOSTED_LOAD_RETRIES,
     });
-    if (retryAction === 'retry' && !win.isDestroyed()) {
+    if (
+      retryAction === 'retry' &&
+      !(win.isDestroyed() || contents.isDestroyed())
+    ) {
       hostedLoadRetryCount += 1;
       retryingHostedLoad = true;
       const retryUrl = lastHostedUrl;
       const reload = (): void => {
-        if (win.isDestroyed()) return;
-        void win.loadURL(retryUrl);
+        if (win.isDestroyed() || contents.isDestroyed()) return;
+        void contents.loadURL(retryUrl);
       };
       if (HOSTED_LOAD_RETRY_DELAY_MS > 0) {
         setTimeout(reload, HOSTED_LOAD_RETRY_DELAY_MS);
@@ -2114,7 +2150,7 @@ function attachRendererRecovery(
       }
       return;
     }
-    showDesktopLoadFailure(win, failure);
+    showDesktopLoadFailure(win, failure, contents);
     if (win === mainWindow) {
       showWindowNow(win);
     }
@@ -2125,7 +2161,7 @@ function attachRendererRecovery(
       booted: rendererBooted,
       everBooted: rendererEverBooted,
       reason,
-      windowDestroyed: win.isDestroyed(),
+      windowDestroyed: win.isDestroyed() || contents.isDestroyed(),
       skipForAuthHandoff: options.shouldSkipWatchdog(),
     });
     if (action === 'ignore') return;
@@ -2144,7 +2180,7 @@ function attachRendererRecovery(
       }
     );
     void isAppOriginReachable().then(hostReachable => {
-      if (win.isDestroyed()) return;
+      if (win.isDestroyed() || contents.isDestroyed()) return;
       // The probe is async. A healthy first compile can send app-booted
       // while it is in flight — do not replace that painted session.
       if (
@@ -2152,7 +2188,7 @@ function attachRendererRecovery(
           booted: rendererBooted,
           everBooted: rendererEverBooted,
           reason,
-          windowDestroyed: win.isDestroyed(),
+          windowDestroyed: win.isDestroyed() || contents.isDestroyed(),
           skipForAuthHandoff: options.shouldSkipWatchdog(),
         }) === 'ignore'
       ) {
@@ -2173,7 +2209,7 @@ function attachRendererRecovery(
     }
     retryingHostedLoad = false;
     if (!armWatchdogs) return;
-    if (win.isDestroyed()) return;
+    if (win.isDestroyed() || contents.isDestroyed()) return;
     if (
       decideRendererLoadStart({
         url,
@@ -2194,8 +2230,8 @@ function attachRendererRecovery(
   const armBootWatchdog = (): void => {
     clearAllWatchdogs();
     if (!armWatchdogs) return;
-    if (win.isDestroyed()) return;
-    const url = win.webContents.getURL();
+    if (win.isDestroyed() || contents.isDestroyed()) return;
+    const url = contents.getURL();
     const action = decideRendererBootWatchdogAfterLoad({
       booted: rendererBooted,
       url,
@@ -2230,11 +2266,11 @@ function attachRendererRecovery(
     },
   });
 
-  win.on('closed', () => {
+  contents.once('destroyed', () => {
     rendererBootControllers.get(webContentsId)?.dispose();
   });
 
-  win.webContents.on('did-start-navigation', (...args: unknown[]) => {
+  contents.on('did-start-navigation', (...args: unknown[]) => {
     const navigation = parseDidStartNavigation(args);
     if (!navigation) return;
     if (
@@ -2254,7 +2290,7 @@ function attachRendererRecovery(
   // did-finish-load is unqualified and can arrive late for the splash or
   // Chromium error document. did-navigate carries the committed URL, so only
   // a positively identified hosted app document may complete local recovery.
-  win.webContents.on('did-navigate', (_event, url) => {
+  contents.on('did-navigate', (_event, url) => {
     localHostedLoadRecovery.onMainFrameDocumentCommitted({
       isHostedAppDocument:
         decideRendererLoadStart({
@@ -2266,21 +2302,18 @@ function attachRendererRecovery(
     });
   });
 
-  win.webContents.on('did-finish-load', () => {
+  contents.on('did-finish-load', () => {
     // Chromium still emits did-finish-load for chrome-error://chromewebdata/
     // after did-fail-load. That is not a hosted app load, so it must not arm
     // the boot watchdog. Local retry completion is owned by the URL-bearing
     // did-navigate handler above (JOV-5474).
-    if (
-      decideDidFinishLoadRecovery({ url: win.webContents.getURL() }) ===
-      'ignore'
-    ) {
+    if (decideDidFinishLoadRecovery({ url: contents.getURL() }) === 'ignore') {
       return;
     }
     armBootWatchdog();
   });
 
-  win.webContents.on(
+  contents.on(
     'did-fail-load',
     (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
       if (!isMainFrame) {
@@ -2303,11 +2336,11 @@ function attachRendererRecovery(
             : false;
         const abortAction = decideAbortedMainFrameRecovery({
           recoveredViaAuthHandoff,
-          currentUrl: win.webContents.getURL(),
+          currentUrl: contents.getURL(),
         });
         if (abortAction === 'canonical-auth-shell') {
           const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
-          void win.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+          void contents.loadURL(buildDesktopAuthHandoffUrl(authUrl));
           showWindowNow(win);
           return;
         }
@@ -2344,7 +2377,7 @@ function attachRendererRecovery(
           // Chromium commits chrome-error://chromewebdata/ after a refused
           // loopback load. Keep the app-owned shell painted while the bounded
           // retry obligation remains active.
-          void win.loadURL(buildDesktopBootSplashUrl());
+          void contents.loadURL(buildDesktopBootSplashUrl());
           return;
         }
       }
@@ -2362,7 +2395,7 @@ function attachRendererRecovery(
     }
   );
 
-  win.webContents.on('render-process-gone', (_event, details) => {
+  contents.on('render-process-gone', (_event, details) => {
     clearAllWatchdogs();
     localHostedLoadRecovery.reset();
     const action = decideRendererRecovery({
@@ -2375,20 +2408,21 @@ function attachRendererRecovery(
       exitCode: details.exitCode,
       action,
     });
-    if (win.isDestroyed() || action === 'ignore') return;
+    if (win.isDestroyed() || contents.isDestroyed() || action === 'ignore')
+      return;
     if (action === 'reload') {
       rendererCrashReloadCount += 1;
-      win.webContents.reload();
+      contents.reload();
       return;
     }
     recoverOrShowFailure('crashed');
   });
 
-  win.webContents.on('unresponsive', () => {
+  contents.on('unresponsive', () => {
     console.warn('[Jovie Desktop] Renderer unresponsive', {
-      url: win.webContents.getURL().split('?')[0],
+      url: contents.getURL().split('?')[0],
     });
-    if (win.isDestroyed()) return;
+    if (win.isDestroyed() || contents.isDestroyed()) return;
     if (!armWatchdogs) return;
     if (options.shouldSkipWatchdog()) return;
     clearAllWatchdogs();
@@ -2406,7 +2440,7 @@ function readinessSender(
   const win = mainWindow;
   const live = Boolean(win && !win.isDestroyed());
   return {
-    isMainWindow: live && win?.webContents === event.sender,
+    isMainWindow: live && isMainPageContents(event.sender),
     frame: frame
       ? {
           isMainFrame: frame === event.sender.mainFrame,
@@ -2419,6 +2453,191 @@ function readinessSender(
     minimized: !live || Boolean(win?.isMinimized()),
     focused: live && Boolean(win?.isFocused()),
   };
+}
+
+function installAppPage(win: BrowserWindow, contents: WebContents): void {
+  const navigationContentsId = contents.id;
+  contents.on('render-process-gone', () => {
+    desktopNavigation.setReady(navigationContentsId, false);
+  });
+  contents.on('destroyed', () => {
+    desktopNavigation.setReady(navigationContentsId, false);
+  });
+  const visualActivity = observeWindowVisualActivity(
+    win,
+    powerMonitor,
+    active => {
+      if (!contents.isDestroyed()) {
+        contents.send(
+          VISUAL_ACTIVITY_CHANNEL,
+          active && getWindowContents(win) === contents
+        );
+      }
+    }
+  );
+  const visualContentsId = contents.id;
+  visualActivityReaders.set(
+    visualContentsId,
+    () => visualActivity.read() && getWindowContents(win) === contents
+  );
+  contents.once('destroyed', () => {
+    visualActivity.dispose();
+    visualActivityReaders.delete(visualContentsId);
+  });
+  const authNavigationRecovery =
+    createAuthHandoffNavigationRecovery(APP_ORIGIN);
+  const authNavigationContentsId = contents.id;
+  authNavigationRecoveries.set(
+    authNavigationContentsId,
+    authNavigationRecovery
+  );
+  contents.once('destroyed', () => {
+    authNavigationRecovery.clear();
+    authNavigationRecoveries.delete(authNavigationContentsId);
+  });
+  contents.on('did-start-navigation', (...args: unknown[]) => {
+    const navigation = parseDidStartNavigation(args);
+    if (!navigation) return;
+    if (navigation.isMainFrame && !navigation.isInPlace) {
+      desktopNavigation.setReady(navigationContentsId, false);
+    }
+    authNavigationRecovery.navigationStarted({
+      ...navigation,
+      currentUrl: contents.getURL(),
+    });
+  });
+  contents.on('did-finish-load', () => {
+    if (!isChromiumErrorDocument(contents.getURL())) {
+      authNavigationRecovery.documentFinished();
+    }
+  });
+
+  contents.setUserAgent(
+    `${contents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
+  );
+
+  contents.on('preload-error', (_event, preloadPath, error) => {
+    console.error('[Jovie Desktop] Preload failed', {
+      preloadPath,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  });
+
+  attachRendererRecovery(
+    win,
+    {
+      shouldSkipWatchdog: isAuthHandoffInteractive,
+      onAbortedMainFrame: validatedURL =>
+        interceptMainWindowAuthNavigation(
+          win,
+          resolveNavigationUrl(validatedURL),
+          contents
+        ),
+    },
+    contents
+  );
+
+  registerMainWindowPermissionHandlers(contents.session);
+
+  // Navigation guard: app-host routes stay in-window; auth routes get the
+  // dedicated handoff; all other safe URLs open in the system browser.
+  contents.on('will-navigate', (event, url) => {
+    const navigationUrl = resolveNavigationUrl(url);
+    if (interceptMainWindowAuthNavigation(win, navigationUrl, contents)) {
+      event.preventDefault();
+      return;
+    }
+
+    const disposition = getUrlDisposition(navigationUrl);
+    if (disposition === 'profile-preview') {
+      event.preventDefault();
+      showPublicProfilePreview(navigationUrl);
+      return;
+    }
+
+    if (shouldLoadDesktopAuthRouteInApp(navigationUrl)) {
+      return;
+    }
+
+    if (disposition === 'in-app') return;
+
+    event.preventDefault();
+    if (disposition === 'external') {
+      void openExternalUrl(navigationUrl);
+    }
+  });
+
+  contents.on('will-frame-navigate', event => {
+    if (event.isMainFrame) {
+      if (getUrlDisposition(event.url) === 'profile-preview') {
+        event.preventDefault();
+        showPublicProfilePreview(event.url);
+      }
+      return;
+    }
+    if (getUrlDisposition(event.url) === 'in-app') return;
+    event.preventDefault();
+  });
+
+  contents.on('will-redirect', (event, url, _isInPlace, isMainFrame) => {
+    const navigationUrl = resolveNavigationUrl(url);
+    if (
+      isMainFrame &&
+      interceptMainWindowAuthNavigation(win, navigationUrl, contents)
+    ) {
+      event.preventDefault();
+      return;
+    }
+
+    const disposition = getUrlDisposition(navigationUrl);
+    if (disposition === 'profile-preview') {
+      event.preventDefault();
+      showPublicProfilePreview(navigationUrl);
+      return;
+    }
+    if (shouldLoadDesktopAuthRouteInApp(navigationUrl)) {
+      return;
+    }
+
+    if (disposition === 'in-app') return;
+
+    event.preventDefault();
+    if (isMainFrame && disposition === 'external') {
+      void openExternalUrl(navigationUrl);
+    }
+  });
+
+  // Deny all child window creation. Auth redirects happen in-place via
+  // navigation guards. Internal targets stay in the app, safe external links
+  // open in the system browser, and unsafe protocols are silently dropped.
+  contents.setWindowOpenHandler(({ url }) => {
+    if (maybeShowDesktopAuthHandoff(url)) {
+      return { action: 'deny' };
+    }
+
+    const disposition = getUrlDisposition(url);
+    if (disposition === 'profile-preview') {
+      showPublicProfilePreview(url);
+    } else if (disposition === 'in-app') {
+      navigateInApp(win, url, contents);
+    } else if (disposition === 'external') {
+      void openExternalUrl(url);
+    }
+
+    return { action: 'deny' };
+  });
+
+  function sendNavState(): void {
+    if (win.isDestroyed() || contents.isDestroyed()) return;
+    const state: NavState = {
+      canGoBack: contents.canGoBack(),
+      canGoForward: contents.canGoForward(),
+    };
+    contents.send(NAV_STATE_CHANNEL, state);
+  }
+
+  contents.on('did-navigate-in-page', sendNavState);
+  contents.on('did-navigate', sendNavState);
 }
 
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
@@ -2475,7 +2694,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   installDesktopCspWatchdog({
-    session: win.webContents.session,
+    session: getWindowContents(win).session,
     appOrigin: APP_ORIGIN,
     report: reportDesktopSecurityEvent,
   });
@@ -2489,10 +2708,10 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const initialVisibilityFallback = setTimeout(() => {
     if (win.isDestroyed() || isAuthHandoffInteractive() || win.isVisible())
       return;
-    const current = win.webContents.getURL();
+    const current = getWindowContents(win).getURL();
     if (!current || current === 'about:blank') {
       const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
-      void win.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+      void getWindowContents(win).loadURL(buildDesktopAuthHandoffUrl(authUrl));
     }
     showWindowNow(win);
   }, 6000);
@@ -2511,153 +2730,6 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   mainWindow = win;
-  const navigationContentsId = win.webContents.id;
-  win.webContents.on('render-process-gone', () => {
-    desktopNavigation.setReady(navigationContentsId, false);
-  });
-  win.webContents.on('destroyed', () => {
-    desktopNavigation.setReady(navigationContentsId, false);
-  });
-  const visualActivity = observeWindowVisualActivity(
-    win,
-    powerMonitor,
-    active => {
-      if (!win.webContents.isDestroyed()) {
-        win.webContents.send(VISUAL_ACTIVITY_CHANNEL, active);
-      }
-    }
-  );
-  const visualContentsId = win.webContents.id;
-  visualActivityReaders.set(visualContentsId, visualActivity.read);
-  win.once('closed', () => visualActivityReaders.delete(visualContentsId));
-  const authNavigationRecovery = createAuthHandoffNavigationRecovery(APP_ORIGIN);
-  const authNavigationContentsId = win.webContents.id;
-  authNavigationRecoveries.set(authNavigationContentsId, authNavigationRecovery);
-  win.on('closed', () => {
-    authNavigationRecovery.clear();
-    authNavigationRecoveries.delete(authNavigationContentsId);
-  });
-  win.webContents.on('did-start-navigation', (...args: unknown[]) => {
-    const navigation = parseDidStartNavigation(args);
-    if (!navigation) return;
-    if (navigation.isMainFrame && !navigation.isInPlace) {
-      desktopNavigation.setReady(navigationContentsId, false);
-    }
-    authNavigationRecovery.navigationStarted({
-      ...navigation,
-      currentUrl: win.webContents.getURL(),
-    });
-  });
-  win.webContents.on('did-finish-load', () => {
-    if (!isChromiumErrorDocument(win.webContents.getURL())) {
-      authNavigationRecovery.documentFinished();
-    }
-  });
-
-  win.webContents.setUserAgent(
-    `${win.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
-  );
-
-  win.webContents.on('preload-error', (_event, preloadPath, error) => {
-    console.error('[Jovie Desktop] Preload failed', {
-      preloadPath,
-      reason: error instanceof Error ? error.message : String(error),
-    });
-  });
-
-  attachRendererRecovery(win, {
-    shouldSkipWatchdog: isAuthHandoffInteractive,
-    onAbortedMainFrame: validatedURL =>
-      interceptMainWindowAuthNavigation(win, resolveNavigationUrl(validatedURL)),
-  });
-
-  registerMainWindowPermissionHandlers(win.webContents.session);
-
-  // Navigation guard: app-host routes stay in-window; auth routes get the
-  // dedicated handoff; all other safe URLs open in the system browser.
-  win.webContents.on('will-navigate', (event, url) => {
-    const navigationUrl = resolveNavigationUrl(url);
-    if (interceptMainWindowAuthNavigation(win, navigationUrl)) {
-      event.preventDefault();
-      return;
-    }
-
-    const disposition = getUrlDisposition(navigationUrl);
-    if (disposition === 'profile-preview') {
-      event.preventDefault();
-      showPublicProfilePreview(navigationUrl);
-      return;
-    }
-
-    if (shouldLoadDesktopAuthRouteInApp(navigationUrl)) {
-      return;
-    }
-
-    if (disposition === 'in-app') return;
-
-    event.preventDefault();
-    if (disposition === 'external') {
-      void openExternalUrl(navigationUrl);
-    }
-  });
-
-  win.webContents.on('will-frame-navigate', event => {
-    if (event.isMainFrame) {
-      if (getUrlDisposition(event.url) === 'profile-preview') {
-        event.preventDefault();
-        showPublicProfilePreview(event.url);
-      }
-      return;
-    }
-    if (getUrlDisposition(event.url) === 'in-app') return;
-    event.preventDefault();
-  });
-
-  win.webContents.on('will-redirect', (event, url, _isInPlace, isMainFrame) => {
-    const navigationUrl = resolveNavigationUrl(url);
-    if (isMainFrame && interceptMainWindowAuthNavigation(win, navigationUrl)) {
-      event.preventDefault();
-      return;
-    }
-
-    const disposition = getUrlDisposition(navigationUrl);
-    if (disposition === 'profile-preview') {
-      event.preventDefault();
-      showPublicProfilePreview(navigationUrl);
-      return;
-    }
-    if (shouldLoadDesktopAuthRouteInApp(navigationUrl)) {
-      return;
-    }
-
-    if (disposition === 'in-app') return;
-
-    event.preventDefault();
-    if (isMainFrame && disposition === 'external') {
-      void openExternalUrl(navigationUrl);
-    }
-  });
-
-  // Deny all child window creation. Auth redirects happen in-place via
-  // navigation guards. Internal targets stay in the app, safe external links
-  // open in the system browser, and unsafe protocols are silently dropped.
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (maybeShowDesktopAuthHandoff(url)) {
-      return { action: 'deny' };
-    }
-
-    const disposition = getUrlDisposition(url);
-    if (disposition === 'profile-preview') {
-      showPublicProfilePreview(url);
-    } else if (disposition === 'in-app') {
-      navigateInApp(win, url);
-    } else if (disposition === 'external') {
-      void openExternalUrl(url);
-    }
-
-    return { action: 'deny' };
-  });
-
   win.on('resize', () => {
     saveWindowState(win);
   });
@@ -2673,18 +2745,6 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
       mainWindow = null;
     }
   });
-
-  function sendNavState(): void {
-    if (win.isDestroyed()) return;
-    const state: NavState = {
-      canGoBack: win.webContents.canGoBack(),
-      canGoForward: win.webContents.canGoForward(),
-    };
-    win.webContents.send(NAV_STATE_CHANNEL, state);
-  }
-
-  win.webContents.on('did-navigate-in-page', sendNavState);
-  win.webContents.on('did-navigate', sendNavState);
 
   if (
     packagedUsesCompetingStagingShell({
@@ -2704,26 +2764,28 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   if (initialAuthUrl) {
     showDesktopAuthHandoff(initialAuthUrl);
   }
-  // Paint a local splash first so ready-to-show is never an empty black
-  // canvas. The hosted entry loads after that first paint; the splash stays
-  // visible until the hosted navigation commits or a watchdog recovers.
+  installAppPage(win, win.webContents);
   loadHostedUrlAfterSplash(win, hostedEntry);
 
   return win;
 }
 
-function navigateInApp(win: BrowserWindow, url: string): void {
+function navigateInApp(
+  win: BrowserWindow,
+  url: string,
+  contents: WebContents = getWindowContents(win)
+): void {
   if (win.isDestroyed()) return;
   const action = desktopNavigation.resolve(
-    win.webContents.id,
-    win.webContents.getURL(),
+    contents.id,
+    contents.getURL(),
     url,
     URL_DISPOSITION_OPTIONS
   );
   if (action?.kind === 'client') {
-    win.webContents.send(CLIENT_NAVIGATION_CHANNEL, action.path);
+    contents.send(CLIENT_NAVIGATION_CHANNEL, action.path);
   } else if (action?.kind === 'document') {
-    void win.loadURL(action.url);
+    void contents.loadURL(action.url);
   }
 }
 
@@ -3057,15 +3119,15 @@ function handleTrayAction(action: TrayAction): void {
   showWindow(win);
 
   if (action === 'new-message') {
-    win.webContents.send(TRAY_ACTION_CHANNEL, action);
+    getWindowContents(win).send(TRAY_ACTION_CHANNEL, action);
   }
 }
 
 function sendToAppWindows(channel: string, payload?: unknown): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    const parsed = parseUrl(win.webContents.getURL());
+  for (const { contents } of appDocuments()) {
+    const parsed = parseUrl(contents.getURL());
     if (parsed?.origin === APP_ORIGIN) {
-      win.webContents.send(channel, payload);
+      contents.send(channel, payload);
     }
   }
 }
@@ -3156,7 +3218,7 @@ ipcMain.handle(GET_VISUAL_ACTIVITY_CHANNEL, (event, ...args: unknown[]) => {
       isMainWindow: Boolean(
         mainWindow &&
           !mainWindow.isDestroyed() &&
-          event.sender === mainWindow.webContents
+          isMainPageContents(event.sender)
       ),
       isCurrentMainFrame: Boolean(
         frame &&
@@ -3250,10 +3312,10 @@ ipcMain.on(CLIENT_NAVIGATION_READY_CHANNEL, (event, ready: unknown) => {
     typeof ready !== 'boolean' ||
     !mainWindow ||
     mainWindow.isDestroyed() ||
-    event.sender !== mainWindow.webContents ||
+    !isMainPageContents(event.sender) ||
     !event.senderFrame ||
     event.senderFrame.detached ||
-    event.senderFrame !== mainWindow.webContents.mainFrame ||
+    event.senderFrame !== event.sender.mainFrame ||
     event.senderFrame.parent !== null ||
     parseUrl(getIpcSenderUrl(event))?.origin !== APP_ORIGIN
   ) {
@@ -3315,16 +3377,24 @@ app.on('before-quit', event => {
 
 ipcMain.handle(GO_BACK_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (!isTrustedIpcSender(event)) return;
-  const win = BrowserWindow.fromWebContents(event.sender);
-  if (win && !win.isDestroyed() && win.webContents.canGoBack())
-    win.webContents.goBack();
+  if (
+    !isMainPageContents(event.sender) ||
+    event.senderFrame !== event.sender.mainFrame
+  )
+    return;
+  if (event.sender.navigationHistory.canGoBack())
+    event.sender.navigationHistory.goBack();
 });
 
 ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (!isTrustedIpcSender(event)) return;
-  const win = BrowserWindow.fromWebContents(event.sender);
-  if (win && !win.isDestroyed() && win.webContents.canGoForward())
-    win.webContents.goForward();
+  if (
+    !isMainPageContents(event.sender) ||
+    event.senderFrame !== event.sender.mainFrame
+  )
+    return;
+  if (event.sender.navigationHistory.canGoForward())
+    event.sender.navigationHistory.goForward();
 });
 
 ipcMain.handle(
@@ -3332,13 +3402,15 @@ ipcMain.handle(
   (event: IpcMainInvokeEvent, ...args: unknown[]) =>
     openCurrentOvieInBrowser(
       {
-        isMainWindow: event.sender === mainWindow?.webContents,
+        isMainWindow: isMainPageContents(event.sender),
         isMainFrame:
           event.senderFrame != null &&
           !event.senderFrame.detached &&
           event.senderFrame.parent === null,
         senderUrl: getIpcSenderUrl(event),
-        currentUrl: mainWindow?.webContents.getURL() ?? '',
+        currentUrl:
+          (mainWindow ? getWindowContents(mainWindow) : undefined)?.getURL() ??
+          '',
         args,
         options: URL_DISPOSITION_OPTIONS,
       },
@@ -3854,9 +3926,7 @@ ipcMain.handle(
       title: request.title,
       body: request.body,
     });
-    notification.on('click', () =>
-      routeDesktopNotificationClick(request.url)
-    );
+    notification.on('click', () => routeDesktopNotificationClick(request.url));
     notification.show();
     return { ok: true };
   }

@@ -22,6 +22,7 @@ vi.mock('electron', () => ({
     exposeInMainWorld: (name: string, api: VisualAPI) => exposed.set(name, api),
   },
   ipcRenderer: ipc,
+  webFrame: { getZoomFactor: () => 1 },
 }));
 beforeEach(() => {
   vi.resetModules();
@@ -97,6 +98,8 @@ describe('visual activity bridge', () => {
           },
         },
         mainWindow: window,
+        isMainPageContents: (sender: unknown) =>
+          !window.isDestroyed() && sender === contents,
         visualActivityReaders: new Map([[1, read]]),
       }
     );

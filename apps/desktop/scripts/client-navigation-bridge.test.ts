@@ -18,6 +18,7 @@ vi.mock('electron', () => ({
     exposeInMainWorld: (name: string, api: never) => exposed.set(name, api),
   },
   ipcRenderer: ipc,
+  webFrame: { getZoomFactor: () => 1 },
 }));
 
 beforeEach(() => {
@@ -94,6 +95,7 @@ describe('native client navigation bridge', () => {
         },
         mainWindow: { isDestroyed: () => false, webContents: contents },
         desktopNavigation: { setReady: ready },
+        isMainPageContents: (sender: unknown) => sender === contents,
         getIpcSenderUrl: (event: { senderFrame: typeof frame }) =>
           event.senderFrame.url,
         parseUrl: (value: string) => new URL(value),

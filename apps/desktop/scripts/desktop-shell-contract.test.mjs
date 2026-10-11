@@ -49,7 +49,7 @@ test('desktop window enters the authenticated chat shell instead of the web root
   assert.match(mainSource, /app\.setName\(getDesktopAppDisplayName\(\)\);/);
   assert.match(mainSource, /APP_ENV === 'local'/);
   assert.match(mainSource, /Jovie-Local/);
-  assert.match(mainSource, /win\.webContents\.setUserAgent\(/);
+  assert.match(mainSource, /contents\.setUserAgent\(/);
   assert.match(
     mainSource,
     /function createWindow\(initialUrl = APP_ENTRY_URL\): BrowserWindow/
@@ -86,10 +86,10 @@ test('desktop polls build-info and reloads idle app windows on deploy drift', as
   assert.match(mainSource, /60 \* 1000/);
   assert.match(
     mainSource,
-    /BrowserWindow\.getAllWindows\(\)\.filter\(\s*isWebBuildReloadWindow\s*\)/
+    /appDocuments\(\)\.filter\(\s*\(\{ contents \}\) =>\s*isReloadableDocument\(contents\),?\s*\)/
   );
   assert.match(mainSource, /powerMonitor\.getSystemIdleTime\(\)/);
-  assert.match(mainSource, /win\.webContents\.reload\(\)/);
+  assert.match(mainSource, /contents\.reload\(\)/);
   assert.doesNotMatch(mainSource, /commitSha.*deployedAt/);
 });
 
@@ -296,7 +296,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
   assert.match(
     mainSource,
-    /interceptMainWindowAuthNavigation\(win, resolveNavigationUrl\(validatedURL\)\)/
+    /interceptMainWindowAuthNavigation\(\s*win,\s*resolveNavigationUrl\(validatedURL\),\s*contents,?\s*\)/
   );
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
   // JOV-3595: blank/crashed-renderer recovery (beyond network did-fail-load).
@@ -344,15 +344,19 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     /refusing to ship unverifiable provenance/
   );
   assert.match(mainSource, /render-process-gone/);
-  assert.match(mainSource, /win\.webContents\.on\('unresponsive'/);
+  assert.match(mainSource, /contents\.on\('unresponsive'/);
   assert.match(
     mainSource,
-    /win\.webContents\.on\('unresponsive'[\s\S]*showDesktopLoadFailure\(win\)/
+    /contents\.on\('unresponsive'[\s\S]*recoverOrShowFailure\('unresponsive'\)/
   );
   assert.match(mainSource, /ipcMain\.on\(APP_BOOTED_CHANNEL/);
   // JOV-5086: did-start-loading must not clear the watchdog without re-arming.
   // That hole left hung / intercepted first navigations on a black canvas.
-  assert.doesNotMatch(mainSource, /'did-start-loading'/);
+  const recoveryBody = mainSource.slice(
+    mainSource.indexOf('function attachRendererRecovery('),
+    mainSource.indexOf('let launchReadiness:')
+  );
+  assert.doesNotMatch(recoveryBody, /'did-start-loading'/);
   // JOV-5339: Jovie Local must not trip packaged recovery on compile/HMR.
   assert.match(mainSource, /shouldArmRendererWatchdogsForAppEnv\(APP_ENV\)/);
   assert.match(mainSource, /decideDidFinishLoadRecovery/);
@@ -360,25 +364,25 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(recoverySource, /chrome-error:/);
   assert.match(
     mainSource,
-    /webContents\.on\(\s*'did-finish-load'[\s\S]{0,500}?decideDidFinishLoadRecovery/
+    /contents\.on\(\s*'did-finish-load'[\s\S]{0,500}?decideDidFinishLoadRecovery/
   );
   assert.match(mainSource, /createLocalHostedLoadRetryController/);
   assert.match(mainSource, /onMainFrameLoadFailure/);
   assert.match(mainSource, /onHostedNavigationStarted/);
   assert.match(
     mainSource,
-    /win\.webContents\.on\('did-start-navigation'[\s\S]*?localHostedLoadRecovery\.onHostedNavigationStarted\(\)/
+    /contents\.on\('did-start-navigation'[\s\S]*?localHostedLoadRecovery\.onHostedNavigationStarted\(\)/
   );
   assert.match(mainSource, /onMainFrameDocumentCommitted/);
   assert.match(mainSource, /isHostedAppDocument/);
-  assert.match(mainSource, /win\.webContents\.on\('did-navigate'/);
+  assert.match(mainSource, /contents\.on\('did-navigate'/);
   assert.doesNotMatch(
     mainSource,
-    /win\.webContents\.on\('did-finish-load'[\s\S]{0,500}?onMainFrameDocumentCommitted/
+    /contents\.on\('did-finish-load'[\s\S]{0,500}?onMainFrameDocumentCommitted/
   );
   assert.match(
     mainSource,
-    /localResult\.action === 'retry'[\s\S]*?win\.loadURL\(buildDesktopBootSplashUrl\(\)\)/
+    /localResult\.action === 'retry'[\s\S]*?contents\.loadURL\(buildDesktopBootSplashUrl\(\)\)/
   );
   const localDidFailLoadBlock = mainSource.match(
     /if \(APP_ENV === 'local'\) \{\s*const retryUrl =[\s\S]*?\n {6}\}\n\n {6}console\.error/
@@ -386,7 +390,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.ok(localDidFailLoadBlock);
   assert.equal(
     localDidFailLoadBlock[0].match(
-      /win\.loadURL\(buildDesktopBootSplashUrl\(\)\)/g
+      /contents\.loadURL\(buildDesktopBootSplashUrl\(\)\)/g
     )?.length,
     1
   );
@@ -423,7 +427,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   );
   assert.match(
     mainSource,
-    /void win\.loadURL\(buildDesktopAuthHandoffUrl\(authUrl\)\);/
+    /void contents\.loadURL\(buildDesktopAuthHandoffUrl\(authUrl\)\);/
   );
   assert.match(mainSource, /loadHostedUrlAfterSplash\(win, hostedEntry\)/);
   assert.doesNotMatch(mainSource, /win\.loadURL\('about:blank'\)/);
@@ -856,17 +860,11 @@ test('desktop navigation uses explicit URL disposition allowlists', async () => 
     mainSource,
     /authHandoffWindow\.webContents\.on\('will-navigate', \(event, url\) =>/
   );
+  assert.match(mainSource, /contents\.on\('will-navigate', \(event, url\) =>/);
+  assert.match(mainSource, /contents\.on\('will-frame-navigate', event =>/);
   assert.match(
     mainSource,
-    /win\.webContents\.on\('will-navigate', \(event, url\) =>/
-  );
-  assert.match(
-    mainSource,
-    /win\.webContents\.on\('will-frame-navigate', event =>/
-  );
-  assert.match(
-    mainSource,
-    /win\.webContents\.on\('will-redirect', \(event, url, _isInPlace, isMainFrame\) =>/
+    /contents\.on\('will-redirect', \(event, url, _isInPlace, isMainFrame\) =>/
   );
   assert.doesNotMatch(mainSource, /resolveNavigationUrl\(event\.url\)/);
   assert.match(mainSource, /getUrlDisposition\(event\.url\) === 'in-app'/);
@@ -1288,7 +1286,7 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   assert.match(mainSource, /function registerMainWindowPermissionHandlers\(/);
   assert.match(
     mainSource,
-    /authHandoffWindow\.on\('closed'[\s\S]*?registerMainWindowPermissionHandlers\(mainWindow\.webContents\.session\)/
+    /authHandoffWindow\.on\('closed'[\s\S]*?registerMainWindowPermissionHandlers\(\s*getWindowContents\(mainWindow\)\.session,?\s*\)/
   );
 
   // Wiring only: permission policy must precede Electron's native picker.
@@ -1320,11 +1318,11 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   // cancel the pending retry timer via unconditional did-finish-load.
   assert.doesNotMatch(
     mainSource,
-    /win\.webContents\.on\(\s*'did-finish-load',\s*\(\) => \{\s*localHostedLoadRetryCount = 0;/
+    /contents\.on\(\s*'did-finish-load',\s*\(\) => \{\s*localHostedLoadRetryCount = 0;/
   );
   assert.match(
     mainSource,
-    /decideDidFinishLoadRecovery\(\{ url: win\.webContents\.getURL\(\) \}\)/
+    /decideDidFinishLoadRecovery\(\{ url: contents\.getURL\(\) \}\)/
   );
 
   // Fix: an app-booted ping that arrives before did-finish-load remains valid.
@@ -1346,8 +1344,14 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
     /function openPreferences\(\): void \{[\s\S]{0,400}?if \(isAuthHandoffOpen\(\)\) return;/
   );
   assert.doesNotMatch(
-    mainSource,
-    /function openPreferences[\s\S]*?BrowserWindow\.getFocusedWindow\(\)/
+    mainSource.slice(
+      mainSource.indexOf('function openPreferences('),
+      mainSource.indexOf(
+        'function ',
+        mainSource.indexOf('function openPreferences(') + 1
+      )
+    ),
+    /BrowserWindow\.getFocusedWindow\(\)/
   );
 
   // Fix: cold-start auth completion keeps client/state params so replay works.
@@ -1610,6 +1614,8 @@ test('Ovie recovery main IPC binds the live main window and root frame without a
       },
     },
     mainWindow: { webContents: mainContents },
+    isMainPageContents: contents => contents === mainContents,
+    getWindowContents: win => win.webContents,
     getIpcSenderUrl: event => event.senderFrame?.url ?? '',
     URL_DISPOSITION_OPTIONS: { appUrl: 'https://jov.ie', appEnv: 'production' },
     openCurrentOvieInBrowser: async input => {
@@ -1718,7 +1724,7 @@ test('real native cancel wiring retries only an interrupted workspace document',
   const visit = node => {
     if (
       ts.isCallExpression(node) &&
-      node.expression.getText(ast) === 'win.webContents.on' &&
+      node.expression.getText(ast) === 'contents.on' &&
       [
         'did-start-navigation',
         'did-finish-load',
@@ -1731,6 +1737,12 @@ test('real native cancel wiring retries only an interrupted workspace document',
     ts.forEachChild(node, visit);
   };
   visit(createWindow);
+  visit(
+    ast.statements.find(
+      node =>
+        ts.isFunctionDeclaration(node) && node.name?.text === 'installAppPage'
+    )
+  );
   assert.equal(registrations.length, 4);
   const cancelHandler = ast.statements.find(node =>
     node
@@ -1752,6 +1764,10 @@ test('real native cancel wiring retries only an interrupted workspace document',
       id: 7,
       getURL: () => currentUrl,
       on: (event, callback) => events.set(event, callback),
+      loadURL: url => {
+        loads.push(url);
+        return new Promise(resolve => completions.push(resolve));
+      },
     },
     loadURL: url => {
       loads.push(url);
@@ -1763,7 +1779,9 @@ test('real native cancel wiring retries only an interrupted workspace document',
     APP_URL: 'https://jov.ie',
     win,
     mainWindow: win,
+    getWindowContents: window => window.webContents,
     mainWindowHiddenForAuthHandoff: true,
+    contents: win.webContents,
     authNavigationRecovery: recovery,
     navigationContentsId: 7,
     desktopNavigation: { setReady: () => {} },
