@@ -2,10 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => ({
   auth: vi.fn(),
+  releases: vi.fn(),
   getLatestDailyPost: vi.fn(),
   isPostDismissed: vi.fn(),
   dismissPost: vi.fn(),
 }));
+
+vi.mock('@/lib/changelog-source', () => ({ getChangelogReleases: m.releases }));
 
 vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: m.auth }));
 vi.mock('@/lib/release-communications/drizzle-adapter', () => ({
@@ -67,6 +70,7 @@ const dismissRequest = (body: unknown) =>
 describe('GET /api/whats-new', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    m.releases.mockResolvedValue([]);
     m.auth.mockResolvedValue({ userId: 'user-1' });
     m.getLatestDailyPost.mockResolvedValue(POST_ROW);
     m.isPostDismissed.mockResolvedValue(false);
@@ -129,4 +133,45 @@ describe('POST /api/whats-new/dismiss', () => {
       userId: 'user-1',
     });
   });
+});
+
+it('preserves the daily text when the published source is unavailable', async () => {
+  m.auth.mockResolvedValue({ userId: 'user-1' });
+  m.getLatestDailyPost.mockResolvedValue(POST_ROW);
+  m.isPostDismissed.mockResolvedValue(false);
+  m.releases.mockRejectedValueOnce(new Error('source unavailable'));
+  const { prompt } = await (await GET()).json();
+  expect(prompt.title).toBe('Profile links are one tap');
+  expect(prompt.hero).toBeNull();
+});
+it('projects the actual published hero and exact post destination into the daily API', async () => {
+  m.auth.mockResolvedValue({ userId: 'user-1' });
+  m.getLatestDailyPost.mockResolvedValue(POST_ROW);
+  m.isPostDismissed.mockResolvedValue(false);
+  const bullet = '**Profile links are one tap:** Claim a profile link.';
+  m.releases.mockResolvedValueOnce([
+    {
+      version: '2026-10-02',
+      kind: 'daily',
+      date: '2026-10-02',
+      summary: '',
+      sections: {
+        featured: [],
+        added: [bullet],
+        changed: [],
+        fixed: [],
+        removed: [],
+      },
+      customerOutcomes: {
+        [bullet]: { availability: 'unverified', prerequisites: [] },
+      },
+    },
+  ]);
+  const { prompt } = await (await GET()).json();
+  expect(prompt.hero).toMatchObject({
+    postId: '2026-10-02',
+    kind: 'image',
+    src: '/images/hero/changelog-version.webp',
+  });
+  expect(prompt.changelogUrl).toBe('https://jov.ie/changelog/2026-10-02');
 });

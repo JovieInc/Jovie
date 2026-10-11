@@ -404,7 +404,10 @@ export function ownerHoldReleaseIntent({ eventName, event } = {}) {
   return { prNumber: pr.number, headSha: pr.head.sha, releasedAt };
 }
 
-/** Recovery never replaces a source failure; owner hold release is not a CI retry. */
+/**
+ * Recovery never replaces a source failure; owner hold release is not a CI retry.
+ * @param {{ failure: object, statuses: object[], repository: string, prNumber: number, lastRemoval: string|undefined, headCommittedAt: string|undefined, autoMergeEnabled: boolean, headSha?: string, lastRemovalReason?: string, ownerHoldRelease?: object|null }} input
+ */
 export function reenrollmentDisposition({
   failure,
   statuses,

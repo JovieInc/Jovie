@@ -114,6 +114,31 @@ class ClassifierFixtureTest(unittest.TestCase):
         self.assertEqual(remediation.classify_event({"source": "sentry", "evidence": {}})["subtype"], "sentry")
 
 
+class AggregateCheckTest(unittest.TestCase):
+    def test_red_summary_over_cancelled_jobs_is_infra_not_a_model_attempt(self):
+        # 2026-10-11 (#20767, #20786): runners never arrived, the jobs were cancelled and the
+        # PR Ready summary failed, so the PR went to a model that had nothing to change.
+        outage = pr(statusCheckRollup=[
+            {"name": "PR Ready", "status": "COMPLETED", "conclusion": "FAILURE"},
+            {"name": "ci-fast", "status": "COMPLETED", "conclusion": "CANCELLED"},
+            {"name": "unit (3)", "status": "COMPLETED", "conclusion": "STARTUP_FAILURE"},
+            *checks(2)])
+        classified = remediation.classify_blocker(outage)
+        self.assertEqual((classified["cls"], classified["subtype"], classified["next_action"]),
+                         ("flaky-infra", "infra", "rerun"))
+        self.assertEqual(remediation.plan_ladder(classified, {}, providers(), NOW, HEAD)["action"], "rerun")
+
+    def test_summary_with_a_real_failure_or_alone_still_goes_to_a_model(self):
+        real = pr(statusCheckRollup=[
+            {"name": "PR Ready", "status": "COMPLETED", "conclusion": "FAILURE"},
+            {"name": "ci-fast", "status": "COMPLETED", "conclusion": "CANCELLED"},
+            {"name": "unit (1)", "status": "COMPLETED", "conclusion": "FAILURE"}])
+        self.assertEqual(remediation.classify_blocker(real)["cls"], "fixable-by-model")
+        alone = pr(statusCheckRollup=[{"name": "PR Ready", "status": "COMPLETED", "conclusion": "FAILURE"}])
+        self.assertEqual(remediation.classify_blocker(alone)["cls"], "fixable-by-model",
+                         "a summary failing on its own carries its own cause")
+
+
 class RouterLadderTest(unittest.TestCase):
     def test_disabled_lanes_including_hyperagent_are_never_chosen(self):
         catalog = providers()
@@ -242,7 +267,7 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertIs(hyperagent["repairs"], False)
         self.assertEqual(hyperagent["agentId"], "cmtj3n2q901i407adklzzq01t")
         self.assertEqual(hyperagent["agentName"], "GLM 5.3 Developer")
-        self.assertFalse(catalog["grok"]["enabled"])
+        self.assertTrue(catalog["grok"].get("enabled", True))  # Tim 2026-10-11: grok lane on
         self.assertFalse(catalog["kimi"]["enabled"])
         for skip in ([], ["devin"], ["devin", "codex"], ["devin", "codex", "claude"]):
             chosen = remediation.route_lane(catalog, exclude=set(skip), healthy=lambda name, spec: True)
@@ -429,12 +454,17 @@ class LabeledEventTest(unittest.TestCase):
             linear_issue("JOV-7", "musicfetch-quota", title="Renew MusicFetch", description="renew MusicFetch"),
         ]
         calls = []
+        states = {node["id"]: {"id": "todo", "name": "Todo"} for node in nodes}
 
         class Linear:
             def gql(self, query, variables):
                 calls.append(query)
                 if "issues(" in query:
                     return {"issues": {"nodes": nodes, "pageInfo": {"hasNextPage": False, "endCursor": None}}}
+                if query.startswith("query") and "issue(" in query:
+                    return {"issue": {"id": variables["id"], "state": states[variables["id"]]}}
+                if query.startswith("mutation") and "issueUpdate" in query:
+                    states[variables["id"]] = {"id": variables["s"], "name": "In Progress"}
                 return {"issueUpdate": {"success": True}, "issueAddLabel": {"success": True}}
 
             def comment(self, issue_id, body):
@@ -453,6 +483,9 @@ class LabeledEventTest(unittest.TestCase):
             self.assertEqual(stored["events"]["musicfetch-quota"]["route"], "JOV-7323")
             self.assertIn("Do not renew MusicFetch", stored["events"]["musicfetch-quota"]["dossier"])
             self.assertNotEqual(stored["events"]["billing-health-public"]["lane"], "devin")
+            # Planning remains one shared bulk inventory read. Targeted start
+            # and acknowledgement readbacks belong to worker admission.
+            self.assertFalse(any(isinstance(query, str) and "issue(id:" in query for query in calls))
             lane_name = stored["events"]["musicfetch-quota"]["lane"]
             for fingerprint, row in stored["events"].items():
                 if fingerprint != "musicfetch-quota" and row.get("lane") == lane_name:
@@ -470,7 +503,7 @@ class LabeledEventTest(unittest.TestCase):
         self.assertEqual(len(reads), 2)
         self.assertIn('"JOV"', reads[0])
         self.assertIn('"LYB"', reads[0])
-        self.assertFalse(any(isinstance(query, str) and "issue(id:" in query for query in calls))
+        self.assertEqual(sum(isinstance(query, str) and "issue(id:" in query for query in calls), 2)
 
     def test_closed_label_is_history_and_titles_do_not_match(self):
         """JOV-7544's title uses the colon form. Match the label, including across JOV and LYB."""

@@ -173,8 +173,11 @@ describe('production marker attempt state', () => {
   it.each([
     'success',
     'pending',
+    'risk-receipt',
     'api-unavailable',
     'wrong-archive',
+    'duplicate-entry',
+    'unexpected-extra',
     'incomplete-jobs',
   ])(
     'executes the production reader CLI with %s retry evidence',
@@ -198,7 +201,13 @@ describe('production marker attempt state', () => {
             args[0] === '-Z1'
               ? failureMode === 'wrong-archive'
                 ? 'unexpected.json\n'
-                : 'production-generation-verified.json\n'
+                : failureMode === 'risk-receipt'
+                  ? 'production-generation-verified.json\nrelease-risk-receipt.json\n'
+                  : failureMode === 'duplicate-entry'
+                    ? 'production-generation-verified.json\nproduction-generation-verified.json\n'
+                    : failureMode === 'unexpected-extra'
+                      ? 'production-generation-verified.json\nunexpected.json\n'
+                      : 'production-generation-verified.json\n'
               : JSON.stringify(marker.payload);
         } else if (command === 'gh' && args[0] === 'api') {
           if (endpoint.endsWith('/zip')) output = Buffer.from('archive');
@@ -249,16 +258,19 @@ describe('production marker attempt state', () => {
           '../../../../../.github/scripts/production-marker-state.mjs'
         );
         const result = JSON.parse(String(output.mock.calls.at(-1)?.[0]));
+        const succeeds = ['success', 'pending', 'risk-receipt'].includes(
+          failureMode
+        );
         expect(result).toMatchObject(
-          failureMode === 'success' || failureMode === 'pending'
+          succeeds
             ? {
-                state: failureMode === 'success' ? 'verified' : 'pending',
+                state: failureMode === 'pending' ? 'pending' : 'verified',
                 controllerAttempt: 2,
                 controllerRun,
               }
             : { state: 'manual', reason: 'evidence_api_error' }
         );
-        if (failureMode === 'success' || failureMode === 'pending') {
+        if (succeeds) {
           expect(
             calls.filter(call => call.includes('/artifacts?'))
           ).toHaveLength(6);

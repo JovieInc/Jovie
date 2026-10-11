@@ -6,6 +6,16 @@
  * files. Linear writes go through a port the merge-sync writer supplies.
  */
 
+import { createHash } from 'node:crypto';
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
 import { uiEvidenceRequirements } from '../invariants/assurance-matrix.mjs';
 import { classifyCiRisk } from './ci-harness.mjs';
 import { evaluateEscapedDefectClosure } from './escaped-defect-closure.mjs';
@@ -84,26 +94,167 @@ export async function fetchWithRetry(fetchImpl, ...args) {
  */
 export function githubClient(fetchImpl, token) {
   return async path => {
-    const response = await fetchWithRetry(
-      fetchImpl,
-      `https://api.github.com/${path}`,
-      {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${token}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-          'User-Agent': 'jovie-linear-sync-on-merge',
-        },
+    // Bounded retry for transient GitHub upstream failures: a 503 from
+    // api.github.com used to fail the whole lifecycle evaluation (JOV-5143,
+    // run 37818346153) even though the next sweep would have converged.
+    // Mirrors the Linear retry in linear-sync-on-merge.mjs: 4 attempts,
+    // exponential backoff; persistent errors and 4xx still throw.
+    const maxAttempts = 4;
+    /** @type {Error | null} */
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const response = await fetchWithRetry(
+        fetchImpl,
+        `https://api.github.com/${path}`,
+        {
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'jovie-linear-sync-on-merge',
+          },
+        }
+      );
+      if (response.ok) {
+        return {
+          body: await response.json(),
+          link: response.headers?.get?.('link') ?? '',
+        };
       }
-    );
-    if (!response.ok) {
-      throw new Error(`GitHub HTTP ${response.status ?? 'error'} for ${path}`);
+      lastError = new Error(
+        `GitHub HTTP ${response.status ?? 'error'} for ${path}`
+      );
+      // An exhausted repo quota fails every later read in this sweep too:
+      // stop and defer the rest, like a Linear rate limit (2026-10-11 20:05Z
+      // turned one quota hit into 137 per-issue failures).
+      if (
+        (response.status === 403 || response.status === 429) &&
+        response.headers?.get?.('x-ratelimit-remaining') === '0'
+      ) {
+        Object.assign(lastError, { rateLimited: true });
+        throw lastError;
+      }
+      const retryable =
+        response.status === 429 ||
+        (typeof response.status === 'number' && response.status >= 500);
+      if (!retryable || attempt === maxAttempts) throw lastError;
+      // Exponential backoff, bounded for the 15-minute sweep budget.
+      const delayMs = Math.min(4_000, 2 ** (attempt - 1) * 250);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
-    return {
-      body: await response.json(),
-      link: response.headers?.get?.('link') ?? '',
-    };
+    throw lastError ?? new Error(`GitHub request failed for ${path}`);
   };
+}
+
+const MERGED_PULL = /^repos\/[^/]+\/[^/]+\/pulls\/(\d+)$/;
+const PULL_FILES = /^repos\/[^/]+\/[^/]+\/pulls\/(\d+)\/files\?/;
+const SHA_COMPARE =
+  /^repos\/[^/]+\/[^/]+\/compare\/[0-9a-f]{40}\.\.\.[0-9a-f]{40}$/i;
+export const GITHUB_CACHE_KEEP = 4000;
+
+/**
+ * Reads that can never change, kept across sweeps (actions/cache): a merged
+ * pull request, its files, and a compare between two exact commits. Every
+ * sweep re-evaluates ~280 lifecycle issues at ~3-4 such reads each, so
+ * sweeps that run back to back drained the repo's shared 1,000/h
+ * GITHUB_TOKEN quota on 2026-10-11. Open pull requests, artifact markers and
+ * the served build stay live. Only the fields the lifecycle reads are kept.
+ *
+ * @param {GithubGet} github
+ * @param {string | undefined} dir
+ * @returns {GithubGet}
+ */
+export function immutableGithubCache(github, dir) {
+  if (!dir) return github;
+  /** @type {Set<string>} */
+  const mergedPulls = new Set();
+  const file = (/** @type {string} */ path) =>
+    join(dir, `${createHash('sha256').update(path).digest('hex')}.json`);
+  const read = (/** @type {string} */ path) => {
+    try {
+      const entry = JSON.parse(readFileSync(file(path), 'utf8'));
+      return entry?.path === path ? entry : null;
+    } catch {
+      return null;
+    }
+  };
+  const write = (/** @type {string} */ path, body, link) => {
+    try {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(file(path), JSON.stringify({ path, body, link }));
+    } catch {
+      // Persistence is optional; the next sweep reads live again.
+    }
+  };
+  return async path => {
+    const pull = MERGED_PULL.exec(path);
+    const files = PULL_FILES.exec(path);
+    const cacheable =
+      pull || SHA_COMPARE.test(path) || (files && mergedPulls.has(files[1]));
+    const hit = cacheable ? read(path) : null;
+    if (hit) {
+      if (pull) mergedPulls.add(pull[1]);
+      return { body: hit.body, link: hit.link ?? '' };
+    }
+    const result = await github(path);
+    const { body, link } = result;
+    if (pull && typeof body?.merged_at === 'string') {
+      mergedPulls.add(pull[1]);
+      write(
+        path,
+        {
+          number: body.number,
+          title: body.title,
+          body: body.body,
+          html_url: body.html_url,
+          merged_at: body.merged_at,
+          merge_commit_sha: body.merge_commit_sha,
+          base: { ref: body.base?.ref },
+          head: { ref: body.head?.ref },
+        },
+        link
+      );
+    } else if (files && mergedPulls.has(files[1]) && Array.isArray(body)) {
+      write(
+        path,
+        body.map(row => ({
+          filename: row?.filename,
+          previous_filename: row?.previous_filename,
+        })),
+        link
+      );
+    } else if (SHA_COMPARE.test(path) && typeof body?.status === 'string') {
+      write(path, { status: body.status }, link);
+    }
+    return result;
+  };
+}
+
+/**
+ * Keep the newest `keep` entries and return a content digest for the cache
+ * save key ('' when the directory is empty or unreadable).
+ * @param {string} dir
+ */
+export function boundGithubCache(dir, keep = GITHUB_CACHE_KEEP) {
+  try {
+    const names = readdirSync(dir).filter(name => name.endsWith('.json'));
+    const dated = names
+      .map(name => ({ name, at: statSync(join(dir, name)).mtimeMs }))
+      .sort(
+        (left, right) => right.at - left.at || (left.name < right.name ? -1 : 1)
+      );
+    for (const { name } of dated.slice(keep))
+      rmSync(join(dir, name), { force: true });
+    const hash = createHash('sha256');
+    for (const { name } of dated
+      .slice(0, keep)
+      .sort((a, b) => (a.name < b.name ? -1 : 1))) {
+      hash.update(name);
+    }
+    return dated.length ? hash.digest('hex').slice(0, 16) : '';
+  } catch {
+    return '';
+  }
 }
 
 /**
