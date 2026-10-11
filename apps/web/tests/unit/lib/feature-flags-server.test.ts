@@ -540,4 +540,108 @@ describe('Statsig server initialization', () => {
     ).resolves.toBe(false);
     expect(run).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { production: true, admin: true },
+    { production: true, admin: false },
+    { production: false, admin: true },
+    { production: false, admin: false },
+  ])(
+    'keeps an environment stop authoritative (production=$production, admin=$admin)',
+    async ({ production, admin }) => {
+      if (production) {
+        vi.stubEnv('NODE_ENV', 'production');
+        process.env.VERCEL_ENV = 'production';
+      }
+      mockIsAdmin.mockResolvedValue(admin);
+      mockGetFlagOverrideMap.mockResolvedValue({ SPOTIFY_OAUTH: false });
+      mockCookiesGet.mockReturnValue({
+        value: encodeURIComponent(
+          JSON.stringify({ 'code:SPOTIFY_OAUTH': true })
+        ),
+      });
+      vi.doMock('flags/next', () => ({ dedupe: (fn: unknown) => fn }));
+      const run = vi.fn().mockResolvedValue(true);
+      vi.doMock('@/lib/flags/registry', () => ({
+        APP_FLAG_REGISTRY: { SPOTIFY_OAUTH: { run } },
+        SUBSCRIBE_CTA_VARIANT_FLAG: { run: vi.fn() },
+        PROFILE_ALERT_OPTIN_VARIANT_FLAG: { run: vi.fn() },
+      }));
+
+      const { getAppFlagValue } = await import('@/lib/flags/server');
+      await expect(
+        getAppFlagValue('SPOTIFY_OAUTH', {
+          userId: admin ? 'admin_123' : 'user_123',
+        })
+      ).resolves.toBe(false);
+      expect(mockCookiesGet).not.toHaveBeenCalled();
+      expect(mockIsAdmin).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rereads a stopped feature after an authorized environment repair', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    process.env.VERCEL_ENV = 'production';
+    mockIsAdmin.mockResolvedValue(true);
+    mockGetFlagOverrideMap
+      .mockResolvedValueOnce({ SPOTIFY_OAUTH: false })
+      .mockResolvedValueOnce({ SPOTIFY_OAUTH: true });
+    vi.doMock('flags/next', () => ({ dedupe: (fn: unknown) => fn }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(
+      getAppFlagValue('SPOTIFY_OAUTH', { userId: 'admin_123' })
+    ).resolves.toBe(false);
+    await expect(
+      getAppFlagValue('SPOTIFY_OAUTH', { userId: 'admin_123' })
+    ).resolves.toBe(true);
+    expect(mockGetFlagOverrideMap).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains the personal ordinary-experience opt-out when the environment enables a feature', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    process.env.VERCEL_ENV = 'production';
+    mockIsAdmin.mockResolvedValue(true);
+    mockGetFlagOverrideMap.mockResolvedValue({ SPOTIFY_OAUTH: true });
+    mockCookiesGet.mockReturnValue({
+      value: encodeURIComponent(
+        JSON.stringify({ 'code:SPOTIFY_OAUTH': false })
+      ),
+    });
+    vi.doMock('flags/next', () => ({ dedupe: (fn: unknown) => fn }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(
+      getAppFlagValue('SPOTIFY_OAUTH', { userId: 'admin_123' })
+    ).resolves.toBe(false);
+  });
+
+  it.each(['enabled', 'unavailable'])(
+    'retains the existing ordinary-user fallback with an %s override store',
+    async store => {
+      vi.stubEnv('NODE_ENV', 'production');
+      process.env.VERCEL_ENV = 'production';
+      if (store === 'enabled') {
+        mockGetFlagOverrideMap.mockResolvedValue({ SPOTIFY_OAUTH: true });
+      } else {
+        mockGetFlagOverrideMap.mockRejectedValue(
+          new Error('store unavailable')
+        );
+      }
+      vi.doMock('flags/next', () => ({ dedupe: (fn: unknown) => fn }));
+      const run = vi.fn().mockResolvedValue(false);
+      vi.doMock('@/lib/flags/registry', () => ({
+        APP_FLAG_REGISTRY: { SPOTIFY_OAUTH: { run } },
+        SUBSCRIBE_CTA_VARIANT_FLAG: { run: vi.fn() },
+        PROFILE_ALERT_OPTIN_VARIANT_FLAG: { run: vi.fn() },
+      }));
+
+      const { getAppFlagValue } = await import('@/lib/flags/server');
+      await expect(
+        getAppFlagValue('SPOTIFY_OAUTH', { userId: 'user_123' })
+      ).resolves.toBe(store === 'enabled');
+      expect(run).toHaveBeenCalledTimes(store === 'enabled' ? 0 : 1);
+    }
+  );
 });

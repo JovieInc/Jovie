@@ -1,13 +1,14 @@
 import { RenderedSidebarFamily } from '@/.storybook/rendered-family';
 import '../../styles/system-b-app.css';
 import { TooltipProvider } from '@jovie/ui';
-import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { withSignedInSession } from '@/.storybook/signed-in-session';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { SidebarProvider } from '@/components/organisms/sidebar';
+import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
+import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
@@ -161,4 +162,36 @@ export const Operator: Story = {
     section: 'ov',
     variant: 'ov',
   },
+};
+
+// The application header owns reopening when its rail control stages out.
+// Keep that ownership in the fixture while exercising the admin brand path.
+function HeaderOwnedCollapsedToggle() {
+  const { open } = useSidebar();
+  return open ? null : (
+    <div
+      className='absolute z-20 px-2'
+      style={{ left: 'var(--sidebar-width-icon)', top: 'var(--space-2)' }}
+    >
+      <SidebarCollapseButton />
+    </div>
+  );
+}
+
+const adminShellDecorator: Decorator = Story => (
+  <DashboardDataProvider value={{ ...dashboardData, isAdmin: true }}>
+    <Story />
+    <HeaderOwnedCollapsedToggle />
+  </DashboardDataProvider>
+);
+
+export const AdminDashboard: Story = {
+  args: { headerOwnsCollapsedToggle: true },
+  decorators: [adminShellDecorator],
+};
+
+export const AdminOperator: Story = {
+  ...Operator,
+  args: { ...Operator.args, headerOwnsCollapsedToggle: true },
+  decorators: [adminShellDecorator],
 };

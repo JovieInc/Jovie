@@ -569,6 +569,10 @@ export function isTransientApiError(error) {
 const TRANSIENT_ADMISSION_MESSAGES = [
   /^live merge queue GraphQL returned errors: API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i,
   /^GitHub API request failed for \S+: The operation was aborted due to timeout$/,
+  // Thrown below when the quota reset lands past the deadline. Live
+  // 2026-10-11 20:10Z (run 38171069689): unmatched, it was classed
+  // "unclassified" and spent #21264's one source retry on a quota outage.
+  /^GitHub rate-limit recovery does not fit within the admission budget$/,
 ];
 const TRANSIENT_ADMISSION_HTTP_MESSAGE =
   /^GitHub API (?:(?:403|429) for \S+: .*\b(?:secondary )?rate limit\b|(?:502|503|504) for \S+: )/i;

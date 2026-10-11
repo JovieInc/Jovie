@@ -439,7 +439,13 @@ describe('Gem Linear rate-limit backoff', () => {
             randomImpl: () => 0,
             fetchImpl: async () => {
               attempts += 1;
-              return rateLimitedResponse({ headers: { 'retry-after': '5' } });
+              return rateLimitedResponse({
+                headers: {
+                  'retry-after': '5',
+                  'x-ratelimit-requests-remaining': '0',
+                  'x-ratelimit-complexity-remaining': '12',
+                },
+              });
             },
             sleepImpl: async ms => sleeps.push(ms),
           }
@@ -452,6 +458,10 @@ describe('Gem Linear rate-limit backoff', () => {
           assert.equal(err.metadata.retryable, false);
           assert.equal(err.metadata.waitedMs, 10_000);
           assert.ok(err.metadata.resetAt >= before + 5_000);
+          assert.deepEqual(err.metadata.rateLimitRemaining, {
+            'x-ratelimit-requests-remaining': 0,
+            'x-ratelimit-complexity-remaining': 12,
+          });
           return true;
         }
       );
@@ -485,7 +495,8 @@ describe('Gem Linear rate-limit backoff', () => {
           return (
             err.code === 'RATE_LIMITED' &&
             err.attempts === 2 &&
-            err.metadata.waitedMs === 1_000
+            err.metadata.waitedMs === 1_000 &&
+            !Object.hasOwn(err.metadata, 'rateLimitRemaining')
           );
         }
       );

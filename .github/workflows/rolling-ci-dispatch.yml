@@ -69,7 +69,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
 
@@ -548,7 +548,7 @@ jobs:
             scripts/run-affected-tests.mjs
           sparse-checkout-cone-mode: false
       - name: Download immutable patch artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
           path: ${{ runner.temp }}/hosted-repair
@@ -593,7 +593,7 @@ jobs:
         with:
           version: 9.15.9
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: pnpm
@@ -687,12 +687,12 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Download immutable tested patch artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
           path: ${{ runner.temp }}/hosted-repair
       - name: Download raw test report and coverage artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.test.outputs.test_artifact_id }}
           path: ${{ runner.temp }}/hosted-repair/test-proof
@@ -836,7 +836,7 @@ jobs:
             scripts/version-fanout-guard.mjs
           sparse-checkout-cone-mode: false
       - name: Setup Node.js for trusted policy
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: Discover provider-bound FX write receipts
@@ -853,7 +853,7 @@ jobs:
       - name: Download trusted writer receipts
         if: steps.discover.outputs.eligible == 'true'
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ steps.discover.outputs.write_artifact_id }}
           run-id: ${{ steps.discover.outputs.run_id }}
@@ -862,7 +862,7 @@ jobs:
       - name: Download immutable patch and original repair plan
         if: steps.discover.outputs.eligible == 'true'
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ steps.discover.outputs.patch_artifact_id }}
           run-id: ${{ steps.discover.outputs.run_id }}
@@ -871,7 +871,7 @@ jobs:
       - name: Download published terminal receipt
         if: steps.discover.outputs.eligible == 'true'
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ steps.discover.outputs.terminal_artifact_id }}
           run-id: ${{ steps.discover.outputs.run_id }}

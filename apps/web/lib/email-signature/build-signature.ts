@@ -7,10 +7,16 @@
  */
 
 import { BASE_URL, HOSTNAME } from '@/constants/domains';
+import { detectPlatformByHost } from '@/lib/utils/platform-detection';
+
+import { getEmailSignatureIconUrl } from './social-icons';
 
 export interface EmailSignatureSocial {
   readonly label: string;
   readonly url: string;
+  /** Canonical platform id (e.g. `instagram`, `spotify`). Used to map the
+   * link to a hosted PNG icon; falls back to host detection from `url`. */
+  readonly platform?: string | null;
 }
 
 export interface EmailSignatureRelease {
@@ -58,16 +64,37 @@ function isSafeHttpsUrl(raw: string): boolean {
   }
 }
 
+interface SanitizedSocial {
+  readonly label: string;
+  readonly url: string;
+  /** Hosted PNG icon URL, or null when the platform has no brand icon. */
+  readonly iconUrl: string | null;
+}
+
+function resolveSocialIconUrl(
+  platform: string | null | undefined,
+  url: string
+): string | null {
+  const candidate = platform?.trim() || detectPlatformByHost(url)?.id || '';
+  return candidate ? getEmailSignatureIconUrl(candidate) : null;
+}
+
 function sanitizeSocials(
   socials: ReadonlyArray<EmailSignatureSocial> | undefined
-): EmailSignatureSocial[] {
+): SanitizedSocial[] {
   if (!socials) return [];
-  return socials
-    .map(social => ({
-      label: social.label.trim(),
-      url: social.url.trim(),
-    }))
-    .filter(social => social.label && isSafeHttpsUrl(social.url));
+  const sanitized: SanitizedSocial[] = [];
+  for (const social of socials) {
+    const label = social.label.trim();
+    const url = social.url.trim();
+    if (!label || !isSafeHttpsUrl(url)) continue;
+    sanitized.push({
+      label,
+      url,
+      iconUrl: resolveSocialIconUrl(social.platform, url),
+    });
+  }
+  return sanitized;
 }
 
 function sanitizeRelease(
@@ -114,14 +141,28 @@ export function buildEmailSignature(
     ? `<td style="padding-right:12px;vertical-align:top;width:56px;"><img src="${escapeHtml(avatarUrl)}" width="56" height="56" alt="${escapeHtml(name)}" style="display:block;border:0;border-radius:28px;width:56px;height:56px;object-fit:cover;"/></td>`
     : '';
 
-  const socialsLine = socials.length
-    ? `<div style="margin-top:6px;color:#525866;font-size:12px;">${socials
+  const iconSocials = socials.filter(social => social.iconUrl !== null);
+  const textSocials = socials.filter(social => social.iconUrl === null);
+
+  const iconRail = iconSocials.length
+    ? `<div style="margin-top:6px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr>${iconSocials
+        .map(
+          (social, index) =>
+            `<td${index < iconSocials.length - 1 ? ' style="padding-right:8px;"' : ''}><a href="${escapeHtml(social.url)}" style="text-decoration:none;"><img src="${escapeHtml(social.iconUrl ?? '')}" width="16" height="16" alt="${escapeHtml(social.label)}" style="display:block;border:0;width:16px;height:16px;"/></a></td>`
+        )
+        .join('')}</tr></table></div>`
+    : '';
+
+  const textLine = textSocials.length
+    ? `<div style="margin-top:6px;color:#525866;font-size:12px;">${textSocials
         .map(
           social =>
             `<a href="${escapeHtml(social.url)}" style="color:#525866;text-decoration:none;">${escapeHtml(social.label)}</a>`
         )
         .join('&nbsp;·&nbsp;')}</div>`
     : '';
+
+  const socialsLine = `${iconRail}${textLine}`;
 
   const taglineLine = tagline
     ? `<div style="color:#525866;font-size:13px;line-height:1.45;">${escapeHtml(tagline)}</div>`

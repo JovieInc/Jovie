@@ -1,0 +1,369 @@
+{
+  "id": "51972833-bb04-46b7-9401-45a5ab449ebd",
+  "name": "Tim White",
+  "type": "Person",
+  "country": "US",
+  "disambiguation": "Singer",
+  "area": {
+    "name": "West Hollywood"
+  },
+  "begin-area": {
+    "name": "New Brunswick"
+  },
+  "isnis": ["0000000427529721"],
+  "ipis": ["00711991833"],
+  "aliases": [],
+  "release-groups": [
+    {
+      "id": "a4730cab-6ab9-43f2-8adb-c9c8caf064ad",
+      "first-release-date": "2015-08-14",
+      "title": "All This Noise EP",
+      "primary-type": "EP"
+    },
+    {
+      "id": "b228970b-ca8e-4b64-93b3-8ce8a9140bd8",
+      "first-release-date": "2015-10-23",
+      "primary-type": "EP",
+      "title": "All This Noise Remixed"
+    },
+    {
+      "id": "6f237576-27fe-4408-ba6c-583e0dd8badf",
+      "title": "Take Me Over",
+      "first-release-date": "2014-05-06",
+      "primary-type": "Single"
+    },
+    {
+      "id": "fc9c192b-90df-4ea5-983a-85955a4ebcd5",
+      "first-release-date": "2014-10-21",
+      "primary-type": "Single",
+      "title": "California"
+    },
+    {
+      "primary-type": "Single",
+      "first-release-date": "2015-07-17",
+      "title": "Trying Too Hard",
+      "id": "381207a5-e577-42cc-8ef8-3d5fbf2c04a1"
+    },
+    {
+      "title": "Save the Night",
+      "primary-type": "Single",
+      "first-release-date": "2015-08-18",
+      "id": "e6024c02-2f58-4f5f-88eb-0771f70793fa"
+    },
+    {
+      "id": "ac90609d-2f68-44e5-99d0-ed062582d54d",
+      "first-release-date": "2016-09-12",
+      "primary-type": "Single",
+      "title": "Revival"
+    },
+    {
+      "title": "Sober",
+      "primary-type": "Single",
+      "first-release-date": "2016-10-07",
+      "id": "27e346ef-f349-4375-8294-8bf49b711e8c"
+    },
+    {
+      "id": "214ae9ae-0a22-4202-b41e-dbdfd991b5ab",
+      "title": "The Deep End",
+      "primary-type": "Single",
+      "first-release-date": "2017-03-03"
+    },
+    {
+      "first-release-date": "2017-06-16",
+      "title": "Songs About You",
+      "primary-type": "Single",
+      "id": "1d311141-5ef4-4ccf-9fa6-f69a80d49dfb"
+    },
+    {
+      "id": "9ef484e1-18df-47a3-b1f0-81f8f376a4b4",
+      "title": "Love Don't Let Me Down",
+      "primary-type": "Single",
+      "first-release-date": "2018-01-12"
+    },
+    {
+      "primary-type": "Single",
+      "first-release-date": "2018-03-20",
+      "title": "The Sound",
+      "id": "00bad680-7b47-4d69-801d-5feff3f06f40"
+    },
+    {
+      "primary-type": "Single",
+      "title": "Wheels Up",
+      "first-release-date": "2018-04-27",
+      "id": "0fc654b8-8b11-4d9f-a61f-0e5a843fa8a3"
+    },
+    {
+      "id": "9ffd0bb1-e64c-45cf-ae56-4d5f75a262db",
+      "primary-type": "Single",
+      "first-release-date": "2019-09-20",
+      "title": "Seaside Heights"
+    },
+    {
+      "id": "c1788ca2-eaef-407a-a76e-78d06f2fecd6",
+      "first-release-date": "2020-01-31",
+      "title": "This Is Love",
+      "primary-type": "Single"
+    },
+    {
+      "id": "f66cbbac-82b8-44ca-92d3-2b1db6f339b3",
+      "title": "Doge (to Mars)",
+      "primary-type": "Single",
+      "first-release-date": "2020-02-19"
+    },
+    {
+      "title": "Supernova Girl",
+      "primary-type": "Single",
+      "first-release-date": "2020-03-06",
+      "id": "e35f22ca-afc5-405d-b369-6bfcbca58786"
+    },
+    {
+      "id": "ee3e8eb9-0b1d-4f7e-bfce-b58d26110d3f",
+      "title": "Tomorrow Sounds",
+      "first-release-date": "2020-04-03",
+      "primary-type": "Single"
+    },
+    {
+      "first-release-date": "2020-05-15",
+      "title": "Seaside Heights",
+      "primary-type": "Single",
+      "id": "6b73414a-c152-42cc-b7ff-9e1aa6d85e33"
+    },
+    {
+      "id": "d199fa4f-0334-4be5-b18f-777a079d4d03",
+      "primary-type": "Single",
+      "title": "Never Say A Word",
+      "first-release-date": "2024-06-21"
+    },
+    {
+      "id": "98614843-1521-4130-8c40-a0f789addc7c",
+      "title": "Take Me Over (Austin Leeds Remix)",
+      "primary-type": "Single",
+      "first-release-date": "2024-05-10"
+    }
+  ],
+  "relations": [
+    {
+      "url": {
+        "resource": "https://www.allmusic.com/artist/mn0003388877"
+      },
+      "type": "allmusic"
+    },
+    {
+      "type": "bandcamp",
+      "url": {
+        "resource": "https://tim-white.bandcamp.com/"
+      }
+    },
+    {
+      "url": {
+        "resource": "https://www.bandsintown.com/a/946944"
+      },
+      "type": "bandsintown"
+    },
+    {
+      "type": "blog",
+      "url": {
+        "resource": "http://itstimwhite.tumblr.com/"
+      }
+    },
+    {
+      "type": "discography page",
+      "url": {
+        "resource": "http://www.1001tracklists.com/artist/89979_tim-white/index.html"
+      }
+    },
+    {
+      "url": {
+        "resource": "https://www.discogs.com/artist/3685842"
+      },
+      "type": "discogs"
+    },
+    {
+      "type": "free streaming",
+      "url": {
+        "resource": "https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm"
+      }
+    },
+    {
+      "url": {
+        "resource": "http://www.earbits.com/#artists/tim-white/discography"
+      },
+      "type": "free streaming"
+    },
+    {
+      "url": {
+        "resource": "http://www.rdio.com/artist/Tim_White_1/"
+      },
+      "type": "free streaming"
+    },
+    {
+      "url": {
+        "resource": "http://www.rhapsody.com/artist/tim-white"
+      },
+      "type": "free streaming"
+    },
+    {
+      "url": {
+        "resource": "https://lh3.googleusercontent.com/-nAVXSG7nvZA/UqDX6v94yII/AAAAAAAAFsY/GfP-z8vhLcs/s1000-no/Tim-White-On-Twitter.jpg"
+      },
+      "type": "image"
+    },
+    {
+      "url": {
+        "resource": "https://scontent-iad3-1.xx.fbcdn.net/hphotos-xpl1/t31.0-8/1965563_854748947984408_2609003527032664856_o.jpg"
+      },
+      "type": "image"
+    },
+    {
+      "type": "image",
+      "url": {
+        "resource": "https://www.gettyimages.com/detail/news-photo/tim-white-attends-the-teatro-white-party-on-june-01-2024-in-news-photo/2156136895?adppopup=true"
+      }
+    },
+    {
+      "type": "image",
+      "url": {
+        "resource": "https://www.gettyimages.com/detail/news-photo/tim-white-attends-the-teatro-white-party-on-june-01-2024-in-news-photo/2156136905"
+      }
+    },
+    {
+      "type": "IMDb",
+      "url": {
+        "resource": "https://www.imdb.com/name/nm5669721/"
+      }
+    },
+    {
+      "url": {
+        "resource": "http://hopedope.net/introducing-tim-white/"
+      },
+      "type": "interview"
+    },
+    {
+      "url": {
+        "resource": "http://www.myamn.com.au/index.php/international/item/1594-tim-white"
+      },
+      "type": "interview"
+    },
+    {
+      "url": {
+        "resource": "https://www.last.fm/music/Tim+White"
+      },
+      "type": "last.fm"
+    },
+    {
+      "url": {
+        "resource": "https://genius.com/artists/Tim-white"
+      },
+      "type": "lyrics"
+    },
+    {
+      "type": "official homepage",
+      "url": {
+        "resource": "http://timwhite.co/"
+      }
+    },
+    {
+      "url": {
+        "resource": "https://itunes.apple.com/us/artist/id859547284"
+      },
+      "type": "purchase for download"
+    },
+    {
+      "type": "purchase for download",
+      "url": {
+        "resource": "https://market.android.com/details?id=artist-Av5zr3wgbfdsudi5van25yg2y4m"
+      }
+    },
+    {
+      "url": {
+        "resource": "https://www.amazon.com/-/e/B00IV2QOEK"
+      },
+      "type": "purchase for download"
+    },
+    {
+      "url": {
+        "resource": "https://www.beatport.com/artist/tim-white/410907"
+      },
+      "type": "purchase for download"
+    },
+    {
+      "type": "social network",
+      "url": {
+        "resource": "https://plus.google.com/+timwhite"
+      },
+      "ended": true
+    },
+    {
+      "url": {
+        "resource": "https://twitter.com/itstimwhite"
+      },
+      "type": "social network"
+    },
+    {
+      "type": "social network",
+      "url": {
+        "resource": "https://wavo.me/timwhite"
+      }
+    },
+    {
+      "type": "social network",
+      "url": {
+        "resource": "https://www.bandpage.com/TimWhite"
+      }
+    },
+    {
+      "type": "social network",
+      "url": {
+        "resource": "https://www.facebook.com/itstimwhite"
+      }
+    },
+    {
+      "url": {
+        "resource": "https://www.instagram.com/timwhite/"
+      },
+      "type": "social network"
+    },
+    {
+      "type": "social network",
+      "url": {
+        "resource": "https://www.tiktok.com/@itstimwhite"
+      }
+    },
+    {
+      "type": "songkick",
+      "url": {
+        "resource": "https://www.songkick.com/artists/166656"
+      }
+    },
+    {
+      "type": "soundcloud",
+      "url": {
+        "resource": "https://soundcloud.com/itstimwhite"
+      }
+    },
+    {
+      "type": "video channel",
+      "url": {
+        "resource": "http://www.muzu.tv/tim-white/"
+      }
+    },
+    {
+      "url": {
+        "resource": "http://www.vevo.com/artist/tim-white"
+      },
+      "type": "video channel"
+    },
+    {
+      "type": "wikidata",
+      "url": {
+        "resource": "https://www.wikidata.org/wiki/Q16762431"
+      }
+    },
+    {
+      "type": "youtube",
+      "url": {
+        "resource": "https://www.youtube.com/channel/UC90tJdD38139ytPUdEZVl1A"
+      }
+    }
+  ]
+}

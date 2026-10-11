@@ -1,4 +1,6 @@
+import * as nodeFs from 'node:fs';
 import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 
 // The JOV-7703 contract is TypeScript in another package; load it at runtime
@@ -18,9 +20,11 @@ const { founderCardKey, fromSummerCard } = await import(
 );
 
 import {
+  boundGithubCache,
   classifyMergedRisk,
   createProductionFacts,
   githubClient,
+  immutableGithubCache,
   listMergedFiles,
   listMergedLinkedPulls,
   mergedUiEvidence,
@@ -715,5 +719,193 @@ describe('validation sync: facts', () => {
     await expect(github('repos/y')).rejects.toThrow(
       /GitHub HTTP 502 for repos\/y/
     );
+  });
+
+  it('retries GitHub 5xx with backoff and succeeds on a later attempt', async () => {
+    const seen = [];
+    const github = githubClient(async () => {
+      seen.push('call');
+      return seen.length < 3
+        ? { ok: false, status: 503, json: async () => ({}) }
+        : json({ ok: 1 });
+    }, 'gh_test');
+    expect((await github('repos/JovieInc/Jovie/pulls/15973')).body).toEqual({
+      ok: 1,
+    });
+    expect(seen).toHaveLength(3);
+  });
+
+  it('reports a persistent GitHub 5xx after the bounded attempts', async () => {
+    let calls = 0;
+    const github = githubClient(async () => {
+      calls += 1;
+      return { ok: false, status: 503, json: async () => ({}) };
+    }, 'gh_test');
+    await expect(github('repos/JovieInc/Jovie/pulls/15973')).rejects.toThrow(
+      /GitHub HTTP 503 for repos\/JovieInc\/Jovie\/pulls\/15973/
+    );
+    expect(calls).toBe(4);
+  });
+
+  it('does not retry a GitHub 4xx', async () => {
+    let calls = 0;
+    const github = githubClient(async () => {
+      calls += 1;
+      return { ok: false, status: 404, json: async () => ({}) };
+    }, 'gh_test');
+    await expect(github('repos/x')).rejects.toThrow(/GitHub HTTP 404/);
+    expect(calls).toBe(1);
+  });
+});
+
+describe('immutable GitHub read cache (repo quota, 2026-10-11)', () => {
+  const { mkdtempSync, rmSync, readdirSync, utimesSync } = nodeFs;
+  const PULL = `repos/${REPO}/pulls/7`;
+  const FILES = `repos/${REPO}/pulls/7/files?per_page=100&page=1`;
+  const COMPARE = `repos/${REPO}/compare/${'a'.repeat(40)}...${'b'.repeat(40)}`;
+  const tempDir = () => mkdtempSync(`${tmpdir()}/linear-sync-cache-`);
+  const live = responses => {
+    const calls = [];
+    return {
+      calls,
+      github: async path => {
+        calls.push(path);
+        return {
+          body: structuredClone(
+            responses[path.split('?')[0]] ?? responses[path]
+          ),
+          link: '',
+        };
+      },
+    };
+  };
+  const merged = {
+    number: 7,
+    title: 'feat: thing (JOV-1)',
+    body: 'Closes JOV-1',
+    html_url: `https://github.com/${REPO}/pull/7`,
+    merged_at: '2026-10-11T00:00:00Z',
+    merge_commit_sha: 'c'.repeat(40),
+    base: { ref: 'main' },
+    head: { ref: 'codex/jov-1' },
+    user: { login: 'large-payload-not-kept' },
+  };
+
+  it('serves merged pulls, their files and exact compares from disk on the next sweep', async () => {
+    const dir = tempDir();
+    try {
+      const responses = {
+        [PULL]: merged,
+        [`repos/${REPO}/pulls/7/files`]: [{ filename: 'a.ts', patch: '@@' }],
+        [COMPARE]: { status: 'ahead', commits: [] },
+      };
+      const first = live(responses);
+      const sweepOne = immutableGithubCache(first.github, dir);
+      await sweepOne(PULL);
+      await sweepOne(FILES);
+      await sweepOne(COMPARE);
+      expect(first.calls).toHaveLength(3);
+
+      const second = live(responses);
+      const sweepTwo = immutableGithubCache(second.github, dir);
+      const pull = await sweepTwo(PULL);
+      const files = await sweepTwo(FILES);
+      const compare = await sweepTwo(COMPARE);
+      expect(second.calls).toEqual([]);
+      expect(pull.body).toMatchObject({
+        merged_at: merged.merged_at,
+        merge_commit_sha: merged.merge_commit_sha,
+        base: { ref: 'main' },
+      });
+      expect(pull.body.user).toBeUndefined();
+      expect(pullImplementsIssue(pull.body, 'JOV-1')).toBe(true);
+      expect(files.body).toEqual([
+        { filename: 'a.ts', previous_filename: undefined },
+      ]);
+      expect(compare.body).toEqual({ status: 'ahead' });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('never caches an open pull request, its files or a non-sha compare', async () => {
+    const dir = tempDir();
+    try {
+      const responses = {
+        [PULL]: { ...merged, merged_at: null },
+        [`repos/${REPO}/pulls/7/files`]: [{ filename: 'a.ts' }],
+        [`repos/${REPO}/compare/main...b`]: { status: 'ahead' },
+      };
+      for (let sweep = 0; sweep < 2; sweep += 1) {
+        const { calls, github } = live(responses);
+        const cached = immutableGithubCache(github, dir);
+        await cached(PULL);
+        await cached(FILES);
+        await cached(`repos/${REPO}/compare/main...b`);
+        expect(calls).toHaveLength(3);
+      }
+      expect(boundGithubCache(dir)).toBe('');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('bounds the directory and keys the save on content', async () => {
+    const dir = tempDir();
+    try {
+      const paths = ['b', 'c', 'd'].map(
+        head => `repos/${REPO}/compare/${'a'.repeat(40)}...${head.repeat(40)}`
+      );
+      const { github } = live(
+        Object.fromEntries(paths.map(path => [path, { status: 'ahead' }]))
+      );
+      const cached = immutableGithubCache(github, dir);
+      for (const path of paths) await cached(path);
+      const names = readdirSync(dir);
+      names.forEach((name, index) =>
+        utimesSync(`${dir}/${name}`, index + 1, index + 1)
+      );
+      const before = boundGithubCache(dir, 10);
+      expect(before).toMatch(/^[0-9a-f]{16}$/);
+      expect(boundGithubCache(dir, 10)).toBe(before);
+      const after = boundGithubCache(dir, 2);
+      expect(readdirSync(dir)).toHaveLength(2);
+      expect(readdirSync(dir)).not.toContain(names[0]);
+      expect(after).not.toBe(before);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('passes through without a cache directory', async () => {
+    const { calls, github } = live({ [PULL]: merged });
+    const cached = immutableGithubCache(github, undefined);
+    await cached(PULL);
+    await cached(PULL);
+    expect(calls).toHaveLength(2);
+  });
+});
+
+describe('githubClient on an exhausted repo quota', () => {
+  it('stops at once and marks the error rate-limited so the sweep defers', async () => {
+    let calls = 0;
+    const fetchImpl = async () => {
+      calls += 1;
+      return {
+        ok: false,
+        status: 403,
+        headers: new Headers({ 'x-ratelimit-remaining': '0' }),
+        json: async () => ({
+          message: 'API rate limit exceeded for installation.',
+        }),
+      };
+    };
+    const error = await githubClient(
+      fetchImpl,
+      't'
+    )(`repos/${REPO}/pulls/1`).catch(e => e);
+    expect(error.message).toContain('GitHub HTTP 403');
+    expect(error.rateLimited).toBe(true);
+    expect(calls).toBe(1);
   });
 });

@@ -3,12 +3,12 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/37729357744)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38166870351)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-10-08T05:11:13.120Z
+Generated: 2026-10-11T19:45:24.349Z
 Workflow conclusion: failure
 
 ## Evidence warnings
@@ -19,10 +19,10 @@ Workflow conclusion: failure
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 7493 | 7463 | 3 | 0 | 27 |
-| unit | 7704 | 7671 | 1 | 0 | 32 |
-| unit | 8328 | 8291 | 0 | 0 | 37 |
-| unit | 10536 | 10530 | 0 | 0 | 6 |
+| unit | 8182 | 8138 | 2 | 0 | 42 |
+| unit | 10294 | 10286 | 0 | 0 | 8 |
+| unit | 8047 | 8015 | 0 | 0 | 32 |
+| unit | 7976 | 7954 | 0 | 0 | 22 |
 
 ## Selected Targets
 
@@ -46,7 +46,5 @@ Workflow conclusion: failure
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| unit | eslint-rules/__tests__/shadcn-lint-changed.test.ts shadcn-lint-changed probe > sees a changed production apps/web TS file from git root and misses it from apps/ |  | probe at git root saw no production files for f3b26f20abf1f7faf0f670ff36c077107ae71f98: expected null not to be null |
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-AOhmzz/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-vU9pW4/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
-| unit | tests/unit/design-system/story-source-sha-ancestry.test.ts story receipt SHA ancestry > keeps every literal receipt ancestral and able to replay its story path |  | expected 3 to be 5 // Object.is equality |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-qjGAof/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-VfnkJV/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
