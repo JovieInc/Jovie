@@ -754,6 +754,28 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('selects physical-pointer onboarding recovery through the guarded Storybook matrix', () => {
+    const surfaces = jobBlock(
+      'ci-storybook-surfaces',
+      'ci-cross-product-integration'
+    );
+    const invocation = surfaces.match(
+      /pnpm exec playwright test ([\s\S]*?)--config=playwright\.config\.storybook\.ts/
+    );
+    expect(
+      invocation,
+      'dedicated Storybook invocation must remain present'
+    ).not.toBeNull();
+    const selected =
+      invocation[1].match(/tests\/e2e\/storybook-[a-z0-9-]+\.spec\.ts/g) ?? [];
+    const recovery = 'tests/e2e/storybook-onboarding-recovery.spec.ts';
+    expect(selected.filter(path => path === recovery)).toHaveLength(1);
+    expect(existsSync(resolve(REPO_ROOT, 'apps/web', recovery))).toBe(true);
+    expect(surfaces).toContain('guard-playwright-artifacts.mjs" --run --');
+    expect(surfaces).toContain('--project=chromium --reporter=line');
+    expect(surfaces).toContain('--workers=2');
+  });
+
   it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',

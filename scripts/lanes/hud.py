@@ -161,6 +161,12 @@ def local_model(host) -> dict:
     base_reader = getattr(host, "base_slots", None)
     base_slots = ({name: base_reader(name, spec.get("slots", 1)) for name, spec in enabled.items()}
                   if base_reader else dict(slots))
+    doctor = read_json(state / "doctor.json", {})
+    # The console unit has its own environment. Dispatcher observations carry the
+    # effective host overrides and autoscaler result; HUD defaults are not capacity.
+    slot_evidence = dispatcher_slots(doctor, enabled)
+    if slot_evidence is not None:
+        slots, base_slots = slot_evidence
     tree = read_text(state / "current" / ".tree")
     current = (state / "current").resolve()
     all_receipts = ledger_rows(state)
@@ -188,16 +194,38 @@ def local_model(host) -> dict:
         "host": lane.HOST, "release": tree[:7] if tree else None,
         "releaseMatchesHud": current == HERE, "hudDir": str(HERE),
         "providers": enabled, "slots": slots, "baseSlots": base_slots,
+        "slotEvidence": "fresh-dispatcher" if slot_evidence is not None else "unknown",
         "autoscaleMode": lane.autoscale.mode(), "workers": running_workers(state),
         "ledger24h": dict(verdicts), "runs24h": len(receipts),
         "receipts24h": receipts, "attributionReceipts": all_receipts,
         "lastLanding": landed[0].get("endedAt") if landed else None,
         "held": read_json(state / "held.json", {}), "failures": read_json(state / "failures.json", {}),
         "gateTimeouts": read_json(state / "gate-timeouts.json", {}), "requeue": read_json(state / "requeue.json", {}),
-        "cooldowns": cooldowns, "codex": accounts, "doctor": read_json(state / "doctor.json", {}),
+        "cooldowns": cooldowns, "codex": accounts, "doctor": doctor,
         "tick": read_json(state / "tick.json", {}),
         "gateSeats": host.gate_slots, "generatedAt": utcnow().isoformat(),
     }
+
+
+
+def dispatcher_slots(doctor: dict, providers: dict, now: datetime | None = None):
+    """Use a complete fresh native census; unknown must never become default seats."""
+    now = utcnow() if now is None else now
+    try:
+        age_s = (now - datetime.fromisoformat(doctor["at"].replace("Z", "+00:00"))).total_seconds()
+        rows = doctor["observed"]["capacityByProvider"]
+        if not 0 <= age_s <= 3 * REFRESH_REMOTE_S:
+            return None
+        slots, bases = {}, {}
+        for name in providers:
+            row = rows[name]
+            count, base = row["slots"], row["base"]
+            if type(count) is not int or type(base) is not int or min(count, base) < 0:
+                return None
+            slots[name], bases[name] = count, base
+        return slots, bases
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return None
 
 
 def read_text(path: Path) -> str:
@@ -217,14 +245,15 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
         def fetch():
             return client.gql(
             'query($labels:[String!]!' + (',$numbers:[Float!]!' if numbers else '') + '){'
-            'pool: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},labels:{name:{in:$labels}}})'
-            '{nodes{identifier priority labels{nodes{name}}}}'
+            # Every JOV Todo issue is a candidate (2026-10-11); labels only break the count down.
+            'pool: issues(first:250,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}}})'
+            '{pageInfo{hasNextPage} nodes{identifier priority labels{nodes{name}}}}'
             + ('active: issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}})'
                '{nodes{identifier title state{name}}}' if numbers else '')
             + 'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
             '{nodes{identifier}}}', {"labels": list(LANE_LABELS), **({"numbers": numbers} if numbers else {})})
 
-        data = lane.shared(f"claim-hud-linear-{token}", lane.CLAIM_SCAN_TTL_S, fetch)
+        data = lane.shared(f"claim-hud-linear-v2-{token}", lane.CLAIM_SCAN_TTL_S, fetch)
     except Exception as error:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"[:100]}
     pool = Counter()
@@ -233,7 +262,9 @@ def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
             if label["name"] in LANE_LABELS:
                 pool[label["name"]] += 1
     active = {n["identifier"]: n["title"] for n in (data.get("active") or {"nodes": []})["nodes"]}
-    return {"ok": True, "pool": dict(pool), "poolTotal": len(data["pool"]["nodes"]), "active": active,
+    total = len(data["pool"]["nodes"])
+    more = bool((data["pool"].get("pageInfo") or {}).get("hasNextPage"))
+    return {"ok": True, "pool": dict(pool), "poolTotal": f"{total}+" if more else total, "active": active,
             "triage": len(data["triage"]["nodes"]), "fetchedAt": utcnow().isoformat()}
 
 
@@ -383,6 +414,9 @@ def visible(text: str) -> int:
 
 def clip(text: str, width: int) -> str:
     """Clip by visible width, keeping ANSI sequences balanced."""
+    # Provider errors and issue titles can contain line breaks. Keep each model
+    # row on one physical row so failures cannot scroll the header off tty1.
+    text = re.sub(r"[\r\n\t]", " ", text)
     out, seen = [], 0
     for token in re.split(r"(\x1b\[[0-9;]*[A-Za-z])", text):
         if token.startswith("\x1b"):
@@ -490,23 +524,26 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     workers = local["workers"]
     busy = [w for w in workers if w["run"]]
     total_slots = sum(local["slots"].values())
+    slots_known = local.get("slotEvidence") != "unknown"
     autoscale_mode = local.get("autoscaleMode") or "off"
     bases = local.get("baseSlots") or {}
     parts = []
     for name, count in local["slots"].items():
-        label = f"{name} {sum(1 for w in busy if w['provider'] == name)}/{count}"
+        label = f"{name} {sum(1 for w in busy if w['provider'] == name)}/{count if slots_known else '?'}"
         base = bases.get(name)
         if autoscale_mode != "off" and isinstance(base, int) and base != count:
             label += f"{'↑' if count > base else '↓'}{base}"
         parts.append(label)
     per = " · ".join(parts)
     auto = f" · auto:{autoscale_mode}" if autoscale_mode != "off" else ""
-    lines.append(section(f"ACTIVE SLOTS · {len(busy)} running / {total_slots} ({per}){auto} · gate seats {local['gateSeats']}", width))
+    lines.append(section(f"ACTIVE SLOTS · {len(busy)} running / {total_slots if slots_known else 'unknown'} ({per}){auto} · gate seats {local['gateSeats']}", width))
     rows_budget = max(3, min(total_slots, height - 30))
     shown = 0
     for name, count in local["slots"].items():
         mine = [w for w in workers if w["provider"] == name]
-        for index in range(count):
+        # Seats taken before an autoscale reduction finish naturally; hiding them showed
+        # "codex 2/0" with no rows while two codex workers were still running.
+        for index in range(max(count, len(mine))):
             if shown >= rows_budget:
                 break
             worker = mine[index] if index < len(mine) else None
@@ -552,7 +589,7 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
             freshness = row.get("freshness") or {}
             detail = (f"{row.get('alias', '?')} {remaining} · banked {banked} · {event.get('label', 'source gap')} "
                       f"{deadline} · drain {drain} @ {rate} · unused {unused} · coverage {len(forecast.get('qualifiedWork') or [])} · {mode} · {job} · {freshness.get('status', 'unknown')}")
-            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else ORANGE if mode == "FAST" else GREEN, detail), width))
+            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else GREEN if mode == "NORMAL" and freshness.get("status") == "fresh" else ORANGE, detail), width))
         blocker = capacity.get("topBlocker") or "no material blocker"
         lines.append(pad("  " + rgb(RED if incidents else DIM, f"top blocker: {blocker}"), width))
     elif accounts.get("error"):
@@ -697,7 +734,9 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
 
 def pool_hint(name: str, local: dict) -> str:
     feed = local.get("doctor") or {}
-    admission = feed.get("admission") or {}
+    # doctor.json persists the census under observed; admission is the published
+    # status-feed projection. Read the native source used by worker admission.
+    admission = feed.get("observed") if isinstance(feed.get("observed"), dict) else feed.get("admission") or {}
     try:
         stamp = datetime.fromisoformat(feed["at"].replace("Z", "+00:00"))
         elapsed = (utcnow() - stamp).total_seconds()
@@ -787,7 +826,9 @@ def main(argv=None) -> int:
     try:
         while True:
             newer = current_hud(host)
-            if newer and newer != Path(__file__).resolve():
+            # HERE binds the loaded release. Resolving __file__ again can follow
+            # the moved `current` symlink and incorrectly compare new to new.
+            if newer and newer != HERE / "hud.py":
                 sys.stdout.write("\x1b[?25h")
                 sys.stdout.flush()
                 os.execv(sys.executable, [sys.executable, str(newer), *sys.argv[1:]])

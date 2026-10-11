@@ -742,7 +742,7 @@ class DrainAndTickTest(unittest.TestCase):
             FakeLock.held_paths = set()
             unhealthy = reason.drain(host, self.lane(FakeLinear()), CONFIG, run=Runner(claude=done("", 1)))
             self.assertEqual(unhealthy["status"], "proposer-unhealthy")
-            linear = FakeLinear(jobs=[{"id": "i-1", "identifier": "JOV-1", "title": "a", "description": "", "createdAt": "1"}])
+            linear = FakeLinear(jobs=[{"id": "i-1", "identifier": "JOV-1", "title": "a", "description": description(), "createdAt": "1"}])
             capped = reason.drain(host, self.lane(linear), {**CONFIG, "maxJobsPerDay": 0},
                                   run=Runner(claude=done('"loggedIn": true')))
             self.assertEqual(capped["status"], "budget-exhausted")
@@ -761,7 +761,7 @@ class DrainAndTickTest(unittest.TestCase):
         self.assertNotIn(("i-1", "In Progress"), linear.moves, "a ranking job waits for a healthy proposer")
 
     def test_a_failed_job_waits_for_the_next_drain(self):
-        linear = FakeLinear(jobs=[{"id": "i-1", "identifier": "JOV-1", "title": "a", "description": "", "createdAt": "1"}])
+        linear = FakeLinear(jobs=[{"id": "i-1", "identifier": "JOV-1", "title": "a", "description": description(), "createdAt": "1"}])
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
             out = reason.drain(host, self.lane(linear), CONFIG,
@@ -769,8 +769,17 @@ class DrainAndTickTest(unittest.TestCase):
         self.assertEqual(out["status"], "idle")
         self.assertEqual(linear.moves[-1], ("i-1", "Todo"))
 
+    def test_tick_leaves_reasoning_job_issues_without_the_summer_block_to_build_lanes(self):
+        hand_filed = FakeLinear(jobs=[{"id": "i", "identifier": "JOV-1", "title": "Rank it",
+                                       "description": "please rank", "createdAt": "1"}])
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "local-test"}):
+            host = SimpleNamespace(state=Path(tmp))
+            self.assertEqual(reason.tick(host, self.lane(None), lambda: hand_filed, CONFIG)["status"], "idle")
+        self.assertTrue(reason.has_job_block(description()))
+        self.assertFalse(reason.has_job_block("```json {not json} ```\n```json {\"schema\": \"other\"} ```"))
+
     def test_tick_local_test_backend_reads_without_cache(self):
-        queued = FakeLinear(jobs=[{"id": "i", "identifier": "JOV-1", "title": "", "description": "", "createdAt": "1"}])
+        queued = FakeLinear(jobs=[{"id": "i", "identifier": "JOV-1", "title": "", "description": description(), "createdAt": "1"}])
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "local-test"}):
             host = SimpleNamespace(state=Path(tmp))
             self.assertEqual(reason.tick(host, self.lane(None), lambda: FakeLinear(), CONFIG)["status"], "idle")
@@ -787,7 +796,7 @@ class DrainAndTickTest(unittest.TestCase):
             self.assertEqual(reason.tick(host, self.lane(None), lambda: None, CONFIG)["status"], "running")
             FakeLock.held_paths = set()
             self.assertEqual(reason.tick(host, self.lane(None), lambda: FakeLinear(), CONFIG)["status"], "idle")
-            queued = FakeLinear(jobs=[{"id": "i", "identifier": "JOV-1", "title": "", "description": "", "createdAt": "1"}])
+            queued = FakeLinear(jobs=[{"id": "i", "identifier": "JOV-1", "title": "", "description": description(), "createdAt": "1"}])
             self.assertEqual(reason.tick(host, self.lane(None), lambda: queued, CONFIG)["status"], "idle")
             import lane_runner as lane
             refreshed = time.time() + lane.CLAIM_SCAN_TTL_S + 1

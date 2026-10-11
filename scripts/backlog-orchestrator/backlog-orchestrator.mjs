@@ -87,6 +87,16 @@ const FLEET_GATE_RECEIPT_FILE =
     'state/gem-priority-gate/latest.json'
   );
 
+// JOV-8000 follow-up 33: the Refresh step's same-run receipt lands at
+// ${RUNNER_TEMP}/jovie-fleet-gate.json (evaluate-fleet-gate.sh:29). A second
+// host writer running older gate code can overwrite the persisted
+// latest.json between Refresh and Remediate (the 38031492172 residual:
+// receipt printed hold-intake while the remediator read an older blocked
+// receipt off the host). In Actions, prefer the same-run file.
+function sameRunFleetGateReceiptPath(env) {
+  return resolve(env.RUNNER_TEMP || '/tmp', 'jovie-fleet-gate.json');
+}
+
 const TEAM_CONFIGS = Object.freeze([
   Object.freeze({
     key: 'JOV',
@@ -459,10 +469,9 @@ async function teamProductionStatus(team) {
   }
 }
 
-function loadFleetGateReceipt(team) {
-  if (team.key !== 'JOV') return null;
+function readFleetGateReceiptFile(path) {
   try {
-    const receipt = JSON.parse(readFileSync(FLEET_GATE_RECEIPT_FILE, 'utf8'));
+    const receipt = JSON.parse(readFileSync(path, 'utf8'));
     return receipt?.schema === admitter.FLEET_GATE_SCHEMA &&
       receipt?.signals &&
       typeof receipt.signals === 'object'
@@ -473,11 +482,85 @@ function loadFleetGateReceipt(team) {
   }
 }
 
-async function fleetGateForTeam(team, now = new Date().toISOString()) {
-  const productionStatus = await teamProductionStatus(team);
-  const receipt = loadFleetGateReceipt(team);
+// JOV-8000 follow-up 33: receipt source order for the remediator.
+// (1) JOVIE_FLEET_GATE_RECEIPT when set (explicit override, tests included).
+// (2) In GitHub Actions, the SAME-RUN receipt the Refresh step just wrote to
+//     ${RUNNER_TEMP}/jovie-fleet-gate.json — adopted only when it is the
+//     typed fleet-gate schema, bound to an exact 40-hex main sha, and no
+//     older than the controller receipt window; a missing, malformed, or
+//     stale same-run file is ignored (fail closed to the host receipt).
+// (3) The persisted host receipt (latest.json), which a second host writer
+//     running older gate code can overwrite between Refresh and Remediate
+//     (the 38031492172 residual: Refresh printed hold-intake while the
+//     remediator read an older blocked latest.json off the host).
+export function loadFleetGateReceipt(
+  team,
+  { now = new Date().toISOString(), env = process.env } = {}
+) {
+  if (team.key !== 'JOV') return null;
+  const hostPath =
+    env.JOVIE_FLEET_GATE_RECEIPT ||
+    (env.GEM_WORKSPACE
+      ? resolve(env.GEM_WORKSPACE, 'state/gem-priority-gate/latest.json')
+      : FLEET_GATE_RECEIPT_FILE);
+  if (env.GITHUB_ACTIONS === 'true' && !env.JOVIE_FLEET_GATE_RECEIPT) {
+    const nowMs = Date.parse(now);
+    const sameRunPath = sameRunFleetGateReceiptPath(env);
+    const sameRun = readFleetGateReceiptFile(sameRunPath);
+    const mainSha = sameRun?.signals?.main?.sha;
+    const observedMs = Date.parse(sameRun?.observedAt || '');
+    if (
+      sameRun &&
+      typeof mainSha === 'string' &&
+      /^[0-9a-f]{40}$/.test(mainSha) &&
+      Number.isFinite(observedMs) &&
+      observedMs <= nowMs &&
+      nowMs - observedMs <= admitter.CONTROLLER_RECEIPT_MAX_AGE_MS
+    ) {
+      return {
+        receipt: sameRun,
+        source: 'same-run',
+        path: sameRunPath,
+        observedAt: sameRun.observedAt,
+      };
+    }
+  }
+  const receipt = readFleetGateReceiptFile(hostPath);
+  return receipt
+    ? {
+        receipt,
+        source:
+          env.JOVIE_FLEET_GATE_RECEIPT &&
+          env.JOVIE_FLEET_GATE_RECEIPT !== FLEET_GATE_RECEIPT_FILE
+            ? 'override'
+            : 'host-persisted',
+        path: hostPath,
+        observedAt: receipt.observedAt ?? null,
+      }
+    : null;
+}
+
+export async function fleetGateForTeam(team, now = new Date().toISOString()) {
+  const loaded = loadFleetGateReceipt(team, { now });
+  const receipt = loaded?.receipt ?? null;
   const receiptMain = receipt?.signals?.main?.status;
-  return admitter.evaluateFleetGate(
+  // JOV-8000 follow-up 30: the production signal comes from the SAME-RUN
+  // persisted receipt (the canonical python writer's own observation, with
+  // its deployedSha binding and fetch evidence) — not a second live fetch
+  // from the remediate step. The live re-fetch re-observed production
+  // seconds after the receipt was written and, on a flaky runner egress or
+  // a 5s timeout miss, returned unknown where the receipt said green —
+  // re-deriving {controller-failure, production-unknown} and binding
+  // capacity merge-queue-blocked while the receipt said hold-intake (the
+  // 38027107786 split-brain). Fail closed: when the receipt is missing or
+  // carries no production signal, fall back to the live fetch as before.
+  const receiptProduction = receipt?.signals?.production;
+  const productionStatus =
+    typeof receiptProduction?.status === 'string' &&
+    ['green', 'red', 'unknown'].includes(receiptProduction.status)
+      ? receiptProduction.status
+      : await teamProductionStatus(team);
+  const fleetGate = admitter.evaluateFleetGate(
     {
       main: {
         status:
@@ -490,7 +573,7 @@ async function fleetGateForTeam(team, now = new Date().toISOString()) {
       },
       production: {
         status: productionStatus,
-        deployedSha: receipt?.signals?.production?.deployedSha,
+        deployedSha: receiptProduction?.deployedSha,
       },
       controller: {
         status: receipt?.signals?.controller?.status || 'unknown',
@@ -504,6 +587,34 @@ async function fleetGateForTeam(team, now = new Date().toISOString()) {
     },
     { now }
   );
+  // JOV-8000 follow-up 33: make the receipt-vs-derivation split-brain
+  // observable instead of silent. The derived mode stays authoritative
+  // (never less restrictive); a mismatch means the receipt file and the
+  // derivation disagree and a human should look at the receipt source.
+  const receiptPromotionMode =
+    typeof receipt?.promotionMode === 'string' ? receipt.promotionMode : null;
+  const derivedPromotionMode = fleetGate.promotionMode;
+  const fleetGateEvidence = {
+    source: loaded?.source ?? null,
+    path: loaded?.path ?? null,
+    observedAt: loaded?.observedAt ?? null,
+    receiptPromotionMode,
+    derivedPromotionMode,
+    reasons: fleetGate.reasons.map(reason => reason.code),
+  };
+  console.log(
+    `capacity.fleet-gate source=${fleetGateEvidence.source ?? 'none'} receipt_mode=${receiptPromotionMode ?? 'none'} derived_mode=${derivedPromotionMode} reasons=[${fleetGateEvidence.reasons.join(';')}]`
+  );
+  if (
+    receiptPromotionMode &&
+    derivedPromotionMode &&
+    receiptPromotionMode !== derivedPromotionMode
+  ) {
+    console.log(
+      `::warning::fleet-gate.split-brain receipt promotionMode=${receiptPromotionMode} but derived=${derivedPromotionMode} (source=${fleetGateEvidence.source ?? 'none'}); keeping the derived mode`
+    );
+  }
+  return { ...fleetGate, fleetGateEvidence };
 }
 
 async function recoverStaleLeases(team, isDryRun) {
@@ -1268,36 +1379,289 @@ function uniqueIssuesByIdentifier(issues) {
   return [...selected.values()];
 }
 
-async function collectGitHubPullRequests() {
+/**
+ * The PR inventory is the pullRequests capacity evidence for the remediate
+ * receipt. One `gh pr list --json` per state (open + merged) through gh's
+ * GraphQL; the rollup + body fields make it the heaviest query in the lane,
+ * so each call gets one bounded retry on any failure (transient API hiccup
+ * or slow-query overrun) before the inventory fails closed. The two states
+ * run in parallel; a state that fails twice leaves the whole inventory null
+ * and the capacity gate reports the exact gap (fail-closed, never guessed).
+ */
+/**
+ * The PR inventory query includes `body` and `statusCheckRollup` on ~100
+ * open PRs — measured at multiple MB of JSON (the equivalent REST payload
+ * is ~1.8MB), far beyond execFile's 1MB default maxBuffer. A maxBuffer
+ * overrun kills the child with SIGTERM and a `stdout maxBuffer exceeded`
+ * message that names no cause in its truncated form, so the call runs with
+ * an explicit 32MB maxBuffer and every failure is described with its exit
+ * code, signal, kill flag and untruncated stderr tail.
+ */
+function describeExecFailure(error, command) {
+  const code = typeof error?.code === 'number' ? error.code : null;
+  const signal = typeof error?.signal === 'string' ? error.signal : null;
+  const killed = error?.killed === true ? 'true' : 'false';
+  const message = String(error?.message || error || 'unknown-error');
+  const stderrTail = String(error?.stderr || '')
+    .trim()
+    .slice(-400);
+  const messageTail = message.slice(-400);
+  return [
+    `exit=${code ?? 'none'}`,
+    `signal=${signal ?? 'none'}`,
+    `killed=${killed}`,
+    `stderr=${stderrTail || 'empty'}`,
+    `message=${messageTail}`,
+  ].join(';');
+}
+
+/**
+ * The capacity inventory query (JOV-8000 follow-up 7): the live residual
+ * failure was GitHub GraphQL 504 (`HTTP 504: 504 Gateway Timeout
+ * (https://api.github.com/graphql)`) on the single heavy open-PR query
+ * (body + statusCheckRollup on ~100 PRs). Three load reductions, same
+ * evidence semantics:
+ * - `statusCheckRollup` is dropped: the error-rate signal survives through
+ *   `mergeStateStatus: UNSTABLE` (GitHub sets UNSTABLE exactly when
+ *   required checks fail; `isErroredPullRequest` already accepts it).
+ * - The open list is paginated: two 50-PR pages instead of one 100-PR
+ *   GraphQL query, each far under the 504 threshold. `body` stays — the
+ *   PR→issue attribution (inventory classifications) reads JOV binds from
+ *   PR bodies.
+ * - A transient 504/502 gets one extra bounded retry with a short backoff
+ *   (server-side timeouts are transient by nature). Any other failure keeps
+ *   the existing two attempts; the gate stays fail-closed with the exact
+ *   cause named in pullRequestsEvidence.
+ */
+const GH_TRANSIENT_GATEWAY = /HTTP 50[24]/;
+
+async function ghPullRequestList(state, limit, env) {
   const fields =
-    'number,title,body,headRefName,state,mergeStateStatus,url,mergedAt,isDraft,statusCheckRollup';
+    'number,title,body,headRefName,state,mergeStateStatus,mergeable,labels,url,mergedAt,isDraft';
+  const args = [
+    'pr',
+    'list',
+    '--repo',
+    'JovieInc/Jovie',
+    '--state',
+    state,
+    '--limit',
+    String(limit),
+    '--json',
+    fields,
+  ];
+  const maxAttempts = 3;
+  let lastError = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (attempt > 0) {
+      // Backoff before a retry: a full second for the first retry of a
+      // gateway timeout, two for the second.
+      await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+    }
+    try {
+      const { stdout } = await execFileAsync('gh', args, {
+        timeout: 45_000,
+        maxBuffer: 32 * 1024 * 1024,
+        env,
+      });
+      return JSON.parse(stdout);
+    } catch (error) {
+      lastError = error;
+      const transient = GH_TRANSIENT_GATEWAY.test(
+        String(error?.stderr || '') + String(error?.message || '')
+      );
+      if (!transient) break;
+    }
+  }
+  throw new Error(
+    `gh-pr-list-${state}:${describeExecFailure(lastError, args.join(' '))}`
+  );
+}
+
+async function ghPullRequestInventory(state, env) {
+  // `gh pr list` has no page offset — a second call with the same --limit
+  // returns the SAME page, and one --limit 100 call cannot prove
+  // completeness past 100 open PRs. The open inventory pages through the
+  // REST API (`gh api` with URL query params only — the `gh api graphql -F`
+  // form was malformed on the Gem runner's gh CLI: exit=1 "Add a string
+  // parameter in key=value format"), ?page=N&per_page=50 until a short
+  // page, deduped by number by the caller, so completeness is proven by
+  // pagination instead of capped. The merged inventory stays one
+  // --limit 50 call (merged PRs are only attribution evidence).
+  if (state !== 'open') return ghPullRequestList(state, 50, env);
+  const rows = [];
+  for (let page = 1; ; page += 1) {
+    const path = `repos/JovieInc/Jovie/pulls?state=open&sort=updated&direction=desc&per_page=50&page=${page}`;
+    const stdout = await execGhApi(path, env);
+    const batch = JSON.parse(stdout);
+    if (!Array.isArray(batch)) {
+      throw new Error(`gh-pr-list-open:gh-api-rest:non-array-page:${page}`);
+    }
+    for (const row of batch) {
+      // The /pulls LIST payload never includes mergeable/mergeable_state
+      // (they are lazily computed per-PR), so no row is marked measured
+      // here — mergeStateStatus stays undefined and the mergeability
+      // phase (measureMergeability) measures every population row with
+      // the per-PR REST GET. mergeabilityUnknown treats unmeasured rows
+      // as unknown.
+      rows.push({
+        number: row.number,
+        title: row.title,
+        body: row.body,
+        headSha: typeof row.head?.sha === 'string' ? row.head.sha : undefined,
+        headRefName: row.head?.ref ?? row.headRefName,
+        state:
+          String(row.state ?? 'OPEN').toUpperCase() === 'MERGED'
+            ? 'MERGED'
+            : 'OPEN',
+        labels: (row.labels ?? []).map(label => ({ name: label.name })),
+        url: row.html_url,
+        mergedAt: row.merged_at,
+        isDraft: row.draft ?? row.isDraft ?? false,
+      });
+    }
+    if (batch.length < 50) break;
+  }
+  return rows;
+}
+
+/**
+ * One `gh api` REST call with the transient-gateway retry (the same bounded
+ * backoff as ghPullRequestList). URL query params only — no `-F` typed
+ * fields (the `gh api graphql -F` form was a CLI usage error on the Gem
+ * runner's gh). Any non-transient failure throws with the exact gh cause
+ * named.
+ */
+/**
+ * Shared gh CLI executor with the transient-gateway retry. Callers pass the
+ * full argv (e.g. ['api', <path>] for REST, ['api', 'graphql', '-f', q] for
+ * GraphQL) — never a fused 'graphql -f query=...' endpoint string, which gh
+ * reads as one invalid endpoint and fails. `timeoutMs` caps each attempt;
+ * the mergeability phase passes its remaining budget so a slow call can
+ * never overrun the 20s phase deadline.
+ */
+async function execGhArgs(args, label, describeAs, env, timeoutMs = 45_000) {
+  const maxAttempts = 3;
+  let lastError = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+    }
+    try {
+      const { stdout } = await execFileAsync('gh', args, {
+        timeout: Math.max(1, timeoutMs),
+        maxBuffer: 32 * 1024 * 1024,
+        env,
+      });
+      return stdout;
+    } catch (error) {
+      lastError = error;
+      const transient = GH_TRANSIENT_GATEWAY.test(
+        String(error?.stderr || '') + String(error?.message || '')
+      );
+      if (!transient) break;
+    }
+  }
+  throw new Error(`${label}:${describeExecFailure(lastError, describeAs)}`);
+}
+
+async function execGhApi(path, env, timeoutMs) {
+  // `gh api` takes NO --repo/-R flag (that is a `gh pr` flag — passing it
+  // makes gh exit 1 with its full usage help, whose -F description line
+  // "Add a string parameter in key=value format" is what the Gem runner's
+  // stderr showed). The repository lives inside the endpoint path itself;
+  // the argv is exactly ['api', <full endpoint path+query>].
+  return execGhArgs(
+    ['api', path],
+    'gh-api-pr-inventory',
+    `api ${path}`,
+    env,
+    timeoutMs
+  );
+}
+
+/**
+ * GraphQL read: `gh api graphql -f query=<gql>` as separate argv elements.
+ * A response carrying errors[] is a failure (the query itself was rejected),
+ * thrown as mergeability-graphql:errors:<msg> so the caller fails closed.
+ */
+async function execGhGraphql(query, env, timeoutMs) {
+  const body = await execGhArgs(
+    ['api', 'graphql', '-f', `query=${query}`],
+    'gh-api-graphql',
+    'api graphql',
+    env,
+    timeoutMs
+  );
+  const parsed = JSON.parse(body);
+  const errors = parsed?.errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    throw new Error(
+      `mergeability-graphql:errors:${errors
+        .map(e => String(e?.message || e).slice(0, 200))
+        .join(';')}`.slice(0, 400)
+    );
+  }
+  return parsed;
+}
+
+export async function collectGitHubPullRequests(env = process.env) {
   const lists = await Promise.all(
     ['open', 'merged'].map(async state => {
       try {
-        const { stdout } = await execFileAsync(
-          'gh',
-          [
-            'pr',
-            'list',
-            '--repo',
-            'JovieInc/Jovie',
-            '--state',
-            state,
-            '--limit',
-            state === 'open' ? '100' : '50',
-            '--json',
-            fields,
-          ],
-          { timeout: 20_000 }
-        );
-        return JSON.parse(stdout);
-      } catch {
-        return null;
+        return await ghPullRequestInventory(state, env);
+      } catch (error) {
+        // ghPullRequestList / ghPullRequestInventory already carry the full
+        // untruncated failure description; keep the raw message as a
+        // fallback if it is ever replaced by a non-Error throw.
+        return {
+          error:
+            error instanceof Error && error.message.startsWith('gh-pr-list-')
+              ? error.message
+              : `gh-pr-list-${state}:${String(error?.message || error).slice(0, 400)}`,
+        };
       }
     })
   );
-  if (lists.some(list => list === null)) return null;
-  return lists.flat();
+  const failed = /** @type {{ error?: string }[]} */ (
+    lists.filter(list => list && !Array.isArray(list))
+  );
+  if (failed.length > 0) {
+    return {
+      error: failed.flatMap(list => list?.error ?? 'unknown').join('|'),
+    };
+  }
+  // The PR inventory is one row per PR number, drafts INCLUDED: the
+  // inventory feeds both the capacity rates (which exclude drafts and
+  // label-quarantined rows inside pullRequestRates) and the issue→PR
+  // attribution (which must see draft PRs too — an issue whose only open
+  // PR is a draft still has that PR and must not be re-selected).
+  const byNumber = new Map();
+  let duplicatesDropped = 0;
+  let openUnique = 0;
+  for (const row of lists.flat()) {
+    const record = /** @type {Record<string, any>} */ (row ?? {});
+    if (!Number.isInteger(record.number)) continue;
+    if (byNumber.has(record.number)) {
+      duplicatesDropped += 1;
+      continue;
+    }
+    byNumber.set(record.number, record);
+    if (String(record.state || '').toUpperCase() === 'OPEN') openUnique += 1;
+  }
+  const inventory = [...byNumber.values()];
+  // The open inventory pages through GraphQL with a real cursor, so its
+  // completeness is proven by pagination (pageInfo.hasNextPage false) —
+  // no page-limit fail-closed is needed for the open side; the merged side
+  // is attribution-only evidence (never rate-defining) and a partial merged
+  // page cannot silently close the gate.
+  return {
+    pullRequests: inventory,
+    count: inventory.length,
+    openUnique,
+    duplicatesDropped,
+    truncated: false,
+  };
 }
 
 async function measureCloneLatencyMs() {
@@ -1338,6 +1702,328 @@ async function readOfficialSymphonyWorkers(maxConcurrent) {
   }
 }
 
+/**
+ * Check-rollup enrichment (JOV-8000 follow-ups 10+15): attaches each
+ * rate-population row's check-rollup state from the per-commit REST
+ * combined-status view — `gh api repos/.../commits/{sha}/status` keyed by
+ * the head SHA the REST inventory already carries (no per-PR lookup, no
+ * graphql). The fetches run in bounded-parallelism batches (4 at a time)
+ * under a hard deadline so the whole pass stays well inside the remediate
+ * step's 90s budget — the sequential form (two calls per row, one row at a
+ * time) hit the step timeout and failed the job with exit 124
+ * (run 37872694219). Returns false when any fetch fails or the deadline
+ * passes — the gate fails closed on prRollups:false, never zero errored.
+ */
+/**
+ * Mergeability measurement (JOV-8000 follow-up 19, Ops spec): the
+ * /pulls LIST payload never includes mergeable/mergeable_state (they
+ * are lazily computed per-PR), so every population row starts
+ * unmeasured. This phase measures each population row with the
+ * per-PR REST GET (`gh api repos/JovieInc/Jovie/pulls/<N>`) — the
+ * request that triggers GitHub's mergeable computation — mapping
+ * mergeable true/false/null to MERGEABLE/CONFLICTING/UNKNOWN and
+ * mergeable_state (uppercased) to mergeStateStatus, refreshing
+ * headSha. The merge queue is read ONCE up front (GraphQL
+ * mergeQueue(branch:"main") entries via a real `gh api graphql -f
+ * query=...` argv — never a fused endpoint string) and is the ONLY
+ * queue proof: an entry whose headRefOid matches the row's headSha is
+ * in-queue, known and not conflicting, with no per-PR retries. The
+ * leaked gh-readonly-queue refs carry the merge group's BASE sha (the
+ * main tip), not the PR head, so they are dropped as evidence. A
+ * GraphQL failure is named in evidence.errors (mergequeue:<cause>) and
+ * queueSource 'none', and rows stay unknown (fail closed). The
+ * remaining rows poll in ROUNDS: round 0 sends one GET per PR through
+ * a 4-wide pool, then later rounds re-poll only the still-null rows
+ * after 2s, 4s and 8s; a failed GET is retried in the next round. Each
+ * call's timeout is capped at the remaining phase budget under the 20s
+ * hard deadline. Fallback: a null-mergeable row with a known
+ * mergeable_state is measured — dirty means conflicting; clean,
+ * unstable, blocked, behind or has_hooks mean known and not
+ * conflicting. Leftovers stay unknown and nothing throws — the gate
+ * fails closed on the unknown share. The receipt carries
+ * deadlineHit/elapsedMs/unpolled (unknown AND never polled) /
+ * queueSource so a starved or queue-blind phase is auditable.
+ * @param {Record<string, any>[]} pullRequests
+ * @param {NodeJS.ProcessEnv} env
+ * @param {{ sleep?: (ms: number) => Promise<void>, now?: () => number }} [timing]
+ * @returns {Promise<{measured: number, polls: number, inMergeQueue: number[], stillUnknown: number[], unpolled: number[], deadlineHit: boolean, elapsedMs: number, queueSource: string, errors: string[]}>}
+ */
+export async function measureMergeability(
+  pullRequests,
+  env,
+  timing = {
+    sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+    now: () => Date.now(),
+  }
+) {
+  const sleep =
+    timing.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
+  const now = timing.now ?? (() => Date.now());
+  const population = pullRequests.filter(isRatePopulationRow);
+  const startMs = now();
+  const backoffMs = [2000, 4000, 8000];
+  const deadline = startMs + 20_000;
+  const evidence = {
+    measured: 0,
+    polls: 0,
+    inMergeQueue: [],
+    stillUnknown: [],
+    unpolled: [],
+    deadlineHit: false,
+    elapsedMs: 0,
+    queueSource: 'none',
+    errors: [],
+  };
+
+  /** @param {Record<string, any>} row */
+  const rowIsUnknown = row =>
+    String(row?.mergeable ?? '').toUpperCase() === 'UNKNOWN' ||
+    String(row?.mergeable ?? '') === '' ||
+    row?.mergeable === undefined ||
+    String(row?.mergeStateStatus ?? '').toUpperCase() === 'UNKNOWN' ||
+    row?.mergeStateStatus === undefined;
+
+  /** Mark a row as in-queue (the head binding is the caller's job). */
+  const markInQueue = row => {
+    // In the merge queue: mergeable stays uncomputed by design — known
+    // and not conflicting, staying in the denominator. The queue's
+    // synthetic merge group is the authority, not the lazily-computed
+    // per-PR state.
+    row.mergeable = 'MERGEABLE';
+    row.mergeStateStatus = 'HAS_HOOKS';
+    row.inMergeQueue = true;
+    evidence.inMergeQueue.push(Number(row?.number));
+  };
+
+  // (A) Merge-queue awareness FIRST, before any per-PR retry: an entry
+  // whose headRefOid matches the row's headSha is in-queue — known and
+  // not conflicting, no retries spent. GraphQL is the ONLY queue proof:
+  // the leaked gh-readonly-queue refs carry the merge group's BASE sha
+  // (the main tip), not the PR head, so a head-bound ref match can never
+  // pass and refs only exist for groups currently building — they are
+  // dropped as evidence. A GraphQL failure is named in evidence.errors
+  // (mergequeue:<cause>) and queueSource 'none'; rows stay unknown (fail
+  // closed).
+  evidence.queueSource = 'none';
+  const queueHeadsByPr = new Map();
+  try {
+    const parsed = await execGhGraphql(
+      '{repository(owner:"JovieInc",name:"Jovie"){mergeQueue(branch:"main"){entries(first:100){nodes{pullRequest{number headRefOid}} pageInfo{hasNextPage}}}}}',
+      env,
+      Math.max(1, deadline - now())
+    );
+    const entries = parsed?.data?.repository?.mergeQueue?.entries;
+    const nodes = entries?.nodes;
+    if (!Array.isArray(nodes)) {
+      throw new Error('mergeability-graphql:unexpected-response');
+    }
+    for (const node of nodes) {
+      const number = Number(node?.pullRequest?.number);
+      const head = String(node?.pullRequest?.headRefOid ?? '');
+      if (!Number.isInteger(number) || !/^[0-9a-f]{40}$/.test(head)) continue;
+      const heads = queueHeadsByPr.get(number) || new Set();
+      heads.add(head);
+      queueHeadsByPr.set(number, heads);
+    }
+    if (entries?.pageInfo?.hasNextPage === true) {
+      evidence.errors.unshift('mergequeue:truncated-at-100');
+    }
+    evidence.queueSource = 'graphql';
+  } catch (queueError) {
+    evidence.errors.unshift(
+      `mergequeue:${String(queueError?.message || queueError).slice(0, 300)}`
+    );
+    evidence.queueSource = 'none';
+  }
+  for (const row of population) {
+    const queuedHeads = queueHeadsByPr.get(Number(row?.number));
+    if (
+      queuedHeads &&
+      typeof row?.headSha === 'string' &&
+      queuedHeads.has(row.headSha)
+    ) {
+      markInQueue(row);
+    }
+  }
+
+  /**
+   * Apply a per-PR GET result to a row; returns true when the row is
+   * measured (known mergeability, or the fallback reads a known
+   * mergeable_state), false when still unknown.
+   * @param {Record<string, any>} row
+   * @param {Record<string, any>} detail
+   */
+  const applyDetail = (row, detail) => {
+    const mergeable = detail?.mergeable;
+    if (
+      typeof row?.headSha !== 'string' &&
+      typeof detail?.head?.sha === 'string'
+    ) {
+      row.headSha = detail.head.sha;
+    }
+    if (detail?.mergeable_state !== undefined) {
+      row.mergeStateStatus = String(detail.mergeable_state).toUpperCase();
+    }
+    if (mergeable === true) {
+      row.mergeable = 'MERGEABLE';
+    } else if (mergeable === false) {
+      row.mergeable = 'CONFLICTING';
+    }
+    if (mergeable === null || mergeable === undefined) {
+      // Fallback: null mergeable with a known mergeable_state still
+      // measures the row — dirty means conflicting; clean, unstable,
+      // blocked, behind or has_hooks mean known and not conflicting.
+      const state = String(detail?.mergeable_state ?? '').toUpperCase();
+      if (state && state !== 'UNKNOWN') {
+        row.mergeable = state === 'DIRTY' ? 'CONFLICTING' : 'MERGEABLE';
+        return true;
+      }
+      return false;
+    }
+    return true;
+  };
+
+  // (B)+(C) Poll in rounds: round 0 sends one GET per row through a
+  // 4-wide pool; later rounds re-poll only the still-unknown rows after
+  // the 2s/4s/8s backoff. A failed GET no longer gives up — the row
+  // rejoins the next round (evidence.errors keeps the named cause).
+  // (D) A row is `unpolled` only when it is still unknown AND never got a
+  // per-PR GET (deadline-cut before round 0 reached it) — a polled-null
+  // row is stillUnknown but NOT unpolled.
+  const pending = population.filter(row => rowIsUnknown(row));
+  const polled = new Set();
+  const getOnce = async row => {
+    if (now() > deadline) return;
+    try {
+      const body = await execGhApi(
+        `repos/JovieInc/Jovie/pulls/${row.number}`,
+        env,
+        Math.max(1, deadline - now())
+      );
+      evidence.polls += 1;
+      const detail = /** @type {Record<string, any>} */ (JSON.parse(body));
+      applyDetail(row, detail);
+    } catch (error) {
+      if (evidence.errors.length < 5) {
+        evidence.errors.push(
+          `pulls/${row.number}:${describeExecFailure(error, 'api')}`
+        );
+      }
+    } finally {
+      polled.add(row);
+    }
+  };
+  for (
+    let round = 0;
+    round <= backoffMs.length && pending.length > 0;
+    round += 1
+  ) {
+    if (now() > deadline) {
+      evidence.deadlineHit = true;
+      break;
+    }
+    if (round > 0) {
+      const wait = backoffMs[round - 1];
+      if (now() + wait > deadline) {
+        evidence.deadlineHit = true;
+        break;
+      }
+      await sleep(wait);
+      if (now() > deadline) {
+        evidence.deadlineHit = true;
+        break;
+      }
+    }
+    const roundRows = pending.splice(0, pending.length);
+    for (let i = 0; i < roundRows.length; i += 4) {
+      if (now() > deadline) {
+        evidence.deadlineHit = true;
+        // Rows not reached this round rejoin pending so unpolled is exact.
+        pending.push(...roundRows.slice(i));
+        break;
+      }
+      const batch = roundRows.slice(i, i + 4);
+      await Promise.all(batch.map(row => getOnce(row)));
+    }
+    for (const row of roundRows) {
+      if (rowIsUnknown(row) && !pending.includes(row)) pending.push(row);
+    }
+  }
+  evidence.unpolled = pending
+    .filter(row => rowIsUnknown(row) && !polled.has(row))
+    .map(row => row?.number);
+
+  evidence.measured = population.filter(row => !rowIsUnknown(row)).length;
+  evidence.stillUnknown = population
+    .filter(row => rowIsUnknown(row))
+    .map(row => row?.number);
+  evidence.elapsedMs = Math.max(0, now() - startMs);
+  return evidence;
+}
+
+export function isRatePopulationRow(pullRequest) {
+  // Population = every counted row (open, non-draft, not
+  // label-quarantined) — the same predicate as pullRequestRates.
+  return (
+    String(pullRequest?.state || '').toUpperCase() === 'OPEN' &&
+    pullRequest?.isDraft !== true &&
+    !(pullRequest?.labels ?? []).some(label =>
+      ['queue-poison', 'hold'].includes(
+        String(
+          typeof label === 'string'
+            ? label
+            : /** @type {any} */ (label?.name ?? '')
+        ).toLowerCase()
+      )
+    )
+  );
+}
+
+export async function attachCheckRollups(pullRequests, env = process.env) {
+  const counted = pullRequests.filter(isRatePopulationRow);
+  const rollupRows = counted.filter(row => typeof row?.headSha === 'string');
+  let prRollups = true;
+  const rollupDeadline = Date.now() + 25_000;
+  for (let i = 0; i < rollupRows.length; i += 4) {
+    if (Date.now() > rollupDeadline) {
+      // A slow runner fails the gate closed on the named cause instead of
+      // timing out the remediate step (the 124 exit class).
+      prRollups = false;
+      break;
+    }
+    const batch = rollupRows.slice(i, i + 4);
+    await Promise.all(
+      batch.map(async row => {
+        try {
+          // JOV-8000 follow-up 20b: the error gate reads the Actions
+          // CHECK-RUNS view — `commits/{sha}/check-runs` — not the legacy
+          // status view (`commits/{sha}/status`), which only aggregates
+          // legacy commit statuses and reads 'success' for PRs whose
+          // failing CI is Actions check-runs (unstable rows read clean).
+          // A row is errored when ANY check-run on its head concluded
+          // FAILURE (isErroredPullRequest reads statusCheckRollup.state
+          // FAILURE/ERROR); otherwise SUCCESS. No threshold change.
+          const body = await execGhApi(
+            `repos/JovieInc/Jovie/commits/${row.headSha}/check-runs?per_page=100`,
+            env
+          );
+          const checkRuns = JSON.parse(body);
+          const runs = Array.isArray(checkRuns?.check_runs)
+            ? checkRuns.check_runs
+            : [];
+          const anyFailure = runs.some(
+            run => String(run?.conclusion ?? '').toUpperCase() === 'FAILURE'
+          );
+          row.statusCheckRollup = { state: anyFailure ? 'FAILURE' : 'SUCCESS' };
+        } catch {
+          prRollups = false;
+        }
+      })
+    );
+  }
+  return prRollups;
+}
+
 async function runRemediate(isDryRun) {
   const team = TEAM_CONFIGS.find(item => item.key === 'JOV');
   if (!team) throw new Error('jov-team-config-missing');
@@ -1346,28 +2032,88 @@ async function runRemediate(isDryRun) {
     linear.fetchTeamActiveIssues(team.id),
   ]);
   const issues = uniqueIssuesByIdentifier([...intake, ...active]);
-  const pullRequests = await collectGitHubPullRequests();
+  // The collector returns either a full inventory receipt
+  // ({pullRequests, count, openUnique, duplicatesDropped, truncated:false})
+  // or a failed-closed receipt ({error, truncated?, ...}) — never a bare
+  // array and never a silent truncation.
+  const pullRequestsReceipt = await collectGitHubPullRequests();
+  const pullRequests = Array.isArray(
+    /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})?.pullRequests
+  )
+    ? /** @type {Record<string, any>} */ (pullRequestsReceipt).pullRequests
+    : null;
+  // Mergeability measurement (JOV-8000 follow-up 19, Ops spec): the
+  // /pulls LIST payload never carries mergeable/mergeable_state, so every
+  // population row starts unmeasured. measureMergeability runs the per-PR
+  // REST GET per row (which triggers GitHub's computation), bounded-parallel
+  // with retries and a hard deadline; merge-queue rows (still null after
+  // retries with a gh-readonly-queue pr-<N>- ref) count as known and not
+  // conflicting. The receipt carries the full evidence.
+  let mergeabilityEvidence = null;
+  if (Array.isArray(pullRequests)) {
+    mergeabilityEvidence = await measureMergeability(
+      pullRequests,
+      process.env,
+      {
+        sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+        now: () => Date.now(),
+      }
+    );
+  }
+  // Check-rollup fetch (JOV-8000 follow-up 10): the error gate reads each
+  // rate-population row's check-rollup STATE (FAILURE/ERROR = a failing
+  // required check on the head), which the inventory query does not carry.
+  // On failure the gate fails closed with 'pr-check-rollup-unavailable' via
+  // the prRollups:false signal — never treated as zero errored.
+  const prRollups = Array.isArray(pullRequests)
+    ? await attachCheckRollups(pullRequests, process.env)
+    : true;
   const cloneLatencyMs = await measureCloneLatencyMs();
   const fleetGate = await fleetGateForTeam(team);
-  const rawReceipt = loadFleetGateReceipt(team);
+  const loadedReceipt = loadFleetGateReceipt(team);
+  const rawReceipt = loadedReceipt?.receipt ?? null;
   const queue = rawReceipt?.signals?.queue;
-  const workers = await readOfficialSymphonyWorkers(
-    fleetGate.concurrency?.gem?.maxConcurrent
-  );
-  const provider = readCodexRotateCapacity();
+  // JOV-8000: the Elixir :4041 state API is retired. The shipping lanes'
+  // doctor report is the measured capacity source; the legacy read survives
+  // only as a fallback so a future controller can re-own the signal.
+  const lanes = backlogRemediation.readLanesCapacity();
+  const rotateProvider = () => {
+    const rotate = readCodexRotateCapacity();
+    return rotate ? { accounts: rotate.accounts, ready: rotate.ready } : null;
+  };
+  const workers = lanes
+    ? lanes.workers
+    : await readOfficialSymphonyWorkers(
+        fleetGate.concurrency?.gem?.maxConcurrent
+      );
+  // The lanes doctor owns worker seats, but its codex attribution can be
+  // unknown (status-probe error) while the report itself is fresh — the same
+  // codex-rotate account evidence backs the provider signal in that case,
+  // so one stale sub-signal cannot blank the whole capacity receipt.
+  const provider = (lanes && lanes.provider) || rotateProvider();
   const previous = loadCache().backlogRemediation || {};
   const receipt = backlogRemediation.buildRemediationReceipt({
     issues,
-    pullRequests: pullRequests || [],
+    pullRequests: Array.isArray(pullRequests) ? pullRequests : [],
     mainSha: rawReceipt?.signals?.main?.sha || null,
     capacitySignals: {
       schema: backlogRemediation.CAPACITY_SCHEMA,
       observedAt: new Date().toISOString(),
       workers,
+      // Worker evidence provenance for the capacity line + receipt (the
+      // lanes doctor report vs the legacy 4041 feed) — a workers-saturated
+      // stop names its source and freshness.
+      workersSource: lanes
+        ? 'lanes-doctor-report'
+        : workers
+          ? 'legacy-4041'
+          : null,
+      workersObservedAt: lanes?.observedAt ?? null,
       host: backlogRemediation.readHostPressure('/proc'),
       provider: provider
         ? { accounts: provider.accounts, ready: provider.ready }
         : null,
+      prRollups,
       cloneLatencyMs,
       ci: {
         saturating:
@@ -1380,6 +2126,10 @@ async function runRemediate(isDryRun) {
         queued: Number.isInteger(queue?.eligiblePrs) ? queue.eligiblePrs : null,
       },
       pullRequests,
+      // JOV-8000 follow-up 19: the mergeability measurement evidence rides
+      // the capacity signals (measured/polls/inMergeQueue/stillUnknown/
+      // errors) so the receipt is auditable against the live fleet.
+      mergeabilityEvidence,
       mergeQueue: {
         health:
           fleetGate.promotionMode === admitter.FLEET_PROMOTION_MODE.BLOCKED
@@ -1400,8 +2150,53 @@ async function runRemediate(isDryRun) {
     mode: isDryRun ? 'dry-run' : 'mutating',
     workpad: undefined,
     workpadBody: receipt.workpad,
+    // JOV-8000 follow-up 33: which receipt the capacity verdict derived from
+    // (same-run file vs host-persisted latest.json) and whether the
+    // receipt's own printed promotionMode matched the derived one.
+    fleetGateEvidence: fleetGate.fleetGateEvidence ?? null,
+    // The pullRequests capacity evidence keeps failing closed inside the
+    // capacity verdict; the exact gh failure and the inventory audit
+    // numbers are surfaced here so a capacity-evidence gap names its
+    // producer. Access stays property-safe across the collector's return
+    // shapes.
+    pullRequestsEvidence: Array.isArray(pullRequests)
+      ? {
+          count:
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.count ?? pullRequests.length,
+          openUnique:
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.openUnique ?? null,
+          duplicatesDropped:
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.duplicatesDropped ?? null,
+          truncated: false,
+          error: null,
+        }
+      : {
+          count:
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.count ?? null,
+          truncated: Boolean(
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.truncated
+          ),
+          error: String(
+            /** @type {Record<string, any>} */ (pullRequestsReceipt ?? {})
+              ?.error ??
+              (pullRequests === null
+                ? 'gh-pr-list:unparseable-output'
+                : 'gh-pr-list:unknown-failure')
+          ).slice(0, 2000),
+        },
     feed: receipt.feed,
     workpadUpsert: null,
+    bridge: null,
+    // JOV-8000 follow-up 36: the mergeability evidence also rides the
+    // printed result top-level (it already sits inside
+    // capacitySignals.mergeabilityEvidence) so the deadline/starvation
+    // fields are one property away from the receipt reader.
+    mergeabilityEvidence,
   };
   if (!isDryRun) {
     result.workpadUpsert = await backlogRemediation.upsertRemediationWorkpad({
@@ -1411,14 +2206,46 @@ async function runRemediate(isDryRun) {
         backlogRemediation.DEFAULT_WORKPAD_ISSUE,
       receipt,
     });
+    // Selected-to-lanes bridge (Symphony Owner, 2026-10-10): convert each
+    // selected issue into a leasable one (add the shared agent-ready label +
+    // a one-time bridge marker) so a lane's claim-scan picks it up. Runs only
+    // in the mutating path, after the workpad upsert; the kill-switch env
+    // JOVIE_BRIDGE_LANES=0|false|off disables it. Linear-budget friendly: one
+    // fetch + at most one write per selected issue.
+    const bridgeInventory = Object.fromEntries(
+      (receipt.matrix ?? [])
+        .filter(row => row?.identifier)
+        .map(row => [row.identifier, { openPullRequests: [] }])
+    );
+    result.bridge = await backlogRemediation.bridgeSelectedToLanes({
+      cohort: receipt.cohort,
+      client: linear,
+      inventory: bridgeInventory,
+      teamId: team.id,
+      env: process.env,
+    });
+    // Surface lane rejection reasons for the selected issues next to the
+    // bridge receipt, so route-held:frontier / over-budget is visible without
+    // host access (the lanes doctor carries observed.rejectedIssues).
+    const rejectedIssues = lanes?.rejectedIssues ?? {};
     if (receipt.cohort.selected.length > 0) {
+      for (const item of receipt.cohort.selected) {
+        const id = item?.identifier;
+        if (!id) continue;
+        const reason = rejectedIssues[id] ?? null;
+        console.log(
+          `bridge.selected ${id} -> ${reason ? `lane-rejected reason=${reason}` : 'lane-leasable'}`
+        );
+      }
+    }
+    if (receipt.cohort.selected.length > 0) {
+      // JOV-8000: the lanes pick up admitted work on their own event-driven
+      // tick — there is no HTTP refresh endpoint to POST anymore. Passing no
+      // URL records an event-driven feed receipt instead of failing remediate
+      // on a dead connection.
       result.feed = {
         ...receipt.feed,
-        refresh: await backlogRemediation.feedOfficialSymphony({
-          url:
-            TEAM_FILE_CONFIG.remediation?.symphonyRefreshUrl ||
-            backlogRemediation.OFFICIAL_SYMPHONY_REFRESH_URL,
-        }),
+        refresh: await backlogRemediation.feedOfficialSymphony({ url: null }),
       };
     }
     const clean = receipt.capacity.allowed === true;
@@ -1433,6 +2260,18 @@ async function runRemediate(isDryRun) {
     });
   }
   console.log(JSON.stringify(result, null, 2));
+  // One-line capacity.rates summary as the LAST log line (JOV-8000
+  // follow-up 19): the full receipt block sits ~300KB above the end of a
+  // ~1.45MB log — the summary lands the auditable numbers at the tail.
+  const ratesSummary = Array.isArray(pullRequests)
+    ? backlogRemediation.pullRequestRates(pullRequests)
+    : null;
+  if (ratesSummary) {
+    const mm = /** @type {Record<string, any>} */ (mergeabilityEvidence ?? {});
+    console.log(
+      `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')} mm.queueSource=${mm.queueSource ?? 'none'} mm.errors=${(mm.errors ?? []).length} workers.running=${workers?.running ?? 'n/a'} workers.max=${workers?.maxConcurrent ?? 'n/a'} workers.source=${lanes ? 'lanes-doctor-report' : workers ? 'legacy-4041' : 'none'} workers.observedAt=${lanes?.observedAt ?? 'n/a'}`
+    );
+  }
 }
 
 if (

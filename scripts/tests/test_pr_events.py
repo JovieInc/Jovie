@@ -541,6 +541,23 @@ class RelayTest(unittest.TestCase):
         self.assertIsNone(events.queue_ejections(7, NOW, repeated, head="h7"))
         self.assertEqual(len(repeated.calls), 2)
 
+    def test_a_sync_with_main_does_not_reset_the_ejection_count(self):
+        # 2026-10-10: #21118 was ejected, update-branch merged main (new head), re-enrolled and
+        # ejected again, six times. A two-parent merge is not a repair, so both ejections count
+        # and the second one poisons; a real (single-parent) commit still starts a new revision.
+        removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        def commit(oid, parents):
+            return {"__typename": "PullRequestCommit", "commit": {"oid": oid, "parents": {"totalCount": parents}}}
+        def page(nodes):
+            return {"data": {"repository": {"pullRequest": {"headRefOid": "sync2", "state": "OPEN", "timelineItems": {
+                "nodes": nodes, "pageInfo": {"hasPreviousPage": False, "startCursor": None}}}}}}
+        looped = page([commit("fix", 1), removal, commit("sync1", 2), removal, commit("sync2", 2), removal])
+        self.assertEqual(events.queue_ejections(7, NOW, Shell({("gh", "api", "graphql"): looped}), head="sync2"), 3)
+        repaired = page([commit("old", 1), removal, removal, commit("fix", 1), commit("sync2", 2), removal])
+        self.assertEqual(events.queue_ejections(7, NOW, Shell({("gh", "api", "graphql"): repaired}), head="sync2"), 1)
+        legacy = page([{"__typename": "PullRequestCommit", "commit": {"oid": "sync2"}}, removal])  # no parents: a plain boundary
+        self.assertEqual(events.queue_ejections(7, NOW, Shell({("gh", "api", "graphql"): legacy}), head="sync2"), 1)
+
     def test_poison_mutation_rechecks_live_head_and_hold_after_history_reads(self):
         removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
         page = {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", "timelineItems": {
@@ -572,10 +589,9 @@ class RelayTest(unittest.TestCase):
         terminal = pr(number=5, branch="tim/terminal", mergeable="CONFLICTING",
                       labels=["lane-fix-exhausted"])
         claimed = pr(number=6, branch="tim/claimed", sha="claimed-head", mergeable="CONFLICTING")
-        claim_url = (f"repos/{events.REPO}/issues/6/comments?per_page=100&sort=created&direction=desc")
         shell = Shell({
             ("gh", "pr", "list"): [terminal, claimed],
-            ("gh", "api", claim_url):
+            ("gh", "api", "--paginate"):
                 f"🤖 lane claim kind=fix sha=claimed-head host=gem at={claimed_at}\n",
         })
         with patch.object(events.time, "time", return_value=NOW):
@@ -611,6 +627,24 @@ class RelayTest(unittest.TestCase):
         self.assertEqual((sentry["source"], sentry["ws"]), ("sentry", "reliability"))
         self.assertIsNone(events.remediation.event_from_sentry({}))
 
+    def test_schedule_failure_fingerprint_ignores_head_sha(self):
+        """JOV-8044: a recurring scheduled red must dedupe to one intake event.
+
+        head_sha moves every scheduled run; including it filed a new issue per
+        failure instead of reopening the canonical one."""
+        base = {"name": "CI Duration Ratchet", "event": "schedule", "conclusion": "failure",
+                "head_branch": "main", "pull_requests": [],
+                "html_url": "https://example.test/run/1", "updated_at": "2026-10-08T00:00:00Z"}
+        first = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**base, "head_sha": "sha-a"}})
+        second = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**base, "head_sha": "sha-b"}})
+        self.assertEqual(first["fingerprint"], second["fingerprint"])
+        self.assertEqual(first["ws"], "ci")
+        push = {"name": "CI", "event": "push", "conclusion": "failure", "head_branch": "main",
+                "pull_requests": [], "html_url": "https://example.test/run/2"}
+        push_a = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**push, "head_sha": "sha-a"}})
+        push_b = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**push, "head_sha": "sha-b"}})
+        self.assertNotEqual(push_a["fingerprint"], push_b["fingerprint"])
+
     def test_push_event_runs_the_conflict_read(self):
         shell = Shell({("gh", "pr", "list"): []})
         self.assertEqual(events.relay("push", {}, shell, set()), [])
@@ -628,6 +662,23 @@ class RelayTest(unittest.TestCase):
             finally:
                 os.environ.clear()
                 os.environ.update(saved)
+
+
+class ClaimCommentTest(unittest.TestCase):
+    def test_claim_read_covers_only_the_ttl_window_on_every_page(self):
+        # The per-issue comments endpoint ignores sort/direction and pages oldest first:
+        # #20979 had 114 comments, so every claim after the 100th was invisible.
+        stamp = lambda age: datetime.fromtimestamp(NOW - age, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        shell = Shell({("gh", "api", "--paginate"):
+                       f"🤖 lane claim kind=fix sha=h1 host=mac at={stamp(60)}\n"
+                       f"🤖 lane claim kind=gate sha=h1 host=gem at={stamp(30)}\n"})
+        self.assertTrue(events.claim_active(7, "h1", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
+        self.assertFalse(events.claim_active(7, "h1", shell, NOW, kind="gate", exclude_host="gem"),
+                         "a host never defers to its own claim")
+        self.assertFalse(events.claim_active(7, "h2", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
+        since = stamp(events.CLAIM_TTL_S)
+        self.assertEqual(shell.calls[0][:4], ["gh", "api", "--paginate",
+                                              f"repos/{events.REPO}/issues/7/comments?per_page=100&since={since}"])
 
 
 class ClaimTest(unittest.TestCase):
@@ -988,41 +1039,88 @@ class GapTest(unittest.TestCase):
                          "a stale agent-owned draft (tim/wip) is counted separately from a human's")
 
     def test_stalled_agent_drafts_are_repaired_or_held_on_a_live_dependency(self):
-        """JOV-7079 canary: an old non-lane agent draft cannot sit forever. Past the 7d SLO
+        """JOV-7079 canary: an old non-lane agent draft cannot sit forever. Past the 3d SLO
         and stalled it enters repair unless a dependency it names is still open."""
         now = events.iso_ts("2033-05-18T03:00:00Z")
         old, recent = "2033-05-15T00:00:00Z", "2033-05-18T00:00:00Z"
         ancient = "2033-05-01T00:00:00Z"
         prs = [
-            # abandoned: >7d old, DIRTY, no open dependency -> close
+            # abandoned: >3d old, DIRTY, no open dependency -> close
             self.node(20, isDraft=True, headRefName="codex/homepage-material", mergeStateStatus="DIRTY",
                       createdAt=ancient, updatedAt=recent),
-            # abandoned: >7d old and idle >48h, CLEAN but unshipped -> close
+            # abandoned: >3d old and idle >48h, CLEAN but unshipped -> close
             self.node(21, isDraft=True, headRefName="devin/leftover", mergeStateStatus="BLOCKED",
                       createdAt=ancient, updatedAt=old),
-            # held: >7d old and stalled, but the dependency it names is still open
+            # held: >3d old and stalled, but the dependency it names is still open
             self.node(22, isDraft=True, headRefName="codex/stacked-child", createdAt=ancient,
                       updatedAt=old),
-            # young agent draft idle >48h is counted, not closed (its writer may still move it)
-            self.node(23, isDraft=True, headRefName="codex/fresh-wip", createdAt=old, updatedAt=old),
-            # a human's own branch is never the lanes' to close
+            # young agent draft (2d) idle >48h is counted, not reclaimed (its writer may still move it)
+            self.node(23, isDraft=True, headRefName="codex/fresh-wip", createdAt="2033-05-16T00:00:00Z", updatedAt=old),
+            # a founder-account writer branch (agent sessions publish as Tim) is reclaimed too,
+            # but never closed
             self.node(24, isDraft=True, headRefName="feature/personal-wip", createdAt=ancient,
                       updatedAt=ancient),
         ]
         plan = events.reconcile_plan(prs, {}, set(), 2, now, deps={22: [9]})
         self.assertEqual(plan["close"], [])
-        self.assertEqual(plan["label"], [], "non-lane drafts stay with their qualified writer")
+        # Tim, 2026-10-10: Symphony reclaims abandoned agent drafts and finishes them. The
+        # conflicting one is repaired and finished; the idle one is finished; the young one
+        # and the dependency-held one stay with their writer. Tim, 2026-10-11: a founder-account
+        # writer draft is no exception (no draft sits without an owner); it is never closed.
+        self.assertEqual(plan["label"], [(20, "conflict"), (20, "stale"), (21, "stale"), (24, "stale")])
         self.assertEqual(plan["depHolds"], [(22, [9])])
         counts = plan["counts"]
-        self.assertEqual((counts["staleAgentDrafts"], counts["staleOtherDrafts"]), (4, 1))
+        self.assertEqual((counts["staleAgentDrafts"], counts["staleOtherDrafts"]), (5, 0))
         states = {row["pr"]: row["state"] for row in plan["dispositions"]}
-        self.assertEqual(states[20], "repair")
+        self.assertEqual(states[20], "advancing", "a reclaimed draft carries a fix label the lanes act on")
         self.assertEqual(states[22], "hold:dependency")
-        self.assertEqual(states[24], "draft")
-        # A landed dependency releases repair; it never grants retirement authority.
+        self.assertEqual(states[24], "advancing")
+        duplicate = {**prs[4], "labels": [{"name": "duplicate"}]}
+        self.assertEqual(events.reconcile_plan([duplicate], {}, set(), 2, now)["close"], [],
+                         "reclaiming a writer draft never grants closure")
+        # A landed dependency releases the draft to the lanes; it never grants retirement authority.
         landed = events.reconcile_plan(prs, {}, set(), 2, now, deps={})
         self.assertEqual(landed["close"], [])
-        self.assertEqual(next(row for row in landed["dispositions"] if row["pr"] == 22)["state"], "repair")
+        self.assertEqual(next(row for row in landed["dispositions"] if row["pr"] == 22)["state"], "advancing")
+        self.assertIn((22, "stale"), landed["label"])
+
+    def test_reclaimed_abandoned_drafts_are_in_scope_for_repair_and_promotion(self):
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        ancient, old, recent = "2033-05-01T00:00:00Z", "2033-05-15T00:00:00Z", "2033-05-18T00:00:00Z"
+        abandoned = pr(30, branch="codex/homepage-material", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=old)
+        self.assertTrue(events.in_scope(abandoned, "red", set(), now))
+        self.assertTrue(events.in_scope(abandoned, "green", set(), now), "a reclaimed draft is readied when CLEAN")
+        self.assertFalse(events.in_scope(abandoned, "orphan", set(), now))
+        moving = pr(31, branch="codex/homepage-material", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=recent)
+        self.assertFalse(events.in_scope(moving, "red", set(), now), "a draft still being pushed stays with its writer")
+        held = pr(32, branch="codex/held", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=old, labels=["hold"])
+        self.assertFalse(events.in_scope(held, "red", set(), now))
+        writer = pr(33, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old)
+        self.assertTrue(events.in_scope(writer, "red", set(), now), "founder-account writer drafts are reclaimed")
+        fork = pr(34, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old,
+                  isCrossRepository=True)
+        self.assertFalse(events.in_scope(fork, "red", set(), now))
+
+    def test_comment_keepalives_do_not_count_as_writer_activity(self):
+        """A bare issue-id comment every ~15 min moved updatedAt and hid abandoned drafts."""
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        ancient, old, recent = "2033-05-01T00:00:00Z", "2033-05-15T00:00:00Z", "2033-05-18T02:50:00Z"
+        chatty = pr(40, branch="tables/admin-people-dense", draft=True, merge="BLOCKED", createdAt=ancient,
+                    updatedAt=recent, lastCommitAt=old)
+        self.assertTrue(events.abandoned_agent_draft(chatty, now))
+        pushed = {**chatty, "lastCommitAt": recent}
+        self.assertFalse(events.abandoned_agent_draft(pushed, now), "a fresh commit keeps it with its writer")
+        legacy = {key: value for key, value in chatty.items() if key != "lastCommitAt"}
+        self.assertFalse(events.abandoned_agent_draft(legacy, now), "without a commit date updatedAt still counts")
+
+    def test_stacked_writer_draft_stays_with_its_stack(self):
+        """A lane rebase onto main would re-add the parent's commits; unstacking owns it."""
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        old = "2033-05-01T00:00:00Z"
+        child = pr(51, branch="tables/admin-people-dense", draft=True, merge="DIRTY", createdAt=old,
+                   updatedAt=old, baseRefName="tables/people-rows-dense")
+        self.assertFalse(events.abandoned_agent_draft(child, now))
+        self.assertTrue(events.abandoned_agent_draft({**child, "baseRefName": "main"}, now))
 
     def test_explicit_duplicate_plan_still_respects_holds_queue_and_forks(self):
         old = "2033-05-01T00:00:00Z"
@@ -1061,6 +1159,7 @@ class GapTest(unittest.TestCase):
         plan = events.reconcile_plan(prs, {}, set(), 2, now)
         rows = {row["pr"]: row for row in plan["dispositions"]}
         self.assertEqual(set(rows), {1, 2, 3, 4}, "every open PR has exactly one disposition")
+        self.assertEqual(rows[1]["headSha"], prs[0]["headRefOid"])
         self.assertEqual([row["pr"] for row in plan["dispositions"]], [3, 1, 4, 2],
                          "oldest first for the cockpit")
         self.assertEqual(rows[1]["state"], "queued")
@@ -1070,7 +1169,7 @@ class GapTest(unittest.TestCase):
 
     def test_stale_draft_disposition_names_the_real_next_step(self):
         """JOV-7132: a draft idle past the 48h SLO is not "inside the SLO". Non-agent
-        branches are never closed by the sweep; young agent drafts close at the 7d SLO."""
+        branches are never closed by the sweep; any writer draft past the 3d floor is reclaimed."""
         now = events.iso_ts("2033-05-18T03:00:00Z")
         prs = [
             self.node(30, isDraft=True, headRefName="feat/jov-6507-thing",
@@ -1080,10 +1179,11 @@ class GapTest(unittest.TestCase):
         ]
         plan = events.reconcile_plan(prs, {}, set(), 2, now)
         rows = {row["pr"]: row for row in plan["dispositions"]}
-        self.assertEqual(rows[30]["state"], "draft")
-        self.assertEqual(rows[30]["reason"], "past the 48h stale SLO")
-        self.assertIn("never closes non-agent drafts", rows[30]["next"])
-        self.assertEqual(rows[31]["next"], "repair unfinished work; closure requires an explicit duplicate label")
+        self.assertEqual(rows[30]["next"], "a lane works the labeled event")
+        self.assertIn((30, "stale"), plan["label"])
+        self.assertNotIn(30, [number for number, _ in plan["close"]])
+        self.assertEqual(rows[31]["next"], "a lane works the labeled event")
+        self.assertIn((31, "stale"), plan["label"])
 
     def test_reconcile_applies_the_plan_on_its_own_cadence(self):
         page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [
@@ -1116,9 +1216,8 @@ class GapTest(unittest.TestCase):
     def test_reconcile_does_not_relabel_a_head_with_an_active_repair_claim(self):
         target = self.node(6, headRefOid="claimed-head", mergeStateStatus="DIRTY")
         claimed_at = datetime.fromtimestamp(NOW - 60, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        claim_url = f"repos/{events.REPO}/issues/6/comments?per_page=100&sort=created&direction=desc"
         shell = Shell({
-            ("gh", "api", claim_url):
+            ("gh", "api", "--paginate"):
                 f"🤖 lane claim kind=fix sha=claimed-head host=gem at={claimed_at}\n",
         })
         with patch.object(events, "open_prs_state", return_value=[target]):

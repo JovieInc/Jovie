@@ -147,7 +147,15 @@ async function enableTestAuthBypass(
 ): Promise<void> {
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
   const redirect = process.env.E2E_AUTH_REDIRECT ?? AUTH_READY_ROUTE;
-  const enterUrl = `${baseUrl}/api/dev/test-auth/enter?persona=${persona}&redirect=${redirect}`;
+  // session=better-auth mints a REAL Better Auth session cookie (not just
+  // the test-mode cookies). OnboardingSessionBoundary (JOV-7689) on /start
+  // cross-checks the browser's authClient identity against the
+  // server-resolved identityId; test-mode cookies alone leave the browser
+  // anonymous, the identities never match, and /start is stuck on its
+  // Try Again state — the shell-ready poll then times out (nightly +
+  // visual-regression lanes, Oct 8). performance-auth.ts already
+  // bootstraps this way.
+  const enterUrl = `${baseUrl}/api/dev/test-auth/enter?persona=${persona}&redirect=${redirect}&session=better-auth`;
 
   // Mint the session cookie through the request API instead of a browser
   // navigation: the enter route 303s into the app shell, so page.goto only
@@ -224,13 +232,36 @@ async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
   const chatComposer = page
     .locator('textarea, [contenteditable="true"], a[href="/app/chat"]')
     .first();
+  const isShellReady = async () =>
+    (await main.isVisible().catch(() => false)) ||
+    (await chatComposer.isVisible().catch(() => false));
+
+  // The `creator` persona keeps onboarding incomplete by design, so the
+  // post-bypass landing can be /start instead of /app. There, the
+  // OnboardingSessionBoundary (JOV-7689) mounts the shell only after a
+  // client-side conversation restore resolves; a failed restore leaves a
+  // static Try Again state with no <main>/composer — a reload is the same
+  // recovery the surface itself offers. Retry the navigation once mid-poll:
+  // /app states always render <main> (shell skeleton included), so the
+  // reload can only fire on a stuck /start boundary.
+  const reloaded = { value: false };
 
   await expect
     .poll(
-      async () =>
-        (await main.isVisible().catch(() => false)) ||
-        (await chatComposer.isVisible().catch(() => false)),
-      { timeout: 30_000, intervals: [2_000, 5_000, 10_000] }
+      async () => {
+        if (await isShellReady()) return true;
+        if (!reloaded.value) {
+          const url = new URL(page.url());
+          if (url.pathname.startsWith('/start')) {
+            reloaded.value = true;
+            await page
+              .reload({ waitUntil: 'domcontentloaded', timeout: 45_000 })
+              .catch(() => undefined);
+          }
+        }
+        return false;
+      },
+      { timeout: 90_000, intervals: [2_000, 5_000, 10_000] }
     )
     .toBe(true);
 }

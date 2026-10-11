@@ -28,9 +28,9 @@ vi.mock('@/lib/onboarding/start-entry-profile.server', () => ({
   resolveStartEntryProfile: mocks.resolveStartEntryProfile,
 }));
 
-// OnboardingShell is a UI component we don't need to render in this test.
-vi.mock('@/components/features/onboarding/OnboardingShell', () => ({
-  OnboardingShell: () => null,
+// The session boundary restores history client-side; this test checks entry props.
+vi.mock('@/components/features/onboarding/OnboardingSessionBoundary', () => ({
+  OnboardingSessionBoundary: () => null,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -141,29 +141,36 @@ describe('StartPage', () => {
     expect(result.props.entryProfile).toBeNull();
   });
 
-  it('redirects a pending account to the canonical receipt when the waitlist read fails', async () => {
+  it('lets a pending account resume without an advisory waitlist read', async () => {
     mocks.resolveUserState.mockResolvedValueOnce({
       state: 'WAITLIST_PENDING',
       context: { email: 'pending@example.com' },
     });
-    mocks.isWaitlistGateEnabled.mockResolvedValueOnce(true);
-    mocks.getWaitlistAccess.mockRejectedValueOnce(new Error('db down'));
+    mocks.isWaitlistGateEnabled.mockClear();
+    mocks.getWaitlistAccess.mockClear();
+    mocks.getWaitlistAccess.mockRejectedValue(new Error('db down'));
 
-    await expect(
-      StartPage({ searchParams: Promise.resolve({}) })
-    ).rejects.toThrow('redirect:/waitlist');
+    const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+    expect(result.props.isSignedIn).toBe(true);
+    expect(mocks.getWaitlistAccess).not.toHaveBeenCalled();
+    expect(mocks.isWaitlistGateEnabled).not.toHaveBeenCalled();
   });
 
-  it('does not 500 when the waitlist gate check itself fails', async () => {
+  it('keeps resume available when the advisory waitlist gate is unavailable', async () => {
     mocks.resolveUserState.mockResolvedValueOnce({
       state: 'WAITLIST_PENDING',
       context: { email: 'pending@example.com' },
     });
-    mocks.isWaitlistGateEnabled.mockRejectedValueOnce(new Error('db down'));
+    mocks.isWaitlistGateEnabled.mockClear();
+    mocks.getWaitlistAccess.mockClear();
+    mocks.isWaitlistGateEnabled.mockRejectedValue(new Error('db down'));
 
-    await expect(
-      StartPage({ searchParams: Promise.resolve({}) })
-    ).rejects.toThrow('redirect:/waitlist');
+    const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+    expect(result.props.isSignedIn).toBe(true);
+    expect(mocks.isWaitlistGateEnabled).not.toHaveBeenCalled();
+    expect(mocks.getWaitlistAccess).not.toHaveBeenCalled();
   });
 
   describe('synthetic principal test sitekey (JOV-7697)', () => {

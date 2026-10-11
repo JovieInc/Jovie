@@ -933,6 +933,82 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
+  it('keeps the JOV-8170 public-screens batch producer bindings synchronized', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    // These screens were registered but uncovered (no rendered producer).
+    // Two bind to already-captured marketing routes; the rest share one
+    // multi-screen proof spec whose entries must match these bindings.
+    assert.equal(SCREEN_MARKETING_ROUTES['web.marketing-renders'], '/renders');
+    assert.equal(
+      SCREEN_MARKETING_ROUTES['web.profile-admission'],
+      '/renders/profile-admission'
+    );
+    const batchScreens = [
+      'web.root-document',
+      'web.root-layout',
+      'web.legal-shell',
+      'web.legal-privacy',
+      'web.legal-terms',
+      'web.legal-cookies',
+      'web.legal-dmca',
+      'web.playlists-index',
+      'web.brand',
+      'web.report',
+      'web.start',
+      'web.marketing-solutions',
+      'web.public-profile-about',
+    ];
+    const spec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/public-screens-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    for (const screenId of batchScreens) {
+      const route = SCREEN_PROOF_ROUTES[screenId];
+      assert.ok(route, `${screenId} must be bound to a proof route`);
+      const suffix = screenId.slice(screenId.indexOf('.') + 1);
+      assert.equal(
+        screenProofArtifactName(screenId),
+        `${PRODUCER.artifact}-${suffix}`
+      );
+      assert.match(
+        spec,
+        new RegExp(
+          `screenId: '${screenId.replace(/\./g, '\\.')}', route: '${route.replace(/[/.?]/g, '\\$&')}'`
+        ),
+        `${screenId} must be captured by public-screens-proof.spec.ts`
+      );
+      assert.match(
+        workflow,
+        new RegExp(`\\b${screenId.replace(/\./g, '\\.')}\\b`)
+      );
+      assert.match(
+        workflow,
+        new RegExp(`name: ${screenProofArtifactName(screenId)}\\b`),
+        `${screenId} must upload its own proof artifact`
+      );
+      assert.match(
+        workflow,
+        new RegExp(
+          `${suffix}-artifact-id: \\$\\{\\{ steps\\.${suffix}-proof\\.outputs\\.artifact-id \\}\\}`
+        ),
+        `${screenId} must expose its artifact id as a job output`
+      );
+      assert.match(
+        workflow,
+        new RegExp(
+          `"${screenId.replace(/\./g, '\\.')}\\|\\$\\{\\{ needs\\.generate\\.outputs\\.${suffix}-artifact-id \\}\\}"`
+        ),
+        `${screenId} must be certified from its own artifact in the certify job`
+      );
+    }
+  });
+
   it('keeps the /artists producer identity synchronized with the trusted resolver (JOV-7125)', () => {
     const workflow = readFileSync(
       join(ROOT, '.github/workflows/screenshots.yml'),

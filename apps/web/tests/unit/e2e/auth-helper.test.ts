@@ -96,7 +96,7 @@ describe('signInUser test-auth bypass navigation', () => {
     await withBypassEnv(() => signInUser(page));
 
     expect(requestGet).toHaveBeenCalledWith(
-      'http://localhost:3100/api/dev/test-auth/enter?persona=creator&redirect=/app',
+      'http://localhost:3100/api/dev/test-auth/enter?persona=creator&redirect=/app&session=better-auth',
       expect.objectContaining({
         maxRedirects: 0,
         timeout: expect.any(Number),

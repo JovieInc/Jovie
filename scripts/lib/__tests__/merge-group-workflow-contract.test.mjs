@@ -1012,7 +1012,19 @@ describe('merge_group workflow contract', () => {
     );
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
-    expect(macos).toContain('runs-on: macos-26');
+    // Self-hosted jovie-mac when the heartbeat is fresh; hosted GA image
+    // otherwise (macos-26 pickup waited 8-68 min per merge group, 2026-10-10).
+    expect(macos).toContain(
+      `runs-on: \${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+    );
+    expect(macos).not.toContain('runs-on: macos-26');
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    expect(pathChanges).toContain(
+      "mac_runner_class: ${{ steps.mac-route.outputs.runner_class || 'hosted' }}"
+    );
+    expect(pathChanges).toContain(
+      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
+    );
     expect(macos).toContain(
       "format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number)"
     );
@@ -2007,9 +2019,32 @@ ${selectedGateScript}`,
         '--arg',
         'run',
         runUrl,
+        '--arg',
+        'risk_level',
+        'medium',
+        '--arg',
+        'rules',
+        'api-write',
+        '--argjson',
+        'requires_smoke',
+        'true',
+        '--argjson',
+        'requires_preview',
+        'false',
+        '--argjson',
+        'blocks_unattended',
+        'false',
         query,
       ],
-      { encoding: 'utf8' }
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_SHA: 'a'.repeat(40),
+          GITHUB_RUN_ID: '7',
+          GITHUB_RUN_ATTEMPT: '1',
+        },
+      }
     );
     expect(
       result.status,
@@ -2021,6 +2056,7 @@ ${selectedGateScript}`,
       lanes: {
         web: ['success', 'success', 'success'],
       },
+      riskReceipt: { risk_level: 'medium', requires_smoke: true },
     });
   });
 
