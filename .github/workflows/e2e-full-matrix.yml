@@ -200,6 +200,9 @@ jobs:
           NEXT_DISABLE_TOOLBAR: '1'
           E2E_ALLOW_DEV_CSP: '1'
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          # Required by the production server for pending-claim and
+          # lead-attribution cookies; without it claim routes 500.
+          URL_ENCRYPTION_KEY: e2e-full-matrix-url-encryption-key
 
       - name: Setup Playwright (Chromium)
         if: matrix.browser == 'chromium'
