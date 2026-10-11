@@ -3,6 +3,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   interval: undefined as string | undefined,
   profile: vi.fn(),
+  hasOfferState: vi.fn(),
+  recordOfferEvent: vi.fn(),
 }));
 vi.mock('next/headers', () => ({
   cookies: async () => ({
@@ -33,6 +35,10 @@ vi.mock('@/lib/auth/plan-intent', () => ({
 vi.mock('@/lib/config/pricing', () => ({
   PRICING: { pro: { monthly: { priceId: 'price_visibility', amount: 19900 } } },
 }));
+vi.mock('@/lib/onboarding/upgrade-offer', () => ({
+  hasOnboardingUpgradeOfferState: mocks.hasOfferState,
+  recordOnboardingUpgradeOfferEvent: mocks.recordOfferEvent,
+}));
 vi.mock('./OnboardingCheckoutClient', () => ({
   OnboardingCheckoutClient: () => null,
 }));
@@ -42,6 +48,8 @@ import Page from './page';
 beforeEach(() => {
   mocks.interval = undefined;
   mocks.profile.mockReset().mockResolvedValue({ selectedProfile: null });
+  mocks.hasOfferState.mockReset().mockResolvedValue(false);
+  mocks.recordOfferEvent.mockReset().mockResolvedValue({ ok: true });
 });
 it.each(['year', 'annual', 'weekly'])(
   'rejects explicit unsupported interval %s before checkout',
@@ -73,4 +81,46 @@ it('passes only the current monthly price to checkout', async () => {
     annualPriceId: null,
     annualAmount: null,
   });
+});
+
+const PROFILE_ID = '11111111-1111-4111-8111-111111111111';
+const PROFILE = {
+  id: PROFILE_ID,
+  displayName: 'Test Artist',
+  username: 'testartist',
+  avatarUrl: null,
+  spotifyFollowers: null,
+};
+
+it('records offer seen and renders for a first-time claimed artist', async () => {
+  mocks.profile.mockResolvedValue({ selectedProfile: PROFILE });
+  await Page({ searchParams: Promise.resolve({ plan: 'pro' }) });
+  expect(mocks.recordOfferEvent).toHaveBeenCalledWith(
+    PROFILE_ID,
+    'seen',
+    'pro'
+  );
+});
+
+it('shows the offer exactly once: a prior receipt skips the upsell', async () => {
+  mocks.profile.mockResolvedValue({ selectedProfile: PROFILE });
+  mocks.hasOfferState.mockResolvedValue(true);
+  await expect(
+    Page({ searchParams: Promise.resolve({ plan: 'pro' }) })
+  ).rejects.toThrow(/^redirect:/);
+  expect(mocks.recordOfferEvent).not.toHaveBeenCalled();
+});
+
+it('still serves artist-initiated paid intent even after the offer was seen', async () => {
+  mocks.profile.mockResolvedValue({ selectedProfile: PROFILE });
+  mocks.hasOfferState.mockResolvedValue(true);
+  const page = await Page({
+    searchParams: Promise.resolve({ plan: 'pro', source: 'intent' }),
+  });
+  expect(page.props).toMatchObject({
+    plan: 'pro',
+    profileId: PROFILE_ID,
+  });
+  // Intent-driven checkout is not an offer impression.
+  expect(mocks.recordOfferEvent).not.toHaveBeenCalled();
 });

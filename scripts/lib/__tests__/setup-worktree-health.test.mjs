@@ -43,7 +43,7 @@ function writeExecutable(filePath, contents) {
 }
 
 function makeToolStubs({
-  nodeVersion = 'v22.23.2',
+  nodeVersion = 'v24.21.0',
   pnpmVersion = '9.15.9',
 } = {}) {
   const bin = makeTempDir('jovie-setup-health-bin-');
@@ -55,7 +55,7 @@ function makeToolStubs({
 function makeWorktree() {
   const root = makeTempDir('jovie-setup-health-repo-');
   writeFileSync(join(root, 'package.json'), '{"name":"fixture"}\n');
-  writeFileSync(join(root, '.nvmrc'), '22.23.2\n');
+  writeFileSync(join(root, '.nvmrc'), '24.21.0\n');
   writeFileSync(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
   writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages: []\n');
   const git = spawnSync('git', ['-c', 'init.defaultBranch=main', 'init'], {
@@ -295,9 +295,10 @@ describe('SessionStart still uses setup.sh for the skip', () => {
 });
 
 describe('package prepare hook lifecycle', () => {
-  const prepare = JSON.parse(
+  const rootPackage = JSON.parse(
     readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
-  ).scripts.prepare;
+  );
+  const prepare = rootPackage.scripts.prepare;
   const configurator = readFileSync(
     resolve(repoRoot, 'scripts/hooks/configure-git-hooks.sh'),
     'utf8'
@@ -346,6 +347,16 @@ describe('package prepare hook lifecycle', () => {
     return { root, env, run };
   }
 
+  it('keeps tracked hook setup independent of Husky wrappers', () => {
+    expect(rootPackage.devDependencies).not.toHaveProperty('husky');
+    expect(rootPackage.devDependencies).toHaveProperty('@commitlint/cli');
+    expect(rootPackage.devDependencies).toHaveProperty('lint-staged');
+    expect(prepare).toContain('scripts/hooks/configure-git-hooks.sh');
+    expect(prepare).toContain('[ -f scripts/hooks/configure-git-hooks.sh ]');
+    expect(prepare).toContain('${VERCEL:-}');
+    expect(prepare).toContain('${CI:-}');
+  });
+
   it('keeps tracked push gates active in another linked worktree after package prepare', () => {
     const { root, env, run } = fixture();
     const git = (args, cwd = root) => {
@@ -389,6 +400,42 @@ describe('package prepare hook lifecycle', () => {
     rmSync(join(root, '.husky'), { recursive: true });
     const result = run('pnpm', ['run', 'prepare']);
     expect(result.status, result.stderr).toBe(0);
+  });
+
+  it('skips hook setup when Git metadata exists but the helper was excluded', () => {
+    const { root, run } = fixture();
+    expect(run('git', ['init', '--initial-branch=main']).status).toBe(0);
+    rmSync(join(root, 'scripts'), { recursive: true });
+    const result = run('pnpm', ['run', 'prepare']);
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(result.status, output).toBe(0);
+    expect(output).not.toContain('No such file or directory');
+    expect(
+      run('git', ['config', '--get', 'core.hooksPath']).stdout.trim()
+    ).toBe('');
+  });
+
+  it('skips hook setup on Vercel and CI even when the helper is present', () => {
+    const { root, env, run } = fixture();
+    expect(run('git', ['init', '--initial-branch=main']).status).toBe(0);
+    expect(run('git', ['config', 'core.hooksPath', '.husky/_']).status).toBe(0);
+    for (const [key, value] of [
+      ['VERCEL', '1'],
+      ['CI', 'true'],
+    ]) {
+      const result = spawnSync('pnpm', ['run', 'prepare'], {
+        cwd: root,
+        env: { ...env, [key]: value },
+        encoding: 'utf8',
+        timeout: 10000,
+      });
+      const output = `${result.stdout}\n${result.stderr}`;
+      expect(result.status, output).toBe(0);
+      expect(output).not.toContain('core.hooksPath=.husky');
+      expect(
+        run('git', ['config', '--get', 'core.hooksPath']).stdout.trim()
+      ).toBe('.husky/_');
+    }
   });
 
   it('propagates a broken tracked-hook configuration inside Git', () => {

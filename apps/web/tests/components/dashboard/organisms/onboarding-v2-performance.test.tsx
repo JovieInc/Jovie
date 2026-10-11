@@ -260,6 +260,10 @@ vi.mock('@/app/onboarding/actions/connect-spotify', () => ({
   connectOnboardingSpotifyArtist: vi.fn().mockResolvedValue({ success: true }),
 }));
 
+vi.mock('@/app/onboarding/actions/upgrade-offer', () => ({
+  recordOnboardingUpgradeOfferDecision: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
 vi.mock('@/app/onboarding/actions/enrich-profile', () => ({
   enrichProfileFromDsp: vi.fn().mockResolvedValue(null),
 }));
@@ -519,6 +523,7 @@ describe('Onboarding screen performance budgets', () => {
             monthlyAmount={1900}
             monthlyPriceId='price_monthly'
             plan='pro'
+            profileId={null}
             spotifyFollowers={15000}
             username='perf-budget'
           />

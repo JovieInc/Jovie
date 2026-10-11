@@ -21,6 +21,10 @@ apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts
 # https target in the introducing commit. Later commits construct the URL
 # from parts; keep the path excluded so range scans do not fail on that blob.
 apps/web/lib/canaries/m2-revenue-path.test.ts
+# ChatGPT directory origin test: the introducing commit contained URI-detector
+# bait for a userinfo origin. Later commits encode that origin. Keep the path
+# excluded so range scans do not fail on that blob.
+apps/web/lib/chatgpt/directory/mcp.test.ts
 .agents/skills/gstack/browse/test/sidebar-unit.test.ts
 .claude/skills/gstack/browse/test/sidebar-unit.test.ts
 .agents/skills/gstack/test/skill-e2e-cso.test.ts

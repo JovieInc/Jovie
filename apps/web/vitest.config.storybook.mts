@@ -85,7 +85,13 @@ export default defineConfig({
       enabled: true,
       provider: playwright({
         launchOptions: {
-          args: [`${STORYBOOK_VITEST_OWNER_ARG}${storybookVitestOwnerToken}`],
+          args: [
+            `${STORYBOOK_VITEST_OWNER_ARG}${storybookVitestOwnerToken}`,
+            // CI runners give Chromium a small /dev/shm; renderer memory
+            // exhaustion there drops the page mid-shard ("Browser connection
+            // was closed"). Use /tmp-backed shared memory instead.
+            '--disable-dev-shm-usage',
+          ],
         },
       }),
       headless: true,
@@ -120,6 +126,10 @@ export default defineConfig({
       // tests mount previews entirely on the client, where React warns for
       // every script and never executes it.
       'next-themes': path.join(dirname, '.storybook/next-themes-mock.tsx'),
+      // packages/ui stories import 'storybook/test', but storybook is only a
+      // devDependency of apps/web and pnpm does not hoist it. Anchor resolution
+      // here so the dep scan can resolve it from this package's node_modules.
+      'storybook/test': fileURLToPath(import.meta.resolve('storybook/test')),
     },
     dedupe: [
       'react',
@@ -169,8 +179,8 @@ export default defineConfig({
       '@radix-ui/react-popover',
       '@radix-ui/react-radio-group',
       '@radix-ui/react-select',
-      '@radix-ui/react-separator',
-      '@radix-ui/react-switch',
+      '@jovie/ui > @radix-ui/react-separator',
+      '@jovie/ui > @radix-ui/react-switch',
       '@radix-ui/react-tabs',
       '@radix-ui/react-tooltip',
       // Data / state
@@ -195,6 +205,7 @@ export default defineConfig({
       'cmdk',
       'nuqs',
       'nuqs/adapters/next/app',
+      'nuqs/adapters/testing',
       'recharts',
       // Analytics
       '@vercel/analytics/react',

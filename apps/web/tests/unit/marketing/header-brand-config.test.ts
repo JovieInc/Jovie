@@ -24,7 +24,6 @@ function inlineH1Text(path: string): string {
 const INLINE_HERO_H1_SOURCES = {
   [APP_ROUTES.AI]: 'app/(marketing)/ai/page.tsx',
   [APP_ROUTES.DOWNLOAD]: 'app/(marketing)/download/page.tsx',
-  [APP_ROUTES.INVESTORS]: 'app/(marketing)/investors/page.tsx',
   [APP_ROUTES.ABOUT]: 'components/organisms/AboutPageContent.tsx',
 } as const;
 

@@ -1,0 +1,73 @@
+/* The cinematic terminal CTA owns its stage. These rules previously lived
+   under the footer wrapper class, so page-owned instances (/product, /ai,
+   /about, /cli, /download, /changelog) rendered with no padding, width or
+   centering. Scope them to the variant, not to the footer that mounts it. */
+.marketing-terminal-cta--cinematic {
+  display: flex;
+  min-height: clamp(24rem, 42vw, 32rem);
+  align-items: stretch;
+}
+
+.marketing-terminal-cta--cinematic .homepage-final-cta-glow {
+  background:
+    radial-gradient(
+      circle at 50% 100%,
+      color-mix(in oklab, var(--color-accent-blue) 34%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(
+      180deg,
+      var(--system-b-cinematic-black) 0%,
+      var(--system-b-bg-page) 100%
+    );
+}
+
+.marketing-terminal-cta--cinematic .homepage-final-cta-rays {
+  height: 100%;
+  min-height: clamp(24rem, 42vw, 32rem);
+}
+
+.marketing-terminal-cta--cinematic .homepage-final-cta-copy {
+  display: flex;
+  min-height: clamp(24rem, 42vw, 32rem);
+  max-width: 44rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  padding-block: clamp(5rem, 10vw, 8rem);
+  padding-inline: var(--space-5);
+  text-align: center;
+}
+
+.marketing-terminal-cta--cinematic .homepage-final-cta-action {
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 40rem) {
+  .marketing-terminal-cta--cinematic,
+  .marketing-terminal-cta--cinematic .homepage-final-cta-rays,
+  .marketing-terminal-cta--cinematic .homepage-final-cta-copy {
+    min-height: 22rem;
+  }
+
+  .marketing-terminal-cta--cinematic .homepage-final-cta-copy {
+    gap: var(--space-4);
+    padding-block: var(--space-16);
+    padding-inline: var(--space-4);
+  }
+}
+
+/* K4ar1 narrow closing scale: the artist claim variant must keep its
+   complete three-word headline together without changing the homepage. */
+@media (max-width: 767px) {
+  .system-b-mounted-home-footer-cta[data-marketing-variant="final-single-claim"]
+    .system-b-mounted-home-footer-cta-copy {
+    padding-inline: 0;
+  }
+
+  .system-b-mounted-home-footer-cta[data-marketing-variant="final-single-claim"]
+    .system-b-mounted-home-footer-cta-heading {
+    font-size: var(--text-3xl);
+  }
+}

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const PROFILE_MOBILE_MEDIA_QUERY = '(max-width: 767px)';
-const PROFILE_IDENTITY_SELECTOR = '[data-testid="profile-hero-identity-block"]';
+const PROFILE_IDENTITY_SELECTOR = '[data-testid="profile-identity-header"]';
 const PROFILE_COVER_SELECTOR = '[data-testid="profile-cover"]';
 
 type UseProfileMobileOverflowOptions = Readonly<{

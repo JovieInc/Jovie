@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -282,5 +282,70 @@ describe('Dialog', () => {
 
       expect(onOpenChange).toHaveBeenCalledWith(false);
     });
+  });
+});
+
+describe('Dialog overlay layer contract', () => {
+  it('paints on the modal layer so it covers sheets it opens from', () => {
+    render(<TestDialog open />);
+    expect(screen.getByTestId('dialog-content').className).toContain('z-modal');
+    expect(screen.getByTestId('dialog-overlay').className).toContain('z-modal');
+  });
+
+  it('restores focus to the menu trigger when opened from a menu item', async () => {
+    function MenuOrigin() {
+      const [open, setOpen] = React.useState(false);
+      return (
+        <>
+          <button id='menu-origin-trigger' type='button'>
+            Actions
+          </button>
+          <div role='menu' aria-labelledby='menu-origin-trigger'>
+            <button role='menuitem' type='button' onClick={() => setOpen(true)}>
+              Rename
+            </button>
+          </div>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogContent>
+              <DialogTitle>Rename</DialogTitle>
+              <DialogDescription>Names show on every link.</DialogDescription>
+            </DialogContent>
+          </Dialog>
+        </>
+      );
+    }
+    render(<MenuOrigin />);
+    const item = screen.getByRole('menuitem', { name: 'Rename' });
+    item.focus();
+    fireEvent.click(item);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Actions' })).toHaveFocus()
+    );
+  });
+});
+
+describe('Dialog full-screen takeover', () => {
+  it('keeps accessible modal semantics and Escape dismissal without centered card geometry', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <Dialog open onOpenChange={onOpenChange}>
+        <DialogContent variant='fullscreen' hideClose>
+          <DialogTitle>Workspace search</DialogTitle>
+          <DialogDescription>Search every workspace.</DialogDescription>
+        </DialogContent>
+      </Dialog>
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Workspace search' });
+    expect(dialog).toHaveClass('inset-0', 'h-dvh', 'w-full', 'max-w-none');
+    expect(dialog).not.toHaveClass(
+      'left-1/2',
+      'max-w-lg',
+      'rounded-(--system-b-radius-panel)'
+    );
+    expect(screen.queryByTestId('dialog-close-button')).not.toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

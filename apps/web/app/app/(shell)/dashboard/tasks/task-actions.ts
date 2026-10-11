@@ -16,7 +16,6 @@ import {
   ilike,
   inArray,
   isNull,
-  max,
   or,
   type SQL,
 } from 'drizzle-orm';
@@ -24,12 +23,16 @@ import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tasks } from '@/lib/db/schema/tasks';
 import { requireTasksWorkspaceAccess } from '@/lib/entitlements/tasks-gate';
+import { isScreenCertAppShellFixtureProfile } from '@/lib/screen-cert/app-shell-fixture-gate';
 import { dedupeReleaseTasks } from '@/lib/tasks/dedupe-release-tasks';
 import { isTaskStatus, TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
 import { sanitizeTaskDueAt } from '@/lib/tasks/task-due-date';
+import {
+  getNextTaskPosition,
+  reserveTaskNumber,
+} from '@/lib/tasks/task-reservation';
 import { buildTaskUpdateFieldPatch } from '@/lib/tasks/task-update';
 import type {
   CreateTaskInput,
@@ -44,6 +47,10 @@ import type {
   UpdateTaskInput,
 } from '@/lib/tasks/types';
 import { requireProfileId } from '../requireProfileId';
+import {
+  getScreenCertTaskById,
+  getScreenCertTasksFixture,
+} from './_lib/screen-cert-fixture';
 
 const DEFAULT_TASK_LIMIT = 50;
 const MAX_TASK_LIMIT = 100;
@@ -58,6 +65,7 @@ function getTaskListWhereClause(profileId: string, filters?: TaskFilters) {
   const conditions: (SQL<unknown> | undefined)[] = [
     eq(tasks.creatorProfileId, profileId),
     isNull(tasks.deletedAt),
+    isNull(tasks.archivedAt),
   ];
 
   if (filters?.status) {
@@ -208,34 +216,6 @@ async function assertReleaseAccess(
   if (!release) {
     throw new Error('Release not found or access denied');
   }
-}
-
-async function getNextTaskPosition(profileId: string): Promise<number> {
-  const [row] = await db
-    .select({ maxPosition: max(tasks.position) })
-    .from(tasks)
-    .where(and(eq(tasks.creatorProfileId, profileId), isNull(tasks.deletedAt)));
-
-  return (row?.maxPosition ?? -1) + 1;
-}
-
-async function reserveTaskNumber(profileId: string): Promise<number> {
-  const [row] = await db
-    .update(creatorProfiles)
-    .set({
-      nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profileId))
-    .returning({
-      taskNumber: drizzleSql<number>`${creatorProfiles.nextTaskNumber} - 1`,
-    });
-
-  if (!row) {
-    throw new Error('Profile not found');
-  }
-
-  return row.taskNumber;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -454,8 +434,19 @@ function getTaskMoveUpdates({
 }
 
 export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
-  await requireTasksWorkspaceAccess();
+  // Screen-cert fixture (tasks producer): resolve profileId first so the
+  // reserved-fixture check can run before requireTasksWorkspaceAccess()'s
+  // real entitlements/billing lookup, which has no noop-DB fallback of its
+  // own. See screen-cert-fixture.ts and app-shell-fixture-gate.ts.
   const profileId = await requireProfileId();
+  if (isScreenCertAppShellFixtureProfile(profileId)) {
+    // The fixture ignores `filters`: TasksRoute's own prefetch only ever
+    // calls this with DEFAULT_TASK_WORKSPACE_FILTERS (limit only, no
+    // status/search/cursor), so a filtered result is never observed by
+    // the producer this fixture serves.
+    return getScreenCertTasksFixture();
+  }
+  await requireTasksWorkspaceAccess();
   const limit = clampLimit(filters?.limit);
 
   const rows = await db
@@ -575,8 +566,16 @@ export async function getTaskBoard(
 }
 
 export async function getTask(taskId: string): Promise<TaskView> {
-  await requireTasksWorkspaceAccess();
+  // Screen-cert fixture (tasks producer): see getTasks() above.
   const profileId = await requireProfileId();
+  if (isScreenCertAppShellFixtureProfile(profileId)) {
+    const fixtureTask = getScreenCertTaskById(taskId);
+    if (!fixtureTask) {
+      throw new Error('Task not found or access denied');
+    }
+    return fixtureTask;
+  }
+  await requireTasksWorkspaceAccess();
 
   const [row] = await db
     .select({
@@ -927,7 +926,13 @@ export async function getTaskStats(
       count: count(),
     })
     .from(tasks)
-    .where(and(eq(tasks.creatorProfileId, profileId), isNull(tasks.deletedAt)))
+    .where(
+      and(
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt),
+        isNull(tasks.archivedAt)
+      )
+    )
     .groupBy(tasks.status);
 
   const stats = formatTaskStats(rows);
@@ -943,6 +948,7 @@ export async function getTaskStats(
       and(
         eq(tasks.creatorProfileId, profileId),
         isNull(tasks.deletedAt),
+        isNull(tasks.archivedAt),
         inArray(tasks.status, ['backlog', 'todo', 'in_progress']),
         gt(tasks.updatedAt, newerThan)
       )

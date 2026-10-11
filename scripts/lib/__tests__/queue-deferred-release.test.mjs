@@ -8,13 +8,18 @@ const fleetGateRefreshWorkflow = readFileSync(
   'utf8'
 );
 
-const STACK_TRIGGER_TYPES =
-  'types: [opened, edited, synchronize, converted_to_draft, closed, labeled, unlabeled, reopened]';
+const STACK_LIVENESS_CRON = "cron: '*/5 * * * *'";
 const STACK_EVENT_GUARD =
-  /pull_request_target:[\s\S]*if: steps\.refresh\.outcome == 'success'[\s\S]*steps\.refresh\.outputs\.receipt_path/;
+  /schedule:[\s\S]*if: steps\.refresh\.outcome == 'success'[\s\S]*steps\.refresh\.outputs\.receipt_path/;
 
 function assertTrustedStackHealthContract(value) {
-  expect(value).toContain(STACK_TRIGGER_TYPES);
+  expect(value).toContain(STACK_LIVENESS_CRON);
+  expect(value).toContain('group: fleet-gate-receipt');
+  expect(value).toContain('cancel-in-progress: false');
+  expect(value).toContain('branches: [main]');
+  expect(value).not.toContain('pull_request_target:');
+  expect(value).not.toContain('check_run:');
+  expect(value).not.toContain('check_suite:');
   expect(value).toMatch(STACK_EVENT_GUARD);
   expect(value).toMatch(
     /Checkout exact main gate code[\s\S]*ref: main[\s\S]*persist-credentials: false/
@@ -48,20 +53,12 @@ describe('retired queue release and retained fleet refresh', () => {
     // CI and Production Controller are direct upstream semantic inputs.
     // Marker Recovery dispatches the gate after durable bytes so it remains
     // within GitHub's workflow_run chain cap.
-    const upstream = fleetGateRefreshWorkflow.match(
-      /workflow_run:\s*\n(?:\s*#[^\n]*\n)*\s*workflows:\s*\[([^\]]+)\]/
-    )?.[1];
-    expect(upstream).toBe('CI, Production Controller');
-    expect(fleetGateRefreshWorkflow).toContain('pull_request_target:');
+    expect(fleetGateRefreshWorkflow).not.toContain('workflow_run:');
+    expect(fleetGateRefreshWorkflow).not.toContain('pull_request_target:');
     assertTrustedStackHealthContract(fleetGateRefreshWorkflow);
     expect(fleetGateRefreshWorkflow).toContain('push:\n    branches: [main]');
-    expect(fleetGateRefreshWorkflow).toContain(
-      "github.event.workflow_run.conclusion != 'cancelled'"
-    );
-    expect(fleetGateRefreshWorkflow).toContain(
-      'github.event.pull_request.merged != true'
-    );
-    expect(fleetGateRefreshWorkflow).not.toContain('schedule:');
+    expect(fleetGateRefreshWorkflow).toContain('schedule:');
+    expect(fleetGateRefreshWorkflow).toContain('cancel-in-progress: false');
     const markerRecovery = readFileSync(
       resolve(repoRoot, '.github/workflows/production-marker-recovery.yml'),
       'utf8'
@@ -74,8 +71,16 @@ describe('retired queue release and retained fleet refresh', () => {
   it('keeps stack repair consumption fail-closed under trigger, checkout, and guard regressions', () => {
     const regressions = [
       fleetGateRefreshWorkflow.replace(
-        STACK_TRIGGER_TYPES,
-        'types: [closed, labeled, unlabeled, reopened]'
+        'cancel-in-progress: false',
+        'cancel-in-progress: true'
+      ),
+      fleetGateRefreshWorkflow.replace(
+        'group: fleet-gate-receipt',
+        'group: fleet-gate-${{ github.run_id }}'
+      ),
+      fleetGateRefreshWorkflow.replace(
+        STACK_LIVENESS_CRON,
+        "cron: '0 0 * * *'"
       ),
       fleetGateRefreshWorkflow.replace(
         'ref: main',

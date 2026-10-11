@@ -82,6 +82,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
 
 import { db } from '@/lib/db';
 import {
+  getNotificationPreferences,
   markNotificationDismissed,
   mergePreferences,
   updateNotificationPreferences,
@@ -112,7 +113,7 @@ describe('Notification Preferences', () => {
 
   describe('mergePreferences', () => {
     const basePreferences: NotificationPreferences = {
-      channels: { email: true, sms: true, push: false, in_app: true },
+      channels: { email: true, sms: true, push: false },
       marketingEmails: true,
       dismissedNotificationIds: ['old-notification'],
       email: 'base@example.com',
@@ -132,7 +133,7 @@ describe('Notification Preferences', () => {
 
     it('should merge channel overrides', () => {
       const overrides: Partial<NotificationPreferences> = {
-        channels: { email: true, sms: true, push: true, in_app: true },
+        channels: { email: true, sms: true, push: true },
       };
 
       const result = mergePreferences(basePreferences, overrides);
@@ -141,7 +142,6 @@ describe('Notification Preferences', () => {
         email: true,
         sms: true,
         push: true, // overridden from false to true
-        in_app: true,
       });
     });
 
@@ -222,7 +222,7 @@ describe('Notification Preferences', () => {
 
     it('should handle base with undefined optional fields', () => {
       const minimalBase: NotificationPreferences = {
-        channels: { email: true, sms: true, push: false, in_app: false },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: true,
         dismissedNotificationIds: [],
       };
@@ -255,7 +255,7 @@ describe('Notification Preferences', () => {
   describe('Default channel values', () => {
     it('should have email enabled by default', () => {
       const defaults: NotificationPreferences = {
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: true,
         dismissedNotificationIds: [],
       };
@@ -265,7 +265,7 @@ describe('Notification Preferences', () => {
 
     it('should have push disabled by default', () => {
       const defaults: NotificationPreferences = {
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: true,
         dismissedNotificationIds: [],
       };
@@ -273,14 +273,25 @@ describe('Notification Preferences', () => {
       expect(defaults.channels.push).toBe(false);
     });
 
-    it('should have in_app enabled by default', () => {
-      const defaults: NotificationPreferences = {
-        channels: { email: true, sms: true, push: false, in_app: true },
-        marketingEmails: true,
-        dismissedNotificationIds: [],
-      };
+    it('leaves in-app off when no channel preferences are stored', async () => {
+      dbMocks.selectLimit.mockResolvedValueOnce([
+        {
+          creatorProfileId: 'profile-123',
+          email: 'artist@example.com',
+          marketingOptOut: false,
+          settings: {},
+        },
+      ]);
 
-      expect(defaults.channels.in_app).toBe(true);
+      const result = await getNotificationPreferences({
+        creatorProfileId: 'profile-123',
+      });
+
+      expect(result.channels).toEqual({
+        email: true,
+        sms: true,
+        push: false,
+      });
     });
   });
 
@@ -296,7 +307,7 @@ describe('Notification Preferences', () => {
           status: 'claimed',
         },
         notifications: {
-          channels: { email: true, sms: true, push: false, in_app: true },
+          channels: { email: true, sms: true, push: false },
           dismissedIds: ['old-notification'],
           preferredChannel: 'sms',
         },
@@ -333,7 +344,7 @@ describe('Notification Preferences', () => {
         value => typeof value === 'string' && value.includes('dismissedIds')
       );
       expect(JSON.parse(notificationsJson as string)).toEqual({
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         dismissedIds: ['old-notification', 'new-notification'],
         lastDismissedAt: expect.any(String),
         preferredChannel: 'sms',
@@ -346,7 +357,7 @@ describe('Notification Preferences', () => {
       await updateNotificationPreferences(
         { creatorProfileId: 'profile-123' },
         {
-          channels: { email: false, sms: true, push: true, in_app: true },
+          channels: { email: false, sms: true, push: true },
           marketingEmails: false,
         }
       );
@@ -363,7 +374,7 @@ describe('Notification Preferences', () => {
         value => typeof value === 'string' && value.includes('dismissedIds')
       );
       expect(JSON.parse(notificationsJson as string)).toEqual({
-        channels: { email: false, sms: true, push: true, in_app: true },
+        channels: { email: false, sms: true, push: true },
         dismissedIds: ['old-notification'],
         preferredChannel: 'sms',
       });

@@ -1,4 +1,8 @@
 name: GitHub AI Orchestrator (retired)
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# capability-gap: Retired GitHub-issue dispatch kept as an unreachable replay shell; every job is gated off.
+# removal-trigger: Delete this workflow when the linear-only intake contract stops pinning its retired jobs.
 # JOV-INV-028: legacy human-hold labels never remove work from intake.
 
 on:
@@ -57,9 +61,9 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Gather issue payload
         id: gather
@@ -109,8 +113,8 @@ jobs:
           fi
 
           # shellcheck disable=SC2016 # $label is a jq variable, not a shell variable.
-          HAS_AGENT_READY=$(gh issue view "$ISSUE_NUMBER" --json labels --jq \
-            --arg label "$AGENT_READY_LABEL" '[.labels[].name] | any(. == $label)')
+          HAS_AGENT_READY=$(gh issue view "$ISSUE_NUMBER" --json labels \
+            | jq -r --arg label "$AGENT_READY_LABEL" '[.labels[].name] | any(. == $label)')
           if [[ "$HAS_AGENT_READY" != "true" ]]; then
             echo "Issue #${ISSUE_NUMBER} is not labeled ${AGENT_READY_LABEL}; skipping"
             echo "should_run=false" >> "$GITHUB_OUTPUT"
@@ -155,7 +159,7 @@ jobs:
           fi
 
           # shellcheck disable=SC2016 # $num is a jq variable, not a shell variable.
-          EXISTING_PR=$(gh pr list --state open --json number,title,body --jq --arg num "$ISSUE_NUMBER" '
+          EXISTING_PR=$(gh pr list --state open --json number,title,body | jq -r --arg num "$ISSUE_NUMBER" '
             map(
               select(
                 ((.title // "") + "\n" + (.body // "")) as $text
@@ -288,7 +292,7 @@ jobs:
         run: git checkout -b "$BRANCH_NAME"
 
       - name: Run Claude Code for implementation
-        uses: anthropics/claude-code-action@9171db3e57d6a3140a37ddc2ba92788584e0ead6 # v1
+        uses: anthropics/claude-code-action@6fed3ca145920b639991cb756090506e1bcaf515 # v1
         env:
           JOVIE_AGENT_PROFILE: coder
         with:
@@ -306,7 +310,7 @@ jobs:
               ${{ needs.guard.outputs.issue_body }}
 
             Hard requirements:
-            1) Node.js 22.x and pnpm 9.15.9 conventions only.
+            1) Node.js 24.x and pnpm 9.15.9 conventions only.
             2) Run from repo root. Use pnpm/turbo commands only.
             3) Never edit drizzle/migrations files.
             4) Never add // biome-ignore.

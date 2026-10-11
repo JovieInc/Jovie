@@ -42,13 +42,21 @@ export function VoicePageContent() {
         body={
           <>
             Paste a clip. We train a model that sounds exactly like you.
-            Generate promos, replies, and drops that fans swear are live. Full
-            consent. Full control. Runs in your Jovie flows.
+            Generate promos, replies, and drops that your audience swears are
+            live. Full consent. Full control. Runs in your Jovie flows.
           </>
         }
         media={<VoiceDemoVisual />}
+        photo={{
+          src: '/images/marketing-hero/voice.webp',
+          width: 1600,
+          height: 686,
+        }}
         headingId='voice-hero-heading'
         titleTestId='voice-hero-title'
+        // JOV-7772: lg splits the hero into two columns, so use 40px in its
+        // narrower text column; xl restores 48px as the column widens.
+        titleClassName='text-3xl md:text-5xl lg:text-4xl xl:text-5xl'
         sectionTestId='voice-hero-section'
         primaryCtaLabel='Start voice cloning'
         primaryCtaHref={APP_ROUTES.START}
@@ -120,7 +128,11 @@ export function VoicePageContent() {
               </ul>
               <div className='mt-8 flex flex-wrap gap-3'>
                 <Button asChild variant='primary'>
-                  <Link href={APP_ROUTES.START} data-testid='voice-trust-cta'>
+                  <Link
+                    href={APP_ROUTES.START}
+                    prefetch={false}
+                    data-testid='voice-trust-cta'
+                  >
                     Start your first clone
                   </Link>
                 </Button>
@@ -128,10 +140,6 @@ export function VoicePageContent() {
                   <Link href={APP_ROUTES.SUPPORT}>Talk to the team</Link>
                 </Button>
               </div>
-              <p className='mt-4 text-xs text-tertiary-token'>
-                Voice infrastructure shipped in PR 9882 (YouTube to ElevenLabs)
-                + webhook/cron layer PR 9881.
-              </p>
             </div>
           </div>
         </MarketingContainer>
@@ -140,14 +148,20 @@ export function VoicePageContent() {
       <section className='border-t border-subtle bg-surface-0 py-14 text-primary-token'>
         <MarketingContainer width='page'>
           <div className='mx-auto flex max-w-2xl flex-col items-center gap-4 text-center'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-3xl font-semibold tracking-tight'>
-              Ready To Sound Like You — Everywhere?
+              Ready to sound like you, everywhere?
             </h2>
             <p className='text-secondary-token'>
-              The same voice that fans already know, now available on demand.
+              The same voice your audience already knows, now available on
+              demand.
             </p>
             <Button asChild variant='secondary' className='mt-2'>
-              <Link href={APP_ROUTES.START} data-testid='voice-final-cta'>
+              <Link
+                href={APP_ROUTES.START}
+                prefetch={false}
+                data-testid='voice-final-cta'
+              >
                 Clone my voice now
               </Link>
             </Button>

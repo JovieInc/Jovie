@@ -262,12 +262,14 @@ export async function getAdminWaitlistEntries(
     return {
       entries: entries.map(entry => ({
         id: entry.id,
-        fullName: entry.fullName,
+        // A sign-up entry has no name or public link until the intake chat
+        // runs; the admin table shows those cells empty.
+        fullName: entry.fullName ?? '',
         email: entry.email,
         primaryGoal: entry.primaryGoal,
-        primarySocialUrl: entry.primarySocialUrl,
-        primarySocialPlatform: entry.primarySocialPlatform,
-        primarySocialUrlNormalized: entry.primarySocialUrlNormalized,
+        primarySocialUrl: entry.primarySocialUrl ?? '',
+        primarySocialPlatform: entry.primarySocialPlatform ?? '',
+        primarySocialUrlNormalized: entry.primarySocialUrlNormalized ?? '',
         spotifyUrl: entry.spotifyUrl,
         spotifyUrlNormalized: entry.spotifyUrlNormalized,
         spotifyArtistName: entry.spotifyArtistName ?? null,

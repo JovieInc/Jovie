@@ -17,7 +17,7 @@ export function slugifyCategory(category: string): string {
 /** Known blog categories with descriptions for SEO */
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   'Artist Management':
-    'Insights on navigating the business side of music — managers, agents, and the systems that connect artists to opportunities.',
+    'Insights on navigating the business side of music: managers, agents, and the systems that connect artists to opportunities.',
   'Release Strategy':
     'Playbooks for building and sustaining momentum around music releases.',
   'Inbound Marketing':

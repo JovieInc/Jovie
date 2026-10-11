@@ -1,8 +1,11 @@
 'use client';
 
 import { Calendar, Download, Home, MapPin } from 'lucide-react';
+import Link from 'next/link';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { formatPublicContactSubtitle } from '@/lib/contacts/format-public-contact';
 import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
+import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 import { EntityMentionText } from './EntityMentionText';
@@ -17,6 +20,17 @@ interface AboutSectionProps {
    * server-side). Falls back to plain text when omitted.
    */
   readonly bioSegments?: readonly EntityMentionSegment[];
+  /**
+   * Selected-credits paragraph as entity-linked segments (computed
+   * server-side from structured release-credit edges). Omitted when the
+   * profile has no verified credits.
+   */
+  readonly creditSegments?: readonly EntityMentionSegment[];
+  /**
+   * Public booking/contact entries. Rendered as a link list into the
+   * Contact view; omitted entirely when the profile has none.
+   */
+  readonly contacts?: readonly PublicContact[];
 }
 
 function sanitizeFilename(value: string): string {
@@ -67,6 +81,8 @@ export function AboutSection({
   pressPhotos = [],
   allowPhotoDownloads = false,
   bioSegments,
+  creditSegments,
+  contacts = [],
 }: AboutSectionProps) {
   const hasBio = Boolean(artist.tagline);
   const hasLocation = Boolean(artist.location);
@@ -78,8 +94,20 @@ export function AboutSection({
   const hasGenres = uniqueGenres.length > 0;
   const hasPressPhotos = allowPhotoDownloads && pressPhotos.length > 0;
   const hasMetadata = hasLocation || hasHometown || hasActiveSince;
+  const hasCredits = Boolean(creditSegments && creditSegments.length > 0);
+  const contactableContacts = contacts.filter(
+    contact => contact.channels.length > 0
+  );
+  const hasContacts = contactableContacts.length > 0;
+  const contactHref = `/${encodeURIComponent(artist.handle)}?mode=contact`;
 
-  const hasContent = hasBio || hasMetadata || hasGenres || hasPressPhotos;
+  const hasContent =
+    hasBio ||
+    hasMetadata ||
+    hasGenres ||
+    hasPressPhotos ||
+    hasCredits ||
+    hasContacts;
 
   if (!hasContent) {
     return (
@@ -140,6 +168,46 @@ export function AboutSection({
               </span>
             );
           })}
+        </div>
+      )}
+
+      {hasCredits && (
+        <div data-testid='profile-about-credits'>
+          <h2 className='mb-2 text-app font-caption text-white/70'>
+            Selected Credits
+          </h2>
+          <p className='text-sm font-book leading-relaxed text-white/70'>
+            <EntityMentionText segments={creditSegments ?? []} />
+          </p>
+        </div>
+      )}
+
+      {hasContacts && (
+        <div data-testid='profile-about-contacts'>
+          <h2 className='mb-2 text-app font-caption text-white/70'>
+            Booking &amp; Contact
+          </h2>
+          <ul className='flex flex-col gap-1'>
+            {contactableContacts.map(contact => {
+              const subtitle = formatPublicContactSubtitle(contact);
+              return (
+                <li key={contact.id}>
+                  <Link
+                    href={contactHref}
+                    prefetch={false}
+                    className='group inline-flex min-h-11 max-w-full flex-col items-start justify-center gap-0.5 text-left'
+                  >
+                    <span className='text-sm font-semibold text-white/80 underline-offset-4 group-hover:underline'>
+                      {contact.roleLabel}
+                    </span>
+                    {subtitle ? (
+                      <span className='text-xs text-white/50'>{subtitle}</span>
+                    ) : null}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 

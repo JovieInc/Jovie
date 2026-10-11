@@ -6,6 +6,8 @@
  *
  * Auth: signature verified via STRIPE_WEBHOOK_SECRET_TIPS using
  * `stripe.webhooks.constructEvent`. Missing/invalid signature → 400.
+ * Unset STRIPE_WEBHOOK_SECRET_TIPS → 200 with a clear log so Stripe does
+ * not retry a configuration gap.
  *
  * Events handled:
  * - `checkout.session.completed` → create a tips row, fire post-processing
@@ -43,10 +45,12 @@ export async function POST(req: NextRequest) {
   try {
     const webhookSecret = env.STRIPE_WEBHOOK_SECRET_TIPS;
     if (!webhookSecret) {
-      logger.error('STRIPE_WEBHOOK_SECRET_TIPS not configured');
+      logger.error(
+        'STRIPE_WEBHOOK_SECRET_TIPS is not configured; acknowledging tip webhook without processing'
+      );
       return NextResponse.json(
-        { error: 'Webhook not configured' },
-        { status: 500, headers: NO_STORE_HEADERS }
+        { received: false, reason: 'not_configured' },
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     }
 

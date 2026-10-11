@@ -1,0 +1,2 @@
+ALTER TABLE "server_analytics_events" ADD COLUMN IF NOT EXISTS "event_identity" text;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "server_analytics_events_event_identity_unique" ON "server_analytics_events" USING btree ("event_identity");

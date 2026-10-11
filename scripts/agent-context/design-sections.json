@@ -49,11 +49,11 @@
   },
   {
     "heading": "## App IA & Page Scaffold",
-    "sha256": "19d50dbe5f3e51fe1c2cf3db9b1afc48b656b9bdacedad5d18f518cf691611d9"
+    "sha256": "3f4917fa28e4c03a78ce89c171ae16ddf4004970b856b1aab9afff00eeaa69f7"
   },
   {
     "heading": "## Component Patterns",
-    "sha256": "6985cd7731e29357ed6f5b289e4066a0a328d681c8c72303723e1565ab0c7b46"
+    "sha256": "c6155cea6f2712ccd80cc66f51fb19d3bfa95a194af79f832314d180c34cd569"
   },
   {
     "heading": "## Full-Screen Status Screens",
@@ -65,7 +65,7 @@
   },
   {
     "heading": "## Text Casing",
-    "sha256": "10db10e0e41b2b585ba45b3ed8daa43e5976274706aecc1718d3a3a4cb309aa8"
+    "sha256": "1f4602a991c9b34afbe54f9a2f4475c9b5d3febd330d8971284b9f5f8e7fb0d4"
   },
   {
     "heading": "## Canonical Surface Split",
@@ -77,6 +77,6 @@
   },
   {
     "heading": "## Decisions Log",
-    "sha256": "a4e225adaf13ffe4a690bc8f19ebe7ef0e3ce2f3e56daae43a633c052c6fbff3"
+    "sha256": "f526047a5f751e257fdda67ddddcaea25f777f1b9e5f232d6a2ef2feebc8be90"
   }
 ]

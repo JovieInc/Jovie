@@ -163,9 +163,21 @@ export function navigationInputMethodFromClick(detail: number) {
   return detail === 0 ? 'keyboard' : 'pointer';
 }
 
-function canonicalNavigationPath(value: string): string {
-  const path = value.split(/[?#]/, 1)[0] || '/';
-  return path === '/' ? path : path.replace(/\/+$/, '');
+const NAVIGATION_IDENTITY_SEARCH_PARAMS = ['panel', 'tab'] as const;
+
+function canonicalNavigationLocation(value: string): string {
+  const url = new URL(value, 'https://jovie.local');
+  const pathname =
+    url.pathname === '/' ? url.pathname : url.pathname.replace(/\/+$/, '');
+  const identityParams = new URLSearchParams();
+  for (const key of NAVIGATION_IDENTITY_SEARCH_PARAMS) {
+    for (const entry of url.searchParams.getAll(key)) {
+      identityParams.append(key, entry);
+    }
+  }
+  identityParams.sort();
+  const query = identityParams.toString();
+  return query ? `${pathname}?${query}` : pathname;
 }
 
 function startUxNavigationMeasurement(
@@ -274,8 +286,8 @@ export function startNavigationTelemetry(input: {
   readonly startedAt?: number;
 }): NavigationTelemetryPayload | null {
   if (
-    canonicalNavigationPath(input.sourcePathname) ===
-    canonicalNavigationPath(input.destinationHref)
+    canonicalNavigationLocation(input.sourcePathname) ===
+    canonicalNavigationLocation(input.destinationHref)
   ) {
     return null;
   }

@@ -18,6 +18,7 @@ import { getMarketingSection } from './sections';
 export const LANDING_PAGE_GRAMMAR_SCHEMA =
   'jovie.landing-page-grammar/v1' as const;
 
+/** Alias of the factory stage spine; see factory/spine.ts for the mapping. */
 export const LANDING_PAGE_PIPELINE_STAGES = [
   'classify-intent',
   'choose-section-jobs',

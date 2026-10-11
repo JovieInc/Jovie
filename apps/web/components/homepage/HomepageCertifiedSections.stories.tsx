@@ -1,15 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { getMarketingExportImage } from '@/lib/screenshots/registry';
-import { HomepageCertifiedSections } from './HomepageCertifiedSections';
+import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
+import {
+  HomepageCertifiedSections,
+  HomepageEditorialFeatureSection,
+} from './HomepageCertifiedSections';
 
 // Same real public-profile exports the live homepage mounts (jov.ie/timwhite).
 const previews = {
-  connected: getMarketingExportImage('tim-white-profile-listen-mobile'),
-  relationships: [
-    getMarketingExportImage('tim-white-profile-subscribe-mobile'),
-    getMarketingExportImage('tim-white-profile-pay-mobile'),
-    getMarketingExportImage('tim-white-profile-tour-mobile'),
-  ],
+  subscribe: HOMEPAGE_MEDIA_MAP.relationships.asset,
+  pay: HOMEPAGE_MEDIA_MAP.pay.asset,
 } as const;
 
 const meta = {
@@ -33,5 +33,24 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     previews,
+  },
+};
+
+// The record-owned renderer factory /solutions pages bind to: one real export,
+// with the certified homepage copy standing in for a page record.
+export const EditorialFeatureSingleExport: Story = {
+  args: { previews },
+  render: () => {
+    const section = HOMEPAGE_LAUNCH_COPY.certified.sections[0];
+    return (
+      <HomepageEditorialFeatureSection
+        previews={[{ image: previews.subscribe }]}
+        section={{
+          id: section.id,
+          headline: section.headline,
+          body: section.body,
+        }}
+      />
+    );
   },
 };

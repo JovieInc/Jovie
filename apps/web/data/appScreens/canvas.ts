@@ -147,19 +147,6 @@ export const APP_SCREEN_CANVAS_EXCEPTIONS: Readonly<
     component: 'PageShell',
     enclosingFunction: 'InsightsPanelView',
   }),
-  'apps/web/app/app/(shell)/jovie-work/page.tsx': screenOwned({
-    source:
-      'apps/web/components/features/dashboard/organisms/jovie-work-feed/JovieWorkPanel.tsx',
-    component: 'PageShell',
-    enclosingFunction: 'JovieWorkPanelView',
-  }),
-  // Existing Library loading canvas remains source-bound while the active
-  // Library PR stack is reconciled; this batch must not silently rewrite it.
-  'apps/web/app/app/(shell)/library/page.tsx': screenOwned({
-    source: 'apps/web/app/app/(shell)/library/LibrarySurface.tsx',
-    component: 'PageShell',
-    enclosingFunction: 'LibraryLoadingState',
-  }),
   'apps/web/app/app/(shell)/youtube/page.tsx': screenOwned({
     source:
       'apps/web/components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx',

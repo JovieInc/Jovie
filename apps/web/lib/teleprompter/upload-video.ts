@@ -13,10 +13,12 @@ export function getTeleprompterVideoAcceptTypes(): string {
 export async function uploadRecordableVideo(params: {
   readonly file: File;
   readonly profileId: string;
+  /** Authenticated user id; scopes the Blob path to the uploader. */
+  readonly ownerId: string;
   readonly kind: RecordableVideoKind;
   readonly showcaseVariant: TeleprompterShowcaseVariant;
 }): Promise<{ readonly blobUrl: string }> {
-  const uploaded = await uploadAccountVideo(params.file);
+  const uploaded = await uploadAccountVideo(params.file, params.ownerId);
 
   trackTeleprompterFunnel('teleprompter_video_uploaded', {
     profileId: params.profileId,

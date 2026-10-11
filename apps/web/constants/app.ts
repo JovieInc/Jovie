@@ -1,4 +1,4 @@
-export { APP_URL, APP_URL as DASHBOARD_URL, BASE_URL } from './domains';
+export { BASE_URL } from './domains';
 
 export const APP_NAME = 'Jovie';
 export const LEGAL_ENTITY_NAME = 'Jovie Technology Inc.';

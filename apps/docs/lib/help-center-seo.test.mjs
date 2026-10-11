@@ -99,18 +99,14 @@ test('redirects are permanent, single-hop, and only target live routes', () => {
   );
   // Every locked migration-map row is either emitted or explicitly held until
   // its canonical destination goes live — nothing is silently dropped.
-  assert.equal(
-    redirects.length + held.length,
-    LEGACY_REDIRECTS.length +
-      registry.articles.reduce(
-        (count, article) =>
-          count +
-          (primaryRoutes.has(article.route)
-            ? (article.redirectAliases ?? []).length
-            : 0),
-        0
-      )
-  );
+  const expectedSources = new Set(LEGACY_REDIRECTS.map(row => row.source));
+  for (const article of registry.articles) {
+    if (!primaryRoutes.has(article.route)) continue;
+    for (const alias of article.redirectAliases ?? []) {
+      expectedSources.add(alias);
+    }
+  }
+  assert.equal(redirects.length + held.length, expectedSources.size);
 });
 
 test('frontmatter redirectAliases extend the redirect set', () => {

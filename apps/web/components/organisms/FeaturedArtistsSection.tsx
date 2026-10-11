@@ -80,6 +80,8 @@ function VirtualizedCreatorsRow({
   ariaLabel,
   showNames,
 }: VirtualizedCreatorsRowProps) {
+  // Reads live virtualizer state each render; see virtualizer-compiler-optout.test.ts.
+  'use no memo';
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const virtualizer = useVirtualizer({

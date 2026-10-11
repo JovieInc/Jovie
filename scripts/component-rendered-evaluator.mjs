@@ -65,10 +65,15 @@ function parseArgs(argv) {
   return flags;
 }
 function normalizeImportPath(value) {
-  return String(value ?? '')
-    .replaceAll('\\', '/')
-    .replace(/^\/+/, '')
-    .replace(/^\.\//, '');
+  return (
+    String(value ?? '')
+      .replaceAll('\\', '/')
+      .replace(/^\/+/, '')
+      .replace(/^\.\//, '')
+      // Storybook 10 indexes web stories relative to apps/web; gate requests
+      // use repository paths. Normalize that exact root, never a suffix match.
+      .replace(/^(components|stories)\//, 'apps/web/$1/')
+  );
 }
 function parseStoryPathRequest(value) {
   const raw = String(value ?? '');
@@ -258,10 +263,17 @@ async function collectSnapshots(
   const storyUrl = new URL(`${storybookUrl}/iframe.html`);
   storyUrl.searchParams.set('id', story.id);
   storyUrl.searchParams.set('viewMode', 'story');
+  // The evaluator owns the mandatory WCAG scan below. Keep Storybook's
+  // automatic addon scan from sharing and resetting that same axe instance.
+  storyUrl.searchParams.set('globals', 'a11y.manual:!true');
   await page.goto(storyUrl.toString(), {
     // Storybook keeps a development websocket open, so network-idle is not a
     // meaningful readiness signal. The certified component root below is.
     waitUntil: 'domcontentloaded',
+    timeout: 120_000,
+  });
+  await page.locator('#storybook-root > *').first().waitFor({
+    state: 'attached',
     timeout: 120_000,
   });
   await page
@@ -744,12 +756,6 @@ async function collectSnapshots(
       const keyboardTarget = variant.keyboardTargetSelector
         ? root.locator(variant.keyboardTargetSelector).first()
         : target;
-      if (variant.keyboardReachable) {
-        variant.keyboardActivatable = await exerciseKeyboardActivation(
-          page,
-          keyboardTarget
-        );
-      }
       try {
         await target.scrollIntoViewIfNeeded({ timeout: 5_000 });
         variant.hoverRootBoxBefore = await root.boundingBox();
@@ -765,11 +771,45 @@ async function collectSnapshots(
         variant.hoverError =
           error instanceof Error ? error.message : String(error);
       }
+      if (variant.keyboardReachable) {
+        variant.keyboardActivatable = await exerciseKeyboardActivation(
+          page,
+          keyboardTarget
+        );
+      }
     }
 
     snapshots.push(snapshot);
   }
 
+  // Keyboard activation can legitimately close a drawer or collapse a rail.
+  // Measure hover before that transition, then reload its declared initial
+  // state for zoom evidence instead of measuring the interaction's aftermath.
+  await page.goto(storyUrl.toString(), {
+    waitUntil: 'domcontentloaded',
+    timeout: 120_000,
+  });
+  await page
+    .locator('[data-jovie-eval-family]')
+    .first()
+    .waitFor({ state: 'visible', timeout: 15_000 });
+  const zoomRoots = page.locator('[data-jovie-eval-family]');
+  if ((await zoomRoots.count()) !== rootCount)
+    throw new Error('Family roots changed while restoring the story for zoom');
+  for (let index = 0; index < rootCount; index += 1) {
+    const restored = zoomRoots.nth(index);
+    if (
+      (await restored.getAttribute('data-jovie-eval-family')) !==
+      snapshots[index].family
+    )
+      throw new Error(
+        'Family identity changed while restoring the story for zoom'
+      );
+    await restored.evaluate(
+      (element, id) => element.setAttribute('data-jovie-eval-instance', id),
+      snapshots[index].instanceId
+    );
+  }
   await clearInteractionState(page);
   await page.setViewportSize({
     width: Math.max(1, Math.floor(viewport.width / 2)),
@@ -883,12 +923,14 @@ async function main() {
     baseURL: flags.storybookUrl,
     reducedMotion: 'reduce',
   });
-  const page = await context.newPage();
   const snapshots = [];
   const missingContracts = [];
   try {
     for (const story of stories) {
       for (const viewport of VIEWPORTS) {
+        // Release each story document before the next navigation. Retaining a
+        // single renderer through the entire catalog can exhaust Chromium.
+        const page = await context.newPage();
         try {
           const storySnapshots = await collectSnapshots(
             page,
@@ -906,6 +948,8 @@ async function main() {
             viewport: viewport.name,
             detail: error instanceof Error ? error.message : String(error),
           });
+        } finally {
+          await page.close();
         }
       }
     }

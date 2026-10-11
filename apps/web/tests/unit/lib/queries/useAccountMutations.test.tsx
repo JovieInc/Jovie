@@ -197,12 +197,11 @@ describe('useExportDataMutation', () => {
 
     // Only intercept createElement('a') -- let React's own DOM calls through
     const originalCreateElement = document.createElement.bind(document);
-    vi.spyOn(document, 'createElement').mockImplementation(
-      (tag: string, options?: ElementCreationOptions) => {
-        if (tag === 'a') return fakeAnchor as unknown as HTMLAnchorElement;
-        return originalCreateElement(tag, options);
-      }
-    );
+    const createElement = ((tag: string, options?: ElementCreationOptions) => {
+      if (tag === 'a') return fakeAnchor as unknown as HTMLAnchorElement;
+      return originalCreateElement(tag, options);
+    }) as typeof document.createElement;
+    vi.spyOn(document, 'createElement').mockImplementation(createElement);
 
     // Spy on appendChild so it accepts our fake anchor without throwing
     const originalAppendChild = document.body.appendChild.bind(document.body);
@@ -229,6 +228,19 @@ describe('useExportDataMutation', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('intercepts download anchors and delegates other DOM creation', () => {
+    expect(document.createElement('a')).toBe(fakeAnchor);
+    expect(document.createElement('div')).toBeInstanceOf(HTMLDivElement);
+    const customElement = document.createElement('jovie-test', {
+      is: 'jovie-test',
+    });
+    expect(customElement.tagName).toBe('JOVIE-TEST');
+    expect(customElement.outerHTML).toBe(
+      '<jovie-test is="jovie-test"></jovie-test>'
+    );
+    expect(customElement).toBeInstanceOf(HTMLElement);
   });
 
   it('starts in an idle state', () => {

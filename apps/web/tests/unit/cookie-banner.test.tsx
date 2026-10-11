@@ -193,6 +193,17 @@ describe('CookieBannerSection', () => {
     expect(shouldSuppressCookieBannerForPathname(pathname)).toBe(true);
   });
 
+  it.each(['/hud', '/hud/wiki', '/hud-tv'])(
+    'suppresses authenticated Ops surface %s',
+    pathname => {
+      expect(shouldSuppressCookieBannerForPathname(pathname)).toBe(true);
+    }
+  );
+
+  it('does not suppress public routes that share a prefix', () => {
+    expect(shouldSuppressCookieBannerForPathname('/huddle')).toBe(false);
+  });
+
   it.each([
     ['/tim', true],
     ['/tim/alerts', true],

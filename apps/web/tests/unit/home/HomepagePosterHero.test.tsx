@@ -43,6 +43,27 @@ function renderHero(
 }
 
 describe('MarketingPosterHero', () => {
+  it('binds a declared profile hero on the semantic root without duplicating it', () => {
+    render(
+      <MarketingPosterHero
+        headline='Profile'
+        subtitle='Your public profile.'
+        primaryCta={primaryCta}
+        media={<div>Product</div>}
+        seam={null}
+        sectionVariant='centered-phone'
+        sectionOwner='apps/web/components/marketing/MarketingPosterHero.tsx'
+      />
+    );
+    const root = screen.getByTestId('marketing-section-hero');
+    expect(root.tagName).toBe('SECTION');
+    expect(root).toHaveAttribute('data-marketing-variant', 'centered-phone');
+    expect(root).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/marketing/MarketingPosterHero.tsx'
+    );
+    expect(screen.queryByTestId('homepage-hero-shell')).toBeNull();
+  });
   it('renders one accessible heading and one primary CTA', () => {
     renderHero();
 
@@ -157,4 +178,105 @@ describe('MarketingPosterHero', () => {
       primaryCta.eventProperties
     );
   });
+});
+
+vi.mock('next/link', async () => {
+  const { forwardRef } = await import('react');
+  return {
+    useLinkStatus: () => ({ pending: false }),
+    default: forwardRef<
+      HTMLAnchorElement,
+      ComponentProps<'a'> & { prefetch?: boolean }
+    >(function PrefetchObservedLink({ prefetch, href, ...props }, ref) {
+      return (
+        <a
+          {...props}
+          href={href ?? '#'}
+          ref={ref}
+          data-test-prefetch={String(prefetch)}
+        />
+      );
+    }),
+  };
+});
+
+it.each([false, true])(
+  'preserves public defaults and defers auth through tracked=%s poster links',
+  tracked => {
+    renderHero(tracked ? HomepageTrackedLink : undefined);
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
+      'href',
+      '/signup'
+    );
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
+      'data-test-prefetch',
+      'false'
+    );
+    expect(screen.getByTestId('homepage-secondary-cta')).toHaveAttribute(
+      'data-test-prefetch',
+      'undefined'
+    );
+  }
+);
+
+it.each(['/signup', '/signin', '/start'])(
+  'defers %s in both poster CTA positions',
+  href => {
+    render(
+      <MarketingPosterHero
+        headline='Share your work'
+        subtitle='Choose a destination'
+        primaryCta={{ label: 'Primary', href }}
+        secondaryCta={{ label: 'Secondary', href }}
+        media={null}
+        seam={null}
+      />
+    );
+    for (const id of ['homepage-primary-cta', 'homepage-secondary-cta']) {
+      expect(screen.getByTestId(id)).toHaveAttribute('href', href);
+      expect(screen.getByTestId(id)).toHaveAttribute(
+        'data-test-prefetch',
+        'false'
+      );
+    }
+  }
+);
+
+it('preserves explicit choices for auth and public poster destinations', () => {
+  const view = render(
+    <MarketingPosterHero
+      headline='Share your work'
+      subtitle='Choose a destination'
+      primaryCta={{ label: 'Primary', href: '/start', prefetch: true }}
+      secondaryCta={{ label: 'Secondary', href: '/signin', prefetch: false }}
+      media={null}
+      seam={null}
+    />
+  );
+  expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
+    'data-test-prefetch',
+    'true'
+  );
+  expect(screen.getByTestId('homepage-secondary-cta')).toHaveAttribute(
+    'data-test-prefetch',
+    'false'
+  );
+  view.rerender(
+    <MarketingPosterHero
+      headline='Share your work'
+      subtitle='Choose a destination'
+      primaryCta={{ label: 'Primary', href: '/pricing', prefetch: false }}
+      secondaryCta={{ label: 'Secondary', href: '/support', prefetch: true }}
+      media={null}
+      seam={null}
+    />
+  );
+  expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
+    'data-test-prefetch',
+    'false'
+  );
+  expect(screen.getByTestId('homepage-secondary-cta')).toHaveAttribute(
+    'data-test-prefetch',
+    'true'
+  );
 });

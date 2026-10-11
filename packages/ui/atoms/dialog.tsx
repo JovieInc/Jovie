@@ -2,13 +2,14 @@
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as React from 'react';
-
+import { useMenuOriginFocusRestore } from '../lib/overlay-focus';
 import {
   centeredContentStyles,
   descriptionStyles,
   footerStyles,
   headerStyles,
   overlayClassName,
+  overlayStyles,
   titleStyles,
 } from '../lib/overlay-styles';
 import { cn } from '../lib/utils';
@@ -48,6 +49,8 @@ interface DialogContentProps
   readonly overlayProps?: DialogOverlayProps;
   readonly disablePortal?: boolean;
   readonly hideClose?: boolean;
+  /** Full-screen takeovers retain the same focus and dismissal behavior. */
+  readonly variant?: 'default' | 'fullscreen';
   /**
    * Test ID for the dialog content.
    * @default "dialog-content"
@@ -67,29 +70,50 @@ const DialogContent = React.forwardRef<
       overlayProps,
       disablePortal = false,
       hideClose = false,
+      variant = 'default',
       testId = 'dialog-content',
+      onCloseAutoFocus,
       ...props
     },
     ref
   ) => {
+    const { contentRef, handleCloseAutoFocus } = useMenuOriginFocusRestore(
+      ref,
+      onCloseAutoFocus
+    );
     const contentClassName = cn(
-      centeredContentStyles.position,
-      centeredContentStyles.layout,
-      centeredContentStyles.surface,
-      centeredContentStyles.animation,
+      variant === 'fullscreen'
+        ? cn(
+            'fixed inset-0 z-modal grid h-dvh w-full max-w-none gap-0 overflow-hidden bg-(--app-shell-content-surface) text-primary-token',
+            overlayStyles.animation
+          )
+        : cn(
+            centeredContentStyles.position,
+            centeredContentStyles.layout,
+            centeredContentStyles.surface,
+            centeredContentStyles.animation,
+            centeredContentStyles.rounded
+          ),
       'duration-cinematic ease-cinematic',
-      centeredContentStyles.rounded,
       centeredContentStyles.reducedMotion,
       className
     );
+    const resolvedOverlayProps = {
+      ...overlayProps,
+      className: cn(
+        variant === 'fullscreen' && 'bg-(--app-shell-content-surface)',
+        overlayProps?.className
+      ),
+    };
 
     const content = (
       <DialogPrimitive.Content
-        ref={ref}
+        ref={contentRef}
         className={contentClassName}
         data-slot='dialog-content'
         data-testid={testId}
         {...props}
+        onCloseAutoFocus={handleCloseAutoFocus}
       >
         {children}
         {!hideClose && (
@@ -107,7 +131,7 @@ const DialogContent = React.forwardRef<
     if (disablePortal) {
       return (
         <>
-          <DialogOverlay {...overlayProps} />
+          <DialogOverlay {...resolvedOverlayProps} />
           {content}
         </>
       );
@@ -115,7 +139,7 @@ const DialogContent = React.forwardRef<
 
     return (
       <DialogPortal {...portalProps}>
-        <DialogOverlay {...overlayProps} />
+        <DialogOverlay {...resolvedOverlayProps} />
         {content}
       </DialogPortal>
     );

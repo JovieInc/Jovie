@@ -24,7 +24,7 @@ import {
   FilterSearchInput,
 } from '@/components/molecules/filters';
 import { PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS } from '@/components/organisms/table';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import type { ReleaseType } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { FilterSubmenu } from './FilterSubmenu';
@@ -80,6 +80,8 @@ function VirtualizedLabelList({
   searchInputRef,
   emptyMessage,
 }: VirtualizedLabelListProps) {
+  // Reads live virtualizer state each render; see virtualizer-compiler-optout.test.ts.
+  'use no memo';
   const parentRef = useRef<HTMLDivElement>(null);
 
   // Use virtualization only if we have more than 20 items

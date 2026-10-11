@@ -25,12 +25,28 @@ describe('CANONICAL_METRICS', () => {
     }
   });
 
+  it('describes subscribers as people who opted in', () => {
+    expect(CANONICAL_METRICS.subscribers.label).toBe('Followers');
+    expect(CANONICAL_METRICS.subscribers.definition).toBe(
+      'People who opted in to notifications.'
+    );
+    expect(CANONICAL_METRICS.unique_users.label).toBe('Unique Visitors');
+  });
+
   it('rate metrics are expressed in percent and document their formula', () => {
     const rateKeys = (
       Object.keys(CANONICAL_METRICS) as CanonicalMetricKey[]
     ).filter(key => CANONICAL_METRICS[key].valueType === 'rate');
 
-    expect(rateKeys.sort()).toEqual(['capture_rate', 'ctr']);
+    expect(rateKeys.sort()).toEqual([
+      'active_drop_purchase_rate',
+      'capture_rate',
+      'completed_card_signup_rate',
+      'completed_drop_profile_signup_rate',
+      'ctr',
+      'normal_item_purchase_rate',
+      'terminal_page_signup_rate',
+    ]);
     for (const key of rateKeys) {
       expect(CANONICAL_METRICS[key].unit).toBe('percent');
       expect(CANONICAL_METRICS[key].source).toContain('derived:');

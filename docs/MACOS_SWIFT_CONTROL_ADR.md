@@ -1,7 +1,7 @@
 # ADR — Control Swift work on iOS and Mac (no rewrite)
 
 > Issue: JOV-5359
-> Status: **Superseded** 2026-09-27 by [`docs/macos/ADR-swift-native-mac.md`](macos/ADR-swift-native-mac.md) (EVENT: the Mac app goes Swift-native). Kept as the historical receipt.
+> Status: **Historical; Electron-only prohibition superseded** by the [native Mac direction](macos/ADR-swift-native-mac.md), first recorded 2026-09-27 and refined 2026-10-02. The investigation below is preserved as dated evidence; its proposed slugs are not adopted.
 > Date: 2026-08-28
 > Founder ask: investigate Mac architecture + Swift transition; recommend at most 4 control invariants
 > Coordination: gbrain-unavailable (CLI missing; MCP empty). Granola and Slack MCP unavailable this session.

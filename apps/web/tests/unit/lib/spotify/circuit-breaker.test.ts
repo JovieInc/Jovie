@@ -43,4 +43,16 @@ describe('CircuitBreaker alert context', () => {
       })
     );
   });
+
+  it('opens without a Sentry alert when notify is false, and only once while it stays open', async () => {
+    const { CircuitBreaker } = await import('@/lib/spotify/circuit-breaker');
+    const breaker = new CircuitBreaker({ name: 'musicfetch' });
+
+    breaker.forceOpen({ notify: false });
+    breaker.forceOpen({ notify: false });
+
+    expect(breaker.getState()).toBe('OPEN');
+    expect(sentry.captureMessage).not.toHaveBeenCalled();
+    expect(sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
+  });
 });

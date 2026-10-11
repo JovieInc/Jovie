@@ -4,18 +4,35 @@ import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 
 import { db, doesTableExist } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
+import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
 import { leadFunnelEvents, leads } from '@/lib/db/schema/leads';
 import {
   creatorDistributionEvents,
   creatorProfiles,
+  userProfileClaims,
 } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const BASELINE_BURN_USD = 5_000;
 const SERPAPI_COST_PER_QUERY = 0.005;
+
+/** Null means no principal is known yet; known internal/QA principals fail. */
+const externalAccount = () =>
+  drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`;
+
+/** Profiles are owned through user_profile_claims; creator_profiles.user_id is legacy. */
+const externalCreatorAccount = () => drizzleSql`not exists (
+  select 1
+  from ${userProfileClaims} metric_claim
+  inner join ${users} metric_user on metric_user.id = metric_claim.user_id
+  where metric_claim.creator_profile_id = ${creatorProfiles.id}
+    and metric_claim.role = 'owner'
+    and lower(metric_user.email) ~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}
+)`;
 
 /** Extract rows from a raw db.execute() result. */
 function extractRawRows(result: unknown): Record<string, unknown>[] {
@@ -141,10 +158,13 @@ async function getOutreachSent7d(sevenDaysAgo: Date): Promise<number> {
       const [row] = await db
         .select({ count: drizzleSql<number>`count(*)::int` })
         .from(leadFunnelEvents)
+        .innerJoin(leads, eq(leads.id, leadFunnelEvents.leadId))
+        .leftJoin(users, eq(users.id, leads.signupUserId))
         .where(
           and(
             drizzleSql`${leadFunnelEvents.eventType} in ('email_queued', 'dm_sent')`,
-            gte(leadFunnelEvents.occurredAt, sevenDaysAgo)
+            gte(leadFunnelEvents.occurredAt, sevenDaysAgo),
+            externalAccount()
           )
         );
 
@@ -157,10 +177,12 @@ async function getOutreachSent7d(sevenDaysAgo: Date): Promise<number> {
     const [row] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
       .from(leads)
+      .leftJoin(users, eq(users.id, leads.signupUserId))
       .where(
         and(
           drizzleSql`${leads.outreachStatus}::text IN ('queued', 'dm_sent')`,
-          gte(leads.updatedAt, sevenDaysAgo)
+          gte(leads.updatedAt, sevenDaysAgo),
+          externalAccount()
         )
       );
 
@@ -190,10 +212,13 @@ async function getClaimClicks7d(sevenDaysAgo: Date): Promise<number> {
     const [row] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
       .from(leadFunnelEvents)
+      .innerJoin(leads, eq(leads.id, leadFunnelEvents.leadId))
+      .leftJoin(users, eq(users.id, leads.signupUserId))
       .where(
         and(
           eq(leadFunnelEvents.eventType, 'claim_page_viewed'),
-          gte(leadFunnelEvents.occurredAt, sevenDaysAgo)
+          gte(leadFunnelEvents.occurredAt, sevenDaysAgo),
+          externalAccount()
         )
       );
 
@@ -215,10 +240,12 @@ async function getSignups7d(sevenDaysAgo: Date): Promise<number> {
     const [row] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
       .from(leads)
+      .leftJoin(users, eq(users.id, leads.signupUserId))
       .where(
         and(
           gte(leads.signupAt, sevenDaysAgo),
-          drizzleSql`${leads.signupUserId} IS NOT NULL`
+          drizzleSql`${leads.signupUserId} IS NOT NULL`,
+          externalAccount()
         )
       );
 
@@ -248,10 +275,12 @@ async function getPaidConversions7d(sevenDaysAgo: Date): Promise<number> {
     const [row] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
       .from(leads)
+      .leftJoin(users, eq(users.id, leads.signupUserId))
       .where(
         and(
           drizzleSql`${leads.paidSubscriptionId} IS NOT NULL`,
-          gte(leads.paidAt, sevenDaysAgo)
+          gte(leads.paidAt, sevenDaysAgo),
+          externalAccount()
         )
       );
 
@@ -327,10 +356,15 @@ async function getInstagramActivationMetrics7d(sevenDaysAgo: Date): Promise<{
         `,
       })
       .from(creatorDistributionEvents)
+      .innerJoin(
+        creatorProfiles,
+        eq(creatorProfiles.id, creatorDistributionEvents.creatorProfileId)
+      )
       .where(
         and(
           eq(creatorDistributionEvents.platform, 'instagram'),
-          gte(creatorDistributionEvents.createdAt, sevenDaysAgo)
+          gte(creatorDistributionEvents.createdAt, sevenDaysAgo),
+          externalCreatorAccount()
         )
       );
 
@@ -364,7 +398,7 @@ async function getMagicMomentMetrics(): Promise<{
       settings: creatorProfiles.settings,
     })
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.isClaimed, true));
+    .where(and(eq(creatorProfiles.isClaimed, true), externalCreatorAccount()));
 
   let magicMomentCount = 0;
   let enrichmentFailureCount = 0;
@@ -426,21 +460,25 @@ async function getWowGrowthRate(): Promise<number | null> {
     const [thisWeek] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
       .from(leads)
+      .leftJoin(users, eq(users.id, leads.signupUserId))
       .where(
         and(
           drizzleSql`${leads.signupAt} IS NOT NULL`,
-          gte(leads.signupAt, thisWeekStart)
+          gte(leads.signupAt, thisWeekStart),
+          externalAccount()
         )
       );
 
     const [lastWeek] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
       .from(leads)
+      .leftJoin(users, eq(users.id, leads.signupUserId))
       .where(
         and(
           drizzleSql`${leads.signupAt} IS NOT NULL`,
           gte(leads.signupAt, lastWeekStart),
-          drizzleSql`${leads.signupAt} < ${thisWeekStart}`
+          drizzleSql`${leads.signupAt} < ${thisWeekStart}`,
+          externalAccount()
         )
       );
 
@@ -477,7 +515,8 @@ async function getCacUsd(): Promise<number | null> {
     const [signupRow] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
       .from(leads)
-      .where(drizzleSql`${leads.signupAt} IS NOT NULL`);
+      .leftJoin(users, eq(users.id, leads.signupUserId))
+      .where(and(drizzleSql`${leads.signupAt} IS NOT NULL`, externalAccount()));
 
     const signups = Number(signupRow?.count ?? 0);
     if (signups === 0) return null;
@@ -532,6 +571,14 @@ async function getActiveProfiles30d(): Promise<number | null> {
         WHERE cp.is_claimed = true
           AND ce.created_at >= ${thirtyDaysAgo}
           AND ce.is_bot = false
+          AND NOT EXISTS (
+            SELECT 1
+            FROM user_profile_claims metric_claim
+            INNER JOIN users metric_user ON metric_user.id = metric_claim.user_id
+            WHERE metric_claim.creator_profile_id = cp.id
+              AND metric_claim.role = 'owner'
+              AND lower(metric_user.email) ~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}
+          )
       `
     );
 
@@ -574,14 +621,17 @@ export async function getWeeklyFunnelTrend(weeks: number = 4): Promise<
     const rows = await db.execute(
       drizzleSql`
         SELECT
-          DATE_TRUNC('week', occurred_at)::date as week_start,
-          COUNT(DISTINCT CASE WHEN event_type = 'discovered' THEN lead_id END)::int AS scraped,
-          COUNT(DISTINCT CASE WHEN event_type = 'qualified' THEN lead_id END)::int AS qualified,
-          COUNT(DISTINCT CASE WHEN event_type IN ('email_queued', 'dm_sent') THEN lead_id END)::int AS contacted,
-          COUNT(DISTINCT CASE WHEN event_type = 'signup_completed' THEN lead_id END)::int AS signups,
-          COUNT(DISTINCT CASE WHEN event_type = 'paid_converted' THEN lead_id END)::int AS paid
-        FROM lead_funnel_events
-        WHERE occurred_at >= ${startDate}
+          DATE_TRUNC('week', lfe.occurred_at)::date as week_start,
+          COUNT(DISTINCT CASE WHEN lfe.event_type = 'discovered' THEN lfe.lead_id END)::int AS scraped,
+          COUNT(DISTINCT CASE WHEN lfe.event_type = 'qualified' THEN lfe.lead_id END)::int AS qualified,
+          COUNT(DISTINCT CASE WHEN lfe.event_type IN ('email_queued', 'dm_sent') THEN lfe.lead_id END)::int AS contacted,
+          COUNT(DISTINCT CASE WHEN lfe.event_type = 'signup_completed' THEN lfe.lead_id END)::int AS signups,
+          COUNT(DISTINCT CASE WHEN lfe.event_type = 'paid_converted' THEN lfe.lead_id END)::int AS paid
+        FROM lead_funnel_events lfe
+        LEFT JOIN leads l ON l.id = lfe.lead_id
+        LEFT JOIN users u ON u.id = l.signup_user_id
+        WHERE lfe.occurred_at >= ${startDate}
+          AND (u.email IS NULL OR lower(u.email) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})
         GROUP BY 1
         ORDER BY 1
       `
@@ -651,13 +701,16 @@ export async function getAllTimeFunnelTotals(): Promise<{
     const rows = await db.execute(
       drizzleSql`
         SELECT
-          COUNT(DISTINCT CASE WHEN event_type = 'discovered' THEN lead_id END)::int AS scraped,
-          COUNT(DISTINCT CASE WHEN event_type = 'qualified' THEN lead_id END)::int AS qualified,
-          COUNT(DISTINCT CASE WHEN event_type IN ('email_queued', 'dm_sent') THEN lead_id END)::int AS contacted,
-          COUNT(DISTINCT CASE WHEN event_type = 'claim_page_viewed' THEN lead_id END)::int AS claimed,
-          COUNT(DISTINCT CASE WHEN event_type = 'signup_completed' THEN lead_id END)::int AS signed_up,
-          COUNT(DISTINCT CASE WHEN event_type = 'paid_converted' THEN lead_id END)::int AS paid
-        FROM lead_funnel_events
+          COUNT(DISTINCT CASE WHEN lfe.event_type = 'discovered' THEN lfe.lead_id END)::int AS scraped,
+          COUNT(DISTINCT CASE WHEN lfe.event_type = 'qualified' THEN lfe.lead_id END)::int AS qualified,
+          COUNT(DISTINCT CASE WHEN lfe.event_type IN ('email_queued', 'dm_sent') THEN lfe.lead_id END)::int AS contacted,
+          COUNT(DISTINCT CASE WHEN lfe.event_type = 'claim_page_viewed' THEN lfe.lead_id END)::int AS claimed,
+          COUNT(DISTINCT CASE WHEN lfe.event_type = 'signup_completed' THEN lfe.lead_id END)::int AS signed_up,
+          COUNT(DISTINCT CASE WHEN lfe.event_type = 'paid_converted' THEN lfe.lead_id END)::int AS paid
+        FROM lead_funnel_events lfe
+        LEFT JOIN leads l ON l.id = lfe.lead_id
+        LEFT JOIN users u ON u.id = l.signup_user_id
+        WHERE u.email IS NULL OR lower(u.email) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}
       `
     );
 

@@ -34,7 +34,7 @@ export interface ShareContext {
 }
 
 export interface ShareLaunchResult {
-  readonly status: 'success' | 'fallback' | 'error';
+  readonly status: 'success' | 'fallback' | 'error' | 'cancelled';
   readonly helperText?: string;
 }
 

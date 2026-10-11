@@ -1,12 +1,25 @@
 import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { CSSProperties, ElementType, ReactNode } from 'react';
-import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { LandingCTAButton as LandingCtaLink } from '@/components/features/landing/LandingCTAButton';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
+import { MarketingHeroPhoto } from './MarketingHeroPhoto';
+
+/**
+ * Unique per-route hero photograph (marketing-routes-code-spec, 2026-09-26).
+ * Passed to Content/Landing mode to render behind the hero copy — see
+ * `MarketingHeroPhoto` for the scrim contract that keeps text legible.
+ */
+export interface MarketingHeroPhotoInput {
+  readonly src: string;
+  readonly width: number;
+  readonly height: number;
+  readonly opacity?: number;
+}
 
 export interface MarketingHeroCta {
   readonly label: ReactNode;
@@ -28,6 +41,8 @@ interface MarketingHeroBaseProps {
   /** Id applied to the hero heading and referenced by `aria-labelledby`. */
   readonly headingId?: string;
   readonly testId?: string;
+  /** Actual route owner when this shared root delegates its content. */
+  readonly sectionOwner?: string;
 }
 
 /**
@@ -64,9 +79,9 @@ export interface MarketingHeroContentProps extends MarketingHeroBaseProps {
   readonly primaryCta: MarketingHeroCta;
   readonly secondaryCta?: MarketingHeroCta;
   /**
-   * Proof element rendered below the hero copy. Defaults to the existing
-   * distributor logo bar (`HomeTrustSection`). Pass `false` to omit, or a
-   * node to override.
+   * Proof element rendered below the hero copy. Omitted by default: a logo
+   * bar needs a permission for the page (JOV-7795), so callers pass
+   * a `HomeTrustSection` with a placement explicitly. `false` also omits.
    *
    * Intentionally NO stats props: numeric social-proof claims must not
    * render here (decision, 2026-07-03 — unverifiable stats never ship;
@@ -82,6 +97,8 @@ export interface MarketingHeroContentProps extends MarketingHeroBaseProps {
    * Defaults to `next/link`.
    */
   readonly linkComponent?: ElementType;
+  /** Unique per-route decorative hero photograph. See `MarketingHeroPhoto`. */
+  readonly photo?: MarketingHeroPhotoInput;
 }
 
 /**
@@ -105,10 +122,18 @@ export interface MarketingHeroLandingProps extends MarketingHeroBaseProps {
   readonly secondaryCtaHref?: string;
   readonly subcopy?: string;
   readonly proofPoints?: readonly string[];
+  /**
+   * Headline line budget. Defaults to 2 (Linear-style clamp). Pass 'none'
+   * when a hero must never truncate its headline (e.g. a promise-breaking
+   * value prop that would render clipped at small widths or zoomed text).
+   */
+  readonly headlineMaxLines?: 2 | 3 | 'none';
   readonly copyClassName?: string;
   readonly titleClassName?: string;
   readonly mediaClassName?: string;
   readonly gridClassName?: string;
+  /** Unique per-route decorative hero photograph. See `MarketingHeroPhoto`. */
+  readonly photo?: MarketingHeroPhotoInput;
 }
 
 export type MarketingHeroProps =
@@ -129,12 +154,14 @@ function MarketingHeroFrame({
   headingId,
   testId,
   sectionVariant,
+  sectionOwner,
   children,
 }: Readonly<{
   className: string;
   headingId?: string;
   testId?: string;
   sectionVariant?: string;
+  sectionOwner?: string;
   children: ReactNode;
 }>) {
   return (
@@ -145,7 +172,7 @@ function MarketingHeroFrame({
       data-testid={testId}
       data-marketing-owner={
         sectionVariant
-          ? 'apps/web/components/marketing/MarketingHero.tsx'
+          ? (sectionOwner ?? 'apps/web/components/marketing/MarketingHero.tsx')
           : undefined
       }
       data-marketing-variant={sectionVariant}
@@ -165,7 +192,7 @@ function MarketingHeroTitle({
   id?: string;
   testId?: string;
   className: string;
-  maxLines?: 2 | 3;
+  maxLines?: 2 | 3 | 'none';
   children: ReactNode;
 }>) {
   return (
@@ -173,16 +200,28 @@ function MarketingHeroTitle({
       id={id}
       data-testid={testId}
       className={cn(
-        maxLines === 3 ? 'line-clamp-3' : 'line-clamp-2',
+        maxLines === 'none'
+          ? undefined
+          : maxLines === 3
+            ? 'line-clamp-3'
+            : 'line-clamp-2',
         className
       )}
       style={
-        maxLines === 3
+        maxLines === 'none'
           ? ({
-              WebkitLineClamp: 3,
-              maxBlockSize: 'calc(3 * 1lh)',
+              display: 'block',
+              maxBlockSize: 'none',
+              overflow: 'visible',
+              WebkitBoxOrient: 'initial',
+              WebkitLineClamp: 'unset',
             } satisfies CSSProperties)
-          : undefined
+          : maxLines === 3
+            ? ({
+                WebkitLineClamp: 3,
+                maxBlockSize: 'calc(3 * 1lh)',
+              } satisfies CSSProperties)
+            : undefined
       }
     >
       {children}
@@ -201,12 +240,14 @@ function MarketingHeroShell({
   headingId,
   testId,
   sectionVariant,
+  sectionOwner,
 }: MarketingHeroShellProps) {
   return (
     <MarketingHeroFrame
       headingId={headingId}
       testId={testId}
       sectionVariant={sectionVariant}
+      sectionOwner={sectionOwner}
       className={cn(
         variant !== 'unstyled' && 'relative w-full',
         variant !== 'unstyled' &&
@@ -246,7 +287,7 @@ function MarketingHeroCtaLink({
     >
       <LinkComponent
         href={cta.href}
-        prefetch={cta.prefetch}
+        prefetch={resolveMarketingAuthPrefetch(cta.href, cta.prefetch)}
         data-testid={cta.testId}
         data-primary-action={intent === 'primary' ? 'true' : undefined}
         data-cta-sign-up={cta.signUp ? 'true' : undefined}
@@ -270,8 +311,10 @@ function MarketingHeroContent({
   testId,
   className,
   sectionVariant,
+  sectionOwner,
   headlineMaxLines = 2,
   linkComponent = Link,
+  photo,
 }: MarketingHeroContentProps) {
   const layout = media ? 'split' : align;
 
@@ -280,12 +323,15 @@ function MarketingHeroContent({
       className={cn(
         'marketing-hero marketing-hero-dock',
         `marketing-hero--${layout}`,
+        photo && 'relative overflow-hidden',
         className
       )}
       headingId={headingId}
       testId={testId}
       sectionVariant={sectionVariant}
+      sectionOwner={sectionOwner}
     >
+      {photo ? <MarketingHeroPhoto {...photo} /> : null}
       <MarketingContainer width='page'>
         <div className='marketing-hero-inner'>
           <div className='marketing-hero-copy'>
@@ -318,15 +364,7 @@ function MarketingHeroContent({
           {media ? <div className='marketing-hero-media'>{media}</div> : null}
         </div>
       </MarketingContainer>
-      {logos === false ? null : (
-        <div className='marketing-hero-logos'>
-          {logos ?? (
-            <MarketingContainer width='page'>
-              <HomeTrustSection variant='compact' presentation='card' />
-            </MarketingContainer>
-          )}
-        </div>
-      )}
+      {logos ? <div className='marketing-hero-logos'>{logos}</div> : null}
     </MarketingHeroFrame>
   );
 }
@@ -348,10 +386,12 @@ function MarketingHeroLanding({
   secondaryCtaHref,
   subcopy,
   proofPoints = [],
+  headlineMaxLines = 2,
   copyClassName,
   titleClassName,
   mediaClassName,
   gridClassName,
+  photo,
 }: MarketingHeroLandingProps) {
   return (
     <MarketingHeroFrame
@@ -359,6 +399,7 @@ function MarketingHeroLanding({
       headingId={headingId}
       testId={testId ?? sectionTestId}
     >
+      {photo ? <MarketingHeroPhoto {...photo} /> : null}
       <div
         aria-hidden='true'
         className='marketing-hero-backdrop pointer-events-none absolute inset-0'
@@ -383,8 +424,10 @@ function MarketingHeroLanding({
               <MarketingHeroTitle
                 id={headingId}
                 testId={titleTestId}
+                maxLines={headlineMaxLines}
                 className={cn(
-                  'marketing-h1-linear marketing-h1-max-two-lines mt-5 text-primary-token',
+                  'marketing-h1-linear mt-5 text-primary-token',
+                  headlineMaxLines === 2 && 'marketing-h1-max-two-lines',
                   titleClassName
                 )}
               >

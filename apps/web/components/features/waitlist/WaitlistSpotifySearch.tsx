@@ -266,7 +266,7 @@ export function WaitlistSpotifySearch({
             <p
               id='waitlist-spotify-url-error'
               role='alert'
-              className='text-sm text-red-400'
+              className='text-sm text-error'
             >
               {fieldErrors.spotifyUrl[0]}
             </p>
@@ -395,7 +395,7 @@ export function WaitlistSpotifySearch({
           {/* Error state */}
           {state === 'error' && (
             <div className='p-4 text-center'>
-              <p className='text-sm text-red-400'>Search failed. Try again.</p>
+              <p className='text-sm text-error'>Search failed. Try again.</p>
             </div>
           )}
 
@@ -505,7 +505,7 @@ export function WaitlistSpotifySearch({
           <p
             id='waitlist-spotify-url-error'
             role='alert'
-            className='text-sm text-red-400'
+            className='text-sm text-error'
           >
             {fieldErrors.spotifyUrl[0]}
           </p>

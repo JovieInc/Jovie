@@ -13,6 +13,8 @@ const post: BlogPostSummary = {
   category: 'Music Business',
   excerpt: 'Distribution is the starting gun.',
   tags: [],
+  image: '/images/blog/suno-playbook.svg',
+  imageAlt: 'Abstract artwork for the Suno playbook article.',
   readingTime: 8,
   wordCount: 1600,
 };
@@ -33,7 +35,10 @@ describe('BlogCard editorial navigation', () => {
       expect(screen.getByRole('heading', { name: post.title })).not.toHaveClass(
         'line-clamp-2'
       );
-      expect(container.querySelector('img')).toHaveAttribute('alt', '');
+      expect(container.querySelector('img')).toHaveAttribute(
+        'alt',
+        post.imageAlt
+      );
       expect(container.querySelector('img')?.getAttribute('src')).toContain(
         'suno-playbook.svg'
       );
@@ -44,7 +49,13 @@ describe('BlogCard editorial navigation', () => {
   it('keeps a new article navigable without artwork or a category', () => {
     const { container } = render(
       <BlogCard
-        post={{ ...post, slug: 'new-article', category: undefined }}
+        post={{
+          ...post,
+          slug: 'new-article',
+          category: undefined,
+          image: undefined,
+          imageAlt: undefined,
+        }}
         author={author}
       />
     );

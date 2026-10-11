@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx
+
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import type { ReactNode } from 'react';
@@ -36,12 +38,17 @@ import {
 import { track } from '@/lib/analytics';
 import {
   ONBOARDING_WIDGET_EVENTS,
+  WIDGET_COMPLETION_ACTIONS,
   widgetEventDisplayText,
 } from '@/lib/chat/onboarding-script/widget-events';
 import { useAppFlag } from '@/lib/flags/client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
+import {
+  buildStartEntryDraft,
+  type StartEntryProfile,
+} from '@/lib/onboarding/start-entry-profile';
 import { cn } from '@/lib/utils';
 import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
 import { ChatProposeNextStepCard } from './ChatProposeNextStepCard';
@@ -71,6 +78,8 @@ import {
   getOnboardingErrorMessage,
   getToolName,
   getToolParts,
+  hasToolOutputAction,
+  hasWidgetEvent,
   isArtistConfirmedOutput,
   isArtistPickerOutput,
   isCheckoutPayload,
@@ -90,6 +99,10 @@ import {
  */
 
 interface OnboardingChatProps {
+  readonly initialMessages?: UIMessage[];
+  readonly conversationId?: string | null;
+  readonly interactionDisabled?: boolean;
+  readonly onBusyChange?: (busy: boolean) => void;
   /** ID for a homepage-captured starter prompt stored in localStorage. */
   readonly intentId?: string;
   /** Turnstile token from the widget. Required on first message. */
@@ -112,21 +125,32 @@ interface OnboardingChatProps {
   ) => void;
   /** Validated URL-provided context for an automatic first message. */
   readonly starterHandoff?: StartEntryHandoff | null;
+  /** The real page behind `?handle=`; drafts (never sends) the claim message. */
+  readonly entryProfile?: StartEntryProfile | null;
+  /**
+   * Reserves extra top clearance inside the scroll region while a floating
+   * header control (the anonymous "Sign in" link) overlays the top-right
+   * corner, so the first right-aligned user bubble never renders beneath it.
+   */
+  readonly headerOverlay?: boolean;
 }
 
 class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
   private readonly turnstileState: { token: string | null };
 
-  constructor() {
+  constructor(conversationId: string | null) {
     const turnstileState = { token: null as string | null };
     super({
       api: '/api/chat',
-      body: { mode: 'onboarding' as const },
+      body: {
+        mode: 'onboarding' as const,
+        ...(conversationId ? { onboardingConversationId: conversationId } : {}),
+      },
       prepareSendMessagesRequest: ({ messages, body }) => ({
         body: {
           ...body,
           mode: 'onboarding' as const,
-          messages,
+          messages: messages.slice(-50),
           ...(turnstileState.token
             ? { turnstileToken: turnstileState.token }
             : {}),
@@ -182,6 +206,8 @@ type OnboardingToolRendererArgs = {
   readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
+  readonly handleStepDone: boolean;
+  readonly socialStepDone: boolean;
 };
 
 type OnboardingToolRenderer = (
@@ -237,9 +263,17 @@ const renderCheckHandle: OnboardingToolRenderer = ({
   part,
   key,
   isBusy,
+  handleStepDone,
 }) => {
   const output = part.output;
   if (!(isHandleCheckOutput(output) || output === undefined)) {
+    return null;
+  }
+
+  // Once the handle step is complete, only the `handle_confirmed` output
+  // renders (as a compact status) — stale `check_handle` parts collapse so
+  // no interactive card survives a completed step.
+  if (handleStepDone && output?.action !== 'handle_confirmed') {
     return null;
   }
 
@@ -260,9 +294,14 @@ const renderProposeSocialLink: OnboardingToolRenderer = ({
   key,
   isBusy,
   onAttachAccount,
+  socialStepDone,
 }) => {
   const output = part.output;
   if (!(isSocialLinkOutput(output) || output === undefined)) {
+    return null;
+  }
+
+  if (socialStepDone && output?.action !== 'social_attached') {
     return null;
   }
 
@@ -323,6 +362,8 @@ function renderOnboardingTools({
   onNoneOfTheseArtists,
   onSelectArtist,
   selectedArtistId,
+  handleStepDone,
+  socialStepDone,
 }: {
   readonly messageId: string;
   readonly toolParts: readonly ToolPart[];
@@ -334,6 +375,8 @@ function renderOnboardingTools({
   readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
+  readonly handleStepDone: boolean;
+  readonly socialStepDone: boolean;
 }) {
   const genericParts: ToolPart[] = [];
   const cards: ReactNode[] = [];
@@ -362,6 +405,8 @@ function renderOnboardingTools({
         onNoneOfTheseArtists,
         onSelectArtist,
         selectedArtistId,
+        handleStepDone,
+        socialStepDone,
       });
       if (card) {
         cards.push(card);
@@ -413,6 +458,19 @@ function OnboardingMessageList({
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
+  const handleStepDone =
+    hasToolOutputAction(
+      displayMessages,
+      WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
+    ) ||
+    hasWidgetEvent(displayMessages, ONBOARDING_WIDGET_EVENTS.HANDLE_CONFIRMED);
+  const socialStepDone =
+    hasToolOutputAction(
+      displayMessages,
+      WIDGET_COMPLETION_ACTIONS.SOCIAL_ATTACHED
+    ) ||
+    hasWidgetEvent(displayMessages, ONBOARDING_WIDGET_EVENTS.SOCIAL_ATTACHED);
+
   return (
     <div className='flex flex-col pb-4'>
       {displayMessages.map(message => {
@@ -451,6 +509,8 @@ function OnboardingMessageList({
                   onNoneOfTheseArtists,
                   onSelectArtist,
                   selectedArtistId,
+                  handleStepDone,
+                  socialStepDone,
                 })
               : null}
           </div>
@@ -521,10 +581,6 @@ function getOnboardingComposerPlaceholder(
     : 'Artist, release, or link...';
 }
 
-function getSendLocalError(chatError: ChatError | null) {
-  return chatError?.errorCode === 'TURNSTILE_REQUIRED' ? null : chatError;
-}
-
 function OnboardingFlowStatus({
   reserveTurnstileSpace = false,
   shouldShowTurnstileBanner,
@@ -557,6 +613,8 @@ interface OnboardingMessageRegionProps {
   readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
   readonly entryMode: OnboardingEntryMode;
+  readonly entryProfile: StartEntryProfile | null;
+  readonly onTryAnotherName: () => void;
   readonly composerPickerOpen: boolean;
 }
 
@@ -564,6 +622,8 @@ function OnboardingMessageRegion({
   composerPickerOpen,
   displayMessages,
   entryMode,
+  entryProfile,
+  onTryAnotherName,
   hasConversationStarted,
   isBusy,
   isStreaming,
@@ -602,7 +662,11 @@ function OnboardingMessageRegion({
       <ChatEmptyStateComposerRegion
         above={
           <div className='flex min-h-full items-center justify-center'>
-            <OnboardingChatEmptyIntro mode={entryMode} />
+            <OnboardingChatEmptyIntro
+              mode={entryMode}
+              entryProfile={entryProfile}
+              onTryAnotherName={onTryAnotherName}
+            />
           </div>
         }
         hideWelcomeHeader
@@ -646,29 +710,39 @@ function OnboardingMessageRegion({
 }
 
 export function OnboardingChat({
+  headerOverlay = false,
   intentId,
   onConversationActivity,
   onProfileBuilderChange,
   onTurnstileRejected,
   onTurnstileRequired,
   starterHandoff,
+  entryProfile = null,
   turnstilePanel,
   turnstilePanelVisible = false,
   turnstileStatus,
   turnstileToken,
+  initialMessages = [],
+  conversationId = null,
+  interactionDisabled = false,
+  onBusyChange,
 }: OnboardingChatProps) {
   const initialStarterPrompt = starterHandoff?.prompt ?? '';
   const hasInitialStarterPrompt = initialStarterPrompt.length > 0;
-  const [input, setInput] = useState(initialStarterPrompt);
+  const initialDraft = hasInitialStarterPrompt
+    ? initialStarterPrompt
+    : (buildStartEntryDraft(entryProfile) ?? '');
+  const [input, setInput] = useState(initialDraft);
   const [entryMode, setEntryMode] = useState<OnboardingEntryMode>(() => {
     if (starterHandoff?.kind === 'spotify_artist') return 'spotify_handoff';
     if (starterHandoff) return 'prompt_handoff';
     if (intentId) return 'restoring_intent';
+    if (entryProfile) return 'handle_entry';
     return 'blank';
   });
-  const latestInputRef = useRef(initialStarterPrompt);
+  const latestInputRef = useRef(initialDraft);
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const [hasSentFirst, setHasSentFirst] = useState(false);
+  const [hasSentFirst, setHasSentFirst] = useState(initialMessages.length > 0);
   const [verificationRequested, setVerificationRequested] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
@@ -676,7 +750,9 @@ export function OnboardingChat({
   const [selectedArtist, setSelectedArtist] =
     useState<OnboardingArtistSelection | null>(null);
   const chipTray = useChipTray();
-  const completedUserTurnsRef = useRef(0);
+  const completedUserTurnsRef = useRef(
+    initialMessages.filter(message => message.role === 'user').length
+  );
   const hasTrackedChatStartedRef = useRef(false);
   const hasTrackedChatCompletedRef = useRef(false);
   const lastAttemptedMessageRef = useRef<string | null>(null);
@@ -687,6 +763,7 @@ export function OnboardingChat({
     hasInitialStarterPrompt ? initialStarterPrompt : null
   );
   const wasAwaitingTurnstileRetryRef = useRef(false);
+  const pendingVerifiedSubmitRef = useRef(false);
   const [localAutomationBypass, setLocalAutomationBypass] = useState<
     boolean | null
   >(null);
@@ -695,6 +772,10 @@ export function OnboardingChat({
   const setComposerInput = useCallback((nextInput: string) => {
     latestInputRef.current = nextInput;
     setInput(nextInput);
+  }, []);
+
+  const focusComposer = useCallback(() => {
+    composerInputRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -709,13 +790,17 @@ export function OnboardingChat({
 
   // AI SDK's useChat captures its transport when the Chat instance is created.
   // Keep it stable and update its request state before any passive send effect.
-  const transport = useMemo(() => new OnboardingChatTransport(), []);
+  const transport = useMemo(
+    () => new OnboardingChatTransport(conversationId),
+    [conversationId]
+  );
   useLayoutEffect(() => {
     transport.setTurnstileToken(turnstileToken);
   }, [transport, turnstileToken]);
 
   const { messages, sendMessage, setMessages, status, stop } = useChat({
-    id: 'onboarding',
+    id: conversationId ?? 'onboarding',
+    messages: initialMessages,
     transport,
     onError: error => {
       const type = getErrorType(error);
@@ -744,8 +829,23 @@ export function OnboardingChat({
   });
 
   const isSubmitted = status === 'submitted';
+  useEffect(
+    () => () => {
+      stop();
+    },
+    [stop]
+  );
+  useEffect(
+    () => () => {
+      onBusyChange?.(false);
+    },
+    [onBusyChange]
+  );
   const isStreaming = status === 'streaming';
-  const isBusy = isSubmitted || isStreaming;
+  const isBusy = isSubmitted || isStreaming || interactionDisabled;
+  useEffect(() => {
+    onBusyChange?.(isSubmitted || isStreaming);
+  }, [isSubmitted, isStreaming, onBusyChange]);
   useLayoutEffect(() => {
     if (!chatError) return;
     composerInputRef.current?.focus({ preventScroll: true });
@@ -780,7 +880,10 @@ export function OnboardingChat({
       if (!text || isBusy || localAutomationBypass === null) return;
       if (isAwaitingFirstToken) {
         setVerificationRequested(true);
-        onTurnstileRequired?.('Verify you are human to send');
+        onTurnstileRequired?.('One quick check before we send');
+        pendingVerifiedSubmitRef.current = true;
+        pendingStarterPromptRef.current = null;
+        hasAutoSubmittedStarterPromptRef.current = true;
         return;
       }
       lastAttemptedMessageRef.current = text;
@@ -911,9 +1014,9 @@ export function OnboardingChat({
       hasInjectedStarterPromptRef.current = true;
       setEntryMode('prompt_handoff');
     } else {
-      setEntryMode('blank');
+      setEntryMode(entryProfile ? 'handle_entry' : 'blank');
     }
-  }, [intentId, setComposerInput]);
+  }, [entryProfile, intentId, setComposerInput]);
 
   useEffect(() => {
     const prompt = pendingStarterPromptRef.current;
@@ -931,7 +1034,7 @@ export function OnboardingChat({
       if (!hasRequestedStarterVerificationRef.current) {
         hasRequestedStarterVerificationRef.current = true;
         setVerificationRequested(true);
-        onTurnstileRequired?.('Verify you are human to send');
+        onTurnstileRequired?.('One quick check before we send');
       }
       return;
     }
@@ -953,6 +1056,15 @@ export function OnboardingChat({
     completedUserTurnsRef.current = 0;
     hasTrackedChatCompletedRef.current = false;
   }, [messages.length]);
+
+  useEffect(() => {
+    if (!pendingVerifiedSubmitRef.current) return;
+    if (isAwaitingFirstToken || isBusy || localAutomationBypass === null) {
+      return;
+    }
+    pendingVerifiedSubmitRef.current = false;
+    submitText(latestInputRef.current);
+  }, [isAwaitingFirstToken, isBusy, localAutomationBypass, submitText]);
 
   useEffect(() => {
     if (isAwaitingFirstToken) {
@@ -1055,7 +1167,7 @@ export function OnboardingChat({
     onAddSkill: chipTray.addSkill,
     onAddEntity: chipTray.addEntity,
   } as const;
-  const sendLocalError = getSendLocalError(chatError);
+  const sendLocalError = chatError;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
       {sendLocalError ? (
@@ -1081,7 +1193,12 @@ export function OnboardingChat({
       <div
         ref={scrollContainerRef}
         onScroll={onScroll}
-        className='relative flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8'
+        className={cn(
+          'relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
+          // Under the floating sign-in row, scrolled-away messages fade out
+          // instead of hard-clipping at the panel edge (JOV-7192).
+          headerOverlay ? 'pt-16 system-b-chat-thread-top-fade' : 'pt-5'
+        )}
         aria-live='polite'
       >
         <div
@@ -1099,6 +1216,8 @@ export function OnboardingChat({
             composerPickerOpen={composerPickerOpen}
             displayMessages={displayMessages}
             entryMode={entryMode}
+            entryProfile={entryProfile}
+            onTryAnotherName={focusComposer}
             hasConversationStarted={hasConversationStarted}
             isBusy={isBusy}
             isStreaming={isStreaming}

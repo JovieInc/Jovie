@@ -84,6 +84,7 @@ export function ProfileAdmissionFixtureClient({
             longName={searchParams.get('name') === 'long'}
             preview={searchParams.get('layout') === 'preview'}
             state={searchParams.get('state')}
+            tourDates={searchParams.get('events') === 'empty' ? [] : undefined}
           />
         </div>
       ) : (

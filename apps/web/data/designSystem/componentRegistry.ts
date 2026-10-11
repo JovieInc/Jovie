@@ -287,10 +287,8 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
         canonicalImportSource: '@jovie/ui',
       },
     ],
-    penRootId: null,
-    referenceEligible: false,
-    penIdentityReason:
-      'No source-mapped Pen icon-button root exists; source ownership remains authoritative until Pen promotion.',
+    penRootId: 'XYhft',
+    referenceEligible: true,
     variantAxes: {
       variant: ICON_BUTTON_VARIANT_NAMES,
       size: ICON_BUTTON_SIZE_NAMES,

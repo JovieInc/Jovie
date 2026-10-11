@@ -8,25 +8,36 @@ function read(relativePath: string) {
   return readFileSync(join(WEB_ROOT, relativePath), 'utf8');
 }
 
-describe('web-195 pitch source contract', () => {
-  it('keeps the route on the shared InvestorBrief body', () => {
-    const route = read('app/pitch/page.tsx');
+describe('investor brief source contract', () => {
+  it('links the deck download to the gated portal route, never public/', () => {
+    const component = read('components/features/pitch/InvestorBrief.tsx');
 
-    expect(route).toContain(
-      "import { InvestorBrief } from '@/components/features/pitch/InvestorBrief'"
+    expect(component).toContain(
+      "const PITCH_DECK_PDF_URL = '/investor-portal/deck/Jovie-Pitch-Deck.pdf'"
     );
-    expect(route).toContain('return <InvestorBrief />');
-    expect(route).toContain('robots: NOINDEX_ROBOTS');
   });
 
   it('keeps the shipped body bound to checked-in registry evidence', () => {
     const component = read('components/features/pitch/InvestorBrief.tsx');
 
+    expect(component).toContain('bg-(--color-bg-base)/90');
     expect(component).toContain('const registry = fundraisingRegistry');
-    expect(component).toContain('registry.coreSlides.map');
+    expect(component).toContain('narrativeSlides.map');
     expect(component).toContain('registry.operatingLoop.map');
     expect(component).toContain('registry.risks.map');
     expect(component).toContain('data-pitch-demo-video');
+  });
+
+  it('keeps the YC deck order behind an off-by-default flag', () => {
+    const component = read('components/features/pitch/InvestorBrief.tsx');
+    const flags = read('lib/flags/code-flags.ts');
+
+    expect(flags).toContain('INVESTOR_PORTAL_YC_DECK: false');
+    expect(component).toContain("isCodeFlagEnabled('INVESTOR_PORTAL_YC_DECK')");
+    expect(component).toContain(
+      'buildInvestorYcDeck(registry, loadInvestorSourcedMetrics())'
+    );
+    expect(component).toContain('registry.coreSlides');
   });
 
   it('keeps exactly one primary-variant CTA on the screen', () => {
@@ -40,22 +51,5 @@ describe('web-195 pitch source contract', () => {
     expect(primaries[0]).toContain("size='md'");
     expect(primaries[0]).toContain("<a href='#demo'>Watch The Product</a>");
     expect(primaries[0]).not.toContain('meeting_cta_clicked');
-  });
-
-  it('registers one deterministic story for the exact production component', () => {
-    const story = read('components/features/pitch/InvestorBrief.stories.tsx');
-
-    expect(story).toContain('component: InvestorBrief');
-    expect(story).toContain("registryId: 'web-195-pitch'");
-    expect(story).toContain("route: '/pitch'");
-    expect(story).toContain(
-      "source: 'apps/web/components/features/pitch/InvestorBrief.tsx'"
-    );
-    expect(story).toContain("sourceExport: 'InvestorBrief'");
-    expect(story).toContain("storyExport: 'Web195Pitch'");
-    expect(story).toContain(
-      "sourceSha: '00895196e53b823bb0311193b4af29f67b8849c1'"
-    );
-    expect(story).not.toContain('fundraisingRegistry:');
   });
 });

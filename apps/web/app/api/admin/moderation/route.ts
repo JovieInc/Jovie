@@ -4,8 +4,8 @@ import {
   applyModerationTakedown,
   listAbuseReports,
 } from '@/lib/admin/moderation';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { reportTargetTypes } from '@/lib/validation/schemas/report';
 
 export const runtime = 'nodejs';
@@ -19,8 +19,8 @@ const takedownSchema = z.object({
   reason: z.string().max(2000).optional(),
 });
 
-async function requireAdmin() {
-  const entitlements = await getCurrentUserEntitlements();
+async function requireAdmin(purpose?: 'read') {
+  const entitlements = await getOvieOperatorEntitlements({ purpose });
   if (!entitlements.isAuthenticated) {
     return {
       error: NextResponse.json(
@@ -42,7 +42,7 @@ async function requireAdmin() {
 
 /** GET — pending abuse/security reports (JOV-6599). */
 export async function GET(request: Request) {
-  const { error } = await requireAdmin();
+  const { error } = await requireAdmin('read');
   if (error) return error;
 
   const limit = Math.min(

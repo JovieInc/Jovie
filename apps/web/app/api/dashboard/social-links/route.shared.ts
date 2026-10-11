@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/nextjs';
 import { and, eq, gt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import type { withDbSessionTx } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { dashboardIdempotencyKeys, socialLinks } from '@/lib/db/schema/links';
 import { captureError } from '@/lib/error-tracking';
@@ -13,6 +14,7 @@ import {
   createRateLimitHeaders,
   dashboardLinksLimiter,
 } from '@/lib/rate-limit';
+import { authorizeRiskyProfileAction } from '@/lib/team/approvals';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import {
@@ -394,3 +396,37 @@ export const validateLinkStatePayload = (
 
   return { ok: true, data: parsed.data };
 };
+
+/**
+ * Enforce the least-privilege team policy (JOV-6601) on link mutations.
+ *
+ * Owners mutate directly. Managers/assistants need a consumed owner approval;
+ * everyone else is denied. Returns a 403 response when the action may not
+ * proceed, or null when it may.
+ */
+export async function enforceLinksMutationAccess(
+  tx: Parameters<Parameters<typeof withDbSessionTx>[0]>[0],
+  profileId: string,
+  appUserId: string,
+  headers: HeadersInit
+): Promise<NextResponse | null> {
+  const authz = await authorizeRiskyProfileAction(tx, {
+    appUserId,
+    profileId,
+    action: 'links.mutate',
+  });
+  if (authz.status === 'allowed') return null;
+  return NextResponse.json(
+    {
+      error:
+        authz.status === 'requires_approval'
+          ? 'This action requires owner approval.'
+          : 'You do not have permission to modify links for this profile.',
+      code:
+        authz.status === 'requires_approval'
+          ? 'owner_approval_required'
+          : 'forbidden',
+    },
+    { status: 403, headers }
+  );
+}

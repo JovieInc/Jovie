@@ -1,0 +1,35 @@
+.help-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 2.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(128, 128, 128, 0.25);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.help-feedback-prompt {
+  font-weight: 500;
+  margin-right: 0.25rem;
+}
+
+.help-feedback button {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.help-feedback button:hover {
+  border-color: currentColor;
+}
+
+.help-feedback-reasons {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

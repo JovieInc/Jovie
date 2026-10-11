@@ -11,6 +11,7 @@
  *   - injecting the "Recent chats" section as an additional source.
  */
 
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   type ReactNode,
@@ -20,11 +21,7 @@ import {
   useMemo,
 } from 'react';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { CmdKPalette } from '@/components/organisms/CmdKPalette';
-import {
-  DEFAULT_PALETTE_SECTION_LIMIT,
-  type PaletteSection,
-} from '@/components/organisms/SharedCommandPalette';
+import type { PaletteSection } from '@/components/organisms/SharedCommandPalette';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   useHeaderActions,
@@ -37,16 +34,24 @@ import {
 } from '@/lib/app-shell/workspaces';
 import type { EntityRef } from '@/lib/commands/entities';
 import {
+  DEFAULT_PALETTE_SECTION_LIMIT,
   getPaletteConversationSubtitle,
   rankPaletteConversations,
 } from '@/lib/commands/palette-ranking';
 import type { NavCommand } from '@/lib/commands/registry';
 import { WORKSPACE_SWITCH_SHORTCUT } from '@/lib/keyboard-shortcuts';
-import { useChatConversationsQuery } from '@/lib/queries';
+import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
 
 const RECENT_CHAT_QUERY_LIMIT = 50;
+
+// The controller stays synchronous so the shell can open/close search before
+// its list and query UI loads. The main-plane surface mounts only while open.
+const CmdKPalette = dynamic(
+  () => import('./CmdKPalette').then(module => module.CmdKPalette),
+  { ssr: false }
+);
 
 function getCurrentConversationId(pathname: string): string | null {
   const chatPrefix = `${APP_ROUTES.CHAT}/`;
@@ -101,14 +106,49 @@ interface CommandPaletteInnerProps {
 }
 
 function CommandPaletteController() {
-  const { closeCommandPalette, isCommandPaletteOpen, openCommandPalette } =
-    useHeaderActions();
+  const {
+    closeCommandPalette,
+    commandPaletteHeader,
+    isCommandPaletteOpen,
+    openCommandPalette,
+  } = useHeaderActions();
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.keyCode === 229 ||
+        event.repeat
+      ) {
+        return;
+      }
+      // The loaded palette owns Escape and focus restoration. While its
+      // header is still absent, the synchronous controller can cancel loading.
+      if (
+        event.key === 'Escape' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.shiftKey &&
+        !isFormElement(event.target) &&
+        isCommandPaletteOpen &&
+        !commandPaletteHeader
+      ) {
+        event.preventDefault();
+        closeCommandPalette();
+        return;
+      }
       const isK = event.key === 'k' || event.key === 'K';
       if (!isK || !(event.metaKey || event.ctrlKey)) return;
-      if (event.shiftKey || event.altKey || isFormElement(event.target)) return;
+      if (
+        event.shiftKey ||
+        event.altKey ||
+        (event.metaKey && event.ctrlKey) ||
+        isFormElement(event.target)
+      ) {
+        return;
+      }
       event.preventDefault();
       if (isCommandPaletteOpen) closeCommandPalette();
       else openCommandPalette();
@@ -122,7 +162,12 @@ function CommandPaletteController() {
         openCommandPalette
       );
     };
-  }, [closeCommandPalette, isCommandPaletteOpen, openCommandPalette]);
+  }, [
+    closeCommandPalette,
+    commandPaletteHeader,
+    isCommandPaletteOpen,
+    openCommandPalette,
+  ]);
 
   return null;
 }

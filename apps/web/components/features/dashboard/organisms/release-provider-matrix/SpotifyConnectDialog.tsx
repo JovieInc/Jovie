@@ -41,10 +41,7 @@ function SearchDropdownState({
       role={tone === 'error' ? 'alert' : undefined}
       aria-atomic='true'
     >
-      <DrawerSurfaceCard
-        variant='card'
-        className='system-b-spotify-connect-status-card px-2.5'
-      >
+      <DrawerSurfaceCard variant='card' data-spotify-connect-surface='status'>
         <p
           className={cn(
             'system-b-spotify-connect-status-copy text-xs',
@@ -70,7 +67,7 @@ function SearchResultsLoadingSkeleton() {
         <DrawerSurfaceCard
           key={key}
           variant='card'
-          className='system-b-spotify-connect-status-card gap-2.5 px-2.5'
+          data-spotify-connect-surface='status'
           aria-hidden='true'
         >
           <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
@@ -96,7 +93,7 @@ function handleEnterInResults(
   const isArtistSelected = activeIndex >= 0 && activeIndex < results.length;
   if (isArtistSelected) {
     const artist = results[activeIndex];
-    if (artist && !artist.isClaimed) onArtistSelect(artist);
+    if (artist && canSelectArtist(artist)) onArtistSelect(artist);
     return;
   }
   if (activeIndex === pasteUrlIndex) {
@@ -104,6 +101,34 @@ function handleEnterInResults(
     return;
   }
   onClaimArtist();
+}
+
+function canSelectArtist(artist: SpotifyArtist): boolean {
+  return !artist.isClaimed || artist.isClaimedByCurrentUser === true;
+}
+
+function getNextSelectableIndex(
+  activeIndex: number,
+  direction: 1 | -1,
+  results: SpotifyArtist[],
+  pasteUrlIndex: number
+): number {
+  const totalItems = results.length + 1;
+  const startIndex =
+    activeIndex >= 0 ? activeIndex : direction === 1 ? -1 : totalItems;
+
+  for (let offset = 1; offset <= totalItems; offset += 1) {
+    const nextIndex =
+      (startIndex + direction * offset + totalItems) % totalItems;
+    if (
+      nextIndex === pasteUrlIndex ||
+      (results[nextIndex] && canSelectArtist(results[nextIndex]))
+    ) {
+      return nextIndex;
+    }
+  }
+
+  return -1;
 }
 
 function isSpotifyUrl(value: string): boolean {
@@ -136,10 +161,7 @@ function SearchInputTrailing({
           tone='primary'
           disabled={claimButtonDisabled}
           onClick={onClaimArtist}
-          className={cn(
-            'h-8 w-full shrink-0 justify-center px-3 text-app',
-            claimButtonDisabled && 'text-btn-primary-foreground/60'
-          )}
+          className='w-full shrink-0 justify-center'
         >
           {(isLoading || isPending) && (
             <LoadingSpinner size='sm' tone='inverse' label='Connecting' />
@@ -304,8 +326,10 @@ export function SpotifyConnectDialog({
       formState.activeResultIndex < results.length
         ? results[formState.activeResultIndex]
         : undefined;
-    const fallbackArtist = results[0];
-    const nextArtist = activeArtist ?? fallbackArtist;
+    const nextArtist =
+      (activeArtist && canSelectArtist(activeArtist)
+        ? activeArtist
+        : undefined) ?? results.find(canSelectArtist);
 
     if (nextArtist) {
       handleArtistSelect(nextArtist);
@@ -349,20 +373,24 @@ export function SpotifyConnectDialog({
           e.preventDefault();
           dispatch({
             type: 'SET_ACTIVE_RESULT_INDEX',
-            payload:
-              formState.activeResultIndex < totalItems - 1
-                ? formState.activeResultIndex + 1
-                : 0,
+            payload: getNextSelectableIndex(
+              formState.activeResultIndex,
+              1,
+              results,
+              pasteUrlIndex
+            ),
           });
           break;
         case 'ArrowUp':
           e.preventDefault();
           dispatch({
             type: 'SET_ACTIVE_RESULT_INDEX',
-            payload:
-              formState.activeResultIndex > 0
-                ? formState.activeResultIndex - 1
-                : totalItems - 1,
+            payload: getNextSelectableIndex(
+              formState.activeResultIndex,
+              -1,
+              results,
+              pasteUrlIndex
+            ),
           });
           break;
         case 'Enter':
@@ -396,7 +424,6 @@ export function SpotifyConnectDialog({
       handlePasteUrlClick,
       pasteUrlIndex,
       results,
-      totalItems,
     ]
   );
 
@@ -416,10 +443,11 @@ export function SpotifyConnectDialog({
   const trimmedQuery = formState.searchQuery.trim();
   const isLoading = searchState === 'loading';
   const showClaimButton = Boolean(trimmedQuery);
+  const hasSelectableResult = results.some(canSelectArtist);
   const claimButtonDisabled =
     isPending ||
     (isLoading && !isSpotifyUrl(trimmedQuery)) ||
-    (!isSpotifyUrl(trimmedQuery) && results.length === 0);
+    (!isSpotifyUrl(trimmedQuery) && !hasSelectableResult);
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='lg'>
@@ -431,10 +459,7 @@ export function SpotifyConnectDialog({
       </DialogDescription>
 
       <DialogBody className='space-y-3'>
-        <DrawerSurfaceCard
-          variant='card'
-          className='system-b-spotify-connect-card p-3.5'
-        >
+        <DrawerSurfaceCard variant='card' data-spotify-connect-surface='card'>
           <div className='mb-2.5'>
             <p className='text-2xs font-caption leading-none text-tertiary-token'>
               Artist search
@@ -512,7 +537,7 @@ export function SpotifyConnectDialog({
             )}
 
             {shouldShowDropdown && (
-              <div className='system-b-spotify-connect-dropdown absolute z-50 mt-1.5 w-full overflow-hidden'>
+              <div className='system-b-spotify-connect-dropdown z-50 mt-1.5 w-full overflow-hidden'>
                 <select
                   id='spotify-connect-results'
                   className='sr-only'
@@ -531,7 +556,7 @@ export function SpotifyConnectDialog({
                     const selectedArtist = results.find(
                       artist => artist.id === event.target.value
                     );
-                    if (selectedArtist) {
+                    if (selectedArtist && canSelectArtist(selectedArtist)) {
                       handleArtistSelect(selectedArtist);
                     }
                   }}
@@ -544,6 +569,7 @@ export function SpotifyConnectDialog({
                       key={artist.id}
                       id={`spotify-connect-result-${index}`}
                       value={artist.id}
+                      disabled={!canSelectArtist(artist)}
                     >
                       {artist.name}
                       {artist.followers
@@ -584,22 +610,22 @@ export function SpotifyConnectDialog({
                       <button
                         key={artist.id}
                         type='button'
-                        tabIndex={artist.isClaimed ? -1 : 0}
-                        disabled={artist.isClaimed}
+                        tabIndex={canSelectArtist(artist) ? 0 : -1}
+                        disabled={!canSelectArtist(artist)}
                         className={cn(
                           'system-b-spotify-connect-result-row mb-1 flex w-full items-center gap-2.5 px-2.5 py-2 text-left last:mb-0 focus-visible:outline-none',
                           index === formState.activeResultIndex &&
-                            !artist.isClaimed &&
+                            canSelectArtist(artist) &&
                             'system-b-spotify-connect-result-row--active',
-                          artist.isClaimed
+                          !canSelectArtist(artist)
                             ? 'opacity-50 cursor-not-allowed'
                             : 'system-b-spotify-connect-result-row--interactive cursor-pointer'
                         )}
                         onClick={() =>
-                          !artist.isClaimed && handleArtistSelect(artist)
+                          canSelectArtist(artist) && handleArtistSelect(artist)
                         }
                         onKeyDown={event =>
-                          !artist.isClaimed &&
+                          canSelectArtist(artist) &&
                           handleActivationKeyDown(event, () =>
                             handleArtistSelect(artist)
                           )
@@ -636,7 +662,9 @@ export function SpotifyConnectDialog({
                           </div>
                           {artist.isClaimed && (
                             <div className='text-2xs text-tertiary-token'>
-                              Already claimed
+                              {artist.isClaimedByCurrentUser
+                                ? 'Already connected'
+                                : 'Already claimed'}
                             </div>
                           )}
                           {!artist.isClaimed && artist.followers && (

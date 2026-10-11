@@ -29,7 +29,7 @@ describe('PageErrorState', () => {
     expect(document.querySelectorAll('details')).toHaveLength(1);
     expect(details).not.toHaveAttribute('open');
     expect(
-      details?.querySelector('[aria-label="Copy Error Details To Clipboard"]')
+      details?.querySelector('[aria-label="Copy error details to clipboard"]')
     ).not.toBeNull();
     expect(document.querySelector('.lucide-triangle-alert')).toBeNull();
 
@@ -86,7 +86,7 @@ describe('PageErrorState', () => {
     expect(screen.getAllByText(longMessage)).toHaveLength(1);
     expect(details).not.toHaveTextContent(longMessage);
     expect(
-      details?.querySelector('[aria-label="Copy Error Details To Clipboard"]')
+      details?.querySelector('[aria-label="Copy error details to clipboard"]')
     ).not.toBeNull();
   });
 

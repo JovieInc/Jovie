@@ -63,6 +63,26 @@ describe('linkEntityMentions', () => {
     ]);
   });
 
+  it.each(['a_15ivccsfpjhtappd1vh15i8jj', 'tmoc9mm7xfvx02c'])(
+    'keeps artists with a raw-ID handle as plain text: %s',
+    handle => {
+      const segments = linkEntityMentions('Remixed by Lynx for the club.', {
+        ownHandle: 'tim',
+        artists: [{ name: 'Lynx', handle }],
+      });
+
+      expect(segments).toEqual([
+        { type: 'text', text: 'Remixed by Lynx for the club.' },
+      ]);
+      expect(
+        collectEntityMentions({
+          ownHandle: 'tim',
+          artists: [{ name: 'Lynx', handle }],
+        })
+      ).toEqual([]);
+    }
+  );
+
   it('keeps artists without a Jovie profile as plain text', () => {
     const segments = linkEntityMentions(
       'Shared bills with The Disco Biscuits.',

@@ -90,7 +90,7 @@ jobs:
       - name: Run Claude Code to fix the bug
         if: steps.dedup.outputs.skip != 'true'
         id: claude
-        uses: anthropics/claude-code-action@9171db3e57d6a3140a37ddc2ba92788584e0ead6 # v1
+        uses: anthropics/claude-code-action@6fed3ca145920b639991cb756090506e1bcaf515 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -153,6 +153,8 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DEDUPE_KEY: ${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
           ISSUE_ID: ${{ github.event.client_payload.issue_id }}
+          SENTRY_SHORT_ID: ${{ github.event.client_payload.short_id }}
+          LINEAR_IDENTIFIER: ${{ github.event.client_payload.linear_identifier }}
           ERROR_TITLE: ${{ github.event.client_payload.title }}
           SENTRY_URL: ${{ github.event.client_payload.url }}
           SENTRY_ENVIRONMENT: ${{ github.event.client_payload.context.environment }}
@@ -205,6 +207,8 @@ jobs:
           - **Error:** ${ERROR_TITLE}
           - **Sentry:** ${SENTRY_URL}
           - **Issue ID:** ${ISSUE_ID}
+          - **Sentry short ID:** ${SENTRY_SHORT_ID}
+          - **Linear:** ${LINEAR_IDENTIFIER}
           - **Root-cause fingerprint:** ${SENTRY_FINGERPRINT}
           - **Environment:** ${SENTRY_ENVIRONMENT}
           - **Release:** ${SENTRY_RELEASE}

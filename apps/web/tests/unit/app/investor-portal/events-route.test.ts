@@ -34,12 +34,16 @@ function selectRows(rows: unknown[]) {
   mocks.select.mockReturnValue({ from });
 }
 
+const CLAIM_TOKEN = 'a'.repeat(43);
+
 describe('investor portal event route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.cookieGet.mockReturnValue({ value: 'secret-token' });
+    mocks.cookieGet.mockReturnValue({ value: CLAIM_TOKEN });
     mocks.limit.mockResolvedValue({ success: true });
-    selectRows([{ id: 'link-1', expiresAt: null }]);
+    selectRows([
+      { id: 'link-1', expiresAt: new Date('2099-01-01T00:00:00.000Z') },
+    ]);
     mocks.insert.mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),
     });
@@ -61,7 +65,7 @@ describe('investor portal event route', () => {
         pagePath: '/investor-portal#event/deck_progressed/product',
       })
     );
-    expect(JSON.stringify(values.mock.calls)).not.toContain('secret-token');
+    expect(JSON.stringify(values.mock.calls)).not.toContain(CLAIM_TOKEN);
   });
 
   it('rejects cross-origin and non-allowlisted payloads', async () => {
@@ -81,6 +85,9 @@ describe('investor portal event route', () => {
     expect((await POST(request({ event: 'portal_opened' }))).status).toBe(404);
 
     selectRows([{ id: 'link-1', expiresAt: new Date('2020-01-01') }]);
+    expect((await POST(request({ event: 'portal_opened' }))).status).toBe(404);
+
+    selectRows([{ id: 'link-1', expiresAt: null }]);
     expect((await POST(request({ event: 'portal_opened' }))).status).toBe(404);
 
     mocks.cookieGet.mockReturnValue(undefined);

@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { acquisitionJourneys } from '@/lib/db/schema/acquisition';
 import { pixelEvents } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -108,6 +109,7 @@ export async function POST(request: NextRequest) {
     const {
       profileId,
       sessionId,
+      acquisitionId,
       eventType,
       eventData,
       consent,
@@ -159,12 +161,33 @@ export async function POST(request: NextRequest) {
       utmContent: eventData?.utm_content,
     };
 
+    if (consent && acquisitionId) {
+      await db
+        .insert(acquisitionJourneys)
+        .values({
+          id: acquisitionId,
+          consentState: 'analytics_allowed',
+          capturedAt: new Date(),
+          firstTouch: {
+            source: eventData?.utm_source,
+            medium: eventData?.utm_medium,
+            campaign: eventData?.utm_campaign,
+            term: eventData?.utm_term,
+            content: eventData?.utm_content,
+            referrer,
+            landingPath: pageUrl,
+          },
+        })
+        .onConflictDoNothing();
+    }
+
     // Insert pixel event and get it back for immediate forwarding
     const [insertedEvent] = await db
       .insert(pixelEvents)
       .values({
         profileId,
         sessionId,
+        ...(consent && acquisitionId ? { acquisitionId } : {}),
         eventType,
         eventData: enrichedEventData,
         consentGiven: consent,

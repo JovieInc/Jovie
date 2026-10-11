@@ -8,6 +8,10 @@ import {
   GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
   isGatewayBudgetExceededError,
 } from '@/lib/ai/gateway-errors';
+import {
+  type OnboardingWidgetEventType,
+  parseWidgetEventFromMetadata,
+} from '@/lib/chat/onboarding-script/widget-events';
 import { type CheckoutCardPayload } from './ChatProposeCheckoutCard';
 import { type NextStepCardPayload } from './ChatProposeNextStepCard';
 import type {
@@ -128,6 +132,36 @@ export function isSocialLinkOutput(
 export function getInputQuery(part: ToolPart): string | null {
   const input = asRecord(part.input);
   return typeof input?.query === 'string' ? input.query : null;
+}
+
+/** True when any message carries a tool output with the given `action`. */
+export function hasToolOutputAction(
+  messages: readonly UIMessage[],
+  action: string
+): boolean {
+  for (const message of messages) {
+    for (const part of getToolParts(message)) {
+      if (asRecord(part.output)?.action === action) return true;
+    }
+  }
+  return false;
+}
+
+/** True when any user message carries the given widget event metadata. */
+export function hasWidgetEvent(
+  messages: readonly UIMessage[],
+  eventType: OnboardingWidgetEventType
+): boolean {
+  for (const message of messages) {
+    if (message.role !== 'user') continue;
+    if (
+      parseWidgetEventFromMetadata(message.metadata)?.onboardingEvent ===
+      eventType
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function findLastAssistantMessageId(messages: readonly UIMessage[]) {

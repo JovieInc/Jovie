@@ -125,12 +125,12 @@ describe('ConnectorCard', () => {
     expect(screen.getByRole('button', { name: 'Disconnect' })).toBeDisabled();
   });
 
-  it('shows connected email or recovery detail in one stable status slot', () => {
+  it('shows connected account or recovery detail in one stable status slot', () => {
     const { rerender } = render(
       <ConnectorCard
         provider='gmail'
         status='connected'
-        email='artist@example.com'
+        accountLabel='artist@example.com'
         errorMessage='This should stay hidden.'
       />
     );
@@ -143,7 +143,7 @@ describe('ConnectorCard', () => {
       <ConnectorCard
         provider='gmail'
         status='error'
-        email='artist@example.com'
+        accountLabel='artist@example.com'
         errorMessage='Google rejected the connection.'
       />
     );
@@ -159,6 +159,19 @@ describe('ConnectorCard', () => {
       <ConnectorCard provider='gmail' status='error' errorMessage='  ' />
     );
     expect(detail).toHaveTextContent('Connection failed. Try again.');
+  });
+
+  it('renders the Spotify social icon for the spotify provider', () => {
+    const { container } = render(
+      <ConnectorCard provider='spotify' status='connected' />
+    );
+
+    expect(
+      screen.getByRole('status', { name: 'Spotify status: Connected' })
+    ).toBeInTheDocument();
+    const iconSlot = container.querySelector('div.mt-0\\.5');
+    expect(iconSlot?.querySelector('svg[fill="currentColor"]')).not.toBeNull();
+    expect(iconSlot?.querySelector('.lucide')).toBeNull();
   });
 
   it('marks syncing as busy without changing the disconnect contract', () => {

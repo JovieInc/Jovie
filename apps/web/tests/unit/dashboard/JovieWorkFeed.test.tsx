@@ -18,6 +18,31 @@ describe('JovieWorkFeed', () => {
     refetchMock.mockReset();
   });
 
+  it('binds completed-only inbox reads to the selected profile and requested range', () => {
+    useJovieWorkFeedQueryMock.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    render(
+      <JovieWorkFeed
+        profileId='artist-profile'
+        range='30d'
+        completedOnly
+        showHeader={false}
+      />
+    );
+    expect(useJovieWorkFeedQueryMock).toHaveBeenCalledWith({
+      profileId: 'artist-profile',
+      range: '30d',
+      completedOnly: true,
+    });
+    expect(screen.queryByText('Jovie Did This')).not.toBeInTheDocument();
+    expect(screen.getByTestId('jovie-work-feed')).toBeVisible();
+  });
+
   it('renders autonomous work items with phase badges', () => {
     useJovieWorkFeedQueryMock.mockReturnValue({
       data: [
@@ -44,7 +69,10 @@ describe('JovieWorkFeed', () => {
     expect(screen.getByTestId('jovie-work-feed')).toBeInTheDocument();
     expect(screen.getByText('Jovie Did This')).toBeInTheDocument();
     expect(screen.getByText('Release autopilot')).toBeInTheDocument();
-    expect(screen.getByText('Done')).toBeInTheDocument();
+    const phaseBadge = screen.getByText('Done');
+    // Phase color comes from semantic status tokens, not the Tailwind palette.
+    expect(phaseBadge).toHaveClass('bg-success/10', 'text-success');
+    expect(phaseBadge.className).not.toMatch(/emerald|amber|blue-|red-/);
     expect(
       screen.getByText('Jovie ran release-to-revenue for Midnight Drive.')
     ).toBeInTheDocument();

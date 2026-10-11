@@ -8,6 +8,13 @@ import {
 import { type RefObject, useCallback } from 'react';
 
 /**
+ * Viewport assumed before the scroll container is measured (SSR and the first
+ * client render). Without it the virtualizer returns no rows, the body falls
+ * back to rendering every row, and a 10k-row table paints 10k rows once.
+ */
+export const VIRTUALIZATION_INITIAL_VIEWPORT_PX = 1080;
+
+/**
  * Configuration for table virtualization
  */
 export interface TableVirtualizationConfig {
@@ -64,6 +71,8 @@ export function useTableVirtualization({
   overscan,
   enabled,
 }: TableVirtualizationConfig): TableVirtualizationResult {
+  // Reads live virtualizer state each render; see virtualizer-compiler-optout.test.ts.
+  'use no memo';
   // Initialize virtualizer with stable estimateSize function
   const virtualizer = useVirtualizer({
     count: rowCount,
@@ -71,6 +80,7 @@ export function useTableVirtualization({
     estimateSize: useCallback(() => estimatedRowHeight, [estimatedRowHeight]),
     overscan,
     enabled,
+    initialRect: { width: 0, height: VIRTUALIZATION_INITIAL_VIEWPORT_PX },
   });
 
   const virtualRows = virtualizer.getVirtualItems();

@@ -14,5 +14,5 @@ export default async function HudTvRedirectPage({
   if (kiosk) {
     redirect(`${APP_ROUTES.HUD}?kiosk=${encodeURIComponent(kiosk)}`);
   }
-  redirect(`${APP_ROUTES.HUD}?fs=1`);
+  redirect(APP_ROUTES.HUD);
 }

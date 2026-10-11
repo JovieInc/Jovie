@@ -54,6 +54,20 @@ const CANCELABLE_STATUSES = new Set<Stripe.Subscription.Status>([
   'incomplete',
 ]);
 
+export class StripeWriteBlockedError extends Error {
+  constructor(input: {
+    subscriptionId: string;
+    chargeId: string;
+    subscriptionStatus: string;
+    eventType: string;
+  }) {
+    super(
+      `Stripe Dashboard: open subscription ${input.subscriptionId} (status ${input.subscriptionStatus}) and cancel it. Replay of ${input.eventType} for charge ${input.chargeId} will not call subscriptions.cancel, and will not refund, charge, or change a price.`
+    );
+    this.name = 'StripeWriteBlockedError';
+  }
+}
+
 /**
  * Handler for subscription charge refunds and disputes.
  */
@@ -65,20 +79,23 @@ export class ChargeHandler implements WebhookHandler {
 
   async handle(context: WebhookContext): Promise<HandlerResult> {
     const { event, stripeEventId, stripeEventTimestamp } = context;
+    const stripeWritesAllowed = context.stripeWritesAllowed !== false;
 
     switch (event.type) {
       case 'charge.refunded':
         return this.handleRefunded(
           event.data.object as Stripe.Charge,
           stripeEventId,
-          stripeEventTimestamp
+          stripeEventTimestamp,
+          stripeWritesAllowed
         );
 
       case 'charge.dispute.created':
         return this.handleDisputeCreated(
           event.data.object as Stripe.Dispute,
           stripeEventId,
-          stripeEventTimestamp
+          stripeEventTimestamp,
+          stripeWritesAllowed
         );
 
       default:
@@ -98,7 +115,8 @@ export class ChargeHandler implements WebhookHandler {
   private async handleRefunded(
     charge: Stripe.Charge,
     stripeEventId: string,
-    stripeEventTimestamp: Date
+    stripeEventTimestamp: Date,
+    stripeWritesAllowed: boolean
   ): Promise<HandlerResult> {
     if (!isFullyRefundedCharge(charge)) {
       return {
@@ -115,6 +133,7 @@ export class ChargeHandler implements WebhookHandler {
       eventType: 'charge_refunded',
       requireLatestInvoice: true,
       stripeEventName: 'charge.refunded',
+      stripeWritesAllowed,
     });
   }
 
@@ -125,7 +144,8 @@ export class ChargeHandler implements WebhookHandler {
   private async handleDisputeCreated(
     dispute: Stripe.Dispute,
     stripeEventId: string,
-    stripeEventTimestamp: Date
+    stripeEventTimestamp: Date,
+    stripeWritesAllowed: boolean
   ): Promise<HandlerResult> {
     const charge = await this.resolveCharge(dispute.charge);
     if (!charge) {
@@ -143,6 +163,7 @@ export class ChargeHandler implements WebhookHandler {
       eventType: 'charge_disputed',
       requireLatestInvoice: false,
       stripeEventName: 'charge.dispute.created',
+      stripeWritesAllowed,
       extraMetadata: {
         disputeId: dispute.id,
         disputeStatus: dispute.status,
@@ -160,6 +181,7 @@ export class ChargeHandler implements WebhookHandler {
     >;
     requireLatestInvoice: boolean;
     stripeEventName: 'charge.refunded' | 'charge.dispute.created';
+    stripeWritesAllowed: boolean;
     extraMetadata?: Record<string, unknown>;
   }): Promise<HandlerResult> {
     const {
@@ -169,6 +191,7 @@ export class ChargeHandler implements WebhookHandler {
       eventType,
       requireLatestInvoice,
       stripeEventName,
+      stripeWritesAllowed,
       extraMetadata,
     } = options;
 
@@ -192,14 +215,17 @@ export class ChargeHandler implements WebhookHandler {
 
     // Notify before downstream API/DB work so a failed revoke still raises an
     // alert. Route-level event deduplication suppresses completed deliveries;
-    // retries may repeat the alert with the same event ID.
-    await this.notifyChargeReversal({
-      stripeEventId,
-      stripeEventName,
-      chargeId: charge.id,
-      invoiceId: invoice.id,
-      subscriptionId,
-    });
+    // retries may repeat the alert with the same event ID. Stored-event replay
+    // skips the Slack alert; the remediation issue is the operator signal.
+    if (stripeWritesAllowed) {
+      await this.notifyChargeReversal({
+        stripeEventId,
+        stripeEventName,
+        chargeId: charge.id,
+        invoiceId: invoice.id,
+        subscriptionId,
+      });
+    }
 
     // Commission reversal is invoice-scoped, independent of entitlement event
     // ordering. Historical refunds and retries after a newer billing event must
@@ -232,6 +258,15 @@ export class ChargeHandler implements WebhookHandler {
       };
     }
 
+    if (!stripeWritesAllowed && CANCELABLE_STATUSES.has(subscription.status)) {
+      throw new StripeWriteBlockedError({
+        subscriptionId: subscription.id,
+        chargeId: charge.id,
+        subscriptionStatus: subscription.status,
+        eventType: stripeEventName,
+      });
+    }
+
     const customerId = getCustomerId(subscription.customer);
     const result = await updateUserBillingStatus({
       clerkUserId: userId,
@@ -248,6 +283,8 @@ export class ChargeHandler implements WebhookHandler {
         invoiceId: invoice.id,
         chargeId: charge.id,
         amountRefunded: charge.amount_refunded,
+        disputedAmountCents:
+          eventType === 'charge_disputed' ? charge.amount : 0,
         ...extraMetadata,
       },
     });
@@ -346,9 +383,11 @@ export class ChargeHandler implements WebhookHandler {
   }
 
   /**
-   * Stripe SDK v22 dropped Charge.invoice from the typed surface, but
-   * webhook payloads and PaymentIntents still carry the invoice id.
-   * Read it without inventing a typed field that does not exist.
+   * Older webhook payloads carry Charge.invoice / PaymentIntent.invoice.
+   * On the pinned API (2026-08-26.dahlia) both are gone, and the only link
+   * from a payment to its invoice is an InvoicePayment, so fall back to it.
+   * Without that fallback no refund resolves its invoice (verified in Stripe
+   * test mode 2026-09-27) and refunds never revoke Pro.
    */
   private async resolveInvoice(
     charge: Stripe.Charge
@@ -368,7 +407,18 @@ export class ChargeHandler implements WebhookHandler {
         ? charge.payment_intent
         : await stripe.paymentIntents.retrieve(paymentIntentId);
 
-    return this.coerceInvoice(Reflect.get(paymentIntent, 'invoice'));
+    const fromPaymentIntent = await this.coerceInvoice(
+      Reflect.get(paymentIntent, 'invoice')
+    );
+    if (fromPaymentIntent) {
+      return fromPaymentIntent;
+    }
+
+    const payments = await stripe.invoicePayments.list({
+      payment: { type: 'payment_intent', payment_intent: paymentIntentId },
+      limit: 1,
+    });
+    return this.coerceInvoice(payments.data[0]?.invoice);
   }
 
   private async coerceInvoice(

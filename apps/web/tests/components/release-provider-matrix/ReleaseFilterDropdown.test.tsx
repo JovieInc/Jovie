@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 /**
  * Tests for ReleaseFilterDropdown — filter toggle and clear logic.
  *
@@ -256,6 +258,13 @@ function renderDropdown(
 // Tests
 // ---------------------------------------------------------------------------
 
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
+
 describe('ReleaseFilterDropdown', () => {
   describe('type toggle', () => {
     it('calls onFiltersChange with added type when toggling on', async () => {
@@ -431,5 +440,29 @@ describe('ReleaseFilterDropdown', () => {
         labels: [],
       });
     });
+  });
+
+  it('imports LINEAR_SURFACE from the canonical token module', () => {
+    const source = readWebSource(
+      'components/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown.tsx'
+    );
+    expect(source).toContain('@/components/tokens/linear-surface');
+    expect(source).not.toContain("from '@/features/dashboard/tokens'");
+  });
+});
+
+describe('VirtualizedLabelList virtualized window under React Compiler', () => {
+  it('opts the virtualizer reader out of memoization (JOV-6702)', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown.tsx'
+      ),
+      'utf8'
+    );
+    const body = source.slice(source.indexOf('function VirtualizedLabelList'));
+    expect(body.slice(0, body.indexOf('useVirtualizer('))).toContain(
+      "'use no memo';"
+    );
   });
 });

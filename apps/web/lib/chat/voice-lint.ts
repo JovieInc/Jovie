@@ -28,3 +28,26 @@ export function lintVoice(text: string): VoiceLintResult {
     })),
   };
 }
+
+/**
+ * Persisted replacement for a completed streamed reply that fails the copy
+ * floor (JOV-6616). The stream itself cannot be blocked mid-flight, so the
+ * floor is enforced at the persist boundary; the violation is logged.
+ */
+export const ASSISTANT_REPLY_FALLBACK =
+  'That answer missed the mark. Ask again and I will take another pass.';
+
+export interface GatedAssistantReply {
+  readonly text: string;
+  readonly violations: readonly VoiceLintViolation[];
+}
+
+/**
+ * Gate a completed assistant reply against the copy floor. Returns the
+ * original text when clean; otherwise a safe fallback plus the violations so
+ * the caller can log which rules fired.
+ */
+export function gateAssistantReply(text: string): GatedAssistantReply {
+  const { ok, violations } = lintVoice(text);
+  return { text: ok ? text : ASSISTANT_REPLY_FALLBACK, violations };
+}

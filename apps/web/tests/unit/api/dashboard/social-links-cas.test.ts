@@ -200,6 +200,11 @@ vi.mock('@/lib/cache', () => ({
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mocks.captureError,
 }));
+vi.mock('@/lib/team/approvals', () => ({
+  authorizeRiskyProfileAction: vi
+    .fn()
+    .mockResolvedValue({ status: 'allowed', role: 'owner' }),
+}));
 vi.mock('@/lib/rate-limit', () => ({
   createRateLimitHeaders: vi.fn(() => ({})),
   dashboardLinksLimiter: {

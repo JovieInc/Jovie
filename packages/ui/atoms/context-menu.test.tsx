@@ -605,3 +605,26 @@ describe('ContextMenu', () => {
     });
   });
 });
+
+describe('ContextMenu submenu viewport fit', () => {
+  it('narrows submenus into the width Radix reports as available', async () => {
+    render(
+      <ContextMenu>
+        <ContextMenuTrigger>Row</ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuSub open>
+            <ContextMenuSubTrigger>Move to</ContextMenuSubTrigger>
+            <ContextMenuSubContent data-testid='fit-context-sub'>
+              <ContextMenuItem>Playlist</ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        </ContextMenuContent>
+      </ContextMenu>
+    );
+    fireEvent.contextMenu(screen.getByText('Row'));
+    const sub = await screen.findByTestId('fit-context-sub');
+    expect(sub.getAttribute('style') ?? '').toContain(
+      'max-width: var(--radix-context-menu-content-available-width)'
+    );
+  });
+});

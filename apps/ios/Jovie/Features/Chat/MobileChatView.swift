@@ -35,10 +35,6 @@ enum MobileChatEmptyHomePolicy {
   static func showsBrandMark() -> Bool {
     false
   }
-
-  static func showsFeatureIntroOnEmptyHome() -> Bool {
-    false
-  }
 }
 
 struct MobileChatEmptyGreetingView: View {

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
 import { DrawerEntityAvatar } from './DrawerEntityAvatar';
-import { EntityHeaderCard } from './EntityHeaderCard';
+import { EntityHeader } from './EntityHeader';
 import { EntityTabbedRail } from './EntityTabbedRail';
 
 const tabOptions = [
@@ -23,9 +23,9 @@ const meta = {
     tabsAriaLabel: 'Visitor tabs',
     title: 'Visitor',
     entityHeader: (
-      <EntityHeaderCard
+      <EntityHeader
         layout='grid'
-        image={<DrawerEntityAvatar name='Visitor' />}
+        thumbnail={<DrawerEntityAvatar name='Visitor' />}
         title='Visitor'
         subtitle='Berlin · 18 visits'
       />

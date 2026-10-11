@@ -764,15 +764,18 @@ function writePlanOutputs(result) {
 /**
  * pnpm.overrides is a deliberate pin. When Dependabot edits the lockfile's
  * overrides block without the matching root package.json change, the lane
- * refuses loudly instead of rewriting either side (PR #18247).
+ * refuses instead of rewriting either side (PR #18247). The refusal is an
+ * expected policy outcome, not a workflow defect: it is surfaced as a warning
+ * annotation plus step summary, and the step stays green so the recurring
+ * Dependabot failure does not page main-failure intake (JOV-6810).
  */
-function failOnConfigMismatch(result, prNumber) {
-  if (result.reason !== 'lockfile-config-mismatch') return;
+export function reportConfigMismatch(result, prNumber) {
+  if (result.reason !== 'lockfile-config-mismatch') return false;
   const message = `PR #${prNumber}: ERR_PNPM_LOCKFILE_CONFIG_MISMATCH. The lockfile "overrides" block no longer matches root package.json pnpm.overrides. Overrides are deliberate pins, so safe remediation will not regenerate this lockfile; close the Dependabot PR or change pnpm.overrides in a reviewed PR.`;
-  console.error(`::error title=Dependabot overrides mismatch::${message}`);
+  console.error(`::warning title=Dependabot overrides mismatch::${message}`);
   if (process.env.GITHUB_STEP_SUMMARY)
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
-  process.exitCode = 1;
+  return true;
 }
 
 async function fetchFailedJobLogs({ repository, workflowRun, token, accept }) {
@@ -827,7 +830,7 @@ async function planRootCommand({ repository, workflowRun, pr, files, token }) {
     manifestEvidence,
   });
   writePlanOutputs(result);
-  failOnConfigMismatch(result, pr.number);
+  reportConfigMismatch(result, pr.number);
 }
 
 async function planCommand() {

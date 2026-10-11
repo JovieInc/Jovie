@@ -76,6 +76,42 @@ describe('runtime config certification contract', () => {
     ]);
   });
 
+  it('deliberate red: stripped or forged blockers fail closed', () => {
+    const missing = snapshot({
+      values: { APP_ORIGIN: 'https://staging.jov.ie' },
+    });
+    const stripped = { ...missing, blockers: [] };
+    assert.deepEqual(validateRuntimeConfigSnapshot(stripped), [
+      'config blocker missing:required-config-missing:DATABASE_URL',
+    ]);
+    assert.equal(
+      evaluateRuntimeConfigParity(stripped, stripped).certified,
+      false
+    );
+
+    const forged = { ...missing, blockers: ['all-checks-passed'] };
+    assert.deepEqual(validateRuntimeConfigSnapshot(forged), [
+      'config blocker missing:required-config-missing:DATABASE_URL',
+      'config blocker unverifiable:all-checks-passed',
+    ]);
+    assert.equal(
+      evaluateRuntimeConfigParity(forged, snapshot()).certified,
+      false
+    );
+
+    const injected = {
+      ...snapshot(),
+      blockers: ['required-config-missing:NEVER_DEFINED'],
+    };
+    assert.deepEqual(validateRuntimeConfigSnapshot(injected), [
+      'config blocker unverifiable:required-config-missing:NEVER_DEFINED',
+    ]);
+    assert.equal(
+      evaluateRuntimeConfigParity(injected, injected).certified,
+      false
+    );
+  });
+
   it('deliberate red: invalid combinations fail closed', () => {
     const value = snapshot({
       values: {

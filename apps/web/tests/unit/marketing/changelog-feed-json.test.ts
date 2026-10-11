@@ -11,6 +11,7 @@ vi.mock('@/lib/changelog-source', () => ({ getChangelogSnapshot }));
 
 const RELEASE_FIXTURE = {
   version: '26.8.0',
+  kind: 'release',
   date: '2026-08-14',
   summary: 'A concise release summary.',
   sections: {
@@ -21,6 +22,14 @@ const RELEASE_FIXTURE = {
     removed: [],
   },
 };
+
+Object.assign(RELEASE_FIXTURE, {
+  customerOutcomes: Object.fromEntries(
+    Object.values(RELEASE_FIXTURE.sections)
+      .flat()
+      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  ),
+});
 
 describe('changelog customer feeds (RSS + JSON share the web page object)', () => {
   beforeEach(() => {

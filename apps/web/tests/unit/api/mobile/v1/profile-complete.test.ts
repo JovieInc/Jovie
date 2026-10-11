@@ -27,6 +27,10 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureErrorMock,
 }));
 
+vi.mock('@/lib/acquisition/activation-receipt', () => ({
+  attachFirstTouchReceipt: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('@/lib/mobile/complete-profile', () => ({
   completeMobileProfile: hoisted.completeMobileProfileMock,
   MobileProfileCompletionError: hoisted.CompletionError,

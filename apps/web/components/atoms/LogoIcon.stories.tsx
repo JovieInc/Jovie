@@ -8,7 +8,7 @@ const meta = {
     layout: 'centered',
   },
   args: {
-    size: 48,
+    size: 'splash',
     variant: 'color',
   },
 } satisfies Meta<typeof LogoIcon>;
@@ -43,6 +43,6 @@ export const White: Story = {
 
 export const Sized: Story = {
   args: {
-    size: 72,
+    size: 'compact',
   },
 };

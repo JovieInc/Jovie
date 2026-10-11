@@ -7,7 +7,8 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
+import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
@@ -69,10 +70,6 @@ vi.mock('@/components/organisms/user-button', () => ({
   },
 }));
 
-vi.mock('@/features/feedback/SidebarUpgradeBanner', () => ({
-  SidebarUpgradeBanner: () => <div data-testid='sidebar-upgrade-banner' />,
-}));
-
 vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   UpdateAvailablePill: () => (
     <button type='button' data-testid='update-available-pill'>
@@ -81,8 +78,17 @@ vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   ),
 }));
 
-vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
-  SidebarInstallBanner: () => <div data-testid='sidebar-install-banner' />,
+vi.mock('@/components/organisms/whats-new/WhatsNewBanner', () => ({
+  WhatsNewBanner: (props: {
+    readonly enabled: boolean;
+    readonly collapsed?: boolean;
+  }) => (
+    <div
+      data-testid='sidebar-whats-new'
+      data-enabled={String(props.enabled)}
+      data-collapsed={String(Boolean(props.collapsed))}
+    />
+  ),
 }));
 
 vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
@@ -152,18 +158,29 @@ function LibrarySidebarOverride({
   return null;
 }
 
+function BrowserHeaderToggle() {
+  const { state } = useSidebar();
+  return !electronRuntimeMock.isElectronRuntime && state === 'closed' ? (
+    <SidebarCollapseButton />
+  ) : null;
+}
+
 function renderUnifiedSidebar({
   overrideContent,
   pathname = APP_ROUTES.LIBRARY,
   section = 'library',
   isAdmin = false,
   variant,
+  data,
+  sidebarDefaultOpen = true,
 }: {
   readonly overrideContent?: ReactNode;
   readonly pathname?: string;
   readonly section?: 'admin' | 'dashboard' | 'library' | 'ov' | 'settings';
   readonly isAdmin?: boolean;
   readonly variant?: 'jovie' | 'ov';
+  readonly data?: Partial<DashboardData>;
+  readonly sidebarDefaultOpen?: boolean;
 } = {}) {
   unifiedPathnameMock.mockReturnValue(pathname);
   const queryClient = new QueryClient({
@@ -173,16 +190,21 @@ function renderUnifiedSidebar({
   return render(
     <QueryClientProvider client={queryClient}>
       <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <DashboardDataProvider value={{ ...dashboardData, isAdmin }}>
+        <DashboardDataProvider value={{ ...dashboardData, isAdmin, ...data }}>
           <TooltipProvider>
-            <SidebarProvider>
+            <SidebarProvider defaultOpen={sidebarDefaultOpen}>
               <ShellSidebarOverrideProvider>
                 {overrideContent ? (
                   <LibrarySidebarOverride>
                     {overrideContent}
                   </LibrarySidebarOverride>
                 ) : null}
-                <UnifiedSidebar section={section} variant={variant} />
+                <UnifiedSidebar
+                  section={section}
+                  variant={variant}
+                  headerOwnsCollapsedToggle
+                />
+                <BrowserHeaderToggle />
               </ShellSidebarOverrideProvider>
             </SidebarProvider>
           </TooltipProvider>
@@ -194,6 +216,7 @@ function renderUnifiedSidebar({
 
 describe('UnifiedSidebar library route', () => {
   afterEach(() => {
+    document.cookie = 'sidebar:state=; path=/; max-age=0';
     electronRuntimeMock.isElectronRuntime = true;
     document.documentElement.removeAttribute('data-desktop-runtime');
     signOutMock.mockReset();
@@ -204,10 +227,22 @@ describe('UnifiedSidebar library route', () => {
     unifiedPathnameMock.mockReturnValue(APP_ROUTES.CHAT);
   });
 
+  it('has one accessible browser toggle with the real sidebar when restored collapsed', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+    renderUnifiedSidebar({ sidebarDefaultOpen: false });
+    expect(
+      screen.getAllByRole('button', { name: 'Expand sidebar' })
+    ).toHaveLength(1);
+    const sidebarToggle = document.querySelector(
+      '[data-shell-rail-motion="left"] [data-rail-toggle="left"]'
+    );
+    expect(sidebarToggle?.closest('[inert]')).not.toBeNull();
+  });
+
   it('keeps the standard dashboard navigation on the library route', () => {
     renderUnifiedSidebar();
 
-    expect(screen.queryByText('Loading Library')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading Work')).not.toBeInTheDocument();
     expect(screen.getByTestId('dashboard-nav')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Search Sidebar' })
@@ -242,24 +277,74 @@ describe('UnifiedSidebar library route', () => {
     expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith({
       collapsed: false,
     });
+    const row = screen
+      .getByRole('link', { name: /Inbox —/ })
+      .closest('[data-sidebar-brand-row]');
+    expect(row).toContainElement(
+      screen.getByRole('button', { name: 'Search Sidebar' })
+    );
+    expect(screen.getByRole('link', { name: /Inbox —/ })).toHaveAttribute(
+      'href',
+      '/app'
+    );
   });
 
-  it('keeps pending Inbox work reachable without a sidebar notifications region', () => {
-    // Runtime updates moved from the sidebar to the central Inbox
-    // (RuntimeUpdateProvider + the DashboardNav Inbox bell); the notification region
-    // and its pill are gone from the sidebar content.
-    electronRuntimeMock.isElectronRuntime = false;
+  it('shows the identity switcher when the account has multiple identities', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+      data: {
+        creatorProfiles: [
+          dashboardData.creatorProfiles[0],
+          {
+            id: 'profile_456',
+            avatarUrl: null,
+            displayName: 'Second Act',
+            username: 'secondact',
+            usernameNormalized: 'secondact',
+          } as DashboardData['creatorProfiles'][number],
+        ],
+      },
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Switch Identity' })
+    ).toBeInTheDocument();
+  });
+
+  it('hides the identity switcher for a single-identity account', () => {
     renderUnifiedSidebar({
       pathname: APP_ROUTES.DASHBOARD,
       section: 'dashboard',
     });
 
     expect(
-      screen.queryByTestId('sidebar-notifications')
+      screen.queryByRole('button', { name: 'Switch Identity' })
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('update-available-pill')
-    ).not.toBeInTheDocument();
+  });
+
+  it("orders update, What's New, and now-playing in the ambient dock", () => {
+    electronRuntimeMock.isElectronRuntime = false;
+    const { container } = renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+
+    const dock = container.querySelector('[data-sidebar-dock="true"]');
+    const update = screen.getByTestId('update-available-pill');
+    const whatsNew = screen.getByTestId('sidebar-whats-new');
+    const nowPlaying = screen.getByTestId('sidebar-now-playing-bridge');
+    expect(dock).toContainElement(update);
+    expect(dock).toContainElement(whatsNew);
+    expect(dock).toContainElement(nowPlaying);
+    expect(update.compareDocumentPosition(whatsNew)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(whatsNew.compareDocumentPosition(nowPlaying)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(whatsNew).toHaveAttribute('data-enabled', 'false');
+    expect(whatsNew).toHaveAttribute('data-collapsed', 'false');
   });
 
   it('keeps the unified user panel available on settings routes', () => {
@@ -344,7 +429,7 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.getByRole('button', { name: 'Needs Assets' })
     ).toBeInTheDocument();
-    expect(screen.queryByText('Loading Library')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading Work')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to App' })).toHaveAttribute(
       'href',
       APP_ROUTES.CHAT
@@ -363,7 +448,9 @@ describe('UnifiedSidebar library route', () => {
       section: 'dashboard',
     });
 
-    expect(screen.getByRole('img', { name: 'Jovie' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Ask Jovie' })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
@@ -388,6 +475,72 @@ describe('UnifiedSidebar library route', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('stages browser header chrome without dropping the expanded toggle (JOV-4522)', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+
+    // The wrapper stages the in-sidebar control out when the main header
+    // takes ownership in compact mode; the expanded control stays mounted.
+    const toggle = screen.getByRole('button', { name: 'Collapse sidebar' });
+    expect(toggle.parentElement?.className).toContain(
+      'group-data-[collapsible=icon]:order-first'
+    );
+    expect(toggle.parentElement?.className).toContain(
+      'group-data-[collapsible=icon]:mx-auto'
+    );
+
+    const brandRow = toggle.closest('[data-sidebar-brand-row]');
+    expect(brandRow).not.toBeNull();
+    const stagedCluster = brandRow?.querySelector(
+      '[data-sidebar-header-actions]'
+    );
+    expect(stagedCluster).not.toBeNull();
+    expect(stagedCluster?.className).toContain(
+      'group-data-[collapsible=icon]:max-w-0'
+    );
+    expect(stagedCluster?.className).not.toContain(
+      'group-data-[collapsible=icon]:hidden'
+    );
+  });
+
+  it.each([
+    {
+      section: 'dashboard' as const,
+      variant: 'jovie' as const,
+      pathname: APP_ROUTES.DASHBOARD,
+    },
+    { section: 'ov' as const, variant: 'ov' as const, pathname: APP_ROUTES.OV },
+  ])(
+    'keeps the canonical $variant logo exposed when restored collapsed',
+    ({ section, variant, pathname }) => {
+      electronRuntimeMock.isElectronRuntime = false;
+      const { container } = renderUnifiedSidebar({
+        section,
+        variant,
+        pathname,
+        isAdmin: true,
+        sidebarDefaultOpen: false,
+      });
+      const logos = container.querySelectorAll(
+        `[data-brand-variant="${variant}"]`
+      );
+      expect(logos).toHaveLength(1);
+      expect(
+        logos[0].parentElement?.closest('[inert], [aria-hidden="true"]')
+      ).toBeNull();
+      expect(
+        screen.getByRole('button', { name: 'Switch Workspace' })
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByRole('button', { name: 'Expand sidebar' })
+      ).toHaveLength(1);
+    }
+  );
+
   it('turns the logo into a workspace selector for admins', () => {
     renderUnifiedSidebar({
       pathname: APP_ROUTES.DASHBOARD,
@@ -410,7 +563,9 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('button', { name: 'Switch Workspace' })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Jovie' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Ask Jovie' })
+    ).toBeInTheDocument();
   });
 
   it('shows OV as the active admin workspace without changing header height', () => {
@@ -427,10 +582,24 @@ describe('UnifiedSidebar library route', () => {
     expect(container.querySelector('[data-brand-variant="ov"]')).not.toBeNull();
   });
 
+  it('keeps the static OV mark at nav-icon scale with no footer duplicate', () => {
+    const { container } = renderUnifiedSidebar({
+      pathname: APP_ROUTES.OV,
+      section: 'ov',
+      variant: 'ov',
+    });
+
+    const marks = container.querySelectorAll('[data-brand-variant="ov"]');
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toHaveAttribute('data-brand-mark-size', '16');
+    expect(marks[0]?.closest('[data-sidebar="header"]')).not.toBeNull();
+  });
+
   it('renders dedicated operator navigation without the customer dashboard nav', () => {
-    renderUnifiedSidebar({
+    const { container } = renderUnifiedSidebar({
       pathname: APP_ROUTES.ADMIN_OPS,
       section: 'ov',
+      variant: 'ov',
     });
 
     expect(
@@ -456,15 +625,30 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('button', { name: 'Search Sidebar' })
     ).not.toBeInTheDocument();
-    expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Account' })).toContainElement(
+      screen.getByTestId('user-button')
+    );
+    expect(userButtonPropsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ showUserInfo: true, profileHref: undefined })
+    );
     expect(
-      screen.getByRole('button', { name: 'Sign Out' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Sign Out' })
+    ).not.toBeInTheDocument();
+    for (const link of operatorLinks) {
+      expect(link).toHaveAttribute('data-navigation-item-id');
+      expect(link).toHaveClass('grid', 'rounded-lg');
+    }
+    expect(
+      container.querySelector('[data-sidebar-dock="true"]')
+    ).toContainElement(screen.getByTestId('sidebar-whats-new'));
+    expect(
+      container.querySelector('[data-sidebar-dock="true"]')
+    ).toContainElement(screen.getByTestId('sidebar-now-playing-bridge'));
   });
 
-  it('marks only the exact Ops destination current', () => {
+  it('marks only the exact Operations destination current', () => {
     renderUnifiedSidebar({
-      pathname: APP_ROUTES.ADMIN_OPS,
+      pathname: APP_ROUTES.ADMIN_OPERATIONS,
       section: 'ov',
     });
 
@@ -474,12 +658,14 @@ describe('UnifiedSidebar library route', () => {
     expect(
       within(operatorNavigation).getByRole('link', { name: 'Chat' })
     ).not.toHaveAttribute('aria-current');
-    expect(
-      within(operatorNavigation).getByRole('link', { name: 'Ops' })
-    ).toHaveAttribute('aria-current', 'page');
+    const operationsLink = within(operatorNavigation).getByRole('link', {
+      name: 'Operations',
+    });
+    expect(operationsLink).toHaveAttribute('href', APP_ROUTES.ADMIN_OPERATIONS);
     expect(
       operatorNavigation.querySelectorAll('[aria-current="page"]')
     ).toHaveLength(1);
+    expect(operationsLink).toHaveAttribute('aria-current', 'page');
   });
 
   it('keeps Jovie-mode admin routes on the same customer navigation contract', () => {

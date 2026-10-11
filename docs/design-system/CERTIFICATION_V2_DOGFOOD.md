@@ -106,6 +106,13 @@ privacy { conversationContentRetained, credentialsRetained,
           accountIdentityRetained, unrelatedPersonalDataRetained }
 ```
 
+CLI and MCP receipts add a `jovie.fleet-invocation/v1` block: caller/model/
+runtime/host, capability version/revision, redacted argv, intent, expected and
+actual results, exit/status, latency, retry/workaround/bypass signals,
+canonical comparison, defect fingerprint, and repair/recertification proof.
+The capability id keeps this reusable beyond the CLI. Legacy receipts remain
+readable but do not enter fleet-hardening denominators.
+
 A receipt counts only if `commitSha` and `deploymentId` match the subject's
 current deploy receipt.
 
@@ -301,6 +308,13 @@ open linked defect blocks `high`.
 
 Summer's loop: pick the metric that is the current bottleneck (constitution
 Law 1), file the smallest Linear issue that moves it, measure again.
+
+The metrics endpoint exposes `fleetHardening` for total invocations, success
+and first-attempt success, retry/workaround/bypass/defect rates, p50/p95
+latency, defect-to-recertification time, promoted regressions, and fleet/surface
+coverage. `machine_certified` → `dogfooding` → `dogfood_certified` → `monitored`
+corresponds to Machine Certified → Fleet Dogfooding → Burned In → Trusted
+Primitive; test proof alone cannot enter `monitored`.
 
 ## 9. Product lanes
 

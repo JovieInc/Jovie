@@ -118,9 +118,9 @@ queued, and cancelled checks do not imply a terminal source failure.
   with immutable ordinary test companions, validates actual behavioral tests
   and coverage, and uses a separate trusted writer to compare-and-swap the
   current PR head. Source landing does not prove activation or a successful
-  repair. Existing Hyperagent delivery handles merge-group failures; an
-  accepted webhook is not a repair or merge receipt. Repair findings in their
-  source PR and let GitHub rebuild the group. No new queue controller is needed.
+  repair. An accepted webhook is not a repair or merge receipt. Repair findings
+  in their source PR and let GitHub rebuild the group.
+- Revision failure hold (JOV-5117): a terminal `CI` `merge_group` run maps   `gh-readonly-queue/main/pr-N-*` to PR `N`, then uses the ordered queue/commit   timeline to bind the failed attempt to its exact source head. The trusted   `Merge Queue Green Enroll` controller writes   `jovie-queue-failure-hold/v1` on that source commit before attempting dequeue and   disabling native auto-merge. The Jovie Bot token for that job is not minted with merge-queue write, so `dequeuePullRequest` may return `Resource not accessible by integration`. That denial, and a `not in queue` response, are logged and do not fail the job: GitHub already removes a pull request when its merge_group run fails. The hold status and auto-merge disable still persist. Any other dequeue or auto-merge error fails the job. Deterministic source failures are held after   one attempt. Retryable or infrastructure-class failures may consume exactly   one controller-owned retry; `jovie-queue-failure-retry/v1` spends it before   re-enrollment. Main movement, elapsed time, labels, production completion,   and generic maintenance do not clear either receipt. A new source SHA has no   old commit status and may enroll after normal source checks. Required checks,   native queue membership, and exact combined-head CI remain authoritative and   unchanged.
 - Pre-land CHANGELOG prohibition (JOV-5291 / JOV-5378): GitHub's server merge
   ignores local union drivers, so two Unreleased `CHANGELOG.md` edits in one
   group park the later entry. Implementation PRs never edit `CHANGELOG.md`.
@@ -200,7 +200,10 @@ runtime behavior, or Summer commissioning.
 - PR not entering: inspect the exact-head Merge when ready request, current
   draft/mergeability state, hard-gate labels, and required GitHub checks.
 - Combined head red: repair the source PR and let GitHub rebuild the queue
-  group. Do not force a stale combined head through production.
+  group. Inspect `jovie-queue-failure-hold/v1` on the exact source commit; do
+  not force a held combined head through production.
+- Recurrence: `node scripts/promotion-loss-metrics.mjs --since 24h` reports
+  merge-group attempts per merge plus deterministic same-head recurrence.
 - Emergency response: inspect the native ruleset and exact queue entry,
   repair the source or required check, and prove a fresh native canary.
 

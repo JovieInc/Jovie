@@ -18,6 +18,11 @@ import {
 } from '@/lib/auth/plan-intent';
 import { isSelfServiceOffer } from '@/lib/billing/offer-truth';
 import { PRICING } from '@/lib/config/pricing';
+import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
+import {
+  hasOnboardingUpgradeOfferState,
+  recordOnboardingUpgradeOfferEvent,
+} from '@/lib/onboarding/upgrade-offer';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
 
 /**
@@ -102,11 +107,13 @@ export default async function OnboardingCheckoutPage({
 
   // Get profile data for the value preview
   let profileData: {
+    id: string | null;
     displayName: string;
     username: string;
     avatarUrl: string | null;
     spotifyFollowers: number | null;
   } = {
+    id: null,
     displayName: '',
     username: '',
     avatarUrl: null,
@@ -118,6 +125,7 @@ export default async function OnboardingCheckoutPage({
     const profile = dashboardData.selectedProfile;
     if (profile) {
       profileData = {
+        id: profile.id ?? null,
         displayName: profile.displayName || '',
         username: profile.username || '',
         avatarUrl: profile.avatarUrl || null,
@@ -145,6 +153,23 @@ export default async function OnboardingCheckoutPage({
     planIntent = recommended;
   }
 
+  const returnTo = normalizeOnboardingReturnTo(
+    typeof params.returnTo === 'string' ? params.returnTo : null
+  );
+
+  // JOV-6675: the Artist Presence upgrade offer surfaces at most once per
+  // claimed artist. Any prior seen/accepted/dismissed receipt means the offer
+  // was already presented — skip straight to the post-onboarding destination
+  // instead of nagging. Only the organic upsell is gated; an explicit
+  // paid-intent visit (source=intent) is artist-initiated checkout, not an
+  // offer impression.
+  if (isDefaultUpsell && profileData.id) {
+    const alreadyOffered = await hasOnboardingUpgradeOfferState(profileData.id);
+    if (alreadyOffered) {
+      redirect(returnTo);
+    }
+  }
+
   // Resolve Stripe price IDs server-side (secure — never exposed as raw env vars)
   const pricing = resolvePriceIds(planIntent);
 
@@ -156,9 +181,16 @@ export default async function OnboardingCheckoutPage({
     redirect(stateRedirect ?? APP_ROUTES.DASHBOARD);
   }
 
+  // Durable server-side "offer seen" receipt, recorded only when the offer
+  // will actually render, so the once-per-artist gate above is reliable.
+  if (isDefaultUpsell && profileData.id) {
+    await recordOnboardingUpgradeOfferEvent(profileData.id, 'seen', planIntent);
+  }
+
   return (
     <OnboardingCheckoutClient
       plan={planIntent}
+      profileId={profileData.id}
       monthlyPriceId={pricing.monthlyPriceId}
       annualPriceId={pricing.annualPriceId}
       monthlyAmount={pricing.monthlyAmount}

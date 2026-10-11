@@ -6,8 +6,10 @@ import { describe, expect, it } from 'vitest';
 import {
   assertLiveProductionBind,
   classifyLiveProductionBind,
+  deferToInFlightSupersede,
   LIVE_BIND_REASONS,
   PRODUCTION_BUILD_INFO_URL,
+  SUPERSEDE_DEFER_REASONS,
 } from '../../../../../.github/scripts/assert-live-production-bind.mjs';
 import {
   classifyInFlightProductionControllerHold,
@@ -160,6 +162,111 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
     expect(ran.stderr).toContain('skip_success_unbound');
   });
 
+  it('defers a superseded skip-success when a newer controller run owns the bind', async () => {
+    let requested: string | undefined;
+    const result = await deferToInFlightSupersede({
+      fetchImpl: async url => {
+        requested = String(url);
+        return {
+          ok: true,
+          json: async () => ({
+            workflow_runs: [
+              { id: 2, head_sha: MAIN_SHA, status: 'in_progress' },
+              { id: 1, head_sha: LIVE_SHA, status: 'in_progress' },
+            ],
+          }),
+        } as Response;
+      },
+      mainSha: MAIN_SHA,
+      repo: 'JovieInc/Jovie',
+      excludeRunId: '999',
+      token: '',
+    });
+
+    expect(requested).toContain(
+      '/actions/workflows/production-controller.yml/runs'
+    );
+    expect(result).toEqual({
+      deferred: true,
+      reason: SUPERSEDE_DEFER_REASONS.supersedingRunInFlight,
+      runIds: [2],
+    });
+  });
+
+  it('stays fail-closed when no superseding controller run is in-flight', async () => {
+    const result = await deferToInFlightSupersede({
+      fetchImpl: async () =>
+        ({
+          ok: true,
+          json: async () => ({
+            workflow_runs: [
+              { id: 3, head_sha: MAIN_SHA, status: 'completed' },
+              { id: 2, head_sha: LIVE_SHA, status: 'in_progress' },
+            ],
+          }),
+        }) as Response,
+      mainSha: MAIN_SHA,
+      repo: 'JovieInc/Jovie',
+      excludeRunId: '999',
+      token: '',
+    });
+
+    expect(result).toEqual({
+      deferred: false,
+      reason: SUPERSEDE_DEFER_REASONS.noSupersedingRunInFlight,
+    });
+  });
+
+  it('excludes the current run when scanning for a superseding owner', async () => {
+    const result = await deferToInFlightSupersede({
+      fetchImpl: async () =>
+        ({
+          ok: true,
+          json: async () => ({
+            workflow_runs: [
+              { id: 999, head_sha: MAIN_SHA, status: 'in_progress' },
+            ],
+          }),
+        }) as Response,
+      mainSha: MAIN_SHA,
+      repo: 'JovieInc/Jovie',
+      excludeRunId: '999',
+      token: '',
+    });
+
+    expect(result.deferred).toBe(false);
+    expect(result.reason).toBe(
+      SUPERSEDE_DEFER_REASONS.noSupersedingRunInFlight
+    );
+  });
+
+  it('stays fail-closed when the in-flight check cannot run', async () => {
+    expect(
+      await deferToInFlightSupersede({
+        fetchImpl: async () => {
+          throw new Error('network down');
+        },
+        mainSha: MAIN_SHA,
+        repo: 'JovieInc/Jovie',
+        token: '',
+      })
+    ).toMatchObject({
+      deferred: false,
+      reason: SUPERSEDE_DEFER_REASONS.inFlightCheckFailed,
+    });
+
+    expect(
+      await deferToInFlightSupersede({
+        mainSha: 'not-a-sha',
+        repo: 'JovieInc/Jovie',
+        token: '',
+      })
+    ).toEqual({
+      deferred: false,
+      reason: SUPERSEDE_DEFER_REASONS.inFlightCheckUnavailable,
+    });
+  });
+
   it('holds screenshot merge-queue while Production Controller is in-flight', () => {
     const fixture = JSON.parse(readFileSync(inFlightPcFixturePath, 'utf8')) as {
       workflow_runs: Array<{ id: number; status: string }>;
@@ -246,6 +353,9 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
     );
     expect(current).toContain(
       'node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"'
+    );
+    expect(current).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha" --allow-in-flight-supersede'
     );
     expect(current).toContain('[ "$RUN_WEB" != true ]');
     expect(current.indexOf('[ "$RUN_WEB" != true ]')).toBeLessThan(

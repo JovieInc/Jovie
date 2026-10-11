@@ -34,7 +34,7 @@ test('xcodebuild wrapper prints phase timing and bounded timeout diagnostics', (
   );
 });
 
-test('iOS CI bounds the fast gate and preserves full release regression headroom', () => {
+test('iOS CI bounds both gates and skips redundant hosted simulator resets', () => {
   const fastStepTimeout = iosWorkflowSource.match(
     /- name: Run fast unit and coverage gate[\s\S]*?timeout-minutes: ([0-9]+)/
   );
@@ -47,11 +47,15 @@ test('iOS CI bounds the fast gate and preserves full release regression headroom
   const fullInternalTimeout = iosWorkflowSource.match(
     /- name: Run full simulator regression[\s\S]*?JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: "([0-9]+)"/
   );
+  const fullResetMode = iosWorkflowSource.match(
+    /- name: Run full simulator regression[\s\S]*?JOVIE_IOS_RESET_SIMULATOR: "([01])"/
+  );
 
   assert.equal(Number(fastStepTimeout?.[1]), 15);
   assert.equal(Number(fullStepTimeout?.[1]), 30);
   assert.equal(Number(fastInternalTimeout?.[1]), 840);
   assert.equal(Number(fullInternalTimeout?.[1]), 1680);
+  assert.equal(fullResetMode?.[1], '0');
   assert.ok(
     Number(fastInternalTimeout?.[1]) < Number(fastStepTimeout?.[1]) * 60,
     'fast internal timeout must fire before the GitHub action step timeout'

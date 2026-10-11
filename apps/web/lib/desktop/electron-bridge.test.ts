@@ -19,6 +19,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __testing,
   isDesktopEnvironment,
+  notifyDesktopComposerReadiness,
+  observeDesktopVisualActivity,
+  reportDesktopWorkState,
   useDesktopBuildIdentity,
 } from './electron-bridge';
 
@@ -66,6 +69,79 @@ afterEach(() => {
 });
 
 describe('electron-bridge — defensive guards', () => {
+  it('reports work only through a supported bridge and tolerates stale or throwing shells', () => {
+    expect(reportDesktopWorkState(null)).toBe(false);
+    setElectronAPI({ versions: { app: 'old' } });
+    expect(reportDesktopWorkState(null)).toBe(false);
+    const setWorkState = vi.fn();
+    setElectronAPI({ setWorkState });
+    expect(reportDesktopWorkState(null)).toBe(true);
+    expect(setWorkState).toHaveBeenCalledWith(null);
+    setWorkState.mockImplementation(() => {
+      throw new Error('disposed');
+    });
+    expect(reportDesktopWorkState(null)).toBe(false);
+  });
+
+  it('omits visual subscription on old and partial bridges', () => {
+    const callback = vi.fn();
+    const subscribe = vi.fn();
+    for (const api of [
+      {},
+      { onVisualActivity: subscribe },
+      { getVisualActivity: vi.fn() },
+    ]) {
+      setElectronAPI(api);
+      observeDesktopVisualActivity(callback)();
+    }
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it('keeps a newer visibility event over a delayed initial snapshot', async () => {
+    let resolveSnapshot: ((active: boolean) => void) | undefined;
+    let listener: ((active: boolean) => void) | undefined;
+    const unsubscribe = vi.fn();
+    setElectronAPI({
+      getVisualActivity: () =>
+        new Promise<boolean>(resolve => {
+          resolveSnapshot = resolve;
+        }),
+      onVisualActivity: (callback: (active: boolean) => void) => {
+        listener = callback;
+        return unsubscribe;
+      },
+    });
+    const callback = vi.fn();
+    const dispose = observeDesktopVisualActivity(callback);
+    listener?.(false);
+    resolveSnapshot?.(true);
+    await Promise.resolve();
+    expect(callback).toHaveBeenCalledExactlyOnceWith(false);
+    dispose();
+    listener?.(true);
+    expect(callback).toHaveBeenCalledOnce();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('reads the initial native state and tolerates rejected or malformed snapshots', async () => {
+    const callback = vi.fn();
+    for (const snapshot of [
+      Promise.resolve(false),
+      Promise.resolve(null),
+      Promise.reject(new Error('old shell')),
+    ]) {
+      setElectronAPI({
+        getVisualActivity: () => snapshot,
+        onVisualActivity: () => () => undefined,
+      });
+      const dispose = observeDesktopVisualActivity(callback);
+      await Promise.resolve();
+      await Promise.resolve();
+      dispose();
+    }
+    expect(callback).toHaveBeenCalledExactlyOnceWith(false);
+  });
   it('isDesktopEnvironment returns false in pure browser context', () => {
     expect(isDesktopEnvironment()).toBe(false);
   });
@@ -283,6 +359,86 @@ describe('electron-bridge — defensive guards', () => {
     });
     expect(copyDesktopAuthUrl).toHaveBeenCalledWith(authUrl);
     expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+
+  it('redeems return codes only through the explicit bridge method', async () => {
+    const redeemDesktopAuthReturnCode = vi.fn(
+      async (): Promise<{ ok: boolean; reason?: string }> => ({
+        ok: false,
+        reason: 'invalid-code',
+      })
+    );
+    setElectronAPI({ redeemDesktopAuthReturnCode });
+
+    expect(__testing.supportsDesktopAuthReturnCode()).toBe(true);
+    await expect(
+      __testing.redeemDesktopAuthReturnCode('BCDF-GHJK')
+    ).resolves.toEqual({ ok: false, reason: 'invalid-code' });
+    expect(redeemDesktopAuthReturnCode).toHaveBeenCalledWith('BCDF-GHJK');
+
+    redeemDesktopAuthReturnCode.mockResolvedValueOnce({ ok: true });
+    await expect(
+      __testing.redeemDesktopAuthReturnCode('BCDF-GHJK')
+    ).resolves.toEqual({ ok: true });
+  });
+
+  it('reads Touch ID state through the bridge and fails closed without it', async () => {
+    const getDesktopPasskeyState = vi.fn(async () => ({
+      available: true,
+      enrolled: 'yes',
+      dismissed: false,
+    }));
+    const setDesktopPasskeyState = vi.fn(
+      async (): Promise<{ ok: boolean; reason?: string }> => ({ ok: true })
+    );
+    const completeDesktopPasskeySignIn = vi.fn(
+      async (): Promise<{ ok: boolean; reason?: string }> => ({
+        ok: false,
+        reason: 'invalid-request',
+      })
+    );
+    setElectronAPI({
+      getDesktopPasskeyState,
+      setDesktopPasskeyState,
+      completeDesktopPasskeySignIn,
+    });
+
+    await expect(__testing.getDesktopPasskeyState()).resolves.toEqual({
+      available: true,
+      enrolled: false,
+      dismissed: false,
+    });
+    await expect(__testing.setDesktopPasskeyState('enrolled')).resolves.toEqual(
+      { ok: true }
+    );
+    expect(setDesktopPasskeyState).toHaveBeenCalledWith('enrolled');
+    await expect(__testing.completeDesktopPasskeySignIn()).resolves.toEqual({
+      ok: false,
+      reason: 'invalid-request',
+    });
+
+    setElectronAPI({ versions: { app: '0.1.0' } });
+    await expect(__testing.getDesktopPasskeyState()).resolves.toEqual({
+      available: false,
+      enrolled: false,
+      dismissed: false,
+    });
+    await expect(__testing.completeDesktopPasskeySignIn()).resolves.toEqual({
+      ok: false,
+      reason: 'desktop-passkey-bridge-unavailable',
+    });
+  });
+
+  it('reports return codes unsupported on a stale bridge', async () => {
+    setElectronAPI({ versions: { app: '0.1.0' } });
+
+    expect(__testing.supportsDesktopAuthReturnCode()).toBe(false);
+    await expect(
+      __testing.redeemDesktopAuthReturnCode('BCDF-GHJK')
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'desktop-auth-return-code-bridge-unavailable',
+    });
   });
 
   it('copyDesktopAuthUrl fails closed for a stale bridge', async () => {
@@ -546,6 +702,36 @@ describe('electron-bridge — defensive guards', () => {
       expect(() => unsub()).not.toThrow();
     });
   });
+
+  describe('showDesktopNotification — native notification bridge', () => {
+    it('silently no-ops when electronAPI is absent (browser)', async () => {
+      await expect(
+        __testing.showDesktopNotification({ title: 'New message' })
+      ).resolves.toBeUndefined();
+      expect(captureWarningMock).not.toHaveBeenCalled();
+    });
+
+    it('silently no-ops when showNotification is missing (stale binary)', async () => {
+      setElectronAPI({ versions: { app: '0.1.0' } });
+      await expect(
+        __testing.showDesktopNotification({ title: 'New message' })
+      ).resolves.toBeUndefined();
+      expect(captureWarningMock).not.toHaveBeenCalled();
+    });
+
+    it('passes the payload through to the bridge', async () => {
+      const showNotification = vi.fn().mockResolvedValue({ ok: true });
+      setElectronAPI({ showNotification });
+
+      const payload = {
+        title: 'New fan DM',
+        body: 'Alex sent you a message',
+        url: '/inbox?thread=123',
+      };
+      await __testing.showDesktopNotification(payload);
+      expect(showNotification).toHaveBeenCalledWith(payload);
+    });
+  });
 });
 
 /**
@@ -622,5 +808,72 @@ describe('useDesktopBuildIdentity — build-identity handoff', () => {
       await Promise.resolve();
     });
     expect(result.current).toBeUndefined();
+  });
+});
+
+describe('narrow current Ovie browser bridge', () => {
+  it('passes no destination to native and never uses window.open', async () => {
+    const open = vi.fn(async () => ({ ok: true }));
+    setElectronAPI({ openCurrentOvieInBrowser: open });
+    expect(await __testing.openCurrentOvieInBrowser()).toEqual({ ok: true });
+    expect(open).toHaveBeenCalledExactlyOnceWith();
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+  it('fails closed for stale binary or ordinary browser', async () => {
+    expect((await __testing.openCurrentOvieInBrowser()).ok).toBe(false);
+    setElectronAPI({});
+    expect(await __testing.openCurrentOvieInBrowser()).toEqual({
+      ok: false,
+      reason: 'ovie-browser-bridge-unavailable',
+    });
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+  it.each([null, { ok: false }, { ok: false, reason: 'blocked-url' }])(
+    'preserves explicit native failure %j',
+    async result => {
+      setElectronAPI({ openCurrentOvieInBrowser: vi.fn(async () => result) });
+      expect((await __testing.openCurrentOvieInBrowser()).ok).toBe(false);
+      expect(windowOpenSpy).not.toHaveBeenCalled();
+    }
+  );
+  it('converts rejected IPC into actionable failure', async () => {
+    setElectronAPI({
+      openCurrentOvieInBrowser: vi.fn().mockRejectedValue(Error('IPC lost')),
+    });
+    expect(await __testing.openCurrentOvieInBrowser()).toEqual({
+      ok: false,
+      reason: 'ovie-browser-open-failed',
+    });
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('passive composer launch readiness bridge', () => {
+  it('silently tolerates browsers, old binaries, and a failed IPC', async () => {
+    expect(await notifyDesktopComposerReadiness('visible-editable')).toBe(
+      false
+    );
+    setElectronAPI({});
+    expect(await notifyDesktopComposerReadiness('focused')).toBe(false);
+    setElectronAPI({
+      notifyComposerReadiness: vi.fn().mockRejectedValue(new Error('closed')),
+    });
+    expect(await notifyDesktopComposerReadiness('focused')).toBe(false);
+    expect(captureWarningMock).not.toHaveBeenCalled();
+  });
+  it('forwards only the milestone and requires a positive main-process receipt', async () => {
+    const notifyComposerReadiness = vi
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    setElectronAPI({ notifyComposerReadiness });
+    expect(await notifyDesktopComposerReadiness('visible-editable')).toBe(
+      false
+    );
+    expect(await notifyDesktopComposerReadiness('focused')).toBe(true);
+    expect(notifyComposerReadiness.mock.calls).toEqual([
+      ['visible-editable'],
+      ['focused'],
+    ]);
   });
 });

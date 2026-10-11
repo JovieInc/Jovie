@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
 import { campaignSettings } from '@/lib/db/schema/admin';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
@@ -13,7 +13,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  * GET /api/admin/outreach/settings — Get current campaign settings.
  */
 export async function GET() {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
   if (!entitlements.isAuthenticated || !entitlements.isAdmin) {
     return NextResponse.json(
       { error: 'Unauthorized' },

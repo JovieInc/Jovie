@@ -9,8 +9,9 @@ function release(
   version: string,
   sections: Partial<ChangelogRelease['sections']>
 ): ChangelogRelease {
-  return {
+  const value: ChangelogRelease = {
     version,
+    kind: 'release',
     date: '2026-08-16',
     summary: '',
     sections: {
@@ -22,6 +23,12 @@ function release(
       ...sections,
     },
   };
+  value.customerOutcomes = Object.fromEntries(
+    Object.values(value.sections)
+      .flat()
+      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  );
+  return value;
 }
 
 describe('featureIntroCatalogFromChangelogRelease', () => {

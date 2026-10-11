@@ -9,6 +9,7 @@ import { generateArtworkImageObject } from '@/lib/images/seo';
 import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
 import { msToIsoDuration, toDateOnlySafe } from '@/lib/utils/date';
 import {
+  profileEntityAnchor,
   resolveArtistEntityType,
   resolveMusicContentSchemaType,
 } from './artist-entity';
@@ -26,6 +27,12 @@ const CREDIT_ROLE_SCHEMA_MAP: Record<string, string> = {
   composer: 'composer',
   lyricist: 'lyricist',
   featured_artist: 'contributor',
+  remixer: 'contributor',
+  arranger: 'contributor',
+  conductor: 'contributor',
+  mix_engineer: 'contributor',
+  mastering_engineer: 'contributor',
+  other: 'contributor',
 };
 
 type TrackListItem = {
@@ -171,7 +178,7 @@ function buildByArtistEntities(
       ...(handle
         ? {
             '@id': isOwnerCredit
-              ? `${ownerUrl}#musicgroup`
+              ? `${ownerUrl}#${profileEntityAnchor(creator.creatorType ?? 'artist')}`
               : `${BASE_URL}/${handle}#musicgroup`,
             url: `${BASE_URL}/${handle}`,
           }

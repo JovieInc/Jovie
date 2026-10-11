@@ -56,6 +56,21 @@ vi.mock('@/lib/discography/provider-links', () => ({
     mockBuildSearchUrl(provider, track, opts),
 }));
 
+const mockProcessProviderRecordingArtistCredits = vi
+  .fn()
+  .mockResolvedValue(true);
+const mockInvalidateSmartLinkContentCache = vi.fn();
+
+vi.mock('@/lib/discography/artist-queries', () => ({
+  processProviderRecordingArtistCredits: (...args: unknown[]) =>
+    mockProcessProviderRecordingArtistCredits(...args),
+}));
+
+vi.mock('@/lib/cache/releases', () => ({
+  invalidateSmartLinkContentCache: (...args: unknown[]) =>
+    mockInvalidateSmartLinkContentCache(...args),
+}));
+
 // Queries
 const mockGetTracksForRelease = vi.fn();
 const mockUpsertProviderLink = vi.fn().mockResolvedValue({ id: 'link-1' });
@@ -152,6 +167,7 @@ describe('discovery', () => {
     mockBuildSearchUrl.mockImplementation(
       (provider: string) => `https://search.example.com/${provider}`
     );
+    mockProcessProviderRecordingArtistCredits.mockResolvedValue(true);
   });
 
   describe('discoverLinksForRelease', () => {
@@ -218,6 +234,56 @@ describe('discovery', () => {
           provider: 'tidal',
           quality: 'canonical',
         })
+      );
+    });
+
+    it('merges Apple primary + featured + remixer evidence into canonical recording credits', async () => {
+      mockMusicKitLookupByIsrc.mockResolvedValue({
+        id: 'apple-track-take-me-over-remix',
+        attributes: {
+          url: 'https://music.apple.com/us/song/take-me-over/123',
+          name: 'Take Me Over (feat. Erica Gibson) [Austin Leeds Remix]',
+          artistName: 'Tim White & Austin Leeds',
+        },
+      });
+
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+      const result = await discoverLinksForRelease('release-1', [
+        'apple_music',
+      ]);
+
+      expect(mockProcessProviderRecordingArtistCredits).toHaveBeenCalledWith({
+        creatorProfileId: 'profile-1',
+        isrc: 'USUM72212345',
+        provider: 'apple_music',
+        sourceEntityId: 'apple-track-take-me-over-remix',
+        credits: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'Tim White',
+            role: 'main_artist',
+            isPrimary: true,
+          }),
+          expect.objectContaining({
+            name: 'Erica Gibson',
+            role: 'featured_artist',
+            isPrimary: false,
+          }),
+          expect.objectContaining({
+            name: 'Austin Leeds',
+            role: 'remixer',
+            isPrimary: false,
+          }),
+        ]),
+      });
+      expect(mockInvalidateSmartLinkContentCache).toHaveBeenCalledWith(
+        'profile-1'
+      );
+      expect(result.discovered).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ provider: 'apple_music' }),
+        ])
       );
     });
 

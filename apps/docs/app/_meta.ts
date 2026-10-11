@@ -1,10 +1,10 @@
 export default {
-  index: {
-    title: 'Home',
+  docs: {
+    title: 'Help Center',
     type: 'page',
   },
-  docs: {
-    title: 'Documentation',
+  contact: {
+    title: 'Contact support',
     type: 'page',
   },
 };

@@ -3,12 +3,14 @@ import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { RouteSegmentControl } from '@/components/molecules/RouteSegmentControl';
 import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
+import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
 import type { AudienceSegment } from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import { LazyDashboardAudienceClient } from '@/features/dashboard/organisms/LazyDashboardAudienceClient';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { getAudienceWorkspaceNavigation } from '@/lib/audience/workspace-navigation';
 import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -51,7 +53,7 @@ function buildAudienceWorkspaceHref(searchParams: SearchParams): string {
   return `${APP_ROUTES.CONTACTS}?${params.toString()}`;
 }
 
-function ContactsWorkspaceTabs({
+function AudienceWorkspaceTabs({
   activeTab,
   searchParams,
 }: Readonly<{
@@ -64,20 +66,11 @@ function ContactsWorkspaceTabs({
       start={
         <RouteSegmentControl
           value={activeTab}
-          aria-label='Contacts Workspace'
-          className='max-w-60'
-          options={[
-            {
-              value: 'contacts',
-              label: 'Contacts',
-              href: APP_ROUTES.CONTACTS,
-            },
-            {
-              value: 'audience',
-              label: 'Audience',
-              href: buildAudienceWorkspaceHref(searchParams),
-            },
-          ]}
+          aria-label='Audience Workspace'
+          className='max-w-72'
+          options={getAudienceWorkspaceNavigation(
+            buildAudienceWorkspaceHref(searchParams)
+          )}
         />
       }
     />
@@ -108,14 +101,17 @@ export default async function ContactsPage({
   }
 
   return (
-    <div
-      className='flex h-full min-h-0 flex-col bg-(--app-shell-content-surface)'
+    <WorkspacePage
+      frame='none'
+      contentPadding='none'
       data-testid='contacts-workspace'
+      toolbar={
+        <AudienceWorkspaceTabs
+          activeTab={activeTab}
+          searchParams={resolvedSearchParams}
+        />
+      }
     >
-      <ContactsWorkspaceTabs
-        activeTab={activeTab}
-        searchParams={resolvedSearchParams}
-      />
       <div className='min-h-0 flex-1'>
         {activeTab === 'audience' ? (
           <Suspense fallback={<AudienceTableLoadingShell />}>
@@ -132,7 +128,7 @@ export default async function ContactsPage({
           />
         )}
       </div>
-    </div>
+    </WorkspacePage>
   );
 }
 

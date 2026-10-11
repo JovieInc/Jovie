@@ -1,6 +1,10 @@
 import 'server-only';
 
 import { and, desc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import type {
+  ProfilesWorkspaceData,
+  ProfileWorkspaceSurfaceRow,
+} from '@/components/features/presence/types';
 import { db } from '@/lib/db';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import {
@@ -27,70 +31,19 @@ import {
   selectCanonicalProfileSurfaces,
 } from '@/lib/profile-surfaces/contracts';
 import {
-  type PresenceIdentityPhoto,
+  findSurfaceDspMatch,
   resolveIdentityPhoto,
 } from '@/lib/profile-surfaces/presence-identity';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
 import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
-import type { SettingsConnectorState } from '../settings/connectors/connectors-data';
 
-export type ProfilesWorkspaceFilter =
-  | 'all'
-  | 'identity'
-  | 'profiles'
-  | 'catalog'
-  | 'connector';
-
-export interface ProfileWorkspaceSurfaceRow {
-  readonly id: string;
-  readonly rowType: 'surface';
-  readonly kind: ProfileSurfaceKind;
-  readonly platform: string;
-  readonly label: string;
-  readonly handle: string | null;
-  readonly url: string;
-  readonly trackedUrl: string | null;
-  readonly qualificationStatus: ProfileQualificationStatus;
-  readonly isOfficial: boolean;
-  readonly monitoringState: 'active' | 'paused' | 'locked' | 'unavailable';
-  readonly rank: number | null;
-  readonly previousRank: number | null;
-  readonly lastObservedAt: string | null;
-  readonly identityPhoto?: PresenceIdentityPhoto;
-}
-
-export interface ProfileWorkspaceConnectorRow {
-  readonly id: string;
-  readonly rowType: 'connector';
-  readonly kind: 'connector';
-  readonly platform: 'gmail' | 'google_calendar';
-  readonly label: string;
-  readonly handle: string | null;
-  readonly url: string;
-  readonly status: SettingsConnectorState['status'];
-  readonly monitoringState: 'active' | 'paused' | 'unavailable';
-}
-
-export type ProfileWorkspaceRow =
-  | ProfileWorkspaceSurfaceRow
-  | ProfileWorkspaceConnectorRow;
-
-export interface ProfilesWorkspaceData {
-  readonly profileId: string;
-  readonly artist: {
-    readonly name: string;
-    readonly username: string;
-    readonly avatarUrl: string | null;
-    readonly isPublic: boolean;
-  };
-  readonly rows: ProfileWorkspaceRow[];
-  readonly monitoringLimit: number | null;
-  readonly monitoredCount: number;
-  readonly qualifiedShare: number | null;
-  readonly bestJovieRank: number | null;
-  readonly lastObservedAt: string | null;
-  readonly providerAvailable: boolean;
-}
+export type {
+  ProfilesWorkspaceData,
+  ProfilesWorkspaceFilter,
+  ProfileWorkspaceConnectorRow,
+  ProfileWorkspaceRow,
+  ProfileWorkspaceSurfaceRow,
+} from '@/components/features/presence/types';
 
 async function ensureWorkspaceSeeded(input: {
   readonly profileId: string;
@@ -306,20 +259,39 @@ export async function loadProfilesWorkspaceData(input: {
       .map(preference => preference.surfaceId)
   );
   const surfaceIds = surfaces.map(surface => surface.id);
-  const socialSourceRows =
+  const sourceRows =
     surfaceIds.length === 0
       ? []
       : await db
-          .select({ surfaceId: profileSurfaceSources.surfaceId })
+          .select({
+            surfaceId: profileSurfaceSources.surfaceId,
+            sourceType: profileSurfaceSources.sourceType,
+          })
           .from(profileSurfaceSources)
           .where(
             and(
               inArray(profileSurfaceSources.surfaceId, surfaceIds),
-              eq(profileSurfaceSources.sourceType, 'social_link'),
               eq(profileSurfaceSources.isLive, true)
             )
           );
-  const socialSourceIds = new Set(socialSourceRows.map(row => row.surfaceId));
+  const sourceTypesBySurface = new Map<string, Set<string>>();
+  for (const source of sourceRows) {
+    const sourceTypes = sourceTypesBySurface.get(source.surfaceId) ?? new Set();
+    sourceTypes.add(source.sourceType);
+    sourceTypesBySurface.set(source.surfaceId, sourceTypes);
+  }
+  const sourceCountBySurface = new Map<string, number>();
+  for (const source of sourceRows) {
+    sourceCountBySurface.set(
+      source.surfaceId,
+      (sourceCountBySurface.get(source.surfaceId) ?? 0) + 1
+    );
+  }
+  const socialSourceIds = new Set(
+    sourceRows
+      .filter(row => row.sourceType === 'social_link')
+      .map(row => row.surfaceId)
+  );
   const dspMatches = await db
     .select({
       providerId: dspArtistMatches.providerId,
@@ -336,10 +308,6 @@ export async function loadProfilesWorkspaceData(input: {
         inArray(dspArtistMatches.status, ['confirmed', 'auto_confirmed'])
       )
     );
-  const dspMatchByPlatform = new Map(
-    dspMatches.map(match => [match.providerId, match] as const)
-  );
-
   const surfaceRows: ProfileWorkspaceSurfaceRow[] = surfaces.map(surface => {
     const rank = rankFor(surface.id, latestRun?.id);
     const preference = preferenceBySurface.get(surface.id);
@@ -354,14 +322,7 @@ export async function loadProfilesWorkspaceData(input: {
             : 'locked';
     const qualificationStatus =
       surface.qualificationStatus as ProfileQualificationStatus;
-    const dspMatch =
-      dspMatchByPlatform.get(surface.platform) ??
-      dspMatches.find(
-        match =>
-          match.externalArtistUrl === surface.url ||
-          (match.externalArtistId &&
-            match.externalArtistId === surface.externalId)
-      );
+    const dspMatch = findSurfaceDspMatch(surface, dspMatches);
     const observedAt =
       surface.lastObservedAt?.toISOString() ??
       dspMatch?.updatedAt?.toISOString() ??
@@ -382,13 +343,13 @@ export async function loadProfilesWorkspaceData(input: {
       kind: surface.kind as ProfileSurfaceKind,
       platform: surface.platform,
       label:
-        surface.displayName ||
         dspMatch?.externalArtistName ||
+        surface.displayName ||
         getDspDisplayName(surface.platform) ||
         surface.platform
           .replaceAll('_', ' ')
           .replaceAll(/\b\w/g, letter => letter.toUpperCase()),
-      handle: surface.handle,
+      handle: surface.handle === surface.displayName ? null : surface.handle,
       url: surface.url,
       trackedUrl,
       qualificationStatus,
@@ -400,6 +361,14 @@ export async function loadProfilesWorkspaceData(input: {
         rankFor(surface.id, previousRun?.id)
       ),
       lastObservedAt: observedAt,
+      identityEvidence: {
+        sourceCount: sourceCountBySurface.get(surface.id) ?? 0,
+        sourceTypes: [...(sourceTypesBySurface.get(surface.id) ?? [])].sort(),
+        confidence:
+          surface.identityConfidence === null
+            ? null
+            : Number(surface.identityConfidence),
+      },
       identityPhoto: resolveIdentityPhoto({
         kind: surface.kind,
         artistAvatarUrl: profileRows[0]?.avatarUrl ?? null,

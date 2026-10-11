@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
@@ -11,6 +11,7 @@ const { mockSearchParams, mockStaticArtistPage } = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => mockSearchParams(),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
 vi.mock('@/features/profile/StaticArtistPage', () => ({
@@ -20,13 +21,29 @@ vi.mock('@/features/profile/StaticArtistPage', () => ({
   },
 }));
 
+// This suite covers demo state selection. Rail/PAC behavior has its own real
+// mounted tests; isolate those unrelated renderers from the showcase inventory.
+vi.mock('@/features/profile/ProfileHomeRail', () => ({
+  ProfileHomeRail: () => <div data-testid='profile-home-rail' />,
+}));
+vi.mock('@/features/profile/ProfilePrimaryActionCard', () => ({
+  ProfilePrimaryActionCard: ({
+    dataTestId,
+  }: {
+    readonly dataTestId: string;
+  }) => <div data-testid={dataTestId} />,
+}));
+
 vi.mock('@/features/demo/DemoClientProviders', () => ({
   DemoClientProviders: ({ children }: { readonly children: ReactNode }) => (
     <>{children}</>
   ),
 }));
 
-const SLOW_DEMO_SURFACE_TIMEOUT_MS = 15_000;
+// First `renderSurface()` pays a cold dynamic import of the demo surface
+// module graph: ~1.8s warm, but the 15s budget fired under full-suite shard
+// CPU contention.
+const SLOW_DEMO_SURFACE_TIMEOUT_MS = 45_000;
 
 async function renderSurface(search = '') {
   mockSearchParams.mockReturnValue(new URLSearchParams(search));
@@ -50,12 +67,31 @@ describe('DemoTimWhiteProfileSurface', () => {
   });
 
   it(
+    'shows supported card examples without inventing an alerts fallback card',
+    async () => {
+      await renderSurface('showcase=cards');
+      expect(
+        screen.getByTestId('demo-showcase-tim-white-profile-cards')
+      ).toBeVisible();
+      expect(
+        screen.queryByTestId('tim-white-cards-alerts-fallback')
+      ).toBeNull();
+      expect(screen.getByTestId('tim-white-cards-release-live')).toBeVisible();
+      expect(screen.getByTestId('tim-white-cards-tour-next')).toBeVisible();
+    },
+    SLOW_DEMO_SURFACE_TIMEOUT_MS
+  );
+
+  it(
     'renders the default clean Tim White profile screenshot surface',
     async () => {
       const props = await renderSurface();
 
       expect(props).toMatchObject({
         mode: 'profile',
+        // Homepage proof captures must match jov.ie/tim, not the dashboard
+        // Preview frame (JOV-6946).
+        presentation: 'full-public',
         artist: expect.objectContaining({
           spotify_id: TIM_WHITE_PROFILE.spotifyArtistId,
           name: TIM_WHITE_PROFILE.name,

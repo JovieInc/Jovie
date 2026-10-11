@@ -55,4 +55,29 @@ describe('ErrorDisplay', () => {
       screen.queryByRole('button', { name: 'Retry Message' })
     ).not.toBeInTheDocument();
   });
+
+  it('keeps the Ovie briefing actionable after a temporary reply failure', () => {
+    fastRender(
+      <ErrorDisplay
+        chatError={{
+          type: 'server',
+          message: 'We encountered a temporary issue. Please try again.',
+          failedMessage: 'What matters now?',
+        }}
+        onRetry={vi.fn()}
+        isLoading={false}
+        isSubmitting={false}
+        presentation='operator'
+      />
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Summer Didn’t Finish That Reply');
+    expect(alert).toHaveTextContent(
+      'Your briefing is still current. Retry this message or ask something else.'
+    );
+    expect(alert).not.toHaveTextContent('Message paused');
+    expect(alert).not.toHaveTextContent('temporary issue');
+    expect(screen.getByRole('button', { name: 'Retry Message' })).toBeEnabled();
+  });
 });

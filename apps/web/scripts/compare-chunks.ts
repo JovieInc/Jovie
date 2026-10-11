@@ -16,9 +16,9 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
 const WEB_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -523,8 +523,14 @@ function compare(): void {
 }
 
 // CLI. Importing the budget helpers must not exit the process.
+// Node resolves module URLs through symlinks; argv can retain an alias (such as
+// macOS /var versus /private/var), so compare canonical paths on both sides.
 const invokedPath = process.argv[1];
-if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
+if (
+  invokedPath &&
+  existsSync(invokedPath) &&
+  realpathSync(invokedPath) === realpathSync(fileURLToPath(import.meta.url))
+) {
   if (process.argv.includes('--snapshot')) {
     captureSnapshot();
   } else {

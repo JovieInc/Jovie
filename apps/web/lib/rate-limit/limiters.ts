@@ -340,6 +340,29 @@ export const publicArtistApiLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for anonymous agent profile creation (`POST /api/agents/profiles`).
+ * Limit: 10 requests per hour per IP. Fails closed without Redis.
+ */
+export const agentProfileCreateLimiter = createRateLimiter(
+  RATE_LIMITERS.agentProfileCreate,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
+ * Rate limiter for anonymous creator extraction
+ * (`GET /api/agents/creator-lookup`). Limit: 60 requests per hour per IP.
+ * Fails closed without Redis.
+ */
+export const agentCreatorLookupLimiter = createRateLimiter(
+  RATE_LIMITERS.agentCreatorLookup,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
  * Rate limiter for the public claim-token entry route (`/claim/[token]`)
  * Limit: 20 requests per minute per IP. Durable (Redis) so the throttle holds
  * across serverless instances; callers treat a degraded backend as advisory
@@ -352,6 +375,43 @@ export const claimTokenAccessLimiter = createRateLimiter(
     requireRedis: true,
   }
 );
+
+/**
+ * Rate limiter for investor-portal token validation (`/investor-portal`).
+ * Limit: 30 attempts per minute per IP; fail-closed without Redis so a limiter
+ * outage cannot reopen the DB-backed token-guessing oracle.
+ */
+export const investorPortalTokenLimiter = createRateLimiter(
+  RATE_LIMITERS.investorPortalToken,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
+ * Rate limiter for private library asset share pages (`/p/[token]`).
+ * A dedicated bucket prevents share traffic from consuming the claim-link or
+ * public-profile budgets.
+ */
+export const libraryAssetShareAccessLimiter = createRateLimiter(
+  RATE_LIMITERS.libraryAssetShareAccess,
+  {
+    requireRedis: true,
+  }
+);
+
+/** Public rider reads/exports (`/api/rider/[username]`); Redis-backed. */
+export const riderPublicAccessLimiter = createRateLimiter(
+  RATE_LIMITERS.riderPublicAccess,
+  {
+    requireRedis: true,
+  }
+);
+
+/** Rider password unlocks; fails closed without Redis (brute-force guard). */
+export const riderUnlockLimiter = createRateLimiter(RATE_LIMITERS.riderUnlock, {
+  requireRedis: true,
+});
 
 /**
  * Rate limiter for public click endpoint
@@ -1255,7 +1315,11 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     trackingIpVisits: trackingIpVisitsLimiter,
     publicProfile: publicProfileLimiter,
     publicArtistApi: publicArtistApiLimiter,
+    agentProfileCreate: agentProfileCreateLimiter,
+    agentCreatorLookup: agentCreatorLookupLimiter,
     claimTokenAccess: claimTokenAccessLimiter,
+    investorPortalToken: investorPortalTokenLimiter,
+    libraryAssetShareAccess: libraryAssetShareAccessLimiter,
     publicClick: publicClickLimiter,
     publicVisit: publicVisitLimiter,
     publicProfileCaptureDismissal: publicProfileCaptureDismissalLimiter,

@@ -6,12 +6,14 @@ import { PlatformConnectionsClient } from '@/app/app/(shell)/admin/platform-conn
 
 const {
   mockGenerateTestPlaylist,
+  mockPush,
   mockRefresh,
   mockSetCurrentAdminAsPlaylistSpotifyPublisher,
   mockUpdatePlaylistEngineSettings,
   mockUseUserSafe,
 } = vi.hoisted(() => ({
   mockGenerateTestPlaylist: vi.fn(),
+  mockPush: vi.fn(),
   mockRefresh: vi.fn(),
   mockSetCurrentAdminAsPlaylistSpotifyPublisher: vi.fn(),
   mockUpdatePlaylistEngineSettings: vi.fn(),
@@ -23,7 +25,7 @@ vi.mock('@/hooks/useClerkSafe', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: mockRefresh }),
+  useRouter: () => ({ refresh: mockRefresh, push: mockPush }),
 }));
 
 vi.mock('@jovie/ui', () => ({
@@ -199,7 +201,7 @@ describe('PlatformConnectionsClient', () => {
     ).toBeInTheDocument();
   });
 
-  it('surfaces the temporary OAuth migration error for a connected admin', async () => {
+  it('routes a connected admin through the canonical Spotify OAuth flow', async () => {
     const user = userEvent.setup();
     mockUseUserSafe.mockReturnValue({ user: { id: 'user_1' } });
 
@@ -218,9 +220,12 @@ describe('PlatformConnectionsClient', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reconnect Spotify' }));
 
-    expect(
-      await screen.findByText(/temporarily unavailable/i)
-    ).toBeInTheDocument();
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.stringContaining('/api/connectors/spotify/authorize?returnTo=')
+    );
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.stringContaining(encodeURIComponent('tab=spotify'))
+    );
   });
 
   it('selects the current admin as publisher and refreshes successful state', async () => {

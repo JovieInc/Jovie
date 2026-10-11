@@ -396,6 +396,15 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       waitlist: { entryId: 'entry-1', status: 'waitlisted' },
     });
     expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledTimes(1);
+    // The recovered receipt re-asserts the hidden handle reservation
+    // (JOV-7204) instead of leaving jov.ie/<handle> claimable.
+    expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: 'conv_already_claimed',
+        visibility: 'reserved',
+        waitlistEntryId: 'entry-1',
+      })
+    );
     expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
   });
 
@@ -453,7 +462,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(mockExtractClientIP).toHaveBeenCalled();
   });
 
-  it('persists a waitlist decision and returns its durable receipt without materializing a profile', async () => {
+  it('persists a waitlist decision, returns its durable receipt, and reserves the handle on a hidden profile', async () => {
     const appUserId = '3a53ba3e-150c-4ab5-8e73-2d2499764e2c';
     setupDbSelectForCandidates(
       [{ id: 'conv_waitlist', createdAt: new Date('2026-05-01') }],
@@ -461,6 +470,11 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     );
     setupUpdateForPrimary(1);
     setupInsertAudit(true);
+    mockMaterializeClaimedOnboardingProfile.mockResolvedValue({
+      profileId: 'profile_reserved',
+      handle: 'coolartist',
+      status: 'created',
+    });
 
     const res = await POST(makeRequest());
 
@@ -473,6 +487,10 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
         status: 'waitlisted',
         outcome: 'waitlisted_gate_on',
       },
+      profile: {
+        profileId: 'profile_reserved',
+        handle: 'coolartist',
+      },
     });
     expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -484,7 +502,107 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
         }),
       })
     );
-    expect(mockMaterializeClaimedOnboardingProfile).not.toHaveBeenCalled();
+    expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: appUserId,
+        conversationId: 'conv_waitlist',
+        visibility: 'reserved',
+        waitlistEntryId: 'entry-1',
+      })
+    );
+  });
+
+  it.each([true, false])(
+    'reports Spotify identity conflict without a false profile receipt (pending=%s)',
+    async pending => {
+      setupDbSelectForCandidates(
+        [{ id: 'conv_waitlist', createdAt: new Date('2026-05-01') }],
+        waitlistDecisionMessageRows()
+      );
+      setupUpdateForPrimary(1);
+      if (pending) setupInsertAudit(true);
+      if (!pending)
+        mockGetDbUser.mockResolvedValue({
+          id: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
+          userStatus: 'waitlist_approved',
+        });
+      const { SpotifyProfileIdentityConflictError } = await import(
+        '@/lib/profile/spotify-profile-identity'
+      );
+      mockMaterializeClaimedOnboardingProfile.mockRejectedValue(
+        new SpotifyProfileIdentityConflictError()
+      );
+      const response = await POST(makeRequest());
+      const body = await response.json();
+      expect(response.status).toBe(409);
+      expect(body.errorCode).toBe('SPOTIFY_IDENTITY_CONFLICT');
+      expect(body).not.toHaveProperty('profile');
+      if (pending) {
+        expect(body).toMatchObject({
+          waitlist: { entryId: 'entry-1' },
+          profileError: { errorCode: 'SPOTIFY_IDENTITY_CONFLICT' },
+        });
+      } else expect(body.errorCode).toBe('SPOTIFY_IDENTITY_CONFLICT');
+      expect(mockCaptureError).not.toHaveBeenCalled();
+      expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['recovered', 'race'] as const)(
+    'keeps a repeated %s claim conflict at 409 and preserves recovery context',
+    async mode => {
+      if (mode === 'recovered') {
+        setupRecoveredClaim('conv_conflict', waitlistDecisionMessageRows());
+      } else {
+        setupDbSelectForCandidates(
+          [{ id: 'conv_conflict', createdAt: new Date() }],
+          waitlistDecisionMessageRows()
+        );
+        setupUpdateForPrimary(0);
+        setupOwnedConversation('conv_conflict', true);
+      }
+      const { SpotifyProfileIdentityConflictError } = await import(
+        '@/lib/profile/spotify-profile-identity'
+      );
+      mockMaterializeClaimedOnboardingProfile.mockRejectedValue(
+        new SpotifyProfileIdentityConflictError()
+      );
+      const response = await POST(makeRequest());
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        errorCode: 'SPOTIFY_IDENTITY_CONFLICT',
+        alreadyClaimed: true,
+        conversationId: 'conv_conflict',
+        waitlist: { entryId: 'entry-1' },
+        profileError: { errorCode: 'SPOTIFY_IDENTITY_CONFLICT' },
+      });
+      expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
+    }
+  );
+
+  it('still returns the waitlist receipt when handle reservation fails', async () => {
+    setupDbSelectForCandidates(
+      [{ id: 'conv_waitlist', createdAt: new Date('2026-05-01') }],
+      waitlistDecisionMessageRows()
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+    mockMaterializeClaimedOnboardingProfile.mockRejectedValue(
+      new Error('db down')
+    );
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      claimed: 1,
+      waitlist: { entryId: 'entry-1', status: 'waitlisted' },
+    });
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Onboarding waitlist handle reservation failed',
+      expect.any(Error),
+      expect.objectContaining({ route: '/api/onboarding/claim' })
+    );
   });
 
   it('rechecks the authoritative gate at claim time when the persisted decision is not waitlist', async () => {
@@ -507,7 +625,12 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(await res.json()).toMatchObject({
       waitlist: { entryId: 'entry-1', status: 'waitlisted' },
     });
-    expect(mockMaterializeClaimedOnboardingProfile).not.toHaveBeenCalled();
+    expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visibility: 'reserved',
+        waitlistEntryId: 'entry-1',
+      })
+    );
   });
 
   it('refuses to consume the transcript when the current gate is on but durable artist data is missing', async () => {

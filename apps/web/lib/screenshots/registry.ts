@@ -12,6 +12,20 @@ export const SCREENSHOT_VIEWPORTS = {
   mobile: { width: 390, height: 844 },
 } as const;
 
+/**
+ * Top safe-area inset for mobile captures (Dynamic Island iPhones: 59px).
+ * Marketing phone frames draw an island over the screen; without the inset
+ * the profile's `env(safe-area-inset-top)` padding resolves to 0 and content
+ * sits under the island. The bottom stays 0: frames draw no home indicator,
+ * and a bottom inset shrinks the scroll area enough to clip the last card.
+ */
+export const SCREENSHOT_MOBILE_SAFE_AREA = {
+  top: 59,
+  bottom: 0,
+  left: 0,
+  right: 0,
+} as const;
+
 export const GROUP_LABELS: Record<ScreenshotGroup, string> = {
   marketing: 'Marketing',
   onboarding: 'Onboarding',
@@ -253,13 +267,17 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       captureSelector: '[data-testid="homepage-phone-state-mock-home"]',
       viewport: 'mobile',
     },
-    {
-      id: 'tim-white-profile-live-desktop',
-      title: 'Tim White Profile — Latest Release Desktop',
-      route: '/demo/showcase/tim-white-profile?release=live',
-      waitFor: '[data-testid="profile-compact-shell"]',
-      publicExportPath: 'tim-white-profile-live-desktop.png',
-    },
+  ]),
+  defineScenario({
+    group: 'marketing',
+    consumers: ADMIN_MARKETING_AND_INVESTOR,
+    id: 'tim-white-profile-live-desktop',
+    title: 'Tim White Profile — Latest Release Desktop',
+    route: '/demo/showcase/tim-white-profile?release=live',
+    waitFor: '[data-testid="profile-compact-shell"]',
+    publicExportPath: 'tim-white-profile-live-desktop.png',
+  }),
+  ...defineScenarios('marketing', ADMIN_AND_INVESTOR, [
     {
       id: 'tim-white-profile-mainstream-desktop',
       title: 'Tim White Profile — Mainstream Desktop',
@@ -312,16 +330,18 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'tim-white-profile-alerts-fallback-mobile',
       title: 'Tim White Profile — Alerts Fallback',
       route: '/demo/showcase/tim-white-profile?state=alerts-fallback',
-      waitFor: '[data-testid="profile-home-alerts-fallback-card"]',
+      waitFor: '[data-testid="profile-identity-get-updates"]',
       viewport: 'mobile',
       publicExportPath: 'tim-white-profile-alerts-fallback-phone.png',
     },
     {
+      // With no dates, ProfileEventsCard renders its empty branch; the tour
+      // list (tour-drawer-content) is only mounted when events exist.
       id: 'tim-white-profile-events-empty-mobile',
       title: 'Tim White Profile — Events Empty',
       route: '/demo/showcase/tim-white-profile?state=events-empty',
-      waitFor: '[data-testid="tour-drawer-content"]',
       viewport: 'mobile',
+      waitFor: '[data-testid="profile-primary-tab-events-empty"]',
       publicExportPath: 'tim-white-profile-events-empty-phone.png',
     },
     {

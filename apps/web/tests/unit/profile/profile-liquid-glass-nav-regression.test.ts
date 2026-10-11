@@ -36,6 +36,17 @@ describe('public profile Liquid Glass navigation', () => {
     );
     expect(NAV.match(/profile-bottom-nav-indicator/g)).toHaveLength(1);
     expect(SURFACE).toContain('CONTENT_SAFE_AREA_BOTTOM_PADDING');
+    const desktopHomeLayoutStart = CSS.indexOf(
+      '/* From md up the compact surface'
+    );
+    expect(desktopHomeLayoutStart).toBeGreaterThan(0);
+    const compactHomeBaseLayout = CSS.slice(0, desktopHomeLayoutStart);
+    expect(compactHomeBaseLayout).toMatch(
+      /\.profile-home-content-column\s*\n\s*\) \{\s*margin-bottom:\s*var\(--profile-bottom-nav-height\)/
+    );
+    expect(compactHomeBaseLayout).toMatch(
+      /\.profile-home-content-scroll \{\s*padding-bottom:\s*0;/
+    );
     expect(CSS).toMatch(
       /\.profile-floating-tab-bar\)[\s\S]{0,180}position:\s*absolute[\s\S]{0,120}pointer-events:\s*none/
     );
@@ -86,11 +97,13 @@ describe('public profile Liquid Glass navigation', () => {
   });
 
   it('renders the PAC listen slot as flat glass from the tab bar lens material', () => {
+    // The rail listen slot keeps the glass tone; the featured mode card
+    // swaps the face to the neutral card CTA through `shape`.
     expect(PAC).toMatch(
-      /<PrimaryPill tone='glass' href=\{listenHref\}>\s*Listen/
+      /<PrimaryPill shape=\{pillShape\} tone='glass' href=\{listenHref\}>\s*\{isFeatured \? 'Listen now' : 'Listen'\}/
     );
     expect(PAC).toMatch(
-      /<PrimaryPill\s+tone='glass'\s+href=\{listenHref\}\s+onClick=\{handlePlayClick\}/
+      /<PrimaryPill\s+shape=\{pillShape\}\s+tone='glass'\s+href=\{listenHref\}\s+onClick=\{handlePlayClick\}/
     );
     expect(PAC).toContain("? 'profile-glass-pill'");
     const pill =
@@ -101,5 +114,21 @@ describe('public profile Liquid Glass navigation', () => {
     expect(pill).not.toContain('backdrop-filter');
     expect(pill).not.toMatch(/box-shadow:[^;]*\b0 \d+px \d+px/);
     expect(CSS).toContain(':root.high-contrast .profile-glass-pill');
+  });
+
+  it('renders the identity Listen action as the flat frosted variant of the same glass', () => {
+    const flat =
+      CSS.match(/:where\(\.profile-glass-pill--flat\) \{[^}]*\}/)?.[0] ?? '';
+    // Same dock tokens as the lens, no second glass recipe.
+    expect(flat).toContain('var(--profile-dock-lens-bg)');
+    expect(flat).toContain('var(--profile-dock-border)');
+    expect(flat).toContain('border-radius: 10px');
+    expect(flat).toContain('backdrop-filter: blur(var(--space-4))');
+    // Flat: no sheen gradient, no top-rim bevel, no drop shadow.
+    expect(flat).not.toContain('linear-gradient');
+    expect(flat).not.toContain('--profile-dock-lens-rim');
+    expect(flat).not.toMatch(/box-shadow:[^;]*\b0 \d+px \d+px/);
+    // Reduced transparency and high contrast drop the blur.
+    expect(CSS).toContain(':root.high-contrast .profile-glass-pill--flat');
   });
 });

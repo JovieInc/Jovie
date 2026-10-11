@@ -102,6 +102,35 @@ describe('useChatConversationQuery', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('treats missing Summer history as a valid empty first-use session', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: 'No Summer history was found yet.' }),
+        {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    const { result } = renderHook(
+      () =>
+        useChatConversationQuery({
+          conversationId: null,
+          chatMode: 'ov',
+        }),
+      { wrapper: TestWrapper }
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toMatchObject({
+      chatMode: 'ov',
+      conversation: { title: 'Summer' },
+      messages: [],
+      hasMore: false,
+    });
+  });
+
   it('should respect refetchInterval when provided', async () => {
     mockFetch.mockResolvedValue({
       ok: true,

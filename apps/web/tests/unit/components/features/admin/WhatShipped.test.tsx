@@ -4,7 +4,10 @@ import type { PropsWithChildren } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WhatShipped } from '../../../../../components/features/admin/WhatShipped';
 
-function renderWhatShipped() {
+function renderWhatShipped(props?: {
+  readonly title?: string;
+  readonly limit?: number;
+}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: {
@@ -19,7 +22,7 @@ function renderWhatShipped() {
     );
   }
 
-  return render(<WhatShipped />, { wrapper: Wrapper });
+  return render(<WhatShipped {...props} />, { wrapper: Wrapper });
 }
 
 describe('WhatShipped', () => {
@@ -125,5 +128,32 @@ describe('WhatShipped', () => {
       );
     });
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('caps rendered rows at the limit and uses the given title', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          generatedAt: '2026-07-03T10:05:34.770172+00:00',
+          available: true,
+          items: [1, 2, 3, 4, 5].map(n => ({
+            number: 1000 + n,
+            title: `Shipped item ${n}`,
+            merged_at: new Date(Date.now() - n * 60 * 1000).toISOString(),
+            url: `https://github.com/JovieInc/Jovie/pull/${1000 + n}`,
+          })),
+        }),
+        { status: 200 }
+      )
+    );
+
+    renderWhatShipped({ title: "What's New", limit: 3 });
+
+    await waitFor(() => {
+      expect(screen.getByText('Shipped item 1')).toBeInTheDocument();
+    });
+    expect(screen.getByText("What's New")).toBeInTheDocument();
+    expect(screen.getByText('Shipped item 3')).toBeInTheDocument();
+    expect(screen.queryByText('Shipped item 4')).not.toBeInTheDocument();
   });
 });

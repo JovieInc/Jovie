@@ -26,9 +26,6 @@ import ProfileOpenGraphImage, {
   size as profileSize,
 } from '@/app/[username]/opengraph-image';
 import { GET as celebrationCardGET } from '@/app/api/celebration-card/[username]/route';
-import InvestorOpenGraphImage, {
-  runtime as investorRuntime,
-} from '@/app/investor-portal/opengraph-image';
 import { getProfileWithLinks } from '@/lib/services/profile';
 
 const mockGetProfile = vi.mocked(getProfileWithLinks);
@@ -81,13 +78,6 @@ describe('profile opengraph-image', () => {
       params: Promise.resolve({ username: 'testartist' }),
     });
     expect(response).toBeDefined();
-  });
-});
-
-describe('investor-portal opengraph-image', () => {
-  it('declares the nodejs runtime and renders the card', () => {
-    expect(investorRuntime).toBe('nodejs');
-    expect(InvestorOpenGraphImage()).toBeDefined();
   });
 });
 

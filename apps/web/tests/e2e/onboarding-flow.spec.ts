@@ -351,7 +351,8 @@ test.describe('Onboarding Flow', () => {
       expect(response.ok()).toBeTruthy();
 
       const health = await response.json();
-      expect(health.status).toBe('ok');
+      expect(health.healthy).toBe(true);
+      expect(health).not.toHaveProperty('details');
     }
   );
 });

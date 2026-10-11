@@ -32,14 +32,17 @@ function AuthReturnContent() {
     return buildDesktopAuthDeepLink(returnRoute, protocol);
   }, [returnRoute, protocol]);
 
-  useEffect(() => {
-    if (deepLink && globalThis.location) {
-      globalThis.location.href = deepLink;
-    }
-  }, [deepLink]);
-
   return (
     <main className='grid min-h-dvh place-items-center bg-base px-6 text-primary-token'>
+      {deepLink ? (
+        <iframe
+          aria-hidden='true'
+          data-testid='native-protocol-launcher'
+          hidden
+          src={deepLink}
+          title='Jovie app launcher'
+        />
+      ) : null}
       <section className='w-full max-w-sm rounded-2xl border border-subtle bg-surface-1 px-6 py-7 text-center shadow-card'>
         {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- Approved conversational return phrase. */}
         <h1 className='text-xl font-semibold leading-7'>Return to Jovie</h1>

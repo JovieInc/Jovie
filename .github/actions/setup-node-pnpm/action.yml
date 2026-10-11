@@ -6,6 +6,14 @@ inputs:
     description: 'Enable setup-node package cache restore and post-job save'
     required: false
     default: 'true'
+  reuse_merge_group_workspace:
+    description: 'Require the prepared merge-group installed tree and skip dependency fetch/install'
+    required: false
+    default: 'false'
+  save_merge_group_workspace:
+    description: 'Allow the merge-group workspace producer to save the exact installed tree'
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -35,11 +43,13 @@ runs:
       shell: bash
       run: node .github/runner-image/verify-prerequisites.mjs --component dependencies
 
-    # Pin the Node 24-based v5 installer because it installs the repo's exact
-    # packageManager version directly. v6.0.9 first bootstraps pnpm 11.7.0 and
-    # then runs `self-update 9.15.4`; that downgrade intermittently failed with
-    # ENOENT inside a fresh runner.temp dest (run 29657049045), before any test
-    # could start. The per-job install dir still prevents the two earlier
+    # Pin the Node 24-based v6.1 installer. v5's bundled pnpm bootstrap calls
+    # deprecated url.parse() under Node 24 (run 37219316854); v6.1 bootstraps
+    # through npm and then selects the repo's exact packageManager version
+    # without that deprecation. v6.0.9's older bootstrap intermittently failed
+    # while downgrading to pnpm 9.15.4 (run 29657049045); v6.1's refreshed
+    # bootstrap installs the current 9.15.9 pin successfully. The per-job
+    # install dir still prevents the two earlier
     # self-hosted pool failure modes caused by a shared persistent dest:
     #   1. default ~/setup-pnpm carried a pnpm v11 layout that crashed pinned
     #      9.15.4 ("Worker pnpm exited with code 1", run 29070623310)
@@ -50,7 +60,7 @@ runs:
     # re-download costs seconds. The package store stays shared and safe.
     - name: Setup pnpm
       if: steps.runner-prereqs.outputs.dependencies_warm != 'true'
-      uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+      uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       with:
         dest: ${{ runner.temp }}/setup-pnpm
 
@@ -59,10 +69,10 @@ runs:
     # pnpm store and another 13-18s in `pnpm fetch` linking 3,083 packages
     # into node_modules/.pnpm. An exact node_modules hit replaces both with
     # one extract. No restore-keys: only an exact lockfile, workspace, patch,
-    # .npmrc and Node pin match restores, and `pnpm install --frozen-lockfile`
-    # below still verifies the tree against pnpm-lock.yaml. Self-hosted
-    # runners never restore or save Actions caches (see setup-node below).
-    # Bump v3 when the install command, its environment or the pruned set
+    # .npmrc and Node pin match restores. Standard jobs still run frozen
+    # install; merge-group consumers validate the prepared-tree receipt and
+    # installed lockfile. Self-hosted runners never use Actions caches.
+    # Bump v4 when the install command, its environment or the pruned set
     # below changes; scripts/lib/actions-cache-supersede.mjs tracks it.
     - name: Restore installed node_modules (GitHub-hosted)
       id: node-modules-cache
@@ -74,7 +84,7 @@ runs:
           apps/*/node_modules
           packages/*/node_modules
           workers/*/node_modules
-        key: pnpm-node-modules-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'patches/**') }}
+        key: pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}
 
     # setup-node's pnpm cache is GitHub-hosted only. Every self-hosted runner,
     # fixed or ephemeral, skips Actions cache restore/save. Fixed runners reuse
@@ -93,13 +103,14 @@ runs:
         cache-dependency-path: '**/pnpm-lock.yaml'
 
     - name: Warm pnpm store
-      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.node-modules-cache.outputs.cache-hit != 'true'
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.node-modules-cache.outputs.cache-hit != 'true' && !(github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true')
       shell: bash
       env:
         ONNXRUNTIME_NODE_INSTALL: skip
       run: pnpm fetch --frozen-lockfile
 
     - name: Install dependencies
+      if: github.event_name != 'merge_group' || inputs.reuse_merge_group_workspace != 'true'
       shell: bash
       env:
         ONNXRUNTIME_NODE_INSTALL: skip
@@ -112,6 +123,30 @@ runs:
           pnpm install --frozen-lockfile
         fi
 
+    # The repo's Actions cache runs over its 10 GB cap on dependabot days (12.3 GB
+    # on 2026-10-10: one 1.25 GB store, one 580 MB workspace and one 260 MB
+    # browser cache per distinct lockfile), so a producer's workspace can be
+    # evicted before a slow consumer restores it. That ejected #21141 and #21097
+    # from the queue. Rebuild the same tree from the frozen lockfile instead of
+    # failing the group; `prepare` then `validate` keep the receipt contract.
+    - name: Require prepared merge-group workspace
+      if: github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true'
+      shell: bash
+      env:
+        ONNXRUNTIME_NODE_INSTALL: skip
+      run: |
+        if [[ "${{ runner.environment }}" != 'github-hosted' ]]; then
+          echo "::error::Prepared merge-group dependency workspace was not restored."
+          exit 1
+        fi
+        if [[ "${{ steps.node-modules-cache.outputs.cache-hit }}" != 'true' ]]; then
+          echo "::warning::Prepared merge-group dependency workspace was not restored (cache evicted); installing the frozen lockfile instead."
+          pnpm fetch --frozen-lockfile
+          pnpm install --frozen-lockfile
+          node scripts/lib/ci-dependency-workspace.mjs prepare
+        fi
+        node scripts/lib/ci-dependency-workspace.mjs validate
+
     # app-builder-bin picks binaries by process.platform, so a Linux tree
     # never loads its mac/win copies.
     - name: Drop unloadable binaries before save
@@ -120,6 +155,7 @@ runs:
         steps.node-modules-cache.outcome == 'success' &&
         steps.node-modules-cache.outputs.cache-hit != 'true' &&
         (github.event_name == 'push' ||
+        (github.event_name == 'merge_group' && inputs.save_merge_group_workspace == 'true') ||
         (github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name == github.repository))
       shell: bash
@@ -141,17 +177,20 @@ runs:
           -o -name '@anthropic-ai+claude-agent-sdk-linux-*' \) \
           -exec find {}/node_modules -type f ! -name package.json -delete \;
 
+    - name: Stamp installed workspace receipt
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true' && !(github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true')
+      shell: bash
+      run: node scripts/lib/ci-dependency-workspace.mjs prepare
+
     # Save right after install, before any job step can write build or test
-    # output under node_modules. Only same-repository push and pull_request
-    # runs save. GitHub scopes each cache to the ref that wrote it (main, or
-    # one PR), so a PR can never seed a tree that main restores. Fork PRs,
-    # pull_request_target, workflow_run and merge_group never save; no later
-    # run restores a merge_group ref's cache.
+    # output under node_modules. Same-repository pushes/PRs seed their scoped
+    # caches; one merge-group producer seeds its queue ref for sibling jobs.
     - name: Save installed node_modules (GitHub-hosted)
       if: >-
         steps.node-modules-cache.outcome == 'success' &&
         steps.node-modules-cache.outputs.cache-hit != 'true' &&
         (github.event_name == 'push' ||
+        (github.event_name == 'merge_group' && inputs.save_merge_group_workspace == 'true') ||
         (github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name == github.repository))
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

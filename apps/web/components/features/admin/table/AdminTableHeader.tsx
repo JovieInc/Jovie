@@ -15,6 +15,8 @@ interface AdminTableSubheaderProps {
   readonly start?: ReactNode;
   readonly end?: ReactNode;
   readonly className?: string;
+  /** Preserve toolbar geometry while a bulk-action overlay owns interaction. */
+  readonly inert?: boolean;
 }
 
 export function AdminTableHeader({
@@ -38,6 +40,7 @@ export function AdminTableSubheader({
   start,
   end,
   className,
+  inert = false,
 }: Readonly<AdminTableSubheaderProps>) {
   const hasToolbar = start !== undefined || end !== undefined;
   const toolbarContent = hasToolbar ? (
@@ -48,10 +51,12 @@ export function AdminTableSubheader({
 
   return (
     <div
+      inert={inert}
+      aria-hidden={inert || undefined}
       className={cn(
         hasToolbar
-          ? 'bg-surface-1'
-          : 'border-b border-(--app-shell-frame-seam) bg-surface-1 px-app-header py-1',
+          ? 'bg-transparent'
+          : 'border-b border-(--app-shell-frame-seam) bg-transparent px-app-header py-1',
         className
       )}
     >

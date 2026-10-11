@@ -72,11 +72,17 @@ describe('social shortcut alias rewrite (JOV-5072)', () => {
 
     expect(Array.isArray(rewrites)).toBe(false);
     // beforeFiles runs ahead of the filesystem tree, so the social alias must
-    // never live there: concrete pages keep precedence over it. The one
-    // deliberate beforeFiles interceptor is the default /hud rewrite into the
-    // OV app shell, whose contract is pinned by ov-mode-routing.test.ts.
+    // never live there: concrete pages keep precedence over it. The
+    // deliberate beforeFiles interceptors are the isolated /hud family
+    // (/hud itself and /hud/wiki) rewriting into the OV app shell — each of
+    // those sources is also a concrete filesystem page, so the redirect must
+    // win before the filesystem check or it would never fire. That contract
+    // is pinned by ov-mode-routing.test.ts.
+    const hudFamily = new Set(['/hud', '/hud/wiki', '/hud/wiki/:path*']);
     const beforeFiles =
       (rewrites as { beforeFiles?: readonly RewriteRule[] }).beforeFiles ?? [];
-    expect(beforeFiles.filter(rule => rule.source !== '/hud')).toHaveLength(0);
+    expect(
+      beforeFiles.filter(rule => !hudFamily.has(rule.source))
+    ).toHaveLength(0);
   });
 });

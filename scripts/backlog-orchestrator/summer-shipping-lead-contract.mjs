@@ -3,12 +3,38 @@ import { createHash, sign, verify } from 'node:crypto';
 export const SHIPPING_TASK = 'jovie-symphony-shipping-lead-task/v1';
 export const SHIPPING_OUTBOX = 'jovie.eve.symphony-shipping-lead-outbox/v1';
 export const SHIPPING_OUTCOME = 'jovie.symphony-shipping-lead-outcome/v1';
-const ACTION = 'request-canonical-jov-triage-admission';
+export const SHIPPING_TASK_PROFILES = Object.freeze({
+  JOV_TRIAGE_ADMISSION: Object.freeze({
+    action: 'request-canonical-jov-triage-admission',
+    authority: 'canonical-admission-request-owner-acceptance-required',
+    safety: 'exact-source-ci-native-queue-production-gates-remain-required',
+    maximumConcurrent: 3,
+    teamKey: 'JOV',
+    issue: /^JOV-[1-9][0-9]{0,6}$/u,
+    state: 'Triage',
+    repository: 'JovieInc/Jovie',
+    selectedId: 'shipping-lead-jov-triage',
+    selectedOwner: 'symphony',
+    approvalOnly: false,
+  }),
+  LYB_REVIEWED_PLAN: Object.freeze({
+    action: 'materialize-canonical-lyb-reviewed-plan-admission',
+    authority: 'authenticated-gem-reviewed-plan-admission-only',
+    safety: 'approval-labels-only-upstream-symphony-owns-pickup-dispatch',
+    maximumConcurrent: 1,
+    teamKey: 'LYB',
+    issue: /^LYB-[1-9][0-9]{0,6}$/u,
+    state: 'Todo',
+    repository: 'JovieInc/LogYourBody',
+    selectedId: 'shipping-lead-lyb-reviewed-plan',
+    selectedOwner: 'Gem',
+    approvalOnly: true,
+  }),
+});
 const SHA = /^(?!0{40})[a-f0-9]{40}$/u;
 const DIGEST = /^[a-f0-9]{64}$/u;
 const UUID =
   /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu;
-const ISSUE = /^JOV-[1-9][0-9]{0,6}$/u;
 const KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u;
 const SIGNATURE = /^ed25519=[A-Za-z0-9_-]{80,100}$/u;
 
@@ -42,8 +68,17 @@ export function shippingCanonical(value) {
 export const shippingDigest = value =>
   createHash('sha256').update(shippingCanonical(value)).digest('hex');
 
+export function shippingTaskProfile(task) {
+  return (
+    Object.values(SHIPPING_TASK_PROFILES).find(
+      profile => profile.action === task?.action
+    ) || null
+  );
+}
+
 /** Mirrors Summer's strict signed contract; no fallback to repair authority. */
 export function validateShippingTask(task) {
+  const profile = shippingTaskProfile(task);
   if (
     !exact(task, [
       'schema',
@@ -63,6 +98,7 @@ export function validateShippingTask(task) {
       'runtime',
     ]) ||
     task.schema !== SHIPPING_TASK ||
+    !profile ||
     !DIGEST.test(task.taskKey ?? '') ||
     !timestamp(task.createdAt) ||
     !timestamp(task.expiresAt) ||
@@ -70,12 +106,9 @@ export function validateShippingTask(task) {
     Date.parse(task.expiresAt) - Date.parse(task.createdAt) > 600_000 ||
     task.owner !== 'symphony' ||
     task.route !== 'symphony' ||
-    task.action !== ACTION ||
-    task.authority !==
-      'canonical-admission-request-owner-acceptance-required' ||
-    task.safety !==
-      'exact-source-ci-native-queue-production-gates-remain-required' ||
-    task.maximumConcurrent !== 3 ||
+    task.authority !== profile.authority ||
+    task.safety !== profile.safety ||
+    task.maximumConcurrent !== profile.maximumConcurrent ||
     !DIGEST.test(task.handoffReceiptId ?? '') ||
     !exact(task.issue, [
       'identifier',
@@ -84,11 +117,11 @@ export function validateShippingTask(task) {
       'state',
       'repository',
     ]) ||
-    !ISSUE.test(task.issue.identifier ?? '') ||
+    !profile.issue.test(task.issue.identifier ?? '') ||
     !UUID.test(task.issue.id ?? '') ||
     !timestamp(task.issue.revision) ||
-    task.issue.state !== 'Triage' ||
-    task.issue.repository !== 'JovieInc/Jovie' ||
+    task.issue.state !== profile.state ||
+    task.issue.repository !== profile.repository ||
     !exact(task.selected, [
       'id',
       'sourceRevision',
@@ -96,13 +129,15 @@ export function validateShippingTask(task) {
       'owner',
       'handle',
     ]) ||
-    task.selected.id !== 'shipping-lead-jov-triage' ||
-    task.selected.owner !== 'symphony' ||
+    task.selected.id !== profile.selectedId ||
+    task.selected.owner !== profile.selectedOwner ||
     task.selected.handle !== task.issue.identifier ||
     !DIGEST.test(task.selected.sourceDigest ?? '') ||
     !exact(task.source, ['sourceVersion', 'snapshotDigest']) ||
     !SHA.test(task.source.sourceVersion ?? '') ||
     !DIGEST.test(task.source.snapshotDigest ?? '') ||
+    (profile.approvalOnly &&
+      task.selected.sourceDigest !== task.source.snapshotDigest) ||
     task.selected.sourceRevision !== task.source.sourceVersion ||
     !exact(task.runtime, ['sourceRevision', 'generation', 'invocationId']) ||
     !SHA.test(task.runtime.sourceRevision ?? '') ||

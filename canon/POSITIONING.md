@@ -164,6 +164,271 @@ Until that approval, proposed language belongs in a clearly labeled proposal or
 issue—not in this active canon, product UI, marketing copy, Pen, or external
 communication.
 
+## Pending proposal P-2026-10-03: the throughline
+
+**Status: not active.** Nothing in this section may appear in product UI,
+marketing copy, Pen, or external communication until Tim locks it. On lock, the
+canon owner moves the locked parts into the sections above, bumps the version,
+and records it in the changelog. Proposed by the story agent under JOV-7701,
+with cross-model review on 2026-10-03.
+
+### Founder inputs (2026-10-03)
+
+1. "We're the launch platform: launch your identity, launch your work, link it
+   all together, build and grow an audience around it. Get the people deep
+   first, then wide."
+2. "I wouldn't even use the word launch." Input 7 later reopened "launch" as
+   the headline concept; it stays out of the category noun and product terms.
+3. "You don't even have to have a thing yet to build the following. Jovie is
+   how you build your cult." Tim later clarified: "I didn't mean it literally,
+   you should test it." The word was tested (see "Headline test" below) and
+   lost.
+4. "Tasks aren't about the release, they're about the launch. A music release
+   should be one template in the tasks list." (Read with input 2: the product
+   term is Tasks.)
+5. Ovie is the company robot dog. Music is the strongest proof, not the
+   boundary.
+6. The main pages (homepage, product, pricing, about) are ICP-agnostic. They
+   carry no music language and should feel like a frontier AI lab's homepage:
+   clean, confident, and universal. Music specifics live only on music pages.
+7. "Launch like a rockstar I honestly think is the move. For startups, for
+   podcasts, for artists, for authors. Then focus on launches that close the
+   loop: iterative launches that improve over time and keep growing the
+   audience, so you launch to more and more people every time. The PR launch
+   is great but should be agent-first: founders want to just connect their
+   agent. Also think about how hands-on they want to be." (03:55Z)
+
+### The problem it solves
+
+About 45 lines are in circulation across the homepage, canon, Pen, gbrain, and
+Linear. They use five different nouns for what Jovie is (presence manager,
+launch platform, partner, link, release OS) and four for who it serves. Not one
+of them answers the question a new visitor brings: why start now, before I have
+anything to sell?
+
+### The throughline
+
+**People before product, then launches that compound.** You build the people
+first. Each launch goes to them, and the people it adds stay for the next one,
+so every launch starts with more people than the last.
+
+This is the internal brand idea. It never runs as a headline. Every surface
+expresses it in its own words, and any line that can't trace back to it gets
+retired. In customer copy, phrase it as "before your next thing exists". That
+version holds for a founder with nothing built yet and for a musician with a
+catalog who is between releases.
+
+### Proposed locked language
+
+| Layer | Proposed wording |
+| --- | --- |
+| One-sentence positioning | Jovie is where your following starts: one profile that gathers the people who believe in you before your next thing exists, and brings them to every launch after. |
+| Subhead (main pages) | Gather the people who believe in you before your next thing exists. Every launch starts with everyone you have gathered so far. |
+| Category noun | The profile. Jovie is the profile you start before the product. |
+| Lead headline | **Gather your people first.** |
+| Three-line story | People follow a person long before they buy a thing. Most tools start once you have something to link, sell, or send. Jovie starts with you: gather your people now, and bring them the work when it is ready. |
+| Launch line (second section, launch pages) | Launch to the people you've gathered. |
+| Podcast and serial-work pages | Every launch builds on the last. |
+| Alternate headline | Start with who believes in you. |
+| Supporting line | Keep your people close. |
+| Primary promise, unchanged | Jovie has your back. It sits beneath the headline on ICP pages. |
+| Product CTA, unchanged | Jovie. Just ask. The name-search CTA stays on the homepage (JOV-5085). |
+| Strategy rule, internal only | Deep before wide: win a small group completely before you reach for breadth. |
+
+The proposed one sentence replaces the 1.1 "always-on creative and business
+partner" sentence. That partner idea survives as the promise "Jovie has your
+back."
+
+"Launch" is the headline concept for the loop (founder input 7). It is not the
+category noun, which is the profile, and it is not a product term. The product
+noun is **Tasks**. A music release is one playbook template in Tasks,
+alongside others such as a startup launch, a video, a podcast season, or a
+book. No qualifier goes in front of "Tasks".
+
+"Launch like a rockstar." is not a page headline. It scored last with every
+persona, artists included (see "Headline test, round 2"). It may live in
+Tim's own voice, where he owns the tone.
+
+### The launch loop
+
+A launch goes to the people already gathered, the people it brings in stay,
+and the next launch starts bigger. Two product principles follow from
+founder input 7:
+
+- **Agent-first.** A founder should be able to connect their own agent and
+  let it run the launch work: the announcement, the press list, and the
+  follow-up. Doing it by hand in the app is the fallback.
+- **Choose how hands-on.** The person sets how much Jovie and their agent do
+  alone, from drafts they approve to work that runs on its own within limits
+  they set. This follows the creator-control rules above.
+
+Neither principle may appear in customer copy until the product supports it
+(see "Proof required before external use").
+
+### Message hierarchy by surface
+
+| Surface | Audience | What it carries | What it never carries |
+| --- | --- | --- | --- |
+| Main pages: homepage, product, pricing, about | Founders, investors, first-time visitors of any kind | The throughline, lead headline, one sentence, and three-line story. Clean, confident, universal, in the register of a frontier AI lab homepage. | Music language or music proof (releases, streams, tours, listeners, "artist"), single-ICP examples, AI-first identity claims |
+| ICP pages: music, video, podcast, books, founders | People arriving from outreach and campaigns | The same throughline in that audience's nouns, its proof, and "Jovie has your back." beneath the headline | Claims about capabilities that ICP doesn't have yet |
+| Music pages only | Musicians | Release, listener, show, and catalog specifics. Music is the strongest proof story here, and only here. | Anything implying Jovie is only for music |
+| Product UI | Signed-in users | The task at hand, Tasks and its templates, "Jovie. Just ask." | Headlines or slogans |
+
+The customer menu routes from the main pages to the ICP pages. Outreach lands
+on ICP pages, never on the homepage.
+
+### Headline test (2026-10-03)
+
+Tim asked for a test, not a decision on "cult". Five headlines were scored
+under one fixed subhead (the one sentence above). There were four personas:
+a founder who just left an AI lab, a seed investor, a video and podcast
+creator, and an independent artist. Each was scored by two judges, Opus 5.5 as
+primary and Fable 5.1 as second opinion, on two passes with rotated order, for
+16 scores per line. The rubric scored value, emotional pull, clarity, trust,
+and would-sign-up on a 0 to 10 scale; this is the funnel-judge rubric adapted
+to headlines. Three of the five lines were Fable's non-cult proposals.
+
+| Headline | Overall | Trust | Sign-up | Founder | Investor | Creator | Artist |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **Gather your people first.** | **5.64** | 6.9 | 3.9 | 6.5 | 5.5 | 4.7 | 5.8 |
+| Start with who believes in you. | 5.34 | 6.4 | 3.5 | 5.7 | 5.6 | 4.8 | 5.3 |
+| Keep your people close. | 5.04 | 6.9 | 3.1 | 4.9 | 4.3 | 5.5 | 5.5 |
+| Before the next thing, the people. | 4.50 | 6.0 | 2.8 | 5.7 | 4.6 | 3.7 | 4.0 |
+| Build your cult following. | 4.16 | 2.9 | 2.6 | 3.3 | 4.8 | 4.6 | 4.0 |
+
+Persona columns are the mean of the five criteria for that persona across both judges and passes.
+
+What the scores say:
+
+- **"Gather your people first." leads.** It ranked first on both passes and
+  with both judges, and it scored highest with founders. Founders read "first"
+  as their situation: no product yet.
+- **"Build your cult following." finished last on trust.** It scored 2.9,
+  against roughly 6 to 7 for every other line. Every persona called it the
+  clearest promise and then said they would hesitate to be associated with it.
+  The investor persona named the press-quote risk. "Cult" is out of every
+  Jovie surface, and "Build your cult." is not canon in any register.
+- **No headline sells on its own.** The best sign-up score was 3.9 of 10, and
+  clarity was weak across the board. The subhead has to say what Jovie is (a
+  profile) and who it is for.
+- **Creators were the coldest audience.** They said "my people are already
+  here". Creator ICP pages should lead with "Keep your people close.", which
+  creators scored highest.
+
+This is a model-judged signal, not live traffic. A five-second comprehension
+test with real visitors comes before any paid use.
+
+### Headline test, round 2 (2026-10-04)
+
+Founder input 7 asked for "Launch like a rockstar." to be tested as the lead.
+
+- **Personas:** a startup founder who would rather connect her agent, a
+  podcaster launching a second season, an independent artist, and a
+  nonfiction author.
+- **Subhead:** every line was shown under one fixed subhead carrying the
+  compounding idea: "Jovie gathers the people who believe in you before your
+  next thing exists, and every launch reaches more people than the last."
+- **Method:** the same judges and rubric as round 1, two passes with rotated
+  order, 16 scores per line.
+- **Extra candidates:** Fable proposed three launch headlines without
+  "rockstar", and they were added so Tim's launch concept got a fair test.
+
+| Headline | Overall | Clarity | Trust | Sign-up | Founder | Podcaster | Artist | Author |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Gather your people first.** | **5.94** | 5.9 | 7.0 | 4.3 | 6.1 | 5.1 | 5.9 | 6.7 |
+| Launch to the people you've gathered. | 5.66 | 6.3 | 6.8 | 3.9 | 5.3 | 5.3 | 6.0 | 6.1 |
+| Every launch builds on the last. | 5.59 | 5.1 | 6.9 | 3.9 | 4.9 | 6.4 | 5.7 | 5.5 |
+| Launch again, to more people. | 5.16 | 5.6 | 5.8 | 3.7 | 4.2 | 6.6 | 4.9 | 5.0 |
+| Start with who believes in you. | 5.14 | 4.1 | 6.1 | 3.5 | 5.4 | 4.4 | 5.2 | 5.7 |
+| Launch like a rockstar. | 2.05 | 2.6 | 2.3 | 1.0 | 1.8 | 2.7 | 2.0 | 1.8 |
+
+A separate two-pass run with only four of these lines gave the same order:
+"Gather your people first." scored 6.16 and "Launch like a rockstar." 2.81.
+
+What the scores say:
+
+- **The judges penalized the word "rockstar", not the launch idea.** Every
+  persona called it cheesy, music-coded, or juvenile hype. The author and the
+  founder said it would make them leave. The judges also said the compounding
+  subhead was better than the headline above it.
+- **"Gather your people first." stays the lead.** It ranked first in both
+  rounds and in every run.
+- **The launch concept belongs in the subhead and the second section.**
+  "Launch to the people you've gathered." had the highest clarity of any line.
+  Podcasters scored the serial lines highest, so podcast pages lead with
+  "Every launch builds on the last."
+
+### Research basis
+
+- *Perennial Seller* (Ryan Holiday) says to build your platform before your
+  first project, and to keep a list you own instead of renting reach. That is
+  "people before product" as a creative discipline, and Jovie turns it into a
+  product. The book's audit questions are what the work is, who it is for, and
+  whether you can say it in one sentence. Jovie fails that test today with
+  about 45 lines in circulation.
+- *Growth Hacker Marketing* (Holiday) says to reach product-market fit before
+  marketing, win the few before the many, build growth into the product, and
+  favor retention over acquisition. This supports deep before wide.
+- *1,000 True Fans* (Kevin Kelly) argues that a creative career needs depth
+  more than reach. Every creator tool cites it, so it supports the idea without
+  making Jovie different.
+- *Zero to One* (Peter Thiel, chapter 10) uses "cult" for the company team, not
+  for an audience. It shows that founders and investors tolerate the word. It
+  is not evidence that audiences welcome it.
+- Category map, with names kept out of this public repo: link-in-bio tools
+  link to things you already have, creator stores sell what you already have,
+  newsletters and memberships publish work you already make, and email tools
+  grow a list you already started. Some email tools do support waitlists and
+  testing an idea before you build it, so the job is served, but nobody owns it
+  as an identity. The open position is a lasting relationship between a person
+  and their people that carries across projects, not a waitlist that dies
+  after one launch.
+
+### Proof required before external use
+
+Under the guardrails above, the lead headline claims nothing on its own. The
+one sentence does claim something, and it holds only if:
+
+1. **Capability.** A profile with nothing released works as a complete page,
+   not as an empty state. Today the profile and claim flows assume a catalog.
+2. **Loop.** Someone can follow before a release, receive something worth
+   returning for, and come back. Capture and notifications exist; the
+   pre-release reason to return does not yet.
+3. **Comprehension.** A five-second test with real visitors shows they
+   understand what Jovie is and who it is for from the hero alone.
+4. **Launch loop.** Any agent-first or "choose how hands-on" claim needs a
+   shipped agent connection and an approval control. The launch-loop copy
+   needs launches on a profile to carry followers forward, with the
+   returning-followers metric instrumented.
+
+### North-star metric this implies
+
+**Returning followers:** the number of unique pairs of a creator and a
+consenting follower in which the follower takes an intentional action (a reply,
+a verified click, or a signed-in return) on two or more distinct days within
+28 days. Opens don't count. Unsubscribe and complaint rates are the
+guardrails. A raw list size measures wide; this measures deep.
+
+### What it retires on lock
+
+| Retired line | Why |
+| --- | --- |
+| Your AI Presence Manager. | AI-first, which already breaks this canon. It describes the machinery, not the person. |
+| The launch platform (as the category), and "launch" or "release" in front of Tasks | Withdrawn by founder input 2. The product term is Tasks, with playbook templates. |
+| AI release OS / AI release management for artists | Machinery, music-only, and AI-first |
+| Go create | Parked since 2026-08-18. The throughline covers its empowerment idea. |
+| The link your music deserves. / One Link. Always In Sync. | Link-in-bio framing that starts after the thing exists |
+| Your living identity on the internet. / Your presence, resolved. / Control how the world sees you. | Identity framing with no people in it |
+| Leverage your fans. / Turn a $10 busking tip into a lifelong customer. | Treats fans as yield. Banned verb. |
+| Build your cult following. / Build your cult. | Tested last on trust (2.9 of 10). Founder clarified it was not meant literally. |
+| What Jovie Handles for You. / Keep your work moving. | Leads with the tool, not the person |
+| Major-label marketing on an indie budget / 14 hours of marketing work in a click / Sell out every show, every time / Stop working, start rocking | Already prohibited as unproven or absolute; listed here so they stay dead |
+
+The following lines keep their current roles: "Jovie has your back.", "Jovie.
+Just ask.", the name-search CTA, "Turn attention into relationships." (feature
+explanation), "AI assistance, with you in control." (mechanism), and the
+community and merch lines.
+
 ## Changelog
 
 | Version | Date | Change | Approval |

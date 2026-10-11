@@ -38,7 +38,9 @@ export function ProfileAeoProofClaimCard({
             </h2>
             {/* eslint-enable @jovie/canonical-ui-label-casing */}
 
-            <div className='flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between'>
+            {/* Left-aligned CTA: the consent card is fixed bottom-right on
+                desktop and must never cover it (JOV-7114). */}
+            <div className='flex flex-col items-start gap-5'>
               <p className='profile-aeo-claim-card__note text-xs font-medium'>
                 {note}
               </p>

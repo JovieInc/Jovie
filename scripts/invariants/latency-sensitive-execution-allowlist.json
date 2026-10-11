@@ -10,13 +10,6 @@
     "apps/desktop/src/tray.ts": {
       "deflateSync": 1
     },
-    "apps/web/app/api/health/build-info/route.ts": {
-      "readFileSync": 1
-    },
-    "apps/web/components/features/home/RecentlyShippedSection.tsx": {
-      "existsSync": 1,
-      "readFileSync": 1
-    },
     "apps/web/lib/a11y-gates/contrast-engine.ts": {
       "readFileSync": 2
     },
@@ -35,10 +28,6 @@
     "apps/web/lib/eval/calibration.ts": {
       "readFileSync": 1
     },
-    "apps/web/lib/hud/ovie-mac-hud.server.ts": {
-      "existsSync": 1,
-      "readFileSync": 1
-    },
     "apps/web/lib/hud/shipper-state.ts": {
       "existsSync": 5,
       "readFileSync": 3
@@ -54,6 +43,10 @@
       "readFileSync": 1
     },
     "apps/web/lib/ovie/mcp/artist-profile-inventory.ts": {
+      "readFileSync": 1
+    },
+    "apps/web/lib/recent-releases.ts": {
+      "existsSync": 1,
       "readFileSync": 1
     },
     "apps/web/lib/seo/ratchet.ts": {

@@ -42,6 +42,7 @@ import {
   searchableSubMenuContentClasses,
   selectContentClasses,
   subMenuContentClasses,
+  submenuViewportFitStyle,
 } from './dropdown-styles';
 
 describe('dropdown-styles', () => {
@@ -66,10 +67,21 @@ describe('dropdown-styles', () => {
     });
 
     it('DROPDOWN_CONTENT_BASE includes z-index, border, and background', () => {
-      expect(DROPDOWN_CONTENT_BASE).toContain('z-50');
+      expect(DROPDOWN_CONTENT_BASE).toContain('z-popover');
       expect(DROPDOWN_CONTENT_BASE).toContain('border');
       expect(DROPDOWN_CONTENT_BASE).toContain('bg-surface-elevated');
       expect(DROPDOWN_CONTENT_BASE).toContain(OVERLAY_CONTENT_RADIUS);
+    });
+
+    it('fits submenus into the space Radix reports on their side', () => {
+      expect(submenuViewportFitStyle('dropdown-menu')).toEqual({
+        maxWidth: 'var(--radix-dropdown-menu-content-available-width)',
+        minWidth:
+          'min(12rem, var(--radix-dropdown-menu-content-available-width))',
+      });
+      expect(submenuViewportFitStyle('context-menu').maxWidth).toBe(
+        'var(--radix-context-menu-content-available-width)'
+      );
     });
 
     it('shares the tokenized overlay surface and rounded rectangle contract', () => {

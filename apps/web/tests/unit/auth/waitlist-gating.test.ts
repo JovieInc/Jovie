@@ -36,6 +36,11 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The beforeEach hooks below transform and import the gate.ts module graph
+// per test; under sharded/loaded runners that exceeds the 5s default hook
+// timeout, so give the hooks explicit headroom.
+vi.setConfig({ hookTimeout: 30_000 });
+
 // ============================================================================
 // Tests for status-checker.ts
 // ============================================================================
@@ -117,9 +122,13 @@ describe('checkUserStatus', () => {
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
 
-    vi.doMock('@/lib/utils/email', () => ({
-      normalizeEmail: (e: string) => e.toLowerCase().trim(),
-    }));
+    vi.doMock('@/lib/utils/email', async importOriginal => {
+      const actual = await importOriginal<typeof import('@/lib/utils/email')>();
+      return {
+        ...actual,
+        normalizeEmail: (e: string) => e.toLowerCase().trim(),
+      };
+    });
 
     vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
@@ -254,9 +263,13 @@ describe('resolveProfileState', () => {
     vi.doMock('@/lib/auth/clerk-sync', () => ({
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.doMock('@/lib/utils/email', () => ({
-      normalizeEmail: (e: string) => e.toLowerCase().trim(),
-    }));
+    vi.doMock('@/lib/utils/email', async importOriginal => {
+      const actual = await importOriginal<typeof import('@/lib/utils/email')>();
+      return {
+        ...actual,
+        normalizeEmail: (e: string) => e.toLowerCase().trim(),
+      };
+    });
     vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
       eq: (a: unknown, b: unknown) => [a, b],
@@ -553,9 +566,13 @@ describe('gate.ts utility functions', () => {
     vi.doMock('@/lib/auth/clerk-sync', () => ({
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.doMock('@/lib/utils/email', () => ({
-      normalizeEmail: (e: string) => e.toLowerCase().trim(),
-    }));
+    vi.doMock('@/lib/utils/email', async importOriginal => {
+      const actual = await importOriginal<typeof import('@/lib/utils/email')>();
+      return {
+        ...actual,
+        normalizeEmail: (e: string) => e.toLowerCase().trim(),
+      };
+    });
     vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
       eq: (a: unknown, b: unknown) => [a, b],
@@ -911,9 +928,13 @@ describe('CanonicalUserState enum', () => {
     vi.doMock('@/lib/auth/clerk-sync', () => ({
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.doMock('@/lib/utils/email', () => ({
-      normalizeEmail: (e: string) => e.toLowerCase().trim(),
-    }));
+    vi.doMock('@/lib/utils/email', async importOriginal => {
+      const actual = await importOriginal<typeof import('@/lib/utils/email')>();
+      return {
+        ...actual,
+        normalizeEmail: (e: string) => e.toLowerCase().trim(),
+      };
+    });
     vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
       eq: (a: unknown, b: unknown) => [a, b],

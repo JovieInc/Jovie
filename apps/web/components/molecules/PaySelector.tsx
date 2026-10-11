@@ -6,6 +6,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
+import {
+  normalizeQuantity,
+  USD_AMOUNT_CONTRACT,
+} from '@/lib/presentation/quantity';
 import { cn } from '@/lib/utils';
 import { formatDollarAmount } from '@/lib/utils/format-number';
 
@@ -56,7 +60,7 @@ function parseCustomAmount(value: string): number | null {
     return null;
   }
 
-  return Number(parsed.toFixed(2));
+  return normalizeQuantity(parsed, USD_AMOUNT_CONTRACT);
 }
 
 export function PaySelector({

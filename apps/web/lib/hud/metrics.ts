@@ -10,6 +10,7 @@ import { env } from '@/lib/env-server';
 import { getHermesDispatchAvailability } from '@/lib/hermes/dispatch';
 import { ServerFetchTimeoutError } from '@/lib/http/server-fetch';
 import { getHudAiOpsSummary } from '@/lib/hud/ai-ops';
+import { getGbrainHealth } from '@/lib/hud/gbrain-health';
 import { mapHermesEventsToAgentRunArtifacts } from '@/lib/hud/hermes-events';
 import { getHermesEventsPayload } from '@/lib/hud/hermes-events-store';
 import { buildHudMetricSources } from '@/lib/hud/source-trust';
@@ -197,6 +198,8 @@ export function buildDegradedHudMetrics(
     mrrGrowth30dUsd: 0,
     isConfigured: true,
     isAvailable: false,
+    excludedInternalSubscribers: 0,
+    excludedInternalMrrUsd: 0,
     errorMessage: timeoutDetail,
   };
 
@@ -352,6 +355,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     dbHealth,
     deployments,
     aiOps,
+    gbrain,
   ] = await Promise.all([
     getAdminStripeOverviewMetrics(),
     getAdminMercuryMetrics(),
@@ -360,6 +364,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     checkDbHealth(),
     getHudDeployments(),
     getHudAiOpsSummary(requestedAt),
+    getGbrainHealth(env.GBRAIN_HEALTH_URL),
   ]);
 
   // Stamp the payload after every producer resolves. Provider observations are
@@ -427,6 +432,16 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
         : 'unknown',
       defaultStatusDetail: financialStatus.defaultStatusDetail,
       financialDataAvailable,
+      ...(stripeMetrics.isAvailable &&
+      stripeMetrics.mrrUsd7dAgo !== undefined &&
+      stripeMetrics.activeSubscribers7dAgo !== undefined
+        ? {
+            weekAgo: {
+              mrrUsd: stripeMetrics.mrrUsd7dAgo,
+              activeSubscribers: stripeMetrics.activeSubscribers7dAgo,
+            },
+          }
+        : {}),
     },
     operations: operationsStatus,
     reliability: {
@@ -442,6 +457,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     aiOps,
     sources,
     agentRuns: buildHudAgentRuns(),
+    ...(gbrain ? { gbrain } : {}),
     generatedAtIso: fetchedAtIso,
   };
 }

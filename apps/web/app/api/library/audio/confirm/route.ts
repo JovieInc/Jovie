@@ -7,7 +7,6 @@
  */
 
 import { and, eq } from 'drizzle-orm';
-import { revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
@@ -18,7 +17,7 @@ import { resolveAudioUploadMime } from '@/lib/audio/constants';
 import { resolvePrimaryRecordingForRelease } from '@/lib/audio/resolve-release-recording';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import { invalidateReleaseCaches } from '@/lib/cache/releases';
 import { db } from '@/lib/db';
 import { discogRecordings } from '@/lib/db/schema/content';
 import { captureError } from '@/lib/error-tracking';
@@ -120,8 +119,7 @@ export async function POST(request: NextRequest) {
         )
       );
 
-    revalidateTag(`releases:${clerkUserId}:${profile.id}`, 'max');
-    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+    invalidateReleaseCaches(clerkUserId, profile.id);
 
     return NextResponse.json(
       {

@@ -9,12 +9,15 @@
  * - Search URL fallbacks for any DSPs not resolved by the above
  */
 
+import { invalidateSmartLinkContentCache } from '@/lib/cache/releases';
 import {
   getAlbum,
   isAppleMusicAvailable,
   lookupByIsrc as musicKitLookupByIsrc,
 } from '@/lib/dsp-enrichment/providers/apple-music';
 
+import { parseArtistCreditsFromArtistLine } from './artist-parser';
+import { processProviderRecordingArtistCredits } from './artist-queries';
 import {
   isMusicfetchAvailable,
   lookupByIsrc as musicfetchLookupByIsrc,
@@ -141,6 +144,8 @@ async function lookupAppleMusic(
   externalId: string | null;
   source: string;
   previewUrl: string | null;
+  trackName: string | null;
+  artistName: string | null;
 } | null> {
   // Try MusicKit API first (officially supports ISRC filtering)
   if (isAppleMusicAvailable()) {
@@ -159,6 +164,8 @@ async function lookupAppleMusic(
             track.attributes.previews?.find(preview =>
               preview.url?.startsWith('https://')
             )?.url ?? null,
+          trackName: track.attributes.name ?? null,
+          artistName: track.attributes.artistName ?? null,
         };
       }
     } catch {
@@ -175,6 +182,8 @@ async function lookupAppleMusic(
         externalId: itunesResult.trackId,
         source: 'itunes_isrc',
         previewUrl: itunesResult.previewUrl,
+        trackName: itunesResult.trackName,
+        artistName: itunesResult.artistName,
       };
     }
   } catch {
@@ -274,22 +283,52 @@ export async function discoverLinksForRelease(
   const lookupPromises: Promise<void>[] = [];
 
   // Apple Music lookup — prefer MusicKit API (reliable), fall back to iTunes
-  if (!skipExisting || !existingSet.has('apple_music')) {
+  const needsAppleLookup =
+    !skipExisting ||
+    !existingSet.has('apple_music') ||
+    Boolean(trackWithIsrc.creatorProfileId);
+  if (needsAppleLookup) {
     attemptedPreviewSources.push('apple_music');
     lookupPromises.push(
       lookupAppleMusic(isrc, storefront)
         .then(async match => {
           if (match) {
             appleMusicPreviewUrl = match.previewUrl;
-            await saveDiscoveredLink({
-              releaseId,
-              providerId: 'apple_music',
-              url: match.url,
-              externalId: match.externalId,
-              source: match.source,
-              isrc,
-              result,
-            });
+            if (!existingSet.has('apple_music')) {
+              await saveDiscoveredLink({
+                releaseId,
+                providerId: 'apple_music',
+                url: match.url,
+                externalId: match.externalId,
+                source: match.source,
+                isrc,
+                result,
+              });
+            }
+
+            if (match.trackName && match.artistName) {
+              try {
+                const stored = await processProviderRecordingArtistCredits({
+                  creatorProfileId: trackWithIsrc.creatorProfileId,
+                  isrc,
+                  provider: 'apple_music',
+                  sourceEntityId: match.externalId,
+                  credits: parseArtistCreditsFromArtistLine(
+                    match.trackName,
+                    match.artistName
+                  ),
+                });
+                if (stored) {
+                  invalidateSmartLinkContentCache(
+                    trackWithIsrc.creatorProfileId
+                  );
+                }
+              } catch (error) {
+                result.errors.push(
+                  `Apple Music credit reconciliation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+                );
+              }
+            }
           }
         })
         .catch(error => {

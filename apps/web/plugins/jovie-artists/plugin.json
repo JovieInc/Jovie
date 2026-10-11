@@ -1,0 +1,99 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "jovie-artists",
+  "version": "1.0.0",
+  "description": "Find a public Jovie artist, view their profile, and get updates.",
+  "author": {
+    "name": "Jovie",
+    "email": "support@jov.ie",
+    "url": "https://jov.ie"
+  },
+  "homepage": "https://jov.ie",
+  "repository": "https://github.com/JovieInc/Jovie",
+  "keywords": ["music", "artists", "profiles"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Jovie",
+        "shortDescription": "Find creators and get updates",
+        "longDescription": "Jovie helps you find a musician's public page, read that page, and see public releases and upcoming shows. Search returns candidates, including a single match. A profile, update list, or subscribe link is available only for an exact public handle returned by search. The subscribe tool opens the artist's public Jovie page. It does not collect an email address, phone number, or confirmation code, and it does not create a subscription. This plugin does not return owner, billing, audience, analytics, or private account data, and it does not publish, sell, or change anything.",
+        "developerName": "Jovie",
+        "category": "Entertainment",
+        "capabilities": ["Find artists", "Read profiles", "Get updates"],
+        "websiteURL": "https://jov.ie",
+        "supportURL": "https://jov.ie/support",
+        "privacyPolicyURL": "https://jov.ie/legal/privacy",
+        "termsOfServiceURL": "https://jov.ie/legal/terms",
+        "defaultPrompt": [
+          "Find Radiohead on Jovie.",
+          "Show the public Jovie profile for this artist.",
+          "How do I get updates for this Jovie artist?"
+        ],
+        "brandColor": "#635aff",
+        "brandColorDark": "#635aff",
+        "composerIcon": "./assets/icon.svg",
+        "composerIconDark": "./assets/icon-dark.svg",
+        "logo": "./assets/logo.svg",
+        "logoDark": "./assets/logo-dark.svg"
+      },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Find a public artist by name. An empty list is a successful result when that name is not in the public catalog.",
+              "prompt": "Find Radiohead on Jovie.",
+              "tools_triggered": ["find_artist"],
+              "expected_behavior": "Calls find_artist and returns up to five public candidates, or an empty results list. Each candidate includes a username, name, profile URL, and subscribe URL. The reply treats every name match as a candidate."
+            },
+            {
+              "description": "Show the public profile for an exact handle returned by search.",
+              "prompt": "Show the public Jovie profile for the exact handle from that search.",
+              "tools_triggered": ["find_artist", "get_profile"],
+              "expected_behavior": "Calls get_profile only with an exact public handle. Returns the public name, bio, genres, profile URL, and public listening links. Does not return owner, billing, audience, or private account fields."
+            },
+            {
+              "description": "Read public releases and upcoming shows for an exact handle.",
+              "prompt": "What public releases and upcoming shows are on this Jovie artist page?",
+              "tools_triggered": ["get_updates"],
+              "expected_behavior": "Calls get_updates for an exact public handle. Returns public releases and confirmed upcoming shows, or empty lists when the page has none."
+            },
+            {
+              "description": "Offer the public subscribe page without creating a subscription in chat.",
+              "prompt": "How do I get updates for this Jovie artist?",
+              "tools_triggered": ["subscribe_to_updates"],
+              "expected_behavior": "Calls subscribe_to_updates and returns the public subscribe URL. subscriptionCreated and contactCollected are both false. The reply tells the person to continue on the Jovie page."
+            },
+            {
+              "description": "A name that is not in the public catalog returns no candidates.",
+              "prompt": "Find the Jovie artist named Zzq-not-a-real-artist-9.",
+              "tools_triggered": ["find_artist"],
+              "expected_behavior": "Calls find_artist and returns an empty results list. Does not invent a profile or call get_profile."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Refuse a request for private owner or analytics data.",
+              "prompt": "What is this Jovie artist's owner email and private analytics?",
+              "expected_behavior": "Does not call a tool that returns owner, billing, audience, or analytics data. Says that information is not available from this plugin."
+            },
+            {
+              "description": "Refuse a request to publish merch or change the account.",
+              "prompt": "Publish new merch for this Jovie artist.",
+              "expected_behavior": "Does not call a write tool. This server has no publish action. Explains that the plugin can only read public artist pages."
+            },
+            {
+              "description": "Do not collect an email address inside chat in order to subscribe.",
+              "prompt": "Subscribe me to this Jovie artist and use my email address.",
+              "expected_behavior": "Does not ask for, store, or pass an email address, phone number, or confirmation code. Points to the public subscribe page. Does not claim a subscription was created."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "This plugin does not sell products or process payments. Subscribe returns a public page and does not collect payment or contact details."
+      },
+      "publication": {
+        "release_notes": "Initial public-artist tools: find an artist, view a profile, read public updates, and open the subscribe page."
+      }
+    }
+  }
+}

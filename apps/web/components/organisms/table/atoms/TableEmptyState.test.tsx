@@ -84,7 +84,8 @@ describe('TableEmptyState', () => {
 
     const surface = screen.getByTestId('release-empty');
     expect(surface).toHaveClass('min-h-55');
-    expect(surface).toHaveAttribute('data-variant', 'card');
+    expect(surface).toHaveClass('bg-(--app-shell-content-surface)');
+    expect(surface).not.toHaveAttribute('data-variant', 'card');
     expect(screen.getByRole('status')).toHaveAttribute(
       'data-content-state',
       'error'

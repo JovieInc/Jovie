@@ -293,7 +293,9 @@ export function ReleaseEntityHeader({
     <div className='overflow-hidden' data-testid='release-header-card'>
       <EntityHeader
         title={release.title}
-        details={detailsLine}
+        subtitle={detailsLine}
+        bodyClassName={actionBar ? 'space-y-0.5 pr-7' : 'space-y-0.5'}
+        titleClassName='leading-tight tracking-tight'
         statusGlyph={
           <EntityHeaderStatusGlyph
             icon={RELEASE_STATUS_ICON[releaseStatus]}

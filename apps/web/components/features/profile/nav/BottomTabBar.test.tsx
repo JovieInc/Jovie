@@ -2,12 +2,12 @@
  * Unit tests for BottomTabBar (JOV-2022)
  *
  * Covers:
- *  - All four destinations render whether or not shows exist
+ *  - All four destinations render whether or not events exist
  *  - Active destination is marked with aria-current="page"
  *  - Tab click handler calls onTabSelect with correct mode
  *  - Grid column count matches the shared destination contract
  *  - Get updates is not an equal-weight destination
- *  - Fan-capture flags do not hide Home · Music · Shows · About
+ *  - Fan-capture flags do not hide Home · Music · Events · About
  *  - One shared liquid-glass lens follows the active tab (spring or snap)
  */
 
@@ -51,7 +51,18 @@ describe('BottomTabBar — tab rendering', () => {
     expect(screen.queryByRole('button', { name: 'Get updates' })).toBeNull();
   });
 
-  it('keeps Shows when hasTourDates is false', () => {
+  it('renders aboveNav inside the dock, directly above the nav (JOV-7114)', () => {
+    render(
+      <BottomTabBar
+        {...makeProps({ aboveNav: <span data-testid='above'>Claim</span> })}
+      />
+    );
+    expect(screen.getByTestId('above').nextElementSibling).toBe(
+      screen.getByTestId('profile-bottom-nav')
+    );
+  });
+
+  it('keeps Events when hasTourDates is false', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: false })} />);
     expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About' })).toBeInTheDocument();
@@ -177,7 +188,7 @@ describe('BottomTabBar — interaction handlers', () => {
     expect(onTabSelect).toHaveBeenCalledWith('listen');
   });
 
-  it('calls onTabSelect with "tour" when Shows is clicked', () => {
+  it('calls onTabSelect with "tour" when Events is clicked', () => {
     const onTabSelect = vi.fn();
     render(
       <BottomTabBar {...makeProps({ onTabSelect, hasTourDates: true })} />

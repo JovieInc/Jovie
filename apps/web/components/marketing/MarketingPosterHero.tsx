@@ -2,6 +2,7 @@
 import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { ElementType, ReactNode } from 'react';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { MarketingCtaPendingLabel } from './MarketingCtaPendingLabel';
 import { MarketingHero } from './MarketingHero';
 
@@ -24,6 +25,8 @@ export interface MarketingPosterHeroProps {
   readonly seam: ReactNode;
   readonly trackedLinkComponent?: ElementType;
   readonly headingId?: string;
+  readonly sectionVariant?: string;
+  readonly sectionOwner?: string;
 }
 
 /**
@@ -41,6 +44,8 @@ export function MarketingPosterHero({
   seam,
   trackedLinkComponent = Link,
   headingId = 'homepage-poster-hero-heading',
+  sectionVariant,
+  sectionOwner,
 }: MarketingPosterHeroProps) {
   const LinkComponent = trackedLinkComponent;
   const analyticsPropsFor = (cta: MarketingPosterHeroCta) =>
@@ -56,7 +61,9 @@ export function MarketingPosterHero({
       variant='unstyled'
       className='homepage-poster-hero'
       headingId={headingId}
-      testId='homepage-hero-shell'
+      testId={sectionVariant ? 'marketing-section-hero' : 'homepage-hero-shell'}
+      sectionVariant={sectionVariant}
+      sectionOwner={sectionOwner}
     >
       <div className='homepage-poster-hero__copy'>
         <h1
@@ -77,7 +84,10 @@ export function MarketingPosterHero({
           >
             <LinkComponent
               href={primaryCta.href}
-              prefetch={primaryCta.prefetch}
+              prefetch={resolveMarketingAuthPrefetch(
+                primaryCta.href,
+                primaryCta.prefetch
+              )}
               {...analyticsPropsFor(primaryCta)}
               data-testid='homepage-primary-cta'
               data-cta-sign-up={primaryCta.signUp ? 'true' : undefined}
@@ -97,7 +107,10 @@ export function MarketingPosterHero({
             >
               <LinkComponent
                 href={secondaryCta.href}
-                prefetch={secondaryCta.prefetch}
+                prefetch={resolveMarketingAuthPrefetch(
+                  secondaryCta.href,
+                  secondaryCta.prefetch
+                )}
                 {...analyticsPropsFor(secondaryCta)}
                 data-testid='homepage-secondary-cta'
               >

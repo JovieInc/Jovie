@@ -56,6 +56,29 @@ export const CHAT_TRANSCRIPT_WINDOW = {
 
 export type ChatTranscriptWindow = typeof CHAT_TRANSCRIPT_WINDOW;
 
+/** Fallback row height before a real measurement lands. */
+export const CHAT_TRANSCRIPT_ROW_ESTIMATE_PX = 80;
+
+/**
+ * Row measurement for the virtualized transcript (JOV-6702).
+ *
+ * A row measured while the scroll viewport is hidden or not yet laid out
+ * (workspace switch on the Mac host, first paint) reads ~0–1px. Caching that
+ * collapses every row, so `scrollToIndex` targets ~0 and the transcript paints
+ * blank. Return the estimate for degenerate reads so a later measure pass can
+ * record the true height once the viewport is real.
+ */
+export function measureChatTranscriptRow(
+  row: Pick<HTMLElement, 'getBoundingClientRect'>,
+  scrollContainer: Pick<HTMLElement, 'clientHeight'> | null | undefined
+): number {
+  if (!scrollContainer || scrollContainer.clientHeight <= 0) {
+    return CHAT_TRANSCRIPT_ROW_ESTIMATE_PX;
+  }
+  const height = row.getBoundingClientRect().height;
+  return height > 1 ? height : CHAT_TRANSCRIPT_ROW_ESTIMATE_PX;
+}
+
 export function chatTranscriptVisibleTail<T>(
   items: readonly T[],
   windowSize: number = CHAT_TRANSCRIPT_WINDOW.initialMessageWindow

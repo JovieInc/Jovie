@@ -2,11 +2,14 @@
 
 import type { ReactNode } from 'react';
 import { memo } from 'react';
-import { CanvasGrain } from '@/components/atoms/CanvasGrain';
-import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
+import { DesktopTitlebar } from '@/components/organisms/DesktopTitlebar';
 import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { OverlayInteractionGuard } from '@/components/shell/OverlayInteractionGuard';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
+import {
+  SHELL_RAIL_ALLOCATION,
+  SHELL_RAIL_FRAME_GAP,
+  SHELL_RAIL_MAIN_PLANE,
+} from '@/components/shell/rail-motion';
 import { cn } from '@/lib/utils';
 
 export interface AppShellFrameProps {
@@ -78,45 +81,58 @@ export const AppShellFrame = memo(function AppShellFrame({
           // Allocation belongs to the shell, not individual routes. Keeping the
           // side slots and main plane on the same motion contract means a rail
           // can yield canvas without its content or adjacent route snapping.
-          'flex min-h-0 min-w-0 flex-1 overflow-hidden transition-[gap,padding] duration-cinematic ease-cinematic motion-reduce:transition-none lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
+          'flex min-h-0 min-w-0 flex-1 overflow-hidden lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)',
+          SHELL_RAIL_FRAME_GAP
         )}
       >
         <div
           data-app-shell-sidebar-mount='true'
           data-testid='app-shell-sidebar-mount'
-          className='flex h-full min-h-0 shrink-0 flex-col transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none'
+          className={cn(
+            'flex h-full min-h-0 shrink-0 flex-col',
+            SHELL_RAIL_ALLOCATION
+          )}
         >
           {sidebar}
         </div>
 
         <div
           data-app-shell-content-column='true'
-          className='flex min-h-0 min-w-0 flex-1 flex-col transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
+          className={cn(
+            'flex min-h-0 min-w-0 flex-1 flex-col',
+            SHELL_RAIL_MAIN_PLANE
+          )}
         >
           <div
             data-app-shell-main-plane='true'
-            className='flex min-h-0 min-w-0 flex-1 overflow-hidden transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
+            className={cn(
+              // This plane clips shell chrome; route panes own scrolling.
+              // overflow:hidden is still programmatically scrollable, so a
+              // hovering inspector's travel can let scrollIntoView move the
+              // entire header and route by 6px. Clip without a scroll box.
+              'flex min-h-0 min-w-0 flex-1 overflow-clip',
+              SHELL_RAIL_MAIN_PLANE
+            )}
           >
-            <main
-              id='main-content'
-              className={cn(
-                // The header and route column live on this one raised plane.
-                // Do not use a translucent recessed well here: it makes the
-                // frame, header, and content read as unrelated backgrounds.
-                // Founder lock 2026-09-25: one rounded, borderless, clipped
-                // panel — no border, soft elevation only.
-                'relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-(--app-shell-content-surface)',
-                'lg:rounded-(--app-shell-radius) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)'
-              )}
+            {/* Main content and audio keep one stable width. The inspector
+                overlays within the route bounds and never allocates canvas. */}
+            <div
+              data-app-shell-main-column='true'
+              className='flex min-h-0 min-w-0 flex-1 flex-col'
             >
-              <div
-                data-app-shell-main-content='true'
-                className='relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
+              <main
+                id='main-content'
+                className={cn(
+                  // The header and route column live on this one raised plane.
+                  // Do not use a translucent recessed well here: it makes the
+                  // frame, header, and content read as unrelated backgrounds.
+                  // Founder lock 2026-09-25: one rounded, borderless, clipped
+                  // panel — no border, soft elevation only.
+                  'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)',
+                  'lg:rounded-(--app-shell-radius) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)'
+                )}
               >
-                {/* The chat wash belongs to the route plane, not the contextual
-                    inspector. Keeping the isolated paint layer in this column
-                    lets the in-flow rail narrow content without tinting its own
-                    raised surface. */}
+                {/* The wash covers the full panel, including its header. */}
                 {chatAmbientGradient ? (
                   <div
                     aria-hidden='true'
@@ -125,35 +141,57 @@ export const AppShellFrame = memo(function AppShellFrame({
                     style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
                   />
                 ) : null}
-                {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
-                {header}
-                <div className='flex min-h-0 min-w-0 flex-1 overflow-hidden'>
+                {header ? (
                   <div
-                    data-testid='app-shell-scroll'
-                    className={cn(
-                      // Shell-level pane never owns vertical scroll — routes and table
-                      // surfaces scroll inside this clip so the right rail stays fixed.
-                      'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none pb-[var(--dev-toolbar-height,0px)]',
-                      contentClassName
-                    )}
+                    data-app-shell-header='true'
+                    className='relative z-30 shrink-0'
                   >
-                    {main}
+                    {header}
                   </div>
+                ) : null}
+                <div
+                  data-app-shell-main-content='true'
+                  // No inset here: the header spans the panel edge-to-edge so
+                  // the top row and route read as one clipped plane (JOV-7207).
+                  // The route inset lives on the scroll wrapper below.
+                  className={cn(
+                    'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:shell-inspector-host',
+                    SHELL_RAIL_MAIN_PLANE
+                  )}
+                >
+                  <div
+                    data-app-shell-content-inset='true'
+                    className='flex min-h-0 min-w-0 flex-1 overflow-hidden p-(--app-shell-content-inset)'
+                  >
+                    <div
+                      data-testid='app-shell-scroll'
+                      className={cn(
+                        // Shell-level pane never owns vertical scroll — routes and table
+                        // surfaces scroll inside this clip so the right rail stays fixed.
+                        'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain pb-[var(--dev-toolbar-height,0px)]',
+                        SHELL_RAIL_MAIN_PLANE,
+                        contentClassName
+                      )}
+                    >
+                      {main}
+                    </div>
+                  </div>
+                  {rightPanel ? (
+                    <AppShellRightRail>{rightPanel}</AppShellRightRail>
+                  ) : null}
                 </div>
-              </div>
-              {rightPanel ? (
-                <AppShellRightRail>{rightPanel}</AppShellRightRail>
+              </main>
+              {/* The player is shell chrome, not content-card chrome. The dock
+                  is an in-flow sibling below <main> so its reveal slides the
+                  panel's bottom edge up in lockstep — only panel height
+                  animates, never content geometry. */}
+              {audioPlayer ? (
+                <div data-testid='app-shell-audio-tray' className='shrink-0'>
+                  {audioPlayer}
+                </div>
               ) : null}
-            </main>
-          </div>
-          {/* The player is shell chrome, not content-card chrome. Keeping it as
-              an in-flow sibling reserves its own tray below <main>, matching
-              the sidebar's canvas elevation without obscuring routes or rails. */}
-          {audioPlayer ? (
-            <div data-testid='app-shell-audio-tray' className='shrink-0'>
-              {audioPlayer}
             </div>
-          ) : null}
+          </div>
         </div>
       </div>
 

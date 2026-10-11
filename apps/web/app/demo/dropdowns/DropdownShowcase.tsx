@@ -60,7 +60,7 @@ function MenuSection({
 export function DropdownShowcase() {
   return (
     <div className='min-h-screen bg-page p-12 text-primary-token'>
-      <h1 className='mb-10 text-[15px] font-semibold tracking-[-0.016em] text-primary-token'>
+      <h1 className='mb-10 text-sm font-semibold tracking-[-0.016em] text-primary-token'>
         Dropdown Parity — Linear.app Eval
       </h1>
 

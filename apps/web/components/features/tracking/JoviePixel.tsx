@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useTrackingMutation } from '@/lib/queries/useTrackingMutation';
 import {
+  getOrCreateAcquisitionId,
   getOrCreateSessionId,
   isTrackingAllowed,
 } from '@/lib/tracking/consent';
@@ -14,6 +15,7 @@ interface JoviePixelProps {
 interface PixelEventPayload {
   profileId: string;
   sessionId: string;
+  acquisitionId?: string;
   eventType:
     | 'page_view'
     | 'link_click'
@@ -38,6 +40,7 @@ interface PixelEventPayload {
 export function JoviePixel({ profileId }: JoviePixelProps) {
   const hasTrackedPageView = useRef(false);
   const sessionId = useRef<string>('');
+  const acquisitionId = useRef<string>('');
   const trackPixel = useTrackingMutation<PixelEventPayload>({
     endpoint: '/api/px',
   });
@@ -45,6 +48,7 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
   // Initialize session ID on mount
   useEffect(() => {
     sessionId.current = getOrCreateSessionId();
+    acquisitionId.current = getOrCreateAcquisitionId();
   }, []);
 
   /**
@@ -63,6 +67,9 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
       const payload: PixelEventPayload = {
         profileId,
         sessionId: sessionId.current,
+        ...(acquisitionId.current
+          ? { acquisitionId: acquisitionId.current }
+          : {}),
         eventType,
         eventData: {
           ...eventData,

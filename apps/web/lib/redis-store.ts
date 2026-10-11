@@ -8,7 +8,7 @@
  * production unless JOVIE_ALLOW_PRODUCTION_UPSTASH=1.
  */
 
-export const PRODUCTION_UPSTASH_HOST = 'real-kiwi-157253.upstash.io';
+export const PRODUCTION_UPSTASH_HOST = 'nice-walleye-308423.upstash.io';
 
 export const ALLOW_PRODUCTION_UPSTASH_ENV = 'JOVIE_ALLOW_PRODUCTION_UPSTASH';
 

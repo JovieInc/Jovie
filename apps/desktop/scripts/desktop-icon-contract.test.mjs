@@ -92,6 +92,41 @@ async function assertRoundedTransparentPng(filePath, size) {
   await assertTransparentCorners(filePath);
 }
 
+// macOS grid: the visible tile must sit inside the canvas (Apple reserves
+// ~824/1024). A full-bleed tile reads oversized next to grid-conforming
+// icons in the Dock and app switcher — this asserts the safe-area margin.
+async function assertMacSafeArea(filePath, size) {
+  const { data, info } = await sharp(filePath)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let minX = info.width;
+  let maxX = -1;
+  let minY = info.height;
+  let maxY = -1;
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      if (data[(y * info.width + x) * info.channels + 3] > 5) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  const tileW = maxX - minX + 1;
+  const tileH = maxY - minY + 1;
+  const ratio = tileW / size;
+  assert.ok(
+    ratio >= 0.76 && ratio <= 0.84,
+    `tile occupies ${(ratio * 100).toFixed(1)}% of canvas; expected ~80%`
+  );
+  assert.equal(tileW, tileH);
+  // Centered within rounding.
+  assert.ok(Math.abs(minX - (size - 1 - maxX)) <= 2);
+  assert.ok(Math.abs(minY - (size - 1 - maxY)) <= 2);
+}
+
 async function assertIcnsFile(filePath) {
   const buffer = await readFile(filePath);
   assert.equal(buffer.subarray(0, 4).toString('utf8'), 'icns');
@@ -134,6 +169,8 @@ test('legacy icon-source.png remains for reference but is no longer the producti
 test('packaged production and staging icons use the rounded desktop profile', async () => {
   await assertRoundedTransparentPng(productionPngPath, ICON_SIZE);
   await assertRoundedTransparentPng(stagingPngPath, ICON_SIZE);
+  await assertMacSafeArea(productionPngPath, ICON_SIZE);
+  await assertMacSafeArea(stagingPngPath, ICON_SIZE);
 
   // .icns files are macOS-specific; skip this assertion on other platforms.
   // They are also gitignored build artifacts of prepare:assets (macOS-only

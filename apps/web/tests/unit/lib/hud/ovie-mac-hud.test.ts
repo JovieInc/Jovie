@@ -5,20 +5,11 @@ import {
   composeOvieMacHudSnapshot,
   computeDefaultAlive,
   computeWowGrowth,
-  countReceiptedShipsThisWeek,
   gradeYcGrowth,
   monthlyToWeeklyUsd,
-  parseReceiptedShip,
+  shippingFromMerges,
   windowToWeeklyUsd,
 } from '@/lib/hud/ovie-mac-hud';
-
-const RECEIPTED = {
-  issueNumber: 5298,
-  symphonyRef: 'symphony-task-1',
-  mergeQueueRef: 'MQ-1',
-  prodSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  receiptAt: '2026-08-20T12:00:00.000Z',
-};
 
 function prNode(
   overrides: Partial<{
@@ -40,7 +31,7 @@ function prNode(
     number,
     title: `PR ${number}`,
     url: `https://github.com/JovieInc/Jovie/pull/${number}`,
-    headRefName: `tim/jov-${number}`,
+    headRefName: `devin/jov-${number}-20260822t000000`,
     updatedAt: '2026-08-22T00:00:00.000Z',
     isDraft: false,
     reviewDecision: null,
@@ -102,23 +93,24 @@ describe('Ovie Mac HUD derivation', () => {
     ).toMatchObject({ source: 'active-users', rate: 0, showChart: false });
   });
 
-  it('counts only receipted ships this week', () => {
-    const now = Date.parse('2026-08-22T00:00:00.000Z');
-    expect(
-      parseReceiptedShip({ issueNumber: 1, mergedAt: RECEIPTED.receiptAt })
-    ).toBeNull();
-    const shipping = countReceiptedShipsThisWeek(
-      [
-        {
-          title: 'Merged without receipt',
-          mergedAt: '2026-08-21T00:00:00.000Z',
-        },
-        RECEIPTED,
-        { ...RECEIPTED, receiptAt: '2026-08-01T00:00:00.000Z', issueNumber: 2 },
-      ],
-      now
+  it('reports shipping throughput from org merge counts, n/a when unmeasured', () => {
+    expect(shippingFromMerges({ last7Days: 862, today: 292 })).toEqual({
+      shipsThisWeek: 862,
+      available: true,
+      detail:
+        'PRs merged across JovieInc in the last 7 days. 292 since midnight PT.',
+    });
+    expect(shippingFromMerges({ last7Days: 862, today: null }).detail).toBe(
+      'PRs merged across JovieInc in the last 7 days.'
     );
-    expect(shipping.shipsThisWeek).toBe(1);
+    expect(shippingFromMerges(null)).toEqual({
+      shipsThisWeek: 0,
+      available: false,
+      detail: 'GitHub merge counts unavailable.',
+    });
+    expect(shippingFromMerges({ last7Days: null, today: 3 }).available).toBe(
+      false
+    );
     expect(monthlyToWeeklyUsd(5200)).toBe(1200);
     expect(windowToWeeklyUsd(300, 30)).toBe(70);
   });
@@ -240,6 +232,47 @@ describe('Ovie Mac HUD derivation', () => {
     });
   });
 
+  it('keeps lane and queued PRs in flight and leaves dependabot out', () => {
+    const result = composeOvieMacHudInFlightPullRequests({
+      totalOpen: 150,
+      pullRequests: [
+        prNode({
+          number: 18856,
+          headRefName: 'dependabot/npm_and_yarn/next-16.2.1',
+          mergeable: 'CONFLICTING',
+        }),
+        prNode({ number: 18857, headRefName: 'tim/manual-fix' }),
+        prNode({
+          number: 18921,
+          headRefName: 'codex/jov-2905-20260927t040433',
+        }),
+        prNode({
+          number: 18917,
+          headRefName: 'devin/jov-5905-20260927t034623',
+        }),
+      ],
+      mergeQueueEntries: [
+        {
+          position: 1,
+          state: 'AWAITING_CHECKS',
+          pullRequest: prNode({
+            number: 18868,
+            headRefName: 'feat/queued-human',
+          }),
+        },
+      ],
+    });
+
+    expect(result.items.map(pr => pr.number).sort()).toEqual([
+      18868, 18917, 18921,
+    ]);
+    expect(result.totalOpen).toBe(3);
+    expect(result.items[0]).toMatchObject({
+      number: 18868,
+      status: 'merge_queue',
+    });
+  });
+
   it('marks the in-flight PR list truncated when source or display is capped', () => {
     const result = composeOvieMacHudInFlightPullRequests({
       totalOpen: 115,
@@ -302,7 +335,7 @@ describe('Ovie Mac HUD derivation', () => {
         thisWeekActiveUsers: null,
         lastWeekActiveUsers: null,
       },
-      shippingEntries: [],
+      shipping: shippingFromMerges(null),
       generatedAtIso: '2026-08-22T00:00:00.000Z',
     });
 

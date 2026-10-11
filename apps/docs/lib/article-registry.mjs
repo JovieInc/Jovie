@@ -100,6 +100,9 @@ export function filterNavigationPageMap(pageMap, primaryRoutes) {
       if (children.length === 0 && !allowedRoutes.has(item.route)) return null;
       return { ...item, children };
     }
+    if (typeof item.href === 'string') {
+      return allowedRoutes.has(item.href) ? item : null;
+    }
     if ('route' in item && !allowedRoutes.has(item.route)) return null;
     return item;
   };

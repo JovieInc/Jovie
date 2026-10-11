@@ -4,6 +4,11 @@ import { HEALTH_CHECK_CONFIG, PERFORMANCE_THRESHOLDS } from '@/lib/db/config';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import {
+  canReadHealthDetail,
+  HEALTH_DETAIL_HEADERS,
+  publicHealthLiveness,
+} from '@/lib/health/detail-access';
+import {
   createRateLimitHeaders,
   getClientIP,
   healthLimiter,
@@ -41,7 +46,6 @@ interface PerformanceHealthResponse {
 export async function GET(request: Request) {
   const databaseUrlOk = Boolean(env.DATABASE_URL);
   const now = new Date().toISOString();
-  const config = getDbConfig();
 
   // Performance thresholds from centralized config
   const thresholds = {
@@ -71,11 +75,24 @@ export async function GET(request: Request) {
         status: 429,
         headers: {
           ...HEALTH_CHECK_CONFIG.cacheHeaders,
+          ...HEALTH_DETAIL_HEADERS,
           ...createRateLimitHeaders(rateLimitResult),
         },
       }
     );
   }
+
+  const authorized = await canReadHealthDetail(
+    request,
+    '/api/health/db/performance'
+  );
+  const rateHeaders = createRateLimitHeaders(rateLimitResult);
+  // Query timings are detail, not liveness. Anonymous callers do not hit the DB.
+  if (!authorized) {
+    return publicHealthLiveness(true, rateHeaders);
+  }
+
+  const config = getDbConfig();
 
   // Validate database environment first
   const dbValidation = validateDatabaseEnvironment();
@@ -108,7 +125,8 @@ export async function GET(request: Request) {
       status: HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
-        ...createRateLimitHeaders(rateLimitResult),
+        ...HEALTH_DETAIL_HEADERS,
+        ...rateHeaders,
       },
     });
   }
@@ -185,7 +203,8 @@ export async function GET(request: Request) {
       : HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
     headers: {
       ...HEALTH_CHECK_CONFIG.cacheHeaders,
-      ...createRateLimitHeaders(rateLimitResult),
+      ...HEALTH_DETAIL_HEADERS,
+      ...rateHeaders,
     },
   });
 }

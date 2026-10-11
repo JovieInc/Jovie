@@ -3,7 +3,11 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { LANE_COMMANDS, LANE_GROUPS } from './ci-fast-lanes.mjs';
+import {
+  LANE_COMMANDS,
+  LANE_GROUPS,
+  runDesignConformance,
+} from './ci-fast-lanes.mjs';
 import {
   COMPONENT_REGISTRY_PATH,
   LOCK_PROFILE_PATH,
@@ -166,6 +170,53 @@ test('design path selection covers web, native, motion, and governance surfaces'
   ]);
   assert.equal(selected.ubuntuOperationsAffected, false);
   assert.deepEqual(selected.invalidPaths, []);
+});
+
+test('registry-only edits execute conformance and reject invalid bindings', () => {
+  const valid = fixture();
+  const invalid = {
+    ...valid,
+    componentRegistrySource: valid.componentRegistrySource.replace(
+      /\n    penIdentityReason:\n      'No committed canonical Pen save\/readback export maps an Input root; source binding remains authoritative until Pen promotion\.',/,
+      ''
+    ),
+  };
+  assert.notEqual(
+    invalid.componentRegistrySource,
+    valid.componentRegistrySource
+  );
+  assert.deepEqual(validateDesignConformance(valid), []);
+  assert.ok(issueCodes(invalid).includes('registry-pen-binding-missing'));
+
+  const previousEvent = process.env.GITHUB_EVENT_NAME;
+  process.env.GITHUB_EVENT_NAME = 'pull_request';
+  try {
+    for (const { input, expectedCode } of [
+      { input: invalid, expectedCode: 1 },
+      { input: valid, expectedCode: 0 },
+    ]) {
+      let executions = 0;
+      const result = runDesignConformance({
+        changedFileList: [COMPONENT_REGISTRY_PATH],
+        execute: command => {
+          executions += 1;
+          assert.equal(command, LANE_COMMANDS['design-conformance']);
+          const issues = validateDesignConformance(input);
+          return {
+            code: issues.length > 0 ? 1 : 0,
+            output: JSON.stringify(issues),
+          };
+        },
+      });
+
+      assert.equal(result.code, expectedCode);
+      assert.equal(executions, 1);
+      assert.notEqual(result.skipped, true);
+    }
+  } finally {
+    if (previousEvent === undefined) delete process.env.GITHUB_EVENT_NAME;
+    else process.env.GITHUB_EVENT_NAME = previousEvent;
+  }
 });
 
 test('ordinary iOS UI changes select the design gate without Ubuntu operations', () => {

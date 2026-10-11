@@ -19,20 +19,56 @@ function makeEntitlements(
 }
 
 describe('resolveActionCapabilities', () => {
-  it('marks every action available on a supported channel for a full-access user', () => {
+  it('preserves public actions for a full-access product session', () => {
     const result = resolveActionCapabilities({
       entitlements: makeEntitlements(),
       channel: 'web',
       profileOwned: true,
     });
 
-    expect(result).toHaveLength(4);
-    for (const capability of result) {
+    expect(result).toHaveLength(12);
+    const publicActions = result.filter(capability => capability.available);
+    expect(publicActions.map(capability => capability.action.id)).toEqual([
+      'chat.start',
+      'contact.create',
+      'release.create',
+      'task.create',
+    ]);
+    for (const capability of publicActions) {
       expect(capability.available).toBe(true);
       expect(capability.visibility).toBe('visible');
       expect(capability.reasonCode).toBeUndefined();
     }
   });
+
+  it.each(['web', 'cli', 'mcp'] as const)(
+    'never grants worker scope to a product session on %s',
+    channel => {
+      const result = resolveActionCapabilities({
+        entitlements: makeEntitlements(),
+        channel,
+        profileOwned: true,
+      });
+      const fleetActions = result.filter(capability =>
+        capability.requirements?.some(
+          state => state.requirement.type === 'worker_scope'
+        )
+      );
+      expect(fleetActions).toHaveLength(8);
+      for (const capability of fleetActions) {
+        expect(capability).toMatchObject({
+          available: false,
+          reasonCode: 'FORBIDDEN',
+          retryable: false,
+        });
+        expect(
+          capability.requirements?.find(
+            state => state.requirement.type === 'worker_scope'
+          )?.satisfied
+        ).toBe(false);
+      }
+    }
+  );
 
   it('hides actions on channels they do not support', () => {
     const result = resolveActionCapabilities({

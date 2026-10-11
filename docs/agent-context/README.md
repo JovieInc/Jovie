@@ -22,6 +22,13 @@ Markdown frontmatter does not itself enforce policy. Before non-file operations
 such as shipping, read the relevant workflow rule explicitly. [Claude loading
 semantics](https://code.claude.com/docs/en/memory).
 
+When editing a scoped rule, review the policy change and run
+`node scripts/agent-context/rule-scopes.mjs --write`. Stage the generated
+`scripts/agent-context/rule-scopes.json` with the rule. The commit hook checks
+the final Git index, so an unstaged edit cannot validate stale staged policy.
+CI retains the independent body-hash and path-routing checks; it never
+regenerates the integrity record automatically.
+
 Keep stable instructions/tools first and variable task material later when the
 provider permits it. Preserve provider-owned message IDs, tool call/result pairs,
 and reasoning/compaction items through the native SDK. Do not reorder, stringify,
@@ -99,3 +106,11 @@ Mechanical green is not model-quality green. Unsupported models, missing auth,
 and failed transport are blocked, never passing or silently substituted.
 
 Latest measured outcome: [evaluation receipt](RESULTS.md).
+
+## Routes beside the entry point
+
+The entry-point table is byte-capped. These routes stay in force:
+
+| Task | Read |
+|---|---|
+| Release channels / update IA | [RELEASE_CHANNELS.md](../../canon/RELEASE_CHANNELS.md) |

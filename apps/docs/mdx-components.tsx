@@ -16,6 +16,7 @@ import {
   HelpTroubleshooting,
   HelpVideo,
 } from '@/components/help';
+import { HelpArticleWrapper } from '@/components/help/HelpArticleWrapper';
 import { RelatedGuides } from '@/components/RelatedGuides';
 import { isPrimaryArticle } from '@/lib/article-metadata.mjs';
 import { loadArticleRegistry } from '@/lib/article-registry.mjs';
@@ -26,7 +27,6 @@ import {
 } from '@/lib/help-center-seo.mjs';
 
 const docsComponents = getDocsMDXComponents();
-const DocsWrapper = docsComponents.wrapper;
 
 let cachedRegistry: ReturnType<typeof loadArticleRegistry> | null = null;
 
@@ -57,21 +57,22 @@ function ArticleSeo({ id }: { id: string }) {
   );
 }
 
-function HelpCenterArticle(
-  props: ComponentProps<NonNullable<typeof DocsWrapper>>
-) {
-  if (!DocsWrapper) return props.children;
-  const metadata = props.metadata as typeof props.metadata & {
+type HelpArticleWrapperProps = ComponentProps<typeof HelpArticleWrapper>;
+
+function HelpCenterArticle(props: HelpArticleWrapperProps) {
+  const metadata = props.metadata as HelpArticleWrapperProps['metadata'] & {
     readonly id?: string;
     readonly category?: string;
+    readonly description?: string;
+    readonly keywords?: readonly string[];
     readonly documentType?: string;
     readonly redirectAliases?: readonly string[];
     readonly searchable?: boolean;
   };
   const searchTerms = [
-    metadata.description,
-    ...(Array.isArray(metadata.keywords) ? metadata.keywords : []),
-    ...(Array.isArray(metadata.redirectAliases)
+    metadata?.description,
+    ...(Array.isArray(metadata?.keywords) ? metadata.keywords : []),
+    ...(Array.isArray(metadata?.redirectAliases)
       ? metadata.redirectAliases
       : []),
   ]
@@ -79,18 +80,18 @@ function HelpCenterArticle(
     .join(' · ');
 
   return (
-    <DocsWrapper {...props}>
-      {typeof metadata.id === 'string' && <ArticleSeo id={metadata.id} />}
+    <HelpArticleWrapper {...props}>
+      {typeof metadata?.id === 'string' && <ArticleSeo id={metadata.id} />}
       {props.children}
-      {metadata.searchable !== false && (
+      {metadata?.searchable !== false && (
         <span className='help-search-index-metadata' aria-hidden='true'>
-          <span data-pagefind-meta='category'>{metadata.category}</span>
-          <span data-pagefind-meta='contentType'>{metadata.documentType}</span>
-          <span data-pagefind-meta='description'>{metadata.description}</span>
+          <span data-pagefind-meta='category'>{metadata?.category}</span>
+          <span data-pagefind-meta='contentType'>{metadata?.documentType}</span>
+          <span data-pagefind-meta='description'>{metadata?.description}</span>
           <span data-pagefind-weight='5'>{searchTerms}</span>
         </span>
       )}
-    </DocsWrapper>
+    </HelpArticleWrapper>
   );
 }
 

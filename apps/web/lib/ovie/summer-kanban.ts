@@ -38,7 +38,7 @@ export type SummerKanbanLane = Extract<OvieLane, 'flash' | 'heavy'>;
 /**
  * The durable initiative record is a persisted source, not a heartbeat, so
  * it rides the same ten-minute semantic window as the persisted producers
- * in SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS (fleet-receipt, lease-guard).
+ * in SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS (lanes-status).
  */
 export const SUMMER_KANBAN_FRESHNESS_MS = 10 * 60_000;
 

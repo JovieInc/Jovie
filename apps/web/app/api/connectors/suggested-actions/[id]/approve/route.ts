@@ -22,7 +22,10 @@ import { requireAuth } from '@/lib/auth/require-auth';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
 import { resolveSuggestedActionDispatch } from '@/lib/connectors/suggested-action-dispatch';
-import { YOUTUBE_THUMBNAIL_CANDIDATE_KIND } from '@/lib/connectors/suggested-action-kinds';
+import {
+  SOCIAL_REPLY_DRAFT_KIND,
+  YOUTUBE_THUMBNAIL_CANDIDATE_KIND,
+} from '@/lib/connectors/suggested-action-kinds';
 import {
   enqueueApprovedActionWorkflow,
   recoverOrphanedApprovedAction,
@@ -157,11 +160,14 @@ export async function POST(_request: Request, { params }: RouteParams) {
             approvalId: id,
             status:
               dispatch.mode === 'decision-only' &&
-              dispatch.family === 'youtube-thumbnail'
-                ? candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND
-                  ? 'approved-publication-blocked'
-                  : 'approved-for-generation'
-                : 'approved-for-preparation',
+              dispatch.family === 'social-reply'
+                ? 'approved-for-send'
+                : dispatch.mode === 'decision-only' &&
+                    dispatch.family === 'youtube-thumbnail'
+                  ? candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND
+                    ? 'approved-publication-blocked'
+                    : 'approved-for-generation'
+                  : 'approved-for-preparation',
           },
           { status: 200, headers: NO_STORE_HEADERS }
         );
@@ -250,6 +256,9 @@ export async function POST(_request: Request, { params }: RouteParams) {
         userId,
         verdict: 'approved',
         cardKind: approvedKind,
+        ...(approvedKind === SOCIAL_REPLY_DRAFT_KIND
+          ? { cardPayload: updated[0].payload }
+          : {}),
         surface: 'opportunity-inbox',
       });
       revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
@@ -259,11 +268,13 @@ export async function POST(_request: Request, { params }: RouteParams) {
           ok: true,
           approvalId: id,
           status:
-            dispatch.family === 'brand-deal'
-              ? 'approved-for-preparation'
-              : candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND
-                ? 'approved-publication-blocked'
-                : 'approved-for-generation',
+            dispatch.family === 'social-reply'
+              ? 'approved-for-send'
+              : dispatch.family === 'brand-deal'
+                ? 'approved-for-preparation'
+                : candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND
+                  ? 'approved-publication-blocked'
+                  : 'approved-for-generation',
         },
         { status: 200, headers: NO_STORE_HEADERS }
       );

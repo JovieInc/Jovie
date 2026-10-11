@@ -8,6 +8,7 @@ import {
   NIGHTLY_UPDATE_FLAG,
   nightlyUpdateLaunchAgentLabel,
   nightlyUpdateMinute,
+  reduceDesktopUpdateState,
   renderNightlyUpdateLaunchAgentPlist,
   shouldInstallDownloadedUpdateNow,
   shouldInstallDownloadedUpdateWhileRunning,
@@ -127,18 +128,28 @@ test('nightly launch agents are registered for prod and staging only', () => {
 test('closed nightly launches install immediately; visible windows wait', () => {
   expect(
     shouldInstallDownloadedUpdateNow({
+      workStateSafe: false,
+      nightlyLaunch: true,
+      hasVisibleWindow: false,
+    })
+  ).toBe(false);
+  expect(
+    shouldInstallDownloadedUpdateNow({
+      workStateSafe: true,
       nightlyLaunch: true,
       hasVisibleWindow: false,
     })
   ).toBe(true);
   expect(
     shouldInstallDownloadedUpdateNow({
+      workStateSafe: true,
       nightlyLaunch: true,
       hasVisibleWindow: true,
     })
   ).toBe(false);
   expect(
     shouldInstallDownloadedUpdateNow({
+      workStateSafe: true,
       nightlyLaunch: false,
       hasVisibleWindow: false,
     })
@@ -187,6 +198,7 @@ const idleOvernight = {
   systemIdleSeconds: IDLE_UPDATE_INSTALL_SECONDS,
   audible: false,
   hasUnsentInput: false,
+  workStateSafe: true,
 };
 
 test('a running app restarts into a downloaded update only overnight and idle', () => {
@@ -214,6 +226,7 @@ test('an idle restart never interrupts audio, drafts, or a missing download', ()
   for (const guard of [
     { audible: true },
     { hasUnsentInput: true },
+    { workStateSafe: false },
     { updateReadyToInstall: false },
   ]) {
     expect(
@@ -238,4 +251,90 @@ test('wake and unlock re-check for updates at most once per window', () => {
       lastCheckMs: 0,
     })
   ).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Renderer-facing update state machine (JOV-6683): each autoUpdater event maps
+// to a fully-determined typed phase, including the retryable error payload.
+// ---------------------------------------------------------------------------
+
+const NOTES_URL = 'https://jov.ie/changelog';
+
+test.each([
+  [{ type: 'checking-for-update' }, { state: 'checking' }],
+  [{ type: 'update-not-available' }, { state: 'not-available' }],
+  [
+    {
+      type: 'update-available',
+      version: '26.9.16',
+      releaseDate: '2026-09-27T00:00:00.000Z',
+    },
+    {
+      state: 'available',
+      version: '26.9.16',
+      releaseDate: '2026-09-27T00:00:00.000Z',
+      notesUrl: NOTES_URL,
+    },
+  ],
+  [
+    {
+      type: 'download-progress',
+      percent: 42.4,
+      transferredBytes: 1024,
+      totalBytes: 4096,
+      bytesPerSecond: 512,
+    },
+    {
+      state: 'downloading',
+      percent: 42.4,
+      transferredBytes: 1024,
+      totalBytes: 4096,
+      bytesPerSecond: 512,
+    },
+  ],
+  [
+    { type: 'update-downloaded', version: '26.9.16' },
+    { state: 'ready', version: '26.9.16' },
+  ],
+  [
+    { type: 'error', message: 'net::ERR_CONNECTION_REFUSED' },
+    { state: 'error', message: 'net::ERR_CONNECTION_REFUSED', retryable: true },
+  ],
+] as const)('mapper emits the typed phase for %#', (event, expected) => {
+  expect(reduceDesktopUpdateState(event, NOTES_URL)).toEqual(expected);
+});
+
+test('error to retry to downloading sequence stays well-typed', () => {
+  const states = [
+    { type: 'error', message: 'offline' },
+    { type: 'checking-for-update' },
+    { type: 'update-available', version: '26.9.16' },
+    {
+      type: 'download-progress',
+      percent: 10,
+      transferredBytes: 1,
+      totalBytes: 10,
+      bytesPerSecond: 1,
+    },
+  ] as const;
+
+  expect(
+    states.map(event => reduceDesktopUpdateState(event, NOTES_URL))
+  ).toEqual([
+    { state: 'error', message: 'offline', retryable: true },
+    { state: 'checking' },
+    {
+      state: 'available',
+      version: '26.9.16',
+      releaseDate: null,
+      notesUrl: NOTES_URL,
+    },
+    {
+      state: 'downloading',
+      percent: 10,
+      transferredBytes: 1,
+      totalBytes: 10,
+      bytesPerSecond: 1,
+    },
+  ]);
 });

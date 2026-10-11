@@ -11,6 +11,9 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getAudioChromeSnapshot,
+  type MediaCanvasTransportSnapshot,
+  publishMediaCanvasTransport,
+  registerMediaCanvasTransport,
   resetAudioChromeSnapshot,
 } from '@/components/organisms/audio-chrome-state';
 import {
@@ -20,6 +23,7 @@ import {
 } from '@/constants/routes';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
+import { detectReversibleControl } from '@/tests/utils/reversible-control-detector';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
 const playNext = vi.fn().mockResolvedValue(undefined);
@@ -89,8 +93,15 @@ vi.mock('@/components/atoms/TruncatedText', () => ({
 }));
 
 vi.mock('@/components/atoms/SeekBar', () => ({
-  SeekBar: (props: { disabled?: boolean }) => (
-    <input type='range' data-testid='seek-bar' disabled={props.disabled} />
+  SeekBar: (props: { disabled?: boolean; onSeek?: (time: number) => void }) => (
+    <input
+      type='range'
+      data-testid='seek-bar'
+      disabled={props.disabled}
+      onChange={event =>
+        props.onSeek?.(Number((event.target as HTMLInputElement).value))
+      }
+    />
   ),
 }));
 
@@ -137,6 +148,14 @@ function getExpandedShell() {
   return screen.getByTestId('audio-surface-expanded-shell');
 }
 
+function getDock() {
+  return screen.getByTestId('shell-audio-dock');
+}
+
+function getDockContent() {
+  return screen.getByTestId('shell-audio-dock-content');
+}
+
 function getPlayerVisibilityToggle() {
   return screen.getByTestId('player-visibility-toggle');
 }
@@ -167,9 +186,15 @@ describe('PersistentAudioBar', () => {
     });
   }
 
-  it('renders nothing (zero reserved space) when no track is active', () => {
-    const { container } = render(<PersistentAudioBar />);
-    expect(container).toBeEmptyDOMElement();
+  it('keeps the dock collapsed (zero reserved space) when no track is active', () => {
+    render(<PersistentAudioBar />);
+
+    // The dock stays mounted so a stop/dismiss can animate the panel back
+    // down — idle means data-state=closed, max-height 0, no player chrome.
+    const dock = getDock();
+    expect(dock).toHaveAttribute('data-state', 'closed');
+    expect(dock).toHaveAttribute('aria-hidden', 'true');
+    expect(dock.style.maxHeight).toBe('0px');
     expect(screen.queryByRole('region', { name: 'Audio Player' })).toBeNull();
     expect(screen.queryByTestId('player-visibility-toggle')).toBeNull();
   });
@@ -231,15 +256,51 @@ describe('PersistentAudioBar', () => {
     }
   });
 
-  it('never renders a collapse/minimize or dismiss control', () => {
+  it('converges rendered metadata when the playing release is mutated', () => {
+    setPlaying({
+      releaseTitle: 'Old Title',
+      artistName: 'DJ Cool',
+      artworkUrl: 'https://cdn.example.com/old.jpg',
+    });
+    const { rerender } = render(<PersistentAudioBar />);
+
+    setPlaying({
+      releaseTitle: 'New Title',
+      artistName: 'DJ Cool',
+      artworkUrl: 'https://cdn.example.com/new.jpg',
+      trackTitle: 'Renamed Track',
+    });
+    rerender(<PersistentAudioBar />);
+
+    expect(screen.queryByText('Old Title')).toBeNull();
+    expect(screen.getAllByText('Renamed Track').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DJ Cool · New Title').length).toBeGreaterThan(
+      0
+    );
+    for (const artwork of screen.getAllByTestId('artwork-img')) {
+      expect(artwork).toHaveAttribute('src', 'https://cdn.example.com/new.jpg');
+    }
+  });
+
+  it('never renders a collapse/minimize control', () => {
     setPlaying({ artistName: 'DJ Cool' });
     render(<PersistentAudioBar />);
 
     expect(screen.queryByTestId('audio-bar-minimize')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Dismiss Player' })).toBeNull();
     expect(
       screen.queryByRole('button', { name: /minimize/i })
     ).not.toBeInTheDocument();
+  });
+
+  it('renders a dismiss control that hides the dock and stops playback', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool' });
+    render(<PersistentAudioBar />);
+
+    const dismiss = screen.getByRole('button', { name: 'Dismiss Player' });
+    await user.click(dismiss);
+
+    expect(stop).toHaveBeenCalledTimes(1);
   });
 
   it('renders exactly one subtle visibility toggle that opens/closes the player', async () => {
@@ -388,9 +449,9 @@ describe('PersistentAudioBar', () => {
       'aria-hidden',
       'false'
     );
-    expect(screen.getByTestId('audio-surface-compact-shell')).toHaveAttribute(
-      'aria-hidden',
-      'true'
+    expect(screen.getByTestId('shell-audio-dock')).toHaveAttribute(
+      'data-state',
+      'open'
     );
   });
 
@@ -661,7 +722,7 @@ describe('PersistentAudioBar', () => {
     expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
   });
 
-  it('hides the full docked player after closing it (mini lives in the sidebar)', async () => {
+  it('collapses the dock after closing to mini (panel slides back down)', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });
 
@@ -669,39 +730,66 @@ describe('PersistentAudioBar', () => {
 
     await user.click(getPlayerVisibilityToggle());
 
+    // The dock collapses to zero height — the sidebar bridge owns the mini
+    // chrome (JOV-3511), so nothing else remains below the panel.
     expect(screen.getByTestId('audio-surface-expanded-shell')).toHaveAttribute(
       'aria-hidden',
       'true'
     );
-    // Compact bottom shell is intentionally empty — sidebar bridge owns mini.
-    expect(screen.getByTestId('audio-surface-compact-shell')).toHaveAttribute(
-      'aria-hidden',
-      'false'
-    );
-    expect(
-      within(screen.getByTestId('audio-surface-compact-shell')).queryByRole(
-        'button',
-        { name: 'Pause' }
-      )
-    ).toBeNull();
+    await waitFor(() => {
+      expect(getDock()).toHaveAttribute('data-state', 'closed');
+      expect(getDock().style.maxHeight).toBe('0px');
+    });
   });
 
-  it('swaps shell audio surfaces when the player is closed', async () => {
+  it('certifies repeated pointer and keyboard audio reveal cycles', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });
 
     render(<PersistentAudioBar />);
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
-    const compactSurface = screen.getByTestId('audio-surface-compact-shell');
 
-    expect(expandedSurface).toHaveAttribute('aria-hidden', 'false');
-    expect(compactSurface).toHaveAttribute('aria-hidden', 'true');
+    getPlayerVisibilityToggle().focus();
+    await detectReversibleControl({
+      name: 'persistent audio-player reveal',
+      states: ['open', 'closed'],
+      activationSequence: ['pointer', 'keyboard', 'keyboard', 'keyboard'],
+      observe: () => ({
+        state:
+          getPlayerVisibilityToggle().getAttribute('aria-expanded') === 'true'
+            ? 'open'
+            : 'closed',
+      }),
+      activate: async via => {
+        getPlayerVisibilityToggle().focus();
+        if (via === 'pointer') {
+          await user.click(getPlayerVisibilityToggle());
+        } else {
+          fireEvent.keyDown(window, { key: '`' });
+        }
+      },
+      assertContinuity: observation => {
+        const expanded = String(observation.state === 'open');
+        expect(getPlayerVisibilityToggle()).toHaveAttribute(
+          'aria-expanded',
+          expanded
+        );
+        expect(getPlayerVisibilityToggle()).toHaveAccessibleName(
+          observation.state === 'open' ? 'Hide Player' : 'Show Player'
+        );
+        expect(getPlayerVisibilityToggle()).toHaveFocus();
+        expect(expandedSurface).toHaveAttribute(
+          'aria-hidden',
+          String(observation.state === 'closed')
+        );
+      },
+    });
 
-    await user.click(getPlayerVisibilityToggle());
-
-    expect(expandedSurface).toHaveAttribute('aria-hidden', 'true');
-    expect(compactSurface).toHaveAttribute('aria-hidden', 'false');
+    await waitFor(() => {
+      expect(getDock()).toHaveAttribute('data-state', 'open');
+      expect(expandedSurface).toHaveAttribute('aria-hidden', 'false');
+    });
   });
 
   it('docks the expanded shell flat — no card border, radius, or shadow', () => {
@@ -756,25 +844,25 @@ describe('PersistentAudioBar', () => {
       </AppFlagProvider>
     );
 
-    fireEvent.keyDown(globalThis, { key: ' ' });
+    fireEvent.keyDown(window, { key: ' ' });
     expect(toggleTrack).toHaveBeenCalledWith({
       id: 'track-1',
       title: 'Midnight Drive',
     });
 
-    fireEvent.keyDown(globalThis, { key: 'w' });
+    fireEvent.keyDown(window, { key: 'w' });
     expect(
       screen.getByRole('button', { name: 'Hide waveform' })
     ).toBeInTheDocument();
 
     toggleTrack.mockClear();
-    fireEvent.keyDown(globalThis, { key: 'l' });
+    fireEvent.keyDown(window, { key: 'l' });
     expect(push).toHaveBeenCalledWith(
       buildLyricsRoute('track-1', { from: APP_ROUTES.CHAT })
     );
     expect(toggleTrack).not.toHaveBeenCalled();
 
-    fireEvent.keyDown(globalThis, { key: '`' });
+    fireEvent.keyDown(window, { key: '`' });
     // Backtick toggles the player closed; mini chrome lives in the sidebar.
     expect(screen.getByTestId('audio-surface-expanded-shell')).toHaveAttribute(
       'aria-hidden',
@@ -802,60 +890,213 @@ describe('PersistentAudioBar', () => {
       </AppFlagProvider>
     );
 
-    fireEvent.keyDown(globalThis, { key: 'Escape' });
+    fireEvent.keyDown(window, { key: 'Escape' });
 
     expect(push).toHaveBeenCalledWith(
       resolveLyricsReturnRoute(searchParams.get('from'), APP_ROUTES.CHAT)
     );
   });
 
-  it('cinematically reveals the canonical bar into place on first play', async () => {
+  it('cinematically reveals the docked player on first play', async () => {
     setPlaying({ artistName: 'DJ Cool' });
 
     render(<PersistentAudioBar />);
 
-    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+    const dock = getDock();
+    const content = getDockContent();
 
-    // First frame: off the bottom + transparent so the transition has a
-    // "from" state to decelerate out of.
-    expect(expandedSurface.style.transform).toBe('translateY(100%)');
-    expect(expandedSurface.style.opacity).toBe('0');
+    await waitFor(() => {
+      expect(dock).toHaveAttribute('data-state', 'open');
+    });
 
-    await flushReveal();
-
-    // Lands into place: no translate offset, fully opaque, interactive.
-    expect(expandedSurface.style.transform).toBe('translateY(0)');
-    expect(expandedSurface.style.opacity).toBe('1');
-    expect(expandedSurface.style.pointerEvents).toBe('auto');
+    // Cinematic tier reveal: height animates open with the cinematic
+    // duration/easing; the content lands fully opaque, in place, interactive.
+    expect(dock.style.maxHeight).toBe('var(--app-shell-audio-bar-max-height)');
+    expect(dock.style.transition).toContain(
+      'var(--ds-motion-cinematic-duration)'
+    );
+    expect(content.style.transform).toBe('translateY(0)');
+    expect(content.style.opacity).toBe('1');
+    expect(content.style.pointerEvents).toBe('auto');
   });
 
-  it('keeps the reserved bar height across the reveal so nothing shifts', async () => {
+  it('animates the dock height 0 → player height so only the panel bottom moves', async () => {
+    const { rerender } = render(<PersistentAudioBar />);
+
+    // Idle: dock collapsed, zero reserved height.
+    const dock = getDock();
+    expect(dock).toHaveAttribute('data-state', 'closed');
+    expect(dock.style.maxHeight).toBe('0px');
+
     setPlaying({ artistName: 'DJ Cool' });
+    rerender(<PersistentAudioBar />);
 
-    render(<PersistentAudioBar />);
-
-    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
-    const reservedHeight = 'var(--app-shell-audio-bar-max-height)';
-
-    // Height is reserved from the very first frame (only transform/opacity
-    // animate), so surrounding content never reflows.
-    expect(expandedSurface.style.maxHeight).toBe(reservedHeight);
-
-    await flushReveal();
-
-    expect(expandedSurface.style.maxHeight).toBe(reservedHeight);
+    await waitFor(() => {
+      expect(dock.style.maxHeight).toBe(
+        'var(--app-shell-audio-bar-max-height)'
+      );
+    });
+    expect(dock).toHaveAttribute('data-state', 'open');
   });
 
-  it('snaps the canonical bar revealed without a translate frame under reduced motion', () => {
+  it('snaps the dock open instantly under reduced motion', () => {
     mockPrefersReducedMotion = true;
     setPlaying({ artistName: 'DJ Cool' });
 
     render(<PersistentAudioBar />);
 
-    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+    const dock = getDock();
+    const content = getDockContent();
 
-    // No translateY(100%) frame ever paints — it's already in place.
-    expect(expandedSurface.style.transform).toBe('translateY(0)');
-    expect(expandedSurface.style.opacity).toBe('1');
+    // No transition ever paints — the dock is already in place.
+    expect(dock.style.transition).toBe('none');
+    expect(content.style.transition).toBe('none');
+    expect(content.style.transform).toBe('translateY(0)');
+    expect(content.style.opacity).toBe('1');
+  });
+
+  describe('media canvas transport (JOV-7240)', () => {
+    const canvasController = {
+      toggle: vi.fn(),
+      seek: vi.fn(),
+      next: vi.fn(),
+      previous: vi.fn(),
+    };
+    let unregisterCanvas: (() => void) | null = null;
+
+    function registerCanvas() {
+      act(() => {
+        unregisterCanvas = registerMediaCanvasTransport(canvasController);
+      });
+    }
+
+    function publishCanvas(
+      overrides: Partial<MediaCanvasTransportSnapshot> = {}
+    ) {
+      act(() => {
+        publishMediaCanvasTransport({
+          title: 'Clip One',
+          index: 0,
+          count: 3,
+          isVideo: true,
+          isPlaying: true,
+          currentTime: 12,
+          duration: 40,
+          hasNext: true,
+          hasPrevious: true,
+          ...overrides,
+        });
+      });
+    }
+
+    beforeEach(() => {
+      unregisterCanvas?.();
+      unregisterCanvas = null;
+      canvasController.toggle.mockClear();
+      canvasController.seek.mockClear();
+      canvasController.next.mockClear();
+      canvasController.previous.mockClear();
+    });
+
+    it('fills the dock with the canvas transport even without an audio track', () => {
+      registerCanvas();
+      render(<PersistentAudioBar />);
+
+      // No published snapshot yet — the dock stays empty.
+      expect(screen.queryByTestId('media-canvas-dock')).toBeNull();
+
+      publishCanvas();
+
+      const rows = screen.getAllByTestId('media-canvas-dock');
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(within(row).getByText('Clip One')).toBeInTheDocument();
+        expect(within(row).getByText('1 / 3')).toBeInTheDocument();
+      }
+    });
+
+    it('wires the dock play/pause, next, and previous controls to the canvas controller', async () => {
+      const user = userEvent.setup();
+      registerCanvas();
+      render(<PersistentAudioBar />);
+      publishCanvas();
+
+      await user.click(
+        screen.getAllByRole('button', { name: 'Pause video' })[0]
+      );
+      await user.click(screen.getAllByRole('button', { name: 'Next Item' })[0]);
+      await user.click(
+        screen.getAllByRole('button', { name: 'Previous Item' })[0]
+      );
+
+      expect(canvasController.toggle).toHaveBeenCalledTimes(1);
+      expect(canvasController.next).toHaveBeenCalledTimes(1);
+      expect(canvasController.previous).toHaveBeenCalledTimes(1);
+    });
+
+    it('wires the dock seek bar to the canvas controller', () => {
+      registerCanvas();
+      render(<PersistentAudioBar />);
+      publishCanvas();
+
+      fireEvent.change(screen.getAllByTestId('seek-bar')[0], {
+        target: { value: '22' },
+      });
+
+      expect(canvasController.seek).toHaveBeenCalledWith(22);
+    });
+
+    it('hides video-only controls for photo items but keeps item stepping', () => {
+      registerCanvas();
+      render(<PersistentAudioBar />);
+      publishCanvas({ isVideo: false, isPlaying: false });
+
+      for (const row of screen.getAllByTestId('media-canvas-dock')) {
+        expect(within(row).getByText('1 / 3 · Photo')).toBeInTheDocument();
+        expect(
+          within(row).queryByRole('button', { name: /video/i })
+        ).toBeNull();
+        expect(
+          within(row).getByRole('button', { name: 'Next Item' })
+        ).toBeInTheDocument();
+        expect(
+          within(row).getByRole('button', { name: 'Previous Item' })
+        ).toBeInTheDocument();
+      }
+      expect(screen.queryByTestId('seek-bar')).toBeNull();
+    });
+
+    it('replaces the audio transport in the dock while the canvas owns playback', () => {
+      setPlaying({ artistName: 'DJ Cool' });
+      registerCanvas();
+      render(<PersistentAudioBar />);
+      publishCanvas();
+
+      expect(screen.queryByTestId('audio-surface-expanded-shell')).toBeNull();
+      expect(screen.getAllByTestId('media-canvas-dock').length).toBeGreaterThan(
+        0
+      );
+      expect(getAudioChromeSnapshot()).toEqual({
+        activeTrackId: 'track-1',
+        compactPlayerVisible: false,
+        fullPlayerVisible: true,
+      });
+    });
+
+    it('clears the dock row when the canvas session unregisters', () => {
+      registerCanvas();
+      render(<PersistentAudioBar />);
+      publishCanvas();
+      expect(screen.getAllByTestId('media-canvas-dock').length).toBeGreaterThan(
+        0
+      );
+
+      act(() => {
+        unregisterCanvas?.();
+        unregisterCanvas = null;
+      });
+
+      expect(screen.queryByTestId('media-canvas-dock')).toBeNull();
+    });
   });
 });

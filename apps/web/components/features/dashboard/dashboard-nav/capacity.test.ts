@@ -26,9 +26,9 @@ function experimentalItem(id: string, name: string): NavItem {
 
 describe('CUSTOMER_NAV_CAPACITY', () => {
   it('documents desktop and mobile caps that preserve the approved core rail', () => {
-    expect(CUSTOMER_NAV_CAPACITY.desktopPrimaryVisible).toBe(7);
+    expect(CUSTOMER_NAV_CAPACITY.desktopPrimaryVisible).toBe(4);
     expect(CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible).toBe(3);
-    expect(customerNavVisibleCap('desktopPrimaryVisible')).toBe(7);
+    expect(customerNavVisibleCap('desktopPrimaryVisible')).toBe(4);
     expect(customerNavVisibleCap('mobilePrimaryVisible')).toBe(3);
   });
 
@@ -50,15 +50,11 @@ describe('partitionCustomerNavigation', () => {
     });
 
     expect(partition.visible.map(item => item.id)).toEqual([
-      'inbox',
-      'chat',
+      'home',
+      'presence',
       'library',
     ]);
-    expect(partition.more.map(item => item.id)).toEqual([
-      'contacts',
-      'calendar',
-      'tasks',
-    ]);
+    expect(partition.more.map(item => item.id)).toEqual(['audience']);
     expect(partition.visible).toEqual(mobilePrimaryNavigation);
     expect(mobileExpandedNavigation).toEqual([
       ...partition.more,
@@ -99,7 +95,7 @@ describe('partitionCustomerNavigation', () => {
   });
 
   it('fills remaining desktop slots with experimental items before overflowing', () => {
-    const coreSlice = primaryNavigation.slice(0, 5);
+    const coreSlice = primaryNavigation.slice(0, 2);
     const items: NavItem[] = [
       ...coreSlice,
       experimentalItem('labs', 'Labs'),
@@ -128,8 +124,8 @@ describe('partitionCustomerNavigation', () => {
       CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible
     );
     expect(partition.visible.map(item => item.id)).toEqual([
-      'inbox',
-      'chat',
+      'home',
+      'presence',
       'library',
     ]);
   });
@@ -185,7 +181,7 @@ describe('partitionCustomerNavigation', () => {
   it('preserves object identity from the source list', () => {
     const partition = partitionCustomerNavigation(primaryNavigation, {
       visibleCap: 3,
-      activeItemId: 'calendar',
+      activeItemId: 'audience',
     });
 
     for (const item of [...partition.visible, ...partition.more]) {

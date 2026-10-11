@@ -9,6 +9,29 @@ const index = rows => ({ entries: Object.fromEntries(rows.map(([id, importPath, 
 const ids = result => result.stories.map(story => story.id);
 
 describe('rendered evaluator story selection', () => {
+  it('matches actual Storybook 10 app-relative index paths without matching legacy suffixes', () => {
+    const observed = index([
+      [
+        'marketing-device--public-profile',
+        './components/marketing/device/DeviceScreen.stories.tsx',
+        { exportName: 'PublicProfile' },
+      ],
+      [
+        'legacy-device--public-profile',
+        './apps/web/legacy/components/marketing/device/DeviceScreen.stories.tsx',
+        { exportName: 'PublicProfile' },
+      ],
+    ]);
+    const selected = storyCandidates(observed, {
+      components: [],
+      storyPaths: [
+        'apps/web/components/marketing/device/DeviceScreen.stories.tsx#PublicProfile',
+      ],
+    });
+    expect(ids(selected)).toEqual(['marketing-device--public-profile']);
+    expect(selected.missingRequests).toEqual([]);
+  });
+
   it('tracks selected and missing requests independently', () => {
     // biome-ignore format: compact fixture keeps this source-PR under the hard size cap
     const result = storyCandidates(index([['badge--certified', BADGE], ['marketing-sections--legacy', CATALOG, { tags: [] }]]), { components: ['packages/ui/atoms/Badge.tsx', 'packages/ui/atoms/Missing.tsx'], storyPaths: ['apps/web/components/marketing/storybook/MarketingSections.stories.tsx', 'apps/web/components/missing/MissingStory.stories.tsx'] });

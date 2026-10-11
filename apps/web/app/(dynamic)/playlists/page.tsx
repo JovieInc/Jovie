@@ -4,6 +4,7 @@ import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { env } from '@/lib/env-server';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { PlaylistGrid } from './_components/PlaylistGrid';
 
 export const revalidate = 300;
@@ -13,6 +14,9 @@ export const metadata: Metadata = {
   description:
     'Hyper-specific, expertly curated playlists for every mood and moment. Featuring independent artists.',
   alternates: { canonical: `${BASE_URL}/playlists` },
+  // Unlinked music-only stub ("Coming soon") — keep it out of the index until
+  // it is either removed or rebuilt as a creator-collections hub (JOV-7602).
+  robots: NOINDEX_ROBOTS,
   openGraph: {
     title: 'Curated Music Playlists — Jovie',
     description:

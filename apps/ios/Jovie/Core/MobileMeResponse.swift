@@ -269,6 +269,20 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     continueOnWebURL: "https://jov.ie/app"
   )
 
+  /// App Store identity shot (JOV-4481): a fictional artist with every
+  /// share path available, including the shipped Apple Wallet pass.
+  static let previewStorefront = MobileMeResponse(
+    state: .ready,
+    displayName: "Tessa Vale",
+    username: "tessavale",
+    publicProfileURL: "https://jov.ie/tessavale",
+    qrPayload: "https://jov.ie/tessavale",
+    avatarURL: nil,
+    appleWalletProfilePassAvailable: true,
+    chatEnabled: true,
+    continueOnWebURL: "https://jov.ie/app"
+  )
+
   static let previewReadyWithoutQR = MobileMeResponse(
     state: .ready,
     displayName: "Tim White",
@@ -304,22 +318,6 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     chatEnabled: false,
     continueOnWebURL: "https://jov.ie/app"
   )
-}
-
-/// Mobile workspace ids match web `APP_SHELL_WORKSPACES` (`customer` / `ov`).
-enum MobileWorkspaceMode: String, Codable, Equatable, Sendable, CaseIterable {
-  case jovie = "customer"
-  case ovie = "ov"
-
-  var displayName: String { self == .ovie ? "Ovie" : "Jovie" }
-  var toggled: MobileWorkspaceMode { self == .jovie ? .ovie : .jovie }
-  var chatMode: String? { self == .ovie ? "ov" : nil }
-  var askChatLabel: String { self == .ovie ? "Ask Summer" : "Ask Jovie" }
-  var composerOfflinePlaceholder: String { "\(askChatLabel) (offline)" }
-  var emptyChatSubtitle: String {
-    self == .ovie ? "Taste cards, stills, and ops. Summer is the speaker."
-      : "Ask Jovie about your profile, releases, and next moves."
-  }
 }
 
 enum MobileWorkspaceStore {

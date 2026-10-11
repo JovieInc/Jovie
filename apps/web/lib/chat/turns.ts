@@ -7,8 +7,10 @@ import {
   chatMessages,
   chatTurns,
 } from '@/lib/db/schema/chat';
+import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
 import { logger } from '@/lib/utils/logger';
 import { sanitizeConversationTitle } from './title';
+import { conversationTitleSource } from './title-source';
 import type { PersistedToolEvent } from './tool-events';
 
 export type ChatTurnSource = 'typed' | 'quick_action' | 'slash_command';
@@ -111,7 +113,7 @@ function toChatMessage(row: ChatMessageCoreRow): ChatMessage {
 }
 
 function toConversationTitle(text: string): string | null {
-  return sanitizeConversationTitle(text, 50);
+  return sanitizeConversationTitle(conversationTitleSource(text).text, 50);
 }
 
 function ephemeralAssistantMessage(input: {
@@ -350,6 +352,22 @@ export async function reserveChatTurn(input: {
     .update(chatConversations)
     .set({ updatedAt: now })
     .where(eq(chatConversations.id, conversationId));
+
+  // JOV-4514: durable work record for the conversation. Idempotent —
+  // attaches to the existing record on retries and covers both the
+  // newly-created and pre-existing conversation paths. Non-fatal by design.
+  try {
+    await ensureChatWorkRecord({
+      conversationId,
+      creatorProfileId: input.creatorProfileId,
+    });
+  } catch (error) {
+    logger.error(
+      'Failed to ensure chat work record',
+      { conversationId, error },
+      'chat/turns'
+    );
+  }
 
   return {
     outcome: 'reserved',

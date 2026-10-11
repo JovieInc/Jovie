@@ -64,8 +64,8 @@ vi.mock('@/lib/db/schema/leads', () => ({
   leads: mockLeadsSchema,
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: mockGetCurrentUserEntitlements,
 }));
 
 vi.mock('@/lib/http/parse-json', () => ({

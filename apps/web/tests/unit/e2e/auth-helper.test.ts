@@ -4,6 +4,7 @@ import {
   fillControlledInputUntilEnabled,
   resolveBypassFallbackUserId,
   setTestAuthBypassSession,
+  signInUser,
 } from '../../helpers/auth';
 
 describe('fillControlledInputUntilEnabled', () => {
@@ -40,6 +41,82 @@ describe('resolveBypassFallbackUserId', () => {
     );
     expect(creatorId).not.toMatch(/^ba_dev_/);
     expect(creatorId).toBe(resolveBypassFallbackUserId('creator-ready'));
+  });
+});
+
+describe('signInUser test-auth bypass navigation', () => {
+  function withBypassEnv<T>(run: () => Promise<T>) {
+    const originalBypass = process.env.E2E_USE_TEST_AUTH_BYPASS;
+    const originalBaseUrl = process.env.BASE_URL;
+    process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
+    delete process.env.BASE_URL;
+
+    return run().finally(() => {
+      if (originalBypass === undefined) {
+        delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+      } else {
+        process.env.E2E_USE_TEST_AUTH_BYPASS = originalBypass;
+      }
+      if (originalBaseUrl === undefined) {
+        delete process.env.BASE_URL;
+      } else {
+        process.env.BASE_URL = originalBaseUrl;
+      }
+    });
+  }
+
+  function buildPage(enterStatus = 303) {
+    const requestGet = vi.fn(
+      async (
+        _url: string,
+        _options?: { maxRedirects?: number; timeout?: number }
+      ) => ({
+        status: () => enterStatus,
+        text: () => Promise.resolve('enter error body'),
+      })
+    );
+    const goto = vi.fn(
+      async (_url: string, _options?: Parameters<Page['goto']>[1]) =>
+        ({ status: () => 200 }) as unknown as Awaited<ReturnType<Page['goto']>>
+    );
+    const readyLocator = { isVisible: () => Promise.resolve(true) };
+    const page = {
+      request: { get: requestGet },
+      goto,
+      url: () => 'http://localhost:3100/app',
+      waitForURL: () => Promise.resolve(),
+      locator: () => ({ first: () => readyLocator }),
+    } as unknown as Page;
+    return { page, requestGet, goto };
+  }
+
+  it('mints the session over request API so the enter route is not gated on the cold /app compile (JOV-7559)', async () => {
+    const { page, requestGet, goto } = buildPage();
+
+    await withBypassEnv(() => signInUser(page));
+
+    expect(requestGet).toHaveBeenCalledWith(
+      'http://localhost:3100/api/dev/test-auth/enter?persona=creator&redirect=/app&session=better-auth',
+      expect.objectContaining({
+        maxRedirects: 0,
+        timeout: expect.any(Number),
+      })
+    );
+    const { timeout } = requestGet.mock.calls[0][1] ?? {};
+    expect(timeout).toBeGreaterThan(45_000);
+    expect(goto).toHaveBeenCalledWith(
+      'http://localhost:3100/app',
+      expect.objectContaining({ timeout: expect.any(Number) })
+    );
+  });
+
+  it('fails closed when the enter route does not 303', async () => {
+    const { page, goto } = buildPage(404);
+
+    await expect(withBypassEnv(() => signInUser(page))).rejects.toMatchObject({
+      code: 'CLERK_SETUP_FAILED',
+    });
+    expect(goto).not.toHaveBeenCalled();
   });
 });
 

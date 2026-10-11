@@ -29,26 +29,28 @@ export async function getFeatureFlagAdminRows(): Promise<
     { dev: boolean | null; staging: boolean | null; prod: boolean | null }
   >();
 
-  if (await doesTableExist('feature_flag_overrides')) {
-    try {
-      const rows = await db
-        .select({
-          flagKey: featureFlagOverrides.flagKey,
-          dev: featureFlagOverrides.devEnabled,
-          staging: featureFlagOverrides.stagingEnabled,
-          prod: featureFlagOverrides.prodEnabled,
-        })
-        .from(featureFlagOverrides);
-      for (const row of rows) {
-        overridesByKey.set(row.flagKey, {
-          dev: row.dev,
-          staging: row.staging,
-          prod: row.prod,
-        });
-      }
-    } catch (error) {
-      await captureWarning('Feature flag admin rows read failed', error);
+  if (!(await doesTableExist('feature_flag_overrides'))) {
+    throw new Error('Feature flag overrides are unavailable.');
+  }
+  try {
+    const rows = await db
+      .select({
+        flagKey: featureFlagOverrides.flagKey,
+        dev: featureFlagOverrides.devEnabled,
+        staging: featureFlagOverrides.stagingEnabled,
+        prod: featureFlagOverrides.prodEnabled,
+      })
+      .from(featureFlagOverrides);
+    for (const row of rows) {
+      overridesByKey.set(row.flagKey, {
+        dev: row.dev,
+        staging: row.staging,
+        prod: row.prod,
+      });
     }
+  } catch (error) {
+    await captureWarning('Feature flag admin rows read failed', error);
+    throw error;
   }
 
   return RUNTIME_FLAG_NAMES.map(flagKey => {

@@ -1,0 +1,103 @@
+---
+id: manage-your-subscription
+title: Manage your subscription
+description: Check your current Jovie plan, use the supported Stripe billing actions, and recover from stale or missing subscription state.
+documentType: guide
+category: manage-jovie
+productBacked: true
+featureId: subscription-and-billing-management
+additionalFeatureIds:
+  - direct-upgrade-checkout-flow
+productRoute: /app/settings/billing
+status: certified
+lastVerifiedAt: 2026-09-27
+verifiedBy: human
+keywords:
+  - billing
+  - cancel
+  - invoice
+  - subscription
+  - payment method
+redirectAliases: []
+visualProofRefs:
+  - proof/manage-your-subscription.png
+uiLabels:
+  - Billing
+  - Manage in Stripe
+  - Compare plans
+  - Payment & Invoices
+  - Cancel Subscription
+  - Retry
+productSourceRefs:
+  - apps/web/app/app/(shell)/settings/billing/page.tsx
+  - apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx
+  - apps/web/components/organisms/BillingDashboard.tsx
+  - apps/web/components/organisms/billing/BillingActionsSection.tsx
+  - apps/web/app/api/stripe/portal/route.ts
+  - apps/web/app/api/stripe/cancel/route.ts
+launchPath: true
+---
+
+<HelpArticle id="manage-your-subscription">
+
+# Manage your subscription
+
+<HelpOutcome>Confirm the plan Jovie currently recognizes and complete supported subscription or payment actions in the correct billing surface.</HelpOutcome>
+
+<HelpPrerequisites>
+
+- Sign in to the Jovie account that owns the subscription.
+
+</HelpPrerequisites>
+
+<HelpSteps>
+
+<HelpStep title="Check the plan Jovie recognizes">
+Open [Settings → Billing](https://jov.ie/app/settings/billing). The card shows **Free**, **Pro**, or **Max** plus a state such as **Active**, **Cached**, **Syncing**, or **Manageable**.
+
+<HelpScreenshot src="/proof/manage-your-subscription.png" alt="Jovie Billing settings showing a Pro plan with an Active badge and Manage in Stripe action" caption="Settings → Billing shows the current plan state and its available action." />
+</HelpStep>
+
+<HelpStep title="Open the action shown for your account">
+Choose **Manage in Stripe** when it appears. Stripe is the billing destination for Jovie web subscriptions and exposes the payment methods, invoices, and subscription details available for that customer. If the account has no Stripe customer, choose **Compare plans** instead.
+</HelpStep>
+
+<HelpStep title="Upgrade or review detailed controls">
+Open the [billing dashboard](https://jov.ie/billing) to compare available plans. A Free account can start an offered upgrade. An active Pro account can see **Payment &amp; Invoices** and **Cancel Subscription**. There is no separate self-serve downgrade button; use only the choices currently displayed.
+</HelpStep>
+
+<HelpStep title="Cancel only after reading the confirmation">
+Choose **Cancel Subscription**, review the access changes, then confirm. Cancellation is scheduled for the end of the current billing period, and the success message shows the date when Stripe returns one. This action does not promise a refund.
+</HelpStep>
+
+<HelpStep title="Return to Jovie and verify entitlement state">
+After a Stripe change, return to Jovie and reload Billing. Confirm that the plan and available features match the completed action; a portal receipt by itself does not prove the app has refreshed its state.
+</HelpStep>
+
+</HelpSteps>
+
+## What happens next
+
+Jovie uses the refreshed plan state to gate paid features. Invoice and payment-method changes remain in Stripe; Jovie does not display full payment details in Settings.
+
+<HelpTroubleshooting>
+
+### A payment failed or an invoice needs attention
+
+Open **Manage in Stripe** or **Payment &amp; Invoices** and use the actions Stripe offers for that invoice or payment method. Return to Jovie afterward. Jovie does not promise when a bank or card provider will resolve a failure.
+
+### The plan is Cached, Syncing, or temporarily unavailable
+
+Choose **Retry** where offered or reload once. A **Cached** badge means Jovie is showing its latest saved billing state while the payment service is unavailable; do not treat it as a newly confirmed Stripe state.
+
+### Payment succeeded but paid access is missing
+
+Verify you are signed into the purchasing account and that Stripe shows the expected subscription. Reload Billing; if the mismatch remains, [contact support](/docs/manage-jovie/contact-support/contact-support-or-report-incorrect-data) with the account email and a redacted receipt or invoice number—never a full card number.
+
+</HelpTroubleshooting>
+
+<HelpRelatedGuides articleId="manage-your-subscription" ids={['manage-privacy-and-account-data', 'contact-support-or-report-incorrect-data']} />
+
+<HelpFeedback articleId="manage-your-subscription" />
+
+</HelpArticle>

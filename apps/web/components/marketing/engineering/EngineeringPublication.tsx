@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingContainer } from '@/components/marketing/MarketingContainer';
 import { MarketingContentProse } from '@/components/marketing/MarketingContentProse';
+import { MarketingEditorialHeroPhoto } from '@/components/marketing/MarketingEditorialHeroPhoto';
 import { MarketingHero } from '@/components/marketing/MarketingHero';
 import { APP_ROUTES } from '@/constants/routes';
 import type { EngineeringStoryRecord } from '@/lib/engineering-publication';
@@ -66,23 +67,45 @@ function PageFrame({
   title,
   description,
   children,
+  /** Only the /engineering index carries the editorial hero photo (route
+   * table: hero image 37). Article and founder-preview pages stay text-only. */
+  showHeroPhoto = false,
 }: {
   readonly kicker: ReactNode;
   readonly title: string;
   readonly description: string;
   readonly children: ReactNode;
+  readonly showHeroPhoto?: boolean;
 }) {
+  const hero = (
+    <MarketingHero
+      variant='left'
+      className={showHeroPhoto ? 'relative z-10' : undefined}
+    >
+      <div className='text-sm font-medium text-tertiary-token'>{kicker}</div>
+      <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-2xl text-primary-token line-clamp-2'>
+        {title}
+      </h1>
+      <p className='mb-4 max-w-xl text-lg leading-relaxed text-secondary-token'>
+        {description}
+      </p>
+    </MarketingHero>
+  );
+
   return (
     <section className='min-h-screen bg-page text-primary-token'>
-      <MarketingHero variant='left'>
-        <div className='text-sm font-medium text-tertiary-token'>{kicker}</div>
-        <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-2xl text-primary-token line-clamp-2'>
-          {title}
-        </h1>
-        <p className='mb-4 max-w-xl text-lg leading-relaxed text-secondary-token'>
-          {description}
-        </p>
-      </MarketingHero>
+      {showHeroPhoto ? (
+        <div className='marketing-hero-dock relative overflow-hidden'>
+          <MarketingEditorialHeroPhoto
+            src='/images/hero/engineering-index.webp'
+            opacity={0.4}
+            testId='engineering-hero-photo'
+          />
+          {hero}
+        </div>
+      ) : (
+        hero
+      )}
       <MarketingContainer width='page' className='pb-20 sm:pb-28'>
         <div className='marketing-divider mb-10' />
         {children}
@@ -110,6 +133,7 @@ export function EngineeringIndex({
           ? 'Draft and provenance status for founder review. This gallery stays out of public indexes.'
           : 'Proof-led notes on what Jovie has shipped and made public.'
       }
+      showHeroPhoto={!preview}
     >
       <div data-testid='engineering-index'>
         {stories.length === 0 ? (

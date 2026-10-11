@@ -3,7 +3,14 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Check, ExternalLink, Loader2, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  ExternalLink,
+  Fingerprint,
+  Loader2,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -15,12 +22,14 @@ import {
   TableEmptyState,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { AdminStepUp } from '@/features/admin/AdminStepUp';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
 import { SKELETON_ROW_COUNT, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import {
   type AdminLead,
   type AdminLeadsSortBy,
+  isForbiddenError,
   queryKeys,
   useLeadsInfiniteQuery,
   useUpdateLeadStatusMutation,
@@ -268,6 +277,7 @@ export function LeadTable({
 
   const {
     data,
+    error,
     isLoading,
     isError,
     hasNextPage,
@@ -420,16 +430,25 @@ export function LeadTable({
         onLoadMore={handleLoadMore}
         emptyState={
           isError ? (
-            <TableEmptyState
-              heading='Unable to load leads'
-              description='Try again in a moment.'
-              icon={<AlertTriangle className='h-4 w-4' />}
-              action={{
-                label: 'Retry',
-                onClick: handleRetry,
-                variant: 'secondary',
-              }}
-            />
+            isForbiddenError(error) ? (
+              <TableEmptyState
+                heading='Admin verification required'
+                description='Unlock admin access to view leads.'
+                icon={<Fingerprint className='h-4 w-4' />}
+                actionSlot={<AdminStepUp />}
+              />
+            ) : (
+              <TableEmptyState
+                heading='Unable to load leads'
+                description='Try again in a moment.'
+                icon={<AlertTriangle className='h-4 w-4' />}
+                action={{
+                  label: 'Retry',
+                  onClick: handleRetry,
+                  variant: 'secondary',
+                }}
+              />
+            )
           ) : (
             <TableEmptyState
               heading='No leads found'

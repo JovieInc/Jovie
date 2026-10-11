@@ -403,6 +403,7 @@ describe('limiters.ts', () => {
         'publicProfile',
         'publicArtistApi',
         'claimTokenAccess',
+        'libraryAssetShareAccess',
         'publicClick',
         'publicVisit',
         'publicProfileCaptureDismissal',

@@ -1,9 +1,14 @@
 /**
  * Chat File Upload Token
  *
- * Issues a Vercel Blob presigned upload URL for generic file types
- * (video, documents, archives already expanded, other) so the browser
- * can upload directly to Blob without routing large bodies through Next.js.
+ * Issues a Vercel Blob presigned upload URL for non-audio attachments (images,
+ * video, documents) so the browser can upload directly to Blob without routing
+ * large bodies through Next.js. Audio goes through
+ * `/api/library/audio/upload-token`.
+ *
+ * Every pathname must sit under the caller's own owner-scoped prefix
+ * (`jovie/files/<surface>/<userId>/`) and the allowed MIME set + size come from
+ * the ONE file policy in `@/lib/media/file-policy` (JOV-5872).
  *
  * Uses `handleUploadPresigned` + `issueSignedToken` so the route works with
  * Vercel OIDC federation (no static BLOB_READ_WRITE_TOKEN required).
@@ -15,26 +20,11 @@ import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { issueBlobPutUploadToken } from '@/lib/blob-presigned';
 import { handleBlobPresignedUploadTokenRequest } from '@/lib/blob-presigned-route';
-
-/** Max file size for generic chat file uploads (500 MB). */
-const CHAT_FILE_MAX_SIZE = 500 * 1024 * 1024;
-
-/** Allowed content types for generic chat file uploads. */
-const ALLOWED_CONTENT_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/avif',
-  'image/gif',
-  'image/tiff',
-  'video/mp4',
-  'video/quicktime',
-  'video/webm',
-  'video/x-msvideo',
-  'application/pdf',
-  'text/plain',
-  'application/octet-stream',
-];
+import {
+  FILE_UPLOAD_POLICIES,
+  getAllowedUploadContentTypes,
+  resolveFileUploadSurface,
+} from '@/lib/media/file-policy';
 
 export const runtime = 'nodejs';
 
@@ -53,10 +43,15 @@ export async function POST(request: NextRequest) {
       throw new Error('Creator profile not found');
     }
 
+    const surface = resolveFileUploadSurface(pathname, clerkUserId);
+    if (!surface) {
+      throw new Error('Invalid file upload pathname');
+    }
+
     return issueBlobPutUploadToken({
       pathname,
-      allowedContentTypes: ALLOWED_CONTENT_TYPES,
-      maximumSizeInBytes: CHAT_FILE_MAX_SIZE,
+      allowedContentTypes: getAllowedUploadContentTypes(surface),
+      maximumSizeInBytes: FILE_UPLOAD_POLICIES[surface].maxFileSizeBytes,
     });
   });
 }

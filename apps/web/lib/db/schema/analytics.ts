@@ -384,6 +384,7 @@ export const serverAnalyticsEvents = pgTable(
     consentPolicy: text('consent_policy').notNull(),
     sourceEntityType: text('source_entity_type'),
     sourceEntityId: text('source_entity_id'),
+    eventIdentity: text('event_identity'),
     properties: jsonb('properties')
       .$type<Record<string, string | number | boolean | null>>()
       .default({})
@@ -405,6 +406,9 @@ export const serverAnalyticsEvents = pgTable(
     createdAtIdx: index('server_analytics_events_created_at_idx').on(
       table.createdAt
     ),
+    eventIdentityUnique: uniqueIndex(
+      'server_analytics_events_event_identity_unique'
+    ).on(table.eventIdentity),
   })
 );
 

@@ -270,13 +270,13 @@ function CreateLinkDialog({
             {error && (
               <DrawerSurfaceCard
                 variant='card'
-                className='flex items-center gap-2 border-destructive/20 bg-destructive/8 px-3 py-2'
+                className='flex items-center gap-2 border-error/20 bg-error/8 px-3 py-2'
               >
                 <Icon
                   name='XCircle'
-                  className='h-3.5 w-3.5 shrink-0 text-destructive'
+                  className='h-3.5 w-3.5 shrink-0 text-error'
                 />
-                <p className='text-xs font-medium text-destructive'>{error}</p>
+                <p className='text-xs font-medium text-error'>{error}</p>
               </DrawerSurfaceCard>
             )}
 
@@ -516,7 +516,7 @@ export function InvestorLinksManager() {
   if (error) {
     return (
       <ContentSurfaceCard className='p-6 text-center'>
-        <p className='text-sm text-destructive'>{error}</p>
+        <p className='text-sm text-error'>{error}</p>
         <Button
           variant='secondary'
           size='sm'

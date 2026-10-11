@@ -8,7 +8,7 @@ import { cn } from '../lib/utils';
 const inputVariants = cva(
   [
     'flex w-full rounded-full border border-subtle bg-surface-1 px-3',
-    'text-app font-normal tracking-normal text-primary-token',
+    'text-base font-normal tracking-normal text-primary-token sm:text-app',
     'file:border-0 file:bg-transparent file:text-sm file:font-medium',
     'placeholder:text-tertiary-token',
     'hover:border-default',
@@ -26,9 +26,9 @@ const inputVariants = cva(
           'border-success hover:border-success focus-visible:border-success focus-visible:ring-success/25',
       },
       inputSize: {
-        sm: 'h-7 px-2 py-1 text-xs',
-        md: 'h-8 px-3 py-1.5 text-app',
-        lg: 'h-10 px-3.5 py-2 text-app',
+        sm: 'h-11 px-2 py-1 sm:h-7 sm:text-xs',
+        md: 'h-11 px-3 py-1.5 sm:h-8',
+        lg: 'h-11 px-3.5 py-2 sm:h-10',
       },
     },
     defaultVariants: {

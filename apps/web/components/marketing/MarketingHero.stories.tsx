@@ -21,6 +21,7 @@ export const MARKETING_HERO_DEFAULT_PROPS = {
 const meta = {
   title: 'Marketing/Sections/MarketingHero',
   component: MarketingHero,
+  excludeStories: /^MARKETING_HERO_/,
   parameters: {
     layout: 'fullscreen',
     pen: {

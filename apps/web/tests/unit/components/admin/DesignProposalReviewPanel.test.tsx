@@ -142,6 +142,17 @@ describe('DesignProposalReviewPanel', () => {
     expect(screen.getByText('No pending taste proposals.')).toBeInTheDocument();
   });
 
+  it('renders the empty inbox when the payload omits the proposals array', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({}));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<DesignProposalReviewPanel />);
+
+    expect(
+      await screen.findByText('No pending taste proposals.')
+    ).toBeInTheDocument();
+  });
+
   it('renders an actionable authorization failure instead of an empty inbox', async () => {
     const fetchMock = vi
       .fn()

@@ -8,6 +8,8 @@ import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
+import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -38,6 +40,11 @@ import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { isTokenBackedClaimFixture } from '@/lib/profile/public-profile-identity-policy';
+import {
+  type ServerAnalyticsDelivery,
+  trackServerEventTx,
+} from '@/lib/server-analytics';
+import { getAccountMetricCohort } from '@/lib/utils/email';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -57,7 +64,7 @@ import {
   fetchExistingUser,
   updateExistingProfile,
 } from './profile-setup';
-import type { CompletionResult } from './types';
+import type { CompletionResult, OnboardingCompletionResult } from './types';
 import { ensureEmailAvailable, ensureHandleAvailable } from './validation';
 
 function hasVerifiedTokenBackedFixtureClaim(
@@ -97,6 +104,88 @@ async function recoverConcurrentProfileClaim(
       profileId: existingProfile.id,
     };
   });
+}
+
+async function recordFunnelDelivery(
+  event: string,
+  delivery: ServerAnalyticsDelivery
+): Promise<void> {
+  if (delivery.ok) return;
+  // Contract/prepare failures are deterministic bugs, not transient loss: a
+  // database failure throws inside the transaction and rolls the state write
+  // back with it, so an undelivered event here means our contract is wrong.
+  const error = new Error(
+    `Onboarding funnel event rejected: ${event} (${delivery.error})`
+  );
+  await captureError(`onboarding funnel event rejected: ${event}`, error, {
+    route: 'onboarding',
+    event,
+  });
+  throw error;
+}
+
+/**
+ * Revenue-critical funnel events emitted atomically inside the onboarding
+ * serializable transaction. If the transaction commits, the durable event
+ * exists; if the insert fails, the whole claim/signup rolls back so a
+ * successful state transition can never go unmeasured. Stable
+ * `eventIdentity` values deduplicate retries, double submissions, and
+ * multi-tab races.
+ */
+async function emitOnboardingFunnelEventsTx(
+  tx: DbOrTransaction,
+  params: {
+    pendingClaim: PendingClaimContext | null;
+    result: CompletionResult;
+  }
+): Promise<void> {
+  const { pendingClaim, result } = params;
+  if (!result.profileId) return;
+
+  // Direct-profile onboarding only reserves the profile here. Spotify
+  // ownership verification and the actual claim happen later in
+  // connectOnboardingSpotifyArtist, which atomically emits claim completion
+  // and activation. Recording either event at reservation time would count
+  // abandoned or mismatched claims as successful and consume their durable
+  // identities before the verified transaction runs.
+  const completesClaim = pendingClaim?.mode !== 'direct_profile';
+
+  if (pendingClaim && completesClaim) {
+    await recordFunnelDelivery(
+      'claim_completed',
+      await trackServerEventTx(
+        tx,
+        'claim_completed',
+        { profileId: result.profileId, source: pendingClaim.mode },
+        { eventIdentity: `claim_completed:${result.profileId}` }
+      )
+    );
+  }
+
+  await recordFunnelDelivery(
+    'signup_completed',
+    await trackServerEventTx(
+      tx,
+      'signup_completed',
+      { profileId: result.profileId, source: pendingClaim?.mode ?? 'organic' },
+      { eventIdentity: `signup_completed:${result.profileId}` }
+    )
+  );
+
+  if (completesClaim) {
+    // Canonical self-serve activation: onboarding completed on the claimed
+    // profile. Durable and queryable without GA4; the client magic_moment
+    // marker remains supplemental telemetry.
+    await recordFunnelDelivery(
+      'activation_achieved',
+      await trackServerEventTx(
+        tx,
+        'activation_achieved',
+        { profileId: result.profileId, source: 'onboarding_completed' },
+        { eventIdentity: `activation_achieved:${result.profileId}` }
+      )
+    );
+  }
 }
 
 async function applyPendingClaimTx(
@@ -216,6 +305,15 @@ async function applyExistingUserProfileTx(
   return newProfile;
 }
 
+/** Funnel reason for a failed claim; null for Next's redirect control flow. */
+function getClaimFailureReason(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('NEXT_REDIRECT')) return null;
+  if (message.includes('PROFILE_CONFLICT')) return 'profile_conflict';
+  if (message.includes('CLAIM_NOT_FOUND')) return 'claim_not_found';
+  return 'failed';
+}
+
 export async function completeOnboarding({
   username,
   displayName,
@@ -226,7 +324,7 @@ export async function completeOnboarding({
   displayName?: string;
   email?: string | null;
   redirectToDashboard?: boolean;
-}): Promise<CompletionResult> {
+}): Promise<OnboardingCompletionResult> {
   let pendingClaim: Awaited<ReturnType<typeof readPendingClaimContext>> = null;
 
   try {
@@ -335,6 +433,10 @@ export async function completeOnboarding({
               if (pendingClaim.mode !== 'direct_profile') {
                 await markWaitlistSignedUpInTx(tx, clerkUserId);
               }
+              await emitOnboardingFunnelEventsTx(tx, {
+                pendingClaim,
+                result,
+              });
               return result;
             }
 
@@ -352,6 +454,10 @@ export async function completeOnboarding({
                 trimmedDisplayName
               );
               await markWaitlistSignedUpInTx(tx, clerkUserId);
+              await emitOnboardingFunnelEventsTx(tx, {
+                pendingClaim,
+                result,
+              });
               return result;
             }
 
@@ -365,6 +471,10 @@ export async function completeOnboarding({
               username
             );
             await markWaitlistSignedUpInTx(tx, clerkUserId);
+            await emitOnboardingFunnelEventsTx(tx, {
+              pendingClaim,
+              result,
+            });
             return result;
           },
           { isolationLevel: 'serializable' }
@@ -408,6 +518,11 @@ export async function completeOnboarding({
     } catch (error) {
       throw createOnboardingReceiptPendingError(error);
     }
+
+    // Passive first-touch receipt (JOV-5036): attach the pre-auth envelope
+    // exactly once. Best-effort — the helper swallows and reports failures
+    // so attribution cannot regress activation.
+    await attachFirstTouchReceipt(userId);
 
     if (pendingClaim?.mode === 'token_backed') {
       await clearPendingClaimContext();
@@ -460,6 +575,12 @@ export async function completeOnboarding({
       await finalizePostOnboarding(userId, completion.username);
     }
 
+    await recordFunnelStep({
+      funnel: 'artist_signup',
+      step: 'claim_complete',
+      cohort: getAccountMetricCohort(userEmail),
+    });
+
     // Invalidate dashboard data cache to prevent stale data causing redirect loops
     // This ensures the app layout gets fresh data showing onboarding is complete
     revalidatePath(APP_ROUTES.DASHBOARD, 'layout');
@@ -470,17 +591,39 @@ export async function completeOnboarding({
 
     return completion;
   } catch (error) {
+    const claimExpired =
+      pendingClaim?.mode === 'token_backed' &&
+      error instanceof Error &&
+      error.message.startsWith('[CLAIM_EXPIRED]');
     if (
       pendingClaim &&
       error instanceof Error &&
       (error.message.includes('PROFILE_CONFLICT') ||
-        error.message.includes('CLAIM_NOT_FOUND'))
+        error.message.includes('CLAIM_NOT_FOUND') ||
+        claimExpired)
     ) {
       await clearPendingClaimContext();
+    }
+    const failureReason = getClaimFailureReason(error);
+    if (failureReason) {
+      await recordFunnelStep({
+        funnel: 'artist_signup',
+        step: 'claim_complete',
+        outcome: 'error',
+        reason: failureReason,
+      });
     }
     await captureError('completeOnboarding failed', error, {
       route: 'onboarding',
     });
-    throw logOnboardingError(error, { username, displayName, email });
+    const loggedError = logOnboardingError(error, {
+      username,
+      displayName,
+      email,
+    });
+    // Next hides thrown Server Action messages in production. Return only the
+    // known recovery code; provider/database errors remain on the thrown path.
+    if (claimExpired) return { error: 'CLAIM_EXPIRED' };
+    throw loggedError;
   }
 }

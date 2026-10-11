@@ -1,11 +1,19 @@
 import {
   MarketingHero,
+  MarketingHeroPhoto,
   MarketingPageShell,
   MarketingSurfaceCard,
 } from '@/components/marketing';
+import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import { PRODUCT_COPY } from '@/data/productCopy';
 import { ProductClaimHandleForm } from './ProductClaimHandleForm';
 import './ProductLanding.css';
+
+const PRODUCT_HERO_PHOTO = {
+  src: '/images/marketing-hero/product.webp',
+  width: 1600,
+  height: 901,
+} as const;
 
 function ProductClaimCard() {
   const { claimCard } = PRODUCT_COPY;
@@ -38,12 +46,46 @@ function ProductClaimCard() {
   );
 }
 
+function ProductClose() {
+  const { claimCard, close } = PRODUCT_COPY;
+
+  return (
+    <MarketingCtaSection
+      className='product-close'
+      data-testid='product-close'
+      data-marketing-variant='editorial-search'
+      data-marketing-owner='apps/web/app/(marketing)/product/ProductLanding.tsx'
+      aria-labelledby='product-close-heading'
+    >
+      {/* ui-casing-allow: marketing display headline */}
+      <h2
+        id='product-close-heading'
+        className='product-close__headline text-primary-token'
+        data-wrap='editorial-title'
+      >
+        {close.headlineLine1} <br />
+        {close.headlineLine2}
+      </h2>
+      <div className='product-close__actions' data-testid='product-close-claim'>
+        <ProductClaimHandleForm
+          domain={claimCard.domain}
+          placeholder={claimCard.handle}
+          submitLabel={claimCard.cta}
+          inputId='product-close-claim-handle'
+          testIdPrefix='product-close'
+        />
+      </div>
+    </MarketingCtaSection>
+  );
+}
+
 export function ProductLanding() {
   const { hero } = PRODUCT_COPY;
 
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
-      <div className='product-hero relative overflow-hidden'>
+      <div className='product-hero marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
+        <MarketingHeroPhoto {...PRODUCT_HERO_PHOTO} />
         <div
           aria-hidden='true'
           className='marketing-hero-backdrop pointer-events-none absolute inset-0'
@@ -70,6 +112,7 @@ export function ProductLanding() {
           <ProductClaimCard />
         </MarketingHero>
       </div>
+      <ProductClose />
     </MarketingPageShell>
   );
 }

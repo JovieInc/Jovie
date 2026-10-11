@@ -31,6 +31,28 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/account/email` | POST | Better Auth | Update account email |
 | `/api/account/export` | GET | Better Auth | Export user data (GDPR) |
 
+### Ovie privacy
+
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/ovie/privacy-lock` | GET/POST | Fresh Better Auth + admin role; same-origin POST | Read `{enabled,locked,unlockedUntil}` or `enable`, `disable`, `lock`, `unlock`. Default off. Unlock requires a recent verified admin-capable passkey on the current session and lasts 24 hours from verification. Explicit relock invalidates receipts; disabling requires an active privacy unlock. |
+
+The optional per-user Ovie privacy gate protects operator data and actions server-side. It is independent of ordinary Jovie access and existing privileged-action/passkey-management authorization. A client cookie never grants operator access. Independent signed machine/service tokens and anonymous kiosk signage retain their existing authority; a valid kiosk token used in an authenticated browser still obeys that user's privacy policy. Credential-bearing claim-token exports and kiosk-secret retrieval retain privileged MFA even when privacy is unlocked.
+
+### External operational contracts (no in-repo HTTP caller)
+
+These handlers are called by sibling deployments, machine publishers, or
+source-repository automation. Keep them in the inventory even though Jovie has
+no literal `fetch` call for their paths.
+
+| Endpoint | Method | Auth | External caller / purpose |
+|----------|--------|------|---------------------------|
+| `/api/hud/hermes-events` | GET/POST | HUD auth (GET); `HERMES_HUD_API_KEY` bearer (POST) | Hermes laptop publisher sends Agent OS events; HUD clients read the current feed |
+| `/api/ovie/certifications/metrics` | GET | Ovie principal + Summer control | Ovie/Summer certification clients read section 8 metrics through the shared Ovie route projection |
+| `/api/ovie/ingest` | POST | Ovie principal + Summer control | Ovie/Summer clients submit durable operating-store dumps through the shared Ovie route projection |
+| `/api/internal/ovie/lyb-mrr` | GET | `CRON_SECRET` + trusted origin | Ovie and Summer company tools read the LogYourBody RevenueCat MRR record |
+| `/api/internal/release-communications/merge-events` | POST | HMAC `x-jovie-signature-256` | Source-repository merge automation submits verified release events |
+
 ### Admin (requires admin role)
 
 | Endpoint | Method | Auth | Purpose |
@@ -39,6 +61,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/admin/campaigns/invites` | GET | Admin | List campaign invites |
 | `/api/admin/campaigns/settings` | GET | Admin | Campaign settings |
 | `/api/admin/campaigns/stats` | GET | Admin | Campaign statistics |
+| `/api/admin/contacts` | GET/POST | Admin | Read canonical customer lifecycle data and update stages |
 | `/api/admin/creator-avatar` | POST | Admin | Upload creator avatar |
 | `/api/admin/creator-ingest` | POST | Admin | Ingest single creator |
 | `/api/admin/creator-ingest/rerun` | POST | Admin | Re-run creator ingestion |
@@ -62,6 +85,14 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/admin/users` | GET | Admin | List users |
 | `/api/admin/waitlist` | GET | Admin | Waitlist management |
 
+### Agents (public, anonymous)
+
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/agents/creator-lookup` | GET | None (durable IP rate limit) | Read-only creator resolution (`@jovie/cli creator lookup <url|platform:handle>`, MCP `lookup_creator`): `exists:true` with the Jovie profile when the channel is already known, otherwise extracted fields with `exists:false` |
+| `/api/agents/profiles` | POST | None (IP rate limit, `AGENT_PROFILE_CREATE` kill switch) | Create or find a claimable profile from a Spotify artist URL (`@jovie/cli profile create`) |
+| `/api/agents/feedback` | POST | None (IP rate limit) | Agent bug/feedback reports into `feedback_items` (source `agent_cli`) for Summer triage (`@jovie/cli report`, MCP `report_issue`) |
+
 ### Audience (public/token-based)
 
 | Endpoint | Method | Auth | Purpose |
@@ -75,7 +106,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/billing/health` | GET | Better Auth | Billing system health |
+| `/api/billing/health` | GET | Public liveness; admin session or `CRON_SECRET` for detail | Anonymous `{healthy, timestamp}` only. Counts, check messages, and Stripe/DB probes require `Authorization: Bearer ${CRON_SECRET}` or an admin session |
 | `/api/billing/history` | GET | Better Auth | Invoice history |
 | `/api/billing/status` | GET | Better Auth | Current billing status |
 | `/api/stripe/cancel` | POST/GET | Better Auth | Cancel subscription |
@@ -119,6 +150,7 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/cron/process-pre-saves` | GET | CRON_SECRET | Process pre-save queue |
 | `/api/cron/schedule-release-notifications` | GET | CRON_SECRET | Schedule release alerts |
 | `/api/cron/send-release-notifications` | GET | CRON_SECRET | Send release alerts |
+| `/api/cron/web-ai-health` | GET | CRON_SECRET | Probe five production AI surfaces and return a redacted health receipt |
 
 ### Inbox Founder Reviews (authenticated founder surface)
 
@@ -149,7 +181,6 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `/api/dsp/bio-sync` | POST | Better Auth | Sync bio to DSPs |
-| `/api/dsp/bio-sync/status` | GET | Better Auth | Bio sync status |
 | `/api/dsp/discover` | POST | Better Auth | Discover DSP profiles |
 | `/api/dsp/enrichment/status` | GET | Better Auth | Enrichment job status |
 | `/api/dsp/matches` | GET | Better Auth | List DSP matches |
@@ -167,16 +198,16 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/health` | GET | Public | Basic health check |
-| `/api/health/auth` | GET | Better Auth | Auth system health |
+| `/api/health` | GET | Public liveness; failure detail is admin session or `Authorization: Bearer $CRON_SECRET` | Success `{status:"ok"}`. Failure `{healthy:false,timestamp}` |
+| `/api/health/auth` | GET | Public liveness outside production; detail is admin session or `CRON_SECRET` | Production 403 for every caller. Anonymous callers do not read the session |
 | `/api/health/build-info` | GET | Public | Build metadata |
-| `/api/health/comprehensive` | GET | Admin | Full system health |
-| `/api/health/db` | GET | Admin | Database health |
-| `/api/health/db/performance` | GET | Admin | DB performance metrics |
-| `/api/health/deploy` | GET | Public | Deploy status |
-| `/api/health/env` | GET | Admin | Environment info |
-| `/api/health/homepage` | GET | Public | Homepage render check |
-| `/api/health/keys` | GET | Admin | API key health |
+| `/api/health/comprehensive` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous body is `{healthy:true,timestamp}` and skips DB/vendor checks |
+| `/api/health/db` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy,timestamp}` after connectivity. No pool or config |
+| `/api/health/db/performance` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy:true,timestamp}` does not run query timings |
+| `/api/health/deploy` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy,timestamp}` (200/503). Checks and issues are authorized |
+| `/api/health/env` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy,timestamp}` with no validation strings |
+| `/api/health/homepage` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy:true,timestamp}` does not fetch featured creators |
+| `/api/health/keys` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy,timestamp}` with no missing-key labels |
 | `/api/health/redis` | GET | Admin or CRON_SECRET | Redis write/read operability probe |
 
 ### Library Documents (authenticated creator)
@@ -237,7 +268,6 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 |----------|--------|------|---------|
 | `/api/pre-save/apple` | POST | Public | Apple Music pre-save |
 | `/api/pre-save/spotify/callback` | GET | OAuth | Spotify pre-save callback |
-| `/api/pre-save/spotify/start` | GET | Public | Start Spotify pre-save |
 
 ### Public / Misc
 
@@ -256,9 +286,6 @@ All routes live under `apps/web/app/api/`. Auth is via self-hosted Better Auth (
 | `/api/monitoring/performance` | GET | Admin | Performance metrics |
 | `/api/profile/view` | POST | Public | Track profile view |
 | `/api/px` | POST | Public | Tracking pixel |
-| `/api/referrals/apply` | POST | Better Auth | Apply referral code |
-| `/api/referrals/code` | GET/POST | Better Auth | Get/create referral code |
-| `/api/referrals/stats` | GET | Better Auth | Referral stats |
 | `/api/report` | POST | Public | Submit abuse/security report (rate-limited) |
 | `/api/revalidate/featured-creators` | POST | Internal | Revalidate featured cache |
 | `/api/suggestions` | GET | Better Auth | Profile suggestions |
@@ -453,6 +480,7 @@ All Drizzle schema files: `apps/web/lib/db/schema/`
 | `auth.ts` | Users, roles, sessions |
 | `analytics.ts` | Page views, click events |
 | `chat.ts` | Chat conversations, messages |
+| `contacts.ts` | Canonical contacts and lifecycle stage history |
 | `insights.ts` | AI-generated insights |
 | `dsp-enrichment.ts` | DSP match candidates |
 | `dsp-bio-sync.ts` | Bio sync jobs |
@@ -582,7 +610,7 @@ Zod-validated environment variables. Never use `process.env` directly.
 
 For the full set of enforced rules, see [`AGENTS.md`](../AGENTS.md). Key points:
 
-- **Node 22 + pnpm 9.15.4** -- verify before any command
+- **Node 24 + pnpm 9.15.9** -- verify before any command
 - **Monorepo commands from root** -- `pnpm --filter web ...`, never `cd apps/web`
 - **Server/client boundaries** -- no DB imports in `'use client'` files
 - **No `db.transaction()`** -- requires explicit approval; use approved RLS wrappers

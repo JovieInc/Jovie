@@ -10,6 +10,7 @@ import { Check } from 'lucide-react';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { SHELL_RAIL_LABEL } from '@/components/shell/rail-motion';
 import type { AppShellWorkspace } from '@/lib/app-shell/workspaces';
 import { cn } from '@/lib/utils';
 
@@ -38,7 +39,7 @@ export function WorkspaceSelector<Id extends string>({
           style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
           className={cn(
             'flex h-7 w-full items-center gap-1.5 rounded-lg px-2.5 transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent/55 focus-visible:outline-none focus-visible:bg-sidebar-accent/55',
-            'group-data-[collapsible=icon]:justify-center'
+            'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
           )}
         >
           <BrandLogo
@@ -49,7 +50,12 @@ export function WorkspaceSelector<Id extends string>({
             className='shrink-0 rounded-sm'
             aria-hidden
           />
-          <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)] group-data-[collapsible=icon]:hidden'>
+          <span
+            className={cn(
+              'truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+              SHELL_RAIL_LABEL
+            )}
+          >
             {currentWorkspace.label}
           </span>
         </button>

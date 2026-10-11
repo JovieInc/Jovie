@@ -41,4 +41,20 @@ describe('alternatives page System B source contract', () => {
       }
     }
   });
+
+  it('does not clamp the hero h1 with a descender-clipping leading', () => {
+    // line-clamp-* sets overflow:hidden; a leading of 1.0 or less clips glyph
+    // descenders on the second painted line (JOV-6848). If the h1 is clamped,
+    // it must carry a named leading token that clears descenders.
+    const source = readFileSync(resolve(process.cwd(), sources[0]), 'utf8');
+    const h1 = source.match(/<h1[^>]*className='([^']+)'/);
+    expect(h1, 'expected an h1 with a literal className').not.toBeNull();
+    const className = h1?.[1] ?? '';
+    if (/\bline-clamp-\d/.test(className)) {
+      expect(className).not.toMatch(/\bleading-none\b/);
+      expect(className).toMatch(
+        /\bleading-(tight|snug|normal|relaxed|loose)\b/
+      );
+    }
+  });
 });

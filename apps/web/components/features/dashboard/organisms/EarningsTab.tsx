@@ -31,6 +31,7 @@ import {
   generateQrCodeSvg,
   qrCodeDataUrlToBlob,
 } from '@/lib/utils/qr-code';
+import { Money } from '@/lib/workspace-lock/money-visibility';
 
 // =============================================================================
 // Constants
@@ -62,7 +63,7 @@ const tipperColumns = [
     meta: { align: 'right' },
     cell: ({ getValue }) => (
       <span className='text-right font-caption tabular-nums text-primary-token'>
-        {formatAmount(getValue())}
+        <Money>{formatAmount(getValue())}</Money>
       </span>
     ),
   }),
@@ -100,6 +101,8 @@ interface StatCardProps {
   readonly icon: React.ComponentType<{ className?: string }>;
   readonly iconBg: string;
   readonly iconColor: string;
+  /** Currency value — redacted when money visibility is off (JOV-6829). */
+  readonly isMoney?: boolean;
 }
 
 const StatCard = memo(function StatCard({
@@ -108,6 +111,7 @@ const StatCard = memo(function StatCard({
   icon: Icon,
   iconBg,
   iconColor,
+  isMoney = false,
 }: StatCardProps) {
   return (
     <ContentSurfaceCard>
@@ -124,7 +128,7 @@ const StatCard = memo(function StatCard({
           </dt>
         </div>
         <dd className='mt-2 text-2xl font-semibold tabular-nums leading-none tracking-[-0.011em] text-primary-token'>
-          {value}
+          {isMoney ? <Money>{value}</Money> : value}
         </dd>
       </div>
     </ContentSurfaceCard>
@@ -317,6 +321,7 @@ export function EarningsTab() {
           <StatCard
             label='Total Revenue'
             value={formatAmount(stats?.totalRevenueCents ?? 0)}
+            isMoney
             icon={DollarSign}
             iconBg='bg-surface-1 border border-subtle'
             iconColor='text-success'
@@ -331,6 +336,7 @@ export function EarningsTab() {
           <StatCard
             label='Average Tip'
             value={formatAmount(stats?.averageTipCents ?? 0)}
+            isMoney
             icon={TrendingUp}
             iconBg='bg-surface-1 border border-subtle'
             iconColor='text-accent'

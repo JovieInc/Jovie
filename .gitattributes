@@ -11,3 +11,6 @@
 *.eot binary
 .claude/skills/vercel-composition-patterns/** -whitespace
 .claude/skills/vercel-react-best-practices/** -whitespace
+# pnpm patches of tab-indented upstream files contain a diff-prefix space
+# before those tabs. That is patch syntax, not a whitespace defect.
+*.patch -whitespace

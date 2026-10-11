@@ -34,7 +34,6 @@ const BRAND_LOGO_PRODUCTION_SOURCES = [
   'components/features/home/HomeV1Design.tsx',
   'components/features/home/HeroProfilePreview.tsx',
   'app/app/(shell)/profiles/ProfilesWorkspace.tsx',
-  'app/[username]/notifications/NotificationsPageClient.tsx',
 ] as const;
 
 const ALLOWED_SIZE_TOKENS = new Set<string>(Object.keys(BRAND_MARK_SIZE));

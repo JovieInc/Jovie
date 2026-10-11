@@ -10,7 +10,50 @@ import {
   compareArtistProfileSnapshots,
   inspectArtistProfile,
 } from '@/lib/canaries/artist-profile-proof';
+import {
+  PROFILE_ROUTE_CONFIG,
+  REDIRECT_SINK_ROUTE_KEYS,
+} from '@/lib/profile/route-config';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+
+const STABLE_ARTIST_ROUTE =
+  /^\/artists\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+
+/**
+ * Redirects the codebase declares on purpose: the stable `/artists/:id`
+ * entity route (survives claims and renames) and the profile mode
+ * redirect-sinks registered in route-config. Only these get one followed
+ * hop, and only to a same-origin 200. Every other redirect still fails.
+ */
+export function isDeclaredRedirect(url: URL, handle: string): boolean {
+  if (STABLE_ARTIST_ROUTE.test(url.pathname)) return true;
+  return REDIRECT_SINK_ROUTE_KEYS.some(
+    key => PROFILE_ROUTE_CONFIG[key].buildPath(handle) === url.pathname
+  );
+}
+
+async function deployedCommitSha(
+  profileUrl: string,
+  fetcher: typeof fetch
+): Promise<string | null> {
+  try {
+    const response = await fetcher(
+      new URL('/api/health/build-info', profileUrl).href,
+      {
+        signal: AbortSignal.timeout(10_000),
+        cache: 'no-store',
+        redirect: 'manual',
+      }
+    );
+    const body = (await response.json()) as { commitSha?: unknown };
+    return typeof body.commitSha === 'string' &&
+      /^[a-f0-9]{40}$/.test(body.commitSha)
+      ? body.commitSha
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function certifyArtistProfile(
   args: string[],
@@ -48,8 +91,13 @@ export async function certifyArtistProfile(
     dom.window.document
       .querySelector('meta[name="baggage"]')
       ?.getAttribute('content') ?? '';
+  // Cache-HIT HTML carries no Sentry baggage, so fall back to the uncached
+  // build-info endpoint of the same deployment to bind the release SHA.
   const releaseSha =
-    /(?:^|,)sentry-release=([a-f0-9]{40})(?:,|$)/.exec(baggage)?.[1] ?? null;
+    /(?:^|,)sentry-release=([a-f0-9]{40})(?:,|$)/.exec(baggage)?.[1] ??
+    (response.status === 200
+      ? await deployedCommitSha(TIM_WHITE_PROFILE.publicProfileUrl, fetcher)
+      : null);
   const snapshot = artistProfileSnapshotSchema.parse({
     schema: 'jovie-public-artist-integrity/v2',
     id,
@@ -69,7 +117,11 @@ export async function certifyArtistProfile(
     url: string;
     status: number | null;
     observedAt: string;
+    redirectedTo?: string;
+    finalStatus?: number | null;
   }[] = [];
+  const origin = new URL(snapshot.profileUrl).origin;
+  const handle = new URL(snapshot.profileUrl).pathname.slice(1);
   // Bounded concurrency, same-origin URLs only. External links are inventory, not verification.
   for (let offset = 0; offset < internalLinks.length; offset += 4) {
     linkChecks.push(
@@ -81,6 +133,36 @@ export async function certifyArtistProfile(
               redirect: 'manual',
             });
             await result.body?.cancel();
+            const location = result.headers.get('location');
+            if (
+              result.status >= 300 &&
+              result.status < 400 &&
+              location &&
+              isDeclaredRedirect(new URL(url), handle)
+            ) {
+              const target = new URL(location, url);
+              if (target.origin !== origin) {
+                return {
+                  url,
+                  status: result.status,
+                  observedAt: new Date().toISOString(),
+                  redirectedTo: target.href,
+                  finalStatus: null,
+                };
+              }
+              const final = await fetcher(target.href, {
+                signal: AbortSignal.timeout(15_000),
+                redirect: 'manual',
+              });
+              await final.body?.cancel();
+              return {
+                url,
+                status: result.status,
+                observedAt: new Date().toISOString(),
+                redirectedTo: target.href,
+                finalStatus: final.status,
+              };
+            }
             return {
               url,
               status: result.status,
@@ -119,7 +201,7 @@ export async function certifyArtistProfile(
     limitations: [
       'Public HTTP integrity only; not search ranking, revenue lift, authenticated Presence, or full artist/media graph certification.',
       'A comparable observed delta alone does not establish causal attribution or permission to publish.',
-      'HTTP redirects are recorded but not certified as working destinations.',
+      'Only declared redirects (stable /artists/:id, route-config redirect-sinks) are followed, one same-origin hop to a 200; any other redirect fails.',
     ],
   };
   await mkdir(output, { recursive: true });
@@ -145,7 +227,9 @@ export async function certifyArtistProfile(
     elapsedMs: report.elapsedMs,
     failed:
       snapshot.checks.some(check => check.status !== 'pass') ||
-      linkChecks.some(check => check.status !== 200),
+      linkChecks.some(
+        check => check.status !== 200 && check.finalStatus !== 200
+      ),
   };
 }
 if (

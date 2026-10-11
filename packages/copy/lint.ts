@@ -5,7 +5,7 @@ import {
   type CopyRegister,
   type CopyRule,
   type CopySeverity,
-} from './rules';
+} from './rules.ts';
 
 export interface CopyFinding {
   readonly rule: string;

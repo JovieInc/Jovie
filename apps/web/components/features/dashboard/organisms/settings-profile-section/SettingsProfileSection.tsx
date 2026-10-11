@@ -137,7 +137,7 @@ export function SettingsProfileSection({
             value={formData.displayName}
             onChange={e => handleFieldChange('displayName', e.target.value)}
             onBlur={() => flushSave()}
-            placeholder='The name your fans will see'
+            placeholder='The name on your profile'
             className={`${PROFILE_FIELD_COLUMN_CLASS} ${PROFILE_INPUT_CLASS}`}
           />
         </div>

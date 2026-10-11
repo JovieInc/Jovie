@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -6,10 +6,7 @@ const postReleaseMigration = join(
   process.cwd(),
   'drizzle/migrations/0098_regular_puff_adder.sql'
 );
-const snapshot = join(
-  process.cwd(),
-  'drizzle/migrations/meta/0098_snapshot.json'
-);
+const metaDir = join(process.cwd(), 'drizzle/migrations/meta');
 const schemaModule = join(process.cwd(), 'lib/db/schema/library-presence.ts');
 const promoSchemaModule = join(
   process.cwd(),
@@ -20,7 +17,12 @@ describe('library post-release private migration', () => {
   it('defines typed Drizzle schema for presence, rights, and attestation columns', async () => {
     const schema = await readFile(schemaModule, 'utf8');
     const promoSchema = await readFile(promoSchemaModule, 'utf8');
-    const snapshotJson = JSON.parse(await readFile(snapshot, 'utf8'));
+    const snapshots = (await readdir(metaDir))
+      .filter(file => file.endsWith('_snapshot.json'))
+      .sort();
+    const snapshotJson = JSON.parse(
+      await readFile(join(metaDir, snapshots.at(-1) as string), 'utf8')
+    );
     for (const [tableName, exportName] of [
       ['library_presence_findings', 'libraryPresenceFindings'],
       ['library_rightsholder_evidence', 'libraryRightsholderEvidence'],

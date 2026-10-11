@@ -58,7 +58,7 @@ const createSurfaceFixture = (
   const identity = document.createElement('div');
   const cover = document.createElement('div');
 
-  identity.dataset.testid = 'profile-hero-identity-block';
+  identity.dataset.testid = 'profile-identity-header';
   cover.dataset.testid = 'profile-cover';
   identity.getBoundingClientRect = () =>
     createRect(dimensions.identityWidth, dimensions.identityHeight);

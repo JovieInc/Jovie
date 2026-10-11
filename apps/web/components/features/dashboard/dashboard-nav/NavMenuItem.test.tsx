@@ -1,12 +1,22 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { Music, SquarePen } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
+import { getSidebarNavRowClassName } from '@/components/shell/SidebarNavItem';
 import { chatNavItem } from './config';
 import { NavMenuItem } from './NavMenuItem';
 
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   useIsElectronRuntime: () => false,
 }));
+
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
 
 describe('NavMenuItem', () => {
   it('keeps a long primary label in its assigned grid track with a right-edge fade', () => {
@@ -89,7 +99,81 @@ describe('NavMenuItem', () => {
     // Founder lock 2026-09-25 (Linear-scale density): calm rows are 28px
     // (h-7), down from the prior 36px (h-9).
     expect(row.className).toContain('h-7');
+    // Consumers must retain the owner primitive's collapsed row height too;
+    // otherwise every item below this row moves during a rail toggle.
+    const collapsedHeight = getSidebarNavRowClassName({
+      calm: true,
+      collapsed: true,
+    })
+      .split(' ')
+      .find(value => /^h-\d+$/.test(value));
+    expect(collapsedHeight).toBeDefined();
+    expect(row).toHaveClass(collapsedHeight!);
+    for (const override of row.className
+      .split(' ')
+      .filter(value => value.startsWith('group-data-[collapsible=icon]:h-'))) {
+      expect(override.split(':').at(-1)).toBe(collapsedHeight);
+    }
     expect(row.className).toContain('rounded-lg');
     expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
+  });
+
+  it('acknowledges a pending destination without changing row geometry', () => {
+    render(
+      <NavMenuItem
+        calm
+        item={{
+          id: 'library',
+          name: 'Library',
+          href: '/app/library',
+          icon: Music,
+        }}
+        isActive={false}
+        pending
+      />
+    );
+
+    const row = screen.getByRole('link', { name: 'Library' });
+    expect(row).toHaveAttribute('aria-busy', 'true');
+    expect(row).toHaveAttribute('data-navigation-item-id', 'library');
+    expect(row).toHaveAttribute('data-navigation-pending', 'true');
+    expect(row.className).toContain('bg-sidebar-accent-active');
+    expect(row.className).toContain('h-7');
+    expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
+  });
+
+  it('stages the label exit out of the collapsed grid flow (JOV-4522)', () => {
+    render(
+      <NavMenuItem
+        item={{
+          id: 'library',
+          name: 'Library',
+          href: '/app/library',
+          icon: Music,
+        }}
+        isActive={false}
+      />
+    );
+
+    const label = screen.getByText('Library');
+    // Absolute positioning in the collapsed rail lifts the label out of the
+    // single-column grid so it fades/drifts instead of wrapping a phantom row
+    // or snapping to display:none.
+    expect(label.className).toContain('group-data-[collapsible=icon]:absolute');
+    expect(label.className).toContain(
+      'group-data-[collapsible=icon]:opacity-0'
+    );
+    expect(label.className).toContain('duration-cinematic');
+    expect(label.className).not.toContain(
+      'group-data-[collapsible=icon]:hidden'
+    );
+  });
+
+  it('imports sidebar chrome from the modular sidebar specifier', () => {
+    const source = readWebSource(
+      'components/features/dashboard/dashboard-nav/NavMenuItem.tsx'
+    );
+    expect(source).toContain("@/components/organisms/sidebar'");
+    expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
 });

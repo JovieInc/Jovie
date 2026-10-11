@@ -1,22 +1,24 @@
 import 'server-only';
 
-import { headers } from 'next/headers';
 import { cache } from 'react';
 import { getAppUserByBetterAuthId } from '@/lib/auth/app-user';
-import { auth } from '@/lib/auth/better-auth';
 import {
   buildDevTestAuthCurrentUser,
   getCachedDevTestAuthSession,
 } from '@/lib/auth/dev-test-auth.server';
 import type { JovieUser } from '@/lib/auth/jovie-user';
 import { toJovieUser } from '@/lib/auth/jovie-user';
+import {
+  getRequestSession,
+  type RequestSessionRead,
+} from '@/lib/auth/request-session';
 import { checkUserStatus } from '@/lib/auth/status-checker';
 import { attachSentryContext } from '@/lib/sentry/set-user-context';
 
 /**
  * Cached server-identity source (Clerk → Better Auth migration, build-safe
- * commit ⑤). Reads Better Auth sessions via `auth.api.getSession({ headers })`
- * and maps the BA user id to the app `users` row through
+ * commit ⑤). Reads Better Auth sessions through `getRequestSession` (one
+ * `auth.api.getSession` per request and mode) and maps the BA user id to the app `users` row through
  * `getAppUserByBetterAuthId` (single indexed query, memoized per request).
  *
  * Export names are preserved — `getCachedAuth`, `getCachedSessionTokenAuth`,
@@ -73,15 +75,11 @@ function isMissingAuthRequestContext(error: unknown): boolean {
   );
 }
 
-type SessionRead = 'cookie' | 'fresh';
-
-const FRESH_SESSION_QUERY = { disableCookieCache: true } as const;
+type SessionRead = RequestSessionRead;
 
 interface FreshAuthSlot {
   settled: boolean;
   result: AuthResult;
-  loaded: boolean;
-  session: Awaited<ReturnType<typeof auth.api.getSession>> | null;
 }
 
 /** Per-request slot so a later cookie read reuses the fresh identity. */
@@ -89,25 +87,11 @@ const freshAuthSlot = cache(
   (): FreshAuthSlot => ({
     settled: false,
     result: NULL_AUTH_RESULT,
-    loaded: false,
-    session: null,
   })
 );
 
-async function loadBetterAuthSession(mode: SessionRead) {
-  const slot = freshAuthSlot();
-  if (mode === 'fresh' && slot.loaded) return slot.session;
-
-  const headerStore = await headers();
-  const session = await auth.api.getSession({
-    headers: headerStore,
-    ...(mode === 'fresh' ? { query: FRESH_SESSION_QUERY } : {}),
-  });
-  if (mode === 'fresh') {
-    slot.loaded = true;
-    slot.session = session;
-  }
-  return session;
+function loadBetterAuthSession(mode: SessionRead) {
+  return getRequestSession(mode);
 }
 
 async function readBetterAuthSession(mode: SessionRead): Promise<AuthResult> {

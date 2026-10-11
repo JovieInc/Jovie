@@ -169,7 +169,12 @@ export async function updateUserBillingStatus(
       return await retryUpdateWithFreshData(options);
     }
 
-    return { success: true, appUserId: currentUser.id };
+    return {
+      success: true,
+      appUserId: result.appUserId,
+      skipped: result.deduplicated,
+      reason: result.deduplicated ? 'Stripe event already applied' : undefined,
+    };
   } catch (error) {
     await captureCriticalError('Error updating user billing status', error, {
       clerkUserId,
@@ -308,7 +313,12 @@ async function retryUpdateWithFreshData(
       };
     }
 
-    return { success: true, appUserId: freshUser.id };
+    return {
+      success: true,
+      appUserId: result.appUserId,
+      skipped: result.deduplicated,
+      reason: result.deduplicated ? 'Stripe event already applied' : undefined,
+    };
   } catch (error) {
     await captureCriticalError('Error retrying billing status update', error, {
       clerkUserId,

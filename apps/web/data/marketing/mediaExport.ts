@@ -10,6 +10,11 @@
  * Keeping rendering out of this module is deliberate: it is what keeps
  * JOV-6232 (no automatic paid-model spend from deterministic capture paths)
  * intact — this contract has no network or provider call of its own.
+ *
+ * Generated media plugs in through apps/web/scripts/marketing-media/
+ * (JOV-7250): generation, provenance and the art evaluator run first, and
+ * `createGeneratedProduceOutput` in media-export-seam.ts adapts the results
+ * to `produceOutput`.
  */
 
 import {

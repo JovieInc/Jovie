@@ -1,9 +1,9 @@
 # Library → Assets IA decision
 
-> Historical recommendation only. The 2026-08-28 Tim lock supersedes the
-> rename: the visible product remains **Library**, lifecycle stages are primary,
-> and asset/media kinds remain composable filters. Do not ship `Assets` as the
-> page name from this document.
+> Historical recommendation only. The JOV-7305 ontology supersedes the rename:
+> the visible product is **Work**, the canonical route remains `/app/library`,
+> lifecycle stages are primary, and asset/media kinds remain composable filters.
+> Do not ship `Assets` or `Library` as the page name from this document.
 
 > Superseded for lifecycle and cross-source organization by
 > [`docs/product/library-content-graph-and-artist-rules.md`](../product/library-content-graph-and-artist-rules.md)

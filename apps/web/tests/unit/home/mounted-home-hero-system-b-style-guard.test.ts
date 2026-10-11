@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
-const heroComponentPath = 'components/homepage/HomepageEditorialHero.tsx';
+const heroComponentPath = 'components/homepage/HomepageIdentityHero.tsx';
 const searchComponentPath = 'components/features/home/HeroSpotifySearch.tsx';
-const cssPath = 'app/(home)/home.css';
+const cssPath = 'components/homepage/HomepageIdentity.css';
 
 const forbiddenPageChromePatterns = [
   /#[0-9a-fA-F]{3,8}/,
@@ -29,13 +29,9 @@ const forbiddenHeroCssPatterns = [
 ] as const;
 
 function extractMountedHeroCss(source: string): string {
-  const start = source.indexOf('HOMEPAGE EDITORIAL HERO START');
-  const end = source.indexOf('HOMEPAGE EDITORIAL HERO END', start);
-
-  expect(start, 'mounted hero CSS block exists').toBeGreaterThanOrEqual(0);
-  expect(end, 'mounted hero CSS block is bounded').toBeGreaterThan(start);
-
-  return source.slice(start, end);
+  // The whole canonical homepage stylesheet is held to the hero contract.
+  expect(source.length, 'mounted hero CSS exists').toBeGreaterThan(0);
+  return source;
 }
 
 function extractMountedHeroPageSource(source: string): string {
@@ -66,28 +62,23 @@ describe('mounted homepage hero System B source contract', () => {
       ).not.toMatch(pattern);
     }
 
-    // The homepage owns copy; the hero primitive owns the abstract composition;
-    // the existing name search is the only control.
-    expect(pageSource).toContain('<HomepageEditorialHero');
+    // The homepage copy module owns words; the hero owns the composition;
+    // the jov.ie/you claim (Tim 2026-09-28) is the only control.
+    expect(pageSource).toContain('<HomepageIdentityHero');
     expect(pageSource).not.toContain('HomeTrustSection');
     expect(pageSource).not.toMatch(/statsRow|stats=\{/);
     expect(pageSource).not.toContain('secondaryCta');
-    expect(heroComponentSource).toContain("appearance='editorial'");
-    expect(heroComponentSource).toContain(
-      "submitTestId='homepage-primary-cta'"
-    );
+    expect(heroComponentSource).toContain('<ProductClaimHandleForm');
+    expect(heroComponentSource).toContain("testIdPrefix='homepage'");
     expect(heroComponentSource).not.toMatch(/<Button|<Link|href=/);
-
-    for (const className of [
-      'homepage-editorial-hero',
-      'homepage-editorial-hero__backdrop',
-      'homepage-editorial-hero__light-well',
-      'homepage-editorial-hero__copy',
-      'homepage-editorial-hero__headline',
-      'homepage-editorial-hero__support',
-      'homepage-editorial-hero__search',
+    // Illustrative claim preview, never a product screenshot.
+    expect(heroComponentSource).not.toContain('<ArtistProfilePhoneFrame');
+    for (const primitive of [
+      '<MarketingHero',
+      '<MarketingHeroPhoto',
+      '<MarketingSurfaceCard',
     ]) {
-      expect(heroComponentSource).toContain(className);
+      expect(heroComponentSource).toContain(primitive);
     }
   });
 
@@ -113,21 +104,11 @@ describe('mounted homepage hero System B source contract', () => {
       expect(css, `${cssPath} leaked ${pattern}`).not.toMatch(pattern);
     }
 
-    expect(css).toContain('var(--system-b-bg-page)');
-    expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--color-text-secondary-token)');
-    expect(css).toContain('var(--homepage-grid-max)');
-    expect(css).toContain('var(--homepage-grid-gutter)');
+    expect(css).toContain('var(--color-text-tertiary-token)');
+    expect(css).toContain('var(--ds-public-content-max)');
     expect(css).toContain('var(--space-');
-    expect(css).toContain('var(--font-satoshi)');
-    expect(css).toContain('font-weight: var(--font-weight-bold);');
-    expect(css).toContain(
-      'letter-spacing: var(--ds-marketing-display-tracking);'
-    );
-    expect(css).toContain('border-radius: var(--radius-pill);');
-    expect(css).toContain('min-height: 100svh;');
-    // Every scrim color is mixed from a token, never a raw value.
-    const tokenMixes = css.match(/color-mix\(\s*in oklab,\s*var\(--system-b-/g);
-    expect(tokenMixes?.length ?? 0).toBeGreaterThanOrEqual(4);
+    expect(css).toContain('var(--font-mono)');
+    expect(css).toContain('var(--font-display)');
+    expect(css).not.toContain('var(--linear-');
   });
 });

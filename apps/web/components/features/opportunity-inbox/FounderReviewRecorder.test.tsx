@@ -113,7 +113,7 @@ describe('FounderReviewRecorder', () => {
     render(<FounderReviewRecorder target={TARGET} onApprove={onApprove} />);
 
     await user.type(
-      screen.getByLabelText('Typed fallback or refinement'),
+      screen.getByLabelText('Notes'),
       'Make the subject readable at mobile size.'
     );
     await user.click(screen.getByRole('button', { name: 'Approve' }));
@@ -236,7 +236,7 @@ describe('FounderReviewRecorder', () => {
 
     render(<Harness />);
     await user.click(screen.getByRole('button', { name: 'Start Session' }));
-    expect(screen.getByText(/Recording this card/)).toBeVisible();
+    expect(screen.getByText(/^Recording ·/)).toBeVisible();
     act(() => {
       transcriberCallbacks[0]?.onTranscript('First thought.');
       transcriberCallbacks[0]?.onEnd?.();
@@ -274,7 +274,7 @@ describe('FounderReviewRecorder', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Microphone access is off'
     );
-    expect(screen.getByLabelText('Typed fallback or refinement')).toBeEnabled();
+    expect(screen.getByLabelText('Notes')).toBeEnabled();
   });
 
   it('serializes rapid microphone acquisition attempts', async () => {
@@ -301,9 +301,7 @@ describe('FounderReviewRecorder', () => {
 
     expect(getUserMedia).toHaveBeenCalledOnce();
     resolveStream?.({ getTracks: () => [] });
-    await waitFor(() =>
-      expect(screen.getByText(/Recording this card/)).toBeVisible()
-    );
+    await waitFor(() => expect(screen.getByText(/^Recording ·/)).toBeVisible());
   });
 
   it('reconciles an applied prior action without applying the next card', async () => {
@@ -345,9 +343,10 @@ describe('FounderReviewRecorder', () => {
       /action applied, but its receipt outcome still needs reconciliation/i
     );
     expect(firstAction).toHaveBeenCalledOnce();
-    expect(
-      screen.getByLabelText('Typed fallback or refinement')
-    ).toHaveAttribute('id', 'founder-note-card-2');
+    expect(screen.getByLabelText('Notes')).toHaveAttribute(
+      'id',
+      'founder-note-card-2'
+    );
 
     await user.click(screen.getByRole('button', { name: 'Approve' }));
     await waitFor(() => expect(hoisted.updateOutcome).toHaveBeenCalledTimes(2));

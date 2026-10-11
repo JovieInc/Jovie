@@ -37,11 +37,11 @@ describe('homepage-proof-no-card-v1 (JOV-6201 wave 2)', () => {
   it('keeps the editorial body on the shared page background with stable spacing', () => {
     const certifiedCss = readCertifiedCss();
 
-    expect(certifiedCss).toContain('aspect-ratio: 1902 / 827');
-    expect(certifiedCss).toContain('homepage-relationship-outcomes');
-    expect(certifiedCss).toContain(
-      'gap: clamp(var(--space-8), 3vw, var(--space-11))'
-    );
+    // Pen My0zu (JOV-6946): real phone captures sit directly on the page
+    // ground; no artwork frame, numbered outcomes, or light panel.
+    expect(certifiedCss).not.toContain('aspect-ratio: 1902 / 827');
+    expect(certifiedCss).toContain('.homepage-next-steps');
+
     expect(certifiedCss).not.toMatch(/backdrop-filter/);
     expect(certifiedCss).not.toMatch(/box-shadow:/);
   });

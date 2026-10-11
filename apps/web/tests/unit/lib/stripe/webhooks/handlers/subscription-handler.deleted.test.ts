@@ -1,6 +1,23 @@
 /**
  * Subscription Handler Tests - Deleted Events
  */
+const mockTrackServerEvent = vi.hoisted(() =>
+  vi.fn(async () => ({
+    ok: true as const,
+    eventId: 'server-event-1',
+    deduplicated: false,
+  }))
+);
+
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: mockTrackServerEvent,
+  trackServerEventTx: vi.fn(async () => ({
+    ok: true as const,
+    eventId: 'server-event-1',
+    deduplicated: false,
+  })),
+}));
+
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscription-handler';
@@ -10,6 +27,7 @@ import {
   mockGetUserIdFromStripeCustomer,
   mockInvalidateBillingCache,
   mockLogFallback,
+  mockNotifySlackCancellation,
   mockUpdateUserBillingStatus,
   setupDefaultMocks,
 } from './subscription-handler.test-utils';
@@ -27,6 +45,7 @@ describe('@critical SubscriptionHandler - Deleted', () => {
   });
 
   it('processes subscription deleted and revokes pro access', async () => {
+    const stripeEventTimestamp = new Date('2026-09-27T11:00:00.000Z');
     const context: WebhookContext = {
       event: {
         id: 'evt_deleted_123',
@@ -44,7 +63,7 @@ describe('@critical SubscriptionHandler - Deleted', () => {
         },
       } as Stripe.Event,
       stripeEventId: 'evt_deleted_123',
-      stripeEventTimestamp: new Date(),
+      stripeEventTimestamp,
     };
 
     const result = await handler.handle(context);
@@ -62,6 +81,79 @@ describe('@critical SubscriptionHandler - Deleted', () => {
       })
     );
     expect(mockInvalidateBillingCache).toHaveBeenCalled();
+    expect(mockTrackServerEvent).toHaveBeenCalledWith(
+      'subscription_churned',
+      { stripeEventId: 'evt_deleted_123' },
+      undefined,
+      {
+        eventIdentity: 'stripe:evt_deleted_123',
+        occurredAt: stripeEventTimestamp,
+      }
+    );
+  });
+
+  it('sends a Slack cancellation notification on subscription deleted', async () => {
+    const context: WebhookContext = {
+      event: {
+        id: 'evt_deleted_slack',
+        type: 'customer.subscription.deleted',
+        created: Math.floor(Date.now() / 1000),
+        data: {
+          object: {
+            id: 'sub_deleted_slack',
+            status: 'canceled',
+            customer: 'cus_deleted_slack',
+            metadata: { clerk_user_id: 'user_deleted_slack' },
+            canceled_at: Math.floor(Date.now() / 1000),
+            items: { data: [{ price: { id: 'price_pro' } }] },
+          } as unknown as Stripe.Subscription,
+        },
+      } as Stripe.Event,
+      stripeEventId: 'evt_deleted_slack',
+      stripeEventTimestamp: new Date(),
+    };
+
+    const result = await handler.handle(context);
+
+    expect(result.success).toBe(true);
+    await vi.waitFor(() => {
+      expect(mockNotifySlackCancellation).toHaveBeenCalledWith('A user');
+    });
+  });
+
+  it('does not send a Slack cancellation notification for skipped stale events', async () => {
+    mockUpdateUserBillingStatus.mockResolvedValue({
+      success: true,
+      skipped: true,
+      reason: 'stale_event',
+      appUserId: 'app_user_deleted_skipped',
+    });
+
+    const context: WebhookContext = {
+      event: {
+        id: 'evt_deleted_skipped_slack',
+        type: 'customer.subscription.deleted',
+        created: Math.floor(Date.now() / 1000),
+        data: {
+          object: {
+            id: 'sub_deleted_skipped_slack',
+            status: 'canceled',
+            customer: 'cus_deleted_skipped_slack',
+            metadata: { clerk_user_id: 'user_deleted_skipped_slack' },
+            canceled_at: Math.floor(Date.now() / 1000),
+            items: { data: [{ price: { id: 'price_pro' } }] },
+          } as unknown as Stripe.Subscription,
+        },
+      } as Stripe.Event,
+      stripeEventId: 'evt_deleted_skipped_slack',
+      stripeEventTimestamp: new Date(),
+    };
+
+    const result = await handler.handle(context);
+
+    expect(result.success).toBe(true);
+    expect(result.skipped).toBe(true);
+    expect(mockNotifySlackCancellation).not.toHaveBeenCalled();
   });
 
   it('falls back to customer ID lookup when metadata is missing', async () => {

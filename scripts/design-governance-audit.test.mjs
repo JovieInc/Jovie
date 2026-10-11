@@ -83,6 +83,20 @@ test('binds design projections to the canonical invariant registry', () => {
   assert.match(wiring.detail, /design:shared-ui-visual-arbitrary:check/);
 });
 
+test('drift ledger is wired as a shrink-only governance check (JOV-6850)', () => {
+  const { results } = runConformanceAudit();
+  const ledger = results.find(item => item.id === 'design-drift-ledger');
+  assert.ok(ledger, 'design-drift-ledger check must run');
+  assert.notEqual(ledger.status, 'FAIL', ledger.detail);
+});
+
+test('design-drift-ledger FAILs when ledger inputs are unreadable', () => {
+  const audit = fixtureRepo(() => {});
+  const result = check(audit, 'design-drift-ledger');
+  assert.equal(result?.status, 'FAIL');
+  assert.match(result.detail, /drift ledger unreadable/);
+});
+
 test('skill-symlinks FAILs on dangling symlinks, nested included (JOV-5231)', () => {
   const audit = fixtureRepo(root => {
     const skills = path.join(root, '.claude/skills');
@@ -126,6 +140,20 @@ test('skill-symlinks FAILs when .claude/skills is missing entirely (JOV-5231)', 
   assert.match(result.detail, /\.claude\/skills is missing/);
   const pins = check(audit, 'skills-lock-pins');
   assert.equal(pins?.status, 'FAIL');
+});
+
+test('governance workflow provides typescript before the audit (JOV-7157)', () => {
+  // The audit imports component-ship-policy.mjs, which needs the TypeScript
+  // compiler; the job intentionally skips pnpm install, so the workflow must
+  // materialize typescript into node_modules before invoking the audit.
+  const workflow = readFileSync(GOVERNANCE_WORKFLOW_PATH, 'utf8');
+  const installIdx = workflow.indexOf('npm pack "typescript@');
+  const auditIdx = workflow.indexOf('node scripts/design-governance-audit.mjs');
+  assert.ok(installIdx > -1, 'workflow must install typescript');
+  assert.ok(
+    installIdx < auditIdx,
+    'typescript install must precede the audit step'
+  );
 });
 
 test('governance workflow gates PRs that touch skill plumbing (JOV-5231)', () => {

@@ -16,6 +16,32 @@ GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.21.2}"
 TRUFFLEHOG_VERSION="${TRUFFLEHOG_VERSION:-3.95.5}"
 EXCLUDE_PATHS="$REPO_ROOT/.trufflehog-exclude.txt"
 
+# Release downloads hit transient network resets (curl 35 connection resets on
+# ubuntu-latest, JOV-6809); a single failed attempt must not fail the scan.
+# Download to a temp file before extracting so a restarted transfer never
+# streams a concatenated response into tar.
+SCAN_SECRETS_RETRY_DELAY="${SCAN_SECRETS_RETRY_DELAY:-2}"
+fetch_release_tarball() {
+  local url="$1" dest_dir="$2" member="$3"
+  local tmp attempt
+  tmp="$(mktemp)"
+  for attempt in 1 2 3; do
+    if curl -sSfL -o "$tmp" "$url" \
+      && tar -xzf "$tmp" -C "$dest_dir" "$member"; then
+      chmod +x "$dest_dir/$member"
+      rm -f "$tmp"
+      return 0
+    fi
+    if [[ $attempt -lt 3 ]]; then
+      echo "scanner download attempt $attempt failed; retrying" >&2
+      sleep "$SCAN_SECRETS_RETRY_DELAY"
+    fi
+  done
+  rm -f "$tmp"
+  echo "::error title=Secret scanner download failed::Could not fetch $member after 3 attempts ($url)." >&2
+  return 1
+}
+
 ensure_gitleaks() {
   if [[ -n "${GITLEAKS_BIN:-}" ]]; then
     return
@@ -36,9 +62,9 @@ ensure_gitleaks() {
   mkdir -p "$cache_dir"
   tarball="gitleaks_${GITLEAKS_VERSION}_${os}_${arch}.tar.gz"
   if [[ ! -x "$cache_dir/gitleaks" ]]; then
-    curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}" \
-      | tar -xz -C "$cache_dir" gitleaks
-    chmod +x "$cache_dir/gitleaks"
+    fetch_release_tarball \
+      "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}" \
+      "$cache_dir" gitleaks
   fi
   GITLEAKS_BIN="$cache_dir/gitleaks"
 }
@@ -63,9 +89,9 @@ ensure_trufflehog() {
   mkdir -p "$cache_dir"
   tarball="trufflehog_${TRUFFLEHOG_VERSION}_${os}_${arch}.tar.gz"
   if [[ ! -x "$cache_dir/trufflehog" ]]; then
-    curl -sSfL "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/${tarball}" \
-      | tar -xz -C "$cache_dir" trufflehog
-    chmod +x "$cache_dir/trufflehog"
+    fetch_release_tarball \
+      "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/${tarball}" \
+      "$cache_dir" trufflehog
   fi
   TRUFFLEHOG_BIN="$cache_dir/trufflehog"
 }
@@ -86,9 +112,41 @@ trufflehog_exclude_args() {
   fi
 }
 
+run_gitleaks_checked() {
+  local scope="$1" log status
+  shift
+  log="$(mktemp)"
+  status=0
+  "$GITLEAKS_BIN" "$@" --no-color >"$log" 2>&1 || status=$?
+  # Gitleaks 8.21.2 can swallow Git reader failures and exit 0 with
+  # "no leaks found". Repair only missing-history failures, once, using
+  # the same exact remote coordinates as the TruffleHog repair path.
+  if [[ "$scope" == history ]] \
+    && grep -qE '(^|[[:space:]])(ERR|FTL)([[:space:]]|$)' "$log" \
+    && grep -qiE 'unable to read tree|bad object|object not found' "$log"; then
+    echo "::warning title=Secret scan checkout corruption::Gitleaks could not read Git history; repairing the checkout and retrying once." >&2
+    repair_partial_clone || {
+      status=$?
+      cat "$log"
+      rm -f "$log"
+      echo "::error title=Secret scan checkout repair failed::Gitleaks could not complete its history scan." >&2
+      return "$status"
+    }
+    status=0
+    "$GITLEAKS_BIN" "$@" --no-color >"$log" 2>&1 || status=$?
+  fi
+  cat "$log"
+  if [[ $status -eq 0 ]] && grep -qE '(^|[[:space:]])(ERR|FTL)([[:space:]]|$)' "$log"; then
+    echo "::error title=Secret scan incomplete::Gitleaks reported a scanner error despite exiting successfully; refusing an empty success." >&2
+    status=1
+  fi
+  rm -f "$log"
+  return "$status"
+}
+
 run_gitleaks_pre_commit() {
   echo "Running gitleaks protect on staged changes..."
-  "$GITLEAKS_BIN" protect \
+  run_gitleaks_checked staged protect \
     --staged \
     --config "$REPO_ROOT/.gitleaks.toml" \
     --verbose
@@ -96,7 +154,7 @@ run_gitleaks_pre_commit() {
 
 run_gitleaks_ci_pr() {
   echo "Running gitleaks detect on ${BASE_REF}..HEAD..."
-  "$GITLEAKS_BIN" detect \
+  run_gitleaks_checked history detect \
     --source "$REPO_ROOT" \
     --config "$REPO_ROOT/.gitleaks.toml" \
     --log-opts="${BASE_REF}..HEAD" \
@@ -105,7 +163,7 @@ run_gitleaks_ci_pr() {
 
 run_gitleaks_full() {
   echo "Running gitleaks detect on full git history..."
-  "$GITLEAKS_BIN" detect \
+  run_gitleaks_checked history detect \
     --source "$REPO_ROOT" \
     --config "$REPO_ROOT/.gitleaks.toml" \
     --verbose

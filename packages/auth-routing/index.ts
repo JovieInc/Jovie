@@ -44,6 +44,7 @@ export interface AuthStartUrlInput {
   readonly intent: AuthIntent;
   readonly returnTo: string;
   readonly codeChallenge?: string | null;
+  readonly nativeAttempt?: string;
 }
 
 export interface AuthStateRecord {
@@ -52,6 +53,7 @@ export interface AuthStateRecord {
   readonly returnTo: string;
   readonly state: string;
   readonly codeChallenge: string | null;
+  readonly nativeAttempt?: string;
   readonly desktopFlow: string | null;
   /**
    * The Mac app can redeem a typed return code when its deep link cannot
@@ -59,6 +61,13 @@ export interface AuthStateRecord {
    * when the app declared support at `/auth/start`.
    */
   readonly desktopReturnCode?: boolean;
+  /**
+   * RFC 8252 section 7.3: the ephemeral 127.0.0.1 port the pending desktop
+   * flow is listening on. The return page hands the code/state pair to it
+   * directly, so sign-in completes even when jovie:// is not handled.
+   * Present only when the app declared a listener at `/auth/start`.
+   */
+  readonly desktopLoopbackPort?: number;
   readonly createdAt: number;
   readonly expiresAt: number;
   readonly consumedAt?: number | null;
@@ -71,6 +80,7 @@ export interface NativeExchangeCodeRecord {
   readonly userId: string;
   readonly returnTo: string;
   readonly codeChallenge: string | null;
+  readonly nativeAttempt?: string;
   /**
    * One-time token minted at the auth callback from the completing browser
    * session (Clerk → Better Auth migration, plan decision 9). The native
@@ -112,6 +122,7 @@ const ELECTRON_AUTH_COMPLETE_PROTOCOLS = [
 const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = NATIVE_HANDBACK_BOUNCE_PATHS.ios;
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
 const LOOPBACK_HANDBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+export const DESKTOP_LOOPBACK_COMPLETE_PATH = '/auth/complete';
 
 const RETURN_BLOCKED_PREFIXES = [
   '/api',
@@ -149,7 +160,6 @@ const NATIVE_EXTERNAL_PREFIXES = [
   '/demovideo',
   '/docs',
   '/download',
-  '/investors',
   '/launch',
   '/legal',
   '/new',
@@ -178,6 +188,7 @@ const PUBLIC_PROFILE_RESERVED_ROOT_SEGMENTS = new Set([
   'hud',
   'hud-tv',
   'investor-portal',
+  'investors',
   'llms-full.txt',
   'llms.txt',
   'mobile-auth-return',
@@ -185,6 +196,7 @@ const PUBLIC_PROFILE_RESERVED_ROOT_SEGMENTS = new Set([
   'onboarding',
   'openapi.json',
   'out',
+  'pitch',
   'r',
   's',
   'share',
@@ -212,6 +224,25 @@ export function isAuthIntent(value: unknown): value is AuthIntent {
   return (
     typeof value === 'string' && AUTH_INTENTS.includes(value as AuthIntent)
   );
+}
+
+/** Optional iOS correlation only; state, PKCE and one-time codes remain authority. */
+export function isValidNativeAttempt(
+  client: unknown,
+  value: unknown
+): value is string | undefined {
+  return (
+    value === undefined ||
+    (client === 'ios' &&
+      typeof value === 'string' &&
+      value.length === 43 &&
+      /^[A-Za-z0-9_-]{43}$/.test(value))
+  );
+}
+
+function requireNativeAttempt(client: AuthClient, value: unknown): void {
+  if (!isValidNativeAttempt(client, value))
+    throw new Error('Invalid native_attempt');
 }
 
 function matchesPathPrefix(pathname: string, prefix: string): boolean {
@@ -293,6 +324,7 @@ export function sanitizeReturnTo(
 }
 
 export function buildAuthStartUrl(input: AuthStartUrlInput): string {
+  requireNativeAttempt(input.client, input.nativeAttempt);
   const sanitizedReturnTo = sanitizeReturnTo(input.client, input.returnTo);
   if (!sanitizedReturnTo) {
     throw new Error('Invalid return_to for auth start URL');
@@ -308,6 +340,9 @@ export function buildAuthStartUrl(input: AuthStartUrlInput): string {
     url.searchParams.set('code_challenge_method', 'S256');
   }
 
+  if (input.nativeAttempt !== undefined) {
+    url.searchParams.set('native_attempt', input.nativeAttempt);
+  }
   return url.toString();
 }
 
@@ -323,14 +358,27 @@ export function createAuthStateRecord(input: {
   readonly returnTo: string;
   readonly state: string;
   readonly codeChallenge?: string | null;
+  readonly nativeAttempt?: string;
   readonly desktopFlow?: string | null;
   readonly desktopReturnCode?: boolean;
+  readonly desktopLoopbackPort?: number | null;
   readonly now: number;
 }): AuthStateRecord {
+  requireNativeAttempt(input.client, input.nativeAttempt);
   const returnTo = sanitizeReturnTo(input.client, input.returnTo);
   if (!returnTo) {
     throw new Error('Invalid return_to for auth state');
   }
+
+  const desktopLoopbackPort =
+    input.client === 'electron' &&
+    Boolean(input.desktopFlow) &&
+    typeof input.desktopLoopbackPort === 'number' &&
+    Number.isInteger(input.desktopLoopbackPort) &&
+    input.desktopLoopbackPort >= 1 &&
+    input.desktopLoopbackPort <= 65535
+      ? input.desktopLoopbackPort
+      : undefined;
 
   return {
     client: input.client,
@@ -338,11 +386,15 @@ export function createAuthStateRecord(input: {
     returnTo,
     state: input.state,
     codeChallenge: input.codeChallenge ?? null,
+    ...(input.nativeAttempt !== undefined
+      ? { nativeAttempt: input.nativeAttempt }
+      : {}),
     desktopFlow: input.desktopFlow ?? null,
     desktopReturnCode:
       input.client === 'electron' &&
       Boolean(input.desktopFlow) &&
       input.desktopReturnCode === true,
+    desktopLoopbackPort,
     createdAt: input.now,
     expiresAt: input.now + AUTH_STATE_TTL_MS,
     consumedAt: null,
@@ -355,9 +407,14 @@ function buildUrlWithCodeAndState(
     readonly code: string;
     readonly state: string;
     readonly desktopFlow?: string | null;
+    readonly nativeAttempt?: string;
   }
 ): string {
+  requireNativeAttempt('ios', input.nativeAttempt);
   const url = new URL(baseUrl);
+  if (input.nativeAttempt !== undefined) {
+    url.searchParams.set('native_attempt', input.nativeAttempt);
+  }
   url.searchParams.set('code', input.code);
   url.searchParams.set('state', input.state);
   if (input.desktopFlow) {
@@ -367,6 +424,7 @@ function buildUrlWithCodeAndState(
 }
 
 export function buildIosAuthCompleteUrl(input: {
+  readonly nativeAttempt?: string;
   readonly code: string;
   readonly state: string;
 }): string {
@@ -374,6 +432,7 @@ export function buildIosAuthCompleteUrl(input: {
 }
 
 export function buildIosUniversalAuthCompleteUrl(input: {
+  readonly nativeAttempt?: string;
   readonly origin: string;
   readonly code: string;
   readonly state: string;
@@ -385,13 +444,17 @@ export function buildIosUniversalAuthCompleteUrl(input: {
 }
 
 export function buildNativeHandbackBouncePath(input: {
+  readonly nativeAttempt?: string;
   readonly client: NativeAuthClient;
   readonly code: string;
   readonly state: string;
   readonly desktopFlow?: string | null;
   /** Electron only: shown when the deep link cannot reach the app. */
   readonly returnCode?: string | null;
+  /** Electron only: the app's pending-flow loopback listener port. */
+  readonly desktopLoopbackPort?: number | null;
 }): string {
+  requireNativeAttempt(input.client, input.nativeAttempt);
   const url = new URL(
     buildUrlWithCodeAndState(
       `https://jov.ie${NATIVE_HANDBACK_BOUNCE_PATHS[input.client]}`,
@@ -399,13 +462,52 @@ export function buildNativeHandbackBouncePath(input: {
         code: input.code,
         state: input.state,
         desktopFlow: input.client === 'electron' ? input.desktopFlow : null,
+        nativeAttempt: input.nativeAttempt,
       }
     )
   );
   if (input.client === 'electron' && input.desktopFlow && input.returnCode) {
     url.searchParams.set('return_code', input.returnCode);
   }
+  if (
+    input.client === 'electron' &&
+    input.desktopFlow &&
+    typeof input.desktopLoopbackPort === 'number'
+  ) {
+    url.searchParams.set('loopback_port', String(input.desktopLoopbackPort));
+  }
   return `${url.pathname}${url.search}`;
+}
+
+/**
+ * The `desktop_loopback` value an app build advertises at `/auth/start`: a
+ * decimal TCP port. Anything else is rejected up front instead of being
+ * silently dropped so a malformed build fails visibly.
+ */
+export function parseDesktopLoopbackPortParam(
+  value: string | null | undefined
+): number | null {
+  if (!value || !/^\d{1,5}$/.test(value)) return null;
+  const port = Number(value);
+  return port >= 1 && port <= 65535 ? port : null;
+}
+
+/**
+ * RFC 8252 section 7.3 loopback handback for the Mac app: the return page
+ * posts the same code/state/desktop_flow the deep link carries to the app's
+ * pending-flow listener on 127.0.0.1. Loopback only — a fetch from a signed-
+ * in page cannot leave the machine, so there is no phishing surface.
+ */
+export function buildDesktopAuthLoopbackUrl(input: {
+  readonly port: number;
+  readonly code: string;
+  readonly state: string;
+  readonly desktopFlow?: string | null;
+}): string {
+  return buildUrlWithCodeAndState(
+    `http://127.0.0.1:${input.port}${DESKTOP_LOOPBACK_COMPLETE_PATH}`,
+    input
+  );
 }
 
 function isLoopbackHandbackHost(hostname: string): boolean {
@@ -504,6 +606,7 @@ export function resolveAuthCallback(input: {
   readonly redirectUrl: string;
 } {
   const { stateRecord } = input;
+  requireNativeAttempt(stateRecord.client, stateRecord.nativeAttempt);
 
   if (input.requestedClient && input.requestedClient !== stateRecord.client) {
     throw new Error('Auth wrong surface prevented');
@@ -526,6 +629,7 @@ export function resolveAuthCallback(input: {
       redirectUrl: buildIosAuthCompleteUrl({
         code: input.exchangeCode,
         state: stateRecord.state,
+        nativeAttempt: stateRecord.nativeAttempt,
       }),
     };
   }
@@ -547,9 +651,11 @@ export function buildNativeExchangeCodeRecord(input: {
   readonly userId: string;
   readonly returnTo: string;
   readonly codeChallenge?: string | null;
+  readonly nativeAttempt?: string;
   readonly ott?: string | null;
   readonly now: number;
 }): NativeExchangeCodeRecord {
+  requireNativeAttempt(input.client, input.nativeAttempt);
   const returnTo = sanitizeReturnTo(input.client, input.returnTo);
   if (!returnTo) {
     throw new Error('Invalid return_to for native exchange code');
@@ -562,6 +668,9 @@ export function buildNativeExchangeCodeRecord(input: {
     userId: input.userId,
     returnTo,
     codeChallenge: input.codeChallenge ?? null,
+    ...(input.nativeAttempt !== undefined
+      ? { nativeAttempt: input.nativeAttempt }
+      : {}),
     ott: input.ott ?? null,
     createdAt: input.now,
     expiresAt: input.now + NATIVE_EXCHANGE_TTL_MS,
@@ -575,6 +684,7 @@ export type NativeExchangeFailureReason =
   | 'wrong_client'
   | 'wrong_state'
   | 'wrong_verifier'
+  | 'wrong_attempt'
   | 'expired'
   | 'replayed';
 
@@ -596,6 +706,7 @@ export function validateNativeExchange(input: {
   readonly code: string;
   readonly state: string;
   readonly codeVerifier?: string | null;
+  readonly nativeAttempt?: string;
   readonly now: number;
   readonly createCodeChallenge: (verifier: string) => string;
 }): NativeExchangeValidationResult {
@@ -611,6 +722,14 @@ export function validateNativeExchange(input: {
   if (input.record.consumedAt) return { ok: false, reason: 'replayed' };
   if (input.now > input.record.expiresAt)
     return { ok: false, reason: 'expired' };
+
+  if (
+    !isValidNativeAttempt(input.client, input.nativeAttempt) ||
+    !isValidNativeAttempt(input.record.client, input.record.nativeAttempt) ||
+    input.record.nativeAttempt !== input.nativeAttempt
+  ) {
+    return { ok: false, reason: 'wrong_attempt' };
+  }
 
   if (input.record.codeChallenge) {
     if (!input.codeVerifier) return { ok: false, reason: 'wrong_verifier' };

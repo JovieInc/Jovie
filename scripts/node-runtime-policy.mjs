@@ -57,7 +57,7 @@ export function latestReleaseForMajor(index, major) {
   }
   return releases[0];
 }
-function engineAllowsMajor(engine, major) {
+export function engineAllowsMajor(engine, major) {
   const alternatives = engine.split('||').map(value => value.trim());
   return alternatives.some(alternative => {
     if (/^\d+$/.test(alternative)) return Number(alternative) === major;

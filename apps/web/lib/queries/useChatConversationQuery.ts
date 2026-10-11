@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useId } from 'react';
 import { z } from 'zod';
 import { CURRENT_SUMMER_SESSION_ID } from '@/lib/ovie/summer-session';
-import { fetchWithTimeout } from './fetch';
+import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import type { ChatConversation } from './useChatConversationsQuery';
 import type { ChatMessage } from './useChatMutations';
@@ -38,6 +38,7 @@ const summerHistorySchema = z.object({
       content: z.string(),
       createdAt: z.string().datetime(),
       clientMessageId: z.string().nullable(),
+      summerFailed: z.literal(true).optional(),
     })
   ),
   hasMore: z.literal(false),
@@ -51,6 +52,29 @@ async function fetchConversation(
     `/api/chat/conversations/${conversationId}`,
     { signal, timeout: CHAT_CONVERSATION_FETCH_TIMEOUT_MS }
   );
+}
+
+async function fetchSummerHistory(
+  signal?: AbortSignal
+): Promise<ConversationWithMessages> {
+  try {
+    return await fetchWithTimeout<ConversationWithMessages>(
+      '/api/ovie/summer/history',
+      { signal, cache: 'no-store', schema: summerHistorySchema }
+    );
+  } catch (error) {
+    // A missing durable session is a truthful first-use state, not a failed
+    // conversation. The first successful turn creates it server-side.
+    if (error instanceof FetchError && error.status === 404) {
+      return {
+        chatMode: 'ov',
+        conversation: { id: CURRENT_SUMMER_SESSION_ID, title: 'Summer' },
+        messages: [],
+        hasMore: false,
+      };
+    }
+    throw error;
+  }
 }
 
 /**
@@ -80,10 +104,7 @@ export function useChatConversationQuery({
       : queryKeys.chat.conversation(conversationId ?? ''),
     queryFn: ({ signal }) =>
       isSummer
-        ? fetchWithTimeout<ConversationWithMessages>(
-            '/api/ovie/summer/history',
-            { signal, cache: 'no-store', schema: summerHistorySchema }
-          )
+        ? fetchSummerHistory(signal)
         : fetchConversation(conversationId!, signal),
     enabled: enabled && (isSummer || !!conversationId),
     staleTime: isSummer ? 0 : 10_000,

@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { cloneElement, isValidElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PreviewPanelData } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { PreviewPanel } from '@/features/dashboard/layout/PreviewPanel';
+import { PreviewPanel } from '@/components/features/dashboard/layout/PreviewPanel';
 
 const closeMock = vi.fn();
 let currentPreviewData: PreviewPanelData | null = null;
@@ -49,7 +51,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     </button>
   ),
   DrawerInlineNote: ({ message }: { message: string }) => <div>{message}</div>,
-  DrawerHeader: ({
+  EntityHeader: ({
     title,
     actions,
   }: {
@@ -93,6 +95,13 @@ vi.mock('@/lib/queries', () => ({
     isPending: false,
   }),
 }));
+
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
 
 describe('PreviewPanel', () => {
   beforeEach(() => {
@@ -171,5 +180,13 @@ describe('PreviewPanel', () => {
     expect(screen.getByText('Since 2020')).toBeInTheDocument();
     expect(screen.getByText('Bio live')).toBeInTheDocument();
     expect(screen.getByText('1 connected')).toBeInTheDocument();
+  });
+
+  it('imports LINEAR_SURFACE from the canonical token module', () => {
+    const source = readWebSource(
+      'components/features/dashboard/layout/PreviewPanel.tsx'
+    );
+    expect(source).toContain('@/components/tokens/linear-surface');
+    expect(source).not.toContain("dashboard/tokens'");
   });
 });

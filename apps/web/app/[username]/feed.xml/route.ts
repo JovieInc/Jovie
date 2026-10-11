@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import {
   isPublicProfileIndexable,
   PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
 } from '@/lib/profile/public-profile-indexing-policy';
+import { getCachedPublicReleasesForProfile } from '@/lib/releases/public-release-loader';
 import { getProfileByUsername } from '@/lib/services/profile';
 
 export const revalidate = 3600;
@@ -42,7 +42,7 @@ export async function GET(
     });
   }
 
-  const releases = await getReleasesForProfileLite(profile.id);
+  const releases = await getCachedPublicReleasesForProfile(profile.id);
   const profileUrl = `${BASE_URL}/${profile.username}`;
   const artistName = escapeXml(profile.displayName ?? profile.username);
 

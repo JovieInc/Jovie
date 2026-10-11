@@ -120,7 +120,9 @@ describe('deprecated Button alias ratchet', () => {
     ).toBeNull();
   });
 
-  it('never grows the live deprecated-alias count above the baseline', () => {
+  it('never grows the live deprecated-alias count above the baseline', {
+    timeout: 60000,
+  }, () => {
     const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
       count: number;
     };

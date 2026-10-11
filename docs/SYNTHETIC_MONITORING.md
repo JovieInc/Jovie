@@ -14,6 +14,7 @@ The production suite is split by responsibility:
 - `synthetic-production-waitlist.spec.ts` reuses one reserved production email-OTP identity, proves the waitlist traversal and scoped durable receipt, and never deletes production identity data.
 - `onboarding-robot.full.spec.ts` validates app behavior after Clerk authentication: profile creation, dashboard load, public profile load, welcome-chat continuity, and exact cleanup.
 - `public-profile-smoke.spec.ts` validates the public profile rendering baseline.
+- `/api/cron/web-ai-health` runs one tiny real production Gateway turn for web chat, insights, pitches, titles, and packaging. Its daily workflow receipt classifies forbidden-model, empty-stream, placeholder-saved, and request failures without retaining model output.
 
 ## Test Coverage
 
@@ -51,6 +52,12 @@ The fast PR smoke, `onboarding-robot.smoke.spec.ts`, runs separately through the
 This required suite reuses exactly `<base-local>+jovie-prod-waitlist-canary@<domain>`. Before authentication it verifies a read-only production preflight receipt. It then completes real email OTP, submits the waitlist intake, renders the confirmation view, and requires a run-bound receipt proving identity linkage, session, waitlist persistence, analytics, and zero communication jobs. The identity is intentionally retained for the next run. No workflow step receives `DATABASE_URL`, and the suite contains no cleanup or deletion path. This is service evidence only; it does not prove a deployment SHA.
 
 The workflow parser treats a missing, empty, or skipped result as failure. The suite is double-gated by `E2E_SYNTHETIC_MODE=true` and `E2E_PROD_WAITLIST_CANARY_ENABLED=true`.
+
+### Web AI Health
+
+The daily `web-ai-health` job calls the bearer-protected production endpoint at `https://jov.ie/api/cron/web-ai-health`. The five probes execute inside the deployed app, so Gateway authentication uses the production project identity rather than a CI-owned model key. SDK retries are disabled: one scheduled run makes exactly five O(1) model calls. GLM-5.3 reasoning is always enabled, so these simple probes request low reasoning and reserve up to 1,024 output tokens for reasoning plus final text or JSON.
+
+The redacted `jovie-web-ai-health/v1` receipt records each surface, runtime model, duration, failure cause, and the canonical Gateway allowlist name (`founder-strict-2026-09-17`). It never records prompts, model responses, credentials, user data, or database state. A red run alerts `#alerts-production` and creates or reopens a high-priority Linear bug signal. Forbidden-model, empty-stream, and placeholder-saved failures use distinct cause codes and messages.
 
 ### Health Checks
 
@@ -95,6 +102,13 @@ pnpm --filter=@jovie/web exec tsx scripts/m2-revenue-path-canary.ts --base-url h
 ```
 
 Red runs write Slack + a Linear issue with the receipt repro. This canary does not replace generic uptime (`canary-health-gate.yml`).
+
+### Web AI Health (JOV-6938)
+
+```bash
+doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback -- \
+  sh -c 'curl --fail-with-body --header "Authorization: Bearer $CRON_SECRET" https://jov.ie/api/cron/web-ai-health'
+```
 
 ### Synthetic Monitoring Test
 
@@ -147,6 +161,7 @@ CLERK_SECRET_KEY=sk_live_...
 DATABASE_URL=postgres://...
 SESSION_SECRET=...
 AI_GATEWAY_API_KEY=...
+CRON_SECRET=...
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=...
 TURNSTILE_SECRET_KEY=...
 E2E_PROD_SIGNUP_EMAIL_BASE=synthetic-signup@...
@@ -194,13 +209,18 @@ The endpoint should return `404` or `204` while no fresh code is available, or
 
 ### GitHub Secrets
 
-The workflow reads application, database, and mailbox secrets through `DOPPLER_TOKEN_PRD`. The production waitlist canary uses `--only-secrets` with fallback disabled, so it receives only its six named mailbox and receipt values and never receives `DATABASE_URL`. Do not duplicate Turnstile or mailbox values as standalone GitHub repo secrets.
+The workflow reads application, database, and mailbox secrets through `DOPPLER_TOKEN_PRD`. The production waitlist canary uses `--only-secrets` with fallback disabled, so it receives only its six named mailbox and receipt values and never receives `DATABASE_URL`. Web AI health similarly receives only `CRON_SECRET`; the model calls use the deployed production app's Gateway identity. Do not duplicate Turnstile or mailbox values as standalone GitHub repo secrets.
+
+Those six Doppler `jovie-web/prd` names are absent today. See [Current production blocker](#current-production-blocker-october-2-2026). Adding them is an operational decision; this document does not store secret values.
 
 ## GitHub Actions Workflow
 
 The synthetic monitoring runs automatically via GitHub Actions:
 
 ### Schedule
+
+- Deep browser synthetics: `17 */6 * * *` UTC
+- Web AI health: `47 7 * * *` UTC (five model turns/day)
 
 
 ### Environments Tested
@@ -212,6 +232,41 @@ The synthetic monitoring runs automatically via GitHub Actions:
 1. **Single Environment Failure**: Alert sent to `#alerts-production`
 2. **Multiple Environment Failure**: Critical alert sent to `#alerts-critical`
 3. **Daily Success Summary**: Sent to `#monitoring` at 9 PM PST
+4. **Web AI Failure**: High-priority Linear bug signal with per-surface cause and Gateway allowlist attribution
+
+### Current production blocker (October 2, 2026)
+
+JOV-4855 is correct: the deep synthetic job fails because production canary secrets are missing. This is a secret-provisioning gap, not a product assertion bug. Adding the secrets is Tim's call. Do not paper over it by skipping the canary, loosening the result parser, or adding workflow retries.
+
+`Production Synthetic Tests` runs on `17 */6 * * *` and on `workflow_dispatch`. The daily `47 7 * * *` run is Web AI health only, so a green workflow conclusion on that cron does not exercise the waitlist canary.
+
+The waitlist step runs:
+
+```bash
+doppler run --project jovie-web --config prd \
+  --only-secrets=E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN \
+  --no-fallback -- …
+```
+
+On [run 37071206285](https://github.com/JovieInc/Jovie/actions/runs/37071206285) (2026-10-02T22:13Z) Doppler exited 1 with:
+
+```text
+Doppler Error: the following secrets you are trying to include do not exist in your config:
+- E2E_PROD_SIGNUP_EMAIL_BASE
+- E2E_PROD_MAILBOX_PROVIDER
+- E2E_PROD_OTP_CHECK_ORIGIN
+- E2E_PROD_OTP_CHECK_TOKEN
+- E2E_PROD_OTP_CHECK_URL
+- PRODUCTION_WAITLIST_CANARY_READ_TOKEN
+```
+
+Playwright never starts, so `apps/web/test-results/synthetic-production-waitlist-results.json` is never written. The parser treats that missing required file as `error` and fails the job. The same six names were missing on [run 36431588956](https://github.com/JovieInc/Jovie/actions/runs/36431588956) (2026-09-28).
+
+The onboarding robot on the same run skips with annotation `Clerk testing setup was not successful`. Production robot auth is enabled only when `E2E_SYNTHETIC_MODE=true` and `E2E_PROD_SIGNUP_EMAIL_BASE` is set. The full `doppler run` for that step also lacked the email base, so the required skip is the same missing secret. The parser counts that required skip as a failure.
+
+`workers/canary-otp/README.md` already records the provisioning order and that the Doppler GitHub sync 100-secret cap (JOV-7237) blocks adding these values. JOV-6813 still requires a passing scheduled run. A `workflow_dispatch` from this checkout would stay red until `jovie-web/prd` contains the six names. Five consecutive green deep runs were not produced.
+
+Signup readiness, the SEO/AEO ratchet, Layer A auth UI, the golden path, public profile smoke, and limiter store health passed on run 37071206285. The Slack step on that run posted the missing-file and skipped-onboarding text. Recurrence filing for the fingerprinted Linear issue is a separate intake change and is unchanged here.
 
 ## Synthetic Account Management
 
@@ -246,6 +301,7 @@ Each alert includes:
 - Specific test failures
 - Direct link to GitHub Actions run
 - Playwright trace, video, screenshot, and JSON artifacts under `synthetic-test-results`
+- Redacted Web AI receipt under `web-ai-health-<run>-<attempt>`
 - Timestamp and context
 
 ### Escalation

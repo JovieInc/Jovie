@@ -2,10 +2,22 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentProps, type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const desktopAuth = vi.hoisted(() => ({ isLoaded: true, isSignedIn: false }));
+vi.mock('@/hooks/useJovieAuth', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/hooks/useJovieAuth')>()),
+  useJovieAuth: () => desktopAuth,
+}));
 
 function readSource(path: string): string {
   return readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -166,6 +178,7 @@ function ControlledChatInputHarness() {
 afterEach(() => {
   removeMockSpeechRecognition();
   removeElectronAPI();
+  desktopAuth.isSignedIn = false;
 });
 
 describe('ChatInput', () => {
@@ -176,6 +189,85 @@ describe('ChatInput', () => {
     isLoading: false,
     isSubmitting: false,
   };
+
+  it('certifies only the opted-in loaded authenticated composer and observes focus passively', async () => {
+    const frames = new Map<number, FrameRequestCallback>();
+    let next = 0;
+    const raf = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation(callback => {
+        frames.set(++next, callback);
+        return next;
+      });
+    const cancel = vi
+      .spyOn(globalThis, 'cancelAnimationFrame')
+      .mockImplementation(id => {
+        frames.delete(id);
+      });
+    const rect = vi
+      .spyOn(HTMLTextAreaElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue(new DOMRect(0, 0, 300, 40));
+    const visible = vi
+      .spyOn(document, 'visibilityState', 'get')
+      .mockReturnValue('visible');
+    const focus = vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+    const notifyComposerReadiness = vi.fn().mockResolvedValue(true);
+    setElectronAPI({ notifyComposerReadiness });
+    desktopAuth.isSignedIn = true;
+    const flush = async () => {
+      await act(async () => {
+        for (let i = 0; i < 2; i += 1) {
+          const callbacks = [...frames.values()];
+          frames.clear();
+          for (const callback of callbacks) callback(performance.now());
+          await Promise.resolve();
+        }
+      });
+    };
+    const view = fastRender(
+      withProviders(
+        <ChatInput {...baseProps} desktopConversationReady={false} />
+      )
+    );
+    try {
+      await flush();
+      expect(notifyComposerReadiness).not.toHaveBeenCalled();
+      view.rerender(
+        withProviders(<ChatInput {...baseProps} desktopConversationReady />)
+      );
+      await flush();
+      expect(notifyComposerReadiness.mock.calls).toEqual([
+        ['visible-editable'],
+      ]);
+      const input = screen.getByRole('textbox', {
+        name: /chat message input/i,
+      });
+      expect(document.activeElement).not.toBe(input);
+      // Direct entity entry changes the composer layout and replaces its input.
+      fireEvent.change(input, {
+        target: { value: '/release ', selectionStart: 9 },
+      });
+      const replacement = screen.getByRole('combobox', {
+        name: /chat message input/i,
+      });
+      expect(replacement).not.toBe(input);
+      expect(input.isConnected).toBe(false);
+      act(() => replacement.focus());
+      await flush();
+      expect(notifyComposerReadiness.mock.calls).toEqual([
+        ['visible-editable'],
+        ['visible-editable'],
+        ['focused'],
+      ]);
+    } finally {
+      view.unmount();
+      raf.mockRestore();
+      cancel.mockRestore();
+      rect.mockRestore();
+      visible.mockRestore();
+      focus.mockRestore();
+    }
+  });
 
   it('emits exactly one onChange per keystroke (JOV-5325)', async () => {
     const user = userEvent.setup();
@@ -674,6 +766,7 @@ describe('ChatInput', () => {
   });
 
   it('surfaces microphone permission errors without blocking send', async () => {
+    const user = userEvent.setup();
     installMockSpeechRecognition();
 
     fastRender(withProviders(<ChatInput {...baseProps} />));
@@ -695,8 +788,10 @@ describe('ChatInput', () => {
     expect(screen.getByTestId('chat-composer-surface')).not.toContainElement(
       screen.getByRole('alert')
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    screen.getByRole('button', { name: 'Dismiss' }).focus();
+    await user.keyboard('{Enter}');
     expect(screen.queryByRole('alert')).toBeNull();
+    expect(dictationButton).toHaveFocus();
   });
 
   it('never starts Web Speech in stale Electron and points at system dictation instead', async () => {
@@ -719,6 +814,7 @@ describe('ChatInput', () => {
   });
 
   it('shows the system-dictation hint when the desktop bridge reports dictation unavailable', async () => {
+    const user = userEvent.setup();
     installMockSpeechRecognition();
     setElectronAPI({
       platform: 'darwin',
@@ -742,8 +838,60 @@ describe('ChatInput', () => {
     const hint = screen.getByRole('status');
     expect(hint).toHaveTextContent(/press the 🎤 key/i);
 
+    expect(hint.closest('[data-chat-composer-overlay="true"]')).toBeNull();
+    within(hint)
+      .getByRole('button', { name: /dismiss/i })
+      .focus();
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(dictationButton).toHaveFocus();
+  });
+
+  it('keeps dictation guidance reachable when the attachment picker opens', async () => {
+    const user = userEvent.setup();
+    setElectronAPI({ platform: 'darwin', versions: { app: '0.1.0' } });
+    fastRender(
+      withProviders(<ChatInput {...baseProps} onFileAttach={vi.fn()} />)
+    );
+    const dictationButton = await screen.findByRole('button', {
+      name: /show how to dictate/i,
+    });
+    await user.click(dictationButton);
+    await user.click(
+      screen.getByRole('button', { name: /attachment options/i })
+    );
+
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    const hint = screen.getByRole('status');
+    expect(
+      within(hint).getByRole('button', { name: /dismiss/i })
+    ).toBeVisible();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(hint).toBeInTheDocument();
+    within(hint)
+      .getByRole('button', { name: /dismiss/i })
+      .focus();
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(dictationButton).toHaveFocus();
+  });
+
+  it('preserves composer focus and draft when guidance is dismissed without owning focus', async () => {
+    setElectronAPI({ platform: 'darwin', versions: { app: '0.1.0' } });
+    fastRender(
+      withProviders(<ChatInput {...baseProps} value='Keep this draft' />)
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /show how to dictate/i })
+    );
+    const hint = screen.getByRole('status');
+    const input = screen.getByRole('textbox');
+    input.focus();
     fireEvent.click(within(hint).getByRole('button', { name: /dismiss/i }));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('Keep this draft');
   });
 
   it('degrades to the system-dictation hint when Electron Web Speech fails with a network error', async () => {

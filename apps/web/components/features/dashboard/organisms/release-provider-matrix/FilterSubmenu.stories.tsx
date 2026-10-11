@@ -30,7 +30,7 @@ const meta = {
         <DropdownMenuTrigger asChild>
           <button type='button'>Open filters</button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent open>
+        <DropdownMenuContent>
           <Story />
         </DropdownMenuContent>
       </DropdownMenu>

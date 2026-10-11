@@ -1,0 +1,15 @@
+# LogYourBody native certification
+
+JOV-6099 extends the JOV-5916 evidence lifecycle; it does not create a second test platform. The executable oracle is `scripts/lyb-native-certification.mjs`. A green workflow, Done issue, policy test, or uploaded-but-missing artifact is not a user-outcome receipt.
+
+The route/state manifest from JOV-6095 supplies path IDs, exact XCTest identifiers, evidence tier, and required captures. JOV-6087 must map preview/export paths to screenshot and exported-image captures; JOV-6091 must map metric states to accessible, hittable action tests; JOV-6095 must map routes to mounted interactions rather than `GoldenPathTests` policy constants. Component/unit, simulator interaction, service integration, and physical-device paths remain separate.
+
+## Current source audit and lifecycle replay
+
+The 2026-09-27 `main` CI run [36293550868](https://github.com/JovieInc/LogYourBody/actions/runs/36293550868) is a real changed-path simulator run for merged SHA `2126a952395429fd6fd84797a5999b913142dc2b`. Artifact `ios-launch-quality-gate-36293550868` contains an xcresult, four passed UI records, device `iPhone 16` / iOS `26.2 (23C54)`, Xcode `26.3` (`17C529`), Swift language mode `5`, bundle `com.logyourbody.app`, version `1.2.0`, build `20251126162826`, and seven hashed screenshots including chat, onboarding, timeline, share, and analytics. The artifact did not emit the exact Swift compiler version, fixture hash/seed, or installed bundle identity, and its receipt explicitly records `exactDeployedBuild: not_verified`; therefore it is valid simulator evidence but **UNVERIFIED** for installed-build certification. This is the required fail-closed example, not a PASS.
+
+The lifecycle is: CI artifact → exact merged SHA → identified installed bundle/version/build/SHA → changed-path replay → certification record. The oracle reconciles declared, discovered, selected, executed, passed, failed, and skipped counts and rejects zero tests, absent required cases/captures, missing xcresult hashes, wrong SHA/build/fixture/config, infrastructure skips, and flaky-only success. The deliberate negative-control test changes a required route record to `Failed` and proves the oracle blocks it.
+
+LYB-19 is partly complete: selected `LogYourBodyUITests` cases run in the Launch Quality Gate, but `OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal()` was not among the four records in the audited artifact. JOV-4673 remains open only for exact installed/TestFlight build lineage and post-install replay; current simulator artifacts do not close it. Real TestFlight purchase/restore and affected physical-device performance are recorded as legitimate human-only candidate gates.
+
+**Ship now:** fail-closed receipt reconciliation and explicit evidence tiers. **Re-evaluate when:** LogYourBody emits the JOV-6095 manifest and installed-build identity. **Then:** feed both JSON files to the existing oracle and promote only affected paths whose required records pass; reuse unaffected receipts only when source dependency, toolchain, configuration, fixture, and build fingerprints still match.

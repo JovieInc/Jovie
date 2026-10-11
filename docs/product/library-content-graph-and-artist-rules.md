@@ -1,8 +1,9 @@
-# Library Content Graph and Artist Rules (JOV-5362)
+# Work Content Graph and Artist Rules (JOV-5362)
 
 Status: approved founder direction; product-first invariants locked
 
-This is the Library product canon, not a strategy memo. It lives under
+This is the Work product canon, not a strategy memo. `Library` remains the
+stable implementation namespace. It lives under
 `docs/product/` so the public-repo brand-scrub path block on `docs/plans/`
 cannot drop the lock.
 
@@ -14,13 +15,19 @@ The current Library separates release/media assets from private ideas and script
 
 Success means one Library read model can answer those questions without replacing the existing source tables. A creator must be able to identify the lifecycle stage of any visible item in one scan, switch stages without losing a draft, and recover an imported YouTube video by title, source, or release relationship. The expected improvement is a single task-led surface where lifecycle, item type, release context, provider identity, and approval state can be filtered independently; imported media and artist rules retain evidence and never create a second graph.
 
-The visible product name remains **Library**. “Assets” is a type filter, not the page name or a peer workspace.
+The visible product name is **Work**. `Library` remains the route, API, storage,
+and source-code compatibility namespace. “Assets” is a type filter, not the
+page name or a peer workspace. See
+[`identity-work-ontology.md`](identity-work-ontology.md) for the top-level IA.
+
+EVENT: Work is the visible product name. The Library implementation namespace
+stays stable so the presentation migration does not fork routes or data owners.
 
 ## Tim lock: post-release presence, track first
 
 Founder lock: 2026-08-28.
 
-Library is the track-first post-release presence surface and optimization flywheel. It does not sell licenses, lead with a license request, create a license desk, or treat an email address as a rights grant. The content card is the hero; one selected item is worked at a time. Artist identity is secondary but prominent. The visual contract remains the approved dark Apple / Linear / iOS-native-in-browser system with 32/510 controls, 28/620 titles, splash B, and blue / hot-pink / purple atoms.
+Work is the track-first post-release presence surface and optimization flywheel. It does not sell licenses, lead with a license request, create a license desk, or treat an email address as a rights grant. The content card is the hero; one selected item is worked at a time. Artist identity is secondary but prominent. The visual contract remains the approved dark Apple / Linear / iOS-native-in-browser system with 32/510 controls, 28/620 titles, splash B, and blue / hot-pink / purple atoms.
 
 Every post-release Library projection contains four bounded primitives:
 
@@ -182,7 +189,7 @@ Required fields:
 18. Brand mentions, sponsor obligations, affiliate offers, redirect destinations, and conversion events are separate primitives. A mention does not imply a paid relationship; a click does not imply a conversion; attribution must retain its model and window.
 19. Optimization consumes eligible, privacy-safe evidence only. Every recommendation names the objective, guardrails, evidence window, sample sufficiency, and affected relationship; no global score may silently trade artist constraints, contractual duties, or audience trust for clicks.
 20. Commercial links fail closed on expired terms, missing disclosure, invalid destination, or a blocking artist/contract rule. Redirect history and experiment assignments remain auditable after a destination changes.
-21. Library never presents or promotes license sales. Track downloads are a separate, attested giveaway primitive using the existing email gate and delivery stack.
+21. Work never presents or promotes license sales. Track downloads are a separate, attested giveaway primitive using the existing email gate and delivery stack.
 22. Existing promo files fail closed to inactive until the artist supplies immutable full-control attestation with an actor and timestamp. An active download without that evidence is rejected in application and database layers.
 23. Unknown stats render `Not connected` or empty. A disconnected provider cannot produce `0`, estimated streams, revenue, or synthetic trend lines.
 24. Rightsholder evidence is domain-scoped and provenance-preserving. Songview/MLC can observe composition claims only; neither upgrades itself to attested ownership or master control.

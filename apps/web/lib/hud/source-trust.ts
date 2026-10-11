@@ -127,7 +127,7 @@ function buildMercurySourceTrust(
     configureUrl: null,
     nextStep: resolveProviderNextStep(
       state,
-      'Add MERCURY_API_TOKEN and MERCURY_CHECKING_ACCOUNT_ID to load runway.',
+      'Add MERCURY_API_TOKEN to load runway.',
       'Check Mercury API credentials and retry.',
       'Retry Mercury transactions before using burn or runway.'
     ),

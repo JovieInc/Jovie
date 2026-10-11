@@ -6,7 +6,6 @@ import {
   type FetchOptions,
   fetchDocument,
   type StrategyConfig,
-  validatePlatformUrl,
 } from './base';
 
 const YOUTUBE_CONFIG: StrategyConfig = {
@@ -23,6 +22,10 @@ const CHANNEL_PATTERNS = [
   /^https?:\/\/(www\.)?youtube\.com\/@[^/?#]+/i,
 ];
 const MAX_URL_LENGTH = 2048;
+/** First path segment(s) that identify a channel; any trailing tab is ignored. */
+const CHANNEL_PATH = /^\/(@[^/?#]+|channel\/[^/?#]+|c\/[^/?#]+)(?:\/[^?#]*)?$/i;
+/** Channel /about pages run about 2.5 MB of inline JSON. */
+const YOUTUBE_MAX_RESPONSE_BYTES = 6_000_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -49,20 +52,31 @@ export function isYouTubeChannelUrl(url: string): boolean {
   }
 }
 
+/**
+ * Canonical `https://www.youtube.com/<channel>/about` URL, or null.
+ *
+ * Idempotent: the result validates to itself. The generic platform validator
+ * rewrites `/@handle` to `/handle` and `/channel/<id>` to `/channel`, which
+ * YouTube does not serve, so channel identity is kept from the path here.
+ */
 export function validateYouTubeChannelUrl(url: string): string | null {
   try {
     if (url.length > MAX_URL_LENGTH) {
       return null;
     }
-    const candidate = normalizeUrl(url);
-    if (!CHANNEL_PATTERNS.some(rx => rx.test(candidate))) {
+    const parsed = new URL(normalizeUrl(url));
+    if (
+      !['http:', 'https:'].includes(parsed.protocol) ||
+      parsed.username ||
+      parsed.password ||
+      !YOUTUBE_CONFIG.validHosts.has(parsed.hostname.toLowerCase())
+    ) {
       return null;
     }
-    const aboutUrl = candidate.endsWith('/about')
-      ? candidate
-      : `${candidate.replace(/\/+$/, '')}/about`;
-    const result = validatePlatformUrl(aboutUrl, YOUTUBE_CONFIG);
-    return result.valid && result.normalized ? result.normalized : null;
+    const channel = CHANNEL_PATH.exec(parsed.pathname)?.[1];
+    return channel
+      ? `https://${YOUTUBE_CONFIG.canonicalHost}/${channel}/about`
+      : null;
   } catch {
     return null;
   }
@@ -98,15 +112,111 @@ export async function fetchYouTubeAboutDocument(
       ...options?.headers,
     },
     allowedHosts: YOUTUBE_CONFIG.validHosts,
+    maxResponseBytes: options?.maxResponseBytes ?? YOUTUBE_MAX_RESPONSE_BYTES,
   });
   return result.html;
+}
+
+/**
+ * Read `var ytInitialData = {...};` the way YouTube actually ships it: an
+ * assignment in an inline script, not a script tag with that id.
+ */
+export function extractAssignedJson(
+  html: string,
+  name: string
+): unknown | null {
+  const marker = new RegExp(
+    `(?:var\\s+|window\\[["']|window\\.)${name}(?:["']\\])?\\s*=\\s*\\{`
+  ).exec(html);
+  if (!marker) return null;
+  const start = marker.index + marker[0].length - 1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < html.length; index++) {
+    const char = html[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === '{') depth++;
+    else if (char === '}' && --depth === 0) {
+      try {
+        return JSON.parse(html.slice(start, index + 1)) as unknown;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
 }
 
 function parseChannelJson(html: string): unknown {
   const data =
     extractScriptJson<unknown>(html, 'ytInitialData') ??
+    extractAssignedJson(html, 'ytInitialData') ??
     extractScriptJson<unknown>(html, 'ytInitialPlayerResponse');
   return data ?? null;
+}
+
+/** Every object stored under `key`, anywhere in the tree (bounded depth). */
+function findAll(value: unknown, key: string, depth = 0, out: unknown[] = []) {
+  if (depth > 40 || !isRecord(value)) return out;
+  for (const [entryKey, entry] of Object.entries(value)) {
+    if (entryKey === key) out.push(entry);
+    findAll(entry, key, depth + 1, out);
+  }
+  return out;
+}
+
+/** youtube.com/redirect?q=<target> wraps every outbound About link. */
+function unwrapRedirect(href: string): string {
+  try {
+    const parsed = new URL(href, 'https://www.youtube.com');
+    if (
+      YOUTUBE_CONFIG.validHosts.has(parsed.hostname) &&
+      parsed.pathname === '/redirect'
+    ) {
+      return parsed.searchParams.get('q') ?? href;
+    }
+  } catch {
+    // Fall through to the raw value.
+  }
+  return href;
+}
+
+/** Links from the current About panel (`aboutChannelViewModel`). */
+function extractLinksFromViewModels(data: unknown): string[] {
+  const urls: string[] = [];
+  for (const model of findAll(data, 'channelExternalLinkViewModel')) {
+    const target =
+      getPath(model, [
+        'link',
+        'commandRuns',
+        '0',
+        'onTap',
+        'innertubeCommand',
+        'urlEndpoint',
+        'url',
+      ]) ?? getPath(model, ['link', 'content']);
+    if (typeof target !== 'string' || !target.trim()) continue;
+    const href = unwrapRedirect(target.trim());
+    urls.push(/^https?:\/\//i.test(href) ? href : `https://${href}`);
+  }
+  return [...new Set(urls)];
+}
+
+function extractBio(data: unknown): string | null {
+  const about = findAll(data, 'aboutChannelViewModel')[0];
+  const description =
+    getPath(about, ['description']) ??
+    getPath(data, ['metadata', 'channelMetadataRenderer', 'description']);
+  return typeof description === 'string' && description.trim()
+    ? description.trim()
+    : null;
 }
 
 function extractLinksFromAbout(data: unknown): string[] {
@@ -236,7 +346,10 @@ function isOfficialArtist(data: unknown): boolean {
 export function extractYouTube(html: string): ExtractionResult {
   const data = parseChannelJson(html);
   const links: ExtractionResult['links'] = [];
-  const rawLinks = extractLinksFromAbout(data);
+  const legacyLinks = extractLinksFromAbout(data);
+  const rawLinks = legacyLinks.length
+    ? legacyLinks
+    : extractLinksFromViewModels(data);
   const official = isOfficialArtist(data);
 
   for (const raw of rawLinks) {
@@ -269,6 +382,7 @@ export function extractYouTube(html: string): ExtractionResult {
     links,
     displayName,
     avatarUrl,
+    bio: extractBio(data),
     sourcePlatform: 'youtube',
   };
 }

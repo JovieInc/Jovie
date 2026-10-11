@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import type { UIMessage } from 'ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
@@ -13,6 +14,9 @@ const chatMocks = vi.hoisted(() => ({
   setMessages: vi.fn(),
   status: 'ready' as 'ready' | 'submitted' | 'streaming',
   stop: vi.fn(),
+  onError: undefined as undefined | ((error: Error) => void),
+  errorMetadata: {} as Record<string, unknown>,
+  options: null as null | { id?: string; messages?: UIMessage[] },
 }));
 
 vi.mock('ai', () => ({
@@ -22,13 +26,23 @@ vi.mock('ai', () => ({
 }));
 
 vi.mock('@ai-sdk/react', () => ({
-  useChat: () => ({
-    messages: chatMocks.messages,
-    sendMessage: chatMocks.sendMessage,
-    setMessages: chatMocks.setMessages,
-    status: chatMocks.status,
-    stop: chatMocks.stop,
-  }),
+  useChat: (options: {
+    onError?: (error: Error) => void;
+    id?: string;
+    messages?: UIMessage[];
+  }) => {
+    chatMocks.options = options;
+    chatMocks.onError = options.onError;
+    return {
+      messages: options.messages?.length
+        ? options.messages
+        : chatMocks.messages,
+      sendMessage: chatMocks.sendMessage,
+      setMessages: chatMocks.setMessages,
+      status: chatMocks.status,
+      stop: chatMocks.stop,
+    };
+  },
 }));
 
 vi.mock('@/lib/analytics', () => ({
@@ -66,7 +80,7 @@ vi.mock('@/components/jovie/tool-ui', () => ({
 }));
 
 vi.mock('@/components/jovie/utils', () => ({
-  extractErrorMetadata: () => ({}),
+  extractErrorMetadata: () => chatMocks.errorMetadata,
   getErrorType: () => 'server',
   getPreferredErrorMessage: (error: Error) => error.message,
 }));
@@ -101,10 +115,46 @@ vi.mock('@/components/jovie/components', () => ({
 }));
 
 describe('OnboardingChat empty intro', () => {
+  it('renders persisted progress without auto-submitting a starter or re-triggering claim activity', async () => {
+    const initialMessages: UIMessage[] = [
+      {
+        id: 'saved-user',
+        role: 'user',
+        parts: [{ type: 'text', text: 'I already selected my artist' }],
+      },
+      {
+        id: 'saved-assistant',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Your artist is saved' }],
+      },
+    ];
+    const activity = vi.fn();
+    render(
+      <OnboardingChat
+        conversationId='saved-conversation'
+        initialMessages={initialMessages}
+        starterHandoff={{ kind: 'prompt', prompt: 'Old starter' }}
+        onConversationActivity={activity}
+        turnstileToken={null}
+      />
+    );
+    await waitFor(() =>
+      expect(screen.getByText('Your artist is saved')).toBeTruthy()
+    );
+    expect(chatMocks.options).toMatchObject({
+      id: 'saved-conversation',
+      messages: initialMessages,
+    });
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    expect(activity).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     chatMocks.messages = [];
     chatMocks.status = 'ready';
+    chatMocks.onError = undefined;
+    chatMocks.errorMetadata = {};
     process.env.NODE_ENV = 'development';
   });
 
@@ -133,9 +183,26 @@ describe('OnboardingChat empty intro', () => {
       />
     );
 
-    expect(screen.getByText('Getting This Ready')).toBeTruthy();
+    expect(screen.getByText('Getting this ready')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
+  });
+
+  it('keeps a handle entry on its value screen and never auto-sends the claim draft (JOV-7753)', async () => {
+    render(
+      <OnboardingChat
+        entryProfile={{ status: 'available', handle: 'newartist' }}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Claim jov.ie/newartist')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
+    expect(screen.queryByText(ONBOARDING_ENTRY_TITLE)).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
   it('falls back to blank entry when a stored intent is missing', async () => {
@@ -151,5 +218,50 @@ describe('OnboardingChat empty intro', () => {
       expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
     });
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
+  });
+
+  it.each([
+    ['default', undefined, 'pt-5'],
+    ['headerOverlay', true, 'pt-16'],
+  ] as const)(
+    'reserves %s top clearance in the scroll region (JOV-7192)',
+    (_label, headerOverlay, expected) => {
+      const { container } = render(
+        <OnboardingChat
+          headerOverlay={headerOverlay}
+          turnstileToken='token'
+          turnstileStatus='verified'
+        />
+      );
+
+      const scrollRegion = container.querySelector(
+        '[aria-live="polite"].overflow-y-auto'
+      );
+      expect(scrollRegion).not.toBeNull();
+      expect(scrollRegion).toHaveClass(expected);
+      // Content scrolled under the floating sign-in fades rather than
+      // hard-clipping into a cut-off bubble; at rest, content below the 4rem
+      // clearance stays fully opaque.
+      expect(
+        scrollRegion?.className.includes('system-b-chat-thread-top-fade')
+      ).toBe(headerOverlay === true);
+    }
+  );
+
+  it('surfaces a turnstile recovery row instead of swallowing the error (JOV-7294)', async () => {
+    chatMocks.errorMetadata = { errorCode: 'TURNSTILE_REQUIRED' };
+    render(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+
+    act(() => {
+      chatMocks.onError?.(new Error('Forbidden'));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('onboarding-message-recovery')
+      ).toHaveTextContent('Complete the security check to send your message.');
+    });
   });
 });

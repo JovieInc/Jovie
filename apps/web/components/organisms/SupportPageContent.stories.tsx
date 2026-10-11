@@ -23,7 +23,7 @@ const meta = {
     ...marketingFullscreenParameters,
     docs: {
       description: {
-        component: `${MARKETING_STORY_DESCRIPTION} Exact System B production body for web-040-support. This story owns the shared body only; route metadata, revalidation, FAQ and breadcrumb schema construction, JSON-LD scripts, section taxonomy, and manifest evidence remain route- or owner-stacked.`,
+        component: `${MARKETING_STORY_DESCRIPTION} Exact System B production body for web-040-support. This story owns the shared body only; route metadata, revalidation, breadcrumb schema construction, JSON-LD scripts, section taxonomy, and manifest evidence remain route- or owner-stacked.`,
       },
     },
     pen: {

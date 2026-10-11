@@ -24,6 +24,7 @@ vi.mock('@neondatabase/serverless', () => {
   // Use a class to properly support `new Pool()` constructor calls
   class MockPool {
     end = vi.fn().mockReturnValue(Promise.resolve());
+    on = vi.fn();
   }
   // Mock neon HTTP client function
   const mockNeon = vi.fn().mockReturnValue(() => Promise.resolve({ rows: [] }));
@@ -73,6 +74,7 @@ vi.mock('@/lib/env-server', () => ({
       return process.env.DATABASE_URL;
     },
   },
+  isTestEnv: () => true,
 }));
 
 // Set default DATABASE_URL for tests
@@ -207,6 +209,29 @@ describe('Health Checks', () => {
       expect(threwError).toBe(false);
       expect(result).toHaveProperty('healthy');
       expect(typeof result.healthy).toBe('boolean');
+    });
+
+    it('should time out instead of hanging when the connection stalls', async () => {
+      const { __mockExecute } = (await import(
+        'drizzle-orm/neon-serverless'
+      )) as unknown as { __mockExecute: ReturnType<typeof vi.fn> };
+
+      vi.useFakeTimers();
+      try {
+        __mockExecute.mockImplementation(() => new Promise(() => {}));
+
+        // Without the per-attempt timeout this promise never resolves and the
+        // health probe hangs until the platform kills the function.
+        const resultPromise = validateDbConnection();
+        await vi.advanceTimersByTimeAsync(60_000);
+        const result = await resultPromise;
+
+        expect(result.connected).toBe(false);
+        expect(result.error).toBeTruthy();
+      } finally {
+        __mockExecute.mockResolvedValue({ rows: [{ health_check: 1 }] });
+        vi.useRealTimers();
+      }
     });
   });
 });

@@ -15,4 +15,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    label: 'Two-factor authentication',
+    control: 'On',
+  },
+};

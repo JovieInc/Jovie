@@ -351,7 +351,7 @@ export function DesignProposalReviewPanel() {
         return;
       }
       const payload = (await response.json()) as DesignProposalsResponse;
-      setProposals(payload.proposals);
+      setProposals(payload.proposals ?? []);
     } catch (error) {
       const nextError = loadErrorFromUnknown(error);
       setProposals([]);

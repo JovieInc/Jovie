@@ -3,6 +3,7 @@ import {
   canonicalizeSurfaceUrl,
   isSharedProfileHost,
   type MonitoringCandidate,
+  reconcileQualificationStatus,
   redactLockedRank,
   selectAdditionalMonitoredSurfaceIds,
   selectCanonicalProfileSurfaces,
@@ -69,14 +70,30 @@ describe('redactLockedRank', () => {
 });
 
 describe('selectRetirableSurfaceIds', () => {
-  it('retires only surfaces absent from current evidence and live sources', () => {
+  it('retires only surfaces absent from current evidence, live sources, and durable negative evidence', () => {
     expect(
       selectRetirableSurfaceIds(
-        ['current', 'stale', 'still-live'],
+        ['current', 'stale', 'still-live', 'owner-rejected'],
         ['current'],
-        ['current', 'still-live']
+        ['current', 'still-live'],
+        ['owner-rejected']
       )
     ).toEqual(['stale']);
+  });
+});
+
+describe('reconcileQualificationStatus', () => {
+  it.each(['qualified', 'conflicting', 'rejected'] as const)(
+    'preserves the durable %s decision during rediscovery',
+    status => {
+      expect(reconcileQualificationStatus(status, 'suggested')).toBe(status);
+    }
+  );
+
+  it('allows a new discovery to replace a non-durable suggestion', () => {
+    expect(reconcileQualificationStatus('suggested', 'qualified')).toBe(
+      'qualified'
+    );
   });
 });
 

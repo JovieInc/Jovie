@@ -62,9 +62,7 @@ export function AccountDashboard() {
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href={APP_ROUTES.SETTINGS_ARTIST_PROFILE}>
-                Edit Profile
-              </Link>
+              <Link href={APP_ROUTES.SETTINGS_PROFILE}>Edit Profile</Link>
             </Button>
           </div>
         </ContentSurfaceCard>
@@ -131,7 +129,11 @@ export function AccountDashboard() {
             <Link href='/support'>Contact Support</Link>
           </Button>
           <Button variant='outline' size='sm' asChild>
-            <a href={DOCS_URL} target='_blank' rel='noopener noreferrer'>
+            <a
+              href={`${DOCS_URL}/docs`}
+              target='_blank'
+              rel='noopener noreferrer'
+            >
               View Documentation
             </a>
           </Button>

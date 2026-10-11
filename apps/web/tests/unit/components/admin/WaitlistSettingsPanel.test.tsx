@@ -13,6 +13,16 @@ const { mockMutate, mockUseWaitlistSettingsQuery, mutationState, toastError } =
     toastError: vi.fn(),
   }));
 
+vi.mock('@/lib/auth/client', () => ({
+  authClient: {
+    passkey: {
+      listUserPasskeys: vi.fn(),
+      addPasskey: vi.fn(),
+    },
+    signIn: { passkey: vi.fn() },
+  },
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     error: (...args: unknown[]) => toastError(...args),
@@ -20,14 +30,18 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@/lib/queries', () => ({
-  useWaitlistSettingsQuery: (...args: unknown[]) =>
-    mockUseWaitlistSettingsQuery(...args),
-  useWaitlistSettingsMutation: () => ({
-    mutate: mockMutate,
-    isPending: mutationState.isPending,
-  }),
-}));
+vi.mock('@/lib/queries', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/queries')>();
+  return {
+    ...actual,
+    useWaitlistSettingsQuery: (...args: unknown[]) =>
+      mockUseWaitlistSettingsQuery(...args),
+    useWaitlistSettingsMutation: () => ({
+      mutate: mockMutate,
+      isPending: mutationState.isPending,
+    }),
+  };
+});
 
 function createQueryClient() {
   return new QueryClient({
@@ -118,8 +132,33 @@ describe('WaitlistSettingsPanel', () => {
     );
     expect(autoAcceptAfter).toHaveClass('text-(--color-text-disabled-token)');
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-    expect(screen.getByLabelText('Auto-accept after days')).toBeDisabled();
-    expect(screen.getByLabelText('Daily auto-accept limit')).toBeDisabled();
+    expect(screen.getByLabelText('Auto-accept After Days')).toBeDisabled();
+    expect(screen.getByLabelText('Daily Auto-accept Limit')).toBeDisabled();
+  });
+
+  it('shows admin verification state when loading settings is forbidden', async () => {
+    const { FetchError } = await import('@/lib/queries/fetch');
+    mockUseWaitlistSettingsQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new FetchError('Forbidden', 403),
+    });
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <WaitlistSettingsPanel />
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Admin verification required to load waitlist settings.'
+        )
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Unlock' })).toBeInTheDocument();
   });
 
   it('shows an error state when loading settings fails', async () => {

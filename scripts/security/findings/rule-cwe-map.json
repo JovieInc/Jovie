@@ -1,0 +1,6 @@
+{
+  "generic-api-key": 798,
+  "javascript.lang.security.audit.sqli.tainted-sql-query": 89,
+  "js/reflected-xss": 79,
+  "js/sql-injection": 89
+}

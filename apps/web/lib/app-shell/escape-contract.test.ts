@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
 import {
   resolveHudEscapeContract,
   resolveHudPresentation,
@@ -17,25 +16,27 @@ describe('HUD escape contract', () => {
     expect(contract.visibleControl).toBe('none');
   });
 
-  it('gives isolated fullscreen a visible Exit control and Escape', () => {
+  it('keeps legacy fs=1 inside the canonical app shell', () => {
     const presentation = resolveHudPresentation({ fs: '1' });
     const contract = resolveHudEscapeContract(presentation);
 
-    expect(presentation).toBe('isolated-fullscreen');
-    expect(contract.visibleControl).toBe('exit-fullscreen');
-    expect(contract.keyboard).toEqual(['Escape']);
-    expect(contract.backTarget).toBe(APP_ROUTES.HUD);
+    expect(presentation).toBe('canonical-app-shell');
+    expect(contract.ownerShell).toBe('ov');
+    expect(contract.visibleControl).toBe('none');
+    expect(contract.keyboard).toEqual([]);
+    expect(contract.backTarget).toBeNull();
     expect(contract.globalDropdownIsPrimaryExit).toBe(false);
   });
 
-  it('gives packaged Mac HUD a Close path back to canonical /hud', () => {
+  it('keeps the packaged Mac entry inside the canonical shell', () => {
     const presentation = resolveHudPresentation({ ovie: 'mac' });
     const contract = resolveHudEscapeContract(presentation);
 
-    expect(presentation).toBe('packaged-mac-hud');
-    expect(contract.visibleControl).toBe('close');
-    expect(contract.keyboard).toEqual(['Escape']);
-    expect(contract.backTarget).toBe(APP_ROUTES.HUD);
+    expect(presentation).toBe('canonical-app-shell');
+    expect(contract.ownerShell).toBe('ov');
+    expect(contract.visibleControl).toBe('none');
+    expect(contract.keyboard).toEqual([]);
+    expect(contract.backTarget).toBeNull();
     expect(contract.globalDropdownIsPrimaryExit).toBe(false);
   });
 

@@ -1,0 +1,17 @@
+name = "jovie-canary-otp"
+main = "src/index.ts"
+compatibility_date = "2026-09-29"
+workers_dev = true
+
+# Copy to a local ignored config and replace with the newly provisioned KV ID.
+# Never bind a pre-existing Worker or production mailbox namespace.
+[[kv_namespaces]]
+binding = "OTP_STATE"
+id = "REPLACE_WITH_DEDICATED_CANARY_KV_ID"
+
+[vars]
+CANARY_EMAIL = "signup+jovie-prod-waitlist-canary@canary.jov.ie"
+CANARY_FROM = "no-reply@jov.ie"
+OTP_CHECK_ORIGIN = "https://jovie-canary-otp.REPLACE_WITH_ACCOUNT.workers.dev"
+
+# OTP_CHECK_TOKEN is a secret binding, never a plaintext var in this file.

@@ -46,6 +46,20 @@ describe('Release task action System B source contract', () => {
     expect(metadataSource).toContain('hover:bg-btn-primary-hover');
   });
 
+  it('keeps metadata agent status callouts on semantic status tokens', () => {
+    const metadataSource = readFileSync(
+      resolve(appRoot, actionSourcePaths[1]),
+      'utf8'
+    );
+
+    // Light-only Tailwind palette callouts (bg-amber-50 etc.) glare in dark mode.
+    expect(metadataSource).not.toMatch(
+      /\b(?:bg|text|border)-(?:red|amber|emerald|green|yellow)-\d{2,3}\b/
+    );
+    expect(metadataSource).toContain('bg-warning-subtle');
+    expect(metadataSource).toContain('bg-error-subtle');
+  });
+
   it('keeps release task progress as the semantic accent exception', () => {
     const progressSource = readFileSync(
       resolve(

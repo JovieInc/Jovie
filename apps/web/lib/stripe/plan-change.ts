@@ -116,13 +116,30 @@ interface SubscriptionWithPeriod extends Stripe.Subscription {
   current_period_start: number;
 }
 
-function hasSubscriptionPeriodFields(
+/**
+ * Since the 2025-03-31 API, billing periods live on subscription items; the
+ * pinned 2026-08-26.dahlia API has no top-level period at all. Read the legacy
+ * top-level fields first, then the first item, so plan changes still resolve.
+ */
+function withSubscriptionPeriod(
   subscription: Stripe.Subscription
-): subscription is SubscriptionWithPeriod {
-  const periodEnd = Reflect.get(subscription, 'current_period_end');
-  const periodStart = Reflect.get(subscription, 'current_period_start');
+): SubscriptionWithPeriod | null {
+  const item = subscription.items?.data?.[0];
+  const periodEnd =
+    Reflect.get(subscription, 'current_period_end') ??
+    (item ? Reflect.get(item, 'current_period_end') : undefined);
+  const periodStart =
+    Reflect.get(subscription, 'current_period_start') ??
+    (item ? Reflect.get(item, 'current_period_start') : undefined);
 
-  return typeof periodEnd === 'number' && typeof periodStart === 'number';
+  if (typeof periodEnd !== 'number' || typeof periodStart !== 'number') {
+    return null;
+  }
+  return {
+    ...subscription,
+    current_period_end: periodEnd,
+    current_period_start: periodStart,
+  };
 }
 
 /**
@@ -139,13 +156,14 @@ export async function getActiveSubscription(
       expand: ['data.items.data.price'],
     });
 
-    const sub = subscriptions.data[0];
-    if (!sub) return null;
+    const listed = subscriptions.data[0];
+    if (!listed) return null;
 
-    if (!hasSubscriptionPeriodFields(sub)) {
+    const sub = withSubscriptionPeriod(listed);
+    if (!sub) {
       logger.warn('Subscription missing period fields', {
         customerId,
-        subscriptionId: sub.id,
+        subscriptionId: listed.id,
       });
       return null;
     }
@@ -332,7 +350,8 @@ export async function executePlanChange(
         expand: ['items.data.price'],
       }
     );
-    if (!hasSubscriptionPeriodFields(subscriptionRaw)) {
+    const subscription = withSubscriptionPeriod(subscriptionRaw);
+    if (!subscription) {
       return {
         success: false,
         error: 'Subscription payload missing billing period fields',
@@ -340,8 +359,6 @@ export async function executePlanChange(
         effectiveDate: new Date(),
       };
     }
-
-    const subscription = subscriptionRaw;
 
     if (subscription?.status !== 'active') {
       return {

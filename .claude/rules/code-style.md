@@ -19,7 +19,7 @@ TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint r
 | Linting | Biome |
 | Package Manager | pnpm 9.15.9 |
 | Monorepo | Turborepo |
-| Runtime | Node.js 22 LTS |
+| Runtime | Node.js 24 LTS |
 
 ## TypeScript
 
@@ -222,7 +222,7 @@ useQuery({
 
 ## Custom ESLint Rules
 
-19 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
+20 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
 
 | Rule | What It Blocks | Fix |
 |------|---------------|-----|
@@ -245,6 +245,7 @@ useQuery({
 | `chat-tool-schema-strict` | Bare `z.object()` chat tool input schemas | Wrap with `chatToolSchema()` |
 | `canonical-ui-label-casing` | Title Case / sentence-case violations on UI labels | Follow `DESIGN.md` casing; allowlist with `ui-casing-allow` |
 | `no-hardcoded-theme-colors` | Bare `text-black`/`bg-white` or `text-[#hex]` that bypass semantic tokens | Use token utilities (`text-primary-token`) or pair light/dark classes |
+| `no-direct-stripe-client` | Runtime `stripe` imports, `require('stripe')`, or `new Stripe(...)` outside `lib/stripe/` | Import the canonical client from `@/lib/stripe/client` (type-only imports are allowed) |
 
 **Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only).
 
@@ -458,17 +459,29 @@ Reference docs for common agent lookups:
 | `docs/DOPPLER_SETUP.md` | How to set up and use Doppler for secrets management |
 | `docs/REVENUE_LIFT_METRICS.md` | How is IRPAA (artist revenue lift) defined, and which table/column emits each metric term? |
 
-## Pre-commit review (agents)
+## Review evidence (agents)
 
-Run CodeRabbit **locally before committing** to catch issues before CI. CodeRabbit
-is a metered plan, so PR auto-review is OFF (`.coderabbit.yaml` `auto_review.enabled: false`)
-— shifting it left to pre-commit conserves reviews and catches problems earlier:
+Use the existing internal review tooling, not CodeRabbit availability, to review
+changes. Before committing, inspect the exact scoped diff for correctness,
+regression coverage, and migration/security risks; resolve actionable findings
+and record the reviewed files and findings' dispositions.
 
-```bash
-coderabbit review --agent --type uncommitted --base main -c AGENTS.md   # before committing
-coderabbit review --agent --type committed   --base main -c AGENTS.md   # already-committed branch work
-```
+On PR open or synchronize, the existing JOV-7400 workflow
+(`.github/workflows/internal-review.yml`) runs
+`node .github/scripts/internal-pr-review.mjs` against trusted base code and reads
+the PR diff as data. Record its event-head comment/run receipt and the disposition
+of any actionable findings. Verify that the reviewed diff matches the recorded
+head before claiming exact-head review: the current script stamps the event SHA
+but fetches a mutable PR diff, so that marker alone does not prove the binding.
+If review or head binding is missing, incomplete, or unavailable, record that
+outcome without claiming a clean exact-head review. It remains advisory: absence,
+latency, quota, or billing must not block commit, publication, or merge. Required
+CI, qualification receipts, security checks, branch protection, and native merge
+queue admission remain unchanged and own merge correctness.
 
-Address blocking findings before committing. CI-side review is the gbrain-aware
-Claude reviewer (`.github/workflows/claude-review.yml`); on a PR you can still
-invoke CodeRabbit on-demand with `@coderabbitai review`.
+CodeRabbit is optional supplementary review. Do not wait for its availability,
+rate limits, credits, or billing, and do not purchase capacity to unblock work.
+If used, evaluate and resolve actionable findings just as for internal review;
+provider availability and an actual correctness finding are different evidence.
+The existing gbrain-aware Claude reviewer (`.github/workflows/claude-review.yml`)
+remains part of the PR review tooling where applicable.

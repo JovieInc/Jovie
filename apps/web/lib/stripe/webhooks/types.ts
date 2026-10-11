@@ -14,6 +14,7 @@ import type Stripe from 'stripe';
  */
 export type SupportedEventType =
   | 'checkout.session.completed'
+  | 'checkout.session.expired'
   | 'customer.subscription.created'
   | 'customer.subscription.updated'
   | 'customer.subscription.deleted'
@@ -35,6 +36,13 @@ export interface WebhookContext {
 
   /** When Stripe created the event (used for event ordering to skip stale events) */
   stripeEventTimestamp: Date;
+
+  /**
+   * Live deliveries may cancel a subscription after a refund or dispute.
+   * Stored-event replay sets this false so a retry cannot call Stripe writes.
+   * Defaults to allowed when omitted.
+   */
+  stripeWritesAllowed?: boolean;
 }
 
 /**
@@ -93,6 +101,7 @@ export function isSupportedEventType(
 ): eventType is SupportedEventType {
   const supportedTypes: readonly string[] = [
     'checkout.session.completed',
+    'checkout.session.expired',
     'customer.subscription.created',
     'customer.subscription.updated',
     'customer.subscription.deleted',

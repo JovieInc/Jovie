@@ -5,6 +5,8 @@
  */
 
 import { eq, or } from 'drizzle-orm';
+import { admitArtistIdentity } from '@/lib/canonical/artist-identity';
+import { SemanticContractError } from '@/lib/canonical/semantic-contract';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { type Artist, artists, type NewArtist } from '@/lib/db/schema/content';
 import { normalizeArtistName } from '../artist-parser';
@@ -92,6 +94,28 @@ export async function findOrCreateArtist(
 ): Promise<Artist> {
   const database = tx ?? db;
 
+  // JOV-6543: canonical admission for the provider-backed identity. An
+  // implausible observation (URL/serialized name, malformed provider ID) is
+  // quarantined by throwing SemanticContractError — never written to the
+  // registry or merged onto an existing artist.
+  const admission = admitArtistIdentity(
+    {
+      name: input.name,
+      spotifyId: input.spotifyId,
+      appleMusicId: input.appleMusicId,
+      musicbrainzId: input.musicbrainzId,
+      deezerId: input.deezerId,
+    },
+    {
+      producer: 'discography/find-or-create-artist@1',
+      confidence: input.isAutoCreated === false ? 'user_certified' : 'imported',
+    }
+  );
+  if (admission.status !== 'accepted' || !admission.canonical) {
+    throw new SemanticContractError(admission);
+  }
+  const identity = admission.canonical;
+
   // Try to find existing artist
   const existing = await findArtist(
     {
@@ -138,15 +162,15 @@ export async function findOrCreateArtist(
 
   // Create new artist
   const now = new Date();
-  const normalized = normalizeArtistName(input.name);
+  const normalized = normalizeArtistName(identity.name);
 
   const insertData: NewArtist = {
-    name: input.name,
+    name: identity.name,
     nameNormalized: normalized,
-    spotifyId: input.spotifyId ?? null,
-    appleMusicId: input.appleMusicId ?? null,
-    musicbrainzId: input.musicbrainzId ?? null,
-    deezerId: input.deezerId ?? null,
+    spotifyId: identity.spotifyId ?? null,
+    appleMusicId: identity.appleMusicId ?? null,
+    musicbrainzId: identity.musicbrainzId ?? null,
+    deezerId: identity.deezerId ?? null,
     imageUrl: input.imageUrl ?? null,
     artistType: input.artistType ?? 'person',
     isAutoCreated: input.isAutoCreated ?? true,

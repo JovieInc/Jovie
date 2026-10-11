@@ -65,6 +65,7 @@ vi.mock('@/hooks/useSearchUrlSync', () => ({
 }));
 
 vi.mock('@/components/organisms/table', () => ({
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME: 'whitespace-normal',
   convertContextMenuItems: () => [],
   createMultiFieldFilterFn: () => () => true,
   ExportCSVButton: () => <button type='button'>Export</button>,
@@ -91,7 +92,23 @@ vi.mock('@/components/organisms/table', () => ({
     <button type='submit'>{submitAriaLabel}</button>
   ),
   TableBulkActionsToolbar: () => null,
-  UnifiedTable: () => <div data-testid='desktop-table'>Desktop table</div>,
+  UnifiedTable: ({
+    columns,
+  }: {
+    columns: Array<{ id: string; meta?: { cellContentClassName?: string } }>;
+  }) => (
+    <div
+      data-testid='desktop-table'
+      data-multiline-columns={columns
+        .filter(column =>
+          column.meta?.cellContentClassName?.includes('whitespace-normal')
+        )
+        .map(column => column.id)
+        .join(',')}
+    >
+      Desktop table
+    </div>
+  ),
   useRowSelection: (rowIds: string[]) => mockUseRowSelection(rowIds),
 }));
 
@@ -169,25 +186,42 @@ describe('AdminUsersTableUnified', () => {
     expect(screen.queryByTestId('desktop-table')).not.toBeInTheDocument();
   });
 
-  it('renders the desktop table on wider screens', () => {
-    mockUseBreakpointDown.mockReturnValue(false);
-    mockUseAdminUsersInfiniteQuery.mockReturnValue({
-      data: { pages: [{ rows: [userRow], total: 1 }] },
-      fetchNextPage: vi.fn().mockResolvedValue(undefined),
-      hasNextPage: false,
-      isFetchingNextPage: false,
-    });
-    mockUseRowSelection.mockReturnValue({
-      selectedIds: new Set<string>(),
-      selectedCount: 0,
-      headerCheckboxState: false,
-      toggleSelect: vi.fn(),
-      toggleSelectAll: vi.fn(),
-      clearSelection: vi.fn(),
-    });
+  it.each([0, 1])(
+    'keeps desktop metadata but excludes covered actions with %i selected rows',
+    selectedCount => {
+      mockUseBreakpointDown.mockReturnValue(false);
+      mockUseAdminUsersInfiniteQuery.mockReturnValue({
+        data: { pages: [{ rows: [userRow], total: 1 }] },
+        fetchNextPage: vi.fn().mockResolvedValue(undefined),
+        hasNextPage: false,
+        isFetchingNextPage: false,
+      });
+      mockUseRowSelection.mockReturnValue({
+        selectedIds: new Set<string>(),
+        selectedCount,
+        headerCheckboxState: false,
+        toggleSelect: vi.fn(),
+        toggleSelectAll: vi.fn(),
+        clearSelection: vi.fn(),
+      });
 
-    renderUsersTable();
+      renderUsersTable();
 
-    expect(screen.getByTestId('desktop-table')).toBeInTheDocument();
-  });
+      expect(screen.getByTestId('desktop-table')).toHaveAttribute(
+        'data-multiline-columns',
+        'name'
+      );
+      expect(screen.getByTestId('desktop-table')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Users' })).toBeNull();
+      expect(screen.getByText(/Showing 1–1 of 1 users/)).toBeInTheDocument();
+      const exportButton = screen.getByRole('button', {
+        name: 'Export',
+        hidden: true,
+      });
+      expect(exportButton.closest('[inert]') !== null).toBe(selectedCount > 0);
+      expect(screen.queryByRole('button', { name: 'Export' }) !== null).toBe(
+        selectedCount === 0
+      );
+    }
+  );
 });

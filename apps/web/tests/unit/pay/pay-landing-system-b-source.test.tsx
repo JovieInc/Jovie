@@ -38,6 +38,15 @@ describe('pay landing System B source contract', () => {
     expect(source.match(/<ClaimHandleForm/g) ?? []).toHaveLength(2);
   });
 
+  it('keeps headings clear of the two-line H1 clamp and the card rows', async () => {
+    const source = await readFile(sourcePath, 'utf8');
+
+    // JOV-7230: a 12ch H1 wrapped to three lines and the global two-line
+    // clamp cut it to "into a…"; mt-0 pulled card rows onto the H2 descenders.
+    expect(source).not.toMatch(/marketing-h1-linear[^']*max-w-\[1[0-5]ch\]/);
+    expect(source).not.toMatch(/homepage-section-stack mt-0/);
+  });
+
   it('keeps the final claim section to the handle form action path', () => {
     render(<PayLanding />);
 
@@ -46,11 +55,13 @@ describe('pay landing System B source contract', () => {
       'pay-hero-heading'
     );
     expect(
-      screen.getByRole('heading', { name: /turn every payment into a fan/i })
+      screen.getByRole('heading', {
+        name: /turn every payment into a follower/i,
+      })
     ).toHaveAttribute('id', 'pay-hero-heading');
 
     const finalHeading = screen.getByRole('heading', {
-      name: /start turning payments into fans/i,
+      name: /start turning payments into followers/i,
     });
     const finalSection = finalHeading.closest('section');
 
@@ -81,5 +92,32 @@ describe('pay landing System B source contract', () => {
       'marketing-hero-dock--inset'
     );
     expect(dock?.querySelector(':scope > .hero-glow')).not.toBeNull();
+  });
+
+  it('gives the hero H1 enough measure to paint both Pen lines', () => {
+    render(<PayLanding />);
+
+    // JOV-7230: every marketing h1 is shell-clamped to two painted lines.
+    // At the old max-w-[12ch] the headline needed three lines and truncated
+    // to "Turn every payment into a…" — Pen pRZwv/c4Zbtc shows the full
+    // two-line "Turn every payment / into a follower."
+    const heading = screen.getByRole('heading', {
+      name: /turn every payment into a follower/i,
+    });
+    expect(heading.className).not.toMatch(/max-w-\[\d+ch\]/);
+  });
+
+  it('keeps the benefits H2 descender-safe at the desktop leading', () => {
+    render(<PayLanding />);
+
+    // JOV-7230: .marketing-h2-linear drops to line-height:1 at 1280px+, which
+    // clips the descenders of "Payments are just the beginning." The named
+    // leading token overrides it (JOV-6848 descender rule).
+    const heading = screen.getByRole('heading', {
+      name: /payments are just the beginning/i,
+    });
+    expect(heading.className).toMatch(
+      /\bxl:leading-(?:tight|snug|normal|relaxed|loose)\b/
+    );
   });
 });

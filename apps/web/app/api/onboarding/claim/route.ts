@@ -18,6 +18,7 @@ import {
   clearOnboardingSessionCookie,
   getCurrentOnboardingSessionId,
 } from '@/lib/onboarding/session';
+import { SpotifyProfileIdentityConflictError } from '@/lib/profile/spotify-profile-identity';
 import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
@@ -163,6 +164,10 @@ async function createWaitlistReceiptOrThrow(params: {
 }
 
 interface ClaimHandoff {
+  readonly profileError?: {
+    readonly errorCode: string;
+    readonly message: string;
+  };
   readonly profile: ClaimedProfilePayload | null;
   readonly waitlist: WaitlistAccessRequestResult | null;
   readonly waitlistIntakeRequired: boolean;
@@ -207,7 +212,46 @@ async function resolveClaimHandoff(params: {
   }
 
   if (isWaitlistPendingStatus(waitlist.status)) {
-    return { profile: null, waitlist, waitlistIntakeRequired: false };
+    // Hold jov.ie/<handle> while the decision is pending: write a hidden,
+    // unclaimed profile row linked to the waitlist entry. Approval later
+    // flips it public through the normal materialize path.
+    let profile: ClaimedProfilePayload | null = null;
+    try {
+      profile = await materializeClaimedOnboardingProfile({
+        userId: params.appUserId,
+        conversationId: params.conversationId,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+        visibility: 'reserved',
+        waitlistEntryId: waitlist.entryId,
+      });
+    } catch (error) {
+      if (error instanceof SpotifyProfileIdentityConflictError) {
+        return {
+          profile: null,
+          waitlist,
+          waitlistIntakeRequired: false,
+          profileError: { errorCode: error.errorCode, message: error.message },
+        };
+      }
+      // Ownership violations still fail closed.
+      if (isOnboardingOwnershipError(error)) throw error;
+      // A failed reservation must not strand the durable waitlist receipt —
+      // the claim retry re-attempts the hold. Profile stays null so the UI
+      // never claims a handle it could not reserve.
+      logger.warn('[onboarding/claim] waitlist handle reservation failed', {
+        waitlistEntryId: waitlist.entryId,
+      });
+      await captureError(
+        'Onboarding waitlist handle reservation failed',
+        error,
+        {
+          route: '/api/onboarding/claim',
+          method: 'POST',
+        }
+      );
+    }
+    return { profile, waitlist, waitlistIntakeRequired: false };
   }
   if (!isWaitlistApprovedStatus(waitlist.status)) {
     throw new WaitlistPersistenceError(
@@ -229,6 +273,13 @@ async function resolveClaimHandoff(params: {
 
 function claimHandoffPayload(handoff: ClaimHandoff) {
   return {
+    ...(handoff.profileError
+      ? {
+          profileError: handoff.profileError,
+          errorCode: handoff.profileError.errorCode,
+          error: handoff.profileError.message,
+        }
+      : {}),
     ...(handoff.waitlist ? { waitlist: handoff.waitlist } : {}),
     ...(handoff.waitlistIntakeRequired ? { waitlistIntakeRequired: true } : {}),
     ...profilePayload(handoff.profile),
@@ -345,13 +396,16 @@ export async function POST(req: Request) {
           ipAddress,
           userAgent,
         });
-        await clearOnboardingSessionCookie();
-        return NextResponse.json({
-          claimed: 0,
-          conversationId: alreadyClaimed.id,
-          alreadyClaimed: true,
-          ...claimHandoffPayload(handoff),
-        });
+        if (!handoff.profileError) await clearOnboardingSessionCookie();
+        return NextResponse.json(
+          {
+            claimed: 0,
+            conversationId: alreadyClaimed.id,
+            alreadyClaimed: true,
+            ...claimHandoffPayload(handoff),
+          },
+          { status: handoff.profileError ? 409 : 200 }
+        );
       }
 
       // Nothing to claim — clear the cookie so future visits start fresh.
@@ -436,13 +490,16 @@ export async function POST(req: Request) {
           ipAddress,
           userAgent,
         });
-        await clearOnboardingSessionCookie();
-        return NextResponse.json({
-          claimed: 0,
-          conversationId: primary.id,
-          alreadyClaimed: true,
-          ...claimHandoffPayload(handoff),
-        });
+        if (!handoff.profileError) await clearOnboardingSessionCookie();
+        return NextResponse.json(
+          {
+            claimed: 0,
+            conversationId: primary.id,
+            alreadyClaimed: true,
+            ...claimHandoffPayload(handoff),
+          },
+          { status: handoff.profileError ? 409 : 200 }
+        );
       }
 
       const handoff = await resolveClaimHandoff({
@@ -499,13 +556,16 @@ export async function POST(req: Request) {
           );
       }
 
-      await clearOnboardingSessionCookie();
+      if (!handoff.profileError) await clearOnboardingSessionCookie();
 
-      return NextResponse.json({
-        claimed: candidates.length,
-        conversationId: primary.id,
-        ...claimHandoffPayload(handoff),
-      });
+      return NextResponse.json(
+        {
+          claimed: candidates.length,
+          conversationId: primary.id,
+          ...claimHandoffPayload(handoff),
+        },
+        { status: handoff.profileError ? 409 : 200 }
+      );
     } catch (error) {
       // Ownership gate: unauthenticated / non-owner / missing conversation.
       // Fail closed — never surface reserved / locked-in success without verify.
@@ -542,6 +602,12 @@ export async function POST(req: Request) {
       throw error;
     }
   } catch (error) {
+    if (error instanceof SpotifyProfileIdentityConflictError) {
+      return NextResponse.json(
+        { error: error.message, errorCode: error.errorCode },
+        { status: error.status }
+      );
+    }
     if (error instanceof WaitlistPersistenceError) {
       logger.error(
         '[onboarding/claim] waitlist persistence failed',

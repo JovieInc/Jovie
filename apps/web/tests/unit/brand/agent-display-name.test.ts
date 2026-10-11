@@ -67,7 +67,9 @@ describe('agent display name brand guard (JOV-3121)', () => {
     }
 
     expect(matches, matches.join('\n')).toEqual([]);
-  });
+    // Sync walk+read of app/components/content/lib/constants: <1s idle, but
+    // the default 12s budget fired under full-suite shard CPU contention.
+  }, 45_000);
 
   it('uses Jovie agent for HUD automation review owner labels', () => {
     const source = readFileSync(join(WEB_ROOT, 'lib/hud/ai-ops.ts'), 'utf8');

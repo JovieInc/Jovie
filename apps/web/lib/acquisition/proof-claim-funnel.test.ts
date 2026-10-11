@@ -14,6 +14,7 @@ import {
   isProofProfileHandle,
   PROOF_CLAIM_CAMPAIGN_KEY,
   PROOF_CLAIM_FUNNEL_EVENTS,
+  PROOF_CLAIM_STARTER_PROMPT,
   PROOF_CLAIM_VARIANT_ID,
   PROOF_PROFILE,
   proofClaimAttribution,
@@ -40,21 +41,26 @@ describe('proof-to-claim funnel contract (JOV-6440)', () => {
     expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(199);
   });
 
-  it('uses Request access and the waitlist door when access is limited', () => {
+  it('enters the /start qualify chat and reserves the name when access is limited (JOV-3379)', () => {
     const cta = resolveProofClaimCta(true);
-    expect(cta.label).toBe('Request access');
+    expect(cta.label).toBe('Claim yours');
     expect(cta.limited).toBe(true);
-    expect(cta.href).toContain(APP_ROUTES.WAITLIST);
+    expect(cta.note).toContain('Reserve');
+    expect(cta.href.startsWith(`${APP_ROUTES.START}?`)).toBe(true);
     expect(cta.href).toContain(`campaign=${PROOF_CLAIM_CAMPAIGN_KEY}`);
+    expect(cta.href).not.toContain(APP_ROUTES.WAITLIST);
     expect(cta.href).not.toContain('/tim/claim');
   });
 
-  it('links the open door into monthly Pro checkout signup', () => {
-    const href = buildProofClaimHref(false);
-    expect(href.startsWith(`${APP_ROUTES.SIGNUP}?`)).toBe(true);
-    expect(href).toContain('plan=pro');
-    expect(href).toContain('interval=month');
+  it('routes the open door through the same qualify chat before Pro', () => {
+    const href = buildProofClaimHref();
+    expect(href.startsWith(`${APP_ROUTES.START}?`)).toBe(true);
     expect(href).toContain(`campaign=${PROOF_CLAIM_CAMPAIGN_KEY}`);
+    expect(href).not.toContain(APP_ROUTES.SIGNUP);
+    expect(resolveProofClaimCta(false).href).toBe(href);
+    expect(
+      new URL(href, 'https://jov.ie').searchParams.get('starter_prompt')
+    ).toBe(PROOF_CLAIM_STARTER_PROMPT);
     expect(resolveProofClaimCta(false).label).toBe('Get yours');
     expect(resolveProofClaimCta(false).note).toContain('$199/mo');
   });
@@ -104,9 +110,9 @@ describe('proof-to-claim funnel contract (JOV-6440)', () => {
     });
   });
 
-  it('uses the live waitlist door without rewriting the homepage (HOLD #17156)', () => {
+  it('keeps the live limited-access claim without rewriting the homepage (HOLD #17156)', () => {
     expect(FEATURE_FLAGS.WAITLIST_ENABLED).toBe(true);
-    expect(resolveProofClaimCta().label).toBe('Request access');
+    expect(resolveProofClaimCta().label).toBe('Claim yours');
     const homepage = readFileSync(
       path.join(
         path.dirname(fileURLToPath(import.meta.url)),

@@ -12,6 +12,7 @@ export const PRODUCTION_BLOCKED_API_PREFIXES = [
 ] as const;
 
 export const PRODUCTION_BLOCKED_PAGE_PREFIXES = [
+  '/demo/',
   '/dev/',
   '/exp/',
   '/sandbox',
@@ -22,6 +23,7 @@ export const PRODUCTION_BLOCKED_PAGE_PREFIXES = [
 
 /** Exact page paths outside the prefix lists above. */
 export const PRODUCTION_BLOCKED_PAGE_EXACT = [
+  '/demo',
   '/sandbox',
   '/spinner-test',
   '/sentry-example-page',
@@ -38,7 +40,13 @@ export const PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS = ['/exp/shell-v1'] as const;
  * Routes that intentionally stay reachable outside development.
  * Keep this list tiny and justify every entry in code review.
  */
-export const DEVELOPMENT_ROUTE_PROXY_ALLOWLIST = ['/sidebar-demo'] as const;
+export const DEVELOPMENT_ROUTE_PROXY_ALLOWLIST = [
+  '/sidebar-demo',
+  // Intentional sales surface (JOV-7606): the demo video page stays reachable
+  // in production while the rest of /demo is blocked. Its /demovideo alias is
+  // outside the /demo prefix and needs no entry here.
+  '/demo/video',
+] as const;
 
 /**
  * API routes that carry their own env/auth gates and must not be short-circuited

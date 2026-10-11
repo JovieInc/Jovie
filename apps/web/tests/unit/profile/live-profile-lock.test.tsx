@@ -238,7 +238,11 @@ describe('live public profile lock', () => {
       expect(compact.getByRole('button', { name: label })).toBeInTheDocument();
     }
 
-    fireEvent.click(compact.getByRole('button', { name: 'Release credits' }));
+    // Credits live in the overflow menu, not as a raw control in the shell.
+    fireEvent.click(compact.getByRole('button', { name: 'Menu' }));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Release credits' })
+    );
     expect(
       await screen.findByRole('heading', { name: 'Credits' })
     ).toBeInTheDocument();

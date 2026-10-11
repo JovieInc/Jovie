@@ -24,4 +24,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    board: undefined,
+    visibleStatuses: ['backlog', 'todo', 'in_progress', 'done'],
+    isLoading: false,
+    selectedTaskId: null,
+    onOpenTask: () => {},
+    onCreateTask: () => {},
+    onMoveTask: () => {},
+    getTaskContextMenuItems: () => [],
+  },
+};

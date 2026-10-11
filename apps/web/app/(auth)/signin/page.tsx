@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { getAuthenticatedAuthEntryRedirectFromParams } from '@/lib/auth/access-route-redirect';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { SignInPageClient } from './SignInPageClient';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,9 @@ export default async function SignInPage({
 
   return (
     <Suspense fallback={<AuthFormSkeleton />}>
-      <SignInPageClient />
+      <SignInPageClient
+        showOfferSummary={isCodeFlagEnabled('AUTH_OFFER_SUMMARY')}
+      />
     </Suspense>
   );
 }

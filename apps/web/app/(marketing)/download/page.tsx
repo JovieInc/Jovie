@@ -11,7 +11,11 @@ import {
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { FaqSection, MarketingContainer } from '@/components/marketing';
+import {
+  FaqSection,
+  MarketingContainer,
+  MarketingHeroPhoto,
+} from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -24,6 +28,12 @@ const DOWNLOAD_URL = '/api/desktop/download';
 const DESKTOP_RELEASES_HTML_URL = 'https://github.com/JovieInc/Jovie/releases';
 const DESKTOP_IMAGE = getMarketingExportImage('dashboard-releases-desktop');
 const PROFILE_IMAGE = getMarketingExportImage('tim-white-profile-live-mobile');
+const DOWNLOAD_HERO_PHOTO = {
+  src: '/images/marketing-hero/download.webp',
+  width: 1600,
+  height: 901,
+  opacity: 0.22,
+} as const;
 
 const FAQ_ITEMS = [
   {
@@ -61,7 +71,7 @@ const PLATFORM_ROWS = [
   {
     icon: Laptop,
     label: 'Mac',
-    title: 'Native desktop workspace',
+    title: 'Native desktop\u00a0workspace',
     body: 'Open Jovie from your Dock, keep your release workflow out of browser noise, and stay current with automatic updates.',
     action: 'Download for Mac',
     href: DOWNLOAD_URL,
@@ -151,6 +161,7 @@ export default function DownloadPage() {
       >
         <section aria-labelledby='download-hero-heading'>
           <div className='relative flex min-h-svh flex-col overflow-hidden pt-28 sm:pt-32'>
+            <MarketingHeroPhoto {...DOWNLOAD_HERO_PHOTO} />
             <MarketingContainer
               width='page'
               className='relative z-3 flex flex-1 flex-col'
@@ -162,7 +173,7 @@ export default function DownloadPage() {
                   </p>
                   <h1
                     id='download-hero-heading'
-                    className='mt-5 text-balance text-5xl font-bold leading-none tracking-normal text-(--system-b-text-primary) sm:text-6xl line-clamp-2'
+                    className='mt-5 text-balance text-4xl font-bold leading-none tracking-normal text-(--system-b-text-primary) sm:text-6xl line-clamp-2'
                   >
                     Jovie, Installed Where You Work.
                   </h1>
@@ -213,7 +224,11 @@ export default function DownloadPage() {
                 </div>
 
                 <div className='relative min-h-96 lg:min-h-144'>
-                  <div className='absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'>
+                  <div
+                    className='absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'
+                    data-overlap='intentional'
+                    data-testid='download-desktop-screenshot'
+                  >
                     <Image
                       src={DESKTOP_IMAGE.publicUrl}
                       alt='Jovie public demo showing the releases catalog'
@@ -225,7 +240,10 @@ export default function DownloadPage() {
                       className='h-full w-full object-cover object-left-top opacity-90'
                     />
                   </div>
-                  <div className='absolute top-0 right-0 w-52 overflow-hidden rounded-3xl border border-subtle bg-(--system-b-cinematic-black) shadow-card max-sm:hidden'>
+                  <div
+                    className='absolute top-0 right-0 w-52 overflow-hidden rounded-3xl border border-subtle bg-(--system-b-cinematic-black) shadow-card max-sm:hidden'
+                    data-overlap='intentional'
+                  >
                     <Image
                       src={PROFILE_IMAGE.publicUrl}
                       alt='Jovie iPhone alpha profile QR and public profile surface'
@@ -265,7 +283,10 @@ export default function DownloadPage() {
                         {platform.label}
                       </span>
                     </div>
-                    <h2 className='mt-5 max-w-xs text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
+                    <h2
+                      data-wrap='editorial-title'
+                      className='mt-5 text-pretty text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-4xl'
+                    >
                       {platform.title}
                     </h2>
                     <p
@@ -306,7 +327,10 @@ export default function DownloadPage() {
           <div className='grid gap-12 lg:grid-cols-2 lg:gap-20'>
             <div>
               <p className='homepage-section-eyebrow'>Release workflow</p>
-              <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
+              <h2
+                data-wrap='editorial-title'
+                className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
+              >
                 Everything In Jovie, Closer.
               </h2>
             </div>
@@ -333,7 +357,10 @@ export default function DownloadPage() {
             <div className='grid gap-12 lg:grid-cols-2 lg:items-start'>
               <div>
                 <p className='homepage-section-eyebrow'>Install details</p>
-                <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
+                <h2
+                  data-wrap='editorial-title'
+                  className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
+                >
                   Built To Stay Out Of The Way.
                 </h2>
               </div>

@@ -278,6 +278,15 @@ export interface SocialReplyBatchOptions {
   readonly minDelayMs?: number;
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly now?: () => Date;
+  /**
+   * Called with each item receipt the moment it settles (posted, skipped,
+   * failed, ambiguous, or batch-halted), so callers can stream incremental
+   * progress instead of waiting for the whole batch. Observer errors are
+   * swallowed: progress reporting must never change execution.
+   */
+  readonly onItemSettled?: (
+    item: SocialReplyItemReceipt
+  ) => void | Promise<void>;
 }
 
 /**

@@ -5,9 +5,9 @@ import { SmartLinksLanding } from './SmartLinksLanding';
 
 export const revalidate = false;
 
-const title = 'Music Smart Links';
+const title = 'Smart Links';
 const description =
-  'One release link that remembers where each fan listens. Explore the haptic streaming dial and create a Smart Link for your music.';
+  'One release link that remembers where each visitor listens. Explore the haptic streaming dial and create a Smart Link on your Jovie profile.';
 const url = `${BASE_URL}${APP_ROUTES.SMART_LINKS}`;
 
 export const metadata: Metadata = {

@@ -1,8 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { Check, ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CertificationJudgments } from '@/components/features/admin/CertificationJudgments';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -12,38 +13,18 @@ import type {
   TimActionsResponse,
 } from '@/lib/hud/linear-actions';
 import type { HudObservationState } from '@/lib/hud/observation';
+import { OVIE_CERTIFICATION_INVENTORY_CONTRACT } from '@/lib/ovie/certifications/types';
 import { STANDARD_CACHE } from '@/lib/queries/cache-strategies';
+import { useOvieCertificationsQuery } from '@/lib/queries/useOvieCertificationsQuery';
 
 const FETCH_URL = '/api/admin/hud/tim-actions';
 
-// Priority display config — maps Linear priority number to label and tone
-const PRIORITY_CONFIG: Record<number, { label: string; className: string }> = {
-  1: {
-    label: 'Urgent',
-    className: 'bg-red-500/15 text-red-400 border border-red-500/20',
-  },
-  2: {
-    label: 'High',
-    className: 'bg-orange-500/15 text-orange-400 border border-orange-500/20',
-  },
-  3: {
-    label: 'Medium',
-    className: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20',
-  },
-  4: {
-    label: 'Low',
-    className: 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20',
-  },
+const PRIORITY_LABELS: Record<number, string> = {
+  1: 'Urgent',
+  2: 'High',
+  3: 'Medium',
+  4: 'Low',
 };
-
-const DEFAULT_PRIORITY_CONFIG = {
-  label: 'No Priority',
-  className: 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20',
-};
-
-function getPriorityConfig(priority: number) {
-  return PRIORITY_CONFIG[priority] ?? DEFAULT_PRIORITY_CONFIG;
-}
 
 function DaysOldBadge({ daysOld }: Readonly<{ readonly daysOld: number }>) {
   const isOverdue = daysOld > 7;
@@ -52,7 +33,7 @@ function DaysOldBadge({ daysOld }: Readonly<{ readonly daysOld: number }>) {
       title={`${daysOld} days old${isOverdue ? ' — overdue' : ''}`}
       className={
         isOverdue
-          ? 'text-2xs font-semibold tabular-nums text-red-400 no-underline'
+          ? 'text-2xs font-semibold tabular-nums text-error no-underline'
           : 'text-2xs tabular-nums text-tertiary-token no-underline'
       }
     >
@@ -68,10 +49,10 @@ interface ActionRowProps {
 }
 
 function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
-  const priorityConfig = getPriorityConfig(issue.priority);
+  const priorityLabel = PRIORITY_LABELS[issue.priority] ?? 'No Priority';
 
   return (
-    <ShellListRowFrame className='flex items-center gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
+    <ShellListRowFrame className='flex items-center gap-3 px-3 py-2.5'>
       {/* Title + Linear link */}
       <div className='min-w-0 flex-1'>
         <a
@@ -94,11 +75,9 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
       </div>
 
       {/* Priority badge */}
-      <span
-        className={`shrink-0 rounded px-1.5 py-0.5 text-3xs font-semibold ${priorityConfig.className}`}
-      >
-        {priorityConfig.label}
-      </span>
+      <Badge variant='outline' size='sm' className='shrink-0'>
+        {priorityLabel}
+      </Badge>
 
       {/* Age */}
       <DaysOldBadge daysOld={issue.daysOld} />
@@ -118,12 +97,18 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
   );
 }
 
-export function TimActionRequiredSection() {
+export function TimActionRequiredSection({
+  presentation = 'section',
+}: {
+  readonly presentation?: 'section' | 'page';
+}) {
   const [data, setData] = useState<TimActionsResponse | null>(null);
   // isInitialLoad tracks whether we've ever received data — only show skeleton on first load
   const isInitialLoadRef = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchFailed, setFetchFailed] = useState(false);
+  // 403 = admin step-up lock, not a Linear outage.
+  const [locked, setLocked] = useState(false);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [optimisticallyClosedIds, setOptimisticallyClosedIds] = useState<
     Set<string>
@@ -136,6 +121,7 @@ export function TimActionRequiredSection() {
     }
     try {
       const response = await fetch(FETCH_URL, { signal });
+      setLocked(response.status === 403);
       if (!response.ok) {
         throw new Error(`Fetch failed (${response.status})`);
       }
@@ -208,9 +194,24 @@ export function TimActionRequiredSection() {
     }
   }
 
+  const certificationQuery = useOvieCertificationsQuery();
+  const certificationInventory =
+    certificationQuery.data?.contract === OVIE_CERTIFICATION_INVENTORY_CONTRACT
+      ? certificationQuery.data
+      : undefined;
+  const judgmentCount = certificationInventory?.queue.needsYou.length ?? 0;
+  const certificationObserved = Boolean(
+    !certificationQuery.isLoading &&
+      !certificationQuery.isError &&
+      certificationInventory?.domains.some(
+        domain => domain.status === 'connected'
+      )
+  );
+
   const visibleIssues = (data?.issues ?? []).filter(
     issue => !optimisticallyClosedIds.has(issue.id)
   );
+  const pendingCount = judgmentCount + visibleIssues.length;
   const observation = resolveTimActionsObservation({
     isLoading,
     fetchFailed,
@@ -218,47 +219,69 @@ export function TimActionRequiredSection() {
     visibleCount: visibleIssues.length,
   });
 
+  const Surface = presentation === 'page' ? 'section' : ContentSurfaceCard;
+
   return (
-    <ContentSurfaceCard surface='details' className='p-3'>
+    <Surface
+      aria-label='Founder Decisions'
+      className={presentation === 'page' ? 'min-w-0' : 'p-3'}
+    >
       <div className='space-y-2.5'>
-        <div className='flex items-center gap-2'>
-          <span
-            className='h-2 w-2 shrink-0 rounded-full bg-warning'
-            aria-hidden='true'
-          />
-          <p className='text-xs font-caption text-tertiary-token'>Needs Tim</p>
-          {!isLoading && visibleIssues.length > 0 ? (
-            <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
-              {visibleIssues.length}
-            </span>
-          ) : null}
-        </div>
+        {presentation === 'section' ? (
+          <div className='flex items-center gap-2'>
+            <span
+              className='h-2 w-2 shrink-0 rounded-full bg-warning'
+              aria-hidden='true'
+            />
+            <p className='text-xs font-caption text-tertiary-token'>
+              Needs You
+            </p>
+            {!isLoading && !certificationQuery.isLoading && pendingCount > 0 ? (
+              <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
+                {pendingCount}
+              </span>
+            ) : null}
+          </div>
+        ) : !isLoading && !certificationQuery.isLoading && pendingCount > 0 ? (
+          <p className='px-3 text-xs tabular-nums text-tertiary-token'>
+            {pendingCount} {pendingCount === 1 ? 'decision' : 'decisions'}
+          </p>
+        ) : null}
+
+        <CertificationJudgments />
 
         {isLoading && !data ? (
           <div className='grid gap-2'>
             {[1, 2].map(i => (
               <div
                 key={i}
-                className='h-13 animate-pulse rounded-xl border border-subtle bg-surface-0'
+                className='h-13 animate-pulse rounded-md bg-surface-1'
                 aria-hidden='true'
               />
             ))}
           </div>
         ) : visibleIssues.length > 0 ? (
-          <div className='grid gap-2'>
-            {visibleIssues.map(issue => (
-              <ActionRow
-                key={issue.id}
-                issue={issue}
-                onClose={handleClose}
-                isClosing={closingIds.has(issue.id)}
-              />
-            ))}
+          <div className='space-y-1.5'>
+            <p className='text-2xs text-tertiary-token'>
+              Linear tracking tasks — closing one does not record a judgment.
+            </p>
+            <div className='grid gap-2'>
+              {visibleIssues.map(issue => (
+                <ActionRow
+                  key={issue.id}
+                  issue={issue}
+                  onClose={handleClose}
+                  isClosing={closingIds.has(issue.id)}
+                />
+              ))}
+            </div>
           </div>
-        ) : (
+        ) : observation === 'unavailable' ||
+          observation === 'not_configured' ||
+          (pendingCount === 0 && certificationObserved) ? (
           <HudObservationStatus
             state={observation}
-            message={timActionsMessage(observation, data)}
+            message={timActionsMessage(observation, data, locked)}
             freshnessLabel={
               data?.fetchedAt
                 ? `Updated ${formatFetchedAt(data.fetchedAt)}`
@@ -273,7 +296,7 @@ export function TimActionRequiredSection() {
             }
             testId='tim-action-observation'
           />
-        )}
+        ) : null}
         {visibleIssues.length > 0 && observation === 'unavailable' ? (
           <HudObservationStatus
             state='unavailable'
@@ -285,7 +308,7 @@ export function TimActionRequiredSection() {
           />
         ) : null}
       </div>
-    </ContentSurfaceCard>
+    </Surface>
   );
 }
 
@@ -309,8 +332,12 @@ function resolveTimActionsObservation({
 
 function timActionsMessage(
   observation: HudObservationState,
-  data: TimActionsResponse | null
+  data: TimActionsResponse | null,
+  locked = false
 ): string {
+  if (locked && observation === 'unavailable') {
+    return 'Admin data is locked. Unlock with Touch ID, then retry.';
+  }
   if (observation === 'not_configured') {
     return (
       data?.errorMessage ??
@@ -321,7 +348,7 @@ function timActionsMessage(
     return data?.errorMessage ?? 'Linear actions are unavailable.';
   }
   if (observation === 'empty') {
-    return 'Nothing needs Tim.';
+    return 'Nothing needs you.';
   }
   return '';
 }

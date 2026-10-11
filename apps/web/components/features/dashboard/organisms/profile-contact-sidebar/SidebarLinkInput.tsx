@@ -18,7 +18,7 @@ import {
   getPlatformIconMetadata,
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
-import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import type { LinkSection } from '@/features/dashboard/organisms/links/utils/link-display-utils';
 import { cn } from '@/lib/utils';
 import { getContrastTextOnBrand } from '@/lib/utils/color';

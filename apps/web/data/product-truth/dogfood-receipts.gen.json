@@ -1,0 +1,37 @@
+{
+  "schema": "jovie.dogfood-receipts/v1",
+  "measuredAt": "2026-10-04T02:20:20.652Z",
+  "generator": "pnpm proof:dogfood",
+  "receipts": [
+    {
+      "id": "dogfood-tim-human-link-clicks-90d",
+      "claimId": "dogfood.tim.human-link-clicks-90d",
+      "capabilityId": "smart-links",
+      "statement": "114 human link clicks on jov.ie/tim in 90 days",
+      "value": 114,
+      "unit": "link clicks",
+      "reproducingQuery": "select count(*) from click_events ce join creator_profiles cp on cp.id = ce.creator_profile_id where cp.username_normalized = 'tim' and ce.is_bot = false and ce.created_at >= now() - interval '90 days'",
+      "population": "jov.ie/tim, is_bot=false, 90 days ending measuredAt; includes founder and team traffic"
+    },
+    {
+      "id": "dogfood-tim-active-subscribers",
+      "claimId": "dogfood.tim.active-subscribers",
+      "capabilityId": "artist-notifications",
+      "statement": "2 people subscribed to updates on jov.ie/tim",
+      "value": 2,
+      "unit": "subscribers",
+      "reproducingQuery": "select count(*) from notification_subscriptions ns join creator_profiles cp on cp.id = ns.creator_profile_id where cp.username_normalized = 'tim' and ns.unsubscribed_at is null",
+      "population": "jov.ie/tim notification subscriptions not unsubscribed"
+    },
+    {
+      "id": "dogfood-tim-known-contacts",
+      "claimId": "dogfood.tim.known-contacts",
+      "capabilityId": "artist-profiles",
+      "statement": "16 known contacts captured by jov.ie/tim",
+      "value": 16,
+      "unit": "contacts",
+      "reproducingQuery": "select count(*) from audience_members am join creator_profiles cp on cp.id = am.creator_profile_id where cp.username_normalized = 'tim' and am.type = 'email'",
+      "population": "jov.ie/tim audience members identified by email (anonymous visitors excluded)"
+    }
+  ]
+}

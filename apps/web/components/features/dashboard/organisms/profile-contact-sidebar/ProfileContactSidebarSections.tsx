@@ -7,7 +7,7 @@ import { type PreviewPanelData } from '@/app/app/(shell)/dashboard/PreviewPanelC
 import {
   DrawerMediaThumb,
   DrawerSurfaceCard,
-  EntityHeaderCard,
+  EntityHeader,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
@@ -39,8 +39,8 @@ export function ProfileBentoView({
       className='flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto px-3 pb-3 pt-2 lg:px-0 lg:pb-0'
       data-testid='profile-preview-summary'
     >
-      <EntityHeaderCard
-        image={
+      <EntityHeader
+        thumbnail={
           <DrawerMediaThumb
             src={previewData.avatarUrl}
             alt={title}
@@ -78,7 +78,7 @@ export function ProfileBentoView({
         </Button>
       ) : (
         <Button asChild variant='secondary' size='sm' className='w-full'>
-          <Link href={APP_ROUTES.PROFILES}>Manage In Presence</Link>
+          <Link href={APP_ROUTES.PRESENCE}>Manage In Presence</Link>
         </Button>
       )}
     </div>

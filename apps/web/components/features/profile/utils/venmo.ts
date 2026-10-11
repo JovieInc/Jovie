@@ -37,3 +37,17 @@ export function extractVenmoUsername(url: string | null): string | null {
 export function findVenmoLink(socialLinks: LegacySocialLink[]): string | null {
   return socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
 }
+
+/**
+ * Venmo hand-off URL for a chosen amount. Returns null when the link is not a
+ * canonical HTTPS Venmo URL, so callers never render an unsafe target.
+ */
+export function buildVenmoPaymentUrl(
+  venmoLink: string | null,
+  amount: number
+): string | null {
+  if (!venmoLink || !isAllowedVenmoUrl(venmoLink)) return null;
+  const sep = venmoLink.includes('?') ? '&' : '?';
+  const username = extractVenmoUsername(venmoLink) ?? '';
+  return `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(username)}`;
+}

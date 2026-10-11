@@ -33,7 +33,7 @@ This repo vendors a Jovie-customized fork of [gstack](https://github.com/garryta
 | Lavish | `/lavish` | Turn agent responses into rich HTML artifacts the user can annotate and send targeted feedback on (design comps, reports, dashboards, review surfaces) |
 | Upgrade | `/gstack-upgrade` | Upgrade gstack to latest version |
 | Last 30 Days | `/last30days` | Multi-source signal search (Reddit/HN/X/YouTube/TikTok/Polymarket/GitHub) scored by real engagement; synthesized to one brief. Use for idea discovery and market research. (mvanhorn) |
-| Idea Radar | `/idea-radar` | Weekly discovery sweep — calls /last30days across creator/music/SaaS signals, evaluates via 10x→MVP→MRR-score pipeline, delivers Slack cards, reconciles reactions. (Jovie AgentOS) |
+| Idea Radar | `/idea-radar` | Event-driven external opportunity-signal producer — normalizes observations into JOV-5916 and routes bounded benchmark work to JOV-2966. (Jovie AgentOS) |
 
 ## Setup
 
@@ -75,7 +75,7 @@ Key routing rules:
 - A shared link/tool/product with no context expecting an opinion or evaluation → invoke `tool-discovery` instead of asking the human to research it first
 - HTML artifact, design comp, review surface, dashboard, deck, report for human annotation → invoke `lavish` to open it in the browser-based review loop instead of embedding a screenshot
 - Market research, competitor complaints, "what are people saying about X", ICP pain points, RP-clone/pep-AI research → invoke `last30days` for multi-source signal gathering
-- Idea Radar sweep, weekly idea discovery, "find new product ideas", SaaS signal discovery → invoke `idea-radar`
+- Idea Radar signals, pending-decision research, "find new product ideas", SaaS signal discovery → invoke `idea-radar`
 - "find complaints about app X", "what do users hate about Y", "App Store reviews for Z" → invoke `market-research` command (calls `/last30days` internally)
 
 ## gbrain (long-term memory layer)
@@ -84,7 +84,13 @@ Same contract as `CLAUDE.md`: query gbrain before architectural decisions and fo
 
 If gbrain is unreachable, continue with repo tools and record `gbrain-unavailable`. Do not invent coordination state.
 
-Tools: MCP `gbrain__search` and `gbrain__recall`. CLI: `gbrain search` and `gbrain query`. After a durable decision, write a short gbrain page. ruflo agentdb is swarm-session memory; gbrain is long-term founder memory.
+Tools (MCP server `gbrain`):
+
+- `query`: any natural-language or multi-concept question. Hybrid vector plus keyword; LLM expansion is off in brain config, so it costs no model call.
+- `search`: exact tokens only (JOV ids, slugs, file names, 1-3 distinctive words). Over MCP it is keyword-only (`search.mcp_keyword_only`), so a long multi-concept string returns 0 results even when matching pages exist. Treat that as a wrong-tool miss and rerun with `query`.
+- `get_page` for a known slug, `recall` for saved facts, and `code_def` / `code_callers` / `code_refs` / `code_blast` for code symbols before grep.
+
+Calls take 2-15s against the remote database, so one good `query` beats several `search` calls. CLI fallback (`gbrain search`, `gbrain query`) needs a hard timeout. After a durable decision, write a short gbrain page. To add to a large page, write a new dated page and link it. Do not rewrite the whole page. ruflo agentdb is swarm-session memory; gbrain is long-term founder memory.
 
 ## Skill File Hygiene
 

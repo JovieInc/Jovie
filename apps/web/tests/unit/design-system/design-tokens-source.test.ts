@@ -16,7 +16,7 @@ import {
  *    design/tokens.json — stale generated files fail CI.
  * 2. The gray scale must actually resolve app-wide: design-system.css must
  *    import the generated CSS that defines --gray1..12 (previously only
- *    defined in public/pitch/colors_and_type.css).
+ *    defined in the pitch deck's colors_and_type.css).
  * 3. No value divergence between the canonical source and the live emitter
  *    (design-system.css) for the accent palette — the source of truth and
  *    the shipped CSS may never disagree.

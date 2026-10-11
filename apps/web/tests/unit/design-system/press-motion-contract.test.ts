@@ -82,20 +82,11 @@ describe('shared press-motion contract', () => {
     'components/jovie/components/SlashCommandMenu.tsx',
     'components/jovie/components/ChatComposerToolbar.tsx',
     'components/jovie/components/ChatMessage.tsx',
-    'components/features/pricing/PricingCTA.tsx',
   ])('%s does not fork hardcoded press or hover scaling', relativePath => {
     const source = readWeb(relativePath);
 
     expect(source).not.toMatch(/active:scale-\[(?!var\(--scale-press\))/);
     expect(source).not.toMatch(/whileTap=\{\{\s*scale:/);
     expect(source).not.toMatch(/whileHover=\{\{\s*scale:/);
-  });
-
-  it('routes the representative standalone CTA through the shared Button primitive', () => {
-    const pricingCta = readWeb('components/features/pricing/PricingCTA.tsx');
-
-    expect(pricingCta).toContain("import { Button } from '@jovie/ui'");
-    expect(pricingCta).toContain('<Button');
-    expect(pricingCta).not.toContain('<motion.button');
   });
 });

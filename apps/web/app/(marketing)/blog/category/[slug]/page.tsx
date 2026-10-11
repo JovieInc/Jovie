@@ -42,13 +42,13 @@ export async function generateMetadata({ params }: CategoryPageProps) {
   }
 
   return {
-    title: `${category.name} — Blog`,
+    title: `${category.name} | Blog`,
     description: category.description,
     alternates: {
       canonical: `${BASE_URL}/blog/category/${slug}`,
     },
     openGraph: {
-      title: `${category.name} — Jovie Blog`,
+      title: `${category.name} | Jovie Blog`,
       description: category.description,
       url: `${BASE_URL}/blog/category/${slug}`,
     },

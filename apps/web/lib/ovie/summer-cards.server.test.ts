@@ -47,6 +47,7 @@ const input = summerCardInputSchema.parse({
   body: 'Renew jov.ie for one year.',
   recommendation: 'Approve',
   amountUsd: 12.5,
+  preflightReceiptId: 'spf_0123456789abcdef0123456789abcdef',
 });
 
 function stored(overrides: Record<string, unknown> = {}) {
@@ -62,6 +63,7 @@ function stored(overrides: Record<string, unknown> = {}) {
     defaultIfSilent: null,
     recipient: null,
     amountUsd: 12.5,
+    preflightReceiptId: input.preflightReceiptId,
     evidence: [],
     status: 'pending',
     comment: null,

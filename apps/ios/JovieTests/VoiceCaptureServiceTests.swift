@@ -488,6 +488,32 @@ struct VoiceCaptureServiceTests {
     #expect(viewModel.currentWordIndex == 2)
   }
 
+  // JOV-5343: the bottom control sheet must stay a fixed 2×3 thumb cluster
+  // for one-hand use, built only from controls the overlay already owns.
+  @Test func vlogControlSheetKeepsTwoByThreeThumbClusterPerMode() {
+    for mode in TeleprompterContentMode.allCases {
+      let rows = TeleprompterControlSheet.cluster(for: mode)
+      #expect(rows.count == TeleprompterControlSheet.clusterRowCount)
+      #expect(rows.allSatisfy { $0.count == TeleprompterControlSheet.clusterColumnCount })
+      // Every mode keeps one-hand access to peek, grid, and close.
+      #expect(rows.flatMap { $0 }.contains(.peek))
+      #expect(rows.flatMap { $0 }.contains(.grid))
+      #expect(rows.flatMap { $0 }.contains(.close))
+    }
+
+    let scriptControls = TeleprompterControlSheet.cluster(for: .script).flatMap { $0 }
+    #expect(scriptControls.contains(.editScript))
+    #expect(scriptControls.contains(.presentation))
+    #expect(scriptControls.contains(.speedOverride))
+
+    // Prompt mode moves the feedback pair into the same cluster slots and
+    // keeps a path back to script mode.
+    let promptControls = TeleprompterControlSheet.cluster(for: .prompt).flatMap { $0 }
+    #expect(promptControls.contains(.usefulFeedback))
+    #expect(promptControls.contains(.passFeedback))
+    #expect(promptControls.contains(.scriptMode))
+  }
+
   @Test func landscapeScriptRegionStaysCompactSoControlsRemain() {
     #expect(
       TeleprompterCaptureOrientation.scriptRegionHeight(

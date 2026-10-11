@@ -198,7 +198,7 @@ function hasAuditedOverlayDeclaration(content) {
   )
     return false;
   return Object.entries({
-    position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]',
+    position: 'fixed left-1/2 top-1/2 z-modal [translate:-50%_-50%]',
     layout:
       'grid max-h-overlay-viewport w-overlay-viewport max-w-lg gap-5 overflow-y-auto overscroll-contain',
   }).every(([name, value]) => {

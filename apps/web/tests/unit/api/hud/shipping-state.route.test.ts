@@ -4,11 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockAuthorizeHud = vi.hoisted(() => vi.fn());
 const mockPublish = vi.hoisted(() => vi.fn());
 const mockReadCached = vi.hoisted(() => vi.fn());
+const mockHasCached = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
 const mockCreateLiveReaders = vi.hoisted(() => vi.fn());
 const mockDefaultLiveIo = vi.hoisted(() => vi.fn());
-const mockReadFile = vi.hoisted(() => vi.fn());
+const mockFetch = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/hud', () => ({
   authorizeHud: mockAuthorizeHud,
@@ -24,6 +25,7 @@ vi.mock('@/lib/ovie/shipping-state', async importOriginal => {
 });
 
 vi.mock('@/lib/ovie/shipping-state/configured.server', () => ({
+  hasCachedConfiguredShippingState: mockHasCached,
   publishConfiguredShippingState: mockPublish,
   readCachedConfiguredShippingState: mockReadCached,
 }));
@@ -59,10 +61,8 @@ describe('GET /api/hud/shipping-state', () => {
     vi.resetModules();
     vi.clearAllMocks();
     mockCreateLiveReaders.mockReturnValue({});
-    mockDefaultLiveIo.mockReturnValue({
-      readFile: mockReadFile,
-      fetch: vi.fn(),
-    });
+    mockDefaultLiveIo.mockReturnValue({ fetch: mockFetch });
+    mockHasCached.mockReturnValue(true);
     mockReadCached.mockReturnValue({
       schema: 'ovie.shipping-state.v1',
       state: 'fresh',
@@ -87,7 +87,7 @@ describe('GET /api/hud/shipping-state', () => {
     expect(mockReadCached).not.toHaveBeenCalled();
   });
 
-  it('rejects path and actuation query parameters without reading files or dispatching', async () => {
+  it('rejects path and actuation query parameters without reading sources or dispatching', async () => {
     mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
     const { GET } = await import('@/app/api/hud/shipping-state/route');
     const response = await GET(
@@ -101,7 +101,7 @@ describe('GET /api/hud/shipping-state', () => {
     });
     expect(mockPublish).not.toHaveBeenCalled();
     expect(mockReadCached).not.toHaveBeenCalled();
-    expect(mockReadFile).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('returns the local projection without waiting for reconciliation', async () => {
@@ -121,6 +121,42 @@ describe('GET /api/hud/shipping-state', () => {
     expect(mockPublish).toHaveBeenCalledTimes(1);
   });
 
+  it('measures inline on a cold instance instead of serving an unknown shell', async () => {
+    mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
+    mockHasCached.mockReturnValue(false);
+    mockPublish.mockResolvedValue({
+      schema: 'ovie.shipping-state.v1',
+      state: 'fresh',
+      delivery: { mergeQueueDepth: { state: 'measured-nonzero', value: 4 } },
+    });
+    const { GET } = await import('@/app/api/hud/shipping-state/route');
+    const response = await GET(
+      new NextRequest('http://localhost/api/hud/shipping-state')
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toMatchObject({
+      state: 'fresh',
+      delivery: { mergeQueueDepth: { value: 4 } },
+    });
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+    expect(mockReadCached).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 when the cold-instance measurement throws', async () => {
+    mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
+    mockHasCached.mockReturnValue(false);
+    mockPublish.mockRejectedValue(new Error('boom'));
+    const { GET } = await import('@/app/api/hud/shipping-state/route');
+    const response = await GET(
+      new NextRequest('http://localhost/api/hud/shipping-state')
+    );
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      state: 'unavailable',
+    });
+  });
+
   it('serves per-source freshness read-only, never coercing stale or unknown to healthy', async () => {
     mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
     mockReadCached.mockReturnValue({
@@ -129,14 +165,14 @@ describe('GET /api/hud/shipping-state', () => {
       publishing: true,
       latencyMs: 12,
       sources: {
-        'fleet-receipt': {
-          sourceId: 'fleet-receipt',
+        'lanes-status': {
+          sourceId: 'lanes-status',
           state: 'stale',
           observedAt: '2026-09-03T00:00:00.000Z',
           freshnessDeadline: '2026-09-03T00:10:00.000Z',
         },
-        'symphony-runtime': {
-          sourceId: 'symphony-runtime',
+        'summer-runtime': {
+          sourceId: 'summer-runtime',
           state: 'unknown',
           observedAt: null,
           freshnessDeadline: null,
@@ -150,14 +186,14 @@ describe('GET /api/hud/shipping-state', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     const body = await response.json();
-    expect(body.sources['fleet-receipt'].state).toBe('stale');
-    expect(body.sources['fleet-receipt'].freshnessDeadline).toBe(
+    expect(body.sources['lanes-status'].state).toBe('stale');
+    expect(body.sources['lanes-status'].freshnessDeadline).toBe(
       '2026-09-03T00:10:00.000Z'
     );
-    expect(body.sources['symphony-runtime'].state).toBe('unknown');
-    expect(body.sources['symphony-runtime'].observedAt).toBeNull();
+    expect(body.sources['summer-runtime'].state).toBe('unknown');
+    expect(body.sources['summer-runtime'].observedAt).toBeNull();
     expect(mockReadCached).toHaveBeenCalledTimes(1);
-    expect(mockReadFile).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('does not export actuation methods', async () => {

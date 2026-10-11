@@ -168,7 +168,19 @@ export function createInitialChatTimelineState(
 export function selectRenderableMessages(
   state: ChatTimelineState
 ): readonly ChatTimelineMessage[] {
-  return state.messages;
+  // A failed turn retains its diagnostic state for recovery. ErrorDisplay owns
+  // that diagnostic; an empty assistant row is not an answer or a loading row.
+  return state.messages.some(isEmptyFailedAssistant)
+    ? state.messages.filter(message => !isEmptyFailedAssistant(message))
+    : state.messages;
+}
+
+function isEmptyFailedAssistant(message: ChatTimelineMessage): boolean {
+  return (
+    message.role === 'assistant' &&
+    message.status === 'failed' &&
+    message.parts.length === 0
+  );
 }
 
 export function reduceChatTimeline(
@@ -492,10 +504,6 @@ function failTurn(
         ? {
             ...message,
             status: 'failed',
-            parts:
-              message.role === 'assistant' && message.parts.length === 0
-                ? failureParts(event.error)
-                : message.parts,
             failedReason: event.error,
             requestId: event.requestId ?? message.requestId,
             updatedAt: now,
@@ -503,15 +511,6 @@ function failTurn(
         : message
     ),
   };
-}
-
-function failureParts(error: string): MessagePart[] {
-  return [
-    {
-      type: 'text',
-      text: error || 'Jovie could not complete that response. Please retry.',
-    } as MessagePart,
-  ];
 }
 
 function updateAssistantMessage(

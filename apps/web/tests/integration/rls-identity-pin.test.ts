@@ -1,10 +1,10 @@
-import { Pool } from '@neondatabase/serverless';
+import { neon, Pool } from '@neondatabase/serverless';
 /* eslint-disable @jovie/no-manual-db-pooling -- Distinct pooled clients for identity-bleed proof */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setupDatabase } from '../setup-db';
 
 const databaseUrl = process.env.DATABASE_URL;
-const describeRlsPin = databaseUrl ? describe : describe.skip;
+const describeRlsPin = describe.skipIf(!databaseUrl);
 
 describeRlsPin('RLS identity pin on real Postgres (JOV-6267)', () => {
   let pool: Pool;
@@ -77,6 +77,54 @@ describeRlsPin('RLS identity pin on real Postgres (JOV-6267)', () => {
     } finally {
       clientA.release();
       clientB.release();
+    }
+  });
+
+  it('cancels bounded SQL and leaves the pooled connection usable', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("SET statement_timeout = '50ms'");
+      await expect(client.query('SELECT pg_sleep(0.2)')).rejects.toThrow(
+        /canceling statement/i
+      );
+      await client.query('RESET statement_timeout');
+      expect((await client.query('SELECT 1 AS ok')).rows[0]?.ok).toBe(1);
+    } finally {
+      await client.query('RESET statement_timeout').catch(() => undefined);
+      client.release();
+    }
+  });
+
+  it('measures HTTP as a deferred stateless transport frontier', async () => {
+    const http = neon(databaseUrl!);
+    const measure = async (query: () => Promise<unknown>) => {
+      const startedAt = performance.now();
+      for (let sample = 0; sample < 5; sample += 1) await query();
+      return Number((performance.now() - startedAt).toFixed(1));
+    };
+
+    const client = await pool.connect();
+    try {
+      const websocketMs = await measure(() => client.query('SELECT 1'));
+      const httpMs = await measure(() => http`SELECT 1`);
+      await expect(
+        http`SELECT * FROM jov_4195_missing_table`
+      ).rejects.toThrow();
+      console.info(
+        JSON.stringify({
+          decision: 'defer',
+          frontier: 'neon-http',
+          samples: 5,
+          websocketMs,
+          httpMs,
+          reEvaluateWhen: 'stateless query transport is a measured bottleneck',
+          rollback: 'retain the canonical pooled WebSocket interface',
+        })
+      );
+      expect(websocketMs).toBeGreaterThan(0);
+      expect(httpMs).toBeGreaterThan(0);
+    } finally {
+      client.release();
     }
   });
 });

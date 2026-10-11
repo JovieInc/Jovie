@@ -7,7 +7,9 @@ import {
   VENDOR_NAMES,
 } from '../changelog-filter-rules';
 import {
+  changelogAnchorId,
   changelogInlineText,
+  changelogVersionLabel,
   parseChangelog,
   parseChangelogDocument,
   parseChangelogInline,
@@ -567,5 +569,108 @@ describe('parseChangelogInline', () => {
     expect(parseChangelogInline('Visit `/pitch today')).toEqual([
       { type: 'text', value: 'Visit /pitch today' },
     ]);
+  });
+});
+
+describe('### Dogfood section', () => {
+  const DOGFOOD_CHANGELOG = `# Changelog
+
+## [3.0.0] - 2026-09-01
+
+### Fixed
+
+- Sign-in recovers after a canceled prompt
+
+### Dogfood
+
+- Open the Mac app and wait for the What's New banner
+- [internal] Check the staging flag
+
+## [2.9.0] - 2026-08-01
+
+### Dogfood
+
+- Only a hint, no customer entries
+`;
+
+  it('collects public dogfood bullets without adding customer entries', () => {
+    const [release] = parseChangelog(DOGFOOD_CHANGELOG);
+    expect(release?.version).toBe('3.0.0');
+    expect(release?.sections.fixed).toEqual([
+      'Sign-in recovers after a canceled prompt',
+    ]);
+    expect(release?.dogfood).toEqual([
+      "Open the Mac app and wait for the What's New banner",
+    ]);
+  });
+
+  it('never publishes a release that only has dogfood bullets', () => {
+    expect(parseChangelog(DOGFOOD_CHANGELOG).map(r => r.version)).toEqual([
+      '3.0.0',
+    ]);
+  });
+
+  it('keeps dogfood bullets out of the email parser sections', async () => {
+    const script = (await import(
+      pathToFileURL(
+        resolve(
+          dirname(fileURLToPath(import.meta.url)),
+          '../../../../scripts/lib/changelog-parser.mjs'
+        )
+      ).href
+    )) as {
+      parseChangelog: (markdown: string) => {
+        releases: { sections: Record<string, string[]> }[];
+      };
+    };
+    const [release] = script.parseChangelog(DOGFOOD_CHANGELOG).releases;
+    expect(release?.sections).toEqual({
+      fixed: ['Sign-in recovers after a canceled prompt'],
+    });
+  });
+});
+
+describe('daily digest headings (JOV-5762)', () => {
+  const DAILY_CHANGELOG = `# Changelog
+
+## [2026-09-27]
+
+> You can find artists by searching your name.
+
+### Added
+
+- Open the homepage and search.
+
+<!-- daily-changelog-receipt/v1 {"schema":"daily-changelog-receipt/v1"} -->
+
+## [Unreleased]
+
+- [internal] pending note.
+
+## [26.9.15] - 2026-09-21
+
+### Fixed
+
+- Sign-in recovers after a canceled prompt.
+`;
+
+  it('parses a date-keyed digest as a public daily record, not a CalVer', () => {
+    const [digest, release] = parseChangelog(DAILY_CHANGELOG);
+    expect(digest).toMatchObject({
+      version: '2026-09-27',
+      kind: 'daily',
+      date: '2026-09-27',
+      summary: 'You can find artists by searching your name.',
+    });
+    expect(digest?.sections.added).toEqual(['Open the homepage and search.']);
+    expect(release?.kind).toBe('release');
+    expect(release?.version).toBe('26.9.15');
+  });
+
+  it('labels daily permalinks without a fake v prefix', () => {
+    expect(changelogVersionLabel('2026-09-27')).toBe('2026-09-27');
+    expect(changelogVersionLabel('26.9.15')).toBe('v26.9.15');
+    expect(changelogAnchorId('2026-09-27')).toBe('2026-09-27');
+    expect(changelogAnchorId('26.9.15')).toBe('v26.9.15');
   });
 });

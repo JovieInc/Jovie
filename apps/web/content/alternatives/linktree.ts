@@ -3,56 +3,103 @@ import type { AlternativeData } from './types';
 export const linktreeAlternative: AlternativeData = {
   slug: 'linktree',
   category: 'Linktree',
-  title: 'Best Linktree Alternative for Musicians (2026)',
+  title: 'A Linktree Alternative for Artists (2026)',
   metaDescription:
-    'Looking for a Linktree alternative built for musicians? Jovie gives you smart links, fan notifications, audience intelligence, and AI tools — not just a list of links.',
-  heroHeadline: 'The best Linktree alternative for musicians',
+    'Consider Jovie as a Linktree alternative for a public artist profile, release smart links, audience capture, and enrolled artist workflows.',
+  heroHeadline: 'A Linktree alternative for artists',
   heroSubheadline:
-    'Linktree gives you a list of links. Jovie gives you a release platform — smart links, fan data, notifications, and AI, built specifically for musicians.',
+    'Jovie combines a public artist profile, release smart links, and audience capture. Linktree also offers link pages, contact collection, subscriber notifications, music links, and analytics.',
+  heroImage: {
+    src: '/images/hero/alternatives-linktree.webp',
+    alt: 'Abstract pink light blooming through dark smoke.',
+  },
   whySwitch: [
-    'Linktree doesn\u2019t know you\u2019re a musician. It treats your Spotify link the same as a restaurant menu link.',
-    'No smart links — you manually create a new link for every release instead of Jovie auto-generating platform-routed links.',
-    'No fan collection — visitors click and leave. Jovie captures emails and builds your audience.',
-    'No release notifications — fans have to remember to check your page. Jovie notifies them automatically.',
-    'No career-aware AI — Jovie\u2019s AI knows your streams, tours, and collaborations.',
+    {
+      text: 'Consider Jovie if you want a public artist profile and release smart links in the same product.',
+      claimIds: ['jovie.public-profile', 'jovie.smart-links'],
+    },
+    {
+      text: 'Both products collect contacts. Jovie keeps audience capture connected to the artist profile workflow.',
+      claimIds: ['jovie.contact-collection', 'linktree.contact-collection'],
+    },
+    {
+      text: 'Both products support subscriber updates. Jovie fan notifications are available to enrolled artists.',
+      claimIds: ['jovie.fan-notifications', 'linktree.notifications'],
+    },
+    {
+      text: 'Both products provide analytics. Jovie advanced analytics require enrollment, while Linktree analytics depth varies by plan.',
+      claimIds: ['jovie.analytics', 'linktree.analytics'],
+    },
   ],
   highlights: [
     {
-      title: 'Auto-generated smart links',
+      title: 'Public artist profile',
       description:
-        'Add a release and Jovie creates a smart link that routes fans to Spotify, Apple Music, YouTube, or wherever they listen. One link, every platform.',
+        'Claim a Jovie profile for your work, links, and artist identity.',
+      claimIds: ['jovie.public-profile', 'jovie.free-profile'],
     },
     {
-      title: 'Fan notifications built in',
+      title: 'Release smart links',
       description:
-        'When you drop new music, Jovie notifies your fans automatically. No email service required — it\u2019s built into the platform.',
+        'Publish release links that remember a fan’s streaming-platform choice.',
+      claimIds: ['jovie.smart-links'],
     },
     {
-      title: 'Audience intelligence',
+      title: 'Audience capture',
       description:
-        'See who your fans are, where they came from, and how they engage. Collect emails and phone numbers directly from your profile.',
+        'Collect audience contacts from the public profile. Export and advanced CRM capabilities depend on plan access.',
+      claimIds: ['jovie.contact-collection', 'jovie.capability-access'],
     },
     {
-      title: 'AI that knows your career',
+      title: 'Enrolled artist workflows',
       description:
-        'Generate press releases, plan release strategy, and get insights powered by AI that has your actual data — not a blank prompt.',
+        'Eligible artists can use fan notifications, advanced analytics, and release-planning tools.',
+      claimIds: [
+        'jovie.fan-notifications',
+        'jovie.analytics',
+        'jovie.release-workspace',
+      ],
     },
   ],
   faq: [
     {
-      question: 'What is the best Linktree alternative for musicians?',
+      question: 'What should I look for in a Linktree alternative?',
       answer:
-        'Jovie is the best Linktree alternative for musicians because it\u2019s built specifically for music artists. Unlike Linktree, Jovie auto-generates smart links for releases, routes fans to streaming platforms, collects fan contacts, sends automatic release notifications, and includes AI tools that know your career data.',
+        'Compare the jobs you actually need. Linktree documents link pages, contact forms, subscriber notifications, music links, and analytics. Jovie combines a public artist profile, release smart links, audience capture, and enrolled artist workflows.',
+      claimIds: [
+        'jovie.public-profile',
+        'jovie.smart-links',
+        'jovie.contact-collection',
+        'jovie.capability-access',
+        'linktree.link-page',
+        'linktree.contact-collection',
+        'linktree.notifications',
+        'linktree.music-links',
+        'linktree.analytics',
+      ],
     },
     {
       question: 'Is Jovie free?',
       answer:
-        'Yes. Jovie has a free tier that includes a profile, smart links, and fan collection. Paid plans unlock advanced analytics, release notifications, and contact export.',
+        'Jovie offers a free public profile with audience capture. Paid and enrolled capabilities have separate access terms.',
+      claimIds: ['jovie.free-profile', 'jovie.capability-access'],
     },
     {
       question: 'Can I use Jovie instead of Linktree?',
       answer:
-        'Yes. Your Jovie profile at jov.ie/username replaces your Linktree. It does everything Linktree does (link-in-bio and analytics) plus music-specific features like smart links, fan notifications, and release automation.',
+        'Yes, if Jovie covers the workflow you need. Claim a profile, add your public links, and verify access to any enrolled artist capabilities before switching your bio URL.',
+      claimIds: ['jovie.public-profile', 'jovie.capability-access'],
     },
+  ],
+  claimIds: [
+    'jovie.public-profile',
+    'jovie.smart-links',
+    'jovie.contact-collection',
+    'jovie.capability-access',
+    'linktree.link-page',
+    'linktree.contact-collection',
+    'linktree.notifications',
+    'linktree.music-links',
+    'linktree.analytics',
   ],
 };

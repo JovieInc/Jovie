@@ -43,6 +43,7 @@ const THEME_SWITCHING_ROUTE_POLICY = {
     '/waitlist',
     '/compare',
     '/alternatives',
+    '/solutions',
     '/blog',
     '/changelog',
     '/renders',

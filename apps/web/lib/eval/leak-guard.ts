@@ -274,13 +274,15 @@ function guardTextPromise(
   textPromise: PromiseLike<string>,
   context: LeakGuardContext
 ): Promise<string> {
-  return Promise.resolve(textPromise).then(text => {
+  const guardedText = Promise.resolve(textPromise).then(text => {
     if (typeof text !== 'string') {
       return text;
     }
 
     return guardModelOutput(text, context).text;
   });
+  void guardedText.catch(() => undefined);
+  return guardedText;
 }
 
 function createGuardedTextStream(
@@ -422,15 +424,27 @@ type StreamObjectGuardableResult = {
   readonly textStream: AsyncIterableStream<string>;
 };
 
-function hasStreamTextGuardSurface(
+function readStreamTextGuardSurface(
   result: Partial<StreamTextGuardableResult>
-): result is StreamTextGuardableResult {
-  return (
-    result.text !== undefined &&
-    result.textStream !== undefined &&
-    result.fullStream !== undefined &&
-    typeof result.toUIMessageStream === 'function'
-  );
+): StreamTextGuardableResult | null {
+  const text = result.text;
+  const textStream = result.textStream;
+  const fullStream = result.fullStream;
+  const toUIMessageStream = result.toUIMessageStream;
+  if (
+    text === undefined ||
+    textStream === undefined ||
+    fullStream === undefined ||
+    typeof toUIMessageStream !== 'function'
+  ) {
+    return null;
+  }
+  return {
+    text,
+    textStream,
+    fullStream,
+    toUIMessageStream: toUIMessageStream.bind(result),
+  };
 }
 
 export function wrapStreamTextResult<TResult>(
@@ -438,17 +452,20 @@ export function wrapStreamTextResult<TResult>(
   context: LeakGuardContext
 ): TResult {
   const result = streamResult as TResult & Partial<StreamTextGuardableResult>;
-  if (!hasStreamTextGuardSurface(result)) {
+  const surface = readStreamTextGuardSurface(result);
+  if (!surface) {
     return streamResult;
   }
 
-  const guardedText = guardTextPromise(result.text, context);
-  const guardedTextStream = createGuardedTextStream(result.textStream, context);
-  const guardedFullStream = createGuardedDeltaStream(
-    result.fullStream,
+  const guardedText = guardTextPromise(surface.text, context);
+  const guardedTextStream = createGuardedTextStream(
+    surface.textStream,
     context
   );
-  const originalToUIMessageStream = result.toUIMessageStream.bind(result);
+  const guardedFullStream = createGuardedDeltaStream(
+    surface.fullStream,
+    context
+  );
 
   return Object.create(result, {
     text: { value: guardedText },
@@ -456,7 +473,7 @@ export function wrapStreamTextResult<TResult>(
     fullStream: { value: guardedFullStream },
     toUIMessageStream: {
       value: (...args: unknown[]) =>
-        createGuardedDeltaStream(originalToUIMessageStream(...args), context),
+        createGuardedDeltaStream(surface.toUIMessageStream(...args), context),
     },
   }) as TResult;
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
+import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 import { AboutSection } from '../AboutSection';
@@ -12,6 +13,10 @@ export interface AboutViewProps {
   readonly allowPhotoDownloads?: boolean;
   /** Entity-linked segments for the artist bio (computed server-side). */
   readonly bioSegments?: readonly EntityMentionSegment[];
+  /** Entity-linked selected-credits paragraph (computed server-side). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
+  /** Public booking/contact entries shown on the About destination. */
+  readonly contacts?: readonly PublicContact[];
 }
 
 /**
@@ -25,6 +30,8 @@ export function AboutView({
   pressPhotos,
   allowPhotoDownloads,
   bioSegments,
+  creditSegments,
+  contacts,
 }: AboutViewProps) {
   return (
     <AboutSection
@@ -33,6 +40,8 @@ export function AboutView({
       pressPhotos={pressPhotos}
       allowPhotoDownloads={allowPhotoDownloads}
       bioSegments={bioSegments}
+      creditSegments={creditSegments}
+      contacts={contacts}
     />
   );
 }

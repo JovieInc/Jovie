@@ -113,6 +113,8 @@ function main(): void {
     branchName,
     prTitle: resolvedTitle,
     prBody: resolvedBody,
+    prAuthor: process.env.PR_AUTHOR,
+    approvedBy: process.env.PR_APPROVED_BY,
   });
 
   console.log(buildBugToTestPrSection(evaluation));

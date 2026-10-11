@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { SupportPageContent } from '@/components/organisms/SupportPageContent';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { SUPPORT_FAQ_ITEMS, SUPPORT_SEO_COPY } from '@/data/supportCopy';
-import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
+import { SUPPORT_SEO_COPY } from '@/data/supportCopy';
+import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 
 export const metadata: Metadata = {
   title: 'Support',
@@ -21,7 +21,6 @@ export const metadata: Metadata = {
 
 export const revalidate = false;
 
-const FAQ_SCHEMA = buildFaqSchema([...SUPPORT_FAQ_ITEMS]);
 const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
   { name: APP_NAME, url: BASE_URL },
   { name: 'Support', url: `${BASE_URL}/support` },
@@ -30,7 +29,6 @@ const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
 export default function SupportPage() {
   return (
     <>
-      <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
       <SupportPageContent />
     </>

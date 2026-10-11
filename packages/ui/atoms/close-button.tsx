@@ -12,10 +12,10 @@ export const closeButtonStyles = {
   base: 'absolute right-4 top-4 inline-flex size-9 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle ease-subtle before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] motion-reduce:transition-none',
   hover: 'hover:bg-interactive-hover hover:text-primary-token',
   focus:
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/55 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
   disabled:
     'disabled:pointer-events-none disabled:text-(--color-text-disabled-token) disabled:opacity-[var(--state-disabled-opacity)]',
-  offset: 'ring-offset-(--linear-bg-page)',
+  offset: 'ring-offset-surface-page',
 } as const;
 
 /**

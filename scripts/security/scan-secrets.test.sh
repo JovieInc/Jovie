@@ -13,7 +13,7 @@ cat >"$BIN_DIR/git" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >>"$GIT_CALLS"
-if [[ " $* " == *" fetch "* && "${SCAN_TEST_SCENARIO:-}" == "repair-failure" ]]; then
+if [[ " $* " == *" fetch "* && "${SCAN_TEST_SCENARIO:-}" =~ ^(repair-failure|gitleaks-repair-failure)$ ]]; then
   exit 42
 fi
 case "${1:-}" in
@@ -96,6 +96,26 @@ cat >"$BIN_DIR/gitleaks" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >>"$GITLEAKS_CALLS"
+count="$(wc -l <"$GITLEAKS_CALLS")"
+case "${SCAN_TEST_SCENARIO:-}" in
+  gitleaks-corruption | gitleaks-unrepaired | gitleaks-repair-failure)
+    if [[ "$SCAN_TEST_SCENARIO" != gitleaks-corruption || $count -eq 1 ]]; then
+      echo '12:00PM ERR [git] fatal: unable to read tree (0123456789abcdef0123456789abcdef01234567)' >&2
+      echo '12:00PM ERR failed to scan Git repository error="stderr is not empty"' >&2
+      echo '12:00PM INF no leaks found' >&2
+    fi
+    ;;
+  gitleaks-incomplete)
+    echo '12:00PM ERR failed to start scan: permission denied' >&2
+    ;;
+  gitleaks-finding)
+    echo '12:00PM WRN leaks found: 1' >&2
+    exit 1
+    ;;
+  gitleaks-exit-error)
+    exit 42
+    ;;
+esac
 EOF
 
 chmod +x "$BIN_DIR/git" "$BIN_DIR/trufflehog" "$BIN_DIR/gitleaks"
@@ -104,6 +124,61 @@ fail() {
   echo "FAIL: $*" >&2
   exit 1
 }
+
+# Gitleaks 8.21.2 can emit a Git reader error and still exit 0 with
+# "no leaks found". Exercise the shipped script, including bounded repair.
+run_gitleaks_scenario() {
+  local scenario="$1" mode="${2:-publication}" status=0
+  export SCAN_TEST_SCENARIO="$scenario"
+  export GIT_CALLS="$TEST_ROOT/$scenario.$mode.git-calls"
+  export GITLEAKS_CALLS="$TEST_ROOT/$scenario.$mode.gitleaks-calls"
+  export TRUFFLEHOG_COUNT="$TEST_ROOT/$scenario.$mode.trufflehog-count"
+  export SECRET_SCAN_REMOTE_CURRENT_REF='refs/pull/14493/head'
+  export SECRET_SCAN_REMOTE_CURRENT_SHA='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  export SECRET_SCAN_REMOTE_BASE_SHA='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+  : >"$GIT_CALLS"
+  : >"$GITLEAKS_CALLS"
+  PATH="$BIN_DIR:$PATH" GITLEAKS_BIN="$BIN_DIR/gitleaks" TRUFFLEHOG_BIN="$BIN_DIR/trufflehog" \
+    bash "$SCAN_SCRIPT" "$mode" origin/main >"$TEST_ROOT/$scenario.$mode.output" 2>&1 || status=$?
+  printf '%s\n' "$status"
+}
+
+for mode in publication ci-pr full; do
+  status="$(run_gitleaks_scenario gitleaks-corruption "$mode")"
+  [[ $status -eq 0 ]] || fail "Gitleaks checkout recovery failed in $mode: $status"
+  [[ "$(wc -l <"$TEST_ROOT/gitleaks-corruption.$mode.gitleaks-calls")" -eq 2 ]] \
+    || fail 'Gitleaks corruption must retry exactly once'
+  [[ "$(grep -c '^fetch ' "$TEST_ROOT/gitleaks-corruption.$mode.git-calls")" -eq 1 ]] \
+    || fail 'Gitleaks recovery must use one successful fetch'
+  grep -q '+refs/pull/14493/head:refs/secret-scan/repair-current' "$TEST_ROOT/gitleaks-corruption.$mode.git-calls" \
+    || fail 'Gitleaks recovery must fetch the stable source ref'
+
+  status="$(run_gitleaks_scenario gitleaks-unrepaired "$mode")"
+  [[ $status -ne 0 ]] || fail "Gitleaks incomplete scan must fail closed in $mode"
+  [[ "$(wc -l <"$TEST_ROOT/gitleaks-unrepaired.$mode.gitleaks-calls")" -eq 2 ]] \
+    || fail 'Gitleaks recovery must stop after one retry'
+  grep -q 'Secret scan incomplete' "$TEST_ROOT/gitleaks-unrepaired.$mode.output" \
+    || fail 'Gitleaks failed recovery must explain the incomplete scan'
+  if grep -q 'PASS: secret scan' "$TEST_ROOT/gitleaks-unrepaired.$mode.output"; then
+    fail 'incomplete Gitleaks scan must not publish a success receipt'
+  fi
+done
+
+for scenario in gitleaks-incomplete gitleaks-finding gitleaks-exit-error gitleaks-repair-failure; do
+  status="$(run_gitleaks_scenario "$scenario")"
+  [[ $status -ne 0 ]] || fail "$scenario must fail the scan"
+  [[ "$(wc -l <"$TEST_ROOT/$scenario.publication.gitleaks-calls")" -eq 1 ]] \
+    || fail "$scenario must not retry the scanner"
+  if [[ "$scenario" != gitleaks-repair-failure ]]; then
+    [[ "$(grep -c '^fetch ' "$TEST_ROOT/$scenario.publication.git-calls" || true)" -eq 0 ]] \
+      || fail "$scenario must not repair the checkout"
+  fi
+  if [[ "$scenario" == gitleaks-finding ]]; then
+    [[ $status -eq 1 ]] || fail 'Gitleaks findings must preserve their exit status'
+  elif [[ "$scenario" == gitleaks-exit-error ]]; then
+    [[ $status -eq 42 ]] || fail 'Gitleaks errors must preserve their exit status'
+  fi
+done
 
 run_scenario() {
   local scenario="$1"
@@ -268,5 +343,77 @@ status="$(run_full_scenario full-blocked "$FULL_BLOCKED_COMMIT")"
   || fail "non-allowlisted full-history findings must still fail: $status"
 
 bash "$REPO_ROOT/scripts/security/prepare-ci-secret-scan-range.test.sh"
+
+# JOV-6809: a transient download failure (curl 35 connection reset on
+# ubuntu-latest) must be retried, not fail the scan outright. Stub curl to
+# fail the first attempt then succeed; stub tar to lay down a no-op binary.
+# A restricted PATH keeps real gitleaks/trufflehog installs from
+# short-circuiting the download path.
+DL_BIN="$TEST_ROOT/dl-bin"
+DL_TMP="$TEST_ROOT/dl-tmp"
+mkdir -p "$DL_BIN" "$DL_TMP"
+cat >"$DL_BIN/curl" <<'EOF'
+#!/usr/bin/env bash
+count=0
+[[ -f "$CURL_COUNT" ]] && count="$(cat "$CURL_COUNT")"
+count=$((count + 1))
+printf '%s\n' "$count" >"$CURL_COUNT"
+if [[ "${CURL_ALWAYS_FAIL:-}" == "1" || $count -eq 1 ]]; then
+  echo "curl: (35) Recv failure: Connection reset by peer" >&2
+  exit 35
+fi
+out=''
+prev=''
+for arg in "$@"; do
+  [[ "$prev" == '-o' ]] && out="$arg"
+  prev="$arg"
+done
+printf 'fake-tarball' >"$out"
+EOF
+cat >"$DL_BIN/tar" <<'EOF'
+#!/usr/bin/env bash
+dest=''
+prev=''
+for arg in "$@"; do
+  [[ "$prev" == '-C' ]] && dest="$arg"
+  prev="$arg"
+done
+member="${!#}"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$dest/$member"
+EOF
+chmod +x "$DL_BIN/curl" "$DL_BIN/tar"
+
+export CURL_COUNT="$TEST_ROOT/download.curl-count"
+: >"$CURL_COUNT"
+status=0
+# CI exports TRUFFLEHOG_BIN for the installed-binary regression run; the
+# download path must be exercised without either scanner env override.
+PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$DL_TMP" SCAN_SECRETS_RETRY_DELAY=0 \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= \
+  bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download.output" 2>&1 \
+  || status=$?
+[[ $status -eq 0 ]] \
+  || fail "transient download failure must be retried to success: $status"
+[[ "$(cat "$CURL_COUNT")" -eq 3 ]] \
+  || fail 'expected 1 failed attempt + 2 successful downloads (gitleaks, trufflehog)'
+grep -q 'download attempt 1 failed; retrying' "$TEST_ROOT/download.output" \
+  || fail 'download retry must log the retry'
+grep -q 'PASS: secret scan' "$TEST_ROOT/download.output" \
+  || fail 'scan must still pass after a retried download'
+
+# Exhausted retries still fail the scan with an explicit classification.
+mkdir -p "$TEST_ROOT/dl-tmp2"
+: >"$CURL_COUNT"
+status=0
+PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp2" \
+  SCAN_SECRETS_RETRY_DELAY=0 CURL_ALWAYS_FAIL=1 \
+  GITLEAKS_BIN= TRUFFLEHOG_BIN= \
+  bash "$SCAN_SCRIPT" pre-commit >"$TEST_ROOT/download-fail.output" 2>&1 \
+  || status=$?
+[[ $status -ne 0 ]] || fail 'exhausted download retries must fail the scan'
+[[ "$(cat "$CURL_COUNT")" -eq 3 ]] \
+  || fail 'download must stop after exactly 3 attempts'
+grep -q 'Secret scanner download failed' "$TEST_ROOT/download-fail.output" \
+  || fail 'download failure must emit an explicit CI classification'
 
 echo 'PASS: scan-secrets corruption recovery regression tests'

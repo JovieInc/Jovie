@@ -441,8 +441,8 @@ export function MetadataAgentPanel({
         <div
           className={`mt-4 rounded-lg border px-3 py-2 text-sm ${
             storageAvailable
-              ? 'border-red-200 bg-red-50 text-red-700'
-              : 'border-amber-200 bg-amber-50 text-amber-700'
+              ? 'border-error/20 bg-error-subtle text-error'
+              : 'border-warning/20 bg-warning-subtle text-warning'
           }`}
         >
           {error}
@@ -450,9 +450,9 @@ export function MetadataAgentPanel({
       ) : null}
 
       {hasBlockingFields ? (
-        <div className='mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3'>
-          <p className='text-sm font-medium text-amber-900'>Missing Fields</p>
-          <ul className='mt-2 space-y-2 text-sm text-amber-950'>
+        <div className='mt-4 rounded-lg border border-warning/20 bg-warning-subtle p-3'>
+          <p className='text-sm font-medium text-warning'>Missing Fields</p>
+          <ul className='mt-2 space-y-2 text-sm text-primary-token'>
             {latestRequest?.missingFields.map(missingField => (
               <li key={`${missingField.field}-${missingField.reason}`}>
                 <span className='font-medium'>
@@ -484,7 +484,7 @@ export function MetadataAgentPanel({
               </p>
             ) : null}
             {latestRequest.lastError ? (
-              <p className='mt-2 text-xs text-red-600'>
+              <p className='mt-2 text-xs text-error'>
                 {latestRequest.lastError}
               </p>
             ) : null}
@@ -531,7 +531,7 @@ export function MetadataAgentPanel({
               </ul>
             )}
             {openIssues.length === 0 && latestRequest.status === 'live' && (
-              <p className='mt-3 text-sm text-emerald-700'>
+              <p className='mt-3 text-sm text-success'>
                 No open drift issues on the latest snapshot.
               </p>
             )}

@@ -8,7 +8,7 @@ import {
   TableRoot,
   TableRow,
 } from '@/components/organisms/table';
-import { rowState } from '@/components/organisms/table/table.styles';
+import { presets, rowState } from '@/components/organisms/table/table.styles';
 import { cn } from '@/lib/utils';
 
 export function InvestorTable({
@@ -19,8 +19,11 @@ export function InvestorTable({
   minWidth?: string;
 }>) {
   return (
-    <div className='overflow-x-auto'>
-      <TableRoot className={cn('w-full border-collapse text-app', minWidth)}>
+    <div className='w-full min-w-0 overflow-x-auto'>
+      <TableRoot
+        rowMode='two-line'
+        className={cn('w-full border-collapse text-app', minWidth)}
+      >
         {children}
       </TableRoot>
     </div>
@@ -75,8 +78,8 @@ export function InvestorTableRow({
   return (
     <TableRow
       className={cn(
+        presets.tableRow,
         'border-b border-subtle bg-transparent',
-        rowState.base,
         rowState.hover
       )}
     >
@@ -89,14 +92,17 @@ export function InvestorTableCell({
   children,
   align = 'left',
   className,
+  multiline = false,
 }: Readonly<{
   children: ReactNode;
   align?: 'left' | 'right';
   className?: string;
+  multiline?: boolean;
 }>) {
   return (
     <TableCell
       align={align}
+      multiline={multiline}
       className={cn('px-3 py-1 align-middle', className)}
     >
       {children}

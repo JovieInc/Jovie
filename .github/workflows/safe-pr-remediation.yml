@@ -4,7 +4,9 @@ name: Safe PR Remediation
 # Dependabot PRs: the isolated Eve lockfile (Eve Pilot failures) and the root
 # workspace lockfile (CI ERR_PNPM_OUTDATED_LOCKFILE, e.g. PR #18250). An
 # ERR_PNPM_LOCKFILE_CONFIG_MISMATCH (pnpm.overrides drift, e.g. PR #18247) is
-# refused with an error: overrides are deliberate pins and are never rewritten.
+# refused with a warning annotation: overrides are deliberate pins and are
+# never rewritten. The refusal is an expected policy outcome, so the step
+# stays green instead of paging main-failure intake on every Dependabot retry.
 # Planning never executes PR code. The prepare job executes an allowlisted
 # Dependabot-only diff with a read-only token and no repository/model secrets.
 # The writer never executes PR code and commits one attested lockfile through
@@ -13,7 +15,7 @@ name: Safe PR Remediation
 
 on:
   workflow_run:
-    workflows: ['Eve Pilot', 'CI']
+    workflows: ['Eve Pilot']
     types: [completed]
 
 permissions: {}
@@ -80,7 +82,7 @@ jobs:
         with:
           version: 9.15.9
       - name: Setup Node.js 24
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: pnpm
@@ -152,7 +154,7 @@ jobs:
           path: candidate
           persist-credentials: false
       - name: Download immutable generated artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
           path: ${{ runner.temp }}/safe-remediation
@@ -164,7 +166,7 @@ jobs:
         with:
           version: 9.15.9
       - name: Setup Node.js 24
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: pnpm
@@ -215,7 +217,7 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Download immutable generated artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
           path: ${{ runner.temp }}/safe-remediation

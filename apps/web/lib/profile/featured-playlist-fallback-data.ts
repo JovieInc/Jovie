@@ -42,6 +42,18 @@ export function getFeaturedPlaylistFallbackCandidate(
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * Playlist context for song listen links (JOV-6765): the artist's confirmed
+ * "This Is"-style Spotify playlist, used to open track URLs inside playlist
+ * context so autoplay continues with the same artist.
+ */
+export function getListenPlaylistContext(
+  settings: Record<string, unknown> | null | undefined
+): { spotifyPlaylist: string } | null {
+  const confirmed = getConfirmedFeaturedPlaylistFallback(settings);
+  return confirmed ? { spotifyPlaylist: confirmed.playlistId } : null;
+}
+
 export function getConfirmedFeaturedPlaylistFallback(
   settings: Record<string, unknown> | null | undefined
 ): ConfirmedFeaturedPlaylistFallback | null {

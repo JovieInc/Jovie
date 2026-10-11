@@ -51,7 +51,7 @@
       "intent": "Deterministic style and server-boundary checks on changed files.",
       "hardBlock": true,
       "preCommit": {
-        "web": "pnpm exec lint-staged (biome + eslint server-boundaries)",
+        "web": "pnpm exec lint-staged --no-stash (biome + eslint server-boundaries)",
         "ios": "pnpm run ios:lint (best-practices) + SwiftFormat/SwiftLint when available"
       },
       "prePush": {

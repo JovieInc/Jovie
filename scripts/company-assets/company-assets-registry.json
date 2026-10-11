@@ -1,0 +1,327 @@
+{
+  "schema": "jovie.company-asset-registry/v1",
+  "issue": "JOV-5945",
+  "auditedAt": "2026-09-27T00:00:00Z",
+  "evidenceLifecycleIssue": "JOV-5916",
+  "secondLedger": false,
+  "autoBuildQueue": false,
+  "summary": "Versioned projection of internal capabilities, workflows, and feature combinations into canonical CompanyAssets with explicit internal value and external option value. Signals enter through the JOV-5916 canonical evidence lifecycle, deduplicate by semantic signature, and produce bounded hypotheses with cheapest-test, capacity cap, success threshold, and kill criteria. High-consequence recommendations (new line, packaging change, open source, pivot) are proposed only and require governed certified evidence to enact.",
+  "dependencies": {
+    "evidenceLifecycle": "JOV-5916",
+    "signalProduction": "JOV-2905",
+    "capabilityBenchmark": "JOV-2966",
+    "costValueAttribution": "JOV-5927",
+    "economicInvariants": "JOV-5840",
+    "decisionValueHud": "JOV-5924"
+  },
+  "revenuePathBlockers": ["JOV-5911"],
+  "assets": [
+    {
+      "id": "symphony-model-routing",
+      "assetClass": "model-router",
+      "owner": "agentos",
+      "version": "2026-09-27.0",
+      "sourceRegistry": "scripts/capability-benchmark/capability-benchmark-registry.json",
+      "sourceRef": "code-review-verification",
+      "dependencies": ["certification-receipts"],
+      "maturity": "production-internal",
+      "internalValue": {
+        "basis": "routes agent work across models inside the shipping lanes harness; internal leverage on cost and quality",
+        "certainty": "medium"
+      },
+      "externalOptionValue": {
+        "basis": "external model-routing products sell per-call; certification receipts differentiate on verifiable outcomes",
+        "certainty": "low",
+        "hypothesis": true
+      },
+      "monetizationForms": [
+        "internal-leverage",
+        "api-mcp-cli",
+        "software",
+        "licensing"
+      ],
+      "benchmarkLink": "JOV-2966"
+    },
+    {
+      "id": "certification-receipts",
+      "assetClass": "operational-process",
+      "owner": "agentos",
+      "version": "2026-09-27.0",
+      "sourceRegistry": "scripts/summer-commissioning/receipt-trust.mjs",
+      "sourceRef": "receipt-trust",
+      "dependencies": [],
+      "maturity": "production-internal",
+      "internalValue": {
+        "basis": "canonical receipt format proving outcomes across commissioning and benchmark domains",
+        "certainty": "medium"
+      },
+      "externalOptionValue": {
+        "basis": "verifiable outcome receipts are scarce in B2B model tooling",
+        "certainty": "unknown",
+        "hypothesis": true
+      },
+      "monetizationForms": ["internal-leverage", "api-mcp-cli"]
+    },
+    {
+      "id": "smart-links",
+      "assetClass": "capability",
+      "owner": "web",
+      "version": "2026-09-27.0",
+      "sourceRegistry": "apps/web",
+      "sourceRef": "smart-links",
+      "dependencies": ["identity", "analytics"],
+      "maturity": "production-external",
+      "internalValue": {
+        "basis": "core creator-link primitive driving profile traffic and conversion",
+        "certainty": "high"
+      },
+      "externalOptionValue": {
+        "basis": "observed use as attribution infrastructure implies a programmatic buyer beyond creators",
+        "certainty": "low",
+        "hypothesis": true
+      },
+      "monetizationForms": ["internal-leverage", "software", "api-mcp-cli"]
+    },
+    {
+      "id": "identity",
+      "assetClass": "capability",
+      "owner": "web",
+      "version": "2026-09-27.0",
+      "sourceRegistry": "apps/web",
+      "sourceRef": "identity",
+      "dependencies": [],
+      "maturity": "production-external",
+      "internalValue": {
+        "basis": "creator/fan identity resolution used across profiles and links",
+        "certainty": "high"
+      },
+      "externalOptionValue": {
+        "basis": "unknown",
+        "certainty": "unknown"
+      },
+      "monetizationForms": ["internal-leverage"]
+    },
+    {
+      "id": "analytics",
+      "assetClass": "capability",
+      "owner": "web",
+      "version": "2026-09-27.0",
+      "sourceRegistry": "apps/web",
+      "sourceRef": "analytics",
+      "dependencies": [],
+      "maturity": "production-external",
+      "internalValue": {
+        "basis": "click/view attribution surfaced to creators on profiles and smart links",
+        "certainty": "high"
+      },
+      "externalOptionValue": {
+        "basis": "same attribution records are the payload for a programmatic attribution product",
+        "certainty": "low",
+        "hypothesis": true
+      },
+      "monetizationForms": ["internal-leverage", "api-mcp-cli", "data-product"]
+    },
+    {
+      "id": "creator-profile",
+      "assetClass": "interface",
+      "owner": "web",
+      "version": "2026-09-27.0",
+      "sourceRegistry": "apps/web",
+      "sourceRef": "creator-profile",
+      "dependencies": ["identity"],
+      "maturity": "production-external",
+      "internalValue": {
+        "basis": "primary public surface; carries brand and audience",
+        "certainty": "high"
+      },
+      "externalOptionValue": {
+        "basis": "unknown",
+        "certainty": "unknown"
+      },
+      "monetizationForms": ["internal-leverage"]
+    },
+    {
+      "id": "commerce",
+      "assetClass": "capability",
+      "owner": "web",
+      "version": "2026-09-27.0",
+      "sourceRegistry": "apps/web",
+      "sourceRef": "commerce",
+      "dependencies": ["creator-profile"],
+      "maturity": "production-external",
+      "internalValue": {
+        "basis": "monetization surface on profiles (tips, paid links, releases)",
+        "certainty": "medium"
+      },
+      "externalOptionValue": {
+        "basis": "unknown",
+        "certainty": "unknown"
+      },
+      "monetizationForms": ["internal-leverage"]
+    },
+    {
+      "id": "brand-matching",
+      "assetClass": "capability",
+      "owner": "agentos",
+      "version": "2026-09-27.0",
+      "sourceRegistry": "apps/web",
+      "sourceRef": "brand-matching",
+      "dependencies": ["analytics"],
+      "maturity": "internal",
+      "internalValue": {
+        "basis": "matches creators to brand-deal opportunities from audience evidence",
+        "certainty": "medium"
+      },
+      "externalOptionValue": {
+        "basis": "sponsor marketplaces exist; differentiation from first-party audience data is unproven",
+        "certainty": "low",
+        "hypothesis": true
+      },
+      "monetizationForms": [
+        "internal-leverage",
+        "productized-service",
+        "partnership"
+      ]
+    },
+    {
+      "id": "audience-intelligence",
+      "assetClass": "dataset",
+      "owner": "web",
+      "version": "2026-09-27.0",
+      "sourceRegistry": "apps/web",
+      "sourceRef": "audience-intelligence",
+      "dependencies": ["analytics", "identity"],
+      "maturity": "internal",
+      "internalValue": {
+        "basis": "aggregated audience segments powering outreach and brand matching",
+        "certainty": "medium"
+      },
+      "externalOptionValue": {
+        "basis": "a different vertical or buyer could pay for the same segments; unproven",
+        "certainty": "unknown",
+        "hypothesis": true
+      },
+      "monetizationForms": ["internal-leverage", "data-product", "partnership"]
+    }
+  ],
+  "featureCombinations": [
+    {
+      "id": "programmatic-attribution",
+      "components": ["smart-links", "identity", "analytics"],
+      "candidateProduct": "Programmatic attribution infrastructure sold to marketers who already misuse smart links for attribution",
+      "minimumMissingCapability": "bulk link provisioning API and attribution export contract",
+      "relabelingCanTestDemand": true
+    },
+    {
+      "id": "affiliate-sponsorship-surface",
+      "components": ["creator-profile", "commerce", "brand-matching"],
+      "candidateProduct": "Affiliate/sponsorship surface matching creator audience to sponsor demand",
+      "minimumMissingCapability": "sponsor-side demand and terms workflow",
+      "relabelingCanTestDemand": false
+    },
+    {
+      "id": "model-routing-b2b",
+      "components": ["symphony-model-routing", "certification-receipts"],
+      "candidateProduct": "B2B model-routing capability with certified outcome receipts",
+      "minimumMissingCapability": "tenant isolation, external-facing API contract, and per-call billing",
+      "relabelingCanTestDemand": true
+    }
+  ],
+  "opportunities": [
+    {
+      "id": "opp-model-routing-b2b",
+      "stage": "hypothesis",
+      "observedSignal": "Internal model router repeatedly outperforms external routing candidates on the code-review benchmark cohort (JOV-2966 domain).",
+      "signalClass": "internal-capability-outperforms-external",
+      "signalSignatures": ["b221cd04738a52d579dbb741"],
+      "assets": ["symphony-model-routing", "certification-receipts"],
+      "internalValue": {
+        "basis": "cost/quality leverage on every agent lane; high replacement cost",
+        "certainty": "medium"
+      },
+      "externalHypothesis": {
+        "buyer": "engineering orgs running multi-model agent fleets",
+        "problem": "unverifiable model routing quality; no certified outcome receipts from incumbent routers",
+        "willingnessToPayEvidence": "none yet; benchmark superiority is internal evidence only",
+        "alternatives": ["incumbent model routers", "in-house routing"]
+      },
+      "expectedEconomics": {
+        "timeToFirstRevenue": "unknown",
+        "marginPotential": "unknown",
+        "capitalRequirement": "tenant isolation + API + billing work bounded by pilot",
+        "strategicFit": "reuses existing routing and receipts; does not require product rewrite"
+      },
+      "cheapestTest": "customer-conversation",
+      "capacity": {
+        "successThreshold": "3 qualified buyers articulate routing-verification pain and accept a paid pilot pitch",
+        "spendCap": "zero budget; founder-led conversations only",
+        "wipCap": "no engineering allocation beyond API-shim scoping",
+        "killCriteria": "no qualified buyer pain after 10 conversations or pilot priced below internal leverage value"
+      },
+      "confidence": "low",
+      "cannibalizationRisk": "none to core product; risk is capacity diversion from revenue blockers",
+      "recommendation": {
+        "type": "expose-api-cli-mcp",
+        "evidence": {
+          "comparableExpectedValue": false,
+          "downsideAssessed": true,
+          "reversibilityAssessed": true,
+          "capacityImpactAssessed": true,
+          "certifiedOutcomeReceipt": false
+        }
+      },
+      "benchmarkLink": "JOV-2966",
+      "requiresFounderDecision": false
+    },
+    {
+      "id": "opp-smart-link-attribution",
+      "stage": "hypothesis",
+      "observedSignal": "Customers repeatedly use smart links plus analytics as an attribution system rather than a creator link, and request bulk/programmatic access.",
+      "signalClass": "repeated-unexpected-use",
+      "signalSignatures": [
+        "68c173b36e47a90350c94f16",
+        "35306a0d6aaf60441e213e8d"
+      ],
+      "assets": ["smart-links", "identity", "analytics"],
+      "internalValue": {
+        "basis": "smart links remain the core creator primitive; attribution use is additive",
+        "certainty": "high"
+      },
+      "externalHypothesis": {
+        "buyer": "growth marketers and agencies managing attribution across creators",
+        "problem": "incumbent attribution tools lack creator-native link + identity data",
+        "willingnessToPayEvidence": "repeated workaround use and programmatic-access requests; no payment attempts yet",
+        "alternatives": [
+          "generic attribution suites",
+          "UTM + spreadsheet workarounds"
+        ]
+      },
+      "expectedEconomics": {
+        "timeToFirstRevenue": "bounded by packaging test",
+        "marginPotential": "high software margin on existing primitives",
+        "capitalRequirement": "relabeling/packaging only for first test",
+        "strategicFit": "extends current product; no new surface required to test"
+      },
+      "cheapestTest": "relabeling-or-packaging",
+      "capacity": {
+        "successThreshold": "5 attribution-intent users activate on a repackaged attribution surface or accept a pre-sale",
+        "spendCap": "zero; packaging and copy only",
+        "wipCap": "one bounded packaging change; no new infrastructure",
+        "killCriteria": "no attribution-segment activation after packaging test window or evidence stays at workaround-only weight"
+      },
+      "confidence": "medium",
+      "cannibalizationRisk": "low; attribution positioning may confuse creator ICP messaging",
+      "recommendation": {
+        "type": "icp-or-packaging-change",
+        "evidence": {
+          "comparableExpectedValue": false,
+          "downsideAssessed": true,
+          "reversibilityAssessed": true,
+          "capacityImpactAssessed": true,
+          "certifiedOutcomeReceipt": false
+        }
+      },
+      "requiresFounderDecision": true
+    }
+  ]
+}

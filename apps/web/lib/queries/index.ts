@@ -41,6 +41,11 @@
 
 // Admin infinite queries
 export {
+  type AdminAssetIssuesFilter,
+  type AdminAssetRow,
+  type AdminAssetSort,
+  type AdminAssetType,
+  type AdminAssetVerifiedFilter,
   type AdminCreatorProfileRow,
   type AdminCreatorProfilesSort,
   type AdminLeadsSortBy,
@@ -49,6 +54,7 @@ export {
   type AdminUserRow,
   type AdminUserStatus,
   type AdminUsersSort,
+  useAdminAssetsInfiniteQuery,
   useAdminCreatorsInfiniteQuery,
   useAdminReleasesInfiniteQuery,
   useAdminUsersInfiniteQuery,
@@ -69,7 +75,6 @@ export {
   getCacheGeneration,
   getCacheScope,
   isShareableAcrossProfileSwitch,
-  registerIsolatedCacheSurface,
   resetCacheIsolationForTests,
   subscribeCacheFence,
   withCacheScope,
@@ -93,6 +98,7 @@ export {
   createQueryFn,
   FetchError,
   fetchWithTimeout,
+  isForbiddenError,
 } from './fetch';
 // Client-side hydration boundary
 export { HydrateClient } from './HydrateClient';
@@ -453,8 +459,6 @@ export {
 } from './usePixelSettingsQuery';
 // Plan gate hook
 export { type PlanGateEntitlements, usePlanGate } from './usePlanGate';
-// Pre-save mutation
-export { useApplePreSaveMutation } from './usePreSaveMutation';
 export {
   useDeletePressPhotoMutation,
   usePressPhotosQuery,

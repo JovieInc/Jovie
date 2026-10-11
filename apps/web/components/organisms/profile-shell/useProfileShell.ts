@@ -65,6 +65,7 @@ export interface UseProfileShellReturn {
   socialLinks: LegacySocialLink[];
   hasSocialLinks: boolean;
   hasContacts: boolean;
+  locationMode: ProfileMode;
 }
 
 const LOCATION_SEARCH_CHANGE_EVENT = 'jovie:location-search-change';
@@ -333,6 +334,7 @@ export function useProfileShell({
   const hasContacts = contacts.length > 0;
 
   return {
+    locationMode,
     isTipNavigating,
     setIsTipNavigating,
     notificationsEnabled,

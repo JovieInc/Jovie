@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import {
   getProfileByUsername,
   getTopProfilesForStaticGeneration,
@@ -52,20 +53,14 @@ export interface SamplePickerItem {
   readonly label: string;
 }
 
+export type ShareStudioType = 'blog' | 'profile' | 'release' | 'playlist';
+
 export interface ShareStudioData {
   readonly urlSearchParams: URLSearchParams;
-  readonly blogItems: readonly SamplePickerItem[];
-  readonly profileItems: readonly SamplePickerItem[];
-  readonly releaseItems: readonly SamplePickerItem[];
-  readonly playlistItems: readonly SamplePickerItem[];
-  readonly selectedBlogKey: string;
-  readonly selectedProfileKey: string;
-  readonly selectedReleaseKey: string;
-  readonly selectedPlaylistKey: string;
-  readonly blogContext: ShareContext;
-  readonly profileContext: ShareContext;
-  readonly releaseContext: ShareContext;
-  readonly playlistContext: ShareContext;
+  readonly items: readonly SamplePickerItem[];
+  readonly selectedKey: string;
+  readonly context: ShareContext | null;
+  readonly state: 'ready' | 'empty' | 'unavailable';
 }
 
 export function getShareStudioParamValue(
@@ -200,79 +195,115 @@ function selectPlaylistSample(
   );
 }
 
+/** Each streamed preview reads only its own public catalog. */
 export async function loadShareStudioData(
-  params: ShareStudioSearchParams
-): Promise<ShareStudioData | null> {
-  const [blogPosts, profileSamples, releaseSamples, playlistSamples] =
-    await Promise.all([
-      getBlogPosts(),
-      getProfileSamples(),
-      getReleaseSamples(),
-      getPlaylistSamples(),
-    ]);
-
-  const selectedBlog = selectBlogSample(blogPosts, params);
-  const selectedProfile = selectProfileSample(profileSamples, params);
-  const selectedRelease = selectReleaseSample(releaseSamples, params);
-  const selectedPlaylist = selectPlaylistSample(playlistSamples, params);
-
-  if (
-    !selectedBlog ||
-    !selectedProfile ||
-    !selectedRelease ||
-    !selectedPlaylist
-  ) {
-    return null;
+  params: ShareStudioSearchParams,
+  type: ShareStudioType
+): Promise<ShareStudioData> {
+  const urlSearchParams = buildUrlSearchParams(params);
+  try {
+    const sample = await loadSample(type, params);
+    if (sample.context) urlSearchParams.set(type, sample.selectedKey);
+    else urlSearchParams.delete(type);
+    return {
+      ...sample,
+      urlSearchParams,
+      state: sample.context ? 'ready' : 'empty',
+    };
+  } catch (error) {
+    await captureError('Admin share preview could not be read', error, {
+      type,
+    });
+    return {
+      urlSearchParams,
+      items: [],
+      selectedKey: '',
+      context: null,
+      state: 'unavailable',
+    };
   }
+}
 
-  const selectedReleaseKey = `${selectedRelease.username}:${selectedRelease.slug}`;
-
-  return {
-    urlSearchParams: buildUrlSearchParams(params),
-    blogItems: blogPosts.slice(0, 4).map(post => ({
-      key: post.slug,
-      label: post.title,
-    })),
-    profileItems: profileSamples.map(profile => ({
-      key: profile.username,
-      label: profile.name,
-    })),
-    releaseItems: releaseSamples.map(release => ({
-      key: `${release.username}:${release.slug}`,
-      label: `${release.artistName} \u2014 ${release.title}`,
-    })),
-    playlistItems: playlistSamples.map(playlist => ({
-      key: playlist.slug,
-      label: playlist.title,
-    })),
-    selectedBlogKey: selectedBlog.slug,
-    selectedProfileKey: selectedProfile.username,
-    selectedReleaseKey,
-    selectedPlaylistKey: selectedPlaylist.slug,
-    blogContext: buildBlogShareContext({
-      slug: selectedBlog.slug,
-      title: selectedBlog.title,
-      excerpt: selectedBlog.excerpt,
-    }),
-    profileContext: buildProfileShareContext({
-      username: selectedProfile.username,
-      artistName: selectedProfile.name,
-      avatarUrl: selectedProfile.avatarUrl,
-      bio: selectedProfile.bio,
-    }),
-    releaseContext: buildReleaseShareContext({
-      username: selectedRelease.username,
-      slug: selectedRelease.slug,
-      title: selectedRelease.title,
-      artistName: selectedRelease.artistName,
-      artworkUrl: selectedRelease.artworkUrl,
-      pathname: `/${selectedRelease.username}/${selectedRelease.slug}`,
-    }),
-    playlistContext: buildPlaylistShareContext({
-      slug: selectedPlaylist.slug,
-      title: selectedPlaylist.title,
-      coverImageUrl: selectedPlaylist.coverImageUrl,
-      editorialNote: selectedPlaylist.editorialNote,
-    }),
-  };
+async function loadSample(
+  type: ShareStudioType,
+  params: ShareStudioSearchParams
+) {
+  switch (type) {
+    case 'blog': {
+      const samples = await getBlogPosts();
+      const selected = selectBlogSample(samples, params);
+      return {
+        items: samples
+          .slice(0, 4)
+          .map(post => ({ key: post.slug, label: post.title })),
+        selectedKey: selected?.slug ?? '',
+        context: selected
+          ? buildBlogShareContext({
+              slug: selected.slug,
+              title: selected.title,
+              excerpt: selected.excerpt,
+            })
+          : null,
+      };
+    }
+    case 'profile': {
+      const samples = await getProfileSamples();
+      const selected = selectProfileSample(samples, params);
+      return {
+        items: samples.map(profile => ({
+          key: profile.username,
+          label: profile.name,
+        })),
+        selectedKey: selected?.username ?? '',
+        context: selected
+          ? buildProfileShareContext({
+              username: selected.username,
+              artistName: selected.name,
+              avatarUrl: selected.avatarUrl,
+              bio: selected.bio,
+            })
+          : null,
+      };
+    }
+    case 'release': {
+      const samples = await getReleaseSamples();
+      const selected = selectReleaseSample(samples, params);
+      return {
+        items: samples.map(release => ({
+          key: `${release.username}:${release.slug}`,
+          label: `${release.artistName} — ${release.title}`,
+        })),
+        selectedKey: selected ? `${selected.username}:${selected.slug}` : '',
+        context: selected
+          ? buildReleaseShareContext({
+              username: selected.username,
+              slug: selected.slug,
+              title: selected.title,
+              artistName: selected.artistName,
+              artworkUrl: selected.artworkUrl,
+              pathname: `/${selected.username}/${selected.slug}`,
+            })
+          : null,
+      };
+    }
+    case 'playlist': {
+      const samples = await getPlaylistSamples();
+      const selected = selectPlaylistSample(samples, params);
+      return {
+        items: samples.map(playlist => ({
+          key: playlist.slug,
+          label: playlist.title,
+        })),
+        selectedKey: selected?.slug ?? '',
+        context: selected
+          ? buildPlaylistShareContext({
+              slug: selected.slug,
+              title: selected.title,
+              coverImageUrl: selected.coverImageUrl,
+              editorialNote: selected.editorialNote,
+            })
+          : null,
+      };
+    }
+  }
 }

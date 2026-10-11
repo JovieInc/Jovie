@@ -23,13 +23,28 @@ describe('public surface guardrails', () => {
         '/app/',
         '/api/',
         '/out/',
+        '/investor-portal$',
+        '/investor-portal/',
+        '/investors$',
         '/investors/',
+        '/pitch$',
+        '/pitch/',
+        '/Jovie-Pitch-Deck.pdf$',
         '/engineering/preview/',
       ])
     );
+    // Every crawler rule carries the investor disallows, AI crawlers included.
+    for (const rule of rules) {
+      expect(rule.disallow).toEqual(
+        expect.arrayContaining(['/investor-portal/', '/pitch/', '/investors/'])
+      );
+    }
+    // Unanchored prefixes would block profile handles like /pitchfork.
     expect(wildcardRule?.disallow).not.toEqual(
       expect.arrayContaining([
         '/investor-portal',
+        '/investors',
+        '/pitch',
         '/demo',
         '/sandbox',
         '/spinner-test',
@@ -123,13 +138,10 @@ describe('public surface guardrails', () => {
       import('../../../app/sentry-example-page/layout'),
       import('../../../app/hud/page'),
       import('../../../app/investor-portal/layout'),
-      import('../../../app/investor-portal/page'),
       import('../../../app/investor-portal/respond/page'),
       import('../../../app/(marketing)/ai/page'),
-      import('../../../app/(marketing)/investors/page'),
       import('../../../app/(marketing)/engineering/preview/page'),
       import('../../../app/(marketing)/engineering/preview/[slug]/page'),
-      import('../../../app/pitch/page'),
     ]);
 
     for (const routeModule of modules) {

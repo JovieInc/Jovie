@@ -17,12 +17,16 @@ describe('LibrarySurface shared right rail contract', () => {
     );
     expect(source).toContain('useRegisterRightPanel(assetDrawerPanel);');
     expect(source).toContain('<InspectorShell');
-    expect(source).toContain("ariaLabel='Library asset details'");
-    expect(source).toContain('LIBRARY_INSPECTOR_TABS');
+    expect(source).toContain("ariaLabel='Work details'");
+    expect(source).toContain('WORK_INSPECTOR_TABS');
+    expect(source).not.toContain('LIBRARY_INSPECTOR_TABS');
+    expect(source).not.toContain("'details'");
+    expect(source).not.toContain('Press Kit Drop');
     expect(source).toContain("data-testid='library-asset-entity-header'");
     expect(source).not.toContain('DrawerSectionGroup');
     expect(source).not.toContain('<DrawerSection');
-    expect(source).toContain("finding.subjectType !== 'artist'");
+    expect(source).toContain('scopeWorkInspectorBundle');
+    expect(source).not.toContain('objectScopedPostReleaseBundle');
   });
 
   it('does not retain the route-local drawer layout implementation', () => {

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/track/route';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { captureError } from '@/lib/error-tracking';
+import { trackingClicksLimiter } from '@/lib/rate-limit';
 
 const hoisted = vi.hoisted(() => {
   const writeDailyProfileViewsMock = vi.fn().mockResolvedValue(undefined);
@@ -139,6 +140,62 @@ describe('POST /api/track', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Invalid JSON');
+  });
+
+  it('returns 429 and skips the click insert when the per-creator click budget is exhausted', async () => {
+    const limitSpy = vi
+      .spyOn(trackingClicksLimiter, 'limit')
+      .mockResolvedValue({
+        success: false,
+        limit: 10000,
+        remaining: 0,
+        reset: new Date(Date.now() + 60_000),
+      });
+
+    const request = new NextRequest('http://localhost/api/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        handle: 'artist123',
+        linkType: 'other',
+        target: 'https://example.com',
+      }),
+    });
+
+    const response = await POST(request as unknown as NextRequest);
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data.reason).toBe('Creator rate limit exceeded');
+    expect(limitSpy).toHaveBeenCalledWith('profile_123');
+    expect(hoisted.withSystemIngestionSession).not.toHaveBeenCalled();
+
+    limitSpy.mockRestore();
+  });
+
+  it('meters clicks by profile identity so distributed traffic cannot bypass the per-IP limit', async () => {
+    const limitSpy = vi.spyOn(trackingClicksLimiter, 'limit');
+
+    const request = new NextRequest('http://localhost/api/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        handle: 'artist123',
+        linkType: 'other',
+        target: 'https://example.com',
+      }),
+    });
+
+    const response = await POST(request as unknown as NextRequest);
+
+    expect(response.status).toBe(200);
+    expect(limitSpy).toHaveBeenCalledWith('profile_123');
+
+    limitSpy.mockRestore();
   });
 
   it('logs errors when social link click updates fail', async () => {

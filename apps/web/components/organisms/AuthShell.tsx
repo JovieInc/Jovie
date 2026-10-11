@@ -7,13 +7,14 @@ import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { useComposerFocus } from '@/components/features/chat/Composer';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
-import { SidebarProvider, useSidebar } from '@/components/organisms/Sidebar';
+import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider';
 import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
@@ -58,13 +59,19 @@ function AuthShellInner({
   isChatRoute = false,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
-  const { isMobile, state: sidebarState } = useSidebar();
+  const { isMobile, open: sidebarPinned } = useSidebar();
   const { isComposerFocused } = useComposerFocus();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
-  const sidebarTrigger = isMobile ? null : sidebarState === 'closed' ? (
-    <SidebarCollapseButton />
-  ) : null;
+  const isElectron = useIsElectronRuntime();
+  // The desktop window-control row (DesktopTitlebar) owns the single canonical
+  // left-sidebar toggle in Electron. Keep the initial client tree identical to
+  // SSR; the runtime CSS hides the header slot before paint, and this hook
+  // removes it after hydration without replacing the shell or losing drafts.
+  const sidebarTrigger =
+    isMobile || isElectron ? null : !sidebarPinned ? (
+      <SidebarCollapseButton />
+    ) : null;
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;
@@ -78,11 +85,12 @@ function AuthShellInner({
   const sidebar = useMemo(
     () => (
       <UnifiedSidebar
+        headerOwnsCollapsedToggle={!hideTopHeader}
         section={section}
         variant={section === 'ov' ? 'ov' : 'jovie'}
       />
     ),
-    [section]
+    [section, hideTopHeader]
   );
 
   // Memoize mobile bottom nav — stable across route changes

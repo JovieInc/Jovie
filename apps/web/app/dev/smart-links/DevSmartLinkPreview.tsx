@@ -99,14 +99,10 @@ futureDate.setDate(futureDate.getDate() + 14);
 
 const PRESAVE_PROPS = {
   release: {
-    id: 'mock-release-id',
     slug: 'midnight-drive',
     title: 'Midnight Drive (Deluxe Anniversary Remastered Edition)',
     artworkUrl: MOCK_ARTWORK,
     releaseDate: futureDate,
-    trackId: null,
-    hasSpotify: true,
-    hasAppleMusic: true,
   },
   artist: {
     id: 'mock-artist-id',

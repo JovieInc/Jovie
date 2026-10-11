@@ -323,14 +323,6 @@ vi.mock(
 );
 
 vi.mock(
-  '@/features/dashboard/organisms/release-provider-matrix/ReleasePlanPromptDialog',
-  () => ({
-    // Legacy mock retained; the live code now renders ReleasePlanWizard.
-    ReleasePlanPromptDialog: () => null,
-  })
-);
-
-vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard',
   () => ({
     ReleasePlanWizard: ({
@@ -646,6 +638,9 @@ describe('ReleaseProviderMatrix', () => {
           spotifyConnected={false}
         />
       );
+      await React.act(async () => {
+        await vi.dynamicImportSettled();
+      });
       expect(
         await screen.findByTestId('releases-empty-state')
       ).toBeInTheDocument();

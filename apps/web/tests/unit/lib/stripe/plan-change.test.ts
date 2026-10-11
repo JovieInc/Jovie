@@ -83,7 +83,12 @@ vi.mock('@/lib/env-public', () => ({
   publicEnv: { NEXT_PUBLIC_APP_URL: 'http://localhost:3000' },
 }));
 
-import { isIntervalChange, isPlanUpgrade } from '@/lib/stripe/plan-change';
+import { stripe } from '@/lib/stripe/client';
+import {
+  getActiveSubscription,
+  isIntervalChange,
+  isPlanUpgrade,
+} from '@/lib/stripe/plan-change';
 
 describe('plan-change', () => {
   describe('isPlanUpgrade', () => {
@@ -131,6 +136,57 @@ describe('plan-change', () => {
 
     it('should not detect change for same interval (year)', () => {
       expect(isIntervalChange('year', 'year')).toBe(false);
+    });
+  });
+
+  describe('getActiveSubscription', () => {
+    const START = 1_790_000_000;
+    const END = START + 30 * 86_400;
+
+    it('reads the billing period from the subscription item on the dahlia API', async () => {
+      // 2026-08-26.dahlia: no top-level current_period_*; items carry them.
+      vi.mocked(stripe.subscriptions.list).mockResolvedValueOnce({
+        data: [
+          {
+            id: 'sub_dahlia',
+            status: 'active',
+            items: {
+              data: [{ current_period_start: START, current_period_end: END }],
+            },
+          },
+        ],
+      } as never);
+
+      const sub = await getActiveSubscription('cus_1');
+      expect(sub?.id).toBe('sub_dahlia');
+      expect(sub?.current_period_start).toBe(START);
+      expect(sub?.current_period_end).toBe(END);
+    });
+
+    it('still accepts legacy top-level period fields', async () => {
+      vi.mocked(stripe.subscriptions.list).mockResolvedValueOnce({
+        data: [
+          {
+            id: 'sub_legacy',
+            status: 'active',
+            current_period_start: START,
+            current_period_end: END,
+            items: { data: [] },
+          },
+        ],
+      } as never);
+
+      expect((await getActiveSubscription('cus_1'))?.current_period_end).toBe(
+        END
+      );
+    });
+
+    it('returns null when no period is readable anywhere', async () => {
+      vi.mocked(stripe.subscriptions.list).mockResolvedValueOnce({
+        data: [{ id: 'sub_none', status: 'active', items: { data: [{}] } }],
+      } as never);
+
+      expect(await getActiveSubscription('cus_1')).toBeNull();
     });
   });
 });

@@ -11,6 +11,7 @@ export interface ShellNavItem {
   readonly icon: React.ComponentType<{
     readonly className?: string;
     readonly strokeWidth?: number;
+    readonly 'aria-hidden'?: boolean | 'true' | 'false';
   }>;
   readonly label: string;
   readonly active?: boolean;
@@ -148,6 +149,7 @@ export function SidebarNavItem({
     <button
       type='button'
       onClick={item.onActivate}
+      aria-pressed={item.active || undefined}
       className={getSidebarNavRowClassName({
         active: item.active,
         collapsed,
@@ -162,6 +164,7 @@ export function SidebarNavItem({
           tight,
         })}
         strokeWidth={2}
+        aria-hidden='true'
       />
       {!collapsed && (
         // These rows never render a trailing action over the label, so the

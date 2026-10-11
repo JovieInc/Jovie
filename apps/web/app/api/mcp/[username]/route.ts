@@ -31,6 +31,11 @@ import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
+  artistMcpOwnerToolAuthMessage,
+  artistMcpWwwAuthenticate,
+  isArtistMcpOwnerTool,
+} from '@/lib/mcp/artist-oauth-discovery';
+import {
   createMerchGeneration,
   getLiveMerchCardsForProfile,
   publishMerchCard,
@@ -238,6 +243,24 @@ export async function POST(
   // tools/call
   // -------------------------------------------------------------------------
   if (msg.method === 'tools/call') {
+    if (isArtistMcpOwnerTool(msg.params.name)) {
+      const { userId } = await getCachedAuth();
+      if (!userId) {
+        return mcpError(
+          -32602,
+          artistMcpOwnerToolAuthMessage(msg.params.name),
+          401,
+          requestId,
+          {
+            'WWW-Authenticate': artistMcpWwwAuthenticate(
+              new URL(req.url).origin,
+              username
+            ),
+            'Cache-Control': 'no-store',
+          }
+        );
+      }
+    }
     const result = await callTool(
       msg.params.name,
       msg.params.arguments ?? {},
@@ -357,7 +380,7 @@ function buildToolDescriptors() {
     {
       name: 'generate_merch',
       description:
-        'Generate exactly three merch design options for the authenticated owner of this artist profile. Creates drafts only; it never publishes.',
+        'Generate exactly three merch design options for the authenticated owner of this creator profile. Creates drafts only; it never publishes.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -424,7 +447,7 @@ function buildToolDescriptors() {
     {
       name: 'get_video_metrics',
       description:
-        'Get analytics metric snapshots for one video in the library. Requires authenticated ownership of this artist profile.',
+        'Get analytics metric snapshots for one video in the library. Requires authenticated ownership of this creator profile.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -452,7 +475,7 @@ function buildToolDescriptors() {
     {
       name: 'register_thumbnail_version',
       description:
-        'Register a candidate thumbnail version for a video (pending human approval). Never performs a YouTube-side thumbnail swap. Requires authenticated ownership of this artist profile.',
+        'Register a candidate thumbnail version for a video (pending human approval). Never performs a YouTube-side thumbnail swap. Requires authenticated ownership of this creator profile.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -740,7 +763,7 @@ async function callTool(
     }
     const ownedProfile = await getAuthenticatedProfile(db, profile.id, userId);
     if (!ownedProfile) {
-      return { error: 'You do not own this artist profile' };
+      return { error: 'You do not own this creator profile' };
     }
 
     if (name === 'get_video_metrics') {

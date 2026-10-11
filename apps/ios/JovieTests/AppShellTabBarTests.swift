@@ -308,16 +308,39 @@ struct AppShellTabBarTests {
     #expect(AppShellPanePolicy.paneAfterDismiss() == .none)
   }
 
-  @Test func sidebarHoldsFormerBottomDestinations() {
+  @Test func sidebarOrdersCanonicalRootsWithWorkflowsUnderWork() {
     let destinations = AppShellPanePolicy.sidebarDestinations(
       chatEnabled: true,
       audienceEnabled: true
     )
-    #expect(destinations == [.chat, .library, .calendar, .inbox, .profile, .audience])
+    #expect(destinations == [.chat, .profile, .library, .inbox, .calendar, .audience])
     #expect(
       AppShellPanePolicy.sidebarDestinations(chatEnabled: false, audienceEnabled: false)
-        == [.library, .calendar, .inbox, .profile]
+        == [.profile, .library, .inbox, .calendar]
     )
+  }
+
+  @Test func rootOntologyAndChildOwnershipAreStableAcrossGates() {
+    #expect(AppShellPanePolicy.rootDestinations(chatEnabled: true, audienceEnabled: true)
+      == [.chat, .profile, .library, .audience])
+    #expect(AppShellPanePolicy.rootDestinations(chatEnabled: false, audienceEnabled: false)
+      == [.profile, .library])
+    #expect(AppShellPanePolicy.childDestinations(of: .library) == [.inbox, .calendar])
+    for root in [AppShellTab.chat, .profile, .audience, .inbox, .calendar] {
+      #expect(AppShellPanePolicy.childDestinations(of: root).isEmpty)
+    }
+    for chatEnabled in [true, false] {
+      for audienceEnabled in [true, false] {
+        let destinations = AppShellPanePolicy.sidebarDestinations(
+          chatEnabled: chatEnabled, audienceEnabled: audienceEnabled
+        )
+        #expect(Set(destinations).count == destinations.count)
+        #expect(destinations.contains(.chat) == chatEnabled)
+        #expect(destinations.contains(.audience) == audienceEnabled)
+      }
+    }
+    #expect(AppShellTab.chat.title == "Home")
+    #expect(AppShellTab.profile.title == "Identity")
   }
 
   @Test func resolveInitialTabKeepsFixtureDestinationWhenChatEnabled() {

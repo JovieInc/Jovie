@@ -129,6 +129,18 @@ describe('SEO/AEO ratchet (#11044)', () => {
         'Allow: /',
         'Disallow: /app/',
         '',
+        'User-agent: OAI-SearchBot',
+        'Allow: /',
+        'User-agent: Claude-SearchBot',
+        'Allow: /',
+        'User-agent: ChatGPT-User',
+        'Allow: /',
+        'User-agent: ClaudeBot',
+        'Allow: /',
+        'User-agent: Anthropic-AI',
+        'Allow: /',
+        'User-agent: Applebot-Extended',
+        'Allow: /',
         'User-agent: GPTBot',
         'Allow: /',
         '',
@@ -405,6 +417,7 @@ describe('seo-ratchet sitemap.xml shape', () => {
       unstable_cache: (callback: () => Promise<unknown>) => callback,
     }));
     vi.doMock('@/constants/app', () => ({
+      APP_NAME: 'Jovie',
       BASE_URL: 'https://jov.ie',
     }));
     vi.doMock('@/lib/env-server', () => ({

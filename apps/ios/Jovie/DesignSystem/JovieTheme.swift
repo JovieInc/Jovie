@@ -1,14 +1,9 @@
 import SwiftUI
 #if canImport(UIKit)
 import UIKit
-
-private typealias PlatformFont = UIFont
-private typealias PlatformFontDescriptor = UIFontDescriptor
 #else
 import AppKit
-
-private typealias PlatformFont = NSFont
-private typealias PlatformFontDescriptor = NSFontDescriptor
+import CoreText
 #endif
 
 /// System B dark tokens. Hexes match the Noir Ion table in DESIGN.md and
@@ -81,30 +76,57 @@ enum JovieFont {
   }
 
   private static func font(size: CGFloat, weight: Font.Weight) -> Font {
-    if PlatformFont(name: "Inter Variable", size: size) != nil {
+    #if canImport(UIKit)
+    if UIFont(name: "Inter Variable", size: size) != nil {
       return .custom("Inter Variable", size: size).weight(weight)
     }
 
-    if PlatformFont(name: "Inter", size: size) != nil {
+    if UIFont(name: "Inter", size: size) != nil {
       return .custom("Inter", size: size).weight(weight)
     }
+    #else
+    if NSFont(name: "Inter Variable", size: size) != nil {
+      return .custom("Inter Variable", size: size).weight(weight)
+    }
+
+    if NSFont(name: "Inter", size: size) != nil {
+      return .custom("Inter", size: size).weight(weight)
+    }
+    #endif
 
     return .system(size: size, weight: weight)
   }
 
   private static func font(size: CGFloat, numericWeight: CGFloat) -> Font {
-    let uiWeight = PlatformFont.Weight(rawValue: uiFontWeightRawValue(forCSSWeight: numericWeight))
+    #if canImport(UIKit)
+    let uiWeight = UIFont.Weight(rawValue: uiFontWeightRawValue(forCSSWeight: numericWeight))
     let descriptorBase =
-      PlatformFont(name: "Inter Variable", size: size)
-      ?? PlatformFont(name: "Inter", size: size)
-      ?? PlatformFont.systemFont(ofSize: size)
+      UIFont(name: "Inter Variable", size: size)
+      ?? UIFont(name: "Inter", size: size)
+      ?? UIFont.systemFont(ofSize: size)
     let descriptor = descriptorBase.fontDescriptor.addingAttributes([
-      .traits: [PlatformFontDescriptor.TraitKey.weight: uiWeight.rawValue]
+      .traits: [UIFontDescriptor.TraitKey.weight: uiWeight.rawValue]
     ])
-    // NSFont(descriptor:size:) is optional on macOS; UIFont's is not.
-    let resolved: PlatformFont? = PlatformFont(descriptor: descriptor, size: size)
-    return Font((resolved ?? descriptorBase) as CTFont)
+    return Font(UIFont(descriptor: descriptor, size: size))
+    #else
+    return Font(appKitBody(size: size, numericWeight: numericWeight) as CTFont)
+    #endif
   }
+
+  #if canImport(AppKit) && !canImport(UIKit)
+  /// The native editor shares the same Inter resolution and weight mapping as SwiftUI.
+  static func appKitBody(size: CGFloat, numericWeight: CGFloat = 400) -> NSFont {
+    let weight = NSFont.Weight(rawValue: uiFontWeightRawValue(forCSSWeight: numericWeight))
+    let descriptorBase =
+      NSFont(name: "Inter Variable", size: size)
+      ?? NSFont(name: "Inter", size: size)
+      ?? NSFont.systemFont(ofSize: size)
+    let descriptor = descriptorBase.fontDescriptor.addingAttributes([
+      .traits: [NSFontDescriptor.TraitKey.weight: weight.rawValue]
+    ])
+    return NSFont(descriptor: descriptor, size: size) ?? descriptorBase
+  }
+  #endif
 
   /// Maps CSS/Satoshi weights onto UIFont.Weight raw values.
   static func uiFontWeightRawValue(forCSSWeight cssWeight: CGFloat) -> CGFloat {

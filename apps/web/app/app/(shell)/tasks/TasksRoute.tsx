@@ -6,6 +6,7 @@ import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
+import { isScreenCertAppShellFixtureProfile } from '@/lib/screen-cert/app-shell-fixture-gate';
 import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { getTasks } from '../dashboard/tasks/task-actions';
@@ -21,9 +22,21 @@ export async function TasksRoute() {
     return routeContext.error;
   }
 
-  const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.canAccessTasksWorkspace) {
-    return <TasksWorkspaceUpgradeInterstitial />;
+  // Screen-cert fixture (tasks producer, apps/web/app/app/(shell)/dashboard/tasks/_lib/screen-cert-fixture.ts):
+  // getCurrentUserEntitlements() degrades to free-tier under the noop DB
+  // (billing lookup fails closed), which would otherwise route the reserved
+  // fixture profile into the Pro upgrade interstitial instead of the real
+  // Tasks UI this producer captures. The reservation is exact-profile-id and
+  // fails closed off VERCEL_ENV==='production', so this never widens who
+  // skips the real entitlements check.
+  const isFixtureRequest = isScreenCertAppShellFixtureProfile(
+    routeContext.profileId
+  );
+  if (!isFixtureRequest) {
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.canAccessTasksWorkspace) {
+      return <TasksWorkspaceUpgradeInterstitial />;
+    }
   }
 
   const profileId = routeContext.profileId;

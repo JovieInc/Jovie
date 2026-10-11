@@ -3,13 +3,12 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { del } from '@vercel/blob';
 import { eq } from 'drizzle-orm';
-import { revalidateTag } from 'next/cache';
 import { processArtworkBufferToSizes } from '@/app/api/images/artwork/upload/process';
 import {
   getBlobCommandOptions,
   isBlobStorageConfigured,
 } from '@/lib/blob-config';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import { invalidateReleaseCaches } from '@/lib/cache/releases';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -208,8 +207,7 @@ export async function applyGeneratedAlbumArt(params: {
     })
     .where(eq(discogReleases.id, params.releaseId));
 
-  revalidateTag(`releases:${params.clerkUserId}:${profile.id}`, 'max');
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  invalidateReleaseCaches(params.clerkUserId, profile.id);
 
   return {
     releaseId: params.releaseId,
@@ -282,8 +280,7 @@ export async function createReleaseAndApplyGeneratedAlbumArt(params: {
     throw error;
   }
 
-  revalidateTag(`releases:${params.clerkUserId}:${profile.id}`, 'max');
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  invalidateReleaseCaches(params.clerkUserId, profile.id);
 
   return {
     releaseId: release.id,

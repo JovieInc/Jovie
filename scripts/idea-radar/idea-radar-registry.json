@@ -1,0 +1,45 @@
+{
+  "schema": "jovie.idea-radar-producer/v1",
+  "issue": "JOV-2905",
+  "canonicalLifecycle": "JOV-5916",
+  "benchmarkOwner": "JOV-2966",
+  "separateLedger": false,
+  "primaryDiscovery": "event-driven",
+  "hermesAuthority": false,
+  "slackAuthority": false,
+  "founderVoteCanAdmitBuild": false,
+  "linearPolicy": "executable-next-action-only",
+  "triggerPolicy": {
+    "lowSignalThreshold": 0.7,
+    "catchUp": {
+      "enabled": true,
+      "primary": false,
+      "requiresMissedEventEvidence": true
+    }
+  },
+  "legacyMigration": {
+    "stableIdentityStrategy": "source type + provider item id; canonical URL fallback",
+    "sources": [
+      {
+        "from": "gbrain idea-radar pages and learned-preferences",
+        "to": "JOV-5916 evidence objects and versioned preference evidence",
+        "dataLoss": false
+      },
+      {
+        "from": "Linear idea-radar ledger issues",
+        "to": "JOV-5916 evidence links; retain Linear only for executable next actions",
+        "dataLoss": false
+      },
+      {
+        "from": "/last30days research output",
+        "to": "JOV-5916 source observations through the Idea Radar normalizer",
+        "dataLoss": false
+      },
+      {
+        "from": "Slack cards, reactions, and comments",
+        "to": "JOV-5916 founder-input evidence with original message provenance",
+        "dataLoss": false
+      }
+    ]
+  }
+}

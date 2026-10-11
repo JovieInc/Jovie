@@ -6,7 +6,11 @@ import {
   primaryNavigation,
 } from '@/components/features/dashboard/dashboard-nav/config';
 import { OPERATOR_NAV_ITEMS } from '@/components/organisms/operator-navigation';
-import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
+import {
+  ADMIN_NAV_REGISTRY,
+  ADMIN_PRIMARY_WORKSPACE_IDS,
+  ADMIN_SETTINGS_TOOL_IDS,
+} from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveAppShellModeFromPathname } from '@/lib/app-shell/mode';
 
@@ -66,6 +70,66 @@ describe('exclusive customer vs OV navigation', () => {
         customerHrefs.includes(href)
       )
     ).toEqual([]);
+  });
+
+  it('organizes the founder cockpit around the five company decisions', () => {
+    expect(ADMIN_PRIMARY_WORKSPACE_IDS).toEqual([
+      'overview',
+      'growth',
+      'product',
+      'operations',
+      'needs_you',
+    ]);
+    expect(
+      ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces').map(
+        item => item.label
+      )
+    ).toEqual(['Now', 'Growth', 'Product', 'Operations', 'Needs You']);
+    expect(
+      ADMIN_NAV_REGISTRY.find(item => item.id === 'activity')
+    ).toMatchObject({ label: 'Timeline', section: 'utilities' });
+    expect(
+      ADMIN_NAV_REGISTRY.filter(item =>
+        ['certifications', 'shipping'].includes(item.id)
+      ).map(({ id, section }) => ({ id, section }))
+    ).toEqual([
+      { id: 'certifications', section: 'utilities' },
+      { id: 'shipping', section: 'utilities' },
+    ]);
+    expect(ADMIN_SETTINGS_TOOL_IDS).toEqual(
+      expect.arrayContaining(['certifications', 'shipping'])
+    );
+  });
+
+  it('gives every operator review workspace a canonical navigation door', () => {
+    const reviewWorkspaces = [
+      { id: 'interviews', href: APP_ROUTES.ADMIN_INTERVIEWS },
+      { id: 'playlists', href: APP_ROUTES.ADMIN_PLAYLISTS },
+      { id: 'presence', href: APP_ROUTES.ADMIN_PRESENCE },
+    ];
+
+    expect(
+      ADMIN_NAV_REGISTRY.filter(item =>
+        reviewWorkspaces.some(workspace => workspace.id === item.id)
+      ).map(({ id, href, section }) => ({ id, href, section }))
+    ).toEqual(
+      reviewWorkspaces.map(workspace => ({
+        ...workspace,
+        section: 'utilities',
+      }))
+    );
+    expect(ADMIN_SETTINGS_TOOL_IDS).toEqual(
+      expect.arrayContaining(reviewWorkspaces.map(workspace => workspace.id))
+    );
+  });
+
+  it.each([
+    ['screenshots', APP_ROUTES.ADMIN_SCREENSHOTS],
+    ['system_map', APP_ROUTES.ADMIN_SYSTEM],
+  ])('keeps the %s diagnostic outside founder navigation', (id, href) => {
+    expect(ADMIN_NAV_REGISTRY.some(item => item.href === href)).toBe(false);
+    expect(OPERATOR_NAV_ITEMS.some(item => item.href === href)).toBe(false);
+    expect(ADMIN_SETTINGS_TOOL_IDS).not.toContain(id);
   });
 
   it('resolves OV routes to ov mode and customer routes to customer mode', () => {

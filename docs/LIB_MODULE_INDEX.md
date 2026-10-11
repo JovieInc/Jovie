@@ -97,7 +97,7 @@
 | `env-public.ts` | Public env vars with lazy getter for Vercel cold-start safety | `publicEnv` |
 | `error-tracking.ts` | Structured error logging with Sentry | `captureError`, `captureCriticalError` |
 | `rate-limit/` | Redis-backed rate limiting with 40+ pre-configured limiters, plan-aware | `createRateLimiter`, `createPlanAwareRateLimiter` |
-| `fetch/` | Request deduplication with in-memory cache and prefetch | `dedupedFetch`, `useDedupedFetch`, `prefetch` |
+| `queries/` | TanStack Query — the single server-state lifecycle | `useDashboardProfileQuery`, `queryKeys` |
 | `nuqs/` | Type-safe URL search params with server/client caches | `useTableParams`, `audienceSearchParams` |
 | `pacer/` | TanStack Pacer: debounce, throttle, auto-save, retry utilities | `useDebouncedInput`, `useAutoSave` |
 | `utils/` | Shared utilities: date formatting, URL parsing, CSV, PII encryption, logger | `logger`, `piiEncryption`, `formatNumber` |

@@ -51,9 +51,11 @@ describe('OnboardingProfileRail', () => {
     expect(screen.getAllByTitle('Spotify').length).toBeGreaterThan(0);
     expect(screen.getAllByTitle('Apple Music').length).toBeGreaterThan(0);
     expect(screen.queryByText('open.spotify.com')).toBeNull();
+    // The Pen identity header shows the name and jov.ie handle; the tagline
+    // (here the enrichment follower count) is not repeated on Home.
     expect(
-      screen.getByText('12.3K Spotify followers (source: enrichment)')
-    ).toBeDefined();
+      within(phonePreview).getByTestId('profile-identity-handle')
+    ).toHaveTextContent('jov.ie/testartist');
     expect(
       screen.getByTestId('onboarding-profile-preview-badge')
     ).toHaveTextContent('Preview');
@@ -129,5 +131,39 @@ describe('OnboardingProfileRail', () => {
         .queryAllByRole('link')
         .some(link => link.getAttribute('href')?.includes('evil.test'))
     ).toBe(false);
+  });
+
+  it('previews jov.ie/<handle> for a non-artist with a public profile', () => {
+    fastRender(
+      <OnboardingProfileRail
+        state={{
+          artist: null,
+          artistConfirmed: false,
+          handle: 'avery',
+          socialLinks: ['https://instagram.com/avery'],
+        }}
+      />
+    );
+
+    const phonePreview = screen.getByTestId('onboarding-phone-preview');
+    expect(
+      within(phonePreview).getByTestId('profile-identity-handle')
+    ).toHaveTextContent('jov.ie/avery');
+    expect(screen.queryAllByTitle('Spotify')).toHaveLength(0);
+  });
+
+  it('renders nothing for a non-artist before a public profile is shared', () => {
+    fastRender(
+      <OnboardingProfileRail
+        state={{
+          artist: null,
+          artistConfirmed: false,
+          handle: 'avery',
+          socialLinks: [],
+        }}
+      />
+    );
+
+    expect(screen.queryByTestId('onboarding-profile-rail')).toBeNull();
   });
 });

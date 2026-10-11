@@ -292,7 +292,7 @@ describe('tracking consent', () => {
   });
 
   describe('getOrCreateSessionId', () => {
-    it('generates a session ID and caches in sessionStorage', () => {
+    it('generates a session ID and caches it across tabs', () => {
       const id = getOrCreateSessionId();
       expect(id).toBeTruthy();
       expect(id.length).toBeGreaterThan(0);
@@ -306,9 +306,9 @@ describe('tracking consent', () => {
       expect(first).toBe(second);
     });
 
-    it('stores the session ID in sessionStorage', () => {
+    it('stores the session ID in localStorage', () => {
       const id = getOrCreateSessionId();
-      expect(sessionStorage.getItem('jv_session_id')).toBe(id);
+      expect(localStorage.getItem('jv_session_id')).toBe(id);
     });
   });
 

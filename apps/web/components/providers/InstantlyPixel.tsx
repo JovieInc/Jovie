@@ -1,11 +1,11 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { isDemoRecordingClient } from '@/lib/demo-recording';
 import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
-import { isMarketingAllowed } from '@/lib/tracking/consent';
+import { useMarketingConsent } from '@/lib/tracking/use-marketing-consent';
 
 // Allowlist approach (fail-closed): the pixel only fires on explicit marketing
 // pages. Any route NOT in this list — including future auth-adjacent routes,
@@ -77,39 +77,7 @@ export function InstantlyPixel() {
   const isAllowed = isAllowedRoute(pathname);
   const isDemo = isDemoRecordingClient();
   const skipConsentListener = !pixelId || isPassive || !isAllowed || isDemo;
-
-  const [allowed, setAllowed] = useState(false);
-
-  useEffect(() => {
-    if (skipConsentListener) return;
-    if (globalThis.window === undefined) return;
-
-    // Sync consent state on mount (covers SSR → client transition)
-    setAllowed(isMarketingAllowed());
-
-    let unsubConsent: (() => void) | undefined;
-
-    const attach = () => {
-      if (!globalThis.JVConsent) return;
-      unsubConsent = globalThis.JVConsent.onChange(() => {
-        setAllowed(isMarketingAllowed());
-      });
-    };
-
-    if (globalThis.JVConsent) {
-      attach();
-      return () => {
-        unsubConsent?.();
-      };
-    }
-
-    const onReady = () => attach();
-    globalThis.addEventListener('jvconsent:ready', onReady, { once: true });
-    return () => {
-      globalThis.removeEventListener('jvconsent:ready', onReady);
-      unsubConsent?.();
-    };
-  }, [skipConsentListener]);
+  const allowed = useMarketingConsent(skipConsentListener);
 
   const runtimeState = resolveInstantlyRuntimeState({
     hasPixelId: Boolean(pixelId),

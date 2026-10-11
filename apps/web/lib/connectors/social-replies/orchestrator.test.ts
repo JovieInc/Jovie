@@ -510,4 +510,58 @@ describe('runSocialReplyBatch execution and receipts', () => {
       expect(receipt.items[1]?.failureReason).toBe('batch-halted');
     }
   );
+
+  it('streams per-item progress and ignores observer errors', async () => {
+    const settled: string[] = [];
+    const adapter = adapterWith({
+      preflight: vi
+        .fn()
+        .mockResolvedValueOnce(preflight({ alreadyReplied: true }))
+        .mockResolvedValueOnce(preflight()),
+    });
+
+    const receipt = await runSocialReplyBatch(
+      approvedRequest([target(1), target(2)]),
+      { youtube: adapter },
+      {
+        now: fixedNow,
+        onItemSettled: item => {
+          settled.push(`${item.targetId}:${item.status}`);
+          if (settled.length === 1) throw new Error('observer exploded');
+        },
+      }
+    );
+
+    expect(settled).toEqual(['comment-1:skipped', 'comment-2:posted']);
+    expect(receipt.counts).toEqual({
+      drafted: 0,
+      posted: 1,
+      skipped: 1,
+      failed: 0,
+      ambiguous: 0,
+    });
+  });
+
+  it('emits progress for halted and unattempted items too', async () => {
+    const settled: string[] = [];
+    const adapter = adapterWith({
+      preflight: vi.fn(async () => {
+        throw new Error('provider timeout');
+      }),
+    });
+
+    const receipt = await runSocialReplyBatch(
+      approvedRequest([target(1), target(2)]),
+      { youtube: adapter },
+      {
+        now: fixedNow,
+        onItemSettled: item => {
+          settled.push(`${item.targetId}:${item.status}`);
+        },
+      }
+    );
+
+    expect(receipt.halted).toBe(true);
+    expect(settled).toEqual(['comment-1:ambiguous', 'comment-2:failed']);
+  });
 });

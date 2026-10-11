@@ -7,8 +7,10 @@ import { getWaitlistRouteRedirect } from '@/lib/auth/access-route-redirect';
 import {
   CanonicalUserState,
   getWaitlistAccess,
+  getWaitlistReservedHandle,
   resolveUserState,
 } from '@/lib/auth/gate';
+import { PRICING } from '@/lib/config/pricing';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
@@ -66,6 +68,10 @@ export default async function WaitlistPage() {
     );
   }
 
+  // Anyone signed in can buy the self-serve Pro offer while waiting; a
+  // verified payment admits them (JOV-7701 founder decision, 2026-10-03).
+  const proCheckoutPriceId = PRICING.pro.monthly.priceId || null;
+
   // JOV-6449: gate-off post-auth must not depend on a waitlist table read.
   // Canonical WAITLIST_PENDING is enough to render the receipt.
   const waitlistGateEnabled = await isWaitlistGateEnabled();
@@ -75,7 +81,10 @@ export default async function WaitlistPage() {
   ) {
     return (
       <WaitlistRouteWithContract>
-        <WaitlistSuccessView email={authResult.context.email} />
+        <WaitlistSuccessView
+          email={authResult.context.email}
+          proCheckoutPriceId={proCheckoutPriceId}
+        />
       </WaitlistRouteWithContract>
     );
   }
@@ -84,9 +93,14 @@ export default async function WaitlistPage() {
     ? await getWaitlistAccess(authResult.context.email)
     : null;
   if (access?.entryId && isWaitlistPendingStatus(access.status)) {
+    const reservedHandle = await getWaitlistReservedHandle(access.entryId);
     return (
       <WaitlistRouteWithContract>
-        <WaitlistSuccessView email={authResult.context.email} />
+        <WaitlistSuccessView
+          email={authResult.context.email}
+          reservedHandle={reservedHandle}
+          proCheckoutPriceId={proCheckoutPriceId}
+        />
       </WaitlistRouteWithContract>
     );
   }

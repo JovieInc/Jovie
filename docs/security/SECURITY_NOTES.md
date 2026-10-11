@@ -10,7 +10,7 @@ _Last reviewed: 2026-04-01_
 
 - **Validation**
   - `lib/env.ts` uses Zod to validate core envs (Clerk, Stripe, Cloudinary, DB) with a runtime-vs-build distinction.
-  - `lib/startup/environment-validator.ts` and `/api/health/*` routes surface missing/invalid envs and DB issues.
+  - `lib/startup/environment-validator.ts` validates missing/invalid envs. `/api/health/*` detail bodies that surface those issues require an admin session or `CRON_SECRET`. Anonymous callers get `{healthy,timestamp}` only (`/api/health` success stays `{status:"ok"}`). `/api/health/build-info` and `/api/health/redis` are unchanged.
 
 - **Client vs server env**
   - Today `lib/env.ts` builds a single `env` object that includes both public (`NEXT_PUBLIC_*`) and server-only values (DB URL, Stripe secret keys, etc.).
@@ -86,7 +86,6 @@ _Last reviewed: 2026-04-01_
       - `X-Content-Type-Options: nosniff`
       - `Referrer-Policy: origin-when-cross-origin`
     - Caching strategy:
-      - `/api/feature-flags`: `Cache-Control: no-store`.
       - Other `/api/*`: `Cache-Control: public, max-age=300, s-maxage=300`.
       - All other routes (except `.well-known/vercel/flags`): `Cache-Control: public, max-age=0, must-revalidate`.
     - `next/image` is configured with a very strict per-image CSP (`default-src 'self'; script-src 'none'; sandbox;`) via `images.contentSecurityPolicy`. This applies only to the image optimizer, not as a global app CSP.

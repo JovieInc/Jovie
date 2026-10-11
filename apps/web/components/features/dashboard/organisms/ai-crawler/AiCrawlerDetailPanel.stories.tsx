@@ -159,22 +159,29 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const detailPanelArgs = { isOpen: true, onClose: () => undefined };
+
 export const Populated: Story = {
+  args: detailPanelArgs,
   render: () => <AiCrawlerDetailStory data={populatedAnalytics} />,
 };
 
 export const MissingTelemetry: Story = {
+  args: detailPanelArgs,
   render: () => <AiCrawlerDetailStory data={null} />,
 };
 
 export const Loading: Story = {
+  args: detailPanelArgs,
   render: () => <AiCrawlerDetailStory data={null} loading />,
 };
 
 export const RealZero: Story = {
+  args: detailPanelArgs,
   render: () => <AiCrawlerDetailStory data={zeroAnalytics} />,
 };
 
 export const FreeTeaser: Story = {
+  args: detailPanelArgs,
   render: () => <AiCrawlerDetailStory data={teaserAnalytics} />,
 };

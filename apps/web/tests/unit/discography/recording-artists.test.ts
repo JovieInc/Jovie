@@ -31,7 +31,7 @@ describe('upsertRecordingArtist', () => {
     const expected = {
       id: 'ra-1',
       recordingId: 'rec-1',
-      artistId: 'artist-1',
+      artistId: '123e4567-e89b-42d3-a456-426614174000',
       role: 'main_artist',
     };
 
@@ -42,7 +42,7 @@ describe('upsertRecordingArtist', () => {
 
     const result = await upsertRecordingArtist({
       recordingId: 'rec-1',
-      artistId: 'artist-1',
+      artistId: '123e4567-e89b-42d3-a456-426614174000',
       role: 'main_artist',
       isPrimary: true,
       position: 0,
@@ -53,7 +53,7 @@ describe('upsertRecordingArtist', () => {
     expect(values).toHaveBeenCalledWith(
       expect.objectContaining({
         recordingId: 'rec-1',
-        artistId: 'artist-1',
+        artistId: '123e4567-e89b-42d3-a456-426614174000',
         role: 'main_artist',
         isPrimary: true,
         position: 0,
@@ -69,7 +69,7 @@ describe('upsertRecordingArtist', () => {
 
     await upsertRecordingArtist({
       recordingId: 'rec-1',
-      artistId: 'artist-1',
+      artistId: '123e4567-e89b-42d3-a456-426614174000',
       role: 'main_artist',
     });
 

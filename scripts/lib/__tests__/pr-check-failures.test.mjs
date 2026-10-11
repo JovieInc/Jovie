@@ -383,6 +383,7 @@ describe('pr-check-failures', () => {
     expect(MERGE_GATE_CHECK_NAMES).toEqual([
       'Path Changes',
       'ci-fast',
+      'Blog Content Qualification',
       'CI Risk Classifier',
       'Secret Scan (gitleaks + trufflehog)',
       'Golden Path Lock',

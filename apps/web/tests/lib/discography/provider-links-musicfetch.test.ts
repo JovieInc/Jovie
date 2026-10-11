@@ -35,6 +35,7 @@ import {
   resolveProviderLinks,
   type TrackDescriptor,
 } from '@/lib/discography/provider-links';
+import { resetMusicfetchDormantForTests } from '@/lib/music-resolver/musicfetch-gate';
 
 const baseTrack: TrackDescriptor = {
   title: 'Blinding Lights',
@@ -46,6 +47,11 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
+    resetMusicfetchDormantForTests();
+    delete process.env.FEATURE_IN_HOUSE_RESOLVER;
+    delete process.env.FEATURE_MUSICFETCH_FALLBACK;
+    delete process.env.FEATURE_MUSIC_RESOLVER_PROVIDER_LINKS;
+    delete process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS;
     vi.clearAllMocks();
     fetchMock.mockReset();
     mockIsMusicfetchAvailable.mockReturnValue(true);
@@ -291,5 +297,24 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
     expect(mockMusicfetchLookupByIsrc).not.toHaveBeenCalled();
     expect(links).toHaveLength(1);
     expect(links[0].quality).toBe('search_fallback');
+  });
+
+  it('cuts provider links over independently and honors vendor-off', async () => {
+    process.env.FEATURE_MUSIC_RESOLVER_PROVIDER_LINKS = 'true';
+    process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS = 'true';
+    process.env.FEATURE_MUSICFETCH_FALLBACK = 'false';
+
+    const { links } = await resolveProviderLinks(baseTrack, {
+      providers: ['youtube'],
+      fetcher: fetchMock,
+    });
+
+    expect(mockMusicfetchLookupByIsrc).not.toHaveBeenCalled();
+    expect(links).toEqual([
+      expect.objectContaining({
+        provider: 'youtube',
+        quality: 'search_fallback',
+      }),
+    ]);
   });
 });

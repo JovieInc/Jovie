@@ -17,6 +17,7 @@ export type TableNavAction =
   | 'last'
   | 'activate'
   | 'toggle'
+  | 'select'
   | 'close'
   | null;
 
@@ -52,6 +53,8 @@ export function resolveTableNavAction(
     case ' ':
     case 'Spacebar':
       return 'toggle';
+    case 'x':
+      return 'select';
     default:
       return null;
   }

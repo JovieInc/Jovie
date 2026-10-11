@@ -39,12 +39,18 @@ describe('last30days skill adoption (GH-10926)', () => {
     expect(content).toContain('idea-radar');
   });
 
-  it('idea-radar skill exists and references last30days', () => {
+  it('idea-radar is an event-driven JOV-5916 producer that references last30days', () => {
     const skillPath = join(repoRoot, '.claude/skills/idea-radar/SKILL.md');
     expect(existsSync(skillPath), `missing: ${skillPath}`).toBe(true);
     const content = readFileSync(skillPath, 'utf8');
     expect(content).toContain('idea-radar');
     expect(content).toContain('/last30days');
+    expect(content).toContain('Event-driven');
+    expect(content).toContain('JOV-5916');
+    expect(content).toContain('JOV-2966');
+    expect(content).toContain('Hermes is retired');
+    expect(content).not.toContain('Weekly Discovery Sweep');
+    expect(content).not.toContain('👍 = go build');
     // must cap cost (acceptance criteria)
     expect(content).toContain('cost-cap');
   });

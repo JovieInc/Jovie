@@ -11,7 +11,9 @@ import {
   createShippingMachine,
   expireShippingStateIfNeeded,
   SHIPPING_STATE_CACHE_GC_MS,
+  SHIPPING_STATE_CLOCK_UNCERTAINTY_MS,
   SHIPPING_STATE_POLL_INTERVAL_MS,
+  SHIPPING_STATE_REQUEST_TIMEOUT_MS,
   type ShippingMachineState,
   type ShippingStateView,
   shippingStateReadFromHttp,
@@ -31,7 +33,7 @@ const EMPTY_OPERATIONAL_FEED: OperationalTaskFeed = {
   canonicalSource: 'linear',
   cacheMode: 'local-reconciled',
   syncState: 'syncing',
-  sourceId: 'symphony-runtime',
+  sourceId: 'lane-pull-requests',
   observedAt: null,
   lastSyncedAt: null,
   freshnessDeadline: null,
@@ -139,20 +141,38 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
       );
       if (kioskToken) url.searchParams.set('kiosk', kioskToken);
 
+      const requestController = new AbortController();
+      const abortRequest = () => requestController.abort();
+      signal.addEventListener('abort', abortRequest, { once: true });
+      let timedOut = false;
+      const timeout = globalThis.setTimeout(() => {
+        timedOut = true;
+        requestController.abort();
+      }, SHIPPING_STATE_REQUEST_TIMEOUT_MS);
       let response: Response;
       try {
-        response = await fetch(url, { signal, cache: 'no-store' });
+        response = await fetch(url, {
+          signal: requestController.signal,
+          cache: 'no-store',
+        });
       } catch {
         if (signal.aborted) {
           throw new DOMException('Aborted', 'AbortError');
         }
         const now = Date.now();
         const next = expireShippingStateIfNeeded(
-          applyShippingStateRead(machine, { kind: 'disconnected' }, now),
+          applyShippingStateRead(
+            machine,
+            { kind: timedOut ? 'timeout' : 'disconnected' },
+            now
+          ),
           now
         );
         shippingMachines.set(key, next);
         return snapshotFor(key, next.view, 'error');
+      } finally {
+        globalThis.clearTimeout(timeout);
+        signal.removeEventListener('abort', abortRequest);
       }
 
       let payload: unknown = null;
@@ -205,6 +225,34 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
     refetchOnReconnect: true,
     retry: false,
   });
+
+  useEffect(() => {
+    const view = query.data?.view;
+    if (view?.connection !== 'connected' || !view.freshnessDeadlineAt) return;
+    const deadline =
+      Date.parse(view.freshnessDeadlineAt) +
+      SHIPPING_STATE_CLOCK_UNCERTAINTY_MS;
+    if (!Number.isFinite(deadline)) return;
+    const key = tokenKey(kioskToken);
+    const expire = () => {
+      const current = shippingMachines.get(key);
+      if (!current) return;
+      const next = expireShippingStateIfNeeded(current, Date.now());
+      if (next === current) return;
+      shippingMachines.set(key, next);
+      queryClient.setQueryData<HudShippingSnapshot>(
+        ['hud', 'shipping-state', kioskToken],
+        snapshot => (snapshot ? { ...snapshot, view: next.view } : snapshot)
+      );
+    };
+    const delay = deadline - Date.now();
+    if (delay <= 0) {
+      expire();
+      return;
+    }
+    const timeout = globalThis.setTimeout(expire, delay + 1);
+    return () => globalThis.clearTimeout(timeout);
+  }, [kioskToken, query.data?.view, queryClient]);
 
   return {
     view: query.data?.view ?? createEmptyShippingStateView(),

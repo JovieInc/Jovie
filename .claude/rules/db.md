@@ -28,9 +28,23 @@ For migration creation/run details: `docs/DB_MIGRATIONS.md`.
 | Use `db.query.*` or `db.select()` | Direct SQL strings outside `lib/db` |
 | `db.insert().values([...items])` | Loop with individual `db.insert()` calls |
 
-The project uses `@neondatabase/serverless` with the **WebSocket driver** for stateful RLS connections. Application code creates a client-side `Pool` (max 20 per Vercel container) because WebSocket connections are stateful and need lifecycle management. The `DATABASE_URL` uses Neon's **direct** endpoint (not the `-pooler` endpoint).
+The project uses `@neondatabase/serverless` with the **WebSocket driver** for stateful RLS connections. Application code creates a client-side `Pool` (max 20 per Vercel container) because WebSocket connections are stateful and need lifecycle management. The production `DATABASE_URL` is Neon's `-pooler` endpoint (PgBouncer, transaction mode).
 
 Scripts and migrations use the HTTP driver for stateless one-off operations. The `lib/db/client.ts` is a legacy HTTP-based client — **do not use it**.
+
+### Production SQL from agents and scripts
+
+Server connections behind the pooler are shared, so a session-level `SET` outlives your
+query and applies to the next app transaction on that connection. On 2026-09-27 an ad-hoc
+`psql "$DATABASE_URL" -c "set default_transaction_read_only=on; ..."` made production
+writes fail for about 1h40m, including LYB OAuth token exchange.
+
+- Read production with `scripts/db/prod-read.mjs "select ..."`. It uses the direct endpoint
+  and `BEGIN READ ONLY ... COMMIT`.
+- Otherwise, use only transaction-scoped state: `BEGIN READ ONLY`, `SET LOCAL`,
+  `SET TRANSACTION`, or `set_config(..., true)`. Never use plain `SET`, `SET SESSION`,
+  `set_config(..., false)`, or `ALTER ROLE/DATABASE ... SET`.
+- `.claude/hooks/prod-db-session-guard.mjs` blocks these forms in agent Bash commands.
 
 ### Transaction Restrictions (Canonical Policy)
 

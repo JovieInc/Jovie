@@ -44,8 +44,9 @@ export const LINKTREE_HANDLE_REGEX =
   /^[a-z0-9][a-z0-9_]{0,28}[a-z0-9]$|^[a-z0-9]{1,2}$/;
 
 /**
- * Patterns that indicate free tier Linktree branding.
- * Paid tier profiles have this branding removed.
+ * Patterns that indicate visible Linktree branding. Branding is a presentation
+ * fact only: paid accounts may leave it enabled and absence does not prove a
+ * paid account, plan, bill, purchase authority, or renewal timing.
  */
 export const LINKTREE_BRANDING_PATTERNS = [
   // Text branding patterns
@@ -64,7 +65,8 @@ export const LINKTREE_BRANDING_PATTERNS = [
 /**
  * Patterns that indicate a Linktree verification badge.
  * Verified profiles have a checkmark badge next to their name.
- * Verification requires a paid plan + identity confirmation.
+ * These patterns identify an identity-style badge only. Badge observations do
+ * not establish billing access or commercial intent.
  */
 export const LINKTREE_VERIFICATION_PATTERNS = [
   // Aria labels for verification badge

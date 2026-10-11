@@ -8,9 +8,10 @@ updates:
       interval: 'daily'
       time: '09:00'
       timezone: 'Etc/UTC'
-    # Ship now: preserve shallow PRs while removing the observed ten-slot
-    # starvation. Re-evaluate when 20+ npm update PRs remain open across two
-    # weekday runs; then group only low-risk development patches (JOV-5465).
+    # JOV-6837: the JOV-5465 re-evaluate trigger fired (12 open npm PRs, 5
+    # DIRTY on pnpm-lock.yaml, 2026-09-27). Each lockfile bump conflicts with
+    # every other one, so move-together families and low-risk dev patches
+    # land as one PR each. Majors and runtime deps stay one PR per package.
     open-pull-requests-limit: 25
     cooldown:
       default-days: 3
@@ -32,6 +33,29 @@ updates:
           - 'electron'
         update-types:
           - 'major'
+      # vitest and @vitest/* must share one version; split PRs broke each other.
+      vitest:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+        update-types:
+          - 'minor'
+          - 'patch'
+      dev-patch:
+        dependency-type: 'development'
+        update-types:
+          - 'patch'
+      # 2026-10-10: one daily batch opened 15 single-package runtime bumps. Each
+      # needs the full merge group (Mac build included) under ALLGREEN with
+      # max_entries_to_build 3, and the queue sat 18 deep for 90 min with no
+      # merge. Non-major runtime bumps land as one PR per day; majors stay one
+      # PR per package. Re-evaluate when the grouped PR fails more than one run
+      # in three (then split by family instead of by package).
+      runtime-non-major:
+        dependency-type: 'production'
+        update-types:
+          - 'minor'
+          - 'patch'
     ignore:
       # Temporary workaround: these packages do not publish 10.3.2.
       # Dependabot currently attempts that version and fails the update job.
@@ -58,8 +82,75 @@ updates:
       # same 6861 files). Ship now: stay on 56.3.2. Re-evaluate when a CLI
       # >=57 prebuilt tgz deploy of this repo reaches READY (manual preview
       # dispatch). Then drop this ignore and re-pin in deploy-workflow.test.ts.
+      # >=56.4 (not >=57): the >=57 range still let the 56.5.0 bump through
+      # (#18529), which fails the structural pin test.
       - dependency-name: 'vercel'
-        versions: ['>=57']
+        versions: ['>=56.4']
+      # Pinned at 2.5.14 (2026-10-10): 2.5.15 crashes ("Biome encountered an
+      # unexpected error") on a file outside the project root, which the
+      # structural Biome contract probes (scripts/lib/__tests__/biome-*.test.mjs)
+      # write to os.tmpdir(). The dev-patch group PR #21118 carried that bump
+      # and failed six merge groups in a row. Re-evaluate at 2.5.16: run those
+      # two probe files locally against the new binary, then drop this ignore.
+      - dependency-name: '@biomejs/biome'
+        versions: ['2.5.15']
+
+  # Isolated Eve pilot manifest (JOV-5214). This directory entry exists so
+  # SECURITY advisories are tracked for the standalone install; version
+  # updates stay OFF (open-pull-requests-limit: 0 keeps dependabot quiet
+  # while still creating the grouped security-update job that must go green).
+  - package-ecosystem: 'npm'
+    directory: '/apps/eve-pilot'
+    schedule:
+      interval: 'daily'
+      time: '09:00'
+      timezone: 'Etc/UTC'
+    open-pull-requests-limit: 0
+    assignees:
+      - 'itstimwhite'
+    commit-message:
+      prefix: 'deps'
+      include: 'scope'
+    labels:
+      - 'dependencies'
+      - 'automated'
+    ignore:
+      # Unfixable advisories tracked in JOV-8060 (exact pins by upstream
+      # CLIs; dev-only paths). Scoped to these exact versions only; new
+      # advisories in other versions still raise.
+      - dependency-name: 'undici'
+        versions: ['5.28.4', '5.29.0']
+      - dependency-name: '@fastify/busboy'
+        versions: ['2.1.1']
+
+  # Standalone deepsec scanner install (deepsec-native.yml runs npm ci
+  # daily). Security advisories tracked; version updates stay OFF the same
+  # way (open-pull-requests-limit: 0).
+  - package-ecosystem: 'npm'
+    directory: '/scripts/security/deepsec'
+    schedule:
+      interval: 'daily'
+      time: '09:00'
+      timezone: 'Etc/UTC'
+    open-pull-requests-limit: 0
+    assignees:
+      - 'itstimwhite'
+    commit-message:
+      prefix: 'deps'
+      include: 'scope'
+    labels:
+      - 'dependencies'
+      - 'automated'
+    ignore:
+      # Unfixable advisories tracked in JOV-8060. Exact-version scope only:
+      # - undici 8.5.0 pinned through pi-coding-agent 0.81.1 (deepsec 2.3.10
+      #   exact pin; next is a major).
+      # - sprintf-js 1.1.3 (GHSA-hp3w-g68c-fv3c): no patched release ever
+      #   published; parent just-bash is already latest.
+      - dependency-name: 'undici'
+        versions: ['8.5.0']
+      - dependency-name: 'sprintf-js'
+        versions: ['1.1.3']
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: 'github-actions'
@@ -82,7 +173,8 @@ updates:
       # init/analyze load one shared bundle and must move in the same PR.
       codeql-action:
         patterns:
-          - 'github/codeql-action'
+          # Sub-actions (analyze, upload-sarif, init) are distinct names.
+          - 'github/codeql-action*'
 
   # Enable version updates for Docker (if needed)
   - package-ecosystem: 'docker'

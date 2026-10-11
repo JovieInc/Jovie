@@ -5,6 +5,19 @@
  * invoice.payment_succeeded and invoice.payment_failed webhook events.
  */
 
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: vi.fn(async () => ({
+    ok: true as const,
+    eventId: 'server-event-1',
+    deduplicated: false,
+  })),
+  trackServerEventTx: vi.fn(async () => ({
+    ok: true as const,
+    eventId: 'server-event-1',
+    deduplicated: false,
+  })),
+}));
+
 import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,6 +29,7 @@ const {
   mockUpdateUserBillingStatus,
   mockGetPlanFromPriceId,
   mockCaptureCriticalError,
+  mockCaptureWarning,
   mockLogFallback,
   mockRecordCommission,
   mockSendPaymentFailedEmail,
@@ -29,6 +43,7 @@ const {
   mockUpdateUserBillingStatus: vi.fn(),
   mockGetPlanFromPriceId: vi.fn(),
   mockCaptureCriticalError: vi.fn(),
+  mockCaptureWarning: vi.fn(),
   mockLogFallback: vi.fn(),
   mockRecordCommission: vi.fn(),
   mockSendPaymentFailedEmail: vi.fn(),
@@ -67,6 +82,7 @@ vi.mock('@/lib/stripe/config', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
+  captureWarning: mockCaptureWarning,
   logFallback: mockLogFallback,
 }));
 
@@ -202,9 +218,15 @@ describe('@critical PaymentHandler', () => {
 
       const result = await handler.handle(context);
 
-      // Subscription is active so it's skipped (not in failure status)
+      // Subscription is active so it's skipped (not in failure status).
+      // The dunning attempt itself is a warning, not a critical error.
       expect(result.success).toBe(true);
-      expect(mockCaptureCriticalError).toHaveBeenCalled();
+      expect(mockCaptureWarning).toHaveBeenCalledWith(
+        'Payment failed for invoice',
+        expect.any(Error),
+        expect.objectContaining({ invoiceId: 'in_fail' })
+      );
+      expect(mockCaptureCriticalError).not.toHaveBeenCalled();
     });
 
     it('returns skipped for unknown event types', async () => {

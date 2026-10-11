@@ -16,6 +16,12 @@ import {
   STRUCTURAL_DEFAULT_CONCURRENCY,
   selectLanes,
 } from '../../ci-fast-lanes.mjs';
+import {
+  realGhVersion,
+  resolveRealGh,
+  runWithRealGh,
+  storedZip,
+} from '../real-gh-harness.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
@@ -42,6 +48,50 @@ const NEWER_SHA = 'b'.repeat(40);
 const DEPLOYMENT_ID = 'dpl_exact_generation';
 const DEPLOYMENT_URL = 'https://jovie-exact-generation-jovie.vercel.app';
 const tempRoots = [];
+
+describe('production verification admission', () => {
+  const job = getJobBlock(CONTROLLER_WORKFLOW, 'production-verified');
+  const condition = job.match(/if: >-\s*\$\{\{([\s\S]*?)\}\}/)?.[1];
+  if (!condition) throw new Error('Missing production verification condition');
+  // Evaluate the actual workflow expression with GitHub's JSON and status
+  // primitives so an empty skipped-job output cannot hide behind YAML parsing.
+  const evaluate = new Function(
+    'needs',
+    'fromJSON',
+    'always',
+    `return (${condition.replace(/needs\.([\w-]+)/g, "needs['$1']")});`
+  );
+  const admission = (result, ci, authorized = 'success', verified = 'false') =>
+    evaluate(
+      {
+        'release-source': { result, outputs: { ci } },
+        'authorize-production': {
+          result: authorized,
+          outputs: { already_verified: verified },
+        },
+      },
+      JSON.parse,
+      () => true
+    );
+
+  it('skips verification safely when source resolution has no receipt', () => {
+    for (const result of ['skipped', 'failure', 'cancelled']) {
+      expect(admission(result, '', 'skipped')).toBe(false);
+    }
+    expect(admission('success', '')).toBe(false);
+  });
+
+  it('requires a push receipt and successful unverified authorization', () => {
+    const push = JSON.stringify({ event: 'push' });
+    expect(admission('success', push)).toBe(true);
+    expect(
+      admission('success', JSON.stringify({ event: 'pull_request' }))
+    ).toBe(false);
+    expect(admission('success', push, 'failure')).toBe(false);
+    expect(admission('success', push, 'success', 'true')).toBe(false);
+    expect(() => admission('success', '{malformed')).toThrow();
+  });
+});
 
 afterEach(() => {
   vi.mocked(spawnSync).mockRestore();
@@ -89,6 +139,7 @@ function getStepRunScript(jobBlock, stepName) {
 function materialize(script, values) {
   const rendered = script.replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_, rawKey) => {
     const key = rawKey.trim();
+    if (key === 'inputs.release_mode') return 'production';
     if (!Object.hasOwn(values, key)) {
       throw new Error(`Missing workflow expression fixture: ${key}`);
     }
@@ -135,6 +186,7 @@ function runScript(script, fixture, env = {}) {
       ...process.env,
       ...env,
       GITHUB_OUTPUT: fixture.output,
+      GITHUB_WORKSPACE: REPO_ROOT,
       PATH: `${fixture.bin}${delimiter}${process.env.PATH || ''}`,
       RUNNER_TEMP: fixture.root,
     },
@@ -143,8 +195,8 @@ function runScript(script, fixture, env = {}) {
 
 function releaseExpressions(overrides = {}) {
   return {
-    "needs.migrate-production.outputs.schema_drift == 'true' || needs.deploy-staging.outputs.schema_drift == 'true'":
-      'false',
+    "needs.migrate-production.outputs.schema_drift == 'true'": 'false',
+    'inputs.staging_verified': 'true',
     'needs.promote-production.outputs.failure_subtype': '',
     'needs.sentry-error-gate.outputs.gate_status': 'passed',
     'needs.production-oauth-gate.outputs.gate_status': 'passed',
@@ -302,6 +354,15 @@ function finalizeExpressions(overrides = {}) {
 function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
   const fixture = makeFixture('controller-finalize-');
   const marker = join(fixture.root, 'production-generation-verified.json');
+  mkdirSync(join(fixture.root, 'release-lineage'), { recursive: true });
+  writeFileSync(
+    join(fixture.root, 'release-lineage/fleet-admission.json'),
+    JSON.stringify({ scopedAdmission: { revision: EXPECTED_SHA } })
+  );
+  writeFileSync(
+    join(fixture.root, 'release-lineage/release-risk-receipt.json'),
+    '{"latency":{"mergeAt":"2026-10-03T00:00:00Z","targetP95Seconds":1800},"ovie":{},"certificationPacket":null}'
+  );
   stubCommand(
     fixture.bin,
     'gh',
@@ -369,6 +430,9 @@ function runStagingStep(stepName, mainSha, env = {}) {
     ROLLBACK_RESULT: 'skipped',
     SOURCE_CI_RUN_ATTEMPT: '1',
     SOURCE_CI_RUN_ID: '9876',
+    SOURCE_CI_COMPLETED_AT: new Date(Date.now() - 1_000).toISOString(),
+    STAGING_REFRESH_OUTCOME:
+      mainSha === EXPECTED_SHA ? 'current' : 'superseded_after_mutation',
     STUB_ALIAS_MARKER: aliasMarker,
     STUB_MAIN_SHA: mainSha,
     ...env,
@@ -400,15 +464,14 @@ describe('production release supersession execution', () => {
     ['staging build', 'needs.deploy-staging.result'],
     ['staging attestation', 'needs.attest-staging-build.result'],
     ['staging canary', 'needs.canary-health-gate.result'],
-  ])('keeps a %s failure red even when main later advances', (_, failedKey) => {
+  ])('handles a %s failure according to phase ownership', (_, failedKey) => {
     const overrides = { [failedKey]: 'failure' };
-    if (failedKey !== 'needs.release-head.result') {
-      overrides['needs.staging-head.outputs.is_current'] = 'false';
-    }
     const failed = runReleaseResult(overrides, NEWER_SHA);
-    expect(failed.result.status).not.toBe(0);
+    expect(failed.result.status === 0).toBe(
+      failedKey !== 'needs.release-head.result'
+    );
     expect(failed.outputs).toMatchObject({
-      released: 'false',
+      released: failedKey === 'needs.release-head.result' ? 'false' : 'true',
       superseded_before_promotion: 'false',
     });
   });
@@ -433,20 +496,13 @@ describe('production release supersession execution', () => {
     });
   });
 
-  it('accepts only a gated post-promotion staging-refresh supersession', () => {
-    const accepted = runReleaseResult({
-      'needs.staging-deployment-receipt.outputs.staging_refresh_outcome':
-        'superseded_after_promotion',
-      'needs.staging-deployment-receipt.outputs.deployed': '',
-    });
+  it('requires the external exact staging receipt', () => {
+    const accepted = runReleaseResult();
     expect(accepted.result.status, accepted.result.stderr).toBe(0);
     expect(accepted.outputs.released).toBe('true');
 
     const incomplete = runReleaseResult({
-      'needs.staging-deployment-receipt.outputs.staging_refresh_outcome':
-        'superseded_after_promotion',
-      'needs.staging-deployment-receipt.outputs.deployed': '',
-      'needs.attest-staging-build.result': 'failure',
+      'inputs.staging_verified': 'false',
     });
     expect(incomplete.result.status).not.toBe(0);
     expect(incomplete.outputs.released).toBe('false');
@@ -525,6 +581,7 @@ describe('production release supersession execution', () => {
     expect(superseded.outputs.verified).toBe('true');
     expect(superseded.marker).toMatchObject({
       deploymentId: DEPLOYMENT_ID,
+      fleetAdmission: { revision: EXPECTED_SHA },
       sha: EXPECTED_SHA,
       terminalReason: 'skipped_superseded',
     });
@@ -552,14 +609,14 @@ describe('production release supersession execution', () => {
     expect(incomplete.marker).toBeNull();
   });
 
-  it('refuses stale staging mutation and omits a post-reassert stale receipt', () => {
+  it('records a mutation that finished before a newer generation took the lease', () => {
     const reassert = runStagingStep(
-      'Reassert the exact preview after production settles',
+      'Classify staging generation after mutation',
       NEWER_SHA
     );
     expect(reassert.result.status, reassert.result.stderr).toBe(0);
     expect(reassert.outputs.staging_refresh_outcome).toBe(
-      'superseded_after_promotion'
+      'superseded_after_mutation'
     );
     expect(reassert.aliasCalled).toBe(false);
 
@@ -569,22 +626,22 @@ describe('production release supersession execution', () => {
     );
     expect(receipt.result.status, receipt.result.stderr).toBe(0);
     expect(receipt.outputs.staging_refresh_outcome).toBe(
-      'superseded_after_promotion'
+      'superseded_after_mutation'
     );
-    expect(receipt.outputs.deployed).toBeUndefined();
-    expect(receipt.receiptExists).toBe(false);
+    expect(receipt.outputs.deployed).toBe('true');
+    expect(receipt.receiptExists).toBe(true);
   });
 
-  it('accepts exact pre-promotion supersession at both staging boundaries without mutation', () => {
+  it('ignores production state when classifying a staging generation', () => {
     const proof = { PROMOTION_SHA: NEWER_SHA };
     const reassert = runStagingStep(
-      'Reassert the exact preview after production settles',
+      'Classify staging generation after mutation',
       NEWER_SHA,
       proof
     );
     expect(reassert.result.status, reassert.result.stderr).toBe(0);
     expect(reassert.outputs.staging_refresh_outcome).toBe(
-      'superseded_before_promotion'
+      'superseded_after_mutation'
     );
     expect(reassert.outputs.deployed).toBeUndefined();
     expect(reassert.aliasCalled).toBe(false);
@@ -597,11 +654,11 @@ describe('production release supersession execution', () => {
     );
     expect(receipt.result.status, receipt.result.stderr).toBe(0);
     expect(receipt.outputs.staging_refresh_outcome).toBe(
-      'superseded_before_promotion'
+      'superseded_after_mutation'
     );
-    expect(receipt.outputs.deployed).toBeUndefined();
+    expect(receipt.outputs.deployed).toBe('true');
     expect(receipt.aliasCalled).toBe(false);
-    expect(receipt.receiptExists).toBe(false);
+    expect(receipt.receiptExists).toBe(true);
   });
 
   it.each([
@@ -618,16 +675,14 @@ describe('production release supersession execution', () => {
       'post-promotion evidence with rollback',
       { PROMOTION_SHA: EXPECTED_SHA, ROLLBACK_RESULT: 'success' },
     ],
-  ])('fails closed at both staging boundaries for %s', (_, evidence) => {
+  ])('keeps staging classification independent of %s', (_, evidence) => {
     for (const stepName of [
-      'Reassert the exact preview after production settles',
+      'Classify staging generation after mutation',
       'Write typed staging deployment receipt',
     ]) {
       const result = runStagingStep(stepName, NEWER_SHA, evidence);
-      expect(result.result.status).not.toBe(0);
-      expect(result.outputs.deployed).toBeUndefined();
+      expect(result.result.status, result.result.stderr).toBe(0);
       expect(result.aliasCalled).toBe(false);
-      expect(result.receiptExists).toBe(false);
     }
   });
 
@@ -640,7 +695,7 @@ describe('production release supersession execution', () => {
     expect(current.outputs).toMatchObject({
       deployed: 'true',
       deployment_id: DEPLOYMENT_ID,
-      staging_refresh_outcome: 'current_receipt',
+      staging_refresh_outcome: 'current',
     });
     expect(current.receiptExists).toBe(true);
   });
@@ -748,6 +803,9 @@ esac
     const fixture = makeFixture('lineage-promote-');
     stubLineageGh(fixture.bin);
     const promoted = join(fixture.root, 'promoted');
+    const stagingAlias = join(fixture.root, 'staging-alias');
+    const stagingRestore = join(fixture.root, 'staging-restore');
+    writeFileSync(stagingAlias, 'dpl_staging_preview');
     const vercel = join(fixture.root, 'vercel');
     writeFileSync(
       vercel,
@@ -757,10 +815,19 @@ case "$1" in
     id="$2"
     if [ "$2" = "jov.ie" ]; then
       if [ -f "$STUB_PROMOTED" ]; then id="$STUB_DEPLOY_ID"; else id="dpl_previous_generation"; fi
+    elif [ "$2" = "staging.jov.ie" ]; then
+      id="$(cat "$STUB_STAGING_ALIAS")"
     fi
-    printf '{"id":"%s","readyState":"READY","target":"production","url":"https://jovie-%s-jovie.vercel.app"}\\n' "$id" "$id" ;;
+    target="production"
+    if [ "$id" = "dpl_staging_preview" ]; then target="preview"; fi
+    printf '{"id":"%s","readyState":"READY","target":"%s","url":"https://jovie-%s-jovie.vercel.app"}\\n' "$id" "$target" "$id" ;;
   rolling-release) printf 'null\\n' ;;
-  promote) printf '%s\\n' "$*" > "$STUB_PROMOTED" ;;
+  promote)
+    printf '%s\\n' "$*" > "$STUB_PROMOTED"
+    printf '%s' "$STUB_DEPLOY_ID" > "$STUB_STAGING_ALIAS" ;;
+  alias)
+    printf '%s\\n' "$*" > "$STUB_STAGING_RESTORE"
+    printf '%s' 'dpl_staging_preview' > "$STUB_STAGING_ALIAS" ;;
 esac
 `
     );
@@ -785,6 +852,8 @@ esac
           STUB_DEPLOY_ID: DEPLOYMENT_ID,
           STUB_MAIN_SHA: mainSha,
           STUB_PROMOTED: promoted,
+          STUB_STAGING_ALIAS: stagingAlias,
+          STUB_STAGING_RESTORE: stagingRestore,
           VERCEL_CLI: vercel,
           VERCEL_ORG_ID: 'team_stub',
           VERCEL_PROJECT_ID: 'prj_stub',
@@ -796,6 +865,8 @@ esac
       promoted: existsSync(promoted),
       result,
       outputs: parseOutputs(fixture.output),
+      stagingAlias: readFileSync(stagingAlias, 'utf8'),
+      stagingRestored: existsSync(stagingRestore),
     };
   }
 
@@ -803,11 +874,15 @@ esac
     const exact = runPromote(EXPECTED_SHA, 'identical');
     expect(exact.result.status, exact.result.stderr).toBe(0);
     expect(exact.promoted).toBe(true);
+    expect(exact.stagingAlias).toBe('dpl_staging_preview');
+    expect(exact.stagingRestored).toBe(true);
     expect(exact.outputs.promotion_sha).toBe(EXPECTED_SHA);
 
     const ancestor = runPromote(NEWER_SHA, 'ahead');
     expect(ancestor.result.status, ancestor.result.stderr).toBe(0);
     expect(ancestor.promoted).toBe(true);
+    expect(ancestor.stagingAlias).toBe('dpl_staging_preview');
+    expect(ancestor.stagingRestored).toBe(true);
     expect(ancestor.outputs.promotion_sha).toBe(EXPECTED_SHA);
   });
 
@@ -815,7 +890,382 @@ esac
     const diverged = runPromote(NEWER_SHA, 'diverged');
     expect(diverged.result.status, diverged.result.stderr).toBe(0);
     expect(diverged.promoted).toBe(false);
+    expect(diverged.stagingAlias).toBe('dpl_staging_preview');
+    expect(diverged.stagingRestored).toBe(false);
     expect(diverged.outputs.promotion_sha).toBe(NEWER_SHA);
+  });
+});
+
+describe('controller exact risk artifact discovery', () => {
+  const runId = 37739744218;
+  const attempt = 2;
+  const artifactName = `ci-risk-classification-${runId}-${attempt}`;
+  const risk = {
+    schemaVersion: 1,
+    riskLevel: 'high',
+    requiresSmoke: true,
+    requiresPreview: true,
+    blocksUnattendedAutoMerge: true,
+  };
+  const run = {
+    id: runId,
+    run_attempt: attempt,
+    run_started_at: '2026-10-08T06:40:00Z',
+    path: '.github/workflows/ci.yml',
+    head_sha: EXPECTED_SHA,
+    event: 'merge_group',
+    status: 'completed',
+    conclusion: 'success',
+  };
+  const artifact = {
+    id: 44,
+    name: artifactName,
+    archive_download_url:
+      'http://github.localhost/repos/JovieInc/Jovie/actions/artifacts/44/zip',
+    expired: false,
+    workflow_run: { id: runId, head_sha: EXPECTED_SHA },
+  };
+  const unrelated = Array.from({ length: 43 }, (_, index) => ({
+    ...artifact,
+    id: index,
+    name: `unrelated-${index}`,
+  }));
+  const script = getStepRunScript(
+    getJobBlock(CONTROLLER_WORKFLOW, 'fleet-promotion'),
+    'Resolve exact CI risk lane'
+  );
+
+  function discover(
+    { runs = [run], artifacts = [...unrelated, artifact], direct = false } = {},
+    candidate = script
+  ) {
+    const fixture = makeFixture('risk-discovery-');
+    const data = join(fixture.root, 'fixture.json');
+    const calls = join(fixture.root, 'calls.jsonl');
+    writeFileSync(
+      data,
+      JSON.stringify({ runs, artifacts, risk, direct, runId, artifactName })
+    );
+    // Emulate the installed gh CLI's page boundary and incompatible flag rule.
+    // jq is the real executable; run/head/attempt filtering is the actual shell.
+    stubCommand(
+      fixture.bin,
+      'gh',
+      `#!${process.execPath}
+const fs = require('node:fs');
+const cp = require('node:child_process');
+const args = process.argv.slice(2);
+const f = JSON.parse(fs.readFileSync(process.env.RISK_FIXTURE, 'utf8'));
+fs.appendFileSync(process.env.RISK_CALLS, JSON.stringify(args) + '\\n');
+if (args.includes('--slurp') && args.includes('--jq')) process.exit(2);
+if (args[0] === 'api') {
+  const endpoint = args.find(a => a.startsWith('repos/'));
+  if (endpoint.endsWith('/artifacts')) {
+    const pages = [ { artifacts: f.artifacts.slice(0, 30) }, { artifacts: f.artifacts.slice(30) } ];
+    const result = args.includes('--paginate') ? pages : args.includes('--slurp') ? [pages[0]] : pages[0];
+    if (args.includes('--jq')) process.stdout.write(cp.execFileSync('jq', ['-r', args[args.indexOf('--jq') + 1]], { input: JSON.stringify(result), encoding: 'utf8' }));
+    else process.stdout.write(JSON.stringify(result));
+  } else {
+    const query = args[args.indexOf('--jq') + 1];
+    process.stdout.write(cp.execFileSync('jq', ['-r', query], { input: JSON.stringify({ workflow_runs: f.runs }), encoding: 'utf8' }));
+  }
+} else if (args[0] === 'run' && args[1] === 'download') {
+  const name = args[args.indexOf('--name') + 1];
+  if (!(f.direct && args[2] === '900') && !(args[2] === String(f.runId) && name === f.artifactName)) process.exit(1);
+  const root = args[args.indexOf('--dir') + 1];
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(root + '/ci-risk-classification.json', JSON.stringify(f.risk));
+} else process.exit(2);
+`
+    );
+    const result = runScript(candidate, fixture, {
+      REPO: 'JovieInc/Jovie',
+      SOURCE_RUN_ID: '900',
+      SOURCE_RUN_ATTEMPT: '1',
+      SOURCE_SHA: EXPECTED_SHA,
+      RISK_FIXTURE: data,
+      RISK_CALLS: calls,
+    });
+    return {
+      result,
+      outputs: parseOutputs(fixture.output),
+      calls: readFileSync(calls, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line)),
+      downloaded: existsSync(
+        join(fixture.root, 'ci-risk/ci-risk-classification.json')
+      )
+        ? JSON.parse(
+            readFileSync(
+              join(fixture.root, 'ci-risk/ci-risk-classification.json'),
+              'utf8'
+            )
+          )
+        : null,
+    };
+  }
+
+  const realGh = resolveRealGh();
+  if (!realGh && process.env.CI)
+    throw new Error('Risk discovery CI requires the real gh CLI.');
+
+  it.skipIf(!realGh)(
+    'follows a real gh Link header beyond the first 100 artifacts and downloads unchanged HIGH policy',
+    async () => {
+      const fixture = makeFixture('risk-real-gh-');
+      const endpoint = `repos/JovieInc/Jovie/actions/runs/${runId}/artifacts`;
+      const realUnrelated = Array.from({ length: 143 }, (_, id) => ({
+        ...artifact,
+        id,
+        name: `unrelated-${id}`,
+      }));
+      const proof = await runWithRealGh({
+        gh: realGh,
+        script,
+        env: {
+          REPO: 'JovieInc/Jovie',
+          SOURCE_RUN_ID: '900',
+          SOURCE_RUN_ATTEMPT: '1',
+          SOURCE_SHA: EXPECTED_SHA,
+          GH_REPO: 'JovieInc/Jovie',
+          RUNNER_TEMP: fixture.root,
+          GITHUB_OUTPUT: fixture.output,
+        },
+        route: path => {
+          if (
+            path.startsWith('repos/JovieInc/Jovie/actions/runs/900/artifacts')
+          )
+            return { body: { artifacts: [] } };
+          if (path.startsWith('repos/JovieInc/Jovie/actions/runs?'))
+            return { body: { workflow_runs: [run] } };
+          if (path === `${endpoint}?per_page=100`)
+            return {
+              body: {
+                total_count: 144,
+                artifacts: realUnrelated.slice(0, 100),
+              },
+              headers: {
+                link: `<http://github.localhost/${endpoint}?per_page=100&page=2>; rel="next"`,
+              },
+            };
+          if (path === `${endpoint}?per_page=100&page=2`)
+            return {
+              body: {
+                total_count: 144,
+                artifacts: [...realUnrelated.slice(100), artifact],
+              },
+            };
+          if (path === 'repos/JovieInc/Jovie/actions/artifacts/44/zip')
+            return {
+              body: storedZip({
+                'ci-risk-classification.json': JSON.stringify(risk),
+              }),
+            };
+          return null;
+        },
+      });
+      expect(realGhVersion(realGh)).toMatch(/^gh version /);
+      expect(proof.code, proof.stderr).toBe(0);
+      expect(proof.requests, JSON.stringify(proof)).toContain(
+        `GET ${endpoint}?per_page=100&page=2`
+      );
+      expect(
+        parseOutputs(fixture.output).risk_lane,
+        JSON.stringify(proof)
+      ).toBe('high');
+      expect(
+        JSON.parse(
+          readFileSync(
+            join(fixture.root, 'ci-risk/ci-risk-classification.json'),
+            'utf8'
+          )
+        )
+      ).toEqual(risk);
+    }
+  );
+
+  it.skipIf(!realGh)(
+    'proves the actual gh parser rejects slurp combined with jq before any request',
+    async () => {
+      const proof = await runWithRealGh({
+        gh: realGh,
+        script:
+          'gh api --paginate --slurp repos/JovieInc/Jovie/actions/runs/123/artifacts --jq ".artifacts"',
+        route: () => {
+          throw new Error('Unsupported flags must not reach the network');
+        },
+      });
+      expect(proof.code).not.toBe(0);
+      expect(proof.stderr).toContain('--jq');
+      expect(proof.requests).toEqual([]);
+    }
+  );
+
+  it('discovers the exact unexpired receipt beyond page one and retains HIGH-risk policy', () => {
+    const proof = discover();
+    expect(proof.result.status, proof.result.stderr).toBe(0);
+    expect(proof.outputs.risk_lane).toBe('high');
+    expect(proof.downloaded).toEqual(risk);
+    expect(proof.calls.find(args => args.includes('--slurp'))).toEqual([
+      'api',
+      '--paginate',
+      '--slurp',
+      `repos/JovieInc/Jovie/actions/runs/${runId}/artifacts`,
+    ]);
+    const firstPageOnly = discover(
+      {},
+      script.replace('gh api --paginate --slurp', 'gh api --slurp')
+    );
+    expect(firstPageOnly.result.status, firstPageOnly.result.stderr).toBe(0);
+    expect(firstPageOnly.outputs.risk_lane).toBe('unknown');
+  });
+
+  it('keeps the existing direct exact-run download', () => {
+    const proof = discover({ direct: true });
+    expect(proof.result.status, proof.result.stderr).toBe(0);
+    expect(proof.outputs.risk_lane).toBe('high');
+    expect(proof.calls).toHaveLength(1);
+    expect(proof.downloaded).toEqual(risk);
+  });
+
+  it.each([
+    ['absent', []],
+    ['expired', [{ ...artifact, expired: true }]],
+    [
+      'stale attempt',
+      [{ ...artifact, name: `ci-risk-classification-${runId}-1` }],
+    ],
+    [
+      'future attempt',
+      [{ ...artifact, name: `ci-risk-classification-${runId}-99` }],
+    ],
+    ['prefix lookalike', [{ ...artifact, name: `${artifactName}-copy` }]],
+    [
+      'wrong run',
+      [
+        {
+          ...artifact,
+          workflow_run: { ...artifact.workflow_run, id: runId + 1 },
+        },
+      ],
+    ],
+    [
+      'wrong head',
+      [
+        {
+          ...artifact,
+          workflow_run: { ...artifact.workflow_run, head_sha: NEWER_SHA },
+        },
+      ],
+    ],
+    ['missing lineage', [{ ...artifact, workflow_run: null }]],
+    ['ambiguous', [artifact, { ...artifact, id: 45 }]],
+  ])('fails closed for %s risk artifacts', (_, artifacts) => {
+    const proof = discover({ artifacts });
+    expect(proof.result.status, proof.result.stderr).toBe(0);
+    expect(proof.outputs.risk_lane).toBe('unknown');
+    expect(proof.downloaded).toBeNull();
+  });
+
+  it.each([
+    ['wrong head', { head_sha: NEWER_SHA }],
+    ['wrong workflow', { path: '.github/workflows/not-ci.yml' }],
+    ['wrong event', { event: 'push' }],
+    ['failed', { conclusion: 'failure' }],
+    ['unfinished', { status: 'in_progress' }],
+    ['invalid attempt', { run_attempt: 0 }],
+  ])('does not consume a %s proof run', (_, fields) => {
+    const proof = discover({ runs: [{ ...run, ...fields }] });
+    expect(proof.result.status, proof.result.stderr).toBe(0);
+    expect(proof.outputs.risk_lane).toBe('unknown');
+    expect(proof.downloaded).toBeNull();
+  });
+
+  it('does not prefer an old higher attempt over the current successful run', () => {
+    const proof = discover({
+      runs: [
+        {
+          ...run,
+          id: 10,
+          run_attempt: 99,
+          run_started_at: '2026-10-01T06:00:00Z',
+        },
+        run,
+      ],
+    });
+    expect(proof.result.status, proof.result.stderr).toBe(0);
+    expect(proof.outputs.risk_lane).toBe('high');
+    expect(proof.downloaded.requiresSmoke).toBe(true);
+    expect(proof.downloaded.requiresPreview).toBe(true);
+    expect(proof.downloaded.blocksUnattendedAutoMerge).toBe(true);
+  });
+});
+
+describe('controller merge-queue read resilience', () => {
+  function runCoalesce(queueFailures) {
+    const fixture = makeFixture('coalesce-');
+    const attempts = join(fixture.root, 'queue-attempts');
+    stubCommand(
+      fixture.bin,
+      'gh',
+      `#!/bin/sh
+case "$*" in
+  *graphql*)
+    n=0
+    [ -f "$STUB_QUEUE_ATTEMPTS" ] && n="$(cat "$STUB_QUEUE_ATTEMPTS")"
+    n=$((n + 1))
+    printf '%s' "$n" > "$STUB_QUEUE_ATTEMPTS"
+    if [ "$n" -le "$STUB_QUEUE_FAILURES" ]; then
+      echo "gh: API rate limit already exceeded for site ID installation." >&2
+      exit 1
+    fi
+    printf '{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[]}}}}}\\n'
+    ;;
+  *) printf '%s\\n' "$STUB_MAIN_SHA" ;;
+esac
+`
+    );
+    const script = getStepRunScript(
+      getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+      'Evaluate event-driven supersession'
+    );
+    const result = runScript(script, fixture, {
+      COALESCE_MAX_SECONDS: '150',
+      COALESCE_PER_GENERATION_SECONDS: '30',
+      EXPECTED_SHA,
+      FIXED_WINDOW_SECONDS_REPLACED: '60',
+      GH_API_RETRY_ATTEMPTS: '3',
+      GH_API_RETRY_SECONDS: '0',
+      GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+      PRODUCTION_STARVATION_SECONDS: '5400',
+      REPOSITORY: 'JovieInc/Jovie',
+      STUB_MAIN_SHA: EXPECTED_SHA,
+      STUB_QUEUE_ATTEMPTS: attempts,
+      STUB_QUEUE_FAILURES: String(queueFailures),
+    });
+    return {
+      attempts: existsSync(attempts)
+        ? Number(readFileSync(attempts, 'utf8'))
+        : 0,
+      outputs: parseOutputs(fixture.output),
+      result,
+    };
+  }
+
+  it('recovers from a transient API failure and proceeds on an empty queue', () => {
+    const run = runCoalesce(1);
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.attempts).toBe(2);
+    expect(run.outputs.is_current).toBe('true');
+    expect(run.outputs.decision).toBe('proceed');
+  });
+
+  it('still fails closed when the merge queue stays unreadable', () => {
+    const run = runCoalesce(9);
+    expect(run.result.status).toBe(1);
+    expect(run.attempts).toBe(3);
+    expect(run.result.stdout).toContain('Could not read the main merge queue');
   });
 });
 

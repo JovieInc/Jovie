@@ -3,6 +3,12 @@ import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const ALLOWED_STATUSES = new Set(['in_progress', 'ok', 'error']);
+const MAX_DELIVERY_ATTEMPTS = 3;
+
+// Delivery failures are transient transport problems (DNS, TCP resets, Sentry
+// 5xx/429). They must not fail the probe job: Sentry's own missed-check-in
+// deadman is the alerting channel for a truly unreachable ingest.
+export class CheckInDeliveryError extends Error {}
 const CHECK_IN_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MONITOR_SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -36,6 +42,7 @@ export async function sendCheckIn({
   environment = 'production',
   fetchImpl = fetch,
   monitorSlug,
+  sleepImpl = ms => new Promise(resolve => setTimeout(resolve, ms)),
   status,
 }) {
   if (!ALLOWED_STATUSES.has(status))
@@ -50,29 +57,41 @@ export async function sendCheckIn({
   };
   if (status === 'in_progress') {
     payload.monitor_config = {
-      checkin_margin: 5,
+      checkin_margin: 60,
       failure_issue_threshold: 1,
       max_runtime: 3,
       recovery_threshold: 1,
-      schedule: { type: 'crontab', value: '*/5 * * * *' },
+      schedule: { type: 'interval', unit: 'hour', value: 4 },
       timezone: 'UTC',
     };
   }
 
-  const response = await fetchImpl(buildCronCheckInUrl(dsn, monitorSlug), {
-    body: JSON.stringify(payload),
-    headers: { 'content-type': 'application/json' },
-    method: 'POST',
-    signal: AbortSignal.timeout(10_000),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Sentry rejected the check-in with HTTP ${response.status}`
-    );
+  const url = buildCronCheckInUrl(dsn, monitorSlug);
+  let lastError;
+  for (let attempt = 1; attempt <= MAX_DELIVERY_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetchImpl(url, {
+        body: JSON.stringify(payload),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (response.ok) return checkInId;
+      const error = new CheckInDeliveryError(
+        `Sentry rejected the check-in with HTTP ${response.status}`
+      );
+      if (response.status !== 429 && response.status < 500) throw error;
+      lastError = error;
+    } catch (error) {
+      if (error instanceof CheckInDeliveryError) throw error;
+      lastError = new CheckInDeliveryError(
+        `Sentry check-in delivery failed: ${error.message}`,
+        { cause: error }
+      );
+    }
+    if (attempt < MAX_DELIVERY_ATTEMPTS) await sleepImpl(250 * attempt);
   }
-
-  return checkInId;
+  throw lastError;
 }
 
 export function parseArgs(argv, uuidFactory = randomUUID) {
@@ -96,16 +115,22 @@ export async function main({
   uuidFactory,
 } = {}) {
   const { checkInId, status } = parseArgs(argv, uuidFactory);
-  await sendCheckInImpl({
-    checkInId,
-    dsn: env.SENTRY_DSN,
-    monitorSlug: 'jovie-production-continuity-schedule',
-    status,
-  });
+  try {
+    await sendCheckInImpl({
+      checkInId,
+      dsn: env.SENTRY_DSN,
+      monitorSlug: 'jovie-production-continuity-schedule',
+      status,
+    });
+    console.log(`Sentry continuity check-in accepted: ${status}`);
+  } catch (error) {
+    if (!(error instanceof CheckInDeliveryError)) throw error;
+    console.warn(`::warning::${error.message}`);
+    console.log(`Sentry continuity check-in skipped: ${status}`);
+  }
 
   if (env.GITHUB_OUTPUT)
     appendFileSync(env.GITHUB_OUTPUT, `check_in_id=${checkInId}\n`);
-  console.log(`Sentry continuity check-in accepted: ${status}`);
 }
 
 /* node:coverage ignore next 6 */

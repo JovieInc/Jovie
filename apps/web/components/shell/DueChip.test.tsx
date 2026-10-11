@@ -7,7 +7,13 @@ describe('DueChip', () => {
 
   it('renders "Due today" when the due date is the same day', () => {
     render(<DueChip dueIso='2026-04-25T12:00:00Z' now={NOW} />);
-    expect(screen.getByText('Due today')).toBeInTheDocument();
+    const label = screen.getByText('Due today');
+    expect(label).toBeInTheDocument();
+    expect(label).toHaveClass('tracking-normal');
+    expect(label).not.toHaveClass('uppercase');
+    expect(label).not.toHaveClass('capitalize');
+    expect(label.className).not.toMatch(/tracking-\[/);
+    expect(label.parentElement).toHaveClass('h-5', 'tabular-nums');
   });
 
   it('renders "Due tomorrow" for 1 day out', () => {
@@ -62,14 +68,14 @@ describe('DueChip', () => {
       <DueChip dueIso='2026-04-20T12:00:00Z' now={NOW} />
     );
     expect((recent.firstElementChild as HTMLElement).className).toContain(
-      'red-300'
+      'text-error'
     );
 
     const { container: stale } = render(
       <DueChip dueIso='2026-03-01T12:00:00Z' now={NOW} />
     );
     expect((stale.firstElementChild as HTMLElement).className).not.toContain(
-      'red-300'
+      'text-error'
     );
     expect((stale.firstElementChild as HTMLElement).className).toContain(
       'quaternary-token'

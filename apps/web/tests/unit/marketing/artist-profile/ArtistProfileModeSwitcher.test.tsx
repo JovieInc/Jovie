@@ -36,7 +36,7 @@ describe('ArtistProfileModeSwitcher', () => {
     );
 
     const panelSlot = screen.getByRole('tabpanel').parentElement;
-    expect(panelSlot).toHaveClass('min-h-20');
+    expect(panelSlot).toHaveClass('grid', 'min-h-20');
 
     for (const mode of ARTIST_PROFILE_COPY.adaptive.modes) {
       fireEvent.mouseDown(screen.getByRole('tab', { name: mode.label }), {
@@ -45,6 +45,29 @@ describe('ArtistProfileModeSwitcher', () => {
       });
       expectSelectedTab(mode.label);
       expect(screen.getByRole('tabpanel').parentElement).toBe(panelSlot);
+    }
+  });
+
+  it('reserves space for the tallest mode so state changes never reflow', () => {
+    render(
+      <ArtistProfileModeSwitcher adaptive={ARTIST_PROFILE_COPY.adaptive} />
+    );
+
+    const modes = ARTIST_PROFILE_COPY.adaptive.modes;
+    const supportTab = screen.getByRole('tab', { name: 'Support' });
+    fireEvent.mouseDown(supportTab, { button: 0, ctrlKey: false });
+    expectSelectedTab('Support');
+
+    // Every inactive mode's copy must still occupy the shared grid cell so
+    // the panel slot height equals the tallest mode at all times.
+    for (const mode of modes) {
+      const isActive = mode.id === modes[3].id;
+      const copies = screen.getAllByText(mode.headline);
+      expect(copies.length).toBeGreaterThanOrEqual(isActive ? 2 : 1);
+      expect(copies[0]).toHaveClass('max-w-lg');
+      if (!isActive) {
+        expect(copies[0].closest('[aria-hidden="true"]')).not.toBeNull();
+      }
     }
   });
 

@@ -30,8 +30,10 @@ describe('admin page header dedupe (JOV-3527)', () => {
     const source = read(ADMIN_PAGE);
 
     expect(source).not.toContain('ContentSectionHeader');
-    expect(source).toContain("data-testid='admin-page-meta'");
-    expect(source).toContain('showMetaHeader');
+    // Actions + the Timeline link live in the canonical PageToolbar, not a
+    // bespoke meta header.
+    expect(source).toContain("data-testid='admin-page-toolbar'");
+    expect(source).toContain('PageToolbar');
     // Title prop is retained for tabs/aria, not for a visible h2.
     expect(source).toMatch(/readonly title: string/);
     expect(source).toContain('DashboardHeader');
@@ -43,7 +45,7 @@ describe('admin page header dedupe (JOV-3527)', () => {
     expect(source).toContain('<AdminPage');
     expect(source).toContain('title={OVIE_OPS_PRODUCT_NAME}');
     expect(source).not.toMatch(
-      /ContentSectionHeader[\s\S]{0,120}title=['"]Ops['"]/
+      /ContentSectionHeader[\s\S]{0,120}title=\{OVIE_OPS_PRODUCT_NAME\}/
     );
   });
 

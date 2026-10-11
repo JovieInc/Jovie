@@ -11,8 +11,8 @@ vi.mock('@/lib/admin/roles', () => ({
   isAdmin: mocks.isAdmin,
 }));
 
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mocks.entitlements,
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  getOvieOperatorEntitlements: mocks.entitlements,
 }));
 
 vi.mock('@/lib/ovie/mcp/oauth', () => ({
@@ -88,5 +88,21 @@ describe('resolveOviePrincipal', () => {
       scopes: [],
     });
     expect(mocks.isAdmin).not.toHaveBeenCalled();
+  });
+  it('denies locked browser session but preserves independent valid bearer authority', async () => {
+    mocks.entitlements.mockRejectedValue(Error('privacy locked'));
+    const { resolveOviePrincipal } = await import('./principal');
+    expect(
+      (await resolveOviePrincipal(new Request('https://jov.ie'))).authenticated
+    ).toBe(false);
+    mocks.bearer = 'service-token';
+    mocks.verifyAccessToken.mockReturnValue({
+      isAdmin: true,
+      sub: 'machine',
+      scopes: ['ovie:read'],
+    });
+    expect(
+      (await resolveOviePrincipal(new Request('https://jov.ie'))).authenticated
+    ).toBe(true);
   });
 });

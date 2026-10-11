@@ -4,12 +4,17 @@ import { parseMainArtists } from './artist-parser';
 import {
   type CanonicalReleaseCredit,
   collectOrderedPrimaryNames,
+  creditProviderMismatchWarningKey,
+  materializeContributorCreditPayload,
   materializeReleaseCreditPayload,
   parseProviderAlbumArtists,
   reconcilePrimaryArtists,
+  resetCreditProviderMismatchWarnings,
   resolveSmartLinkArtistByline,
   selectPrimaryArtistCredits,
   serializePrimaryArtists,
+  shouldReportCreditProviderMismatch,
+  TAKE_ME_OVER_ROLE_COMPLETE_FIXTURE,
   WHEELS_UP_MULTI_PRIMARY_FIXTURE,
 } from './release-credits';
 
@@ -169,6 +174,50 @@ describe('release credit integrity', () => {
     expect(revalidated.mismatch).toBeNull();
   });
 
+  it('serializes the complete Take Me Over contributor graph losslessly', () => {
+    const fixture = TAKE_ME_OVER_ROLE_COMPLETE_FIXTURE;
+    const credits: CanonicalReleaseCredit[] = fixture.expected.map(
+      (credit, position) => ({
+        artistId: `artist-${position}`,
+        spotifyId: credit.name === 'Austin Leeds' ? 'spotify-austin' : null,
+        appleMusicId: credit.name === 'Erica Gibson' ? 'apple-erica' : null,
+        name: credit.name,
+        handle: credit.name === 'Tim White' ? 'timwhite' : null,
+        role: credit.role,
+        position,
+        isPrimary: credit.role === 'main_artist',
+        sourceType: 'ingested',
+        metadata: {
+          apple_music: {
+            sourceEntityId: 'apple-track-take-me-over-remix',
+          },
+        },
+      })
+    );
+
+    const cached = JSON.parse(
+      JSON.stringify(
+        materializeContributorCreditPayload({ storedCredits: credits })
+      )
+    ) as ReturnType<typeof materializeContributorCreditPayload>;
+
+    expect(cached.credits.map(({ name, role }) => ({ name, role }))).toEqual(
+      fixture.expected
+    );
+    expect(cached.primaryArtists.map(credit => credit.name)).toEqual([
+      'Tim White',
+    ]);
+    expect(cached.credits[1]).toMatchObject({
+      appleMusicId: 'apple-erica',
+      role: 'featured_artist',
+      metadata: {
+        apple_music: {
+          sourceEntityId: 'apple-track-take-me-over-remix',
+        },
+      },
+    });
+  });
+
   it('unions a missing provider primary and emits an observable mismatch', () => {
     const storedOnlyOwner = wheelsUpSourceCredits.filter(
       credit => credit.name === 'Tim White'
@@ -223,6 +272,147 @@ describe('release credit integrity', () => {
       'Tim White',
     ]);
     expect(reconciled.mismatch?.skippedFeaturedNames).toEqual(['LYNX']);
+  });
+
+  it('repairs stored credits that split Tones And I into Tones and I', () => {
+    const providerArtists = parseProviderAlbumArtists({
+      spotifyArtists: [
+        { id: 'david-guetta', name: 'David Guetta' },
+        { id: 'tones-and-i', name: 'Tones And I' },
+        { id: 'nicky-romero', name: 'Nicky Romero' },
+      ],
+    });
+    const stored: CanonicalReleaseCredit[] = [
+      'David Guetta',
+      'Tones',
+      'I',
+      'Nicky Romero',
+    ].map((name, position) => ({
+      artistId: `artist-${position}`,
+      spotifyId: name === 'Tones' ? 'tones-and-i' : null,
+      name,
+      handle: null,
+      role: 'main_artist' as const,
+      position,
+      isPrimary: true,
+    }));
+
+    const reconciled = reconcilePrimaryArtists({
+      storedCredits: stored,
+      providerArtists,
+    });
+
+    expect(reconciled.primaryArtists.map(credit => credit.name)).toEqual([
+      'David Guetta',
+      'Tones And I',
+      'Nicky Romero',
+    ]);
+    expect(reconciled.mismatch).toBeNull();
+    expect(
+      reconciled.primaryArtists.find(credit => credit.name === 'Tones And I')
+    ).toMatchObject({ spotifyId: 'tones-and-i' });
+  });
+
+  it('does not duplicate or flag a primary whose name differs only by case', () => {
+    const reconciled = reconcilePrimaryArtists({
+      storedCredits: [
+        {
+          artistId: 'artist-tones',
+          name: 'Tones and I',
+          handle: null,
+          role: 'main_artist',
+          position: 0,
+          isPrimary: true,
+        },
+      ],
+      providerArtists: [
+        { provider: 'spotify', id: 'tones-and-i', name: 'Tones And I' },
+      ],
+    });
+
+    expect(reconciled.primaryArtists.map(credit => credit.name)).toEqual([
+      'Tones and I',
+    ]);
+    expect(reconciled.mismatch).toBeNull();
+  });
+
+  it('does not hide a provider id conflict behind a case-only name match', () => {
+    const reconciled = reconcilePrimaryArtists({
+      storedCredits: [
+        {
+          artistId: 'artist-tones',
+          spotifyId: 'different-spotify-artist',
+          name: 'Tones and I',
+          handle: null,
+          role: 'main_artist',
+          position: 0,
+          isPrimary: true,
+        },
+      ],
+      providerArtists: [
+        { provider: 'spotify', id: 'tones-and-i', name: 'Tones And I' },
+      ],
+    });
+
+    expect(reconciled.primaryArtists).toHaveLength(2);
+    expect(reconciled.mismatch).toMatchObject({
+      addedNames: ['Tones And I'],
+    });
+  });
+
+  it('does not treat unrelated neighbors as a split provider artist', () => {
+    const reconciled = reconcilePrimaryArtists({
+      storedCredits: [
+        {
+          artistId: 'artist-a',
+          name: 'Bob',
+          handle: null,
+          role: 'main_artist',
+          position: 0,
+          isPrimary: true,
+        },
+        {
+          artistId: 'artist-b',
+          name: 'Dylan',
+          handle: null,
+          role: 'main_artist',
+          position: 1,
+          isPrimary: true,
+        },
+      ],
+      providerArtists: [
+        { provider: 'spotify', id: 'bob-dylan', name: 'Bob Dylan' },
+      ],
+    });
+
+    expect(reconciled.primaryArtists.map(credit => credit.name)).toEqual([
+      'Bob',
+      'Dylan',
+      'Bob Dylan',
+    ]);
+    expect(reconciled.mismatch?.addedNames).toEqual(['Bob Dylan']);
+  });
+
+  it('reports each credit provider mismatch once per warm instance', () => {
+    resetCreditProviderMismatchWarnings();
+    const key = creditProviderMismatchWarningKey({
+      entityType: 'release',
+      entityId: 'release-1',
+      mismatch: {
+        provider: 'spotify',
+        storedNames: ['Tim White'],
+        providerNames: ['Tim White', 'LYNX'],
+        addedNames: ['LYNX'],
+        skippedFeaturedNames: [],
+      },
+    });
+
+    expect(shouldReportCreditProviderMismatch(key, 1_000)).toBe(true);
+    expect(shouldReportCreditProviderMismatch(key, 1_500)).toBe(false);
+    expect(
+      shouldReportCreditProviderMismatch(key, 1_000 + 60 * 60 * 1000)
+    ).toBe(true);
+    resetCreditProviderMismatchWarnings();
   });
 
   it('dedupes dashboard artist names by canonical artist id, not similar names', () => {

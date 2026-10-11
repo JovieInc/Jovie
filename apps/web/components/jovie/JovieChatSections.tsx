@@ -1,7 +1,9 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import type { Virtualizer } from '@tanstack/react-virtual';
-import type { ReactNode, RefCallback } from 'react';
+import { memo, type ReactNode, type RefCallback } from 'react';
+import { useDesktopChatWorkState } from '@/lib/desktop/chat-work-state';
 import { composerPlaceholderForChatMode } from './chat-composer-copy';
 import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
@@ -28,6 +30,7 @@ import { ChatUploadManifest } from './components/ChatUploadManifest';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import type { PendingAudio } from './hooks/useChatAudioAttachments';
 import type { PendingFile } from './hooks/useChatFileAttachments';
+import { type ComposerDraft, useComposerDraft } from './hooks/useComposerDraft';
 import type { ChatError, MessagePart } from './types';
 
 interface ChatComposerSurfaceProps {
@@ -58,6 +61,39 @@ interface ChatComposerSurfaceProps {
   readonly onRemoveFile: (id: string) => void;
   readonly onCollapseManifest: () => void;
   readonly onExpandManifest: () => void;
+}
+
+interface ChatDraftComposerSurfaceProps
+  extends Omit<ChatComposerSurfaceProps, 'chatInputProps'> {
+  readonly draft: ComposerDraft;
+  readonly chatInputProps: Omit<ChatInputProps, 'value'>;
+}
+
+/** Only this leaf subscribes to characters; the transcript owns the runtime. */
+export const ChatDraftComposerSurface = memo(function ChatDraftComposerSurface({
+  draft,
+  chatInputProps,
+  ...surface
+}: ChatDraftComposerSurfaceProps) {
+  const value = useComposerDraft(draft);
+  return (
+    <ChatComposerSurface
+      {...surface}
+      chatInputProps={{ ...chatInputProps, value }}
+    />
+  );
+});
+
+/** Keep committed draft safety live without rerendering the transcript owner. */
+export function ChatDraftWorkState({
+  draft,
+  ...work
+}: Omit<Parameters<typeof useDesktopChatWorkState>[0], 'input'> & {
+  readonly draft: ComposerDraft;
+}) {
+  const input = useComposerDraft(draft);
+  useDesktopChatWorkState({ ...work, input });
+  return null;
 }
 
 export function ChatComposerSurface({
@@ -151,6 +187,7 @@ interface ChatInlineErrorProps {
   readonly onRetry: () => void;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
+  readonly chatMode?: 'ov';
 }
 
 export function ChatInlineError({
@@ -158,6 +195,7 @@ export function ChatInlineError({
   onRetry,
   isLoading,
   isSubmitting,
+  chatMode,
 }: ChatInlineErrorProps) {
   return (
     <div
@@ -169,6 +207,7 @@ export function ChatInlineError({
         onRetry={onRetry}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
+        presentation={chatMode === 'ov' ? 'operator' : 'default'}
       />
     </div>
   );
@@ -204,6 +243,9 @@ interface ChatThreadMessagesProps {
   readonly onScrollToBottom: () => void;
   /** Conversation id for 👍/👎 feedback attribution. */
   readonly conversationId?: string | null;
+  /** Earlier unanswered turns hidden behind one control (Summer only). */
+  readonly collapsedFailureCount?: number;
+  readonly onShowCollapsedFailures?: () => void;
 }
 
 export function ChatThreadMessages({
@@ -224,7 +266,11 @@ export function ChatThreadMessages({
   isStuckToBottom,
   onScrollToBottom,
   conversationId,
+  collapsedFailureCount = 0,
+  onShowCollapsedFailures,
 }: ChatThreadMessagesProps) {
+  // Reads live `virtualizer` state each render; see JovieChat (JOV-6702).
+  'use no memo';
   const renderMessage = (message: ChatThreadMessage, index: number) => {
     const isThinking =
       message.role === 'assistant' && message.status === 'pending';
@@ -254,6 +300,21 @@ export function ChatThreadMessages({
 
   return (
     <div>
+      {collapsedFailureCount > 0 && onShowCollapsedFailures ? (
+        <div className={`${CHAT_CONTENT_SHELL_CLASSNAME} pb-4`}>
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            onClick={onShowCollapsedFailures}
+            data-testid='chat-collapsed-failures'
+          >
+            {collapsedFailureCount === 1
+              ? '1 earlier message went unanswered. Show it'
+              : `${collapsedFailureCount} earlier messages went unanswered. Show them`}
+          </Button>
+        </div>
+      ) : null}
       {shouldVirtualizeMessages ? (
         <div
           ref={totalSizeRef}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { captureWarning } from '@/lib/error-tracking';
+import type { DesktopWorkState } from './session-work-state';
 
 // ---------------------------------------------------------------------------
 // ElectronAPI contract — mirrors what apps/desktop/src/preload.ts exposes.
@@ -30,6 +31,17 @@ export interface ElectronAPI {
   readonly electronVersion: string;
   /** Main-process-validated package provenance. Optional for older shells. */
   readonly getBuildIdentity?: () => Promise<DesktopBuildIdentity | null>;
+  /** Per-document idle evidence, optional for installed older shells. */
+  readonly setWorkState?: (state: DesktopWorkState | null) => void;
+  readonly getWorkState?: () => {
+    readonly state: DesktopWorkState;
+    readonly reportedAt: number;
+  } | null;
+  /** Native visual eligibility; independent from session work and keyboard focus. */
+  readonly getVisualActivity?: () => Promise<boolean | null>;
+  readonly onVisualActivity?: (
+    callback: (active: boolean) => void
+  ) => () => void;
   /** Register a callback that fires when electron-updater detects a new version. */
   readonly onUpdateAvailable: (cb: () => void) => void | (() => void);
   /** Register a callback that fires when the update download is complete. */
@@ -43,6 +55,8 @@ export interface ElectronAPI {
   readonly goBack: () => Promise<void>;
   /** Navigate forward in the SPA history stack. */
   readonly goForward: () => Promise<void>;
+  /** Validated application route commands. Optional on older binaries. */
+  readonly onNavigate?: (cb: (path: string) => void) => () => void;
   /** Subscribe to nav-state changes; returns unsubscribe. */
   readonly onNavStateChanged: (
     cb: (state: { canGoBack: boolean; canGoForward: boolean }) => void
@@ -62,6 +76,27 @@ export interface ElectronAPI {
     readonly ok: boolean;
     readonly reason?: string;
   }>;
+  /**
+   * Redeem the return code shown by the browser when the jovie:// deep link
+   * could not reach the app. The main process adds the PKCE verifier.
+   */
+  readonly redeemDesktopAuthReturnCode?: (returnCode: string) => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
+  /** Touch ID sign-in capability and this Mac's enrollment choice. */
+  readonly getDesktopPasskeyState?: () => Promise<DesktopPasskeyState>;
+  /** Record that this Mac enrolled or declined Touch ID sign-in. */
+  readonly setDesktopPasskeyState?: (
+    update: DesktopPasskeyStateUpdate
+  ) => Promise<{ readonly ok: boolean; readonly reason?: string }>;
+  /** Finish an in-app Touch ID sign-in: close the handoff, open the app. */
+  readonly completeDesktopPasskeySignIn?: () => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
+  /** Continue the main Ovie route in an independent browser session. */
+  readonly openCurrentOvieInBrowser?: () => Promise<DesktopAuthActionResult>;
   /** Open the current isolated public profile in the system browser. */
   readonly openPublicProfileInBrowser?: () => Promise<DesktopAuthActionResult>;
   /** Close the dedicated desktop auth handoff window. */
@@ -91,10 +126,24 @@ export interface ElectronAPI {
    */
   readonly onTrayAction?: (cb: (action: string) => void) => () => void;
   /**
+   * Post a native OS notification. On click the main process routes `url`
+   * through the desktop URL disposition rules, so only routes the shell
+   * already allows can be deep-linked. Optional on older binaries.
+   */
+  readonly showNotification?: (payload: {
+    title: string;
+    body?: string;
+    url?: string;
+  }) => Promise<{ readonly ok: boolean; readonly reason?: string }>;
+  /**
    * Signal first successful React paint so the desktop shell can cancel its
    * boot watchdog (JOV-3595). Optional — older binaries ignore the channel.
    */
   readonly notifyAppBooted?: () => void;
+  /** Passive authenticated-composer milestone. Optional on older binaries. */
+  readonly notifyComposerReadiness?: (
+    phase: 'visible-editable' | 'focused'
+  ) => Promise<boolean>;
   /** Launch a preflighted Ovie web origin or SSH TUI. Optional on older binaries. */
   readonly launchOperatorControl?: (
     request: OperatorLaunchRequest
@@ -116,6 +165,20 @@ export type DesktopAuthCompletionResult =
       readonly ok: false;
       readonly reason?: string;
     };
+
+export interface DesktopPasskeyState {
+  readonly available: boolean;
+  readonly enrolled: boolean;
+  readonly dismissed: boolean;
+}
+
+export type DesktopPasskeyStateUpdate = 'enrolled' | 'dismissed' | 'reset';
+
+const NO_DESKTOP_PASSKEY: DesktopPasskeyState = {
+  available: false,
+  enrolled: false,
+  dismissed: false,
+};
 
 export interface DesktopAuthActionResult {
   readonly ok: boolean;
@@ -203,6 +266,73 @@ export function getElectronAPI(): ElectronAPI | undefined {
  */
 export function isDesktopEnvironment(): boolean {
   return getRawElectronAPI() !== undefined;
+}
+
+/** Unknown/older shells remain safe and ordinary web tabs schedule no heartbeat. */
+export function reportDesktopWorkState(
+  state: DesktopWorkState | null
+): boolean {
+  const report = getRawElectronAPI()?.setWorkState;
+  if (typeof report !== 'function') return false;
+  try {
+    report(state);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Optional routing capability; stale binaries retain native load fallback. */
+export function supportsDesktopNavigation(): boolean {
+  return typeof getRawElectronAPI()?.onNavigate === 'function';
+}
+
+export function onDesktopNavigate(cb: (path: string) => void): () => void {
+  const subscribe = getRawElectronAPI()?.onNavigate;
+  if (typeof subscribe !== 'function') return noopUnsubscribe;
+  return subscribe(cb);
+}
+
+/** Old binaries and browsers keep their existing visual behavior. */
+export function observeDesktopVisualActivity(
+  callback: (active: boolean) => void
+): () => void {
+  const api = getRawElectronAPI();
+  if (
+    typeof api?.getVisualActivity !== 'function' ||
+    typeof api.onVisualActivity !== 'function'
+  ) {
+    return () => undefined;
+  }
+  let disposed = false;
+  let revision = 0;
+  let unsubscribe: (() => void) | undefined;
+  try {
+    unsubscribe = api.onVisualActivity(active => {
+      if (disposed || typeof active !== 'boolean') return;
+      revision += 1;
+      callback(active);
+    });
+    const requestedRevision = revision;
+    void api
+      .getVisualActivity()
+      .then(active => {
+        // A live event wins over an older asynchronous snapshot.
+        if (
+          !disposed &&
+          revision === requestedRevision &&
+          typeof active === 'boolean'
+        )
+          callback(active);
+      })
+      .catch(() => undefined);
+  } catch {
+    // Optional stale bridge methods cannot break the transcript.
+  }
+  return () => {
+    disposed = true;
+    if (typeof unsubscribe === 'function') unsubscribe();
+  };
 }
 
 /**
@@ -419,6 +549,20 @@ export function notifyDesktopAppBooted(): void {
   }
 }
 
+/** Old binaries and browsers silently omit optional launch evidence. */
+export async function notifyDesktopComposerReadiness(
+  phase: 'visible-editable' | 'focused'
+): Promise<boolean> {
+  if (!isElectronRuntime()) return false;
+  const api = getRawElectronAPI();
+  if (typeof api?.notifyComposerReadiness !== 'function') return false;
+  try {
+    return (await api.notifyComposerReadiness(phase)) === true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Fire the desktop boot heartbeat once React has mounted this tree.
  * Mount near the top of any client provider that wraps desktop routes.
@@ -527,6 +671,87 @@ export async function copyDesktopAuthUrl(
     reportMissingBridgeMethod('copyDesktopAuthUrl');
   }
   return { ok: false, reason: 'desktop-auth-copy-bridge-unavailable' };
+}
+
+/** Older Mac builds cannot redeem return codes; hide the entry for them. */
+export function supportsDesktopAuthReturnCode(): boolean {
+  const api = getRawElectronAPI();
+  return typeof api?.redeemDesktopAuthReturnCode === 'function';
+}
+
+export async function redeemDesktopAuthReturnCode(
+  returnCode: string
+): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.redeemDesktopAuthReturnCode === 'function') {
+    const result = await api.redeemDesktopAuthReturnCode(returnCode);
+    if (result.ok) return { ok: true };
+    return {
+      ok: false,
+      reason: result.reason ?? 'desktop-auth-return-code-failed',
+    };
+  }
+  if (api) {
+    reportMissingBridgeMethod('redeemDesktopAuthReturnCode');
+  }
+  return { ok: false, reason: 'desktop-auth-return-code-bridge-unavailable' };
+}
+
+export async function getDesktopPasskeyState(): Promise<DesktopPasskeyState> {
+  const api = getRawElectronAPI();
+  if (typeof api?.getDesktopPasskeyState !== 'function') {
+    return NO_DESKTOP_PASSKEY;
+  }
+  try {
+    const state = await api.getDesktopPasskeyState();
+    return {
+      available: state?.available === true,
+      enrolled: state?.enrolled === true,
+      dismissed: state?.dismissed === true,
+    };
+  } catch {
+    return NO_DESKTOP_PASSKEY;
+  }
+}
+
+export async function setDesktopPasskeyState(
+  update: DesktopPasskeyStateUpdate
+): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (typeof api?.setDesktopPasskeyState !== 'function') {
+    return { ok: false, reason: 'desktop-passkey-bridge-unavailable' };
+  }
+  const result = await api.setDesktopPasskeyState(update);
+  return result.ok
+    ? { ok: true }
+    : { ok: false, reason: result.reason ?? 'desktop-passkey-state-failed' };
+}
+
+export async function completeDesktopPasskeySignIn(): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (typeof api?.completeDesktopPasskeySignIn !== 'function') {
+    return { ok: false, reason: 'desktop-passkey-bridge-unavailable' };
+  }
+  const result = await api.completeDesktopPasskeySignIn();
+  return result.ok
+    ? { ok: true }
+    : { ok: false, reason: result.reason ?? 'desktop-passkey-complete-failed' };
+}
+
+export async function openCurrentOvieInBrowser(): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (!api || typeof api.openCurrentOvieInBrowser !== 'function') {
+    if (api) reportMissingBridgeMethod('openCurrentOvieInBrowser');
+    return { ok: false, reason: 'ovie-browser-bridge-unavailable' };
+  }
+  try {
+    const result = await api.openCurrentOvieInBrowser();
+    return result?.ok === true
+      ? { ok: true }
+      : { ok: false, reason: result?.reason ?? 'ovie-browser-open-failed' };
+  } catch {
+    return { ok: false, reason: 'ovie-browser-open-failed' };
+  }
 }
 
 export async function openPublicProfileInBrowser(): Promise<DesktopAuthActionResult> {
@@ -756,6 +981,26 @@ export function onDesktopTrayAction(cb: (action: string) => void): () => void {
   return typeof unsubscribe === 'function' ? unsubscribe : noopUnsubscribe;
 }
 
+export interface DesktopNotificationPayload {
+  readonly title: string;
+  readonly body?: string;
+  readonly url?: string;
+}
+
+/**
+ * Post a native OS notification for an event the user already opted into by
+ * email (inbox, chat). Clicking it deep-links into the app via the desktop
+ * URL disposition rules. Silently no-ops in the browser and on stale binaries
+ * that predate the notification bridge.
+ */
+export async function showDesktopNotification(
+  payload: DesktopNotificationPayload
+): Promise<void> {
+  const api = getRawElectronAPI();
+  if (!api || typeof api.showNotification !== 'function') return;
+  await api.showNotification(payload);
+}
+
 export async function launchOperatorControl(
   request: OperatorLaunchRequest
 ): Promise<{ readonly ok: boolean; readonly reason?: string }> {
@@ -783,11 +1028,18 @@ export const __testing = {
   startDesktopAuthHandoff,
   openDesktopAuthUrl,
   copyDesktopAuthUrl,
+  redeemDesktopAuthReturnCode,
+  supportsDesktopAuthReturnCode,
+  getDesktopPasskeyState,
+  setDesktopPasskeyState,
+  completeDesktopPasskeySignIn,
   openPublicProfileInBrowser,
+  openCurrentOvieInBrowser,
   closeDesktopAuthWindow,
   consumeDesktopAuthCompletion,
   setDesktopTrayState,
   onDesktopTrayAction,
+  showDesktopNotification,
   launchOperatorControl,
   notifyDesktopAppBooted,
   RELEASE_DOWNLOAD_URL,

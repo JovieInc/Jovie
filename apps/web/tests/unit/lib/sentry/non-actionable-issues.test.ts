@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DESTINATION_STREAM_CLOSED_IGNORE_ERRORS,
+  isMusicfetchCutoverCapture,
+  isNonActionableDestinationStreamEvent,
+  isNonActionableDestinationStreamIssue,
   isNonActionableLoopbackBetterAuthHostEvent,
   isNonActionableLoopbackBetterAuthHostIssue,
   isNonActionableSpotifyReleaseCreditBoundEvent,
@@ -17,6 +21,8 @@ import {
   isUpstashQuotaNoise,
   isUpstashQuotaSentryEvent,
   LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS,
+  MUSICFETCH_CUTOVER_IGNORE_ERRORS,
+  MUSICFETCH_REMEDIATION_ISSUE,
   SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS,
   UPSTASH_ERROR_JSON_BAG,
   VERCEL_IPC_SOCK_IGNORE_ERRORS,
@@ -473,6 +479,61 @@ describe('non-actionable Sentry issues', () => {
     });
   });
 
+  describe('isNonActionableDestinationStreamIssue (JOV-7319)', () => {
+    const title = 'Error: The destination stream closed early.';
+
+    it('matches the Linear/Sentry title', () => {
+      expect(isNonActionableDestinationStreamIssue({ title })).toBe(true);
+      expect(
+        DESTINATION_STREAM_CLOSED_IGNORE_ERRORS.some(pattern =>
+          pattern.test(title)
+        )
+      ).toBe(true);
+    });
+
+    it('matches the write-error variant on title or culprit', () => {
+      expect(
+        isNonActionableDestinationStreamIssue({
+          title: 'Error: The destination stream errored while writing data.',
+        })
+      ).toBe(true);
+      expect(
+        isNonActionableDestinationStreamIssue({
+          title: 'Error',
+          culprit: 'The destination stream closed early.',
+        })
+      ).toBe(true);
+    });
+
+    it('matches a Sentry exception event', () => {
+      expect(
+        isNonActionableDestinationStreamEvent({
+          exception: {
+            values: [
+              {
+                type: 'Error',
+                value: 'The destination stream closed early.',
+              },
+            ],
+          },
+        })
+      ).toBe(true);
+    });
+
+    it('does not match unrelated stream or render errors', () => {
+      expect(
+        isNonActionableDestinationStreamIssue({
+          title: 'Error: The destination stream errored while flushing chunks',
+        })
+      ).toBe(false);
+      expect(
+        isNonActionableDestinationStreamEvent({
+          exception: { values: [{ value: 'Unauthorized' }] },
+        })
+      ).toBe(false);
+    });
+  });
+
   describe('isNonActionableLoopbackBetterAuthHostIssue (JOV-5843)', () => {
     const title =
       'BetterAuthError: Host "localhost:3193" is not in the allowed hosts list. Allowed hosts: jov.ie, www.jov.ie, staging.jov.ie, localhost:3100, localhost:3194, 127.0.0.1:3194. Add this host to your allowedHosts config or provide a fallback URL.';
@@ -536,6 +597,20 @@ describe('non-actionable Sentry issues', () => {
           },
         })
       ).toBe(false);
+    });
+  });
+
+  describe('MusicFetch cutover fingerprints (JOV-7323)', () => {
+    it('routes subscription failures to JOV-7323 and never a renewal issue', () => {
+      const message =
+        'MusicFetch API error: 401 - subscription not active (remediation:musicfetch-subscription-inactive)';
+      expect(isMusicfetchCutoverCapture(message)).toBe(true);
+      expect(isMusicfetchCutoverCapture(new Error(message))).toBe(true);
+      expect(
+        MUSICFETCH_CUTOVER_IGNORE_ERRORS.some(pattern => pattern.test(message))
+      ).toBe(true);
+      expect(MUSICFETCH_REMEDIATION_ISSUE).toBe('JOV-7323');
+      expect(message).not.toMatch(/renew/i);
     });
   });
 });

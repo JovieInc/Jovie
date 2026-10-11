@@ -5,18 +5,15 @@ import { OpportunityRow } from '@/components/organisms/opportunity-card/Opportun
 import type { OpportunityRowState } from '@/components/organisms/opportunity-card/types';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { cn } from '@/lib/utils';
-import { FounderReviewStack } from './FounderReviewStack';
+import { OpportunityCardStack } from './OpportunityCardStack';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
+import { OpportunityInboxSocialReplyCard } from './OpportunityInboxSocialReplyCard';
 import { OpportunityInboxYoutubeThumbnailCard } from './OpportunityInboxYoutubeThumbnailCard';
-import { WorkflowCaptureInboxCard } from './WorkflowCaptureInboxCard';
 
 export interface OpportunityInboxFeedProps {
   readonly cards: readonly OpportunityInboxCardViewModel[];
   readonly onApprove: (id: string) => void | Promise<void>;
   readonly onDismiss: (id: string) => void | Promise<void>;
-  readonly onRecordedApprove?: (id: string) => Promise<void>;
-  readonly onRecordedDismiss?: (id: string) => Promise<void>;
-  readonly onRecordedNextStep?: (id: string) => Promise<void>;
   readonly onOpen?: (id: string) => void;
   readonly onFeedback: (
     id: string,
@@ -24,8 +21,10 @@ export interface OpportunityInboxFeedProps {
     comment?: string
   ) => void;
   readonly onNextStep?: (id: string) => void;
+  readonly onRevise?: (id: string, comment: string) => void;
   readonly pendingActionId?: string | null;
   readonly pendingFeedbackId?: string | null;
+  readonly pendingReviseId?: string | null;
   readonly pendingNextStepId?: string | null;
   /** When true, render the swipe/keyboard card stack (JOV-3932). */
   readonly enableStackInteractions?: boolean;
@@ -35,7 +34,6 @@ export interface OpportunityInboxFeedProps {
   readonly onStackActionInitiated?: (id: string) => void;
   /** Queues a report next step and restores focus only after it succeeds. */
   readonly onStackNextStep?: (id: string) => void;
-  readonly onCaptureCompleted?: (id: string) => void;
   readonly className?: string;
 }
 
@@ -53,65 +51,49 @@ export function OpportunityInboxFeed({
   cards,
   onApprove,
   onDismiss,
-  onRecordedApprove,
-  onRecordedDismiss,
-  onRecordedNextStep,
   onOpen,
   onFeedback: _onFeedback,
   onNextStep,
+  onRevise,
   pendingActionId = null,
   pendingFeedbackId: _pendingFeedbackId = null,
+  pendingReviseId = null,
   pendingNextStepId = null,
   enableStackInteractions = false,
   stackKeyboardControlRef,
   onStackActionInitiated,
   onStackNextStep,
-  onCaptureCompleted,
   className,
 }: OpportunityInboxFeedProps) {
   if (enableStackInteractions) {
-    const workflowCaptureCards = cards.filter(
-      card => card.category === 'workflow_capture'
-    );
     const stackCards = cards.filter(
-      (
-        card
-      ): card is OpportunityInboxCardViewModel & {
-        readonly sourceKind: string;
-      } => card.category !== 'workflow_capture' && Boolean(card.sourceKind)
+      card => card.category !== 'workflow_capture'
     );
     return (
       <div className={className}>
-        {workflowCaptureCards.map(card => (
-          <WorkflowCaptureInboxCard
-            key={card.id}
-            card={card}
-            onDismiss={onDismiss}
-            onComplete={onCaptureCompleted ?? onDismiss}
-          />
-        ))}
-        <FounderReviewStack
+        <OpportunityCardStack
           cards={stackCards}
-          onApprove={id => {
+          onAccept={id => {
             onStackActionInitiated?.(id);
             const card = stackCards.find(candidate => candidate.id === id);
             if (card?.category === 'report') {
-              return (
-                onRecordedNextStep ??
-                onStackNextStep ??
-                onNextStep ??
-                onApprove
-              )(id);
+              (onStackNextStep ?? onNextStep ?? onApprove)(id);
             } else {
-              return (onRecordedApprove ?? onApprove)(id);
+              void onApprove(id);
             }
           }}
           onReject={id => {
             onStackActionInitiated?.(id);
-            return (onRecordedDismiss ?? onDismiss)(id);
+            void onDismiss(id);
           }}
-          onOpen={onOpen}
+          onNextStep={id => {
+            (onStackNextStep ?? onNextStep ?? onApprove)(id);
+          }}
+          onRevise={onRevise}
+          onOpen={onOpen ?? (() => undefined)}
           pendingActionId={pendingActionId}
+          pendingNextStepId={pendingNextStepId}
+          pendingReviseId={pendingReviseId}
           keyboardControlRef={stackKeyboardControlRef}
         />
       </div>
@@ -126,50 +108,57 @@ export function OpportunityInboxFeed({
     >
       <div className='system-b-opportunity-inbox-section-label'>Today</div>
       <div className='system-b-opportunity-inbox-feed-list'>
-        {cards.map(card =>
-          card.category === 'workflow_capture' && card.workflowCapture ? (
-            <WorkflowCaptureInboxCard
-              key={card.id}
-              card={card}
-              onDismiss={onDismiss}
-              onComplete={onCaptureCompleted ?? onDismiss}
-            />
-          ) : card.category === 'report' && card.report ? (
-            <OpportunityInboxReportCard
-              key={card.id}
-              card={card}
-              onNextStep={onNextStep ?? onApprove}
-              onDismiss={onDismiss}
-              isSubmittingNextStep={pendingNextStepId === card.id}
-              isDismissing={pendingActionId === card.id}
-            />
-          ) : card.category === 'youtube_thumbnail' && card.youtubeThumbnail ? (
-            <OpportunityInboxYoutubeThumbnailCard
-              key={card.id}
-              card={card}
-              onApprove={onApprove}
-              onReject={onDismiss}
-              isBusy={pendingActionId === card.id}
-            />
-          ) : (
-            <OpportunityRow
-              key={card.id}
-              id={card.id}
-              state={mapCardState(card.status)}
-              title={card.title}
-              metadata={card.why}
-              hideDot={false}
-              primaryActionLabel={
-                card.category === 'brand_deal'
-                  ? card.primaryActionLabel
-                  : undefined
-              }
-              onPrimaryAction={id => onApprove(id)}
-              onDismiss={id => onDismiss(id)}
-              isBusy={pendingActionId === card.id}
-            />
-          )
-        )}
+        {cards
+          .filter(card => card.category !== 'workflow_capture')
+          .map(card =>
+            card.category === 'report' && card.report ? (
+              <OpportunityInboxReportCard
+                key={card.id}
+                card={card}
+                onNextStep={onNextStep ?? onApprove}
+                onDismiss={onDismiss}
+                isSubmittingNextStep={pendingNextStepId === card.id}
+                isDismissing={pendingActionId === card.id}
+              />
+            ) : card.category === 'social_reply' && card.socialReply ? (
+              <OpportunityInboxSocialReplyCard
+                key={card.id}
+                card={card}
+                onApprove={id => void onApprove(id)}
+                onDismiss={id => void onDismiss(id)}
+                onRevise={onRevise ?? (() => undefined)}
+                isApproving={pendingActionId === card.id}
+                isDismissing={pendingActionId === card.id}
+                isRevising={pendingReviseId === card.id}
+              />
+            ) : card.category === 'youtube_thumbnail' &&
+              card.youtubeThumbnail ? (
+              <OpportunityInboxYoutubeThumbnailCard
+                key={card.id}
+                card={card}
+                onApprove={onApprove}
+                onReject={onDismiss}
+                isBusy={pendingActionId === card.id}
+              />
+            ) : (
+              <OpportunityRow
+                key={card.id}
+                id={card.id}
+                state={mapCardState(card.status)}
+                title={card.title}
+                metadata={card.why}
+                hideDot={false}
+                primaryActionLabel={
+                  card.category === 'brand_deal'
+                    ? card.primaryActionLabel
+                    : undefined
+                }
+                onPrimaryAction={id => onApprove(id)}
+                onDismiss={id => onDismiss(id)}
+                isBusy={pendingActionId === card.id}
+              />
+            )
+          )}
       </div>
     </section>
   );

@@ -18,6 +18,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { CallerCancellationError } from '@/lib/resilience/caller-cancellation';
 
 // ============================================================================
 // Types
@@ -184,7 +185,10 @@ export class CircuitBreaker {
     } catch (error) {
       // Only count errors that the config considers real failures.
       // Rate-limit (429) responses are excluded so they don't trip the breaker.
-      if (!this.config.shouldCount || this.config.shouldCount(error)) {
+      if (
+        !(error instanceof CallerCancellationError) &&
+        (!this.config.shouldCount || this.config.shouldCount(error))
+      ) {
         this.onFailure();
       }
       throw error;
@@ -297,7 +301,10 @@ export class CircuitBreaker {
   /**
    * Transition to a new state.
    */
-  private transitionTo(newState: CircuitState): void {
+  private transitionTo(
+    newState: CircuitState,
+    options?: { notify?: boolean }
+  ): void {
     const oldState = this.state;
     this.state = newState;
     this.lastStateChange = Date.now();
@@ -320,8 +327,9 @@ export class CircuitBreaker {
       data: this.getStats(),
     });
 
-    // Alert Sentry when the circuit opens so we know the service is failing
-    if (newState === 'OPEN') {
+    // Unexpected opens page. Callers that already know the vendor is down
+    // pass notify: false and keep the info breadcrumb above.
+    if (newState === 'OPEN' && options?.notify !== false) {
       Sentry.captureMessage(
         `[${this.config.name}] Circuit breaker opened (${oldState} -> OPEN)`,
         {
@@ -371,8 +379,9 @@ export class CircuitBreaker {
    * Force the circuit to open.
    * Use for manual intervention when issues are detected.
    */
-  forceOpen(): void {
-    this.transitionTo('OPEN');
+  forceOpen(options?: { notify?: boolean }): void {
+    if (this.state === 'OPEN') return;
+    this.transitionTo('OPEN', options);
   }
 }
 

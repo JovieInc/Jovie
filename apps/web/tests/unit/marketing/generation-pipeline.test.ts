@@ -3,21 +3,28 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type {
+  MarketingCharacterGenerationBrief,
   MarketingGateReceipt,
   MarketingModelCandidate,
   MarketingNarrativePlan,
 } from '@/data/marketing';
 import {
   auditJovieImageColorDecision,
+  auditMarketingCharacterGenerationBrief,
   auditMarketingNarrativePlan,
   auditMarketingTasteAdmission,
+  findNearDuplicateMarketingCharacters,
   formatJovieImageColorPolicyForPrompt,
+  formatMarketingCharacterSystemForPrompt,
   isForbiddenControllableSceneColor,
   JOVIE_IMAGE_COLOR_POLICY,
+  JOVIE_MARKETING_CHARACTER_SYSTEM,
+  MARKETING_ASSET_GENERATION_CHARACTER_CONTRACT,
   MARKETING_ASSET_GENERATION_COLOR_CONTRACT,
   MARKETING_GENERATION_STAGES,
   MARKETING_STAGE_ATTEMPT_LIMITS,
   MARKETING_TASTE_GATE_IDS,
+  MARKETING_VISUAL_REVIEW_CHARACTER_CONTRACT,
   MARKETING_VISUAL_REVIEW_COLOR_CONTRACT,
   resolveJovieSceneColorRole,
   selectMarketingModelCandidate,
@@ -89,6 +96,69 @@ const narrative = (overrides: Partial<MarketingNarrativePlan> = {}) => ({
       mustNotRepeat: ['adaptation'],
     },
   ],
+  ...overrides,
+});
+
+const characterBrief = (
+  overrides: Partial<MarketingCharacterGenerationBrief> = {}
+): MarketingCharacterGenerationBrief => ({
+  purpose: 'campaign',
+  modelIds: ['C02', 'C10'],
+  persona: {
+    role: 'independent artist collaborators',
+    scene: 'progressive R&B and melodic rap-pop',
+    lifestyleContext: 'a focused writing and live-show development session',
+    aestheticVocabulary: ['assured', 'minimal', 'magnetic'],
+    likelyEnvironment: 'the Bubblegum Factory live room',
+    aspiration: 'build distinctive self-owned careers with direct audiences',
+    icpTags: ['independent recording artist', 'creator-operator'],
+  },
+  world: {
+    character:
+      'two independent artists preparing one collaborative performance',
+    wardrobe: 'fitted neutral rehearsal wardrobe with different silhouettes',
+    environment: 'the circular Bubblegum Factory live room',
+    props: 'one vocal microphone and one compact performance controller',
+    activity: 'rehearsing a shared transition at the center mark',
+    lighting: 'one large camera-left softbox motivated as a studio source',
+    coherenceStatement:
+      'Every choice belongs to one premium performance rehearsal in the locked studio.',
+  },
+  groupDifferentiators: [
+    {
+      modelId: 'C02',
+      traits: ['sculpted hair silhouette', 'still composed posture'],
+      highSignalStyling: ['sleeveless graphite column'],
+    },
+    {
+      modelId: 'C10',
+      traits: ['close-cropped hair silhouette', 'open movement stance'],
+      highSignalStyling: ['long-sleeve cream crew'],
+    },
+  ],
+  physics: {
+    camera: {
+      lensMm: 50,
+      position: 'eye level, three metres from the center mark',
+      perspective: 'normal perspective with shallow but plausible falloff',
+    },
+    lightSources: [
+      {
+        id: 'key-softbox',
+        direction: 'from-left',
+        motivation: 'visible studio softbox just outside frame',
+      },
+    ],
+    keyLightId: 'key-softbox',
+    shadowDirection: 'to-right',
+    reflectionSourceIds: ['key-softbox'],
+    materialBehavior: [
+      'matte cotton scatters the key softly',
+      'brushed metal reflects a narrow low-intensity source',
+    ],
+    vectorCoherenceStatement:
+      'Both gazes, gestures, controller angle, and camera blocking converge on the shared center mark.',
+  },
   ...overrides,
 });
 
@@ -289,6 +359,89 @@ describe('marketing generation pipeline', () => {
     expect(promptBlock).toContain('#3FAFF3');
     expect(promptBlock).toContain('Protected truth');
     expect(promptBlock).toContain('Never fix with post-hoc recoloring');
+  });
+
+  it('embeds one persona and physics contract into asset generation and visual review', () => {
+    const promptBlock = formatMarketingCharacterSystemForPrompt();
+
+    expect(JOVIE_MARKETING_CHARACTER_SYSTEM.schema).toBe(
+      'jovie-marketing-character-system/v2'
+    );
+    expect(MARKETING_ASSET_GENERATION_CHARACTER_CONTRACT.promptBlock).toBe(
+      promptBlock
+    );
+    expect(MARKETING_VISUAL_REVIEW_CHARACTER_CONTRACT.promptBlock).toBe(
+      promptBlock
+    );
+    expect(promptBlock).toContain('Persona-first');
+    expect(promptBlock).toContain('premium documentary direction');
+    expect(promptBlock).toContain(
+      'Realistic means physically credible, never average'
+    );
+    expect(promptBlock).toContain('Do not manufacture demographic variety');
+    expect(promptBlock).toContain('C05: emerging singer-songwriter');
+    expect(promptBlock).toContain('C06: touring indie-pop artist');
+  });
+
+  it('audits persona, group individuality, scene coherence, and physical vectors', () => {
+    expect(auditMarketingCharacterGenerationBrief(characterBrief())).toEqual(
+      []
+    );
+
+    const invalid = characterBrief({
+      modelIds: ['C01', 'C07'],
+      nosePiercing: 'silver septum bull-ring',
+      world: {
+        ...characterBrief().world,
+        environment: 'generic stock studio',
+      },
+      groupDifferentiators: [
+        {
+          modelId: 'C01',
+          traits: ['skin tone'],
+          highSignalStyling: ['hot-pink hero jacket'],
+        },
+        {
+          modelId: 'C07',
+          traits: ['hair silhouette'],
+          highSignalStyling: ['hot-pink hero jacket'],
+        },
+      ],
+      physics: {
+        ...characterBrief().physics,
+        shadowDirection: 'to-left',
+        reflectionSourceIds: ['missing-practical'],
+      },
+    });
+
+    expect(
+      auditMarketingCharacterGenerationBrief(invalid).map(
+        finding => finding.code
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        'campaign-character-blocked',
+        'unavailable-character',
+        'generic-stock-environment',
+        'forbidden-nose-piercing',
+        'protected-characteristic-differentiator',
+        'duplicate-high-signal-styling',
+        'incoherent-shadow-direction',
+        'unmotivated-reflection',
+      ])
+    );
+  });
+
+  it('machine-flags controlled-vocabulary sibling records', () => {
+    const source = JOVIE_MARKETING_CHARACTER_SYSTEM.models[0];
+    expect(source).toBeDefined();
+    if (!source) return;
+    expect(
+      findNearDuplicateMarketingCharacters([
+        source,
+        { ...source, id: 'C99' },
+      ]).map(pair => [pair.leftId, pair.rightId, pair.score])
+    ).toEqual([['C01', 'C99', 1]]);
   });
 
   it('allows controllable scene colors only when they are scene hues or neutral', () => {

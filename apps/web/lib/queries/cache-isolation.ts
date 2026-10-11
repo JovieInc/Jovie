@@ -46,7 +46,6 @@ const EMPTY_SCOPE: CacheScope = {
 let scope: CacheScope = { ...EMPTY_SCOPE };
 let generation = 0;
 const listeners = new Set<(event: CacheFenceEvent) => void>();
-const isolatedSurfaces = new Set<() => void>();
 
 export function getCacheScope(): CacheScope {
   return { ...scope };
@@ -62,13 +61,6 @@ export function subscribeCacheFence(
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
-  };
-}
-
-export function registerIsolatedCacheSurface(clear: () => void): () => void {
-  isolatedSurfaces.add(clear);
-  return () => {
-    isolatedSurfaces.delete(clear);
   };
 }
 
@@ -115,12 +107,6 @@ export function classifyCacheScopeChange(
 }
 
 function notifyFence(event: CacheFenceEvent): void {
-  if (event.reason !== 'hydrate') {
-    for (const clear of isolatedSurfaces) {
-      clear();
-    }
-  }
-
   if (!event.changed) {
     return;
   }

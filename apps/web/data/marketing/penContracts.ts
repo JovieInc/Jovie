@@ -10,27 +10,37 @@ export const MARKETING_PEN_CONTRACT_IDS = {
     publicPage: 'C9drCF',
     header: 'GTcgO',
     footer: 'jhV4a',
-    footerCta: 'LCLXI',
-    finalCta: 'iY5Lp',
+    footerCta: 'DiH2U',
+    finalCta: 'DKVHD',
     page: 'sDFX1',
     container: 'x2TNM',
-    containerProse: 'q24ow',
+    containerProse: 'ZVDFa',
     prose: 'ND9fM',
   },
   section: {
     hero: 'SijpA',
     logoCloud: 'bKvfJ',
     featureGrid: 'pM23w',
-    featureSplit: 'kQ4vN',
+    featureSplit: 'Y44oSU',
     howItWorks: 'rsv9G',
     socialProof: 'RVUME',
     stats: 'fkRn8',
     pricing: 'D34VIr',
+    /** Registry index read natively 2026-09-29. Visual import/owner approval remains pending. */
+    comparison: 'x5gKwl',
     faq: 'pAAhw',
     specWall: 'rWyLP',
+    /** Native existing demonstration gallery owners read 2026-09-29; not adoption proof. */
+    productGallery: 'NGW0P',
+    productGalleryReleaseRail: 'EnK3s',
     capture: 'Nqx7t',
     monetization: 'F3grtS',
     contentProse: 'hRysI',
+    /**
+     * Pen registry entry `y8oKXI` ("Registry Entry / CTA") points at design
+     * owner `K4ar1`. The footer/final CTA shells stay adapters under it.
+     */
+    cta: 'y8oKXI',
   },
   recipe: {
     homepage: 'oPZHQ',

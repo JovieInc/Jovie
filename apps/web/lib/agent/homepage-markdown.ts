@@ -1,7 +1,8 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
+import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 
 function toAbsolutePublicUrl(href: string): string {
@@ -11,39 +12,68 @@ function toAbsolutePublicUrl(href: string): string {
   return `${BASE_URL}${href}`;
 }
 
+function renderIdentitySections(): string {
+  return HOMEPAGE_IDENTITY_COPY.sections
+    .map(section => {
+      const lines = [
+        `## ${section.eyebrow}`,
+        '',
+        `### ${section.headline}`,
+        '',
+        section.body,
+      ];
+      if ('step' in section) {
+        lines.push('', `### ${section.step.headline}`, '', section.step.body);
+      }
+      if ('identity' in section) {
+        lines.push(
+          '',
+          `### ${section.identity.label}`,
+          '',
+          section.identity.title,
+          '',
+          section.identity.handle
+        );
+      }
+      if ('possibilities' in section) {
+        lines.push('', `### ${section.possibilities.label}`, '');
+        for (const item of section.possibilities.items) {
+          lines.push(`- ${item.title}: ${item.detail}`);
+        }
+      }
+      return lines.join('\n');
+    })
+    .join('\n\n');
+}
+
+function renderFaq(): string {
+  const { faq } = HOMEPAGE_IDENTITY_COPY;
+  return [
+    `## ${faq.heading}`,
+    ...faq.items.map(item => `\n### ${item.question}\n\n${item.answer}`),
+  ].join('\n');
+}
+
 /**
  * Markdown representation of the public homepage for Accept: text/markdown.
- * Copy comes from the existing launch document — this is not a redesign.
+ * Projects approved identity copy. The music launch document is a separate surface.
  */
 export function buildHomepageMarkdown(): string {
-  const { hero, workspace, productStatement, faq } = HOMEPAGE_LAUNCH_COPY;
-  const callouts = workspace.callouts
-    .map(item => `### ${item.title}\n\n${item.body}`)
-    .join('\n\n');
-  const questions = faq
-    .map(item => `### ${item.question}\n\n${item.answer}`)
-    .join('\n\n');
+  const { hero, close } = HOMEPAGE_IDENTITY_COPY;
 
   return `# ${hero.headline}
 
 ${hero.subhead}
 
-${hero.primaryCta.label}: ${toAbsolutePublicUrl(hero.primaryCta.href)}
-${hero.secondaryCta.label}: ${toAbsolutePublicUrl(hero.secondaryCta.href)}
+${COMPANY_IDENTITY.definition}
 
-## ${workspace.kicker}
+${hero.claim.action} ${hero.claim.domain}${hero.claim.placeholder}: ${toAbsolutePublicUrl(APP_ROUTES.START)}
 
-${workspace.headline.replaceAll('\n', ' ')}
+${renderIdentitySections()}
 
-${callouts}
+${renderFaq()}
 
-## ${productStatement.body}
-
-${productStatement.description}
-
-## Questions
-
-${questions}
+## ${close.headline}
 
 ${buildSiteLlmsGuidance()}
 ## Recovery links
@@ -51,7 +81,7 @@ ${buildSiteLlmsGuidance()}
 - Home: ${BASE_URL}${APP_ROUTES.HOME}
 - About: ${BASE_URL}${APP_ROUTES.ABOUT}
 - Support: ${BASE_URL}${APP_ROUTES.SUPPORT}
-- Docs: ${DOCS_URL}
+- Help Center: ${DOCS_URL}/docs
 - OpenAPI: ${BASE_URL}/openapi.json
 - llms.txt: ${BASE_URL}/llms.txt
 - Sitemap: ${BASE_URL}/sitemap.xml
@@ -69,8 +99,8 @@ That path does not exist on ${APP_NAME}. Recover from one of these public surfac
 - When to use ${APP_NAME}: ${BASE_URL}/llms.txt
 - ${APP_NAME} developer resources: ${BASE_URL}/llms.txt
 - OpenAPI 3.1: ${BASE_URL}/openapi.json
-- Public artist API: ${BASE_URL}/api/v1/{username}
-- Docs: ${DOCS_URL}
+- Public profile API: ${BASE_URL}/api/v1/{username}
+- Help Center: ${DOCS_URL}/docs
 - Sitemap: ${BASE_URL}/sitemap.xml
 - Full site guide: ${BASE_URL}/llms-full.txt
 - About: ${BASE_URL}${APP_ROUTES.ABOUT}

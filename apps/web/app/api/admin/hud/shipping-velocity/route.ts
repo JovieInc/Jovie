@@ -2,13 +2,13 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { serverFetch } from '@/lib/http/server-fetch';
 import { medianNumber } from '@/lib/hud/number-series';
 import type { HudObservationState } from '@/lib/hud/observation';
 import { observationFromShippingVelocityBuckets } from '@/lib/hud/shipping-velocity-observation';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 
@@ -361,7 +361,7 @@ function parseRange(request: Request): ValidRange {
 }
 
 async function authorizeAdmin(): Promise<Response | null> {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
   if (!entitlements.isAuthenticated || !entitlements.userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },

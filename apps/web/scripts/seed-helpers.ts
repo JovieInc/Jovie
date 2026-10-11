@@ -249,3 +249,30 @@ export function chunk<T>(arr: T[], size: number): T[][] {
   }
   return chunks;
 }
+
+// ---------------------------------------------------------------------------
+// Shared release fixtures
+// ---------------------------------------------------------------------------
+
+/**
+ * Music-video demo release inserted by seed-video-release.ts. Artwork is
+ * served from a local public asset so seeded /demo surfaces never depend on
+ * third-party thumbnail hosts (i.ytimg.com maxresdefault 404s when the source
+ * video lacks a large thumbnail).
+ */
+export const DEMO_VIDEO_RELEASE = {
+  title: 'Miracle (Official Music Video)',
+  slug: 'demo-miracle-official-music-video',
+  releaseType: 'music_video' as const,
+  releaseDate: new Date('2023-04-14'),
+  artworkUrl: '/images/demo/artwork-video.jpg',
+  totalTracks: 0,
+  metadata: {
+    youtubeVideoId: 'v7GHn2WJCM4',
+    youtubeThumbnailUrl: '/images/demo/artwork-video.jpg',
+    youtubeChannelId: 'UCIjYyZxkFucP_W-tmXg_ILw',
+    youtubeChannelName: 'Calvin Harris',
+    duration: 219,
+  },
+  sourceType: 'manual' as const,
+};

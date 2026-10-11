@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { withDashboardProviders } from '@/.storybook/dashboard-fixtures';
 import { DashboardPay } from './DashboardPay';
 
 const meta = {
@@ -27,6 +28,7 @@ const meta = {
       ],
     },
   },
+  decorators: [withDashboardProviders],
 } satisfies Meta<typeof DashboardPay>;
 
 export default meta;

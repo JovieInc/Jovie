@@ -10,6 +10,8 @@ function makePixelEvent(overrides: Partial<PixelEvent> = {}): PixelEvent {
     id: 'evt-123',
     profileId: 'prof-456',
     sessionId: 'sess-789',
+    acquisitionId: null,
+    userId: null,
     eventType: 'page_view',
     eventData: {
       pageUrl: 'https://jov.ie/artist',

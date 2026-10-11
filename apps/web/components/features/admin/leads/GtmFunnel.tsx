@@ -56,31 +56,32 @@ function formatRate(numerator: number, denominator: number): string {
 
 function EmptyFunnel() {
   return (
-    <ContentSurfaceCard
-      className='px-(--app-shell-content-padding-x) py-6'
-      data-testid='gtm-pipeline-status'
-    >
-      <p className='text-center text-app font-book text-secondary-token'>
-        Pipeline hasn&apos;t run yet. Select a speed above to start.
-      </p>
+    <ContentSurfaceCard data-testid='gtm-pipeline-status'>
+      <div className='px-(--app-shell-content-padding-x) py-6'>
+        <p className='text-center text-app font-book text-secondary-token'>
+          Pipeline hasn&apos;t run yet. Select a speed above to start.
+        </p>
+      </div>
     </ContentSurfaceCard>
   );
 }
 
 export function GtmFunnelSkeleton() {
   return (
-    <ContentSurfaceCard className='px-(--app-shell-content-padding-x) py-4'>
-      <div className='flex gap-6'>
-        {['sk-discovered', 'sk-qualified', 'sk-approved', 'sk-ingested'].map(
-          id => (
-            <div key={id} className='space-y-1'>
-              <div className='h-3 w-16 animate-pulse rounded bg-surface-0' />
-              <div className='h-6 w-10 animate-pulse rounded bg-surface-0' />
-            </div>
-          )
-        )}
+    <ContentSurfaceCard>
+      <div className='px-(--app-shell-content-padding-x) py-4'>
+        <div className='flex gap-6'>
+          {['sk-discovered', 'sk-qualified', 'sk-approved', 'sk-ingested'].map(
+            id => (
+              <div key={id} className='space-y-1'>
+                <div className='h-3 w-16 animate-pulse rounded bg-surface-0' />
+                <div className='h-6 w-10 animate-pulse rounded bg-surface-0' />
+              </div>
+            )
+          )}
+        </div>
+        <div className='mt-3 h-3 w-56 animate-pulse rounded bg-surface-0' />
       </div>
-      <div className='mt-3 h-3 w-56 animate-pulse rounded bg-surface-0' />
     </ContentSurfaceCard>
   );
 }
@@ -106,62 +107,62 @@ export async function GtmFunnel({ counts }: GtmFunnelProps) {
 
   return (
     <ContentSurfaceCard
-      className='overflow-hidden px-(--app-shell-content-padding-x) py-4'
+      className='overflow-hidden'
       data-testid='gtm-pipeline-status'
     >
-      <div className='mb-3 flex flex-wrap items-end justify-between gap-3'>
-        <div>
-          <p className='text-app font-semibold text-primary-token'>
-            Pipeline Scan
-          </p>
-          <p className='mt-0.5 text-xs text-secondary-token'>
-            All-time lead status flow from discovery through ingestion.
-          </p>
+      <div className='px-(--app-shell-content-padding-x) py-4'>
+        <div className='mb-3 flex flex-wrap items-end justify-between gap-3'>
+          <div>
+            <p className='text-app font-semibold text-primary-token'>
+              Pipeline Scan
+            </p>
+            <p className='mt-0.5 text-xs text-secondary-token'>
+              All-time lead status flow from discovery through ingestion.
+            </p>
+          </div>
+          <span className='text-2xs text-tertiary-token'>
+            {total.toLocaleString()} total lead{total === 1 ? '' : 's'}
+          </span>
         </div>
-        <span className='text-2xs text-tertiary-token'>
-          {total.toLocaleString()} total lead{total === 1 ? '' : 's'}
-        </span>
-      </div>
-      <div className='flex flex-wrap items-stretch gap-2'>
-        <FunnelStage label='Discovered' count={discovered} />
-        <FunnelStage
-          label='Qualified'
-          count={qualified}
-          rate={discovered > 0 ? formatRate(qualified, discovered) : undefined}
-        />
-        <FunnelStage label='Approved' count={approved} />
-        <FunnelStage label='Ingested' count={ingested} isLast />
-      </div>
-      <div className='mt-1.5 flex flex-wrap gap-4'>
-        <DropOff label='disqualified' count={disqualified} total={discovered} />
-        <DropOff
-          label='rejected'
-          count={rejected}
-          total={approved + rejected}
-        />
-      </div>
+        <div className='flex flex-wrap items-stretch gap-2'>
+          <FunnelStage label='Discovered' count={discovered} />
+          <FunnelStage
+            label='Qualified'
+            count={qualified}
+            rate={
+              discovered > 0 ? formatRate(qualified, discovered) : undefined
+            }
+          />
+          <FunnelStage label='Approved' count={approved} />
+          <FunnelStage label='Ingested' count={ingested} isLast />
+        </div>
+        <div className='mt-1.5 flex flex-wrap gap-4'>
+          <DropOff label='Disqualified' count={disqualified} total={total} />
+          <DropOff label='Rejected' count={rejected} total={total} />
+        </div>
 
-      {/* Conversion (last 30 days) */}
-      {summary.contacted > 0 && (
-        <div className='mt-4 border-t border-subtle pt-3'>
-          <p className='mb-1 text-2xs font-medium text-tertiary-token'>
-            Conversion (last 30 days)
-          </p>
-          <p className='text-app font-book text-secondary-token'>
-            Contacted: {summary.contacted}
-            {' · '}
-            Claimed: {summary.claimClicks} (
-            {formatRate(summary.claimClicks, summary.contacted)}){' · '}
-            Signed up: {summary.signups}
-            {summary.paidConversions > 0 && (
-              <>
-                {' · '}
-                Paid: {summary.paidConversions}
-              </>
-            )}
-          </p>
-        </div>
-      )}
+        {/* Conversion (last 30 days) */}
+        {summary.contacted > 0 && (
+          <div className='mt-4 border-t border-subtle pt-3'>
+            <p className='mb-1 text-2xs font-medium text-tertiary-token'>
+              Conversion (last 30 days)
+            </p>
+            <p className='text-app font-book text-secondary-token'>
+              Contacted: {summary.contacted}
+              {' · '}
+              Claimed: {summary.claimClicks} (
+              {formatRate(summary.claimClicks, summary.contacted)}){' · '}
+              Signed up: {summary.signups}
+              {summary.paidConversions > 0 && (
+                <>
+                  {' · '}
+                  Paid: {summary.paidConversions}
+                </>
+              )}
+            </p>
+          </div>
+        )}
+      </div>
     </ContentSurfaceCard>
   );
 }

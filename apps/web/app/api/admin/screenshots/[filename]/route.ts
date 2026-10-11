@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { type NextRequest, NextResponse } from 'next/server';
 import { resolveScreenshotPath } from '@/lib/admin/screenshots';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
@@ -10,7 +10,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ filename: string }> }
 ) {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
 
   if (!entitlements.isAuthenticated) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

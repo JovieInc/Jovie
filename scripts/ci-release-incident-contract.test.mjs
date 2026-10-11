@@ -22,6 +22,7 @@ function fixture() {
       command: 'node regression.mjs',
       path: 'regression.mjs',
     },
+    lifecycle: { state: 'active' },
     ciStageOwner: { stage: 'source-pr', owner: 'CI' },
     documentation: { operator: 'operator.md', postmortem: 'postmortem.md' },
     templatePropagation: {
@@ -80,6 +81,51 @@ test('rejects legacy labels and non-native queue backends', () => {
   assert.deepEqual(validateMergeQueueBackendLabels('graphite', []), [
     'merge queue backend must be native',
   ]);
+});
+
+test('accepts a superseded incident without a local regression', () => {
+  const { root, ledger } = fixture();
+  const cwd = process.cwd();
+  process.chdir(root);
+  try {
+    const incident = ledger.incidents[0];
+    delete incident.regression;
+    incident.lifecycle = {
+      state: 'superseded',
+      supersededBy: 'JovieInc/symphony-control',
+    };
+    assert.deepEqual(validateIncidentLedger(ledger), { ok: true, errors: [] });
+  } finally {
+    process.chdir(cwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('fails closed when supersession has no successor or regression', () => {
+  const { root, ledger } = fixture();
+  const cwd = process.cwd();
+  process.chdir(root);
+  try {
+    const incident = ledger.incidents[0];
+    delete incident.regression;
+    incident.lifecycle = { state: 'superseded' };
+    const result = validateIncidentLedger(ledger);
+    assert.equal(result.ok, false);
+    assert.match(
+      result.errors.join('\n'),
+      /lifecycle\.supersededBy is required/
+    );
+    ledger.incidents[1].lifecycle = { state: 'retired' };
+    const invalid = validateIncidentLedger(ledger);
+    assert.equal(invalid.ok, false);
+    assert.match(
+      invalid.errors.join('\n'),
+      /lifecycle\.state must be active or superseded/
+    );
+  } finally {
+    process.chdir(cwd);
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('fails closed when an incident lacks propagation or a regression path', () => {

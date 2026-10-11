@@ -38,7 +38,7 @@ export function ReleaseTaskProgressBar({
           <>
             {done}/{total} done
             {overdueCount > 0 && (
-              <span className='text-red-400'>
+              <span className='text-error'>
                 {' '}
                 &middot; {overdueCount} overdue
               </span>

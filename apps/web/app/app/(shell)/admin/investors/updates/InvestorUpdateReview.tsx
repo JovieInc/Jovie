@@ -38,7 +38,7 @@ function ApprovalStatus({
   latestApproval: InvestorUpdateReviewState['latestApproval'];
 }>) {
   if (error) {
-    return <p className='text-sm text-destructive'>{error}</p>;
+    return <p className='text-sm text-error'>{error}</p>;
   }
   if (approvalIsCurrent && latestApproval) {
     return (

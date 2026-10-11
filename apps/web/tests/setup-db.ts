@@ -40,13 +40,22 @@ export async function setupDatabase() {
 
   const pool = new Pool({ connectionString: databaseUrl });
   db = drizzle(pool, { schema });
+  const certificationMode = process.env.DB_CERTIFICATION === 'true';
 
   try {
     const migrationsFolder = path.join(process.cwd(), 'drizzle', 'migrations');
     try {
       await migrate(db, { migrationsFolder });
     } catch (error) {
+      if (certificationMode) throw error;
       console.warn('Migration failed, continuing with existing schema:', error);
+    }
+
+    if (certificationMode) {
+      await setupRlsTestRole(db);
+      globalThis.db = db as unknown as DbType;
+      dbSetupComplete = true;
+      return db;
     }
 
     await db.execute(`
@@ -227,6 +236,7 @@ async function setupRlsTestRole(db: NeonDatabase<typeof schema>) {
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'test_app_user') THEN
         CREATE ROLE test_app_user WITH LOGIN NOINHERIT NOBYPASSRLS;
       END IF;
+      EXECUTE format('GRANT test_app_user TO %I', current_user);
       GRANT USAGE ON SCHEMA public TO test_app_user;
       GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO test_app_user;
       GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO test_app_user;

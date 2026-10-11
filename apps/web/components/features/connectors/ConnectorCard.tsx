@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/features/connectors/ConnectorCard.test.tsx
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
@@ -27,7 +28,8 @@ export type {
 interface ConnectorCardProps {
   readonly provider: ConnectorProviderId;
   readonly status: ConnectorStatus;
-  readonly email?: string;
+  readonly accountLabel?: string;
+  readonly scopes?: readonly string[];
   readonly errorMessage?: string;
   readonly onConnect?: () => void;
   readonly onDisconnect?: () => void;
@@ -72,17 +74,17 @@ const STATUS_BADGE: Record<
 export function ConnectorCard({
   provider,
   status,
-  email,
+  accountLabel,
+  scopes,
   errorMessage,
   onConnect,
   onDisconnect,
   className,
 }: ConnectorCardProps) {
   const definition = getConnectorDefinition(provider);
-  const Icon =
-    definition.iconKey === 'youtube'
-      ? null
-      : CONNECTOR_ICONS[definition.iconKey];
+  const isSocialIcon =
+    definition.iconKey === 'youtube' || definition.iconKey === 'spotify';
+  const Icon = isSocialIcon ? null : CONNECTOR_ICONS[definition.iconKey];
   const {
     label: statusLabel,
     variant: statusVariant,
@@ -98,13 +100,17 @@ export function ConnectorCard({
   const actionHandler = isConnected ? onDisconnect : onConnect;
   const normalizedError = errorMessage?.trim();
   const detailLine = isConnected
-    ? email?.trim()
+    ? accountLabel?.trim()
     : needsAttention
       ? normalizedError ||
         (status === 'needs_reauth'
           ? 'Reconnect to continue syncing.'
           : 'Connection failed. Try again.')
       : undefined;
+  const grantedScopeLabels = definition.oauthScopes.flatMap((scope, index) => {
+    const label = definition.oauthScopeLabels[index];
+    return scopes?.includes(scope) && label ? [label] : [];
+  });
 
   return (
     <div
@@ -113,9 +119,13 @@ export function ConnectorCard({
       aria-busy={status === 'syncing' ? true : undefined}
     >
       <div className='flex min-w-0 flex-1 gap-3'>
-        {provider === 'youtube' ? (
+        {isSocialIcon ? (
           <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center'>
-            <SocialIcon platform='youtube' className='h-4 w-4' aria-hidden />
+            <SocialIcon
+              platform={definition.iconKey}
+              className='h-4 w-4'
+              aria-hidden
+            />
           </div>
         ) : (
           <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center'>
@@ -158,6 +168,14 @@ export function ConnectorCard({
           >
             {detailLine ?? <span aria-hidden='true'>&nbsp;</span>}
           </p>
+          {isConnected && grantedScopeLabels.length > 0 && (
+            <ul
+              className='text-xs text-tertiary'
+              aria-label={`${definition.label} granted scopes`}
+            >
+              <li>Scopes: {grantedScopeLabels.join(', ')}</li>
+            </ul>
+          )}
         </div>
       </div>
 

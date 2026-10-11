@@ -61,13 +61,18 @@ describe('AuthReturnPage (legacy desktop auth bounce)', () => {
     expect(
       screen.getByRole('link', { name: 'Return to Jovie' })
     ).toHaveAttribute('href', expectedDeepLink);
-    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      expectedDeepLink
+    );
+    expect(hrefWrites).toEqual([]);
     expect(
       screen.getByRole('heading', { name: 'Return to Jovie' })
     ).toBeVisible();
     expect(
       screen.getByText('Authentication is complete. Return to Jovie.')
     ).toBeVisible();
+    expect(document.body).not.toHaveTextContent(expectedDeepLink);
     expect(screen.queryByText('Jovie Desktop')).toBeNull();
   });
 
@@ -81,7 +86,11 @@ describe('AuthReturnPage (legacy desktop auth bounce)', () => {
     expect(
       screen.getByRole('link', { name: 'Return to Jovie' })
     ).toHaveAttribute('href', expectedDeepLink);
-    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      expectedDeepLink
+    );
+    expect(hrefWrites).toEqual([]);
   });
 
   it('uses the local app scheme on localhost origin', () => {
@@ -94,7 +103,11 @@ describe('AuthReturnPage (legacy desktop auth bounce)', () => {
     expect(
       screen.getByRole('link', { name: 'Return to Jovie' })
     ).toHaveAttribute('href', expectedDeepLink);
-    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.getByTestId('native-protocol-launcher')).toHaveAttribute(
+      'src',
+      expectedDeepLink
+    );
+    expect(hrefWrites).toEqual([]);
   });
 
   it('renders safely before browser location is available', () => {

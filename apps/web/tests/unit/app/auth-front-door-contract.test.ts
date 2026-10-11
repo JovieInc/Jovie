@@ -40,9 +40,10 @@ describe('auth front-door contract', () => {
     expect(contract.fallbackSupport).toBe('Free forever. No credit card.');
   });
 
-  it('keeps free acquisition on signup and Pro on approved request-access routing', () => {
+  it('keeps free acquisition on signup, claims on the qualify chat, and Pro on request-access routing', () => {
     expect(HOMEPAGE_FRONT_DOOR_CTA.primary.href).toBe(APP_ROUTES.SIGNUP);
-    expect(MARKETING_CTA_INTENTS.claimProfile.href).toBe(APP_ROUTES.SIGNUP);
+    // Claims enter the /start qualify chat (Tim 2026-09-28, JOV-3379).
+    expect(MARKETING_CTA_INTENTS.claimProfile.href).toBe(APP_ROUTES.START);
     expect(
       MARKETING_PRICING_PLANS.find(plan => plan.id === 'free')?.ctaHref
     ).toBe(`${APP_ROUTES.SIGNUP}?plan=free`);
@@ -81,7 +82,10 @@ describe('auth front-door contract', () => {
       destination: APP_ROUTES.SIGNIN,
       permanent: true,
     });
-  });
+    // Cold `import('next.config.js')` pulls the whole Next config module
+    // graph: <1s warm, but the default 12s budget fired under full-suite
+    // shard CPU contention.
+  }, 45_000);
 
   it('keeps first-party auth copy aligned with the canonical cross-links', () => {
     expect(authCopy.signUp.start.title).toBe('Continue to Jovie');

@@ -103,6 +103,8 @@ const EXPECTATIONS = [
       'STACK_REPAIR_ACTION',
     ],
   },
+  // symphony-lease-guard and symphony-concurrency-controller.py moved to
+  // JovieInc/symphony-control, which carries their scope expectations.
 ];
 
 function textFor(path, repoRoot, files) {

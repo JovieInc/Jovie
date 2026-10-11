@@ -10,9 +10,11 @@ import {
   SheetTitle,
 } from '@jovie/ui';
 import { ChevronLeft, Search, X } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { useKeyboardShortcuts } from '@/contexts/KeyboardShortcutsContext';
+import { getCurrentAppShellWorkspace } from '@/lib/app-shell/workspaces';
 import {
   type KeyboardShortcut,
   SHORTCUT_CATEGORY_LABELS,
@@ -107,11 +109,16 @@ function ShortcutCategorySection({
 export function KeyboardShortcutsSheet() {
   const { isOpen, close } = useKeyboardShortcuts();
   const { canUse: canUseFounderDoor } = useFounderDoor();
+  const pathname = usePathname();
+  const isOvieWorkspace = getCurrentAppShellWorkspace(pathname).id === 'ov';
   const [searchQuery, setSearchQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const catalogShortcuts = useMemo(
-    () => shortcutsForHelpSheet({ canUseFounderDoor }),
-    [canUseFounderDoor]
+    () =>
+      shortcutsForHelpSheet({ canUseFounderDoor }).filter(
+        shortcut => isOvieWorkspace || shortcut.id !== 'lock-workspace'
+      ),
+    [canUseFounderDoor, isOvieWorkspace]
   );
 
   // Filter shortcuts based on search query

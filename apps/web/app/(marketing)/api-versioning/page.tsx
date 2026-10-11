@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
+import '@/components/marketing/MarketingRouteHero.css';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
@@ -15,7 +17,7 @@ export const revalidate = false;
 const PAGE_URL = PUBLIC_ARTIST_API_POLICY_URL;
 
 export const metadata: Metadata = {
-  title: `API Versioning and Deprecation Policy — ${APP_NAME}`,
+  title: `API Versioning and Deprecation Policy - ${APP_NAME}`,
   description:
     // ui-casing-allow: metadata sentence with API lifecycle terms
     'The canonical lifecycle policy for Jovie’s public artist API: URL versioning, active v1 status, and future Deprecation or Sunset signals.',
@@ -23,7 +25,7 @@ export const metadata: Metadata = {
     canonical: PAGE_URL,
   },
   openGraph: {
-    title: `API Versioning and Deprecation Policy — ${APP_NAME}`,
+    title: `API Versioning and Deprecation Policy - ${APP_NAME}`,
     description:
       // ui-casing-allow: metadata sentence with API lifecycle terms
       'The canonical lifecycle policy for Jovie’s public artist API: URL versioning, active v1 status, and future Deprecation or Sunset signals.',
@@ -42,18 +44,45 @@ export default function ApiVersioningPage() {
     <>
       <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
 
-      <MarketingHero variant='left'>
-        <p className='text-sm font-medium text-tertiary-token'>
-          Public API policy
-        </p>
-        <h1 className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'>
-          API Versioning And Deprecation Policy
-        </h1>
-        <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
-          The canonical lifecycle contract for Jovie&apos;s public artist API.
-          It explains how versions change and how genuine retirement will be
-          signaled.
-        </p>
+      <MarketingHero
+        variant='unstyled'
+        headingId='api-versioning-hero-heading'
+        testId='api-versioning-hero'
+        className='marketing-hero-dock marketing-hero-dock--inset relative w-full overflow-hidden pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32'
+      >
+        <div className='marketing-route-hero__media' aria-hidden='true'>
+          <Image
+            src='/images/hero/api-versioning-hero.webp'
+            alt=''
+            fill
+            sizes='100vw'
+            priority
+          />
+        </div>
+        <div className='marketing-route-hero__scrim' aria-hidden='true' />
+        <div
+          className='marketing-route-hero__accent marketing-route-hero__accent--pink'
+          aria-hidden='true'
+        />
+        <MarketingContainer
+          width='page'
+          className='marketing-route-hero__content'
+        >
+          <p className='text-sm font-medium text-tertiary-token'>
+            Public API policy
+          </p>
+          <h1
+            id='api-versioning-hero-heading'
+            className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'
+          >
+            API Versioning And Deprecation Policy
+          </h1>
+          <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
+            The canonical lifecycle contract for Jovie&apos;s public artist API.
+            It explains how versions change and how genuine retirement will be
+            signaled.
+          </p>
+        </MarketingContainer>
       </MarketingHero>
 
       <MarketingContainer width='prose' className='pb-20 sm:pb-28'>

@@ -146,6 +146,8 @@ function KanbanColumn<TData>({
   cardHeight,
   enableVirtualization,
 }: Readonly<KanbanColumnProps<TData>>) {
+  // Reads live virtualizer state each render; see virtualizer-compiler-optout.test.ts.
+  'use no memo';
   const containerRef = useRef<HTMLFieldSetElement>(null);
   const itemGap = 10;
 
@@ -181,7 +183,10 @@ function KanbanColumn<TData>({
   }, []);
 
   return (
-    <ContentSurfaceCard className='flex min-w-75 max-w-95 flex-1 flex-col overflow-hidden bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_96%,transparent)]'>
+    <ContentSurfaceCard
+      surface='nested'
+      className='flex min-w-75 max-w-95 flex-1 flex-col overflow-hidden'
+    >
       <div className='flex items-center justify-between border-b border-subtle px-3 py-2.5'>
         <div className='flex items-center gap-2'>
           {accentStyle && (

@@ -4,6 +4,7 @@ import {
   ICON_BUTTON_FADE_CLASSNAME,
   ICON_BUTTON_VISIBLE_CLASSNAME,
   IconButton,
+  type IconButtonSize,
 } from '@jovie/ui';
 import type {
   AnchorHTMLAttributes,
@@ -31,6 +32,7 @@ interface InlineIconButtonSharedProps {
   readonly children: ReactNode;
   readonly className?: string;
   readonly fadeOnParentHover?: boolean;
+  readonly size?: IconButtonSize;
 }
 
 type InlineIconButtonAnchorProps = InlineIconButtonSharedProps &
@@ -63,6 +65,7 @@ export const InlineIconButton = React.memo(function InlineIconButton(
       children,
       className,
       fadeOnParentHover = false,
+      size = 'lg',
       href,
       ...anchorProps
     } = props;
@@ -70,7 +73,7 @@ export const InlineIconButton = React.memo(function InlineIconButton(
     return (
       <IconButton
         variant='inline'
-        size='lg'
+        size={size}
         asChild
         className={sharedClassName(className, fadeOnParentHover)}
       >
@@ -85,6 +88,7 @@ export const InlineIconButton = React.memo(function InlineIconButton(
     children,
     className,
     fadeOnParentHover = false,
+    size = 'lg',
     type = 'button',
     ...buttonProps
   } = props;
@@ -92,7 +96,7 @@ export const InlineIconButton = React.memo(function InlineIconButton(
   return (
     <IconButton
       variant='inline'
-      size='lg'
+      size={size}
       type={type}
       className={sharedClassName(className, fadeOnParentHover)}
       {...buttonProps}

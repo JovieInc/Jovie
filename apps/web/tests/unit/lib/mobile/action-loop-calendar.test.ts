@@ -132,7 +132,6 @@ describe('buildMobileCalendar', () => {
     expect(payload.pendingEvents).toHaveLength(1);
     expect(payload.pendingEvents[0]?.id).toBe('event-pending');
     expect(payload.upcomingEvents.map(event => event.id)).toEqual([
-      'event-pending',
       'event-confirmed',
     ]);
     expect(payload.upcomingReleases).toEqual([

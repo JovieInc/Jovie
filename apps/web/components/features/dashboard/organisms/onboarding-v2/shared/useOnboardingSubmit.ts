@@ -23,6 +23,7 @@ import {
   toDurationMs,
 } from '@/features/dashboard/organisms/onboarding-v2/shared/analytics';
 import { identify, track } from '@/lib/analytics';
+import { markSignupFirstValuePending } from '@/lib/analytics/signup-funnel-client';
 import {
   clearSignupClaimValue,
   readSignupClaimValue,
@@ -464,6 +465,9 @@ export function useOnboardingSubmit({
           email: userEmail,
           redirectToDashboard: false,
         });
+        if ('error' in completion) {
+          throw new Error(`[${completion.error}]`);
+        }
         onCompleted?.(completion);
 
         isSubmittingRef.current = false;
@@ -487,6 +491,7 @@ export function useOnboardingSubmit({
           handle: resolvedHandle,
           method: getOnboardingCompletionMethod(shouldAutoSubmitHandle),
         });
+        markSignupFirstValuePending();
 
         if (shouldAutoSubmitHandle) {
           setAutoSubmitClaimed(true);

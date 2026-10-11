@@ -35,3 +35,7 @@ export {
   socialReplyWriteResultSchema,
 } from './contract';
 export { runSocialReplyBatch } from './orchestrator';
+export {
+  createYouTubeReplyAdapter,
+  type YouTubeReplyAdapterInput,
+} from './youtube';

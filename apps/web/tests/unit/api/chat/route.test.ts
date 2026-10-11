@@ -20,6 +20,8 @@ import {
 const hoisted = vi.hoisted(() => ({
   tryHandleAnonymousOnboardingChatMock: vi.fn(),
   getOptionalAuthMock: vi.fn(),
+  getFreshAuthMock: vi.fn(),
+  assertOviePrivacyUnlockedMock: vi.fn(),
   getSessionContextMock: vi.fn(),
   resolveChatAccountContextMock: vi.fn(),
   checkGatesForUserMock: vi.fn(),
@@ -27,6 +29,7 @@ const hoisted = vi.hoisted(() => ({
   checkAiChatRateLimitForPlanMock: vi.fn(),
   executeChatTurnMock: vi.fn(),
   reserveChatTurnMock: vi.fn(),
+  markChatTurnTerminalMock: vi.fn(),
   persistTerminalAssistantMessageMock: vi.fn(),
   isAdminMock: vi.fn(),
   getOvieOperatingStoreMock: vi.fn(),
@@ -43,7 +46,12 @@ vi.mock('@/app/api/chat/onboarding-handler', () => ({
 
 vi.mock('@/lib/auth/cached', () => ({
   getOptionalAuth: hoisted.getOptionalAuthMock,
+  getFreshAuth: hoisted.getFreshAuthMock,
   getCachedAuth: vi.fn(),
+}));
+
+vi.mock('@/lib/ovie/privacy-lock/server', () => ({
+  assertOviePrivacyUnlocked: hoisted.assertOviePrivacyUnlockedMock,
 }));
 
 vi.mock('@/lib/admin/roles', () => ({
@@ -116,6 +124,7 @@ vi.mock('@/lib/chat/run', () => ({
 vi.mock('@/lib/chat/turns', () => ({
   reserveChatTurn: hoisted.reserveChatTurnMock,
   markChatTurnStreaming: vi.fn(),
+  markChatTurnTerminal: hoisted.markChatTurnTerminalMock,
   persistTerminalAssistantMessage: hoisted.persistTerminalAssistantMessageMock,
   recordChatTurnModel: vi.fn(),
   TURN_IN_PROGRESS_ERROR_CODE: 'TURN_IN_PROGRESS',
@@ -373,6 +382,11 @@ describe('POST /api/chat guard wiring', () => {
     hoisted.getOptionalAuthMock.mockResolvedValue({
       userId: '00000000-0000-4000-8000-000000000123',
     });
+    hoisted.getFreshAuthMock.mockResolvedValue({
+      userId: '00000000-0000-4000-8000-000000000123',
+      sessionId: 'session-founder',
+    });
+    hoisted.assertOviePrivacyUnlockedMock.mockResolvedValue(undefined);
     hoisted.resolveChatAccountContextMock.mockResolvedValue(
       makeAccountContext()
     );
@@ -519,6 +533,58 @@ describe('POST /api/chat guard wiring', () => {
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
   });
+
+  it.each(['locked', 'storage unavailable'])(
+    'denies an admin OV turn before effects when privacy is %s',
+    async reason => {
+      hoisted.isAdminMock.mockResolvedValue(true);
+      hoisted.assertOviePrivacyUnlockedMock.mockRejectedValue(
+        new Error(reason)
+      );
+
+      const response = await POST(
+        chatRequest(
+          validBody({ chatMode: 'ov', clientTurnId: 'privacy-denied-turn' })
+        )
+      );
+
+      expect(response.status).toBe(403);
+      expect(hoisted.assertOviePrivacyUnlockedMock).toHaveBeenCalledWith({
+        userId: '00000000-0000-4000-8000-000000000123',
+        sessionId: 'session-founder',
+      });
+      expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+      expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
+      expect(hoisted.getOvieOperatingStoreMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { userId: 'another-user', sessionId: 'session-other' },
+    { userId: '00000000-0000-4000-8000-000000000123', sessionId: null },
+  ])(
+    'rejects an OV turn with invalid fresh identity %j before effects',
+    async auth => {
+      hoisted.isAdminMock.mockResolvedValue(true);
+      hoisted.getFreshAuthMock.mockResolvedValue(auth);
+
+      expect(
+        (
+          await POST(
+            chatRequest(
+              validBody({ chatMode: 'ov', clientTurnId: 'privacy-denied-turn' })
+            )
+          )
+        ).status
+      ).toBe(403);
+      expect(hoisted.assertOviePrivacyUnlockedMock).not.toHaveBeenCalled();
+      expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+      expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
+      expect(hoisted.getOvieOperatingStoreMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('transports entitled OV turns to Summer without artist Jovie generation or Ovie self-id', async () => {
     hoisted.isAdminMock.mockResolvedValue(true);

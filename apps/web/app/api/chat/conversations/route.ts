@@ -3,9 +3,11 @@ import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { listCreatorConversations } from '@/lib/chat/conversation-queries';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
+import { conversationTitleSource } from '@/lib/chat/title-source';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
+import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
 import { logger } from '@/lib/utils/logger';
 import { getSessionErrorResponse } from '../session-error-response';
 
@@ -116,7 +118,10 @@ export async function POST(req: Request) {
     }
 
     const { title, initialMessage } = body;
-    const sanitizedTitle = sanitizeConversationTitle(title);
+    const source = conversationTitleSource(initialMessage);
+    const sanitizedTitle =
+      sanitizeConversationTitle(title) ??
+      (source.deterministic ? source.text : null);
 
     // Validate initial message length
     if (
@@ -140,6 +145,21 @@ export async function POST(req: Request) {
         title: sanitizedTitle,
       })
       .returning();
+
+    // JOV-4514: durable work record for the new chat. Non-fatal: the chat
+    // must still be usable if task creation fails.
+    try {
+      await ensureChatWorkRecord({
+        conversationId: conversation.id,
+        creatorProfileId: profile.id,
+      });
+    } catch (workRecordError) {
+      await captureError('Failed to create chat work record', workRecordError, {
+        route: '/api/chat/conversations',
+        method: 'POST',
+        conversationId: conversation.id,
+      });
+    }
 
     // If there's an initial message, create it
     if (initialMessage?.trim()) {

@@ -368,17 +368,27 @@ test('persists verified checkout entitlement for a fresh and returning session',
         status: 'pending',
       });
 
-    const charges = await stripeClient.charges.list({
-      customer: customerId!,
-      limit: 100,
+    // Stripe API 2026-08-26.dahlia links invoices to payments only through
+    // InvoicePayments; Charge.invoice no longer exists.
+    const invoicePayments = await stripeClient.invoicePayments.list({
+      invoice: invoiceId,
+      status: 'paid',
+      limit: 1,
     });
-    const paidCharge = charges.data.find(candidate => {
-      const chargeInvoiceId =
-        typeof candidate.invoice === 'string'
-          ? candidate.invoice
-          : candidate.invoice?.id;
-      return chargeInvoiceId === invoiceId;
-    });
+    const paymentIntentRef = invoicePayments.data[0]?.payment?.payment_intent;
+    const paymentIntentId =
+      typeof paymentIntentRef === 'string'
+        ? paymentIntentRef
+        : paymentIntentRef?.id;
+    const paymentIntent = paymentIntentId
+      ? await stripeClient.paymentIntents.retrieve(paymentIntentId)
+      : null;
+    const latestCharge = paymentIntent?.latest_charge;
+    const paidCharge = latestCharge
+      ? await stripeClient.charges.retrieve(
+          typeof latestCharge === 'string' ? latestCharge : latestCharge.id
+        )
+      : null;
     if (!paidCharge) {
       throw new Error('Paid test invoice did not expose its Stripe charge');
     }
@@ -391,7 +401,9 @@ test('persists verified checkout entitlement for a fresh and returning session',
       { charge: paidCharge.id, amount: partialAmount },
       { idempotencyKey: `jovie-refund-e2e:${runId}:partial` }
     );
-    expect(partialRefund.livemode).toBe(false);
+    // Refunds carry no livemode; bind them to the test-mode charge instead.
+    expect(partialRefund.charge).toBe(paidCharge.id);
+    expect(partialRefund.status).not.toBe('failed');
 
     const partiallyRefundedCharge = await stripeClient.charges.retrieve(
       paidCharge.id
@@ -436,7 +448,8 @@ test('persists verified checkout entitlement for a fresh and returning session',
       { charge: paidCharge.id, amount: remainingAmount },
       { idempotencyKey: `jovie-refund-e2e:${runId}:final` }
     );
-    expect(finalRefund.livemode).toBe(false);
+    expect(finalRefund.charge).toBe(paidCharge.id);
+    expect(finalRefund.status).not.toBe('failed');
 
     const fullyRefundedCharge = await stripeClient.charges.retrieve(
       paidCharge.id

@@ -8,7 +8,7 @@ vi.mock('@/hooks/useAuthRouteConfig', () => ({
     breadcrumbs: [],
     isTableRoute: false,
     showMobileTabs: false,
-    isArtistProfileSettings: false,
+    isProfileSettings: false,
     isDemoRoute: false,
     isChatRoute: false,
     isLyricsRoute: false,
@@ -31,10 +31,6 @@ vi.mock('@/components/organisms/keyboard-shortcuts-sheet', () => ({
 
 vi.mock('@/features/dashboard/organisms/profile-contact-sidebar', () => ({
   ProfileContactSidebar: () => null,
-}));
-
-vi.mock('@/features/dashboard/atoms/HeaderProfileProgress', () => ({
-  HeaderProfileProgress: () => null,
 }));
 
 vi.mock('@/features/dashboard/atoms/DrawerToggleButton', () => ({

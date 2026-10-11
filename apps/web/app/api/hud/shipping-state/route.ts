@@ -5,6 +5,7 @@ import { captureError } from '@/lib/error-tracking';
 import { scheduleAfter } from '@/lib/next/schedule-after';
 import { FORBIDDEN_QUERY_KEYS } from '@/lib/ovie/shipping-state';
 import {
+  hasCachedConfiguredShippingState,
   publishConfiguredShippingState,
   readCachedConfiguredShippingState,
 } from '@/lib/ovie/shipping-state/configured.server';
@@ -42,6 +43,13 @@ export async function GET(request: NextRequest) {
         },
         { status: 400, headers: NO_STORE_HEADERS }
       );
+    }
+
+    // A cold serverless instance has nothing cached. Measure once inline so
+    // the first response carries live sources instead of an all-unknown shell.
+    if (!hasCachedConfiguredShippingState()) {
+      const projection = await publishConfiguredShippingState();
+      return NextResponse.json(projection, { headers: NO_STORE_HEADERS });
     }
 
     const projection = readCachedConfiguredShippingState();

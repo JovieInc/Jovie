@@ -3,6 +3,9 @@ import { getPublicProfileCandidate } from '@/lib/routing/proxy-routing';
 const COOKIE_BANNER_SUPPRESSED_PATH_PREFIXES = [
   '/app',
   '/demo',
+  // Authenticated Ops surfaces inside the desktop/TV shell.
+  '/hud',
+  '/hud-tv',
   '/desktop-auth',
   '/start',
   // Native/browser auth handoff routes should stay free of visible banner chrome.

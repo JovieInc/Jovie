@@ -1762,7 +1762,7 @@ describe('origin-bound Vercel protection bypass', () => {
     }
   });
 
-  it('uses deploy health without touching the rate-limited general health endpoint', async () => {
+  it('accepts anonymous deploy-health liveness without touching the rate-limited general health endpoint', async () => {
     const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
     const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
       const url = new URL(rawUrl);
@@ -1770,11 +1770,8 @@ describe('origin-bound Vercel protection bypass', () => {
       const isGeneralHealth = url.pathname === '/api/health';
       const body = isDeployHealth
         ? JSON.stringify({
-            status: 'healthy',
-            checks: {
-              environment: { ok: true },
-              database: { ok: true },
-            },
+            healthy: true,
+            timestamp: '2026-10-03T17:42:00.000Z',
           })
         : isGeneralHealth
           ? JSON.stringify({ status: 'rate_limited' })
@@ -1810,6 +1807,14 @@ describe('origin-bound Vercel protection bypass', () => {
   });
 
   it.each([
+    {
+      label: 'unhealthy anonymous liveness',
+      payload: {
+        healthy: false,
+        timestamp: '2026-10-03T17:42:00.000Z',
+      },
+      error: 'did not report healthy status',
+    },
     {
       label: 'legacy general-health status',
       payload: {

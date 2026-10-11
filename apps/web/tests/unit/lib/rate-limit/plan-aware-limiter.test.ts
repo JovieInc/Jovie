@@ -6,11 +6,13 @@ import type { RateLimitConfig, RateLimitResult } from '@/lib/rate-limit/types';
 // Hoisted mocks
 // ---------------------------------------------------------------------------
 
-const { mockLimit, mockGetStatus, mockWouldBeRateLimited } = vi.hoisted(() => ({
-  mockLimit: vi.fn(),
-  mockGetStatus: vi.fn(),
-  mockWouldBeRateLimited: vi.fn(),
-}));
+const { mockLimit, mockGetStatus, mockReadStatus, mockWouldBeRateLimited } =
+  vi.hoisted(() => ({
+    mockLimit: vi.fn(),
+    mockGetStatus: vi.fn(),
+    mockReadStatus: vi.fn(),
+    mockWouldBeRateLimited: vi.fn(),
+  }));
 
 /**
  * Every call to createRateLimiter returns a fake RateLimiter whose methods
@@ -27,6 +29,7 @@ vi.mock('@/lib/rate-limit/rate-limiter', () => {
     }
     limit = mockLimit;
     getStatus = mockGetStatus;
+    readStatus = mockReadStatus;
     wouldBeRateLimited = mockWouldBeRateLimited;
     getBackend = vi.fn().mockReturnValue('memory');
     isRedisActive = vi.fn().mockReturnValue(false);
@@ -512,6 +515,21 @@ describe('plan-aware-limiter.ts', () => {
   // =========================================================================
   // getStatus delegation
   // =========================================================================
+
+  it('reads status using the same plan config and identifier as enforcement', async () => {
+    const { createPlanAwareRateLimiter } = await import(
+      '@/lib/rate-limit/plan-aware-limiter'
+    );
+    const unavailable = { available: false, backend: 'unavailable' };
+    mockReadStatus.mockResolvedValue(unavailable);
+    const limiter = createPlanAwareRateLimiter({
+      configs: { free: freeConfig, pro: proConfig },
+    });
+    expect(await limiter.readStatus('user-1', 'founding')).toBe(unavailable);
+    expect(mockReadStatus).toHaveBeenCalledWith('user-1');
+    expect(limiter.getConfigForPlan('founding')).toBe(proConfig);
+    expect(mockLimit).not.toHaveBeenCalled();
+  });
 
   describe('getStatus delegation', () => {
     it('delegates to correct limiter based on plan', async () => {

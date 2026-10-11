@@ -1,7 +1,8 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Checkbox, Textarea } from '@jovie/ui';
 import { AudioLines, Mic, Square, Trash2 } from 'lucide-react';
+import { useId } from 'react';
 import type {
   FounderReviewReceipt,
   FounderReviewTarget,
@@ -43,7 +44,7 @@ function RecorderHeader({
   onStart,
   onStop,
 }: RecorderHeaderProps) {
-  const sessionLabel = sessionActive ? 'Recording this card' : 'Mic off';
+  const sessionLabel = sessionActive ? 'Recording' : 'Mic off';
   const buttonLabel = sessionActive ? 'Stop And Save' : 'Start Session';
   const buttonAction = sessionActive ? onStop : onStart;
   const buttonVariant = sessionActive ? 'secondary' : 'primary';
@@ -99,10 +100,7 @@ function RecorderStatus({
 }: RecorderStatusProps) {
   if (error) {
     return (
-      <p
-        className='min-h-12 rounded-md border border-status-error/30 bg-status-error/5 px-3 py-2 text-xs text-status-error'
-        role='alert'
-      >
+      <p className='text-xs text-secondary-token' role='alert'>
         {error}
       </p>
     );
@@ -113,7 +111,7 @@ function RecorderStatus({
     ? 'private audio retained'
     : 'transcript only';
   return (
-    <div className='flex min-h-12 items-center justify-between gap-3 rounded-md bg-surface-1 px-3 py-2 text-xs text-secondary-token'>
+    <div className='flex flex-wrap items-center justify-between gap-2 text-xs text-secondary-token'>
       <span>
         Saved · {latestReceipt.target.title} · {retentionLabel} · action{' '}
         {latestReceipt.actionOutcome.status.replace('-', ' ')}
@@ -202,6 +200,7 @@ export function FounderReviewRecorderControls({
   onApprove,
   onReject,
 }: FounderReviewRecorderControlsProps) {
+  const controlsId = useId();
   return (
     <section
       className={cn('border-subtle border-t pt-4', className)}
@@ -215,7 +214,7 @@ export function FounderReviewRecorderControls({
         onStop={onStop}
       />
 
-      <div className='mt-4 min-h-20 rounded-md border border-subtle bg-surface-0 p-3'>
+      <div className='mt-4 min-h-20'>
         <p className='mb-1 text-2xs font-medium text-tertiary-token'>
           Live Transcript
         </p>
@@ -223,7 +222,7 @@ export function FounderReviewRecorderControls({
           className='line-clamp-3 text-sm text-secondary-token'
           aria-live='polite'
         >
-          {transcript || 'Your dictation will stay bound to this card.'}
+          {transcript || 'Your transcript will appear here.'}
         </p>
       </div>
 
@@ -231,51 +230,50 @@ export function FounderReviewRecorderControls({
         className='mt-3 block text-xs font-medium text-secondary-token'
         htmlFor={`founder-note-${target.id}`}
       >
-        Typed fallback or refinement
+        Notes
       </label>
-      <textarea
+      <Textarea
         id={`founder-note-${target.id}`}
         value={typedText}
         rows={target.type === 'founder-note' ? 2 : 3}
         disabled={saving}
-        className='mt-1 w-full resize-y rounded-md border border-subtle bg-surface-0 px-3 py-2 text-sm text-primary-token outline-none placeholder:text-quaternary-token focus-visible:ring-2 focus-visible:ring-ring/50'
-        placeholder='Add context, even when the microphone is unavailable'
+        className='mt-1'
+        placeholder='Type a note or add to your transcript'
         onChange={event => onTypedTextChange(event.target.value)}
       />
 
       <div className='mt-3 grid gap-2 text-xs text-secondary-token sm:grid-cols-2'>
-        <label className='flex min-h-9 items-center gap-2 rounded-md border border-subtle px-3 py-2'>
-          <input
-            type='checkbox'
+        <label
+          className='flex min-h-11 items-center gap-3'
+          htmlFor={`${controlsId}-audio`}
+        >
+          <Checkbox
+            id={`${controlsId}-audio`}
             checked={keepAudio}
             disabled={saving}
-            onChange={event => onKeepAudioChange(event.target.checked)}
+            onCheckedChange={checked => onKeepAudioChange(checked === true)}
           />
           <span>Keep private audio after saving</span>
         </label>
-        <label className='flex min-h-9 items-center gap-2 rounded-md border border-subtle px-3 py-2'>
-          <input
-            type='checkbox'
+        <label
+          className='flex min-h-11 items-center gap-3'
+          htmlFor={`${controlsId}-content`}
+        >
+          <Checkbox
+            id={`${controlsId}-content`}
             checked={allowContentUse}
             disabled={saving}
-            onChange={event => onAllowContentUseChange(event.target.checked)}
+            onCheckedChange={checked =>
+              onAllowContentUseChange(checked === true)
+            }
           />
           <span>Allow this material in future content</span>
         </label>
       </div>
-      <p className='mt-2 text-2xs text-quaternary-token'>
+      <p className='mt-2 text-2xs text-tertiary-token'>
         Default: transcript only, no content reuse. A recorded thought never
         authorizes publishing or another external action.
       </p>
-
-      <div className='mt-3 min-h-12' aria-live='polite'>
-        <RecorderStatus
-          error={error}
-          latestReceipt={latestReceipt}
-          saving={saving}
-          onDeleteAudio={onDeleteAudio}
-        />
-      </div>
 
       <div className='mt-4 flex min-h-10 items-center justify-end gap-2'>
         <RecorderActions
@@ -286,6 +284,15 @@ export function FounderReviewRecorderControls({
           onSaveNote={onSaveNote}
           onApprove={onApprove}
           onReject={onReject}
+        />
+      </div>
+
+      <div className='mt-2 min-h-24 sm:min-h-12' aria-live='polite'>
+        <RecorderStatus
+          error={error}
+          latestReceipt={latestReceipt}
+          saving={saving}
+          onDeleteAudio={onDeleteAudio}
         />
       </div>
     </section>

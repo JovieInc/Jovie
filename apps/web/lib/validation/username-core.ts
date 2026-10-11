@@ -98,6 +98,7 @@ export const RESERVED_USERNAMES = [
   'compare',
   'alternatives',
   'directory',
+  'solutions', // /solutions permanently redirects to /solutions/artists
   'features',
   'demo',
   'sandbox',

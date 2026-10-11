@@ -10,6 +10,11 @@ const includeGardeningOnly = process.argv.includes('--include-gardening');
 const registry = loadDocFreshnessRegistry();
 const result = runDocFreshnessLint(registry, { includeGardeningOnly });
 
+// A qualification finding is visible but cannot change the existing gate exit.
+console.log(
+  `doc-review-qualification: ${JSON.stringify(result.qualification)}`
+);
+
 if (result.violations.length > 0) {
   console.error('doc-freshness: found documentation drift\n');
   for (const violation of result.violations) {
@@ -35,5 +40,6 @@ if (result.violations.length > 0) {
 
 console.log(
   `doc-freshness: ok (${result.scanned.crossLinkFiles} cross-link files, ` +
-    `${result.scanned.agentsMapLines} AGENTS map lines)`
+    `${result.scanned.agentsMapLines} AGENTS map lines, ` +
+    `${result.scanned.reviewedDocuments} source-bound document reviews)`
 );

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ChangelogRelease } from '@/lib/changelog-parser';
+import { parseWhatsNewFeed, projectWhatsNew } from '@/lib/whats-new';
 
 const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
@@ -15,6 +16,7 @@ vi.mock('next/navigation', () => ({
 const RELEASES: readonly ChangelogRelease[] = [
   {
     version: '26.9.0',
+    kind: 'release',
     date: '2026-09-09',
     summary: 'Presence workspace ships **public visibility** reporting.',
     sections: {
@@ -27,6 +29,7 @@ const RELEASES: readonly ChangelogRelease[] = [
   },
   {
     version: '26.8.0',
+    kind: 'release',
     date: '2026-08-09',
     summary: 'Chat shell refinements.',
     sections: {
@@ -39,6 +42,7 @@ const RELEASES: readonly ChangelogRelease[] = [
   },
   {
     version: '26.7.0',
+    kind: 'release',
     date: '2026-07-21',
     summary: 'First public release in this set.',
     sections: {
@@ -71,6 +75,11 @@ describe('ChangelogReleasePage', () => {
   it('renders the release header, body sections, resources, and navigation', async () => {
     await renderVersion('26.9.0');
 
+    const heroPhoto = screen.getByTestId('changelog-version-hero-photo');
+    expect(heroPhoto).toBeInTheDocument();
+    expect(heroPhoto.querySelector('img')?.getAttribute('src')).toContain(
+      'changelog-version.webp'
+    );
     expect(
       screen.getByRole('heading', { level: 1, name: 'v26.9.0' })
     ).toBeVisible();
@@ -151,6 +160,14 @@ describe('ChangelogReleasePage', () => {
     expect(screen.getByText('1 update')).toBeVisible();
   });
 
+  it('emits Article and BreadcrumbList JSON-LD for agents and rich results', async () => {
+    const { container } = await renderVersion('26.8.0');
+    const types = [
+      ...container.querySelectorAll('script[type="application/ld+json"]'),
+    ].map(node => JSON.parse(node.textContent ?? '{}')['@type']);
+    expect(types).toEqual(['Article', 'BreadcrumbList']);
+  });
+
   it('calls notFound for unknown versions', async () => {
     await expect(renderVersion('0.0.0')).rejects.toThrow('NEXT_NOT_FOUND');
     expect(mocks.notFound).toHaveBeenCalled();
@@ -175,10 +192,42 @@ describe('ChangelogReleasePage', () => {
     expect(metadata.openGraph).toMatchObject({
       type: 'article',
       publishedTime: '2026-08-09T00:00:00Z',
+      images: [
+        expect.objectContaining({ url: 'https://jov.ie/og/default.png' }),
+      ],
     });
+    expect(metadata.twitter).toMatchObject({ card: 'summary_large_image' });
 
     await expect(
       generateMetadata({ params: Promise.resolve({ version: '0.0.0' }) })
     ).resolves.toEqual({});
   });
+});
+
+it('uses the same published hero descriptor as the validated update feed', async () => {
+  const release = RELEASES[0]!;
+  const reviewed = {
+    ...release,
+    customerOutcomes: Object.fromEntries(
+      Object.values(release.sections)
+        .flat()
+        .map(text => [
+          text,
+          { availability: 'unverified' as const, prerequisites: [] },
+        ])
+    ),
+  };
+  const update = parseWhatsNewFeed(
+    projectWhatsNew([reviewed], 'https://jov.ie')
+  )?.entries[0];
+  await renderVersion(release.version);
+  const hero = screen.getByTestId('changelog-version-hero-photo');
+  const image = hero.querySelector('img');
+  expect(update?.hero?.postId).toBe(release.version);
+  expect(decodeURIComponent(image?.getAttribute('src') ?? '')).toContain(
+    update?.hero?.src
+  );
+  expect(image).toHaveAttribute('alt', update?.hero?.alt);
+  expect(hero).toHaveAttribute('aria-hidden', 'true');
+  expect(update?.url).toBe('https://jov.ie/changelog/26.9.0');
 });

@@ -1,9 +1,22 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type { ComponentProps } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 import { WaitlistInviteMessage } from './WaitlistInviteMessage';
 import storyMeta, { Web213MissingToken } from './WaitlistInviteMessage.stories';
+
+vi.mock('next/link', async () => {
+  const { forwardRef } = await import('react');
+  return {
+    default: forwardRef<
+      HTMLAnchorElement,
+      ComponentProps<'a'> & { prefetch?: boolean }
+    >(function PrefetchObservedLink({ prefetch, ...props }, ref) {
+      return <a {...props} ref={ref} data-test-prefetch={String(prefetch)} />;
+    }),
+  };
+});
 
 const MISSING_TOKEN_TITLE = 'Invite link missing';
 const MISSING_TOKEN_BODY =
@@ -25,6 +38,22 @@ describe('WaitlistInviteMessage', () => {
     expect(
       screen.getByRole('link', { name: 'Check waitlist status' })
     ).toHaveAttribute('href', '/waitlist');
+  });
+
+  it('waits for visitor intent before loading the auth-dependent status route', () => {
+    render(
+      <WaitlistInviteMessage
+        title={MISSING_TOKEN_TITLE}
+        body={MISSING_TOKEN_BODY}
+      />
+    );
+    const status = screen.getByRole('link', { name: 'Check waitlist status' });
+    expect(status).toHaveAttribute('href', '/waitlist');
+    expect(status).toHaveAttribute('data-test-prefetch', 'false');
+    fireEvent.focus(status);
+    fireEvent.mouseEnter(status);
+    expect(status).toHaveAttribute('href', '/waitlist');
+    expect(status).toHaveAttribute('data-test-prefetch', 'false');
   });
 
   it('keeps secure invite workflow semantics route-owned', () => {

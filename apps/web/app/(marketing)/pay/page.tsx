@@ -5,10 +5,10 @@ import { PayLanding } from '@/features/pay/PayLanding';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = 'Turn Every Payment Into a Fan';
-  const ogTitle = `${APP_NAME} — Turn Every Payment Into a Fan`;
+  const title = 'Turn Every Payment Into a Follower';
+  const ogTitle = `${APP_NAME} — Turn Every Payment Into a Follower`;
   const description =
-    'Scan. Pay. Stream. One QR code turns a stranger into a superfan. Perfect for buskers, open mic nights, merch tables, and house shows.';
+    'Scan the code, pay in seconds, and turn a stranger into a follower. Perfect for market stalls, service providers, live events, and pop-up shops.';
 
   return {
     title,

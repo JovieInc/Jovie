@@ -11,14 +11,6 @@ on:
   # that remained individually paused after another project was resumed.
   schedule:
     - cron: '*/5 * * * *'
-  # Production Controller completion is the event-driven freshness signal.
-  # GitHub throttles this repository's five-minute schedule to hours
-  # (2026-09-26: six scheduled runs in 18 h), so the production-stale alarm
-  # also rides every controller generation, including failed ones.
-  workflow_run:
-    workflows: [Production Controller]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -174,7 +166,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
 
@@ -204,6 +196,52 @@ jobs:
             }}' > "$event_file"
           node scripts/backlog-orchestrator/delivery-state-machine.mjs \
             --event-file="$event_file"
+
+  remediation:
+    name: File production continuity remediation
+    needs: observe
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: File or resolve production-monitor-continuity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-continuity
+          REMEDIATION_SOURCE: production-continuity.yml
+          REMEDIATION_CONCLUSION: ${{ (needs.observe.result != 'success' || needs.observe.outputs.status == 'unhealthy') && 'failure' || 'success' }}
+          REMEDIATION_DETAIL: ${{ needs.observe.outputs.incident_key }} ${{ needs.observe.outputs.incident_classes }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REMEDIATION_GATE_STEADY_GREEN: '1'
+          REMEDIATION_FAIL_OPEN: '1'
+          REMEDIATION_PREVIOUS_FILE: remediation-state/previous
+          REMEDIATION_STATE_FILE: remediation-state/status
+        run: |
+          mkdir -p remediation-state
+          id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=remediation-continuity-state&per_page=100" --jq '([(.artifacts // [])[] | select(.expired|not)] | sort_by(.created_at) | last | .id) // empty' || true)"
+          if [ -n "$id" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > remediation-state/prior.zip || true
+            entry="$(unzip -Z1 remediation-state/prior.zip 2>/dev/null | head -1 || true)"
+            if [ -n "$entry" ]; then
+              unzip -p remediation-state/prior.zip "$entry" > remediation-state/previous || true
+            fi
+          fi
+          node scripts/remediation-signal-intake.mjs
+      - name: Save continuity remediation state
+        if: ${{ hashFiles('remediation-state/status') != '' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: remediation-continuity-state
+          path: remediation-state/status
+          if-no-files-found: ignore
+          retention-days: 90
 
   preserve-incident:
     name: Preserve production incident

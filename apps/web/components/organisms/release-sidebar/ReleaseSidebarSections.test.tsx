@@ -51,14 +51,14 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntityHeader: ({
     thumbnail,
     title,
-    details,
+    subtitle,
     statusGlyph,
     actions,
     'data-testid': testId,
   }: {
     readonly thumbnail?: React.ReactNode;
     readonly title?: React.ReactNode;
-    readonly details?: React.ReactNode;
+    readonly subtitle?: React.ReactNode;
     readonly statusGlyph?: React.ReactNode;
     readonly actions?: React.ReactNode;
     readonly 'data-testid'?: string;
@@ -67,7 +67,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       {thumbnail}
       <h2>{title}</h2>
       <div>
-        {details}
+        {subtitle}
         {statusGlyph}
       </div>
       {actions}

@@ -4,7 +4,6 @@
  * Tests:
  * - ClaimBanner: rendering, auth-aware URLs, accessibility
  * - ProfileViewTracker: analytics tracking, sendBeacon, deduplication
- * - ProfileHeader: rendering, schema.org markup
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

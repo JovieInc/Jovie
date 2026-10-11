@@ -95,7 +95,8 @@ describe('scripts-typecheck: compilerRunHasParseableDiagnostics', () => {
         globalErrors: [],
       })
     ).toBe(false);
-    expect(isSupportedTypecheckNode('v22.23.1')).toBe(true);
+    expect(isSupportedTypecheckNode('v24.21.0')).toBe(true);
+    expect(isSupportedTypecheckNode('v22.23.2')).toBe(false);
     expect(isSupportedTypecheckNode('v20.19.0')).toBe(false);
     expect(
       describeUnusableCompilerRun({
@@ -292,7 +293,7 @@ describe('scripts-typecheck: fail closed before baseline write (JOV-5450)', () =
       prefix: 'scripts-typecheck',
       tsconfig: resolve(options.directory, 'tsconfig.json'),
       updateCommand: 'pnpm run typecheck:scripts:update',
-      nodeVersion: 'v22.23.1',
+      nodeVersion: 'v24.21.0',
       exit: code => {
         exits.push(code);
       },
@@ -358,7 +359,7 @@ describe('scripts-typecheck: fail closed before baseline write (JOV-5450)', () =
     );
   });
 
-  it('refuses to write a baseline on a non-Node-22 runtime', () => {
+  it('refuses to write a baseline on a non-Node-24 runtime', () => {
     const { directory, baselineFile } = makeBaselineDir();
     const result = captureEvaluate({
       directory,
@@ -368,7 +369,7 @@ describe('scripts-typecheck: fail closed before baseline write (JOV-5450)', () =
       runTsc: () => ({ status: 0, output: '' }),
     });
     expect(result.exits).toEqual([1]);
-    expect(result.errors).toContain('real Node 22 compiler run is required');
+    expect(result.errors).toContain('real Node 24 compiler run is required');
     expect(JSON.parse(readFileSync(baselineFile, 'utf8'))).toEqual(
       sentinelBaseline
     );

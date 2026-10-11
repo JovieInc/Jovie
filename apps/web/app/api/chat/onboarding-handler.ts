@@ -1,16 +1,23 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
-import type { UIMessage } from 'ai';
-import { and, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  type UIMessage,
+} from 'ai';
+import { and, asc, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   isGatewayBudgetExceededError,
   resolveChatStreamErrorMessage,
 } from '@/lib/ai/gateway-errors';
+import { getAppUserByBetterAuthId } from '@/lib/auth/app-user';
 import { auth } from '@/lib/auth/better-auth';
+import { checkUserStatus } from '@/lib/auth/status-checker';
 import {
+  confirmSelectedArtist,
   decideFallbackTurn,
   type FallbackTurn,
 } from '@/lib/chat/onboarding-script/engine';
@@ -18,13 +25,22 @@ import {
   buildScriptedFallbackResponse,
   type FallbackReason,
 } from '@/lib/chat/onboarding-script/respond';
-import { STREAM_ERROR_LINE } from '@/lib/chat/onboarding-script/script';
+import {
+  OWNERSHIP_CONFLICT_LINE,
+  STREAM_ERROR_LINE,
+} from '@/lib/chat/onboarding-script/script';
+import {
+  type PersistedOnboardingMessage,
+  resumeOnboardingTranscript,
+} from '@/lib/chat/onboarding-transcript';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import {
+  decodeToolEvents,
   encodeToolEvents,
   type PersistedToolEvent,
+  toolEventToMessagePart,
 } from '@/lib/chat/tool-events';
 import {
   buildOnboardingTools,
@@ -38,11 +54,13 @@ import { publicEnv } from '@/lib/env-public';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { checkGateForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
+import { findOnboardingConversation } from '@/lib/onboarding/conversation.server';
 import {
   encodeSessionCookie,
   ONBOARDING_SESSION_COOKIE_NAME,
   verifySessionCookie,
 } from '@/lib/onboarding/session';
+import { hasSpotifyProfileIdentityConflict } from '@/lib/profile/spotify-profile-identity';
 import {
   checkAnonymousChatRateLimit,
   checkAuthenticatedOnboardingChatRateLimit,
@@ -50,8 +68,10 @@ import {
   rateLimitDenialStatus,
 } from '@/lib/rate-limit';
 import { isLocalDevelopmentAutomationHostname } from '@/lib/security/development-only';
+import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 import {
   isTurnstileConfigured,
+  verifyTurnstileTestModeToken,
   verifyTurnstileToken,
 } from '@/lib/turnstile/verify';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
@@ -92,6 +112,7 @@ const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
 const onboardingPayloadSchema = z.object({
   mode: z.literal('onboarding'),
   turnstileToken: z.string().max(2048).optional(),
+  onboardingConversationId: z.string().uuid().optional(),
   /**
    * UIMessage[] from the AI SDK client. Validated for shape elsewhere (message
    * role + parts structure); we only enforce length caps here.
@@ -116,6 +137,7 @@ const IMPLICIT_ONBOARDING_ENVELOPE_KEYS = new Set([
   'id',
   'trigger',
   'messageId',
+  'onboardingConversationId',
 ]);
 
 /**
@@ -248,9 +270,25 @@ export async function tryHandleAnonymousOnboardingChat(
   // A verified Better Auth identity has its own spend quota. The /start
   // envelope remains onboarding-shaped after OTP, so routing by body alone
   // would keep charging the shared anonymous IP/ASN pools.
-  const signedInSession = await auth.api
-    .getSession({ headers: req.headers, query: { disableCookieCache: true } })
-    .catch(() => null);
+  let signedInSession: Awaited<ReturnType<typeof auth.api.getSession>>;
+  try {
+    signedInSession = await auth.api.getSession({
+      headers: req.headers,
+      query: { disableCookieCache: true },
+    });
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { context: 'onboarding_session_resolution' },
+    });
+    return NextResponse.json(
+      {
+        error: 'Your session could not be verified. Try again.',
+        errorCode: 'ONBOARDING_SESSION_UNAVAILABLE',
+        requestId,
+      },
+      { status: 503, headers: { 'x-request-id': requestId } }
+    );
+  }
 
   const corsHeaders = createAuthenticatedCorsHeaders(
     req.headers.get('origin'),
@@ -294,17 +332,65 @@ export async function tryHandleAnonymousOnboardingChat(
   // --- Session cookie: read existing or mint a new one ---
   const incomingCookieHeader = req.headers.get('cookie') || '';
   const cookieMap = parseCookieHeader(incomingCookieHeader);
-  const existingSessionId = verifySessionCookie(
+  const cookieSessionId = verifySessionCookie(
     cookieMap.get(ONBOARDING_SESSION_COOKIE_NAME)
   );
+  let verifiedAppUserId: string | null = null;
+  let ownedConversation: Awaited<
+    ReturnType<typeof findOnboardingConversation>
+  > = null;
+  try {
+    if (signedInSession) {
+      const appUser = await getAppUserByBetterAuthId(signedInSession.user.id);
+      if (
+        appUser &&
+        checkUserStatus(appUser.userStatus, appUser.deletedAt).isBlocked
+      ) {
+        return NextResponse.json(
+          {
+            error: 'This account cannot continue onboarding',
+            errorCode: 'ACCOUNT_UNAVAILABLE',
+            requestId,
+          },
+          { status: 403, headers: corsHeaders }
+        );
+      }
+      if (appUser) {
+        verifiedAppUserId = appUser.id;
+        const conversation = await findOnboardingConversation({
+          userId: appUser.id,
+          sessionId: null,
+        });
+        if (conversation?.owned) ownedConversation = conversation;
+      }
+    }
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { context: 'onboarding_owner_resolution' },
+    });
+    return NextResponse.json(
+      {
+        error: 'Your conversation could not be restored',
+        errorCode: 'ONBOARDING_CHAT_PERSISTENCE_FAILED',
+        requestId,
+      },
+      { status: 503, headers: corsHeaders }
+    );
+  }
+  // Claimed transcripts retain their session identifier after the anonymous
+  // cookie is cleared. Only the verified account owner can use that identifier.
+  const existingSessionId = ownedConversation?.sessionId ?? cookieSessionId;
 
-  let sessionId: string;
+  const sessionId = existingSessionId ?? randomUUID();
   let mintedSessionCookie: string | null = null;
-  if (existingSessionId) {
-    sessionId = existingSessionId;
-  } else {
-    sessionId = randomUUID();
-    // Sign the new sessionId. encodeSessionCookie throws if SESSION_SECRET is
+  if (
+    !existingSessionId ||
+    (ownedConversation && cookieSessionId !== sessionId)
+  ) {
+    // A genuine owned turn restores the signed cookie needed by the existing
+    // claim/handoff route. Reading history alone must not claim or redirect.
+    // This identifier came from verified ownership, never a client locator.
+    // encodeSessionCookie throws if SESSION_SECRET is
     // missing/short — surface that as a 503 (not 500) so observability can tell
     // an ops-config gap from a true crash.
     try {
@@ -357,11 +443,25 @@ export async function tryHandleAnonymousOnboardingChat(
     }
 
     if (!shouldBypassTurnstile) {
-      const verify = await verifyTurnstileToken(
-        parsed.data.turnstileToken,
-        ip,
-        extractRequestHostname(req)
+      // Approved synthetic principals (JOV-7697) verify in Cloudflare's test
+      // mode. Passage needs a verified session on the controlled canary
+      // mailbox plus a roster grant and a default-off gate. Anonymous
+      // visitors and every other account still verify against the real key.
+      const syntheticPrincipal = await resolveSyntheticPassage(
+        signedInSession,
+        'onboarding_chat',
+        { requestId }
       );
+      if (syntheticPrincipal) {
+        Sentry.setTag('synthetic_principal', syntheticPrincipal.actorId);
+      }
+      const verify = syntheticPrincipal
+        ? await verifyTurnstileTestModeToken(parsed.data.turnstileToken, ip)
+        : await verifyTurnstileToken(
+            parsed.data.turnstileToken,
+            ip,
+            extractRequestHostname(req)
+          );
       if (!verify.success) {
         return NextResponse.json(
           {
@@ -452,8 +552,8 @@ export async function tryHandleAnonymousOnboardingChat(
       { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-  const uiMessages = rawMessages as UIMessage[];
-  const latestUserMessage = getLatestUserMessage(uiMessages);
+  const clientMessages = rawMessages as UIMessage[];
+  const latestUserMessage = getLatestUserMessage(clientMessages);
   if (!latestUserMessage) {
     return NextResponse.json(
       {
@@ -464,7 +564,7 @@ export async function tryHandleAnonymousOnboardingChat(
       { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-  const turnCount = uiMessages.filter(m => m.role === 'user').length;
+  const clientTurnCount = clientMessages.filter(m => m.role === 'user').length;
   const accessControlled = await isWaitlistGateEnabled().catch(error => {
     // Fail closed: a settings outage must never grant anonymous instant access.
     Sentry.captureException(error, {
@@ -476,14 +576,34 @@ export async function tryHandleAnonymousOnboardingChat(
 
   let conversationId: string;
   try {
+    if (parsed.data.onboardingConversationId) {
+      const currentConversation =
+        ownedConversation ??
+        (await findOnboardingConversation({ userId: null, sessionId }));
+      if (currentConversation?.id !== parsed.data.onboardingConversationId) {
+        return NextResponse.json(
+          {
+            error: 'Your onboarding conversation changed. Reload to continue.',
+            errorCode: 'ONBOARDING_CONTEXT_CHANGED',
+            requestId,
+          },
+          { status: 409, headers: corsHeaders }
+        );
+      }
+    }
     conversationId = await reserveAnonymousOnboardingConversation({
       sessionId,
       latestUserMessage,
+      ownedConversationId: ownedConversation?.id,
     });
   } catch (error) {
     Sentry.captureException(error, {
       tags: { context: 'onboarding_handler_persistence' },
-      extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
+      extra: {
+        sessionId: sessionId.slice(0, 8),
+        requestId,
+        turnCount: clientTurnCount,
+      },
     });
     return NextResponse.json(
       {
@@ -499,13 +619,37 @@ export async function tryHandleAnonymousOnboardingChat(
   }
 
   // --- Build the per-turn state accumulator and the onboarding tool palette ---
+  // JOV-7143: turn state (artist, followers, interview signals) feeds the
+  // access decision, so it comes from the tool calls this server persisted,
+  // never from tool outputs in the client-supplied history.
+  const serverToolHistory = await loadServerToolHistory(conversationId);
+  // A reload or new tab sends only the newest message; the server transcript
+  // is the conversation of record, so the turn never restarts at the opener.
+  const uiMessages = resumeOnboardingTranscript({
+    clientMessages,
+    persisted: await loadPersistedTranscript(conversationId),
+    latestClientMessageId: latestUserMessage.clientMessageId,
+  });
+  const turnCount = uiMessages.filter(m => m.role === 'user').length;
   const onboardingState = createOnboardingTurnState({
     sessionId,
     turnCount,
     accessControlled,
-    messages: uiMessages,
+    messages: serverToolHistory,
   });
   const tools = buildOnboardingTools(onboardingState);
+
+  // JOV-7134: the artist picker carries the real Spotify id only in message
+  // metadata, which never reaches the model. Confirm the pick here from that
+  // id, show the model the result as a completed tool call, and stream the
+  // same tool part to the client (profile rail) and persistence.
+  const serverArtistConfirmation = await confirmSelectedArtist(
+    uiMessages,
+    onboardingState
+  );
+  const modelUiMessages = serverArtistConfirmation
+    ? [...uiMessages, serverArtistConfirmation.historyMessage]
+    : uiMessages;
 
   // --- Telemetry hooks (mirror authenticated chat) ---
   const telemetry: ChatTelemetry = {
@@ -564,7 +708,7 @@ export async function tryHandleAnonymousOnboardingChat(
       sessionId,
       turnCount,
       accessControlled,
-      messages: uiMessages,
+      messages: serverToolHistory,
     });
     const turn: FallbackTurn = await decideFallbackTurn({
       uiMessages,
@@ -598,13 +742,94 @@ export async function tryHandleAnonymousOnboardingChat(
       ? 'injected'
       : null;
 
+  // Check the canonical Spotify identity on every turn, including a new
+  // picker/URL confirmation. Neither client history nor a matching artist
+  // can authorize a claim, handle change, or checkout suggestion.
+  if (onboardingState.spotifyArtistId) {
+    let identityConflict: boolean;
+    try {
+      identityConflict = await hasSpotifyProfileIdentityConflict(
+        db,
+        onboardingState.spotifyArtistId,
+        verifiedAppUserId
+      );
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { context: 'onboarding_identity_lookup', requestId },
+      });
+      return NextResponse.json(
+        {
+          error: 'Profile ownership could not be verified. Try again.',
+          errorCode: 'SPOTIFY_IDENTITY_LOOKUP_FAILED',
+          requestId,
+        },
+        { status: 503, headers: responseHeaders }
+      );
+    }
+    if (identityConflict) {
+      const confirmationPart = serverArtistConfirmation?.historyMessage
+        .parts[0] as
+        | { input: Record<string, unknown>; output: Record<string, unknown> }
+        | undefined;
+      const recovery: FallbackTurn = {
+        line: OWNERSHIP_CONFLICT_LINE,
+        text: OWNERSHIP_CONFLICT_LINE.text,
+        // Persist enrichment only, so a reload still knows which artist
+        // is blocked. No claim, handle, or checkout tool is emitted.
+        toolEvents: confirmationPart
+          ? [
+              {
+                toolName: 'confirmSpotifyArtist',
+                input: confirmationPart.input,
+                output: confirmationPart.output,
+              },
+            ]
+          : [],
+      };
+      const built = buildScriptedFallbackResponse({
+        turn: recovery,
+        reason: 'ownership_conflict',
+        headers: {
+          ...responseHeaders,
+          'x-onboarding-error-code': 'SPOTIFY_IDENTITY_CONFLICT',
+        },
+      });
+      try {
+        await persistAnonymousAssistantRecord({
+          conversationId,
+          latestUserClientMessageId: latestUserMessage.clientMessageId,
+          content: recovery.text,
+          toolCalls: built.persistedToolEvents,
+          assistantSource: 'script',
+          scriptLineKey: recovery.line.key,
+        });
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: {
+            context: 'onboarding_identity_recovery_persistence',
+            requestId,
+          },
+        });
+        return NextResponse.json(
+          {
+            error: 'Your conversation could not be saved. Try again.',
+            errorCode: 'ONBOARDING_CHAT_PERSISTENCE_FAILED',
+            requestId,
+          },
+          { status: 503, headers: responseHeaders }
+        );
+      }
+      return built.response;
+    }
+  }
   try {
     if (forcedFallbackReason) {
       return await serveScriptedFallback(forcedFallbackReason);
     }
 
+    let streamFailed = false;
     const turn = await executeChatTurn({
-      uiMessages,
+      uiMessages: modelUiMessages,
       artistContext: null,
       releases: [],
       resolvedProfileId: null,
@@ -621,6 +846,9 @@ export async function tryHandleAnonymousOnboardingChat(
       requestId,
       telemetry,
       mode: 'onboarding',
+      onStreamError: async () => {
+        streamFailed = true;
+      },
     });
 
     Sentry.addBreadcrumb({
@@ -636,21 +864,56 @@ export async function tryHandleAnonymousOnboardingChat(
       },
     });
 
+    const persistResponse = async ({
+      responseMessage,
+      outcome,
+    }: {
+      responseMessage: UIMessage;
+      outcome: { status: string };
+    }) => {
+      if (streamFailed || outcome.status === 'failed') {
+        return;
+      }
+      await persistAnonymousAssistantMessage({
+        conversationId,
+        latestUserClientMessageId: latestUserMessage.clientMessageId,
+        responseMessage,
+      });
+    };
+    // Mid-stream failures cannot swap the Response for the scripted
+    // fallback; the lint-clean script line is the recovery copy instead.
+    const streamErrorText = (error: unknown) =>
+      isGatewayBudgetExceededError(error)
+        ? resolveChatStreamErrorMessage(error)
+        : STREAM_ERROR_LINE.text;
+
+    if (serverArtistConfirmation) {
+      const stream = createUIMessageStream({
+        execute: ({ writer }) => {
+          writer.write({ type: 'start' });
+          for (const chunk of serverArtistConfirmation.chunks) {
+            writer.write(chunk);
+          }
+          writer.merge(
+            turn.streamResult.toUIMessageStream({
+              sendStart: false,
+              onError: streamErrorText,
+            })
+          );
+        },
+        onError: streamErrorText,
+        onFinish: persistResponse,
+      });
+      return createUIMessageStreamResponse({
+        stream,
+        headers: responseHeaders,
+      });
+    }
+
     return turn.streamResult.toUIMessageStreamResponse({
       headers: responseHeaders,
-      onFinish: async ({ responseMessage }) => {
-        await persistAnonymousAssistantMessage({
-          conversationId,
-          latestUserClientMessageId: latestUserMessage.clientMessageId,
-          responseMessage,
-        });
-      },
-      // Mid-stream failures cannot swap the Response for the scripted
-      // fallback; the lint-clean script line is the recovery copy instead.
-      onError: error =>
-        isGatewayBudgetExceededError(error)
-          ? resolveChatStreamErrorMessage(error)
-          : STREAM_ERROR_LINE.text,
+      onFinish: persistResponse,
+      onError: streamErrorText,
     });
   } catch (error) {
     if (isClientDisconnect(error, req.signal)) {
@@ -758,26 +1021,85 @@ function extractUIMessageText(parts: UIMessage['parts']): string {
     .join('');
 }
 
+/**
+ * JOV-7143: the tool calls this server streamed and persisted for the
+ * conversation, as UI messages for turn-state derivation. Oldest first.
+ */
+async function loadServerToolHistory(
+  conversationId: string
+): Promise<UIMessage[]> {
+  const rows = await db
+    .select({ id: chatMessages.id, toolCalls: chatMessages.toolCalls })
+    .from(chatMessages)
+    .where(
+      and(
+        eq(chatMessages.conversationId, conversationId),
+        eq(chatMessages.role, 'assistant')
+      )
+    )
+    .orderBy(asc(chatMessages.createdAt))
+    .limit(MAX_SERVER_TOOL_HISTORY_ROWS);
+  return rows.map(row => ({
+    id: String(row.id),
+    role: 'assistant' as const,
+    parts: decodeToolEvents(row.toolCalls).events.map(toolEventToMessagePart),
+  }));
+}
+
+const MAX_SERVER_TOOL_HISTORY_ROWS = 200;
+
+async function loadPersistedTranscript(
+  conversationId: string
+): Promise<PersistedOnboardingMessage[]> {
+  const rows = await db
+    .select({
+      id: chatMessages.id,
+      role: chatMessages.role,
+      content: chatMessages.content,
+      clientMessageId: chatMessages.clientMessageId,
+    })
+    .from(chatMessages)
+    .where(eq(chatMessages.conversationId, conversationId))
+    .orderBy(asc(chatMessages.createdAt))
+    .limit(MAX_SERVER_TOOL_HISTORY_ROWS);
+  return rows.flatMap(row =>
+    row.role === 'user' || row.role === 'assistant'
+      ? [
+          {
+            id: String(row.id),
+            role: row.role,
+            content: row.content,
+            clientMessageId: row.clientMessageId,
+          },
+        ]
+      : []
+  );
+}
+
 async function reserveAnonymousOnboardingConversation({
   sessionId,
   latestUserMessage,
+  ownedConversationId,
 }: {
   readonly sessionId: string;
   readonly latestUserMessage: LatestUserMessage;
+  readonly ownedConversationId?: string;
 }): Promise<string> {
   const now = new Date();
-  const [existingConversation] = await db
-    .select({ id: chatConversations.id })
-    .from(chatConversations)
-    .where(
-      and(
-        eq(chatConversations.sessionId, sessionId),
-        isNull(chatConversations.userId),
-        isNull(chatConversations.creatorProfileId)
-      )
-    )
-    .orderBy(desc(chatConversations.updatedAt))
-    .limit(1);
+  const [existingConversation] = ownedConversationId
+    ? [{ id: ownedConversationId }]
+    : await db
+        .select({ id: chatConversations.id })
+        .from(chatConversations)
+        .where(
+          and(
+            eq(chatConversations.sessionId, sessionId),
+            isNull(chatConversations.userId),
+            isNull(chatConversations.creatorProfileId)
+          )
+        )
+        .orderBy(desc(chatConversations.updatedAt))
+        .limit(1);
 
   const conversationId =
     existingConversation?.id ??
@@ -831,11 +1153,15 @@ async function persistAnonymousAssistantMessage({
   const assistantText = sanitizeAssistantResponse(
     extractUIMessageText(responseMessage.parts)
   ).text;
+  const toolCalls = encodeToolEvents(responseMessage.parts);
+  if (!assistantText.trim() && (!toolCalls || toolCalls.length === 0)) {
+    return;
+  }
   await persistAnonymousAssistantRecord({
     conversationId,
     latestUserClientMessageId,
     content: assistantText,
-    toolCalls: encodeToolEvents(responseMessage.parts),
+    toolCalls,
     assistantSource: 'llm',
     scriptLineKey: null,
   });
@@ -857,6 +1183,9 @@ async function persistAnonymousAssistantRecord({
   readonly assistantSource: 'llm' | 'script';
   readonly scriptLineKey: string | null;
 }): Promise<void> {
+  if (!content.trim() && (!toolCalls || toolCalls.length === 0)) {
+    return;
+  }
   const now = new Date();
   await db
     .insert(chatMessages)
@@ -864,11 +1193,7 @@ async function persistAnonymousAssistantRecord({
       conversationId,
       clientMessageId: `assistant:${latestUserClientMessageId}`,
       role: 'assistant',
-      content:
-        content ||
-        (toolCalls && toolCalls.length > 0
-          ? ''
-          : 'Done. What would you like to do next?'),
+      content,
       toolCalls,
       assistantSource,
       scriptLineKey,
@@ -878,11 +1203,7 @@ async function persistAnonymousAssistantRecord({
       target: [chatMessages.conversationId, chatMessages.clientMessageId],
       targetWhere: drizzleSql`${chatMessages.clientMessageId} IS NOT NULL`,
       set: {
-        content:
-          content ||
-          (toolCalls && toolCalls.length > 0
-            ? ''
-            : 'Done. What would you like to do next?'),
+        content,
         toolCalls,
         assistantSource,
         scriptLineKey,
@@ -947,8 +1268,10 @@ function validateMessageShape(msg: unknown, index: number): string | null {
     return `messages[${index}] must be an object`;
   }
   const m = msg as { role?: unknown; parts?: unknown };
-  if (m.role !== 'user' && m.role !== 'assistant' && m.role !== 'system') {
-    return `messages[${index}].role must be user/assistant/system`;
+  // JOV-7143: the onboarding client never sends system messages; accepting
+  // them let a caller inject instructions into the model's history.
+  if (m.role !== 'user' && m.role !== 'assistant') {
+    return `messages[${index}].role must be user/assistant`;
   }
   if (!Array.isArray(m.parts)) {
     return `messages[${index}].parts must be an array`;

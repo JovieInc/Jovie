@@ -28,9 +28,9 @@ const PROMPT = [
   'isolated as cleanly cut artwork on a flat dark charcoal background. Print-ready, no garment, no mockup.',
 ].join(' ');
 
+// openai/* ids are banned on the gateway (JOV-7119) — removed from the roster.
 const ALL_MODELS = [
-  { id: 'openai/gpt-image-1.5', label: 'gpt-image-1.5' },
-  { id: 'openai/gpt-image-1', label: 'gpt-image-1' },
+  { id: 'recraft/recraft-v3', label: 'recraft-v3' },
   { id: 'bfl/flux-2-pro', label: 'flux-2-pro' },
   { id: 'bfl/flux-pro-1.1-ultra', label: 'flux-1.1-ultra' },
   { id: 'xai/grok-imagine-image', label: 'grok-imagine' },

@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { RecentlyShippedSection } from './RecentlyShippedSection';
 
+// Storybook aliases '@/lib/recent-releases' to fixture releases, since the
+// real reader loads CHANGELOG.md through node:fs.
 const meta = {
   title: 'Marketing/RecentlyShippedSection',
   component: RecentlyShippedSection,

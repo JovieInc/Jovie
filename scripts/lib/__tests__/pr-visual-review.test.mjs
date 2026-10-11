@@ -13,11 +13,16 @@ import {
   classifyReviewOutcome,
   inspectReviewBackendConfiguration,
   isBlockingCaptureRuntimeFailure,
+  MAX_CAPTURE_WORKERS,
   normalizeBackendReview,
   readTrustedCapture,
+  resolveCaptureJourneyId,
+  resolveCaptureWorkerCount,
   reviewWithConfiguredBackends,
   routeChangedFiles,
+  runCapturePool,
   sanitizeForPrompt,
+  summarizeScriptedCaptures,
   validateCaptureManifest,
   visualReviewIdentity,
 } from '../../../.github/scripts/pr-visual-review.mjs';
@@ -234,6 +239,53 @@ describe('bounded PR visual review contract', () => {
     );
     expect(incomplete.ok).toBe(false);
     expect(incomplete.failures).toContain('missing capture /app/chat::mobile');
+  });
+
+  it('bounds parallel capture at four workers while preserving result order', async () => {
+    let active = 0;
+    let peak = 0;
+    const results = await runCapturePool(
+      [1, 2, 3, 4, 5, 6],
+      MAX_CAPTURE_WORKERS,
+      async value => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await Promise.resolve();
+        active -= 1;
+        return value * 2;
+      }
+    );
+
+    expect(results).toEqual([2, 4, 6, 8, 10, 12]);
+    expect(peak).toBe(MAX_CAPTURE_WORKERS);
+    expect(resolveCaptureWorkerCount(undefined)).toBe(2);
+    expect(() => resolveCaptureWorkerCount(5)).toThrow('integer from 1 to 4');
+  });
+
+  it('binds capture routes to canonical P0 journeys', () => {
+    expect(resolveCaptureJourneyId('/')).toBe('marketing-home-render');
+    expect(resolveCaptureJourneyId('/app/chat')).toBe('chat-agent-turn');
+    expect(resolveCaptureJourneyId('/unmapped')).toBeNull();
+  });
+
+  it('keeps scripted failure green-proof when advisory review agrees', () => {
+    const summary = summarizeScriptedCaptures([
+      { status: 'failed', semanticReview: { alignment: 'supported' } },
+      { status: 'captured' },
+      { status: 'blocked' },
+      { status: 'skipped' },
+      { status: 'uncovered' },
+      { status: 'ambiguous' },
+    ]);
+    expect(summary).toEqual({
+      executed: 2,
+      passed: 1,
+      failed: 1,
+      blocked: 1,
+      skipped: 1,
+      uncovered: 1,
+      unknown: 1,
+    });
   });
 
   it('keys visual review idempotency to the exact PR, head, and run', () => {
@@ -536,8 +588,8 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain(
       "getByRole('heading', { name: 'New Chat', level: 1 })"
     );
-    expect(capture).toContain("getByRole('heading', { name: 'Just ask' })");
-    expect(capture).toContain("getByTestId('chat-empty-state-greeting')");
+    expect(capture).toContain("getByRole('heading', { level: 2 })");
+    expect(capture).toContain("getByTestId('chat-empty-state-greeting-text')");
     expect(capture).toContain("'domcontentloaded'");
   });
 });

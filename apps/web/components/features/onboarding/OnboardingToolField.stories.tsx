@@ -68,8 +68,12 @@ const meta: Meta<typeof FieldPreview> = {
   component: FieldPreview,
   parameters: { layout: 'centered' },
   decorators: [
-    Story => (
-      <ThemeFrame theme='dark'>
+    (Story, context) => (
+      <ThemeFrame
+        theme={
+          (context.parameters.theme as 'light' | 'dark' | undefined) ?? 'dark'
+        }
+      >
         <Story />
       </ThemeFrame>
     ),
@@ -131,13 +135,7 @@ export const Light: Story = {
     label: 'Edit Proposed Handle',
     defaultValue: 'validartist',
   },
-  decorators: [
-    Story => (
-      <ThemeFrame theme='light'>
-        <Story />
-      </ThemeFrame>
-    ),
-  ],
+  parameters: { theme: 'light' },
   play: async ({ canvasElement }) => {
     await waitFor(() =>
       expect(canvasElement.ownerDocument.documentElement).toHaveClass('light')

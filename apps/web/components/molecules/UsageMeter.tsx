@@ -7,12 +7,13 @@ interface UsageMeterProps {
   readonly description?: string;
   readonly model: UsageMeterModel;
   readonly resetLabel: string;
+  readonly showStatus?: boolean;
   readonly density?: 'compact' | 'comfortable';
   readonly className?: string;
 }
 
 const STATE_LABELS: Record<UsageMeterState, string> = {
-  healthy: 'On pace',
+  healthy: 'Available',
   warning: 'Near limit',
   exhausted: 'Limit reached',
 };
@@ -39,11 +40,14 @@ export function UsageMeter({
   model,
   resetLabel,
   density = 'comfortable',
+  showStatus = true,
   className,
 }: UsageMeterProps) {
   const compact = density === 'compact';
   const progressLabel = `${label} remaining`;
-  const progressValueText = `${formatNumber(model.remaining)} of ${formatNumber(model.limit)} remaining. ${STATE_LABELS[model.state]}.`;
+  const stateLabel =
+    model.limit === 0 ? 'No allowance' : STATE_LABELS[model.state];
+  const progressValueText = `${formatNumber(model.remaining)} of ${formatNumber(model.limit)} remaining. ${showStatus ? stateLabel + '.' : 'Last known usage.'}`;
 
   return (
     <div
@@ -63,7 +67,7 @@ export function UsageMeter({
           ) : null}
         </div>
         <p className='shrink-0 text-right text-xs font-caption tabular-nums text-primary-token'>
-          {model.remainingPercent}% left
+          {formatNumber(model.remaining)} left
         </p>
       </div>
 
@@ -83,26 +87,20 @@ export function UsageMeter({
           )}
           style={{ width: `${model.remainingPercent}%` }}
         />
-        {/* Fill width is remaining % from the left; the tick uses that same axis. */}
-        <span
-          aria-hidden
-          title={`${model.warningRemainingPercent}% warning threshold`}
-          data-threshold='warning'
-          className='absolute top-1/2 h-3 w-px -translate-y-1/2 rounded-full bg-warning ring-1 ring-surface-1'
-          style={{ left: `${model.warningRemainingPercent}%` }}
-        />
       </div>
-      <progress
-        aria-label={progressLabel}
-        aria-valuetext={progressValueText}
-        className='sr-only'
-        max={model.limit}
-        value={model.remaining}
-      >
-        {progressValueText}
-      </progress>
+      {model.limit > 0 && (
+        <progress
+          aria-label={progressLabel}
+          aria-valuetext={progressValueText}
+          className='sr-only'
+          max={model.limit}
+          value={model.remaining}
+        >
+          {progressValueText}
+        </progress>
+      )}
 
-      <div className='flex items-start justify-between gap-3 text-2xs text-secondary-token'>
+      <div className='flex flex-wrap items-start justify-between gap-2 text-2xs text-secondary-token'>
         <p
           className={cn(
             model.state === 'warning' && 'text-warning',
@@ -110,21 +108,23 @@ export function UsageMeter({
           )}
         >
           <span className='font-caption text-primary-token'>
-            {formatNumber(model.remaining)} left
+            {formatNumber(model.used)} of {formatNumber(model.limit)} used
           </span>
-          <span
-            data-testid='usage-meter-state-label'
-            className={cn(
-              model.state === 'healthy' && 'text-tertiary-token',
-              model.state === 'warning' && 'text-warning',
-              model.state === 'exhausted' && 'text-error'
-            )}
-          >
-            {' '}
-            · {STATE_LABELS[model.state]}
-          </span>
+          {showStatus && (
+            <span
+              data-testid='usage-meter-state-label'
+              className={cn(
+                model.state === 'healthy' && 'text-tertiary-token',
+                model.state === 'warning' && 'text-warning',
+                model.state === 'exhausted' && 'text-error'
+              )}
+            >
+              {' '}
+              · {stateLabel}
+            </span>
+          )}
         </p>
-        <p className='shrink-0 text-right text-tertiary-token'>{resetLabel}</p>
+        <p className='text-right text-tertiary-token'>{resetLabel}</p>
       </div>
     </div>
   );

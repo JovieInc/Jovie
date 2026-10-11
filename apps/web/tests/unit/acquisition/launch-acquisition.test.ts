@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as acq from '@/lib/acquisition';
+import {
+  evaluateCertificationAdmission,
+  JOVIE_CERTIFICATION_CONTRACT,
+} from '@/lib/agent-os/certification';
 
 const ready = {
   displayName: 'Ada North',
@@ -32,9 +36,9 @@ describe('launch acquisition kernel', () => {
         entry.owner.includes('jovie.certification/v1')
       )
     ).toBe(true);
-    expect(acq.machineCertifyPremadeProfile(ready).passed).toBe(true);
+    expect(acq.runPremadeProfilePreflight(ready).passed).toBe(true);
     expect(
-      acq.machineCertifyYouTubeGrowth({
+      acq.runYouTubeGrowthPreflight({
         channelId: 'UC1',
         channelTitle: 'Ada',
         videoCount: 3,
@@ -47,7 +51,7 @@ describe('launch acquisition kernel', () => {
       state: 'human_review',
       displayName: 'Ada North',
       claimOrApplyPath: '/claim/token-1',
-      machineCertification: acq.machineCertifyPremadeProfile(ready),
+      preflightReadiness: acq.runPremadeProfilePreflight(ready),
     });
     expect(packet.actions).toEqual(acq.ACQUISITION_REVIEW_ACTIONS);
     const rejection = acq.captureAcquisitionRejection({
@@ -146,5 +150,71 @@ describe('launch acquisition kernel', () => {
         verifiedProductGapIssueKeys: [afterRebuild.productGapIssueKey ?? ''],
       })
     ).toBe(true);
+  });
+
+  it('keeps preflight readiness typed separately from post-build certification', () => {
+    const preflight = acq.runPremadeProfilePreflight(ready);
+    expect(preflight.stage).toBe('preflight_field_presence');
+    // Checklist coverage, not a calibrated correctness probability.
+    expect(preflight.checklistCoverage).toBe(1);
+    expect('confidence' in preflight).toBe(false);
+
+    const partial = acq.runPremadeProfilePreflight({
+      ...ready,
+      avatarUrl: null,
+      fitScore: 10,
+    });
+    expect(partial.passed).toBe(false);
+    expect(partial.checklistCoverage).toBeCloseTo(3 / 5);
+
+    // Receipts carry a content digest bound to the observed inputs, but no
+    // commit SHA: they must not satisfy jovie.certification/v1 admission.
+    expect(
+      preflight.receipts.every(
+        receipt =>
+          receipt.ref.startsWith(
+            `acquisition-preflight:${preflight.rubricId}:`
+          ) &&
+          receipt.digest?.startsWith('fnv1a64:') &&
+          receipt.sourceSha === null
+      )
+    ).toBe(true);
+    const changed = acq.runPremadeProfilePreflight({ ...ready, fitScore: 61 });
+    expect(changed.receipts.find(item => item.id === 'fit')?.digest).not.toBe(
+      preflight.receipts.find(item => item.id === 'fit')?.digest
+    );
+
+    const admission = evaluateCertificationAdmission({
+      packet: {
+        contract: JOVIE_CERTIFICATION_CONTRACT,
+        subject: {
+          id: 'acquisition:premade-artist-profile:lead-1:run-1',
+          kind: 'acquisition-premade-artist-profile',
+          title: 'Preflight is not certification',
+        },
+        source: {
+          repository: 'JovieInc/Jovie',
+          ref: 'main',
+          sha: 'a'.repeat(40),
+          paths: ['apps/web/lib/acquisition/kernel.ts'],
+        },
+        canonicalReferences: [],
+        invariantEvaluation: preflight.receipts,
+        testsCoverage: [],
+        visualProof: [],
+        requiredVariants: [],
+        itemMedia: [],
+      },
+      evaluatedAt: '2026-09-27T00:00:00.000Z',
+    });
+    expect(admission.state).toBe('working');
+    expect(admission.blockers.map(item => item.code)).toEqual(
+      expect.arrayContaining([
+        'canonical_reference_missing',
+        'tests_coverage_missing',
+        'visual_proof_missing',
+        'evidence_source_sha_mismatch',
+      ])
+    );
   });
 });

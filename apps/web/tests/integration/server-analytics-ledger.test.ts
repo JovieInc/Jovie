@@ -56,7 +56,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
         .from(serverAnalyticsEvents)
         .where(eq(serverAnalyticsEvents.id, delivery.eventId));
       expect(stored).toMatchObject({
-        contractVersion: 'server-analytics/v1',
+        contractVersion: 'server-analytics/v2',
         eventName: 'dashboard_profile_updated',
         sourceEntityType: 'creator_profile',
         sourceEntityId: profileId,

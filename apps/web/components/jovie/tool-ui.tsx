@@ -16,6 +16,7 @@ import {
 } from '@/lib/chat/tool-events';
 import { getToolUiConfig } from '@/lib/chat/tool-ui-registry';
 import { env } from '@/lib/env-client';
+import { opsCardFromToolOutput } from '@/lib/ovie/ops-card';
 import { addBreadcrumb } from '@/lib/sentry/client-lite';
 import { isVideoRecordingProposalPayload } from '@/lib/teleprompter/types';
 import { cn } from '@/lib/utils';
@@ -38,6 +39,7 @@ import {
   ChatMerchDesignCarouselLoading,
   isChatMerchDesignCarouselResult,
 } from './components/ChatMerchDesignCarousel';
+import { ChatOpsDataCard } from './components/ChatOpsDataCard';
 import { ChatPitchCard } from './components/ChatPitchCard';
 import { ChatPresenceArtifactCard } from './components/ChatPresenceArtifactCard';
 import { ChatVideoRecordingProposalCard } from './components/ChatVideoRecordingProposalCard';
@@ -732,6 +734,7 @@ const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   deleteOrArchiveMerchCard: (event, profileId) =>
     renderMerchActionArtifact(event, profileId),
   researchArtistPresence: event => renderPresenceBuildArtifact(event),
+  checkLinkDrift: event => renderPresenceBuildArtifact(event),
   surfaceLibraryOpportunities: event => renderPresenceBuildArtifact(event),
   assembleArtistProfile: event => renderPresenceBuildArtifact(event),
   generateSmartLink: event => renderPresenceBuildArtifact(event),
@@ -823,12 +826,17 @@ function renderToolActivityGroups({
 
   for (const event of events) {
     const config = getToolUiConfig(event.toolName);
+    // Operational data payloads (summer.ops-card.v1) render as editorial
+    // cards + charts regardless of the tool's registry hint (JOV-6708).
+    const opsCard =
+      event.state === 'succeeded' ? opsCardFromToolOutput(event.output) : null;
     // Locked results always render as status rows — artifact cards expect
     // real generation payloads.
-    const artifactCard =
-      config.renderer === 'artifact' && !isLockedToolEvent(event)
-        ? renderArtifactCard(event, profileId)
-        : null;
+    const artifactCard = opsCard ? (
+      <ChatOpsDataCard card={opsCard} summary={event.summary} />
+    ) : config.renderer === 'artifact' && !isLockedToolEvent(event) ? (
+      renderArtifactCard(event, profileId)
+    ) : null;
 
     if (!artifactCard) {
       statusEvents.push(event);

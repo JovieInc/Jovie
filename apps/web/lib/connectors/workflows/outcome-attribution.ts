@@ -253,8 +253,12 @@ function resolveReleaseActivationAt(
   stepOutputs: ReleaseToRevenueRunStepOutputs,
   fallback: Date
 ): Date | null {
+  // Only provider-verified sends activate measurement: a legacy status-only
+  // 'dispatched' receipt (no delivery.state === 'accepted') is unverified and
+  // must not anchor an outcome window or the jovie_active cohort.
   const dispatched = stepOutputs.distributionDrafts?.items.filter(
-    draft => draft.status === 'dispatched'
+    draft =>
+      draft.status === 'dispatched' && draft.delivery?.state === 'accepted'
   );
   if (!dispatched || dispatched.length === 0) {
     return null;

@@ -76,7 +76,6 @@ describe('public root stylesheet isolation', () => {
     'app/(dynamic)/playlists/layout.tsx',
     'app/brand/layout.tsx',
     'app/exp/layout.tsx',
-    'app/pitch/layout.tsx',
   ])('loads the shared public theme bridge for %s', routeSource => {
     const source = readFileSync(resolve(process.cwd(), routeSource), 'utf8');
 

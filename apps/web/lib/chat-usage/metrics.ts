@@ -23,6 +23,7 @@ export function formatResetAt(value: string | null | undefined): string {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZoneName: 'short',
   }).format(resetAt);
 }
 
@@ -35,4 +36,14 @@ export function formatUsageResetTime(value: string | null | undefined): string {
     hour: 'numeric',
     minute: '2-digit',
   }).format(resetAt);
+}
+
+/** Include the reset prefix only when a real timestamp is available. */
+export function formatUsageResetLabel(
+  value: string | null | undefined
+): string {
+  const formatted = formatResetAt(value);
+  return formatted === 'Reset timing unavailable'
+    ? formatted
+    : `Resets ${formatted}`;
 }

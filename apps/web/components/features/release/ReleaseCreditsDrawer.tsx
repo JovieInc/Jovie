@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
+import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 
 interface ReleaseCreditsDrawerProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly credits?: SmartLinkCreditGroup[];
+  readonly presentation?: ProfileSurfacePresentation;
 }
 
 function toSentenceCase(str: string): string {
@@ -18,6 +20,7 @@ export function ReleaseCreditsDrawer({
   open,
   onOpenChange,
   credits,
+  presentation,
 }: ReleaseCreditsDrawerProps) {
   const visibleCredits =
     credits?.filter(group => group.entries.length > 0) ?? [];
@@ -25,7 +28,12 @@ export function ReleaseCreditsDrawer({
   if (visibleCredits.length === 0) return null;
 
   return (
-    <ProfileDrawerShell open={open} onOpenChange={onOpenChange} title='Credits'>
+    <ProfileDrawerShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title='Credits'
+      presentation={presentation}
+    >
       <div className='space-y-5'>
         {visibleCredits.map(group => (
           <section key={group.role} aria-labelledby={`credits-${group.role}`}>

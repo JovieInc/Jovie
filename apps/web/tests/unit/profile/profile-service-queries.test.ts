@@ -90,6 +90,7 @@ const mockProfileData = {
   theme: {},
   profileViews: 42,
   genres: ['rock', 'indie'],
+  spotifyFollowers: 12345,
   spotifyPopularity: 65,
   createdAt: NOW,
   updatedAt: NOW,
@@ -402,6 +403,40 @@ describe('Profile Service Queries', () => {
       expect(result?.contacts).toEqual([mockContact]);
     });
 
+    it.each([
+      [false, 'therealeternia | Instagram, Facebook', 'therealeternia'],
+      [true, 'Name | Owner Chose This', 'Name | Owner Chose This'],
+    ])(
+      'cleans scraped title chrome only on unclaimed pages (claimed=%s, JOV-7753)',
+      async (isClaimed, stored, shown) => {
+        mockRedisGet.mockResolvedValue(null);
+        mockGetLatestRelease.mockResolvedValue(null);
+        let selectCallCount = 0;
+        mockDbSelect.mockImplementation(() => {
+          selectCallCount++;
+          const rows =
+            selectCallCount === 1
+              ? [{ ...mockProfileWithUser, isClaimed, displayName: stored }]
+              : [];
+          return {
+            from: vi.fn().mockReturnThis(),
+            leftJoin: vi.fn().mockReturnThis(),
+            innerJoin: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            orderBy: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue(rows),
+          };
+        });
+
+        const { getProfileWithLinks } = await import(
+          '@/lib/services/profile/queries'
+        );
+        const result = await getProfileWithLinks(`scraped${String(isClaimed)}`);
+
+        expect(result?.displayName).toBe(shown);
+      }
+    );
+
     it('returns null when profile not found in database', async () => {
       mockRedisGet.mockResolvedValue(null);
 
@@ -481,6 +516,89 @@ describe('Profile Service Queries', () => {
         expect.any(Error),
         'profile-service'
       );
+    });
+
+    it('coalesces concurrent cache misses into a single database fetch', async () => {
+      mockRedisGet.mockResolvedValue(null);
+      mockGetLatestRelease.mockResolvedValue(null);
+
+      let resolveProfileQuery: (rows: unknown[]) => void = () => {};
+      const profileQueryGate = new Promise<unknown[]>(resolve => {
+        resolveProfileQuery = resolve;
+      });
+      let profileQueryCount = 0;
+
+      mockDbSelect.mockImplementation(() => {
+        profileQueryCount++;
+        if (profileQueryCount === 1) {
+          // Profile query — hold it open so the second caller arrives mid-flight
+          return {
+            from: vi.fn().mockReturnThis(),
+            leftJoin: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockImplementation(() => profileQueryGate),
+          };
+        }
+        // Links, contacts, and press photos queries
+        return {
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnThis(),
+          leftJoin: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          orderBy: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockResolvedValue([]),
+        };
+      });
+
+      const { getProfileWithLinks } = await import(
+        '@/lib/services/profile/queries'
+      );
+
+      const first = getProfileWithLinks('testartist');
+      const second = getProfileWithLinks('testartist');
+
+      // Let both callers pass the Redis miss and reach the database fetch
+      await vi.waitFor(() => {
+        expect(profileQueryCount).toBeGreaterThan(0);
+      });
+      resolveProfileQuery([mockProfileWithUser]);
+
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+
+      expect(firstResult).toBeTruthy();
+      expect(secondResult).toBeTruthy();
+      // Single-flight: one profile query plus one round of related queries,
+      // not two full fetches.
+      expect(mockDbSelect.mock.calls.length).toBe(4);
+    });
+
+    it('does not coalesce a fresh fetch with one that already settled', async () => {
+      mockRedisGet.mockResolvedValue(null);
+      mockGetLatestRelease.mockResolvedValue(null);
+
+      mockDbSelect.mockImplementation(() => ({
+        from: vi.fn().mockReturnThis(),
+        innerJoin: vi.fn().mockReturnThis(),
+        leftJoin: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockReturnThis(),
+        limit: vi
+          .fn()
+          .mockResolvedValueOnce([mockProfileWithUser])
+          .mockResolvedValue([]),
+      }));
+
+      const { getProfileWithLinks } = await import(
+        '@/lib/services/profile/queries'
+      );
+
+      await getProfileWithLinks('testartist');
+      const selectsAfterFirst = mockDbSelect.mock.calls.length;
+      await getProfileWithLinks('testartist');
+
+      // The settled in-flight entry is cleared, so a second cache miss
+      // issues its own fetch instead of reusing a stale promise.
+      expect(mockDbSelect.mock.calls.length).toBeGreaterThan(selectsAfterFirst);
     });
 
     it('falls back to the legacy profile query shape when the rich select fails', async () => {

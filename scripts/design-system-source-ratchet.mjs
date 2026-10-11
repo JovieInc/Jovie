@@ -45,8 +45,10 @@ export const ARBITRARY_VALUE_PATTERN =
 export const ARBITRARY_SCAN_DIRS = Object.freeze(['components', 'app']);
 const ARBITRARY_SOURCE_EXT = /\.(tsx|ts)$/;
 
-// Tailwind arbitrary properties the class-prefix scan misses: [width:327px]
-export const ARBITRARY_PROPERTY_PATTERN = /\[[a-z][a-z0-9-]*:[^\]]+\]/gi;
+// Tailwind arbitrary properties the class-prefix scan misses: [width:327px].
+// Raw whitespace cannot occur inside a class token; excluding it also keeps
+// TypeScript labeled tuples such as [src: string, alt: string] out of the scan.
+export const ARBITRARY_PROPERTY_PATTERN = /\[[a-z][a-z0-9-]*:[^\s\]]+\]/gi;
 
 // Locked to linear-namespace-ratchet.test.ts
 export const LINEAR_NAMESPACE_PATTERN = /--linear-[a-z0-9-]+/g;

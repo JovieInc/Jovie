@@ -31,12 +31,30 @@ struct MobileActionLoopCalendarResponse: Codable, Equatable, Sendable {
     pendingReviewCount: 1,
     upcomingEvents: [
       MobileActionLoopCalendarEventItem(
-        id: "event-1",
-        title: "Brooklyn show",
-        subtitle: "Brooklyn, NY · Bandsintown",
-        eventDate: "2026-07-10T20:00:00.000Z",
+        id: "event-2",
+        title: "Listening party",
+        subtitle: "New York, NY · Manual",
+        eventDate: "2026-07-15T20:00:00.000Z",
+        eventType: "livestream",
+        confirmationStatus: "confirmed",
+        statusBadge: nil
+      ),
+      MobileActionLoopCalendarEventItem(
+        id: "event-3",
+        title: "Rooftop set",
+        subtitle: "Los Angeles, CA · Manual",
+        eventDate: "2026-07-24T02:00:00.000Z",
         eventType: "tour",
-        confirmationStatus: "pending",
+        confirmationStatus: "confirmed",
+        statusBadge: nil
+      ),
+      MobileActionLoopCalendarEventItem(
+        id: "event-4",
+        title: "Summer tour: Chicago",
+        subtitle: "Chicago, IL · Imported",
+        eventDate: "2026-07-31T01:00:00.000Z",
+        eventType: "tour",
+        confirmationStatus: "confirmed",
         statusBadge: nil
       ),
     ],
@@ -44,7 +62,7 @@ struct MobileActionLoopCalendarResponse: Codable, Equatable, Sendable {
       MobileActionLoopCalendarEventItem(
         id: "event-1",
         title: "Brooklyn show",
-        subtitle: "Brooklyn, NY · Bandsintown",
+        subtitle: "Brooklyn, NY · Imported",
         eventDate: "2026-07-10T20:00:00.000Z",
         eventType: "tour",
         confirmationStatus: "pending",

@@ -48,7 +48,32 @@ interface MetadataSnapshot {
   readonly robots: string;
 }
 
+/**
+ * Next.js streams resolved metadata into the document (inside a hidden
+ * `Next.Metadata` div) when generateMetadata finishes after the initial
+ * shell flush; React then hoists <title> and the metadata tags into <head>.
+ * `waitForHydration` resolves on the page's interactive-ready marker, which
+ * does not guarantee the deferred metadata chunk has been delivered and
+ * deduped — on a cold route (the first matrix entry) the snapshot can
+ * observe zero or a transiently doubled <title>. Wait until the head tags
+ * have settled before counting. A genuine persistent duplicate still fails
+ * the exact-once assertions below with the actual count.
+ */
+async function waitForHeadMetadata(page: Page) {
+  await page
+    .waitForFunction(
+      () =>
+        document.querySelectorAll('head title').length === 1 &&
+        document.querySelectorAll('head meta[name="description"]').length >=
+          1 &&
+        document.querySelectorAll('head link[rel="canonical"]').length >= 1,
+      { timeout: 30_000 }
+    )
+    .catch(() => undefined);
+}
+
 async function collectMetadata(page: Page): Promise<MetadataSnapshot> {
+  await waitForHeadMetadata(page);
   return page.evaluate(() => {
     const text = (selector: string) =>
       document.querySelector(selector)?.getAttribute('content')?.trim() ?? '';

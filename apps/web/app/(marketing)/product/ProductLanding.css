@@ -1,5 +1,5 @@
 .product-hero {
-  min-height: calc(100svh - var(--public-shell-header-offset));
+  min-height: 100svh;
 }
 
 .product-hero-glow {
@@ -7,7 +7,8 @@
 }
 
 .product-claim-card {
-  --product-claim-unclaimed: #ff8a3d;
+  /* Blue/purple/pink accent discipline (DESIGN.md) — never orange. */
+  --product-claim-unclaimed: var(--color-accent-pink);
 }
 
 .product-claim-card__status {
@@ -27,4 +28,32 @@
   font-weight: 510;
   letter-spacing: -0.03em;
   line-height: 1.02;
+}
+
+/* Final CTA — Pen editorial-search composition (headline + handle claim). */
+.product-close {
+  display: grid;
+  justify-items: center;
+  padding-block: clamp(var(--space-12), 5vw, var(--space-16));
+  border-top: 1px solid var(--color-border-subtle);
+  text-align: center;
+}
+
+.product-close__headline {
+  margin: 0;
+  max-width: 30ch;
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 2.8vw, 2.5rem);
+  font-weight: var(--font-weight-normal, 400);
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+.product-close__actions {
+  display: flex;
+  justify-content: center;
+  width: min(100%, 30rem);
+  margin-top: var(--space-6);
+  padding-inline: var(--space-6);
 }

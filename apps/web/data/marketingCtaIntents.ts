@@ -1,5 +1,4 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -24,12 +23,14 @@ export interface MarketingCtaIntent {
   readonly support: string;
 }
 
+// Every claim enters the /start qualify chat (Tim 2026-09-28, JOV-3379): the
+// chat admits or reserves, so no front door routes to /signup or /waitlist.
 const CLAIM_PROFILE_WAITLIST_INTENT = {
   id: 'claim-profile',
-  label: 'Get started',
-  href: PUBLIC_WAITLIST_URL,
+  label: 'Claim your profile',
+  href: APP_ROUTES.START,
   eventName: 'landing_cta_claim_profile',
-  support: 'Limited prelaunch access. We will email when you are in.',
+  support: 'Limited access. Reserve your name now.',
 } as const satisfies MarketingCtaIntent;
 
 const CLAIM_PROFILE_OPEN_SIGNUP_INTENT = {
@@ -65,28 +66,8 @@ function buildOpenClaimProfileStartHref(trimmedHandle: string): string {
   return `${APP_ROUTES.START}?${params.toString()}`;
 }
 
-export function buildClaimProfileStartHref(
-  handle?: string,
-  waitlistEnabled: boolean = FEATURE_FLAGS.WAITLIST_ENABLED
-): string {
-  const trimmed = handle?.trim().replace(/^@/, '') ?? '';
-  if (!waitlistEnabled) {
-    return buildOpenClaimProfileStartHref(trimmed);
-  }
-
-  if (!trimmed) {
-    return CLAIM_PROFILE_WAITLIST_INTENT.href;
-  }
-
-  const destination = new URL(
-    CLAIM_PROFILE_WAITLIST_INTENT.href,
-    'https://jov.ie'
-  );
-  destination.search = new URLSearchParams({
-    starter_prompt: `I want to claim jov.ie/${trimmed}.`,
-    handle: trimmed,
-  }).toString();
-  return `${destination.pathname}${destination.search}`;
+export function buildClaimProfileStartHref(handle?: string): string {
+  return buildOpenClaimProfileStartHref(handle?.trim().replace(/^@/, '') ?? '');
 }
 
 export function getClaimProfileIntent(

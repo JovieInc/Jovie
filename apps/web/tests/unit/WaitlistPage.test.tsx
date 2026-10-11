@@ -1,14 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import WaitlistPage from '@/app/waitlist/page';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 
 const {
   mockGetWaitlistAccess,
+  mockGetWaitlistReservedHandle,
   mockIsWaitlistGateEnabled,
   mockNotFound,
   mockRedirect,
   mockResolveUserState,
 } = vi.hoisted(() => ({
   mockGetWaitlistAccess: vi.fn(),
+  mockGetWaitlistReservedHandle: vi.fn(),
   mockIsWaitlistGateEnabled: vi.fn(),
   mockNotFound: vi.fn(),
   mockRedirect: vi.fn(),
@@ -26,9 +29,11 @@ vi.mock('next/navigation', () => ({
   },
 }));
 
-vi.mock('@/lib/auth/gate', () => ({
-  CanonicalUserState,
+vi.mock('@/lib/auth/gate', async () => ({
+  CanonicalUserState: (await import('@/lib/auth/canonical-user-state'))
+    .CanonicalUserState,
   getWaitlistAccess: mockGetWaitlistAccess,
+  getWaitlistReservedHandle: mockGetWaitlistReservedHandle,
   resolveUserState: mockResolveUserState,
 }));
 
@@ -39,6 +44,8 @@ vi.mock('@/lib/waitlist/settings', () => ({
 describe('WaitlistPage', () => {
   beforeEach(() => {
     mockGetWaitlistAccess.mockReset();
+    mockGetWaitlistReservedHandle.mockReset();
+    mockGetWaitlistReservedHandle.mockResolvedValue(null);
     mockIsWaitlistGateEnabled.mockReset();
     mockIsWaitlistGateEnabled.mockResolvedValue(true);
     mockNotFound.mockClear();
@@ -73,8 +80,6 @@ describe('WaitlistPage', () => {
         context: { email: 'artist@example.com' },
       });
 
-      const { default: WaitlistPage } = await import('../../app/waitlist/page');
-
       await expect(WaitlistPage()).rejects.toThrow('NEXT_REDIRECT');
       expect(mockRedirect).toHaveBeenCalledTimes(1);
       expect(mockRedirect).toHaveBeenCalledWith(expectedRedirect);
@@ -90,7 +95,6 @@ describe('WaitlistPage', () => {
       context: { email: null },
     });
 
-    const { default: WaitlistPage } = await import('../../app/waitlist/page');
     const { WaitlistPublicLanding } = await import(
       '@/components/features/waitlist/WaitlistPublicLanding'
     );
@@ -113,7 +117,6 @@ describe('WaitlistPage', () => {
     mockNotFound.mockClear();
     mockResolveUserState.mockClear();
 
-    const { default: WaitlistPage } = await import('../../app/waitlist/page');
     const { WaitlistPublicLanding } = await import(
       '@/components/features/waitlist/WaitlistPublicLanding'
     );
@@ -136,7 +139,6 @@ describe('WaitlistPage', () => {
       new Error('waitlist table unavailable')
     );
 
-    const { default: WaitlistPage } = await import('../../app/waitlist/page');
     const { WaitlistSuccessView } = await import(
       '@/components/features/waitlist/WaitlistSuccessView'
     );
@@ -162,8 +164,8 @@ describe('WaitlistPage', () => {
       entryId: 'entry-1',
       status: 'waitlisted',
     });
+    mockGetWaitlistReservedHandle.mockResolvedValue('tim');
 
-    const { default: WaitlistPage } = await import('../../app/waitlist/page');
     const { WaitlistSuccessView } = await import(
       '@/components/features/waitlist/WaitlistSuccessView'
     );
@@ -173,10 +175,12 @@ describe('WaitlistPage', () => {
     expect(mockResolveUserState).toHaveBeenCalledWith({
       createDbUserIfMissing: false,
     });
+    expect(mockGetWaitlistReservedHandle).toHaveBeenCalledWith('entry-1');
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(mockNotFound).not.toHaveBeenCalled();
     expect(result.type.name).toBe('WaitlistRouteWithContract');
     expect(result.props.children.type).toBe(WaitlistSuccessView);
+    expect(result.props.children.props.reservedHandle).toBe('tim');
   });
 
   test.each([
@@ -193,8 +197,6 @@ describe('WaitlistPage', () => {
         context: { email: 'artist@example.com' },
       });
       mockGetWaitlistAccess.mockResolvedValue({ entryId: null, status: null });
-
-      const { default: WaitlistPage } = await import('../../app/waitlist/page');
 
       if (state === CanonicalUserState.WAITLIST_PENDING) {
         const { WaitlistSuccessView } = await import(

@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  Button,
-  Checkbox,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@jovie/ui';
+import { Checkbox } from '@jovie/ui';
 import { useMemo } from 'react';
 import { SortableHeaderButton } from '@/components/organisms/table/SortableHeaderButton';
 import {
@@ -36,7 +29,7 @@ export interface AdminCreatorsTableHeaderProps {
 export function AdminCreatorsTableHeader({
   sort,
   headerCheckboxState,
-  selectedCount,
+  selectedCount: _selectedCount,
   headerElevated,
   stickyTopPx,
   onToggleSelectAll,
@@ -61,7 +54,7 @@ export function AdminCreatorsTableHeader({
           style={stickyStyle}
         >
           <Checkbox
-            aria-label='Select all creators'
+            aria-label='Select All Creators'
             checked={headerCheckboxState}
             onCheckedChange={onToggleSelectAll}
           />
@@ -71,30 +64,9 @@ export function AdminCreatorsTableHeader({
           style={stickyStyle}
         >
           <div className='inline-flex h-8 items-center'>
-            {selectedCount > 0 ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant='secondary' size='sm' className='normal-case'>
-                    Bulk actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align='start'>
-                  <DropdownMenuItem disabled>
-                    Feature selected (coming soon)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem disabled>
-                    Unverify selected (coming soon)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem disabled className='text-destructive'>
-                    Delete selected (coming soon)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <span className='text-app font-medium tracking-normal text-secondary-token'>
-                Creator
-              </span>
-            )}
+            <span className='text-app font-medium tracking-normal text-secondary-token'>
+              Creator
+            </span>
           </div>
         </th>
         <th

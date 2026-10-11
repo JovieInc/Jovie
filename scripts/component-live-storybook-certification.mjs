@@ -186,11 +186,11 @@ export function storyIdFromTitleAndExport(title, exportName) {
   return `${sanitizeStoryIdPart(title)}--${sanitizeStoryIdPart(storyNameFromExport(exportName))}`;
 }
 
-export function qualifyNode22(version = process.versions.node) {
-  if (!/^22\./.test(String(version || ''))) {
+export function qualifyNode24(version = process.versions.node) {
+  if (!/^24\./.test(String(version || ''))) {
     return {
       ok: false,
-      detail: `live Storybook certification requires Node 22.x, found ${version || 'unknown'}`,
+      detail: `live Storybook certification requires Node 24.x, found ${version || 'unknown'}`,
     };
   }
   return { ok: true };
@@ -1111,7 +1111,7 @@ function liveVisualCertification(ok, stories, extra = {}) {
  * @param {{ headSha?: string, observations?: any[], redFixtures?: any[], repoRoot?: string, skipCollect?: boolean, collect?: boolean, nodeVersion?: string, stories?: any[], changedComponents?: string[], storyIds?: string[] }} [options]
  */
 export function runLiveStorybookCertification(options = {}) {
-  const node = qualifyNode22(options.nodeVersion ?? process.versions.node);
+  const node = qualifyNode24(options.nodeVersion ?? process.versions.node);
   const issues = [];
   if (!node.ok) issues.push(node.detail);
   const catalog = validateCanonicalStoryInventory({

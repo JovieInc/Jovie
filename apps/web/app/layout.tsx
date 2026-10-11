@@ -12,6 +12,7 @@ import './globals.css';
 // traverse client-component CSS imports, so we ground the bundle here too.
 import '@/components/organisms/HeaderNav.css';
 import '@/components/site/MarketingFooter.css';
+import { AcquisitionCapture } from '@/components/features/tracking/AcquisitionCapture';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { GoogleAnalytics } from '@/components/providers/GoogleAnalytics';
 import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
@@ -216,6 +217,7 @@ export default async function RootLayout({
 
   const content = (
     <>
+      <AcquisitionCapture />
       {children}
       {auth}
       {devToolbar}

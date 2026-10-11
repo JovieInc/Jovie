@@ -6,12 +6,12 @@ Locked path: homepage **name search** (“Search your name” → “Find me”,
 
 ## Required CI Jobs For Launch-Candidate PRs
 
-Launch-candidate PRs are not launch-ready unless all of these jobs are green when the launch gate is triggered:
+Launch-candidate PRs are not launch-ready unless all of these jobs are green when the launch gate is triggered. The Lighthouse gates run on the merge-group combined head (`merge_group`) for launch-gate paths; the same lanes remain available via manual dispatch for deep evidence:
 
 - `PR Ready`
 - `Golden Path (PR)`
-- `Lighthouse (dashboard PR)`
-- `Lighthouse (onboarding PR)`
+- `Lighthouse (dashboard gate)`
+- `Lighthouse (onboarding gate)`
 
 The launch gate is path-based. It turns on for changes touching:
 
@@ -27,8 +27,8 @@ Docs-only changes do not trigger launch-gate jobs.
 ## What Each Gate Means
 
 - `Golden Path (PR)`: `tests/e2e/golden-path.spec.ts` passes in CI against an ephemeral Neon database.
-- `Lighthouse (dashboard PR)`: authenticated dashboard Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.dashboard.pr.json](../../apps/web/.lighthouserc.dashboard.pr.json).
-- `Lighthouse (onboarding PR)`: onboarding Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.onboarding.pr.json](../../apps/web/.lighthouserc.onboarding.pr.json).
+- `Lighthouse (dashboard gate)`: authenticated dashboard Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.dashboard.pr.json](../../apps/web/.lighthouserc.dashboard.pr.json).
+- `Lighthouse (onboarding gate)`: onboarding Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.onboarding.pr.json](../../apps/web/.lighthouserc.onboarding.pr.json).
 
 ## Required Local Launch Perf Check
 

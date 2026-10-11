@@ -58,6 +58,14 @@ vi.mock('@/lib/auth/session', () => ({
 }));
 
 vi.mock('@/lib/cache/tags', () => ({
+  CACHE_TAGS: {
+    PUBLIC_PROFILE: 'profiles-all',
+    SITEMAP_CATALOG: 'sitemap-catalog',
+  },
+  createPublicReleasesTag: (profileId: string) =>
+    `public-releases:${profileId}`,
+  createReleasesTag: (userId: string, profileId: string) =>
+    `releases:${userId}:${profileId}`,
   createSmartLinkContentTag: (profileId: string) =>
     `smart-link-content:${profileId}`,
 }));
@@ -202,6 +210,10 @@ describe('library audio upload API', () => {
     );
     expect(hoisted.revalidateTagMock).toHaveBeenCalledWith(
       'releases:clerk_user_123:profile_123',
+      'max'
+    );
+    expect(hoisted.revalidateTagMock).toHaveBeenCalledWith(
+      'smart-link-content:profile_123',
       'max'
     );
   });

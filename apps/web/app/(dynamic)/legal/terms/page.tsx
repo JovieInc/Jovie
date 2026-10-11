@@ -10,7 +10,7 @@ export const revalidate = false;
 export const metadata: Metadata = {
   title: 'Terms of Service',
   description:
-    'Jovie is a creative workspace governed by clear, fair policies so you can focus on sharing your music.',
+    'Jovie is a creative workspace governed by clear, fair policies so you can focus on your work.',
   alternates: {
     canonical: `${BASE_URL}/legal/terms`,
   },

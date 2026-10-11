@@ -23,6 +23,10 @@ export type {
 } from './base-handler';
 export { BaseSubscriptionHandler } from './base-handler';
 export { ChargeHandler, chargeHandler } from './handlers/charge-handler';
+export {
+  CheckoutSessionExpiredHandler,
+  checkoutSessionExpiredHandler,
+} from './handlers/checkout-expired-handler';
 // Handler instances (for testing and introspection)
 export {
   CheckoutSessionHandler,

@@ -1,10 +1,9 @@
 import { and, eq } from 'drizzle-orm';
-import { revalidateTag } from 'next/cache';
 import {
   resolveAudioUploadMime,
   validateAudioFile,
 } from '@/lib/audio/constants';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import { invalidateReleaseCaches } from '@/lib/cache/releases';
 import {
   type AudioEntityInference,
   buildAudioUploadPrompt,
@@ -274,8 +273,7 @@ export async function routeChatAudioUpload(
     releaseTitle = created.releaseTitle;
   }
 
-  revalidateTag(`releases:${input.clerkUserId}:${input.profileId}`, 'max');
-  revalidateTag(createSmartLinkContentTag(input.profileId), 'max');
+  invalidateReleaseCaches(input.clerkUserId, input.profileId);
 
   const prompt = buildAudioUploadPrompt({
     fileName: input.fileName,

@@ -27,19 +27,65 @@ export function storybookAddonsForEnvironment(
   isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1',
   hasManualAxeSuite = process.env.JOVIE_STORYBOOK_MANUAL_AXE === '1'
 ) {
+  // The live certificate reads the preview iframe directly and injects its
+  // own pinned Axe bundle. Loading docs, Vitest, Chromatic, and MCP here adds
+  // an unrelated production build graph that can exhaust the source-gate
+  // runner before any canonical story is measured.
+  if (isLiveStorybookCert) return [];
+
   return [
     '@storybook/addon-docs',
     // The live cert and the surface matrix run their own pinned, fail-closed
     // axe passes in the preview iframe. Keep Storybook's automatic scan for
     // normal and scheduled builds, but omit it from those manual suites so the
     // two axe runs cannot race.
-    ...(isLiveStorybookCert || hasManualAxeSuite
-      ? []
-      : ['@storybook/addon-a11y']),
+    ...(hasManualAxeSuite ? [] : ['@storybook/addon-a11y']),
     '@storybook/addon-vitest',
     '@chromatic-com/storybook',
     '@storybook/addon-mcp',
   ];
+}
+
+export function storybookStyleAliasesForEnvironment(
+  isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+) {
+  return isLiveStorybookCert
+    ? [
+        {
+          find: '../app/globals.css',
+          replacement: require.resolve('./live-cert.css'),
+        },
+      ]
+    : [];
+}
+
+export function storybookFrameworkForEnvironment(
+  _isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+) {
+  // Live certification uses the same Next.js Vite framework as the catalog.
+  // Naming @storybook/react-vite here required a direct dependency that Knip
+  // cannot see, because this directory is ignored.
+  return {
+    name: '@storybook/nextjs-vite',
+    options: {
+      builder: {
+        viteConfigPath: undefined,
+      },
+    },
+  } as const;
+}
+
+// Pinned Vite 8 supports importer-aware alias resolution. Revisit at Vite 9.
+export function resolvePrivacyBoundaryShellAlias(
+  updatedId: string,
+  importer?: string
+) {
+  const boundary = require
+    .resolve('../app/app/(shell)/DashboardShellPrivacyBoundary.tsx')
+    .replaceAll('\\', '/');
+  return importer?.split('?')[0].replaceAll('\\', '/') === boundary
+    ? require.resolve('../components/organisms/AuthShellWrapper.tsx')
+    : updatedId;
 }
 
 const config: StorybookConfig = {
@@ -48,14 +94,7 @@ const config: StorybookConfig = {
       ? [...LIVE_CERT_STORIES]
       : [...FULL_CATALOG_STORIES],
   addons: storybookAddonsForEnvironment(),
-  framework: {
-    name: '@storybook/nextjs-vite',
-    options: {
-      builder: {
-        viteConfigPath: undefined,
-      },
-    },
-  },
+  framework: storybookFrameworkForEnvironment(),
   docs: {},
   typescript:
     process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
@@ -118,6 +157,7 @@ const config: StorybookConfig = {
       ...config.resolve,
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
       alias: [
+        ...storybookStyleAliasesForEnvironment(),
         // Must come before the generic '@' alias to avoid resolving to the real file.
         {
           // The real provider renders an inline bootstrap script. That script is
@@ -134,6 +174,21 @@ const config: StorybookConfig = {
         {
           find: '@/components/organisms/AuthShellWrapper',
           replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
+          customResolver: resolvePrivacyBoundaryShellAlias,
+        },
+        {
+          // lib/docs/getMarkdownDocument imports node:fs at module scope
+          // (the file-based getMarkdownDocument path), which crashes the
+          // browser Vite build. createMarkdownDocument is isomorphic, so the
+          // mock keeps the same remark pipeline without the fs reads.
+          find: '@/lib/docs/getMarkdownDocument',
+          replacement: require.resolve('./markdown-document-mock.ts'),
+        },
+        {
+          // lib/recent-releases reads CHANGELOG.md through node:fs for the
+          // homepage Recently Shipped section; serve fixture releases instead.
+          find: '@/lib/recent-releases',
+          replacement: require.resolve('./recent-releases-mock.ts'),
         },
         {
           find: '@/lib/releases/release-matrix-loader',
@@ -142,6 +197,26 @@ const config: StorybookConfig = {
         {
           find: '@/app/app/(shell)/dashboard/tour-dates/actions',
           replacement: require.resolve('./composer-catalog-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/releases/catalog-task-actions',
+          replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/releases/task-actions',
+          replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
+          find: '@/lib/leads/reporting',
+          replacement: require.resolve('./leads-reporting-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/releases/actions',
+          replacement: require.resolve('./library-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/library/actions',
+          replacement: require.resolve('./library-actions-mock.ts'),
         },
         {
           find: '@/app/app/(shell)/dashboard/actions/dashboard-data',
@@ -195,6 +270,10 @@ const config: StorybookConfig = {
           replacement: require.resolve('./dev-test-auth-identity-mock.ts'),
         },
         {
+          find: '@/app/app/(shell)/admin/actions',
+          replacement: require.resolve('./admin-actions-mock.ts'),
+        },
+        {
           find: '@/app/app/(shell)/dashboard/actions',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },
@@ -237,6 +316,12 @@ const config: StorybookConfig = {
           // crash Storybook's browser Vite build. Product stories never call it.
           find: /^@anthropic-ai\/sdk(\/.*)?$/,
           replacement: require.resolve('./anthropic-sdk-mock.ts'),
+        },
+        {
+          // Statsig's server SDK loads native Node bindings. Stories exercise
+          // deterministic UI states and must never initialize that SDK.
+          find: '@statsig/statsig-node-core',
+          replacement: require.resolve('./statsig-node-core-mock.ts'),
         },
         {
           find: 'server-only',
@@ -321,6 +406,8 @@ const config: StorybookConfig = {
           'react/jsx-runtime',
           'react/jsx-dev-runtime',
           'react-dom/client',
+          // Sentry's browser entry imports this CommonJS module by name.
+          'next/constants.js',
         ]),
       ],
       esbuildOptions: {
@@ -333,9 +420,13 @@ const config: StorybookConfig = {
     // Re-resolve through Vite so optimizeDeps + needsInterop still apply.
     // Do NOT return bare 'react' (already-resolved) or absolute CJS paths
     // (raw /@fs without default-export interop).
+    let isProductionBuild = false;
     const rewriteNextReactPlugin = {
       name: 'jovie-storybook-rewrite-next-react',
       enforce: 'pre' as const,
+      configResolved(resolved: { command: string }) {
+        isProductionBuild = resolved.command === 'build';
+      },
       async resolveId(
         this: {
           resolve: (
@@ -383,6 +474,19 @@ const config: StorybookConfig = {
 
         if (!bare) return null;
 
+        // Production's native resolver does not carry nested skipSelf calls
+        // across plugins. Next's bare -> compiled alias and this compiled ->
+        // bare rewrite otherwise recurse indefinitely. Resolve to a terminal
+        // workspace entry; keep the existing named-client interop module.
+        // Dev still needs bare resolution for optimizeDeps CJS interop.
+        if (isProductionBuild) {
+          return {
+            id:
+              bare === 'react-dom/client'
+                ? '\0jovie-react-dom-client'
+                : require.resolve(bare),
+          };
+        }
         return this.resolve(bare, importer, { skipSelf: true });
       },
     };

@@ -177,6 +177,22 @@ export const audienceSortParser =
   parseAsStringLiteral(audienceSortFields).withDefault('lastSeen');
 
 /**
+ * Valid secondary panels in the audience workspace.
+ */
+export const audiencePanels = ['contact', 'analytics', 'ai-crawlers'] as const;
+
+export type AudiencePanel = (typeof audiencePanels)[number];
+
+/**
+ * Parser for the audience workspace secondary panel. No default: an absent
+ * `panel` param means the panel is closed. Panel state is encoded in the URL
+ * so opening/closing stays an explicit, deep-linkable action and survives
+ * back/forward navigation — route or tab navigation alone never opens a panel
+ * (JOV-5836).
+ */
+export const audiencePanelParser = parseAsStringLiteral(audiencePanels);
+
+/**
  * Search params cache for audience table pages.
  * Use this in server components to parse URL params.
  *
@@ -300,8 +316,44 @@ export const adminWaitlistSearchParams = createSearchParamsCache({
   pageSize: pageSizeParser,
 });
 
+/**
+ * Canonical asset library (JOV-6889) — one aggregate table across releases,
+ * tracks, links, and media for every creator.
+ */
+export const adminAssetTypes = [
+  'all',
+  'release',
+  'track',
+  'link',
+  'photo',
+] as const;
+
+export type AdminAssetTypeParam = (typeof adminAssetTypes)[number];
+
+export const adminAssetIssuesFilters = ['all', 'issues'] as const;
+export type AdminAssetIssuesParam = (typeof adminAssetIssuesFilters)[number];
+
+export const adminAssetVerifiedFilters = [
+  'all',
+  'verified',
+  'unverified',
+] as const;
+export type AdminAssetVerifiedParam =
+  (typeof adminAssetVerifiedFilters)[number];
+
+export const adminAssetTypeParser =
+  parseAsStringLiteral(adminAssetTypes).withDefault('all');
+
+export const adminAssetIssuesParser = parseAsStringLiteral(
+  adminAssetIssuesFilters
+).withDefault('all');
+
+export const adminAssetVerifiedParser = parseAsStringLiteral(
+  adminAssetVerifiedFilters
+).withDefault('all');
+
 export const adminPeopleViewParser =
-  parseAsStringLiteral(adminPeopleViews).withDefault('waitlist');
+  parseAsStringLiteral(adminPeopleViews).withDefault('contacts');
 
 export const adminPeopleSortFields = [
   'created_asc',
@@ -332,6 +384,11 @@ export const adminPeopleSearchParams = createSearchParamsCache({
   view: adminPeopleViewParser,
   sort: adminPeopleSortParser,
   q: searchQueryParser,
+  key: searchQueryParser,
+  stage: searchQueryParser,
+  type: adminAssetTypeParser,
+  issues: adminAssetIssuesParser,
+  verified: adminAssetVerifiedParser,
 });
 
 export const adminGrowthViewParser =
@@ -340,12 +397,22 @@ export const adminGrowthViewParser =
 export const adminOutreachQueueParser =
   parseAsStringLiteral(adminOutreachQueues).withDefault('all');
 
+export const founderFunnelRangeParser = parseAsStringLiteral([
+  '7d',
+  '30d',
+  'all',
+] as const).withDefault('30d');
+
 export const adminGrowthSearchParams = createSearchParamsCache({
   page: pageParser,
   pageSize: pageSizeParser,
   view: adminGrowthViewParser,
   queue: adminOutreachQueueParser,
   q: searchQueryParser,
+  /** Founder funnel drill-down: which stage's records to list (JOV-7484). */
+  funnelStage: searchQueryParser,
+  /** Founder funnel cohort window shared by aggregate and drill-down. */
+  funnelRange: founderFunnelRangeParser,
 });
 
 // ============================================================================

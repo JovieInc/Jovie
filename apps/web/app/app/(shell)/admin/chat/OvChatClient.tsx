@@ -4,6 +4,7 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { OVIE_APP_SHELL_WORKSPACE } from '@/lib/app-shell/workspaces';
+import type { OvieHomeBriefing } from '@/lib/ovie/home-briefing';
 
 /**
  * Operator (OV) chat surface (JOV-4810). Ovie dogfoods the canonical Jovie
@@ -11,7 +12,11 @@ import { OVIE_APP_SHELL_WORKSPACE } from '@/lib/app-shell/workspaces';
  * selected Summer agent, admin authorization, operator data scope, and
  * capability-derived navigation; it does not own parallel chat presentation.
  */
-export function OvChatClient() {
+export function OvChatClient({
+  homeBriefing,
+}: {
+  readonly homeBriefing: OvieHomeBriefing;
+}) {
   const { selectedProfile, creatorProfiles } = useDashboardData();
   const activeProfile = selectedProfile ?? creatorProfiles[0] ?? null;
 
@@ -23,6 +28,7 @@ export function OvChatClient() {
         avatarUrl={activeProfile?.avatarUrl}
         username={activeProfile?.username ?? undefined}
         chatMode={OVIE_APP_SHELL_WORKSPACE.chatMode}
+        ovieHomeBriefing={homeBriefing}
       />
     </ChatWorkspaceSurface>
   );

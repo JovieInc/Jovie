@@ -60,11 +60,12 @@ Two layers:
 5. If the data also lives in Next.js data cache (public profiles, etc.), add or call a helper in `lib/cache/`.
 6. Export from `index.ts`.
 
-Canonical, compiled examples live in [`examples.ts`](./examples.ts) and are
-exercised by `examples.test.ts`. Copy from there rather than inventing new
-wiring — it covers parameterized reads, paginated reads
-(`infiniteQueryOptions`), search+pacing, mutations with invalidation, and
-autosave-scoped invalidation. SSR hydration uses `HydrateClient.tsx` +
+Canonical, compiled examples live in [`examples.ts`](./examples.ts) and
+[`fixtures/example-release-detail.ts`](./fixtures/example-release-detail.ts);
+both are exercised by tests (`examples.test.ts`, `fixtures/`). Copy from there
+rather than inventing new wiring — they cover parameterized reads, paginated
+reads (`infiniteQueryOptions`), search+pacing, mutations with invalidation,
+and autosave-scoped invalidation. SSR hydration uses `HydrateClient.tsx` +
 `server.ts` prefetch helpers; error boundaries use `QueryErrorBoundary.tsx`.
 
 Key contract points the fixtures demonstrate:

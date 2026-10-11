@@ -35,7 +35,7 @@ const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
  * @param {string} markdown - Raw CHANGELOG.md content
  * @param {{ includeFeatured?: boolean }} [options] - `includeFeatured`
  *   recognizes `### Featured` as a section (default false; see file header).
- * @returns {{ unreleased: { raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }, releases: Array<{ version: string, date: string, raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }> }}
+ * @returns {{ unreleased: { raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }, releases: Array<{ version: string, date: string, kind: string, raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }> }}
  */
 export function parseChangelog(markdown, { includeFeatured = false } = {}) {
   const sectionHeadingRe = includeFeatured
@@ -64,10 +64,14 @@ export function parseChangelog(markdown, { includeFeatured = false } = {}) {
       if (version.toLowerCase() === 'unreleased') {
         currentBlock = 'unreleased';
       } else {
+        // A `## [YYYY-MM-DD]` heading is a JOV-5762 daily digest, not a
+        // CalVer release: it carries its date in the key.
+        const daily = /^\d{4}-\d{2}-\d{2}$/.test(version);
         currentBlock = releases.length;
         releases.push({
           version,
-          date: date || '',
+          date: daily ? version : date || '',
+          kind: daily ? 'daily' : 'release',
           raw: '',
           summary: '',
           sections: {},
@@ -105,6 +109,12 @@ export function parseChangelog(markdown, { includeFeatured = false } = {}) {
       continue;
     }
 
+    // Any other H3 (e.g. `### Dogfood`) ends the current section so its
+    // bullets never leak into the previous customer section.
+    if (line.startsWith('### ')) {
+      currentSection = null;
+    }
+
     // Collect raw content
     target.raw += line + '\n';
 
@@ -136,7 +146,7 @@ export function parseChangelog(markdown, { includeFeatured = false } = {}) {
  * Get the latest (first) release after [Unreleased].
  *
  * @param {string} markdown
- * @returns {{ version: string, date: string, raw: string, sections: Record<string, string[]> } | null}
+ * @returns {{ version: string, date: string, kind: string, raw: string, sections: Record<string, string[]> } | null}
  */
 export function getLatestRelease(markdown) {
   const { releases } = parseChangelog(markdown);

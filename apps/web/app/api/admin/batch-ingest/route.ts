@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import {
@@ -13,6 +12,7 @@ import {
   handleReingestProfile,
 } from '@/lib/ingestion/flows/reingest-flow';
 import { ingestSocialPlatformUrl } from '@/lib/ingestion/flows/social-platform-ingest';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { batchCreatorIngestSchema } from '@/lib/validation/schemas';
 
@@ -141,7 +141,7 @@ async function ingestUrlEntry(entry: string): Promise<BatchIngestResult> {
 async function resolveAdminEntitlements(
   _route: string
 ): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
-  const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
 
   if (!entitlements.isAuthenticated) {
     return {

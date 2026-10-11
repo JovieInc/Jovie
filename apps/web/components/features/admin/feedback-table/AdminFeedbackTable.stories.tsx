@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { APP_ROUTES } from '@/constants/routes';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { AdminPeopleRightPanelProvider } from '../AdminPeopleRightPanelProvider';
 import { AdminFeedbackTable } from './AdminFeedbackTable';
 
 const items = [
@@ -26,6 +28,15 @@ const meta: Meta<typeof AdminFeedbackTable> = {
   parameters: {
     layout: 'fullscreen',
   },
+  decorators: [
+    Story => (
+      <RightPanelProvider>
+        <AdminPeopleRightPanelProvider>
+          <Story />
+        </AdminPeopleRightPanelProvider>
+      </RightPanelProvider>
+    ),
+  ],
 };
 
 export default meta;

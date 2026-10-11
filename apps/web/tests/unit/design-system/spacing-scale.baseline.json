@@ -6,47 +6,47 @@
   },
   "conservative": {
     "armed": true,
-    "count": 737,
+    "count": 666,
     "perFamily": {
-      "marketing": 113,
-      "web-shell": 295,
-      "web-other": 318,
+      "marketing": 86,
+      "web-shell": 264,
+      "web-other": 305,
       "packages/ui": 11
     },
     "perUtility": {
-      "gap-2.5": 92,
-      "gap-3.5": 15,
+      "gap-2.5": 79,
+      "gap-3.5": 14,
       "gap-x-2.5": 1,
       "mb-2.5": 9,
-      "mt-2.5": 23,
-      "mt-3.5": 3,
+      "mt-2.5": 20,
+      "mt-3.5": 2,
       "mx-2.5": 1,
       "my-2.5": 1,
-      "p-2.5": 34,
-      "p-3.5": 32,
-      "pb-2.5": 12,
+      "p-2.5": 32,
+      "p-3.5": 22,
+      "pb-2.5": 11,
       "pb-3.5": 1,
       "pl-2.5": 2,
       "pl-3.5": 2,
       "pr-2.5": 3,
       "pr-3.5": 2,
-      "pt-2.5": 9,
-      "px-2.5": 245,
-      "px-3.5": 47,
-      "py-2.5": 131,
-      "py-3.5": 34,
-      "space-y-2.5": 35,
+      "pt-2.5": 8,
+      "px-2.5": 229,
+      "px-3.5": 43,
+      "py-2.5": 120,
+      "py-3.5": 29,
+      "space-y-2.5": 32,
       "space-y-3.5": 3
     }
   },
   "strict": {
     "armed": false,
-    "count": 2379,
+    "count": 2310,
     "perFamily": {
-      "marketing": 313,
-      "web-shell": 919,
-      "web-other": 1088,
-      "packages/ui": 59
+      "marketing": 258,
+      "web-shell": 866,
+      "web-other": 1126,
+      "packages/ui": 60
     }
   }
 }

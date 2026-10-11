@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   cookieSetMock,
+  cookieJar,
+  cookieDeleteMock,
   mockAttributeLeadSignupFromAppUserId,
   mockCacheHandleAvailability,
   mockCaptureError,
@@ -38,8 +40,11 @@ const {
   mockWithDbSessionTx,
   mockWithRetry,
   mockRevalidatePath,
+  mockTrackServerEventTx,
 } = vi.hoisted(() => ({
   cookieSetMock: vi.fn(),
+  cookieJar: new Map<string, string>(),
+  cookieDeleteMock: vi.fn(),
   mockAttributeLeadSignupFromAppUserId: vi.fn(),
   mockCacheHandleAvailability: vi.fn(),
   mockCaptureError: vi.fn(),
@@ -80,6 +85,11 @@ const {
   mockWithDbSessionTx: vi.fn(),
   mockWithRetry: vi.fn(),
   mockRevalidatePath: vi.fn(),
+  mockTrackServerEventTx: vi.fn().mockResolvedValue({
+    ok: true,
+    eventId: 'server-event-1',
+    deduplicated: false,
+  }),
 }));
 
 vi.mock('next/cache', () => ({
@@ -89,6 +99,11 @@ vi.mock('next/cache', () => ({
 vi.mock('next/headers', () => ({
   cookies: vi.fn(async () => ({
     set: cookieSetMock,
+    get: (name: string) => {
+      const value = cookieJar.get(name);
+      return value === undefined ? undefined : { value };
+    },
+    delete: cookieDeleteMock,
   })),
   headers: mockHeaders,
 }));
@@ -134,6 +149,7 @@ vi.mock('@/lib/db/client', () => ({
 }));
 
 vi.mock('@/lib/env-server', () => ({
+  env: { URL_ENCRYPTION_KEY: 'pending-claim-test-secret' },
   isSecureEnv: vi.fn(() => true),
 }));
 
@@ -151,6 +167,11 @@ vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
 
 vi.mock('@/lib/onboarding/rate-limit', () => ({
   enforceOnboardingRateLimit: mockEnforceOnboardingRateLimit,
+}));
+
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEventTx: mockTrackServerEventTx,
+  trackServerEvent: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({
@@ -222,6 +243,14 @@ import { APP_ROUTES } from '@/constants/routes';
 describe('completeOnboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    cookieJar.clear();
+    cookieSetMock.mockImplementation((name: string, value: string) =>
+      cookieJar.set(name, value)
+    );
+    cookieDeleteMock.mockImplementation((name: string) =>
+      cookieJar.delete(name)
+    );
+    mockClearPendingClaimContext.mockReset();
 
     mockGetCachedAuth.mockResolvedValue({ userId: 'clerk-user-123' });
     mockGetCachedCurrentUser.mockResolvedValue({ id: 'clerk-user-123' });
@@ -487,6 +516,118 @@ describe('completeOnboarding', () => {
     expect(mockClearPendingClaimContext).toHaveBeenCalled();
   });
 
+  it('keeps provider failures private and retains valid pending context for retry', async () => {
+    mockReadPendingClaimContext.mockResolvedValue({
+      mode: 'token_backed',
+      creatorProfileId: 'profile-claim-123',
+      username: 'artist',
+      claimTokenHash: 'verified-hash',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    const failure = new Error(
+      'private provider failure mentioning CLAIM_EXPIRED'
+    );
+    mockClaimPrebuiltProfileForUser.mockRejectedValueOnce(failure);
+    await expect(
+      completeOnboarding({
+        username: 'artist',
+        displayName: 'Artist',
+        redirectToDashboard: false,
+      })
+    ).rejects.toBe(failure);
+    expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
+    expect(cookieSetMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['expired', 'revoked'] as const)(
+    'clears a signed %s claim cookie and returns only public recovery across serialization',
+    async failure => {
+      const context = await vi.importActual<
+        typeof import('@/lib/claim/context')
+      >('@/lib/claim/context');
+      const finalize = await vi.importActual<
+        typeof import('@/lib/claim/finalize')
+      >('@/lib/claim/finalize');
+      const { mapErrorToUserMessage } = await import(
+        '@/features/dashboard/organisms/onboarding-v2/shared/errors'
+      );
+      const profile = {
+        id: 'profile-claim-123',
+        usernameNormalized: 'artist',
+        userId: null,
+        isClaimed: false,
+        claimedAt: null,
+        onboardingCompletedAt: null,
+        displayName: 'Artist',
+        settings: null,
+        claimToken: failure === 'revoked' ? null : 'verified-hash',
+        claimTokenExpiresAt: new Date(
+          Date.now() + (failure === 'expired' ? -60_000 : 60_000)
+        ),
+      };
+      const tx = {
+        select: () => {
+          const chain = {
+            from: () => chain,
+            where: () => chain,
+            for: () => chain,
+            limit: async () => [profile],
+          };
+          return chain;
+        },
+        update: vi.fn(),
+        insert: vi.fn(),
+      };
+      mockReadPendingClaimContext.mockImplementation(
+        context.readPendingClaimContext
+      );
+      mockClearPendingClaimContext.mockImplementation(
+        context.clearPendingClaimContext
+      );
+      mockClaimPrebuiltProfileForUser.mockImplementation((_tx, params) =>
+        finalize.claimPrebuiltProfileForUser(
+          tx as unknown as Parameters<
+            typeof finalize.claimPrebuiltProfileForUser
+          >[0],
+          params
+        )
+      );
+      await context.writePendingClaimContext({
+        mode: 'token_backed',
+        creatorProfileId: profile.id,
+        username: 'artist',
+        claimTokenHash: 'verified-hash',
+      });
+      expect(await context.readPendingClaimContext()).not.toBeNull();
+      cookieSetMock.mockClear();
+
+      const result = await completeOnboarding({
+        username: 'artist',
+        displayName: 'Artist',
+        redirectToDashboard: false,
+      });
+      const serialized = JSON.parse(JSON.stringify(result));
+      expect(serialized).toEqual({ error: 'CLAIM_EXPIRED' });
+      expect(
+        mapErrorToUserMessage(`[${serialized.error}]`, '/onboarding')
+      ).toEqual({
+        userMessage:
+          'This claim link has expired or is no longer valid. Please request a new claim link.',
+      });
+      expect(cookieDeleteMock).toHaveBeenCalledWith(
+        context.PENDING_CLAIM_COOKIE
+      );
+      expect(await context.readPendingClaimContext()).toBeNull();
+      expect(tx.update).not.toHaveBeenCalled();
+      expect(tx.insert).not.toHaveBeenCalled();
+      expect(mockMarkWaitlistSignedUpInTx).not.toHaveBeenCalled();
+      expect(mockFinalizePostOnboarding).not.toHaveBeenCalled();
+      expect(mockRedirect).not.toHaveBeenCalled();
+      expect(cookieSetMock).not.toHaveBeenCalled();
+    }
+  );
+
   it('keeps signed claim context after receipt failure and clears it only on successful retry', async () => {
     const realFinalize = await vi.importActual<
       typeof import('@/lib/claim/finalize')
@@ -579,6 +720,11 @@ describe('completeOnboarding', () => {
   });
 
   it('reserves the prebuilt profile for direct pending claims', async () => {
+    mockReservePrebuiltProfileForUser.mockResolvedValueOnce({
+      username: 'artist',
+      status: 'updated',
+      profileId: 'profile-claim-456',
+    });
     mockReadPendingClaimContext.mockResolvedValueOnce({
       mode: 'direct_profile',
       creatorProfileId: 'profile-claim-456',
@@ -605,6 +751,16 @@ describe('completeOnboarding', () => {
     expect(mockClaimPrebuiltProfileForUser).not.toHaveBeenCalled();
     expect(mockMarkWaitlistSignedUpInTx).not.toHaveBeenCalled();
     expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
+    expect(mockTrackServerEventTx).toHaveBeenCalledTimes(1);
+    expect(mockTrackServerEventTx).toHaveBeenCalledWith(
+      expect.anything(),
+      'signup_completed',
+      {
+        profileId: 'profile-claim-456',
+        source: 'direct_profile',
+      },
+      { eventIdentity: 'signup_completed:profile-claim-456' }
+    );
     // Finalization stays gated for direct_profile claims...
     expect(mockFinalizePostOnboarding).not.toHaveBeenCalled();
     // ...but the completion cookie must still be set (JOV-2996) so the
@@ -691,6 +847,34 @@ describe('completeOnboarding', () => {
     );
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(mockGetCachedCurrentUser).toHaveBeenCalled();
+  });
+
+  it('fails the completion when a durable funnel event is rejected', async () => {
+    mockTrackServerEventTx.mockResolvedValueOnce({
+      ok: false,
+      error: 'invalid_properties',
+    });
+
+    await expect(
+      completeOnboarding({
+        username: 'artist',
+        displayName: 'Artist',
+        redirectToDashboard: false,
+      })
+    ).rejects.toThrow(
+      'Onboarding funnel event rejected: signup_completed (invalid_properties)'
+    );
+
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'onboarding funnel event rejected: signup_completed',
+      expect.any(Error),
+      {
+        route: 'onboarding',
+        event: 'signup_completed',
+      }
+    );
+    expect(mockFinalizePostOnboarding).not.toHaveBeenCalled();
+    expect(cookieSetMock).not.toHaveBeenCalled();
   });
 
   it('updates an existing incomplete profile and deactivates orphaned profiles', async () => {

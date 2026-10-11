@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
-
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { getAdminFeedbackItems } from '@/lib/feedback';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
 
   if (!entitlements.isAuthenticated) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

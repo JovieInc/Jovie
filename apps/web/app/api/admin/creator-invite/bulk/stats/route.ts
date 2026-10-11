@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import { NO_STORE_HEADERS } from '../lib';
@@ -52,7 +52,7 @@ interface JobQueueStats {
  */
 export async function GET() {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

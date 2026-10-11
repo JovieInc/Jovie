@@ -7,7 +7,7 @@ import {
   safeParseAgentRunArtifact,
 } from '@/lib/agent-os/artifact';
 import { areAgentOsWorkflowsEnabled } from '@/lib/agent-os/workflows';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,7 @@ type RunRouteContext = {
 };
 
 async function authorizeAdmin() {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
 
   if (!entitlements.isAuthenticated) {
     return { ok: false as const, status: 401, error: 'Unauthorized' };

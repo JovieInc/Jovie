@@ -37,6 +37,12 @@ const BANNED_ICONS = [
   'Disc3',
   'DiscAlbum',
   'CircleDot',
+  // JOV-7207 (Tim, 2026-10-03): arrow-bearing rail glyphs. Rail controls use
+  // the mirrored Jovie rail family (`Rail{Left,Right}{Open,Closed}`).
+  'PanelLeftClose',
+  'PanelLeftOpen',
+  'PanelRightClose',
+  'PanelRightOpen',
 ] as const;
 
 // Whole-word match only — must not fire on `discNumber`, `totalDiscs`,
@@ -96,7 +102,9 @@ describe('banned icons — vinyl/record and dot-in-circle status (2026-09-25)', 
         `CircleDot with CircleCheck/CircleDashed/CircleX by status.\n` +
         offenders.join('\n')
     ).toEqual([]);
-  });
+    // Sync walk+read of every .ts/.tsx under apps/web: <1s idle, but the
+    // default 12s budget fired under full-suite shard CPU contention.
+  }, 45_000);
 
   it('the shared Icon registry does not re-admit a banned icon', () => {
     const iconTsx = readFileSync(

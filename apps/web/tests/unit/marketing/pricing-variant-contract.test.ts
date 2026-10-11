@@ -13,7 +13,7 @@ function readSource(sourcePath: string): string {
   return readFileSync(resolve(process.cwd(), sourcePath), 'utf8');
 }
 
-function pricingBinding(route: '/new' | '/pricing') {
+function pricingBinding(route: '/pricing') {
   const manifestEntry = MARKETING_ROUTE_MANIFEST.find(
     entry => entry.url === route
   );
@@ -55,22 +55,31 @@ describe('section.pricing variant contract', () => {
     );
   });
 
-  it('binds /pricing to neutral and /new to Pro-recommended', () => {
+  it('binds /pricing to neutral and keeps retired /new free of rendered pricing sections', () => {
     expect(pricingBinding('/pricing')).toMatchObject({
-      componentPath: 'apps/web/app/(marketing)/pricing/page.tsx',
+      componentPath: 'apps/web/components/organisms/PricingRecipeBody.tsx',
       variantId: 'tier-cards-neutral',
     });
-    expect(pricingBinding('/new')).toMatchObject({
-      componentPath:
-        'apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx',
-      variantId: 'tier-cards-recommended',
+    expect(
+      MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/new')
+    ).toMatchObject({
+      status: 'deprecated',
+      aliasOf: '/',
+      renderedSections: [],
     });
 
     const pricingRoute = readSource('app/(marketing)/pricing/page.tsx');
+    const pricingBody = readSource(
+      'components/organisms/PricingRecipeBody.tsx'
+    );
     const homepagePricing = readSource(
       'components/marketing/homepage-v2/HomepageV2Ctas.tsx'
     );
+    expect(pricingRoute).toContain('<PricingRecipeBody');
     expect(pricingRoute).toContain("variant='tier-cards-neutral'");
+    expect(pricingBody).toContain(
+      "data-marketing-variant='tier-cards-neutral'"
+    );
     expect(pricingRoute).not.toContain("variant='tier-cards-recommended'");
     expect(homepagePricing).toContain("variant='tier-cards-recommended'");
   });
@@ -157,6 +166,9 @@ describe('section.pricing variant contract', () => {
       entry => entry.id === 'section.pricing'
     );
     const route = readSource('app/(marketing)/pricing/page.tsx');
+    const pricingBody = readSource(
+      'components/organisms/PricingRecipeBody.tsx'
+    );
     const sectionStory = readSource(
       'components/marketing/storybook/MarketingSections.stories.tsx'
     );
@@ -164,8 +176,12 @@ describe('section.pricing variant contract', () => {
     expect(registry?.source).toBe(
       'components/features/pricing/MarketingPricingPlans'
     );
+    expect(route).toContain('<PricingRecipeBody');
     expect(route).toContain(
       "<MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />"
+    );
+    expect(pricingBody).toContain(
+      "data-marketing-variant='tier-cards-neutral'"
     );
     expect(sectionStory).toContain(
       "<MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />"

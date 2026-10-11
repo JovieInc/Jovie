@@ -9,8 +9,20 @@
  *
  * @see apps/web/components/providers/ClientProviders.tsx
  */
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const { router } = vi.hoisted(() => ({ router: { push: vi.fn() } }));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => router,
+  usePathname: () => '/app/chat',
+}));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+});
 
 vi.mock('@/hooks/useJovieAuth', () => ({
   JovieAuthDefaultsProvider: ({ children }: { children: React.ReactNode }) => (
@@ -58,6 +70,30 @@ function TestChild() {
 }
 
 describe('ClientProviders composition', () => {
+  it.each([false, true])(
+    'routes native commands and releases the subscription with signed-out defaults=%s',
+    forceSignedOutDefaults => {
+      let navigate: ((path: string) => void) | undefined;
+      const unsubscribe = vi.fn();
+      const onNavigate = vi.fn((callback: (path: string) => void) => {
+        navigate = callback;
+        return unsubscribe;
+      });
+      vi.stubGlobal('electronAPI', { onNavigate });
+      const view = render(
+        <ClientProviders forceSignedOutDefaults={forceSignedOutDefaults}>
+          <TestChild />
+        </ClientProviders>
+      );
+
+      expect(onNavigate).toHaveBeenCalledTimes(1);
+      act(() => navigate?.('/app/settings'));
+      expect(router.push).toHaveBeenCalledExactlyOnceWith('/app/settings');
+      view.unmount();
+      expect(unsubscribe).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('uses signed-out defaults for public surfaces', () => {
     render(
       <ClientProviders forceSignedOutDefaults>

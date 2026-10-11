@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { shouldExcludeSelfByHandle } from '@/lib/analytics/self-exclusion';
+import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { createRateLimitHeaders, publicProfileLimiter } from '@/lib/rate-limit';
@@ -113,6 +114,8 @@ export async function POST(request: NextRequest) {
 
     try {
       await incrementProfileViews(handle);
+      // Same bot, rate-limit, and self-view filters as the view counter.
+      await recordFunnelStep({ funnel: 'fan_subscribe', step: 'profile_view' });
     } catch (error) {
       // View counting is non-critical — log the failure but return 200.
       // Returning 500 for a view counter failure creates unnecessary Sentry noise

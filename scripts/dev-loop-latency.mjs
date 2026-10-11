@@ -22,7 +22,7 @@ export const BUDGETS = Object.freeze({
   stepSeconds: 5,
   stepOverrides: Object.freeze({
     'bash scripts/security/scan-secrets.sh pre-commit': 10,
-    'pnpm exec lint-staged': 10,
+    'pnpm exec lint-staged --no-stash': 10,
   }),
   preCommitTotalSeconds: 25,
 });

@@ -11,7 +11,7 @@ Not a formatter, Ultracite, Oxlint, or Biome replacement.
 | `@shadcn/lint` | `0.1.0` (MIT) |
 | Peer ESLint | `>=9.30.0` (Jovie: ESLint `^10.10.0`) |
 | Tailwind | v4 (Jovie: Tailwind `^4.3`) |
-| Node | `>=20.19` (Jovie: Node `>=22.23.2`) |
+| Node | `>=20.19` (Jovie: Node `>=24.21.0`) |
 | License | MIT |
 | Config | `apps/web/eslint.config.js` (`settings.shadcn`, `shadcn/no-restyle`) |
 | Recognition | `ui: '@jovie/ui'`, `componentImports: ['^@jovie/ui(/|$)']` |

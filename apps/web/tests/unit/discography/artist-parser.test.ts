@@ -6,6 +6,7 @@ import {
   isRemix,
   normalizeArtistName,
   parseArtistCredits,
+  parseArtistCreditsFromArtistLine,
   parseMainArtists,
   splitByConjunction,
 } from '@/lib/discography/artist-parser';
@@ -38,6 +39,18 @@ describe('artist-parser', () => {
         'Artist B',
       ]);
     });
+
+    it('does not split and/& when the whole name matches a known provider artist', () => {
+      expect(splitByConjunction('Tones And I', ['Tones And I'])).toEqual([
+        'Tones And I',
+      ]);
+      expect(splitByConjunction('Above & Beyond', ['Above & Beyond'])).toEqual([
+        'Above & Beyond',
+      ]);
+      expect(
+        splitByConjunction('Artist A and Artist B', ['Tones And I'])
+      ).toEqual(['Artist A', 'Artist B']);
+    });
   });
 
   describe('parseMainArtists', () => {
@@ -64,26 +77,27 @@ describe('artist-parser', () => {
       });
     });
 
-    it('conservatively splits short "&" collaborations into two main artists', () => {
+    it('does not split and/& when the whole name is a provider artist', () => {
       const credits = parseMainArtists([
-        { id: '1', name: 'Artist A & Artist B' },
+        { id: 'david-guetta', name: 'David Guetta' },
+        { id: 'tones-and-i', name: 'Tones And I' },
+        { id: 'nicky-romero', name: 'Nicky Romero' },
+        { id: 'above-and-beyond', name: 'Above & Beyond' },
       ]);
-      expect(credits).toHaveLength(2);
-      expect(credits[0]).toMatchObject({
-        name: 'Artist A',
-        role: 'main_artist',
-        joinPhrase: null,
-        position: 0,
-        isPrimary: true,
-        spotifyId: '1',
-      });
-      expect(credits[1]).toMatchObject({
-        name: 'Artist B',
-        role: 'main_artist',
-        joinPhrase: ' & ',
-        position: 1,
-        isPrimary: true,
-      });
+
+      expect(credits.map(credit => credit.name)).toEqual([
+        'David Guetta',
+        'Tones And I',
+        'Nicky Romero',
+        'Above & Beyond',
+      ]);
+      expect(credits.map(credit => credit.spotifyId)).toEqual([
+        'david-guetta',
+        'tones-and-i',
+        'nicky-romero',
+        'above-and-beyond',
+      ]);
+      expect(credits.every(credit => credit.role === 'main_artist')).toBe(true);
     });
 
     it('keeps every Spotify album artist as a primary credit', () => {
@@ -117,7 +131,7 @@ describe('artist-parser', () => {
   });
 
   describe('parseArtistCredits', () => {
-    it('dedupes featured artists already present in main artist array', () => {
+    it('uses explicit title roles instead of promoting provider artists', () => {
       const credits = parseArtistCredits(
         'Song (feat. Artist B) [Skrillex Remix]',
         [
@@ -128,10 +142,61 @@ describe('artist-parser', () => {
 
       expect(credits.map(c => `${c.role}:${c.name}`)).toEqual([
         'main_artist:Artist A',
-        'main_artist:Artist B',
+        'featured_artist:Artist B',
         'remixer:Skrillex',
       ]);
       expect(credits.map(c => c.position)).toEqual([0, 1, 2]);
+      expect(credits[1]).toMatchObject({
+        spotifyId: '2',
+        observedRole: 'main_artist',
+        roleSource: 'title',
+        isPrimary: false,
+      });
+    });
+
+    it('preserves primary, featured, and remixer roles for Take Me Over', () => {
+      const credits = parseArtistCredits(
+        'Take Me Over (feat. Erica Gibson) [Austin Leeds Remix]',
+        [
+          { id: 'spotify-tim', name: 'Tim White' },
+          { id: 'spotify-austin', name: 'Austin Leeds' },
+        ]
+      );
+
+      expect(credits).toMatchObject([
+        {
+          name: 'Tim White',
+          role: 'main_artist',
+          isPrimary: true,
+          spotifyId: 'spotify-tim',
+        },
+        {
+          name: 'Erica Gibson',
+          role: 'featured_artist',
+          isPrimary: false,
+        },
+        {
+          name: 'Austin Leeds',
+          role: 'remixer',
+          isPrimary: false,
+          spotifyId: 'spotify-austin',
+          observedRole: 'main_artist',
+        },
+      ]);
+    });
+
+    it('normalizes Apple display metadata without inventing artist IDs', () => {
+      const credits = parseArtistCreditsFromArtistLine(
+        'Take Me Over (feat. Erica Gibson) [Austin Leeds Remix]',
+        'Tim White & Austin Leeds'
+      );
+
+      expect(credits.map(({ name, role }) => ({ name, role }))).toEqual([
+        { name: 'Tim White', role: 'main_artist' },
+        { name: 'Erica Gibson', role: 'featured_artist' },
+        { name: 'Austin Leeds', role: 'remixer' },
+      ]);
+      expect(credits.every(credit => !credit.spotifyId)).toBe(true);
     });
   });
 

@@ -1,5 +1,34 @@
 import Foundation
 
+/// Summer approval-card detail embedded in an OV inbox item (JOV-6670).
+struct MobileSummerCard: Codable, Equatable, Sendable {
+  let id: String
+  let kind: String
+  let body: String
+  let defaultIfSilent: String?
+  let recipient: String?
+  let amountUsd: Double?
+  let evidence: [String]
+
+  var amountLabel: String? {
+    guard let amountUsd else { return nil }
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .currency
+    formatter.currencyCode = "USD"
+    formatter.maximumFractionDigits = amountUsd.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
+    return formatter.string(from: NSNumber(value: amountUsd))
+  }
+
+  var evidenceURLs: [URL] {
+    evidence.compactMap { URL(string: $0) }
+  }
+}
+
+enum SummerCardDecision: String, Codable, Sendable {
+  case approve
+  case reject
+}
+
 struct MobileActionLoopInboxItem: Codable, Equatable, Sendable, Identifiable {
   let id: String
   let typeLabel: String
@@ -9,6 +38,7 @@ struct MobileActionLoopInboxItem: Codable, Equatable, Sendable, Identifiable {
   let primaryActionLabel: String
   let status: String
   let imageURL: String?
+  let summerCard: MobileSummerCard?
 
   enum CodingKeys: String, CodingKey {
     case id
@@ -19,6 +49,7 @@ struct MobileActionLoopInboxItem: Codable, Equatable, Sendable, Identifiable {
     case primaryActionLabel
     case status
     case imageURL = "imageUrl"
+    case summerCard
   }
 
   init(
@@ -29,7 +60,8 @@ struct MobileActionLoopInboxItem: Codable, Equatable, Sendable, Identifiable {
     why: String,
     primaryActionLabel: String,
     status: String,
-    imageURL: String? = nil
+    imageURL: String? = nil,
+    summerCard: MobileSummerCard? = nil
   ) {
     self.id = id
     self.typeLabel = typeLabel
@@ -39,6 +71,7 @@ struct MobileActionLoopInboxItem: Codable, Equatable, Sendable, Identifiable {
     self.primaryActionLabel = primaryActionLabel
     self.status = status
     self.imageURL = imageURL
+    self.summerCard = summerCard
   }
 
   var stillImageURL: URL? {

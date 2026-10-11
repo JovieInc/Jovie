@@ -50,7 +50,7 @@ export function createUsageMeterModel(
   if (
     !isFiniteNonNegative(input.used) ||
     !Number.isFinite(input.limit) ||
-    input.limit <= 0
+    input.limit < 0
   ) {
     return null;
   }
@@ -64,7 +64,7 @@ export function createUsageMeterModel(
     remaining = Math.min(remaining, clamp(input.remaining, 0, limit));
   }
 
-  const used = limit - remaining;
+  const used = Math.max(input.used, limit - remaining);
   const remainingPercent = computeRatePercent(remaining, limit, 0);
   const warningRemaining =
     input.warningRemaining !== undefined &&

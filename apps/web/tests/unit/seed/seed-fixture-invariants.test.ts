@@ -10,7 +10,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
+import {
+  FOUNDER_DEMO_PERSONA,
+  INTERNAL_DJ_DEMO_PERSONA,
+} from '@/lib/demo-personas';
 import { SCREENSHOT_SCENARIOS } from '@/lib/screenshots/registry';
 
 // ---------------------------------------------------------------------------
@@ -75,6 +78,28 @@ describe('demo persona fixtures (JOV-2077)', () => {
     expect(fixtureText).not.toContain('Blessings');
     expect(fixtureText).not.toContain('Clementine Douglas');
     expect(fixtureText).not.toContain('Tim White');
+  });
+
+  it('serves all release artwork from local public assets (JOV-6907)', () => {
+    // Third-party thumbnail URLs (e.g. i.ytimg.com maxresdefault) 404 when the
+    // source video lacks a large thumbnail, producing console errors on /demo.
+    for (const persona of [INTERNAL_DJ_DEMO_PERSONA, FOUNDER_DEMO_PERSONA]) {
+      for (const release of persona.releases) {
+        expect(
+          release.artworkUrl.startsWith('/'),
+          `Release "${release.title}" artwork must be a local asset, got ${release.artworkUrl}`
+        ).toBe(true);
+        const thumbnailUrl = (
+          release.metadata as { youtubeThumbnailUrl?: string } | undefined
+        )?.youtubeThumbnailUrl;
+        if (thumbnailUrl) {
+          expect(
+            thumbnailUrl.startsWith('/'),
+            `Release "${release.title}" thumbnail must be a local asset, got ${thumbnailUrl}`
+          ).toBe(true);
+        }
+      }
+    }
   });
 
   it('has releases with consistent Spotify ID and artwork pairing', () => {

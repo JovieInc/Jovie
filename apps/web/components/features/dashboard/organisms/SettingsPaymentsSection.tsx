@@ -69,7 +69,7 @@ export function SettingsPaymentsSection() {
       className={
         tone === 'warning'
           ? 'text-app leading-[18px] text-warning'
-          : 'text-app leading-[18px] text-destructive'
+          : 'text-app leading-[18px] text-error'
       }
     >
       {message}

@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+import {
+  closeLinearIssueByFingerprint,
+  logRemediationDryRun,
+  remediationTriggersEnabled,
+  upsertLinearIssueByTitleFingerprint,
+} from './lib/linear-issue-intake.mjs';
+
 const SENTRY_API = 'https://sentry.io/api/0';
 const GITHUB_API = 'https://api.github.com';
 export const DEFAULT_SOAK_MS = 45 * 60 * 1000;
@@ -17,10 +24,56 @@ function nonempty(value) {
 }
 
 /**
- * @param {unknown} body
- * @param {string} label
- * @returns {string | null}
+ * @param {{ shortId?: unknown, issueId?: unknown }} incident
+ * @returns {string}
  */
+function sentryRecurrenceKey(incident) {
+  const slug = String(incident?.shortId ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) return `sentry-${slug}`;
+  const numeric = String(incident?.issueId ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (/^[a-z0-9]+(-[a-z0-9]+)*$/.test(numeric)) return `sentry-${numeric}`;
+  return 'sentry-unknown';
+}
+
+async function mirrorSentryRecurrenceToLinear({ incident, decision }) {
+  const key = sentryRecurrenceKey(incident);
+  const action = decision.action === 'resolve' ? 'resolve' : 'upsert';
+  if (!remediationTriggersEnabled()) {
+    return logRemediationDryRun({ action, key, fingerprint: key });
+  }
+  try {
+    if (decision.action === 'resolve') {
+      return await closeLinearIssueByFingerprint({
+        fingerprint: key,
+        labelKey: key,
+        comment: 'Sentry autofix recurrence resolved the issue.',
+        runId: incident.issueId,
+        fetchImpl: fetch,
+      });
+    }
+    return await upsertLinearIssueByTitleFingerprint({
+      fingerprint: key,
+      labelKey: key,
+      title: `Sentry recurrence reopened (${key})`,
+      description: `Sentry issue ${incident.issueId} is still firing after the autofix merged.`,
+      priority: 2,
+      reopenTerminal: true,
+      fetchImpl: fetch,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 function fieldFromBody(body, label) {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return (
@@ -36,6 +89,8 @@ function fieldFromBody(body, label) {
  * @param {unknown} body
  * @returns {{
  *   issueId: string | null,
+ *   shortId: string | null,
+ *   linearIdentifier: string | null,
  *   fingerprint: string | null,
  *   environment: string | null,
  *   release: string | null,
@@ -45,6 +100,8 @@ function fieldFromBody(body, label) {
 export function parseAutofixIncident(body) {
   return {
     issueId: fieldFromBody(body, 'Issue ID'),
+    shortId: fieldFromBody(body, 'Sentry short ID'),
+    linearIdentifier: fieldFromBody(body, 'Linear'),
     fingerprint: fieldFromBody(body, 'Root-cause fingerprint'),
     environment: fieldFromBody(body, 'Environment'),
     release: fieldFromBody(body, 'Release'),
@@ -535,6 +592,7 @@ export async function runSentryAutofixRecurrence({
       }),
     });
     results.push({ pr: prNumber, issueId: incident.issueId, ...decision });
+    await mirrorSentryRecurrenceToLinear({ incident, decision });
   }
 
   return { ok: true, currentMainSha, results };

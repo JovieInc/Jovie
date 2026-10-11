@@ -1,0 +1,132 @@
+/* Editorial background masters (JOV-6249, spec JOV-6246).
+   Two registered variants of one system — 'soft' quiet atmosphere and
+   'flow' coherent directional sweep — rendered as static CSS/SVG layers
+   over the noir-ion canvas. Contract: data/marketing/editorialBackgrounds.
+   Purely decorative; foreground content keeps its own stacking context. */
+
+.marketing-editorial-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background-color: var(--color-bg-base);
+  pointer-events: none;
+}
+
+.marketing-editorial-background__washes {
+  position: absolute;
+  inset: 0;
+}
+
+/* --- soft: broad low-contrast transitions, gentle depth ------------------
+   Focal off-center upper-right (desktop) / top-center (mobile); large calm
+   dark regions stay in the content-safe lower-left block. Three washes at
+   <= 0.16 peak opacity — never a flat uniform glow. */
+.marketing-editorial-background[data-variant="soft"]
+.marketing-editorial-background__washes {
+  background:
+    radial-gradient(
+      62% 48% at 72% 28%,
+      var(--noir-ion-ultra-soft) 0%,
+      transparent 72%
+    ),
+    radial-gradient(
+      55% 42% at 30% 78%,
+      oklch(38% 0.03 285 / 0.1) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      120% 90% at 50% 110%,
+      oklch(0% 0 0 / 0.42) 0%,
+      transparent 62%
+    );
+}
+
+/* --- flow: one dominant rising sweep, subordinate echoes ------------------
+   The whole field flows together lower-left → upper-right (the #24
+   correction: no contradictory curves). Curves share one direction and
+   never cross; washes stay under 0.14 peak so the sweep reads as light,
+   not object. */
+.marketing-editorial-background[data-variant="flow"]
+.marketing-editorial-background__washes {
+  background:
+    radial-gradient(
+      58% 44% at 78% 30%,
+      var(--color-accent-blue-subtle) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      130% 100% at 50% 112%,
+      oklch(0% 0 0 / 0.46) 0%,
+      transparent 60%
+    );
+}
+
+.marketing-editorial-background__curves {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.marketing-editorial-background__curves path[data-weight="dominant"] {
+  stroke-width: 2.4;
+  opacity: 0.5;
+}
+
+.marketing-editorial-background__curves path[data-weight="subordinate"] {
+  stroke-width: 1.1;
+  opacity: 0.22;
+}
+
+/* Mobile: tighten focal toward top-center; content-safe block stays calm. */
+@media (max-width: 640px) {
+  .marketing-editorial-background[data-variant="soft"]
+    .marketing-editorial-background__washes {
+    background:
+      radial-gradient(
+        90% 34% at 50% 16%,
+        var(--noir-ion-ultra-soft) 0%,
+        transparent 74%
+      ),
+      radial-gradient(
+        80% 40% at 50% 84%,
+        oklch(38% 0.03 285 / 0.1) 0%,
+        transparent 72%
+      ),
+      radial-gradient(
+        140% 80% at 50% 112%,
+        oklch(0% 0 0 / 0.44) 0%,
+        transparent 60%
+      );
+  }
+
+  .marketing-editorial-background[data-variant="flow"]
+    .marketing-editorial-background__washes {
+    background:
+      radial-gradient(
+        86% 30% at 60% 18%,
+        var(--color-accent-blue-subtle) 0%,
+        transparent 72%
+      ),
+      radial-gradient(
+        150% 90% at 50% 114%,
+        oklch(0% 0 0 / 0.48) 0%,
+        transparent 58%
+      );
+  }
+}
+
+/* Reduced motion: masters are already static — this is the approved still.
+   Forced colors / high contrast: drop decoration to the plain canvas so
+   foreground contrast is never compromised. */
+@media (prefers-contrast: more), (forced-colors: active) {
+  .marketing-editorial-background {
+    background-color: var(--color-bg-base);
+  }
+
+  .marketing-editorial-background__washes,
+  .marketing-editorial-background__curves {
+    display: none;
+  }
+}

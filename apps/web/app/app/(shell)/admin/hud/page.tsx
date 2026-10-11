@@ -14,8 +14,7 @@ export default async function AdminHudPage({
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>) {
   await requireCurrentAdminPageAccess();
-  // In the shell, the packaged Mac door renders the full Ops screen, not
-  // the chromeless OvieMacHud (JOV-6164).
+  // The packaged Mac compatibility query resolves to this same shell route.
   const { ovie: _macDoor, ...params } = await searchParams;
   return HudPage({ searchParams: Promise.resolve(params) });
 }

@@ -6,7 +6,9 @@ import type {
   MerchPricingSnapshot,
   MerchPrintfulSnapshot,
 } from '@/lib/db/schema/merch';
-import { selectMerchDesign } from './service';
+import { createMerchArtwork } from './artwork';
+import { resolveMerchCatalogSelection } from './catalog';
+import { createMerchGeneration, selectMerchDesign } from './service';
 
 /**
  * Queue-driven mock for the drizzle `db` client. Every awaited query in
@@ -89,6 +91,13 @@ vi.mock('./catalog', () => ({
 
 vi.mock('./mockup-enrichment', () => ({
   scheduleMerchMockupEnrichment: vi.fn(),
+}));
+
+vi.mock('./artwork', () => ({
+  createMerchArtwork: vi.fn(async () => ({
+    mockupUrl: 'https://files.example.com/mockup.png',
+    printFileUrl: 'https://files.example.com/print.png',
+  })),
 }));
 
 const GENERATION_ID = '11111111-1111-4111-8111-111111111111';
@@ -358,5 +367,68 @@ describe('selectMerchDesign one-card-per-option', () => {
     expect(result.merchCardId).toBe(CARD_ID);
     expect(dbHarness.countCalls('insert')).toBe(1);
     expect(dbHarness.countCalls('onConflictDoNothing')).toBe(1);
+  });
+});
+
+describe('createMerchGeneration generalized lane copy', () => {
+  beforeEach(() => {
+    dbHarness.reset();
+    vi.mocked(createMerchArtwork).mockClear();
+    vi.mocked(resolveMerchCatalogSelection).mockResolvedValue({
+      catalogProductId: CATALOG_PRODUCT_ID,
+      productName: 'Bella+Canvas 3001',
+      productType: 'tshirt',
+      colorway: 'black',
+      variantMap: { '4016': 0 },
+      catalogVariantIds: [4016],
+      sizes: ['M'],
+      placements: ['front'],
+      technique: 'dtg',
+      availabilityRegion: 'US',
+      shippingProfile: 'default',
+      pricing: printfulPricing,
+      providerWarnings: [],
+    });
+  });
+
+  it('writes creator-agnostic briefs and option copy', async () => {
+    dbHarness.queue([profile]); // getCreatorProfileForMerch
+    dbHarness.queue([]); // getReleaseContext
+    dbHarness.queue(undefined); // insert merchGenerationBatches
+    dbHarness.queue([makeOption({ id: 'option-1' })]);
+    dbHarness.queue([makeOption({ id: 'option-2' })]);
+    dbHarness.queue([makeOption({ id: 'option-3' })]);
+    dbHarness.queue(undefined); // update merchGenerationBatches -> ready
+
+    const result = await createMerchGeneration({
+      profileId: PROFILE_ID,
+      clerkUserId: CLERK_USER_ID,
+      prompt: 'make something for fans',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.artistBrief.artist_myth).toContain(
+      'independent creative work'
+    );
+    expect(result.artistBrief.best_merch_hypothesis).toContain(
+      'creator naming'
+    );
+    expect(result.artistBrief.commercial_angle).toContain('creator merch');
+
+    const artworkCalls = vi
+      .mocked(createMerchArtwork)
+      .mock.calls.map(([params]) => params);
+    expect(artworkCalls.map(call => call.lane)).toEqual([
+      'band_tour_uniform',
+      'fashion_graphic_item',
+      'artist_world_artifact',
+    ]);
+    const generatedCopy = artworkCalls
+      .map(call => `${call.designName} ${call.concept}`)
+      .join(' ');
+    expect(generatedCopy).toContain('signature uniform');
+    expect(generatedCopy).toContain('creator merch');
+    expect(generatedCopy).toContain('creator world');
+    expect(generatedCopy).not.toMatch(/tour|merch table|artist merch/i);
   });
 });

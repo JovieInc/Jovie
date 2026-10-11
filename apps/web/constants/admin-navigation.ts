@@ -6,11 +6,14 @@ type SearchParamRecord = Record<
 >;
 
 export const adminPeopleViews = [
+  'contacts',
   'waitlist',
   'creators',
   'users',
   'releases',
+  'assets',
   'feedback',
+  'recovery',
 ] as const;
 
 export type AdminPeopleView = (typeof adminPeopleViews)[number];
@@ -31,12 +34,21 @@ export type AdminOutreachQueue = (typeof adminOutreachQueues)[number];
 export type AdminWorkspaceId =
   | 'overview'
   | 'chat'
+  | 'certifications'
+  | 'product'
+  | 'operations'
+  | 'needs_you'
   | 'ops'
+  | 'shipping'
   | 'people'
+  | 'interviews'
   | 'growth'
   | 'platform_connections'
+  | 'playlists'
+  | 'presence'
   | 'activity'
   | 'investors'
+  | 'feature_registry'
   | 'screenshots'
   | 'costs'
   | 'revenue_lift'
@@ -55,38 +67,89 @@ export interface AdminNavRegistryItem {
 }
 
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
-  'ops',
-  'people',
+  'overview',
   'growth',
-  'platform_connections',
-  'activity',
+  'product',
+  'operations',
+  'needs_you',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_SETTINGS_TOOL_IDS = [
+  'chat',
+  'certifications',
+  'shipping',
+  'people',
+  'interviews',
+  'platform_connections',
+  'playlists',
+  'presence',
+  'activity',
   'investors',
-  'screenshots',
+  'feature_registry',
   'share_studio',
   'costs',
   'revenue_lift',
-  'system_map',
   'features',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
   {
+    id: 'overview',
+    label: 'Now',
+    href: APP_ROUTES.ADMIN_NOW,
+    description: 'Company pulse, ranked signals, health, and freshness',
+    section: 'workspaces',
+  },
+  {
+    id: 'growth',
+    label: 'Growth',
+    href: APP_ROUTES.ADMIN_GROWTH,
+    description: 'Visited through expanded, with people behind every stage',
+    section: 'workspaces',
+  },
+  {
+    id: 'product',
+    label: 'Product',
+    href: APP_ROUTES.ADMIN_PRODUCT,
+    description: 'Certified, deployed, exposed, and observed customer reality',
+    section: 'workspaces',
+  },
+  {
+    id: 'operations',
+    label: 'Operations',
+    href: APP_ROUTES.ADMIN_OPERATIONS,
+    description: 'Autonomous execution outcomes, exceptions, costs, and queues',
+    section: 'workspaces',
+  },
+  {
+    id: 'needs_you',
+    label: 'Needs You',
+    href: APP_ROUTES.ADMIN_NEEDS_YOU,
+    description: 'Founder judgments that automation cannot safely make',
+    section: 'workspaces',
+  },
+  {
     id: 'chat',
     label: 'Chat',
     href: APP_ROUTES.ADMIN_CHAT,
     description: 'Operator chat surface on the signed-in artist profile',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
-    id: 'ops',
-    label: 'Ops',
-    href: APP_ROUTES.ADMIN_OPS,
+    id: 'certifications',
+    label: 'Certifications',
+    href: APP_ROUTES.ADMIN_CERTIFICATIONS,
     description:
-      'Canonical company Ops — decisions, survival, bottleneck, delivery',
-    section: 'workspaces',
+      'Founder review of certification evidence, with certify and reject',
+    section: 'utilities',
+  },
+  {
+    id: 'shipping',
+    label: 'Shipping',
+    href: APP_ROUTES.ADMIN_SHIPPING,
+    description:
+      'Read-only shipping pipeline, merge velocity, deployment, and runtime receipts',
+    section: 'utilities',
   },
   {
     id: 'people',
@@ -94,28 +157,42 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_PEOPLE,
     description:
       'User table, roles, waitlist, creators, and individual actions',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
-    id: 'growth',
-    label: 'Growth',
-    href: APP_ROUTES.ADMIN_GROWTH,
-    description: 'Acquisition funnel, referral, outreach, and conversion',
-    section: 'workspaces',
+    id: 'interviews',
+    label: 'Interviews',
+    href: APP_ROUTES.ADMIN_INTERVIEWS,
+    description: 'Review post-onboarding interview transcripts and summaries',
+    section: 'utilities',
   },
   {
     id: 'platform_connections',
     label: 'Platform Connections',
     href: APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS,
     description: 'Spotify publisher and playlist generation controls',
-    section: 'workspaces',
+    section: 'utilities',
+  },
+  {
+    id: 'playlists',
+    label: 'Playlists',
+    href: APP_ROUTES.ADMIN_PLAYLISTS,
+    description: 'Review and publish generated playlists',
+    section: 'utilities',
+  },
+  {
+    id: 'presence',
+    label: 'Presence',
+    href: APP_ROUTES.ADMIN_PRESENCE,
+    description: 'Inspect indexing, SEO, copy, and Lighthouse health',
+    section: 'utilities',
   },
   {
     id: 'activity',
-    label: 'Activity',
+    label: 'Timeline',
     href: APP_ROUTES.ADMIN_ACTIVITY,
-    description: 'Cross-cutting operational feed and recent changes',
-    section: 'workspaces',
+    description: 'Semantic company changes, evidence, and measured outcomes',
+    section: 'utilities',
   },
   {
     id: 'investors',
@@ -125,10 +202,10 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
-    id: 'screenshots',
-    label: 'Screenshots',
-    href: APP_ROUTES.ADMIN_SCREENSHOTS,
-    description: 'Generated docs and QA screenshots',
+    id: 'feature_registry',
+    label: 'Feature Registry',
+    href: APP_ROUTES.ADMIN_FEATURE_REGISTRY,
+    description: 'Founder review packets for canonical product capabilities',
     section: 'utilities',
   },
   {
@@ -155,13 +232,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'utilities',
   },
   {
-    id: 'system_map',
-    label: 'System Map',
-    href: APP_ROUTES.ADMIN_SYSTEM,
-    description: 'Read-only map of skills, connectors, tools, and memory',
-    section: 'utilities',
-  },
-  {
     id: 'features',
     label: 'Features',
     href: APP_ROUTES.ADMIN_FEATURES,
@@ -171,11 +241,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
 ] as const;
 
 export const ADMIN_PEOPLE_VIEW_LABELS: Record<AdminPeopleView, string> = {
+  contacts: 'Customers',
   waitlist: 'Waitlist',
   creators: 'Creators',
   users: 'Users',
   releases: 'Releases',
+  assets: 'Assets',
   feedback: 'Feedback',
+  recovery: 'Recovery',
 };
 
 export const ADMIN_GROWTH_VIEW_LABELS: Record<AdminGrowthView, string> = {

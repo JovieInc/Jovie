@@ -168,6 +168,13 @@ describe('OnboardingToolField production sources', () => {
     }
   });
 
+  it('keeps the stories theme switch on one meta-level ThemeFrame decorator', () => {
+    const source = readSource('OnboardingToolField.stories.tsx');
+    expect(source.match(/decorators:/g)).toHaveLength(1);
+    expect(source).toContain('context.parameters.theme');
+    expect(source).toContain("parameters: { theme: 'light' }");
+  });
+
   it('uses one field owner for the three onboarding tool inputs', () => {
     const source = readSource('OnboardingToolArtifacts.tsx');
     expect(source).toContain("from './OnboardingToolField'");

@@ -58,19 +58,19 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerSurfaceCard: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),
-  EntityHeaderCard: ({
+  EntityHeader: ({
     title,
     subtitle,
     badge,
-    image,
+    thumbnail,
   }: {
     title: ReactNode;
     subtitle?: ReactNode;
     badge?: ReactNode;
-    image?: ReactNode;
+    thumbnail?: ReactNode;
   }) => (
     <div>
-      {image}
+      {thumbnail}
       <div>{title}</div>
       <div>{subtitle}</div>
       {badge}

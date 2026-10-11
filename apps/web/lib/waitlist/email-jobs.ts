@@ -279,7 +279,7 @@ type ParsedWaitlistEmailJobPayload = z.infer<
 type LockedWaitlistEmailEntry = {
   id: string;
   email: string;
-  fullName: string;
+  fullName: string | null;
   status: string;
   waitlistEmailSentAt: Date | null;
   inviteEmailSentAt: Date | null;

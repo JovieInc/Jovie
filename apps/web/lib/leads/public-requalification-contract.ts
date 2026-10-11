@@ -2,16 +2,23 @@ import 'server-only';
 
 import { createHash } from 'node:crypto';
 import {
-  type AcquisitionMachineCertification,
-  machineCertifyPremadeProfile,
+  type AcquisitionPreflightResult,
+  runPremadeProfilePreflight,
 } from '@/lib/acquisition';
 import type { Lead, LeadSignalSnapshot } from '@/lib/db/schema/leads';
 import {
   calculateFitScore,
   FIT_SCORE_VERSION,
+  projectObservedQualificationFitInput,
 } from '@/lib/fit-scoring/calculator';
+import {
+  type JobQualificationResult,
+  PUBLIC_EVIDENCE_EXTRACTION_VERSION,
+  qualifySupportedJob,
+} from '@/lib/leads/job-qualification';
 import type { QualificationResult } from '@/lib/leads/qualify';
 import type { SpotifyLeadEnrichment } from '@/lib/leads/spotify-enrich-lead';
+import { stableSerialize } from '@/lib/stable-serialize';
 
 export const PUBLIC_REQUALIFICATION_EVENT_TYPE =
   'public_requalification' as const;
@@ -22,7 +29,7 @@ export const PUBLIC_REQUALIFICATION_SCOPE =
 export const PUBLIC_REQUALIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** Bump when derived public fit inputs change so old receipts stay immutable. */
 export const PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION =
-  'public-fit-inputs/v2' as const;
+  'public-fit-inputs/v3' as const;
 
 /**
  * Public DSP signals mirror the existing fit-scoring service's supported
@@ -192,9 +199,10 @@ export interface PublicCandidateRun {
   sourceUrls: string[];
   state: 'machine_failed' | 'human_review';
   publicObservation: PublicCandidateObservation;
+  jobQualification?: JobQualificationResult;
   fitScore: number;
   fitScoreBreakdown: Record<string, unknown>;
-  machineCertification: AcquisitionMachineCertification;
+  preflightReadiness: AcquisitionPreflightResult;
 }
 
 export interface PublicRequalificationResult {
@@ -213,10 +221,11 @@ export interface PublicRequalificationResult {
   expiresAt: string;
   fitScore: number;
   fitScoreBreakdown: Record<string, unknown>;
-  machineCertification: AcquisitionMachineCertification;
+  preflightReadiness: AcquisitionPreflightResult;
   state: PublicCandidateRun['state'];
   deduplicated: boolean;
   publicObservation: PublicCandidateObservation;
+  jobQualification: JobQualificationResult | null;
 }
 
 export class PublicRequalificationConflictError extends Error {
@@ -238,20 +247,7 @@ export class PublicRequalificationConflictError extends Error {
     this.incomingSourceRevision = input.incomingSourceRevision;
   }
 }
-function stableSerialize(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(item => stableSerialize(item)).join(',')}]`;
-  }
-  if (value && typeof value === 'object') {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableSerialize(item)}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value) ?? 'null';
-}
-
-function sha256(value: unknown): string {
+function sha256(value: unknown): `sha256:${string}` {
   return `sha256:${createHash('sha256').update(stableSerialize(value)).digest('hex')}`;
 }
 
@@ -356,22 +352,22 @@ export function buildPublicRun(input: {
   const dedupeKey = `${PUBLIC_REQUALIFICATION_SCOPE}:${input.candidateKey}:${sourceRevision}`;
   const attemptEventType = publicRequalificationEventType(sourceRevision);
   const fitResult = calculateFitScore({
-    ingestionSourcePlatform: 'linktree',
-    hasPaidTier: input.qualification.hasPaidTier ?? undefined,
-    socialLinkPlatforms: input.qualification.allLinks
-      .map(link => link.platformId)
-      .filter((platform): platform is string => Boolean(platform)),
-    hasSpotifyId: input.qualification.hasSpotifyLink,
+    ...projectObservedQualificationFitInput({
+      sourcePlatform: input.qualification.sourcePlatform,
+      hasPaidTier: input.qualification.hasPaidTier,
+      linkPlatforms: input.qualification.allLinks.map(link => link.platformId),
+      hasSpotifyArtist: input.qualification.hasSpotifyLink,
+      hasContactEmail: false,
+      hasTrackingPixels: input.qualification.hasTrackingPixels,
+    }),
     spotifyPopularity: input.spotify.spotifyPopularity,
     genres: input.spotify.spotifyGenres,
     latestReleaseDate: input.spotify.latestReleaseDate,
-    hasContactEmail: false,
     hasAppleMusicId: dspSignals.hasAppleMusicId,
     hasSoundCloudId: dspSignals.hasSoundCloudId,
     dspPlatformCount: dspSignals.dspPlatformCount,
-    hasTrackingPixels: input.qualification.hasTrackingPixels,
   });
-  const evidence = machineCertifyPremadeProfile({
+  const evidence = runPremadeProfilePreflight({
     displayName: input.qualification.displayName,
     avatarUrl: input.qualification.avatarUrl,
     hasSpotifyLink: input.qualification.hasSpotifyLink,
@@ -387,11 +383,11 @@ export function buildPublicRun(input: {
     fitScoreBreakdown: stableDecisionBreakdown(
       fitResult.breakdown as unknown as Record<string, unknown>
     ),
-    machineCertification: {
+    preflightReadiness: {
       experimentId: evidence.experimentId,
       rubricId: evidence.rubricId,
       passed: evidence.passed,
-      confidence: evidence.confidence,
+      checklistCoverage: evidence.checklistCoverage,
       criteria: evidence.criteria,
       failures: evidence.failures,
     },
@@ -409,7 +405,7 @@ export function buildPublicRun(input: {
       fitInputVersion: PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION,
     },
   };
-  const machineCertification: AcquisitionMachineCertification = {
+  const preflightReadiness: AcquisitionPreflightResult = {
     ...evidence,
     receipts: evidence.receipts.map(receipt => ({
       ...receipt,
@@ -427,6 +423,89 @@ export function buildPublicRun(input: {
   ]
     .filter((url, index, urls) => urls.indexOf(url) === index)
     .sort((left, right) => left.localeCompare(right));
+  const jobQualification = qualifySupportedJob({
+    candidateRunId: runId,
+    identity: {
+      personId: input.candidateId,
+      displayName: input.qualification.displayName,
+      roles: ['artist'],
+      representsIdentityIds: input.existingRepresentation
+        ? [input.candidateId]
+        : [],
+      sourceAliases: [`linktree:${input.candidateKey}`],
+      identityConfidence: input.spotify.artistId ? 0.8 : 0.5,
+      // A cross-platform URL and same display name do not prove ownership.
+      identityDecision: 'review_needed',
+    },
+    activeGoal: null,
+    supportedJobId: 'premade-artist-profile',
+    observedOpportunity: null,
+    source: 'public-linktree',
+    timeWindow: {
+      startsAt: input.observedAt.toISOString(),
+      endsAt: expiresAt.toISOString(),
+    },
+    observations: [
+      {
+        id: `${runId}:linktree-profile`,
+        kind: 'public_profile_snapshot',
+        observedFact: publicObservation.qualification,
+        provenance: {
+          sourceUrl: input.profileUrl,
+          sourceId: input.candidateKey,
+          capturedAt: input.observedAt.toISOString(),
+          sourceDigest,
+          immutableRef: sourceRevision,
+          extractionVersion: PUBLIC_EVIDENCE_EXTRACTION_VERSION,
+          supportingField: 'publicObservation.qualification',
+          supportingExcerpt: null,
+        },
+        confidence: 1,
+        uncertainty: ['ownership_not_proven'],
+        contradictions: [],
+      },
+    ],
+    tools: input.qualification.musicToolsDetected.map(toolId => ({
+      toolId,
+      usageObserved: 'yes',
+      paidAccess: 'unknown',
+      exactPlan: null,
+      exactSpend: null,
+      purchaseControl: 'unknown',
+      replaceability: 'unknown',
+      buyIntent: 'unknown',
+      accessBasis: 'unknown',
+      evidenceIds: [`${runId}:linktree-profile`],
+    })),
+    spotifyUrls: input.qualification.allLinks
+      .filter(link => link.platformId === 'spotify')
+      .map(link => link.url),
+    channelEligibility: [
+      {
+        channel: 'public-profile',
+        decision: 'review_needed',
+        permissionEvidenceIds: [],
+        reasons: ['contact_permission_not_observed'],
+      },
+    ],
+    duplicateOf: [],
+    existingCustomer: false,
+    existingClaim: false,
+    priorOutreach: false,
+    now: input.observedAt.toISOString(),
+    evidenceMaxAgeMs: PUBLIC_REQUALIFICATION_TTL_MS,
+  });
+  const combinedDecisionDigest = sha256({
+    incumbentDecisionDigest: decisionDigest,
+    jobQualification,
+  });
+  const combinedPreflightReadiness: AcquisitionPreflightResult = {
+    ...preflightReadiness,
+    receipts: preflightReadiness.receipts.map(receipt => ({
+      ...receipt,
+      digest: combinedDecisionDigest,
+    })),
+  };
 
   return {
     contract: PUBLIC_REQUALIFICATION_CONTRACT,
@@ -443,13 +522,14 @@ export function buildPublicRun(input: {
     expiresAt: expiresAt.toISOString(),
     sourceRevision,
     sourceDigest,
-    decisionDigest,
+    decisionDigest: combinedDecisionDigest,
     sourceUrls,
-    state: machineCertification.passed ? 'human_review' : 'machine_failed',
+    state: preflightReadiness.passed ? 'human_review' : 'machine_failed',
     publicObservation,
+    jobQualification,
     fitScore: fitResult.score,
     fitScoreBreakdown,
-    machineCertification,
+    preflightReadiness: combinedPreflightReadiness,
   };
 }
 
@@ -470,15 +550,20 @@ export function resultFromRun(run: PublicCandidateRun, deduplicated: boolean) {
     expiresAt: run.expiresAt,
     fitScore: run.fitScore,
     fitScoreBreakdown: run.fitScoreBreakdown,
-    machineCertification: run.machineCertification,
+    preflightReadiness: run.preflightReadiness,
     state: run.state,
     deduplicated,
     publicObservation: run.publicObservation,
+    jobQualification: run.jobQualification ?? null,
   } satisfies PublicRequalificationResult;
 }
 export function runFromMetadata(
   metadata: Record<string, unknown>
 ): PublicCandidateRun | null {
+  // Runs written before the preflight rename stored the same object under
+  // `machineCertification`; read both keys so older receipts stay usable.
+  const preflightReadiness =
+    metadata.preflightReadiness ?? metadata.machineCertification;
   if (
     metadata.contract !== PUBLIC_REQUALIFICATION_CONTRACT ||
     typeof metadata.candidateId !== 'string' ||
@@ -493,14 +578,15 @@ export function runFromMetadata(
     typeof metadata.fitScore !== 'number' ||
     !metadata.publicObservation ||
     typeof metadata.publicObservation !== 'object' ||
-    !metadata.machineCertification ||
-    typeof metadata.machineCertification !== 'object'
+    !preflightReadiness ||
+    typeof preflightReadiness !== 'object'
   ) {
     return null;
   }
   const sourceRevision = metadata.sourceRevision;
   return {
     ...metadata,
+    preflightReadiness,
     attemptEventType:
       typeof metadata.attemptEventType === 'string'
         ? metadata.attemptEventType

@@ -42,10 +42,9 @@ export const metadata: Metadata = {
     creator: '@meetjovie',
     site: '@meetjovie',
   },
-  robots: {
-    index: false,
-    follow: true,
-  },
+  // No robots override: the capability is GA and publicly proof-authorized
+  // (data/product-truth/registry.ts), so the root layout's index/follow
+  // applies and the render agrees with the sitemap manifest (JOV-7277).
 };
 
 export default function ArtistNotificationsPage() {

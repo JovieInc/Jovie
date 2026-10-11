@@ -42,6 +42,7 @@ export interface AppliedMigration {
 export interface MissingMigration {
   idx: number;
   tag: string;
+  when: number;
   hash: string;
 }
 
@@ -75,6 +76,27 @@ export function computeMigrationDrift(
     ledgerCount: applied.length,
     missing,
     unexpected,
+  };
+}
+
+export interface LedgerRepairPlan {
+  /** Ledger rows to delete (hash matches no journal file). */
+  deleteRows: AppliedMigration[];
+  /** Ledger rows to insert (file hash + journal `when`). */
+  insertRows: { hash: string; created_at: number; tag: string }[];
+}
+
+export function planLedgerRepair(
+  journal: (JournalEntry & { hash: string })[],
+  report: DriftReport
+): LedgerRepairPlan {
+  return {
+    deleteRows: report.unexpected,
+    insertRows: report.missing.map(entry => ({
+      hash: entry.hash,
+      created_at: entry.when,
+      tag: entry.tag,
+    })),
   };
 }
 
@@ -150,6 +172,42 @@ function printReport(report: DriftReport): void {
   console.error('  3. Re-run `pnpm run db:verify` until it passes.');
 }
 
+/**
+ * Reconcile an ephemeral certification branch ledger with the repo journal.
+ * The certification lane snapshots the shared parent branch, whose ledger can
+ * drift from the journal (mutated file hashes, lost rows) even though the
+ * schema is the real prior-release state. Drift is reported loudly before
+ * repair; this only rewrites drizzle.__drizzle_migrations bookkeeping — it
+ * never touches schema and must never run against a shared database.
+ */
+export async function repairLedger(
+  databaseUrl: string,
+  journal: (JournalEntry & { hash: string })[],
+  report: DriftReport
+): Promise<void> {
+  const plan = planLedgerRepair(journal, report);
+  const pool = new Pool({ connectionString: databaseUrl });
+  try {
+    for (const row of plan.deleteRows) {
+      await pool.query(
+        'DELETE FROM drizzle.__drizzle_migrations WHERE hash = $1',
+        [row.hash]
+      );
+    }
+    for (const row of plan.insertRows) {
+      await pool.query(
+        'INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ($1, $2)',
+        [row.hash, row.created_at]
+      );
+      console.log(
+        `  reconciled ledger row: ${row.tag} (hash ${row.hash.slice(0, 12)}…)`
+      );
+    }
+  } finally {
+    await pool.end();
+  }
+}
+
 async function main(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -157,13 +215,28 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const repair = process.argv.includes('--repair-ephemeral-ledger');
   const journal = readJournalWithHashes();
   const applied = await fetchAppliedMigrations(databaseUrl);
   const report = computeMigrationDrift(journal, applied);
   printReport(report);
 
   if (!report.ok) {
-    process.exit(1);
+    if (!repair) {
+      process.exit(1);
+    }
+    console.log(
+      '↻ Reconciling the ephemeral ledger to the journal (certification branch only)'
+    );
+    await repairLedger(databaseUrl, journal, report);
+    const recheck = computeMigrationDrift(
+      journal,
+      await fetchAppliedMigrations(databaseUrl)
+    );
+    printReport(recheck);
+    if (!recheck.ok) {
+      process.exit(1);
+    }
   }
 }
 

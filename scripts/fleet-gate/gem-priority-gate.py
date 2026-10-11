@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -22,6 +23,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -46,6 +48,10 @@ from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from summer_ci_audit import observe_ci_audit  # noqa: E402
 from gem_gate_contract import (  # noqa: E402
     CAPACITY_MAX_TARGET,
+    GENERATION_MARKER_PREFIX,
+    MAIN_HEALTH_CONTRACT_SCHEMA,
+    MAIN_HEALTH_CONTRACT_VERSION,
+    REQUIRED_MAIN_CHECKS,
     V2_PROOF_SCHEMA,
     assert_repo_sidecar_path,
     fleet_sidecar_path,
@@ -53,7 +59,7 @@ from gem_gate_contract import (  # noqa: E402
     validate_capacity_receipt as validate_legacy_capacity_receipt,
     v2_validate_capacity_receipt,
 )
-from symphony_proof_context import load_context, validation_args  # noqa: E402
+from symphony_proof_context import load_context, public_context_diagnostics, validation_args  # noqa: E402
 
 
 SCHEMA = "jovie-fleet-gate/v1"
@@ -290,43 +296,251 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
     }
 
 
-def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
-    result = subprocess.run(
-        ["gh", "api", f"repos/{repo}/{endpoint}"],
-        check=True,
+_GITHUB_ETAG_RE = re.compile(r'^(?:W/)?"[0-9A-Fa-f]+"$')
+
+
+def _github_http_cache_dir() -> Path | None:
+    """Persistent conditional-GET cache. ``off`` disables it."""
+    raw = os.environ.get("FLEET_GATE_HTTP_CACHE")
+    if raw == "off":
+        return None
+    if raw:
+        return Path(raw)
+    workspace = os.environ.get("GEM_WORKSPACE", "/home/timwhite/gem-workspace")
+    return Path(workspace) / "state" / "gem-priority-gate" / "github-http-cache"
+
+
+def _github_cache_path(repo: str, endpoint: str) -> Path | None:
+    directory = _github_http_cache_dir()
+    if directory is None:
+        return None
+    digest = hashlib.sha256(f"{repo}\n{endpoint}".encode()).hexdigest()
+    return directory / digest
+
+
+def _read_github_cache(path: Path) -> tuple[str | None, dict[str, Any] | None]:
+    try:
+        etag = path.with_name(path.name + ".etag").read_text(encoding="utf-8").strip()
+        body = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, None
+    if not _GITHUB_ETAG_RE.fullmatch(etag) or not isinstance(body, dict):
+        return None, None
+    return etag, body
+
+
+def _write_github_cache(path: Path, etag: str, body: str) -> None:
+    if not _GITHUB_ETAG_RE.fullmatch(etag):
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(body, encoding="utf-8")
+    temporary.replace(path)
+    etag_path = path.with_name(path.name + ".etag")
+    etag_temporary = etag_path.with_name(etag_path.name + ".tmp")
+    etag_temporary.write_text(etag + "\n", encoding="utf-8")
+    etag_temporary.replace(etag_path)
+
+
+def _parse_gh_include(stdout: str) -> tuple[int | None, dict[str, str], str]:
+    if not stdout.startswith("HTTP/"):
+        return None, {}, stdout
+    separator = "\r\n\r\n" if "\r\n\r\n" in stdout else "\n\n"
+    head, _, body = stdout.partition(separator)
+    lines = head.splitlines()
+    try:
+        status = int(lines[0].split()[1])
+    except (IndexError, ValueError):
+        return None, {}, stdout
+    headers: dict[str, str] = {}
+    for line in lines[1:]:
+        key, sep, value = line.partition(":")
+        if sep:
+            headers[key.strip().lower()] = value.strip()
+    return status, headers, body
+
+
+def _gh_api(endpoint: str, etag: str | None) -> subprocess.CompletedProcess[str]:
+    command = ["gh", "api", "--include"]
+    if etag:
+        command.extend(["-H", f"If-None-Match: {etag}"])
+    command.append(endpoint)
+    return subprocess.run(
+        command,
+        check=False,
         capture_output=True,
         text=True,
         timeout=20,
     )
-    value = json.loads(result.stdout)
+
+
+def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
+    """Read one GitHub REST object, revalidating with If-None-Match.
+
+    A 304 does not count against the primary rate limit. The cached body is
+    the last 200 for that exact endpoint. A rejected or missing validator
+    refetches unconditionally.
+    """
+    return _gh_json(repo, endpoint, revalidate=True)
+
+
+def _gh_json(repo: str, endpoint: str, *, revalidate: bool) -> dict[str, Any]:
+    cache = _github_cache_path(repo, endpoint)
+    etag, cached = _read_github_cache(cache) if revalidate and cache is not None else (None, None)
+    result = _gh_api(f"repos/{repo}/{endpoint}", etag)
+    if result.returncode != 0 and "unknown flag" in result.stderr and "--include" in result.args:
+        fallback = subprocess.run(
+            ["gh", "api", f"repos/{repo}/{endpoint}"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        value = json.loads(fallback.stdout)
+        if not isinstance(value, dict):
+            raise ValueError("GitHub response was not an object")
+        return value
+    status, headers, body = _parse_gh_include(result.stdout)
+    if status == 304:
+        if cached is not None:
+            return cached
+        if revalidate:
+            return _gh_json(repo, endpoint, revalidate=False)
+        raise subprocess.CalledProcessError(
+            result.returncode or 1, result.args, result.stdout, result.stderr
+        )
+    if result.returncode != 0 or (status is not None and not 200 <= status < 300):
+        raise subprocess.CalledProcessError(
+            result.returncode or 1, result.args, result.stdout, result.stderr
+        )
+    payload = body if status is not None else result.stdout
+    value = json.loads(payload)
     if not isinstance(value, dict):
         raise ValueError("GitHub response was not an object")
+    if cache is not None and status is not None:
+        try:
+            _write_github_cache(cache, headers.get("etag", ""), payload)
+        except OSError:
+            pass
     return value
 
 
 NO_VERDICT_CONCLUSIONS = frozenset({"skipped", "cancelled", "neutral"})
 
 
-def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Pick the latest real Main Release Ready attempt.
+def latest_check_attempt(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Pick the latest real attempt of one check name.
 
     Merge-group / source-inactive jobs complete as ``skipped``. Those are not
     a red main — treating the newest skip as the source gate flips the fleet
     to draft-only after every land and zeroes enroll.
     """
-    if not attempts:
-        raise ValueError("Main Release Ready check is missing")
-
     def sort_key(run: dict[str, Any]) -> str:
         return str(run.get("started_at") or run.get("completed_at") or "")
 
-    scored = [
-        run
-        for run in attempts
-        if run.get("conclusion") not in {"skipped", "cancelled", "neutral"}
-    ]
-    pool = scored if scored else attempts
+    pool = _real_release_attempts(runs) or runs
     return max(pool, key=sort_key)
+
+
+def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
+    if not attempts:
+        raise ValueError("Main Release Ready check is missing")
+    return latest_check_attempt(attempts)
+
+
+def check_verdict(run: dict[str, Any] | None) -> str:
+    """Classify one check-run attempt against the main-health contract."""
+    if run is None or run.get("status") != "completed":
+        return "pending"
+    conclusion = run.get("conclusion")
+    if conclusion == "success":
+        return "success"
+    if conclusion in NO_VERDICT_CONCLUSIONS:
+        return "no-verdict"
+    return "failed"
+
+
+def classify_main_checks(
+    check_runs: list[dict[str, Any]],
+    required_attempts: dict[str, list[dict[str, Any]]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split every check run on the SHA into the required/optional contract.
+
+    JOV-4970: promotion binds only to REQUIRED_MAIN_CHECKS. Every other run is
+    advisory evidence — a pending or failed optional lane stays observable in
+    the receipt without flipping global main health.
+    """
+    by_name: dict[str, list[dict[str, Any]]] = {}
+    for run in check_runs:
+        name = run.get("name")
+        if isinstance(name, str) and name:
+            by_name.setdefault(name, []).append(run)
+    required: list[dict[str, Any]] = []
+    for name in sorted(REQUIRED_MAIN_CHECKS):
+        attempts = required_attempts.get(name, by_name.get(name) or [])
+        if not attempts:
+            required.append(
+                {"name": name, "classification": "required", "verdict": "missing"}
+            )
+            continue
+        latest = latest_check_attempt(attempts)
+        required.append(
+            {
+                "name": name,
+                "classification": "required",
+                "verdict": check_verdict(latest),
+                "status": latest.get("status"),
+                "conclusion": latest.get("conclusion"),
+            }
+        )
+    optional: list[dict[str, Any]] = []
+    for name in sorted(by_name):
+        if name in REQUIRED_MAIN_CHECKS:
+            continue
+        latest = latest_check_attempt(by_name[name])
+        optional.append(
+            {
+                "name": name,
+                "classification": "optional",
+                "verdict": check_verdict(latest),
+                "status": latest.get("status"),
+                "conclusion": latest.get("conclusion"),
+            }
+        )
+    return required, optional
+
+
+def observe_generation_marker(repo: str, sha: object) -> dict[str, Any]:
+    """Read the exact production-generation-verified-<sha> artifact marker.
+
+    The Production Controller preserves this artifact after its final marker
+    decision for the exact generation. An artifact bound to an older SHA never
+    matches the name filter; an expired artifact is stale evidence, not proof.
+    """
+    name = f"{GENERATION_MARKER_PREFIX}{sha}"
+    try:
+        listing = gh_json(repo, f"actions/artifacts?per_page=100&name={name}")
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
+        return {
+            "name": name,
+            "verified": False,
+            "stale": False,
+            "error": f"generation-marker-observation-failed: {error}",
+        }
+    artifacts = [
+        artifact
+        for artifact in listing.get("artifacts") or []
+        if isinstance(artifact, dict) and artifact.get("name") == name
+    ]
+    live = [artifact for artifact in artifacts if artifact.get("expired") is False]
+    result: dict[str, Any] = {
+        "name": name,
+        "verified": bool(live),
+        "stale": bool(artifacts) and not live,
+    }
+    if live:
+        result["artifactId"] = live[0].get("id")
+    return result
 
 
 def observe_main_release_ready_jobs(repo: str, sha: object) -> list[dict[str, Any]]:
@@ -368,6 +582,69 @@ def observe_main_release_ready_jobs(repo: str, sha: object) -> list[dict[str, An
     return attempts
 
 
+MAIN_RELEASE_READY_FALLBACK_MAX_AGE_MS = 3 * 60 * 60 * 1000
+
+
+def observe_recent_real_release_ready(repo: str, now: datetime) -> dict[str, Any] | None:
+    """Find the most recent real Main Release Ready attempt on main history.
+
+    JOV-8000 follow-up 27: a queue merge lands the tip through the merge-group
+    CI, whose Main Release Ready job is skipped by design (its `if:` binds to
+    event=push). The direct push CI run starts minutes later; until its Main
+    Release Ready completes, the exact tip carries only skipped attempts and
+    observe_main reads main-unknown — a window after EVERY queue merge. This
+    fallback reads the recent push CI runs on main (newest first) and returns
+    the newest real (success/failed — not skipped/cancelled/neutral) Main
+    Release Ready attempt within a freshness bound, or None when none exists
+    (the caller fails closed as before). An ancestor's green gate within the
+    bound is honest main evidence: the direct push CI on the tip re-proves it
+    in minutes, and a real failure on the newest attempt wins regardless of
+    age ordering.
+    """
+    try:
+        runs = gh_json(repo, "actions/workflows/ci.yml/runs?branch=main&event=push&per_page=10")
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+        return None
+    now_ms = now.timestamp() * 1000
+    for run in runs.get("workflow_runs") or []:
+        run_sha = run.get("head_sha")
+        run_created = run.get("created_at")
+        if not run_sha or not run_created:
+            continue
+        created = parse_time(run_created)
+        if created is None:
+            continue
+        if now_ms - created.timestamp() * 1000 > MAIN_RELEASE_READY_FALLBACK_MAX_AGE_MS:
+            break
+        run_id = run.get("id")
+        if not run_id:
+            continue
+        try:
+            jobs = gh_json(repo, f"actions/runs/{run_id}/jobs?per_page=100")
+        except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+            continue
+        for job in jobs.get("jobs") or []:
+            if job.get("name") != "Main Release Ready":
+                continue
+            conclusion = job.get("conclusion")
+            if conclusion in {"skipped", "cancelled", "neutral"}:
+                continue
+            if job.get("status") != "completed":
+                continue
+            return {
+                "name": "Main Release Ready",
+                "status": job.get("status"),
+                "conclusion": conclusion,
+                "startedAt": job.get("started_at"),
+                "completedAt": job.get("completed_at"),
+                "htmlUrl": job.get("html_url"),
+                "source": "ancestor-ci-workflow-job",
+                "ancestorSha": run_sha,
+                "ancestorRunCreatedAt": run_created,
+            }
+    return None
+
+
 def _real_release_attempts(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         run
@@ -384,10 +661,12 @@ def observe_main(repo: str) -> dict[str, Any]:
         if not sha:
             raise ValueError("main SHA missing")
         combined = gh_json(repo, f"commits/{sha}/status")
+        check_runs: list[dict[str, Any]] = []
         release_attempts: list[dict[str, Any]] = []
         for page in range(1, 11):
             checks = gh_json(repo, f"commits/{sha}/check-runs?per_page=100&page={page}")
             page_runs = checks.get("check_runs", [])
+            check_runs.extend(page_runs)
             release_attempts.extend(
                 run for run in page_runs if run.get("name") == "Main Release Ready"
             )
@@ -415,24 +694,47 @@ def observe_main(repo: str) -> dict[str, Any]:
                         "conclusion": combined_state,
                     },
                 }
+        # JOV-4970: main health binds to the versioned required-check contract
+        # and the exact generation marker, not to every check run on the SHA.
+        # Optional lanes (Generate Screenshots, agent suites) stay observable
+        # in pendingChecks/failedChecks without classifying main.
         latest = select_main_release_ready(release_attempts)
+        marker = observe_generation_marker(repo, sha)
+        required_checks, optional_checks = classify_main_checks(
+            check_runs,
+            {"Main Release Ready": release_attempts},
+        )
+        failed = [entry["name"] for entry in required_checks if entry["verdict"] == "failed"]
+        unresolved = [
+            entry["name"]
+            for entry in required_checks
+            if entry["verdict"] in {"missing", "pending", "no-verdict"}
+        ]
         combined_state = str(combined.get("state") or "unknown")
         conclusion = latest.get("conclusion")
-        if latest.get("status") != "completed":
-            status = "unknown"
-        elif conclusion == "success":
-            status = "green"
-        elif conclusion in NO_VERDICT_CONCLUSIONS:
-            # A skipped/cancelled/neutral source gate is the absence of a
-            # verdict (merge_group or source-inactive job, cancelled attempt),
-            # not a red main. Freezing promotion on unknown is correct; flipping
-            # the fleet to main-not-green/draft-only on it is a false red.
-            status = "unknown"
-        else:
+        if failed:
             status = "red"
+            reason = "required-check-failed"
+        elif unresolved:
+            status = "unknown"
+            reason = (
+                "required-check-missing"
+                if any(entry["verdict"] == "missing" for entry in required_checks)
+                else "required-check-pending"
+                if any(entry["verdict"] == "pending" for entry in required_checks)
+                else "required-check-no-verdict"
+            )
+        else:
+            status = "green"
+            reason = (
+                "required-checks-green-generation-verified"
+                if marker.get("verified") is True
+                else "required-checks-green-generation-unverified"
+            )
         observed = {
             "status": status,
             "sha": sha,
+            "reason": reason,
             "combinedStatus": combined_state,
             "sourceGate": {
                 "name": "Main Release Ready",
@@ -441,11 +743,69 @@ def observe_main(repo: str) -> dict[str, Any]:
                 "startedAt": latest.get("started_at"),
                 "completedAt": latest.get("completed_at"),
             },
+            "contract": {
+                "schema": MAIN_HEALTH_CONTRACT_SCHEMA,
+                "version": MAIN_HEALTH_CONTRACT_VERSION,
+                "requiredChecks": sorted(REQUIRED_MAIN_CHECKS),
+            },
+            "requiredChecks": required_checks,
+            "optionalChecks": optional_checks,
+            "checks": required_checks + optional_checks,
+            "pendingChecks": sorted(
+                entry["name"]
+                for entry in required_checks + optional_checks
+                if entry["verdict"] == "pending"
+            ),
+            "failedChecks": sorted(
+                entry["name"]
+                for entry in required_checks + optional_checks
+                if entry["verdict"] == "failed"
+            ),
+            "generationVerified": marker.get("verified") is True,
+            "marker": marker,
         }
-        if status == "unknown" and conclusion in NO_VERDICT_CONCLUSIONS:
+        if status == "unknown" and (
+            conclusion in NO_VERDICT_CONCLUSIONS
+            or any(entry["verdict"] in {"missing", "pending", "no-verdict"} for entry in required_checks)
+        ):
+            # JOV-8000 follow-up 27+28: the queue-merge window — the tip's
+            # Main Release Ready attempts are the merge-group run's skipped-
+            # by-design one and/or the just-started direct push CI's PENDING
+            # one (the follow-up-27 fix only covered the skipped shape; the
+            # 38019846033 run bound through the pending window minutes after
+            # it landed). Fall back to the most recent REAL attempt within
+            # the freshness bound (an ancestor's push-CI gate); green main
+            # via the ancestor also lets the independent-review refresh
+            # write a fresh exact-head receipt (clearing head-mismatch in
+            # the same window). Fail closed when no real attempt exists
+            # within the bound.
             observed["error"] = (
-                f"Main Release Ready has no real attempt for {sha} "
-                f"(latest conclusion: {conclusion})"
+                f"Main Release Ready has no completed real attempt for {sha} "
+                f"(latest conclusion: {conclusion}; unresolved: "
+                f"{', '.join(sorted({entry['verdict'] for entry in required_checks if entry['verdict'] in {'missing', 'pending', 'no-verdict'}}))})"
+            )
+            fallback = observe_recent_real_release_ready(repo, utc_now())
+            if fallback is not None and fallback.get("conclusion") == "success":
+                observed["status"] = "green"
+                observed["reason"] = "required-checks-green-ancestor-fallback"
+                observed["sourceGate"] = fallback
+                observed["error"] = (
+                    f"exact-head gate pending (latest conclusion: {conclusion}); "
+                    f"fell back to the newest real Main Release Ready attempt "
+                    f"within {MAIN_RELEASE_READY_FALLBACK_MAX_AGE_MS // 60000}m "
+                    f"(ancestor {fallback.get('ancestorSha')})"
+                )
+            elif fallback is not None and fallback.get("conclusion") in {"failure", "error", "timed_out", "startup_failure"}:
+                observed["status"] = "red"
+                observed["reason"] = "required-check-failed-ancestor"
+                observed["sourceGate"] = fallback
+        elif status == "unknown" and any(
+            entry["verdict"] == "missing" for entry in required_checks
+        ):
+            missing = [entry["name"] for entry in required_checks if entry["verdict"] == "missing"]
+            observed["error"] = (
+                f"Required main check is missing for {sha}: "
+                f"{', '.join(missing)}"
             )
         return observed
 
@@ -498,12 +858,52 @@ def observe_controller(
                     **cached,
                     "error": f"controller-observation-failed-used-last-known: {error}",
                 }
+        if is_retired_controller_endpoint(url, error):
+            # JOV-8000 follow-up 24: the default symphony state URL is the
+            # RETIRED Elixir endpoint (:4041, decommissioned per #20931).
+            # Connection refused against it is the permanent retired-endpoint
+            # class, not a controller crash — the parked capacity shape the
+            # hold-intake semantics already define ("A parked controller (…
+            # :4041 connection refused) is that same capacity shape, not a
+            # crash"). Named so the receipt distinguishes retired from failed:
+            # crashed (failed) holds runtime intake; parked does not — already
+            # green PRs continue promoting in hold-intake, and the reason stays
+            # in the controller-failure family so hold-intake's bounded set
+            # still engages. Fail-closed is preserved: parked is not green.
+            return {
+                "status": "parked",
+                "kind": "symphony",
+                "url": url,
+                "retired": True,
+                "error": f"controller-endpoint-retired: {error}",
+                "observedAt": isoformat(observed_at),
+            }
         return {
             "status": "failed",
             "kind": "symphony",
             "url": url,
             "error": f"controller-observation-failed: {error}",
         }
+
+
+def is_retired_controller_endpoint(url: object, error: BaseException) -> bool:
+    """Whether an observation failure is the retired-endpoint class.
+
+    The retired default symphony URL is the decommissioned Elixir state API
+    (http://127.0.0.1:4041/api/v1/state, #20931). A connection-level refusal
+    against it is permanent by construction: the service is retired, so no
+    observation can ever go green and no last-known snapshot can exist.
+    """
+    return isinstance(url, str) and url.rstrip("/") == (
+        "http://127.0.0.1:4041/api/v1/state"
+    ) and (
+        isinstance(error, (ConnectionRefusedError, ConnectionResetError))
+        or (
+            isinstance(error, urllib.error.URLError)
+            and isinstance(getattr(error, "reason", None), OSError)
+        )
+        or "connection refused" in str(error).lower()
+    )
 
 
 def load_last_known_controller(path: Path, now: datetime) -> dict[str, Any] | None:
@@ -594,7 +994,70 @@ def observe_lease(guard_bin: str) -> dict[str, Any]:
     }
 
 
+def observe_database(production_url: str) -> dict[str, str]:
+    """Observe public DB liveness on the configured production origin only.
+
+    Deploy liveness deliberately omits private dependency diagnostics. Never
+    infer database readiness from that aggregate response or carry diagnostics
+    into a fleet receipt. Uncertain DB evidence remains unknown.
+    """
+    def unknown(reason: str) -> dict[str, str]:
+        return {"status": "unknown", "detail": f"database health probe: {reason}"}
+
+    try:
+        origin = urllib.parse.urlsplit(production_url)
+        if (origin.scheme != "https" or not origin.hostname
+                or origin.username is not None or origin.password is not None
+                or origin.query or origin.fragment):
+            return unknown("untrusted production origin")
+        # Validate the port before constructing the credential-free same-origin URL.
+        origin.port
+        url = urllib.parse.urlunsplit((origin.scheme, origin.netloc, "/api/health/db", "", ""))
+        try:
+            with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured origin
+                status, final_url = response.status, response.geturl()
+                value = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            status, final_url = error.code, error.geturl()
+            value = json.loads(error.read().decode("utf-8"))
+        if final_url != url:
+            return unknown("redirected away from the configured database endpoint")
+        if not isinstance(value, dict) or not isinstance(value.get("healthy"), bool):
+            return unknown("malformed public liveness schema")
+        timestamp = value.get("timestamp")
+        if not isinstance(timestamp, str):
+            return unknown("missing observation timestamp")
+        observed_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        if observed_at.tzinfo is None:
+            return unknown("timestamp has no timezone")
+        age = utc_now() - observed_at.astimezone(UTC)
+        if not timedelta(0) <= age <= timedelta(minutes=10):
+            return unknown("stale or future-dated observation")
+        if value["healthy"] is False and status in (200, 503):
+            return {"status": "red", "detail": "same-origin database health check failed"}
+        if value["healthy"] is True and status == 200:
+            return {"status": "green", "detail": "same-origin database health check passed"}
+        return unknown("unexpected HTTP status or contradictory liveness")
+    except (OSError, ValueError, OverflowError, urllib.error.URLError):
+        return unknown("transport or malformed response")
+
+
 def observe_production(url: str) -> dict[str, Any]:
+    def dependencies(final_url: str, value: object) -> dict[str, Any]:
+        alias_ok = (
+            isinstance(value, dict)
+            and final_url.rstrip("/") == url.rstrip("/")
+        )
+        return {
+            "vercel-alias": {
+                "status": "green" if alias_ok else "red",
+                "detail": "canonical alias resolved without redirect"
+                if alias_ok
+                else f"canonical alias redirected to {final_url}",
+            },
+            "database": observe_database(url),
+        }
+
     try:
         with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured health URL
             if response.status < 200 or response.status >= 300:
@@ -611,17 +1074,28 @@ def observe_production(url: str) -> dict[str, Any]:
         if not isinstance(value, dict):
             raise ValueError("production health was not an object")
         reported_status = value.get("status")
+        # Anonymous deploy liveness is {healthy: true|false} with no status.
+        # Keep accepting the legacy {status: healthy|ok} body until every
+        # production deploy has the new handler.
+        if reported_status is None and isinstance(value.get("healthy"), bool):
+            reported_status = "healthy" if value.get("healthy") else "unhealthy"
         observed: dict[str, Any] = {
             "status": "green" if reported_status in ("healthy", "ok") else "red",
             "url": url,
             "reportedStatus": reported_status,
+            "dependencies": dependencies(final_url, value),
         }
     except urllib.error.HTTPError as error:
+        try:
+            value = json.loads(error.read().decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            value = None
         return {
             "status": "red",
             "url": url,
             "httpStatus": error.code,
             "error": "production-observation-http-error",
+            "dependencies": dependencies(error.geturl(), value),
         }
     except (OSError, ValueError, json.JSONDecodeError, urllib.error.URLError) as error:
         return {
@@ -757,7 +1231,10 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
             "reason": "capacity-evidence-malformed",
         }
     accepted, reason, proofs = validate_capacity_receipt(receipt, now)
-    return {**receipt, "accepted": accepted, "reason": reason, "acceptedEvidence": proofs}
+    observation = {**receipt, "accepted": accepted, "reason": reason, "acceptedEvidence": proofs}
+    if not accepted and reason == "capacity-evidence-trust-context-unavailable":
+        observation["trustDiagnostics"] = public_context_diagnostics(now)
+    return observation
 
 
 def _fallback_probe_timeout() -> float:
@@ -1664,12 +2141,25 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
 
     if not any(reason["severity"] == "critical" for reason in reasons):
         if controller.get("status") != "green":
+            # JOV-8000 follow-up 24: parked (the named retired-endpoint
+            # capacity shape) stays in the controller-failure family — the
+            # hold-intake bounded reason set admits controller-failure, so a
+            # parked controller keeps qualified promotion alive instead of
+            # binding blocked; crashed (failed) and unknown keep the same
+            # mappings as before.
             reasons.append(
                 typed_reason(
-                    "controller-failure" if controller.get("status") == "failed" else "controller-unknown",
+                    "controller-failure"
+                    if controller.get("status") in {"failed", "parked"}
+                    else "controller-unknown",
                     "controller",
                     "warning",
-                    "Symphony controller is not green; promotion is frozen.",
+                    (
+                        "Symphony controller endpoint is retired (parked); "
+                        "promotion continues in hold-intake."
+                        if controller.get("status") == "parked"
+                        else "Symphony controller is not green; promotion is frozen."
+                    ),
                 )
             )
         if main.get("status") != "green":
@@ -1874,6 +2364,10 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and {reason["code"] for reason in reasons}
         <= {"controller-failure", "production-deployment-unbound"}
     )
+    # JOV-8000 follow-up 24: only a CRASHED controller (failed) holds runtime
+    # intake. A parked controller (the retired-endpoint capacity shape) does
+    # not — the hold-intake comment's own promise: already-green PRs continue
+    # promoting while the controller is parked.
     runtime_intake_hold = hold_intake_allowed and controller.get("status") == "failed"
     unbound_repair_allowed = (
         hold_intake_allowed

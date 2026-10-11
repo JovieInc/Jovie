@@ -5,8 +5,8 @@
  * The canonical Pen document is not the source of the denominator. The exact
  * current code registry — `apps/web/data/marketing/componentRegistry.ts` —
  * is. Registered identities are derived by importing the registry with tsx
- * (already a repo devDependency) and projecting every entry id. On exact
- * current main this yields 37 identities (8 shells + 17 sections + 12
+ * (already a repo devDependency) and projecting every entry id. The registered
+ * product gallery brings this to 38 identities (8 shells + 18 sections + 12
  * recipes); stale Pen-only roots such as `shell.marketingfootercta`,
  * `shell.marketingfinalcta`, or the `shell.marketingcontainer.prose` variant
  * root are not code-registry identities and must never be encoded as

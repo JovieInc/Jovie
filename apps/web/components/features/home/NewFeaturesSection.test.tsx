@@ -14,7 +14,7 @@ describe('NewFeaturesSection', () => {
     ).toHaveClass('line-clamp-2');
     expect(screen.getByText('Higher conversion')).toBeInTheDocument();
     expect(screen.getByText('Owned audience')).toBeInTheDocument();
-    expect(screen.getByText('Optimization over time')).toBeInTheDocument();
+    expect(screen.getByText('Clear performance signals')).toBeInTheDocument();
     expect(screen.getByText('More details')).toBeInTheDocument();
   });
 });

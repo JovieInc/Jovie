@@ -59,7 +59,9 @@ describe('ArtistProfileSocialProof', () => {
       />
     );
 
-    expect(screen.getByText('One profile across three moments.')).toBeVisible();
+    expect(
+      screen.getByText('Three demonstration views of one profile.')
+    ).toBeVisible();
     expect(screen.getByText('Release Alerts')).toBeVisible();
     expect(screen.queryByText('Pre-Save')).not.toBeInTheDocument();
     expect(screen.getAllByRole('img')).toHaveLength(3);

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { BREAKPOINTS } from '@/hooks/useBreakpoint';
 
 const webRoot = path.resolve(__dirname, '../../..');
 
@@ -19,7 +20,9 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
       'utf8'
     );
 
-    expect(sidebar).toMatch(/group peer max-lg:hidden h-full min-h-0 shrink-0/);
+    expect(sidebar).toMatch(
+      /group peer relative max-lg:hidden h-full min-h-0 shrink-0/
+    );
     expect(frame).toMatch(
       /data-testid='app-shell-sidebar-mount'[\s\S]*?h-full min-h-0/
     );
@@ -49,8 +52,23 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(previewHost).toContain('height: 100%');
     expect(previewHost).not.toContain('box-shadow');
     expect(previewHost).not.toContain('border:');
-    expect(rail).toMatch(/lg:flex-col lg:self-stretch lg:overflow-hidden/);
-    expect(rail).toMatch(/h-0 w-0[\s\S]*overflow-visible/);
+    expect(rail).toContain('shell-inspector-overlay');
+    const foundation = readFileSync(
+      path.join(webRoot, 'styles/tailwind-foundation.css'),
+      'utf8'
+    );
+    const overlay = foundation.slice(
+      foundation.indexOf('@utility shell-inspector-overlay')
+    );
+    expect(overlay).toMatch(
+      /height: 0;[\s\S]*width: 0;[\s\S]*overflow: visible;/
+    );
+    expect(overlay).toMatch(
+      new RegExp(
+        `@media \\(min-width: ${BREAKPOINTS.lg}px\\)[\\s\\S]*position: absolute;[\\s\\S]*inset-inline-end: 0;`
+      )
+    );
+    expect(overlay).toContain('width: fit-content;');
     expect(rail).not.toMatch(/lg:flex-col lg:self-start lg:overflow-hidden/);
   });
 
@@ -90,15 +108,22 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(leftToggle).toContain("side='left'");
     expect(rightToggle).toContain('<RailToggleButton');
     expect(rightToggle).toContain("side='right'");
-    expect(sharedToggle).toContain('PanelLeftClose');
-    expect(sharedToggle).toContain('PanelLeftOpen');
-    expect(sharedToggle).toContain('PanelRightClose');
-    expect(sharedToggle).toContain('PanelRightOpen');
+    // JOV-7207 (2026-10-03): the arrow-bearing Lucide panel glyphs are banned;
+    // the toggle resolves its art from the Jovie-owned rail icon family.
+    for (const banned of [
+      'PanelLeftClose',
+      'PanelLeftOpen',
+      'PanelRightClose',
+      'PanelRightOpen',
+      'Chevron',
+    ])
+      expect(sharedToggle).not.toContain(banned);
+    expect(sharedToggle).toContain('railIconName(side, open)');
     expect(sharedToggle).toContain(
       "import { IconButton, TooltipShortcut } from '@jovie/ui'"
     );
     expect(sharedToggle).toContain('<IconButton');
-    expect(sharedToggle).toContain("variant='secondary'");
+    expect(sharedToggle).toContain("variant='ghost'");
     expect(sharedToggle).toContain("size='sm'");
     expect(sharedToggle).not.toContain('<Button');
     expect(sharedToggle).not.toContain('h-7 w-7 rounded-full');
@@ -160,21 +185,53 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
       path.join(webRoot, 'components/shell/AppShellRightRail.tsx'),
       'utf8'
     );
+    const drawer = readFileSync(
+      path.join(webRoot, 'components/molecules/drawer/RightDrawer.tsx'),
+      'utf8'
+    );
+    const dock = readFileSync(
+      path.join(webRoot, 'components/shell/ShellAudioDock.tsx'),
+      'utf8'
+    );
 
+    // Allocation and main-plane movement share the shell-motion primitives —
+    // no route-local width/transform physics re-declared at the slots.
     expect(frame).toContain("data-shell-rail-motion='coordinated'");
-    expect(frame).toContain(
-      'transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none'
-    );
-    expect(frame).toContain(
-      'transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
-    );
+    expect(frame).toContain('SHELL_RAIL_FRAME_GAP');
+    expect(frame).toContain('SHELL_RAIL_ALLOCATION');
+    expect(frame).toContain('SHELL_RAIL_MAIN_PLANE');
     expect(unified).toContain("data-shell-rail-motion='left'");
-    expect(unified).toContain(
-      'transition-[flex-basis,width,transform,opacity] duration-cinematic ease-cinematic motion-reduce:transition-none'
-    );
+    expect(unified).toContain('SHELL_RAIL_ALLOCATION');
     expect(rail).toContain("data-shell-rail-motion='right'");
-    expect(rail).toContain(
-      'transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none'
+    expect(rail).toContain('SHELL_RAIL_ALLOCATION');
+    expect(drawer).toContain('SHELL_RAIL_ALLOCATION');
+    expect(drawer).toContain('SHELL_RAIL_SHEET');
+    expect(dock).toContain("data-shell-rail-motion='dock'");
+
+    const sidebarPrimitive = readFileSync(
+      path.join(webRoot, 'components/organisms/sidebar/sidebar.tsx'),
+      'utf8'
     );
+
+    // Shared closed/opening/open/closing lifecycle is surfaced for
+    // certification on both rails, and the closing phase keeps the drawer
+    // visible so opacity + travel stage against the width give-back.
+    expect(sidebarPrimitive).toContain('useRailMotionPhase');
+    expect(sidebarPrimitive).toContain('data-rail-phase');
+    expect(drawer).toContain('useRailMotionPhase');
+    expect(drawer).toContain('data-rail-phase');
+    expect(drawer).toContain(
+      "railPhase === 'closed' ? 'invisible' : 'visible'"
+    );
+
+    // The collapse toggle stays reachable in the 52px icon rail: it is
+    // ordered first while the brand cluster and header actions stage out.
+    expect(unified).toContain('group-data-[collapsible=icon]:order-first');
+    expect(unified).toContain("data-sidebar-header-actions='true'");
+
+    // Long labels stage out (max-width + opacity + travel) instead of
+    // popping to display:none at frame one.
+    expect(unified).toContain('SHELL_RAIL_LABEL');
+    expect(unified).not.toContain("group-data-[collapsible=icon]:hidden'");
   });
 });

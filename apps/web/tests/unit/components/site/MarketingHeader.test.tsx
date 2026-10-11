@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
@@ -126,17 +126,19 @@ describe('MarketingHeader', () => {
       MARKETING_PEN_CONTRACT_IDS.shell.header
     );
     expect(MARKETING_PEN_CONTRACT_IDS.shell.header).toBe('GTcgO');
-    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute(
-      'href',
-      '/about'
-    );
-    expect(screen.getByRole('link', { name: 'For Artists' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/product'
     );
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
+    );
+    expect(screen.queryByRole('link', { name: 'About' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'For Artists' })).toBeNull();
+    expect(screen.getByRole('button', { name: /Customers/ })).toHaveAttribute(
+      'aria-expanded',
+      'false'
     );
     expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
@@ -153,14 +155,14 @@ describe('MarketingHeader', () => {
     ).toHaveAttribute('href', '/signup');
   });
 
-  it('shows canonical desktop links instead of flyout menu triggers', () => {
+  it('orders Customers, Product, and Pricing after the wordmark', () => {
     render(<MarketingHeader />);
 
     const navItems = Array.from(
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
     ).map(item => item.textContent);
 
-    expect(navItems).toEqual(['Jovie', 'About', 'For Artists', 'Pricing']);
+    expect(navItems).toEqual(['Jovie', 'Customers', 'Product', 'Pricing']);
     expect(
       document.querySelector(
         '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
@@ -171,10 +173,46 @@ describe('MarketingHeader', () => {
         .getByTestId('site-logo-link')
         .querySelector('[data-brand-variant="jovie"]')
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
+  });
+
+  it('opens the compact Customers flyout with only audiences that have a page', () => {
+    render(<MarketingHeader />);
+
+    const trigger = screen.getByRole('button', { name: /Customers/ });
+    fireEvent.focus(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    const flyout = document.getElementById('marketing-header-flyout-customers');
+    expect(flyout).toHaveClass('marketing-glass-header__flyout--compact');
+    expect(flyout).toHaveTextContent('Customers');
+    const links = within(flyout as HTMLElement).getAllByRole('link');
+    expect(
+      links.map(link => [link.textContent, link.getAttribute('href')])
+    ).toEqual([['Artists', '/solutions/artists']]);
+    for (const absent of ['Founders', 'Authors', 'Creators', 'Investors']) {
+      expect(within(flyout as HTMLElement).queryByText(absent)).toBeNull();
+    }
+    expect(
+      flyout?.querySelectorAll('.marketing-glass-header__flyout-arrow')
+    ).toHaveLength(1);
+    expect(
+      flyout?.querySelectorAll('.marketing-glass-header__flyout-description')
+    ).toHaveLength(0);
+  });
+
+  it('uses the one Find yourself CTA on the homepage header (JOV-5085)', () => {
+    mockUsePathname.mockReturnValue('/');
+    render(<MarketingHeader />);
+
+    const ctas = screen.getAllByRole('link', { name: 'Find yourself' });
+    expect(ctas.length).toBeGreaterThanOrEqual(1);
+    for (const cta of ctas) {
+      expect(cta).toHaveAttribute('href', '/start');
+    }
+    expect(screen.queryByRole('link', { name: 'Request access' })).toBeNull();
   });
 
   it('scopes homepage-style header overrides to the artist-profiles route', () => {
@@ -189,10 +227,10 @@ describe('MarketingHeader', () => {
       'data-presentation',
       'marketing-glass'
     );
-    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
-      'href',
-      '/signup'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Request access' })
+    ).toHaveAttribute('href', '/signup');
+    expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
   });
 
   it('keeps the legacy artist-profile alias on the same shared chrome', () => {
@@ -217,13 +255,14 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
-      '/about'
+      '/product'
     );
-    expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/signup');
+    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
+      'href',
+      '/start'
+    );
   });
 
   it('docks with no glass at the top and fades it in once the sentinel scrolls away', () => {

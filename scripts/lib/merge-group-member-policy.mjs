@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { appendFile, readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
 import {
@@ -11,6 +11,18 @@ const GENERATED_PR_TRAILER_PATTERN = /\(#(\d+)\)$/;
 // Fail closed at the checked-in native queue's max_entries_to_merge ceiling.
 const MAX_GROUP_MEMBERS = 5;
 const SIZE_BYPASS_LABELS = new Set(['big-pr', 'codemod']);
+// Mirrors scripts/lanes/pr_events.py HOLD_LABELS. Native auto-merge checks
+// labels only when it is armed, so a hold added later is enforced here, on the
+// merge group every landing passes through (JOV-6843).
+export const HOLD_LABELS = new Set([
+  'hold',
+  'gated',
+  'incident',
+  'do-not-merge',
+  'tim-hold',
+  'tim:hold',
+  'hold:tim',
+]);
 const COLLABORATOR_ASSOCIATIONS = new Set(['COLLABORATOR', 'MEMBER', 'OWNER']);
 const OPINIONATED_REVIEW_STATES = new Set([
   'APPROVED',
@@ -270,6 +282,16 @@ export function countSizeGuardFiles(files) {
     count += 1;
   }
   return { lines, files: count };
+}
+
+/** A held member fails every merge-group policy, whatever else it passes. */
+export function evaluateHoldMemberPolicy(pr) {
+  const held = labelsFor(pr).find(label =>
+    HOLD_LABELS.has(label.toLowerCase())
+  );
+  return held
+    ? { passed: false, policy: 'hold', reason: `carries the ${held} label` }
+    : null;
 }
 
 export function evaluateSizeMemberPolicy({ pr, files, maxLines, maxFiles }) {
@@ -591,62 +613,27 @@ function parsePolicy(argv) {
   if (policy !== 'fork' && policy !== 'size') {
     fail('expected --policy=fork or --policy=size');
   }
-  return policy;
+  const also = argv
+    .find(value => value.startsWith('--also='))
+    ?.slice('--also='.length);
+  // One combined-head producer evaluates both member policies from a single
+  // compare + pull read, and hands the fork verdict to the dependent
+  // `Fork PR Gate` job, which then spends no API calls (JOV-7744 quota).
+  if (also !== undefined && (also !== 'fork' || policy !== 'size')) {
+    fail('expected --also=fork only with --policy=size');
+  }
+  return { policy, also };
 }
 
-export async function runPolicy({
-  argv = process.argv.slice(2),
-  env = process.env,
-  event: providedEvent = undefined,
-  log = console.log,
-  now = Date.now,
-  request = githubRequest,
-} = {}) {
-  const policy = parsePolicy(argv);
-  const token = env.GH_TOKEN || env.GITHUB_TOKEN;
-  const eventPath = env.GITHUB_EVENT_PATH;
-  if (!token || (!eventPath && !providedEvent)) {
-    fail('GH_TOKEN and GITHUB_EVENT_PATH are required');
-  }
-
-  const event = providedEvent ?? JSON.parse(await readFile(eventPath, 'utf8'));
-  const { baseSha, headSha, repository } = validateMergeGroupEvent(event);
-  const deadlineMs = now() + MERGE_GROUP_POLICY_DEADLINE_MS;
-
-  if (policy === 'size') {
-    const payload = await enforceCombinedTreePayload({
-      deadlineMs,
-      headSha,
-      now,
-      repository,
-      request,
-      token,
-    });
-    const warning = trackedBytesBudgetWarning(payload.bytes);
-    if (warning) log(`::warning::Combined tree: ${warning}`);
-    log(
-      `Combined tree: PASS — ${payload.bytes} tracked regular-file bytes across ${payload.files} files.`
-    );
-  }
-
-  const comparison = await fetchComparison(
-    repository,
-    baseSha,
-    headSha,
-    token,
-    deadlineMs,
-    request
-  );
-  const members = resolveMergeGroupMembers({ event, comparison });
-  const pullRequests = await Promise.all(
-    members.map(member =>
-      fetchPullRequest(repository, member.number, token, deadlineMs, request)
-    )
-  );
-  pullRequests.forEach((pr, index) =>
-    assertCurrentPullRequest(members[index], pr)
-  );
-
+async function evaluateMembers({
+  deadlineMs,
+  env,
+  policy,
+  pullRequests,
+  repository,
+  request,
+  token,
+}) {
   let results;
   if (policy === 'fork') {
     const reviews = await Promise.all(
@@ -691,7 +678,89 @@ export async function runPolicy({
       })
     );
   }
+  return results.map(
+    (result, index) => evaluateHoldMemberPolicy(pullRequests[index]) ?? result
+  );
+}
 
+export async function runPolicy({
+  argv = process.argv.slice(2),
+  env = process.env,
+  event: providedEvent = undefined,
+  log = console.log,
+  now = Date.now,
+  request = githubRequest,
+  writeOutput = undefined,
+} = {}) {
+  const { policy, also } = parsePolicy(argv);
+  const token = env.GH_TOKEN || env.GITHUB_TOKEN;
+  const eventPath = env.GITHUB_EVENT_PATH;
+  if (!token || (!eventPath && !providedEvent)) {
+    fail('GH_TOKEN and GITHUB_EVENT_PATH are required');
+  }
+  const emit =
+    writeOutput ??
+    (env.GITHUB_OUTPUT
+      ? line => appendFile(env.GITHUB_OUTPUT, `${line}\n`)
+      : undefined);
+  if (also && !emit) {
+    fail('GITHUB_OUTPUT is required to hand off the --also verdict');
+  }
+
+  const event = providedEvent ?? JSON.parse(await readFile(eventPath, 'utf8'));
+  const { baseSha, headSha, repository } = validateMergeGroupEvent(event);
+  const deadlineMs = now() + MERGE_GROUP_POLICY_DEADLINE_MS;
+
+  const comparison = await fetchComparison(
+    repository,
+    baseSha,
+    headSha,
+    token,
+    deadlineMs,
+    request
+  );
+  const members = resolveMergeGroupMembers({ event, comparison });
+  const pullRequests = await Promise.all(
+    members.map(member =>
+      fetchPullRequest(repository, member.number, token, deadlineMs, request)
+    )
+  );
+  pullRequests.forEach((pr, index) =>
+    assertCurrentPullRequest(members[index], pr)
+  );
+  const shared = { deadlineMs, env, pullRequests, repository, request, token };
+
+  if (also) {
+    // Publish the secondary verdict before any primary-only evidence (the
+    // combined tree) can fail this job, so the dependent gate judges the
+    // members it was asked about instead of an absent output.
+    const alsoResults = await evaluateMembers({ ...shared, policy: also });
+    alsoResults.forEach((result, index) =>
+      log(
+        `${also} policy PR #${members[index].number}: ${result.passed ? 'PASS' : 'FAIL'} — ${result.reason}`
+      )
+    );
+    const passed = alsoResults.every(result => result.passed);
+    await emit(`${also}_verdict=${passed ? 'pass' : 'fail'}`);
+  }
+
+  if (policy === 'size') {
+    const payload = await enforceCombinedTreePayload({
+      deadlineMs,
+      headSha,
+      now,
+      repository,
+      request,
+      token,
+    });
+    const warning = trackedBytesBudgetWarning(payload.bytes);
+    if (warning) log(`::warning::Combined tree: ${warning}`);
+    log(
+      `Combined tree: PASS — ${payload.bytes} tracked regular-file bytes across ${payload.files} files.`
+    );
+  }
+
+  const results = await evaluateMembers({ ...shared, policy });
   for (let index = 0; index < members.length; index += 1) {
     const result = results[index];
     log(

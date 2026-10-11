@@ -10,10 +10,17 @@ import type { AdminLead } from '@/lib/queries';
 const mockLeadsInfiniteQuery = vi.fn();
 const mockUpdateLeadStatusMutation = vi.fn();
 
-vi.mock('@/lib/queries', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/queries')>();
+vi.mock('@/lib/queries', async () => {
+  const [fetchQueries, { queryKeys }] = await Promise.all([
+    vi.importActual<typeof import('@/lib/queries/fetch')>(
+      '@/lib/queries/fetch'
+    ),
+    vi.importActual<typeof import('@/lib/queries/keys')>('@/lib/queries/keys'),
+  ]);
+
   return {
-    ...actual,
+    isForbiddenError: fetchQueries.isForbiddenError,
+    queryKeys,
     useLeadsInfiniteQuery: (...args: unknown[]) =>
       mockLeadsInfiniteQuery(...args),
     useUpdateLeadStatusMutation: () => mockUpdateLeadStatusMutation(),
@@ -39,6 +46,16 @@ vi.mock('@/components/molecules/HeaderSearchAction', () => ({
 
 vi.mock('@/hooks/useSearchUrlSync', () => ({
   useSearchUrlSync: () => {},
+}));
+
+vi.mock('@/lib/auth/client', () => ({
+  authClient: {
+    passkey: {
+      listUserPasskeys: vi.fn(),
+      addPasskey: vi.fn(),
+    },
+    signIn: { passkey: vi.fn() },
+  },
 }));
 
 // Mock sonner
@@ -301,5 +318,29 @@ describe('LeadTable', () => {
     const user = userEvent.setup();
     await user.click(retryButton);
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders an admin verification state when the leads request is forbidden', async () => {
+    const { FetchError } = await import('@/lib/queries/fetch');
+    mockLeadsInfiniteQuery.mockReturnValue({
+      data: undefined,
+      error: new FetchError('Forbidden', 403),
+      isLoading: false,
+      isError: true,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
+    });
+
+    const LeadTable = await getLeadTable();
+    renderWithProviders(<LeadTable />);
+
+    expect(screen.getByText('Admin verification required')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unlock' })).toBeInTheDocument();
+    expect(
+      screen.queryByText('No leads have been discovered yet')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Unable to load leads')).not.toBeInTheDocument();
   });
 });

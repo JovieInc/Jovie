@@ -3,7 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, test } from 'node:test';
-import { validateWorkflowReferences } from './verify-workflow-references.mjs';
+import {
+  findGhJqArgMisuse,
+  validateWorkflowReferences,
+} from './verify-workflow-references.mjs';
 
 const temporaryRoots = [];
 
@@ -80,4 +83,25 @@ jobs:
   );
 
   assert.deepEqual(validateWorkflowReferences(root), []);
+});
+
+test('rejects gh --jq combined with --arg (JOV-7698, #20164)', () => {
+  const broken = [
+    '      - run: |',
+    '          id="$(gh api "repos/o/r/actions/runs/1/artifacts?per_page=100" \\',
+    '            --jq --arg name "$receipt_name" \\',
+    "            '[.artifacts[] | select(.name == $name)] | last | .id')\"",
+    '          ok=$(gh issue view 1 --json labels --jq=.labels --argjson n 1)',
+  ].join('\n');
+  assert.deepEqual(findGhJqArgMisuse(broken), [2, 5]);
+
+  const fixed = [
+    '          id="$(gh api \\',
+    '            "repos/o/r/actions/artifacts?name=$receipt_name&per_page=100" \\',
+    "            --jq '[.artifacts[] | select(.expired == false)] | last | .id // empty')\"",
+    "          has=$(gh issue view 1 --json labels | jq -r --arg l x '.labels')",
+    '          jq -e --arg sha "$SHA" \'.sha == $sha\' receipt.json',
+    "          gh api x --jq '.a | length' && jq --arg n 1 '.' f",
+  ].join('\n');
+  assert.deepEqual(findGhJqArgMisuse(fixed), []);
 });

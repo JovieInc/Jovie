@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/admin';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { env } from '@/lib/env';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
 import { createRateLimitHeaders, deployPromoteLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
@@ -24,7 +24,7 @@ function isLimiterUnavailable(reason: string | undefined): boolean {
 export async function POST() {
   const { userId } = await getCachedAuth({ session: 'fresh' });
 
-  const authError = await requireAdmin({ session: 'fresh' });
+  const authError = await requireOvieApiAccess({ privileged: true });
   if (authError) return authError;
 
   const rateLimitResult = await deployPromoteLimiter.limit(

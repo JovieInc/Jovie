@@ -7,6 +7,7 @@ import {
 } from '@/lib/flags/overrides';
 import {
   getScreenshotScenario,
+  SCREENSHOT_MOBILE_SAFE_AREA,
   SCREENSHOT_SCENARIOS,
   SCREENSHOT_VIEWPORTS,
 } from '../../lib/screenshots/registry';
@@ -183,6 +184,12 @@ async function prepareScenario(
     reducedMotion: scenario.reducedMotion ? 'reduce' : 'no-preference',
   });
   await page.setViewportSize(viewport);
+  if (scenario.viewport === 'mobile') {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setSafeAreaInsetsOverride', {
+      insets: SCREENSHOT_MOBILE_SAFE_AREA,
+    });
+  }
   await page.addInitScript(
     ({ cookieName, key, value }) => {
       localStorage.setItem(key, value);

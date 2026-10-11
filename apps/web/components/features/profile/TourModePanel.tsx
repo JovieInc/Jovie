@@ -138,6 +138,9 @@ function TourDateRow({
       {canBuyTickets ? (
         <a
           href={item.date.ticketUrl ?? undefined}
+          // JOV-4429: unique accessible name per date — a shared ticketing
+          // URL would otherwise render as a duplicate "Tickets" CTA cluster.
+          aria-label={`Tickets for ${item.date.venueName} — ${location}`}
           onClick={event => {
             track('event_click', {
               artist_id: artistId,
@@ -171,6 +174,48 @@ function TourDateRow({
   );
 }
 
+/**
+ * Event alerts opt-in shown when an artist has no upcoming events. Shared by
+ * the tour drawer empty state and the Events mode card.
+ */
+export function TourEventAlertsAction({
+  artist,
+  sourceContext,
+  renderMode,
+}: Readonly<{
+  readonly artist: Artist;
+  readonly sourceContext: NotificationSourceContext;
+  readonly renderMode: ProfileRenderMode;
+}>) {
+  if (renderMode === 'preview') {
+    return (
+      <Button
+        type='button'
+        variant='primary'
+        size='marketing'
+        className='w-full'
+        disabled
+      >
+        Turn On Event Alerts
+      </Button>
+    );
+  }
+
+  return (
+    <ArtistNotificationsCTA
+      artist={artist}
+      variant='button'
+      hideListenFallback
+      source={sourceContext.ctaLocation}
+      sourceContext={sourceContext}
+      triggerLabel='Turn On Event Alerts'
+      // Canonical Button owns the 32px control and 44px touch floor.
+      triggerClassName={`${subscriptionPrimaryActionClassName} w-full justify-center gap-2 px-4 text-xs`}
+      presentation='overlay'
+    />
+  );
+}
+
 function TourDatesContent({
   artist,
   nearby,
@@ -185,30 +230,13 @@ function TourDatesContent({
   readonly renderMode: ProfileRenderMode;
 }>) {
   if (allDates.length === 0) {
-    const action =
-      renderMode === 'preview' ? (
-        <Button
-          type='button'
-          variant='primary'
-          size='marketing'
-          className='w-full'
-          disabled
-        >
-          Turn On Event Alerts
-        </Button>
-      ) : (
-        <ArtistNotificationsCTA
-          artist={artist}
-          variant='button'
-          hideListenFallback
-          source={emptyStateSourceContext.ctaLocation}
-          sourceContext={emptyStateSourceContext}
-          triggerLabel='Turn On Event Alerts'
-          // Canonical Button owns the 32px control and 44px touch floor.
-          triggerClassName={`${subscriptionPrimaryActionClassName} w-full justify-center gap-2 px-4 text-xs`}
-          presentation='overlay'
-        />
-      );
+    const action = (
+      <TourEventAlertsAction
+        artist={artist}
+        sourceContext={emptyStateSourceContext}
+        renderMode={renderMode}
+      />
+    );
 
     return (
       <EmptyState
@@ -244,7 +272,7 @@ function TourDatesContent({
     <div data-testid='tour-drawer-list'>
       {groups.map(group => (
         <section key={group.label} className='pb-4'>
-          <div className='px-4 pb-2 pt-3 text-2xs font-semibold text-tertiary-token'>
+          <div className='px-4 pb-2 pt-3 text-2xs font-semibold text-secondary-token'>
             {group.label}
           </div>
           <div className='border-y border-white/[0.075]'>

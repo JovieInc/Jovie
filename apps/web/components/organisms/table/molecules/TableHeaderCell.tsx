@@ -1,10 +1,14 @@
 'use client';
 
+import { th as MotionTableHeader } from 'motion/react-m';
+import { useContext } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { Header, RowData } from '@/lib/tanstack-table';
 import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
+import { ColumnSnapReducedMotionContext } from '../ColumnSnapMotion';
+import { columnSnapTransition } from '../column-snap';
 import { iconColors, tableAlignment } from '../table.styles';
 
 interface TableHeaderCellProps<TData extends RowData>
@@ -15,6 +19,8 @@ interface TableHeaderCellProps<TData extends RowData>
     readonly stickyHeaderClass: string;
     readonly tableHeaderClass: string;
     readonly onToggleSort?: (event: unknown) => void;
+    /** Layout-snap this header with the body. The header row does not stagger. */
+    readonly columnSnap?: boolean;
   }> {}
 
 /**
@@ -32,7 +38,9 @@ export function TableHeaderCell<TData extends RowData>({
   stickyHeaderClass,
   tableHeaderClass,
   onToggleSort,
+  columnSnap = false,
 }: TableHeaderCellProps<TData>) {
+  const reducedMotion = useContext(ColumnSnapReducedMotionContext);
   // Determine aria-sort attribute without nested ternaries
   let ariaSort: 'ascending' | 'descending' | 'none' | undefined;
   if (!canSort || header.isPlaceholder) {
@@ -50,6 +58,21 @@ export function TableHeaderCell<TData extends RowData>({
   const align = meta?.align ?? 'left';
   const isSemanticOnlyHeader = meta?.headerVisibility === 'sr-only';
 
+  const rawHeader = header.column.columnDef.header;
+  const columnLabel =
+    typeof rawHeader === 'string' && rawHeader.trim().length > 0
+      ? rawHeader
+      : header.column.id;
+
+  // Accessible name carries label + current sort state so screen readers get
+  // context that the aria-hidden direction glyph cannot provide (eval G4).
+  const sortButtonLabel =
+    sortDirection === 'asc'
+      ? `${columnLabel}: sorted ascending`
+      : sortDirection === 'desc'
+        ? `${columnLabel}: sorted descending`
+        : `${columnLabel}: not sorted, activate to sort`;
+
   const headerContent = isSemanticOnlyHeader ? (
     <span className='sr-only'>
       {flexRender(header.column.columnDef.header, header.getContext())}
@@ -63,23 +86,37 @@ export function TableHeaderCell<TData extends RowData>({
     <span className='min-w-0 truncate'>{headerContent}</span>
   );
 
+  const headerClassName = cn(
+    stickyHeaderClass,
+    tableAlignment.text[align],
+    // The sort pill pads 6px; inset the cell 6px so the label lands on
+    // the body cells' 12px text edge.
+    canSort && 'px-1.5',
+    metaClassName,
+    'whitespace-nowrap'
+  );
+  const headerStyle = {
+    width:
+      header.getSize() >= 9999 || header.getSize() === 150
+        ? undefined
+        : header.getSize(),
+  };
+  const HeaderCell = columnSnap ? MotionTableHeader : 'th';
+
   return (
-    <th
+    <HeaderCell
       key={header.id}
       scope='col'
       aria-sort={ariaSort}
-      className={cn(
-        stickyHeaderClass,
-        tableAlignment.text[align],
-        metaClassName,
-        'whitespace-nowrap'
-      )}
-      style={{
-        width:
-          header.getSize() >= 9999 || header.getSize() === 150
-            ? undefined
-            : header.getSize(),
-      }}
+      className={headerClassName}
+      style={headerStyle}
+      {...(columnSnap && !reducedMotion
+        ? {
+            layout: true,
+            transition: columnSnapTransition(0),
+            'data-column-snap': 'on',
+          }
+        : {})}
     >
       {(() => {
         if (header.isPlaceholder) return null;
@@ -88,6 +125,7 @@ export function TableHeaderCell<TData extends RowData>({
             <button
               type='button'
               onClick={onToggleSort}
+              aria-label={sortButtonLabel}
               className={cn(
                 tableHeaderClass,
                 'flex w-full items-center gap-2',
@@ -120,6 +158,6 @@ export function TableHeaderCell<TData extends RowData>({
           </div>
         );
       })()}
-    </th>
+    </HeaderCell>
   );
 }

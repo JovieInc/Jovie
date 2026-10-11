@@ -50,32 +50,46 @@ function walkFiles(relDir, predicate) {
   return found.sort();
 }
 
-function macosTopLevelDirs() {
+function macosSwiftTargetDirs() {
   return readdirSync(join(ROOT, 'apps/macos'), { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+    .filter(
+      entry =>
+        entry.isDirectory() &&
+        !entry.name.startsWith('.') &&
+        entry.name !== 'node_modules' &&
+        existsSync(join(ROOT, 'apps/macos', entry.name, 'Package.swift'))
+    )
     .map(entry => entry.name)
+    .filter(
+      name =>
+        walkFiles(join('apps/macos', name), abs => abs.endsWith('.swift'))
+          .length > 0
+    )
     .sort();
 }
 
-describe('Mac Swift-control invariants (Swift-native ADR, supersedes JOV-5359)', () => {
-  it('names the proposed slugs without adopting them and records the supersession', () => {
+describe('Mac ownership during the Swift-native transition', () => {
+  it('records the superseded prohibition without adopting proposed registry slugs', () => {
     const report = read(REPORT_PATH);
     const rule = read(RULE_PATH);
-    const adr = read(ADR_PATH);
     const registry = read('canon/invariants.jsonl');
     for (const slug of PROPOSED_SLUGS) {
       assert.match(report, new RegExp(`\\b${slug}\\b`));
+      assert.match(rule, new RegExp(`\\b${slug}\\b`));
       assert.doesNotMatch(registry, new RegExp(`"id":"${slug}"`));
     }
-    assert.match(report, /`JOV-INV-013` \| \*\*Superseded\*\*/);
     assert.match(report, /Transition plan/i);
+    assert.match(report, /`JOV-INV-013` \| \*\*Superseded\*\*/);
     assert.match(report, /\*\*Swift-native, phased\.\*\*/);
     assert.match(rule, /ADR-swift-native-mac\.md/);
-    assert.match(adr, /EVENT: permanent direction set by Tim 2026-09-27/);
-    assert.match(adr, /Supersedes:/);
+    assert.match(read(ADR_PATH), /3dde45bbe4d5fc657ace0bf551f0d99f7ad53674/);
+    assert.match(read(ADR_PATH), /Electron remains the shipped Mac app/);
+    assert.match(report, /Electron/);
+    assert.match(report, /MenuMonitor/);
+    assert.match(report, /WKWebView/);
   });
 
-  it('keeps the shipped Mac app on Electron BrowserWindow until parity', () => {
+  it('keeps the shipped Mac app on Electron BrowserWindow until qualified cutover', () => {
     const desktopPkg = JSON.parse(read('apps/desktop/package.json'));
     assert.equal(desktopPkg.devDependencies?.electron !== undefined, true);
     const main = read('apps/desktop/src/main.ts');
@@ -87,12 +101,21 @@ describe('Mac Swift-control invariants (Swift-native ADR, supersedes JOV-5359)',
     assert.match(ovieDoor, /OVIE_OPERATOR_OPS_SEARCH = 'ovie=mac'/);
   });
 
-  it('keeps MenuMonitor as the only apps/macos Swift target and without a webview', () => {
-    assert.deepEqual(macosTopLevelDirs(), ['MenuMonitor']);
+  it('keeps apps/macos Swift targets limited to the MenuMonitor accessory', () => {
+    // The invariant is about Swift targets, not every top-level directory:
+    // apps/macos/media-ingest (JOV-5370) is a plain TypeScript CLI with no
+    // Package.swift, so it must not trip this check. Scoping to dirs with
+    // Package.swift means no hardcoded list needs editing when the next
+    // non-Swift tool is added here.
+    assert.deepEqual(macosSwiftTargetDirs(), ['MenuMonitor']);
     const macosSwift = walkFiles(
       'apps/macos',
       abs => abs.endsWith('.swift') && !abs.includes('/.build/')
     );
+    const swiftTopLevelDirs = new Set(
+      macosSwift.map(file => file.split('/')[2])
+    );
+    assert.deepEqual([...swiftTopLevelDirs].sort(), ['MenuMonitor']);
     assert.equal(
       macosSwift.every(file => file.startsWith('apps/macos/MenuMonitor/')),
       true
@@ -105,22 +128,6 @@ describe('Mac Swift-control invariants (Swift-native ADR, supersedes JOV-5359)',
     const pkg = read('apps/macos/MenuMonitor/Package.swift');
     assert.match(pkg, /executable\(name: "MenuMonitor"/);
     assert.match(pkg, /\.macOS\(\.v14\)/);
-  });
-
-  it('builds the native Mac app as one JovieMac target sharing iOS sources', () => {
-    const generator = read('apps/ios/scripts/generate-mac-project.rb');
-    assert.match(generator, /Jovie\/DesignSystem\/JovieTheme\.swift/);
-    assert.match(generator, /'PRODUCT_BUNDLE_IDENTIFIER' => 'ie\.jov\.Jovie'/);
-    const pbxproj = read('apps/ios/JovieMac.xcodeproj/project.pbxproj');
-    assert.match(pbxproj, /JovieTheme\.swift in Sources/);
-    const entitlements = read('apps/ios/JovieMac/JovieMac.entitlements');
-    assert.match(entitlements, /webcredentials:jov\.ie/);
-    // No unregistered WKWebView bridge: the ADR bridge register is empty.
-    const macSwift = walkFiles('apps/ios/JovieMac', abs => abs.endsWith('.swift'));
-    assert.ok(macSwift.length > 0);
-    for (const file of macSwift) {
-      assert.doesNotMatch(read(file), /\bWKWebView\b/);
-    }
   });
 
   it('confines iOS WKWebView to the public-profile browser', () => {

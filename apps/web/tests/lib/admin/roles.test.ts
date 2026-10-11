@@ -9,11 +9,16 @@ const mockRedisGet = vi.hoisted(() => vi.fn());
 const mockRedisSet = vi.hoisted(() => vi.fn());
 const mockRedisDel = vi.hoisted(() => vi.fn());
 const mockGetRedis = vi.hoisted(() => vi.fn<() => any>(() => null));
+const mockGetCachedDevTestAuthSession = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   db: {
     select: vi.fn(),
   },
+}));
+
+vi.mock('@/lib/auth/dev-test-auth.server', () => ({
+  getCachedDevTestAuthSession: mockGetCachedDevTestAuthSession,
 }));
 
 vi.mock('@/lib/redis', () => ({
@@ -66,6 +71,7 @@ describe('Admin Roles', () => {
     clearAdminCache();
     vi.clearAllMocks();
     mockGetRedis.mockReturnValue(null);
+    mockGetCachedDevTestAuthSession.mockResolvedValue(null);
     mockCheckUserStatus.mockImplementation(
       (userStatus: string, deletedAt: Date | null) => ({
         isBlocked:
@@ -86,11 +92,53 @@ describe('Admin Roles', () => {
       expect(result).toBe(false);
     });
 
-    it('skips the database during secretless visual capture', async () => {
+    it('skips the database during secretless visual capture with no dev-test-auth session', async () => {
       vi.stubEnv('E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH', '1');
       mockDbResult([{ isAdmin: true, userStatus: 'active', deletedAt: null }]);
 
       const result = await isAdmin('user_visual_capture');
+
+      expect(result).toBe(false);
+      expect(dbModule.db.select).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
+    });
+
+    it('grants admin during secretless visual capture only for the exact dev-test-auth admin persona (JOV-7126)', async () => {
+      vi.stubEnv('E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH', '1');
+      mockGetCachedDevTestAuthSession.mockResolvedValueOnce({
+        isAdmin: true,
+        dbUserId: 'user_visual_capture_admin',
+      });
+
+      const result = await isAdmin('user_visual_capture_admin');
+
+      expect(result).toBe(true);
+      expect(dbModule.db.select).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
+    });
+
+    it('denies admin during secretless visual capture for a non-admin dev-test-auth persona', async () => {
+      vi.stubEnv('E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH', '1');
+      mockGetCachedDevTestAuthSession.mockResolvedValueOnce({
+        isAdmin: false,
+        dbUserId: 'user_visual_capture_creator',
+      });
+
+      const result = await isAdmin('user_visual_capture_creator');
+
+      expect(result).toBe(false);
+      expect(dbModule.db.select).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
+    });
+
+    it('denies admin during secretless visual capture when the session belongs to a different user', async () => {
+      vi.stubEnv('E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH', '1');
+      mockGetCachedDevTestAuthSession.mockResolvedValueOnce({
+        isAdmin: true,
+        dbUserId: 'some_other_user',
+      });
+
+      const result = await isAdmin('user_visual_capture_admin');
 
       expect(result).toBe(false);
       expect(dbModule.db.select).not.toHaveBeenCalled();

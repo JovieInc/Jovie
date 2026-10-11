@@ -399,7 +399,8 @@ describe('redis command budget', () => {
     expect(shouldUseEssentialShellData('/app/library')).toBe(true);
     expect(shouldUseEssentialShellData('/app/ov/people')).toBe(true);
     expect(shouldUseEssentialShellData('/app/contacts')).toBe(false);
-    expect(shouldUseEssentialShellData('/app/profiles')).toBe(false);
+    expect(shouldUseEssentialShellData('/app/presence')).toBe(true);
+    expect(shouldUseEssentialShellData('/app/profiles')).toBe(true);
 
     await getCachedAuth();
     expect(mockGetSession).toHaveBeenCalledTimes(1);
@@ -413,7 +414,8 @@ describe('redis command budget', () => {
     mockGetSession.mockClear();
     await fullAuth.getCachedAuth();
     await loadEntitlements();
-    expect(mockGetSession).toHaveBeenCalledTimes(2);
+    // Entitlements' identity read reuses the request's session read.
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
     for (const call of mockGetSession.mock.calls) {
       expect(call[0]?.query).toBeUndefined();
     }

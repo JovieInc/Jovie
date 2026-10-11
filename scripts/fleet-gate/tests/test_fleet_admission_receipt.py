@@ -13,7 +13,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -133,6 +134,29 @@ def huge_classifications() -> dict[str, object]:
 
 def evaluate_receipt(**overrides):
     return GATE_MODULE.evaluate(signals(**overrides), now_iso())
+
+
+def scoped_request(surface="production-web", risk_lane="low", **overrides):
+    request = {
+        "consumer": "deployment",
+        "surface": surface,
+        "repository": "JovieInc/Jovie",
+        "revision": SHA,
+        "mutation": "promote-staged-web-release",
+        "riskLane": risk_lane,
+        "healthSignals": [],
+    }
+    request.update(overrides)
+    return request
+
+
+def production_health(alias, database="green"):
+    dependencies = {
+        "vercel-alias": {"status": alias, "detail": "alias health"},
+    }
+    if database is not None:
+        dependencies["database"] = {"status": database, "detail": "database health"}
+    return {"status": "green" if alias == database == "green" else "red", "deployedSha": SHA, "dependencies": dependencies}
 
 
 def legacy_controller_repair_receipt():
@@ -389,6 +413,85 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         with self.assertRaisesRegex(PROJECT.AdmissionProjectionError, "bypasses closure intake"):
             PROJECT.project_fleet_admission_receipt(receipt)
 
+    def test_parked_hold_intake_survives_projection_and_drain_validation(self):
+        receipt = evaluate_receipt(controller={"status": "parked", "retired": True})
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        projected = PROJECT.project_fleet_admission_receipt(receipt)
+        self.assertEqual(projected["signals"]["controller"]["status"], "parked")
+        self.assertTrue(projected["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(projected["alreadyAdmittedCohort"]["newIntakeAllowed"])
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 4)
+        self.assertFalse(projected["promotionAdmission"]["allowed"])
+        self.assertFalse(projected["isolatedPromotionAdmission"]["allowed"])
+        accepted = subprocess.run(
+            [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+            input=json.dumps(projected), capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
+    def test_parked_hold_intake_consumers_reject_unhealthy_or_unknown_signals(self):
+        for signal, values in (
+            ("main", ("red", "unknown", None)),
+            ("production", ("red", "unknown", None)),
+            ("integrity", ("active", "invalid", "unknown", None)),
+            ("controller", ("unknown", "recovering", "invalid", None)),
+        ):
+            for status in values:
+                with self.subTest(signal=signal, status=status):
+                    receipt = evaluate_receipt(controller={"status": "parked", "retired": True})
+                    receipt["signals"][signal]["status"] = status
+                    self.assert_hold_intake_rejected(receipt)
+
+    def test_parked_hold_intake_consumers_still_require_exact_main_review(self):
+        for field, value in (("allowed", False), ("headSha", "b" * 40),
+                             ("authority", "untrusted"), ("reviewer", "untrusted"),
+                             ("scope", "other"), ("required", False),
+                             ("reviewId", None), ("observedAt", None)):
+            with self.subTest(field=field):
+                receipt = evaluate_receipt(controller={"status": "parked", "retired": True})
+                receipt["reviewAdmission"][field] = value
+                self.assert_hold_intake_rejected(receipt)
+
+    def test_parked_hold_intake_rejects_missing_stale_or_invalid_review(self):
+        stale = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        for review in (None, {}, {**signals()["independentReview"], "observedAt": stale},
+                       {**signals()["independentReview"], "headSha": "b" * 40}):
+            with self.subTest(review=review):
+                receipt = evaluate_receipt(
+                    controller={"status": "parked", "retired": True}, independentReview=review,
+                )
+                self.assertNotEqual(receipt["promotionMode"], "hold-intake")
+                self.assertFalse(receipt["reviewAdmission"]["allowed"])
+
+    def test_parked_remote_mutation_rejects_missing_stale_or_invalid_capacity(self):
+        stale = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        for evidence in (None, {}, {**capacity_evidence(), "observedAt": stale},
+                         {**capacity_evidence(), "acceptedEvidence": []}):
+            with self.subTest(evidence=evidence):
+                receipt = evaluate_receipt(
+                    controller={"status": "parked", "retired": True}, concurrencyEvidence=evidence,
+                )
+                self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+
+    def test_parked_does_not_change_real_failure_or_unknown_admission(self):
+        for status in ("failed", "unknown"):
+            with self.subTest(status=status):
+                receipt = evaluate_receipt(controller={"status": status})
+                projected = PROJECT.project_fleet_admission_receipt(receipt)
+                self.assertFalse(projected["promotionAdmission"]["allowed"])
+                if status == "failed":
+                    self.assertFalse(projected["workAdmission"]["newIssueLeaseAllowed"])
+                    self.assertFalse(projected["alreadyAdmittedCohort"]["newIntakeAllowed"])
+                    self.assertEqual(receipt["workAdmission"]["activities"], ["tests", "review"])
+                else:
+                    self.assertEqual(projected["promotionMode"], "blocked")
+                    rejected = subprocess.run(
+                        [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+                        input=json.dumps(projected), capture_output=True, text=True, check=False,
+                    )
+                    self.assertNotEqual(rejected.returncode, 0)
+
     def test_queue_empty_feed_projects_only_when_hold_intake_evidence_is_complete(self):
         closure = {
             **signals()["closureHealth"],
@@ -568,15 +671,19 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
 
     def test_cli_projects_stdin_and_fails_closed(self):
         receipt = inject_inventories(evaluate_receipt())
-        ok = subprocess.run(
-            ["python3", str(PROJECTOR)],
-            input=json.dumps(receipt),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            request = pathlib.Path(tmp) / "request.json"
+            request.write_text(json.dumps(scoped_request()))
+            ok = subprocess.run(
+                ["python3", str(PROJECTOR), "--request", str(request)],
+                input=json.dumps(receipt),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
         self.assertEqual(ok.returncode, 0, ok.stderr)
         projection = json.loads(ok.stdout)
+        self.assertEqual(projection["scopedAdmission"]["surface"], "production-web")
         self.assertNotIn(
             "classifications", projection["signals"]["closureHealth"]
         )
@@ -590,8 +697,240 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertEqual(refused.returncode, 2)
         self.assertIn("Fleet admission projection failed", refused.stderr)
 
+    def test_anonymous_database_probe_and_screenshot_have_independent_production_holds(self):
+        for healthy, screenshot_failed, expected in (
+            (None, True, {"database", "check:Generate Screenshots"}),
+            (True, True, {"check:Generate Screenshots"}),
+            (None, False, {"database"}),
+            (True, False, set()),
+        ):
+            with self.subTest(healthy=healthy, screenshot_failed=screenshot_failed):
+                def open_url(url, timeout=0):
+                    payload = {"healthy": healthy if url.endswith("/db") else True,
+                               "timestamp": now_iso()}
+                    if url.endswith("/build-info"):
+                        payload = {"commitSha": SHA}
+                    response = mock.MagicMock()
+                    response.__enter__.return_value = response
+                    response.status = 200
+                    response.geturl.return_value = url
+                    response.read.return_value = json.dumps(payload).encode()
+                    return response
+                with mock.patch.object(GATE_MODULE.urllib.request, "urlopen", side_effect=open_url):
+                    production = GATE_MODULE.observe_production("https://jov.ie/api/health/deploy")
+                receipt = evaluate_receipt(
+                    production=production, controller={"status": "failed"},
+                    main={"status": "green", "sha": SHA, "checks": [{
+                        "name": "Generate Screenshots", "classification": "optional",
+                        "verdict": "failed" if screenshot_failed else "success"}]},
+                )
+                admission = PROJECT.project_fleet_admission_receipt(
+                    receipt, scoped_request(risk_lane="high"))["scopedAdmission"]
+                self.assertEqual({row["signal"] for row in admission["relevantBlockers"]}, expected)
+                self.assertEqual(admission["allowed"], not expected)
+
+    def test_scopes_unhealthy_signals_to_the_exact_mutation(self):
+        receipt = evaluate_receipt(
+            controller={"status": "failed"},
+            production=production_health("green", "red"),
+            closureHealth={**signals()["closureHealth"], "repository": "JovieInc/Sibling",
+                "status": "red", "newIssueIntakeAllowed": False,
+                "reasons": ["sibling repository unhealthy"]},
+        )
+        low = PROJECT.project_fleet_admission_receipt(receipt, scoped_request())[
+            "scopedAdmission"
+        ]
+        self.assertTrue(low["allowed"])
+        self.assertEqual((low["schema"], low["allowedMode"], low["freshness"]["fresh"], len(low["hardInvariants"])), ("jovie-fleet-admission/v2", "normal", True, 5))
+        self.assertEqual(
+            {row["signal"] for row in low["unrelatedDegradations"]},
+            {"database", "symphony-capacity", "repository:JovieInc/Sibling"},
+        )
+
+        migration = PROJECT.project_fleet_admission_receipt(
+            receipt, scoped_request("migration", "high", mutation="apply-migration")
+        )["scopedAdmission"]
+        self.assertFalse(migration["allowed"])
+        self.assertEqual(
+            {row["signal"] for row in migration["relevantBlockers"]},
+            {"database"},
+        )
+        self.assertIn("database", migration["nextProof"])
+        unknown = PROJECT.project_fleet_admission_receipt(
+            evaluate_receipt(production=production_health("green", None)),
+            scoped_request(risk_lane="high"),
+        )["scopedAdmission"]
+        self.assertEqual(unknown["relevantBlockers"][0]["status"], "unknown")
+
+    def test_production_alias_failure_does_not_block_independent_staging(self):
+        receipt = evaluate_receipt(production=production_health("red", "green"))
+        production = PROJECT.project_fleet_admission_receipt(
+            receipt, scoped_request()
+        )["scopedAdmission"]
+        self.assertFalse(production["allowed"])
+        self.assertIn("vercel-alias", production["nextProof"])
+
+        staging_signal = {"signal": "staging-alias", "status": "green", "detail": "staging exact", "proof": "staging-controller"}
+        staging = PROJECT.project_fleet_admission_receipt(receipt, scoped_request(
+            "staging-web", "low", mutation="deploy-staging-web",
+            healthSignals=[staging_signal],
+        ))["scopedAdmission"]
+        self.assertTrue(staging["allowed"])
+        self.assertIn(
+            "vercel-alias",
+            {row["signal"] for row in staging["unrelatedDegradations"]},
+        )
+
+    def test_failed_screenshot_check_blocks_only_production_web(self):
+        """JOV-4970: a terminal Generate Screenshots failure gates the UI
+        surface that names it, never global fleet promotion."""
+        main = {
+            "status": "green",
+            "sha": SHA,
+            "checks": [
+                {
+                    "name": "Main Release Ready",
+                    "classification": "required",
+                    "verdict": "success",
+                },
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "failed",
+                    "conclusion": "failure",
+                },
+            ],
+        }
+        receipt = evaluate_receipt(main=main)
+        self.assertEqual(receipt["signals"]["main"]["status"], "green")
+        production = PROJECT.project_fleet_admission_receipt(
+            receipt, scoped_request("production-web")
+        )["scopedAdmission"]
+        self.assertFalse(production["allowed"])
+        self.assertEqual(
+            {row["signal"] for row in production["relevantBlockers"]},
+            {"check:Generate Screenshots"},
+        )
+        fleet = PROJECT.project_fleet_admission_receipt(
+            receipt,
+            scoped_request("fleet-control", mutation="refresh-fleet-admission"),
+        )["scopedAdmission"]
+        self.assertTrue(fleet["allowed"])
+        self.assertEqual(
+            {row["signal"] for row in fleet["unrelatedDegradations"]},
+            {"check:Generate Screenshots"},
+        )
+
+    def test_pending_screenshot_check_never_blocks_promotion(self):
+        """The incident shape: optional pending lane stays observable only."""
+        main = {
+            "status": "green",
+            "sha": SHA,
+            "checks": [
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "pending",
+                    "status": "in_progress",
+                },
+            ],
+        }
+        receipt = evaluate_receipt(main=main)
+        for surface, mutation in (
+            ("production-web", "promote-staged-web-release"),
+            ("fleet-control", "refresh-fleet-admission"),
+        ):
+            admission = PROJECT.project_fleet_admission_receipt(
+                receipt, scoped_request(surface, mutation=mutation)
+            )["scopedAdmission"]
+            self.assertTrue(admission["allowed"], surface)
+            self.assertEqual(
+                {row["signal"] for row in admission["unrelatedDegradations"]},
+                {"check:Generate Screenshots"},
+            )
+
+    def test_main_health_classification_survives_bounded_projection(self):
+        main = {
+            "status": "green",
+            "sha": SHA,
+            "reason": "required-checks-green-generation-verified",
+            "generationVerified": True,
+            "contract": {"version": "2026-10-01.1"},
+            "marker": {
+                "name": f"production-generation-verified-{SHA}",
+                "verified": True,
+                "stale": False,
+            },
+            "pendingChecks": ["Generate Screenshots"],
+            "checks": [
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "pending",
+                },
+            ],
+        }
+        projection = PROJECT.project_fleet_admission_receipt(
+            evaluate_receipt(main=main)
+        )
+        projected_main = projection["signals"]["main"]
+        self.assertEqual(
+            projected_main["reason"],
+            "required-checks-green-generation-verified",
+        )
+        self.assertTrue(projected_main["generationVerified"])
+        self.assertEqual(projected_main["contractVersion"], "2026-10-01.1")
+        self.assertTrue(projected_main["marker"]["verified"])
+        self.assertEqual(
+            projected_main["pendingChecks"], ["Generate Screenshots"]
+        )
+        self.assertEqual(
+            projected_main["checks"],
+            [
+                {
+                    "name": "Generate Screenshots",
+                    "classification": "optional",
+                    "verdict": "pending",
+                }
+            ],
+        )
 
 class LargeAdmissionDrainLaunchTests(unittest.TestCase):
+    def test_parked_drain_requires_fresh_well_formed_receipt(self):
+        receipt = PROJECT.project_fleet_admission_receipt(
+            evaluate_receipt(controller={"status": "parked", "retired": True})
+        )
+        stale = {**receipt, "observedAt": (datetime.now(timezone.utc) - timedelta(minutes=11)).isoformat()}
+        invalid_time = {**receipt, "observedAt": "not-a-timestamp"}
+        future = {**receipt, "observedAt": (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat()}
+        cases = [("fresh", receipt, 0), ("stale", stale, 2),
+                 ("invalid-time", invalid_time, 2), ("future", future, 2),
+                 ("missing", None, 2), ("invalid-json", "not-json", 2)]
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_gh = pathlib.Path(tmp) / "gh"
+            fake_gh.write_text(
+                "#!/usr/bin/env bash\n[[ \"$1 $2\" == \"pr list\" ]] && echo '[]' && exit 0\nexit 2\n"
+            )
+            fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+            for name, value, expected in cases:
+                encoded = "" if value is None else base64.b64encode(
+                    (value if isinstance(value, str) else json.dumps(value)).encode()
+                ).decode()
+                with self.subTest(case=name):
+                    result = subprocess.run(
+                        ["bash", str(DRAIN)], cwd=str(ROOT),
+                        env={**os.environ, "PATH": f"{tmp}:{os.environ.get('PATH', '')}",
+                             "DRAIN_EXPECT_GH": str(fake_gh), "DRAIN_MUTATION_AUTHORIZATION": "test-fixture",
+                             "MERGE_QUEUE_BACKEND": "test-label-fixture", "DRY_RUN": "1",
+                             "DRAIN_PROMOTION_MODE": "hold-intake", "DRAIN_FLEET_GATE_B64": encoded},
+                        capture_output=True, text=True, check=False,
+                    )
+                    self.assertEqual(result.returncode, expected, result.stderr)
+                    if expected:
+                        self.assertNotIn("queue depth:", result.stdout)
+                    else:
+                        self.assertIn("queue depth:", result.stdout)
+
     def test_projected_large_receipt_launches_the_drain_path(self):
         receipt = inject_inventories(
             evaluate_receipt(production={"status": "red", "deployedSha": SHA})

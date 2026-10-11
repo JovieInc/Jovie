@@ -5,6 +5,9 @@ import { ArrowRight, CheckCircle2, Clock3, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { track } from '@/lib/analytics';
+import { PLAN_PRICES } from '@/lib/config/plan-prices';
+import { useCheckoutMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 
@@ -19,12 +22,23 @@ interface WaitlistOutcomeViewProps {
   readonly onRetry?: () => void;
   /** Known contact email for the receipt (optional). */
   readonly email?: string | null;
+  /**
+   * jov.ie handle held by the reservation profile, when one exists. Copy
+   * only claims the handle is reserved when this is non-null.
+   */
+  readonly reservedHandle?: string | null;
+  /**
+   * Stripe price for the self-serve Pro offer. When present, waiting visitors
+   * can buy now: a verified payment admits them, then /billing/success sends
+   * them on to claim their link.
+   */
+  readonly proCheckoutPriceId?: string | null;
 }
 
 type OutcomeCopy = {
   readonly title: string;
-  /** Body may depend on whether a contact email is known (never invent one). */
-  readonly body: (hasEmail: boolean) => string;
+  /** Body may depend on the known contact email and reserved handle. */
+  readonly body: (hasEmail: boolean, reservedHandle: string | null) => string;
   readonly icon: typeof CheckCircle2;
   readonly actionLabel?: string;
   readonly actionHref?: string;
@@ -77,10 +91,12 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
   },
   pending: {
     title: "You're on the list",
-    body: hasEmail =>
-      hasEmail
-        ? "Request saved. We'll email you when a spot opens — typically within a few days of capacity."
-        : 'Request saved. Return via /start when a spot opens — typically within a few days of capacity.',
+    body: (hasEmail, reservedHandle) =>
+      reservedHandle
+        ? `jov.ie/${reservedHandle} is yours. Your name and profile are reserved, and we'll email you the moment your spot opens.`
+        : hasEmail
+          ? "We're opening Jovie in waves. Your request is saved, and we'll email you the moment your spot opens."
+          : "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens.",
     icon: Clock3,
     showNextSteps: true,
   },
@@ -135,13 +151,15 @@ function PrimaryCtaLink({
   href,
   label,
   testId,
+  variant = 'primary',
 }: {
   readonly href: string;
   readonly label: string;
   readonly testId?: string;
+  readonly variant?: 'primary' | 'secondary';
 }) {
   return (
-    <Button asChild variant='primary' size='lg'>
+    <Button asChild variant={variant} size='lg'>
       <Link href={href} data-testid={testId}>
         {label}
         <ArrowRight className='h-3.5 w-3.5' aria-hidden />
@@ -150,21 +168,69 @@ function PrimaryCtaLink({
   );
 }
 
+export const WAITLIST_START_PRO_TEST_ID = 'waitlist-start-pro-checkout';
+
+/**
+ * Opens the default checkout (no onboarding source), so success lands on
+ * /billing/success, which routes a buyer without a claimed link to /start.
+ */
+function StartProCheckoutButton({ priceId }: { readonly priceId: string }) {
+  const checkout = useCheckoutMutation();
+
+  return (
+    <div className='flex flex-col gap-2'>
+      <Button
+        type='button'
+        variant='primary'
+        size='lg'
+        disabled={checkout.isPending}
+        data-testid={WAITLIST_START_PRO_TEST_ID}
+        onClick={() => {
+          track('checkout_initiated', {
+            flow_type: 'waitlist_receipt',
+            price_id: priceId,
+          });
+          checkout.mutate(
+            { priceId },
+            {
+              onSuccess: data => {
+                globalThis.location.href = data.url;
+              },
+            }
+          );
+        }}
+      >
+        {checkout.isPending
+          ? 'Opening Checkout...'
+          : `Start Pro ($${PLAN_PRICES.pro.monthly})`}
+      </Button>
+      {checkout.isError ? (
+        <p className='text-sm text-error' role='alert'>
+          {"Checkout didn't open. Try again in a moment."}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function WaitlistOutcomeView({
   outcome,
   onRetry,
   email,
+  reservedHandle,
+  proCheckoutPriceId,
 }: Readonly<WaitlistOutcomeViewProps>) {
   const copy = OUTCOME_COPY[outcome];
   const Icon = copy.icon;
   const hasEmail = Boolean(email?.trim());
-  const body = copy.body(hasEmail);
+  const body = copy.body(hasEmail, reservedHandle?.trim() || null);
   const canRetry =
     (outcome === 'save_failed' || outcome === 'rate_limited') && onRetry;
   const { signOut } = useAuthSafe();
   const primaryHref = copy.actionHref;
   const primaryLabel = copy.actionLabel;
   const showResumeCta = Boolean(copy.showNextSteps && !primaryHref);
+  const showStartPro = Boolean(copy.showNextSteps && proCheckoutPriceId);
 
   return (
     <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-primary-token shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
@@ -183,11 +249,15 @@ export function WaitlistOutcomeView({
         {primaryHref && primaryLabel ? (
           <PrimaryCtaLink href={primaryHref} label={primaryLabel} />
         ) : null}
+        {showStartPro && proCheckoutPriceId ? (
+          <StartProCheckoutButton priceId={proCheckoutPriceId} />
+        ) : null}
         {showResumeCta ? (
           <PrimaryCtaLink
             href={APP_ROUTES.START}
             label='Resume At Start'
             testId='waitlist-resume-start'
+            variant={showStartPro ? 'secondary' : 'primary'}
           />
         ) : null}
         {canRetry ? (

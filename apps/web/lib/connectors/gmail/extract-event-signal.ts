@@ -65,8 +65,8 @@ export async function assertDailyBudget(userId: string): Promise<void> {
 // Extractor model constant
 // ---------------------------------------------------------------------------
 
-/** claude-sonnet-4-6 via AI Gateway (Gateway format: provider/model) */
-const EXTRACTOR_MODEL = 'anthropic/claude-sonnet-4-20250514';
+/** glm-5.3-flash via AI Gateway (Gateway format: provider/model) */
+const EXTRACTOR_MODEL = 'zai/glm-5.3-flash';
 
 // ---------------------------------------------------------------------------
 // Input / Output schemas
@@ -146,7 +146,7 @@ STRICT RULES:
 /**
  * Extracts potential calendar event signals from a batch of Gmail message stubs.
  *
- * Uses claude-sonnet-4-6 via AI Gateway with Zod-validated output schema.
+ * Uses glm-5.3-flash via AI Gateway with Zod-validated output schema.
  * Prompt-injection defense: system prompt instructs the model to ignore
  * instructions inside email body/snippet; Zod strict schema prevents
  * any non-conforming output from reaching callers.
@@ -285,12 +285,12 @@ function buildDigest(content: string): string {
 }
 
 /**
- * Rough cost estimate in USD cents for a claude-sonnet-4-6 run.
- * Prices: $3/Mtok input, $15/Mtok output (as of May 2026).
+ * Rough cost estimate in USD cents for a glm-5.3-flash run.
+ * Prices: $0.20/Mtok input, $1.50/Mtok output (gateway catalog, Sep 2026).
  */
 function estimateCost(promptTokens: number, completionTokens: number): number {
-  const inputCost = (promptTokens / 1_000_000) * 3;
-  const outputCost = (completionTokens / 1_000_000) * 15;
+  const inputCost = (promptTokens / 1_000_000) * 0.2;
+  const outputCost = (completionTokens / 1_000_000) * 1.5;
   return Math.round((inputCost + outputCost) * 10_000) / 10_000;
 }
 

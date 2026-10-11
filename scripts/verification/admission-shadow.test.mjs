@@ -238,6 +238,21 @@ describe('admission-control shadow evidence', () => {
     );
   });
 
+  it('deliberate red: seal refuses snapshots with stripped or forged blockers', () => {
+    const blocked = configSnapshot({ values: {} });
+    assert.throws(
+      () => sealed({ configSnapshot: { ...blocked, blockers: [] } }),
+      /config blocker missing:required-config-missing:DATABASE_URL/
+    );
+    assert.throws(
+      () =>
+        sealed({
+          configSnapshot: { ...blocked, blockers: ['forged-clean'] },
+        }),
+      /config blocker (missing|unverifiable)/
+    );
+  });
+
   it('deliberate red: verifier authority cannot acquire write actions', () => {
     assert.equal(assertVerifierAuthority(VERIFIER_AUTHORITY), true);
     assert.throws(

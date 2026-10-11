@@ -19,7 +19,6 @@ export const MARKETING_HEADER_ICON_ONLY_PATHS: readonly string[] = [
   APP_ROUTES.AI,
   APP_ROUTES.CARD,
   APP_ROUTES.DOWNLOAD,
-  APP_ROUTES.INVESTORS,
   `${APP_ROUTES.COMPARE}/linkfire`,
   `${APP_ROUTES.COMPARE}/linktree`,
 ];

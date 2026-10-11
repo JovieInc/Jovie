@@ -990,6 +990,16 @@ async function verifyPublicSurfaceOnce(
     } catch {
       throw new Error(`${surface.label} returned invalid JSON.`);
     }
+    const reportsAnonymousLiveness =
+      surface.acceptsAnonymousLiveness === true &&
+      payload &&
+      typeof payload === 'object' &&
+      payload.healthy === true &&
+      typeof payload.timestamp === 'string' &&
+      Object.keys(payload).every(
+        key => key === 'healthy' || key === 'timestamp'
+      );
+    if (reportsAnonymousLiveness) return;
     if (
       !payload ||
       typeof payload !== 'object' ||
@@ -1077,6 +1087,7 @@ async function verifyPublicDeploymentSurfaces(
       label: 'Deploy health',
       path: DEPLOY_HEALTH_PATH,
       json: true,
+      acceptsAnonymousLiveness: true,
       expectedStatus: 'healthy',
       requiredChecks: ['environment', 'database'],
     },

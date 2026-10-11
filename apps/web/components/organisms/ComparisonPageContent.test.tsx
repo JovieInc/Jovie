@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { getComparison } from '@/content/comparisons';
+import { getComparison, getComparisonSlugs } from '@/content/comparisons';
 import { ComparisonPageContent } from './ComparisonPageContent';
 
 const data = getComparison('linktree');
@@ -14,11 +14,18 @@ if (!data) {
 
 describe('ComparisonPageContent', () => {
   it('renders the complete checked-in comparison body', () => {
-    render(<ComparisonPageContent data={data} />);
+    const { container } = render(<ComparisonPageContent data={data} />);
+
+    expect(
+      container.querySelector('[class~="via-(--color-bg-base)/70"]')
+    ).toBeInTheDocument();
 
     expect(
       screen.getByRole('heading', { level: 1, name: data.heroHeadline })
     ).toBeInTheDocument();
+    expect(
+      screen.getByAltText(data.heroImage.alt).getAttribute('src')
+    ).toContain(encodeURIComponent(data.heroImage.src));
 
     const table = screen.getByRole('table');
     expect(within(table).getAllByRole('row')).toHaveLength(
@@ -35,9 +42,26 @@ describe('ComparisonPageContent', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(data.bottomLine)).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Try Jovie Free' })
-    ).toHaveAttribute('href', '/signup');
+      screen.getByRole('link', { name: 'Claim my free profile' })
+    ).toHaveAttribute('href', '/signup?plan=free');
     expect(screen.getAllByRole('button')).toHaveLength(data.faq.length);
+  });
+
+  it('keeps the feature matrix scroll region keyboard focusable', () => {
+    render(<ComparisonPageContent data={data} />);
+
+    const scrollRegion = screen.getByRole('region', {
+      name: `Jovie vs ${data.competitor} feature comparison`,
+    });
+    expect(scrollRegion).toHaveAttribute('tabindex', '0');
+    expect(within(scrollRegion).getByRole('table')).toBeInTheDocument();
+  });
+
+  it('never repeats a hero image across the checked-in comparison slugs', () => {
+    const slugs = getComparisonSlugs();
+    const images = slugs.map(slug => getComparison(slug)?.heroImage.src);
+
+    expect(images).toHaveLength(new Set(images).size);
   });
 
   it('is shared by the route and deterministic Storybook fixture', () => {

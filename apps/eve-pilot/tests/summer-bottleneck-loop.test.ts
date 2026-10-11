@@ -9,6 +9,7 @@ import {
   type SummerBottleneckStore,
   type SummerCiImprovementClassId,
   signSummerBottleneckProducerAttestation,
+  summerBottleneckSnapshotSchema,
   summerCiImprovementClassIds,
   verifySummerBottleneckReceipt,
 } from '../agent/lib/summer-bottleneck-loop';
@@ -379,6 +380,7 @@ function harness(
     async (
       task: import('../agent/lib/summer-bottleneck-loop').SymphonyRepairTask
     ) => {
+      expect([...store.records.keys()].join()).toContain('/predictions/');
       dispatchedTask = task;
       return { handle: 'symphony:task_0001' };
     }
@@ -464,6 +466,38 @@ function harness(
 }
 
 describe('Summer bottleneck loop', () => {
+  it('accepts omitted, unknown, and observed runner activity counts', () => {
+    for (const runner of [
+      {},
+      { running: null, blocked: null },
+      { running: 0, blocked: 2 },
+    ]) {
+      const input = snapshot({ runner });
+      const parsed = summerBottleneckSnapshotSchema.safeParse(input);
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.signals.runner).toMatchObject(runner);
+      }
+    }
+  });
+
+  it('rejects malformed runner activity counts and unrecognized fields', () => {
+    for (const name of ['running', 'blocked']) {
+      for (const value of [-1, 0.5, '1', true]) {
+        expect(
+          summerBottleneckSnapshotSchema.safeParse(
+            snapshot({ runner: { [name]: value } })
+          ).success
+        ).toBe(false);
+      }
+    }
+    expect(
+      summerBottleneckSnapshotSchema.safeParse(
+        snapshot({ runner: { unsupportedCount: 1 } })
+      ).success
+    ).toBe(false);
+  });
+
   it('deterministically ranks one bottleneck by blocked time, impact, then id', () => {
     const input = snapshot({
       closure: {
@@ -841,6 +875,9 @@ describe('Summer bottleneck loop', () => {
       decision: 'pending-symphony',
       selected: { id: 'merge-group-flake-baseline-ratchet' },
     });
+    // biome-ignore format: keep the recovery fixture compact.
+    const predictionPath = [...shared.records.keys()].find(path => path.includes('/predictions/'))!;
+    shared.records.delete(predictionPath);
 
     const restarted = harness(shared);
     await expect(
@@ -855,6 +892,8 @@ describe('Summer bottleneck loop', () => {
     ]);
     expect(restarted.dispatchToSymphony).not.toHaveBeenCalled();
     expect(restarted.observeSymphonyOutcome).toHaveBeenCalledTimes(1);
+    // biome-ignore format: distinguish backfill from prospective evidence.
+    expect(shared.records.get(predictionPath)).toMatchObject({ temporalClass: 'retrospective' });
   });
 
   it('dispatches once when only freshness metadata changes on a later cadence', async () => {

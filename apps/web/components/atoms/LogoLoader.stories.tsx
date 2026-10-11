@@ -28,7 +28,7 @@ export const Compact: Story = {
 
 export const Large: Story = {
   args: {
-    size: 48,
+    size: 32,
   },
 };
 

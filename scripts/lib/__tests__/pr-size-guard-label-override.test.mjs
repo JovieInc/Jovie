@@ -104,7 +104,9 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
   it('keeps the primary size guard off labeled events', () => {
     const workflow = readFileSync(SIZE_GUARD_WORKFLOW, 'utf8');
 
-    expect(workflow).toContain('types: [opened, synchronize, reopened]');
+    expect(workflow).toContain(
+      'types: [opened, synchronize, reopened, edited]'
+    );
     expect(workflow).not.toContain('ready_for_review');
     expect(workflow).not.toMatch(/types:\s*\[[^\]]*labeled/);
     expect(workflow).toContain(

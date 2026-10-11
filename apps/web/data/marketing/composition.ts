@@ -20,7 +20,20 @@
  */
 
 import { z } from 'zod';
+import { MARKETING_COMPOSITION_CONTRACT } from './componentRegistry';
 import { assertMarketingComposition } from './compositionValidation';
+import {
+  dedupeSectionRequests,
+  detectSectionGaps,
+  getSectionOmitRung,
+  type SectionJobNeed,
+  type SectionRequest,
+  SectionRequestSchema,
+} from './factory/sectionRequest';
+import {
+  auditMarketingNarrativePlan,
+  type MarketingNarrativePlan,
+} from './generation';
 import { getMarketingRecipe, type RecipeId } from './recipes';
 import {
   getMarketingSection,
@@ -103,6 +116,8 @@ export type MarketingBrief = z.infer<typeof MarketingBriefSchema>;
  * Copy/imagery-within-ladder are BOUNDED TASTE (not in the tuple) per D1=B.
  */
 export const MarketingCompositionSectionSchema = z.object({
+  /** Identity of the verified story occurrence, retained through rendering. */
+  sectionInstanceId: z.string().min(1).optional(),
   sectionId: z.enum(
     MARKETING_SECTION_IDS as unknown as [
       MarketingSectionId,
@@ -160,8 +175,22 @@ export const MarketingCompositionSchema = z.object({
       reason: z.string(),
     })
   ),
+  /** Present when the factory supplied explicit section jobs. */
+  degraded: z.boolean().optional(),
+  /** True when an essential job has a gap; the page stays in shadow. */
+  shadowRequired: z.boolean().optional(),
+  /** Deduplicated gaps awaiting the canonical design-gap workflow. */
+  sectionRequests: z.array(SectionRequestSchema).optional(),
 });
 export type MarketingComposition = z.infer<typeof MarketingCompositionSchema>;
+
+export interface ResolveCompositionOptions {
+  readonly narrativePlan?: MarketingNarrativePlan;
+  /** Explicit visual decisions for verified story occurrences, never recipe ordinals. */
+  readonly sectionVariants?: Readonly<Record<string, string>>;
+  readonly sectionJobs?: readonly SectionJobNeed[];
+  readonly existingSectionRequests?: readonly SectionRequest[];
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Decision table — deterministic recipe selection (charter P6)
@@ -189,6 +218,7 @@ const RECIPE_DECISION_TABLE: readonly {
       (b.desiredConversion === 'request-access' &&
         (b.targetAudience === 'general' || b.targetAudience === 'fan')) ||
       (b.brandConstraints.waitlistEnabled &&
+        !['claim-handle', 'claim-profile'].includes(b.desiredConversion) &&
         b.trafficSource === 'home' &&
         (b.targetAudience === 'general' || b.targetAudience === 'fan')),
     recipeId: 'waitlist',
@@ -448,8 +478,8 @@ function matchesVariant(
         brief.availableAssets.productScreenshots
       );
     }
-    if (variantId === 'centered-video') {
-      return recipeId === 'launch' && brief.availableAssets.videoAsset;
+    if (variantId === 'split-claim-card') {
+      return recipeId === 'homepage';
     }
     if (variantId === 'centered-none') {
       return (
@@ -722,14 +752,78 @@ function matchesVariant(
  *   5. Ordering legality: drop sections whose illegalAfter/requiresPrior are violated.
  *   6. Variant selection: per section, walk variants; first match wins; no-match → defaultVariant.
  *   7. CTA position assignment: hero=primary, cta section=primary (terminal), mid-page after proof=secondary.
- *   8. Trace: record every step for the AGENT_GUIDE worked example + failure messages.
+ *   8. Gap detection: emit deduplicated section requests, omit gap sections
+ *      (never the hero), and mark the page shadow-required for essential jobs.
+ *   9. Trace: record every step for the AGENT_GUIDE worked example + failure messages.
  *
  * Deterministic: same Brief → same Composition, every time (E9 tuple equality).
  * Bounded taste (imagery within degradation rung, copy, density) is NOT in the tuple.
  */
-export function resolveComposition(input: unknown): MarketingComposition {
+export function resolveComposition(
+  input: unknown,
+  options: ResolveCompositionOptions = {}
+): MarketingComposition {
   const brief = MarketingBriefSchema.parse(input);
+  const narrative = options.narrativePlan;
+  if (narrative) {
+    const findings = auditMarketingNarrativePlan(narrative);
+    if (findings.length > 0) {
+      throw new Error(
+        `Invalid narrative: ${findings.map(f => f.message).join('; ')}`
+      );
+    }
+    for (const id of Object.keys(options.sectionVariants ?? {})) {
+      if (
+        !narrative.sections.some(section => section.sectionInstanceId === id)
+      ) {
+        throw new Error(
+          `Layout variant references unknown story instance ${id}`
+        );
+      }
+    }
+    for (const section of narrative.sections) {
+      const repeated =
+        narrative.sections.filter(
+          other => other.sectionId === section.sectionId
+        ).length > 1;
+      if (repeated && !options.sectionVariants?.[section.sectionInstanceId]) {
+        throw new Error(
+          `Repeated story family ${section.sectionId} requires an explicit variant for ${section.sectionInstanceId}`
+        );
+      }
+    }
+  }
   const trace: { step: string; decision: string; reason: string }[] = [];
+  const gapReport = detectSectionGaps(options.sectionJobs ?? []);
+  const newSectionRequests = gapReport.requests;
+  const sectionRequests = dedupeSectionRequests([
+    ...(options.existingSectionRequests ?? []),
+    ...newSectionRequests,
+  ]);
+  const hasFactoryContext =
+    options.sectionJobs !== undefined ||
+    options.existingSectionRequests !== undefined;
+  for (const request of newSectionRequests) {
+    trace.push({
+      step: 'composition-degradation',
+      decision: `omit ${request.job}; emit ${request.dedupeKey}`,
+      reason:
+        'No certified family or active variant fits; preserve the registry composition and route the gap through DESIGN_GAPS.md.',
+    });
+  }
+  for (const gap of gapReport.registryGaps) {
+    trace.push({
+      step: 'registry-gap',
+      decision: `keep ${gap.sectionId}; no section request`,
+      reason: gap.evidence.join('; '),
+    });
+  }
+  const shadowRequired = sectionRequests.some(request => request.essential);
+  const gapSectionIds = new Set(
+    newSectionRequests.flatMap(request =>
+      request.sectionId ? [request.sectionId] : []
+    )
+  );
 
   // 1. Recipe selection
   const recipeMatch = RECIPE_DECISION_TABLE.find(entry => entry.when(brief));
@@ -747,11 +841,20 @@ export function resolveComposition(input: unknown): MarketingComposition {
   });
 
   // 2. Section sequence
-  let sections = recipe.sectionOrder.slice();
+  const sourceOrder = narrative
+    ? narrative.sections.map(section =>
+        MarketingCompositionSectionSchema.shape.sectionId.parse(
+          section.sectionId
+        )
+      )
+    : recipe.sectionOrder;
+  let sections = sourceOrder.slice();
   trace.push({
     step: 'section-sequence',
     decision: sections.join(','),
-    reason: `recipe ${recipeId} sectionOrder`,
+    reason: narrative
+      ? 'verified narrative section order'
+      : `recipe ${recipeId} sectionOrder`,
   });
 
   // 2.5. Substitution application (A4 fix — substitutions were dead code).
@@ -763,7 +866,7 @@ export function resolveComposition(input: unknown): MarketingComposition {
   //   not all occurrences. This preserves repeated-section instances (e.g.
   //   artist-lp has two feature-split instances; substituting the first with
   //   ownership leaves the second feature-split intact for the reactivation beat).
-  if (recipe.substitutions) {
+  if (!narrative && recipe.substitutions) {
     for (const sub of recipe.substitutions) {
       if (matchesSubstitution(sub, brief, recipeId)) {
         const firstIndex = sections.indexOf(sub.replace);
@@ -835,7 +938,6 @@ export function resolveComposition(input: unknown): MarketingComposition {
         decision: `drop ${sectionId}`,
         reason: `section ${sectionId} illegalAfter ${section.illegalAfter?.join(',')} and immediately-preceding=${immediatelyPreceding}`,
       });
-      immediatelyPreceding = sectionId; // the dropped section is still "immediately preceding" for the next
       return false;
     }
     // requiresPrior: every required section must be in priorSections (anywhere earlier)
@@ -846,7 +948,6 @@ export function resolveComposition(input: unknown): MarketingComposition {
         decision: `drop ${sectionId}`,
         reason: `section ${sectionId} requiresPrior ${(section.requiresPrior ?? []).join(',')} not yet present`,
       });
-      immediatelyPreceding = sectionId;
       return false;
     }
     priorSections.push(sectionId);
@@ -860,9 +961,22 @@ export function resolveComposition(input: unknown): MarketingComposition {
   //   holes without a fallback = the composition is structurally broken; emit
   //   a trace warning. The manifest gate asserts every recipe's arc beats
   //   either survive the worst-case zero-proof filter or have a fallback.
-  for (const beat of recipe.arc) {
+  const remaining = [...sections];
+  for (const beat of narrative ? [] : recipe.arc) {
     if (beat.section === null) continue;
-    if (sections.includes(beat.section)) continue;
+    const occurrenceIndex = remaining.indexOf(beat.section);
+    if (occurrenceIndex >= 0) {
+      remaining.splice(occurrenceIndex, 1);
+      continue;
+    }
+    if (
+      trace.some(
+        item =>
+          item.step === 'substitution' &&
+          item.decision.startsWith(`${beat.section} (first instance)`)
+      )
+    )
+      continue;
     const fallback = recipe.fallbacks?.find(f =>
       f.missing.includes(beat.section ?? '')
     );
@@ -873,12 +987,19 @@ export function resolveComposition(input: unknown): MarketingComposition {
         reason: `fallback: ${fallback.fallback}`,
       });
     } else {
-      trace.push({
-        step: 'arc-hole-warning',
-        decision: `beat ${beat.beat} (section ${beat.section}) omitted with NO fallback`,
-        reason: `arc integrity violation — recipe ${recipeId} needs a fallback for ${beat.section} (add to recipe.fallbacks)`,
-      });
+      throw new Error(
+        `Incomplete story: recipe ${recipeId} lost required beat ${beat.beat} (${beat.section})`
+      );
     }
+  }
+  if (
+    narrative &&
+    (sections.length !== sourceOrder.length ||
+      sections.some((id, i) => id !== sourceOrder[i]))
+  ) {
+    throw new Error(
+      'Incomplete story: layout cannot omit or replace a verified narrative section'
+    );
   }
 
   // 6. Variant selection + 7. CTA position assignment.
@@ -889,7 +1010,7 @@ export function resolveComposition(input: unknown): MarketingComposition {
   //   so a substituted-away first instance still counts — the reactivation
   //   feature-split keeps occurrence=2 even after the adaptive one becomes ownership.
   const originalOccurrences: Partial<Record<MarketingSectionId, number>> = {};
-  const originalOccurrenceByPosition: number[] = recipe.sectionOrder.map(s => {
+  const originalOccurrenceByPosition: number[] = sourceOrder.map(s => {
     const occ = (originalOccurrences[s] ?? 0) + 1;
     originalOccurrences[s] = occ;
     return occ;
@@ -897,8 +1018,8 @@ export function resolveComposition(input: unknown): MarketingComposition {
   // Map original positions to filtered positions (sections may have been dropped)
   const filteredPositionToOriginal = new Map<number, number>();
   let filteredIdx = 0;
-  for (let origIdx = 0; origIdx < recipe.sectionOrder.length; origIdx++) {
-    const origSection = recipe.sectionOrder[origIdx];
+  for (let origIdx = 0; origIdx < sourceOrder.length; origIdx++) {
+    const origSection = sourceOrder[origIdx];
     // Skip if this original position was substituted away OR dropped by a filter
     // (the sections array is post-filter; we walk it in parallel)
     if (filteredIdx < sections.length) {
@@ -907,9 +1028,11 @@ export function resolveComposition(input: unknown): MarketingComposition {
       // We match by: the original section at origIdx is either the same id OR
       // was substituted to the current filtered id.
       const filteredSection = sections[filteredIdx];
-      const wasSubstituted = recipe.substitutions?.some(
-        sub => sub.replace === origSection && sub.with === filteredSection
-      );
+      const wasSubstituted =
+        !narrative &&
+        recipe.substitutions?.some(
+          sub => sub.replace === origSection && sub.with === filteredSection
+        );
       if (origSection === filteredSection || wasSubstituted) {
         filteredPositionToOriginal.set(filteredIdx, origIdx);
         filteredIdx++;
@@ -919,15 +1042,48 @@ export function resolveComposition(input: unknown): MarketingComposition {
   const compositionSections: MarketingCompositionSection[] = sections.map(
     (sectionId, index) => {
       const origIdx = filteredPositionToOriginal.get(index) ?? index;
-      const arcBeat = recipe.arc[origIdx]?.beat ?? `position-${origIdx}`;
+      const arcBeat =
+        narrative?.sections[origIdx]?.sectionJob ??
+        recipe.arc[origIdx]?.beat ??
+        `position-${origIdx}`;
       const occurrence = originalOccurrenceByPosition[origIdx] ?? 1;
-      const { variantId, reason } = selectVariant(
-        sectionId,
-        brief,
-        recipeId,
-        arcBeat,
-        occurrence
-      );
+      const explicitVariant =
+        narrative &&
+        options.sectionVariants?.[
+          narrative.sections[origIdx].sectionInstanceId
+        ];
+      if (
+        explicitVariant &&
+        !getMarketingSection(sectionId).variants.some(
+          variant => variant.id === explicitVariant
+        )
+      ) {
+        throw new Error(
+          `Unregistered story variant ${sectionId}/${explicitVariant}`
+        );
+      }
+      const { variantId, reason } = explicitVariant
+        ? {
+            variantId: explicitVariant,
+            reason: 'explicit verified story instance decision',
+          }
+        : selectVariant(
+            sectionId,
+            brief,
+            recipeId,
+            arcBeat,
+            narrative ? 1 : occurrence
+          );
+      if (
+        narrative &&
+        getMarketingSection(sectionId).variants.find(
+          variant => variant.id === variantId
+        )?.status !== 'active'
+      ) {
+        throw new Error(
+          `Incomplete story: ${sectionId}/${variantId} needs a certified variant before copy`
+        );
+      }
       trace.push({
         step: 'variant-selection',
         decision: `${sectionId}/${variantId}`,
@@ -950,6 +1106,9 @@ export function resolveComposition(input: unknown): MarketingComposition {
         ctaPosition = 'primary'; // capture is a conversion section (waitlist/blog-landing/newsletter-signup)
       }
       return {
+        ...(narrative
+          ? { sectionInstanceId: narrative.sections[origIdx].sectionInstanceId }
+          : {}),
         sectionId,
         variantId,
         ctaPosition,
@@ -959,15 +1118,65 @@ export function resolveComposition(input: unknown): MarketingComposition {
     }
   );
 
-  // 8. CTA label + cadence from recipe
+  // 8. Gap degradation: omit sections whose job raised a request (the OMIT
+  //    rung of their ladder). The hero is never omitted; its gap keeps the
+  //    page in shadow instead.
+  const degradedSections = compositionSections.filter(section => {
+    if (!gapSectionIds.has(section.sectionId)) return true;
+    if (section.sectionId === MARKETING_COMPOSITION_CONTRACT.hero.sectionId) {
+      trace.push({
+        step: 'gap-hero-preserved',
+        decision: `keep ${section.sectionId}/${section.variantId}; shadow required`,
+        reason: 'a composition must keep exactly one hero',
+      });
+      return true;
+    }
+    const omit = getSectionOmitRung(section.sectionId);
+    trace.push({
+      step: 'gap-degradation-omit',
+      decision: `drop ${section.sectionId}/${section.variantId}`,
+      reason: omit
+        ? `${omit.assetClass} ladder rung ${omit.tier}: ${omit.description}`
+        : 'no asset ladder; omit until the section request is promoted',
+    });
+    return false;
+  });
+  if (narrative && degradedSections.length !== narrative.sections.length) {
+    throw new Error(
+      'Incomplete story: resolve narrative section gaps before copy'
+    );
+  }
+  if (!narrative) {
+    const missing = compositionSections.find(
+      section =>
+        !degradedSections.includes(section) &&
+        recipe.arc.some(beat => beat.section === section.sectionId) &&
+        !recipe.fallbacks?.some(fallback =>
+          fallback.missing.includes(section.sectionId)
+        )
+    );
+    if (missing)
+      throw new Error(
+        `Incomplete story: gap degradation removed required ${missing.sectionId} beat`
+      );
+  }
+
+  // 9. CTA label + cadence from recipe
   return assertMarketingComposition({
     specVersion: MARKETING_SPEC_VERSION,
     recipeId,
-    sections: compositionSections,
+    sections: degradedSections,
     primaryCtaLabel: recipe.ctaCadence.primaryLabel,
     secondaryCtaLabel: recipe.ctaCadence.secondaryLabel,
     ctaCadence: recipe.ctaCadence.cadence,
     trace,
+    ...(hasFactoryContext
+      ? {
+          degraded: newSectionRequests.length > 0,
+          shadowRequired,
+          sectionRequests,
+        }
+      : {}),
   });
 }
 

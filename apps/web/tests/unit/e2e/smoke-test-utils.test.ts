@@ -1,9 +1,11 @@
+import type { Page } from '@playwright/test';
 import { describe, expect, it } from 'vitest';
 import {
   filterCriticalErrors,
   isExpectedError,
   isExpectedWarning,
   isTransientNavigationError,
+  waitForAnyVisible,
 } from '@/tests/e2e/utils/smoke-test-utils';
 
 describe('smoke-test-utils', () => {
@@ -131,6 +133,49 @@ describe('smoke-test-utils', () => {
       ).toEqual([
         'Blocked by CORS policy: No Access-Control-Allow-Origin header is present.',
       ]);
+    });
+  });
+
+  describe('waitForAnyVisible', () => {
+    function stubPage(visible: boolean) {
+      return {
+        locator: () => ({
+          first: () => ({ isVisible: () => Promise.resolve(visible) }),
+        }),
+        waitForTimeout: () => Promise.resolve(),
+        evaluate: (fn: () => unknown) => Promise.resolve(fn()),
+      } as unknown as Page;
+    }
+
+    it('returns the selector that became visible', async () => {
+      await expect(
+        waitForAnyVisible(stubPage(true), ['[data-testid="a"]'], {
+          timeout: 50,
+        })
+      ).resolves.toBe('[data-testid="a"]');
+    });
+
+    it('throws with the rendered testids and URL when nothing appears', async () => {
+      document.body.innerHTML =
+        '<div data-testid="profile-compact-shell"></div><div data-testid="profile-header"></div>';
+
+      await expect(
+        waitForAnyVisible(
+          stubPage(false),
+          ['[data-testid="profile-primary-tab-about"]'],
+          { timeout: 1, label: 'Desktop (1280) about' }
+        )
+      ).rejects.toThrow(
+        /Desktop \(1280\) about: None of the expected selectors became visible: \[data-testid="profile-primary-tab-about"\]/
+      );
+
+      await expect(
+        waitForAnyVisible(
+          stubPage(false),
+          ['[data-testid="profile-primary-tab-about"]'],
+          { timeout: 1 }
+        )
+      ).rejects.toThrow(/testids=\[.*profile-compact-shell.*profile-header/);
     });
   });
 });

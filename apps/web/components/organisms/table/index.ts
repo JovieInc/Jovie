@@ -83,6 +83,7 @@ export { AudienceVisitsCell } from './atoms/AudienceVisitsCell';
 export { AvatarCell } from './atoms/AvatarCell';
 export { DateCell } from './atoms/DateCell';
 export { GroupHeader } from './atoms/GroupHeader';
+export { PersonCell, type PersonCellProps } from './atoms/PersonCell';
 export type {
   ShellListRowButtonProps,
   ShellListRowChrome,
@@ -101,7 +102,10 @@ export { SkeletonCell } from './atoms/SkeletonCell';
 export { SkeletonRow } from './atoms/SkeletonRow';
 export { TableBadge } from './atoms/TableBadge';
 export type { TableCellProps } from './atoms/TableCell';
-export { TableCell } from './atoms/TableCell';
+export {
+  TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
+  TableCell,
+} from './atoms/TableCell';
 export type {
   TableCheckboxCellLegacyProps,
   TableCheckboxCellProps,
@@ -195,6 +199,16 @@ export type { TableHeaderRowProps } from './molecules/TableHeaderRow';
 export { TableHeaderRow } from './molecules/TableHeaderRow';
 export type { TableSearchBarProps } from './molecules/TableSearchBar';
 export { TableSearchBar } from './molecules/TableSearchBar';
+export type {
+  ToolbarFilterSuggestion,
+  ToolbarFilterSuggestionsProps,
+} from './molecules/ToolbarFilterSuggestions';
+export { ToolbarFilterSuggestions } from './molecules/ToolbarFilterSuggestions';
+export type {
+  ViewModeSliderOption,
+  ViewModeSliderProps,
+} from './molecules/ViewModeSlider';
+export { ViewModeSlider } from './molecules/ViewModeSlider';
 
 // =============================================================================
 // Organisms
@@ -209,8 +223,18 @@ export { UnifiedTableSkeleton } from './organisms/UnifiedTableSkeleton';
 // Hooks
 // =============================================================================
 
+export {
+  COLUMN_PRIORITY_HYSTERESIS_PX,
+  type ColumnPriorityLayout,
+  type ColumnPrioritySpec,
+  columnPrioritySpecsFromDefs,
+  resolveColumnPriorityLayout,
+  stabilizeColumnPriorityLayout,
+} from './column-priority';
 export type { UseAmbientListSelectionParams } from './hooks/useAmbientListSelection';
 export { useAmbientListSelection } from './hooks/useAmbientListSelection';
+export { useColumnPriorityLayout } from './hooks/useColumnPriorityLayout';
+export { useContainerWidth } from './hooks/useContainerWidth';
 export type {
   UseRowKeyboardOptions,
   UseRowKeyboardResult,

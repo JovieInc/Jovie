@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
+import { isDedicatedRootSegment } from '@/lib/routing/proxy-routing';
 import {
   isReservedUsername,
   validateUsernameCore,
@@ -39,6 +40,19 @@ describe('marketing route manifest ⇔ reserved usernames', () => {
         validateUsernameCore(handle).isValid,
         `should reject "${handle}"`
       ).toBe(false);
+    }
+  });
+
+  it('routes every reserved marketing root to its page instead of the edge 404', () => {
+    // The proxy fast-404s a reserved handle unless the segment is a dedicated
+    // root route. Reserving a live marketing root without also making it
+    // dedicated took /voice offline in production.
+    for (const url of singleSegmentActiveMarketingUrls()) {
+      const segment = url.slice(1);
+      expect(
+        isDedicatedRootSegment(segment),
+        `${url} is reserved but not a dedicated root route`
+      ).toBe(true);
     }
   });
 });

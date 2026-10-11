@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Sidebar, SidebarProvider } from '@/components/organisms/Sidebar';
+import { Sidebar, SidebarProvider } from '@/components/organisms/sidebar';
 
 const originalMatchMedia = globalThis.matchMedia;
 

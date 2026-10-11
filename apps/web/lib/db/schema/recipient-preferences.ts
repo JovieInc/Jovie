@@ -25,11 +25,11 @@ export const RECIPIENT_PREFERENCES_VERSION = 1 as const;
 
 export const MARKETING_CONSENT_VERSION = 'recipient-marketing-v1' as const;
 
-export const TIM_DEFAULT_TIMEZONE = 'America/Los_Angeles';
+export { TIM_DEFAULT_TIMEZONE } from '@/lib/tim-white';
 
-export const DEFAULT_QUIET_HOURS_START = '21:00';
+export const DEFAULT_QUIET_HOURS_START = '22:00';
 
-export const DEFAULT_QUIET_HOURS_END = '08:00';
+export const DEFAULT_QUIET_HOURS_END = '07:00';
 
 export const RECIPIENT_KINDS = ['tim', 'customer'] as const;
 

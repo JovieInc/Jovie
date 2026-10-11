@@ -589,6 +589,20 @@ DSP_CONFIGS['soundcloud_release'] = {
   logoSvg: SOUNDCLOUD_LOGO,
 };
 
+const GENERIC_LINK_LOGO = `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><title>Link</title><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+
+/**
+ * Neutral visual config for platform links that are not a known provider.
+ * The link model is generic (URL + label); this is the fallback rendering
+ * for platforms outside the registry.
+ */
+export const GENERIC_PLATFORM_LINK_CONFIG: DSPConfig = {
+  name: 'Link',
+  color: '#374151',
+  textColor: 'white',
+  logoSvg: GENERIC_LINK_LOGO,
+};
+
 /**
  * Provider domain mapping for URL validation.
  * Only includes entries with domains defined.

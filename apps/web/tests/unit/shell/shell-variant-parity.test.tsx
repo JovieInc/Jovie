@@ -7,12 +7,14 @@ import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboar
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AuthShell } from '@/components/organisms/AuthShell';
 import { APP_ROUTES } from '@/constants/routes';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({ toggle: vi.fn() }),
+  useOptionalPreviewPanelState: () => null,
 }));
 
 vi.mock('@/components/organisms/PersistentAudioBar', () => ({
@@ -41,14 +43,6 @@ vi.mock('@/features/dashboard/dashboard-nav', () => ({
 
 vi.mock('@/components/organisms/user-button', () => ({
   UserButton: () => <div data-testid='fixture-user-button' />,
-}));
-
-vi.mock('@/features/feedback/SidebarUpgradeBanner', () => ({
-  SidebarUpgradeBanner: () => null,
-}));
-
-vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
-  SidebarInstallBanner: () => null,
 }));
 
 vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
@@ -117,9 +111,11 @@ function renderShell() {
         <DashboardDataProvider value={dashboardData}>
           <TooltipProvider>
             <ShellSidebarOverrideProvider>
-              <AuthShell section='dashboard' breadcrumbs={[]} showMobileTabs>
-                <div>Main Content</div>
-              </AuthShell>
+              <HeaderActionsProvider>
+                <AuthShell section='dashboard' breadcrumbs={[]} showMobileTabs>
+                  <div>Main Content</div>
+                </AuthShell>
+              </HeaderActionsProvider>
             </ShellSidebarOverrideProvider>
           </TooltipProvider>
         </DashboardDataProvider>

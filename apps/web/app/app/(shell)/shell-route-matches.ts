@@ -119,6 +119,14 @@ export function isLibraryShellRoute(pathname: string | null): boolean {
   );
 }
 
+export function isLinksShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(
+    pathname,
+    APP_ROUTES.LINKS,
+    APP_ROUTES.DASHBOARD_LINKS
+  );
+}
+
 export function isTasksShellRoute(pathname: string | null): boolean {
   return matchesRoutePrefix(
     pathname,
@@ -145,8 +153,13 @@ export function isAdminShellRoute(pathname: string | null): boolean {
   );
 }
 
-export function isProfileShellRoute(pathname: string | null): boolean {
-  return matchesRoutePrefix(pathname, APP_ROUTES.PROFILES);
+export function isPresenceShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(
+    pathname,
+    APP_ROUTES.PRESENCE,
+    APP_ROUTES.PROFILES,
+    `${APP_ROUTES.LEGACY_DASHBOARD}/presence`
+  );
 }
 
 export function isTouringShellRoute(pathname: string | null): boolean {
@@ -162,13 +175,9 @@ export function resolveDashboardSegmentSkeletonVariant(
 ): DashboardSegmentSkeletonVariant {
   if (isAdminShellRoute(pathname)) return 'admin';
   if (isInsightsShellRoute(pathname)) return 'insights';
-  if (isProfileShellRoute(pathname)) return 'profile';
+  if (isPresenceShellRoute(pathname)) return 'profile';
   if (isTouringShellRoute(pathname)) return 'tour';
   return 'default';
-}
-
-export function isPresenceShellRoute(pathname: string | null): boolean {
-  return matchesRoutePrefix(pathname, APP_ROUTES.PRESENCE);
 }
 
 export function isAudienceShellRoute(pathname: string | null): boolean {
@@ -204,6 +213,7 @@ function isLightweightShellRoute(pathname: string | null): boolean {
     isReleasesShellRoute(pathname) ||
     isLyricsShellRoute(pathname) ||
     isLibraryShellRoute(pathname) ||
+    isLinksShellRoute(pathname) ||
     isTasksShellRoute(pathname) ||
     isInsightsShellRoute(pathname) ||
     isPresenceShellRoute(pathname) ||
@@ -226,6 +236,7 @@ export function shouldRedirectToOnboarding(pathname: string | null): boolean {
     isReleasesShellRoute(pathname) ||
     isLyricsShellRoute(pathname) ||
     isLibraryShellRoute(pathname) ||
+    isLinksShellRoute(pathname) ||
     isTasksShellRoute(pathname) ||
     isInsightsShellRoute(pathname) ||
     isPresenceShellRoute(pathname) ||

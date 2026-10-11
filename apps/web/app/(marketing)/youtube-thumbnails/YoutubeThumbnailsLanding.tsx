@@ -4,12 +4,19 @@ import {
   MarketingContainer,
   MarketingFeatureGrid,
   MarketingHero,
+  MarketingHeroPhoto,
   MarketingPageShell,
 } from '@/components/marketing';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import { APP_ROUTES } from '@/constants/routes';
 import { YOUTUBE_THUMBNAILS_COPY as copy } from '@/data/youtubeThumbnailsCopy';
 import { YoutubeThumbnailPasteForm } from './YoutubeThumbnailPasteForm';
+
+const YOUTUBE_THUMBNAILS_HERO_PHOTO = {
+  src: '/images/marketing-hero/youtube-thumbnails.webp',
+  width: 1600,
+  height: 686,
+} as const;
 
 /** Apply needs an account and YouTube Connect. Live mutation is JOV-5158. */
 export const YOUTUBE_THUMBNAILS_APPLY_HREF = `${APP_ROUTES.SIGNUP}?source=youtube-thumbnails&intent=apply`;
@@ -19,28 +26,31 @@ export function YoutubeThumbnailsLanding() {
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
       <div>
-        <MarketingHero
-          variant='left'
-          sectionVariant='left-none'
-          headingId='youtube-thumbnails-hero-heading'
-          testId='marketing-section-hero'
-        >
-          <p className='homepage-section-eyebrow'>{copy.hero.eyebrow}</p>
-          <h1
-            id='youtube-thumbnails-hero-heading'
-            data-testid='youtube-thumbnails-hero-heading'
-            className='marketing-h1-linear mt-5 max-w-3xl text-primary-token line-clamp-2'
+        <div className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
+          <MarketingHeroPhoto {...YOUTUBE_THUMBNAILS_HERO_PHOTO} />
+          <MarketingHero
+            variant='left'
+            sectionVariant='left-none'
+            headingId='youtube-thumbnails-hero-heading'
+            testId='marketing-section-hero'
           >
-            {copy.hero.title}
-          </h1>
-          <p className='mt-5 max-w-2xl text-base leading-7 text-secondary-token sm:text-lg'>
-            {copy.hero.body}
-          </p>
-          <YoutubeThumbnailPasteForm
-            className='mt-8 w-full'
-            applyHref={YOUTUBE_THUMBNAILS_APPLY_HREF}
-          />
-        </MarketingHero>
+            <p className='homepage-section-eyebrow'>{copy.hero.eyebrow}</p>
+            <h1
+              id='youtube-thumbnails-hero-heading'
+              data-testid='youtube-thumbnails-hero-heading'
+              className='marketing-h1-linear mt-5 max-w-3xl text-primary-token line-clamp-2'
+            >
+              {copy.hero.title}
+            </h1>
+            <p className='mt-5 max-w-2xl text-base leading-7 text-secondary-token sm:text-lg'>
+              {copy.hero.body}
+            </p>
+            <YoutubeThumbnailPasteForm
+              className='mt-8 w-full'
+              applyHref={YOUTUBE_THUMBNAILS_APPLY_HREF}
+            />
+          </MarketingHero>
+        </div>
 
         <section
           id='how-it-works'

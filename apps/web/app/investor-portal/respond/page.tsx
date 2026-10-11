@@ -1,8 +1,13 @@
 import { and, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
-import { investorLinks, investorSettings } from '@/lib/db/schema/investors';
+import { investorLinks, investorViews } from '@/lib/db/schema/investors';
+import {
+  isInvestorClaimTokenShape,
+  isInvestorClaimUnexpired,
+} from '@/lib/investors/claim-token';
+import { buildInvestorEventPath } from '@/lib/investors/portal-events';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
@@ -17,7 +22,7 @@ interface RespondPageProps {
  * Interest/decline response handler for investor follow-up emails.
  * Token-authenticated via URL param (no cookie needed).
  *
- * ?t=TOKEN&action=interested → update stage, redirect to calendar
+ * ?t=TOKEN&action=interested → record the ask, no calendar
  * ?t=TOKEN&action=pass → update stage, show thank-you
  */
 export default async function InvestorRespondPage({
@@ -25,7 +30,12 @@ export default async function InvestorRespondPage({
 }: RespondPageProps) {
   const { t: token, action } = await searchParams;
 
-  if (!token || !action || !['interested', 'pass'].includes(action)) {
+  if (
+    !token ||
+    !isInvestorClaimTokenShape(token) ||
+    !action ||
+    !['interested', 'pass'].includes(action)
+  ) {
     notFound();
   }
 
@@ -47,31 +57,23 @@ export default async function InvestorRespondPage({
     notFound();
   }
 
-  // Reject expired tokens
-  if (link.expiresAt && new Date(link.expiresAt) < now) {
+  if (!isInvestorClaimUnexpired(link.expiresAt, now)) {
     notFound();
   }
 
-  // Fetch settings for calendar URL
-  const [settings] = await db.select().from(investorSettings).limit(1);
-
   if (action === 'interested') {
-    // Update stage to meeting_booked (only advance forward)
-    const advanceableStages = ['shared', 'viewed', 'engaged'];
+    const advanceableStages = ['shared', 'viewed'];
     if (advanceableStages.includes(link.stage)) {
       await db
         .update(investorLinks)
-        .set({ stage: 'meeting_booked', updatedAt: new Date() })
+        .set({ stage: 'engaged', updatedAt: new Date() })
         .where(eq(investorLinks.id, link.id));
+      await db.insert(investorViews).values({
+        investorLinkId: link.id,
+        pagePath: buildInvestorEventPath('call_requested'),
+      });
     }
 
-    // Redirect to calendar
-    const calendarUrl = settings?.bookCallUrl;
-    if (calendarUrl) {
-      redirect(calendarUrl);
-    }
-
-    // Fallback if no calendar URL configured
     return (
       <div className='dark flex min-h-screen items-center justify-center bg-(--color-bg-base)'>
         <div className='text-center'>

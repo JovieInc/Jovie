@@ -22,13 +22,7 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
   prefetchForRoute: prefetchForRouteMock,
 }));
 
-const PRIMARY_LABELS = [
-  'Inbox',
-  'New Chat',
-  'Library',
-  'Contacts',
-  'Presence',
-] as const;
+const PRIMARY_LABELS = ['New Chat', 'Identity', 'Work', 'Audience'] as const;
 
 describe('DashboardNav interactions', () => {
   afterEach(() => {
@@ -38,12 +32,20 @@ describe('DashboardNav interactions', () => {
   });
 
   it('exposes an icon and label for each canonical navigation item', () => {
-    renderDashboardNav({ renderFn: render });
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { PROFILES_WORKSPACE: true },
+    });
 
     for (const label of PRIMARY_LABELS) {
       const link = screen.getByRole('link', { name: label });
       expect(link.querySelector('svg')).toBeTruthy();
       expect(link).toHaveAccessibleName(label);
+    }
+    const homeLinks = screen.getAllByRole('link', { name: 'Home' });
+    expect(homeLinks).toHaveLength(2);
+    for (const link of homeLinks) {
+      expect(link.querySelector('svg')).toBeTruthy();
     }
   });
 
@@ -57,7 +59,10 @@ describe('DashboardNav interactions', () => {
     const searchSlot = container.querySelector<HTMLElement>(
       '[data-sidebar-search-slot="true"]'
     );
-    const inbox = screen.getByRole('link', { name: 'Inbox' });
+    const inbox = container.querySelector('[data-navigation-item-id="inbox"]');
+    expect(inbox).toBeInstanceOf(HTMLElement);
+    if (!(inbox instanceof HTMLElement)) return;
+    expect(inbox).toHaveAccessibleName('Home');
 
     expect(newChat).toHaveClass(
       'size-6',
@@ -76,9 +81,9 @@ describe('DashboardNav interactions', () => {
     const user = userEvent.setup();
     renderDashboardNav({ renderFn: render });
 
-    const libraryLink = screen.getByRole('link', { name: 'Library' });
-    libraryLink.addEventListener('click', event => event.preventDefault());
-    await user.click(libraryLink);
+    const workLink = screen.getByRole('link', { name: 'Work' });
+    workLink.addEventListener('click', event => event.preventDefault());
+    await user.click(workLink);
 
     expect(mockStartNavigationTelemetry).toHaveBeenCalledExactlyOnceWith({
       itemId: 'library',
@@ -88,23 +93,34 @@ describe('DashboardNav interactions', () => {
       context: {
         isElectron: false,
         isMobile: false,
-        navVariant: 'canonical_customer_ia_v1',
+        navVariant: 'canonical_identity_work_v1',
       },
     });
   });
 
-  it('does not duplicate sidebar Search or removed primary destinations', () => {
+  it('keeps entity categories and retired workflows out of root navigation', () => {
     renderDashboardNav({ renderFn: render });
 
-    for (const label of ['Search', 'Touring', 'Audience', 'Releases']) {
+    for (const label of [
+      'Calendar',
+      'Contacts',
+      'Events',
+      'Library',
+      'Links',
+      'Products',
+      'Releases',
+      'Tasks',
+      'Videos',
+    ]) {
       expect(screen.queryByRole('link', { name: label })).toBeNull();
       expect(screen.queryByRole('button', { name: label })).toBeNull();
     }
   });
 
-  it('routes Presence through the artist navigation without a duplicate avatar button', () => {
+  it('routes Identity through root navigation without a duplicate avatar button', () => {
     renderDashboardNav({
       renderFn: render,
+      appFlags: { PROFILES_WORKSPACE: true },
       overrides: {
         selectedProfile: {
           id: 'profile_123',
@@ -115,9 +131,9 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    expect(screen.getByRole('link', { name: 'Presence' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Identity' })).toHaveAttribute(
       'href',
-      APP_ROUTES.PROFILES
+      APP_ROUTES.PRESENCE
     );
     expect(
       screen.queryByRole('button', { name: 'Open Tim White profile' })
@@ -126,14 +142,17 @@ describe('DashboardNav interactions', () => {
     expect(mockOpenPreviewPanel).not.toHaveBeenCalled();
   });
 
-  it('keeps Library active throughout a canonical release workspace', () => {
-    mockUsePathname.mockReturnValue('/app/releases/release-123/tasks');
+  it('marks Work active on the canonical library route', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.LIBRARY);
     renderDashboardNav({ renderFn: render });
 
-    expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Work' })).toHaveAttribute(
       'aria-current',
       'page'
     );
+    expect(
+      document.querySelector('[data-navigation-item-id="home"]')
+    ).not.toHaveAttribute('aria-current');
   });
 
   it('renders recent chats as App Router links', () => {
@@ -219,6 +238,7 @@ describe('DashboardNav interactions', () => {
     vi.useFakeTimers();
     renderDashboardNav({
       renderFn: render,
+      appFlags: { PROFILES_WORKSPACE: true },
       overrides: {
         selectedProfile: {
           id: 'profile_123',
@@ -229,12 +249,35 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Contacts' }));
+    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Identity' }));
     expect(prefetchForRouteMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(150);
 
     expect(prefetchForRouteMock).toHaveBeenCalledWith(
-      'contacts',
+      'presence',
+      expect.anything(),
+      'profile_123'
+    );
+  });
+
+  it('does not warm Work without an interaction', async () => {
+    vi.useFakeTimers();
+    renderDashboardNav({
+      renderFn: render,
+      overrides: {
+        selectedProfile: {
+          id: 'profile_123',
+          displayName: 'Tim White',
+          username: 'tim',
+          usernameNormalized: 'tim',
+        } as DashboardData['selectedProfile'],
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(prefetchForRouteMock).not.toHaveBeenCalledWith(
+      'library',
       expect.anything(),
       'profile_123'
     );
@@ -243,14 +286,17 @@ describe('DashboardNav interactions', () => {
   it('keeps demo-disabled rows as links while intercepting unavailable content', async () => {
     const user = userEvent.setup();
     mockUsePathname.mockReturnValue('/demo/showcase/settings');
-    renderDashboardNav({ renderFn: render });
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { PROFILES_WORKSPACE: true },
+    });
 
-    const calendarLink = screen.getByRole('link', { name: 'Contacts' });
-    expect(calendarLink).toHaveAttribute('href', APP_ROUTES.CONTACTS);
-    await user.click(calendarLink);
+    const identityLink = screen.getByRole('link', { name: 'Identity' });
+    expect(identityLink).toHaveAttribute('href', APP_ROUTES.PRESENCE);
+    await user.click(identityLink);
 
     expect(mockToastInfo).toHaveBeenCalledWith(
-      'Contacts is not available in demo mode'
+      'Identity is not available in demo mode'
     );
   });
 });

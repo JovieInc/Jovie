@@ -5,7 +5,7 @@ import {
   type Request,
 } from '@playwright/test';
 import { isValidDspUrl } from '@/lib/dsp';
-import { getRegistryEntry } from '@/lib/dsp-registry';
+import { DSP_REGISTRY, getRegistryEntry } from '@/lib/dsp-registry';
 import type {
   PublicInteractionSpec,
   ResolvedPublicSurfaceSpec,
@@ -590,8 +590,13 @@ async function runArtworkMenuInteraction(page: Page) {
 }
 
 export async function runDspInteraction(page: Page) {
+  // Generic platform links use link_ keys (toGenericPlatformLink), even when
+  // ActionDial renders them through the shared provider button. Audit music
+  // actions separately; unknown music keys must still fail the registry check.
+  const dspActionSelector =
+    '[data-dsp-provider]:not([data-dsp-provider^="link_"])';
   const visibleActions = page
-    .locator('[data-dsp-provider]')
+    .locator(dspActionSelector)
     .filter({ visible: true });
 
   const actionCount = await visibleActions.count();
@@ -613,10 +618,14 @@ export async function runDspInteraction(page: Page) {
     ).toBeGreaterThan(0);
     expect(url.username, 'DSP handoff must not embed credentials').toBe('');
     expect(url.password, 'DSP handoff must not embed credentials').toBe('');
-    expect(
-      isValidDspUrl(provider, url.href),
-      `DSP handoff host is not canonical for ${provider}: ${url.hostname}`
-    ).toBe(true);
+    // Generic platform links (`link_<slug>`) have no canonical host — any
+    // valid https destination is acceptable for them.
+    if (!provider.startsWith('link_')) {
+      expect(
+        isValidDspUrl(provider, url.href),
+        `DSP handoff host is not canonical for ${provider}: ${url.hostname}`
+      ).toBe(true);
+    }
     if (target === '_blank') {
       const protections = new Set(
         (relOrFeatures ?? '')
@@ -652,20 +661,23 @@ export async function runDspInteraction(page: Page) {
   });
 
   const exercisedProviders = new Set<string>();
-  for (let index = 0; index < actionCount; index += 1) {
-    const action = visibleActions.nth(index);
+  const auditAction = async (action: Locator) => {
     const provider = await action.getAttribute('data-dsp-provider');
     expect(
       provider,
       'DSP action is missing its canonical provider key'
     ).toBeTruthy();
-    if (!provider) continue;
-    const registryEntry = getRegistryEntry(provider);
-    expect(
-      registryEntry,
-      `Unknown DSP provider key: ${provider}`
-    ).toBeDefined();
-    expect(registryEntry?.showOnListenPage).toBe(true);
+    if (!provider) return;
+    // Generic platform links (`link_<slug>`) are rendered on the listen
+    // surface but are intentionally absent from the DSP registry.
+    if (!provider.startsWith('link_')) {
+      const registryEntry = getRegistryEntry(provider);
+      expect(
+        registryEntry,
+        `Unknown DSP provider key: ${provider}`
+      ).toBeDefined();
+      expect(registryEntry?.showOnListenPage).toBe(true);
+    }
     exercisedProviders.add(provider);
 
     const href = await action.getAttribute('href');
@@ -676,7 +688,7 @@ export async function runDspInteraction(page: Page) {
         await action.getAttribute('target'),
         await action.getAttribute('rel')
       );
-      continue;
+      return;
     }
 
     await expect(action).toBeEnabled();
@@ -719,6 +731,44 @@ export async function runDspInteraction(page: Page) {
     ).toBe('_blank');
     assertSafeHandoff(provider, handoff.url, handoff.target, handoff.features);
     await expect(action).toBeEnabled({ timeout: 2_000 });
+  };
+
+  for (let index = 0; index < actionCount; index += 1) {
+    await auditAction(visibleActions.nth(index));
+  }
+
+  // Dials expose one handoff at a time. Select every available service rather
+  // than mistaking the initially selected Spotify action for the full fixture.
+  const dials = page
+    .getByTestId('action-dial')
+    .filter({ has: page.locator(dspActionSelector) });
+  for (let index = 0; index < (await dials.count()); index += 1) {
+    const dial = dials.nth(index);
+    const action = dial.locator(dspActionSelector).filter({ visible: true });
+    const initialProvider = await action.getAttribute('data-dsp-provider');
+    const visited = new Set<string | null>();
+    while (true) {
+      const provider = await action.getAttribute('data-dsp-provider');
+      if (visited.has(provider)) {
+        expect(provider, 'DSP dial must return to its initial selection').toBe(
+          initialProvider
+        );
+        break;
+      }
+      visited.add(provider);
+      expect(
+        visited.size,
+        'DSP dial must finish a bounded provider cycle'
+      ).toBeLessThanOrEqual(DSP_REGISTRY.length);
+      await auditAction(action);
+      const nextService = dial.locator('[data-dial-offset="1"]');
+      if ((await nextService.count()) === 0) break;
+      await nextService.click();
+      await expect(action).not.toHaveAttribute(
+        'data-dsp-provider',
+        provider ?? ''
+      );
+    }
   }
 
   expect(

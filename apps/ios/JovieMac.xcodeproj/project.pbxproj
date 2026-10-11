@@ -3,27 +3,32 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0576152A09AF7C5FD59AC2DB /* MobileAuthReturn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499DE09E02420D4532C5AA68 /* MobileAuthReturn.swift */; };
-		170EA01F5A346D1D233F74E4 /* MobileActionLoopCalendarResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE8E81BE0FE93BE87562115 /* MobileActionLoopCalendarResponse.swift */; };
+		A07571000000000000000002 /* MacComposerTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A07571000000000000000001 /* MacComposerTextView.swift */; };
 		1896A3883415894102BD7253 /* JovieTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB44E21E153FB9E310A070D5 /* JovieTheme.swift */; };
-		1C8356139DFCF69188E86883 /* MacPasskeySignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 383E4BBD38F04554E7CA8FE7 /* MacPasskeySignIn.swift */; };
-		292F2C03A242D95946638218 /* MobileMeResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A57EAFA6BED3636627412744 /* MobileMeResponse.swift */; };
 		3353B95B121A56335FF6FE38 /* JovieMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 757F8502356A59A5F57050B8 /* JovieMacApp.swift */; };
 		3AE40D4F04A738A193B7ABF6 /* Inter-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0ED25F3AE58B87A3EC2CB07D /* Inter-Variable.ttf */; };
-		5C3E68B076532A283DE77339 /* MobileAudienceHighlightsResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A08D6AA8A358931993EF71C6 /* MobileAudienceHighlightsResponse.swift */; };
-		5E4C645892E22481F584748F /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA29F504D6EF56434B66B296 /* AppRouter.swift */; };
 		7C2DC859CF9A98CC979BE7C8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C7307463378A4CD5C32D2818 /* Assets.xcassets */; };
-		8567EA78F63A86F259A51764 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAB2175CCABDB1ECD5AF25E /* APIClient.swift */; };
-		9037230434B51527C5BEADAA /* NativeSessionTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F0FFC73749238AA3D0F9697 /* NativeSessionTokenStore.swift */; };
 		B26F569A9ED51C90D2BC85CD /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E8620D0FAF554FF421D51A6C /* Cocoa.framework */; };
-		BAFBC828F71AF1EDD6AD73A4 /* MacSessionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF034425181827A1F0DE391F /* MacSessionModel.swift */; };
+		BAFBC828F71AF1EDD6AD73A4 /* MacDevelopmentContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF034425181827A1F0DE391F /* MacDevelopmentContent.swift */; };
 		E283E047266C50CE787D64D8 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E8620D0FAF554FF421D51A6C /* Cocoa.framework */; };
-		E55663FD7607AEF97C8ACC9D /* MacPasskeySignInTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D5ED72B96DE18C73D3034E /* MacPasskeySignInTests.swift */; };
-		EF9F35021FF51A3AA12BF3BC /* MobileActionLoopInboxResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B53A6B29A3BBDA97B188771 /* MobileActionLoopInboxResponse.swift */; };
+		E55663FD7607AEF97C8ACC9D /* MacDevelopmentBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D5ED72B96DE18C73D3034E /* MacDevelopmentBoundaryTests.swift */; };
+		F75280000000000000000001 /* JovieKit in Frameworks */ = {isa = PBXBuildFile; productRef = F75280000000000000000003 /* JovieKit */; };
+		F75280000000000000000002 /* JovieKit in Frameworks */ = {isa = PBXBuildFile; productRef = F75280000000000000000004 /* JovieKit */; };
+		A076610000000000000000C9 /* ChatRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000C8 /* ChatRepository.swift */; };
+		A076610000000000000000CB /* ChatCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000CA /* ChatCache.swift */; };
+		A076610000000000000000CD /* NativeSessionTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000CC /* NativeSessionTokenStore.swift */; };
+		A076610000000000000000CF /* MobileChatClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000CE /* MobileChatClient.swift */; };
+		A076610000000000000000D1 /* NativeAPIContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D0 /* NativeAPIContracts.swift */; };
+		A076610000000000000000D3 /* ChatStateModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D2 /* ChatStateModels.swift */; };
+		A076610000000000000000D5 /* MobileWorkspaceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D4 /* MobileWorkspaceMode.swift */; };
+		A076610000000000000000D7 /* VoiceCaptureContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D6 /* VoiceCaptureContracts.swift */; };
+		A076610000000000000000D9 /* NativeChatRepositoryFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D8 /* NativeChatRepositoryFactory.swift */; };
+		A076610000000000000000DB /* IntentNavigationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000DA /* IntentNavigationStore.swift */; };
+		A076610000000000000000DD /* ConversationUserActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000DC /* ConversationUserActivity.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,24 +42,27 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A07571000000000000000001 /* MacComposerTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacComposerTextView.swift; sourceTree = "<group>"; };
 		0ED25F3AE58B87A3EC2CB07D /* Inter-Variable.ttf */ = {isa = PBXFileReference; includeInIndex = 1; path = "Inter-Variable.ttf"; sourceTree = "<group>"; };
-		0F0FFC73749238AA3D0F9697 /* NativeSessionTokenStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeSessionTokenStore.swift; sourceTree = "<group>"; };
-		29D5ED72B96DE18C73D3034E /* MacPasskeySignInTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacPasskeySignInTests.swift; sourceTree = "<group>"; };
-		383E4BBD38F04554E7CA8FE7 /* MacPasskeySignIn.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacPasskeySignIn.swift; sourceTree = "<group>"; };
-		499DE09E02420D4532C5AA68 /* MobileAuthReturn.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAuthReturn.swift; sourceTree = "<group>"; };
-		6AE8E81BE0FE93BE87562115 /* MobileActionLoopCalendarResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileActionLoopCalendarResponse.swift; sourceTree = "<group>"; };
-		6B53A6B29A3BBDA97B188771 /* MobileActionLoopInboxResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileActionLoopInboxResponse.swift; sourceTree = "<group>"; };
+		29D5ED72B96DE18C73D3034E /* MacDevelopmentBoundaryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacDevelopmentBoundaryTests.swift; sourceTree = "<group>"; };
 		757F8502356A59A5F57050B8 /* JovieMacApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieMacApp.swift; sourceTree = "<group>"; };
-		A08D6AA8A358931993EF71C6 /* MobileAudienceHighlightsResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAudienceHighlightsResponse.swift; sourceTree = "<group>"; };
-		A57EAFA6BED3636627412744 /* MobileMeResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileMeResponse.swift; sourceTree = "<group>"; };
-		AAAB2175CCABDB1ECD5AF25E /* APIClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		B6A8941AB0E3F97761A1A4C5 /* JovieMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JovieMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB44E21E153FB9E310A070D5 /* JovieTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieTheme.swift; sourceTree = "<group>"; };
 		C467FF241C814A0409E33490 /* JovieMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JovieMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C7307463378A4CD5C32D2818 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		CF034425181827A1F0DE391F /* MacSessionModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacSessionModel.swift; sourceTree = "<group>"; };
-		E8620D0FAF554FF421D51A6C /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
-		EA29F504D6EF56434B66B296 /* AppRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
+		CF034425181827A1F0DE391F /* MacDevelopmentContent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacDevelopmentContent.swift; sourceTree = "<group>"; };
+		E8620D0FAF554FF421D51A6C /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		A076610000000000000000C8 /* ChatRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRepository.swift; sourceTree = "<group>"; };
+		A076610000000000000000CA /* ChatCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCache.swift; sourceTree = "<group>"; };
+		A076610000000000000000CC /* NativeSessionTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSessionTokenStore.swift; sourceTree = "<group>"; };
+		A076610000000000000000CE /* MobileChatClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileChatClient.swift; sourceTree = "<group>"; };
+		A076610000000000000000D0 /* NativeAPIContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAPIContracts.swift; sourceTree = "<group>"; };
+		A076610000000000000000D2 /* ChatStateModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStateModels.swift; sourceTree = "<group>"; };
+		A076610000000000000000D4 /* MobileWorkspaceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileWorkspaceMode.swift; sourceTree = "<group>"; };
+		A076610000000000000000D6 /* VoiceCaptureContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCaptureContracts.swift; sourceTree = "<group>"; };
+		A076610000000000000000D8 /* NativeChatRepositoryFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChatRepositoryFactory.swift; sourceTree = "<group>"; };
+		A076610000000000000000DA /* IntentNavigationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntentNavigationStore.swift; sourceTree = "<group>"; };
+		A076610000000000000000DC /* ConversationUserActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationUserActivity.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,6 +71,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E283E047266C50CE787D64D8 /* Cocoa.framework in Frameworks */,
+				F75280000000000000000002 /* JovieKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,25 +80,17 @@
 			buildActionMask = 2147483647;
 			files = (
 				B26F569A9ED51C90D2BC85CD /* Cocoa.framework in Frameworks */,
+				F75280000000000000000001 /* JovieKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		094157E2015B47146D7E559C /* App */ = {
-			isa = PBXGroup;
-			children = (
-				499DE09E02420D4532C5AA68 /* MobileAuthReturn.swift */,
-				EA29F504D6EF56434B66B296 /* AppRouter.swift */,
-			);
-			path = App;
-			sourceTree = "<group>";
-		};
 		1BD92BD3BC4268D8089E76AF /* JovieMacTests */ = {
 			isa = PBXGroup;
 			children = (
-				29D5ED72B96DE18C73D3034E /* MacPasskeySignInTests.swift */,
+				29D5ED72B96DE18C73D3034E /* MacDevelopmentBoundaryTests.swift */,
 			);
 			path = JovieMacTests;
 			sourceTree = "<group>";
@@ -110,19 +111,6 @@
 			path = DesignSystem;
 			sourceTree = "<group>";
 		};
-		49AC6485186B601150539059 /* Core */ = {
-			isa = PBXGroup;
-			children = (
-				AAAB2175CCABDB1ECD5AF25E /* APIClient.swift */,
-				A57EAFA6BED3636627412744 /* MobileMeResponse.swift */,
-				A08D6AA8A358931993EF71C6 /* MobileAudienceHighlightsResponse.swift */,
-				6B53A6B29A3BBDA97B188771 /* MobileActionLoopInboxResponse.swift */,
-				6AE8E81BE0FE93BE87562115 /* MobileActionLoopCalendarResponse.swift */,
-				0F0FFC73749238AA3D0F9697 /* NativeSessionTokenStore.swift */,
-			);
-			path = Core;
-			sourceTree = "<group>";
-		};
 		4A923170AE15028DA071DFF8 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
@@ -136,8 +124,8 @@
 			isa = PBXGroup;
 			children = (
 				439F3503579FAE5E1B0CE7D2 /* DesignSystem */,
-				49AC6485186B601150539059 /* Core */,
-				094157E2015B47146D7E559C /* App */,
+				A0766100000000000000012C /* Core */,
+				A0766100000000000000012D /* Features */,
 				4A923170AE15028DA071DFF8 /* Resources */,
 			);
 			path = Jovie;
@@ -166,8 +154,8 @@
 			isa = PBXGroup;
 			children = (
 				757F8502356A59A5F57050B8 /* JovieMacApp.swift */,
-				383E4BBD38F04554E7CA8FE7 /* MacPasskeySignIn.swift */,
-				CF034425181827A1F0DE391F /* MacSessionModel.swift */,
+				CF034425181827A1F0DE391F /* MacDevelopmentContent.swift */,
+				A07571000000000000000001 /* MacComposerTextView.swift */,
 			);
 			path = JovieMac;
 			sourceTree = "<group>";
@@ -189,6 +177,39 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		A0766100000000000000012C /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				A076610000000000000000C8 /* ChatRepository.swift */,
+				A076610000000000000000CA /* ChatCache.swift */,
+				A076610000000000000000CC /* NativeSessionTokenStore.swift */,
+				A076610000000000000000CE /* MobileChatClient.swift */,
+				A076610000000000000000D0 /* NativeAPIContracts.swift */,
+				A076610000000000000000D2 /* ChatStateModels.swift */,
+				A076610000000000000000D4 /* MobileWorkspaceMode.swift */,
+				A076610000000000000000D6 /* VoiceCaptureContracts.swift */,
+				A076610000000000000000D8 /* NativeChatRepositoryFactory.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		A0766100000000000000012D /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A0766100000000000000012E /* Intents */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A0766100000000000000012E /* Intents */ = {
+			isa = PBXGroup;
+			children = (
+				A076610000000000000000DA /* IntentNavigationStore.swift */,
+				A076610000000000000000DC /* ConversationUserActivity.swift */,
+			);
+			path = Intents;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -206,6 +227,9 @@
 				F284D7AD2F86DC60816A961D /* PBXTargetDependency */,
 			);
 			name = JovieMacTests;
+			packageProductDependencies = (
+				F75280000000000000000004 /* JovieKit */,
+			);
 			productName = JovieMacTests;
 			productReference = C467FF241C814A0409E33490 /* JovieMacTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -223,6 +247,9 @@
 			dependencies = (
 			);
 			name = JovieMac;
+			packageProductDependencies = (
+				F75280000000000000000003 /* JovieKit */,
+			);
 			productName = JovieMac;
 			productReference = B6A8941AB0E3F97761A1A4C5 /* JovieMac.app */;
 			productType = "com.apple.product-type.application";
@@ -237,7 +264,7 @@
 				LastUpgradeCheck = 1600;
 			};
 			buildConfigurationList = DAEF582C8140B6838D4E2F04 /* Build configuration list for PBXProject "JovieMac" */;
-			compatibilityVersion = "Xcode 3.2";
+			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -246,8 +273,10 @@
 			);
 			mainGroup = 74142DBE726B1EC98E0AC553;
 			minimizedProjectReferenceProxies = 0;
-			preferredProjectObjectVersion = 77;
 			productRefGroup = D74DB3699CBD1639D8E9346F /* Products */;
+			packageReferences = (
+				F75280000000000000000005 /* XCLocalSwiftPackageReference "Packages/JovieKit" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -281,7 +310,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E55663FD7607AEF97C8ACC9D /* MacPasskeySignInTests.swift in Sources */,
+				E55663FD7607AEF97C8ACC9D /* MacDevelopmentBoundaryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -290,17 +319,20 @@
 			buildActionMask = 2147483647;
 			files = (
 				1896A3883415894102BD7253 /* JovieTheme.swift in Sources */,
-				8567EA78F63A86F259A51764 /* APIClient.swift in Sources */,
-				292F2C03A242D95946638218 /* MobileMeResponse.swift in Sources */,
-				5C3E68B076532A283DE77339 /* MobileAudienceHighlightsResponse.swift in Sources */,
-				EF9F35021FF51A3AA12BF3BC /* MobileActionLoopInboxResponse.swift in Sources */,
-				170EA01F5A346D1D233F74E4 /* MobileActionLoopCalendarResponse.swift in Sources */,
-				9037230434B51527C5BEADAA /* NativeSessionTokenStore.swift in Sources */,
-				0576152A09AF7C5FD59AC2DB /* MobileAuthReturn.swift in Sources */,
-				5E4C645892E22481F584748F /* AppRouter.swift in Sources */,
+				A076610000000000000000C9 /* ChatRepository.swift in Sources */,
+				A076610000000000000000CB /* ChatCache.swift in Sources */,
+				A076610000000000000000CD /* NativeSessionTokenStore.swift in Sources */,
+				A076610000000000000000CF /* MobileChatClient.swift in Sources */,
+				A076610000000000000000D1 /* NativeAPIContracts.swift in Sources */,
+				A076610000000000000000D3 /* ChatStateModels.swift in Sources */,
+				A076610000000000000000D5 /* MobileWorkspaceMode.swift in Sources */,
+				A076610000000000000000D7 /* VoiceCaptureContracts.swift in Sources */,
+				A076610000000000000000D9 /* NativeChatRepositoryFactory.swift in Sources */,
+				A076610000000000000000DB /* IntentNavigationStore.swift in Sources */,
+				A076610000000000000000DD /* ConversationUserActivity.swift in Sources */,
 				3353B95B121A56335FF6FE38 /* JovieMacApp.swift in Sources */,
-				1C8356139DFCF69188E86883 /* MacPasskeySignIn.swift in Sources */,
-				BAFBC828F71AF1EDD6AD73A4 /* MacSessionModel.swift in Sources */,
+				BAFBC828F71AF1EDD6AD73A4 /* MacDevelopmentContent.swift in Sources */,
+				A07571000000000000000002 /* MacComposerTextView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -320,14 +352,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.JovieMacTests;
+				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.JovieMac.Development.Tests;
 				PRODUCT_NAME = JovieMacTests;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -340,14 +371,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.JovieMacTests;
+				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.JovieMac.Development.Tests;
 				PRODUCT_NAME = JovieMacTests;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -359,22 +389,19 @@
 		54AF82653035F91D11CB0026 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_ENTITLEMENTS = JovieMac/JovieMac.entitlements;
-				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = JovieMac/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.Jovie;
+				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.JovieMac.Development;
 				PRODUCT_MODULE_NAME = JovieMac;
 				PRODUCT_NAME = JovieMac;
 				SDKROOT = macosx;
@@ -420,6 +447,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -440,22 +468,19 @@
 		F13DE769C919389774D9152E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_ENTITLEMENTS = JovieMac/JovieMac.entitlements;
-				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = JovieMac/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.Jovie;
+				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.JovieMac.Development;
 				PRODUCT_MODULE_NAME = JovieMac;
 				PRODUCT_NAME = JovieMac;
 				SDKROOT = macosx;
@@ -556,6 +581,26 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		F75280000000000000000005 /* XCLocalSwiftPackageReference "Packages/JovieKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/JovieKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F75280000000000000000003 /* JovieKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F75280000000000000000005 /* XCLocalSwiftPackageReference "Packages/JovieKit" */;
+			productName = JovieKit;
+		};
+		F75280000000000000000004 /* JovieKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F75280000000000000000005 /* XCLocalSwiftPackageReference "Packages/JovieKit" */;
+			productName = JovieKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D76D382B5F2722A84D6621D4 /* Project object */;
 }

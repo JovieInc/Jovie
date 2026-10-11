@@ -8,7 +8,7 @@ export type {
 export { useChatFileAttachments } from './useChatFileAttachments';
 export { useChatImageAttachments } from './useChatImageAttachments';
 export { useChatJankMonitor } from './useChatJankMonitor';
-export { useJovieChat } from './useJovieChat';
+export { useJovieChat, useJovieChatController } from './useJovieChat';
 export { useSpeechRecognition } from './useSpeechRecognition';
 export { useStickToBottom } from './useStickToBottom';
 export { useSuggestedProfiles } from './useSuggestedProfiles';

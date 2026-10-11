@@ -1,5 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -17,6 +23,7 @@ import {
   planChangedLineCoverage,
   resolveTestSpecifierCandidates,
   runChangedLineCoverageCheck,
+  SOURCE_SCANNER_TESTS,
   toWebCoverageIncludePaths,
 } from '../changed-test-coverage.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
@@ -499,6 +506,27 @@ const rule = require('./no-hardcoded-theme-colors.js');`,
     expect(sourceReady).toContain('COVERAGE_RESULT" != "success"');
   });
 
+  it('deliberate red: source-validation.yml reads the current plan field name', () => {
+    // Regression for a real break: the planner's output field was renamed
+    // include -> coverageInclude (see the "serializes coverageInclude..."
+    // test above and ci.yml's `.coverageInclude // [] | .[]` usage), but
+    // .github/workflows/source-validation.yml's own "Exact-head Coverage"
+    // job still read the old `.include[]`. `jq` throws on a null `.include`
+    // (exit 5) for any PR with an applicable plan, failing every PR's
+    // merge-queue entry behind the one that introduced the rename until
+    // this was caught (JOV-7126 PR #19508, blocked behind #19436).
+    const workflow = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../.github/workflows/source-validation.yml'
+      ),
+      'utf8'
+    );
+    expect(workflow).toContain('JOVIE_COVERAGE_INCLUDE');
+    expect(workflow).toContain('.coverageInclude // [] | .[]');
+    expect(workflow).not.toContain(String.raw`jq -r '.include[]'`);
+  });
+
   it('deliberate red: the gate merges exactly one coverage report per shard', () => {
     const workflow = readFileSync(
       resolve(import.meta.dirname, '../../../.github/workflows/ci.yml'),
@@ -712,4 +740,37 @@ const rule = require('./no-hardcoded-theme-colors.js');`,
       }
     }
   );
+});
+
+describe('source scanner admission on the PR (JOV-6834)', () => {
+  const REPO = resolve(import.meta.dirname, '..', '..', '..');
+  const scanner = SOURCE_SCANNER_TESTS[0];
+
+  it('names scanner tests that exist, so a rename fails here, not silently', () => {
+    expect(SOURCE_SCANNER_TESTS.length).toBeGreaterThan(0);
+    for (const test of SOURCE_SCANNER_TESTS) {
+      expect(existsSync(resolve(REPO, test)), test).toBe(true);
+    }
+  });
+
+  it('adds present scanners to every applicable plan, never to a no-op plan', () => {
+    const testFiles = [
+      { path: scanner, source: "readFileSync('components/x.tsx')" },
+      {
+        path: 'apps/web/tests/unit/a.test.ts',
+        source: "import '@/lib/example';",
+      },
+    ];
+    const plan = planChangedLineCoverage({ files: [path], testFiles });
+    expect(plan.relatedTests).toEqual(
+      [scanner.slice('apps/web/'.length), 'tests/unit/a.test.ts'].sort()
+    );
+    expect(
+      planChangedLineCoverage({ files: [], testFiles }).relatedTests
+    ).toEqual([]);
+    expect(
+      planChangedLineCoverage({ files: [path], testFiles: testFiles.slice(1) })
+        .relatedTests
+    ).toEqual(['tests/unit/a.test.ts']);
+  });
 });

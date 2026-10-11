@@ -1,5 +1,6 @@
 import { HOSTNAME, STAGING_HOSTNAMES } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { OVIE_OAUTH_VERIFY_PATH } from '@/lib/ovie/mcp/oauth-contract';
 import { isReservedUsername } from '@/lib/validation/username-core';
 
 export interface PathCategory {
@@ -70,6 +71,10 @@ const SYSTEM_RESERVED_SEGMENTS = new Set([
   'sentry-example-page',
   'sentry-example-api',
   'investor-portal',
+  // Retired public investor pages (now 404 in lib/auth/investor-portal.ts);
+  // reserved so no profile handle can claim the old URLs.
+  'investors',
+  'pitch',
   'llms.txt',
   'llms-full.txt',
   'openapi.json',
@@ -172,6 +177,7 @@ export function categorizePath(pathname: string): PathCategory {
   const cached = _categorizePathCache.get(pathname);
   if (cached) return cached;
   const isAuthPath =
+    pathname === OVIE_OAUTH_VERIFY_PATH ||
     pathname === APP_ROUTES.SIGNIN ||
     pathname === APP_ROUTES.SIGNIN_HYPHEN ||
     pathname === APP_ROUTES.SIGNUP ||

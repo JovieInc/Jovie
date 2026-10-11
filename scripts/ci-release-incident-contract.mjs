@@ -131,16 +131,31 @@ export function validateIncidentLedger(ledger) {
     if (!nonEmptyString(incident.failureMode))
       errors.push(`${id}: failureMode is required`);
 
-    const regression = incident.regression;
-    if (!regression || !['test', 'verifier'].includes(regression.kind)) {
-      errors.push(`${id}: regression.kind must be test or verifier`);
+    if (incident.lifecycle !== undefined) {
+      const lifecycle = incident.lifecycle;
+      if (!['active', 'superseded'].includes(lifecycle?.state)) {
+        errors.push(`${id}: lifecycle.state must be active or superseded`);
+      }
+      if (
+        lifecycle?.state === 'superseded' &&
+        !nonEmptyString(lifecycle?.supersededBy)
+      ) {
+        errors.push(`${id}: lifecycle.supersededBy is required`);
+      }
     }
-    if (
-      !nonEmptyString(regression?.command) ||
-      !/^(node|pnpm|pytest|test|\.\/)/.test(regression.command)
-    )
-      errors.push(`${id}: regression.command is required`);
-    requireExistingPath(regression?.path, `${id}: regression.path`, errors);
+    const superseded = incident.lifecycle?.state === 'superseded';
+    const regression = incident.regression;
+    if (!superseded) {
+      if (!regression || !['test', 'verifier'].includes(regression.kind)) {
+        errors.push(`${id}: regression.kind must be test or verifier`);
+      }
+      if (
+        !nonEmptyString(regression?.command) ||
+        !/^(node|pnpm|pytest|test|\.\/)/.test(regression.command)
+      )
+        errors.push(`${id}: regression.command is required`);
+      requireExistingPath(regression?.path, `${id}: regression.path`, errors);
+    }
 
     if (!REQUIRED_STAGES.has(incident.ciStageOwner?.stage)) {
       errors.push(`${id}: ciStageOwner.stage is not a supported CI stage`);

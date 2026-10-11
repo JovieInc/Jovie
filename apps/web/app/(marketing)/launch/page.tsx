@@ -18,9 +18,14 @@ import {
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHeroPhoto,
+  MarketingPageShell,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
@@ -412,7 +417,8 @@ function SectionIntro({
       <p className='system-b-launch-kicker'>{eyebrow}</p>
       <h2
         id={headingId}
-        className={cn('system-b-launch-section-title', 'line-clamp-2')}
+        data-wrap='editorial-title'
+        className='system-b-launch-section-title'
       >
         {title}
       </h2>
@@ -447,9 +453,14 @@ export default function LaunchPage() {
       <main>
         <section
           aria-labelledby='hero-heading'
-          className='system-b-launch-hero'
+          className='system-b-launch-hero marketing-hero-dock relative overflow-hidden'
         >
-          <MarketingContainer width='page'>
+          <MarketingHeroPhoto
+            src='/images/marketing-hero/launch.webp'
+            width={1600}
+            height={901}
+          />
+          <MarketingContainer width='page' className='relative z-3'>
             <div className='system-b-launch-hero-grid'>
               <div className='system-b-launch-hero-copy'>
                 <p className='system-b-launch-kicker'>Launch</p>
@@ -470,6 +481,7 @@ export default function LaunchPage() {
                 <div className='system-b-launch-hero-actions'>
                   <Link
                     href={APP_ROUTES.SIGNUP}
+                    prefetch={resolveMarketingAuthPrefetch(APP_ROUTES.SIGNUP)}
                     className='system-b-launch-primary-link'
                   >
                     Request access
@@ -498,7 +510,7 @@ export default function LaunchPage() {
           aria-label='Supported Platforms'
         >
           <MarketingContainer width='page'>
-            <ul>
+            <ul data-component='platform-logo-strip'>
               {PLATFORM_LOGOS.map(name => (
                 <li key={name}>{name}</li>
               ))}
@@ -515,7 +527,8 @@ export default function LaunchPage() {
             <div className='system-b-launch-thesis'>
               <h2
                 id='thesis-heading'
-                className={cn('system-b-launch-thesis-title', 'line-clamp-2')}
+                data-wrap='editorial-title'
+                className='system-b-launch-thesis-title'
               >
                 {/* ui-casing-allow: marketing display headline */}
                 Paste one Spotify link. Get smart links, fan notifications, and
@@ -851,12 +864,17 @@ export default function LaunchPage() {
           className='system-b-launch-final'
         >
           <MarketingContainer width='page'>
-            <h2 id='cta-heading' className='line-clamp-2'>
+            <h2 id='cta-heading' data-wrap='editorial-title'>
               {/* ui-casing-allow: marketing display headline */}
               Your music deserves better than a stack of links.
             </h2>
             <div>
-              <Link href={APP_ROUTES.SIGNUP}>Request access</Link>
+              <Link
+                href={APP_ROUTES.SIGNUP}
+                prefetch={resolveMarketingAuthPrefetch(APP_ROUTES.SIGNUP)}
+              >
+                Request access
+              </Link>
               <a href='mailto:hello@jov.ie'>Contact us</a>
             </div>
           </MarketingContainer>

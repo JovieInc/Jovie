@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Ready-to-test worktree in seconds from the pre-installed pool (JOV-7705).
+# Implementation lives with the lanes release so the harness imports the same code:
+# scripts/lanes/worktree_pool.py. Run with --help for usage.
+set -euo pipefail
+exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lanes" && pwd)/worktree_pool.py" "$@"

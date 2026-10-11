@@ -38,15 +38,17 @@ const SOURCE_EXT = /\.(tsx|ts)$/;
 
 function walk(dir: string, out: string[]): void {
   if (!existsSync(dir)) return;
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const s = statSync(full);
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    // Dirents avoid a filesystem stat for every source entry. Follow symlinks
+    // exactly as before so the ratchet keeps scanning the same surfaces.
+    const s = entry.isSymbolicLink() ? statSync(full) : entry;
     if (s.isDirectory()) {
-      if (entry === 'node_modules' || entry === '.next') continue;
+      if (entry.name === 'node_modules' || entry.name === '.next') continue;
       walk(full, out);
     } else if (
-      SOURCE_EXT.test(entry) &&
-      !/\.test\.[tj]sx?$/.test(entry) &&
+      SOURCE_EXT.test(entry.name) &&
+      !/\.test\.[tj]sx?$/.test(entry.name) &&
       !full.includes(`${sep}__tests__${sep}`)
     ) {
       out.push(full);

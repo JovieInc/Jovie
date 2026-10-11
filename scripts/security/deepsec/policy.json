@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "projectId": "jovie",
   "maxTargets": 9,
   "sourceExtensions": [".ts"],
@@ -20,65 +20,53 @@
     "fixtures",
     "__fixtures__"
   ],
-  "modelAuth": "local",
-  "agent": "codex",
-  "model": "gpt-5.5",
+  "scanner": { "package": "deepsec", "version": "2.3.10" },
+  "modelAuth": "gateway",
   "providerFallback": false,
+  "gatewayTags": ["security-scan", "deepsec"],
+  "models": {
+    "cheap": {
+      "gatewayId": "zai/glm-5.3-flash",
+      "agent": "pi",
+      "model": "zai/glm-5.3-flash",
+      "reasoning": "high"
+    },
+    "frontierSource": "https://vercel.com/ai-gateway/leaderboards/deepsecbench/results.json",
+    "frontierTopN": 3,
+    "pricingSource": "https://ai-gateway.vercel.sh/v1/models"
+  },
   "billing": {
-    "route": "prepaid-codex-subscription",
-    "dollarBudgetUsd": null,
-    "hardCap": false,
-    "stopOnExhaustion": true
+    "route": "ai-gateway",
+    "hardCap": true,
+    "monthlyCapUsd": 200,
+    "runCapUsd": { "pr": 2, "weekly": 15, "frontier": 75 },
+    "minRunUsd": 0.25,
+    "costSafetyFactor": 1.75,
+    "prMaxFiles": 40,
+    "maxNewIssuesPerRun": 25,
+    "onUnknownPrice": "skip",
+    "onCapReached": "stop-partial"
   },
   "execution": {
-    "status": "disabled",
-    "scanEnabled": false,
+    "status": "advisory",
+    "blocking": false,
     "workspace": "fresh-temp",
     "dotenv": false,
-    "envAllowlist": [
-      "HOME",
-      "PATH",
-      "TMPDIR",
-      "LANG",
-      "LC_ALL",
-      "RUNNER_TEMP",
-      "DEEPSEC_DATA_ROOT",
-      "DEEPSEC_SOURCE_ROOT"
-    ],
+    "prSources": "same-repo-only",
+    "prCodeExecution": "none",
     "rejectEnv": [
       "OPENAI_API_KEY",
       "ANTHROPIC_API_KEY",
       "ANTHROPIC_AUTH_TOKEN",
-      "AI_GATEWAY_API_KEY",
       "VERCEL_OIDC_TOKEN",
       "VERCEL_TOKEN",
-      "VERCEL_TEAM_ID",
-      "VERCEL_PROJECT_ID",
       "OPENAI_BASE_URL",
       "ANTHROPIC_BASE_URL",
       "NODE_OPTIONS",
       "NODE_PATH",
       "DEEPSEC_INSIDE_SANDBOX"
     ],
-    "requireCodexSubscriptionProof": true,
-    "requireCodexExecutableProvenance": true,
-    "requirePinnedBundledCodexPathProof": true,
-    "rejectPathWrapperQualification": true,
-    "requireCodexVersionAndSha256Proof": true,
-    "requireSpawnedCodexArgvProof": true,
-    "onCodexProofFailure": "hold",
-    "requireSourceWriteDenialProof": true,
-    "localIsolationProofRequired": true,
-    "requireRunScopedTempPaths": true,
-    "requireAuthReadIsolationProof": true,
-    "requireAuthFileReadIsolationProof": true,
-    "requireSnapshotContentGate": true,
-    "onProofFailure": "hold",
-    "sandbox": false,
-    "network": "codex-subscription-only",
-    "toolNetwork": "disabled",
     "triage": false,
-    "sourceWriteAccess": "denied",
-    "allowPathFallback": false
+    "sourceWriteAccess": "ephemeral-runner-only"
   }
 }

@@ -100,6 +100,24 @@ describe('Eve framework smoke', () => {
       cpSync(resolve(pilotRoot, 'agent'), join(isolatedRoot, 'agent'), {
         recursive: true,
       });
+      const isolatedLoop = join(
+        isolatedRoot,
+        'agent/lib/summer-bottleneck-loop.ts'
+      );
+      writeFileSync(
+        isolatedLoop,
+        readFileSync(isolatedLoop, 'utf8').replace(
+          '../../../../packages/agent-transport-contracts/prediction-receipt',
+          './prediction-receipt'
+        )
+      );
+      copyFileSync(
+        resolve(
+          pilotRoot,
+          '../../packages/agent-transport-contracts/prediction-receipt.ts'
+        ),
+        join(isolatedRoot, 'agent/lib/prediction-receipt.ts')
+      );
       const identities = resolve(pilotRoot, 'identities');
       if (existsSync(identities)) {
         cpSync(identities, join(isolatedRoot, 'identities'), {

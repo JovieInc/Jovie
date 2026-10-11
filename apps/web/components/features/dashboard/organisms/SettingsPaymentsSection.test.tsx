@@ -63,9 +63,7 @@ describe('SettingsPaymentsSection', () => {
     const disconnected = render(<SettingsPaymentsSection />);
     expect(await screen.findByText('Stripe not connected')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Connect Stripe' }));
-    expect(await screen.findByText('Stripe is down')).toHaveClass(
-      'text-destructive'
-    );
+    expect(await screen.findByText('Stripe is down')).toHaveClass('text-error');
     disconnected.unmount();
 
     vi.stubGlobal(

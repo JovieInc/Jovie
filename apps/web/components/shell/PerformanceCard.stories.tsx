@@ -21,4 +21,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    title: 'Smart Link',
+    metricLabel: 'clicks',
+    pointsByRange: {
+      '7d': [120, 132, 101, 154, 190, 172, 210],
+      '30d': [90, 110, 105, 130, 140, 150, 172, 210],
+    },
+    trend: 'up',
+    delta: 12.4,
+  },
+};

@@ -24,6 +24,47 @@ const VALID_INPUTS: Record<string, unknown> = {
   'contact.create': { role: 'management', email: 'manager@example.com' },
   'release.create': { title: 'New Single', releaseType: 'single' },
   'task.create': { title: 'Follow up with venue' },
+  'fleet.register': {
+    workerId: 'test-dot',
+    runtimeClass: 'chatgpt-dot',
+    capabilities: ['artist.get'],
+    tools: ['jovie-cli'],
+    connectors: [],
+    availability: 'available',
+  },
+  'fleet.status': {},
+  'fleet.directory': {},
+  'work.request': {
+    requestId: UUID,
+    kind: 'dogfood',
+    proposal: {
+      issueId: 'JOV-7393',
+      title: 'Read public contract',
+      acceptanceCriteria: ['Valid OpenAPI'],
+      existingWorkRefs: [],
+      command: 'api.openapi',
+      requiredTools: ['jovie'],
+      requiredConnectors: [],
+      maxDurationSeconds: 30,
+      notAfter: '2026-10-31T12:00:00.000Z',
+    },
+  },
+  'work.next': {},
+  'work.claim': { leaseId: UUID },
+  'work.report': {
+    leaseId: UUID,
+    outcome: 'completed',
+    summary: 'Resolved artist',
+    evidence: [{ ref: 'https://jov.ie/tim', summary: 'Public profile read' }],
+  },
+  'defect.report': {
+    leaseId: UUID,
+    title: 'Failure',
+    command: 'artist.get',
+    apiCode: 'TEST_FAILURE',
+    details: 'Reproduction',
+    evidence: [{ ref: 'urn:test:failure', summary: 'Failed command' }],
+  },
 };
 
 describe('action identity', () => {
@@ -284,7 +325,9 @@ describe('discovery document', () => {
       expect(action.titleKey.length).toBeGreaterThan(0);
       expect(action.descriptionKey.length).toBeGreaterThan(0);
       expect(action.supportedChannels.length).toBeGreaterThan(0);
-      expect(action.schemas.input).toBe(`schemas/${action.id}.input.json`);
+      expect(action.schemas.input).toBe(
+        `schemas/${action.id === 'work.next' ? 'work-next' : action.id}.input.json`
+      );
     }
   });
 

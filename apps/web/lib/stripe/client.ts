@@ -9,6 +9,7 @@ import { cacheQuery, invalidateCache } from '@/lib/db/cache';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { syntheticPrincipalStripeMetadata } from '@/lib/synthetic/principals';
 import {
   type CheckoutCorrelation,
   hasCheckoutCorrelation,
@@ -110,12 +111,15 @@ export async function getOrCreateCustomer(
         }
 
         // If no customer found, create a new one
+        // Synthetic principals (JOV-7697) are marked so revenue reads treat
+        // their purchases as proof-of-path, never customer revenue.
         const customer = await stripeClient.customers.create({
           email,
           name,
           metadata: {
             clerk_user_id: userId,
             created_via: 'jovie_app',
+            ...syntheticPrincipalStripeMetadata(email),
           },
         });
 

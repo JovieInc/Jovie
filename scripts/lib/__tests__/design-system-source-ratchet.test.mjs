@@ -110,7 +110,7 @@ describe('design-system source identity ratchet (JOV-5301)', () => {
       `const LINEAR_VAR = ${LINEAR_NAMESPACE_PATTERN.toString()};`
     );
     expect(LINEAR_TEST).toContain(
-      "for (const dir of ['app', 'components', 'styles'])"
+      "const SCANNED_ROOTS = ['app', 'components', 'styles'] as const;"
     );
     expect([...LINEAR_SCAN_DIRS]).toEqual(['app', 'components', 'styles']);
   });
@@ -196,6 +196,34 @@ describe('design-system source identity ratchet (JOV-5301)', () => {
       );
       expect(result.issues.join('\n')).toMatch(
         /new arbitrary-value identity in packages\/ui\/chip\.tsx: w-\[99px\]/
+      );
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('does not treat TypeScript labeled tuples as arbitrary properties', () => {
+    const { repoRoot, webRoot } = makeFixture();
+    try {
+      seedBaseline(repoRoot);
+      writeFileSync(
+        join(webRoot, 'lib', 'registry.ts'),
+        [
+          'type Shot = readonly [src: string, alt: string];',
+          'type ReceiptSpec = readonly [suffix: string, summary: string, ref: string];',
+        ].join('\n')
+      );
+
+      expect(evaluateDesignSystemSourceRatchet({ repoRoot }).ok).toBe(true);
+
+      writeFileSync(
+        join(webRoot, 'lib', 'registry.ts'),
+        'export const className = "[width:327px]";\n'
+      );
+      expect(
+        evaluateDesignSystemSourceRatchet({ repoRoot }).issues.join('\n')
+      ).toContain(
+        'new arbitrary-property identity in apps/web/lib/registry.ts: [width:327px]'
       );
     } finally {
       rmSync(repoRoot, { recursive: true, force: true });

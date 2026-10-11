@@ -55,7 +55,7 @@ export const PUBLIC_ARTIST_API_DEVELOPERS_URL = `${BASE_URL}/developers`;
 export const PUBLIC_ARTIST_API_SITEMAP_URL = `${BASE_URL}/sitemap.xml`;
 
 /** Canonical human-readable API reference. */
-export const PUBLIC_ARTIST_API_REFERENCE_URL = `${DOCS_URL}/docs/api-reference`;
+export const PUBLIC_ARTIST_API_REFERENCE_URL = `${DOCS_URL}/docs/developers/api-reference`;
 
 /**
  * RFC 9745 policy discovery link. It intentionally does not claim that v1 is

@@ -107,6 +107,7 @@ export function ChatEmptyStateWelcome({
 export function ChatEmptyStateComposerRegion({
   above,
   children,
+  fullBleed = false,
   hideWelcomeHeader = false,
   stableDocked = false,
   showDockedWelcome = false,
@@ -114,6 +115,8 @@ export function ChatEmptyStateComposerRegion({
 }: {
   readonly above?: ReactNode;
   readonly children: ReactNode;
+  /** Let editorial content use the canvas while callers keep the composer constrained. */
+  readonly fullBleed?: boolean;
   readonly hideWelcomeHeader?: boolean;
   /** Keep composer geometry docked when transient empty-state affordances hide. */
   readonly stableDocked?: boolean;
@@ -132,7 +135,7 @@ export function ChatEmptyStateComposerRegion({
     return (
       <div
         className={cn(
-          CHAT_CONTENT_SHELL_CLASSNAME,
+          fullBleed ? 'w-full' : CHAT_CONTENT_SHELL_CLASSNAME,
           'relative flex min-h-full flex-col px-1',
           ownsTopSpacing ? 'pt-0 pb-4 sm:pb-5' : 'py-4 sm:py-5'
         )}
@@ -149,7 +152,10 @@ export function ChatEmptyStateComposerRegion({
         >
           {above ? (
             <div
-              className='mt-auto flex shrink-0 flex-col'
+              className={cn(
+                'mt-auto flex shrink-0 flex-col',
+                fullBleed && 'min-h-full'
+              )}
               data-empty-chat-suggestions='true'
             >
               {above}
@@ -177,7 +183,10 @@ export function ChatEmptyStateComposerRegion({
 
   return (
     <div
-      className={`${CHAT_CONTENT_SHELL_CLASSNAME} chat-stagger relative flex min-h-full flex-col items-center justify-center px-1 py-8`}
+      className={cn(
+        fullBleed ? 'w-full' : CHAT_CONTENT_SHELL_CLASSNAME,
+        'chat-stagger relative flex min-h-full flex-col items-center justify-center px-1 py-8'
+      )}
       data-grid-anchor={DESKTOP_CONTENT_GRID_ANCHOR}
       data-testid='chat-empty-state-composer-region'
       data-layout='centered'

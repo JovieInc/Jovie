@@ -63,6 +63,10 @@ export interface ParsedQuarantineLedger {
   readonly ledger: QuarantineLedger;
   readonly unitPaths: readonly string[];
   readonly e2ePaths: readonly string[];
+  /** fixIssueUrl for each unit entry, in entry order (same order as unitPaths). */
+  readonly unitIssueUrls: readonly string[];
+  /** fixIssueUrl for each e2e entry, in entry order (same order as e2ePaths). */
+  readonly e2eIssueUrls: readonly string[];
   readonly summary: QuarantineLedgerSummary;
   readonly issues: readonly QuarantineLedgerValidationIssue[];
 }
@@ -204,6 +208,8 @@ export function parseQuarantineLedger(raw: unknown): ParsedQuarantineLedger {
       },
       unitPaths: [],
       e2ePaths: [],
+      unitIssueUrls: [],
+      e2eIssueUrls: [],
       summary: buildQuarantineLedgerSummary({
         entries: [],
         retryBudget: DEFAULT_RETRY_BUDGET,
@@ -377,17 +383,17 @@ export function parseQuarantineLedger(raw: unknown): ParsedQuarantineLedger {
     });
   }
 
-  const unitPaths = entries
-    .filter(entry => entry.kind === 'unit')
-    .map(entry => entry.path);
-  const e2ePaths = entries
-    .filter(entry => entry.kind === 'e2e')
-    .map(entry => entry.path);
+  const unitEntries = entries.filter(entry => entry.kind === 'unit');
+  const e2eEntries = entries.filter(entry => entry.kind === 'e2e');
+  const unitPaths = unitEntries.map(entry => entry.path);
+  const e2ePaths = e2eEntries.map(entry => entry.path);
 
   return {
     ledger,
     unitPaths,
     e2ePaths,
+    unitIssueUrls: unitEntries.map(entry => entry.fixIssueUrl),
+    e2eIssueUrls: e2eEntries.map(entry => entry.fixIssueUrl),
     summary,
     issues,
   };

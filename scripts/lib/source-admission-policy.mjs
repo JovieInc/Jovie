@@ -1,4 +1,6 @@
 // JOV-INV-011: retain exact-head failure memory. JOV-INV-028: legacy human labels are inert.
+
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {
   evaluateForkMemberPolicy,
@@ -6,6 +8,7 @@ import {
   latestOpinionatedReviewsByReviewer,
 } from './merge-group-member-policy.mjs';
 import { evaluatePreLandChangelogAdmission } from './pre-land-changelog.mjs';
+import { classifyProductLanes } from './product-lane-classifier.mjs';
 
 export const SOURCE_ADMISSION_SCHEMA = 'jovie-source-admission/v1';
 const SHA = /^[0-9a-f]{40}$/;
@@ -19,13 +22,32 @@ const HOLDS = new Set([
   'fast',
 ]);
 const TOMBSTONES = new Set([
+  'jovie-queue-failure-hold/v1',
   'jovie-queue-product-failure/v1',
   'jovie-native-unmergeable/v1',
 ]);
 
+/** Native Linear ignores negation around closing magic words. Inspect the whole
+ * title/body, including caveats after an explicit non-closing relation.
+ * @param {{title: string, body: string | null}} text
+ */
+export function evaluateLinearReferencePolicy({ title, body }) {
+  const closing =
+    /\b(?:close[sd]?|closing|fix(?:es|ed|ing)?|resolve[sd]?|resolving|complete[sd]?|completing|implement(?:s|ed|ing)?|linear issue)\s+[*_`\[]*(?:https:\/\/linear\.app\/[^\s/]+\/issue\/)?([a-z][a-z0-9]*-\d+)\b(?![\w-])/gi;
+  const identifiers = new Set(
+    [...`${title}\n${body ?? ''}`.matchAll(closing)].map(match =>
+      match[1].toUpperCase()
+    )
+  );
+  const blockers = [...identifiers].map(id => `linear-closing-reference:${id}`);
+  return { allowed: blockers.length === 0, blockers };
+}
+
 /**
  * @typedef {Object} AdmissionPullRequest
  * @property {number} [number]
+ * @property {string} [title]
+ * @property {string | null} [body]
  * @property {string} [state]
  * @property {boolean} [draft]
  * @property {{sha?: string, ref?: string, repo?: {fork?: boolean}}} [head]
@@ -91,6 +113,8 @@ export function evaluateSourceAdmission({
     !SHA.test(expectedHead ?? '') ||
     !Number.isInteger(pr?.number) ||
     pr.number < 1 ||
+    typeof pr.title !== 'string' ||
+    (pr.body !== null && typeof pr.body !== 'string') ||
     typeof pr?.draft !== 'boolean' ||
     !['open', 'closed'].includes(pr?.state) ||
     !Array.isArray(pr?.labels) ||
@@ -114,6 +138,17 @@ export function evaluateSourceAdmission({
   if (pr.draft) blockers.push('draft');
   if (pr.base.ref !== 'main') blockers.push('wrong-base');
   if (pr.mergeable === false) blockers.push('conflict');
+  try {
+    classifyProductLanes(files.map(file => file.filename));
+  } catch {
+    blockers.push('unmapped-product-paths');
+  }
+  blockers.push(
+    ...evaluateLinearReferencePolicy({
+      title: pr.title,
+      body: pr.body,
+    }).blockers
+  );
   for (const label of pr.labels)
     if (HOLDS.has(label.name)) blockers.push(`hold:${label.name}`);
   try {
@@ -143,12 +178,29 @@ export function evaluateSourceAdmission({
       continue;
     }
     if (!TOMBSTONES.has(status.context)) continue;
+    const failureMatch =
+      status.context === 'jovie-queue-failure-hold/v1' &&
+      typeof status.description === 'string'
+        ? /^class=(deterministic-source|retryable-product|transient-infrastructure|unclassified);n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*$/.exec(
+            status.description
+          )
+        : null;
+    const baseBranchMatch =
+      status.context === 'jovie-queue-failure-hold/v1' &&
+      typeof status.description === 'string'
+        ? /^class=base-branch;n=[1-9][0-9]*;run=([1-9][0-9]*);try=[1-9][0-9]*;main=([0-9a-f]{40})$/.exec(
+            status.description
+          )
+        : null;
+    const matchedFailure = failureMatch ?? baseBranchMatch;
     const description =
-      status.context === 'jovie-queue-product-failure/v1'
+      matchedFailure !== null ||
+      (status.context === 'jovie-queue-product-failure/v1'
         ? status.description === 'blocked:merge-group-product-failure'
-        : typeof status.description === 'string' &&
-          status.description.startsWith('ejected:');
-    if (status.state !== 'success' || !description) continue;
+        : status.context === 'jovie-native-unmergeable/v1' &&
+          typeof status.description === 'string' &&
+          status.description.startsWith('ejected:'));
+    if (status.state !== 'success' || description !== true) continue;
     const prefix = `https://github.com/${repository}/actions/runs/`;
     if (!status.creator || typeof status.creator.login !== 'string') {
       blockers.push('tombstone-provenance-unavailable');
@@ -162,7 +214,10 @@ export function evaluateSourceAdmission({
     if (
       typeof status.target_url !== 'string' ||
       !status.target_url.startsWith(prefix) ||
-      !/^[1-9][0-9]*$/.test(status.target_url.slice(prefix.length))
+      !/^[1-9][0-9]*$/.test(status.target_url.slice(prefix.length)) ||
+      (matchedFailure !== null &&
+        status.target_url.slice(prefix.length) !==
+          (failureMatch ? failureMatch[2] : baseBranchMatch[1]))
     ) {
       blockers.push('tombstone-provenance-unavailable');
       continue;
@@ -248,11 +303,21 @@ if (
     const value = name =>
       args.find(arg => arg.startsWith(`${name}=`))?.slice(name.length + 1) ??
       args[args.indexOf(name) + 1];
-    const receipt = await runSourceAdmission({
-      repository: value('--repo'),
-      prNumber: Number(value('--pr')),
-      expectedHead: value('--head'),
-    });
+    const has = name =>
+      args.some(arg => arg === name || arg.startsWith(`${name}=`));
+    const bodyFile = has('--body-file') ? value('--body-file') : null;
+    const title = has('--title') ? value('--title') : null;
+    if (bodyFile && !title) throw new Error('--body-file requires --title');
+    const receipt = bodyFile
+      ? evaluateLinearReferencePolicy({
+          title,
+          body: readFileSync(bodyFile, 'utf8'),
+        })
+      : await runSourceAdmission({
+          repository: value('--repo'),
+          prNumber: Number(value('--pr')),
+          expectedHead: value('--head'),
+        });
     console.log(JSON.stringify(receipt));
     process.exitCode = receipt.allowed ? 0 : 1;
   } catch (error) {

@@ -1,7 +1,7 @@
 {
   "schema": "jovie-preview-env-registry/v1",
-  "updatedBy": "JOV-5941",
-  "policy": "The normal path is local/CI proof -> main -> current staging. A PR never automatically creates a hosted Vercel preview or Neon branch. Hosted isolation exists only as an explicit, expiring exception admitted by the requires_preview risk policy or by manual dispatch, and every admitted environment carries the jovie-preview-env-admission/v1 contract plus a jovie-preview-env-cleanup/v1 receipt at teardown.",
+  "updatedBy": "JOV-4195",
+  "policy": "The normal path is local/CI proof -> main -> current staging. Source PRs never create a hosted Vercel preview or Neon branch. Hosted isolation exists only for a risk-selected database merge-group head, an explicit expiring exception, or manual dispatch, and every admitted environment carries the jovie-preview-env-admission/v1 contract plus lifecycle cleanup proof.",
   "entries": [
     {
       "id": "ci-neon-db",
@@ -10,15 +10,15 @@
       "kind": "neon-branch",
       "ephemeral": true,
       "admission": {
-        "policy": "manual-dispatch",
-        "reason": "Ephemeral Postgres branch for manually dispatched database-affecting evidence lanes (migration and authenticated smoke proof).",
+        "policy": "risk-selected-merge-group or manual-dispatch",
+        "reason": "Ephemeral Postgres branch for risk-selected combined-head certification and manually dispatched database evidence.",
         "evidencePurpose": "Database-affecting proof that cannot be obtained from normal CI or the shared staging database.",
         "owner": "ci-risk-classifier / release engineering",
         "surface": "ephemeral Neon branch ci-neon-run-<run_id>-<attempt> (isolated database only)",
         "ttlHours": 2,
         "cleanupTrigger": "Neon branch TTL (expires_in_hours=2); neon-scheduled-cleanup daily heartbeat reconciles missed events",
         "cleanupProof": "Branch absent from the Neon project branch inventory",
-        "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
+        "costBudget": "One Neon branch with at most 2h of endpoint compute per selected run"
       }
     },
     {

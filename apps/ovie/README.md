@@ -13,7 +13,7 @@ must exercise both apps when shared code changes.
 
 ## Local commands
 
-Use pinned Node 22 and pnpm 9.15.4. Build and typecheck sequentially;
+Use pinned Node 24.21.0 and pnpm 9.15.9. Build and typecheck sequentially;
 both generate route adapters.
 
 ```sh
@@ -39,7 +39,7 @@ Dev port: 3105. Tests mock external services. Packaged server:
 
 ## Deployment and rollback
 
-Use a dedicated Vercel Next.js project rooted at `apps/ovie`, Node 22,
+Use a dedicated Vercel Next.js project rooted at `apps/ovie`, Node 24,
 `vercel.json` and workspace-file access. Build only Ovie. Bind a reviewed
 private hostname; never reuse Jovie's project, release lease or alias.
 Vercel deployment history supplies promotion and rollback.

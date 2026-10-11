@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/admin/AdminUserDetailDrawer.test.tsx
+
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Badge, Button, UserAvatar } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
@@ -9,7 +11,7 @@ import {
   DrawerAnalyticsSummaryCard,
   DrawerCardActionBar,
   DrawerSection,
-  EntityHeaderCard,
+  EntityHeader,
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
@@ -85,6 +87,7 @@ export function AdminUserDetailDrawer({
       width={400}
       ariaLabel='User details'
       scrollStrategy='shell'
+      contentBleed
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar
@@ -95,63 +98,72 @@ export function AdminUserDetailDrawer({
       emptyMessage='Select a user to view details.'
       entityHeader={
         user ? (
-          <EntityHeaderCard
-            title={user.name ?? 'Unnamed user'}
-            stableLayout
-            titleLineClamp={1}
-            subtitleLineClamp={1}
-            reserveSubtitleSlot
-            reserveMetaSlot
-            metaOverflow='scroll'
-            image={
-              <UserAvatar name={user.name ?? user.email ?? 'User'} size='lg' />
-            }
-            subtitle={
-              user.email ? (
-                <div className='flex items-center gap-1.5'>
-                  <span className='truncate'>{user.email}</span>
-                  <CopyButton value={user.email} label='Email' />
-                </div>
-              ) : (
-                'No email'
-              )
-            }
-            meta={
-              <div className='flex flex-wrap gap-1.5'>
-                <Badge
-                  size='sm'
-                  variant={user.plan === 'pro' ? 'primary' : 'secondary'}
-                >
-                  {user.plan}
-                </Badge>
-                {user.deletedAt ? (
-                  <Badge size='sm' variant='warning'>
-                    Deleted
-                  </Badge>
+          <div className='px-3 pt-3'>
+            <EntityHeader
+              title={user.name ?? 'Unnamed user'}
+              stableLayout
+              titleLineClamp={1}
+              subtitleLineClamp={1}
+              reserveSubtitleSlot
+              reserveMetaSlot
+              metaOverflow='scroll'
+              thumbnail={
+                <UserAvatar
+                  name={user.name ?? user.email ?? 'User'}
+                  size='lg'
+                />
+              }
+              subtitle={
+                user.email ? (
+                  <div className='flex items-center gap-1.5'>
+                    <span className='truncate'>{user.email}</span>
+                    <CopyButton value={user.email} label='Email' />
+                  </div>
                 ) : (
-                  <Badge size='sm' variant='success'>
-                    Active
+                  'No email'
+                )
+              }
+              meta={
+                <div className='flex flex-wrap gap-1.5'>
+                  <Badge
+                    size='sm'
+                    variant={user.plan === 'pro' ? 'primary' : 'secondary'}
+                  >
+                    {user.plan}
                   </Badge>
-                )}
-              </div>
-            }
-            actions={
-              <DrawerCardActionBar
-                primaryActions={[]}
-                menuItems={contextMenuItems}
-                onClose={onClose}
-                overflowTriggerPlacement='card-top-right'
-                overflowTriggerIcon='vertical'
-                className='border-0 bg-transparent px-0 py-0'
-              />
-            }
-            bodyClassName='pr-9'
-            data-testid='admin-user-entity-header'
-          />
+                  {user.deletedAt ? (
+                    <Badge size='sm' variant='warning'>
+                      Deleted
+                    </Badge>
+                  ) : (
+                    <Badge size='sm' variant='success'>
+                      Active
+                    </Badge>
+                  )}
+                </div>
+              }
+              actions={
+                <DrawerCardActionBar
+                  primaryActions={[]}
+                  menuItems={contextMenuItems}
+                  onClose={onClose}
+                  overflowTriggerPlacement='card-top-right'
+                  overflowTriggerIcon='vertical'
+                  className='border-0 bg-transparent px-0 py-0'
+                />
+              }
+              bodyClassName='pr-9'
+              data-testid='admin-user-entity-header'
+            />
+          </div>
         ) : undefined
       }
     >
-      {user && <UserDrawerContent user={user} />}
+      {user && (
+        <div className='space-y-3 px-3 pb-3'>
+          <UserDrawerContent user={user} />
+        </div>
+      )}
     </EntitySidebarShell>
   );
 }

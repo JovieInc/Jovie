@@ -1,18 +1,14 @@
 'use server';
 
 import { and, eq, ne } from 'drizzle-orm';
-import {
-  unstable_noStore as noStore,
-  revalidatePath,
-  revalidateTag,
-} from 'next/cache';
+import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import { invalidateReleaseCaches } from '@/lib/cache/releases';
 import {
   clearPendingClaimContext,
   readPendingClaimContext,
@@ -35,13 +31,21 @@ import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { createOnboardingReceiptPendingError } from '@/lib/errors/onboarding';
 import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
+import { musicfetchNetworkAllowed } from '@/lib/music-resolver/musicfetch-gate';
 import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
-import { lockSpotifyProfileIdentity } from '@/lib/profile/spotify-profile-identity';
+import {
+  assertSpotifyProfileIdentityAvailable,
+  SpotifyProfileIdentityConflictError,
+} from '@/lib/profile/spotify-profile-identity';
 import {
   isUnclaimedStructuredCreditProfile,
   markStructuredCreditProfileClaimed,
 } from '@/lib/profile/unclaimed-artist-profile';
-import { trackServerEvent } from '@/lib/server-analytics';
+import {
+  type ServerAnalyticsDelivery,
+  trackServerEvent,
+  trackServerEventTx,
+} from '@/lib/server-analytics';
 import { finalizePostOnboarding } from './post-onboarding';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
@@ -54,7 +58,21 @@ const DSP_DISCOVERY_PROVIDERS = [
   'musicbrainz',
 ] as const;
 
-class SpotifyProfileIdentityConflictError extends Error {}
+async function requireFunnelDelivery(
+  event: string,
+  delivery: ServerAnalyticsDelivery
+): Promise<void> {
+  if (delivery.ok) return;
+
+  const error = new Error(
+    `Onboarding Spotify funnel event rejected: ${event} (${delivery.error})`
+  );
+  await captureError('onboarding Spotify funnel event rejected', error, {
+    action: 'connectOnboardingSpotifyArtist',
+    event,
+  });
+  throw error;
+}
 
 export interface ConnectOnboardingSpotifyArtistParams {
   artistName: string;
@@ -123,22 +141,6 @@ async function getOtherExactSpotifyProfiles(
     .limit(2);
 }
 
-async function assertSpotifyProfileIdentityAvailable(
-  tx: DbOrTransaction,
-  spotifyArtistId: string,
-  currentProfileId: string
-): Promise<void> {
-  await lockSpotifyProfileIdentity(tx, spotifyArtistId);
-  const conflicts = await getOtherExactSpotifyProfiles(
-    tx,
-    spotifyArtistId,
-    currentProfileId
-  );
-  if (conflicts.length > 0) {
-    throw new SpotifyProfileIdentityConflictError();
-  }
-}
-
 function deriveSpotifyImportStatus(result: SpotifyImportResult) {
   if (result.success || result.releases.length > 0 || result.imported > 0) {
     return 'complete' as const;
@@ -191,7 +193,7 @@ async function markSpotifyImportFailed(profileId: string): Promise<void> {
   }
 }
 
-async function getOwnedProfile(profileId: string, clerkUserId: string) {
+async function getOwnedProfile(profileId: string, appUserId: string) {
   const [profile] = await db
     .select({
       dbUserId: users.id,
@@ -203,9 +205,7 @@ async function getOwnedProfile(profileId: string, clerkUserId: string) {
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(
-      and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-    )
+    .where(and(eq(creatorProfiles.id, profileId), eq(users.id, appUserId)))
     .limit(1);
 
   if (!profile) {
@@ -331,6 +331,27 @@ export async function connectOnboardingSpotifyArtist(
             finalizeOnboarding: true,
           });
 
+          // Durable funnel events commit atomically with the claim inside
+          // this transaction; stable identities deduplicate retries.
+          await requireFunnelDelivery(
+            'claim_completed',
+            await trackServerEventTx(
+              tx,
+              'claim_completed',
+              { profileId: profile.id, source: 'direct_profile_spotify_match' },
+              { eventIdentity: `claim_completed:${profile.id}` }
+            )
+          );
+          await requireFunnelDelivery(
+            'activation_achieved',
+            await trackServerEventTx(
+              tx,
+              'activation_achieved',
+              { profileId: profile.id, source: 'onboarding_completed' },
+              { eventIdentity: `activation_achieved:${profile.id}` }
+            )
+          );
+
           await tx
             .update(creatorProfiles)
             .set({
@@ -443,8 +464,7 @@ export async function connectOnboardingSpotifyArtist(
       })
       .where(eq(creatorProfiles.id, profile.id));
 
-    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+    invalidateReleaseCaches(userId, profile.id);
     revalidatePath(APP_ROUTES.RELEASES);
 
     if (!result.success) {
@@ -496,28 +516,26 @@ export async function connectOnboardingSpotifyArtist(
       );
     }
 
-    if (params.skipMusicFetchEnrichment) {
-      return;
-    }
-
-    try {
-      await processMusicFetchEnrichmentJob(db, {
-        creatorProfileId: profile.id,
-        spotifyUrl: spotifyUrlForEnrichment,
-        dedupKey: buildInlineMusicFetchDedupKey(
-          profile.id,
-          params.spotifyArtistId
-        ),
-      });
-    } catch (error) {
-      void captureError(
-        'MusicFetch enrichment inline processing failed on connect',
-        error,
-        {
-          action: 'connectOnboardingSpotifyArtist',
+    if (!params.skipMusicFetchEnrichment && musicfetchNetworkAllowed()) {
+      try {
+        await processMusicFetchEnrichmentJob(db, {
           creatorProfileId: profile.id,
-        }
-      );
+          spotifyUrl: spotifyUrlForEnrichment,
+          dedupKey: buildInlineMusicFetchDedupKey(
+            profile.id,
+            params.spotifyArtistId
+          ),
+        });
+      } catch (error) {
+        void captureError(
+          'MusicFetch enrichment inline processing failed on connect',
+          error,
+          {
+            action: 'connectOnboardingSpotifyArtist',
+            creatorProfileId: profile.id,
+          }
+        );
+      }
     }
 
     void refreshFeaturedPlaylistFallbackCandidate({

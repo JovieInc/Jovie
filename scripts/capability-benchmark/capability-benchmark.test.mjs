@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-
+import { buildCorpus as buildInboxCorpus } from '../invariants/fixtures/inbox-triage-corpus.gen.mjs';
+import { buildCorpus as buildReleaseCorpus } from '../invariants/fixtures/release-task-corpus.gen.mjs';
+import { summarizeOutcomes as summarizeInbox } from '../invariants/jev-inbox-pilot.mjs';
+import { summarizeOutcomes as summarizeRelease } from '../invariants/jev-task-pilot.mjs';
 import {
   BENCHMARK_REGISTRY_SCHEMA,
   CAPACITY_RECEIPT_SCHEMA,
   classifyTriggerEvent,
+  DECISION_BENCHMARK_DIMENSIONS,
   isDecisionStale,
+  loadDecisionRoutingBenchmark,
   loadRegistry,
   MATERIAL_TRIGGER_CLASSES,
   REQUIRED_CODE_REVIEW_METRICS,
@@ -14,6 +19,7 @@ import {
   SOURCING_STATES,
   validateBenchmarkRegistry,
   validateCapacityReceipt,
+  validateDecisionRoutingBenchmark,
   validateShadowReplayReceipt,
 } from './capability-benchmark.mjs';
 
@@ -83,6 +89,180 @@ test('shipped registry validates', () => {
   assert.equal(registry.issue, 'JOV-2966');
   assert.equal(registry.evidenceLifecycleIssue, 'JOV-5916');
   assert.match(registryDigest(registry), /^[a-f0-9]{64}$/u);
+});
+
+test('JOV-7341 records workload-scoped dispositions on the pinned cohorts', () => {
+  const report = loadDecisionRoutingBenchmark();
+  assert.equal(validateDecisionRoutingBenchmark(report), true);
+  assert.equal(Object.hasOwn(report, 'aggregateScore'), false);
+  const generated = new Map(
+    [buildReleaseCorpus(), buildInboxCorpus()].map(corpus => [
+      corpus.version,
+      registryDigest(corpus),
+    ])
+  );
+  for (const workload of report.workloads) {
+    assert.equal(
+      generated.get(workload.cohort.version),
+      workload.cohort.sha256
+    );
+    assert.deepEqual(
+      Object.keys(workload.evidenceByDimension).sort(),
+      [...DECISION_BENCHMARK_DIMENSIONS].sort()
+    );
+    assert.equal(workload.sourcingDecision.state, 'retain-internal-only');
+    const baseline = workload.candidates.find(
+      candidate => candidate.id === 'deterministic-baseline'
+    );
+    const corpus =
+      workload.id === 'release-task-clustering'
+        ? buildReleaseCorpus()
+        : buildInboxCorpus();
+    const outcomes = corpus.examples.map(example => ({
+      id: example.id,
+      decision:
+        workload.id === 'release-task-clustering'
+          ? { action: 'abstain', clusterSlug: null }
+          : { action: 'abstain', category: null, priority: null },
+      latencyMs: 0,
+      executed: false,
+    }));
+    if (workload.id === 'release-task-clustering') {
+      const metrics = summarizeRelease(corpus, outcomes, {}, {});
+      assert.equal(baseline.evaluated, metrics.evaluated);
+      assert.equal(baseline.macroF1, metrics.macroF1);
+      assert.equal(baseline.abstentionRate, metrics.abstentionRate);
+      assert.equal(
+        baseline.falseAutoAssignmentRate,
+        metrics.falseAutoAssignmentRate
+      );
+    } else {
+      const metrics = summarizeInbox(corpus, outcomes, {}, {});
+      assert.equal(baseline.evaluated, metrics.evaluated);
+      assert.equal(baseline.macroF1, metrics.macroF1);
+      assert.equal(baseline.abstentionRate, metrics.abstentionRate);
+      assert.equal(baseline.highValueMissRate, metrics.highValueMissRate);
+    }
+  }
+});
+
+test('JOV-7341 fails closed on cohort drift, hidden calls, or missing resume event', () => {
+  const report = loadDecisionRoutingBenchmark();
+  const drifted = structuredClone(report);
+  drifted.workloads[0].candidates[1].cohortSha256 = '0'.repeat(64);
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(drifted),
+    /different cohort/
+  );
+
+  const hiddenCall = structuredClone(report);
+  hiddenCall.workloads[0].bypass.oneOption.probabilisticCalls = 1;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(hiddenCall),
+    /zero calls/
+  );
+
+  const noResume = structuredClone(report);
+  delete noResume.access.resumeEvent;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(noResume),
+    /resumeEvent/
+  );
+
+  const rolledUp = structuredClone(report);
+  rolledUp.aggregateScore = 0.99;
+  assert.throws(() => validateDecisionRoutingBenchmark(rolledUp), /aggregate/);
+
+  for (const companyWinner of [false, null, '', 0, 'openai-decisions']) {
+    const companyWide = { ...structuredClone(report), companyWinner };
+    assert.throws(
+      () => validateDecisionRoutingBenchmark(companyWide),
+      /company-wide winner/
+    );
+  }
+
+  const wrongIssue = structuredClone(report);
+  wrongIssue.issue = 'JOV-2966';
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(wrongIssue),
+    /must be JOV-7341/
+  );
+});
+
+test('JOV-7341 fails closed on contradictory candidate status and counts', () => {
+  const report = loadDecisionRoutingBenchmark();
+
+  const promoted = structuredClone(report);
+  const promotedJev = promoted.workloads[0].candidates.find(
+    candidate => candidate.id === 'typesafe-jev'
+  );
+  promotedJev.status = 'production';
+  promotedJev.executedComparisons = 999;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(promoted),
+    /status must be one of/
+  );
+
+  const blockedButRan = structuredClone(report);
+  blockedButRan.workloads[0].candidates.find(
+    candidate => candidate.id === 'openai-decisions'
+  ).executedComparisons = 3;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(blockedButRan),
+    /executedComparisons: 0/
+  );
+
+  const shadowRan = structuredClone(report);
+  shadowRan.workloads[1].candidates.find(
+    candidate => candidate.id === 'typesafe-jev'
+  ).executedComparisons = 1;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(shadowRan),
+    /executedComparisons: 0/
+  );
+
+  const missingCount = structuredClone(report);
+  delete missingCount.workloads[0].candidates.find(
+    candidate => candidate.id === 'typesafe-jev'
+  ).executedComparisons;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(missingCount),
+    /executedComparisons: 0/
+  );
+
+  const baselineRan = structuredClone(report);
+  baselineRan.workloads[0].candidates.find(
+    candidate => candidate.id === 'deterministic-baseline'
+  ).executedComparisons = 1;
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(baselineRan),
+    /must not execute supplier comparisons/
+  );
+
+  const duplicated = structuredClone(report);
+  duplicated.workloads[0].candidates.push(
+    structuredClone(duplicated.workloads[0].candidates[1])
+  );
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(duplicated),
+    /duplicate ids/
+  );
+
+  const completedWithoutEvidence = structuredClone(report);
+  const completedJev = completedWithoutEvidence.workloads[0].candidates.find(
+    candidate => candidate.id === 'typesafe-jev'
+  );
+  completedJev.status = 'complete';
+  assert.throws(
+    () => validateDecisionRoutingBenchmark(completedWithoutEvidence),
+    /positive integer/
+  );
+
+  completedJev.executedComparisons = 1;
+  assert.equal(
+    validateDecisionRoutingBenchmark(completedWithoutEvidence),
+    true
+  );
 });
 
 test('rejects wrong schema and second ledger', () => {

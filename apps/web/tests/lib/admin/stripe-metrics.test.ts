@@ -127,6 +127,56 @@ describe('getAdminStripeOverviewMetrics', () => {
     expect(metrics.errorMessage).toBeUndefined();
   });
 
+  it('builds a 7-day baseline net of churn for week-over-week', async () => {
+    const monthly = (cents: number) =>
+      ({
+        data: [
+          {
+            price: {
+              currency: 'usd',
+              unit_amount: cents,
+              recurring: { interval: 'month', interval_count: 1 },
+            },
+            quantity: 1,
+          },
+        ],
+      }) as Stripe.ApiList<Stripe.SubscriptionItem>;
+    const day = 24 * 60 * 60;
+    const nowSeconds = Math.floor(Date.now() / 1000);
+
+    listMock.mockResolvedValue({
+      data: [
+        makeSubscription({
+          id: 'steady',
+          status: 'active',
+          created: nowSeconds - 40 * day,
+          items: monthly(1000),
+        }),
+        makeSubscription({
+          id: 'new-this-week',
+          status: 'active',
+          created: nowSeconds - 3 * day,
+          items: monthly(2000),
+        }),
+        makeSubscription({
+          id: 'churned-this-week',
+          status: 'canceled',
+          created: nowSeconds - 40 * day,
+          ended_at: nowSeconds - 2 * day,
+          items: monthly(500),
+        }),
+      ],
+      has_more: false,
+    });
+
+    const metrics = await getAdminStripeOverviewMetrics();
+
+    expect(metrics.mrrUsd).toBe(30);
+    expect(metrics.mrrUsd7dAgo).toBe(15);
+    expect(metrics.activeSubscribers).toBe(2);
+    expect(metrics.activeSubscribers7dAgo).toBe(2);
+  });
+
   it('subtracts percentage coupon discount from MRR (JOV-1089)', async () => {
     const items = {
       data: [
@@ -166,6 +216,90 @@ describe('getAdminStripeOverviewMetrics', () => {
     // $20 gross - 50% = $10 net MRR
     expect(metrics.mrrUsd).toBe(10);
     expect(metrics.activeSubscribers).toBe(1);
+  });
+
+  it('asks Stripe to expand coupons so discounts are really netted (JOV-1089)', async () => {
+    listMock.mockResolvedValue({ data: [], has_more: false });
+    await getAdminStripeOverviewMetrics();
+    expect(listMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expand: expect.arrayContaining([
+          'data.discounts',
+          'data.discounts.source.coupon',
+        ]),
+      })
+    );
+  });
+
+  it('counts a 100%-off forever comp as $0 MRR, not list price', async () => {
+    const items = {
+      data: [
+        {
+          price: {
+            currency: 'usd',
+            unit_amount: 19900,
+            recurring: { interval: 'month', interval_count: 1 },
+          },
+          quantity: 1,
+        },
+      ],
+    } as Stripe.ApiList<Stripe.SubscriptionItem>;
+    listMock.mockResolvedValue({
+      data: [
+        {
+          ...makeSubscription({ id: 'sub_comp', status: 'active', items }),
+          customer: { id: 'cus_ext', email: 'artist@example-label.com' },
+          discounts: [
+            {
+              source: {
+                coupon: { percent_off: 100, duration: 'forever' },
+                type: 'coupon',
+              },
+            },
+          ],
+        } as unknown as Stripe.Subscription,
+      ],
+      has_more: false,
+    });
+
+    const metrics = await getAdminStripeOverviewMetrics();
+
+    expect(metrics.mrrUsd).toBe(0);
+  });
+
+  it('excludes internal/dogfood customers by default, with no classifier passed', async () => {
+    const items = {
+      data: [
+        {
+          price: {
+            currency: 'usd',
+            unit_amount: 19900,
+            recurring: { interval: 'month', interval_count: 1 },
+          },
+          quantity: 1,
+        },
+      ],
+    } as Stripe.ApiList<Stripe.SubscriptionItem>;
+    listMock.mockResolvedValue({
+      data: [
+        {
+          ...makeSubscription({ id: 'sub_founder', status: 'active', items }),
+          customer: { id: 'cus_founder', email: 'tim@jov.ie' },
+        } as unknown as Stripe.Subscription,
+      ],
+      has_more: false,
+    });
+
+    const metrics = await getAdminStripeOverviewMetrics();
+
+    expect(metrics.mrrUsd).toBe(0);
+    expect(metrics.activeSubscribers).toBe(0);
+    expect(metrics.excludedInternalSubscribers).toBe(1);
+    expect(listMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expand: expect.arrayContaining(['data.customer']),
+      })
+    );
   });
 
   it('subtracts fixed amount coupon discount from MRR (JOV-1089)', async () => {
@@ -212,6 +346,64 @@ describe('getAdminStripeOverviewMetrics', () => {
     // $20 gross - $5 fixed = $15 net MRR
     expect(metrics.mrrUsd).toBe(15);
     expect(metrics.activeSubscribers).toBe(1);
+  });
+
+  it('excludes internal/test customers when a classifier is provided (JOV-6673)', async () => {
+    const items = {
+      data: [
+        {
+          price: {
+            currency: 'usd',
+            unit_amount: 19900,
+            recurring: { interval: 'month', interval_count: 1 },
+          },
+          quantity: 1,
+        },
+      ],
+    } as Stripe.ApiList<Stripe.SubscriptionItem>;
+
+    const thirtyDaysAgoSeconds = Math.floor(
+      (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000
+    );
+
+    const subscriptions = [
+      {
+        ...makeSubscription({
+          id: 'sub_internal',
+          status: 'active',
+          created: thirtyDaysAgoSeconds - 10 * 24 * 60 * 60,
+          items,
+        }),
+        customer: { id: 'cus_internal', email: 'tim@jov.ie' },
+      } as unknown as Stripe.Subscription,
+      {
+        ...makeSubscription({
+          id: 'sub_external',
+          status: 'active',
+          created: thirtyDaysAgoSeconds - 5 * 24 * 60 * 60,
+          items,
+        }),
+        customer: { id: 'cus_real', email: 'artist@band.com' },
+      } as unknown as Stripe.Subscription,
+    ];
+
+    listMock.mockResolvedValue({ data: subscriptions, has_more: false });
+
+    const metrics = await getAdminStripeOverviewMetrics({
+      isInternalCustomer: ({ email }) => email?.endsWith('@jov.ie') ?? false,
+    });
+
+    expect(listMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expand: expect.arrayContaining(['data.customer']),
+      })
+    );
+    expect(metrics.activeSubscribers).toBe(1);
+    expect(metrics.mrrUsd).toBe(199);
+    expect(metrics.excludedInternalSubscribers).toBe(1);
+    expect(metrics.excludedInternalMrrUsd).toBe(199);
+    expect(metrics.activeSubscribers7dAgo).toBe(1);
+    expect(metrics.mrrUsd7dAgo).toBe(199);
   });
 
   it('returns isAvailable false when Stripe API fails', async () => {

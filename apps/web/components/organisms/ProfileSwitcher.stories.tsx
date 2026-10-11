@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { ProfileSwitcher } from './ProfileSwitcher';
+import { IdentitySwitcher } from './ProfileSwitcher';
 
 const dashboardData: DashboardData = {
   user: { id: 'story-user' },
@@ -50,9 +50,9 @@ const dashboardData: DashboardData = {
   },
 };
 
-const meta: Meta<typeof ProfileSwitcher> = {
-  title: 'Organisms/ProfileSwitcher',
-  component: ProfileSwitcher,
+const meta: Meta<typeof IdentitySwitcher> = {
+  title: 'Organisms/IdentitySwitcher',
+  component: IdentitySwitcher,
   decorators: [
     Story => (
       <DashboardDataProvider value={dashboardData}>
@@ -68,6 +68,6 @@ const meta: Meta<typeof ProfileSwitcher> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof ProfileSwitcher>;
+type Story = StoryObj<typeof IdentitySwitcher>;
 
 export const Default: Story = {};

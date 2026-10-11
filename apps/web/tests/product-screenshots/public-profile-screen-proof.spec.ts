@@ -2,6 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { PROFILE_DESKTOP_SURFACE_ENABLED } from '../../lib/profile/desktop-surface-flag';
 import { installPublicRouteMocks } from '../e2e/utils/public-surface-helpers';
 import { waitForHydration } from '../e2e/utils/smoke-test-utils';
 import { collectBrowserErrors } from '../visual-qa/route-quality';
@@ -32,7 +33,15 @@ type ViewportMeasurement = {
 const profileRoute = '/unfazed';
 
 const viewports = [
-  { id: 'desktop', width: 1440, height: 900, layout: 'desktop' },
+  // With the desktop surface flagged off (the shipped default), desktop
+  // visitors get the compact profile centered in a phone column (Tim,
+  // 2026-09-26), so the proof expects the layout the flag actually renders.
+  {
+    id: 'desktop',
+    width: 1440,
+    height: 900,
+    layout: PROFILE_DESKTOP_SURFACE_ENABLED ? 'desktop' : 'compact',
+  },
   { id: 'mobile', width: 390, height: 900, layout: 'compact' },
 ] as const;
 

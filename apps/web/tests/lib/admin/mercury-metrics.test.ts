@@ -61,7 +61,7 @@ describe('getAdminMercuryMetrics', () => {
       defaultStatus: 'unknown',
       observedAtIso: expect.any(String),
       errorMessage:
-        'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
+        'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY)',
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -76,7 +76,9 @@ describe('getAdminMercuryMetrics', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          availableBalance: 2500,
+          accounts: [
+            { id: 'acct_123', status: 'active', availableBalance: 2500 },
+          ],
         }),
       })
       .mockResolvedValueOnce({
@@ -102,11 +104,50 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.errorMessage).toBeUndefined();
     expect(mockCaptureError).not.toHaveBeenCalled();
     expect(new URL(String(fetchMock.mock.calls[0]?.[0])).pathname).toBe(
-      '/api/v1/account/acct_123'
+      '/api/v1/accounts'
     );
     expect(new URL(String(fetchMock.mock.calls[1]?.[0])).pathname).toBe(
       '/api/v1/account/acct_123/transactions'
     );
+  });
+
+  it('sums cash across every active account and ignores internal transfers', async () => {
+    process.env.MERCURY_API_TOKEN = 'token';
+    delete process.env.MERCURY_CHECKING_ACCOUNT_ID;
+    fetchMock.mockImplementation(async (url: string) => {
+      const path = new URL(url).pathname;
+      if (path === '/api/v1/accounts') {
+        return {
+          ok: true,
+          json: async () => ({
+            accounts: [
+              { id: 'acct_empty', status: 'active', availableBalance: 0 },
+              { id: 'acct_funded', status: 'active', availableBalance: 9000 },
+              { id: 'acct_savings', status: 'active', currentBalance: 1000 },
+              { id: 'acct_closed', status: 'archived', availableBalance: 777 },
+            ],
+          }),
+        };
+      }
+      const transactions =
+        path === '/api/v1/account/acct_funded/transactions'
+          ? [
+              { amount: -40, kind: 'debitCardTransaction' },
+              { amount: -500, kind: 'internalTransfer' },
+            ]
+          : path === '/api/v1/account/acct_savings/transactions'
+            ? [{ amount: 500, kind: 'internalTransfer' }]
+            : [];
+      return { ok: true, json: async () => ({ transactions }) };
+    });
+
+    const metrics = await getAdminMercuryMetrics();
+
+    expect(metrics.balanceUsd).toBe(10000);
+    expect(metrics.burnRateUsd).toBe(40);
+    expect(metrics.burnRateAvailable).toBe(true);
+    const paths = fetchMock.mock.calls.map(c => new URL(String(c[0])).pathname);
+    expect(paths).not.toContain('/api/v1/account/acct_closed/transactions');
   });
 
   it('returns isAvailable false when Mercury API fails', async () => {
@@ -173,7 +214,7 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.isAvailable).toBe(false);
     expect(metrics.defaultStatus).toBe('unknown');
     expect(metrics.errorMessage).toContain('404');
-    expect(metrics.errorMessage).toContain('/account/acct_123');
+    expect(metrics.errorMessage).toContain('/accounts');
     expect(metrics.errorMessage).toContain('notFound');
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
@@ -220,7 +261,11 @@ describe('getAdminMercuryMetrics', () => {
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ availableBalance: 2500 }),
+        json: async () => ({
+          accounts: [
+            { id: 'acct_123', status: 'active', availableBalance: 2500 },
+          ],
+        }),
       })
       .mockRejectedValueOnce(
         new ServerFetchTimeoutError(
@@ -244,7 +289,10 @@ describe('getAdminMercuryMetrics', () => {
   it('rejects a successful response with a missing balance instead of measuring zero', async () => {
     process.env.MERCURY_API_TOKEN = 'token';
     process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ accounts: [{ id: 'acct_123', status: 'active' }] }),
+    });
 
     const metrics = await getAdminMercuryMetrics();
 
@@ -260,7 +308,11 @@ describe('getAdminMercuryMetrics', () => {
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ availableBalance: 2500 }),
+        json: async () => ({
+          accounts: [
+            { id: 'acct_123', status: 'active', availableBalance: 2500 },
+          ],
+        }),
       })
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
 
@@ -277,7 +329,11 @@ describe('getAdminMercuryMetrics', () => {
     process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
     fetchMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ availableBalance: 2500 }),
+      json: async () => ({
+        accounts: [
+          { id: 'acct_123', status: 'active', availableBalance: 2500 },
+        ],
+      }),
     });
     for (let page = 1; page <= 20; page++) {
       fetchMock.mockResolvedValueOnce({
@@ -307,7 +363,11 @@ describe('getAdminMercuryMetrics', () => {
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ availableBalance: 2500 }),
+        json: async () => ({
+          accounts: [
+            { id: 'acct_123', status: 'active', availableBalance: 2500 },
+          ],
+        }),
       })
       .mockResolvedValueOnce({
         ok: true,

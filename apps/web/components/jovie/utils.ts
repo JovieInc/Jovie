@@ -9,6 +9,7 @@ import {
   isRecoverableToolStreamError,
   resolveToolFailurePresentation,
 } from '@/lib/chat/tool-errors';
+import { isSummerFailureHop, summerHopLabel } from '@/lib/ovie/summer-failure';
 import type { ChatErrorType, MessagePart } from './types';
 
 /**
@@ -138,6 +139,8 @@ export function getUserFriendlyMessage(
   retryAfter?: number,
   errorCode?: string
 ): string {
+  if (isSummerFailureHop(errorCode))
+    return `Failed at: ${summerHopLabel(errorCode)}`;
   switch (type) {
     case 'network':
       return 'Unable to connect. Please check your internet connection.';
@@ -167,6 +170,8 @@ export function getNextStepMessage(
   type: ChatErrorType,
   errorCode?: string
 ): string {
+  if (isSummerFailureHop(errorCode))
+    return `Failed at: ${summerHopLabel(errorCode)}`;
   switch (type) {
     case 'network':
       return 'Check your connection and try again';

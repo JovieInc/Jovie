@@ -6,6 +6,7 @@ export type {
   AlternativeData,
   AlternativeFaq,
   AlternativeHighlight,
+  AlternativeReason,
 } from './types';
 
 const alternatives: Record<string, AlternativeData> = {

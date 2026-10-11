@@ -62,6 +62,20 @@ These states apply across families and were previously undocumented.
 
 ---
 
+## Artist profile mode readiness
+
+| State | Token | Selector | Story | Primitive |
+| --- | --- | --- | --- | --- |
+| Before hydration | `--state-disabled-opacity` | `[data-interactive-ready="false"][aria-busy="true"]`, tab `:disabled` | `Marketing/Artist Profile/ArtistProfileModeSwitcher/Readiness` | `apps/web/components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx` |
+| Interactive | Existing selected-tab surface and focus tokens | `[data-interactive-ready="true"][aria-busy="false"]` | `Marketing/Artist Profile/ArtistProfileModeSwitcher/Readiness` | Same canonical mode owner |
+
+Server-rendered choices stay disabled until their handlers attach. The existing
+preview and panel geometry remain visible; hydration enables the same controls.
+The readiness story exercises selection after activation, and the adjacent SSR
+regression covers the pending state without claiming DOM-ready proves hydration.
+
+---
+
 ## Inputs and auth forms
 
 | State | Token | Selector | Story | Primitive |
@@ -152,3 +166,23 @@ These states apply across families and were previously undocumented.
 4. Inline offline is for **in-context** recovery; full-page offline/error uses `EmptyState` or `PageErrorState`.
 5. Error/recovery presenters (`SystemBErrorFallback`, `PublicPageErrorFallback`, `PageErrorState`, `ErrorBanner`, chat inline error cards) take copy from the RecoveryState contract (`apps/web/components/features/feedback/recovery-contract.ts`) — one `Try again` recovery action; error digests render only behind an opt-in details disclosure, never in the default tree.
 6. When adding a new state, update this matrix **and** add a Storybook story before shipping.
+
+
+### Homepage handle claim: native draft to client validation
+
+The existing ProductClaimHandleForm remains a native GET form to `/start` before
+JavaScript attaches. An editable server-rendered field must retain its complete
+normalized draft through client readiness; availability and Claim/Enter handoff
+must use that same draft. Capture the native value before passive validation
+updates render the initial controlled value. Preserve copy, geometry, focus,
+status space and the no-JavaScript handoff.
+
+| State | Observable contract | Evidence |
+| --- | --- | --- |
+| Native editable field | `action=/start`, `method=get`, named `handle` input; accepted text survives hydration | Real SSR/hydrate tests and held-client-assets homepage E2E |
+| Checking / available / error | Draft retained; live status belongs to that draft; failure remains disclosed | Co-located ProductClaimHandleForm tests with real validation owner |
+| Pointer / Enter handoff | Same normalized handle reaches the existing start/signup entry | Homepage readiness E2E, trusted fill and keyboard paths |
+| JavaScript unavailable | Native GET still carries the entered handle | Homepage no-JavaScript E2E |
+
+The visual field, action and tokens are unchanged. These are lifecycle and
+handoff receipts; they do not establish account creation or notification delivery.

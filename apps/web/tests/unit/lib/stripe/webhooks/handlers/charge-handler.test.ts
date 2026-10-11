@@ -14,6 +14,7 @@ const {
   mockStripeInvoicesRetrieve,
   mockStripeChargesRetrieve,
   mockStripePaymentIntentsRetrieve,
+  mockStripeInvoicePaymentsList,
   mockGetUserIdFromStripeCustomer,
   mockInvalidateBillingCache,
   mockUpdateUserBillingStatus,
@@ -29,6 +30,7 @@ const {
   mockStripeInvoicesRetrieve: vi.fn(),
   mockStripeChargesRetrieve: vi.fn(),
   mockStripePaymentIntentsRetrieve: vi.fn(),
+  mockStripeInvoicePaymentsList: vi.fn(),
   mockGetUserIdFromStripeCustomer: vi.fn(),
   mockInvalidateBillingCache: vi.fn(),
   mockUpdateUserBillingStatus: vi.fn(),
@@ -66,6 +68,9 @@ vi.mock('@/lib/stripe/client', () => ({
     },
     paymentIntents: {
       retrieve: mockStripePaymentIntentsRetrieve,
+    },
+    invoicePayments: {
+      list: mockStripeInvoicePaymentsList,
     },
   },
 }));
@@ -111,6 +116,7 @@ vi.mock('@/lib/utils/logger', () => ({
 import {
   ChargeHandler,
   chargeHandler,
+  StripeWriteBlockedError,
 } from '@/lib/stripe/webhooks/handlers/charge-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 import { isSupportedEventType } from '@/lib/stripe/webhooks/types';
@@ -358,6 +364,45 @@ describe('@critical ChargeHandler', () => {
       expect(mockInvalidateBillingCache).toHaveBeenCalledWith('app_user_123');
     });
 
+    it('does not cancel or revoke when replay finds a still-cancelable subscription', async () => {
+      const context = refundContext(refundedCharge());
+      context.stripeWritesAllowed = false;
+
+      let caught: unknown;
+      try {
+        await handler.handle(context);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(StripeWriteBlockedError);
+      expect((caught as Error).message).toContain(
+        'Stripe Dashboard: open subscription sub_123 (status active)'
+      );
+
+      expect(mockStripeSubscriptionsCancel).not.toHaveBeenCalled();
+      expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
+      expect(mockSendSlackMessage).not.toHaveBeenCalled();
+      expect(mockReverseReferralCommission).toHaveBeenCalled();
+    });
+
+    it('revokes locally on replay once the subscription is no longer cancelable', async () => {
+      mockStripeSubscriptionsRetrieve.mockResolvedValue({
+        ...activeSubscription(),
+        status: 'canceled',
+      });
+      const context = refundContext(refundedCharge());
+      context.stripeWritesAllowed = false;
+
+      const result = await handler.handle(context);
+
+      expect(result).toEqual({ success: true });
+      expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ isPro: false, stripeSubscriptionId: null })
+      );
+      expect(mockStripeSubscriptionsCancel).not.toHaveBeenCalled();
+      expect(mockSendSlackMessage).not.toHaveBeenCalled();
+    });
+
     it('is safe to replay: a second identical refund still revokes and cancels', async () => {
       const context = refundContext(refundedCharge(), 'evt_refund_replay');
 
@@ -566,6 +611,34 @@ describe('@critical ChargeHandler', () => {
       expect(result.success).toBe(true);
       expect(mockStripePaymentIntentsRetrieve).toHaveBeenCalledWith('pi_123');
       expect(mockStripeInvoicesRetrieve).toHaveBeenCalledWith('in_latest');
+    });
+
+    it('resolves the invoice through InvoicePayments on the current Stripe API', async () => {
+      // 2026-08-26.dahlia: neither Charge.invoice nor PaymentIntent.invoice exists.
+      mockStripePaymentIntentsRetrieve.mockResolvedValueOnce({
+        id: 'pi_123',
+        object: 'payment_intent',
+      });
+      mockStripeInvoicePaymentsList.mockResolvedValueOnce({
+        data: [{ id: 'inpay_1', invoice: 'in_latest' }],
+      });
+
+      const result = await handler.handle(
+        refundContext(
+          refundedCharge({
+            invoice: undefined,
+            payment_intent: 'pi_123',
+          })
+        )
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockStripeInvoicePaymentsList).toHaveBeenCalledWith({
+        payment: { type: 'payment_intent', payment_intent: 'pi_123' },
+        limit: 1,
+      });
+      expect(mockStripeInvoicesRetrieve).toHaveBeenCalledWith('in_latest');
+      expect(mockUpdateUserBillingStatus).toHaveBeenCalled();
     });
 
     it('skips unhandled event types', async () => {

@@ -49,6 +49,19 @@ describe('JOV-4932 /new defect contracts', () => {
     expect(source).toContain('profile-viewport--embedded');
   });
 
+  it('marks marketing state renders as embedded so light marketing chrome cannot restyle identity', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'app/(marketing)/renders/[state]/MarketingStateRenderClient.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain(
+      "className='profile-viewport profile-viewport--embedded'"
+    );
+  });
+
   it('spans the canonical pricing row across the shared shell grid', () => {
     const css = readFileSync(resolve(process.cwd(), homepageV2CssPath), 'utf8');
     expect(css).toMatch(

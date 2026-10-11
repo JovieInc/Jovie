@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { TrackedGuideLink } from '@/components/TrackedGuideLink';
 import { loadArticleRegistry } from '@/lib/article-registry.mjs';
 
 type RelatedArticle = {
@@ -19,7 +19,9 @@ export function RelatedGuides({ articleId }: { articleId: string }) {
       <ul>
         {articles.map(article => (
           <li key={article.id}>
-            <Link href={article.route}>{article.title}</Link>
+            <TrackedGuideLink href={article.route} sourceArticleId={articleId}>
+              {article.title}
+            </TrackedGuideLink>
             <p>{article.description}</p>
           </li>
         ))}

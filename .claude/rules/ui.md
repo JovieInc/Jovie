@@ -461,7 +461,7 @@ Marketing pages reference product screenshots through `apps/web/lib/screenshots/
 
 - **NEVER** invent, substitute, or mix placeholder creator identities on the homepage or marketing demos when Tim White or a real featured creator from canonical data should be used.
 - For Tim White specifically, agents must use the canonical homepage identity source instead of hardcoded fallback assets or guessed values.
-- If Tim White appears in homepage mocks, use the correct founder photo and the correct Spotify artist ID: `4u`.
+- If Tim White appears in homepage mocks, use `TIM_WHITE_PROFILE` from `apps/web/lib/tim-white.ts` and `TIM_WHITE_SPOTIFY_ID` from `apps/web/lib/spotify/blacklist.ts`; do not duplicate or truncate the identifier.
 - Calvin Harris demo fixtures must not include `Blessings`, Clementine Douglas, or any Tim White credit. Those names create an obvious founder-identity collision and must be treated as forbidden in Calvin demo content.
 - When fixing one wrong Tim White reference, search for sibling homepage/demo references and fix all of them in the same pass.
 
@@ -480,3 +480,13 @@ When building or iterating on the Artist Profiles landing page:
 - Keep copy in data files, not inline JSX.
 - Iterate section by section in browser instead of trying to style the whole page in one pass.
 - Marketing fake-proof/founder-first rules are now owned normatively by the marketing registry (`apps/web/data/marketing/`) — see `docs/marketing/AGENT_GUIDE.md` (zero-proof path: proof/trust sections illegal without verified data).
+
+## Lesson Guard References
+
+- Register new Tailwind v4 utility tokens in `@theme` or `@theme inline` in
+  `globals.css`; a CSS variable declared only in `:root` does not emit utilities.
+- Marketing signup CTAs use `/signup`. Do not send them to `/claim`, `/register`
+  or `/waitlist`; the artist profile claim flow has a different intent.
+- Honor the marketing registry's above-the-fold hero contract: do not use a
+  full-height hero shell that pushes the first proof element below the fold.
+  Keep the opening proof in the composition without decorative inset cards.

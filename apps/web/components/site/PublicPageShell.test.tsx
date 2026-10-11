@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { YoutubeThumbnailsLanding } from '@/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding';
 import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
@@ -6,11 +7,28 @@ import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingPageContractMarkers } from './MarketingPageContractMarkers';
 import { PublicPageShell } from './PublicPageShell';
 
+const pathnameRef = vi.hoisted(() => ({ current: '/' }));
+
 vi.mock('next/navigation', async importOriginal => {
   const actual = await importOriginal<typeof import('next/navigation')>();
   return {
     ...actual,
-    usePathname: () => '/',
+    usePathname: () => pathnameRef.current,
+  };
+});
+
+const footerFlagCalls = vi.hoisted(() => ({
+  values: [] as Array<boolean | undefined>,
+}));
+
+vi.mock('./MarketingFooter', async importOriginal => {
+  const actual = await importOriginal<typeof import('./MarketingFooter')>();
+  return {
+    ...actual,
+    MarketingFooter: (props: ComponentProps<typeof actual.MarketingFooter>) => {
+      footerFlagCalls.values.push(props.genericCreatorNav);
+      return <actual.MarketingFooter {...props} />;
+    },
   };
 });
 
@@ -42,6 +60,9 @@ describe('PublicPageShell', () => {
     expect(container.firstElementChild).toHaveAttribute(
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.shell.publicPage
+    );
+    expect(container.firstElementChild).toHaveAttribute(
+      'data-public-page-shell'
     );
     const main = document.getElementById('main-content');
     expect(main).toBeInTheDocument();
@@ -83,12 +104,52 @@ describe('PublicPageShell', () => {
     );
   });
 
+  it('leaves a record family route to its record contract markers', () => {
+    pathnameRef.current = '/solutions/artists';
+    try {
+      const { container, rerender } = render(<MarketingPageContractMarkers />);
+      expect(container.querySelector('[data-copy-scope]')).toBeNull();
+
+      const recordContract = {
+        ...MARKETING_PAGE_CONTRACTS[
+          '(marketing)/solutions/[audience]/page.tsx'
+        ],
+        url: '/solutions/artists',
+        copyScope: 'music' as const,
+        job: 'record job',
+      };
+      rerender(<MarketingPageContractMarkers contract={recordContract} />);
+      const marker = container.querySelector('[data-copy-scope]');
+      expect(marker).toHaveAttribute('data-copy-scope', 'music');
+      expect(marker).toHaveAttribute('data-page-job', 'record job');
+    } finally {
+      pathnameRef.current = '/';
+    }
+  });
+
   it('omits the fixed-header offset when mainOffset is false', () => {
     render(<PublicPageShell mainOffset={false}>hero</PublicPageShell>);
 
     const main = document.getElementById('main-content');
     expect(main?.className).not.toContain('pt-(--public-shell-header-offset)');
     expect(main).not.toHaveClass('public-shell-main--docked');
+  });
+
+  it('passes MARKETING_GENERIC_CREATOR_NAV into the marketing footer', () => {
+    footerFlagCalls.values.length = 0;
+    delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
+
+    const on = render(<PublicPageShell>body</PublicPageShell>);
+    expect(footerFlagCalls.values.at(-1)).toBe(true);
+    on.unmount();
+
+    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'false';
+    try {
+      render(<PublicPageShell>body</PublicPageShell>);
+      expect(footerFlagCalls.values.at(-1)).toBe(false);
+    } finally {
+      delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
+    }
   });
 
   it('passes footer variant and className through to MarketingFooter', () => {

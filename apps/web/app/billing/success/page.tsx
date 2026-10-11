@@ -66,17 +66,23 @@ const ARTIST_VISIBILITY_STEP_ICONS = {
   fix: Wrench,
 } as const;
 
-async function fetchValidatedSessionPlan(
+async function fetchValidatedSession(
   sessionId: string,
   signal: AbortSignal
-): Promise<PaidPlanId | null> {
+): Promise<{ plan: PaidPlanId | null; needsProfile: boolean }> {
   const response = await fetch(
     `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`,
     { cache: 'no-store', signal }
   );
-  if (!response.ok) return null;
-  const body = (await response.json()) as { plan?: string | null };
-  return resolvePaidPlan(body.plan ?? null);
+  if (!response.ok) return { plan: null, needsProfile: false };
+  const body = (await response.json()) as {
+    plan?: string | null;
+    needsProfile?: boolean;
+  };
+  return {
+    plan: resolvePaidPlan(body.plan ?? null),
+    needsProfile: body.needsProfile === true,
+  };
 }
 
 function FeatureCard({
@@ -130,6 +136,7 @@ export default function CheckoutSuccessPage() {
   );
   const [validatedSessionPlan, setValidatedSessionPlan] =
     useState<PaidPlanId | null>(null);
+  const [needsProfile, setNeedsProfile] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const shouldSuppressMotion = hasHydratedMotion && prefersReducedMotion;
   const isBillingPending =
@@ -157,10 +164,11 @@ export default function CheckoutSuccessPage() {
     const controller = new AbortController();
     setIsSessionPlanPending(true);
 
-    void fetchValidatedSessionPlan(sessionId, controller.signal)
-      .then(plan => {
+    void fetchValidatedSession(sessionId, controller.signal)
+      .then(session => {
         if (controller.signal.aborted) return;
-        setValidatedSessionPlan(plan);
+        setValidatedSessionPlan(session.plan);
+        setNeedsProfile(session.needsProfile);
       })
       .catch(error => {
         if (controller.signal.aborted) return;
@@ -438,11 +446,13 @@ export default function CheckoutSuccessPage() {
                     href={getPaidSuccessPrimaryHref({
                       plan: view.plan,
                       isOnboardingUpgrade,
+                      needsProfile,
                     })}
                   >
                     {getPaidSuccessPrimaryLabel({
                       plan: view.plan,
                       isOnboardingUpgrade,
+                      needsProfile,
                     })}
                   </Link>
                 </Button>

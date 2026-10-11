@@ -28,6 +28,10 @@ describe('ChatMerchActionCard', () => {
     expect(confirmButton.className).toContain('bg-btn-primary');
     expect(confirmButton.className).toContain('text-btn-primary-foreground');
     expect(confirmButton.className).toContain('hover:bg-btn-primary-hover');
+    // JOV-6774: canonical --color-btn-primary-* tokens, not legacy --linear-*.
+    expect(confirmButton.className).toContain('--color-btn-primary-bg');
+    expect(confirmButton.className).toContain('--color-btn-primary-hover');
+    expect(confirmButton.className).not.toContain('linear-btn');
 
     await user.click(confirmButton);
     expect(mutateMock).toHaveBeenCalledWith(

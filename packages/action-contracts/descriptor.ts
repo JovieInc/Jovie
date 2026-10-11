@@ -34,6 +34,7 @@ export type ActionConfirmation = (typeof ACTION_CONFIRMATIONS)[number];
 export const actionRequirementSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('auth') }),
   z.object({ type: z.literal('profile_ownership') }),
+  z.object({ type: z.literal('worker_scope'), key: z.string().min(1) }),
   z.object({
     type: z.literal('entitlement'),
     key: z.string().min(1),

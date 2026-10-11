@@ -1,0 +1,7 @@
+Domain Name: jovie.ai
+Updated Date: 2026-08-12T02:16:11Z
+Registry Expiry Date: 2028-01-18T16:18:01Z
+Registrar: NameCheap, Inc.
+Domain Status: clientTransferProhibited https://icann.org/epp#clientTransferProhibited
+Name Server: ns3.afternic.com
+Name Server: ns4.afternic.com

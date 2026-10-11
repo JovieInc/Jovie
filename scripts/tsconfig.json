@@ -42,6 +42,7 @@
     "node_modules",
     "__pycache__",
     "**/node_modules",
-    "invariants/fixtures/done-sprint-invariants"
+    "invariants/fixtures/done-sprint-invariants",
+    "invariants/fixtures/design-surfaces"
   ]
 }

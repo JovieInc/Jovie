@@ -75,6 +75,15 @@ describe('shared route adapters', () => {
         await readFile(path.join(destination, route.target), 'utf8')
       ).toContain(`from '@/app/${endpoint}/route'`);
     }
+    expect(inventory.some(entry => entry.source.startsWith('hud/wiki/'))).toBe(
+      false
+    );
+    expect(inventory).toContainEqual(
+      expect.objectContaining({
+        source: 'app/(shell)/admin/wiki/page.tsx',
+        target: 'app/(operator)/app/admin/wiki/page.tsx',
+      })
+    );
   });
   it('projects only selected routes and removes stale adapters while retaining the app shell', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'ovie-routes-'));
@@ -120,16 +129,27 @@ describe('shared route adapters', () => {
 
 describe('independent deployment config', () => {
   it('keeps deep-link queries on local rewrites and starts at Ops', async () => {
-    expect(await config.rewrites()).toEqual([
-      { source: '/app/ov/:path*', destination: '/app/admin/:path*' },
-    ]);
+    expect(await config.rewrites()).toMatchObject({
+      beforeFiles: expect.arrayContaining([
+        { source: '/hud/wiki', destination: '/app/admin/wiki' },
+        {
+          source: '/hud/wiki/:path*',
+          destination: '/app/admin/wiki/:path*',
+        },
+      ]),
+      afterFiles: [
+        { source: '/app/ov/:path*', destination: '/app/admin/:path*' },
+      ],
+    });
     expect(await config.redirects()).toContainEqual({
       source: '/',
       destination: '/hud',
       permanent: false,
     });
     expect(
-      (await config.rewrites()).every(rule => rule.destination.startsWith('/'))
+      Object.values(await config.rewrites())
+        .flat()
+        .every(rule => rule.destination.startsWith('/'))
     ).toBe(true);
     expect(config.output).toBe('standalone');
     expect((await config.headers())[0].headers).toContainEqual({

@@ -52,9 +52,21 @@ heartbeat_gh_api() {
 if ! [[ "$GH_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
   degrade uncertain "repository identity is malformed"
 fi
-if [[ "$HEARTBEAT_WORKFLOW" != "runner-heartbeat.yml" ]]; then
-  degrade uncertain "heartbeat workflow identity is not authorized"
-fi
+# Each authorized pool has exactly one heartbeat workflow identity.
+case "$HEARTBEAT_WORKFLOW" in
+  runner-heartbeat.yml)
+    HEARTBEAT_WORKFLOW_NAME="Runner Heartbeat"
+    HEARTBEAT_JOB_NAME="Self-hosted runner heartbeat"
+    HEARTBEAT_RUNNER_LABEL="jovie-runner"
+    ;;
+  mac-runner-heartbeat.yml)
+    HEARTBEAT_WORKFLOW_NAME="Mac Runner Heartbeat"
+    HEARTBEAT_JOB_NAME="Self-hosted Mac runner heartbeat"
+    HEARTBEAT_RUNNER_LABEL="jovie-mac"
+    ;;
+  *) degrade uncertain "heartbeat workflow identity is not authorized" ;;
+esac
+HEARTBEAT_WORKFLOW_PATH=".github/workflows/$HEARTBEAT_WORKFLOW"
 if ! [[ "$HEARTBEAT_MAX_AGE_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   degrade uncertain "heartbeat freshness boundary is malformed"
 fi
@@ -108,14 +120,16 @@ fi
 run_record="$(jq -c '.workflow_runs[0]' <<<"$runs_json")"
 if ! jq -e \
   --arg repo "$GH_REPO" \
+  --arg workflow_name "$HEARTBEAT_WORKFLOW_NAME" \
+  --arg workflow_path "$HEARTBEAT_WORKFLOW_PATH" \
   --arg expected_event "$HEARTBEAT_EXPECTED_EVENT" \
   --arg expected_sha "$HEARTBEAT_EXPECTED_SHA" \
   --argjson strict "$STRICT_EXPECTATION" '
   type == "object" and
   (.id | type == "number" and . > 0) and
   (.run_attempt | type == "number" and . > 0) and
-  .name == "Runner Heartbeat" and
-  .path == ".github/workflows/runner-heartbeat.yml" and
+  .name == $workflow_name and
+  .path == $workflow_path and
   .head_repository.full_name == $repo and
   (.head_sha | type == "string" and test("^[0-9a-f]{40}$")) and
   (
@@ -203,10 +217,10 @@ for ((job_poll_attempt = 1; job_poll_attempt <= HEARTBEAT_JOB_POLL_ATTEMPTS; job
   ' >/dev/null <<<"$jobs_json"; then
     degrade uncertain "exact heartbeat job evidence is malformed"
   fi
-  if ! heartbeat_jobs="$(jq -c '
+  if ! heartbeat_jobs="$(jq -c --arg job_name "$HEARTBEAT_JOB_NAME" '
     [
       .[] | .jobs[]? |
-      select(.name == "Self-hosted runner heartbeat")
+      select(.name == $job_name)
     ] | unique_by(.id)
   ' <<<"$jobs_json")"; then
     degrade uncertain "exact heartbeat job evidence is malformed"
@@ -245,10 +259,10 @@ for ((job_poll_attempt = 1; job_poll_attempt <= HEARTBEAT_JOB_POLL_ATTEMPTS; job
         fi
         degrade uncertain "exact heartbeat job conclusion is malformed"
       fi
-      if ! jq -e '
+      if ! jq -e --arg runner_label "$HEARTBEAT_RUNNER_LABEL" '
         (.[0].runner_id | type == "number" and . > 0) and
         (.[0].runner_name | type == "string" and length > 0) and
-        (.[0].labels | type == "array" and index("jovie-runner") != null)
+        (.[0].labels | type == "array" and index($runner_label) != null)
       ' >/dev/null <<<"$heartbeat_jobs"; then
         degrade uncertain "exact heartbeat runner identity is malformed or missing"
       fi

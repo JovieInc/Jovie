@@ -1,9 +1,59 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import { OperationalTasksPanelView } from '@/components/features/admin/hud/OperationalTasksPanel';
+import {
+  fireEvent,
+  render as renderWithRoot,
+  screen,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { type ReactNode, useState } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  OperationalTasksPanel,
+  OperationalTasksPanelView,
+} from '@/components/features/admin/hud/OperationalTasksPanel';
+import {
+  RightPanelProvider,
+  useRightPanel,
+} from '@/contexts/RightPanelContext';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
+type OperationalTask = OperationalTaskFeed['tasks'][number];
+
+const { mockTaskQuery } = vi.hoisted(() => ({ mockTaskQuery: vi.fn() }));
+vi.mock('@/components/features/admin/hud/useHudShippingStateQuery', () => ({
+  useHudShippingStateQuery: mockTaskQuery,
+}));
+
+function ShellRail() {
+  return <div data-testid='shell-rail'>{useRightPanel()}</div>;
+}
+
+function render(ui: ReactNode) {
+  return renderWithRoot(
+    <RightPanelProvider>
+      {ui}
+      <ShellRail />
+    </RightPanelProvider>
+  );
+}
+
+function Harness({
+  feed,
+  presentation = 'section',
+}: Readonly<{
+  feed: OperationalTaskFeed;
+  presentation?: 'section' | 'page';
+}>) {
+  const [selected, setSelected] = useState<OperationalTask['id'] | null>(null);
+  return (
+    <OperationalTasksPanelView
+      feed={feed}
+      presentation={presentation}
+      selectedTaskId={selected}
+      onSelectTask={setSelected}
+    />
+  );
+}
 
 function feed(
   overrides: Partial<OperationalTaskFeed> = {}
@@ -12,7 +62,7 @@ function feed(
     canonicalSource: 'linear',
     cacheMode: 'local-reconciled',
     syncState: 'fresh',
-    sourceId: 'symphony-runtime',
+    sourceId: 'lane-pull-requests',
     observedAt: '2026-09-01T22:00:00.000Z',
     lastSyncedAt: '2026-09-01T22:00:00.000Z',
     freshnessDeadline: '2026-09-01T22:00:10.000Z',
@@ -36,6 +86,35 @@ function feed(
 }
 
 describe('OperationalTasksPanelView', () => {
+  it('connects the live query wrapper to page inspection and request state', () => {
+    mockTaskQuery.mockReturnValue({
+      isFetching: false,
+      operationalRequestState: 'error',
+      operationalTasks: feed(),
+    });
+    renderWithRoot(
+      <RightPanelProvider>
+        <OperationalTasksPanel presentation='page' />
+        <ShellRail />
+      </RightPanelProvider>
+    );
+
+    expect(mockTaskQuery).toHaveBeenCalledWith(null);
+    expect(screen.getByText('Stale Cache')).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('region', { name: 'Operational Tasks' })
+        .querySelector('.overflow-y-auto')
+    ).toBeNull();
+    const inspect = screen.getByRole('button', { name: /Inspect JOV-5544/ });
+    fireEvent.click(inspect);
+    expect(inspect).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('shell-rail')).toContainElement(
+      screen.getByTestId('shipping-row-rail')
+    );
+    mockTaskQuery.mockReset();
+  });
+
   it('renders the stable Linear identity from the local reconciled cache', () => {
     render(<OperationalTasksPanelView feed={feed()} />);
 
@@ -52,6 +131,27 @@ describe('OperationalTasksPanelView', () => {
     );
     expect(panel.className).toContain('overflow-hidden');
     expect(panel.className.split(/\s+/)).not.toContain('p-0');
+  });
+
+  it('uses page scrolling and exposes the full task identity as a link', () => {
+    render(<OperationalTasksPanelView feed={feed()} presentation='page' />);
+    const panel = screen.getByRole('region', { name: 'Operational Tasks' });
+    expect(panel.querySelector('.overflow-y-auto')).toBeNull();
+    expect(panel.className).not.toContain('bg-surface');
+    const link = screen.getByRole('link', { name: feed().tasks[0].title });
+    expect(link).toHaveAttribute('href', feed().tasks[0].linearUrl);
+    expect(link).toHaveAttribute('title', feed().tasks[0].title);
+  });
+
+  it('retains a readable title when the source has no Linear URL', () => {
+    render(
+      <OperationalTasksPanelView
+        feed={feed({ tasks: [{ ...feed().tasks[0], linearUrl: null }] })}
+        presentation='page'
+      />
+    );
+    expect(screen.getByText(feed().tasks[0].title)).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('makes a running-to-retrying transition visually explicit', () => {
@@ -82,7 +182,7 @@ describe('OperationalTasksPanelView', () => {
     expect(screen.getByText('Retrying')).toBeInTheDocument();
     expect(screen.getByText('Attempt 3')).toBeInTheDocument();
     expect(screen.getByText('Retry scheduled')).toBeInTheDocument();
-    expect(screen.getByText('running → retrying')).toBeInTheDocument();
+    expect(screen.getByText('Running → Retrying')).toBeInTheDocument();
   });
 
   it('keeps last-known tasks visible and labels them stale after a request error', () => {
@@ -112,5 +212,192 @@ describe('OperationalTasksPanelView', () => {
       screen.getByText('Task cache unavailable. Retrying automatically.')
     ).toBeInTheDocument();
     expect(screen.queryByText('JOV-5544')).not.toBeInTheDocument();
+  });
+
+  describe('inspect and canonical recovery', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const blockedFeed = () =>
+      feed({
+        tasks: [
+          {
+            ...feed().tasks[0],
+            workflowState: 'blocked',
+            pullRequest: {
+              number: 42,
+              url: 'https://github.com/JovieInc/Jovie/pull/42',
+              branch: 'devin/jov-5544',
+              agent: 'devin',
+              isDraft: false,
+              checks: { rollup: 'failure', failing: ['PR Ready'] },
+              queuePosition: null,
+              queueState: null,
+              createdAt: '2026-09-01T20:00:00.000Z',
+            },
+          },
+        ],
+      });
+
+    it('opens the inspector with owner, failing dependency, and next action', () => {
+      render(<Harness feed={blockedFeed()} />);
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Inspect JOV-5544: Cache Symphony workspaces on NVMe',
+        })
+      );
+
+      const rail = screen.getByTestId('shipping-row-rail');
+      expect(rail).toHaveTextContent('Owner');
+      expect(rail).toHaveTextContent('devin');
+      expect(rail).toHaveTextContent('Failing checks');
+      expect(rail).toHaveTextContent('PR Ready');
+      expect(rail).toHaveTextContent('Next Expected Action');
+      expect(rail).toHaveTextContent('#42 on GitHub');
+      expect(rail).toHaveTextContent('JOV-5544');
+    });
+
+    it('keeps task inspection available on the flat page presentation', () => {
+      render(<Harness feed={blockedFeed()} presentation='page' />);
+
+      const inspect = screen.getByRole('button', {
+        name: 'Inspect JOV-5544: Cache Symphony workspaces on NVMe',
+      });
+      expect(
+        screen.getByRole('link', { name: feed().tasks[0].title })
+      ).toHaveAttribute('href', feed().tasks[0].linearUrl);
+      expect(
+        screen
+          .getByRole('region', { name: 'Operational Tasks' })
+          .querySelector('.overflow-y-auto')
+      ).toBeNull();
+
+      fireEvent.click(inspect);
+      expect(inspect).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByTestId('shell-rail')).toContainElement(
+        screen.getByTestId('shipping-row-rail')
+      );
+      expect(screen.getByTestId('shipping-row-rail')).toHaveTextContent(
+        'PR Ready'
+      );
+
+      fireEvent.click(inspect);
+      expect(inspect).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByTestId('shipping-row-rail')).toHaveAttribute(
+        'aria-hidden',
+        'true'
+      );
+      expect(screen.getByTestId('shipping-row-rail')).toHaveAttribute('inert');
+    });
+
+    it('offers a pointer-accessible close action inside task details', async () => {
+      const user = userEvent.setup();
+      render(<Harness feed={blockedFeed()} presentation='page' />);
+      const inspect = screen.getByRole('button', { name: /Inspect JOV-5544/ });
+
+      await user.click(inspect);
+      await user.click(screen.getByRole('button', { name: 'More actions' }));
+      await user.click(screen.getByRole('menuitem', { name: 'Close' }));
+
+      expect(inspect).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByTestId('shipping-row-rail')).toHaveAttribute('inert');
+    });
+
+    it('requests the canonical reconcile and shows the durable receipt', async () => {
+      const fetcher = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            persisted: 'created',
+            result: { eventId: 'sum_QYMFgF57GrOps8oualjPI5dD' },
+          }),
+          { status: 200 }
+        )
+      );
+      vi.stubGlobal('fetch', fetcher);
+      render(<Harness feed={blockedFeed()} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /Inspect JOV-5544/ }));
+      fireEvent.click(screen.getByTestId('summer-reconcile-request'));
+
+      const receipt = await screen.findByTestId('summer-reconcile-receipt');
+      expect(receipt).toHaveTextContent('Recorded');
+      expect(receipt).toHaveTextContent('sum_QYMFgF57GrOps8oualjPI5dD');
+      expect(fetcher).toHaveBeenCalledWith('/api/ovie/summer/reconcile', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+    });
+
+    it('reports an existing receipt on a repeated request instead of duplicating', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              ok: true,
+              persisted: 'existing',
+              result: { eventId: 'sum_QYMFgF57GrOps8oualjPI5dD' },
+            }),
+            { status: 200 }
+          )
+        )
+      );
+      render(<Harness feed={blockedFeed()} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /Inspect JOV-5544/ }));
+      fireEvent.click(screen.getByTestId('summer-reconcile-request'));
+
+      expect(
+        await screen.findByTestId('summer-reconcile-receipt')
+      ).toHaveTextContent('Already recorded');
+    });
+
+    it('surfaces an explicit denial instead of a false green', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response(
+              JSON.stringify({ ok: false, code: 'founder_access_required' }),
+              { status: 403 }
+            )
+          )
+      );
+      render(<Harness feed={blockedFeed()} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /Inspect JOV-5544/ }));
+      fireEvent.click(screen.getByTestId('summer-reconcile-request'));
+
+      const denial = await screen.findByTestId('summer-reconcile-denial');
+      expect(denial).toHaveTextContent('founder access is required');
+      expect(
+        screen.queryByTestId('summer-reconcile-receipt')
+      ).not.toBeInTheDocument();
+    });
+
+    it('stays read-only with an explanation when no recovery is indicated', () => {
+      render(
+        <Harness
+          feed={feed({
+            tasks: [
+              { ...feed().tasks[0], updatedAt: new Date().toISOString() },
+            ],
+          })}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Inspect JOV-5544/ }));
+
+      expect(
+        screen.getByText(/no authorized operation applies/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('summer-reconcile-request')
+      ).not.toBeInTheDocument();
+    });
   });
 });

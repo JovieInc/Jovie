@@ -4,8 +4,6 @@ import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../..');
 const workspacePath = 'components/homepage/HomepageWorkspaceSection.tsx';
-const workspaceLazyPath =
-  'components/homepage/HomepageWorkspaceSectionLazy.tsx';
 const cssPath = 'app/(home)/home.css';
 
 const forbiddenWorkspaceSourcePatterns = [
@@ -66,27 +64,6 @@ describe('mounted homepage workspace System B source contract', () => {
       'system-b-mounted-home-workspace-callout-label',
       'system-b-mounted-home-workspace-callout-title',
       'system-b-mounted-home-workspace-callout-body',
-    ]) {
-      expect(source).toContain(className);
-    }
-  });
-
-  it('keeps workspace placeholder markup on matching System B primitives', () => {
-    const source = readFileSync(path.join(webRoot, workspaceLazyPath), 'utf8');
-
-    for (const pattern of forbiddenWorkspaceSourcePatterns) {
-      expect(source, `${workspaceLazyPath} leaked ${pattern}`).not.toMatch(
-        pattern
-      );
-    }
-
-    for (const className of [
-      'system-b-mounted-home-workspace',
-      'system-b-mounted-home-workspace-inner',
-      'system-b-mounted-home-workspace-copy',
-      'system-b-mounted-home-workspace-headline',
-      'system-b-mounted-home-workspace-placeholder-heading',
-      'system-b-mounted-home-workspace-visual',
     ]) {
       expect(source).toContain(className);
     }

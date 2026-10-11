@@ -418,6 +418,6 @@ describe('marketing media export contract (JOV-6250)', () => {
       })
     );
     expect(flowingPrompt).toContain('Flow direction');
-    expect(flowingPrompt).toContain('Never: invent a third recipe');
+    expect(flowingPrompt).toContain('Never: invent a fifth recipe');
   });
 });

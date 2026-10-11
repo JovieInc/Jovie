@@ -25,6 +25,10 @@ const MAX_TOTAL_CAPTURE_BYTES = 24 * 1024 * 1024;
 const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex');
 
 export const REQUIRED_CAPTURE_VIEWPORTS = ['desktop', 'mobile'];
+export const MAX_CAPTURE_WORKERS = 4;
+export const DEFAULT_CAPTURE_WORKERS = 2;
+export const CRITICAL_JOURNEY_CAPTURE_SCHEMA =
+  'jovie.critical-journey-capture/v1';
 const PUBLIC_HOME_CAPTURE_ROUTE = '/';
 const PUBLIC_PROFILE_CAPTURE_ROUTE = '/demo/showcase/public-profile';
 const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
@@ -34,6 +38,12 @@ const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
 // guard, not every page under the auth route group.
 const AUTHENTICATED_SHELL_CAPTURE_FILE =
   /^(?:apps\/web\/(?:proxy|middleware)\.[cm]?[jt]s|apps\/web\/lib\/auth\/(?:gate|session|auth-session-cookies)\.[cm]?[jt]sx?|apps\/web\/app\/app(?:\/\(shell\))?\/layout\.[cm]?[jt]sx?)$/i;
+
+const CAPTURE_JOURNEYS = new Map([
+  [PUBLIC_HOME_CAPTURE_ROUTE, 'marketing-home-render'],
+  [PUBLIC_PROFILE_CAPTURE_ROUTE, 'artist-profile-public'],
+  [AUTHENTICATED_CHAT_CAPTURE_ROUTE, 'chat-agent-turn'],
+]);
 
 /**
  * Authenticated `/app/chat` capture is for visual chat/shell surfaces.
@@ -76,6 +86,76 @@ export function sanitizeForPrompt(value) {
       '[redacted-secret]'
     )
     .replace(SECRET, '[redacted-secret]');
+}
+
+export function sanitizeCaptureText(value) {
+  return sanitizeForPrompt(value)
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+    .slice(0, 8_000);
+}
+
+export function resolveCaptureJourneyId(route) {
+  return CAPTURE_JOURNEYS.get(route) ?? null;
+}
+
+export function resolveCaptureWorkerCount(value) {
+  if (value === undefined || value === null || value === '')
+    return DEFAULT_CAPTURE_WORKERS;
+  const workers = Number(value);
+  if (
+    !Number.isInteger(workers) ||
+    workers < 1 ||
+    workers > MAX_CAPTURE_WORKERS
+  ) {
+    throw new Error(
+      `PR_VISUAL_WORKERS must be an integer from 1 to ${MAX_CAPTURE_WORKERS}`
+    );
+  }
+  return workers;
+}
+
+/** Bounded worker pool that preserves input order in the returned evidence. */
+export async function runCapturePool(items, workerCount, capture) {
+  const workers = resolveCaptureWorkerCount(workerCount);
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  await Promise.all(
+    Array.from({ length: Math.min(workers, items.length) }, async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await capture(items[index], index);
+      }
+    })
+  );
+  return results;
+}
+
+export function summarizeScriptedCaptures(captures) {
+  const summary = {
+    executed: 0,
+    passed: 0,
+    failed: 0,
+    blocked: 0,
+    skipped: 0,
+    uncovered: 0,
+    unknown: 0,
+  };
+  for (const capture of Array.isArray(captures) ? captures : []) {
+    if (capture?.status === 'captured') {
+      summary.executed += 1;
+      summary.passed += 1;
+    } else if (capture?.status === 'failed') {
+      summary.executed += 1;
+      summary.failed += 1;
+    } else if (capture?.status in summary) {
+      summary[capture.status] += 1;
+    } else {
+      summary.unknown += 1;
+    }
+  }
+  return summary;
 }
 
 export function routeChangedFiles(files) {

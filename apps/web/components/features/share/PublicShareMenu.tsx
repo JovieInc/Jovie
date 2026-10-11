@@ -83,6 +83,10 @@ export function PublicShareActionList({
         return;
       }
 
+      if (result.status === 'cancelled') {
+        return;
+      }
+
       if (result.status === 'fallback') {
         setHelperText(result.helperText ?? null);
         toast.message(destination.label, {
@@ -158,6 +162,10 @@ export function PublicShareMenu({
           toast.success('Link copied');
         }
         setOpen(false);
+        return;
+      }
+
+      if (result.status === 'cancelled') {
         return;
       }
 

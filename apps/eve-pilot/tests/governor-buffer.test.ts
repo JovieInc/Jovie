@@ -9,7 +9,9 @@ import {
   GovernorCapacityError,
   officialSymphonyCapacity,
   planQualifiedTodoBuffer,
+  planValueReservoir,
   qualifyIssueForTodoBuffer,
+  type ReservoirCandidate,
   rankTodoBufferCandidate,
 } from '../agent/lib/governor-buffer';
 
@@ -37,6 +39,47 @@ function capacity(
     value,
     source,
     observedAt: '2026-09-06T16:00:00.000Z',
+  };
+}
+
+const reservoirRequirements =
+  'route:symphony,provider:openai,model:codex,cli:codex,harness:eve,tool:linear'.split(
+    ','
+  ) as ReservoirCandidate['executionRequirements'];
+
+function reservoirCandidate(
+  id: string,
+  overrides: Partial<ReservoirCandidate> = {}
+): ReservoirCandidate {
+  return {
+    id,
+    objective: `Resolve ${id}`,
+    valueHypothesis: `Certified ${id} creates durable value`,
+    workClass: 'code',
+    executionRequirements: reservoirRequirements,
+    sourceRefs: [`linear://${id}`],
+    dedupeKey: `gap:${id}`,
+    estimatedCapacityUnits: 10,
+    completionMinutes: 30,
+    maxParallelism: 1,
+    dependencies: [],
+    freshUntil: '2026-10-01T00:00:00.000Z',
+    reversibility: 'reversible',
+    riskTier: 'low',
+    authority: 'automation',
+    privacy: 'internal',
+    artifactUri: `gbrain://evidence/${id}`,
+    provenanceRefs: [`linear://${id}`],
+    certificationPredicate: 'artifact-reviewed',
+    stopConditions: ['certified'],
+    lowValueEvidence: ['duplicate-or-no-new-evidence'],
+    tier: 1,
+    marginalValue: 0.8,
+    confidence: 0.8,
+    completionProbability: 0.9,
+    generatorId: 'evidence-gap-adapter',
+    persistence: 'job',
+    ...overrides,
   };
 }
 
@@ -216,5 +259,64 @@ describe('Governor qualified Todo buffer', () => {
       'JOV-7001',
       'JOV-7002',
     ]);
+  });
+
+  it('fills an imminent cross-route reservoir without duplicates or weakened safety floors', () => {
+    const workClasses =
+      'code,eval,research,acquisition-outbound,seo-aeo,documentation,reliability,certification'.split(
+        ','
+      ) as ReservoirCandidate['workClass'][];
+    const candidates = workClasses.map((workClass, index) =>
+      reservoirCandidate(workClass, {
+        workClass,
+        tier: Math.min(index + 1, 6) as ReservoirCandidate['tier'],
+      })
+    );
+    candidates.push(
+      reservoirCandidate('duplicate-wording', { dedupeKey: 'gap:code' }),
+      reservoirCandidate('too-long', { completionMinutes: 120 }),
+      reservoirCandidate('partial', {
+        completionMinutes: 120,
+        partialDurableValue: {
+          usefulAfterMinutes: 15,
+          capacityUnits: 5,
+        },
+      }),
+      reservoirCandidate('unsafe', { riskTier: 'critical' })
+    );
+    const horizon = {
+      id: 'imminent-grant',
+      unavailableAt: '2026-09-29T21:00:00.000Z',
+      availableCapacityUnits: 80,
+      throughputUnitsPerHour: 100,
+      headroomUnits: 0,
+      existingQualifiedWorkUnits: 0,
+      activeDedupeKeys: new Set(),
+      resolvedDependencies: new Set(),
+      executionCapabilities: new Set(reservoirRequirements),
+      maxRiskTier: 'medium',
+      allowedAuthorities: ['automation'] as const,
+      allowedPrivacy: ['internal'] as const,
+    };
+    const receipt = planValueReservoir({
+      candidates,
+      horizon,
+      observedAt: '2026-09-29T20:00:00.000Z',
+    });
+
+    expect(receipt.coverage.projectedUnusedCapacityUnits).toBe(0);
+    expect(
+      Object.fromEntries(
+        receipt.rejections.map(item => [item.candidateId, item.reason])
+      )
+    ).toMatchObject({
+      'duplicate-wording': 'duplicate',
+      'too-long': 'incompatible-route',
+      unsafe: 'unsafe-authority',
+    });
+    expect(
+      receipt.eligible.find(item => item.candidate.id === 'partial')
+        ?.completionMode
+    ).toBe('partial-durable');
   });
 });

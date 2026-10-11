@@ -66,7 +66,7 @@ async function loadReleaseOutcomeCandidates(
       and(
         eq(workflowRuns.kind, RELEASE_TO_REVENUE_WORKFLOW_KIND),
         eq(workflowRuns.status, 'completed'),
-        drizzleSql<boolean>`jsonb_path_exists(${workflowRuns.stepOutputs}, '$.distributionDrafts.items[*] ? (@.status == "dispatched")')`,
+        drizzleSql<boolean>`jsonb_path_exists(${workflowRuns.stepOutputs}, '$.distributionDrafts.items[*] ? (@.status == "dispatched" && @.delivery.state == "accepted")')`,
         or(
           isNull(workflowRunOutcomes.id),
           lt(

@@ -10,6 +10,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { musicfetchCircuitBreaker } from '@/lib/discography/musicfetch-circuit-breaker';
 
 vi.mock('server-only', () => ({}));
 
@@ -429,6 +430,29 @@ describe('musicfetch-enrichment', () => {
       );
 
       expect(result.errors).toContain('Creator profile not found');
+    });
+
+    it('throws a retryable failure when the circuit is open', async () => {
+      const state = vi
+        .spyOn(musicfetchCircuitBreaker, 'getState')
+        .mockReturnValue('OPEN');
+      mockTxLimit.mockResolvedValue([makeProfile()]);
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
+      try {
+        const { processMusicFetchEnrichmentJob } = await import(
+          '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+        );
+        await expect(
+          processMusicFetchEnrichmentJob(
+            mockTx as unknown as Parameters<
+              typeof processMusicFetchEnrichmentJob
+            >[0],
+            makePayload()
+          )
+        ).rejects.toThrow('MusicFetch circuit breaker open');
+      } finally {
+        state.mockRestore();
+      }
     });
 
     it('completes with error when MusicFetch API returns no data (permanent failure)', async () => {

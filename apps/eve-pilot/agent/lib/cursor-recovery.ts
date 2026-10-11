@@ -107,7 +107,9 @@ export const CURSOR_CLOUD_RECOVERY_ROUTE: RouteCandidate = {
   tuple: {
     model: 'cursor-cloud-agent',
     provider: 'cursor-cloud',
+    endpoint: 'cursor-cloud-agents-api',
     cli: 'cursor-cloud-agents-api',
+    harness: 'eve',
     configVersion: CURSOR_RECOVERY_ADAPTER_VERSION,
     tools: ['github', 'repo-read', 'test'],
     reviewPlan: 'postflight',

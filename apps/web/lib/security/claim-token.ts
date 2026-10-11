@@ -1,4 +1,5 @@
 const CLAIM_TOKEN_EXPIRY_DAYS = 30;
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export interface ClaimTokenPair {
   token: string;
@@ -17,8 +18,9 @@ export async function hashClaimToken(token: string): Promise<string> {
 export async function generateClaimTokenPair(): Promise<ClaimTokenPair> {
   const token = crypto.randomUUID();
   const tokenHash = await hashClaimToken(token);
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS);
+  const expiresAt = new Date(
+    Date.now() + CLAIM_TOKEN_EXPIRY_DAYS * MILLISECONDS_PER_DAY
+  );
 
   return { token, tokenHash, expiresAt };
 }

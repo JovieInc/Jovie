@@ -136,6 +136,7 @@ export function BlackHoleRecordingsLogo({
       width={1119}
       height={146}
       sizes='(min-width: 1024px) 140px, (min-width: 640px) 126px, 112px'
+      unoptimized // static public asset; the optimizer request was rejected in deployed environments (JOV-6849)
       className={cn('select-none brightness-0 invert', className)}
       style={style}
     />

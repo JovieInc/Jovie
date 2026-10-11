@@ -13,6 +13,13 @@ interface AnonCookieBootstrapProps {
    */
   readonly onVariantResolved?: (variant: ProfileAlertOptInVariant) => void;
   readonly onProfilePacResolved?: (assignment: ProfilePacAssignment) => void;
+  /**
+   * Fires exactly once when per-user assignment resolution settles — whether
+   * the fetch succeeded, returned a non-OK response, or failed outright.
+   * Surfaces gate interactive fan-capture CTAs on this so the assigned
+   * variant is fixed before the control can render or receive clicks.
+   */
+  readonly onResolved?: () => void;
 }
 
 /**
@@ -35,9 +42,10 @@ interface AnonCookieBootstrapProps {
 export function AnonCookieBootstrap({
   onVariantResolved,
   onProfilePacResolved,
+  onResolved,
 }: AnonCookieBootstrapProps) {
   useEffect(() => {
-    if (!onVariantResolved && !onProfilePacResolved) return;
+    if (!onVariantResolved && !onProfilePacResolved && !onResolved) return;
 
     void fetch('/api/profile/audience-anon-cookie', {
       method: 'GET',
@@ -61,8 +69,13 @@ export function AnonCookieBootstrap({
       )
       .catch(() => {
         // Best-effort: analytics and the default CTA variant are unaffected.
+      })
+      .finally(() => {
+        // Resolution settled — the effective variant is final even when the
+        // fetch failed and the ISR default remains in force.
+        onResolved?.();
       });
-  }, [onProfilePacResolved, onVariantResolved]);
+  }, [onProfilePacResolved, onResolved, onVariantResolved]);
 
   return null;
 }

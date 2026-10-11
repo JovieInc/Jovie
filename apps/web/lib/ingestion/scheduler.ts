@@ -6,6 +6,7 @@ import { sendClaimInvitePayloadSchema } from '@/lib/email/jobs/send-claim-invite
 import { captureError } from '@/lib/error-tracking';
 import {
   isMusicfetchInvalidServicesError,
+  isMusicfetchVendorUnavailable,
   MusicfetchBudgetExceededError,
   MusicfetchRequestError,
 } from '@/lib/musicfetch/errors';
@@ -67,6 +68,16 @@ export function determineJobFailure(error: unknown): {
     (error instanceof MusicfetchRequestError && error.statusCode === 429)
   ) {
     return { message: error.message, reason: 'rate_limited' };
+  }
+
+  if (isMusicfetchVendorUnavailable(error)) {
+    return {
+      message:
+        error instanceof Error
+          ? error.message
+          : 'MusicFetch vendor unavailable',
+      reason: 'permanent',
+    };
   }
 
   if (
@@ -199,7 +210,7 @@ export async function handleIngestionJobFailure(
     }
   }
 
-  if (!shouldRetry) {
+  if (!shouldRetry && !isMusicfetchVendorUnavailable(error)) {
     await captureError('Ingestion job permanently failed', error, {
       jobId: job.id,
       jobType: job.jobType,

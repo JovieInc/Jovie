@@ -4,14 +4,19 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { clearPlanIntentMock, fetchMock, hrefState, trackMock } = vi.hoisted(
-  () => ({
-    clearPlanIntentMock: vi.fn(),
-    fetchMock: vi.fn(),
-    hrefState: { current: 'http://localhost/onboarding/checkout' },
-    trackMock: vi.fn(),
-  })
-);
+const {
+  clearPlanIntentMock,
+  fetchMock,
+  hrefState,
+  recordOfferDecisionMock,
+  trackMock,
+} = vi.hoisted(() => ({
+  clearPlanIntentMock: vi.fn(),
+  fetchMock: vi.fn(),
+  hrefState: { current: 'http://localhost/onboarding/checkout' },
+  recordOfferDecisionMock: vi.fn().mockResolvedValue({ ok: true }),
+  trackMock: vi.fn(),
+}));
 
 vi.mock('@jovie/ui', () => ({
   Button: ({
@@ -69,7 +74,7 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
   ),
 }));
 
-vi.mock('@/components/organisms/Sidebar', () => ({
+vi.mock('@/components/organisms/sidebar', () => ({
   SidebarProvider: ({ children }: { readonly children: React.ReactNode }) => (
     <div data-testid='sidebar-provider'>{children}</div>
   ),
@@ -79,6 +84,10 @@ vi.mock('@/lib/analytics', () => ({ track: trackMock }));
 
 vi.mock('@/lib/auth/plan-intent', () => ({
   clearPlanIntent: clearPlanIntentMock,
+}));
+
+vi.mock('@/app/onboarding/actions/upgrade-offer', () => ({
+  recordOnboardingUpgradeOfferDecision: recordOfferDecisionMock,
 }));
 
 vi.mock('@/lib/entitlements/registry', () => ({
@@ -95,6 +104,7 @@ const checkoutClientSourcePath =
 
 const defaultProps = {
   plan: 'pro' as const,
+  profileId: null as string | null,
   monthlyPriceId: 'price_monthly',
   annualPriceId: 'price_annual',
   monthlyAmount: 3900,
@@ -284,5 +294,71 @@ describe('OnboardingCheckoutClient', () => {
   it('does not emit proof-to-claim checkout without attribution', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
     expect(trackMock).not.toHaveBeenCalledWith('checkout', expect.anything());
+  });
+
+  it('presents the Artist Presence offer once with an honest free-forever note', () => {
+    render(
+      <OnboardingCheckoutClient
+        {...defaultProps}
+        isDefaultUpsell
+        profileId='11111111-1111-4111-8111-111111111111'
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Upgrade To Artist Presence' })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/free forever/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Start free, upgrade anytime' })
+    ).toBeInTheDocument();
+  });
+
+  it('records the offer as accepted server-side when upgrade starts', async () => {
+    const user = userEvent.setup();
+    const profileId = '11111111-1111-4111-8111-111111111111';
+    render(
+      <OnboardingCheckoutClient {...defaultProps} profileId={profileId} />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+
+    expect(recordOfferDecisionMock).toHaveBeenCalledWith(
+      profileId,
+      'accepted',
+      'pro'
+    );
+  });
+
+  it('records the offer as dismissed server-side when skipped', async () => {
+    const user = userEvent.setup();
+    const profileId = '11111111-1111-4111-8111-111111111111';
+    render(
+      <OnboardingCheckoutClient {...defaultProps} profileId={profileId} />
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Continue with Free' })
+    );
+
+    expect(recordOfferDecisionMock).toHaveBeenCalledWith(
+      profileId,
+      'dismissed',
+      'pro'
+    );
+  });
+
+  it('does not record a decision when no profile is attached', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingCheckoutClient {...defaultProps} />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Continue with Free' })
+    );
+
+    expect(recordOfferDecisionMock).not.toHaveBeenCalled();
   });
 });

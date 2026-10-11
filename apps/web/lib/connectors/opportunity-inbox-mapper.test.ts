@@ -432,3 +432,110 @@ describe('buildOpportunityInboxData tour-date sections', () => {
     expect(data.tourDates).toBeUndefined();
   });
 });
+
+describe('social reply drafts (JOV-5128)', () => {
+  const socialReplyPayload = {
+    schemaVersion: 1,
+    title: 'Reply to @promoter on Instagram',
+    platform: 'instagram',
+    sourceId: 'post-9',
+    targetId: 'comment-9',
+    authorLabel: '@promoter',
+    authorKind: 'collab',
+    inboundText: 'Want to collab on a remix?',
+    inboundAt: '2026-09-30T14:00:00.000Z',
+    draftedText: 'Would love to — sending stems this week.',
+    sourceUrl: 'https://instagram.com/p/post-9',
+  };
+
+  it('maps a collab request into first-class inbox activity with provenance and draft copy', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'reply-1',
+      kind: 'social_reply.draft',
+      payload: socialReplyPayload,
+      rationale: null,
+      createdAt: new Date('2026-10-01T08:00:00.000Z'),
+    });
+
+    expect(card.category).toBe('social_reply');
+    expect(card.signalType).toBe('fan_reply');
+    expect(card.typeLabel).toBe('Collab Request');
+    expect(card.primaryActionLabel).toBe('Approve Reply');
+    expect(card.socialReply).toMatchObject({
+      platform: 'instagram',
+      authorLabel: '@promoter',
+      draftedText: 'Would love to — sending stems this week.',
+      executionState: 'pending',
+      revisionCount: 0,
+    });
+  });
+
+  it('surfaces per-item execution progress on the card', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'reply-2',
+      kind: 'social_reply.draft',
+      payload: {
+        ...socialReplyPayload,
+        authorKind: 'fan',
+        executionState: 'ambiguous',
+      },
+      rationale: null,
+      createdAt: new Date('2026-10-01T08:00:00.000Z'),
+    });
+
+    expect(card.typeLabel).toBe('Fan Reply');
+    expect(card.socialReply?.executionState).toBe('ambiguous');
+  });
+
+  it('orders social replies by ROI instead of creation time (JOV-5859)', () => {
+    const data = buildOpportunityInboxData(
+      [
+        {
+          id: 'fresh-fire',
+          kind: 'social_reply.draft',
+          payload: {
+            ...socialReplyPayload,
+            title: 'Fresh emoji',
+            authorKind: 'anonymous',
+            inboundText: '🔥',
+            inboundAt: '2026-10-02T11:55:00.000Z',
+          },
+          rationale: null,
+          createdAt: new Date('2026-10-02T11:55:00.000Z'),
+        },
+        {
+          id: 'older-collab',
+          kind: 'social_reply.draft',
+          payload: {
+            ...socialReplyPayload,
+            title: 'Older collab',
+            inboundAt: '2026-09-29T12:00:00.000Z',
+          },
+          rationale: null,
+          createdAt: new Date('2026-09-29T12:00:00.000Z'),
+        },
+      ],
+      undefined,
+      { now: new Date('2026-10-02T12:00:00.000Z') }
+    );
+
+    expect(data.cards.map(card => card.id)).toEqual([
+      'older-collab',
+      'fresh-fire',
+    ]);
+  });
+
+  it('drops malformed social reply drafts instead of rendering them', () => {
+    const data = buildOpportunityInboxData([
+      {
+        id: 'reply-bad',
+        kind: 'social_reply.draft',
+        payload: { title: 'no draft copy' },
+        rationale: null,
+        createdAt: new Date('2026-10-01T08:00:00.000Z'),
+      },
+    ]);
+
+    expect(data.cards).toEqual([]);
+  });
+});

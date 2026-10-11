@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { isAdmin } from '@/lib/admin/roles';
+import { getFreshAuth } from '@/lib/auth/cached';
+import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 
 /**
  * Operator (OV) chat mode (JOV-4810). The OV chat surface at /app/ov/chat
@@ -33,5 +35,13 @@ export async function canUseOvChatMode(
   userId: string | null
 ): Promise<boolean> {
   if (!userId) return false;
-  return isAdmin(userId);
+  if (!(await isAdmin(userId))) return false;
+  try {
+    const auth = await getFreshAuth();
+    if (auth.userId !== userId || !auth.sessionId) return false;
+    await assertOviePrivacyUnlocked({ userId, sessionId: auth.sessionId });
+    return true;
+  } catch {
+    return false;
+  }
 }

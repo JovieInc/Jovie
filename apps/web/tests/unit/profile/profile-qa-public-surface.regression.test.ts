@@ -9,16 +9,20 @@ function readRepoFile(relativePath: string): string {
 }
 
 describe('public profile QA regressions', () => {
-  it('keeps the compact hero location from collapsing to two letters', () => {
+  it('keeps location out of the compact identity header so it never collapses to two letters', () => {
     // Regression: ISSUE-003 — compact hero truncated location to "Lo..."
     // Found by /qa on 2026-08-17
     // Report: .gstack/qa-reports/qa-report-localhost-3100-2026-08-17.md
-    const source = readRepoFile(
+    // Pen parity (2026-09-26): the identity header shows only name and
+    // handle; location lives in About, where it has the full row.
+    const surface = readRepoFile(
       'components/features/profile/templates/ProfileCompactSurface.tsx'
     );
-    expect(source).toMatch(
-      /className='min-w-0 max-w-full whitespace-normal \[overflow-wrap:anywhere\] md:truncate md:whitespace-nowrap md:wrap-normal'\s*>\s*\{locationLabel\}/
+    const header = readRepoFile(
+      'components/features/profile/ProfileIdentityHeader.tsx'
     );
+    expect(surface).not.toContain('locationLabel');
+    expect(header).not.toContain('location');
   });
 
   it('reserves extra tab-bar clearance so Music rows are not clipped', () => {

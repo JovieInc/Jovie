@@ -120,14 +120,14 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntityHeader: ({
     thumbnail,
     title,
-    details,
+    subtitle,
     statusGlyph,
     actions,
     'data-testid': testId,
   }: {
     thumbnail?: React.ReactNode;
     title: string;
-    details?: React.ReactNode;
+    subtitle?: React.ReactNode;
     statusGlyph?: React.ReactNode;
     actions?: React.ReactNode;
     'data-testid'?: string;
@@ -136,7 +136,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       {thumbnail}
       <h2 className='truncate text-sm font-semibold'>{title}</h2>
       <div data-testid='entity-header-details-row'>
-        {details}
+        {subtitle}
         {statusGlyph}
       </div>
       {actions}
@@ -339,15 +339,6 @@ vi.mock('@/components/molecules/drawer', () => ({
   ),
 }));
 
-// Mock sub-components that are not under test — useReleaseHeaderParts hook
-vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  useReleaseHeaderParts: () => ({
-    headerLabel: '',
-    primaryActions: [],
-    overflowActions: [],
-  }),
-}));
-
 vi.mock('next/image', () => ({
   default: (props: { alt: string }) => <img alt={props.alt} />,
 }));
@@ -460,15 +451,6 @@ vi.mock('@/constants/routes', () => ({
   buildReleaseTasksRoute: (releaseId: string) =>
     `/app/releases/${releaseId}/tasks`,
 }));
-
-vi.mock(
-  '@/components/organisms/release-sidebar/ReleaseSmartLinkSection',
-  () => ({
-    ReleaseSmartLinkSection: () => (
-      <div data-testid='smart-link-section'>Smart Link Content</div>
-    ),
-  })
-);
 
 vi.mock(
   '@/components/organisms/release-sidebar/ReleaseSmartLinkAnalytics',

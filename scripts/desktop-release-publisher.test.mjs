@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   expectedDesktopAssetNames,
+  parseArgs,
   prepare,
   releaseMetadataUpdate,
   uploadAndPublish,
@@ -723,4 +724,24 @@ test('production publishes forward-only when main advances past the verified gen
     /not a trusted ancestor/
   );
   assert.equal(diverged.release.draft, true);
+});
+
+test('parseArgs accepts equals-form values without consuming the next token', () => {
+  const { args, command } = parseArgs([
+    'upload-and-publish',
+    '--environment',
+    'staging',
+    '--sha',
+    NEXT_SHA,
+    '--version=26.8.2-staging.17823456790.1',
+    '--dist',
+    'apps/desktop/dist',
+  ]);
+  assert.equal(command, 'upload-and-publish');
+  assert.deepEqual(args, {
+    environment: 'staging',
+    sha: NEXT_SHA,
+    version: '26.8.2-staging.17823456790.1',
+    dist: 'apps/desktop/dist',
+  });
 });

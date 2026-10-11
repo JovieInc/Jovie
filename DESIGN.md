@@ -15,6 +15,8 @@ Current direction: one System B token foundation, compact product and editorial
 marketing languages. Inter is the body/UI face; Satoshi is the approved display
 exception. Do not revive System A or DM Sans from historical examples.
 
+Follow the founder-locked [settings decisions](docs/design-system/DETAILS.md#settings-decisions) (2026-10-02).
+
 ## Authority and precedence
 
 After `canon/OPERATING_SYSTEM.md` and `canon/DESIGN.md`, this file is the
@@ -211,10 +213,11 @@ Read [the component patterns reference](docs/design-system/DETAILS.md#component-
 ### Sidebar (App Shell)
 
 Founder lock 2026-09-12, Pen `OqZTF`: combined search/inbox/new-chat bar;
-Library, Contacts, Presence (`canonicalSidebarNavigation`); Today/Earlier
-history; footer. Mobile keeps composition. Homepage `t1x8T` locked. Founder
-lock 2026-09-25 brought it to Linear-scale density (28px rows, neutral
-non-ion selected state). Read
+Today/Earlier history; footer. JOV-7305 defines the shared Home, Identity,
+Work, Audience root (`canonicalSidebarNavigation`). Links are contextual
+representations, not a top-level area. Mobile derives from the same ordered set.
+Homepage `t1x8T` locked. Founder lock 2026-09-25 brought it to Linear-scale
+density (28px rows, neutral non-ion selected state). Read
 [the sidebar reference](docs/design-system/DETAILS.md#sidebar-app-shell)
 for full tokens and sizing when changing this area.
 

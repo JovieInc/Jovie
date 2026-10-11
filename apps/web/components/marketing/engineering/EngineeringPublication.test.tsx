@@ -40,6 +40,22 @@ describe('EngineeringPublication', () => {
     ).toBeVisible();
   });
 
+  it('renders the unique docked hero photo on the public index only', () => {
+    const view = render(<EngineeringIndex stories={[]} />);
+    const heroPhoto = screen.getByTestId('engineering-hero-photo');
+    expect(heroPhoto).toBeInTheDocument();
+    expect(heroPhoto.querySelector('img')?.getAttribute('src')).toContain(
+      'engineering-index.webp'
+    );
+    view.unmount();
+
+    // The founder-only preview gallery stays text-only.
+    render(<EngineeringIndex stories={[]} preview />);
+    expect(
+      screen.queryByTestId('engineering-hero-photo')
+    ).not.toBeInTheDocument();
+  });
+
   it('shows draft provenance, evidence, and reserved responsive space', () => {
     const view = render(<EngineeringIndex stories={[record]} preview />);
     expect(screen.getByText('Blocked')).toBeVisible();
@@ -55,6 +71,9 @@ describe('EngineeringPublication', () => {
       <EngineeringArticle record={record} html='<p>Shipped copy.</p>' preview />
     );
     expect(screen.getByTestId('engineering-article')).toBeVisible();
+    expect(
+      screen.queryByTestId('engineering-hero-photo')
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Evidence')).toBeVisible();
     expect(screen.getByText('https://jov.ie/changelog')).toBeVisible();
     expect(container.querySelector('h1')).toHaveClass(

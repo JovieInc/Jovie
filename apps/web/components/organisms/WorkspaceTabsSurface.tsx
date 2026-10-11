@@ -218,21 +218,6 @@ function LinkedTabBar<T extends string>({
                 data-testid={`drawer-tab-${option.value}`}
                 aria-selected={selected}
                 tabIndex={selected ? 0 : -1}
-                onClick={event => {
-                  if (
-                    event.defaultPrevented ||
-                    event.button !== 0 ||
-                    event.metaKey ||
-                    event.altKey ||
-                    event.ctrlKey ||
-                    event.shiftKey
-                  ) {
-                    return;
-                  }
-
-                  event.preventDefault();
-                  globalThis.location.assign(href);
-                }}
                 className={cn(
                   TAB_BAR_SEGMENT_TRIGGER_CLASSNAME,
                   selected && TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME

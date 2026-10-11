@@ -14,6 +14,8 @@ interface ParseJsonOptions<T> {
    * Helps prevent DoS attacks via large payloads.
    */
   maxBodySize?: number;
+  /** Capability-bearing requests must not log parser excerpts of the body. */
+  redactParseErrors?: boolean;
 }
 
 /** Default max body size: 1MB */
@@ -151,7 +153,10 @@ export async function parseJsonBody<T = unknown>(
     const parsed = JSON.parse(rawBody) as T;
     return { ok: true, data: parsed };
   } catch (error) {
-    const message = formatErrorMessage(error);
+    const safeError = options.redactParseErrors
+      ? new Error('Invalid JSON')
+      : error;
+    const message = formatErrorMessage(safeError);
     const contentType = request.headers.get('content-type') ?? undefined;
     const context = {
       route: options.route,
@@ -160,7 +165,7 @@ export async function parseJsonBody<T = unknown>(
       ...options.logContext,
     };
 
-    await captureError(`[${options.route}] JSON parse failed`, error, {
+    await captureError(`[${options.route}] JSON parse failed`, safeError, {
       context: 'json_parse_failure',
       ...context,
     });

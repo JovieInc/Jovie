@@ -1,3 +1,5 @@
+// @vitest-environment node
+import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import {
   getUrlDisposition,
@@ -14,6 +16,65 @@ const localPolicy = {
   appUrl: 'http://127.0.0.1:3112',
   appEnv: 'local',
 } as const satisfies UrlDispositionOptions;
+
+const stagingPolicy = {
+  appUrl: 'https://staging.jov.ie',
+  appEnv: 'staging',
+} as const satisfies UrlDispositionOptions;
+
+test.each([productionPolicy, stagingPolicy, localPolicy])(
+  'marketing pages open externally in $appEnv instead of becoming artist previews',
+  policy => {
+    for (const pathname of [
+      '/developers',
+      '/cli',
+      '/api-versioning',
+      '/smart-links',
+      '/solutions/artists',
+      '/legal/privacy',
+      '/legal/terms',
+      '/legal/cookies',
+    ]) {
+      const url = new URL(pathname, policy.appUrl).toString();
+      expect(getUrlDisposition(url, policy), url).toBe('external');
+    }
+  }
+);
+
+test('every canonical marketing route is reserved from artist preview classification', () => {
+  const manifest = readFileSync(
+    new URL('../../web/data/marketing/routeManifest.ts', import.meta.url),
+    'utf8'
+  );
+  const routes = [...manifest.matchAll(/\burl:\s*'([^']+)'/g)].map(match =>
+    match[1]!.replaceAll('*', 'example')
+  );
+  expect(routes.length).toBeGreaterThan(0);
+  for (const pathname of routes) {
+    for (const policy of [productionPolicy, stagingPolicy, localPolicy]) {
+      const url = new URL(pathname, policy.appUrl).toString();
+      expect(getUrlDisposition(url, policy), url).toBe('external');
+    }
+  }
+});
+
+test('marketing classification rejects credentials and encoded path tricks', () => {
+  const credentialedUrls = [
+    'https://jov.ie/developers',
+    'https://docs.jov.ie/guide',
+  ].map(target => {
+    const credentialedUrl = new URL(target);
+    credentialedUrl.username = 'test-user';
+    credentialedUrl.password = 'test-password';
+    return credentialedUrl.toString();
+  });
+  assertDisposition(productionPolicy, 'blocked', [
+    ...credentialedUrls,
+    'https://jov.ie/developers/%2F%2Fevil.example',
+    'https://jov.ie/developers/%5Cevil.example',
+    'https://jov.ie/%64evelopers',
+  ]);
+});
 
 function assertDisposition(
   policy: UrlDispositionOptions,

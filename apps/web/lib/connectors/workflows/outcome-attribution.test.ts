@@ -61,6 +61,16 @@ const releaseStepOutputs = {
         createdAt: '2026-06-20T12:00:00.000Z',
         decidedAt: '2026-06-20T13:00:00.000Z',
         dispatchedAt: '2026-06-20T13:00:00.000Z',
+        delivery: {
+          provider: 'twilio' as const,
+          state: 'accepted' as const,
+          attemptedAt: '2026-06-20T13:00:00.000Z',
+          acceptedAt: '2026-06-20T13:00:00.000Z',
+          attemptedRecipients: 1,
+          acceptedRecipients: 1,
+          suppressedRecipients: 0,
+          providerMessageIds: ['SM_test_1'],
+        },
       },
     ],
   },
@@ -403,6 +413,35 @@ describe('recordWorkflowRunOutcome', () => {
 
     await expect(recordWorkflowRunOutcome('run-1')).resolves.toBeNull();
     expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockEnsureJovieActiveCohort).not.toHaveBeenCalled();
+  });
+
+  it('treats a status-only dispatched receipt without provider evidence as unverified', async () => {
+    const legacyStepOutputs = {
+      ...releaseStepOutputs,
+      distributionDrafts: {
+        ...releaseStepOutputs.distributionDrafts,
+        items: releaseStepOutputs.distributionDrafts.items.map(
+          ({ delivery: _delivery, ...draft }) => draft
+        ),
+      },
+    };
+    mockDbSelect.mockReturnValueOnce(
+      mockSelectChain([
+        {
+          id: 'run-1',
+          kind: 'release_to_revenue',
+          userId: 'user-1',
+          status: 'completed',
+          createdAt: new Date('2026-06-19T00:00:00.000Z'),
+          updatedAt: new Date('2026-06-21T00:00:00.000Z'),
+          stepOutputs: legacyStepOutputs,
+        },
+      ])
+    );
+
+    await expect(recordWorkflowRunOutcome('run-1')).resolves.toBeNull();
     expect(mockDbInsert).not.toHaveBeenCalled();
     expect(mockEnsureJovieActiveCohort).not.toHaveBeenCalled();
   });

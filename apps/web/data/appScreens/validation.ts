@@ -1,3 +1,4 @@
+import type { SettingsAdmissionItem } from '@/components/features/settings/settings-decision-admission';
 import {
   APP_SCREEN_ARCHETYPE_IDS,
   APP_SCREEN_ARCHETYPE_REGISTRY,
@@ -11,6 +12,16 @@ import {
   APP_SCREEN_NESTED_SURFACE_ROLES,
   type AppScreenCanvasContract,
 } from './canvas';
+import {
+  APP_SCREEN_PEN_GEOMETRY,
+  APP_SCREEN_PEN_PARITY_CHECKS,
+  APP_SCREEN_PEN_PENDING_DECISIONS,
+  APP_SCREEN_PEN_REFERENCE_HOLDS,
+  type AppScreenPenGeometryExport,
+  type PenPendingDecision,
+  type PenReferenceHold,
+  penRootEligibilityScope,
+} from './penParity';
 import {
   APP_SCREEN_COMPONENT_REGISTRY,
   APP_SCREEN_LEGACY_BODY_SOURCES,
@@ -33,6 +44,9 @@ export type AppScreenValidationCode =
   | 'duplicate-reference-concept'
   | 'missing-component'
   | 'reference-component-without-pen-root'
+  | 'component-pen-root-without-readback'
+  | 'component-pen-root-readback-mismatch'
+  | 'reference-component-with-pending-pen-decision'
   | 'unresolved-component-pen-identity-without-reason'
   | 'duplicate-recipe-component'
   | 'missing-recipe'
@@ -79,6 +93,12 @@ export interface AppScreenValidationInput {
   readonly screens?: readonly AppScreenRegistryEntry[];
   readonly archetypes?: readonly AppScreenArchetypeRegistryEntry[];
   readonly canvasExceptions?: Readonly<Record<string, AppScreenCanvasContract>>;
+  /** Committed Pen readback that every bound `penRootId` must appear in. */
+  readonly penGeometry?: AppScreenPenGeometryExport;
+  /** Pending Pen-vs-code decisions; a root with any stays non-referenceable. */
+  readonly penPendingDecisions?: readonly PenPendingDecision[];
+  /** Non-geometry decisions that also keep a root non-referenceable. */
+  readonly penReferenceHolds?: readonly PenReferenceHold[];
 }
 
 const duplicates = (values: readonly string[]): readonly string[] => {
@@ -97,7 +117,7 @@ const BROWSER_SAFE_STORY_ID =
 
 const SLOT_ID_SET: ReadonlySet<string> = new Set(APP_SCREEN_SLOT_IDS);
 const STATE_ID_SET: ReadonlySet<string> = new Set(APP_SCREEN_STATE_IDS);
-const REQUIRED_ARCHETYPE_IDS: readonly string[] = APP_SCREEN_ARCHETYPE_IDS;
+const REQUIRED_ARCHETYPE_IDS = APP_SCREEN_ARCHETYPE_IDS;
 
 const LEGACY_BODY_SOURCE_SET: ReadonlySet<string> = new Set(
   APP_SCREEN_LEGACY_BODY_SOURCES
@@ -116,6 +136,9 @@ export function validateAppScreenSystem({
   screens = APP_SCREEN_REGISTRY,
   archetypes = APP_SCREEN_ARCHETYPE_REGISTRY,
   canvasExceptions = APP_SCREEN_CANVAS_EXCEPTIONS,
+  penGeometry = APP_SCREEN_PEN_GEOMETRY,
+  penPendingDecisions = APP_SCREEN_PEN_PENDING_DECISIONS,
+  penReferenceHolds = APP_SCREEN_PEN_REFERENCE_HOLDS,
 }: AppScreenValidationInput = {}): readonly AppScreenValidationIssue[] {
   const issues: AppScreenValidationIssue[] = [];
   const add = (code: AppScreenValidationCode, message: string) =>
@@ -164,6 +187,51 @@ export function validateAppScreenSystem({
         );
       }
       componentPenRoots.add(component.penRootId);
+      const master = penGeometry.masters[component.penRootId];
+      if (!master) {
+        add(
+          'component-pen-root-without-readback',
+          `component ${component.id} binds Pen root ${component.penRootId}, which is absent from the committed readback`
+        );
+      } else if (master.registryComponentId !== component.id) {
+        add(
+          'component-pen-root-readback-mismatch',
+          `component ${component.id} binds Pen root ${component.penRootId}, but the readback maps it to ${master.registryComponentId ?? 'no component'}`
+        );
+      }
+      const penRootId = component.penRootId;
+      const scope = penRootEligibilityScope(penRootId);
+      const pendingForRoot = [
+        ...penPendingDecisions.filter(decision =>
+          APP_SCREEN_PEN_PARITY_CHECKS.some(
+            check => check.id === decision.checkId && scope.has(check.masterId)
+          )
+        ),
+        ...penReferenceHolds.filter(hold => scope.has(hold.masterId)),
+      ];
+      if (component.penReferenceEligible && pendingForRoot.length > 0) {
+        add(
+          'reference-component-with-pending-pen-decision',
+          `component ${component.id} is Pen-referenceable while ${[
+            ...new Set(pendingForRoot.map(decision => decision.decisionId)),
+          ].join(', ')} is pending on ${penRootId}`
+        );
+      }
+    }
+  }
+  for (const [masterId, master] of Object.entries(penGeometry.masters)) {
+    if (
+      master.registryComponentId !== null &&
+      !components.some(
+        component =>
+          component.id === master.registryComponentId &&
+          component.penRootId === masterId
+      )
+    ) {
+      add(
+        'component-pen-root-readback-mismatch',
+        `Pen readback maps ${masterId} to ${master.registryComponentId}, but that component does not bind it`
+      );
     }
   }
 
@@ -612,4 +680,51 @@ export function buildAppScreenArchetypeReceipt(input: {
       storyId: entry.representativeStoryId,
     })),
   };
+}
+
+/** Existing screen authority validates settings admission; this is not a second registry. */
+export function validateSettingsAdmission(
+  groups: readonly {
+    items: readonly Pick<SettingsAdmissionItem, 'id' | 'href' | 'admission'>[];
+  }[],
+  screens: readonly AppScreenRegistryEntry[] = APP_SCREEN_REGISTRY
+): { itemId: string; code: string }[] {
+  const issues: { itemId: string; code: string }[] = [];
+  const ids = new Set<string>();
+  const allowedRoles = new Set([
+    'preference',
+    'consent',
+    'account-control',
+    'status',
+  ]);
+  for (const item of groups.flatMap(group => group.items)) {
+    const reject = (code: string) => issues.push({ itemId: item.id, code });
+    if (ids.has(item.id)) reject('duplicate-item');
+    ids.add(item.id);
+    const admission = item.admission;
+    if (!admission?.userJob.trim() || !admission.screenRationale.trim()) {
+      reject('missing-rationale');
+    }
+    if (!admission) continue;
+    if (!['profile', 'account', 'workspace'].includes(admission.scope))
+      reject('invalid-scope');
+    if (
+      !admission.roles.length ||
+      admission.roles.some(role => !allowedRoles.has(role))
+    )
+      reject('invalid-role');
+    const screen = screens.find(entry => entry.route === item.href);
+    const canonical = screens.find(
+      entry => entry.route === admission.canonicalRoute
+    );
+    if (
+      !screen ||
+      screen.conceptId !== admission.canonicalRoute ||
+      canonical?.kind !== 'canonical'
+    )
+      reject('canonical-screen-mismatch');
+    if (admission.defaultBehavior && !admission.overrideReason?.trim())
+      reject('missing-override-reason');
+  }
+  return issues;
 }

@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const appRoot = process.cwd();
 const testsRoot = path.join(appRoot, 'tests');
+const repoRoot = path.resolve(appRoot, '..', '..');
 
 const invalidPhrasePatterns = [
   /duplicate the algorithm/i,
@@ -29,6 +30,16 @@ function walk(dir) {
 
     const content = fs.readFileSync(fullPath, 'utf8');
     const lines = content.split('\n');
+    const relativePath = path.relative(appRoot, fullPath);
+
+    if (relativePath.startsWith(`tests${path.sep}integration${path.sep}`)) {
+      if (!/\bexpect\s*\(/.test(content)) {
+        violations.push(`${relativePath} has zero protected assertions`);
+      }
+      if (/\.(?:skip|todo)\s*\(/.test(content)) {
+        violations.push(`${relativePath} contains an unconditional skip`);
+      }
+    }
 
     lines.forEach((line, index) => {
       for (const pattern of invalidPhrasePatterns) {
@@ -49,6 +60,44 @@ function walk(dir) {
 }
 
 walk(testsRoot);
+
+const fastConfig = fs.readFileSync(
+  path.join(appRoot, 'vitest.config.fast.mts'),
+  'utf8'
+);
+const integrationConfigPath = path.join(
+  appRoot,
+  'vitest.config.integration.mts'
+);
+const integrationConfig = fs.existsSync(integrationConfigPath)
+  ? fs.readFileSync(integrationConfigPath, 'utf8')
+  : '';
+const ciWorkflow = fs.readFileSync(
+  path.join(repoRoot, '.github', 'workflows', 'ci.yml'),
+  'utf8'
+);
+
+if (!fastConfig.includes("'tests/integration/**'")) {
+  violations.push(
+    'vitest.config.fast.mts must explicitly route tests/integration to the database lane'
+  );
+}
+if (
+  !integrationConfig.includes("'tests/integration/**/*.test.ts'") ||
+  !integrationConfig.includes('passWithNoTests: false')
+) {
+  violations.push(
+    'vitest.config.integration.mts must discover integration tests and reject zero tests'
+  );
+}
+if (
+  !ciWorkflow.includes('run test:integration') ||
+  !ciWorkflow.includes("DB_CERTIFICATION: 'true'")
+) {
+  violations.push(
+    'ci.yml must execute the real database integration lane in certification mode'
+  );
+}
 
 for (const setupFile of setupFiles) {
   const content = fs.readFileSync(setupFile, 'utf8');

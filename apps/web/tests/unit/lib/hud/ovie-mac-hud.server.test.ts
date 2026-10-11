@@ -25,19 +25,11 @@ vi.mock('@/lib/http/server-fetch', () => ({
   serverFetch: mockServerFetch,
 }));
 
-vi.mock('node:fs', async importOriginal => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    existsSync: vi.fn(() => false),
-    readFileSync: vi.fn(),
-    default: {
-      ...actual,
-      existsSync: vi.fn(() => false),
-      readFileSync: vi.fn(),
-    },
-  };
-});
+const mockReadMerges = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/ovie/shipping-state/configured.server', () => ({
+  readConfiguredMerges: mockReadMerges,
+}));
 
 vi.mock('@/lib/admin/stripe-metrics', () => ({
   getAdminStripeOverviewMetrics: vi.fn(),
@@ -51,6 +43,10 @@ vi.mock('@/lib/ovie/lyb-mrr.server', () => ({
   getLybDailyMrr: vi.fn(),
 }));
 
+vi.mock('@/lib/admin/founder-funnel', () => ({
+  getFounderFunnelData: vi.fn().mockResolvedValue(null),
+}));
+
 function stripeAvailable() {
   return {
     mrrUsd: 5200,
@@ -59,6 +55,8 @@ function stripeAvailable() {
     mrrGrowth30dUsd: 200,
     isConfigured: true,
     isAvailable: true,
+    excludedInternalSubscribers: 0,
+    excludedInternalMrrUsd: 0,
   };
 }
 
@@ -83,6 +81,12 @@ describe('getOvieMacHudSnapshot', () => {
     mockEnv.HUD_GITHUB_OWNER = undefined;
     mockEnv.HUD_GITHUB_REPO = undefined;
     mockServerFetch.mockReset();
+    mockReadMerges.mockReset();
+    mockReadMerges.mockResolvedValue({
+      sourceId: 'github-merges',
+      status: 'unavailable',
+      errorCode: 'unavailable',
+    });
     vi.mocked(getAdminStripeOverviewMetrics).mockResolvedValue(
       stripeAvailable()
     );
@@ -168,7 +172,7 @@ describe('getOvieMacHudSnapshot', () => {
                     number: 16931,
                     title: 'draft HUD affordance',
                     url: 'https://github.com/JovieInc/Jovie/pull/16931',
-                    headRefName: 'tim/jov-16931',
+                    headRefName: 'devin/jov-16931',
                     updatedAt: '2026-08-22T02:00:00.000Z',
                     isDraft: true,
                     reviewDecision: null,
@@ -181,7 +185,7 @@ describe('getOvieMacHudSnapshot', () => {
                     number: 16927,
                     title: 'review HUD affordance',
                     url: 'https://github.com/JovieInc/Jovie/pull/16927',
-                    headRefName: 'tim/jov-16927',
+                    headRefName: 'devin/jov-16927',
                     updatedAt: '2026-08-22T01:00:00.000Z',
                     isDraft: false,
                     reviewDecision: 'REVIEW_REQUIRED',
@@ -203,7 +207,7 @@ describe('getOvieMacHudSnapshot', () => {
                         number: 16886,
                         title: 'feat(eve): bind signed Summer shadow ingress',
                         url: 'https://github.com/JovieInc/Jovie/pull/16886',
-                        headRefName: 'tim/jov-16886',
+                        headRefName: 'devin/jov-16886',
                         updatedAt: '2026-08-22T00:00:00.000Z',
                         isDraft: false,
                         reviewDecision: 'APPROVED',
@@ -258,6 +262,41 @@ describe('getOvieMacHudSnapshot', () => {
     });
   });
 
+  it('reports shipping throughput from org merge counts, not local receipts', async () => {
+    mockReadMerges.mockResolvedValue({
+      sourceId: 'github-merges',
+      status: 'ok',
+      delivery: {
+        merges: {
+          today: { state: 'measured-nonzero', value: 292 },
+          last7Days: { state: 'measured-nonzero', value: 862 },
+        },
+      },
+    });
+    const { getOvieMacHudSnapshot } = await import(
+      '@/lib/hud/ovie-mac-hud.server'
+    );
+    const snapshot = await getOvieMacHudSnapshot(
+      Date.parse('2026-08-22T00:00:00.000Z')
+    );
+
+    expect(snapshot.shipping).toEqual({
+      shipsThisWeek: 862,
+      available: true,
+      detail:
+        'PRs merged across JovieInc in the last 7 days. 292 since midnight PT.',
+    });
+
+    mockReadMerges.mockResolvedValue({
+      sourceId: 'github-merges',
+      status: 'unavailable',
+    });
+    const degraded = await getOvieMacHudSnapshot(
+      Date.parse('2026-08-22T00:00:00.000Z')
+    );
+    expect(degraded.shipping.available).toBe(false);
+  });
+
   it('keeps PR data from partial GraphQL responses without merge queue data', async () => {
     const { parseOvieMacHudInFlightPullRequestsResponse } = await import(
       '@/lib/hud/ovie-mac-hud.server'
@@ -274,7 +313,7 @@ describe('getOvieMacHudSnapshot', () => {
                 number: 16949,
                 title: 'available PR data',
                 url: 'https://github.com/JovieInc/Jovie/pull/16949',
-                headRefName: 'tim/jov-16949',
+                headRefName: 'devin/jov-16949',
                 updatedAt: '2026-08-22T03:00:00.000Z',
                 isDraft: false,
                 reviewDecision: null,

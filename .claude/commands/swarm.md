@@ -16,10 +16,10 @@ Every spawned coding agent prompt must include `JOVIE_AGENT_PROFILE=coder`. Plan
 
 ```bash
 node --version   # MUST be v22.x
-pnpm --version   # MUST be 9.15.4
+pnpm --version   # MUST be 9.15.9
 ```
 
-If wrong: `nvm use 22 && corepack prepare pnpm@9.15.4 --activate`
+If wrong: `nvm use 24 && corepack prepare pnpm@9.15.9 --activate`
 
 ## Execution
 
@@ -99,7 +99,7 @@ SETUP (do this first):
 cd /tmp/jovie-worktrees/jov-<NUMBER> && pnpm install
 
 CODEBASE RULES:
-- Node 22.x, pnpm 9.15.4 only
+- Node 24.x, pnpm 9.15.9 only
 - Never edit drizzle/migrations/
 - Never create middleware.ts
 - Never add // biome-ignore

@@ -40,7 +40,12 @@ function collectPageGlobs(): readonly string[] {
     }
   }
 
-  for (const routeRoot of ['(home)', '(marketing)', 'waitlist']) {
+  for (const routeRoot of [
+    '(home)',
+    '(marketing)',
+    '(profile-admission)',
+    'waitlist',
+  ]) {
     visit(join(appRoot, routeRoot));
   }
   return pageGlobs.sort();

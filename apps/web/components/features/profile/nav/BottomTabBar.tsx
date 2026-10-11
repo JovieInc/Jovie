@@ -14,7 +14,7 @@
  * Destinations (JOV-6198 shared contract):
  *   1. Home   (mode: profile) — House icon
  *   2. Music  (mode: listen)  — Music2 icon
- *   3. Shows  (mode: tour)    — CalendarDays icon
+ *   3. Events (mode: tour)    — CalendarDays icon
  *   4. About  (mode: about)   — UserRound icon
  * Get updates is an action, not a destination. Presentation owns icons only.
  *
@@ -37,7 +37,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { motion, useSpring, useTransform, useVelocity } from 'motion/react';
-import { useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { TAB_BAR_INTERNAL_SAFE_AREA_PADDING } from '@/lib/profile/nav-constants';
 import {
@@ -153,7 +153,7 @@ export interface BottomTabBarProps {
   readonly activeTab: ProfilePrimaryTab;
 
   /**
-   * Retained for API compatibility. Shows stays visible so Wave 1 can own
+   * Retained for API compatibility. Events stays visible so Wave 1 can own
    * empty-vs-no-surface copy without compact hiding the destination.
    */
   readonly hasTourDates: boolean;
@@ -174,6 +174,9 @@ export interface BottomTabBarProps {
 
   /** Optional extra className applied to the outermost wrapper. */
   readonly className?: string;
+
+  /** Rendered directly above the nav and moves with it (proof claim bar). */
+  readonly aboveNav?: ReactNode;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +201,7 @@ export function BottomTabBar({
   onTabSelect,
   showAlertsTab: _showAlertsTab = true,
   className,
+  aboveNav,
 }: BottomTabBarProps) {
   const visibleTabs = getPermittedPublicProfileNavigation();
   const columnCount = visibleTabs.length;
@@ -215,6 +219,7 @@ export function BottomTabBar({
       )}
       data-testid='profile-tab-bar'
     >
+      {aboveNav}
       <nav
         aria-label='Profile Navigation'
         data-testid='profile-bottom-nav'

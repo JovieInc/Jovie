@@ -41,7 +41,7 @@ describe('dashboard link action System B style guard', () => {
       expect(source).toContain('NEUTRAL_SWIPE_ACTION_CLASS');
       expect(source).toContain('bg-surface-2 text-primary-token');
       expect(source).toContain('DESTRUCTIVE_SWIPE_ACTION_CLASS');
-      expect(source).toContain('bg-red-500 text-white');
+      expect(source).toContain('bg-error text-white');
     }
   );
 });

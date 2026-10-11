@@ -604,7 +604,7 @@ export async function waitForHydration(
       () => {
         // Check if React has hydrated (no hydration markers remaining)
         const hasHydrationError =
-          document.body.innerHTML.includes('Hydration failed');
+          document.body?.innerHTML?.includes('Hydration failed') ?? false;
         // Check if document is interactive
         const isReady =
           document.readyState === 'complete' ||
@@ -629,6 +629,76 @@ export async function waitForHydration(
       }
       // Non-profile callers retain the historical DOM-ready fallback.
     });
+}
+
+/**
+ * Wait until any one of `selectors` is visible. Returns the selector that
+ * resolved, or throws on timeout.
+ *
+ * The timeout error carries the final URL plus a bounded snapshot of every
+ * `[data-testid]` node (with a `(hidden)` marker for rendered-but-invisible
+ * candidates), so a miss reports what actually rendered — not just what was
+ * absent. This makes selector regressions self-diagnosing instead of
+ * surfacing as unactionable "selector never appeared" tickets (JOV-4432).
+ */
+export async function waitForAnyVisible(
+  page: Page,
+  selectors: readonly string[],
+  options?: { timeout?: number; label?: string }
+): Promise<string> {
+  const timeout = options?.timeout ?? SMOKE_TIMEOUTS.VISIBILITY;
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    for (const selector of selectors) {
+      const visible = await page
+        .locator(selector)
+        .first()
+        .isVisible()
+        .catch(() => false);
+      if (visible) return selector;
+    }
+    await page.waitForTimeout(150);
+  }
+
+  const diagnostics = await page
+    .evaluate(() => {
+      const isVisible = (element: HTMLElement) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        );
+      };
+      const testIds = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid]')
+      )
+        .slice(0, 80)
+        .map(
+          element =>
+            `${element.getAttribute('data-testid')}${isVisible(element) ? '' : ' (hidden)'}`
+        );
+      return {
+        url: window.location.href,
+        title: document.title,
+        bodyText: (document.body?.innerText || document.body?.textContent || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 240),
+        testIds,
+      };
+    })
+    .catch(() => null);
+
+  const label = options?.label ? `${options.label}: ` : '';
+  const context = diagnostics
+    ? ` | url=${diagnostics.url} title=${JSON.stringify(diagnostics.title)} body=${JSON.stringify(diagnostics.bodyText)} testids=[${diagnostics.testIds.join(', ')}]`
+    : '';
+  throw new Error(
+    `${label}None of the expected selectors became visible: ${selectors.join(', ')}${context}`
+  );
 }
 
 // ============================================================================

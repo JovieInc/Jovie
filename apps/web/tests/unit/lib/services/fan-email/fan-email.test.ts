@@ -9,6 +9,7 @@ import {
 } from '@/lib/services/fan-email/send-rule-cases';
 import {
   EMPTY_LIST_SKIP_REASON,
+  FAN_EMAIL_FALLBACK_SUBJECT,
   FAN_EMAIL_SEND_RULES,
   gateFanEmailSend,
   UNKNOWN_LIST_SKIP_REASON,
@@ -47,6 +48,37 @@ describe('fan email no-invent + human-send gate', () => {
         humanSignOff: true,
       })
     ).toMatchObject({ sent: false, scheduled: false, queued: true });
+  });
+
+  it('replaces floor-breaking draft copy with safe fallbacks', () => {
+    const gated = gateFanEmailSend({
+      retrieved: { listSize: 120, observedAt: '2026-08-21T00:00:00.000Z' },
+      smartLink: { url: 'https://jov.ie/tim/never-say-a-word', live: true },
+      sendIntent: 'queue_for_approval',
+      draft: {
+        subject: 'Act now: guaranteed streams for everyone',
+        body: 'Buy real followers today. Act now.',
+      },
+    });
+    expect(gated.copy.subject).toBe(FAN_EMAIL_FALLBACK_SUBJECT);
+    expect(gated.copy.body).toContain('The release is live.');
+    expect(gated.copy.copyFloorViolations).toContain('guaranteed-results');
+    expect(gated.copy.copyFloorViolations).toContain('artificial-engagement');
+  });
+
+  it('keeps clean draft copy untouched', () => {
+    const gated = gateFanEmailSend({
+      retrieved: { listSize: 120, observedAt: '2026-08-21T00:00:00.000Z' },
+      smartLink: { url: 'https://jov.ie/tim/never-say-a-word', live: true },
+      sendIntent: 'queue_for_approval',
+      draft: {
+        subject: 'New single out Friday',
+        body: 'The track is live. Listen here.',
+      },
+    });
+    expect(gated.copy.subject).toBe('New single out Friday');
+    expect(gated.copy.body).toContain('The track is live.');
+    expect(gated.copy.copyFloorViolations).toEqual([]);
   });
 
   it('encodes the gate in the skill, rules, and playbooks', () => {

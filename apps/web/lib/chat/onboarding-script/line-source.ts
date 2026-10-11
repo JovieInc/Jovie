@@ -25,11 +25,25 @@ import {
 export interface ServableLine {
   readonly line: ScriptLine;
   readonly weight: number;
+  /** 'seed' lines are the holdout arm; 'promoted' only serve to treatment. */
+  readonly source: 'seed' | 'promoted';
 }
 
 export type ScriptBank = ReadonlyMap<ScriptStepId, readonly ServableLine[]>;
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * JOV-7148 holdout arm: ~5% of sessions deterministically serve seed lines
+ * only, giving the learning loop a stable control group to detect regressions
+ * from promoted copy. The arm is a pure function of sessionId, so a visitor
+ * never flips arms between steps.
+ */
+export const HOLDOUT_MODULUS = 20;
+
+export function isHoldoutSession(sessionId: string): boolean {
+  return hashSessionId(sessionId) % HOLDOUT_MODULUS === 0;
+}
 
 let cache: { bank: ScriptBank; expiresAt: number } | null = null;
 
@@ -43,7 +57,11 @@ function seedBank(): Map<ScriptStepId, ServableLine[]> {
   for (const stepId of SCRIPT_STEP_IDS) {
     bank.set(
       stepId,
-      linesForStep(stepId).map(line => ({ line, weight: 100 }))
+      linesForStep(stepId).map(line => ({
+        line,
+        weight: 100,
+        source: 'seed' as const,
+      }))
     );
   }
   return bank;
@@ -68,7 +86,7 @@ export async function loadScriptBank(): Promise<ScriptBank> {
       if (seedIndex >= 0) {
         // Seed row: DB contributes the tuned weight; text stays code-side.
         const seed = entries[seedIndex];
-        if (seed) entries[seedIndex] = { line: seed.line, weight: row.weight };
+        if (seed) entries[seedIndex] = { ...seed, weight: row.weight };
         continue;
       }
       entries.push({
@@ -79,6 +97,7 @@ export async function loadScriptBank(): Promise<ScriptBank> {
           text: row.text,
         },
         weight: row.weight,
+        source: 'promoted',
       });
     }
   } catch (error) {
@@ -101,7 +120,12 @@ export function pickFromBank(
   stepId: ScriptStepId,
   sessionId: string
 ): ScriptLine {
-  const entries = bank.get(stepId) ?? [];
+  const bankEntries = bank.get(stepId) ?? [];
+  // Holdout arm: stable excluded group that only ever sees seed lines, so
+  // promoted copy can be measured against an unexposed control.
+  const entries = isHoldoutSession(sessionId)
+    ? bankEntries.filter(entry => entry.source === 'seed')
+    : bankEntries;
   const total = entries.reduce(
     (sum, entry) => sum + Math.max(entry.weight, 0),
     0

@@ -131,12 +131,12 @@ describe('non-production store selection', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     mockEnv.NODE_ENV = 'development';
     mockEnv.VERCEL_ENV = undefined;
-    mockEnv.UPSTASH_REDIS_REST_URL = 'https://real-kiwi-157253.upstash.io';
+    mockEnv.UPSTASH_REDIS_REST_URL = 'https://nice-walleye-308423.upstash.io';
 
     expect(getRedis()).toBeNull();
     expect(mockConstructor).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('real-kiwi-157253.upstash.io')
+      expect.stringContaining('nice-walleye-308423.upstash.io')
     );
     expect(warn.mock.calls[0]?.[0]).not.toContain('token');
   });
@@ -146,7 +146,7 @@ describe('non-production store selection', () => {
     mockEnv.VERCEL_ENV = 'preview';
     mockEnv.CI = 'true';
     mockEnv.REDIS_URL = 'redis://127.0.0.1:6379';
-    mockEnv.UPSTASH_REDIS_REST_URL = 'https://real-kiwi-157253.upstash.io';
+    mockEnv.UPSTASH_REDIS_REST_URL = 'https://nice-walleye-308423.upstash.io';
 
     expect(getRedis()).not.toBeNull();
     expect(mockConstructor).not.toHaveBeenCalled();
@@ -157,12 +157,12 @@ describe('non-production store selection', () => {
     mockEnv.NODE_ENV = 'development';
     mockEnv.VERCEL_ENV = undefined;
     mockEnv.JOVIE_ALLOW_PRODUCTION_UPSTASH = '1';
-    mockEnv.UPSTASH_REDIS_REST_URL = 'https://real-kiwi-157253.upstash.io';
+    mockEnv.UPSTASH_REDIS_REST_URL = 'https://nice-walleye-308423.upstash.io';
 
     expect(getRedis()).not.toBeNull();
     expect(mockConstructor).toHaveBeenCalledWith(
       expect.objectContaining({
-        url: 'https://real-kiwi-157253.upstash.io',
+        url: 'https://nice-walleye-308423.upstash.io',
       })
     );
     expect(warn).toHaveBeenCalledWith(

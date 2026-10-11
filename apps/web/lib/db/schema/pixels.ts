@@ -11,6 +11,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { acquisitionJourneys } from './acquisition';
+import { users } from './auth';
 import { pixelEventTypeEnum } from './enums';
 import { creatorProfiles } from './profiles';
 
@@ -90,6 +92,17 @@ export const pixelEvents = pgTable(
     // Anonymous session tracking (cookie-based, not PII)
     sessionId: text('session_id').notNull(),
 
+    // Exact consented first-party journey. Nullable means attribution unknown.
+    acquisitionId: uuid('acquisition_id').references(
+      () => acquisitionJourneys.id,
+      { onDelete: 'set null' }
+    ),
+
+    // Set only by the authenticated link operation; never accepted from clients.
+    userId: uuid('user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+
     // Event details
     eventType: pixelEventTypeEnum('event_type').notNull(),
     eventData: jsonb('event_data').$type<PixelEventData>().default({}),
@@ -129,6 +142,10 @@ export const pixelEvents = pgTable(
 
     // Index for session-based queries
     sessionIdIdx: index('idx_pixel_events_session_id').on(table.sessionId),
+    acquisitionIdIdx: index('idx_pixel_events_acquisition_id').on(
+      table.acquisitionId
+    ),
+    userIdIdx: index('idx_pixel_events_user_id').on(table.userId),
 
     // Index for recent events by profile (analytics)
     profileRecentIdx: index('idx_pixel_events_profile_recent').on(

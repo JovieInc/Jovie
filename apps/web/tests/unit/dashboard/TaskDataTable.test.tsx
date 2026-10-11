@@ -5,9 +5,11 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   TASK_DATA_TABLE_CLASSNAME,
   TASK_DATA_TABLE_CONTAINER_CLASSNAME,
+  TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME,
   TASK_DATA_TABLE_ROW_CLASSNAME,
   TaskDataTable,
 } from '@/components/features/dashboard/tasks/TaskDataTable';
+import type { ColumnDef } from '@/lib/tanstack-table';
 
 vi.mock('@/components/organisms/table', () => ({
   UnifiedTable: ({
@@ -19,6 +21,7 @@ vi.mock('@/components/organisms/table', () => ({
     minWidth,
     rowHeight,
     skeletonRows,
+    columns,
   }: {
     readonly className?: string;
     readonly containerClassName?: string;
@@ -31,6 +34,9 @@ vi.mock('@/components/organisms/table', () => ({
     readonly minWidth?: string;
     readonly rowHeight?: number;
     readonly skeletonRows?: number;
+    readonly columns?: ReadonlyArray<{
+      readonly meta?: { readonly cellContentClassName?: string };
+    }>;
   }) => (
     <div
       data-class-name={className}
@@ -40,6 +46,9 @@ vi.mock('@/components/organisms/table', () => ({
       data-row-class-name={getRowClassName?.({ id: 'task-1' }, 0)}
       data-row-height={String(rowHeight)}
       data-skeleton-rows={String(skeletonRows)}
+      data-cell-content-class-name={
+        columns?.[0]?.meta?.cellContentClassName ?? ''
+      }
       data-testid='unified-table'
       data-virtualized={String(enableVirtualization)}
     />
@@ -107,6 +116,30 @@ describe('TaskDataTable', () => {
       `${TASK_DATA_TABLE_ROW_CLASSNAME} selected-row`
     );
     expect(table).toHaveAttribute('data-row-height', '72');
+  });
+
+  it('preserves column-owned multiline content through the task table wrapper', () => {
+    const columns: ColumnDef<{ id: string }>[] = [
+      {
+        accessorKey: 'id',
+        meta: {
+          cellContentClassName:
+            TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME,
+        },
+      },
+    ];
+
+    render(
+      <TaskDataTable<{ id: string }>
+        columns={columns}
+        data={[{ id: 'task-1' }]}
+      />
+    );
+
+    expect(screen.getByTestId('unified-table')).toHaveAttribute(
+      'data-cell-content-class-name',
+      TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME
+    );
   });
 
   it('routes table API imports through the v9 compat adapter', () => {

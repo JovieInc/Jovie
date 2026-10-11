@@ -15,7 +15,7 @@ describe('Library toolbar layout contract', () => {
     );
     const library = read('app/app/(shell)/library/LibrarySurface.tsx');
     const filterChips = library.slice(
-      library.indexOf('function LibraryViewFilterChips'),
+      library.indexOf('function LibraryStageTabs'),
       library.indexOf('function LibrarySavedViewRow')
     );
 

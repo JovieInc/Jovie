@@ -3,6 +3,8 @@
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
+import { computeRatePercent } from '@/lib/analytics/metrics';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { SmartLinkProviderButton } from './SmartLinkProviderButton';
 
@@ -22,6 +24,7 @@ interface ActionDialProps {
   readonly onActivate?: (id: string) => void;
   readonly hint?: string;
   readonly className?: string;
+  readonly disabled?: boolean;
 }
 
 const SNAP_MS = 150;
@@ -32,10 +35,15 @@ function wrapIndex(index: number, count: number): number {
   return ((index % count) + count) % count;
 }
 
-function prefersReducedMotion(): boolean {
-  return typeof globalThis.matchMedia === 'function'
-    ? globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
+function relativeIndex(
+  index: number,
+  activeIndex: number,
+  count: number,
+  tieSign: number
+): number {
+  const forward = wrapIndex(index - activeIndex, count);
+  if (forward === count / 2) return tieSign * forward;
+  return forward > count / 2 ? forward - count : forward;
 }
 
 export function ActionDial({
@@ -47,6 +55,7 @@ export function ActionDial({
   onActivate,
   hint = 'Swipe to switch. Your choice is remembered.',
   className,
+  disabled = false,
 }: Readonly<ActionDialProps>) {
   const selectedIndex = Math.max(
     0,
@@ -55,6 +64,8 @@ export function ActionDial({
   const [visualIndex, setVisualIndex] = useState(selectedIndex);
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [settledTieSign, setSettledTieSign] = useState(1);
+  const reducedMotion = useReducedMotion();
   const pointerRef = useRef<{
     id: number;
     y: number;
@@ -97,22 +108,24 @@ export function ActionDial({
       const next = wrapIndex(index, options.length);
       if (options[next]?.id === options[visualIndexRef.current]?.id) return;
       if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
+      setSettledTieSign(index > visualIndexRef.current ? -1 : 1);
       setVisualIndex(next);
       visualIndexRef.current = next;
       // Vibration requires a live user gesture on supporting browsers. The
       // preference itself is persisted only after the reel settles.
       selectionHaptic();
-      if (prefersReducedMotion()) {
+      if (reducedMotion) {
         commit(next);
       } else {
         snapTimerRef.current = setTimeout(() => commit(next), SNAP_MS);
       }
     },
-    [commit, options, selectionHaptic]
+    [commit, options, reducedMotion, selectionHaptic]
   );
 
   const onPointerDown = useCallback(
     (event: PointerEvent<HTMLFieldSetElement>) => {
+      if (options.length < 2) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       const target = event.target instanceof Element ? event.target : null;
       // Leave the fixed action alone so its native link/button activation works.
@@ -123,7 +136,7 @@ export function ActionDial({
       setIsDragging(true);
       event.currentTarget.setPointerCapture?.(event.pointerId);
     },
-    []
+    [options.length]
   );
 
   const onPointerMove = useCallback(
@@ -141,10 +154,12 @@ export function ActionDial({
       const start = pointerRef.current;
       if (start?.id !== event.pointerId) return;
       pointerRef.current = null;
+      const distance = event.clientY - start.y;
+      if (Number.isFinite(distance) && distance !== 0)
+        setSettledTieSign(distance > 0 ? -1 : 1);
       setDragY(0);
       setIsDragging(false);
       if (canceled) return;
-      const distance = event.clientY - start.y;
       if (!Number.isFinite(distance)) return;
       if (Math.abs(distance) < SWIPE_THRESHOLD_PX) {
         if (start.tapOffset !== null) {
@@ -160,16 +175,50 @@ export function ActionDial({
       setTimeout(() => {
         suppressClickRef.current = false;
       }, 0);
-      const steps = Math.max(
-        1,
-        Math.min(3, Math.round(Math.abs(distance) / SWIPE_STEP_PX))
-      );
-      select(visualIndexRef.current + (distance < 0 ? steps : -steps));
+      // One swipe settles the adjacent provider actually shown in the track.
+      select(visualIndexRef.current + (distance < 0 ? 1 : -1));
     },
     [select]
   );
 
   const active = options[visualIndex] ?? options[0];
+  const actionIcon =
+    reducedMotion || options.length < 2 || !active?.icon ? (
+      active?.icon
+    ) : (
+      <span
+        className='relative h-5 w-5 shrink-0 overflow-hidden'
+        aria-hidden='true'
+        data-testid='action-dial-icon-track'
+      >
+        {options.map((option, index) => {
+          const tieSign =
+            isDragging && dragY !== 0 ? (dragY > 0 ? -1 : 1) : settledTieSign;
+          const offset = relativeIndex(
+            index,
+            visualIndex,
+            options.length,
+            tieSign
+          );
+          return option.icon ? (
+            <span
+              key={option.id}
+              className={cn(
+                'absolute inset-0 transition duration-subtle ease-subtle motion-reduce:transition-none',
+                isDragging && 'transition-none',
+                Math.abs(offset) <= 1 ? 'opacity-100' : 'opacity-0'
+              )}
+              style={{
+                transform: `translateY(${offset * 100 + computeRatePercent(dragY, SWIPE_STEP_PX, 12)}%)`,
+              }}
+              data-testid={`action-dial-icon-${option.id}`}
+            >
+              {option.icon}
+            </span>
+          ) : null;
+        })}
+      </span>
+    );
   const visible = useMemo(() => {
     if (options.length === 0) return [];
     const offsets =
@@ -218,7 +267,12 @@ export function ActionDial({
       data-testid='action-dial'
     >
       <legend className='sr-only'>{groupLabel}</legend>
-      <div className='relative h-53 overflow-hidden'>
+      <div
+        className={cn(
+          'relative overflow-hidden',
+          options.length === 1 ? 'h-19' : 'h-53'
+        )}
+      >
         <div
           className={cn(
             'absolute inset-0 transition-transform duration-subtle ease-out motion-reduce:transition-none',
@@ -277,12 +331,16 @@ export function ActionDial({
         </div>
         <SmartLinkProviderButton
           label={actionLabel}
-          icon={active.icon}
+          icon={actionIcon}
           href={active.href}
           providerKey={active.id}
           primary
+          disabled={disabled}
           ariaLabel={`${actionLabel} with ${active.label}`}
-          className='absolute inset-x-3 top-20 z-10 w-auto'
+          className={cn(
+            'absolute inset-x-3 z-10 w-auto',
+            options.length === 1 ? 'top-3' : 'top-20'
+          )}
           onClick={event => {
             if (suppressClickRef.current) {
               event.preventDefault();
@@ -292,7 +350,12 @@ export function ActionDial({
           }}
         />
       </div>
-      <p className='text-muted-foreground mt-1 text-center text-xs'>{hint}</p>
+      {/* JOV-INV-019 image-contrast: text-muted-foreground resolves to
+          text-secondary-token, which measures 4.48:1 against a real photo
+          background on the pay hint (just under the 4.5:1 floor); bump one
+          rung to text-primary-token for margin, same fix as the tab-bar
+          scrim label. */}
+      <p className='mt-1 text-center text-xs text-primary-token'>{hint}</p>
       <p className='sr-only' role='status' aria-live='polite'>
         {active.label} selected
       </p>

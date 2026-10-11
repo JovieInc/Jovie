@@ -34,11 +34,12 @@ export type HomepageRedesignViewportId =
 
 export const LIVE_HOMEPAGE_SOURCE_FILES = [
   'apps/web/app/(home)/page.tsx',
-  'apps/web/components/homepage/HomepageEditorialHero.tsx',
+  'apps/web/components/homepage/HomepageIdentityHero.tsx',
+  'apps/web/components/homepage/HomepageIdentity.css',
+  'apps/web/data/homepageIdentityCopy.ts',
   'apps/web/components/homepage/HomepageCertifiedSections.tsx',
   'apps/web/components/homepage/HomepageClose.tsx',
   'apps/web/components/features/home/HeroSpotifySearch.tsx',
-  'apps/web/components/homepage/intent.ts',
   'apps/web/data/homepageLaunchCopy.ts',
   'apps/web/data/homepageCertifiedOptimization.ts',
   'apps/web/components/homepage/HomepageCertifiedExposure.tsx',

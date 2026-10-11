@@ -29,6 +29,7 @@ import {
   type TranscriberErrorCode,
 } from '@/lib/chat/transcriber';
 import { SYSTEM_B_RADIUS_PX } from '@/lib/design/system-b-radius';
+import { useDesktopComposerReadiness } from '@/lib/desktop/use-desktop-composer-readiness';
 import { useEntityRecents } from '@/lib/queries/useEntityRecents';
 import { cn } from '@/lib/utils';
 
@@ -74,6 +75,8 @@ export interface ChatInputProps {
   readonly onInterruptAndSend?: () => void;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
+  /** Opt in when the authenticated chat owner finishes initial history loading. */
+  readonly desktopConversationReady?: boolean;
   readonly placeholder?: string;
   readonly variant?: 'default' | 'compact' | 'hero';
   readonly onFileAttach?: () => void;
@@ -230,7 +233,7 @@ function DictationStatusBanner({
         role='status'
         className='flex items-center justify-between gap-3 px-3 py-2 text-xs text-tertiary-token'
       >
-        <span>{hint}</span>
+        <span className='min-w-0 flex-1'>{hint}</span>
         <Button
           type='button'
           variant='ghost'
@@ -280,6 +283,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onInterruptAndSend,
       isLoading,
       isSubmitting,
+      desktopConversationReady = false,
       placeholder = '',
       variant = 'default',
       onFileAttach,
@@ -350,6 +354,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const minHeight = 24;
 
     const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+    const micButtonRef = useRef<HTMLButtonElement>(null);
+    const dictationBannerRef = useRef<HTMLDivElement>(null);
     const latestOnChangeRef = useRef(onChange);
     // Last string handed to onChange. The DOM-level input listener and React's
     // synthetic onChange both fire for a single keystroke; dedupe so each edit
@@ -705,9 +711,23 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const handleMicUnavailable = useCallback(() => {
       setShowDictationHint(true);
     }, []);
-    const dismissDictationHint = useCallback(() => {
-      setShowDictationHint(false);
+    const restoreDictationFocus = useCallback(() => {
+      if (dictationBannerRef.current?.contains(document.activeElement)) {
+        micButtonRef.current?.focus({ preventScroll: true });
+      }
     }, []);
+    const dismissDictationHint = useCallback(() => {
+      restoreDictationFocus();
+      setShowDictationHint(false);
+    }, [restoreDictationFocus]);
+    const dismissDictationError = useCallback(() => {
+      restoreDictationFocus();
+      clearDictationError();
+    }, [clearDictationError, restoreDictationFocus]);
+    const cancelDictationFromBanner = useCallback(() => {
+      restoreDictationFocus();
+      handleMicCancel();
+    }, [handleMicCancel, restoreDictationFocus]);
 
     const handleMicPushStart = useCallback(() => {
       if (isListening) return;
@@ -899,8 +919,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       isListening ||
       Boolean(dictationError) ||
       (showDictationHint && Boolean(dictationUnavailableHint));
-    const showComposerOverlay =
-      showInlinePicker || isPickerOpen || showDictationBanner;
+    const showComposerOverlay = showInlinePicker || isPickerOpen;
     // Container the slash key listener cares about when the picker is closed.
     // (The active-listener inside SlashCommandMenu only mounts while open.)
 
@@ -913,9 +932,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         isListening={isListening}
         error={dictationError}
         hint={showDictationHint ? dictationUnavailableHint : null}
-        onDismissError={clearDictationError}
+        onDismissError={dismissDictationError}
         onDismissHint={dismissDictationHint}
-        onCancel={handleMicCancel}
+        onCancel={cancelDictationFromBanner}
       />
     );
     // The mic slot stays mounted when the desktop can point at system
@@ -927,6 +946,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       containerRef,
       hiddenDivRef,
       internalTextareaRef,
+      desktopConversationReady,
+      micButtonRef,
       value,
       onChange: handleChange,
       handleKeyDown,
@@ -974,60 +995,66 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         aria-label={CHAT_COMPOSER_FORM_ARIA_LABEL}
         className='relative z-10 w-full focus-within:outline-none'
       >
+        {/* Anchor the picker above the whole form so dictation guidance and
+            its Dismiss or Cancel action remain reachable below it. */}
+        {showInlinePicker ? (
+          <div
+            className={cn(
+              reserveInlinePickerSpace
+                ? 'relative z-[80] flex w-full flex-col items-center gap-2'
+                : 'absolute bottom-full left-0 right-0 z-[80] flex flex-col items-center gap-2',
+              statusBanner ? 'mb-9' : 'mb-4'
+            )}
+          >
+            {showInlinePicker ? (
+              <div
+                style={{
+                  width: geometry.width,
+                  maxWidth: geometry.maxWidth,
+                }}
+                className='system-b-chat-composer-picker-shell isolate max-h-[min(340px,calc(100vh-12rem))] overflow-hidden'
+              >
+                <SlashCommandMenu
+                  profileId={pickerProfileId}
+                  state={picker.state}
+                  onSelectSkill={handleSelectSkill}
+                  onSelectEntity={handleSelectEntity}
+                  onSetSelected={picker.setSelected}
+                  onMoveSelected={picker.moveSelected}
+                  onClose={handlePickerClose}
+                  variant='inline'
+                  listIdProp={pickerListId}
+                  onActiveRowChange={setPickerActiveRowId}
+                  attachmentActions={attachmentActions}
+                  onQueryChange={pickerFromPlus ? picker.setQuery : undefined}
+                  promptActions={quickActions}
+                  onSelectPrompt={handleSelectPromptAction}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {showDictationBanner && hasDictationAffordance ? (
+          <div
+            ref={dictationBannerRef}
+            className='mb-3 flex w-full justify-center'
+          >
+            <div
+              data-testid='dictation-status-banner'
+              style={{ width: geometry.width, maxWidth: geometry.maxWidth }}
+              className='rounded-lg border border-subtle bg-surface-elevated shadow-sm'
+            >
+              {dictationBanner}
+            </div>
+          </div>
+        ) : null}
         <div
           className={dockClass}
           data-chat-composer-overlay={showComposerOverlay ? 'true' : undefined}
         >
-          {/* ROOT inline picker is absolutely positioned so it does not alter
-              the composer surface height and cause layout shift when it opens. */}
-          {showInlinePicker || showDictationBanner ? (
-            <div
-              className={cn(
-                reserveInlinePickerSpace
-                  ? 'relative z-[80] flex w-full flex-col items-center gap-2'
-                  : 'absolute bottom-full left-0 right-0 z-[80] flex flex-col items-center gap-2',
-                statusBanner ? 'mb-9' : 'mb-4'
-              )}
-            >
-              {showInlinePicker ? (
-                <div
-                  style={{
-                    width: geometry.width,
-                    maxWidth: geometry.maxWidth,
-                  }}
-                  className='system-b-chat-composer-picker-shell isolate max-h-[min(340px,calc(100vh-12rem))] overflow-hidden'
-                >
-                  <SlashCommandMenu
-                    profileId={pickerProfileId}
-                    state={picker.state}
-                    onSelectSkill={handleSelectSkill}
-                    onSelectEntity={handleSelectEntity}
-                    onSetSelected={picker.setSelected}
-                    onMoveSelected={picker.moveSelected}
-                    onClose={handlePickerClose}
-                    variant='inline'
-                    listIdProp={pickerListId}
-                    onActiveRowChange={setPickerActiveRowId}
-                    attachmentActions={attachmentActions}
-                    onQueryChange={pickerFromPlus ? picker.setQuery : undefined}
-                    promptActions={quickActions}
-                    onSelectPrompt={handleSelectPromptAction}
-                  />
-                </div>
-              ) : null}
-              {showDictationBanner && hasDictationAffordance ? (
-                <div
-                  data-testid='dictation-status-overlay'
-                  style={{ width: geometry.width, maxWidth: geometry.maxWidth }}
-                  className='rounded-lg border border-subtle bg-surface-elevated shadow-sm'
-                >
-                  {dictationBanner}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
           <motion.div
-            layoutId='jovie-composer-surface'
+            layoutId={reducedMotion ? undefined : 'jovie-composer-surface'}
+            layout={reducedMotion ? false : 'size'}
             data-testid='chat-composer-surface'
             data-surface-mode={surfaceMode}
             data-compact={isCompact ? 'true' : 'false'}
@@ -1168,6 +1195,8 @@ interface InputRowProps {
   readonly containerRef: React.RefObject<HTMLDivElement | null>;
   readonly hiddenDivRef: React.RefObject<HTMLDivElement | null>;
   readonly internalTextareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  readonly desktopConversationReady: boolean;
+  readonly micButtonRef: React.RefObject<HTMLButtonElement | null>;
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly handleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -1221,6 +1250,8 @@ function InputRow({
   containerRef,
   hiddenDivRef,
   internalTextareaRef,
+  desktopConversationReady,
+  micButtonRef,
   value,
   onChange,
   handleKeyDown,
@@ -1262,6 +1293,8 @@ function InputRow({
   pickerActiveRowId,
   isHero,
 }: InputRowProps) {
+  // This component owns the textarea lifetime, including entity-picker swaps.
+  useDesktopComposerReadiness(internalTextareaRef, desktopConversationReady);
   const hasInlineContent = Boolean(value.trim()) || (chips?.length ?? 0) > 0;
   const hasOnlyRootSlashQuery =
     isRootPickerOpen &&
@@ -1273,7 +1306,7 @@ function InputRow({
     <div className={cn(hasBorderTop && 'system-b-chat-composer-seam border-t')}>
       <motion.div
         data-testid='chat-composer-input-row'
-        layout={!reducedMotion}
+        layout={reducedMotion ? false : 'size'}
         ref={containerRef}
         transition={reducedMotion ? undefined : TRANSITION_SURFACE}
         className={cn(
@@ -1386,6 +1419,7 @@ function InputRow({
           <div className='flex shrink-0 items-center gap-2'>
             {dictationEnabled ? (
               <ComposerMicButton
+                buttonRef={micButtonRef}
                 isListening={isListening}
                 isSupported={isDictationSupported}
                 unavailableHint={dictationUnavailableHint}
