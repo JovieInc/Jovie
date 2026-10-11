@@ -1116,6 +1116,11 @@ class FakeLinear:
 
 
 class LinearClientTest(unittest.TestCase):
+    def setUp(self):
+        budget = patch.object(lane.Linear, "_snapshot_budget_admitted", return_value=True)
+        budget.start()
+        self.addCleanup(budget.stop)
+
     def test_comment_rejects_malformed_success_payloads_as_known_failure(self):
         for payload in (None, {"commentCreate": None}, {"commentCreate": []}, {"commentCreate": {"success": None}}):
             with self.subTest(payload=payload), patch.object(lane.Linear, "gql", return_value=payload):
@@ -1142,7 +1147,7 @@ class LinearClientTest(unittest.TestCase):
             self.assertEqual(client.key, "lin_api_x")
             payload = {"data": {"issues": {"pageInfo": {"hasNextPage": False}, "nodes": [{
                 "id": "i1", "identifier": "JOV-5", "title": "t", "description": None, "priority": 2,
-                "createdAt": "2026-09-01T00:00:00Z", "labels": {"nodes": [{"name": "devin"}]}}]}}}
+                "createdAt": "2026-09-01T00:00:00Z", "labels": {"pageInfo": {"hasNextPage": False}, "nodes": [{"name": "devin"}]}}]}}}
             real = lane.urllib.request.urlopen
 
             class Response:
@@ -1166,7 +1171,7 @@ class LinearClientTest(unittest.TestCase):
             lane.urllib.request.urlopen = capture
             try:
                 [found] = client.lane_issues("devin")
-                self.assertEqual(seen[0]["variables"]["labels"], ["devin", lane.SHARED_LABEL])
+                self.assertEqual(seen[0]["variables"]["labels"], client._todo_catalog("devin"))
                 self.assertEqual((found.identifier, found.description, found.labels), ("JOV-5", "", ["devin"]))
                 lane.urllib.request.urlopen = lambda request, timeout: Response({"errors": [{"message": "nope"}]})
                 with self.assertRaises(RuntimeError):
@@ -1176,8 +1181,9 @@ class LinearClientTest(unittest.TestCase):
 
     def test_lane_issue_reads_paginate_the_whole_todo_pool(self):
         client = lane.Linear.__new__(lane.Linear)
+        client.key = "fixture-key"
         node = lambda n: {"id": f"i{n}", "identifier": f"JOV-{n}", "title": "t", "description": None,
-                          "priority": 2, "createdAt": "2026-09-01T00:00:00Z", "labels": {"nodes": []}}
+                          "priority": 2, "createdAt": "2026-09-01T00:00:00Z", "labels": {"pageInfo": {"hasNextPage": False}, "nodes": [{"name": "codex"}]}}
         pages = [{"issues": {"pageInfo": {"hasNextPage": True, "endCursor": "c1"}, "nodes": [node(1)]}},
                  {"issues": {"pageInfo": {"hasNextPage": False, "endCursor": "c2"}, "nodes": [node(2)]}}]
         seen = []
@@ -1198,8 +1204,17 @@ class LinearClientTest(unittest.TestCase):
 
 
 class NativeInventoryBoundaryTest(unittest.TestCase):
+    def setUp(self):
+        budget = patch.object(lane.Linear, "_snapshot_budget_admitted", return_value=True)
+        budget.start()
+        self.addCleanup(budget.stop)
+        catalog = patch.object(lane, "load_providers", return_value={"codex": {"label": "codex", "slots": 1}})
+        catalog.start()
+        self.addCleanup(catalog.stop)
+
     def client(self, pages):
         client = lane.Linear.__new__(lane.Linear)
+        client.key = "fixture-key"
         calls = []
         def gql(query, variables):
             calls.append((query, variables["after"]))
@@ -1212,7 +1227,7 @@ class NativeInventoryBoundaryTest(unittest.TestCase):
 
     def node(self, index):
         return {"id": str(index), "identifier": f"JOV-{index}", "title": "task", "description": "",
-                "priority": 2, "createdAt": "2026-09-01T00:00:00Z", "labels": {"nodes": []}}
+                "priority": 2, "createdAt": "2026-09-01T00:00:00Z", "labels": {"pageInfo": {"hasNextPage": False}, "nodes": [{"name": "codex"}]}}
 
     def test_complete_native_candidate_and_ownership_scans_include_page101_and_dedupe(self):
         for method in ("lane_issues", "active_lane_issues"):
@@ -1263,6 +1278,188 @@ class NativeInventoryBoundaryTest(unittest.TestCase):
                 client.lane_issues("codex")
             self.assertEqual(len(calls), 1)
             self.assertFalse((Path(tmp) / "claim-lane-issues-v2-codex.json").exists())
+
+
+class LinearUnionSnapshotTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.clock = [1800000000.0]
+        self.rows, self.calls = [], []
+        for patcher in (patch.object(lane.Linear, "_snapshot_budget_admitted", return_value=True),
+                        patch.object(lane, "SHARED_CACHE_DIR", self.root),
+                        patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "cache-fixture"}),
+                        patch.object(lane.time, "time", side_effect=lambda: self.clock[0]),
+                        patch.object(lane, "load_providers", return_value={name: {"label": name, "slots": 1}
+                                     for name in ("codex", "devin", "claude")})):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.client = lane.Linear.__new__(lane.Linear)
+        self.client.key = "fixture-key"
+        self.client.gql = self.gql
+
+    def node(self, n, labels):
+        return {"id": f"i{n:04}", "identifier": f"JOV-{n}", "title": "task", "description": "",
+                "priority": 2, "createdAt": "2026-09-01T00:00:00Z",
+                "labels": {"nodes": [{"name": name} for name in labels], "pageInfo": {"hasNextPage": False}}}
+
+    def gql(self, query, variables):
+        self.calls.append(dict(variables))
+        rows = [row for row in self.rows if set(variables["labels"]).intersection(
+            label["name"] for label in row["labels"]["nodes"])]
+        after = int(variables["after"] or 0)
+        return {"issues": {"nodes": rows[after:after + 100],
+                "pageInfo": {"hasNextPage": len(rows) > after + 100, "endCursor": str(after + 100)}}}
+
+    def test_three_requested_pools_use_two_complete_pages_once(self):
+        self.rows = [self.node(i, [lane.SHARED_LABEL]) for i in range(107)] + [
+            self.node(107, ["codex"]), self.node(108, ["codex"]), self.node(109, ["codex"]),
+            self.node(110, ["devin"]), self.node(111, ["devin"]),
+            self.node(112, ["claude"]), self.node(113, ["claude"])]
+        counts = [len(self.client.lane_issues(name)) for name in ("codex", "devin", "claude")]
+        self.assertEqual(counts, [110, 109, 109])
+        self.assertEqual(len(self.calls), 2)
+        self.assertTrue(all(call["labels"] == ["agent-ready", "claude", "codex", "devin"] for call in self.calls))
+        with patch.object(self.client, "gql", return_value={"issue": {"state": {"name": "In Progress"}}}) as fresh:
+            self.assertEqual(self.client.state_of("i0000"), "In Progress")
+        fresh.assert_called_once()
+
+    def test_concurrent_cold_misses_have_one_fill(self):
+        self.rows = [self.node(1, [lane.SHARED_LABEL])]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            found = list(pool.map(lambda _: self.client.lane_issues("codex"), range(4)))
+        self.assertEqual([len(rows) for rows in found], [1, 1, 1, 1])
+        self.assertEqual(len(self.calls), 1)
+
+    def test_credential_and_exact_catalog_bindings_do_not_share_rows(self):
+        self.rows = [self.node(1, [lane.SHARED_LABEL])]
+        self.client.lane_issues("codex")
+        self.client.key = "other-fixture-key"
+        self.client.lane_issues("codex")
+        with patch.object(lane, "load_providers", return_value={"codex": {"label": "codex", "slots": 1}}):
+            self.client.lane_issues("codex")
+        self.assertEqual(len(self.calls), 3)
+        self.assertFalse(any(self.client.key in path.read_text() for path in self.root.glob("*.json")))
+
+    def test_expired_slow_or_reversed_fill_never_publishes_usable_rows(self):
+        self.rows = [self.node(1, ["codex"])]
+        real = self.gql
+        for delta in (60, -1):
+            with self.subTest(delta=delta):
+                def slow(query, variables):
+                    result = real(query, variables)
+                    self.clock[0] += delta
+                    return result
+                self.client.gql = slow
+                with self.assertRaises(lane.LaneInventoryUnknown):
+                    self.client.lane_issues("codex")
+                self.assertEqual(list(self.root.glob("*.json")), [])
+                self.clock[0] = 1800000000.0
+
+    def test_security_labels_require_complete_explicit_label_inventory(self):
+        for metadata in (None, {"hasNextPage": True}, {"hasNextPage": 0}):
+            with self.subTest(metadata=metadata):
+                row = self.node(1, ["codex", "no-symphony", "auth"])
+                row["labels"]["pageInfo"] = metadata
+                self.rows = [row]
+                with self.assertRaises(lane.LaneInventoryUnknown):
+                    self.client.lane_issues("codex")
+                self.assertEqual(list(self.root.glob("*.json")), [])
+        self.rows = [self.node(1, ["codex", "no-symphony", "auth"])]
+        [found] = self.client.lane_issues("codex")
+        self.assertIn("no-symphony", found.labels)
+        self.assertIsNone(lane.pick_issue([found], {}, provider="codex"))
+
+    def test_expired_continuation_stops_before_another_request(self):
+        started, calls = self.clock[0], []
+        def continuation(_query, _variables):
+            calls.append(self.clock[0] - started)
+            self.clock[0] += 15
+            return {"issues": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": str(len(calls))}}}
+        self.client.gql = continuation
+        with self.assertRaisesRegex(lane.LaneInventoryUnknown, "scan-expired"):
+            self.client.lane_issues("codex")
+        self.assertEqual(calls, [0, 15, 30, 45])
+        self.assertEqual(list(self.root.glob("*.json")), [])
+
+    def test_nonfinite_read_clock_never_accepts_a_warm_snapshot(self):
+        self.rows = [self.node(1, ["codex"])]
+        self.client.lane_issues("codex")
+        self.clock[0] = float("nan")
+        with self.assertRaisesRegex(lane.LaneInventoryUnknown, "clock-invalid|scan-expired"):
+            self.client.lane_issues("codex")
+        self.assertEqual(len(self.calls), 1)
+
+    def test_large_other_pool_does_not_starve_500_requested_rows(self):
+        self.rows = [self.node(i, ["codex"]) for i in range(500)] + [
+            self.node(i, ["devin"]) for i in range(500, 1100)]
+        self.assertEqual(len(self.client.lane_issues("codex")), 500)
+        self.assertEqual(len(self.calls), 11)
+        with self.assertRaises(lane.LaneInventoryUnknown):
+            self.client.lane_issues("devin")
+        self.assertEqual(len(self.calls), 11)
+
+    def test_structural_union_overflow_alone_uses_bounded_scoped_fallback(self):
+        self.rows = [self.node(i, ["devin"]) for i in range(1600)] + [self.node(1600, ["codex"])]
+        self.assertEqual(len(self.client.lane_issues("codex")), 1)
+        self.assertEqual(len(self.calls), 16)
+        self.assertEqual(self.calls[-1]["labels"], ["agent-ready", "codex"])
+        self.client.lane_issues("codex")
+        self.assertEqual(len(self.calls), 16)
+
+    def test_partial_error_and_conflicting_duplicates_never_certify_empty(self):
+        for result in (RuntimeError("read failed"),
+                       {"issues": {"nodes": [], "pageInfo": {}}},
+                       {"issues": {"nodes": [self.node(1, ["codex"]), self.node(1, ["devin"])],
+                                   "pageInfo": {"hasNextPage": False}}}):
+            with self.subTest(result=type(result).__name__), patch.object(self.client, "gql") as read:
+                if isinstance(result, Exception): read.side_effect = result
+                else: read.return_value = result
+                with self.assertRaises(RuntimeError): self.client.lane_issues("codex")
+                self.assertEqual(list(self.root.glob("*.json")), [])
+                self.assertEqual(read.call_count, 1)
+
+
+class LinearProtectedBudgetTest(unittest.TestCase):
+    def test_snapshot_refresh_protects_both_dimensions_and_full_request_page_bound(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_STATE": tmp}):
+            now = time.time()
+            budget = {"dimensions": {"requests": {"remaining": 700, "limit": 2500, "observedAt": now},
+                                    "complexity": {"remaining": 1000000, "limit": 3000000, "observedAt": now}}}
+            path = Path(tmp) / "api-budget.json"
+            client = lane.Linear.__new__(lane.Linear)
+            path.write_text(json.dumps(budget))
+            self.assertTrue(client._snapshot_budget_admitted(5))
+            self.assertFalse(client._snapshot_budget_admitted(100))
+            for name in ("requests", "complexity"):
+                for changes in ({"remaining": 0}, {"remaining": None}, {"limit": True},
+                                {"observedAt": now - 61}, {"observedAt": now + 10}):
+                    altered = json.loads(json.dumps(budget))
+                    altered["dimensions"][name].update(changes)
+                    path.write_text(json.dumps(altered))
+                    self.assertFalse(client._snapshot_budget_admitted(1), (name, changes))
+            path.write_text(json.dumps({"remaining": 2500, "limit": 2500, "observedAt": now}))
+            self.assertFalse(client._snapshot_budget_admitted(1))
+            self.assertFalse(any(Path(tmp).glob("linear-usage*")))
+
+    def test_write_queue_bound_preserves_unresolved_intents_and_deduplicates(self):
+        now = time.time()
+        plan = {"events": {"fp": {"issueId": "id", "noted": []}}, "comments": [{"id": "id", "body": "safe"}]}
+        data = {"actions": {}}
+        lane._queue_event_delivery(data, plan, [], {"fp"}, now)
+        before = json.loads(json.dumps(data))
+        lane._queue_event_delivery(data, plan, [], {"fp"}, now + 1)
+        self.assertEqual(data, before)
+        crowded = {"actions": {str(n): {"status": "exhausted"} for n in range(lane.EVENT_DELIVERY_PENDING_CAP)}}
+        before = json.loads(json.dumps(crowded))
+        with self.assertRaisesRegex(RuntimeError, "event-delivery-capacity-held"):
+            lane._queue_event_delivery(crowded, plan, [], {"fp"}, now)
+        self.assertEqual(crowded, before)
+        crowded["actions"]["0"]["status"] = "acknowledged"
+        lane._queue_event_delivery(crowded, plan, [], {"fp"}, now)
+        self.assertEqual(len(crowded["actions"]), lane.EVENT_DELIVERY_PENDING_CAP + 1)
+        self.assertIn("0", crowded["actions"])
 
 
 class LinearRateLimitTest(unittest.TestCase):
@@ -1520,6 +1717,9 @@ class HeldPruneTest(unittest.TestCase):
 
 class ClaimScanCacheTest(unittest.TestCase):
     def setUp(self):
+        budget = patch.object(lane.Linear, "_snapshot_budget_admitted", return_value=True)
+        budget.start()
+        self.addCleanup(budget.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.saved = (lane.SHARED_CACHE_DIR, os.environ.pop("LANES_EXECUTION_BACKEND", None), lane.sh,
@@ -1549,12 +1749,13 @@ class ClaimScanCacheTest(unittest.TestCase):
             self.counts["issues"] += 1
             after = variables.get("after")
             node = lambda n: {"id": f"i{n}", "identifier": f"JOV-{n}", "title": "t", "description": None,
-                              "priority": 2, "createdAt": "2026-09-01T00:00:00Z", "labels": {"nodes": []}}
+                              "priority": 2, "createdAt": "2026-09-01T00:00:00Z", "labels": {"pageInfo": {"hasNextPage": False}, "nodes": [{"name": "codex"}]}}
             if after is None:
                 return {"issues": {"pageInfo": {"hasNextPage": True, "endCursor": "c1"}, "nodes": [node(1)]}}
             return {"issues": {"pageInfo": {"hasNextPage": False, "endCursor": "c2"}, "nodes": [node(2)]}}
 
         client = lane.Linear.__new__(lane.Linear)
+        client.key = "fixture-key"
         client.gql = gql
         lane.lane_prs = lambda name, providers=None, fields="": self.counts.__setitem__("fix", self.counts["fix"] + 1) or [
             {"number": 1, "headRefName": "devin/jov-1-20260901", "isDraft": False}]
@@ -1597,15 +1798,16 @@ class ClaimScanCacheTest(unittest.TestCase):
     def test_pagination_runs_only_as_the_cache_fill(self):
         calls = []
         client = lane.Linear.__new__(lane.Linear)
+        client.key = "fixture-key"
         client.gql = lambda *args, **kwargs: calls.append(1)
         saved = lane.shared
 
-        def cached(key, ttl, fetch):
-            self.assertEqual(key, "claim-lane-issues-v2-codex")
+        def cached(key, ttl, fetch, *, validate=None):
+            self.assertTrue(key.startswith("claim-todo-union-v1-"))
             self.assertLessEqual(ttl, 60)
             self.assertEqual(calls, [], "pagination must not run before the cache fill")
-            return [{"id": "i", "identifier": "JOV-9", "title": "t", "description": "", "priority": 1,
-                     "created_at": "2026-09-01T00:00:00Z", "labels": ["codex"]}]
+            return {"rows": [{"id": "i", "identifier": "JOV-9", "title": "t", "description": "", "priority": 1,
+                     "created_at": "2026-09-01T00:00:00Z", "labels": ["codex"]}]}
         lane.shared = cached
         try:
             found = client.lane_issues("codex")
@@ -2201,6 +2403,84 @@ class MaintenanceDemandTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    def test_unknown_linear_inventory_releases_the_seat_without_claiming(self):
+        with patch.object(self.linear, "lane_issues", side_effect=lane.LaneInventoryUnknown("linear-refresh-reserve-held")), \
+                patch.object(lane, "run_issue") as work:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        work.assert_not_called()
+        self.assertEqual(self.linear.moves, [])
+        idle = json.loads((self.host.state / "worker-idle.json").read_text())
+        self.assertEqual(idle["devin"]["reason"], "linear-inventory-unknown")
+        seat = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
+        try:
+            self.assertTrue(seat.held)
+        finally:
+            seat.release()
+
+    def test_selected_repair_needs_no_linear_credentials_or_housekeeping(self):
+        with patch.object(lane, "claim_red_pr", return_value={"number": 7}), \
+                patch.object(lane, "Linear", side_effect=SystemExit("no key")) as client, \
+                patch.object(lane, "escalate_exhausted", side_effect=lane.LinearRateLimited(9999999999)) as cleanup, \
+                patch.object(lane, "sweep_lane_prs") as sweep, \
+                patch.object(lane, "fix_red_pr") as repair:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        repair.assert_called_once()
+        client.assert_not_called()
+        cleanup.assert_not_called()
+        sweep.assert_not_called()
+
+    def test_maintenance_only_seat_never_falls_through_after_fresh_repair_miss(self):
+        with patch.object(self.host, "intake_slots", return_value=0), \
+                patch.object(lane, "Linear") as client, \
+                patch.object(lane, "claim_labeled_event") as event, \
+                patch.object(lane, "read_new_issue_budget") as budget, \
+                patch.object(lane, "run_issue") as new_work:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        client.assert_not_called()
+        event.assert_not_called()
+        budget.assert_not_called()
+        new_work.assert_not_called()
+        self.assertEqual(self.linear.moves, [])
+        idle = json.loads((self.host.state / "worker-idle.json").read_text())
+        self.assertEqual(idle["devin"]["reason"], "maintenance-only-idle")
+
+    def test_extra_repair_seat_is_part_of_the_shared_total(self):
+        occupied = lane.Locked(self.host.state / "slots/devin.0.lock", False)
+        self.addCleanup(occupied.release)
+        with patch.object(self.host, "slots", return_value=2), \
+                patch.object(self.host, "intake_slots", return_value=1), \
+                patch.object(lane, "worker_with_slot", return_value=0) as work:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertTrue(work.call_args.kwargs["maintenance_only"])
+        self.assertEqual(work.call_args.args[3].handle.name, str(self.host.state / "slots/devin.1.lock"))
+        self.assertTrue(occupied.held)
+
+    def test_occupied_seat_outside_reduced_cap_prevents_another_start(self):
+        occupied = lane.Locked(self.host.state / "slots/devin.4.lock", False)
+        self.addCleanup(occupied.release)
+        with patch.object(self.host, "slots", return_value=1), \
+                patch.object(lane, "worker_with_slot") as work:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        work.assert_not_called()
+        self.assertTrue(occupied.held)
+
+    def test_host_cap_counts_occupied_seats_from_every_provider(self):
+        occupied = lane.Locked(self.host.state / "slots/codex.4.lock", False)
+        self.addCleanup(occupied.release)
+        with patch.object(lane.autoscale, "host_ceiling", return_value=1), \
+                patch.object(lane, "worker_with_slot") as work:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        work.assert_not_called()
+        self.assertTrue(occupied.held)
+
+    def test_unknown_or_special_slot_inventory_refuses_a_start(self):
+        slots = self.host.state / "slots"
+        slots.mkdir()
+        os.mkfifo(slots / "codex.3.lock")
+        with patch.object(lane, "worker_with_slot") as work:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        work.assert_not_called()
+
     def test_eligible_repair_precedes_held_new_intake(self):
         self.linear.issues = [issue("JOV-3")]
         with patch.object(lane, "claim_red_pr", return_value={"number": 21175}), \
@@ -2282,6 +2562,9 @@ class WorkerTest(unittest.TestCase):
         lane.escalate_exhausted = lambda host, prs, linear: None
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name), linear_env=Path("unused"))
+        intake = patch.object(self.host, "intake_slots", return_value=1)
+        intake.start()
+        self.addCleanup(intake.stop)
         self.linear = FakeLinear([issue("JOV-3")])
         lane.Linear = lambda env: self.linear
         lane.load_providers = lambda: {"devin": {"label": "devin", "slots": 1, "model": "m", "cmd": ["true"]}}
@@ -2491,7 +2774,7 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual((fixed, self.linear.moves), ([5], []))
         self.assertEqual(len(self.execs), 1)
 
-    def test_event_queued_prs_are_fixed_first_and_escalated_once(self):
+    def test_event_queued_prs_are_fixed_first_without_optional_linear_escalation(self):
         fixed, escalated = [], []
         lane.fix_candidates = lambda name: [{"number": 5}, {"number": 6}]
         lane.pr_events.queued_prs = lambda module, kinds: [{"number": 6, "eventKinds": ["red"]}]
@@ -2500,7 +2783,7 @@ class WorkerTest(unittest.TestCase):
         lane.escalate_exhausted = lambda host, prs, linear: escalated.append(sorted(pr["number"] for pr in prs))
         lane.fix_red_pr = lambda host, name, spec, pr: fixed.append(pr["number"])
         lane.worker(self.host, "devin")
-        self.assertEqual((fixed, escalated), ([6], [[5, 6]]))
+        self.assertEqual((fixed, escalated), ([6], []))
 
     def test_late_remote_drafts_are_adopted_and_gated(self):
         adopted = []
