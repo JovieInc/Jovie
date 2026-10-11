@@ -37,17 +37,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 POLICY = Path(__file__).resolve().parent / "routing.json"
-TODO_QUERY = (
-    'query($team:String!,$labels:[String!]!,$after:String){issues(first:100,after:$after,'
-    'filter:{team:{key:{eq:$team}},state:{name:{eq:"Todo"}},labels:{name:{in:$labels}}}){'
-    'pageInfo{hasNextPage endCursor} '
-    'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}')
-# Tim 2026-10-11: any issue is eligible. A binding with no required labels scans every Todo issue.
-TODO_ALL_QUERY = (
-    'query($team:String!,$after:String){issues(first:100,after:$after,'
-    'filter:{team:{key:{eq:$team}},state:{name:{eq:"Todo"}}}){'
-    'pageInfo{hasNextPage endCursor} '
-    'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}')
 REPAIR_STATES = frozenset({"BEHIND", "DIRTY"})
 # Every open PR of a binding repo with what maintenance needs, 50 per GraphQL page (cost 2).
 OPEN_PRS_QUERY = (
@@ -146,25 +135,13 @@ def team_of(identifier: str) -> str:
 
 # ---------------------------------------------------------------- cached reads
 
-def todo_issues(lane, linear, binding: Binding) -> list:
+def todo_issues(lane, host, binding: Binding) -> list:
     """Todo issues carrying any required label (every Todo issue when none is required),
-    one cached Linear read per host per TTL."""
-    def fetch():
-        nodes = (linear._bounded_lane_nodes(TODO_QUERY, {"team": binding.key, "labels": list(binding.labels)})
-                 if binding.labels else linear._bounded_lane_nodes(TODO_ALL_QUERY, {"team": binding.key}))
-        return [{"id": n["id"], "identifier": n["identifier"], "title": n.get("title") or "",
-                 "description": n.get("description") or "", "priority": n.get("priority") or 0,
-                 "created_at": n.get("createdAt") or "",
-                 "labels": sorted(label["name"] for label in (n.get("labels") or {}).get("nodes") or [])}
-                for n in nodes]
-    scope = lane._linear_scope_id(linear.key)
-    catalog = lane._cache_token(",".join(binding.labels) or "*")
-    rows = lane.shared(f"binding-todo-v2-{binding.key}-{catalog}-{lane._cache_token(scope)}",
-                       lane.CLAIM_SCAN_TTL_S, fetch)
-    if rows is None:
-        raise lane.LaneInventoryUnknown("binding-inventory-unavailable")
+    from the host's local mirror of the binding's team: no Linear request (2026-10-11)."""
+    wanted = set(binding.labels)
     return [lane.Issue(r["id"], r["identifier"], r["title"], r["description"], r["priority"],
-                       r["created_at"], list(r["labels"])) for r in rows]
+                       r["createdAt"], list(r["labels"]))
+            for r in lane.linear_sync.todo(host.state, binding.key) if not wanted or wanted & set(r["labels"])]
 
 
 def required_checks(lane, binding: Binding) -> list[str] | None:
@@ -588,14 +565,16 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
                           reasons=pr.get("repairReasons") or [], maintained=maintained)
         elif not maintenance_only:
             budget = intake_refusal(binding, prs, running_issue_runs(lane, host, binding))
-            linear = lane.Linear(host.linear_env)
-            pool = todo_issues(lane, linear, binding)
+            linear = lane.linear_sync.Outboxed(host.state, lane.Linear(host.linear_env))
+            pool = todo_issues(lane, host, binding)
             failures = lane.read_json(lane.failures_path(host))
             now, flying = time.time(), in_flight(binding, prs)
             refused = {item.identifier: refusal(lane, binding, item, failures, now, flying, name) for item in pool}
             eligible = sorted((item for item in pool if refused[item.identifier] is None),
                               key=lambda item: lane.admission_order(item, now))
-            if eligible and budget is None and linear.state_of(eligible[0].id) == "Todo":
+            # The local ledger is the claim; In Progress reaches Linear through the outbox.
+            if eligible and budget is None and lane.linear_sync.claim(
+                    host.state, eligible[0].id, eligible[0].identifier, name):
                 issue = eligible[0]
                 lease = lane.Locked(host.state / "bindings" / binding.key / f"issue.{issue.identifier}.lock",
                                     blocking=False)

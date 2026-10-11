@@ -15,6 +15,12 @@ const SHA = /^[0-9a-f]{40}$/;
 const REARM_DESCRIPTION =
   /^n=([1-9][0-9]*);sha=([0-9a-f]{40});run=([1-9][0-9]*)$/;
 const BUDGET_FILE = /([A-Za-z0-9_./-]+\.md): \d+ bytes exceeds \d+/;
+// GitHub reports BLOCKED while any required check is pending or red, so
+// UNSTABLE means every required check is green and only a non-required context
+// (for example a lane's jovie-execution/* receipt) is pending or red. The enroll
+// controller admits the same states; requiring CLEAN stranded victims whose
+// head carried a pending lane receipt.
+export const REARM_MERGE_STATES = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
 const BLOCKING = new Set([
   'hold',
   'gated',
@@ -115,7 +121,9 @@ export function planVictimRearms({
       return skip('blocking-label');
     }
     if (candidate.inQueue || candidate.autoMerge) return skip('already-armed');
-    if (candidate.mergeStateStatus !== 'CLEAN') return skip('head-not-green');
+    if (!REARM_MERGE_STATES.has(candidate.mergeStateStatus)) {
+      return skip('head-not-green');
+    }
     if (candidate.filesTruncated || candidate.statusesTruncated) {
       return skip('evidence-truncated');
     }
@@ -191,7 +199,7 @@ export async function applyVictimRearms(decisions, io) {
       current?.headSha !== decision.headSha ||
       current.inQueue ||
       current.autoMerge ||
-      current.mergeStateStatus !== 'CLEAN'
+      !REARM_MERGE_STATES.has(current.mergeStateStatus)
     ) {
       continue;
     }
