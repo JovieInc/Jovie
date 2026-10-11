@@ -147,15 +147,207 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                 return {"workflow_runs": []}
             if endpoint.startswith("actions/artifacts?"):
                 return {"artifacts": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {"workflow_runs": []}
             raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
 
         with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
             observed = MODULE.observe_main("JovieInc/Jovie")
 
+        # JOV-8000 follow-up 27: with no real ancestor attempt either, main
+        # stays unknown (fail closed) — the fallback finds nothing.
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
         self.assertEqual(observed["sourceGate"]["conclusion"], "skipped")
-        self.assertIn("no real attempt", observed["error"])
+        self.assertIn("no completed real attempt", observed["error"])
+
+    def test_observe_main_falls_back_to_recent_real_release_attempt(self):
+        """JOV-8000 follow-up 27: the queue-merge window. A merge-group run
+        lands the tip; its Main Release Ready is skipped by design (the job's
+        if binds to event=push); the direct push CI started minutes ago. The
+        exact tip carries only skipped attempts, so observe_main falls back to
+        the newest REAL attempt within the freshness bound (an ancestor's
+        push-CI gate) — green via the ancestor, named, fail-closed when the
+        bound has no real attempt (the test above)."""
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "skipped",
+                            "started_at": "2026-10-10T02:46:00Z",
+                            "completed_at": "2026-10-10T02:46:01Z",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 424242,
+                            "head_sha": "b" * 40,
+                            "created_at": "2026-10-10T02:11:50Z",
+                        }
+                    ]
+                }
+            if endpoint == "actions/runs/424242/jobs?per_page=100":
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-10-10T02:25:00Z",
+                            "completed_at": "2026-10-10T02:26:00Z",
+                            "html_url": "https://example.test/job/424242",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        now = MODULE.datetime(2026, 10, 10, 2, 50, tzinfo=MODULE.UTC)
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            with mock.patch.object(MODULE, "utc_now", return_value=now):
+                observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["reason"], "required-checks-green-ancestor-fallback")
+        self.assertEqual(
+            observed["sourceGate"]["source"], "ancestor-ci-workflow-job"
+        )
+        self.assertEqual(observed["sourceGate"]["ancestorSha"], "b" * 40)
+        self.assertIn("fell back to the newest real Main Release Ready attempt", observed["error"])
+
+    def test_observe_main_falls_back_when_exact_gate_is_pending_not_skipped(self):
+        """JOV-8000 follow-up 28 — the 38019846033 shape: minutes after a queue
+        merge (and minutes after the follow-up-27 fix itself landed), the tip's
+        direct push CI has STARTED — its Main Release Ready is PENDING, not
+        skipped. The follow-up-27 fallback only fired for the skipped shape and
+        the gate bound main-unknown through the pending window. The unified
+        fallback fires for pending/missing/no-verdict too: a fresh real
+        ancestor SUCCESS grades main green (named, with the ancestor sha)."""
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "in_progress",
+                            "conclusion": None,
+                            "started_at": "2026-10-10T03:14:20Z",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 424244,
+                            "head_sha": "c" * 40,
+                            "created_at": "2026-10-10T02:45:58Z",
+                        }
+                    ]
+                }
+            if endpoint == "actions/runs/424244/jobs?per_page=100":
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-10-10T02:53:00Z",
+                            "completed_at": "2026-10-10T02:54:00Z",
+                            "html_url": "https://example.test/job/424244",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        now = MODULE.datetime(2026, 10, 10, 3, 15, tzinfo=MODULE.UTC)
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            with mock.patch.object(MODULE, "utc_now", return_value=now):
+                observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["reason"], "required-checks-green-ancestor-fallback")
+        self.assertEqual(
+            observed["sourceGate"]["source"], "ancestor-ci-workflow-job"
+        )
+        self.assertEqual(observed["sourceGate"]["ancestorSha"], "c" * 40)
+        self.assertIn("fell back to the newest real Main Release Ready attempt", observed["error"])
+
+    def test_observe_main_ancestor_fallback_fails_closed_when_bound_exceeded(self):
+        """No real attempt within the freshness bound: main stays unknown."""
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "skipped",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 424243,
+                            "head_sha": "b" * 40,
+                            "created_at": "2026-10-10T00:00:00Z",
+                        }
+                    ]
+                }
+            if endpoint == "actions/runs/424243/jobs?per_page=100":
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        # 4h later: the only real attempt is older than the 3h bound.
+        now = MODULE.datetime(2026, 10, 10, 4, 0, tzinfo=MODULE.UTC)
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            with mock.patch.object(MODULE, "utc_now", return_value=now):
+                observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertIn("no completed real attempt", observed["error"])
 
     def test_observe_main_failure_is_still_red(self):
         def github_response(_repo: str, endpoint: str):
@@ -324,6 +516,10 @@ def _main_fixture(
         if endpoint.startswith(f"commits/{sha}/check-runs?"):
             return {"check_runs": check_runs}
         if endpoint.startswith("actions/runs?"):
+            return {"workflow_runs": []}
+        if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+            # JOV-8000 follow-up 28: the ancestor-fallback history query —
+            # empty by default so pending/missing fixtures fail closed.
             return {"workflow_runs": []}
         if endpoint.startswith("actions/artifacts?"):
             return {"artifacts": artifacts or []}
@@ -3217,7 +3413,95 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(cached["status"], "green")
         self.assertEqual(cached["source"], "last-known")
         self.assertIn("controller-observation-failed-used-last-known", cached["error"])
-        self.assertEqual(stale["status"], "failed")
+        # JOV-8000 follow-up 24: the stale-TTL connection refusal against the
+        # retired :4041 endpoint reads parked (the permanent retired-endpoint
+        # class) instead of failed.
+        self.assertEqual(stale["status"], "parked")
+        self.assertTrue(stale["retired"])
+
+    def test_retired_controller_endpoint_observes_parked(self):
+        """JOV-8000 follow-up 24: the default symphony URL is the RETIRED
+        Elixir endpoint (:4041, decommissioned per #20931). Connection
+        refused against it is the permanent retired-endpoint class: the
+        observation names it parked with the retired flag instead of a
+        crash-shaped failed, and a NON-retired URL keeps failed."""
+        now = MODULE.datetime(2026, 10, 9, 22, 40, tzinfo=MODULE.UTC)
+        with mock.patch.object(
+            MODULE.urllib.request,
+            "urlopen",
+            side_effect=ConnectionRefusedError("Connection refused"),
+        ):
+            retired = MODULE.observe_controller(
+                "http://127.0.0.1:4041/api/v1/state",
+                now=now,
+            )
+        self.assertEqual(retired["status"], "parked")
+        self.assertTrue(retired["retired"])
+        self.assertIn("controller-endpoint-retired", retired["error"])
+        with mock.patch.object(
+            MODULE.urllib.request,
+            "urlopen",
+            side_effect=ConnectionRefusedError("Connection refused"),
+        ):
+            other = MODULE.observe_controller(
+                "http://127.0.0.1:9999/api/v1/state",
+                now=now,
+            )
+        self.assertEqual(other["status"], "failed")
+        self.assertNotIn("retired", other)
+
+    def test_parked_controller_with_bound_production_feeds_hold_intake(self):
+        """The parked (retired-endpoint) controller keeps the
+        controller-failure family reason so the hold-intake bounded set
+        still engages — promotion of already-green PRs continues."""
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {
+            "status": "parked",
+            "retired": True,
+            "error": "controller-endpoint-retired: Connection refused",
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"controller-failure"},
+        )
+
+    def test_parked_controller_with_red_production_stays_blocked(self):
+        # production red adds production-not-green, outside the allowed pair.
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "red"}
+        signals["controller"] = {
+            "status": "parked",
+            "retired": True,
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
+    def test_parked_controller_does_not_hold_runtime_intake(self):
+        """A CRASHED controller (failed) holds runtime intake even in
+        hold-intake; a parked (retired) controller does not — the
+        hold-intake comment's own promise: already-green PRs keep
+        promoting while the controller is parked."""
+        base = dict(GREEN_SIGNALS)
+        base["production"] = {"status": "green", "deployedSha": "b" * 40}
+
+        crashed = dict(base)
+        crashed["controller"] = {"status": "failed"}
+        crashed_receipt = self.evaluate(crashed)
+        self.assertEqual(crashed_receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            crashed_receipt["workAdmission"]["activities"], ["tests", "review"]
+        )
+
+        parked = dict(base)
+        parked["controller"] = {"status": "parked", "retired": True}
+        parked_receipt = self.evaluate(parked)
+        self.assertEqual(parked_receipt["promotionMode"], "hold-intake")
+        self.assertNotEqual(
+            parked_receipt["workAdmission"]["activities"], ["tests", "review"]
+        )
 
     def test_last_known_green_controller_keeps_hold_intake(self):
         now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
@@ -4502,7 +4786,9 @@ class WorkflowContractTests(unittest.TestCase):
             content,
         )
         self.assertIn("jovie-fixed", content)
-        self.assertIn("cancel-in-progress: true", content)
+        self.assertIn("cancel-in-progress: false", content)
+        self.assertIn("group: fleet-gate-receipt", content)
+        self.assertIn("--sweep", content)
         self.assertIn("fleet-gate-receipt", content)
         self.assertIn("0 <= age < 120", content)
         self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST", content)

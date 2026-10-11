@@ -404,17 +404,25 @@ describe('DashboardNav', () => {
       renderFn: fastRender,
       appFlags: { PROFILES_WORKSPACE: true },
       sidebarProps: { defaultOpen: false },
+      navChildren: <button type='button'>Search fixture</button>,
     });
 
     expect(primaryLinks(container)).toHaveLength(4);
     // The shared New control remains available; its label stages out with
     // the same rail-motion owner as the other navigation labels.
     const newChat = getByRole('link', { name: 'New Chat' });
+    expect(newChat).toHaveAttribute('href', APP_ROUTES.CHAT);
     expect(newChat.querySelector('span')).toHaveClass(
       'group-data-[collapsible=icon]:opacity-0'
     );
     expect(newChat).not.toHaveAttribute('aria-hidden', 'true');
     expect(newChat).not.toHaveClass('group-data-[collapsible=icon]:hidden');
+    // JOV-8017: secondary commands leave collapsed keyboard and AX navigation.
+    const secondary = container.querySelector(
+      '[data-sidebar-search-divider]'
+    )?.parentElement;
+    expect(secondary).toHaveAttribute('inert');
+    expect(secondary).toHaveAttribute('aria-hidden', 'true');
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,
       enabled: false,

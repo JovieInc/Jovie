@@ -161,13 +161,16 @@ export function isTrustedControllerRun(run, marker, compare) {
   );
 }
 
-/** A retained verified marker AND an exact fresh public readback are required. */
+/** A retained verified marker AND an exact fresh public readback are required. The
+ * marker's lane list is NOT part of the binding: an operations-only range with the
+ * live deployment unbound still runs Web/Promote and binds jov.ie to current main
+ * (production-lane-range), so its marker legitimately carries selectedLanes without
+ * 'web'. Publication binds on the verified marker + exact public identity. */
 export function assertPublicationBinding(marker, buildInfo, controller) {
   if (
     !SHA_RE.test(marker?.sha ?? '') ||
     !['promoted', 'skipped_superseded'].includes(marker?.terminalReason) ||
     marker?.authSmoke !== 'passed' ||
-    !marker?.selectedLanes?.includes('web') ||
     !marker?.deploymentId ||
     buildInfo?.environment !== 'production' ||
     controller?.verified !== true ||

@@ -1102,6 +1102,8 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'worktree_sweep',
     'service_census',
     'hyperagent_lane',
+    'codex_lane',
+    'devin_free_policy',
     'execution_attempt',
     'gh_app_token',
   ].flatMap(name => [
@@ -1110,6 +1112,8 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
   ]),
   // The merge reader is exercised by the doctor transport/window regressions.
   'scripts/lanes/merge_evidence.py',
+  // Immutable dependency classification is covered by the real lane gate tests.
+  'scripts/lanes/dependency_diff.py',
 ]);
 
 // Service ownership and maintenance qualification changes are Python controls.
@@ -1128,6 +1132,21 @@ const SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS = [
   ...AFFECTED_TEST_SELECTOR_TESTS,
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
 ];
+const DEPENDENCY_GATE_QUALIFICATION_MANIFEST = new Set([
+  'scripts/lanes/dependency_diff.py',
+  'scripts/lanes/lane_runner.py',
+  'scripts/tests/test_lane_runner.py',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const CODEX_CAPACITY_QUALIFICATION_MANIFEST = new Set([
+  'scripts/lanes/codex_lane.py',
+  'scripts/tests/test_codex_lane.py',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
 
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
@@ -1153,6 +1172,12 @@ export function buildAffectedTestPlan(changedFiles, options) {
     !['scripts/tests/test_doctor.py', 'scripts/tests/test_hud.py'].every(
       isFileAvailable
     );
+  const missingDevinFreeProof =
+    files.includes('scripts/lanes/devin_free_policy.py') &&
+    !isFileAvailable('scripts/tests/test_devin_free_policy.py');
+  const missingCodexCapacityProof =
+    files.includes('scripts/lanes/codex_lane.py') &&
+    !isFileAvailable('scripts/tests/test_codex_lane.py');
   // Global/full early returns need the same command fields as focused plans.
   // Retain lane coverage even when an unrelated input requires the full suite.
   return {
@@ -1170,19 +1195,35 @@ export function buildAffectedTestPlan(changedFiles, options) {
       ? {
           lanePythonCoverage: true,
           mode:
-            unknownPythonPeer || missingMergeEvidenceProof
+            unknownPythonPeer ||
+            missingMergeEvidenceProof ||
+            missingDevinFreeProof ||
+            missingCodexCapacityProof
               ? 'full'
               : plan.mode === 'none'
                 ? 'selected'
                 : plan.mode,
-          ...(missingMergeEvidenceProof
-            ? { fallbackReason: 'merge evidence coverage proof is unavailable' }
-            : unknownPythonPeer
+          ...(missingCodexCapacityProof
+            ? {
+                fallbackReason:
+                  'Codex subscription capacity coverage proof is unavailable',
+              }
+            : missingDevinFreeProof
               ? {
                   fallbackReason:
-                    'unmapped Python peer mixed with lane coverage',
+                    'Devin Free expiry coverage proof is unavailable',
                 }
-              : {}),
+              : missingMergeEvidenceProof
+                ? {
+                    fallbackReason:
+                      'merge evidence coverage proof is unavailable',
+                  }
+                : unknownPythonPeer
+                  ? {
+                      fallbackReason:
+                        'unmapped Python peer mixed with lane coverage',
+                    }
+                  : {}),
         }
       : {}),
   };
@@ -1200,6 +1241,52 @@ function planAffectedTests(
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  if (
+    files.length === CODEX_CAPACITY_QUALIFICATION_MANIFEST.size &&
+    files.every(file => CODEX_CAPACITY_QUALIFICATION_MANIFEST.has(file))
+  ) {
+    if (![...CODEX_CAPACITY_QUALIFICATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan(
+        'Codex subscription capacity qualification proof is unavailable'
+      );
+    }
+    // The reviewed source and selector closure retains the entire structural
+    // Python runner and both CI plumbing suites, including every coverage floor.
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
+  if (
+    files.length === DEPENDENCY_GATE_QUALIFICATION_MANIFEST.size &&
+    files.every(file => DEPENDENCY_GATE_QUALIFICATION_MANIFEST.has(file))
+  ) {
+    if (![...DEPENDENCY_GATE_QUALIFICATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan(
+        'dependency gate qualification proof is unavailable'
+      );
+    }
+    // Preserve the entire canonical structural Python command and its floors,
+    // plus the selector and CI plumbing tests, for this exact source closure.
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      nodeTests: [],
+    };
   }
   const isExactServiceCensusQualification =
     files.length === SERVICE_CENSUS_QUALIFICATION_MANIFEST.size &&

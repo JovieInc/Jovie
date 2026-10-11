@@ -16,7 +16,7 @@ QUERY = '''query($owner:String!,$name:String!,$cursor:String){
   repository(owner:$owner,name:$name){
     pullRequests(states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC},first:100,after:$cursor){
       totalCount pageInfo{hasNextPage endCursor}
-      nodes{number title headRefName baseRefName createdAt updatedAt mergedAt}
+      nodes{number title headRefName headRefOid mergeCommit{oid} baseRefName createdAt updatedAt mergedAt}
     }
   }
 }'''

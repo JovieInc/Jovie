@@ -323,6 +323,24 @@ describe('DashboardNav route warming', () => {
     expect(action).not.toHaveClass('group-data-[collapsible=icon]:hidden');
   });
 
+  it('retains New Chat while secondary commands leave collapsed keyboard and AX navigation', () => {
+    const view = renderDashboardNav({
+      renderFn: render,
+      sidebarProps: { defaultOpen: false },
+      navChildren: <button type='button'>Search fixture</button>,
+    });
+    const create = view.getByRole('link', { name: 'New Chat' });
+    expect(create.closest('[inert], [aria-hidden="true"]')).toBeNull();
+    expect(view.queryByRole('button', { name: 'Search fixture' })).toBeNull();
+    const secondary = view.container.querySelector(
+      '[data-sidebar-search-slot] > [inert]'
+    );
+    expect(secondary).toHaveAttribute('aria-hidden', 'true');
+    expect(
+      secondary?.querySelector('[data-navigation-item-id="inbox"]')
+    ).not.toBeNull();
+  });
+
   it('imports sidebar chrome from the modular sidebar specifier', () => {
     const source = readWebSource(
       'components/features/dashboard/dashboard-nav/DashboardNav.tsx'

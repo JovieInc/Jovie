@@ -46,11 +46,52 @@ describe('pickWalkthroughArtifact', () => {
     expect(artifact?.href).toBe('https://example.test/proof.mp4');
   });
 
+  it('renders a same-origin screenshot stored as a ref', () => {
+    const row = fixtureRow('contact-page');
+    const evidence = {
+      ...row.evidence[0],
+      tier: 'visual_proof' as const,
+      status: 'passed' as const,
+      href: null,
+      ref: '/product-screenshots/tim-white-profile-contact-phone.png',
+    };
+    expect(
+      pickWalkthroughArtifact({ ...row, evidence: [evidence] })?.href
+    ).toBe(evidence.ref);
+  });
+
+  it.each([
+    '//outside.test/proof.png',
+    '/\\outside.test/proof.png',
+    'file:///tmp/proof.png',
+    'javascript:proof.png',
+    '/proof\n.png',
+  ])('does not promote an unsafe media ref: %s', ref => {
+    const row = fixtureRow('contact-page');
+    const evidence = { ...row.evidence[0], href: null, ref };
+    expect(
+      pickWalkthroughArtifact({ ...row, evidence: [evidence] })?.href
+    ).toBeNull();
+  });
+
   it('classifies screenshot receipts as image evidence', () => {
     const row = fixtureRow('flow-shot');
     const artifact = pickWalkthroughArtifact(row);
     // fixture visual proof ref is https://example.test/screenshot.png
     expect(artifact?.kind).toBe('image');
+  });
+
+  it('never selects failed media as review proof', () => {
+    const row = fixtureRow('failed');
+    const evidence = {
+      ...row.evidence[0],
+      status: 'failed' as const,
+      ref: '/failed.png',
+      href: null,
+    };
+    expect(
+      pickWalkthroughArtifact({ ...row, evidence: [evidence] })
+    ).toBeNull();
   });
 
   it('falls back to a structured receipt when no media exists', () => {
@@ -160,6 +201,23 @@ describe('structureWalkthroughFindings', () => {
 });
 
 describe('isWalkthroughReviewStale', () => {
+  it('invalidates a review when its action is withdrawn or subject changes', () => {
+    const row = fixtureRow('flow-a');
+    const review = createWalkthroughReview(row)!;
+    expect(isWalkthroughReviewStale(review, { ...row, id: 'different' })).toBe(
+      true
+    );
+    expect(
+      isWalkthroughReviewStale(review, {
+        ...row,
+        decision: {
+          ...row.decision,
+          available: false,
+        },
+      })
+    ).toBe(true);
+  });
+
   it('detects a newer evidence digest and blocks certification', () => {
     const row = fixtureRow('flow-a');
     const review = createWalkthroughReview(row)!;

@@ -27,7 +27,6 @@ import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchS
 import { RailStagedContent } from '@/components/shell/RailStagedContent';
 import {
   SHELL_RAIL_ALLOCATION,
-  SHELL_RAIL_BLOCK_LABEL,
   SHELL_RAIL_LABEL,
 } from '@/components/shell/rail-motion';
 import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
@@ -102,7 +101,7 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
           <span
             className={cn(
               'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
-              SHELL_RAIL_BLOCK_LABEL
+              SHELL_RAIL_LABEL
             )}
           >
             {section.label}
@@ -178,7 +177,7 @@ function SettingsNavigation({
         <span
           className={cn(
             'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
-            SHELL_RAIL_BLOCK_LABEL
+            SHELL_RAIL_LABEL
           )}
         >
           Account
@@ -189,7 +188,7 @@ function SettingsNavigation({
         <span
           className={cn(
             'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
-            SHELL_RAIL_BLOCK_LABEL
+            SHELL_RAIL_LABEL
           )}
         >
           Artist
@@ -229,12 +228,9 @@ function SidebarHeaderNav({
 
   return (
     <div className='flex w-full items-center' data-sidebar-brand-row='true'>
-      {/* In the 52px icon rail the whole brand/action cluster stages out
-          (max-width → 0, fade, 6px drift) while the collapse toggle — ordered
-          first and centered — stays reachable. Before this, the fixed-width
-          chrome pushed the toggle past the clipped rail edge and the sidebar
-          could not be reopened from the rail itself (JOV-4522). */}
-      <RailStagedContent hidden={chromeHidden} className='min-w-0 flex-1'>
+      {/* Keep the canonical brand painted; only its labels and secondary
+          actions stage out. The icon and toggle both fit the 52px rail. */}
+      <div className='min-w-0 flex-1'>
         {(() => {
           if (isRouteSidebar) {
             return (
@@ -323,7 +319,7 @@ function SidebarHeaderNav({
             </div>
           );
         })()}
-      </RailStagedContent>
+      </div>
       {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
         <RailStagedContent
           hidden={chromeHidden}
@@ -416,7 +412,7 @@ export function UnifiedSidebar({
       <SidebarHeader
         data-electron-drag-region='true'
         className={cn(
-          'relative justify-center gap-0 px-(--space-2-5)',
+          'relative justify-center gap-0 px-(--space-2-5) group-data-[collapsible=icon]:px-0',
           isRouteSidebar || isOperatorSection
             ? 'h-(--app-shell-header-height) py-0.5'
             : 'h-16 pl-4 pr-3 pt-5 pb-4'
@@ -457,7 +453,7 @@ export function UnifiedSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5)'>
+      <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>
         {ambientDock}
         <SidebarIdentityGroup
           calm={!isRouteSidebar}

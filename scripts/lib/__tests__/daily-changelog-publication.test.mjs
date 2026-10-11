@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { parseChangelog } from '../changelog-parser.mjs';
 import { collectCustomerCandidates } from '../daily-changelog-collector.mjs';
 import {
+  assertPublicationBinding,
   checkPublicationBinding,
   evaluateCustomerNoteContract,
   isTrustedControllerRun,
@@ -346,7 +347,6 @@ describe('source → published changelog', () => {
     for (const change of [
       { marker: { ...marker, authSmoke: 'failed' } },
       { marker: { ...marker, terminalReason: 'noop' } },
-      { marker: { ...marker, selectedLanes: [] } },
       { buildInfo: { ...buildInfo, deploymentId: 'another' } },
       { buildInfo: { ...buildInfo, commitSha: MERGE } },
       { controller: { ...controller, verified: false } },
@@ -355,6 +355,23 @@ describe('source → published changelog', () => {
       { markdown: '<!-- daily-changelog-receipt/v1 {broken} -->' },
     ])
       expect(() => planDailyPublication(input(change))).toThrow();
+  });
+  it('binds an operations-only verified generation (JOV-8016)', () => {
+    // An operations-only range with the live deployment unbound still runs
+    // Web/Promote and binds jov.ie to current main, so its verified marker
+    // legitimately carries selectedLanes without 'web'. The binding is the
+    // verified marker + exact public identity, not lane membership.
+    const operationsMarker = { ...marker, selectedLanes: ['operations'] };
+    expect(() =>
+      planDailyPublication(input({ marker: operationsMarker }))
+    ).not.toThrow(/binding missing/);
+    expect(() =>
+      assertPublicationBinding(operationsMarker, buildInfo, controller)
+    ).not.toThrow();
+    expect(
+      assertPublicationBinding(operationsMarker, buildInfo, controller) ===
+        undefined
+    ).toBe(true);
   });
   it('emits audited no-change for internal, unavailable and missing-copy sources', () => {
     const candidates = [

@@ -344,6 +344,10 @@ describe('OvieCertificationsWorkspace', () => {
     act(() => latestRailProps().onWalkthrough?.());
 
     expect(screen.getByTestId('certification-walkthrough')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Certify' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
+    expect(mocks.mutateAsync).not.toHaveBeenCalled();
+    fireEvent.load(screen.getByTestId('walkthrough-image'));
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Certify' }));
     });
