@@ -12,6 +12,7 @@ import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { notifySlackSmsAccessRequest } from '@/lib/notifications/providers/slack';
@@ -43,7 +44,9 @@ export async function POST() {
 
     if (!user.isPro) {
       return NextResponse.json(
-        { error: 'SMS notifications require a Pro plan' },
+        {
+          error: `SMS notifications require the ${getPlanDisplayName('pro')} plan`,
+        },
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }

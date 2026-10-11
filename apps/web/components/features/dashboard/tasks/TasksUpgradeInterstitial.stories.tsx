@@ -23,6 +23,11 @@ const meta = {
   title: 'Dashboard/Tasks/TasksUpgradeInterstitial',
   parameters: {
     layout: 'padded',
+    jovie: {
+      // heading/description/secondaryLabel are owned by the internal
+      // TasksUpgradeContent; the exported wrappers bind them to fixed copy.
+      uncoveredProps: ['heading', 'description', 'secondaryLabel'],
+    },
   },
   decorators: [
     Story => (

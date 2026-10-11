@@ -26,7 +26,7 @@ function makeAccountContext(
   return {
     email: 'tim@jov.ie',
     plan: 'pro',
-    displayPlan: 'Pro',
+    displayPlan: 'Artist Presence',
     isPro: true,
     billingVerification: 'verified',
     planMismatch: null,
@@ -95,7 +95,7 @@ describe('account chat tools', () => {
     expect(payload).toMatchObject({
       email: 'tim@jov.ie',
       plan: 'pro',
-      displayPlan: 'Pro',
+      displayPlan: 'Artist Presence',
       billingVerification: 'verified',
       merchAccess: { available: true, reason: 'available' },
     });
@@ -108,7 +108,7 @@ describe('account chat tools', () => {
 
     await expect(executeTool(tools.showUsage)).resolves.toMatchObject({
       success: true,
-      displayPlan: 'Pro',
+      displayPlan: 'Artist Presence',
       usage: {
         weeklyLimit: 70,
         used: 4,

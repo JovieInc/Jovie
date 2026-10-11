@@ -4,6 +4,7 @@
 import { Switch } from '@jovie/ui';
 import * as React from 'react';
 import { SettingsPlanGateLabel } from '@/components/atoms/SettingsPlanGateLabel';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { cn } from '@/lib/utils';
 import {
   getSettingsRowDataState,
@@ -101,7 +102,7 @@ export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
       <div className='flex min-h-8 items-center justify-end'>
         {props.gated ? (
           <SettingsPlanGateLabel
-            planName={props.gatePlanName ?? 'Pro'}
+            planName={props.gatePlanName ?? getPlanDisplayName('pro')}
             featureContext={props.gateFeatureContext}
           />
         ) : (

@@ -28,10 +28,10 @@ import {
   getPaymentRecoveredText,
   type PaymentRecoveredTemplateData,
 } from '@/lib/email/templates/payment-recovered';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
 import { logger } from '@/lib/utils/logger';
-
 import { createBillingPortalSession } from './client';
 import { getPriceMappingDetails } from './config';
 
@@ -110,9 +110,9 @@ async function getUserEmail(userId: string): Promise<{
  * Get plan name from price ID
  */
 function getPlanName(priceId?: string): string {
-  if (!priceId) return 'Pro';
+  if (!priceId) return getPlanDisplayName('pro');
   const details = getPriceMappingDetails(priceId);
-  return details?.description ?? 'Pro';
+  return details?.description ?? getPlanDisplayName('pro');
 }
 
 /**

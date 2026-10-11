@@ -7,6 +7,7 @@ import {
   PRO_TRIAL_TRUTH,
 } from '@/lib/billing/offer-truth';
 import { buildOnboardingPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 
 /**
  * Calibration examples of how Jovie sounds. Exported so the voice lint
@@ -41,7 +42,7 @@ const PRO_PRICE_DISPLAY = formatPublicPriceDisplay(getPublicPriceClaim('pro'));
 
 export const ONBOARDING_PRICING_TRUTH = [
   `Free: ${FREE_PROFILE_TRUTH}`,
-  `Pro: ${PRO_PRICE_DISPLAY}. ${PRO_TRIAL_TRUTH}`,
+  `${getPlanDisplayName('pro')}: ${PRO_PRICE_DISPLAY}. ${PRO_TRIAL_TRUTH}`,
   `Max: ${MAX_EARLY_ACCESS_TRUTH}`,
   'Quote only these facts. Never cite other prices, discounts, or comparisons.',
 ].join('\n');
@@ -52,7 +53,7 @@ export const ONBOARDING_CALIBRATION_EXAMPLES = {
     'Pulled up this artist. 47k Spotify followers (source: enrichment), last release about 2 weeks ago. The gap is the bio-link layer downstream of the DSP, not the songs. What is making you fix this now?',
   softCommit: 'Want me to set this up?',
   waitlist: ONBOARDING_WAITLIST_RECEIPT,
-  checkoutCloser: `Pro is ${PRO_PRICE_DISPLAY} after a ${PRO_TRIAL_DURATION_DAYS}-day trial with no card; the free profile stays free. Want to start there?`,
+  checkoutCloser: `${getPlanDisplayName('pro')} is ${PRO_PRICE_DISPLAY} after a ${PRO_TRIAL_DURATION_DAYS}-day trial with no card; the free profile stays free. Want to start there?`,
 } as const;
 
 /**

@@ -18,7 +18,7 @@ export const ARTIST_VISIBILITY_OFFER = {
     audienceCapture: true,
   },
   pro: {
-    displayName: 'Pro',
+    displayName: 'Artist Presence',
     monthlyUsd: 199,
     currency: 'usd',
     interval: 'month',

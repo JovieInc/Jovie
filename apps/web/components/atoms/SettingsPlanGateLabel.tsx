@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 
 interface SettingsPlanGateLabelProps {
   readonly planName?: string;
@@ -13,7 +14,7 @@ interface SettingsPlanGateLabelProps {
 }
 
 export function SettingsPlanGateLabel({
-  planName = 'Pro',
+  planName = getPlanDisplayName('pro'),
   featureContext,
 }: Readonly<SettingsPlanGateLabelProps>) {
   const hasTrackedRef = useRef(false);

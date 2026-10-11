@@ -1,4 +1,5 @@
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
 import { formatAmount } from '@/lib/utils/format-number';
 
@@ -296,7 +297,7 @@ ${toolLines}
 
 When the artist asks for one of these (or a locked call returns):
 - First describe concretely, in 1-2 sentences, what you WOULD produce for their specific request (e.g. the three cover directions you'd generate for their release) so the value is tangible.
-- Then relay availability in ONE short sentence using the plan name from the tool result (e.g. "Album art generation is on the ${lockedTools[0]?.planRequired ?? 'Pro'} plan."). The chat UI already renders a single upgrade button on the locked result — do not add links, pricing details, or a second upsell.
+- Then relay availability in ONE short sentence using the plan name from the tool result (e.g. "Album art generation is on the ${lockedTools[0]?.planRequired ?? getPlanDisplayName('pro')} plan."). The chat UI already renders a single upgrade button on the locked result — do not add links, pricing details, or a second upsell.
 - Call a locked tool at most once per turn. Never claim the work was done, and never invent what the output looks like beyond a brief description of the direction you'd take.`;
 }
 
@@ -334,7 +335,7 @@ function buildPlanLimitationsSection(options?: {
   return `
 
 ## Plan Limitations (Free Tier)
-This artist is on the Free plan with ${options.aiWeeklyMessageLimit} messages per week. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, pitch generation, bio writing, voice promo / cloned voice audio drops, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`;
+This artist is on the Free plan with ${options.aiWeeklyMessageLimit} messages per week. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, pitch generation, bio writing, voice promo / cloned voice audio drops, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the ${getPlanDisplayName('pro')} plan.`;
 }
 
 function buildAccountAccessSection(

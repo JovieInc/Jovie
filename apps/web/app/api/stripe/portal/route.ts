@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { createBillingPortalSession } from '@/lib/stripe/client';
@@ -50,7 +51,7 @@ export async function POST() {
     if (!stripeCustomerId) {
       return NextResponse.json(
         {
-          error: 'No billing account found. Upgrade to Pro to manage billing.',
+          error: `No billing account found. Upgrade to ${getPlanDisplayName('pro')} to manage billing.`,
           code: 'no_billing_account',
         },
         { status: 400, headers: NO_STORE_HEADERS }

@@ -17,11 +17,11 @@ const VISIBLE_PRICING_PLANS = getVisibleMarketingPricingPlans();
 const PRO_MONTHLY_PRICE = `${getPublicPriceClaim('pro').priceLabel}/month`;
 const PRICING_OG_IMAGE = `${BASE_URL}/og/default.png`;
 const PRICING_TITLE = `Pricing | ${APP_NAME}`;
-const requestAccessCopy = `Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access. Request access.`;
+const requestAccessCopy = `Artist Presence is ${PRO_MONTHLY_PRICE} with limited access. Request access.`;
 
 export const metadata: Metadata = {
   title: PRICING_TITLE,
-  description: `Jovie profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
+  description: `Jovie profiles are free forever. Artist Presence is ${PRO_MONTHLY_PRICE} with limited access.`,
   keywords: [
     'Jovie pricing',
     'Jovie profile pricing',
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     title: `Pricing - ${APP_NAME}`,
-    description: `Jovie profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
+    description: `Jovie profiles are free forever. Artist Presence is ${PRO_MONTHLY_PRICE} with limited access.`,
     url: `${BASE_URL}/pricing`,
     siteName: APP_NAME,
     type: 'website',
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: `Pricing - ${APP_NAME}`,
-    description: `Jovie profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
+    description: `Jovie profiles are free forever. Artist Presence is ${PRO_MONTHLY_PRICE} with limited access.`,
     images: [PRICING_OG_IMAGE],
   },
   robots: {
@@ -93,7 +93,7 @@ const PRICING_SCHEMA = {
   '@context': 'https://schema.org',
   '@type': 'WebPage',
   name: `Pricing - ${APP_NAME}`,
-  description: `Jovie profiles are free forever. Artist Visibility Pro is ${PRO_MONTHLY_PRICE} with limited access.`,
+  description: `Jovie profiles are free forever. Artist Presence is ${PRO_MONTHLY_PRICE} with limited access.`,
   url: `${BASE_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',

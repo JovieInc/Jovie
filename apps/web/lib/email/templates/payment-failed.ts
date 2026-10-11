@@ -77,14 +77,14 @@ export function getPaymentFailedText(data: PaymentFailedTemplateData): string {
   }
 
   const daysMessage = daysRemaining
-    ? `\n\nYou have ${daysRemaining} days to update your payment method before your Pro access is cancelled.`
+    ? `\n\nYou have ${daysRemaining} days to update your payment method before your ${planName} access is cancelled.`
     : '';
 
   return `Hi ${userName},
 
 We tried to charge ${amount} for your ${planName} subscription, but the payment didn't go through.${urgencyMessage}${daysMessage}
 
-Please update your payment method to keep your Pro features:
+Please update your payment method to keep your ${planName} features:
 
 ${billingUrl}
 
@@ -165,7 +165,7 @@ export function getPaymentFailedHtml(data: PaymentFailedTemplateData): string {
     ${daysMessage}
 
     <p style="margin: 0 0 24px 0;">
-      Please update your payment method to keep your Pro features:
+      Please update your payment method to keep your ${planName} features:
     </p>
 
     <div style="text-align: center; margin: 24px 0;">

@@ -105,7 +105,7 @@ describe('ReleasePlanWizard', () => {
     render(
       <ReleasePlanWizard {...baseProps} canGenerateReleasePlans={false} />
     );
-    expect(screen.getByText(/Pro feature/i)).toBeInTheDocument();
+    expect(screen.getByText(/Artist Presence feature/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upgrade' })).toBeInTheDocument();
   });
 

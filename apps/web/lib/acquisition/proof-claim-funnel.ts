@@ -17,7 +17,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
-/** Locked Artist Visibility Pro monthly offer. Keep in sync with plan-prices. */
+/** Locked Artist Presence monthly offer. Keep in sync with plan-prices. */
 const PROOF_CLAIM_MONTHLY_USD = 199;
 
 export const PROOF_CLAIM_CAMPAIGN_KEY = 'proof-to-claim' as const;
@@ -82,7 +82,7 @@ export function proofClaimAttribution() {
 }
 
 export interface ProofClaimOffer {
-  readonly product: 'Artist Visibility Pro';
+  readonly product: 'Artist Presence';
   readonly monthlyUsd: number;
   readonly currency: 'usd';
   readonly interval: 'month';
@@ -90,7 +90,7 @@ export interface ProofClaimOffer {
 
 export function getProofClaimOffer(): ProofClaimOffer {
   return {
-    product: 'Artist Visibility Pro',
+    product: 'Artist Presence',
     monthlyUsd: PROOF_CLAIM_MONTHLY_USD,
     currency: 'usd',
     interval: 'month',

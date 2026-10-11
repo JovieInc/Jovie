@@ -6,6 +6,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { users } from '@/lib/db/schema/auth';
 import { creatorPixels } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -43,8 +44,7 @@ export async function GET() {
     if (!entitlements.canAccessAdPixels) {
       return NextResponse.json(
         {
-          error:
-            'Ad pixels require a Pro plan. Upgrade to unlock this feature.',
+          error: `Ad pixels require the ${getPlanDisplayName('pro')} plan. Upgrade to unlock this feature.`,
         },
         { status: 403, headers: NO_STORE_HEADERS }
       );
@@ -170,8 +170,7 @@ export async function PUT(req: Request) {
     if (!entitlements.canAccessAdPixels) {
       return NextResponse.json(
         {
-          error:
-            'Ad pixels require a Pro plan. Upgrade to unlock this feature.',
+          error: `Ad pixels require the ${getPlanDisplayName('pro')} plan. Upgrade to unlock this feature.`,
         },
         { status: 403, headers: NO_STORE_HEADERS }
       );
@@ -322,8 +321,7 @@ export async function DELETE() {
     if (!entitlements.canAccessAdPixels) {
       return NextResponse.json(
         {
-          error:
-            'Ad pixels require a Pro plan. Upgrade to unlock this feature.',
+          error: `Ad pixels require the ${getPlanDisplayName('pro')} plan. Upgrade to unlock this feature.`,
         },
         { status: 403, headers: NO_STORE_HEADERS }
       );

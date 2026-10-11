@@ -242,7 +242,7 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
   {
     name: 'Entitlement gate: album art upsell on free plan',
     userPrompt: 'Generate album art for my new single',
-    mustSay: ['album art', 'pro plan'],
+    mustSay: ['album art', 'Artist Presence'],
     mustNotSay: [],
     harmfulBlacklist: [
       'your album art is ready',
@@ -250,6 +250,6 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
       'here are your three covers',
     ],
     groundTruth:
-      'Album art generation is entitlement-gated (canGenerateAlbumArt is false on the Free plan). Instead of erroring, the assistant should concretely describe what it would produce — for example three cover directions tailored to the release — then relay a single upgrade line naming the Pro plan. It must never claim the artwork was generated (GH #13304).',
+      'Album art generation is entitlement-gated (canGenerateAlbumArt is false on the Free plan). Instead of erroring, the assistant should concretely describe what it would produce — for example three cover directions tailored to the release — then relay a single upgrade line naming the Artist Presence plan. It must never claim the artwork was generated (GH #13304).',
   },
 ] as const;

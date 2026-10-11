@@ -63,10 +63,9 @@ function resolveDisplayPlan(
   billingVerification: BillingVerificationState
 ): string {
   if (billingVerification === 'unavailable') return 'Unverified';
-  if (plan === 'trial') return 'Pro Trial';
-  if (plan === 'max' || plan === 'growth') return 'Max';
-  if (plan === 'founding' || plan === 'pro') return 'Pro';
-  return 'Free';
+  const canonical =
+    plan === 'founding' ? 'pro' : plan === 'growth' ? 'max' : plan;
+  return getEntitlements(canonical).marketing.displayName;
 }
 
 function resolveUsage(

@@ -125,6 +125,18 @@ describe('ChatUploadManifest', () => {
     expect(screen.queryByText('-25%')).not.toBeInTheDocument();
   });
 
+  it('names the canonical Artist Presence plan on the locked-files pay gate', () => {
+    renderManifest({ lockedCount: 2, isPro: false });
+
+    expect(screen.getByText('2 files locked')).toBeInTheDocument();
+    expect(
+      screen.getByText('Upgrade to Artist Presence for unlimited file uploads')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Upgrade to Artist Presence' })
+    ).toHaveAttribute('href', '/pricing');
+  });
+
   it('retires bespoke manifest bar fills in favor of ProgressBar ownership', () => {
     const manifestSource = readFileSync(
       resolve(__dirname, 'ChatUploadManifest.tsx'),

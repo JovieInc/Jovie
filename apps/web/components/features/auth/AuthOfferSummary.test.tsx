@@ -36,7 +36,7 @@ describe('AuthOfferSummary', () => {
 
     expect(screen.queryByTestId('auth-offer-summary')).not.toBeInTheDocument();
     expect(
-      screen.queryByText('Start your 14-day Pro trial')
+      screen.queryByText('Start your 14-day Artist Presence trial')
     ).not.toBeInTheDocument();
   });
 
@@ -47,7 +47,9 @@ describe('AuthOfferSummary', () => {
     const summary = screen.getByTestId('auth-offer-summary');
     expect(summary).toHaveAttribute('data-offer-plan', 'pro');
     expect(summary).toHaveAttribute('data-offer-interval', 'month');
-    expect(summary).toHaveTextContent('Start your 14-day Pro trial');
+    expect(summary).toHaveTextContent(
+      'Start your 14-day Artist Presence trial'
+    );
     expect(summary).toHaveTextContent('No credit card');
     expect(summary).toHaveTextContent(
       `${formatUsdAmount(PLAN_PRICES.pro.monthly)}/mo`
@@ -59,9 +61,11 @@ describe('AuthOfferSummary', () => {
     render(<AuthOfferSummary mode='sign-in' enabled />);
 
     const summary = screen.getByTestId('auth-offer-summary');
-    expect(summary).toHaveTextContent('Continue to Pro');
+    expect(summary).toHaveTextContent('Continue to Artist Presence');
     expect(summary).toHaveTextContent('Existing subscribers go to billing');
-    expect(summary).not.toHaveTextContent('Start your 14-day Pro trial');
+    expect(summary).not.toHaveTextContent(
+      'Start your 14-day Artist Presence trial'
+    );
   });
 
   it('keeps Max explicit and trial-free', () => {
@@ -73,6 +77,8 @@ describe('AuthOfferSummary', () => {
     expect(summary).toHaveTextContent('Continue to Max');
     expect(summary).toHaveTextContent('Contact sales');
     expect(summary).toHaveTextContent('No self-service Max checkout');
-    expect(summary).not.toHaveTextContent('Start your 14-day Pro trial');
+    expect(summary).not.toHaveTextContent(
+      'Start your 14-day Artist Presence trial'
+    );
   });
 });

@@ -175,9 +175,9 @@ async function assertState(
   }
 
   await expect(panel).toContainText(
-    'Upgrade to Pro to see named AI crawlers and 30-day trends.'
+    'Upgrade to Artist Presence to see named AI crawlers and 30-day trends.'
   );
-  await expect(panel).toContainText('Upgrade to Pro');
+  await expect(panel).toContainText('Upgrade to Artist Presence');
   await expect(panel).toContainText('AI Crawler');
   await expect(panel).toContainText('They do not show an AI answer mention');
 }

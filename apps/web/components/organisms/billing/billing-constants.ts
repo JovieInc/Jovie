@@ -1,5 +1,8 @@
 import { AlertTriangle, CheckCircle, RefreshCw, XCircle } from 'lucide-react';
-import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+import {
+  ENTITLEMENT_REGISTRY,
+  getPlanDisplayName as getRegistryPlanDisplayName,
+} from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
 
 export const LINEAR_EASE = [0.16, 1, 0.3, 1] as const;
@@ -108,7 +111,5 @@ export function formatDate(dateStr: string): string {
 }
 
 export function getPlanDisplayName(plan: string | null): string {
-  if (plan === 'max') return 'Max';
-  if (plan === 'pro') return 'Pro';
-  return 'Free';
+  return getRegistryPlanDisplayName(plan);
 }

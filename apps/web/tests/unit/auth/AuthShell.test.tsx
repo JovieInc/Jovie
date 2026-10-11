@@ -112,7 +112,9 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     searchParamsState.value =
       'plan=pro&interval=monthly&artist=Tim%20White&handle=timwhite';
     render(<AuthShell mode='sign-up' />);
-    expect(screen.getByText('Start 14-day Pro trial')).toBeInTheDocument();
+    expect(
+      screen.getByText('Start 14-day Artist Presence trial')
+    ).toBeInTheDocument();
     expect(screen.getByText(/199\/month/)).toBeInTheDocument();
     expect(screen.getByText(/No credit card/)).toBeInTheDocument();
     expect(

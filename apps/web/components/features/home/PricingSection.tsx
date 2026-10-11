@@ -41,7 +41,7 @@ export function PricingSection() {
               </h2>
             </div>
             <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
-              Artist profiles are free forever. Artist Visibility Pro is{' '}
+              Artist profiles are free forever. Artist Presence is{' '}
               {proMonthlyPrice} with limited access.
             </p>
           </div>

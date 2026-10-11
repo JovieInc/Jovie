@@ -75,7 +75,7 @@ describe('GET /llms-full.txt', () => {
     expect(body).not.toContain('Instagram: @meetjovie');
     expect(body).not.toContain('**Instagram**: @meetjovie');
     expect(body).not.toContain('$149');
-    expect(body).toContain('Artist Visibility Pro ($199/mo)');
+    expect(body).toContain('Artist Presence ($199/mo)');
     expect(body).toContain('Enterprise (Custom)');
     expect(body).toContain(
       'Capability maturity and account access remain separate from a feature being described publicly.'
@@ -83,6 +83,6 @@ describe('GET /llms-full.txt', () => {
     expect(body).toContain('Self-hosted Better Auth');
     expect(body).not.toContain('**Authentication**: Clerk');
     expect(body).not.toContain('Max tier');
-    expect(body).not.toContain('14-day Pro trial');
+    expect(body).not.toContain('14-day Artist Presence trial');
   });
 });

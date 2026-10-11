@@ -38,7 +38,7 @@ test.describe('Billing payment flow - Stripe Checkout', () => {
       page
         .getByRole('heading', { name: 'Free Plan' })
         .locator('xpath=ancestor::div[.//button][1]')
-        .getByRole('button', { name: /upgrade to pro/i })
+        .getByRole('button', { name: /upgrade to artist presence/i })
     ).toBeVisible({ timeout: 15_000 });
 
     const { sessionId, url } = await createCheckoutSession(page, priceId);

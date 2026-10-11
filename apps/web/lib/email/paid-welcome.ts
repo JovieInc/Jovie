@@ -17,6 +17,7 @@ import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { sendEmail } from '@/lib/email/send';
 import { getPaidWelcomeEmail } from '@/lib/email/templates/paid-welcome';
 import { resolveSafeFirstName } from '@/lib/email/templates/personalization';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { getFlagOverrideMap } from '@/lib/flags/overrides-store.server';
 import { logDelivery } from '@/lib/notifications/suppression';
@@ -158,9 +159,8 @@ function resolveOfferName(
     const details = getPriceMappingDetails(priceId);
     if (details?.description) return details.description;
   }
-  if (plan === 'max' || plan === 'growth') return 'Max';
-  if (plan === 'pro') return 'Pro';
-  return 'Pro';
+  if (plan === 'max' || plan === 'growth') return getPlanDisplayName('max');
+  return getPlanDisplayName('pro');
 }
 
 /**

@@ -10,6 +10,7 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { getAeoMeasurementDisclosure } from '@/lib/aeo/citation-monitor';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { useAiCrawlerAnalyticsQuery } from '@/lib/queries/useAiCrawlerAnalyticsQuery';
 import { cn } from '@/lib/utils';
 import type { AiCrawlerStat } from '@/types/ai-crawler-analytics';
@@ -223,10 +224,10 @@ export function AiCrawlerDetailPanel({
         {showTeaser ? (
           <div className='mb-3 rounded-lg border border-subtle bg-surface-0 px-3 py-3 text-center'>
             <p className='text-app text-secondary-token'>
-              Upgrade to Pro to see named AI crawlers and 30-day trends.
+              {`Upgrade to ${getPlanDisplayName('pro')} to see named AI crawlers and 30-day trends.`}
             </p>
             <div className='mt-3 flex justify-center'>
-              <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>
+              <UpgradeButton size='sm'>{`Upgrade to ${getPlanDisplayName('pro')}`}</UpgradeButton>
             </div>
           </div>
         ) : null}
