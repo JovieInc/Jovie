@@ -2071,10 +2071,14 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     import signal
     free_guard = devin_free_policy.command_guard(cmd, timeout)
     if free_guard:
-        existing_guard = guard
+        # The free-policy proof ticks every second; the ownership guard keeps its own cadence.
+        # Running it at 1 Hz made a Devin repair read its multi-page GraphQL target up to 787
+        # times, and any one racing read stopped the run as reconcile-unavailable (2026-10-11).
+        existing_guard, existing_interval, next_existing = guard, guard_interval, [0.0]
         def guard():
-            if existing_guard:
+            if existing_guard and time.monotonic() >= next_existing[0]:
                 existing_guard()
+                next_existing[0] = time.monotonic() + existing_interval
             free_guard()
         guard_interval = min(guard_interval, 1)
     if guard:
@@ -2692,11 +2696,13 @@ def require_gate_authority(host: Host, pr: dict, stage: str, sensitive: bool) ->
     return live
 
 
+GATE_OWNER_KINDS = ("fix", "gate")  # Either foreign owner defers a gate on that head.
+
+
 def require_gate_command_authority(host: Host, pr: dict, worktree: Path, stage: str, sensitive: bool) -> None:
     """Waiting for a seat is not permission to run checks for stale authority."""
     try:
-        if any(claimed_elsewhere(pr["number"], pr["headRefOid"], kind, timeout=30)
-               for kind in ("fix", "gate")):
+        if claimed_elsewhere(pr["number"], pr["headRefOid"], GATE_OWNER_KINDS, timeout=30):
             raise RepairStopped("gate-owner-active-or-unavailable", None, stage)
         live = require_gate_authority(host, pr, stage, sensitive)
         head = sh(["git", "rev-parse", "HEAD"], cwd=worktree, timeout=30)
@@ -3334,6 +3340,7 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         return
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
+    observed = json.loads(json.dumps(attempts))
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
     providers = load_providers()
     cooled = {name for name in providers if cooling(host, name)}
@@ -3397,8 +3404,16 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         elif plan.get("action") == "surface":
             _surface_exhausted(host, pr, record, classified, plan.get("reason") or classified["cls"],
                                linear, attempts, data)
+
+    def merge(current: dict) -> None:
+        # Repairs end outside claim.lock (end_local_fix_attempt), so a whole-file rewrite of
+        # this pass's snapshot could drop their endedAt/pushed/verdict. Write only the rows
+        # this pass changed, and only where nobody changed them since it read them.
+        for key, value in attempts.items():
+            if value != observed.get(key) and current.get(key) == observed.get(key):
+                current[key] = value
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(attempts))
+    update_json(path, merge)
     save_escalation(host, data)
 
 
@@ -4456,6 +4471,10 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
     update_json(host.state / "fix-attempts.json", finish)
 
 
+# Consecutive unreadable target snapshots the in-run guard tolerates (~90s at its 30s cadence).
+AGENT_GUARD_UNREADABLE_LIMIT = 3
+
+
 class RepairStopped(RuntimeError):
     def __init__(self, reason: str, live: dict | None, stage: str):
         super().__init__(reason)
@@ -4721,6 +4740,47 @@ def retire_completed_repair(host: Host, worktree: Path, receipt: dict) -> bool:
     return False
 
 
+def retire_published_preserved(host: Host, number: int) -> list[str]:
+    """Under the PR's repair lock: free this PR's preserved checkouts that hold nothing to recover.
+
+    A cancelled or unreadable-target run preserves its checkout as evidence. Once that
+    checkout is idle, has no source change and every commit is on origin, the evidence is
+    already published; keeping it only turns each later repair into a recovery handoff
+    (preserved-head-superseded / preserved-target-needs-reconciliation). On 2026-10-11 that
+    spent 29 repair attempts and the top escalation rung of 3 PRs on no work. Anything
+    unpublished, dirty, busy or unreadable stays preserved for the existing recovery path.
+    """
+    retired = []
+    for marker_path in sorted((host.state / "worktrees").glob(f"*/{disk_guard.PRESERVED_REPAIR}")):
+        path = marker_path.parent
+        try:
+            marker = json.loads(marker_path.read_text())
+        except (OSError, ValueError):
+            continue
+        if not isinstance(marker, dict) or marker.get("issue") is not None:
+            continue
+        named = RUN_TARGET.search(path.name)
+        if marker.get("pr") != number and not (
+                marker.get("pr") is None and named and named.group(1) == str(number)):
+            continue
+        try:
+            if worktree_busy(path):
+                continue
+            status = sh(["git", "status", "--porcelain", "--untracked-files=all", *disk_guard.SOURCE_PATHSPEC],
+                        cwd=path, timeout=30)
+            unpushed = sh(["git", "rev-list", "--count", "HEAD", "--not", "--remotes=origin"],
+                          cwd=path, timeout=30)
+            if status.returncode or status.stdout.strip() or unpushed.returncode or unpushed.stdout.strip() != "0":
+                continue
+            marker_path.unlink()
+            remove_worktree(host, path)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if not path.exists():
+            retired.append(path.name)
+    return retired
+
+
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
     try:
@@ -4778,6 +4838,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     try:
         if not branch_held:
             raise RecoveryHandoff("repair-owner-active", worktree)
+        if retired := retire_published_preserved(host, pr["number"]):
+            receipt["retiredPreserved"] = retired
         preserved = preserved_run(host, pr=pr["number"])
         if preserved:
             ident = qualify_preserved_pr(host, pr, preserved)
@@ -4820,9 +4882,26 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         receipt.update(worktree=str(worktree), resumedFrom=prior["runId"])
     with open(runs / f"{run_id}.log", "w") as log:
         try:
+            unreadable = [0]  # consecutive unavailable reads while the agent runs
+
             def verify_target(target, stage, *, worktree=None):
                 receipt["targetStateReads"] += 1
-                live = require_fix_target(target, stage, worktree=worktree, repair=True)
+                try:
+                    live = require_fix_target(target, stage, worktree=worktree, repair=True)
+                except RepairStopped as error:
+                    # Mid-run, one unreadable snapshot (a check finishing between pages, a
+                    # 502) is not evidence the target changed; it stopped 20 runs in 48h.
+                    # Positive evidence still stops at once, every boundary around the run
+                    # stays a strict single read, and a sustained outage still stops it.
+                    if stage != "agent-running" or error.live is not None:
+                        raise
+                    unreadable[0] += 1
+                    receipt["targetUnreadableMidRun"] = receipt.get("targetUnreadableMidRun", 0) + 1
+                    if unreadable[0] >= AGENT_GUARD_UNREADABLE_LIMIT:
+                        raise
+                    require_publishable(host, pr["headRefName"], stage)
+                    return None
+                unreadable[0] = 0
                 require_publishable(host, live.get("headRefName") or pr["headRefName"], stage)
                 return live
             require_disk(host, "repair-checkout")
@@ -5493,8 +5572,11 @@ def claim_adoptable_pr(host: Host, name: str, prs: list[dict], repair_candidates
             try:
                 latest = json.loads(path.read_text()) if path.exists() else {}
                 sensitive = SENSITIVE_PR_LABEL in {label["name"].lower() for label in pr.get("labels", [])}
+                # Admission must refuse exactly what the gate command later refuses: a
+                # foreign live fix claim deferred 141 adopt runs in 48h, each posting
+                # another gate claim on the PR (2026-10-11, #20979/#20820).
                 if not terminal_gate(pr, latest, sensitive) and not gate_deferral(host, pr) \
-                        and not claimed_elsewhere(pr["number"], pr["headRefOid"], "gate"):
+                        and not claimed_elsewhere(pr["number"], pr["headRefOid"], GATE_OWNER_KINDS):
                     post_claim(pr["number"], pr["headRefOid"], "gate")
                     return reservation
             except BaseException:

@@ -20,7 +20,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lifecycle  # noqa: E402
@@ -340,7 +340,7 @@ def add_label(number: int, kind: str, sh=run) -> bool:
                "-f", f"labels[]={PREFIX}{kind}"]).returncode == 0
 
 
-def claim_active(number: int, sha: str | None, sh=run, now: float | None = None, *, kind: str = "fix",
+def claim_active(number: int, sha: str | None, sh=run, now: float | None = None, *, kind: str | tuple = "fix",
                  exclude_host: str | None = None, timeout: float = 30) -> bool:
     """Whether an unexpired lane claim owns this exact head; unreadable evidence blocks.
 
@@ -350,7 +350,12 @@ def claim_active(number: int, sha: str | None, sh=run, now: float | None = None,
     if not isinstance(sha, str) or not sha.strip():
         return True
     now = time.time() if now is None else now
-    listed = sh(["gh", "api", f"repos/{REPO}/issues/{number}/comments?per_page=100&sort=created&direction=desc",
+    kinds = {kind} if isinstance(kind, str) else set(kind)
+    # The per-issue comments endpoint ignores sort/direction: it pages oldest first, so a PR
+    # past 100 comments hid every newer claim (2026-10-11: #20979 at 114). Only comments
+    # inside the claim TTL can be live, so `since` bounds the read to exactly those.
+    since = datetime.fromtimestamp(now - CLAIM_TTL_S, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    listed = sh(["gh", "api", "--paginate", f"repos/{REPO}/issues/{number}/comments?per_page=100&since={since}",
                  "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"], timeout=timeout)
     if listed.returncode != 0:
         return True
@@ -360,7 +365,7 @@ def claim_active(number: int, sha: str | None, sh=run, now: float | None = None,
             age = now - datetime.fromisoformat(fields.get("at", "").replace("Z", "+00:00")).timestamp()
         except ValueError:
             continue
-        if fields.get("sha") == sha and fields.get("kind") == kind \
+        if fields.get("sha") == sha and fields.get("kind") in kinds \
                 and fields.get("host") != exclude_host and age < CLAIM_TTL_S:
             return True
     return False
