@@ -96,6 +96,7 @@ export function evaluateHold({ labeledAt, now, headSha, comments = [] }) {
   return { action: 'keep', reason: 'receipt-valid', owner };
 }
 
+/** @param {{ reason: string, owner?: string }} verdict */
 export function releaseComment({ reason, owner }) {
   const why = {
     ownerless: `it has no \`${HOLD_RECEIPT_SCHEMA}\` receipt naming an owner and a release condition, and the ${OWNERLESS_GRACE_MS / 3600000}h grace period has passed`,
