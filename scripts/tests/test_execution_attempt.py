@@ -258,6 +258,10 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.state = Path(self.tmp.name); (self.state / "runs").mkdir()
+        env = {**attempt.os.environ, "LANES_STATE": str(self.state)}
+        env.pop(attempt.lifecycle.FD_ENV, None)
+        isolated = patch.dict(attempt.os.environ, env, clear=True)
+        isolated.start(); self.addCleanup(isolated.stop)
         self.path = self.state / "execution.jsonl"
         self.sha, self.branch, self.pr, self.now = "a" * 40, "codex/jov-6225-focus", 7, 20000
         self.coord = {"kind": "github-status", "repository": "JovieInc/Jovie", "sha": self.sha}
@@ -546,6 +550,8 @@ class ExecutionAttemptCliLifecycleTest(unittest.TestCase):
         self.env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"),
                     "LANES_STATE": str(self.state),
                     "PYTHONPYCACHEPREFIX": str(Path(self.tmp.name) / "bytecode")}
+        isolated = patch.dict(attempt.os.environ, self.env, clear=True)
+        isolated.start(); self.addCleanup(isolated.stop)
         self.started = attempt.claim(self.path, self.ident, owner(), policy(), {"triggerId": "fixture"},
                                      now=100, coordination=LOCAL)
 
