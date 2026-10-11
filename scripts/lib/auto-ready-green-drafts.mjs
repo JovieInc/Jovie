@@ -198,36 +198,6 @@ export function selectMissedCohort(prs = [], options = {}) {
   return rotate(candidates, options.offset).slice(0, limit);
 }
 
-/**
- * Orphaned stacked drafts: the base branch is not main and no open PR owns it
- * as a head. The repo keeps merged head branches (delete_branch_on_merge is
- * off), so GitHub never retargets these children and the green-source path
- * (main-only) never sees them. The caller must still prove the parent PR was
- * MERGED before retargeting; a closed-unmerged parent stays untouched.
- */
-export function selectOrphanedStacks(prs = [], options = {}) {
-  const limit = Math.max(
-    0,
-    Number.parseInt(String(options.limit ?? 0), 10) || 0
-  );
-  if (limit === 0) return [];
-  const list = Array.isArray(prs) ? prs : [];
-  const openHeads = new Set(
-    list.map(pr => String(pr?.headRefName ?? '')).filter(Boolean)
-  );
-  const candidates = list
-    .filter(pr => pr && (pr.isDraft === true || pr.draft === true))
-    .filter(pr => {
-      const base = String(pr.baseRefName ?? '');
-      return base !== '' && base !== 'main' && !openHeads.has(base);
-    })
-    .filter(pr => prNumberOf(pr) > 0)
-    .filter(pr => !skippedByStaticPolicy(pr))
-    .map(pr => ({ number: prNumberOf(pr), base: String(pr.baseRefName) }))
-    .sort((a, b) => a.number - b.number);
-  return rotate(candidates, options.offset).slice(0, limit);
-}
-
 function readStdin() {
   try {
     return readFileSync(0, 'utf8');
@@ -246,7 +216,7 @@ function main(argv) {
     process.stdout.write(`${GREEN_SOURCE_PROTECTED_PRS.join(',')}\n`);
     return 0;
   }
-  if (cmd === 'cohort' || cmd === 'orphans') {
+  if (cmd === 'cohort') {
     let parsed = [];
     try {
       parsed = JSON.parse(readStdin().trim() || '[]');
@@ -258,12 +228,7 @@ function main(argv) {
       offset: argv[4] ?? 0,
       skip: argv[5] ?? 0,
     };
-    const out =
-      cmd === 'cohort'
-        ? selectMissedCohort(parsed, options).map(String)
-        : selectOrphanedStacks(parsed, options).map(
-            o => `${o.number}\t${o.base}`
-          );
+    const out = selectMissedCohort(parsed, options).map(String);
     if (out.length > 0) process.stdout.write(`${out.join('\n')}\n`);
     return 0;
   }
@@ -290,7 +255,7 @@ function main(argv) {
     return 0;
   }
   console.error(
-    'Usage: auto-ready-green-drafts.mjs <classify|cohort|orphans|hold-re|protected>'
+    'Usage: auto-ready-green-drafts.mjs <classify|cohort|hold-re|protected>'
   );
   return 2;
 }

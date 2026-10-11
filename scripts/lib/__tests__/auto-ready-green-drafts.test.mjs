@@ -18,7 +18,6 @@ import {
   hasGreenSourceHold,
   isProtectedGreenSourcePr,
   selectMissedCohort,
-  selectOrphanedStacks,
   TIM_HOLD_LABELS,
 } from '../auto-ready-green-drafts.mjs';
 
@@ -353,22 +352,6 @@ describe('missed-event cohort selection', () => {
   });
 });
 
-describe('orphaned stacked draft selection', () => {
-  it('selects drafts whose non-main base is no open PR head', () => {
-    const prs = [
-      listed({ number: 1, baseRefName: 'feat/merged-parent' }),
-      listed({ number: 2, baseRefName: 'feat/open-parent' }),
-      listed({ number: 3, headRefName: 'feat/open-parent', isDraft: false }),
-      listed({ number: 4, baseRefName: 'feat/gone', labels: ['hold'] }),
-      listed({ number: 5, baseRefName: 'feat/gone', isDraft: false }),
-      listed({ number: 6 }),
-    ];
-    expect(selectOrphanedStacks(prs, { limit: 5 })).toEqual([
-      { number: 1, base: 'feat/merged-parent' },
-    ]);
-  });
-});
-
 describe('green-source shell controller (fake gh)', () => {
   const greenChecksJson = JSON.stringify(greenChecks());
 
@@ -464,22 +447,5 @@ esac
     expect(result.stdout).toContain('would mark #20874 ready');
     expect(result.stdout).toContain('would mark #20834 ready');
     expect(result.stdout).not.toContain('#20991');
-  });
-
-  it('retargets only orphans whose parent merged', () => {
-    const result = runController(
-      [
-        listed({ number: 20577, baseRefName: 'feat/outbound-approval-guard' }),
-        listed({ number: 20117, baseRefName: 'cursor/abandoned-parent' }),
-      ],
-      { mergedParents: { 'feat/outbound-approval-guard': 20551 } }
-    );
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain(
-      'would retarget #20577 from merged parent #20551'
-    );
-    expect(result.stdout).toContain(
-      '#20117 base cursor/abandoned-parent has no merged parent'
-    );
   });
 });
