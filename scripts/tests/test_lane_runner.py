@@ -3879,6 +3879,102 @@ class PreservedRecoveryTest(unittest.TestCase):
     def test_disk_hold_resumes_dirty_work_in_the_same_budget(self):
         self.assert_resume("disk-held")
 
+    def cancelled_predecessor(self, commit=False):
+        """A run stopped by the target (queued) after the agent ran; the checkout is preserved."""
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            (cwd / ".codex-last-message.txt").write_text("done\n")
+            if commit:
+                (cwd / "repair.txt").write_text("unpublished fix")
+                self.git(cwd, "add", "repair.txt")
+                self.git(cwd, "commit", "-qm", "unpublished fix")
+            raise lane.RepairStopped("target-pr-queued", {**self.live, "isInMergeQueue": True}, "agent-running")
+        with patch.object(lane, "run_agent", side_effect=agent):
+            prior = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(prior["verdict"], "cancelled")
+        self.path = Path(prior["preservedWorktree"])
+        self.calls.clear()
+        return prior
+
+    def test_published_preserved_checkout_is_retired_and_the_repair_does_work(self):
+        # 2026-10-11 on Gem: clean, fully pushed checkouts preserved by cancelled or
+        # unreadable-target runs turned every later repair into a recovery handoff.
+        self.cancelled_predecessor()
+        ran = []
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            ran.append(cwd)
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=agent):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertEqual(receipt["retiredPreserved"], [self.path.name])
+        self.assertFalse((self.path / lane.disk_guard.PRESERVED_REPAIR).exists())
+        self.assertEqual(len(ran), 1)
+        self.assertNotEqual(ran[0], self.path)
+
+    def test_unpublished_preserved_commit_still_hands_off(self):
+        self.cancelled_predecessor(commit=True)
+        with patch.object(lane, "run_agent", side_effect=AssertionError("agent must not run")):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "recovery-handoff")
+        self.assertNotIn("retiredPreserved", receipt)
+        self.assertEqual((self.path / "repair.txt").read_text(), "unpublished fix")
+        self.assertTrue((self.path / lane.disk_guard.PRESERVED_REPAIR).exists())
+
+    def test_busy_published_checkout_is_never_retired(self):
+        self.cancelled_predecessor()
+        self.active = f"p123\nn{self.path}\n"
+        self.assertEqual(lane.retire_published_preserved(self.host, self.pr["number"]), [])
+        self.assertTrue((self.path / lane.disk_guard.PRESERVED_REPAIR).exists())
+        self.active = ""
+        self.assertEqual(lane.retire_published_preserved(self.host, 999), [], "another PR's checkout is untouched")
+        self.assertTrue(self.path.exists())
+
+    def test_agent_guard_tolerates_a_transient_unreadable_target(self):
+        reads = iter([None, None, "live"])
+        target = lambda _: dict(self.live) if next(reads, "live") else None
+        def agent(cmd, cwd, log, timeout, guard=None, **kwargs):
+            for _ in range(3):
+                guard()
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=agent), \
+                patch.object(lane, "reconcile_fix_target", side_effect=lambda pr: dict(self.live)):
+            # Every boundary outside the running agent reads normally; only the guard is flaky.
+            lane_require = lane.require_fix_target
+            def flaky(pr, stage, **kwargs):
+                if stage == "agent-running" and target(pr) is None:
+                    raise lane.RepairStopped("target-state-unavailable", None, stage)
+                return lane_require(pr, stage, **kwargs)
+            with patch.object(lane, "require_fix_target", side_effect=flaky):
+                receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertEqual(receipt["targetUnreadableMidRun"], 2)
+
+    def test_agent_guard_stops_on_a_sustained_unreadable_target(self):
+        def agent(cmd, cwd, log, timeout, guard=None, **kwargs):
+            for _ in range(lane.AGENT_GUARD_UNREADABLE_LIMIT):
+                guard()
+            raise AssertionError("the guard must stop the run")
+        lane_require = lane.require_fix_target
+        def flaky(pr, stage, **kwargs):
+            if stage == "agent-running":
+                raise lane.RepairStopped("target-state-unavailable", None, stage)
+            return lane_require(pr, stage, **kwargs)
+        with patch.object(lane, "run_agent", side_effect=agent), \
+                patch.object(lane, "require_fix_target", side_effect=flaky):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "reconcile-unavailable")
+        self.assertEqual(receipt["cancellation"]["stage"], "agent-running")
+
+    def test_agent_guard_still_stops_at_once_on_positive_evidence(self):
+        def agent(cmd, cwd, log, timeout, guard=None, **kwargs):
+            self.live["state"] = "MERGED"
+            guard()
+            raise AssertionError("merged target must stop the run")
+        with patch.object(lane, "run_agent", side_effect=agent):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "cancelled")
+        self.assertEqual(receipt["reasons"], ["target-pr-merged"])
+
     def test_a_revoked_branch_is_never_repaired_or_enrolled(self):
         lane.revoke_publication(self.host, branch=self.pr["headRefName"], reason="run-stopped")
         with patch.object(lane, "run_agent", side_effect=AssertionError("agent must not run")):
@@ -4626,6 +4722,15 @@ class FixRedTest(unittest.TestCase):
                 reservation = lane.claim_adoptable_pr(host2, "devin", [draft])
                 self.addCleanup(reservation.lock.release)
                 self.assertEqual(reservation.pr["number"], 5, "retried once the claim is gone")
+                # The gate command defers to a foreign fix owner, so admission must too:
+                # otherwise every pass checks out, defers and posts another gate claim
+                # (141 deferred adopt runs on #20979/#20820, 2026-10-11).
+                comments[:] = [f"🤖 lane claim kind=fix sha=h1 host=other at={lane.now_iso()}"]
+                host3 = lane.Host(state=Path(tmp) / "c")
+                host3.state.mkdir()
+                before = len(posted)
+                self.assertIsNone(lane.claim_adoptable_pr(host3, "devin", [draft]))
+                self.assertEqual(len(posted), before, "a refused admission posts no claim")
         finally:
             lane.sh = real
 
@@ -4702,6 +4807,31 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertEqual(linear.moves, [])
         self.assertEqual(linear.comments, [])
+
+    def test_escalation_pass_never_overwrites_a_repair_that_ended_meanwhile(self):
+        stuck = {**self.pr(number=7), "headRefName": "devin/jov-7-20260928000000",
+                 "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "fix-attempts.json"
+            path.write_text(json.dumps({"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS},
+                                        "8": {"sha": "h8", "count": 1, "lane": "codex", "at": 1.0}}))
+
+            def repair_ends_elsewhere(*_args):
+                # end_local_fix_attempt runs outside claim.lock while this pass works.
+                lane.update_json(path, lambda rows: rows["8"].update(endedAt=2.0, pushed=True))
+                return "failed"
+            os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
+            try:
+                with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stderr="", stdout="")), \
+                        patch.object(lane, "provider_healthy", return_value=True), \
+                        patch.object(lane.pr_events, "sync_main", side_effect=repair_ends_elsewhere):
+                    lane.escalate_exhausted(host, [stuck], FakeLinear([]))
+            finally:
+                os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
+            rows = json.loads(path.read_text())
+            self.assertEqual((rows["8"]["endedAt"], rows["8"]["pushed"]), (2.0, True), "the ended repair survives")
+            self.assertEqual(rows["7"]["escalations"][0]["rung"], "update-branch")
 
     def test_exhausted_heads_get_one_terminal_disposition_not_queue_inventory(self):
         stuck = {**self.pr(number=7), "headRefName": "devin/jov-7-20260928000000",
@@ -5277,7 +5407,7 @@ class GateCommandAuthorityTest(unittest.TestCase):
                 live = {**pr, "state": "OPEN"}; fake = FakeShell([pr]); order = []
                 def owner(number, sha, kind, **kwargs):
                     order.append(kind)
-                    if kind == "gate":
+                    if "gate" in kind:
                         if change == "head": live["headRefOid"] = "moved"
                         else: live["labels"] = [{"name": "hold"}]
                     return False
@@ -5286,7 +5416,7 @@ class GateCommandAuthorityTest(unittest.TestCase):
                      patch.object(lane, "claimed_elsewhere", side_effect=owner):
                     result = lane.gate_pr(host, pr, Path(tmp), None)
                 self.assertEqual(result["verdict"], "gate-deferred")
-                self.assertEqual(order[-3:], ["fix", "gate", "target"])
+                self.assertEqual(order[-2:], [("fix", "gate"), "target"], "one owner read covers both kinds")
                 self.assertNotIn(lane.CANONICAL_GATE, fake.calls)
 
     def test_changes_after_first_command_block_second_command_and_sensitive_review(self):

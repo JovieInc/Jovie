@@ -121,6 +121,14 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("8h ago", alerts["no-landing"])
         self.assertIn("Boom", alerts["tick-error"])
 
+    def test_repairs_spent_without_work_name_their_infrastructure_causes(self):
+        quiet = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": doctor.NO_WORK_REPAIR_ALERT - 1}))
+        self.assertNotIn("repairs-without-work", quiet)
+        alerts = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": 23,
+                                                    "preserved-target-needs-reconciliation": 17}))
+        self.assertIn("40 PR repairs", alerts["repairs-without-work"])
+        self.assertIn("target-state-unavailable 23", alerts["repairs-without-work"])
+
     def test_disk_tiers_page_summer_only_below_critical(self):
         self.assertEqual(set(doctor.judge(obs(diskFreePct=7.0))), {"disk-low"})
         alerts = doctor.judge(obs(diskFreePct=4.9))
@@ -874,6 +882,11 @@ class StatusFeedTest(unittest.TestCase):
             rows = [{"endedAt": doctor.epoch_iso(now - 60), "verdict": "landing", "gateWaitS": 120},
                     {"endedAt": doctor.epoch_iso(now - 120), "verdict": "held", "gateWaitS": 300},
                     {"endedAt": doctor.epoch_iso(now - 30), "verdict": "no-change"},
+                    {"endedAt": doctor.epoch_iso(now - 40), "kind": "fix-red", "verdict": "recovery-handoff",
+                     "reasons": ["preserved-head-superseded"]},
+                    {"endedAt": doctor.epoch_iso(now - 50), "kind": "fix-red", "verdict": "skipped",
+                     "reasons": ["worktree-unavailable:fatal: already used by worktree"]},
+                    {"endedAt": doctor.epoch_iso(now - 55), "kind": "fix-red", "verdict": "fix-no-change"},
                     {"endedAt": doctor.epoch_iso(now - 90000), "verdict": "landing", "gateWaitS": 9999}]
             (state / "runs" / "ledger.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
             host = type("Host", (), {"state": state, "linear_env": state / "missing.env"})()
@@ -889,6 +902,7 @@ class StatusFeedTest(unittest.TestCase):
             finally:
                 os.environ.pop("LANES_SELFTEST", None)
         self.assertEqual(observed["gateWaits24h"], 2)
+        self.assertEqual(observed["noWorkRepairs24h"], {"preserved-head-superseded": 1, "worktree-unavailable": 1})
         self.assertEqual(observed["gateWaitMedianS24h"], 210)
         self.assertEqual(observed["gateWaitMaxS24h"], 300)
         self.assertEqual(feed["gateWaitMedianS24h"], 210)
