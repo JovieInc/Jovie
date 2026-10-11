@@ -664,6 +664,86 @@ class RelayTest(unittest.TestCase):
                 os.environ.update(saved)
 
 
+class QuotaRelayTest(unittest.TestCase):
+    """2026-10-11 20:07Z: the repo GITHUB_TOKEN quota hit zero and the relay queued quota-red
+    PR Size Guard / Source Validation runs as lane-fix-red. Quota is re-run, never repair."""
+
+    VIEW = {"state": "OPEN", "isDraft": False, "headRefName": "tim/fix", "headRefOid": "h1",
+            "isCrossRepository": False, "labels": []}
+    RUN = {"id": 900, "run_attempt": 1, "event": "pull_request", "conclusion": "failure",
+           "head_sha": "h1", "pull_requests": [{"number": 5}]}
+    QUOTA_LOG = ("2026-10-11T20:20:00Z ##[group]Run node changelog-source-guard.mjs\n"
+                 "2026-10-11T20:21:04Z gh: API rate limit exceeded for installation. (HTTP 403)\n"
+                 "2026-10-11T20:21:04Z ##[error]Process completed with exit code 1.\n")
+    REAL_LOG = ("2026-10-11T20:20:00Z ##[group]Run node scripts/lib/pr-size-guard-policy.mjs\n"
+                "2026-10-11T20:20:01Z ##[error]1600 lines exceeds the 1500-line cap\n"
+                "2026-10-11T20:20:01Z ##[error]Process completed with exit code 1.\n")
+
+    @staticmethod
+    def classify(text):
+        # Mirrors scripts/lib/github-rate-limit.mjs for the wordings below.
+        if "rate limit exceeded" in text:
+            return "primary-rate-limit"
+        return "transient-server" if "HTTP 502" in text else "none"
+
+    def shell(self, logs, jobs=(1,), jobs_reply=None):
+        routes = {("gh", "pr", "view"): self.VIEW,
+                  ("gh", "api", f"repos/{events.REPO}/actions/runs/900/jobs?filter=latest&per_page=100"):
+                      jobs_reply or (0, json.dumps(list(jobs)))}
+        for job, log in zip(jobs, logs):
+            routes[("gh", "api", f"repos/{events.REPO}/actions/jobs/{job}/logs")] = (0, log)
+        return Shell(routes)
+
+    def relay(self, shell, run=None):
+        with patch.object(events, "classify_github_failure", self.classify):
+            return events.relay("workflow_run", {"workflow_run": run or self.RUN}, shell, set())
+
+    def test_a_quota_only_failure_is_rerun_not_labelled(self):
+        shell = self.shell([self.QUOTA_LOG])
+        self.assertEqual(self.relay(shell), [])
+        self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs"],
+                      shell.calls)
+        self.assertNotIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/5/labels", "-f",
+                          "labels[]=lane-fix-red"], shell.calls)
+
+    def test_an_unreadable_run_on_the_same_quota_is_not_labelled(self):
+        shell = self.shell([], jobs=(), jobs_reply=(1, "gh: API rate limit exceeded for installation. (HTTP 403)"))
+        self.assertEqual(self.relay(shell), [])
+
+    def test_real_failures_stay_red(self):
+        for logs, jobs in (([self.REAL_LOG], (1,)),
+                           ([self.QUOTA_LOG, self.REAL_LOG], (1, 2)),
+                           (["no runner exit line"], (1,)),
+                           ([self.QUOTA_LOG.replace("rate limit exceeded for installation",
+                                                    "Resource not accessible")], (1,))):
+            shell = self.shell(logs, jobs)
+            self.assertEqual(self.relay(shell), [(5, "red")], logs)
+            self.assertEqual(shell.made("gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs"), [])
+
+    def test_a_quota_run_past_the_rerun_cap_becomes_repair_work(self):
+        shell = self.shell([self.QUOTA_LOG])
+        run = {**self.RUN, "run_attempt": events.INFRA_RERUN_MAX_ATTEMPT}
+        self.assertEqual(self.relay(shell, run), [(5, "red")])
+
+    def test_without_the_shared_classifier_the_red_signal_is_unchanged(self):
+        shell = self.shell([self.QUOTA_LOG])
+        with patch.object(events, "classify_github_failure", lambda text: None):
+            added = events.relay("workflow_run", {"workflow_run": self.RUN}, shell, set())
+        self.assertEqual(added, [(5, "red")])
+
+    @unittest.skipUnless(events.RATE_LIMIT_HELPER.exists(), "shared classifier lands separately")
+    def test_the_shared_classifier_agrees(self):
+        self.assertEqual(events.classify_github_failure(self.QUOTA_LOG), "primary-rate-limit")
+        self.assertEqual(events.classify_github_failure(self.REAL_LOG), "none")
+
+    def test_failed_step_text_is_the_failing_steps_slice(self):
+        log = ("##[group]Run earlier step\nHTTP 502 recovered\n##[endgroup]\n" + self.REAL_LOG)
+        step = events.failed_step_text(log)
+        self.assertTrue(step.startswith("2026-10-11T20:20:00Z ##[group]Run node scripts/lib/pr-size-guard-policy.mjs"))
+        self.assertNotIn("HTTP 502", step)
+        self.assertEqual(events.failed_step_text("no exit line"), "")
+
+
 class ClaimCommentTest(unittest.TestCase):
     def test_claim_read_covers_only_the_ttl_window_on_every_page(self):
         # The per-issue comments endpoint ignores sort/direction and pages oldest first:
