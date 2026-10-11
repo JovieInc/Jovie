@@ -4951,6 +4951,46 @@ class UpdateTest(unittest.TestCase):
             with patch.object(lane.worktree_pool, "pool_dir", return_value=tmp / "missing"):
                 self.assertIsNone(lane.mesh_dependency_root(lane.Host(state=tmp / "state", repo=tmp / "bare")))
 
+    def test_staged_proof_completes_a_bundle_an_older_installer_archived(self):
+        # 2026-10-11: the installed installer lacked test_lifecycle.py in LANE_TESTS, so every
+        # release that added it was staged without it and refused "release tests failed".
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp).resolve()
+            repo, staging = tmp / "repo", tmp / "staging"
+            for path in ["scripts/lanes/lane_runner.py", "scripts/lanes/lib/helper.py", *lane.RELEASE_EXTRAS, *lane.LANE_TESTS]:
+                (repo / path).parent.mkdir(parents=True, exist_ok=True)
+                (repo / path).write_text(f"# {path}\n")
+            env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+            for command in [["init", "-q"], ["add", "-A"],
+                            ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "release"],
+                            ["update-ref", "refs/remotes/origin/main", "HEAD"]]:
+                subprocess.run(["git", *command], cwd=repo, check=True, env=env)
+            older = [path for path in lane.LANE_TESTS if path != lane.LANE_TESTS[0]]
+            archive = subprocess.run(["git", "archive", "HEAD", "scripts/lanes", *lane.RELEASE_EXTRAS, *older],
+                                     cwd=repo, capture_output=True, check=True, env=env).stdout
+            staging.mkdir()
+            subprocess.run(["tar", "-x", "-C", str(staging)], input=archive, check=True)
+            (staging / "scripts/lanes/__pycache__").mkdir()
+            (staging / "scripts/lanes/__pycache__/lane_runner.cpython-312.pyc").write_bytes(b"\0")
+            host = lane.Host(state=tmp / "state", repo=repo)
+            with patch.dict(os.environ, env, clear=True):
+                self.assertIsNone(lane.complete_staged_bundle(host, staging))
+                self.assertEqual((staging / lane.LANE_TESTS[0]).read_text(), f"# {lane.LANE_TESTS[0]}\n")
+                self.assertIsNone(lane.complete_staged_bundle(host, staging), "complete bundle: no git reads")
+                (staging / lane.LANE_TESTS[0]).unlink()
+                (staging / "scripts/lanes/lib/helper.py").write_text("tampered\n")
+                self.assertEqual(lane.complete_staged_bundle(host, staging), "release-bundle-incomplete")
+                self.assertFalse((staging / lane.LANE_TESTS[0]).exists(), "a mismatched tree is never filled")
+                (staging / "scripts/lanes/lib/helper.py").write_text("# scripts/lanes/lib/helper.py\n")
+                (staging / "scripts/lanes/extra.py").write_text("")
+                self.assertEqual(lane.complete_staged_bundle(host, staging), "release-bundle-incomplete")
+            with patch.object(lane, "Host", return_value=host), \
+                    patch.object(lane, "complete_staged_bundle", return_value="release-bundle-incomplete"), \
+                    patch.object(lane, "prove_staging") as proved, patch("sys.stdout", new_callable=io.StringIO) as out:
+                self.assertEqual(lane.guarded_main(["prove-staging", str(staging)]), 1)
+            proved.assert_not_called()
+            self.assertEqual(out.getvalue().strip(), "release-bundle-incomplete")
+
     def test_prove_staging_names_the_refusal_and_the_cli_reports_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp).resolve()
@@ -4962,12 +5002,14 @@ class UpdateTest(unittest.TestCase):
                 self.assertEqual(lane.prove_staging(host, staging), "mesh runtime dependency closure failed")
             self.assertTrue((staging / ".selftest-state").is_dir(), "scratch state lives under staging only")
             with patch.object(lane, "load_github_env"), patch.object(lane, "Host", return_value=host), \
+                    patch.object(lane, "complete_staged_bundle", return_value=None), \
                     patch.object(lane, "prove_staging", return_value="release tests failed") as proved, \
                     patch("sys.stdout", new_callable=io.StringIO) as out:
                 self.assertEqual(lane.guarded_main(["prove-staging", str(staging)]), 1)
             self.assertEqual(out.getvalue().strip(), "release tests failed")
             self.assertEqual(proved.call_args.args[1], staging)
             with patch.object(lane, "load_github_env"), patch.object(lane, "Host", return_value=host), \
+                    patch.object(lane, "complete_staged_bundle", return_value=None), \
                     patch.object(lane, "prove_staging", return_value=None):
                 self.assertEqual(lane.guarded_main(["prove-staging", str(staging)]), 0)
 
@@ -8251,6 +8293,7 @@ class OperatorInstallerGlueTest(unittest.TestCase):
 
     def test_private_proof_CLI_never_loads_credentials(self):
         with patch.object(lane, "Host", return_value=self.host), patch.object(lane, "prove_staging", return_value=None), \
+                patch.object(lane, "complete_staged_bundle", return_value=None), \
                 patch.object(lane, "load_github_env", side_effect=AssertionError("credential loading during private proof")) as credentials:
             self.assertEqual(lane.guarded_main(["prove-staging", str(self.root / "stage")]), 0)
             credentials.assert_not_called()

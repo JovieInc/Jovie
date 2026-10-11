@@ -6408,6 +6408,37 @@ def retain_selftest_diagnostic(staging: Path, stderr, returncode, *, timed_out=F
             os.fsync(handle.fileno())
 
 
+def complete_staged_bundle(host: Host, staging: Path) -> str | None:
+    """An older installer archives with *its* LANE_TESTS, so a release that adds a test file was
+    staged without it and refused forever (2026-10-11: test_lifecycle.py from #21225 kept Gem on
+    a 10-10 release). Fill missing bundle paths from origin/main only when its scripts/lanes is
+    byte-identical to the staged tree; anything else stays a refusal."""
+    missing = [path for path in sorted({"scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS})
+               if not (staging / path).exists()]
+    if not missing:
+        return None
+    def git(*args, **kwargs):
+        return subprocess.run(["git", *args], cwd=host.repo, capture_output=True, **kwargs)
+    revision = git("rev-parse", "--verify", "origin/main^{commit}", text=True).stdout.strip()
+    listing = git("ls-tree", "-r", revision, "scripts/lanes", text=True)
+    expected = {line.split("\t", 1)[1]: line.split()[2] for line in listing.stdout.splitlines()}
+    lanes = staging / "scripts/lanes"
+    # Importing this file already wrote __pycache__ beside it.
+    staged = sorted(str(path.relative_to(staging)) for path in lanes.rglob("*")
+                    if path.is_file() and "__pycache__" not in path.parts) if lanes.is_dir() else []
+    if listing.returncode or not expected or staged != sorted(expected):
+        return "release-bundle-incomplete"
+    hashed = subprocess.run(["git", "hash-object", "--no-filters", "--stdin-paths"], cwd=staging,
+                            input="\n".join(staged), capture_output=True, text=True)
+    if hashed.returncode or hashed.stdout.split() != [expected[path] for path in staged]:
+        return "release-bundle-incomplete"
+    archive = git("archive", revision, *missing)
+    if archive.returncode:
+        return "release-bundle-incomplete"
+    subprocess.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
+    return None
+
+
 def prove_staging(host: Host, staging: Path) -> str | None:
     """Compile the mesh runtime and run the release self-test inside a staged tree. Returns the
     refusal reason, or None when the tree may be activated. Writes only under `staging`."""
@@ -6691,7 +6722,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
         return 0 if matched else 1
     host = Host()
     if args.command == "prove-staging":
-        why = prove_staging(host, Path(args.staging))
+        why = complete_staged_bundle(host, Path(args.staging)) or prove_staging(host, Path(args.staging))
         if why:
             print(why)
             return 1
