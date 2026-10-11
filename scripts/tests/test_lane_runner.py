@@ -3641,7 +3641,7 @@ class DispatchTest(unittest.TestCase):
             with patch.object(lane, "sh", side_effect=fake):
                 lane.remove_worktree(lane.Host(state=Path(tmp), repo=Path(tmp)), Path(tmp))
             self.assertEqual(fake.calls, [["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"],
-                                          ["git", "status", "--porcelain"],
+                                          ["git", "status", "--porcelain", *lane.disk_guard.SOURCE_PATHSPEC],
                                           ["git", "rev-list", "--count", "HEAD", "--not", "--all"],
                                           ["git", "worktree", "remove", "--force", tmp]])
 
