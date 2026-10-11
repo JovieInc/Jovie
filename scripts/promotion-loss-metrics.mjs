@@ -276,11 +276,30 @@ export function renderMarkdown(m) {
 
 // Network I/O only; computeMetrics carries the logic and the tests.
 /* node:coverage disable */
+const GH_ATTEMPTS = 3;
+
 function gh(args) {
-  return execFileSync('gh', args, {
-    encoding: 'utf8',
-    maxBuffer: 256 * 1024 * 1024,
-  });
+  let lastError;
+  for (let attempt = 1; attempt <= GH_ATTEMPTS; attempt += 1) {
+    try {
+      return execFileSync('gh', args, {
+        encoding: 'utf8',
+        maxBuffer: 256 * 1024 * 1024,
+      });
+    } catch (error) {
+      lastError = error;
+      if (attempt < GH_ATTEMPTS) {
+        // Transient API failures (HTTP 5xx, network) get a short backoff.
+        Atomics.wait(
+          new Int32Array(new SharedArrayBuffer(4)),
+          0,
+          0,
+          4000 * attempt
+        );
+      }
+    }
+  }
+  throw lastError;
 }
 
 function graphqlPages(query, variables, pick) {
