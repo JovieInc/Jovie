@@ -122,8 +122,16 @@ parent_pr="${parent%% *}"
 parent_sha="${parent##* }"
 echo "  parent #$parent_pr merged; dropping commits up to ${parent_sha:0:12}"
 
-git fetch -q "$GIT_REMOTE" main "+refs/pull/${parent_pr}/head:refs/remotes/${GIT_REMOTE}/pull/${parent_pr}"
+git fetch -q "$GIT_REMOTE" main "+refs/pull/${parent_pr}/head:refs/remotes/${GIT_REMOTE}/pull/${parent_pr}" \
+  "+refs/heads/${child_branch}:refs/remotes/${GIT_REMOTE}/${child_branch}"
 onto="${GIT_REMOTE}/main"
+# Our own retarget emits the same `edited` wake. A child that no longer carries
+# the parent tip was already unstacked; rebasing it again would misreport a
+# conflict (or replay commits) on a branch that is already correct.
+if ! git merge-base --is-ancestor "$parent_sha" "$child_sha" 2>/dev/null; then
+  echo "  ~ #$CHILD_PR no longer carries parent #$parent_pr; already unstacked"
+  exit 0
+fi
 if ! new_child="$(rebase_branch "$child_branch" "$parent_sha" "$onto" "$child_sha")"; then
   comment "$CHILD_PR" "🤖 Unstack: parent #${parent_pr} merged, but rebasing \`${child_branch}\` onto \`main\` without the parent's commits did not apply cleanly. The branch is unchanged; the conflict lane owns it next. _(at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
   exit 0
