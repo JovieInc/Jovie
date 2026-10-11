@@ -38,7 +38,9 @@ class ExecutionAttemptTest(unittest.TestCase):
         self.assertEqual(self.ident, attempt.identity("pr-remediation", {"repo": "JovieInc/Jovie", "pr": 7}, {"head": "a" * 40}))
         request = {"command": "claim", "path": str(self.path), "ident": self.ident, "owner": owner(), "policy": policy(),
                    "trigger": {"triggerId": "same"}, "now": 100, "coordination": LOCAL}
-        children = [subprocess.Popen([sys.executable, str(MODULE)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True) for _ in range(2)]
+        env = {**attempt.os.environ, "LANES_STATE": str(Path(self.tmp.name) / "state")}
+        env.pop(attempt.lifecycle.FD_ENV, None)
+        children = [subprocess.Popen([sys.executable, str(MODULE)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env=env) for _ in range(2)]
         results = [json.loads(child.communicate(json.dumps(request))[0]) for child in children]
         self.assertEqual([row["admitted"] for row in results].count(True), 1)
     def test_resume_preserves_live_owner_fence_lease_and_budget(self):
@@ -256,6 +258,10 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.state = Path(self.tmp.name); (self.state / "runs").mkdir()
+        env = {**attempt.os.environ, "LANES_STATE": str(self.state)}
+        env.pop(attempt.lifecycle.FD_ENV, None)
+        isolated = patch.dict(attempt.os.environ, env, clear=True)
+        isolated.start(); self.addCleanup(isolated.stop)
         self.path = self.state / "execution.jsonl"
         self.sha, self.branch, self.pr, self.now = "a" * 40, "codex/jov-6225-focus", 7, 20000
         self.coord = {"kind": "github-status", "repository": "JovieInc/Jovie", "sha": self.sha}
@@ -464,7 +470,7 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
     def test_cli_reports_blocked_operation_with_nonzero_exit(self):
         request = {"command": "reconcile", "path": str(self.path), "ident": self.identities[0], "pr": self.pr, "coordination": LOCAL}
         output = io.StringIO()
-        with patch.object(sys, "stdin", io.StringIO(json.dumps(request))), patch.object(sys, "stdout", output), self.assertRaises(SystemExit) as exited:
+        with patch.dict(attempt.os.environ, {"LANES_STATE": str(self.state)}), patch.object(sys, "stdin", io.StringIO(json.dumps(request))), patch.object(sys, "stdout", output), self.assertRaises(SystemExit) as exited:
             runpy.run_path(str(MODULE), run_name="__main__")
         self.assertEqual(exited.exception.code, 2)
         self.assertIn("live-coordination-required", json.loads(output.getvalue())["error"])
@@ -532,5 +538,148 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
             return real(coord, method, endpoint, body)
         with patch.object(attempt, "_gh", side_effect=raced), self.assertRaisesRegex(RuntimeError, "unsupported-history"): self.reconcile()
         self.assertEqual([body["state"] for body in self.posts], ["failure"])
+
+
+class ExecutionAttemptCliLifecycleTest(unittest.TestCase):
+    def setUp(self):
+        import os
+        self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        self.state = Path(self.tmp.name) / "state"; self.state.mkdir()
+        self.path = Path(self.tmp.name) / "execution.jsonl"
+        self.ident = attempt.identity("pr-remediation", {"pr": 7}, {"head": "a" * 40})
+        self.env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+                    "LANES_STATE": str(self.state),
+                    "PYTHONPYCACHEPREFIX": str(Path(self.tmp.name) / "bytecode")}
+        isolated = patch.dict(attempt.os.environ, self.env, clear=True)
+        isolated.start(); self.addCleanup(isolated.stop)
+        self.started = attempt.claim(self.path, self.ident, owner(), policy(), {"triggerId": "fixture"},
+                                     now=100, coordination=LOCAL)
+
+    def request(self, command):
+        common = {"command": command, "path": str(self.path), "ident": self.ident,
+                  "coordination": LOCAL, "now": 101}
+        if command == "claim":
+            return {**common, "ident": attempt.identity("pr-remediation", {"pr": 8}, {"head": "b" * 40}),
+                    "owner": owner(), "policy": policy(), "trigger": {"triggerId": "second"}}
+        if command == "boundary":
+            return {**common, "fence": self.started["fencingToken"], "reservation": {"spend": 0, "mutations": 0}}
+        if command == "finish":
+            return {**common, "fence": self.started["fencingToken"], "result": "succeeded", "detail": {}}
+        return {**common, "pr": 7,
+                "coordination": {"kind": "github-status", "repository": "JovieInc/Jovie", "sha": "a" * 40},
+                "state": "/caller-replacement-state"}
+
+    def cli(self, request):
+        output = io.StringIO(); exit_code = 0
+        with patch.dict(attempt.os.environ, self.env, clear=True), \
+             patch.object(attempt.lifecycle, "run", side_effect=AssertionError("offline transport tripwire")) as remote, \
+             patch.object(sys, "stdin", io.StringIO(json.dumps(request))), patch.object(sys, "stdout", output):
+            try:
+                runpy.run_path(str(MODULE), run_name="__main__")
+            except SystemExit as error:
+                exit_code = error.code
+        return exit_code, json.loads(output.getvalue()), remote.call_count
+
+    def assert_mutations_held(self, reason):
+        before = self.path.read_bytes()
+        for command in ("claim", "boundary", "finish", "reconcile"):
+            with self.subTest(command=command):
+                code, result, remote_calls = self.cli(self.request(command))
+                self.assertEqual(code, 2)
+                self.assertIn(reason, result["error"])
+                self.assertEqual(remote_calls, 0)
+                self.assertEqual(self.path.read_bytes(), before)
+        self.assertFalse((self.state / "fix-attempts.json.lock").exists())
+
+    def test_all_mutating_cli_routes_refuse_owned_or_malformed_drain(self):
+        marker = self.state / "lifecycle-drain.json"
+        for content in ("owned operator hold", "{malformed"):
+            with self.subTest(content=content):
+                marker.write_text(content)
+                self.assert_mutations_held("natural controller drain")
+                self.assertEqual(marker.read_text(), content)
+        self.assertFalse((self.state / "lifecycle.lock").exists())
+
+    def test_all_mutating_cli_routes_refuse_real_exclusive_lock_without_drain(self):
+        import fcntl, os
+        fd = os.open(self.state / "lifecycle.lock", os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assert_mutations_held("temporarily unavailable")
+        finally:
+            os.close(fd)
+
+    def test_pure_identity_remains_available_under_drain_and_exclusion_without_state_write(self):
+        import fcntl, os
+        marker = self.state / "lifecycle-drain.json"; marker.write_text("hold")
+        fd = os.open(self.state / "lifecycle.lock", os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
+        request = {"command": "identity", "domain": "pr-remediation", "work": {"pr": 7}, "generation": {"head": "a" * 40}}
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            before = {path.name: path.read_bytes() for path in self.state.iterdir()}
+            code, result, remote_calls = self.cli(request)
+            self.assertEqual((code, result, remote_calls), (0, self.ident, 0))
+            self.assertEqual({path.name: path.read_bytes() for path in self.state.iterdir()}, before)
+        finally:
+            os.close(fd)
+        self.env["LANES_STATE"] = str(Path(self.tmp.name) / "absent-state")
+        self.assertEqual(self.cli(request), (0, self.ident, 0))
+        self.assertFalse(Path(self.env["LANES_STATE"]).exists())
+
+    def test_unblocked_local_mutations_keep_fences_history_and_spent_count(self):
+        claim_request = self.request("claim")
+        code, claimed, calls = self.cli(claim_request)
+        self.assertEqual((code, calls), (0, 0)); self.assertTrue(claimed["admitted"])
+        fence, ident = claimed["fencingToken"], claim_request["ident"]
+        code, boundary, calls = self.cli({"command": "boundary", "path": str(self.path), "ident": ident,
+            "fence": fence, "reservation": {"spend": 1, "mutations": 1}, "now": 102, "coordination": LOCAL})
+        self.assertEqual((code, calls), (0, 0)); self.assertTrue(boundary["admitted"])
+        finish_request = {"command": "finish", "path": str(self.path), "ident": ident, "fence": fence,
+            "result": "failed_known", "detail": {"failureClass": "repair_incomplete", "failureFingerprint": "fixture"},
+            "now": 103, "coordination": LOCAL}
+        code, ended, calls = self.cli(finish_request)
+        self.assertEqual((code, calls), (0, 0))
+        self.assertEqual((ended["result"], ended["retryDecision"], ended["remainingBudgets"]["attempts"]),
+                         ("failed_known", "retry", 1))
+        rows = [json.loads(line) for line in self.path.read_text().splitlines()]
+        self.assertEqual([row["event"] for row in rows],
+                         ["attempt_started", "attempt_started", "boundary_admitted", "attempt_finished"])
+        self.assertTrue(all(row["fencingToken"] == fence for row in rows[1:]))
+        before = self.path.read_bytes()
+        self.assertEqual(self.cli(finish_request)[0], 2)
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_valid_but_unlocked_inherited_descriptor_cannot_bypass_operator_exclusion(self):
+        import fcntl, os
+        path = self.state / "lifecycle.lock"
+        exclusive = os.open(path, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
+        unrelated = os.open(path, os.O_RDWR)
+        try:
+            fcntl.flock(exclusive, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.env[attempt.lifecycle.FD_ENV] = str(unrelated)
+            self.assert_mutations_held("temporarily unavailable")
+        finally:
+            os.close(unrelated); os.close(exclusive)
+
+    def test_real_inherited_shared_ownership_survives_child_cli_exit(self):
+        import fcntl, os
+        with attempt.lifecycle.Guard(self.state) as parent:
+            request = self.request("claim")
+            child = subprocess.run([sys.executable, str(MODULE)], input=json.dumps(request),
+                capture_output=True, text=True, timeout=10,
+                **attempt.lifecycle.spawn_kwargs(env=self.env))
+            self.assertEqual(child.returncode, 0); self.assertTrue(json.loads(child.stdout)["admitted"])
+            parent.validate()
+            fd = os.open(self.state / "lifecycle.lock", os.O_RDWR)
+            try:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            finally:
+                os.close(fd)
+        fd = os.open(self.state / "lifecycle.lock", os.O_RDWR)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            os.close(fd)
 
 if __name__ == "__main__": unittest.main()

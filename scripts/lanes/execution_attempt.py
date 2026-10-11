@@ -439,5 +439,7 @@ if __name__ == "__main__":
         if command == "reconcile":
             # A JSON request cannot supply a replacement authority journal or clock.
             request.pop("state", None); request.pop("now", None)
-        print(json.dumps({"claim": claim, "boundary": boundary, "finish": finish, "reconcile": reconcile_completed_failure}[command](**request)))
+        state = Path(os.environ.get("LANES_STATE") or Path.home() / ".local/state/jovie-lanes")
+        with lifecycle.Guard(state):
+            print(json.dumps({"claim": claim, "boundary": boundary, "finish": finish, "reconcile": reconcile_completed_failure}[command](**request)))
     except Exception as error: print(json.dumps({"error": str(error)})); raise SystemExit(2)
