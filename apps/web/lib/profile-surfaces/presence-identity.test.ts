@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  findSurfaceDspMatch,
   formatPresenceRank,
   getPresenceEntityName,
   getPresenceHandle,
@@ -240,5 +241,59 @@ describe('presence identity', () => {
     expect(summaries[1]?.value).toBe('1 Page');
     expect(summaries[2]?.value).toBe('0 Pages');
     expect(summaries[3]?.value).toBe('#2');
+  });
+});
+
+describe('exact DSP source identity', () => {
+  const matches = [
+    {
+      providerId: 'spotify',
+      externalArtistUrl: 'https://open.spotify.com/artist/a',
+      externalArtistId: 'a',
+    },
+  ];
+  it('does not reuse another artist photo merely because the platform matches', () => {
+    expect(
+      findSurfaceDspMatch(
+        {
+          platform: 'spotify',
+          url: 'https://open.spotify.com/artist/b',
+          externalId: 'b',
+        },
+        matches
+      )
+    ).toBeUndefined();
+  });
+  it('binds an exact URL or provider artist ID and rejects a cross-provider ID collision', () => {
+    expect(
+      findSurfaceDspMatch(
+        {
+          platform: 'spotify',
+          url: matches[0].externalArtistUrl,
+          externalId: null,
+        },
+        matches
+      )
+    ).toBe(matches[0]);
+    expect(
+      findSurfaceDspMatch(
+        {
+          platform: 'spotify',
+          url: 'https://open.spotify.com/artist/a?locale=en',
+          externalId: 'a',
+        },
+        matches
+      )
+    ).toBe(matches[0]);
+    expect(
+      findSurfaceDspMatch(
+        {
+          platform: 'deezer',
+          url: 'https://deezer.com/artist/a',
+          externalId: 'a',
+        },
+        matches
+      )
+    ).toBeUndefined();
   });
 });

@@ -934,18 +934,38 @@ describe('canonical marketing component registry', () => {
     );
   });
 
-  it('Pen-binds every source-backed marketing identity', () => {
+  it('keeps selected homepage source ownership separate from its unknown native identity', () => {
+    const homepage = MARKETING_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'recipe.homepage'
+    )!;
+    expect(homepage).toMatchObject({
+      sourceBacked: true,
+      source: 'apps/web/app/(home)/page.tsx',
+      resolvedSource: 'apps/web/app/(home)/page.tsx',
+      exportName: 'HomePage',
+      referenceRoute: '/',
+      penRootId: null,
+      penRootIds: [],
+    });
+    expect(homepage.penIdentityReason?.trim()).toBeTruthy();
+    expect(homepage.penRootIds).not.toContain(
+      MARKETING_PEN_CONTRACT_IDS.recipe.homepage
+    );
+    expect(validateMarketingPenRegistry([homepage])).toEqual([]);
+  });
+
+  it('requires one native root or an explicit independently owned unknown identity', () => {
     const sourceBacked = MARKETING_COMPONENT_REGISTRY.filter(
       entry => entry.sourceBacked
     );
+    const unknown = sourceBacked.filter(entry => entry.penRootId === null);
+    expect(unknown.map(entry => entry.id)).toEqual(['recipe.homepage']);
+    expect(validateMarketingPenRegistry(sourceBacked)).toEqual([]);
     expect(
       sourceBacked
-        .filter(entry => entry.penRootIds.length !== 1)
-        .map(entry => entry.id)
-    ).toEqual([]);
-    expect(
-      sourceBacked
-        .filter(entry => entry.penRootId === null)
+        .filter(
+          entry => entry.penRootId !== null && entry.penRootIds.length !== 1
+        )
         .map(entry => entry.id)
     ).toEqual([]);
   });

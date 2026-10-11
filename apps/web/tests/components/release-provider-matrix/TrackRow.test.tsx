@@ -2,7 +2,10 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TrackRow } from '@/features/dashboard/organisms/release-provider-matrix/components/TrackRow';
+import {
+  TrackRow,
+  TrackRowsContainer,
+} from '@/components/features/dashboard/organisms/release-provider-matrix/components/TrackRow';
 import type { ProviderKey, TrackViewModel } from '@/lib/discography/types';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
@@ -104,8 +107,61 @@ function renderTrackRow(props: Partial<ComponentProps<typeof TrackRow>> = {}) {
 }
 
 describe('TrackRow', () => {
+  it.each(['table', 'stack'] as const)(
+    'ends the %s dependency guide at the last track and preserves selected state and explicit content',
+    renderMode => {
+      const content = (
+        <TrackRowsContainer
+          tracks={[
+            createTrack({ isExplicit: true }),
+            createTrack({ id: 'track-2' }),
+          ]}
+          providerConfig={providerConfig}
+          allProviders={['spotify', 'apple_music']}
+          columnCount={11}
+          renderMode={renderMode}
+          selectedTrackId='track-2'
+        />
+      );
+      render(
+        renderMode === 'table' ? (
+          <table>
+            <tbody>{content}</tbody>
+          </table>
+        ) : (
+          content
+        )
+      );
+      const guides = screen.getAllByTestId('table-dependency-guide');
+      expect(guides).toHaveLength(2);
+      expect(guides[0]).toHaveAttribute('data-last', 'false');
+      expect(guides[1]).toHaveAttribute('data-last', 'true');
+      expect(guides[1]).toHaveAttribute('aria-hidden', 'true');
+      expect(screen.getByTestId('track-row-track-2')).toHaveAttribute(
+        'data-state',
+        'selected'
+      );
+      const badge = screen.getByLabelText('Explicit Content');
+      expect(badge).toHaveTextContent('E');
+      expect(badge).toHaveAttribute('data-size', 'sm');
+      expect(badge).toHaveAttribute('data-tone', 'neutral');
+    }
+  );
+
   it('marks selected rows with the selected state contract', () => {
-    renderTrackRow({ isSelected: true });
+    render(
+      <table>
+        <tbody>
+          <TrackRow
+            track={createTrack()}
+            providerConfig={providerConfig}
+            allProviders={['spotify', 'apple_music']}
+            columnCount={11}
+            isSelected
+          />
+        </tbody>
+      </table>
+    );
 
     const row = screen.getByTestId('track-row-track-1');
     expect(row).toHaveAttribute('data-state', 'selected');

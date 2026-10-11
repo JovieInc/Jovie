@@ -14,7 +14,9 @@ export const EVIDENCE_DRIVEN_WORKFLOWS = Object.freeze([
   '.github/workflows/eval-real-model.yml',
   '.github/workflows/nightly-testing-agent.yml',
   '.github/workflows/nightly-tests.yml',
-  '.github/workflows/security.yml',
+  // security.yml intentionally keeps a weekly upstream-advisory baseline
+  // (JOV-7565): dependency/OSV advisories publish on their own clock, so a
+  // purely causal trigger can miss new findings on unchanged source.
   '.github/workflows/sonarcloud.yml',
   '.github/workflows/test-coverage-audit.yml',
   '.github/workflows/test-flakiness-report.yml',

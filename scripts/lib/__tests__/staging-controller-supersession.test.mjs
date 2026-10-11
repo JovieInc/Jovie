@@ -31,6 +31,14 @@ const fetchReceiptScript = workflow
   .split('\n')
   .map(line => line.replace(/^ {10}/, ''))
   .join('\n');
+const brokenFetchReceiptScript = fetchReceiptScript.replace(
+  `artifact_id="$(gh api \\
+  "repos/$REPOSITORY/actions/artifacts?name=$receipt_name&per_page=100" \\
+  --jq '[.artifacts[] | select(.expired == false)] | sort_by(.id) | last | .id // empty')"`,
+  `artifact_id="$(gh api "repos/$REPOSITORY/actions/runs/$SOURCE_CI_RUN_ID/artifacts?per_page=100" \\
+  --jq --arg name "$receipt_name" \\
+  '[.artifacts[] | select(.expired == false and .name == $name)] | sort_by(.id) | last | .id // empty')"`
+);
 const sourceSha = 'a'.repeat(40);
 const mainSha = 'b'.repeat(40);
 const candidateSha = 'c'.repeat(40);
@@ -222,7 +230,7 @@ else process.exit(2);
 });
 
 describe('Staging Controller sealed receipt fetch', () => {
-  function fetchReceipt(artifacts) {
+  function fetchReceipt(artifacts, receiptScript = fetchReceiptScript) {
     const root = mkdtempSync(join(tmpdir(), 'staging-receipt-fetch-'));
     roots.push(root);
     const bin = join(root, 'bin');
@@ -267,7 +275,7 @@ printf '%s' '{}' > "$dir/release.json"
     );
     chmodSync(unzip, 0o755);
     const receiptName = `product-lane-release-${sourceSha}-1`;
-    const result = spawnSync('bash', ['-c', fetchReceiptScript], {
+    const result = spawnSync('bash', ['-c', receiptScript], {
       encoding: 'utf8',
       timeout: 5000,
       env: {
@@ -305,5 +313,12 @@ printf '%s' '{}' > "$dir/release.json"
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
     expect(existsSync(receiptPath)).toBe(false);
+  });
+
+  it('rejects the PR 20164 gh api --jq --arg form with the production parser error', () => {
+    expect(brokenFetchReceiptScript).not.toBe(fetchReceiptScript);
+    const { result } = fetchReceipt([], brokenFetchReceiptScript);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('accepts 1 arg(s)');
   });
 });

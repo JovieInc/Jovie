@@ -155,9 +155,30 @@ describe('PATCH /api/admin/leads/[id]/dm-sent', () => {
       expect.objectContaining({
         leadId: 'lead-1',
         eventType: 'dm_sent',
+        metadata: {
+          approvedCopyRevision: approvedDmLedger().get(LEAD.id)?.[0]
+            .evidenceRevision,
+          recordingSource: 'operator_reported',
+          deliveryVerified: false,
+        },
       }),
       { idempotent: true }
     );
+  });
+
+  it.each([
+    { isAuthenticated: false, isAdmin: false, status: 401 },
+    { isAuthenticated: true, isAdmin: false, status: 403 },
+  ])('refuses history recording without operator access (%s)', async access => {
+    mockGetCurrentUserEntitlements.mockResolvedValue(access);
+    const response = await PATCH(new Request('http://localhost') as never, {
+      params: Promise.resolve({ id: LEAD.id }),
+    });
+    expect(response.status).toBe(access.status);
+    expect(mockDb.select).not.toHaveBeenCalled();
+    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(mockReadOutboundLedger).not.toHaveBeenCalled();
+    expect(mockRecordLeadFunnelEvent).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the lead does not exist', async () => {

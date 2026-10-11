@@ -198,6 +198,8 @@ export function createWorld(overrides = {}) {
               .map(issue => ({
                 identifier: issue.identifier,
                 updatedAt: issue.updatedAt ?? '2026-10-03T12:00:00Z',
+                state: { name: issue.state },
+                attachments: { nodes: issue.attachments.map(url => ({ url })) },
               })),
             pageInfo: { hasNextPage: false, endCursor: null },
           },

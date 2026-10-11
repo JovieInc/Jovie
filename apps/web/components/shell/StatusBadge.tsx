@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import { ShellMetadataChip } from './ShellMetadataChip';
 
-// StatusBadge — release status pill with a leading dot + uppercase label.
+// StatusBadge — release status pill with a leading dot + Title Case label.
 // All chips share the same surface + border so visual differentiation
 // comes from the leading dot color, keeping the row calm. "Live" is the
 // default state and shouldn't shout; saturated tones are reserved for
@@ -69,7 +69,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       title={cfg.tooltip}
       dotClassName={cfg.dot}
       dotBorderClassName={cfg.dotBorder}
-      contentClassName={cn(cfg.text, 'uppercase tracking-[0.06em]')}
+      contentClassName={cn(cfg.text, 'tracking-normal')}
     >
       {cfg.label}
     </ShellMetadataChip>

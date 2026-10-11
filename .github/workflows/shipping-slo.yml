@@ -118,52 +118,19 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          # One open issue per regressed metric; the label dedupes across runs.
-          for KEY in $(jq -r '.evaluation.regressions[].key' "$REPORT"); do
-            TITLE="slo-regression: ${KEY} >20% over baseline"
-            EXISTING=$(gh issue list --repo "${{ github.repository }}" --state open \
-              --label slo-regression --search "in:title \"$KEY\"" --json number --jq 'length')
-            if [ "$EXISTING" -gt 0 ]; then
-              echo "Open slo-regression issue already covers $KEY — skipping."
-              continue
-            fi
-            BODY=$(jq -r --arg key "$KEY" --arg run "$RUN_URL" '
-              (.evaluation.regressions[] | select(.key == $key)) as $r |
-              "Rolling 7d SLO regression detected by the shipping-SLO ratchet (JOV-6783).\n\n" +
-              "| Metric | Baseline | Observed | Change |\n| --- | --- | --- | --- |\n" +
-              "| `\($r.key)` | \($r.baseline) | \($r.observed) | \(($r.changeFraction * 100 | floor))% |\n\n" +
-              "## Top offenders\n" +
-              (.offenders.slowestPrs | map("- #\(.number) \(.title) — \(.lane) lane, \(.leadTimeSeconds / 3600 * 10 | floor / 10)h lead time") | join("\n")) +
-              "\n\nSlowest CI gate runs in the window:\n" +
-              (.offenders.slowestCiRuns | map("- run \(.id) `\(.head_branch)` — \(.seconds / 60 | floor)m (\(.conclusion))") | join("\n")) +
-              "\n\nMeasurement run: \($run)\nBaseline: `docs/metrics/shipping-slo-baseline.json`"
-            ' "$REPORT")
-            gh issue create --repo "${{ github.repository }}" \
-              --title "$TITLE" --label slo-regression --body "$BODY" \
-              || gh issue create --repo "${{ github.repository }}" \
-                --title "$TITLE" --body "$BODY"
-          done
+          node scripts/shipping-slo-intake.mjs \
+            --report "$REPORT" --repo "${{ github.repository }}" \
+            --run-url "$RUN_URL" \
+            --receipt "$RUNNER_TEMP/shipping-slo-intake.json"
 
-          if [ "${{ steps.slo.outputs.flat_stall }}" = "true" ]; then
-            TITLE="slo-regression: throughput growth flat below +8% WoW target"
-            EXISTING=$(gh issue list --repo "${{ github.repository }}" --state open \
-              --label slo-regression --search "in:title \"throughput growth flat\"" --json number --jq 'length')
-            if [ "$EXISTING" -eq 0 ]; then
-              BODY=$(jq -r --arg run "$RUN_URL" '
-                "Throughput improvement has flattened: WoW merge growth stayed below the +8% target across the flat-growth window, even though absolute throughput has not regressed (JOV-6783 2026-09-28 extension).\n\n" +
-                "Investigate the limiting stage: host pressure, provider/account concurrency, admission/readiness, CI, merge queue, remediation, deploy, or serialization.\n\n" +
-                "Current readings:\n" +
-                "- merges/day (7d): \(.flat["throughput.merges_per_day"])\n" +
-                "- WoW growth: \(.flat.throughput_wow_growth)\n" +
-                "- growth trend: \(.flat.throughput_growth_trend)\n\n" +
-                "Feed any capacity recommendation through JOV-5817/JOV-5484 only if implementation capacity is the proven limiter.\n\nMeasurement run: \($run)"
-              ' "$REPORT")
-              gh issue create --repo "${{ github.repository }}" \
-                --title "$TITLE" --label slo-regression --body "$BODY" \
-                || gh issue create --repo "${{ github.repository }}" \
-                  --title "$TITLE" --body "$BODY"
-            fi
-          fi
+      - name: Preserve shipping SLO delivery receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shipping-slo-delivery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/shipping-slo-intake.json
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Open baseline ratchet PR
         if: ${{ steps.slo.outputs.tighten != '0' }}
