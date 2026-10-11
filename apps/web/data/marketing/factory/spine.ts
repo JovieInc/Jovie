@@ -280,12 +280,17 @@ export const FACTORY_MEDIA_KINDS = [
 
 /** Shared authoring intent; not evidence that a rendered placement passed. */
 export const EditorialMediaIntentSchema = z.object({
-  benefit: Id,
-  focalDetail: Id,
-  rationale: Id,
-  fallback: Id,
+  benefit: z.string().trim().min(1),
+  focalDetail: z.string().trim().min(1),
+  rationale: z.string().trim().min(1),
+  fallback: z.string().trim().min(1),
   alternatives: z
-    .array(z.object({ medium: z.enum(FACTORY_MEDIA_KINDS), reason: Id }))
+    .array(
+      z.object({
+        medium: z.enum(FACTORY_MEDIA_KINDS),
+        reason: z.string().trim().min(1),
+      })
+    )
     .min(1),
 });
 export type EditorialMediaIntent = z.infer<typeof EditorialMediaIntentSchema>;
