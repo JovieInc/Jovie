@@ -4708,6 +4708,12 @@ def _qualify_preserved_pr(host: Host, pr: dict, preserved):
     return {key: prior["execution"][key] for key in ("workKey", "executionGeneration", "identityDigest")}
 
 
+# A run id names its target: <ts>-PR<n>-... for repairs, <ts>-<TEAM>-<n>-... for issues.
+# Cleanup markers stay unbound (recovery binds through the ledger), but an issue run's
+# checkout can never hide a PR, so it must not blank every lane's repair demand (2026-10-11).
+RUN_TARGET = re.compile(r"-(?:PR(\d+)|([A-Z]+-\d+))-")
+
+
 def preserve_repair(worktree: Path, receipt: dict) -> None:
     """A cancelled run's local work is evidence, including uncommitted follow-up."""
     if worktree.exists():
@@ -5764,9 +5770,9 @@ def maintenance_preserved(state: Path) -> set[int]:
                 if not isinstance(marker, dict):
                     raise ValueError("maintenance-preserved-marker-not-object")
                 target = marker.get("pr")
-                match = re.search(r"-PR(\d+)-", entry.name)
-                if match:
-                    preserved.add(int(match.group(1)))
+                match = RUN_TARGET.search(entry.name)
+                if match and match[1]:
+                    preserved.add(int(match[1]))
                 if type(target) is int and target > 0:
                     preserved.add(target)
                 elif not match and not (isinstance(marker, dict) and marker.get("issue")):

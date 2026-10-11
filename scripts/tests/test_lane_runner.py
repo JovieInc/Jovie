@@ -2287,6 +2287,23 @@ class MaintenanceDemandTest(unittest.TestCase):
         self.assertIsNone(self.census([self.pr()])["pending"])
         self.assertEqual(marker.read_text(), raw)
 
+    def test_cleanup_preserved_issue_checkout_keeps_repair_demand_known(self):
+        # 2026-10-11 on Gem: four issue-run checkouts preserved by cleanup carried
+        # {"pr": null, "issue": null}; every lane published pending=null and stayed at its floor.
+        legacy = self.host.state / "worktrees/20261010T104030Z-JOV-8157-codex-64d65a"
+        legacy.mkdir(parents=True)
+        (legacy / lane.disk_guard.PRESERVED_REPAIR).write_text(json.dumps({"pr": None, "issue": None}))
+        self.assertEqual(self.census([self.pr()])["pending"], 1)
+        repair = self.host.state / "worktrees/20261011T000000Z-PR7-codex-fix-bb"
+        repair.mkdir()
+        (repair / lane.disk_guard.PRESERVED_REPAIR).write_text(json.dumps({"pr": None, "issue": None}))
+        self.assertIsNone(self.census([self.pr()])["pending"], "a preserved PR checkout is still withheld")
+        repair.joinpath(lane.disk_guard.PRESERVED_REPAIR).unlink()
+        unnamed = self.host.state / "worktrees/scratch"
+        unnamed.mkdir()
+        (unnamed / lane.disk_guard.PRESERVED_REPAIR).write_text(json.dumps({"pr": None, "issue": None}))
+        self.assertIsNone(self.census([self.pr()])["pending"], "an unattributable marker stays unknown")
+
     def test_current_metadata_overrules_stale_candidates_at_the_same_head(self):
         for change in ({"labels": [{"name": "hold"}]}, {"isInMergeQueue": True},
                        {"statusCheckRollup": [{"status": "IN_PROGRESS", "conclusion": None}]}):
