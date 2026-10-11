@@ -194,6 +194,7 @@ export function useContextMenuItems({
                 socials: profile.socialLinks?.map(link => ({
                   label: link.displayText ?? link.platform,
                   url: link.url,
+                  platform: link.platform,
                 })),
               });
               if (!input) {
