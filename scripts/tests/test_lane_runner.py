@@ -4285,6 +4285,71 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertFalse((competitor / lane.disk_guard.PRESERVED_REPAIR).exists())
         agent.assert_not_called()
 
+    def charge_attempt(self, count=1):
+        """The record claim_red_pr's charge writes before fix_red_pr ever runs."""
+        self.host.state.mkdir(parents=True, exist_ok=True)
+        (self.host.state / "fix-attempts.json").write_text(json.dumps(
+            {str(self.pr["number"]): {"sha": self.pr["headRefOid"], "count": count,
+                                      "lane": "codex", "at": time.time()}}))
+
+    def attempt_count(self):
+        data = json.loads((self.host.state / "fix-attempts.json").read_text())
+        return data[str(self.pr["number"])]["count"]
+
+    def test_unreadable_target_at_claim_refunds_the_attempt(self):
+        self.charge_attempt()
+        with patch.object(lane, "reconcile_fix_target", return_value=None), \
+                patch.object(lane, "run_agent", side_effect=AssertionError("agent must not run")):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "reconcile-unavailable")
+        self.assertEqual(receipt["cancellation"]["stage"], "before-execution-claim")
+        self.assertEqual(receipt["attemptRefunded"], "target-state-unavailable")
+        self.assertEqual(self.attempt_count(), 0)
+
+    def test_unreadable_target_before_checkout_refunds_the_attempt(self):
+        self.charge_attempt()
+        reads = iter([dict(self.live), None])
+        with patch.object(lane, "reconcile_fix_target", side_effect=lambda _: next(reads, None)), \
+                patch.object(lane, "run_agent", side_effect=AssertionError("agent must not run")):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "reconcile-unavailable")
+        self.assertEqual(receipt["cancellation"]["stage"], "before-checkout")
+        self.assertEqual(receipt["attemptRefunded"], "target-state-unavailable")
+        self.assertEqual(self.attempt_count(), 0)
+
+    def test_worktree_unavailable_refunds_the_attempt(self):
+        self.charge_attempt()
+        with patch.object(lane, "add_worktree", side_effect=lane.WorktreeUnavailable("checkout failed")), \
+                patch.object(lane, "run_agent", side_effect=AssertionError("agent must not run")):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "skipped")
+        self.assertTrue(receipt["attemptRefunded"].startswith("worktree-unavailable"))
+        self.assertEqual(self.attempt_count(), 0)
+
+    def test_recovery_handoff_refunds_the_attempt(self):
+        self.cancelled_predecessor(commit=True)
+        self.charge_attempt()
+        with patch.object(lane, "run_agent", side_effect=AssertionError("agent must not run")):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "recovery-handoff")
+        self.assertTrue(receipt["attemptRefunded"].startswith("preserved-"))
+        self.assertEqual(self.attempt_count(), 0)
+
+    def test_a_stop_after_the_agent_ran_keeps_its_charge(self):
+        self.charge_attempt()
+        prior = self.hold("reconcile-unavailable")
+        self.assertEqual(prior["cancellation"]["stage"], "agent-running")
+        self.assertNotIn("attemptRefunded", prior)
+        self.assertEqual(self.attempt_count(), 1)
+
+    def test_fix_pushed_and_no_change_keep_their_charge(self):
+        self.charge_attempt()
+        with patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertNotIn("attemptRefunded", receipt)
+        self.assertEqual(self.attempt_count(), 1)
+
     def assert_resume(self, reason):
         prior = self.hold(reason)
         def agent(cmd, cwd, log, timeout, **kwargs):

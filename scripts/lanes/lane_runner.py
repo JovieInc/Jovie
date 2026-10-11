@@ -4694,6 +4694,36 @@ def fix_request_source(pr: dict) -> dict:
     }
 
 
+# Cancellation stages before the agent ran or any source mutation landed. A repair
+# stopped at one of them consumed none of the work the fix budget pays for.
+UNWORKED_PRE_AGENT_STAGES = frozenset(
+    {"before-execution-claim", "before-checkout", "after-fetch", "before-install", "before-agent"})
+
+
+def unworked_fix_attempt(receipt: dict) -> str | None:
+    """The no-work reason when a charged attempt ended before any agent work, else None.
+
+    The attempt is charged at claim time, before the run learns the target or its
+    checkout are unusable. Infrastructure stops (an unreadable target, a failed
+    checkout, a preserved-run handoff) then spent the head's bounded fix budget on
+    no work — 19 repairs in 24h on 2026-10-11 (JOV-8191). Stops after the agent ran
+    or source changed keep their charge."""
+    verdict = receipt.get("verdict")
+    if verdict == "recovery-handoff":
+        return str((receipt.get("reasons") or ["recovery-handoff"])[0])
+    if verdict == "skipped":
+        reason = str((receipt.get("reasons") or [""])[0])
+        return reason if reason.startswith("worktree-unavailable") else None
+    # `cancelled` keeps its charge: a queued, merged or superseded target is a repair
+    # outcome, not host infrastructure spending the budget (the doctor never counts it).
+    if verdict == "reconcile-unavailable":
+        stage = (receipt.get("cancellation") or {}).get("stage")
+        if stage is None or stage in UNWORKED_PRE_AGENT_STAGES:
+            return str((receipt.get("cancellation") or {}).get("reason")
+                       or (receipt.get("reasons") or [verdict])[0])
+    return None
+
+
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
     """Release the host-local claim without fabricating an attempt when called directly."""
     def finish(attempts: dict) -> None:
@@ -4705,6 +4735,12 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
                        repairHeadBefore=receipt.get("headBefore"), repairVerdict=receipt.get("verdict"))
         if receipt.get("verdict") == "fix-pushed" and receipt.get("headAfter"):
             attempt["pushedHead"] = receipt["headAfter"]
+        if (refund := unworked_fix_attempt(receipt)) \
+                and type(attempt.get("count")) is int and attempt["count"] > 0:
+            attempt["count"] -= 1
+            attempt["noWorkRefund"] = {"reason": refund[:120], "runId": receipt.get("runId"),
+                                       "at": time.time()}
+            receipt["attemptRefunded"] = refund[:120]
     update_json(host.state / "fix-attempts.json", finish)
 
 
@@ -5051,6 +5087,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             cancellation={
                 "schema": "jovie-fix-cancellation/v1",
                 "reason": reason,
+                "stage": error.stage,
                 "observedState": state or "UNKNOWN",
                 "mergedAt": (live or {}).get("mergedAt"),
                 "observedHead": (live or {}).get("headRefOid"),
