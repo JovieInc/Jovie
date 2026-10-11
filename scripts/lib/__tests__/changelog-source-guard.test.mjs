@@ -39,7 +39,7 @@ beforeAll(() => {
 });
 afterAll(() => rmSync(checkout, { recursive: true, force: true }));
 
-async function run(responses) {
+async function run(responses, env = {}, rateLimit = null) {
   let index = 0;
   return runWithRealGh({
     gh: resolveRealGh(),
@@ -49,8 +49,10 @@ async function run(responses) {
       GUARD_SOURCE: guard,
       GITHUB_EVENT_PATH: eventPath,
       GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      ...env,
     },
     route: path => {
+      if (path === 'rate_limit' && rateLimit) return { body: rateLimit() };
       if (path !== 'repos/JovieInc/Jovie/pulls/20031') return null;
       return responses[Math.min(index++, responses.length - 1)];
     },
@@ -104,5 +106,51 @@ describe('trusted changelog metadata read with real gh', () => {
     const result = await run([{ body: '{invalid JSON' }]);
     expect(result.code).not.toBe(0);
     expect(result.requests).toHaveLength(1);
+  });
+});
+
+const quotaExhausted = {
+  status: 403,
+  body: {
+    message:
+      'API rate limit exceeded for installation. If you reach out to GitHub Support for help, please include the request ID.',
+  },
+};
+const resetIn = seconds => () => ({
+  resources: {
+    core: {
+      remaining: 0,
+      reset: Math.ceil(Date.now() / 1000) + seconds,
+    },
+    graphql: { remaining: 1000, reset: Math.ceil(Date.now() / 1000) + 3600 },
+  },
+});
+
+describe('GitHub quota is never a changelog verdict', () => {
+  it('spends no API call on a first attempt and judges the event body', async () => {
+    const result = await run([current()], { GITHUB_RUN_ATTEMPT: '1' });
+    expect(result.requests).toHaveLength(0);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ passed: true });
+  });
+  it('waits out an exhausted installation quota on a re-run, then evaluates', async () => {
+    const result = await run(
+      [quotaExhausted, current()],
+      { GITHUB_RUN_ATTEMPT: '2' },
+      resetIn(1)
+    );
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ passed: true });
+    expect(result.stderr).toContain('primary-rate-limit on attempt 1');
+  }, 30_000);
+  it('defers instead of judging when the reset is past the wait budget', async () => {
+    const result = await run(
+      [quotaExhausted],
+      { GITHUB_RUN_ATTEMPT: '2', GITHUB_QUOTA_MAX_WAIT_SECONDS: '0' },
+      resetIn(3000)
+    );
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('github-quota-deferred');
+    expect(result.stderr).not.toContain('Customer outcome decision');
   });
 });
