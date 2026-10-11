@@ -978,6 +978,8 @@ describe('terminal failure hold application', () => {
       'Process completed with exit code 1.\nGitHub API 503 for /graphql: Service Unavailable',
       'GitHub API request failed for /graphql: The operation was aborted due to timeout',
       'GitHub API 403 for /repos/x/y/commits/z/check-runs: API rate limit exceeded for installation',
+      // Run 38171069689 (2026-10-11): reset later than the admission deadline.
+      'GitHub rate-limit recovery does not fit within the admission budget\nProcess completed with exit code 1.',
     ]) {
       expect(
         classifyMergeGroupFailure({
