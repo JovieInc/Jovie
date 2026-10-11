@@ -897,14 +897,19 @@ def terminal_reason(pr: dict, record: dict, max_attempts: int, *, allow_reentry:
 
 
 def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict | None = None,
-                        now: float | None = None, allow_reentry: bool = False) -> str | None:
-    """One guard for the existing claim, event and maintenance paths; no new retry authority."""
+                        now: float | None = None, allow_reentry: bool = False,
+                        terminal_ok: bool = False) -> str | None:
+    """One guard for the existing claim, event and maintenance paths; no new retry authority.
+
+    `terminal_ok` is only for deterministic main syncs of a terminal generation: a merge of
+    main creates the new head that is that generation's material-change exit. Holds, active
+    repairs and diff-policy holds still refuse."""
     labels = {label.lower() for label in label_names(pr)}
     if not isinstance(pr.get("headRefOid"), str) or not pr["headRefOid"].strip():
         return "head-unavailable"
     if holds := labels & HOLD_LABELS:
         return sorted(holds)[0]
-    if reason := terminal_reason(pr, record, max_attempts, allow_reentry=allow_reentry):
+    if not terminal_ok and (reason := terminal_reason(pr, record, max_attempts, allow_reentry=allow_reentry)):
         return reason
     # A different remote head is material evidence, not revocation of a local
     # writer's live lease. Wait for that attempt to end before recording re-entry.
@@ -916,9 +921,10 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
     return None
 
 
-def maintenance_hold(host, lane, pr: dict, now: float) -> str | None:
+def maintenance_hold(host, lane, pr: dict, now: float, *, terminal_ok: bool = False) -> str | None:
     reason = preservation_reason(pr, read_state(host, "fix-attempts.json").get(str(pr["number"]), {}),
-                                 lane.MAX_FIX_ATTEMPTS, held=read_state(host, "held.json").get(str(pr["number"])), now=now)
+                                 lane.MAX_FIX_ATTEMPTS, held=read_state(host, "held.json").get(str(pr["number"])), now=now,
+                                 terminal_ok=terminal_ok)
     if reason:
         return reason
     return "repair-active" if lane.claimed_elsewhere(pr["number"], pr.get("headRefOid"), "fix") else None
@@ -1363,12 +1369,14 @@ def requeue_parked(lane, linear, pr: dict, since: float, open_prs: list[dict], *
     return True
 
 
-def sync_main(host, lane, pr: dict, now: float) -> str:
+def sync_main(host, lane, pr: dict, now: float, *, terminal_ok: bool = False) -> str:
     """No-model first answer to a merge-queue removal: GitHub merges main into the branch
     (exact head, no force), so the PR gets a new head, fresh CI and a fresh enroll. The queue
     never takes a rejected head twice (JOV-INV-022), so this is the one sanctioned re-enqueue.
-    Once per PR per stuck episode; a second removal goes to a model with the queue's log."""
-    if reason := maintenance_hold(host, lane, pr, now):
+    Once per PR per stuck episode; a second removal goes to a model with the queue's log.
+    The escalation ladder passes `terminal_ok`: its update-branch rung exists for exhausted
+    heads, so their own exhaustion must not refuse it (it always did before 2026-10-11)."""
+    if reason := maintenance_hold(host, lane, pr, now, terminal_ok=terminal_ok):
         return f"held:{reason}"
     revoked = lane.publication_revocation(host, pr.get("headRefName"))
     if revoked:

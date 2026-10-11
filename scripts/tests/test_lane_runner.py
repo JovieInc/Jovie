@@ -3818,6 +3818,107 @@ class DispatchTest(unittest.TestCase):
         self.assertFalse(lane.provider_healthy({"health": ["/nonexistent/binary"]}))
 
 
+TERMINAL_NOW = 2_000_000_000.0
+
+
+class TerminalRevisitTest(unittest.TestCase):
+    """The material-change exit for terminal generations fires without a human (2026-10-11)."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.host = lane.Host(state=Path(self.temp.name), repo=Path(self.temp.name))
+        self.calls, self.main = [], "m1"
+
+        def shell(args, **kwargs):
+            self.calls.append(args)
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stdout=f"{self.main}\trefs/heads/main\n" if self.main else "",
+                                       stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        for patcher in (patch.object(lane, "sh", side_effect=shell),
+                        patch.object(lane.pr_events, "claim_active", return_value=False),
+                        patch.object(lane, "claimed_elsewhere", return_value=False)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def pr(self, number, **extra):
+        return {"number": number, "headRefOid": f"h{number}", "headRefName": f"codex/jov-{number}-20261010t000000",
+                "isDraft": False, "isInMergeQueue": False, "isCrossRepository": False,
+                "mergeStateStatus": "BLOCKED", "labels": [], **extra}
+
+    def write(self, name, data):
+        (self.host.state / name).write_text(json.dumps(data))
+
+    def updates(self):
+        return [args for args in self.calls if args[:3] == ["gh", "api", "-X"] and args[-1].startswith("expected_head_sha=")]
+
+    def test_terminal_heads_get_one_deterministic_sync_per_main_and_window(self):
+        spent = {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}
+        self.write("fix-attempts.json", {"1": spent, "2": {"sha": "h2", "count": lane.MAX_FIX_ATTEMPTS},
+                                          "5": {"sha": "h5", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True},
+                                          "6": {"sha": "h6", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True},
+                                          "7": {"sha": "h7", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}})
+        self.write("held.json", {"7": {"sha": "h7", "evidence": ["diff-too-large:3036"]}})
+        prs = [self.pr(1),
+               self.pr(2),  # spent but still on the ladder (not escalated): the ladder owns it
+               self.pr(3, labels=[{"name": "queue-poison"}]),  # poisoned head nobody moved
+               self.pr(4, labels=[{"name": "lane-fix-exhausted"}, {"name": "hold"}]),
+               self.pr(5, mergeStateStatus="DIRTY"),  # conflict: needs a model, stays on the ladder
+               self.pr(6, isInMergeQueue=True),
+               self.pr(7)]  # diff-policy hold: a sync cannot clear it
+        self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW), [1, 3])
+        self.assertEqual([args[4] for args in self.updates()],
+                         [f"repos/{lane.REPO_SLUG}/pulls/1/update-branch", f"repos/{lane.REPO_SLUG}/pulls/3/update-branch"])
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text())["1"], spent,
+                         "no attempt, rung or escalation is refunded or reset")
+        ledger = [json.loads(line) for line in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
+        self.assertEqual({row["kind"] for row in ledger if row.get("kind") != "sync-main"}, {"terminal-revisit"})
+        self.calls.clear()
+        self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW + 3600), [], "once per window")
+        self.main = "m1"
+        self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW + lane.TERMINAL_REVISIT_S + 1), [],
+                         "main has not moved: nothing new to merge")
+        self.main = "m2"
+        self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW + lane.TERMINAL_REVISIT_S + 2), [1, 3])
+
+    def test_dependabot_bumps_are_recreated_by_dependabot_even_when_conflicted(self):
+        self.write("fix-attempts.json", {"9": {"sha": "h9", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}})
+        bump = self.pr(9, headRefName="dependabot/npm_and_yarn/dev-patch-1", mergeStateStatus="DIRTY",
+                       labels=[{"name": "queue-poison"}])
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW), [9])
+        comments = [args for args in self.calls if args[:3] == ["gh", "pr", "comment"]]
+        self.assertEqual(comments[0][-1], "@dependabot recreate")
+        self.assertEqual(self.updates(), [], "never merge main into a Dependabot branch")
+
+    def test_unreadable_main_or_revoked_branch_does_nothing(self):
+        self.write("fix-attempts.json", {"1": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}})
+        self.main = ""
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [self.pr(1)], now=TERMINAL_NOW), [])
+        self.main = "m1"
+        with patch.object(lane, "publication_revocation", return_value={"reason": "run-stopped"}):
+            self.assertEqual(lane.revisit_terminal_prs(self.host, [self.pr(1)], now=TERMINAL_NOW), [])
+        self.assertEqual(self.updates(), [])
+
+    def test_ladder_update_branch_rung_is_not_refused_by_its_own_exhaustion(self):
+        # Before 2026-10-11 sync_main returned held:fix-exhausted for every exhausted head,
+        # so the deterministic rung recorded ok=False without ever calling GitHub.
+        self.write("fix-attempts.json", {"1": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS}})
+        self.assertEqual(lane.pr_events.sync_main(self.host, lane, self.pr(1), TERMINAL_NOW), "held:fix-exhausted")
+        self.assertEqual(lane.pr_events.sync_main(self.host, lane, self.pr(1), TERMINAL_NOW, terminal_ok=True), "synced")
+        held = self.pr(1, labels=[{"name": "hold"}])
+        self.assertEqual(lane.pr_events.sync_main(self.host, lane, held, TERMINAL_NOW, terminal_ok=True), "held:hold")
+
+    def test_rerun_covers_every_failed_or_cancelled_run_once(self):
+        pr = self.pr(1, statusCheckRollup=[
+            {"name": "PR Ready", "conclusion": "FAILURE", "detailsUrl": "https://x/actions/runs/11/job/1"},
+            {"name": "unit", "conclusion": "CANCELLED", "detailsUrl": "https://x/actions/runs/11/job/2"},
+            {"name": "security", "conclusion": "CANCELLED", "detailsUrl": "https://x/actions/runs/22/job/3"},
+            {"name": "lint", "conclusion": "SUCCESS", "detailsUrl": "https://x/actions/runs/33/job/4"}])
+        self.assertTrue(lane._rerun_failed(pr))
+        self.assertEqual([args[3] for args in self.calls if args[:3] == ["gh", "run", "rerun"]], ["11", "22"])
+
+
 class PreservedRecoveryTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -4817,7 +4918,7 @@ class FixRedTest(unittest.TestCase):
             path.write_text(json.dumps({"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS},
                                         "8": {"sha": "h8", "count": 1, "lane": "codex", "at": 1.0}}))
 
-            def repair_ends_elsewhere(*_args):
+            def repair_ends_elsewhere(*_args, **_kwargs):
                 # end_local_fix_attempt runs outside claim.lock while this pass works.
                 lane.update_json(path, lambda rows: rows["8"].update(endedAt=2.0, pushed=True))
                 return "failed"

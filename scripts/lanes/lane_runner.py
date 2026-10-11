@@ -3360,7 +3360,7 @@ def escalate_exhausted(host: Host, prs: list[dict], linear) -> None:
         plan = remediation.plan_ladder(classified, record, providers, now, pr["headRefOid"],
                                        healthy=healthy, cooled=cooled)
         if plan["action"] == "update-branch":
-            outcome = pr_events.sync_main(host, THIS, pr, now)
+            outcome = pr_events.sync_main(host, THIS, pr, now, terminal_ok=True)
             record = remediation.append_rung(record, rung="update-branch", lane=None, cls=classified["cls"],
                                              at=now, head=pr["headRefOid"], kind="deterministic",
                                              ok=outcome == "synced")
@@ -3443,16 +3443,104 @@ def _legacy_terminal(host: Host, pr: dict, record: dict, held: dict, linear, att
         pass
 
 
+TERMINAL_REVISIT_S = 24 * 3600
+TERMINAL_REVISITS_PER_PASS = 3
+TERMINAL_LABELS = frozenset({pr_events.PREFIX + pr_events.EXHAUSTED, pr_events.POISON_LABEL})
+
+
+def terminal_prs(prs: list[dict], attempts: dict, held: dict) -> list[dict]:
+    """Open PRs parked on a terminal generation whose only exit is a new head: an escalated
+    spent head, or an exhausted/poisoned label on a head no repair has moved since."""
+    parked = []
+    for pr in prs:
+        head, record = pr.get("headRefOid"), attempts.get(str(pr.get("number"))) or {}
+        labels = {label.lower() for label in pr_events.label_names(pr)}
+        if not isinstance(head, str) or not head or not isinstance(record, dict) \
+                or labels & pr_events.HOLD_LABELS or pr.get("isInMergeQueue") is not False \
+                or pr.get("isCrossRepository") is not False \
+                or not pr_events.fixable_hold(held.get(str(pr["number"])), head):
+            continue  # holds, queued heads, forks and diff-policy holds have other owners
+        spent = pr_events.spent(record, head, MAX_FIX_ATTEMPTS)
+        unchanged = not record.get("count") or pr_events.same_generation(record, head)
+        if (record.get("escalated") and spent) or (labels & TERMINAL_LABELS and unchanged):
+            parked.append(pr)
+    return parked
+
+
+def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) -> list[int]:
+    """The material-change exit for terminal generations, fired without a human (2026-10-11).
+
+    A terminal head waits for "a new PR head", which nothing produced: 26 PRs sat exhausted,
+    poisoned or escalated for days. Main moving is new evidence, so at most once per PR per
+    TERMINAL_REVISIT_S, and only when main moved since the last revisit, the PR gets a
+    deterministic no-model sync: GitHub merges main into it (exact expected head), or a
+    Dependabot bump asks Dependabot to recreate itself on main. The new head is ordinary
+    re-entry: a new bounded generation with its own attempts and the queue's failure log.
+    Conflicted (DIRTY) non-Dependabot heads cannot merge main without a model and stay with
+    the escalation ladder. No attempt or rung is refunded or reset.
+    """
+    now = time.time() if now is None else now
+    attempts = read_json(host.state / "fix-attempts.json")
+    held = read_json(held_path(host))
+    path = host.state / "terminal-revisits.json"
+    visits = read_json(path)
+    due = []
+    for pr in sorted(terminal_prs(prs, attempts, held), key=lambda item: item["number"]):
+        last = visits.get(str(pr["number"])) if isinstance(visits.get(str(pr["number"])), dict) else {}
+        dependabot = (pr.get("headRefName") or "").startswith("dependabot/")
+        if pr.get("mergeStateStatus") == "DIRTY" and not dependabot:
+            continue
+        if type(last.get("at")) in (int, float) and now - last["at"] < TERMINAL_REVISIT_S:
+            continue
+        due.append((pr, last, dependabot))
+    if not due:
+        return []
+    listed = sh(["git", "ls-remote", "origin", "refs/heads/main"], cwd=host.repo, timeout=60)
+    main = (listed.stdout or "").split()[0] if listed.returncode == 0 and (listed.stdout or "").split() else None
+    if not main:
+        return []  # without main's head, "main moved" is unproven
+    acted = []
+    for pr, last, dependabot in due:
+        if len(acted) >= TERMINAL_REVISITS_PER_PASS:
+            break
+        if last.get("main") == main or publication_revocation(host, pr.get("headRefName")) \
+                or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+            continue
+        if dependabot:
+            action = "dependabot-recreate"
+            result = sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG,
+                         "--body", "@dependabot recreate"])
+            ok = result.returncode == 0
+        else:
+            action = "update-branch"
+            ok = pr_events.sync_main(host, THIS, pr, now, terminal_ok=True) == "synced"
+        visit = {"at": now, "head": pr["headRefOid"], "main": main, "action": action, "ok": ok}
+        update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
+        pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "terminal-revisit", "origin": AUTONOMOUS_ORIGIN,
+                                "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+                                "pr": pr["number"], "headBefore": pr["headRefOid"], "main": main,
+                                "action": action, "verdict": "revisited" if ok else "revisit-failed",
+                                "endedAt": now_iso()})
+        acted.append(pr["number"])
+    return acted
+
+
+RERUN_RUNS_LIMIT = 5
+
+
 def _rerun_failed(pr: dict):
+    """Rerun the failed jobs of every distinct run behind a red check (bounded). An outage
+    can cancel jobs in several workflows; rerunning only the first left the rest red."""
+    runs = []
     for check in pr.get("statusCheckRollup") or []:
-        if check.get("conclusion") not in RED:
+        if str(check.get("conclusion") or "").upper() not in RED | {"CANCELLED"}:
             continue
         found = re.search(r"/runs/(\d+)", check.get("detailsUrl") or "")
-        if not found:
-            continue
-        result = sh(["gh", "run", "rerun", found.group(1), "--failed", "--repo", REPO_SLUG])
-        return result.returncode == 0
-    return False
+        if found and found.group(1) not in runs:
+            runs.append(found.group(1))
+    results = [sh(["gh", "run", "rerun", run, "--failed", "--repo", REPO_SLUG]).returncode == 0
+               for run in runs[:RERUN_RUNS_LIMIT]]
+    return bool(results) and any(results)
 
 
 def arm_ready_prs(host: Host, prs: list[dict]) -> None:
@@ -6025,6 +6113,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             sweep_lane_prs(host, name, linear)
         if local and not (red or adopt or labeled):
             publish_exhausted_repairs(host, name, candidates)
+            try:
+                revisit_terminal_prs(host, candidates)
+            except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+                pass  # The exit is retried next idle pass; it never blocks new work.
         # JOV-7514 budgets stay on configured base slots. Scaling the cap with the
         # autoscaled count would admit more parked PRs as capacity rises.
         budget = None if red or adopt or labeled or maintenance_only else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
