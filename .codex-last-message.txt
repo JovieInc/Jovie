@@ -1,0 +1,11 @@
+No files changed, installed, committed, or pushed.
+
+Evidence:
+
+- Branch and remote are both at `7322df09d26`.
+- Worktree is clean.
+- PR diff only updates generated nightly evidence files.
+- The unchanged base guard failed during `github.rest.pulls.get` because GitHub’s installation API rate limit was exhausted.
+- Required GraphQL safety query was also blocked, independently prohibiting a push.
+
+NOT-SHIPPABLE: required check failure is unrelated GitHub installation rate-limit infrastructure failure.
