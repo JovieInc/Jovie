@@ -390,7 +390,7 @@ class AutoscaleTest(unittest.TestCase):
                 "remaining": 2000, "limit": 2500, "observedAt": NOW, "rateLimitedAt": None,
                 "dimensions": state["apiBudget"]["linearDimensions"]}))
             self.assertEqual(A.intake_slots(root, "devin", 4, NOW), 5)
-            self.assertEqual(A.host_ceiling(root, NOW), 8)
+            self.assertEqual(A.host_ceiling(root, NOW), 16)  # compute cap: cpuCount, not 2x base
             self.assertEqual(A.intake_slots(root, "devin", 0, NOW), 0)
             for change in ({"mode": "observe"}, {"mode": None}, {"observedAt": NOW - 601},
                            {"observedAt": NOW + 1}, {"observedAt": True}, {"observedAt": float("nan")},
@@ -555,6 +555,15 @@ class AutoscaleTest(unittest.TestCase):
         self.assertEqual((self.lane(small, "devin")["effective"], self.lane(small, "codex")["effective"], self.lane(small, "devin")["lastReason"]),
                          (1, 1, "hold:host-ceiling"))
         self.assertEqual(small["host"]["ceiling"], 2)
+    def test_lane_ceiling_is_compute_and_credits_not_twice_base(self):
+        # Tim 2026-10-11: lanes are capped only by compute and credits.
+        state = decide(None, obs(), sample(cpuCount=16), {"devin": 2}, cfg(intervalS=60), NOW)
+        self.assertEqual((self.lane(state, "devin")["ceiling"], state["host"]["ceiling"]), (16, 16))
+        credits = decide(None, obs(runningByProvider={"codex": 1}, codexUnleasedAvailable=0), sample(cpuCount=16),
+                         {"codex": 3}, cfg(intervalS=60), NOW)
+        self.assertEqual(self.lane(credits, "codex")["ceiling"], 1, "codex stays bound by its leases")
+        operator = decide(None, obs(), sample(cpuCount=16), {"devin": 2}, cfg(intervalS=60, hostMax=6), NOW)
+        self.assertEqual(operator["host"]["ceiling"], 6, "an explicit host max still wins")
     def test_fail_safe_collect_and_linear_capture(self):
         state = decide({"mode": "apply", "lanes": {"devin": {"effective": 8}, "claude": {"effective": 2}}}, obs(doctorFresh=False), sample(),
                        {"devin": 4, "claude": 0}, cfg(intervalS=60), NOW)

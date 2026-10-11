@@ -2304,6 +2304,14 @@ class MaintenanceDemandTest(unittest.TestCase):
         (unnamed / lane.disk_guard.PRESERVED_REPAIR).write_text(json.dumps({"pr": None, "issue": None}))
         self.assertIsNone(self.census([self.pr()])["pending"], "an unattributable marker stays unknown")
 
+    def test_one_racing_row_leaves_proven_demand_as_a_lower_bound(self):
+        # 2026-10-11 on Gem: demand flapped to null whenever one candidate's head differed from
+        # the summary cache, so autoscale held repairs at the floor despite real red PRs.
+        moved = self.pr(8)
+        self.assertEqual(self.census([self.pr(), moved], current=[self.pr(), self.pr(8, headRefOid="moved")])["pending"], 1)
+        self.assertIsNone(self.census([moved], current=[self.pr(8, headRefOid="moved")])["pending"],
+                          "with nothing proven, a racing row is still unknown, never zero")
+
     def test_current_metadata_overrules_stale_candidates_at_the_same_head(self):
         for change in ({"labels": [{"name": "hold"}]}, {"isInMergeQueue": True},
                        {"statusCheckRollup": [{"status": "IN_PROGRESS", "conclusion": None}]}):
