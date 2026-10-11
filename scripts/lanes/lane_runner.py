@@ -29,6 +29,7 @@ import socket
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -1514,13 +1515,23 @@ def linear_cooldown_until(key: str, now: float | None = None) -> float | None:
     root = linear_cooldown_root()
     now = time.time() if now is None else now
     now_ms = int(now * 1000)
+    scope_id = _linear_scope_id(key)
     latest = 0
     if root is not None:
-        scope = root / _linear_scope_id(key)
+        scope = root / scope_id
         latest = max(latest, _scan_scope(scope, now_ms), _legacy_file_reset_ms(root, key, now_ms))
     for legacy in _legacy_cooldown_roots(root):
-        latest = max(latest, _scan_scope(legacy / _linear_scope_id(key), now_ms),
+        latest = max(latest, _scan_scope(legacy / scope_id, now_ms),
                      _legacy_file_reset_ms(legacy, key, now_ms))
+    # Fallbacks written when the shared dir rejected a publish (JOV-7577).
+    latest = max(latest, _scan_scope(_tmp_cooldown_root() / scope_id, now_ms))
+    local = _PROCESS_LINEAR_COOLDOWNS.get(scope_id)
+    if local is not None:
+        local_ms = int(local * 1000)
+        if local_ms > now_ms:
+            latest = max(latest, local_ms)
+        else:
+            del _PROCESS_LINEAR_COOLDOWNS[scope_id]
     if latest <= now_ms:
         return None
     return latest / 1000
@@ -1541,6 +1552,60 @@ def _chmod_private(path: Path, mode: int) -> None:
         os.chmod(path, mode)
     except OSError:
         pass
+
+
+# Cooldowns this process failed to persist to the shared dir, keyed by scope hash.
+# An unwritable canonical dir used to mean every sibling process re-hit Linear;
+# the in-process and tmp fallbacks keep the backoff alive until a write succeeds.
+_PROCESS_LINEAR_COOLDOWNS: dict[str, float] = {}
+_COOLDOWN_UNWRITABLE_EVENT_FIRED = False
+
+
+def _tmp_cooldown_root() -> Path:
+    uid = os.getuid() if hasattr(os, "getuid") else "shared"
+    return Path(tempfile.gettempdir()) / f"jovie-linear-cooldown-{uid}"
+
+
+def _tmp_fallback_publish(scope_id: str, reset_s: float) -> None:
+    """Best-effort record under tmp so sibling processes still back off."""
+    try:
+        scope = _tmp_cooldown_root() / scope_id
+        scope.mkdir(parents=True, exist_ok=True)
+        _chmod_private(scope, 0o700)
+        reset_ms = int(reset_s * 1000)
+        record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
+        record.write_text(json.dumps({"schema": 1, "resetAt": reset_ms}))
+        _chmod_private(record, 0o600)
+    except OSError:
+        pass
+
+
+def _emit_cooldown_unwritable_event(root: Path, error: Exception) -> None:
+    """One remediation intake per process; Linear is cooled down, so file via gh."""
+    global _COOLDOWN_UNWRITABLE_EVENT_FIRED
+    if _COOLDOWN_UNWRITABLE_EVENT_FIRED:
+        return
+    _COOLDOWN_UNWRITABLE_EVENT_FIRED = True
+    try:
+        pr_events.upsert_intake(remediation.remediation_event(
+            source="lanes",
+            fingerprint="linear-cooldown-unwritable",
+            subject={"cooldown_root": str(root)},
+            evidence={"excerpt": f"shared Linear cooldown write failed: {type(error).__name__}: {error}"},
+            ws="ci",
+            first_seen=remediation.now_iso()))
+    except Exception:
+        pass
+
+
+def _cooldown_write_failed(root: Path, scope_id: str, reset_s: float, error: Exception) -> None:
+    print(json.dumps({"schema": "jovie.linear-cooldown-write-failure/v1",
+                      "fingerprint": "linear-cooldown-unwritable", "root": str(root),
+                      "error": f"{type(error).__name__}: {error}"}),
+          file=sys.stderr, flush=True)
+    _PROCESS_LINEAR_COOLDOWNS[scope_id] = max(reset_s, _PROCESS_LINEAR_COOLDOWNS.get(scope_id, 0))
+    _tmp_fallback_publish(scope_id, reset_s)
+    _emit_cooldown_unwritable_event(root, error)
 
 
 def publish_linear_cooldown(key: str, headers, now: float | None = None) -> float:
@@ -1572,8 +1637,8 @@ def publish_linear_cooldown(key: str, headers, now: float | None = None) -> floa
                 _chmod_private(record, 0o600)
             finally:
                 fcntl.flock(handle, fcntl.LOCK_UN)
-    except Exception:
-        return reset_s
+    except Exception as error:
+        _cooldown_write_failed(root, scope.name, reset_s, error)
     return reset_s
 
 

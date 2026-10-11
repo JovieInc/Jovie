@@ -13,6 +13,7 @@ import {
   activeResetAt,
   credentialBackoff,
   credentialHash,
+  fallbackCooldownRoot,
   LINEAR_API_URL,
   legacyKeyHash,
   linearRequest,
@@ -156,6 +157,55 @@ describe('shared linear cooldown', () => {
       assert.ok(resetAt > Date.now());
     } finally {
       process.env.LINEAR_COOLDOWN_STATE_DIR = previousDir;
+    }
+  });
+
+  it('an unwritable state dir still backs siblings off and reports (JOV-7577)', async () => {
+    const key = 'fallback-secret';
+    const blocker = join(root, 'unwritable');
+    fs.writeFileSync(blocker, 'not a directory');
+    const fallbackScope = join(fallbackCooldownRoot(), credentialHash(key));
+    fs.rmSync(fallbackScope, { recursive: true, force: true });
+    const previousDir = process.env.LINEAR_COOLDOWN_STATE_DIR;
+    const logged = [];
+    const consoleError = console.error;
+    console.error = (...args) => logged.push(args.join(' '));
+    process.env.LINEAR_COOLDOWN_STATE_DIR = blocker;
+    try {
+      const resetAt = await publishLaneCooldown(
+        key,
+        { get: () => undefined },
+        Date.now(),
+        () => 0
+      );
+      assert.ok(resetAt > Date.now());
+      assert.ok(
+        logged.some(line => line.includes('linear-cooldown-unwritable')),
+        'the write failure must be logged loudly'
+      );
+      // The deadline survived without the canonical dir: siblings see the tmp
+      // record and this process keeps its own copy.
+      assert.equal((await activeResetAt(key, Date.now())) >= resetAt, true);
+      const names = fs
+        .readdirSync(fallbackScope)
+        .filter(name => /^\d+-[0-9a-f-]+\.json$/.test(name));
+      assert.equal(names.length >= 1, true);
+      let calls = 0;
+      const skipped = await linearRequest({
+        key,
+        query: 'query { viewer { id } }',
+        variables: {},
+        fetchImpl: async () => {
+          calls += 1;
+          return new Response('{"data":{"ok":true}}', { status: 200 });
+        },
+      });
+      assert.equal(skipped.rateLimited, true);
+      assert.equal(calls, 0);
+    } finally {
+      console.error = consoleError;
+      process.env.LINEAR_COOLDOWN_STATE_DIR = previousDir;
+      fs.rmSync(fallbackScope, { recursive: true, force: true });
     }
   });
 });
