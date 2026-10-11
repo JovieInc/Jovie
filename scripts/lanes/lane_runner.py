@@ -5428,8 +5428,8 @@ def with_checks(pr: dict) -> dict:
 
 
 def reclaimable_drafts() -> list[dict]:
-    """Abandoned agent drafts the lanes reclaim (Tim, 2026-10-10): non-lane agent branches past
-    the 7-day SLO that are idle 48h, red or conflicting, and not held. Same-repo only."""
+    """Abandoned drafts the lanes reclaim (Tim, 2026-10-10/11): any same-repo non-lane draft
+    past the age floor with no commit for 48h, red or conflicting, and not held."""
     now = time.time()
     return [pr for pr in open_prs_summary() if not pr.get("isCrossRepository")
             and pr_events.abandoned_agent_draft(pr, now)

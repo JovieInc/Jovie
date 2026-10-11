@@ -238,18 +238,38 @@ def stale_agent_drafts(prs: list[dict], now: float) -> list[dict]:
     return [pr for pr in prs if abandoned_agent_draft(pr, now)]
 
 
+def last_activity(pr: dict) -> float | None:
+    """When the writer last moved the PR: its head commit time. `updatedAt` also moves on bot
+    and keepalive comments (a bare issue-id comment every ~15 min kept drafts "active" for
+    days), so it is only the fallback for rows read without the commit date."""
+    committed = iso_ts(pr.get("lastCommitAt"))
+    return committed if committed is not None else iso_ts(pr.get("updatedAt"))
+
+
 def abandoned_agent_draft(pr: dict, now: float) -> bool:
-    """A draft the lanes do not gate (not a lane branch) on an agent-owned prefix, old enough
-    that age alone is the governor signal, and demonstrably stalled: idle past the stale SLO
-    or already conflicting/red. A recently pushed draft still in motion is left alone."""
+    """A draft the lanes do not gate (not a lane branch), old enough that age alone is the
+    governor signal, and demonstrably stalled: no commit past the stale SLO or already
+    conflicting/red. A recently pushed draft still in motion is left alone.
+
+    Any same-repo writer counts (Tim, 2026-10-11: no PR sits as a draft without an owner
+    moving it to merge). Agent sessions also publish as the founder on `feat/`, `tables/`,
+    `brand/`, `docs/` branches, so a branch prefix cannot tell a live writer from an
+    abandoned one; only the commit clock can. `hold` stays the explicit opt-out, and
+    reclaiming only repairs and readies: closure still needs an agent branch and an explicit
+    duplicate label (JOV-INV-011)."""
     branch = pr.get("headRefName") or ""
-    if not pr.get("isDraft") or LANE_BRANCH.match(branch) or not AGENT_BRANCH.match(branch):
+    if not pr.get("isDraft") or LANE_BRANCH.match(branch) or pr.get("isCrossRepository"):
+        return False
+    # A stacked draft belongs to its parent's stack: it either waits on an open parent or,
+    # once the parent squash-merged, on the unstack controller. A lane rebasing it onto main
+    # would re-add the parent's commits (memory: lanes unstack stacked PRs).
+    if (pr.get("baseRefName") or "main") != "main":
         return False
     created = iso_ts(pr.get("createdAt"))
     if created is None or now - created <= AGENT_DRAFT_S:
         return False
-    updated = iso_ts(pr.get("updatedAt"))
-    idle = now - updated if updated is not None else AGENT_DRAFT_S
+    moved = last_activity(pr)
+    idle = now - moved if moved is not None else AGENT_DRAFT_S
     return idle > STALE_DRAFT_S or pr.get("mergeStateStatus") == "DIRTY" \
         or pr.get("rollup") in ("FAILURE", "ERROR")
 
@@ -279,7 +299,7 @@ def dispositions(prs: list[dict], plan: dict, attempts: dict, max_attempts: int,
     rows = []
     for pr in prs:
         number, labels = pr["number"], label_names(pr)
-        updated = iso_ts(pr.get("updatedAt"))
+        updated = last_activity(pr)
         created = iso_ts(pr.get("createdAt"))
         idle_s = now - updated if updated is not None else 0
         holds = ({label.lower() for label in labels} & HOLD_LABELS) or (
@@ -1404,7 +1424,7 @@ pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor}
 baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue autoMergeRequest{enabledAt}
 isCrossRepository createdAt updatedAt
 labels(first:30){nodes{name}} files(first:100){totalCount nodes{path additions deletions changeType}}
-commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}"""
+commits(last:1){nodes{commit{committedDate statusCheckRollup{state}}}}}}}}"""
 
 
 def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
@@ -1429,6 +1449,7 @@ def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
         for node in page["nodes"]:
             commits = node.pop("commits", {}).get("nodes") or [{}]
             node["rollup"] = ((commits[0].get("commit") or {}).get("statusCheckRollup") or {}).get("state")
+            node["lastCommitAt"] = (commits[0].get("commit") or {}).get("committedDate")
             node["labels"] = node.get("labels", {}).get("nodes", [])
             files = node.pop("files", {}) or {}
             node["files"] = files.get("nodes") or []
@@ -1503,7 +1524,9 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
             wanted.append("green")
         found = LANE_BRANCH.match(pr.get("headRefName") or "")
         stalled_agent_draft = abandoned_agent_draft(pr, now)
-        if pr.get("isDraft") and (age > STALE_DRAFT_S or stalled_agent_draft):
+        moved = last_activity(pr)
+        draft_idle = now - moved if moved is not None else 0
+        if pr.get("isDraft") and (draft_idle > STALE_DRAFT_S or stalled_agent_draft):
             if found:
                 counts["staleLaneDrafts"] += 1
                 group = lane_groups.get(found.group("issue"), [pr])
@@ -1513,12 +1536,12 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
                     plan["close"].append((number, f"superseded by #{best['number']} for the same issue"))
                     continue
                 wanted.append("stale")
-            elif agent_owned(pr):
+            elif agent_owned(pr) or stalled_agent_draft:
                 waiting_on = (deps or {}).get(number) if stalled_agent_draft else None
                 if waiting_on:
                     counts["staleAgentDrafts"] += 1
                     plan["depHolds"].append((number, waiting_on))
-                elif stalled_agent_draft and duplicate_authorized(pr):
+                elif stalled_agent_draft and agent_owned(pr) and duplicate_authorized(pr):
                     opened = iso_ts(pr.get("createdAt"))
                     days = int((now - opened) // 86400) if opened is not None else int(age // 86400)
                     plan["close"].append((number, f"abandoned agent draft: open {days}d with no "

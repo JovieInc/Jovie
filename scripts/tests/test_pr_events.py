@@ -1056,7 +1056,8 @@ class GapTest(unittest.TestCase):
                       updatedAt=old),
             # young agent draft (2d) idle >48h is counted, not reclaimed (its writer may still move it)
             self.node(23, isDraft=True, headRefName="codex/fresh-wip", createdAt="2033-05-16T00:00:00Z", updatedAt=old),
-            # a human's own branch is never the lanes' to close
+            # a founder-account writer branch (agent sessions publish as Tim) is reclaimed too,
+            # but never closed
             self.node(24, isDraft=True, headRefName="feature/personal-wip", createdAt=ancient,
                       updatedAt=ancient),
         ]
@@ -1064,15 +1065,19 @@ class GapTest(unittest.TestCase):
         self.assertEqual(plan["close"], [])
         # Tim, 2026-10-10: Symphony reclaims abandoned agent drafts and finishes them. The
         # conflicting one is repaired and finished; the idle one is finished; the young one
-        # and the dependency-held one stay with their writer; a human branch is never touched.
-        self.assertEqual(plan["label"], [(20, "conflict"), (20, "stale"), (21, "stale")])
+        # and the dependency-held one stay with their writer. Tim, 2026-10-11: a founder-account
+        # writer draft is no exception (no draft sits without an owner); it is never closed.
+        self.assertEqual(plan["label"], [(20, "conflict"), (20, "stale"), (21, "stale"), (24, "stale")])
         self.assertEqual(plan["depHolds"], [(22, [9])])
         counts = plan["counts"]
-        self.assertEqual((counts["staleAgentDrafts"], counts["staleOtherDrafts"]), (4, 1))
+        self.assertEqual((counts["staleAgentDrafts"], counts["staleOtherDrafts"]), (5, 0))
         states = {row["pr"]: row["state"] for row in plan["dispositions"]}
         self.assertEqual(states[20], "advancing", "a reclaimed draft carries a fix label the lanes act on")
         self.assertEqual(states[22], "hold:dependency")
-        self.assertEqual(states[24], "draft")
+        self.assertEqual(states[24], "advancing")
+        duplicate = {**prs[4], "labels": [{"name": "duplicate"}]}
+        self.assertEqual(events.reconcile_plan([duplicate], {}, set(), 2, now)["close"], [],
+                         "reclaiming a writer draft never grants closure")
         # A landed dependency releases the draft to the lanes; it never grants retirement authority.
         landed = events.reconcile_plan(prs, {}, set(), 2, now, deps={})
         self.assertEqual(landed["close"], [])
@@ -1090,8 +1095,32 @@ class GapTest(unittest.TestCase):
         self.assertFalse(events.in_scope(moving, "red", set(), now), "a draft still being pushed stays with its writer")
         held = pr(32, branch="codex/held", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=old, labels=["hold"])
         self.assertFalse(events.in_scope(held, "red", set(), now))
-        human = pr(33, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old)
-        self.assertFalse(events.in_scope(human, "red", set(), now))
+        writer = pr(33, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old)
+        self.assertTrue(events.in_scope(writer, "red", set(), now), "founder-account writer drafts are reclaimed")
+        fork = pr(34, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old,
+                  isCrossRepository=True)
+        self.assertFalse(events.in_scope(fork, "red", set(), now))
+
+    def test_comment_keepalives_do_not_count_as_writer_activity(self):
+        """A bare issue-id comment every ~15 min moved updatedAt and hid abandoned drafts."""
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        ancient, old, recent = "2033-05-01T00:00:00Z", "2033-05-15T00:00:00Z", "2033-05-18T02:50:00Z"
+        chatty = pr(40, branch="tables/admin-people-dense", draft=True, merge="BLOCKED", createdAt=ancient,
+                    updatedAt=recent, lastCommitAt=old)
+        self.assertTrue(events.abandoned_agent_draft(chatty, now))
+        pushed = {**chatty, "lastCommitAt": recent}
+        self.assertFalse(events.abandoned_agent_draft(pushed, now), "a fresh commit keeps it with its writer")
+        legacy = {key: value for key, value in chatty.items() if key != "lastCommitAt"}
+        self.assertFalse(events.abandoned_agent_draft(legacy, now), "without a commit date updatedAt still counts")
+
+    def test_stacked_writer_draft_stays_with_its_stack(self):
+        """A lane rebase onto main would re-add the parent's commits; unstacking owns it."""
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        old = "2033-05-01T00:00:00Z"
+        child = pr(51, branch="tables/admin-people-dense", draft=True, merge="DIRTY", createdAt=old,
+                   updatedAt=old, baseRefName="tables/people-rows-dense")
+        self.assertFalse(events.abandoned_agent_draft(child, now))
+        self.assertTrue(events.abandoned_agent_draft({**child, "baseRefName": "main"}, now))
 
     def test_explicit_duplicate_plan_still_respects_holds_queue_and_forks(self):
         old = "2033-05-01T00:00:00Z"
@@ -1140,7 +1169,7 @@ class GapTest(unittest.TestCase):
 
     def test_stale_draft_disposition_names_the_real_next_step(self):
         """JOV-7132: a draft idle past the 48h SLO is not "inside the SLO". Non-agent
-        branches are never closed by the sweep; an agent draft past the 3d floor is reclaimed."""
+        branches are never closed by the sweep; any writer draft past the 3d floor is reclaimed."""
         now = events.iso_ts("2033-05-18T03:00:00Z")
         prs = [
             self.node(30, isDraft=True, headRefName="feat/jov-6507-thing",
@@ -1150,9 +1179,9 @@ class GapTest(unittest.TestCase):
         ]
         plan = events.reconcile_plan(prs, {}, set(), 2, now)
         rows = {row["pr"]: row for row in plan["dispositions"]}
-        self.assertEqual(rows[30]["state"], "draft")
-        self.assertEqual(rows[30]["reason"], "past the 48h stale SLO")
-        self.assertIn("never closes non-agent drafts", rows[30]["next"])
+        self.assertEqual(rows[30]["next"], "a lane works the labeled event")
+        self.assertIn((30, "stale"), plan["label"])
+        self.assertNotIn(30, [number for number, _ in plan["close"]])
         self.assertEqual(rows[31]["next"], "a lane works the labeled event")
         self.assertIn((31, "stale"), plan["label"])
 
