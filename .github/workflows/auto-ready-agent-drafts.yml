@@ -153,8 +153,9 @@ jobs:
           GH_RETRY_MAX_DELAY: 60
           TARGET_PR: ${{ github.event.inputs.pr_number || github.event.workflow_run.pull_requests[0].number || '' }}
           TARGET_HEAD: ${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || '' }}
-          # Missed-event recovery rides only the PR Ready producer's wakes and
-          # rotates by run number so no ineligible draft starves the rest.
-          MISSED_COHORT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Source Validation' && '3' || '0' }}
+          # Missed-event recovery rides only the PR Ready producer's wakes, one
+          # draft per wake, rotated by run number: every candidate is revisited
+          # within a few wakes without a per-event full scan of every draft.
+          MISSED_COHORT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Source Validation' && '1' || '0' }}
           RUN_OFFSET: ${{ github.run_number }}
         run: bash scripts/auto-ready-green-drafts.sh

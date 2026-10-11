@@ -355,7 +355,7 @@ describe('missed-event cohort selection', () => {
 describe('green-source shell controller (fake gh)', () => {
   const greenChecksJson = JSON.stringify(greenChecks());
 
-  function runController(snapshot, { mergedParents = {} } = {}) {
+  function runController(snapshot, env = {}) {
     const dir = mkdtempSync(join(tmpdir(), 'green-source-'));
     try {
       const states = Object.fromEntries(
@@ -384,11 +384,10 @@ describe('green-source shell controller (fake gh)', () => {
       writeFileSync(join(dir, 'snapshot.json'), JSON.stringify(snapshot));
       writeFileSync(join(dir, 'states.json'), JSON.stringify(states));
       writeFileSync(join(dir, 'checks.json'), greenChecksJson);
-      writeFileSync(join(dir, 'merged.json'), JSON.stringify(mergedParents));
       const fakeGh = `#!/usr/bin/env bash
 set -euo pipefail
 D="${dir}"
-echo "$*" >> "$D/calls.log"
+echo "$1 $2 $3" >> "$D/calls.log"
 args=("$@")
 jq_expr=""
 for ((i=0; i<\${#args[@]}; i++)); do
@@ -403,11 +402,9 @@ case "$1 $2" in
     for a in "$@"; do [[ "$a" == number=* ]] && n="\${a#number=}"; done
     jq -c --arg n "$n" '.[$n]' "$D/states.json" | emit ;;
   *)
-    if [[ "$1" == "api" && "$2" == repos/*/pulls\?state=closed* ]]; then
-      branch="\${2#*head=}"; branch="\${branch#*:}"; branch="\${branch%%&*}"
-      jq -c --arg b "$branch" '[(.[$b] // empty) | {number: ., merged_at: "2026-10-01T00:00:00Z"}]' "$D/merged.json" | emit
-    else
-      exit 0
+    if [[ "$1" == "api" && "$2" == repos/*/commits/*/pulls ]]; then
+      sha="\${2%/pulls}"; sha="\${sha##*/}"
+      jq -c --arg sha "$sha" '[.[] | {number, state: "open", base: {ref: .baseRefName}, head: {sha: $sha}}]' "$D/snapshot.json" | emit
     fi ;;
 esac
 `;
@@ -427,10 +424,17 @@ esac
             TARGET_PR: '',
             TARGET_HEAD: '',
             GH_RETRY_ATTEMPTS: '1',
+            ...env,
           },
         }
       );
-      return result;
+      let calls = [];
+      try {
+        calls = readFileSync(join(dir, 'calls.log'), 'utf8')
+          .split('\n')
+          .filter(Boolean);
+      } catch {}
+      return { ...result, calls };
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -447,5 +451,40 @@ esac
     expect(result.stdout).toContain('would mark #20874 ready');
     expect(result.stdout).toContain('would mark #20834 ready');
     expect(result.stdout).not.toContain('#20991');
+  });
+
+  it('an event for a ready PR costs one API read and never lists every PR', () => {
+    const result = runController([listed({ number: 21261, isDraft: false })], {
+      TARGET_PR: '21261',
+      TARGET_HEAD: head,
+      MISSED_COHORT: '0',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('green-source not-draft');
+    expect(result.calls, result.calls.join('\n')).toHaveLength(1);
+    expect(result.calls.join('\n')).not.toContain('pr list');
+  });
+
+  it('resolves a head-only event with the commit pulls API, not a PR scan', () => {
+    const result = runController([listed({ number: 20783 })], {
+      TARGET_HEAD: head,
+      MISSED_COHORT: '0',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('→ #20783');
+    expect(result.calls.join('\n')).toContain(`commits/${head}/pulls`);
+    expect(result.calls.join('\n')).not.toContain('pr list');
+  });
+
+  it('bounds a one-draft missed cohort to a single list plus one PR evaluation', () => {
+    const result = runController(
+      [listed({ number: 1 }), listed({ number: 2 }), listed({ number: 3 })],
+      { MISSED_COHORT: '1', RUN_OFFSET: '1' }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('missed candidate #2');
+    expect(result.stdout).not.toContain('#1 ');
+    // pr list + (state, checks) twice before the (dry-run) mutation.
+    expect(result.calls.length).toBeLessThanOrEqual(5);
   });
 });

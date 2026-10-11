@@ -152,6 +152,13 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
     echo "    ~ could not read live PR state for #$n; leaving PR unchanged"
     return 0
   fi
+  # State-only screen first: a ready, held, conflicting or non-main PR (most
+  # wakes) is rejected without spending a second API read on its checks.
+  verdict="$(classify_live "$n" "$before" '[]' "$expected_head")"
+  if [[ "$(jq -r '.reason' <<<"$verdict")" != checks:* ]]; then
+    echo "    ~ green-source $(jq -r '.reason' <<<"$verdict"); leaving PR unchanged"
+    return 0
+  fi
   if ! checks="$(read_checks "$n")"; then
     echo "    ~ required check status unavailable for #$n; leaving PR unchanged"
     return 0
@@ -230,15 +237,17 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
 }
 
 resolve_head_pr() {  # resolve_head_pr <sha>
+  # One REST read of the PRs that own this exact commit, instead of listing
+  # every open PR per event (the shared API budget is the bottleneck).
   local sha="$1"
-  gh_retry pr list -R "$REPO" --state open --limit 200 \
-    --json number,isDraft,headRefOid,baseRefName \
-    | jq -r --arg head "$sha" '
+  [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || return 1
+  gh_retry api "repos/${REPO}/commits/${sha}/pulls" --jq "
       .[]
-      | select(.baseRefName == "main")
-      | select(((.headRefOid // "") | ascii_downcase) == $head)
+      | select(.state == \"open\")
+      | select(.base.ref == \"main\")
+      | select(((.head.sha // \"\") | ascii_downcase) == \"${sha}\")
       | .number
-    '
+    "
 }
 
 echo "=== AUTO-READY GREEN-SOURCE: event-driven undraft (no queue enroll) ==="
