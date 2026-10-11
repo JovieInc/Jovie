@@ -38,9 +38,9 @@ if (pr) {
         encoding: 'utf8',
         env: {
           ...process.env,
-          GH_RETRY_ATTEMPTS: '3',
+          GH_RETRY_ATTEMPTS: '8',
           GH_RETRY_BASE_DELAY: '2',
-          GH_RETRY_MAX_DELAY: '4',
+          GH_RETRY_MAX_DELAY: '30',
         },
       }
     )
