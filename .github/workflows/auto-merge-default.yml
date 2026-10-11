@@ -112,6 +112,9 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: read
+          # Auto-merge on a head that edits .github/workflows needs it
+          # ("`workflows` scope may be required"); the installation grants it.
+          permission-workflows: write
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -191,6 +194,7 @@ jobs:
           permission-issues: write
           permission-pull-requests: write
           permission-statuses: read
+          permission-workflows: write
       - name: Triage stuck PRs
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
