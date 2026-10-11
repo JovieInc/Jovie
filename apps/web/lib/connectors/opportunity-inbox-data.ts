@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, desc, eq, gte, inArray, ne, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, type SQL } from 'drizzle-orm';
 import {
   isMissingConnectorSchemaError,
   isMissingSignalTypeColumnError,
@@ -11,6 +11,8 @@ import { suggestedActions } from '@/lib/db/schema/connectors';
 import { feedbackItems } from '@/lib/db/schema/feedback';
 import { tourDates } from '@/lib/db/schema/tour';
 import { logger } from '@/lib/utils/logger';
+import { isCreatorInboxSourceKind } from './creator-inbox-source-policy';
+import { creatorInboxSourceCondition } from './creator-inbox-source-policy.server';
 import { buildOpportunityInboxData } from './opportunity-inbox-mapper';
 import { mapTourDateRowToInboxItem } from './opportunity-inbox-tour-dates';
 import type {
@@ -22,10 +24,7 @@ import {
   parseSocialInboxFeedbackSample,
 } from './social-inbox-ranker';
 
-import {
-  SOCIAL_REPLY_DRAFT_KIND,
-  WORKFLOW_CAPTURE_REQUEST_KIND,
-} from './suggested-action-kinds';
+import { SOCIAL_REPLY_DRAFT_KIND } from './suggested-action-kinds';
 
 const PENDING_TOUR_DATE_LIMIT = 20;
 const CONFIRMED_TOUR_DATE_LIMIT = 10;
@@ -60,7 +59,7 @@ function pendingForUser(userId: string): SQL | undefined {
     eq(suggestedActions.userId, userId),
     eq(suggestedActions.status, 'pending'),
     // Workflow recordings belong to Ovie, including for founders using Jovie.
-    ne(suggestedActions.kind, WORKFLOW_CAPTURE_REQUEST_KIND)
+    creatorInboxSourceCondition(suggestedActions.kind)
   );
 }
 
@@ -103,7 +102,11 @@ async function buildRankedOpportunityInbox(
   const preferences = rows.some(row => row.kind === SOCIAL_REPLY_DRAFT_KIND)
     ? await loadSocialInboxRankingPreferences(userId)
     : undefined;
-  return buildOpportunityInboxData(rows, tourDateSections, { preferences });
+  return buildOpportunityInboxData(
+    rows.filter(row => isCreatorInboxSourceKind(row.kind)),
+    tourDateSections,
+    { preferences }
+  );
 }
 
 /**

@@ -6,5 +6,6 @@ export type { ActivityRange, JovieWorkItem };
 export interface JovieWorkFeedProps {
   readonly profileId: string;
   readonly range?: ActivityRange;
+  readonly completedOnly?: boolean;
   readonly showHeader?: boolean;
 }

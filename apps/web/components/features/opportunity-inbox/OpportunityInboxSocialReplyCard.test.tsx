@@ -79,7 +79,7 @@ describe('OpportunityInboxSocialReplyCard', () => {
     expect(onDismiss).toHaveBeenCalledWith('reply-1');
   });
 
-  it('submits revision feedback through onRevise and clears the field', async () => {
+  it('submits revision feedback and preserves input until the replacement is committed', async () => {
     const user = userEvent.setup();
     const onRevise = vi.fn();
     renderCard({ onRevise });
@@ -98,8 +98,8 @@ describe('OpportunityInboxSocialReplyCard', () => {
 
     await user.click(submit);
     expect(onRevise).toHaveBeenCalledWith('reply-1', 'Make it warmer');
-    expect(field).toHaveValue('');
-    expect(reviseToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(field).toHaveValue('Make it warmer');
+    expect(reviseToggle).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('surfaces the execution state label when mapped', () => {

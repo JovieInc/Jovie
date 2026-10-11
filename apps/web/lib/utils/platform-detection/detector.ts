@@ -211,8 +211,15 @@ export function canonicalIdentity(
     const platformId = link.platform.id;
     let identity: string | null = null;
 
+    // Names are mutable and shared by different people; the store ID is not.
+    if (
+      platformId === 'beatport' &&
+      ['artist', 'release', 'track'].includes(parts[0])
+    ) {
+      identity = `beatport:${parts[0]}:${parts.at(-1)}`;
+    }
     // Social platforms with username as first segment
-    if (['instagram', 'twitter', 'tiktok'].includes(platformId)) {
+    else if (['instagram', 'twitter', 'tiktok'].includes(platformId)) {
       identity = getSocialPlatformIdentity(platformId, parts);
     }
     // YouTube with multiple URL formats

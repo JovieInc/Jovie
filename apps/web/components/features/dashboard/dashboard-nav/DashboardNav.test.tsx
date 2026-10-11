@@ -310,15 +310,22 @@ describe('DashboardNav route warming', () => {
     }
   });
 
-  it('stages the search slot exit on the shared rail-motion contract (JOV-4522)', () => {
-    const source = readWebSource(
-      'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
+  it('retains New Chat while secondary commands leave collapsed keyboard and AX navigation', () => {
+    const view = renderDashboardNav({
+      renderFn: render,
+      sidebarProps: { defaultOpen: false },
+      navChildren: <button type='button'>Search fixture</button>,
+    });
+    const create = view.getByRole('link', { name: 'New Chat' });
+    expect(create.closest('[inert], [aria-hidden="true"]')).toBeNull();
+    expect(view.queryByRole('button', { name: 'Search fixture' })).toBeNull();
+    const secondary = view.container.querySelector(
+      '[data-sidebar-search-slot] > [inert]'
     );
-    // The search pill collapses vertically (max-height + fade) in lockstep
-    // with the rail instead of snapping to display:none at frame one.
-    const slot = source.slice(source.indexOf('data-sidebar-search-slot'));
-    expect(slot).toContain('SHELL_RAIL_BLOCK_LABEL');
-    expect(slot).not.toContain('group-data-[collapsible=icon]:hidden');
+    expect(secondary).toHaveAttribute('aria-hidden', 'true');
+    expect(
+      secondary?.querySelector('[data-navigation-item-id="inbox"]')
+    ).not.toBeNull();
   });
 
   it('imports sidebar chrome from the modular sidebar specifier', () => {

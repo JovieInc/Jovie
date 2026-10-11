@@ -14,6 +14,7 @@ import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({ toggle: vi.fn() }),
+  useOptionalPreviewPanelState: () => null,
 }));
 
 vi.mock('@/components/organisms/PersistentAudioBar', () => ({
