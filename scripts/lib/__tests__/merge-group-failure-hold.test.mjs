@@ -669,6 +669,26 @@ describe('failure classification and revision-scoped suppression', () => {
       'deterministic-source'
     );
     expect(classify('failure', ['Run unit tests'])).toBe('retryable-product');
+    // #20958 (run 38167113928): static build-output certification is not
+    // retried on an unchanged head.
+    for (const step of [
+      'Certify marketing SEO against prerendered HTML',
+      'Certify marketing route DOM invariants',
+    ]) {
+      expect(
+        classify('failure', [
+          step,
+          'Join exact lane results',
+          'Evaluate combined-head checks',
+        ])
+      ).toBe('deterministic-source');
+    }
+    expect(
+      classify('failure', [
+        'Run ./.github/actions/setup-node-pnpm',
+        'Join exact lane results',
+      ])
+    ).toBe('unclassified');
     expect(classify('startup_failure')).toBe('transient-infrastructure');
   });
 
