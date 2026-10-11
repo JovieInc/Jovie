@@ -1142,7 +1142,6 @@ describe('selection exclusions for shipped and unhandoffable work (JOV-8000 foll
     );
     assert.equal(byId['JOV-6022'].outcome, 'superseded');
     assert.equal(byId['JOV-6022'].reason, 'merged-pr-still-open-in-linear');
-    // the next eligible candidate still gets the slot
     assert.deepEqual(
       built.cohort.selected.map(item => item.identifier),
       ['JOV-7000']
@@ -1162,8 +1161,6 @@ describe('selection exclusions for shipped and unhandoffable work (JOV-8000 foll
     const byId = Object.fromEntries(
       built.matrix.map(item => [item.identifier, item])
     );
-    // assigned is excluded (admission disposition fires first as
-    // 'already-assigned'; the shared handoff predicate is the same class)
     assert.equal(byId['JOV-7001'].outcome, 'blocked');
     assert.equal(byId['JOV-7001'].reason, 'already-assigned');
     assert.deepEqual(
@@ -1176,22 +1173,18 @@ describe('selection exclusions for shipped and unhandoffable work (JOV-8000 foll
     const { selectionHandoffExclusion } = await import(
       '../backlog-remediation.mjs'
     );
-    // assigned: both read 'assigned'
     const assigned = issue('JOV-7003', {
       assignee: { id: 'u1', name: 'Someone' },
     });
     assert.equal(selectionHandoffExclusion(assigned), 'assigned');
-    // not Todo
     assert.equal(
       selectionHandoffExclusion(issue('JOV-7004', { state: 'In Progress' })),
       'not-todo'
     );
-    // protected label
     assert.equal(
       selectionHandoffExclusion(issue('JOV-7005', { labels: ['protected'] })),
       'protected-label'
     );
-    // clean Todo unassigned -> null (handoffable)
     assert.equal(selectionHandoffExclusion(issue('JOV-7006')), null);
   });
 });
