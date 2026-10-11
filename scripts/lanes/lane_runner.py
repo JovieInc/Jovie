@@ -58,6 +58,7 @@ import reason_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
+import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
@@ -3855,6 +3856,8 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
             continue
         if row.get("status") != "claimed" or row.get("lane") != name or row.get("running"):
             continue
+        if (row.get("team") or bindings.team_of(row.get("identifier") or "")) not in ("", "JOV"):
+            continue  # Another team's issue runs in its own repo via its binding, never in Jovie.
         if row.get("identifier") in held_back:
             continue
         if not row.get("issueId"):
@@ -5899,6 +5902,16 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         record_idle_exit(host, name, "disk-unobservable")
         slot.release()
         return 1
+    # Extra repository bindings (LYB) share this seat. Jovie-only holds below never block them,
+    # and a binding fault never blocks the Jovie path. No configured binding = no reads at all.
+    try:
+        bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only)
+    except Exception as error:
+        bound = None
+        print(f"binding pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
+    if bound is not None:
+        slot.release()
+        return 1 if bound == "disk-held" else reexec(host, name)
     linear = None
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
