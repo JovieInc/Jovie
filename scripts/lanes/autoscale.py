@@ -205,10 +205,12 @@ def _load_ratio(sample: dict) -> float | None:
     load, cpu = _num(sample.get("load1")), _int(sample.get("cpuCount")); return None if load is None or cpu is None or cpu <= 0 else load / cpu
 def _psi_known(psi) -> bool:
     return isinstance(psi, dict) and all(_num(psi.get(key)) is not None for key in _PSI)
-def _lane_ceiling(name: str, base: int, running, obs: dict, config: dict) -> int:
+def _lane_ceiling(name: str, base: int, running, obs: dict, config: dict, host_cap: int) -> int:
+    # Tim 2026-10-11: lanes are capped by compute and credits only. A lane may grow to the host's
+    # compute cap; credit limits (codex leases, provider cooldowns) and host pressure still apply.
     if base <= 0:
         return 0
-    named = _int(_obj(config.get("max")).get(name)); cap = named if named is not None and named > 0 else 2 * base
+    named = _int(_obj(config.get("max")).get(name)); cap = named if named is not None and named > 0 else host_cap
     if name == "codex":
         unleased = _count(obs.get("codexUnleasedAvailable"))
         cap = min(cap, base) if unleased is None or running is None else min(cap, max(0, running) + max(0, unleased))
@@ -350,7 +352,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
     cpu = _int(sample.get("cpuCount")) or 0; cpu = max(0, cpu); enabled = [base for base in bases.values() if _int(base) is not None and base > 0]
     base_sum, host_max = sum(enabled), config.get("hostMax")
     host_max = _int(host_max)
-    host_cap = min(host_max if host_max is not None and host_max > 0 else 2 * base_sum, cpu); fresh = obs.get("doctorFresh") is True
+    host_cap = min(host_max if host_max is not None and host_max > 0 else cpu, cpu); fresh = obs.get("doctorFresh") is True
     unknown = _budget_unknown(obs) if fresh else None; brake = _throughput_brake(previous, obs, now, interval)
     obs = {**obs, "throughputBrake": brake}; rows, pending = {}, []
     for order, (name, raw_base) in enumerate(bases.items()):
@@ -358,7 +360,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
         running = _int(_obj(obs.get("runningByProvider")).get(name))
         if base <= 0:
             rows[name] = _row(0, 0, running, changed, "hold:disabled", ["disabled"], 0); continue
-        ceiling = _lane_ceiling(name, base, running, obs, config)
+        ceiling = _lane_ceiling(name, base, running, obs, config, host_cap)
         current = _int(prev.get("effective")); current = base if current is None or current < 0 else current
         if not fresh:
             fallback = min(base, current, ceiling)

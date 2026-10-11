@@ -5811,66 +5811,71 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
         # A preserved checkout needs its existing reconciliation/qualification path.
         # Withhold it from this cheap demand hint; never touch or qualify that work.
         preserved = maintenance_preserved(host.state)
-        eligible = set()
+        eligible, unknown_rows = set(), 0
         rows = {pr["number"]: pr for pr in best_per_issue([*prs, *candidates, *events])}
         current = {pr["number"]: pr for pr in _SUMMARY["prs"]}
         event_rows = {pr["number"]: pr for pr in events}
         adopt_numbers = {pr["number"] for pr in prs}
         for number, candidate in rows.items():
-            pr = current.get(number)
-            if not pr or pr.get("headRefOid") != candidate.get("headRefOid") \
-                    or not isinstance(pr.get("headRefName"), str) or not pr["headRefName"] \
-                    or any(type(pr.get(key)) is not bool for key in ("isDraft", "isCrossRepository", "isInMergeQueue")) \
-                    or not isinstance(pr.get("labels"), list) or not isinstance(pr.get("statusCheckRollup"), list):
-                raise ValueError("maintenance-current-metadata-unknown")
-            remote_active = any(key[:2] == (number, pr["headRefOid"]) and row.get("active")
-                                and 0 <= now - row["at"] <= SUMMARY_TTL_S
-                                for key, row in _CLAIM_OBSERVATIONS.items())
-            if number in selected or number in preserved or remote_active or not pr_events.in_scope(pr, "red", disabled) \
-                    or pr.get("isInMergeQueue") or (pr.get("headRefName") or "").startswith("dependabot/"):
-                continue
-            attempt = attempts.get(str(number), {})
-            entry = held.get(str(number), {})
-            if not isinstance(attempt, dict) or not isinstance(entry, dict) \
-                    or type(attempt.get("count", 0)) is not int or attempt.get("count", 0) < 0 \
-                    or (attempt and (not isinstance(attempt.get("sha"), str) or not attempt["sha"])) \
-                    or ("at" in attempt and (type(attempt["at"]) not in (int, float) or not math.isfinite(attempt["at"]) or attempt["at"] <= 0)):
-                raise ValueError("maintenance-disposition-unknown")
-            if ("pushed" in attempt and type(attempt["pushed"]) is not bool) or (
-                    "pushedHead" in attempt and (not isinstance(attempt["pushedHead"], str) or not attempt["pushedHead"].strip())):
-                raise ValueError("maintenance-generation-unknown")
-            ended = attempt.get("endedAt")
-            if ended is not None and not (
-                    (type(ended) in (int, float) and math.isfinite(ended) and 0 < ended <= now)
-                    or (isinstance(ended, str) and (ended_at := pr_events.iso_ts(ended)) is not None and 0 < ended_at <= now)):
-                raise ValueError("maintenance-ended-lease-unknown")
-            if entry and (not isinstance(entry.get("sha"), str) or not entry["sha"]
-                          or not isinstance(entry.get("evidence"), list)
-                          or any(not isinstance(item, str) for item in entry["evidence"])
-                          or ("at" in entry and (type(entry["at"]) not in (int, float)
-                                                 or not math.isfinite(entry["at"]) or entry["at"] <= 0))):
-                raise ValueError("maintenance-hold-unknown")
-            if pr_events.preservation_reason(pr, attempt, MAX_FIX_ATTEMPTS, held=entry, now=now, allow_reentry=True) \
-                    or pr_events.in_flight(attempt, pr, now):
-                continue
-            kinds = [kind for kind in event_rows.get(number, {}).get("eventKinds", [])
-                     if kind in pr_events.FIX_KINDS and pr_events.PREFIX + kind in pr_events.label_names(pr)]
-            event_work = kinds and pr_events.needs_work(THIS, {**pr, "eventKinds": kinds}) \
-                and pr_events.fixable_hold(entry, pr["headRefOid"])
-            if set(kinds) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
-                    and pr_events.POISON_LABEL not in pr_events.label_names(pr) \
-                    and str(number) not in snapshots["synced.json"]:
-                event_work = False  # Existing no-model sync must precede this repair.
-            if provider_may_run(name, "fix") and pr_events.may_take(name, pr, attempt, order, now) \
-                    and (red_pr([pr], attempts, held) or event_work):
-                eligible.add(number)
-            elif number in adopt_numbers and provider_may_run(name, "adopt") and unverified_pr(
-                    [pr], snapshots["verified.json"], snapshots["requeue.json"]) \
-                    and not gate_disposition(pr, held, attempts):
-                eligible.add(number)
+            try:
+                pr = current.get(number)
+                if not pr or pr.get("headRefOid") != candidate.get("headRefOid") \
+                        or not isinstance(pr.get("headRefName"), str) or not pr["headRefName"] \
+                        or any(type(pr.get(key)) is not bool for key in ("isDraft", "isCrossRepository", "isInMergeQueue")) \
+                        or not isinstance(pr.get("labels"), list) or not isinstance(pr.get("statusCheckRollup"), list):
+                    raise ValueError("maintenance-current-metadata-unknown")
+                remote_active = any(key[:2] == (number, pr["headRefOid"]) and row.get("active")
+                                    and 0 <= now - row["at"] <= SUMMARY_TTL_S
+                                    for key, row in _CLAIM_OBSERVATIONS.items())
+                if number in selected or number in preserved or remote_active or not pr_events.in_scope(pr, "red", disabled) \
+                        or pr.get("isInMergeQueue") or (pr.get("headRefName") or "").startswith("dependabot/"):
+                    continue
+                attempt = attempts.get(str(number), {})
+                entry = held.get(str(number), {})
+                if not isinstance(attempt, dict) or not isinstance(entry, dict) \
+                        or type(attempt.get("count", 0)) is not int or attempt.get("count", 0) < 0 \
+                        or (attempt and (not isinstance(attempt.get("sha"), str) or not attempt["sha"])) \
+                        or ("at" in attempt and (type(attempt["at"]) not in (int, float) or not math.isfinite(attempt["at"]) or attempt["at"] <= 0)):
+                    raise ValueError("maintenance-disposition-unknown")
+                if ("pushed" in attempt and type(attempt["pushed"]) is not bool) or (
+                        "pushedHead" in attempt and (not isinstance(attempt["pushedHead"], str) or not attempt["pushedHead"].strip())):
+                    raise ValueError("maintenance-generation-unknown")
+                ended = attempt.get("endedAt")
+                if ended is not None and not (
+                        (type(ended) in (int, float) and math.isfinite(ended) and 0 < ended <= now)
+                        or (isinstance(ended, str) and (ended_at := pr_events.iso_ts(ended)) is not None and 0 < ended_at <= now)):
+                    raise ValueError("maintenance-ended-lease-unknown")
+                if entry and (not isinstance(entry.get("sha"), str) or not entry["sha"]
+                              or not isinstance(entry.get("evidence"), list)
+                              or any(not isinstance(item, str) for item in entry["evidence"])
+                              or ("at" in entry and (type(entry["at"]) not in (int, float)
+                                                     or not math.isfinite(entry["at"]) or entry["at"] <= 0))):
+                    raise ValueError("maintenance-hold-unknown")
+                if pr_events.preservation_reason(pr, attempt, MAX_FIX_ATTEMPTS, held=entry, now=now, allow_reentry=True) \
+                        or pr_events.in_flight(attempt, pr, now):
+                    continue
+                kinds = [kind for kind in event_rows.get(number, {}).get("eventKinds", [])
+                         if kind in pr_events.FIX_KINDS and pr_events.PREFIX + kind in pr_events.label_names(pr)]
+                event_work = kinds and pr_events.needs_work(THIS, {**pr, "eventKinds": kinds}) \
+                    and pr_events.fixable_hold(entry, pr["headRefOid"])
+                if set(kinds) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
+                        and pr_events.POISON_LABEL not in pr_events.label_names(pr) \
+                        and str(number) not in snapshots["synced.json"]:
+                    event_work = False  # Existing no-model sync must precede this repair.
+                if provider_may_run(name, "fix") and pr_events.may_take(name, pr, attempt, order, now) \
+                        and (red_pr([pr], attempts, held) or event_work):
+                    eligible.add(number)
+                elif number in adopt_numbers and provider_may_run(name, "adopt") and unverified_pr(
+                        [pr], snapshots["verified.json"], snapshots["requeue.json"]) \
+                        and not gate_disposition(pr, held, attempts):
+                    eligible.add(number)
+            except ValueError:
+                # One stale or racing row (two caches, different TTLs) must not erase the
+                # demand every other PR proves; eligible is then a lower bound (2026-10-11).
+                unknown_rows += 1
         if eligible:
             pending_count = len(eligible)
-        elif _SUMMARY["readable"] and 0 <= now - _SUMMARY["at"] <= SUMMARY_TTL_S \
+        elif not unknown_rows and _SUMMARY["readable"] and 0 <= now - _SUMMARY["at"] <= SUMMARY_TTL_S \
                 and not _SUMMARY["prs"] and not rows:
             # A complete empty repository inventory proves no PR maintenance.
             pending_count = 0
