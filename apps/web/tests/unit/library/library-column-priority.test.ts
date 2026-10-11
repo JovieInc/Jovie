@@ -62,16 +62,13 @@ describe('library column priority', () => {
           | { compact?: (asset: unknown) => unknown }
           | undefined
       )?.compact;
-    const empty = { providers: [], totalDurationMs: null };
 
     for (const metric of ['bpm', 'key', 'energy', 'rating']) {
       expect(compactFor(metric)).toBeUndefined();
     }
-    expect(compactFor('length')?.(empty)).toBeNull();
-    expect(compactFor('providers')?.(empty)).toBeNull();
-    expect(
-      compactFor('length')?.({ ...empty, totalDurationMs: 1000 })
-    ).not.toBeNull();
+    for (const id of ['artist', 'type', 'providers', 'length']) {
+      expect(compactFor(id)).toBeUndefined();
+    }
   });
 
   it('never folds the share URL beside a list title', () => {

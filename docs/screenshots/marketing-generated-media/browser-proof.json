@@ -1,0 +1,186 @@
+[
+  {
+    "direction": "first",
+    "width": 390,
+    "theme": "dark",
+    "digest": "sha256:d5b3128c2077fede9fd1733226345995448581f1d1164fe57743076d9eebd77d",
+    "cls": 0,
+    "geometry": {
+      "naturalWidth": 975,
+      "naturalHeight": 609,
+      "box": {
+        "x": 21,
+        "y": 1546.9375,
+        "width": 348,
+        "height": 217.5,
+        "top": 1546.9375,
+        "right": 369,
+        "bottom": 1764.4375,
+        "left": 21
+      },
+      "documentWidth": 390
+    },
+    "pixel": [25, 25, 25, 255]
+  },
+  {
+    "direction": "second",
+    "width": 390,
+    "theme": "dark",
+    "digest": "sha256:30d1bc19d16faf254c49303a16fd3a103eb2ea39c897448452f1bb511f5c2759",
+    "cls": 0,
+    "geometry": {
+      "naturalWidth": 975,
+      "naturalHeight": 609,
+      "box": {
+        "x": 21,
+        "y": 1546.9375,
+        "width": 348,
+        "height": 217.5,
+        "top": 1546.9375,
+        "right": 369,
+        "bottom": 1764.4375,
+        "left": 21
+      },
+      "documentWidth": 390
+    },
+    "pixel": [37, 37, 37, 255]
+  },
+  {
+    "direction": "first",
+    "width": 390,
+    "theme": "light",
+    "digest": "sha256:d5b3128c2077fede9fd1733226345995448581f1d1164fe57743076d9eebd77d",
+    "cls": 0,
+    "geometry": {
+      "naturalWidth": 975,
+      "naturalHeight": 609,
+      "box": {
+        "x": 21,
+        "y": 1546.9375,
+        "width": 348,
+        "height": 217.5,
+        "top": 1546.9375,
+        "right": 369,
+        "bottom": 1764.4375,
+        "left": 21
+      },
+      "documentWidth": 390
+    },
+    "pixel": [25, 25, 25, 255]
+  },
+  {
+    "direction": "second",
+    "width": 390,
+    "theme": "light",
+    "digest": "sha256:30d1bc19d16faf254c49303a16fd3a103eb2ea39c897448452f1bb511f5c2759",
+    "cls": 0,
+    "geometry": {
+      "naturalWidth": 975,
+      "naturalHeight": 609,
+      "box": {
+        "x": 21,
+        "y": 1546.9375,
+        "width": 348,
+        "height": 217.5,
+        "top": 1546.9375,
+        "right": 369,
+        "bottom": 1764.4375,
+        "left": 21
+      },
+      "documentWidth": 390
+    },
+    "pixel": [37, 37, 37, 255]
+  },
+  {
+    "direction": "first",
+    "width": 1440,
+    "theme": "dark",
+    "digest": "sha256:d5b3128c2077fede9fd1733226345995448581f1d1164fe57743076d9eebd77d",
+    "cls": 0,
+    "geometry": {
+      "naturalWidth": 1536,
+      "naturalHeight": 960,
+      "box": {
+        "x": 32.671875,
+        "y": 1517.4375,
+        "width": 1374.65625,
+        "height": 859.15625,
+        "top": 1517.4375,
+        "right": 1407.328125,
+        "bottom": 2376.59375,
+        "left": 32.671875
+      },
+      "documentWidth": 1440
+    },
+    "pixel": [25, 25, 25, 255]
+  },
+  {
+    "direction": "second",
+    "width": 1440,
+    "theme": "dark",
+    "digest": "sha256:30d1bc19d16faf254c49303a16fd3a103eb2ea39c897448452f1bb511f5c2759",
+    "cls": 0,
+    "geometry": {
+      "naturalWidth": 1536,
+      "naturalHeight": 960,
+      "box": {
+        "x": 32.671875,
+        "y": 1517.4375,
+        "width": 1374.65625,
+        "height": 859.15625,
+        "top": 1517.4375,
+        "right": 1407.328125,
+        "bottom": 2376.59375,
+        "left": 32.671875
+      },
+      "documentWidth": 1440
+    },
+    "pixel": [37, 37, 37, 255]
+  },
+  {
+    "direction": "first",
+    "width": 1440,
+    "theme": "light",
+    "digest": "sha256:d5b3128c2077fede9fd1733226345995448581f1d1164fe57743076d9eebd77d",
+    "cls": 0,
+    "geometry": {
+      "naturalWidth": 1536,
+      "naturalHeight": 960,
+      "box": {
+        "x": 32.671875,
+        "y": 1517.4375,
+        "width": 1374.65625,
+        "height": 859.15625,
+        "top": 1517.4375,
+        "right": 1407.328125,
+        "bottom": 2376.59375,
+        "left": 32.671875
+      },
+      "documentWidth": 1440
+    },
+    "pixel": [25, 25, 25, 255]
+  },
+  {
+    "direction": "second",
+    "width": 1440,
+    "theme": "light",
+    "digest": "sha256:30d1bc19d16faf254c49303a16fd3a103eb2ea39c897448452f1bb511f5c2759",
+    "cls": 0,
+    "geometry": {
+      "naturalWidth": 1536,
+      "naturalHeight": 960,
+      "box": {
+        "x": 32.671875,
+        "y": 1517.4375,
+        "width": 1374.65625,
+        "height": 859.15625,
+        "top": 1517.4375,
+        "right": 1407.328125,
+        "bottom": 2376.59375,
+        "left": 32.671875
+      },
+      "documentWidth": 1440
+    },
+    "pixel": [37, 37, 37, 255]
+  }
+]

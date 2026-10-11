@@ -160,6 +160,9 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
     const currentToggle = () =>
       screen.getByTestId('reversible-right-rail-toggle');
     currentToggle().focus();
+    // Keyboard focus opens the tooltip above the transient preview. Each
+    // Escape belongs to one layer: tooltip first, then the preview.
+    await user.keyboard('{Escape}{Escape}');
 
     await detectReversibleControl({
       name: 'composed preview right rail',

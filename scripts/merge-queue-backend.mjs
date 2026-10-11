@@ -78,6 +78,7 @@ const EJECTION_HISTORY_QUERY = `query MergeQueueEjectionHistory($owner:String!,$
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:${INVENTORY_PAGE_SIZE},after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
 const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
 const LIVE_QUEUE_CONFIGURATION_QUERY = `query MergeQueueLiveConfiguration($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){configuration{checkResponseTimeout maximumEntriesToBuild maximumEntriesToMerge mergeMethod minimumEntriesToMerge minimumEntriesToMergeWaitTime}}}}`;
+const BYPASS_ACTOR_AGGREGATE_QUERY = `query MergeQueueBypassActorAggregate($owner:String!,$name:String!,$rulesetId:Int!){viewer{login} repository(owner:$owner,name:$name){nameWithOwner ruleset(databaseId:$rulesetId){id databaseId name enforcement target updatedAt source{__typename ... on Repository{nameWithOwner}} conditions{refName{include exclude} organizationProperty{__typename} repositoryId{__typename} repositoryName{__typename} repositoryProperty{__typename}} rules(first:100){totalCount pageInfo{hasNextPage hasPreviousPage} nodes{type parameters{__typename ... on MergeQueueParameters{checkResponseTimeoutMinutes groupingStrategy maxEntriesToBuild maxEntriesToMerge mergeMethod minEntriesToMerge minEntriesToMergeWaitMinutes} ... on RequiredStatusChecksParameters{strictRequiredStatusChecksPolicy requiredStatusChecks{context integrationId}}}}} bypassActors(first:1){totalCount pageInfo{hasNextPage hasPreviousPage}}}}}`;
 const NATIVE_MUTATION_ACTOR_QUERY =
   'query MergeQueueNativeMutationActor { viewer { login } }';
 const DEQUEUE_PULL_REQUEST_MUTATION = `mutation DequeuePullRequest($id:ID!){dequeuePullRequest(input:{id:$id}){mergeQueueEntry{id}}}`;
@@ -284,9 +285,254 @@ function hasMergeGroupChecksRequested(workflowYaml) {
   );
 }
 
+// REST omits bypass_actors without ruleset write access. This independently
+// labelled proof comes from the same configured reader, never a synthetic []
+// or a historical receipt. v1 binds an exact version; v2 independently proves
+// admission policy and global zero in one ruleset response. Preserve both raw
+// timestamps: DateTime precision cannot establish cross-interface revisions.
+function versionTimestamp(value) {
+  if (typeof value !== 'string') return null;
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|([+-])(\d{2}):(\d{2}))$/
+  );
+  if (!match) return null;
+  const [
+    ,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    fraction = '',
+    zone,
+    ,
+    zoneHour = '0',
+    zoneMinute = '0',
+  ] = match;
+  const leap =
+    Number(year) % 4 === 0 &&
+    (Number(year) % 100 !== 0 || Number(year) % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (
+    Number(month) < 1 ||
+    Number(month) > 12 ||
+    Number(day) < 1 ||
+    Number(day) > days[Number(month) - 1] ||
+    Number(hour) > 23 ||
+    Number(minute) > 59 ||
+    Number(second) > 59 ||
+    Number(zoneHour) > 23 ||
+    Number(zoneMinute) > 59
+  )
+    return null;
+  // Parse only whole seconds; compare every fractional digit independently.
+  const seconds = Date.parse(
+    `${year}-${month}-${day}T${hour}:${minute}:${second}${zone}`
+  );
+  return Number.isFinite(seconds)
+    ? { seconds, fraction: fraction.replace(/0+$/, '') }
+    : null;
+}
+
+function matchingVersionTimestamps(restValue, graphqlValue, policyBound) {
+  const rest = versionTimestamp(restValue);
+  const graphql = UTC_TIMESTAMP_PATTERN.test(graphqlValue ?? '')
+    ? versionTimestamp(graphqlValue)
+    : null;
+  return Boolean(
+    rest &&
+      graphql &&
+      rest.seconds === graphql.seconds &&
+      (rest.fraction === graphql.fraction ||
+        // This rejects incompatible observations; it never proves equal revisions.
+        (policyBound && !graphqlValue.includes('.')))
+  );
+}
+
+const QUEUE_PARAMETER_FIELDS = Object.freeze({
+  checkResponseTimeoutMinutes: 'check_response_timeout_minutes',
+  groupingStrategy: 'grouping_strategy',
+  maxEntriesToBuild: 'max_entries_to_build',
+  maxEntriesToMerge: 'max_entries_to_merge',
+  mergeMethod: 'merge_method',
+  minEntriesToMerge: 'min_entries_to_merge',
+  minEntriesToMergeWaitMinutes: 'min_entries_to_merge_wait_minutes',
+});
+
+function completeConnection(connection) {
+  return (
+    Number.isSafeInteger(connection?.totalCount) &&
+    connection.totalCount >= 0 &&
+    Array.isArray(connection.nodes) &&
+    connection.nodes.length === connection.totalCount &&
+    connection.pageInfo?.hasNextPage === false &&
+    connection.pageInfo?.hasPreviousPage === false
+  );
+}
+
+function checkIdentity(check, graphql) {
+  const field = graphql ? 'integrationId' : 'integration_id';
+  const id = check?.[field];
+  if (
+    typeof check?.context !== 'string' ||
+    check.context.length === 0 ||
+    (graphql && (!Object.hasOwn(check, field) || id === undefined)) ||
+    (id !== undefined && id !== null && (!Number.isSafeInteger(id) || id < 1))
+  )
+    return null;
+  return JSON.stringify([check.context, id ?? null]);
+}
+
+function matchingAdmissionPolicy(live, rest, repository) {
+  const conditions = live?.conditions;
+  const refs = conditions?.refName;
+  const restRefs = rest?.conditions?.ref_name;
+  const nodes = live?.rules?.nodes;
+  const restRules = rest?.rules;
+  if (
+    live?.source?.__typename !== 'Repository' ||
+    live.source.nameWithOwner !== repository ||
+    live.target !== 'BRANCH' ||
+    !conditions ||
+    [
+      'organizationProperty',
+      'repositoryId',
+      'repositoryName',
+      'repositoryProperty',
+    ].some(field => conditions[field] !== null) ||
+    Object.keys(rest?.conditions ?? {}).some(field => field !== 'ref_name') ||
+    !Array.isArray(refs?.include) ||
+    !refs.include.every(ref => typeof ref === 'string') ||
+    !Array.isArray(refs?.exclude) ||
+    refs.exclude.length !== 0 ||
+    !Array.isArray(restRefs?.include) ||
+    !Array.isArray(restRefs?.exclude) ||
+    JSON.stringify(refs.include.slice().sort()) !==
+      JSON.stringify(restRefs.include.slice().sort()) ||
+    JSON.stringify(refs.exclude) !== JSON.stringify(restRefs?.exclude) ||
+    !completeConnection(live.rules) ||
+    !Array.isArray(restRules) ||
+    nodes.some(node => typeof node?.type !== 'string') ||
+    restRules.some(rule => typeof rule?.type !== 'string') ||
+    JSON.stringify(nodes.map(node => node.type.toLowerCase()).sort()) !==
+      JSON.stringify(restRules.map(rule => rule.type).sort())
+  )
+    return false;
+  const queueRules = nodes.filter(node => node.type === 'MERGE_QUEUE');
+  const checkRules = nodes.filter(
+    node => node.type === 'REQUIRED_STATUS_CHECKS'
+  );
+  if (queueRules.length !== 1 || checkRules.length !== 1) return false;
+  const queue = queueRules[0].parameters;
+  const restQueue = restRules.find(
+    rule => rule.type === 'merge_queue'
+  )?.parameters;
+  const checks = checkRules[0].parameters;
+  const restChecks = restRules.find(
+    rule => rule.type === 'required_status_checks'
+  )?.parameters;
+  if (
+    queue?.__typename !== 'MergeQueueParameters' ||
+    checks?.__typename !== 'RequiredStatusChecksParameters' ||
+    checks.strictRequiredStatusChecksPolicy !== false ||
+    restChecks?.strict_required_status_checks_policy !== false ||
+    !Array.isArray(checks.requiredStatusChecks) ||
+    !Array.isArray(restChecks.required_status_checks)
+  )
+    return false;
+  const checkIds = checks.requiredStatusChecks.map(check =>
+    checkIdentity(check, true)
+  );
+  const restCheckIds = restChecks.required_status_checks.map(check =>
+    checkIdentity(check, false)
+  );
+  if (
+    checkIds.includes(null) ||
+    restCheckIds.includes(null) ||
+    JSON.stringify(checkIds.sort()) !== JSON.stringify(restCheckIds.sort()) ||
+    !REQUIRED_CHECKS.every(context =>
+      checks.requiredStatusChecks.some(
+        check => normalizeRequiredCheckName(check.context) === context
+      )
+    )
+  )
+    return false;
+  // Validate this response independently. External queue configuration must
+  // never overwrite an invalid projected ruleset parameter.
+  return Object.entries(QUEUE_PARAMETER_FIELDS).every(([field, restField]) => {
+    const value = queue[field];
+    const numeric = typeof NATIVE_QUEUE_POLICY[restField] === 'number';
+    const minimum = restField === 'min_entries_to_merge_wait_minutes' ? 0 : 1;
+    if (numeric && (!Number.isSafeInteger(value) || value < minimum))
+      return false;
+    return (
+      value !== undefined &&
+      value === restQueue?.[restField] &&
+      (value === NATIVE_QUEUE_POLICY[restField] ||
+        isSupportedNativeBuildConcurrency(restField, value) ||
+        isPendingNativeCheckTimeoutCutover(restField, value) ||
+        isPendingNativeCohortCutoverField(restField))
+    );
+  });
+}
+
+function freshBypassAggregateTimestamp(observedAt) {
+  const age = Date.now() - Date.parse(observedAt);
+  return (
+    typeof observedAt === 'string' &&
+    UTC_TIMESTAMP_PATTERN.test(observedAt) &&
+    Number.isFinite(age) &&
+    age >= 0 &&
+    age <= 60_000
+  );
+}
+
+function validateBypassActorAggregate(proof, ruleset, repository, rulesetId) {
+  const response = proof?.response;
+  const data = response?.data;
+  const liveRepository = data?.repository;
+  const liveRuleset = liveRepository?.ruleset;
+  const connection = liveRuleset?.bypassActors;
+  const policyBound = proof?.schema === 'jovie-native-bypass-aggregate/v2';
+  return (
+    (proof?.schema === 'jovie-native-bypass-aggregate/v1' || policyBound) &&
+    freshBypassAggregateTimestamp(proof.observedAt) &&
+    (response?.errors === undefined ||
+      (Array.isArray(response.errors) && response.errors.length === 0)) &&
+    data?.viewer?.login === CANONICAL_NATIVE_MUTATION_ACTOR &&
+    liveRepository?.nameWithOwner === repository &&
+    ruleset?.source_type === 'Repository' &&
+    ruleset.source === repository &&
+    Number.isSafeInteger(liveRuleset?.databaseId) &&
+    String(liveRuleset.databaseId) === String(rulesetId) &&
+    liveRuleset.databaseId === ruleset?.id &&
+    typeof ruleset?.node_id === 'string' &&
+    ruleset.node_id.length > 0 &&
+    liveRuleset?.id === ruleset.node_id &&
+    typeof ruleset?.name === 'string' &&
+    ruleset.name.length > 0 &&
+    liveRuleset?.name === ruleset.name &&
+    liveRuleset?.enforcement === 'ACTIVE' &&
+    ruleset.enforcement === 'active' &&
+    (!policyBound ||
+      matchingAdmissionPolicy(liveRuleset, ruleset, repository)) &&
+    matchingVersionTimestamps(
+      ruleset?.updated_at,
+      liveRuleset?.updatedAt,
+      policyBound
+    ) &&
+    connection?.totalCount === 0 &&
+    connection?.pageInfo?.hasNextPage === false &&
+    connection?.pageInfo?.hasPreviousPage === false
+  );
+}
+
 /**
  * Validate live GitHub ruleset, repository, and workflow evidence for native
  * merge-queue enrollment.
+ * The legacy allowUnavailableBypassActors option is accepted but ignored;
+ * complete zero-bypass proof is always required.
  *
  * @param {{
  *   ruleset?: object | null,
@@ -296,6 +542,8 @@ function hasMergeGroupChecksRequested(workflowYaml) {
  *   liveQueueConfiguration?: object | null,
  *   rulesetId?: string,
  *   baseBranch?: string,
+ *   repositorySlug?: string,
+ *   bypassActorAggregate?: object,
  *   allowUnavailableBypassActors?: boolean,
  * }} [input]
  */
@@ -307,7 +555,8 @@ export function validateNativePreflightEvidence({
   liveQueueConfiguration = null,
   rulesetId = DEFAULT_RULESET_ID,
   baseBranch = DEFAULT_BASE_BRANCH,
-  allowUnavailableBypassActors = false,
+  repositorySlug = DEFAULT_REPOSITORY,
+  bypassActorAggregate,
 } = {}) {
   const errors = [];
   const mergeQueueRule = ruleset?.rules?.find(
@@ -328,8 +577,22 @@ export function validateNativePreflightEvidence({
   const bypassActors = ruleset?.bypass_actors;
   const hasValidBypassActors = Array.isArray(bypassActors);
   const bypassActorsVisible = bypassActors !== undefined;
-  const unavailableBypassActorsAllowed =
-    allowUnavailableBypassActors === true && !bypassActorsVisible;
+  const aggregateProvided = bypassActorAggregate !== undefined;
+  const aggregateZero =
+    aggregateProvided &&
+    validateBypassActorAggregate(
+      bypassActorAggregate,
+      ruleset,
+      repositorySlug,
+      rulesetId
+    );
+  const missingRestProvenZero =
+    !Object.hasOwn(ruleset ?? {}, 'bypass_actors') && aggregateZero;
+  if (aggregateProvided && !aggregateZero) {
+    errors.push(
+      'ruleset bypass aggregate must be fresh, complete, canonical-actor, identity-bound zero evidence'
+    );
+  }
   const hasBranchProtectionRef =
     typeof branchProtectionRef === 'object' &&
     branchProtectionRef !== null &&
@@ -380,7 +643,7 @@ export function validateNativePreflightEvidence({
       ruleset?.rules?.find(rule => rule?.type === 'required_status_checks')
         ?.parameters?.strict_required_status_checks_policy === false,
     'ruleset bypass_actors must be an array':
-      hasValidBypassActors || unavailableBypassActorsAllowed,
+      hasValidBypassActors || missingRestProvenZero,
     'ruleset bypass_actors must be empty before native enrollment':
       !hasValidBypassActors || bypassActors.length === 0,
     [`repository default branch must be ${baseBranch}`]:
@@ -422,19 +685,40 @@ export function validateNativePreflightEvidence({
       rulesetId: ruleset?.id ?? null,
       workflowHasMergeGroup,
       bypassActorsVisible,
+      bypassActorEvidence: aggregateZero
+        ? {
+            kind: 'graphql-aggregate',
+            totalCount: 0,
+            actor: bypassActorAggregate.response.data.viewer.login,
+            observedAt: bypassActorAggregate.observedAt,
+            rulesetNodeId: ruleset.node_id,
+            updatedAt: ruleset.updated_at,
+            graphqlUpdatedAt:
+              bypassActorAggregate.response.data.repository.ruleset.updatedAt,
+            binding:
+              bypassActorAggregate.schema === 'jovie-native-bypass-aggregate/v2'
+                ? 'same-response-admission-policy'
+                : 'exact-version',
+          }
+        : {
+            kind: hasValidBypassActors ? 'rest-actor-list' : 'unverified',
+            totalCount: hasValidBypassActors ? bypassActors.length : null,
+          },
       policyReadback,
     },
   };
 }
 
 /**
+ * The legacy allowUnavailableBypassActors option is accepted but ignored;
+ * acquisition and validation remain fail closed.
  * @param {{
  *   backend?: string,
  *   repository?: string,
  *   rulesetId?: string,
  *   baseBranch?: string,
- *   allowUnavailableBypassActors?: boolean,
  *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   allowUnavailableBypassActors?: boolean,
  * }} [input]
  */
 export async function preflightMergeQueue({
@@ -442,12 +726,12 @@ export async function preflightMergeQueue({
   repository = DEFAULT_REPOSITORY,
   rulesetId = DEFAULT_RULESET_ID,
   baseBranch = DEFAULT_BASE_BRANCH,
-  allowUnavailableBypassActors = false,
   runner = createGhRunner(),
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
 
   const { owner, name } = parseRepositorySlug(repository);
+  const observedAt = new Date().toISOString();
   const ruleset = await runGhJson(
     runner,
     ['api', `repos/${repository}/rulesets/${rulesetId}`],
@@ -495,6 +779,27 @@ export async function preflightMergeQueue({
   );
   const liveQueueConfiguration =
     liveQueuePayload?.data?.repository?.mergeQueue?.configuration ?? null;
+  // Acquire only for an actually omitted field. A visible malformed/nonempty
+  // list still rejects; the old unavailable-field opt-in cannot authorize entry.
+  const bypassActorAggregate = Object.hasOwn(ruleset ?? {}, 'bypass_actors')
+    ? undefined
+    : {
+        schema: 'jovie-native-bypass-aggregate/v2',
+        observedAt,
+        response: await runGhJson(
+          runner,
+          graphqlArgs(
+            BYPASS_ACTOR_AGGREGATE_QUERY,
+            {
+              owner,
+              name,
+              rulesetId,
+            },
+            { typed: ['rulesetId'] }
+          ),
+          'reading the live ruleset bypass aggregate'
+        ),
+      };
   const validation = validateNativePreflightEvidence({
     ruleset,
     repository: repositoryEvidence,
@@ -503,7 +808,8 @@ export async function preflightMergeQueue({
     liveQueueConfiguration,
     rulesetId,
     baseBranch,
-    allowUnavailableBypassActors,
+    repositorySlug: repository,
+    bypassActorAggregate,
   });
   if (!validation.ok) {
     throw backendError(
@@ -1320,7 +1626,7 @@ export async function enrollPullRequest({
     runner,
   };
 
-  await preflightMergeQueue({
+  const preflight = await preflightMergeQueue({
     backend: resolvedBackend,
     repository,
     rulesetId,
@@ -1363,6 +1669,15 @@ export async function enrollPullRequest({
   }
 
   let mutationError = null;
+  if (
+    preflight.bypassActorEvidence.kind === 'graphql-aggregate' &&
+    !freshBypassAggregateTimestamp(preflight.bypassActorEvidence.observedAt)
+  ) {
+    throw backendError(
+      'native_preflight_failed',
+      'Native merge-queue bypass aggregate expired before enrollment'
+    );
+  }
   try {
     await runGraphqlMutation(
       mutationRunner,

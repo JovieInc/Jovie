@@ -465,6 +465,9 @@ export function useOnboardingSubmit({
           email: userEmail,
           redirectToDashboard: false,
         });
+        if ('error' in completion) {
+          throw new Error(`[${completion.error}]`);
+        }
         onCompleted?.(completion);
 
         isSubmittingRef.current = false;

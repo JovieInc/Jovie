@@ -17,6 +17,7 @@ export const SIDEBAR_USER_PANEL_TEST_ID = 'sidebar-user-panel';
 export interface SidebarIdentityGroupProps {
   readonly calm?: boolean;
   readonly profileHref: string | undefined;
+  readonly label?: string;
 }
 
 function isPublicProfilePath(
@@ -46,6 +47,7 @@ export function publicProfileAccessibleName(
 export function SidebarIdentityGroup({
   calm = false,
   profileHref,
+  label = SIDEBAR_IDENTITY_GROUP_LABEL,
 }: SidebarIdentityGroupProps) {
   const pathname = usePathname();
   const profileDisplayHref = profileHref
@@ -55,7 +57,7 @@ export function SidebarIdentityGroup({
 
   return (
     <fieldset
-      aria-label={SIDEBAR_IDENTITY_GROUP_LABEL}
+      aria-label={label}
       data-sidebar='user-panel'
       data-testid={SIDEBAR_USER_PANEL_TEST_ID}
       data-identity-group=''

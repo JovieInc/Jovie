@@ -1,5 +1,6 @@
 import {
   type CertificationAuditEvent,
+  type CertificationReviewPacket,
   evaluateCertificationAdmission,
   type FounderCertificationDecision,
   type FounderCertificationDecisionKind,
@@ -16,19 +17,19 @@ import {
   type CertificationRecordBackend,
   mutateCertificationRecord,
 } from '@/lib/agent-os/certification-cas';
-import type {
-  CertificationPacketFile,
-  PacketFileDomain,
-} from './packet-files.server';
+import type { OvieCertificationDomainId } from './types';
 
 /**
- * Founder decisions for packet-file domains. Packets are committed evidence;
- * decisions are revision-bound kernel records persisted with the same CAS
- * mechanics as the marketing and acquisition adapters (one key per domain).
+ * Founder decisions for packet-shaped domains — committed packet files and
+ * derived projections such as the feature registry. Decisions are
+ * revision-bound kernel records persisted with the same CAS mechanics as the
+ * marketing and acquisition adapters (one key per domain).
  */
 export const PACKET_DECISION_LEDGER_SCHEMA_VERSION = 1 as const;
 
-export function packetDecisionLedgerKey(domain: PacketFileDomain): string {
+export function packetDecisionLedgerKey(
+  domain: OvieCertificationDomainId
+): string {
   return `jovie:certification:v1:packet-decisions:${domain}`;
 }
 
@@ -41,7 +42,7 @@ export interface PacketDecisionRecord {
 export interface PacketDecisionLedger {
   readonly schemaVersion: typeof PACKET_DECISION_LEDGER_SCHEMA_VERSION;
   readonly contract: typeof JOVIE_CERTIFICATION_CONTRACT;
-  readonly domain: PacketFileDomain;
+  readonly domain: OvieCertificationDomainId;
   readonly records: Readonly<Record<string, PacketDecisionRecord>>;
 }
 
@@ -52,7 +53,7 @@ export class PacketDecisionPersistenceError extends Error {
   }
 }
 
-function emptyLedger(domain: PacketFileDomain): PacketDecisionLedger {
+function emptyLedger(domain: OvieCertificationDomainId): PacketDecisionLedger {
   return {
     schemaVersion: PACKET_DECISION_LEDGER_SCHEMA_VERSION,
     contract: JOVIE_CERTIFICATION_CONTRACT,
@@ -67,7 +68,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function parsePacketDecisionLedger(
   raw: unknown,
-  domain: PacketFileDomain
+  domain: OvieCertificationDomainId
 ): PacketDecisionLedger {
   let value: unknown = raw;
   if (typeof raw === 'string') {
@@ -111,7 +112,7 @@ export function parsePacketDecisionLedger(
 /** Read-only: an absent ledger is an empty one and is never created here. */
 export async function readPacketDecisionLedger(
   backend: CertificationRecordBackend,
-  domain: PacketFileDomain
+  domain: OvieCertificationDomainId
 ): Promise<PacketDecisionLedger> {
   const raw = await backend.get(packetDecisionLedgerKey(domain));
   if (raw === null || raw === undefined) return emptyLedger(domain);
@@ -125,9 +126,15 @@ export type RecordPacketFounderDecisionResult =
       readonly reason: 'decision_predates_packet';
     };
 
+export interface PacketDecisionTarget {
+  readonly domain: OvieCertificationDomainId;
+  readonly packet: CertificationReviewPacket;
+  readonly packetUpdatedAt: string;
+}
+
 export async function recordPacketFounderDecision(input: {
   readonly backend: CertificationRecordBackend;
-  readonly file: CertificationPacketFile;
+  readonly target: PacketDecisionTarget;
   readonly decision: {
     readonly id: string;
     readonly decision: FounderCertificationDecisionKind;
@@ -137,11 +144,11 @@ export async function recordPacketFounderDecision(input: {
   };
   readonly decidedAt?: string;
 }): Promise<RecordPacketFounderDecisionResult> {
-  const { backend, file } = input;
-  const domain = file.domain;
-  const subjectId = file.packet.subject.id;
+  const { backend, target } = input;
+  const domain = target.domain;
+  const subjectId = target.packet.subject.id;
   const decidedAt = input.decidedAt ?? new Date().toISOString();
-  if (Date.parse(decidedAt) < Date.parse(file.packetUpdatedAt)) {
+  if (Date.parse(decidedAt) < Date.parse(target.packetUpdatedAt)) {
     return { ok: false, reason: 'decision_predates_packet' };
   }
   const key = packetDecisionLedgerKey(domain);
@@ -178,7 +185,7 @@ export async function recordPacketFounderDecision(input: {
             ok: false,
             reason: 'duplicate_founder_decision',
             admission: evaluateCertificationAdmission({
-              packet: file.packet,
+              packet: target.packet,
               decisions: existing.decisions,
               evaluatedAt: decidedAt,
             }),
@@ -195,7 +202,7 @@ export async function recordPacketFounderDecision(input: {
       }
       const recorded = recordFounderCertificationDecision({
         decidedAt,
-        packet: file.packet,
+        packet: target.packet,
         existingDecisions: existing.decisions,
         decision: input.decision,
       });

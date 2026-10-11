@@ -6,15 +6,17 @@ import { railIconName } from '@/components/atoms/rail-icons';
 import { cn } from '@/lib/utils';
 
 export const RAIL_TOGGLE_BUTTON_CLASS =
-  'text-tertiary-token aria-pressed:bg-interactive-active aria-pressed:text-primary-token';
+  'text-tertiary-token aria-pressed:text-primary-token active:bg-transparent';
 
 interface RailToggleButtonProps {
   readonly side: 'left' | 'right';
   readonly open: boolean;
+  readonly pinned?: boolean;
   readonly openLabel: string;
   readonly closedLabel: string;
   readonly onToggle: () => void;
   readonly disabled?: boolean;
+  readonly controlsId?: string;
   readonly shortcut?: string;
   readonly className?: string;
   readonly dataTestId?: string;
@@ -29,10 +31,12 @@ interface RailToggleButtonProps {
 export function RailToggleButton({
   side,
   open,
+  pinned,
   openLabel,
   closedLabel,
   onToggle,
   disabled,
+  controlsId,
   shortcut,
   className,
   dataTestId,
@@ -44,11 +48,13 @@ export function RailToggleButton({
   const button = (
     <IconButton
       type='button'
-      variant='secondary'
+      variant='ghost'
       size='sm'
       aria-label={label}
+      aria-controls={controlsId}
       aria-expanded={open}
-      aria-pressed={open}
+      aria-pressed={pinned ?? open}
+      data-rail-pinned={pinned ?? open}
       onClick={onToggle}
       disabled={disabled}
       data-testid={dataTestId}

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { listCreatorConversations } from '@/lib/chat/conversation-queries';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
+import { conversationTitleSource } from '@/lib/chat/title-source';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
@@ -117,7 +118,10 @@ export async function POST(req: Request) {
     }
 
     const { title, initialMessage } = body;
-    const sanitizedTitle = sanitizeConversationTitle(title);
+    const source = conversationTitleSource(initialMessage);
+    const sanitizedTitle =
+      sanitizeConversationTitle(title) ??
+      (source.deterministic ? source.text : null);
 
     // Validate initial message length
     if (

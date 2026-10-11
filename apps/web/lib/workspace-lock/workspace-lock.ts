@@ -105,6 +105,9 @@ async function requestPrivacyLockState(
   init: RequestInit
 ): Promise<WorkspacePrivacyLockState> {
   const controller = new AbortController();
+  const cancel = () => controller.abort(init.signal?.reason);
+  init.signal?.addEventListener('abort', cancel, { once: true });
+  if (init.signal?.aborted) cancel();
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -129,6 +132,7 @@ async function requestPrivacyLockState(
       'Could not confirm the Ovie privacy lock. Check your connection and try again.'
     );
   } finally {
+    init.signal?.removeEventListener('abort', cancel);
     if (timeout !== undefined) globalThis.clearTimeout(timeout);
   }
 }
@@ -169,10 +173,12 @@ export async function getWorkspacePrivacyLockState(): Promise<WorkspacePrivacyLo
 }
 
 export async function updateWorkspacePrivacyLock(
-  action: WorkspacePrivacyLockAction
+  action: WorkspacePrivacyLockAction,
+  signal?: AbortSignal
 ): Promise<WorkspacePrivacyLockState> {
   return requestPrivacyLockState({
     method: 'POST',
+    signal,
     credentials: 'same-origin',
     cache: 'no-store',
     headers: { 'Content-Type': 'application/json' },

@@ -90,6 +90,10 @@ const sentryGateActionPath = resolve(
   repoRoot,
   '.github/actions/sentry-error-gate/action.yml'
 );
+const sentryReadHelperPath = resolve(
+  repoRoot,
+  '.github/scripts/sentry-read-json.sh'
+);
 const costAnomalyWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/cost-anomaly-gate.yml'
@@ -153,7 +157,7 @@ function getStepBlock(workflow: string, stepName: string): string {
 function getSentryStatsRequests(action: string): string[] {
   return (
     action.match(
-      /STATS_RESPONSE=\$\(curl[\s\S]*?"https:\/\/sentry\.io\/api\/0\/organizations\/\$SENTRY_ORG\/events-stats\/"\)/g
+      /STATS_RESPONSE=\$\(sentry_read_json[\s\S]*?"https:\/\/sentry\.io\/api\/0\/organizations\/\$SENTRY_ORG\/events-stats\/"\)/g
     ) ?? []
   );
 }
@@ -619,7 +623,7 @@ describe('deploy workflow Vercel env resolution', () => {
 
     expect(classifierJob).toContain('timeout-minutes: 3');
     expect(classifierJob).toContain(
-      'uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
+      'uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'
     );
     expect(classifierJob).toContain("node-version: '24'");
     // biome-ignore format: exact-diff/fail-closed contract stays compact for the integration-train cap
@@ -1604,7 +1608,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(domainGuardStep).toContain(
       'failure_subtype=domain_project_mismatch'
     );
-    expect(stageStep).toContain('--prod --skip-domain --format=json');
+    expect(stageStep).toContain('--prod --skip-domain --no-wait --format=json');
     expect(stageStep).toContain(
       'assert-authorized-origin "$production_deploy_url" "$inspected_url"'
     );
@@ -4051,7 +4055,7 @@ describe('production promotion exact-artifact contract', () => {
     const pullIndex = stageStep.indexOf('--environment=production');
     const buildIndex = stageStep.indexOf('vercel build --prod');
     const deployIndex = stageStep.indexOf(
-      '--prebuilt --archive=tgz --prod --skip-domain --format=json'
+      '--prebuilt --archive=tgz --prod --skip-domain --no-wait --format=json'
     );
     const inspectIndex = stageStep.indexOf(
       'vercel inspect "$production_deploy_id"'
@@ -4117,7 +4121,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(promoteJob).not.toContain('vercel promote "$deploy_url"');
   });
 
-  it('retries a transient production deploy before failing without evidence', () => {
+  it('hands accepted production deploys to exact-ID readiness before retrying', () => {
     // JOV-4373: a single `vercel deploy` transport failure stranded the release
     // with an empty deployment ID/URL. The exact-production deploy must retry
     // bounded inside stage-production, mirroring the staging deploy loop.
@@ -4130,8 +4134,9 @@ describe('production promotion exact-artifact contract', () => {
 
     const loopIndex = stageStep.indexOf('for deploy_attempt in 1 2 3; do');
     const deployIndex = stageStep.indexOf(
-      '--prebuilt --archive=tgz --prod --skip-domain --format=json'
+      '--prebuilt --archive=tgz --prod --skip-domain'
     );
+    const noWaitIndex = stageStep.indexOf('--no-wait');
     const retryIndex = stageStep.indexOf(
       'Production prebuilt deploy attempt ${deploy_attempt}/3 failed'
     );
@@ -4141,12 +4146,23 @@ describe('production promotion exact-artifact contract', () => {
     const outputIndex = stageStep.indexOf(
       'echo "production_deployment_id=$production_deploy_id"'
     );
+    const parseIndex = stageStep.indexOf('production_deploy_id="$(jq -r');
+    const inspectIndex = stageStep.indexOf(
+      'vercel inspect "$production_deploy_id"'
+    );
 
     expect(loopIndex).toBeGreaterThanOrEqual(0);
     expect(deployIndex).toBeGreaterThan(loopIndex);
+    // Return as soon as Vercel accepts the exact deployment. The explicit
+    // inspect below owns readiness, so an internal CLI polling failure cannot
+    // discard the accepted deployment ID and trigger duplicate deployments.
+    expect(noWaitIndex).toBeGreaterThan(deployIndex);
     expect(failIndex).toBeGreaterThan(deployIndex);
     expect(retryIndex).toBeGreaterThan(failIndex);
     expect(outputIndex).toBeGreaterThan(retryIndex);
+    expect(parseIndex).toBeGreaterThan(retryIndex);
+    expect(inspectIndex).toBeGreaterThan(parseIndex);
+    expect(outputIndex).toBeGreaterThan(inspectIndex);
     expect(stageStep).toContain('sleep 10');
     // Still fail-closed after the bounded retry exhausts.
     expect(stageStep).toContain(
@@ -4592,6 +4608,24 @@ describe('production promotion exact-artifact contract', () => {
     const sentryJob = getJobBlock(reusable, 'sentry-error-gate');
     const sentryAction = readFileSync(sentryGateActionPath, 'utf8');
 
+    // The action delegates transport to the shared helper. Keep the strict
+    // failure/deadline/retry contract as well as the production query checks.
+    const sentryReadHelper = readFileSync(sentryReadHelperPath, 'utf8');
+    expect(sentryAction).toContain(
+      'source .github/scripts/sentry-read-json.sh'
+    );
+    expect(sentryReadHelper).toContain('curl --fail --silent --show-error');
+    expect(sentryReadHelper).toContain('--connect-timeout 5 --max-time 15');
+    expect(sentryReadHelper).toContain(
+      '--retry 2 --retry-delay 1 --retry-max-time 40'
+    );
+    expect(sentryReadHelper).toContain(
+      'timeout --signal=TERM --kill-after=1s 55s'
+    );
+    expect(sentryReadHelper).not.toContain('--retry-all-errors');
+    expect(sentryAction).toContain('echo "gate_status=error"');
+    expect(sentryAction).toContain('refusing automatic rollback');
+
     expect(sentryJob).toContain('runs-on: ubuntu-latest');
     expect(sentryJob).toContain('name: Production – jovie');
     expect(sentryJob).toContain('ref: ${{ inputs.expected_sha }}');
@@ -4631,7 +4665,7 @@ describe('production promotion exact-artifact contract', () => {
     const exactProductionErrorQuery =
       '--data-urlencode "query=event.type:error environment:vercel-production"';
     for (const request of statsRequests.slice(0, 2)) {
-      expect(request).toContain('curl --fail --silent --show-error --get');
+      expect(request).toContain('sentry_read_json --get');
       expect(request.match(/--data-urlencode "query=[^"]+"/g)).toEqual([
         exactProductionErrorQuery,
       ]);

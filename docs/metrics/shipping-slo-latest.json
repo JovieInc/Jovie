@@ -1,19 +1,19 @@
 {
-  "at": "2026-10-05T15:57:21.674Z",
+  "at": "2026-10-11T13:58:52.520Z",
   "ciP95Seconds": {
-    "pull_request": 629,
-    "merge_group": 866
+    "pull_request": null,
+    "merge_group": 677
   },
   "queueWaitP95Seconds": null,
   "queueEjectionRate": null,
   "leadTimeP95Seconds": {
-    "devin": 92406,
-    "codex": 59425,
-    "other": 65628
+    "devin": 15878,
+    "codex": 197039,
+    "other": 23317
   },
   "remediationP95Seconds": {
-    "prRedToGreen": 3267,
-    "mainRedToGreen": 6650,
+    "prRedToGreen": null,
+    "mainRedToGreen": 2552,
     "productionPromoteHold": null
   },
   "productionLagP95Seconds": null,
@@ -24,7 +24,6 @@
     "growthTrend": "unknown"
   },
   "regressions": [
-    "lead_time.devin.p95",
     "lead_time.codex.p95",
     "remediation.main_red_to_green.p95",
     "throughput.verified_per_day"
