@@ -27,8 +27,9 @@ if (pr) {
   // The `edited` trigger starts a fresh run for every body edit, so a first
   // attempt already holds the current body: spend no API call on it (the shared
   // GITHUB_TOKEN quota ran dry on 2026-10-11). A re-run replays the original
-  // event, so it re-reads the body at the same head, waiting out a quota reset
-  // instead of failing red on it.
+  // event, so it re-reads the body at the same head. An exhausted quota is
+  // reported as github-quota-deferred at once (no runner held waiting for the
+  // reset); Lane Fix Relay re-runs it instead of queueing repair.
   let current = { head: pr.head, body: pr.body };
   if (process.env.GITHUB_RUN_ATTEMPT !== '1') {
     const read = await runWithGitHubRetry(
@@ -39,8 +40,8 @@ if (pr) {
       ],
       {
         attempts: 3,
-        maxWaitMs:
-          Number(process.env.GITHUB_QUOTA_MAX_WAIT_SECONDS ?? 1800) * 1000,
+        // Covers the 2s/4s transient-5xx backoff only; never a quota reset.
+        maxWaitMs: 10_000,
       }
     );
     process.stderr.write(read.stderr);
