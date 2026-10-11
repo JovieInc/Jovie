@@ -19,7 +19,25 @@ import { fixtureCaptures, sha256Digest } from './render-measurer';
 import { FACTORY_MAX_REWORKS, runFactory } from './run';
 
 const PAGE_ID = 'solutions-founders';
-const brief = loadFactoryBrief('solutions', 'founders');
+const legacy = loadFactoryBrief('solutions', 'founders');
+const brief = {
+  ...legacy,
+  media: legacy.media.map(entry => ({
+    ...entry,
+    input: {
+      ...entry.input,
+      editorial: {
+        benefit: 'Explain the tested product action',
+        focalDetail: 'One verified action',
+        rationale: 'Use the evidence available to this scenario',
+        fallback: 'Retain readable benefit text',
+        alternatives: [
+          { medium: 'video' as const, reason: 'Motion is unnecessary' },
+        ],
+      },
+    },
+  })),
+};
 
 let runsDir: string;
 const runDir = () => join(runsDir, PAGE_ID);
@@ -30,6 +48,7 @@ function run(options: Partial<Parameters<typeof runFactory>[0]> = {}) {
   return runFactory({
     family: 'solutions',
     slug: 'founders',
+    brief,
     dry: true,
     runsDir,
     ...options,

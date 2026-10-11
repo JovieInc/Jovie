@@ -15,6 +15,7 @@ import {
   getAvailableDSPs,
   sortDSPsForDevice,
 } from '@/lib/dsp';
+import { getRegistryEntry } from '@/lib/dsp-registry';
 import { useAppFlag } from '@/lib/flags/client';
 import { cn, detectPlatformFromUA } from '@/lib/utils';
 import { Artist } from '@/types/db';
@@ -167,7 +168,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
       {/* DSP Buttons */}
       <nav
         className='space-y-3'
-        aria-label='Listen on streaming services'
+        aria-label='Listen On Streaming Services'
         data-testid='profile-listen-dsp-links'
       >
         {availableDSPs.length === 0 ? (
@@ -183,6 +184,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
           </div>
         ) : (
           availableDSPs.map(dsp => {
+            const provider = getRegistryEntry(dsp.platformKey ?? dsp.key);
             const logoConfig =
               DSP_LOGO_CONFIG[dsp.key as keyof typeof DSP_LOGO_CONFIG];
             const isSelected = selectedDSP === dsp.key;
@@ -200,7 +202,9 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
                 }}
                 label={isSelected ? `Opening ${dsp.name}...` : dsp.name}
                 ariaLabel={`Listen on ${dsp.name}`}
-                providerKey={dsp.key}
+                providerKey={
+                  provider?.showOnListenPage ? provider.key : undefined
+                }
                 disabled={isLoading}
                 iconPath={logoConfig?.iconPath}
                 iconColor={logoConfig?.color}

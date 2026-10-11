@@ -25,7 +25,12 @@ import {
 } from '../mediaRecipes';
 import type { RecipeId } from '../recipes';
 import type { MarketingSectionId, VariantMedia } from '../sections';
-import { FACTORY_MEDIA_KINDS, type FactoryStageArtifact } from './spine';
+import {
+  type EditorialMediaIntent,
+  EditorialMediaIntentSchema,
+  FACTORY_MEDIA_KINDS,
+  type FactoryStageArtifact,
+} from './spine';
 
 export const FACTORY_MEDIA_DECISION_VERSION = '1.0.0';
 
@@ -171,6 +176,7 @@ export const FactoryMediaDecisionInputSchema = z.object({
   audience: z.enum(FACTORY_MEDIA_AUDIENCES),
   evidence: FactoryMediaEvidenceSchema,
   fold: z.enum(['above', 'below']),
+  editorial: EditorialMediaIntentSchema.optional(),
 });
 
 export type FactoryMediaDecisionInput = z.infer<
@@ -202,6 +208,7 @@ export interface FactoryMediaTraceEntry {
 export type FactoryPhotoSource = 'real-photo' | 'virtual-model';
 
 export interface FactoryMediaDecision {
+  readonly editorial?: EditorialMediaIntent;
   readonly medium: FactoryMedium;
   readonly recipeId: MarketingMediaRecipeId | null;
   readonly rule: FactoryMediaRuleId;
@@ -402,6 +409,7 @@ export function decideMedium(
     }
     trace.push({ rule, outcome: 'matched', note: result.rationale });
     return {
+      ...(input.editorial ? { editorial: input.editorial } : {}),
       medium: result.medium,
       recipeId: FACTORY_MEDIUM_RECIPES[result.medium],
       rule,
@@ -424,6 +432,8 @@ export function toFactoryMediaPlanSection(
 ): FactoryStageArtifact<'media-decision'>['sections'][number] {
   return {
     sectionInstanceId,
+    ...(decision.editorial ? { editorial: decision.editorial } : {}),
+    editorialStatus: decision.editorial ? 'authored' : 'legacy-unqualified',
     medium: decision.medium,
     decision: 'deterministic',
     reason: `${decision.rule}: ${decision.rationale}`,

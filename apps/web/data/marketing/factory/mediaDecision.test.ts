@@ -497,3 +497,48 @@ describe('spine artifact', () => {
     });
   });
 });
+
+describe('shared editorial authoring in the existing media plan', () => {
+  const editorial = {
+    benefit: 'Find the next release action',
+    focalDetail: 'One release inspector action',
+    rationale: 'A focused captured action explains the benefit',
+    fallback: 'Keep the authored benefit without media',
+    alternatives: [
+      {
+        medium: 'video' as const,
+        reason: 'Motion adds no explanation to this action',
+      },
+    ],
+  };
+  it('carries benefit, focus, alternatives and fallback through the executed decision seam', () => {
+    const decision = decideMedium(
+      input({ editorial, evidence: { captureScenario: 'release-action' } })
+    );
+    const section = toFactoryMediaPlanSection('feature-main', decision);
+    expect(section).toMatchObject({
+      editorialStatus: 'authored',
+      editorial,
+      medium: 'product-shot',
+    });
+    expect(
+      FACTORY_STAGE_ARTIFACT_SCHEMAS['media-decision'].parse({
+        pageId: 'test',
+        sections: [section],
+      }).sections[0]?.editorial
+    ).toEqual(editorial);
+  });
+  it('keeps old briefs compatible but explicitly unqualified for editorial rationale', () => {
+    expect(
+      toFactoryMediaPlanSection('feature-main', decideMedium(input({})))
+    ).toMatchObject({ editorialStatus: 'legacy-unqualified' });
+  });
+  it('rejects empty focus or missing alternative rationale instead of qualifying it', () => {
+    expect(() =>
+      decideMedium(input({ editorial: { ...editorial, focalDetail: '' } }))
+    ).toThrow();
+    expect(() =>
+      decideMedium(input({ editorial: { ...editorial, alternatives: [] } }))
+    ).toThrow();
+  });
+});
