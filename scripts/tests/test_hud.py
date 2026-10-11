@@ -328,6 +328,13 @@ class LedgerSchemaTest(unittest.TestCase):
     """JOV-7497: receipts missing optional verdict/provider/kind metadata must render
     as unclassified, not crash the display or be inferred as success."""
 
+    def setUp(self):
+        # The fixtures own the worker census. Reading this host's /proc made the release
+        # self-test fail whenever a live Gem worker was running (2026-10-11: devin 1/0).
+        patcher = mock.patch.object(hud, "running_workers", return_value=[])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def host_with_ledger(self, receipts):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
