@@ -541,7 +541,9 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     shown = 0
     for name, count in local["slots"].items():
         mine = [w for w in workers if w["provider"] == name]
-        for index in range(count):
+        # Seats taken before an autoscale reduction finish naturally; hiding them showed
+        # "codex 2/0" with no rows while two codex workers were still running.
+        for index in range(max(count, len(mine))):
             if shown >= rows_budget:
                 break
             worker = mine[index] if index < len(mine) else None

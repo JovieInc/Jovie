@@ -9,6 +9,9 @@ LINEAR_INCREASE_RATIO, LINEAR_DECREASE_RATIO = 0.25, 0.10; LOAD_INCREASE_MAX, LO
 PSI_CPU_OK, PSI_MEM_OK, PSI_IO_OK, PSI_CPU_SEVERE, PSI_MEM_SEVERE, PSI_IO_SEVERE = 20, 2, 10, 40, 5, 20
 GATE_WAIT_INCREASE_MAX, GATE_WAIT_DECREASE, PRODUCTIVE_MIN, PRODUCTIVE_MIN_STARTS = 600, 1200, 0.5, 5; DISK_INCREASE_MIN, DISK_SOFT, DISK_HARD = 15, 10, 5
 MERGE_QUEUE_WAIT_BRAKE_MIN = 30
+RAMP_INTERVAL_S = 300  # surge ramp: proven demand > 2x seats doubles toward demand every 5 min
+# A census is stamped with its source rows' age (up to 3 x 60 s cache TTLs), read on the next minute tick.
+MAINTENANCE_DEMAND_STALE_S = 240
 _OFF, _OBSERVE, _APPLY = frozenset({"0", "off", "false"}), frozenset({"observe", "shadow"}), frozenset({"1", "on", "true", "apply"})
 _AVG10, _PSI = re.compile(r"avg10=([0-9.]+)"), ("cpuSomeAvg10", "memoryFullAvg10", "ioFullAvg10")
 _HARD_REASONS = ("over-budget", "terminal-pr-backlog", "provider-disabled", "pr-inventory-unavailable")
@@ -96,8 +99,15 @@ def _pressure_avg(path: Path, label: str) -> float | None:
     except (OSError, ValueError):
         return None
     return None
-def sample_host(proc_root=Path("/proc")) -> dict:
-    """Local CPU, load, MemAvailable and PSI. Memory and PSI are None when absent."""
+def sample_host(proc_root=None) -> dict:
+    """Local CPU, load, MemAvailable and PSI. Memory and PSI are None when absent.
+
+    The release self-test samples a calm host without /proc: a dispatch fixture must not read
+    Gem's live load and PSI, which made slot counts differ between a laptop and Gem."""
+    if proc_root is None:
+        if os.environ.get("LANES_SELFTEST") == "1":
+            return {"cpuCount": os.cpu_count() or 1, "load1": 0.0, "memAvailableBytes": None, "psi": None}
+        proc_root = Path("/proc")
     try:
         load1 = os.getloadavg()[0]
     except OSError:
@@ -182,7 +192,7 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
     census = _obj(_read_json(root / "maintenance-demand.json", max_bytes=65536))
     if census.get("schema") == "symphony-lanes-maintenance-demand/v1":
         maintenance = {name: _count(_obj(row).get("pending")) for name, row in _obj(census.get("lanes")).items()
-                       if (at := _num(_obj(row).get("observedAt"))) is not None and 0 <= now - at <= 120}
+                       if (at := _num(_obj(row).get("observedAt"))) is not None and 0 <= now - at <= MAINTENANCE_DEMAND_STALE_S}
     merge = _obj(observed.get("mergeThroughput")); merge_at = _num(merge.get("observedAt"))
     return {"doctorFresh": stamp is not None and 0 <= now - stamp <= STALE_S,
             "eligiblePoolByProvider": _obj(observed.get("eligiblePoolByProvider")),
@@ -320,12 +330,31 @@ def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
         (github is None or github < GITHUB_INCREASE_MIN, "github-unknown" if github is None else "github-budget"),
     )
     return [token for cond, token in pairs if cond]
+_CEILING_HOLDS = ("hold:lane-ceiling", "hold:host-ceiling")
+def _aimd_level(prev: dict, base: int) -> int:
+    """The AIMD level a lane evolves from. Credit and host ceilings clamp only the published
+    ``effective``: on 2026-10-11 one codex lease dip set its ceiling to 0 for a tick and the
+    clamp became the next tick's level, so codex sat at 0 seats (no repairs, no demand census
+    to prove recovery) after its credits returned. Receipts before ``target`` existed fall back
+    to the configured base when their last value was only a ceiling clamp."""
+    target = _int(prev.get("target"))
+    if target is None or target < 0:
+        target = _int(prev.get("effective"))
+        if target is None or target < 0:
+            return base
+        if prev.get("lastReason") in _CEILING_HOLDS:
+            target = max(target, base)
+    # No AIMD step goes below the floor; only a ceiling publishes 0. A lane whose level reads 0
+    # (an older clamped receipt) could never run the worker whose scan proves its demand.
+    return max(MIN_SLOTS, target) if base > 0 else target
 def _row(base, effective, running, changed, reason, blockers, ceiling, up=0, idle=0, floor=None) -> dict:
     return {"base": base, "effective": effective, "floor": (MIN_SLOTS if base > 0 else 0) if floor is None else floor,
             "ceiling": ceiling, "running": running, "upStreak": up, "idleStreak": idle,
             "lastChangeAt": changed, "lastReason": reason, "blockers": blockers}
-def _limit_host(rows: dict, cap: int) -> None:
-    """Proportional bounded allocation; a real host ceiling may require zero seats."""
+def _limit_host(all_rows: dict, cap: int, exclude: set | frozenset = frozenset()) -> None:
+    """Proportional bounded allocation; a real host ceiling may require zero seats.
+    Excluded (unhealthy) lanes spawn no workers and take no host share."""
+    rows = {name: row for name, row in all_rows.items() if name not in exclude}
     total = sum(row["effective"] for row in rows.values())
     if total <= cap:
         return
@@ -361,14 +390,15 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
         if base <= 0:
             rows[name] = _row(0, 0, running, changed, "hold:disabled", ["disabled"], 0); continue
         ceiling = _lane_ceiling(name, base, running, obs, config, host_cap)
-        current = _int(prev.get("effective")); current = base if current is None or current < 0 else current
+        current = _aimd_level(prev, base)
         if not fresh:
             fallback = min(base, current, ceiling)
-            rows[name] = _row(base, fallback, running, changed, "hold:stale-doctor", ["stale-doctor"], ceiling, floor=0 if fallback == 0 else MIN_SLOTS); continue
+            rows[name] = _row(base, fallback, running, changed, "hold:stale-doctor", ["stale-doctor"], ceiling, floor=0 if fallback == 0 else MIN_SLOTS)
+            rows[name]["target"] = current; continue
         recovery = current < base and (prev.get("recoveryPending") is True or prev.get("lastReason") in _LINEAR_COLLAPSE_REASONS)
         up, idle, demand = _int(prev.get("upStreak")) or 0, _int(prev.get("idleStreak")) or 0, _demand(name, obs, now)
         multi, additive = _multi_reason(name, obs, sample, now), _additive_reason(obs, sample)
-        effective, reason, blockers, want = current, "hold:steady", [], False; lane_ready = changed is None or now - changed >= interval
+        effective, reason, blockers, want, step_to = current, "hold:steady", [], False, current + 1; lane_ready = changed is None or now - changed >= interval
         host_ready = host_last is None or now - host_last >= HOST_COOLDOWN_S
         if multi:
             effective, reason, blockers, up, idle = max(0 if current == 0 else MIN_SLOTS, math.ceil(current / 2)), multi, [multi], 0, 0
@@ -410,33 +440,47 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
                 elif blockers:
                     up, reason = 0, "hold:" + blockers[0]
                 else:
-                    up = min(need, up + 1)
-                    hold = ("lane-cooldown" if not lane_ready else "host-cooldown" if not host_ready
-                            else "lane-ceiling" if current + 1 > ceiling else "up-streak" if up < need else None)
+                    # Tim 2026-10-11: capped by compute and credits only. Proven demand more than
+                    # twice the current seats ramps multiplicatively on a short interval instead
+                    # of one seat per 30 min (1 -> 16 took ~7.5 h with ~300 eligible issues).
+                    surge = demand is not None and demand > 2 * max(1, current)
+                    ramp_need = min(need, streak_ticks(RAMP_INTERVAL_S)) if surge else need
+                    ramp_ready = lane_ready or (surge and (changed is None or now - changed >= min(interval, RAMP_INTERVAL_S)))
+                    up = min(ramp_need, up + 1)
+                    hold = ("lane-cooldown" if not ramp_ready else "host-cooldown" if not host_ready
+                            else "lane-ceiling" if current + 1 > ceiling else "up-streak" if up < ramp_need else None)
                     if hold:
                         reason, blockers = "hold:" + hold, [hold]
                     else:
                         want, reason, blockers = True, "hold:one-lane", ["one-lane"]
+                        step_to = min(ceiling, demand, 2 * max(1, current)) if surge else current + 1
+        target = effective
         if effective > ceiling:
             effective, reason, blockers = ceiling, "hold:lane-ceiling", ["lane-ceiling"]
         rows[name] = _row(base, effective, running, changed, reason, blockers, ceiling, up, idle, 0 if effective == 0 else MIN_SLOTS)
+        rows[name]["target"] = target
         rows[name]["recoveryPending"] = recovery
         if want:
-            pending.append((demand or 0, order, name, current))
-    _limit_host(rows, host_cap)
+            pending.append((demand or 0, order, name, current, max(current + 1, step_to)))
+    _limit_host(rows, host_cap, exclude=set(obs.get("unhealthy") or []))
     if pending:
-        used = sum(row["effective"] for row in rows.values())
-        for _demand_value, _order, chosen, current in sorted(pending, key=lambda item: (item[0] / max(1, item[3]), -item[1]), reverse=True):
+        used = sum(row["effective"] for name, row in rows.items() if name not in set(obs.get("unhealthy") or []))
+        # Every lane with sustained demand may grow in the same tick while host headroom lasts.
+        for _demand_value, _order, chosen, current, step_to in sorted(pending, key=lambda item: (item[0] / max(1, item[3]), -item[1]), reverse=True):
             row = rows[chosen]
-            if row["effective"] == current and used + 1 <= host_cap and current + 1 <= row["ceiling"]:
-                row.update(effective=current + 1, lastReason="sustained-demand", blockers=[], upStreak=0); break
+            grow = min(step_to, row["ceiling"]) - current
+            grow = min(grow, host_cap - used)
+            if row["effective"] == current and grow >= 1:
+                row.update(effective=current + grow, target=current + grow, lastReason="sustained-demand", blockers=[], upStreak=0)
+                used += grow
+                continue
             row.update(lastReason="hold:host-ceiling", blockers=["host-ceiling"])
     intake_reason = _linear_intake_reason(obs, now) if fresh else "stale-doctor"
     for name, row in rows.items():
         base = row["base"]
         if base > 0 and row["effective"] > base and unknown:
             # API-budget uncertainty stays fail-safe; queue metrics are only diagnostic.
-            row.update(effective=base, lastReason="hold:" + unknown, blockers=[unknown], upStreak=0)
+            row.update(effective=base, target=min(base, row.get("target", base)), lastReason="hold:" + unknown, blockers=[unknown], upStreak=0)
         prior = _obj(prev_lanes.get(name))
         if prior.get("recoveryPending") is True or prior.get("lastReason") in _LINEAR_COLLAPSE_REASONS:
             row["recoveryPending"] = row["effective"] < base

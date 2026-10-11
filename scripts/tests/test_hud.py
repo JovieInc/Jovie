@@ -206,6 +206,14 @@ class RenderTest(unittest.TestCase):
         self.assertIn("✕ beta 0% left · reset 1h30m · banked 1 · retry 1h30m", text)
         self.assertIn("● gamma 90% left · reset 2h00m · banked 0 · leased", text)
 
+    def test_workers_above_a_reduced_cap_stay_visible(self):
+        value = model()
+        value["local"]["slots"] = {"devin": 0, "codex": 1}
+        text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
+        self.assertIn("devin 1/0", text)
+        self.assertIn("JOV-6544", text, "a running worker over the reduced cap is still shown")
+        self.assertIn("worker polling", text)
+
     def test_capacity_horizon_is_show_only_and_renders_source_gaps(self):
         value = model()
         value["local"]["doctor"]["capacity"] = {
@@ -327,6 +335,13 @@ class RenderTest(unittest.TestCase):
 class LedgerSchemaTest(unittest.TestCase):
     """JOV-7497: receipts missing optional verdict/provider/kind metadata must render
     as unclassified, not crash the display or be inferred as success."""
+
+    def setUp(self):
+        # The fixtures own the worker census. Reading this host's /proc made the release
+        # self-test fail whenever a live Gem worker was running (2026-10-11: devin 1/0).
+        patcher = mock.patch.object(hud, "running_workers", return_value=[])
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def host_with_ledger(self, receipts):
         tmp = tempfile.TemporaryDirectory()

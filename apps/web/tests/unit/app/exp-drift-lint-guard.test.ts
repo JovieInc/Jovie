@@ -1,7 +1,8 @@
-import { execSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { Linter } from 'eslint';
 import { describe, expect, it } from 'vitest';
 
@@ -10,7 +11,9 @@ const tsParser = require('@typescript-eslint/parser');
 const canonicalUiLabelCasingRule = require('../../../eslint-rules/canonical-ui-label-casing.js');
 
 const webRoot = path.resolve(__dirname, '../../..');
-const repoRoot = path.resolve(webRoot, '..');
+const repoRoot = path.resolve(webRoot, '../..');
+const biomeCli = require.resolve('@biomejs/biome/bin/biome');
+const execFileAsync = promisify(execFile);
 
 const EXP_DRIFT_TARGETS = [
   'apps/web/app/exp/library-v1/page.tsx',
@@ -41,11 +44,13 @@ const LABEL_CASING_TARGETS = [
   'components/features/dev/DevToolbar.tsx',
 ] as const;
 
-function run(command: string) {
-  return execSync(command, {
+function checkBiome(targets: readonly string[]) {
+  // Resolve the installed CLI directly: shell/pnpm startup can exhaust the
+  // unit-test budget on a loaded pre-push runner. Keep the subprocess bounded.
+  return execFileAsync(process.execPath, [biomeCli, 'check', ...targets], {
     cwd: repoRoot,
     encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 15_000,
   });
 }
 
@@ -86,10 +91,9 @@ function canonicalLabelErrors(targets: readonly string[]) {
 }
 
 describe('exp drift lint guard (#11224 follow-up)', () => {
-  it('keeps the exp route sources Biome-clean so pre-push hooks do not fail on unrelated work', () => {
-    const files = EXP_DRIFT_TARGETS.join(' ');
-    expect(() => run(`pnpm biome check ${files}`)).not.toThrow();
-  });
+  it('keeps the exp route sources Biome-clean so pre-push hooks do not fail on unrelated work', async () => {
+    await expect(checkBiome(EXP_DRIFT_TARGETS)).resolves.toBeDefined();
+  }, 20_000);
 
   it('keeps canonical UI label casing clean on the exp route sources', () => {
     expect(canonicalLabelErrors(EXP_DRIFT_TARGETS)).toEqual([]);
@@ -97,10 +101,9 @@ describe('exp drift lint guard (#11224 follow-up)', () => {
 });
 
 describe('component drift lint guard (#11274)', () => {
-  it('keeps the 8 component files Biome-clean so pre-push hooks do not fail on unrelated work', () => {
-    const files = COMPONENT_DRIFT_TARGETS.join(' ');
-    expect(() => run(`pnpm biome check ${files}`)).not.toThrow();
-  });
+  it('keeps the 8 component files Biome-clean so pre-push hooks do not fail on unrelated work', async () => {
+    await expect(checkBiome(COMPONENT_DRIFT_TARGETS)).resolves.toBeDefined();
+  }, 20_000);
 
   it('keeps canonical UI label casing clean on the two previously-violated component files', () => {
     expect(canonicalLabelErrors(LABEL_CASING_TARGETS)).toEqual([]);
