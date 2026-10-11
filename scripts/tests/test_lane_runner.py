@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import contextlib
+import dataclasses
 import fcntl
 import concurrent.futures
 import io
@@ -2418,6 +2419,21 @@ class WorkerTest(unittest.TestCase):
             self.assertTrue(seat.held)
         finally:
             seat.release()
+
+    def test_bound_lyb_work_uses_this_seat_before_jovie_intake(self):
+        with patch.object(lane.bindings, "work", return_value="pr-opened") as bound, \
+                patch.object(lane, "run_issue") as jovie:
+            self.assertEqual(lane.worker(self.host, "devin"), 0)
+        self.assertEqual(bound.call_args.args[2:4], ("devin", lane.load_providers()["devin"]))
+        jovie.assert_not_called()
+        self.assertEqual(len(self.execs), 1)  # re-exec for the next unit, like any finished run
+
+    def test_binding_fault_never_blocks_the_jovie_path(self):
+        with patch.object(lane.bindings, "work", side_effect=RuntimeError("lyb unreadable")), \
+                patch.object(lane, "run_issue", return_value={"verdict": "landing"}) as jovie, \
+                contextlib.redirect_stderr(io.StringIO()):
+            lane.worker(self.host, "devin")
+        self.assertEqual(jovie.call_args.args[4].identifier, "JOV-3")
 
     def test_selected_repair_needs_no_linear_credentials_or_housekeeping(self):
         with patch.object(lane, "claim_red_pr", return_value={"number": 7}), \
@@ -8287,3 +8303,192 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         diagnostic = json.loads((stage / ".selftest-diagnostic.json").read_text())
         self.assertEqual(diagnostic["failedSelectors"], ["test_partial (scripts.tests.test_fixture.Example)"])
         self.assertEqual((stage / ".selftest-stderr.log").read_bytes(), stderr)
+
+
+class RepositoryBindingTest(unittest.TestCase):
+    """Extra Linear team -> repo bindings (LYB) inside the one lanes service."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.host = lane.Host(state=root / "state", repo=root / "jovie", linear_env=Path("unused"))
+        self.host.state.mkdir()
+        self.repo = root / "lyb"
+        (self.repo / ".git").mkdir(parents=True)
+        self.policy = lane.read_json(lane.bindings.POLICY)
+        self.binding = lane.bindings.extra_bindings(
+            lane, self.policy, env={"LANES_REPO_LYB": str(self.repo)}, hostname="mac")[0]
+
+    def lyb(self, identifier, labels=("symphony", "plan-approved", "admission-approved"), priority=2):
+        return lane.Issue("id-" + identifier, identifier, f"Fix {identifier}", "body", priority,
+                          "2026-10-01T00:00:00Z", list(labels))
+
+    def test_checked_in_lyb_binding_keeps_the_symphony_lyb_contract(self):
+        b = self.binding
+        self.assertEqual((b.key, b.slug, b.repo, b.gate), ("LYB", "JovieInc/LogYourBody", self.repo,
+                                                          "github-required-checks"))
+        self.assertEqual(set(b.labels), {"symphony", "plan-approved", "admission-approved"})
+        self.assertEqual(b.concurrency, 1)
+        self.assertEqual(b.review_state, "In Review")
+        default = lane.bindings.default_binding(lane, self.host)
+        self.assertEqual((default.key, default.slug, default.repo, default.gate),
+                         ("JOV", lane.REPO_SLUG, self.host.repo, "lane-gate"))
+
+    def test_binding_activation_is_host_and_env_scoped(self):
+        extra = lane.bindings.extra_bindings
+        self.assertEqual(extra(lane, self.policy, env={}, hostname="mac"), [])  # not a listed host
+        self.assertEqual(extra(lane, self.policy, env={"LANES_REPO_LYB": str(self.repo), "LANES_BINDING_LYB": "0"},
+                               hostname="gem"), [])
+        self.assertEqual(extra(lane, self.policy, env={"LANES_REPO_LYB": str(self.repo / "missing")},
+                               hostname="gem"), [])
+        # Unit tests and the release self-test never activate the checked-in host binding.
+        self.assertEqual(extra(lane, env={"LANES_EXECUTION_BACKEND": "local-test"}, hostname="gem"), [])
+
+    def test_no_binding_means_no_reads_and_the_jovie_path_runs(self):
+        with patch.object(lane, "sh") as sh, patch.object(lane, "Linear") as linear:
+            self.assertIsNone(lane.bindings.work(lane, self.host, "codex", {"cmd": ["true"]}))
+            self.assertIsNone(lane.bindings.work(lane, self.host, "codex", {"cmd": ["true"]}, bindings=[]))
+        sh.assert_not_called()
+        linear.assert_not_called()
+
+    def test_admission_refusals_are_precise_and_lyb_scoped(self):
+        refusal = lane.bindings.refusal
+        lyb152 = self.lyb("LYB-152", labels=("symphony", "ci-nightly", "flaky", "remediation:red-checks", "area:ios"))
+        self.assertEqual(refusal(lane, self.binding, lyb152, {}, time.time(), frozenset()),
+                         "LYB:missing-label:admission-approved,plan-approved")
+        self.assertIsNone(refusal(lane, self.binding, self.lyb("LYB-1"), {}, time.time(), frozenset()))
+        held = self.lyb("LYB-2", labels=("symphony", "plan-approved", "admission-approved", "hold"))
+        self.assertEqual(refusal(lane, self.binding, held, {}, time.time(), frozenset()), "LYB:excluded-label:hold")
+        self.assertEqual(refusal(lane, self.binding, self.lyb("LYB-3"), {}, time.time(), frozenset({"LYB-3"})),
+                         "LYB:in-flight-pr")
+        self.assertEqual(refusal(lane, self.binding, self.lyb("LYB-4"), {"LYB-4": {"count": 3, "at": 0}},
+                                 time.time(), frozenset()), "LYB:retry-exhausted")
+
+    def claim(self, issues, prs, run_receipt=None, states=None):
+        linear = FakeLinear([])
+        linear.key = "lin_test"
+        linear.states = states or {}
+        rows = [{"id": i.id, "identifier": i.identifier, "title": i.title, "description": i.description,
+                 "priority": i.priority, "createdAt": i.created_at,
+                 "labels": {"nodes": [{"name": name} for name in i.labels]}} for i in issues]
+        linear._bounded_lane_nodes = Mock(return_value=rows)
+        light = [{key: value for key, value in pr.items() if key != "statusCheckRollup"} for pr in prs]
+
+        def gh(args, *rest, **kwargs):
+            if args[:3] == ["gh", "pr", "view"]:
+                rollup = next(pr for pr in prs if pr["number"] == int(args[3])).get("statusCheckRollup", [])
+                return SimpleNamespace(returncode=0, stdout=json.dumps({"statusCheckRollup": rollup}), stderr="")
+            return SimpleNamespace(returncode=0, stdout=json.dumps(light), stderr="")
+        receipt = run_receipt or {"verdict": "pr-opened", "prUrl": "https://github.com/JovieInc/LogYourBody/pull/9"}
+        with patch.object(lane, "Linear", return_value=linear), patch.object(lane, "sh", side_effect=gh), \
+                patch.object(lane.bindings, "run", return_value=receipt) as run, \
+                patch.object(lane, "read_new_issue_budget") as jovie_budget, \
+                patch.object(lane, "in_flight_issues") as jovie_in_flight:
+            verdict = lane.bindings.work(lane, self.host, "codex", {"cmd": ["true"], "model": "m"},
+                                         bindings=[self.binding])
+        jovie_budget.assert_not_called()
+        jovie_in_flight.assert_not_called()
+        status = json.loads((self.host.state / "bindings.json").read_text())["LYB"]
+        return verdict, linear, run, status
+
+    def test_admitted_lyb_issue_runs_in_lyb_and_moves_to_in_review(self):
+        verdict, linear, run, status = self.claim(
+            [self.lyb("LYB-152", labels=("symphony", "area:ios")), self.lyb("LYB-7")], [])
+        self.assertEqual(verdict, "pr-opened")
+        self.assertEqual(run.call_args.kwargs["issue"].identifier, "LYB-7")
+        self.assertEqual(run.call_args.args[2], self.binding)
+        self.assertEqual(linear.moves, [("id-LYB-7", "In Progress"), ("id-LYB-7", "In Review")])
+        self.assertEqual(status["claimed"], "LYB-7")
+        self.assertEqual(status["refusals"], {"LYB-152": "LYB:missing-label:admission-approved,plan-approved"})
+        linear._bounded_lane_nodes.assert_called_once()
+        self.assertIn('team:{key:{eq:$team}}', linear._bounded_lane_nodes.call_args.args[0])
+        self.assertEqual(linear._bounded_lane_nodes.call_args.args[1]["team"], "LYB")
+
+    def test_lyb_intake_budget_is_its_own_and_counts_open_lane_prs(self):
+        prs = [{"number": n, "headRefName": f"codex/lyb-{n}-20261011t000000", "headRefOid": "a" * 40,
+                "title": "t", "mergeStateStatus": "BLOCKED", "statusCheckRollup": []} for n in (1, 2, 3)]
+        verdict, linear, run, status = self.claim([self.lyb("LYB-7")], prs)
+        self.assertIsNone(verdict)
+        run.assert_not_called()
+        self.assertEqual(linear.moves, [])
+        self.assertEqual(status["outcome"], "LYB:intake-budget:3/3")
+
+    def test_claim_race_does_not_run(self):
+        verdict, linear, run, status = self.claim([self.lyb("LYB-7")], [], states={"id-LYB-7": "In Progress"})
+        self.assertIsNone(verdict)
+        run.assert_not_called()
+        self.assertEqual(status["outcome"], "claim-raced")
+
+    def test_red_or_behind_lyb_lane_pr_is_repaired_at_most_twice_per_head(self):
+        red = {"number": 41, "headRefName": "devin/lyb-9-20261011t000000", "headRefOid": "b" * 40, "title": "t",
+               "mergeStateStatus": "BLOCKED", "statusCheckRollup": [{"name": "iOS", "conclusion": "FAILURE"}]}
+        human = {**red, "number": 42, "headRefName": "tim/lyb-9-20261011-fix"}  # not a lane
+        for _ in range(lane.MAX_FIX_ATTEMPTS):
+            verdict, _, run, _ = self.claim([], [human, red], run_receipt={"verdict": "pushed"})
+            self.assertEqual(verdict, "pushed")
+            self.assertEqual(run.call_args.kwargs["pr"]["number"], 41)
+        verdict, _, run, _ = self.claim([], [human, red])
+        run.assert_not_called()
+        behind = {**red, "number": 43, "headRefName": "codex/lyb-10-20261011t000000",
+                  "statusCheckRollup": [], "mergeStateStatus": "BEHIND"}
+        self.assertEqual(lane.bindings.repair_candidate(lane, self.binding, [behind], {})["number"], 43)
+
+    def test_seat_is_shared_one_lyb_run_at_a_time(self):
+        held = lane.bindings.take_seat(lane, self.host, self.binding)
+        self.addCleanup(held.release)
+        with patch.object(lane, "sh") as sh:
+            self.assertIsNone(lane.bindings.work(lane, self.host, "codex", {"cmd": ["true"]}, bindings=[self.binding]))
+        sh.assert_not_called()
+        self.assertFalse(any(path.parent.name == "slots" for path in self.host.state.rglob("seat.*.lock")))
+
+    def test_failed_run_charges_the_shared_failure_ledger(self):
+        verdict, linear, _, _ = self.claim([self.lyb("LYB-7")], [],
+                                           run_receipt={"verdict": "no-change", "reasons": ["no-commits"]})
+        self.assertEqual(verdict, "no-change")
+        self.assertEqual(linear.moves[-1], ("id-LYB-7", "Todo"))
+        self.assertEqual(json.loads(lane.failures_path(self.host).read_text())["LYB-7"]["count"], 1)
+
+    def test_run_pushes_lyb_commits_and_opens_one_draft_pr_in_lyb(self):
+        root = Path(self.tmp.name)
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
+        env.pop("GIT_DIR", None)
+        run = lambda *args, cwd=root: subprocess.run(args, cwd=cwd, env=env, check=True, capture_output=True)
+        run("git", "init", "-q", "--bare", "-b", "main", str(root / "origin.git"))
+        shutil.rmtree(self.repo)
+        run("git", "clone", "-q", str(root / "origin.git"), str(self.repo))
+        run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=self.repo)
+        run("git", "push", "-q", "origin", "HEAD:main", cwd=self.repo)
+        real_sh, calls = lane.sh, []
+
+        def sh(args, *rest, **kwargs):
+            calls.append(args)
+            if args[0] == "gh":
+                return SimpleNamespace(returncode=0, stdout="https://github.com/JovieInc/LogYourBody/pull/9\n", stderr="")
+            return real_sh(args, *rest, **kwargs)
+        spec = {"model": "m", "cmd": ["sh", "-c", "echo fix > fix.txt && git add fix.txt && git commit -qm 'fix: x'"]}
+        with patch.dict(os.environ, env), patch.object(lane, "sh", side_effect=sh), \
+                patch.object(lane, "context_pack", return_value=""):
+            binding = dataclasses.replace(self.binding, install=())
+            receipt = lane.bindings.run(lane, self.host, binding, "codex", spec, issue=self.lyb("LYB-7"))
+        self.assertEqual(receipt["verdict"], "pr-opened", receipt)
+        self.assertEqual(receipt["repository"], "JovieInc/LogYourBody")
+        create = next(args for args in calls if args[:3] == ["gh", "pr", "create"])
+        self.assertEqual(create[create.index("--repo") + 1], "JovieInc/LogYourBody")
+        self.assertIn("--draft", create)
+        self.assertIn("(LYB-7)", create[create.index("--title") + 1])
+        pushed = subprocess.run(["git", "ls-remote", str(root / "origin.git"), receipt["branch"]], env=env,
+                                capture_output=True, text=True).stdout
+        self.assertIn(receipt["headSha"], pushed)
+        self.assertTrue(receipt["branch"].startswith("codex/lyb-7-"))
+        self.assertFalse(Path(receipt["worktree"]).exists())
+        self.assertFalse(any("pre-push-gate" in " ".join(map(str, args)) for args in calls))
+
+    def test_lyb_remediation_event_never_runs_in_the_jovie_repo(self):
+        lane.save_escalation(self.host, {"events": {"red-checks": {
+            "issueId": "id-LYB-152", "identifier": "LYB-152", "team": "LYB", "status": "claimed",
+            "lane": "codex", "startedStateId": "ip-LYB", "attempts": []}}})
+        gql = Mock(side_effect=AssertionError("no Linear read for another team's event"))
+        self.assertIsNone(lane.claim_labeled_event(self.host, "codex", SimpleNamespace(gql=gql)))
+        gql.assert_not_called()
