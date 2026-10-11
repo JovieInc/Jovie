@@ -194,8 +194,6 @@ export const POLLING_DEBT = Object.freeze({
     'manual self-test rereads autoMergeRequest 12 times for 60 s',
   '.github/workflows/auto-pr-on-push.yml#open-pr':
     'waits up to 6 min for open agent PRs to drop below the rate limit',
-  '.github/workflows/ci.yml#ci-merge-group-watchdog':
-    'holds a runner up to 65 min watching for a superseding merge group (removal in flight)',
   '.github/workflows/golden-path-nightly.yml#golden-path':
     'dispatches ci.yml then waits up to 80 min for that run to complete',
   '.github/workflows/pr-conflict-handler.yml#record_cohort':
@@ -203,7 +201,7 @@ export const POLLING_DEBT = Object.freeze({
   '.github/workflows/production-controller.yml#coalesce-production':
     'sleeps up to the coalescing cap scaled by merge-queue depth before rereading main',
 });
-export const POLLING_DEBT_CEILING = 6;
+export const POLLING_DEBT_CEILING = 5;
 
 /**
  * Mutations that change PR, merge-queue, issue, or label state. A workflow is
