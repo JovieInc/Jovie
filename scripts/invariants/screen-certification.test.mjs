@@ -182,6 +182,34 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
     }
   });
+  it('registers the guarded Ovie Inbox without substituting source ownership for browser proof', () => {
+    const source = 'apps/web/app/app/(shell)/admin/inbox/page.tsx';
+    const classified = classifyScreenPath(source);
+    assert.equal(classified.kind, 'registered');
+    assert.equal(classified.entry?.id, 'web.ov-inbox');
+    assert.equal(classified.entry?.owner, 'ovie-ops-shell');
+    assert.deepEqual(classified.entry?.viewports, ['desktop', 'mobile']);
+    assert.equal(SCREEN_MARKETING_ROUTES['web.ov-inbox'], undefined);
+    assert.equal(SCREEN_PROOF_ROUTES['web.ov-inbox'], undefined);
+    const registration = runScreenCertification({
+      headSha: HEAD,
+      changedFiles: [source],
+      registrationOnly: true,
+    });
+    assert.equal(registration.ok, true, registration.receipt.issues.join('\n'));
+    assert.equal(registration.receipt.certified, false);
+    assert.equal(registration.receipt.status, 'source-registered');
+    assert.deepEqual(
+      registration.receipt.changedScreens.map(item => [item.id, item.verdict]),
+      [['web.ov-inbox', 'evidence-required']]
+    );
+    const certification = runScreenCertification({
+      headSha: HEAD,
+      changedFiles: [source],
+    });
+    assert.equal(certification.ok, false);
+    assert.equal(certification.receipt.certified, false);
+  });
   it('registers the admin share studio for both viewports', () => {
     const entry = classifyScreenPath(
       'apps/web/app/app/(shell)/admin/share-studio/page.tsx'
