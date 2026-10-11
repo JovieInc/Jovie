@@ -116,10 +116,10 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
   });
   await page
     .getByRole('navigation', { name: 'Dashboard Navigation' })
-    .getByRole('link', { name: 'Identity' })
+    .getByRole('link', { name: 'Work' })
     .click();
-  await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.PRESENCE}$`));
-  await expect(page.getByTestId('profiles-workspace')).toBeVisible({
+  await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.LIBRARY}$`));
+  await expect(page.getByTestId('library-stage-tabs')).toBeVisible({
     timeout: 30_000,
   });
   await expect
@@ -129,7 +129,7 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
           () =>
             window.__JOVIE_NAV_TELEMETRY_OBSERVATIONS__?.filter(
               observation =>
-                observation.payload.item_id === 'presence' &&
+                observation.payload.item_id === 'library' &&
                 ['activation', 'destination_ready'].includes(
                   observation.payload.event
                 )
@@ -145,7 +145,7 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
   const clickToReady = observations
     .filter(
       observation =>
-        observation.payload.item_id === 'presence' &&
+        observation.payload.item_id === 'library' &&
         ['activation', 'destination_ready'].includes(observation.payload.event)
     )
     .toSorted((left, right) => left.sequence - right.sequence);
@@ -155,14 +155,14 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
   ]);
   expect(clickToReady[0]?.payload).toMatchObject({
     source_route: 'chat',
-    destination_route: 'other_app',
+    destination_route: 'library',
     input_method: 'pointer',
     platform: 'web_desktop',
     nav_variant: 'canonical_identity_work_v1',
     consent_mode: 'explicit',
   });
   expect(clickToReady[0]?.presenceSurfaceVisible).toBe(false);
-  expect(clickToReady[1]?.presenceSurfaceVisible).toBe(true);
+  expect(clickToReady[1]?.presenceSurfaceVisible).toBe(false);
   expect(clickToReady[1]?.payload.latency_bucket).not.toBe('na');
 
   const payloads = observations.map(({ payload }) => payload);

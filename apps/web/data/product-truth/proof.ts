@@ -535,7 +535,8 @@ export const DOGFOOD_METRIC_PROOF: readonly MetricProof[] =
     unit: receipt.unit,
     reproducingQuery: receipt.reproducingQuery,
     measuredAt: DOGFOOD_RECEIPTS.measuredAt,
-    sample: { size: receipt.value, population: receipt.population },
+    // One profile measured; the event count is the value, not the sample.
+    sample: { size: 1, population: receipt.population },
     source: `${DOGFOOD_RECEIPTS_SOURCE}#${receipt.id}`,
   }));
 
@@ -815,6 +816,22 @@ export function selectProof(
 
   section.page.usedProofIds.add(selected.id);
   return selected as ProofItem;
+}
+
+/**
+ * The registry a factory page may select from (JOV-7750): a measured Jovie
+ * outcome claim keeps only proof with admissible evidence, so a market fact
+ * can never back it and selectProof returns a ProofRequest instead.
+ */
+export function admissibleProofRegistry(
+  measuredClaimIds: ReadonlySet<string>,
+  registry: readonly ProofCandidate[] = PROOF_REGISTRY
+): readonly ProofCandidate[] {
+  return registry.filter(
+    proof =>
+      !measuredClaimIds.has(proof.claimId) ||
+      proofEvidenceClass(proof) !== 'none'
+  );
 }
 
 /**

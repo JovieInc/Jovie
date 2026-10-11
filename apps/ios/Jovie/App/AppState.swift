@@ -191,6 +191,7 @@ final class AppState {
          .uiTestingVenueMode,
          .uiTestingAudience,
          .uiTestingLibrary,
+         .uiTestingStorefrontReleases,
          .uiTestingLibraryEmpty,
          .uiTestingInbox,
          .uiTestingInboxLoading,
@@ -218,6 +219,10 @@ final class AppState {
       default:
         activeUserID = "user_ui_testing_chat_entity_fixture"
       }
+    case .uiTestingStorefrontIdentity:
+      route = .ready
+      dashboardState = .loaded(.previewStorefront)
+      isOffline = false
     case .uiTestingQRUnavailable:
       route = .ready
       dashboardState = .loaded(.previewReadyWithoutQR)

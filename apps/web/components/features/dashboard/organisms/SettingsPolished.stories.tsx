@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { withDashboardProviders } from '@/.storybook/dashboard-fixtures';
 import { SettingsPolished } from './SettingsPolished';
 
 const meta = {
@@ -10,6 +11,7 @@ const meta = {
       uncoveredProps: ['artist'],
     },
   },
+  decorators: [withDashboardProviders],
 } satisfies Meta<typeof SettingsPolished>;
 
 export default meta;

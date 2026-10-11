@@ -1,0 +1,59 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: Public review sites emit no event Jovie can subscribe to, so a weekly read-only collector is the only trigger; it writes nothing but a run artifact.
+# removal-trigger: Remove when VOC mining moves into an existing scheduled owner (Summer heartbeat or a local Codex automation) that runs scripts/voc/voc-mine.mjs with gbrain access.
+name: VOC Mine
+# clock-class: upstream-advisory
+# Public complaints and payment objections have no causal event we can
+# subscribe to, so a weekly clock is the trigger (JOV-7701, scripts/voc).
+
+on:
+  schedule:
+    # Mondays 14:00 UTC.
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voc-mine
+  cancel-in-progress: true
+
+jobs:
+  mine:
+    name: Mine complaints and objections
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VOC_TARGETS_JSON: ${{ secrets.VOC_TARGETS_JSON }}
+      EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+    steps:
+      - name: Skip until secrets exist
+        if: env.VOC_TARGETS_JSON == ''
+        run: echo "::notice::VOC_TARGETS_JSON is not set; skipping. See scripts/voc/README.md."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.VOC_TARGETS_JSON != ''
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: env.VOC_TARGETS_JSON != ''
+        with:
+          node-version-file: .nvmrc
+      - name: Run miner
+        if: env.VOC_TARGETS_JSON != ''
+        run: |
+          set -euo pipefail
+          node scripts/voc/voc-mine.mjs --days 30 --out "$RUNNER_TEMP/voc-items.jsonl" 2> "$RUNNER_TEMP/voc-run.log"
+          {
+            echo "## VOC mine $(date -u +%F)"
+            echo '```json'
+            tail -n 1 "$RUNNER_TEMP/voc-run.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: env.VOC_TARGETS_JSON != ''
+        with:
+          name: voc-items-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/voc-items.jsonl
+            ${{ runner.temp }}/voc-run.log
+          retention-days: 90

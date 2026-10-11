@@ -9,6 +9,7 @@ import {
   buildJudgeSchema,
   calibrationHolds,
   evaluatePassBar,
+  objectionsFor,
   PERSONAS,
   parseCoherenceOutput,
   parseJudgeOutput,
@@ -394,4 +395,49 @@ test('coherence prompt and schema cover every step and hand-off', () => {
     schema.properties.transitions.items.properties.fromStepId.enum,
     ['outreach', 'start']
   );
+});
+
+test('mined VOC objections reach the persona prompt and must each be answered', () => {
+  const voc = {
+    personas: {
+      'indie-release': [
+        { type: 'not-worth-price', objection: '$199 vs a $9 link page?' },
+        { type: 'bad', objection: '' },
+      ],
+    },
+  };
+  const objections = objectionsFor(voc, 'indie-release');
+  assert.equal(objections.length, 1);
+  assert.deepEqual(objectionsFor(voc, 'skeptic'), []);
+  assert.deepEqual(objectionsFor(null, 'skeptic'), []);
+
+  const prompt = buildJudgePrompt(PERSONAS[0], [], 'full', objections);
+  assert.match(prompt, /Objections you already carry/);
+  assert.match(prompt, /1\. \$199 vs a \$9 link page\?/);
+  assert.doesNotMatch(buildJudgePrompt(PERSONAS[0], []), /Objections/);
+
+  const schema = buildJudgeSchema(STEP_IDS, 1);
+  assert.ok(schema.required.includes('objections'));
+  assert.ok(!buildJudgeSchema(STEP_IDS).required.includes('objections'));
+
+  const base = {
+    steps: STEP_IDS.map(id => stepVerdict(id, 8)),
+    wouldPay: true,
+    payReason: 'r',
+  };
+  assert.throws(() => parseJudgeOutput(base, STEP_IDS, 1), /objection 1/);
+  const parsed = parseJudgeOutput(
+    {
+      ...base,
+      objections: [
+        { index: 1, answered: false, stepId: '', note: 'never shown ROI' },
+      ],
+    },
+    STEP_IDS,
+    1
+  );
+  assert.deepEqual(parsed.objections, [
+    { index: 1, answered: false, stepId: null, note: 'never shown ROI' },
+  ]);
+  assert.equal('objections' in parseJudgeOutput(base, STEP_IDS), false);
 });

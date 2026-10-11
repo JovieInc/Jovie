@@ -8,6 +8,7 @@ enum LaunchMode: Equatable, CaseIterable {
   case uiTestingAuthCallback
   case uiTestingSignedOut
   case uiTestingReady
+  case uiTestingStorefrontIdentity
   case uiTestingProfileError
   case uiTestingChat
   case uiTestingChatOffline
@@ -23,6 +24,7 @@ enum LaunchMode: Equatable, CaseIterable {
   case uiTestingSplash
   case uiTestingAudience
   case uiTestingLibrary
+  case uiTestingStorefrontReleases
   case uiTestingLibraryEmpty
   case uiTestingInbox
   case uiTestingInboxOffline
@@ -40,6 +42,7 @@ enum LaunchMode: Equatable, CaseIterable {
          .uiTestingAuthCallback,
          .uiTestingSignedOut,
          .uiTestingReady,
+         .uiTestingStorefrontIdentity,
          .uiTestingProfileError,
          .uiTestingChat,
          .uiTestingChatOffline,
@@ -55,6 +58,7 @@ enum LaunchMode: Equatable, CaseIterable {
          .uiTestingSplash,
          .uiTestingAudience,
          .uiTestingLibrary,
+         .uiTestingStorefrontReleases,
          .uiTestingLibraryEmpty,
          .uiTestingInbox,
          .uiTestingInboxOffline,
@@ -129,12 +133,13 @@ enum LaunchMode: Equatable, CaseIterable {
   var defaultInitialTab: AppShellTab {
     switch self {
     case .uiTestingReady,
+         .uiTestingStorefrontIdentity,
          .uiTestingSettings,
          .uiTestingQRUnavailable,
          .uiTestingAuthCallback,
          .uiTestingVenueMode:
       return .profile
-    case .uiTestingLibrary, .uiTestingLibraryEmpty:
+    case .uiTestingLibrary, .uiTestingLibraryEmpty, .uiTestingStorefrontReleases:
       return .library
     case .uiTestingInbox, .uiTestingInboxOffline, .uiTestingInboxLoading:
       return .inbox
@@ -193,6 +198,10 @@ enum LaunchMode: Equatable, CaseIterable {
 
     if arguments.contains("-ui-testing-ready") {
       return .uiTestingReady
+    }
+
+    if arguments.contains("-ui-testing-storefront-identity") {
+      return .uiTestingStorefrontIdentity
     }
 
     if arguments.contains("-ui-testing-profile-error") {
@@ -257,6 +266,10 @@ enum LaunchMode: Equatable, CaseIterable {
 
     if arguments.contains("-ui-testing-library") {
       return .uiTestingLibrary
+    }
+
+    if arguments.contains("-ui-testing-storefront-releases") {
+      return .uiTestingStorefrontReleases
     }
 
     if arguments.contains("-ui-testing-inbox-offline") {

@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { withDbSessionTx } from '@/lib/auth/session';
+import { assertCreatorFinanceEnabled } from '@/lib/finance/flags';
 import { buildMoneyOverview, type MoneyOverview } from '@/lib/finance/metrics';
 import { requireFinancialOwnerId } from '@/lib/finance/owner';
 import {
@@ -18,6 +19,7 @@ import {
  */
 export async function getMoneyOverview(): Promise<MoneyOverview> {
   const ownerUserId = await requireFinancialOwnerId();
+  await assertCreatorFinanceEnabled(ownerUserId);
   return withDbSessionTx(
     async tx => {
       const [institutions, accounts, transactions] = await Promise.all([

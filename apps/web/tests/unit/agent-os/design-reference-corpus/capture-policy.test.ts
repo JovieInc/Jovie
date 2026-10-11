@@ -21,6 +21,18 @@ function fetcher(status: number, body = ''): typeof fetch {
 }
 
 describe('isPathAllowedByRobots', () => {
+  it('treats brackets as literal path characters, including an unmatched bracket', () => {
+    const robots = 'User-agent: *\nDisallow: /path[abc]/';
+    expect(isPathAllowedByRobots(robots, '/path[abc]/image')).toBe(false);
+    expect(isPathAllowedByRobots(robots, '/patha/image')).toBe(true);
+    expect(
+      isPathAllowedByRobots(
+        'User-agent: *\nDisallow: /unfinished[',
+        '/unfinished[image'
+      )
+    ).toBe(false);
+  });
+
   it('applies the wildcard group with longest-match precedence', () => {
     expect(isPathAllowedByRobots(ROBOTS, '/')).toBe(true);
     expect(isPathAllowedByRobots(ROBOTS, '/private/team')).toBe(false);

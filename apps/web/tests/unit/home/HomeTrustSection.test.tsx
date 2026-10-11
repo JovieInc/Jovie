@@ -11,11 +11,17 @@ vi.mock('next/image', () => ({
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { ArtistProfileLogoBar } from '@/components/marketing/artist-profile/ArtistProfileLogoBar';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { LOGO_PERMISSION_FIXTURES } from '@/data/product-truth/logo-permissions.fixture';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
+
+const granted = {
+  placement: { page: '/' },
+  fixturePermissions: LOGO_PERMISSION_FIXTURES,
+} as const;
 
 describe('HomeTrustSection', () => {
   it('renders the boxed card presentation by default', () => {
-    render(<HomeTrustSection />);
+    render(<HomeTrustSection {...granted} />);
 
     expect(screen.getByTestId('homepage-trust')).toHaveAttribute(
       'data-presentation',
@@ -31,6 +37,7 @@ describe('HomeTrustSection', () => {
   it('renders the homepage inline strip presentation when requested', () => {
     const { container } = render(
       <HomeTrustSection
+        {...granted}
         presentation='inline-strip'
         label='Trusted by artists'
       />
@@ -56,7 +63,7 @@ describe('HomeTrustSection', () => {
   });
 
   it('keeps the inline strip free of unsupported endorsement copy', () => {
-    render(<HomeTrustSection presentation='inline-strip' />);
+    render(<HomeTrustSection {...granted} presentation='inline-strip' />);
 
     expect(
       screen.queryByText('Trusted by artists and teams releasing on')
@@ -75,6 +82,8 @@ describe('HomeTrustSection', () => {
         adaptive={ARTIST_PROFILE_COPY.adaptive}
         phoneCaption={ARTIST_PROFILE_COPY.hero.phoneCaption}
         phoneSubcaption={ARTIST_PROFILE_COPY.hero.phoneSubcaption}
+        logoPlacement={granted.placement}
+        fixturePermissions={LOGO_PERMISSION_FIXTURES}
       />
     );
 

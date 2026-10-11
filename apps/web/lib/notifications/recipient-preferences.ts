@@ -53,7 +53,6 @@ export interface RecipientChannelEnablement {
   email: boolean;
   sms: boolean;
   push: boolean;
-  in_app: boolean;
 }
 
 export interface MarketingConsentRecord {
@@ -122,7 +121,6 @@ const recipientPreferencesWriteSchema = z
         email: z.boolean(),
         sms: z.boolean(),
         push: z.boolean(),
-        in_app: z.boolean(),
       })
       .strict(),
     marketingOptIn: z.boolean(),
@@ -189,7 +187,6 @@ function disabledChannels(): RecipientChannelEnablement {
     email: false,
     sms: false,
     push: false,
-    in_app: false,
   };
 }
 
@@ -295,7 +292,9 @@ export function toStoredRecipientPreferences(
     channelEmail: preferences.channels.email,
     channelSms: preferences.channels.sms,
     channelPush: preferences.channels.push,
-    channelInApp: preferences.channels.in_app,
+    // The channel_in_app column stays until an in-app transport exists; no
+    // settings surface can enable it, so writes always persist false.
+    channelInApp: false,
     marketingOptIn: preferences.marketingOptIn,
     marketingConsentVersion: preferences.marketingConsent?.version ?? null,
     marketingConsentRecordedAt:
@@ -371,7 +370,6 @@ export function fromStoredRecipientPreferences(
       email: row.channelEmail,
       sms: row.channelSms,
       push: row.channelPush,
-      in_app: row.channelInApp,
     },
     marketingOptIn: optedIn,
     marketingConsent: optedIn

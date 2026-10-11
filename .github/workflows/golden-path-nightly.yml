@@ -65,8 +65,9 @@ jobs:
           MAIN_SHA: ${{ steps.skip.outputs.main_sha }}
         run: |
           set -euo pipefail
+          source scripts/lib/gh-retry.sh
           since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          gh workflow run ci.yml --repo "$REPO" --ref main
+          gh_retry workflow run ci.yml --repo "$REPO" --ref main
           run_id=""
           for _ in $(seq 1 30); do
             sleep 10

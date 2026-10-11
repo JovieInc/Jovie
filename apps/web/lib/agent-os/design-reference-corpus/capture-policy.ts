@@ -35,7 +35,7 @@ function ruleMatches(rulePath: string, path: string): boolean {
   const body = anchored ? rulePath.slice(0, -1) : rulePath;
   const pattern = body
     .split('*')
-    .map(part => part.replace(/[.+?^${}()|\\]/gu, '\\$&'))
+    .map(part => part.replace(/[.+?^${}()|[\]\\]/gu, '\\$&'))
     .join('.*');
   return new RegExp(`^${pattern}${anchored ? '$' : ''}`, 'u').test(path);
 }

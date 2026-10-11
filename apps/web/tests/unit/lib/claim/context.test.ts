@@ -36,6 +36,10 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: captureErrorMock,
 }));
 
+vi.mock('@/lib/server-analytics', () => ({
+  trackServerEvent: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
 describe('readPendingClaimContext', () => {
   beforeEach(() => {
     deleteMock.mockReset();
@@ -74,9 +78,9 @@ describe('readPendingClaimContext', () => {
     expect(deleteMock).toHaveBeenCalled();
   });
 
-  it('returns null (no clear) on expired cookie', async () => {
+  it('returns null and clears an expired signed cookie', async () => {
     // Produce legitimately signed cookie via write, then advance fake time past TTL
-    // so parse succeeds (sig+fields) but expiry branch returns null without delete.
+    // so signature validation succeeds but the expired context is discarded.
     vi.useFakeTimers();
     const { writePendingClaimContext, readPendingClaimContext } = await import(
       '@/lib/claim/context'
@@ -93,7 +97,7 @@ describe('readPendingClaimContext', () => {
     const result = await readPendingClaimContext();
     expect(result).toBeNull();
     vi.useRealTimers();
-    // expiry path returns null without calling delete (unlike parse failures)
+    expect(deleteMock).toHaveBeenCalledWith('jovie_pending_claim');
   });
 
   it('respects username filter option (case-insensitive)', async () => {

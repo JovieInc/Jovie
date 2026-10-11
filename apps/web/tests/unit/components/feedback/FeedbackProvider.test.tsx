@@ -121,6 +121,23 @@ describe('FeedbackProvider toast viewport', () => {
     expect(classNames.cancelButton).toContain('focus-visible:ring-accent');
   });
 
+  it.each(['/hud', '/hud/wiki', '/app/ov/hud'])(
+    'mounts feedback for the visible Ops path and its shell destination: %s',
+    async pathname => {
+      mockPathname.mockReturnValue(pathname);
+
+      render(
+        <FeedbackProvider>
+          <main>Ops</main>
+        </FeedbackProvider>
+      );
+
+      await waitFor(() => {
+        expect(mockToaster).toHaveBeenCalled();
+      });
+    }
+  );
+
   it('does not mount app feedback chrome on public profile routes', () => {
     mockPathname.mockReturnValue('/tim');
 

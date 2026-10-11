@@ -116,6 +116,7 @@ vi.mock('@/lib/utils/logger', () => ({
 import {
   ChargeHandler,
   chargeHandler,
+  StripeWriteBlockedError,
 } from '@/lib/stripe/webhooks/handlers/charge-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 import { isSupportedEventType } from '@/lib/stripe/webhooks/types';
@@ -361,6 +362,45 @@ describe('@critical ChargeHandler', () => {
       expect(mockStripeSubscriptionsCancel).toHaveBeenCalledWith('sub_123');
       expect(mockExpireReferralOnChurn).toHaveBeenCalledWith('app_user_123');
       expect(mockInvalidateBillingCache).toHaveBeenCalledWith('app_user_123');
+    });
+
+    it('does not cancel or revoke when replay finds a still-cancelable subscription', async () => {
+      const context = refundContext(refundedCharge());
+      context.stripeWritesAllowed = false;
+
+      let caught: unknown;
+      try {
+        await handler.handle(context);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(StripeWriteBlockedError);
+      expect((caught as Error).message).toContain(
+        'Stripe Dashboard: open subscription sub_123 (status active)'
+      );
+
+      expect(mockStripeSubscriptionsCancel).not.toHaveBeenCalled();
+      expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
+      expect(mockSendSlackMessage).not.toHaveBeenCalled();
+      expect(mockReverseReferralCommission).toHaveBeenCalled();
+    });
+
+    it('revokes locally on replay once the subscription is no longer cancelable', async () => {
+      mockStripeSubscriptionsRetrieve.mockResolvedValue({
+        ...activeSubscription(),
+        status: 'canceled',
+      });
+      const context = refundContext(refundedCharge());
+      context.stripeWritesAllowed = false;
+
+      const result = await handler.handle(context);
+
+      expect(result).toEqual({ success: true });
+      expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ isPro: false, stripeSubscriptionId: null })
+      );
+      expect(mockStripeSubscriptionsCancel).not.toHaveBeenCalled();
+      expect(mockSendSlackMessage).not.toHaveBeenCalled();
     });
 
     it('is safe to replay: a second identical refund still revokes and cancels', async () => {

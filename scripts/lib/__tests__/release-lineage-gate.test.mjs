@@ -42,6 +42,8 @@ function runGate({
   main = EXPECTED_SHA,
   lineageStatus = 'ahead',
   pendingSuccessors = 0,
+  runsFail = false,
+  runsResponse = /** @type {string | undefined} */ (undefined),
   liveSha = LIVE_SHA,
   unshipped = 3,
   ageSeconds = 600,
@@ -59,16 +61,18 @@ function runGate({
   const oldest = new Date(Date.now() - ageSeconds * 1000)
     .toISOString()
     .replace(/\.\d+Z$/, 'Z');
-  const runs = JSON.stringify({
-    workflow_runs: [
-      { id: 100, status: 'in_progress' },
-      ...Array.from({ length: pendingSuccessors }, (_, i) => ({
-        id: 101 + i,
-        status: 'pending',
-      })),
-      { id: 50, status: 'pending' },
-    ],
-  });
+  const runs =
+    runsResponse ??
+    JSON.stringify({
+      workflow_runs: [
+        { id: 100, status: 'in_progress' },
+        ...Array.from({ length: pendingSuccessors }, (_, i) => ({
+          id: 101 + i,
+          status: 'pending',
+        })),
+        { id: 50, status: 'pending' },
+      ],
+    });
   const compare = compareFails
     ? ''
     : JSON.stringify({
@@ -84,7 +88,8 @@ case "$*" in
   *compare/${EXPECTED_SHA}...*) printf '%s\\n' "${lineageStatus}" ;;
   *compare/${liveSha}...*) ${compareFails ? 'exit 1' : `cat <<'JSON'\n${compare}\nJSON\n`}
   ;;
-  *production-controller.yml/runs*) cat <<'JSON'
+  *production-controller.yml/runs*) ${runsFail ? 'exit 22' : ''}
+cat <<'JSON'
 ${runs}
 JSON
   ;;
@@ -142,6 +147,32 @@ describe('release lineage gate', () => {
       expect(run.outputs.lineage).toBe('diverged');
     }
   });
+
+  it.each([
+    { runsFail: true },
+    { runsResponse: '' },
+    { runsResponse: '{}' },
+    { runsResponse: 'not json' },
+    { runsResponse: '{"workflow_runs":[{"id":101}]}' },
+  ])(
+    'keeps failed successor visibility unknown even under starvation: %j',
+    overrides => {
+      const run = runGate({
+        main: NEWER_SHA,
+        ageSeconds: 6000,
+        inFlight: true,
+        ...overrides,
+      });
+      expect(run.result.status).toBe(1);
+      expect(run.decision).toBe('decision=error');
+      expect(run.outputs).toMatchObject({
+        successor_pending: 'unknown',
+        starving: 'unknown',
+        gate_decision: 'error',
+      });
+      expect(run.result.stderr).not.toContain('no newer generation');
+    }
+  );
 
   it('keeps the lease for an ancestor when no newer generation is queued', () => {
     const run = runGate({ main: NEWER_SHA, pendingSuccessors: 0 });
@@ -202,12 +233,14 @@ describe('release lineage gate', () => {
     });
   });
 
-  it('ships exactly one full pipeline for the newest of five queued generations under starvation', () => {
-    // Five stale generations queued FIFO behind a starving production. Each
-    // still-queued generation yields to its queued successors in seconds, so
-    // only the newest (no successors behind it) proceeds to the pipeline.
-    const queued = 5;
-    for (let position = 0; position < queued; position += 1) {
+  it.each([0, 1, 2, 3, 4])(
+    'drains five queued generations under starvation: position %i',
+    position => {
+      // Five stale generations queued FIFO behind a starving production. Each
+      // still-queued generation yields to its queued successors in seconds, so
+      // only the newest (no successors behind it) proceeds to the pipeline.
+      const queued = 5;
+
       const run = runGate({
         main: NEWER_SHA,
         pendingSuccessors: queued - 1 - position,
@@ -219,7 +252,7 @@ describe('release lineage gate', () => {
         position === queued - 1 ? 'decision=proceed' : 'decision=yield'
       );
     }
-  });
+  );
 
   it('treats unreadable production evidence as starving rather than yielding forever', () => {
     for (const overrides of [

@@ -67,7 +67,7 @@ WOULD CONTINUE: an honest yes/no for a busy person who did not ask for this. A b
 WOULD PAY $199/month: answer only from what the flow has shown so far, not from what the product might do.`;
 
 /** JSON schema handed to `claude -p --json-schema` for each persona run. */
-export function buildJudgeSchema(stepIds) {
+export function buildJudgeSchema(stepIds, objectionCount = 0) {
   const stepSchema = {
     type: 'object',
     properties: {
@@ -95,7 +95,7 @@ export function buildJudgeSchema(stepIds) {
       'quote',
     ],
   };
-  return {
+  const schema = {
     type: 'object',
     properties: {
       steps: { type: 'array', items: stepSchema },
@@ -104,6 +104,23 @@ export function buildJudgeSchema(stepIds) {
     },
     required: ['steps', 'wouldPay', 'payReason'],
   };
+  if (objectionCount > 0) {
+    schema.properties.objections = {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          index: { type: 'integer', minimum: 1, maximum: objectionCount },
+          answered: { type: 'boolean' },
+          stepId: { type: 'string', enum: ['', ...stepIds] },
+          note: { type: 'string' },
+        },
+        required: ['index', 'answered', 'stepId', 'note'],
+      },
+    };
+    schema.required.push('objections');
+  }
+  return schema;
 }
 
 /** @param {Array<{ id: string, label: string, context: string, images: string[], text?: string, uncaptured?: string }>} steps */
@@ -131,8 +148,21 @@ function renderStepBlocks(steps) {
  * @param {Array<{ id: string, label: string, context: string, images: string[], text?: string, uncaptured?: string }>} steps
  * @param {'full' | 'emotional'} focus
  */
-export function buildJudgePrompt(persona, steps, focus = 'full') {
+export function buildJudgePrompt(
+  persona,
+  steps,
+  focus = 'full',
+  objections = []
+) {
   const stepBlocks = renderStepBlocks(steps);
+  const objectionBlock =
+    objections.length > 0
+      ? `\n\nObjections you already carry (from real reviews by people like you):\n${objections
+          .map((item, index) => `${index + 1}. ${item.objection}`)
+          .join(
+            '\n'
+          )}\nFor each objection, say whether the flow you were shown answered it, at which stepId (empty if none), and why. Only what is on screen counts as an answer.`
+      : '';
 
   const focusLine =
     focus === 'emotional'
@@ -149,14 +179,14 @@ ${SCORE_ANCHORS}
 
 ${stepBlocks}
 
-Return one entry per step, in order, using the exact stepId values. "quote" is one blunt first-person sentence ${persona.name} would say about that step.`;
+Return one entry per step, in order, using the exact stepId values. "quote" is one blunt first-person sentence ${persona.name} would say about that step.${objectionBlock}`;
 }
 
 /**
  * Coerce a judge's structured output into the receipt shape. Throws on a
  * malformed or incomplete result so a broken judge can never read as a pass.
  */
-export function parseJudgeOutput(raw, stepIds) {
+export function parseJudgeOutput(raw, stepIds, objectionCount = 0) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.steps)) {
     throw new Error('judge output missing steps[]');
   }
@@ -186,11 +216,36 @@ export function parseJudgeOutput(raw, stepIds) {
       quote: String(step.quote ?? ''),
     };
   });
+  const objections = [];
+  for (let index = 1; index <= objectionCount; index++) {
+    const row = Array.isArray(raw.objections)
+      ? raw.objections.find(item => item?.index === index)
+      : null;
+    if (!row) throw new Error(`judge output missing objection ${index}`);
+    objections.push({
+      index,
+      answered: row.answered === true,
+      stepId: stepIds.includes(row.stepId) ? row.stepId : null,
+      note: String(row.note ?? ''),
+    });
+  }
   return {
     steps,
     wouldPay: raw.wouldPay === true,
     payReason: String(raw.payReason ?? ''),
+    ...(objectionCount > 0 ? { objections } : {}),
   };
+}
+
+/**
+ * Mined VOC objections per persona id (scripts/voc/persona-objections.json,
+ * jovie.voc-persona-objections/v1). Unknown or missing personas get none.
+ */
+export function objectionsFor(voc, personaId) {
+  const rows = voc?.personas?.[personaId];
+  return Array.isArray(rows)
+    ? rows.filter(row => typeof row?.objection === 'string' && row.objection)
+    : [];
 }
 
 /**

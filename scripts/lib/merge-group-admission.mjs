@@ -99,14 +99,19 @@ function fail(message) {
   throw new MergeGroupAdmissionError(message);
 }
 
+function matchesLegacyGraphqlQuotaMessage(error) {
+  return (
+    typeof error?.message === 'string' &&
+    /^API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i.test(
+      error.message
+    )
+  );
+}
+
 function isGraphqlQuotaError(error) {
   return (
     error?.type === 'RATE_LIMITED' ||
-    (error?.type === undefined &&
-      typeof error?.message === 'string' &&
-      /^API rate limit already exceeded for (?:site ID installation|installation ID [0-9]+)\.?$/i.test(
-        error.message
-      ))
+    (error?.type === undefined && matchesLegacyGraphqlQuotaMessage(error))
   );
 }
 
@@ -255,17 +260,56 @@ function requireNullableSha(value, field) {
 
 export function normalizeLiveQueueEntriesPage(
   payload,
-  { branch = 'main' } = {}
+  { branch = 'main', httpStatus = /** @type {number | null} */ (null) } = {}
 ) {
   if (payload?.errors !== undefined && !Array.isArray(payload.errors)) {
     fail('live merge queue GraphQL errors must be an array when present');
   }
   if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
-    throw new MergeGroupAdmissionError(
-      `live merge queue GraphQL returned errors: ${payload.errors
-        .map(error => error?.message ?? String(error))
-        .join('; ')}`,
-      { rateLimit: payload.errors.every(isGraphqlQuotaError) }
+    const rateLimit = payload.errors.every(isGraphqlQuotaError);
+    throw Object.assign(
+      new MergeGroupAdmissionError(
+        `live merge queue GraphQL returned errors: ${payload.errors
+          .map(error => error?.message ?? String(error))
+          .join('; ')}`,
+        { rateLimit }
+      ),
+      {
+        // Categories only: a quota-looking message must not hide its rejected
+        // shape, and diagnostics must not echo arbitrary response fields.
+        graphqlDiagnostic: {
+          httpStatus:
+            httpStatus !== null &&
+            Number.isInteger(httpStatus) &&
+            httpStatus >= 100 &&
+            httpStatus <= 599
+              ? httpStatus
+              : null,
+          errorCount: payload.errors.length,
+          entries: payload.errors.slice(0, 8).map(error => ({
+            kind:
+              error === null
+                ? 'null'
+                : typeof error === 'string'
+                  ? 'string'
+                  : typeof error === 'object' && !Array.isArray(error)
+                    ? 'object'
+                    : 'other',
+            typeCategory:
+              error?.type === undefined
+                ? 'absent'
+                : error.type === null
+                  ? 'null'
+                  : error.type === 'RATE_LIMITED'
+                    ? 'RATE_LIMITED'
+                    : 'other',
+            exactLegacyQuotaMessageMatch:
+              matchesLegacyGraphqlQuotaMessage(error),
+          })),
+          omittedEntries: Math.max(0, payload.errors.length - 8),
+          retryable: rateLimit,
+        },
+      }
     );
   }
 
@@ -829,7 +873,7 @@ async function githubRequest(
     // Classify the structured error array before its messages are flattened.
     // Mixed permission/quota responses never enter the retry path.
     try {
-      normalizeLiveQueueEntriesPage(data);
+      normalizeLiveQueueEntriesPage(data, { httpStatus: response.status });
     } catch (error) {
       if (isTransientApiError(error)) {
         error.retryAtMs = quotaRetryAt(response.headers, now());
@@ -1046,6 +1090,14 @@ if (
       console.error(
         `::error::${error instanceof Error ? error.message : String(error)}`
       );
+      if (
+        error instanceof MergeGroupAdmissionError &&
+        'graphqlDiagnostic' in error
+      ) {
+        console.error(
+          `::notice::merge-group GraphQL diagnostic ${JSON.stringify(error.graphqlDiagnostic)}`
+        );
+      }
       process.exitCode = 1;
     });
   }

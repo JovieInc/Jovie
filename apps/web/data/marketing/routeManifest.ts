@@ -372,11 +372,8 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'hero',
         'centered-phone'
       ),
-      approvedVariantBinding(
-        'apps/web/components/features/home/HomeTrustSection.tsx',
-        'logo-cloud',
-        'inline-strip'
-      ),
+      // logo-cloud renders only once a brand grants permission for this page
+      // (data/product-truth/logo-permissions.ts, JOV-7795).
       approvedVariantBinding(
         'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx',
         'feature-split',
@@ -467,7 +464,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     renderedSections: approvedBindings(
       'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
       'hero',
-      'logo-cloud',
       'feature-split',
       'feature-grid',
       'capture',
@@ -507,7 +503,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     renderedSections: approvedBindings(
       'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
       'hero',
-      'logo-cloud',
       'feature-split',
       'feature-grid',
       'capture',
@@ -545,7 +540,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     renderedSections: approvedBindings(
       'components/marketing/artist-notifications/ArtistNotificationsLanding.tsx',
       'hero',
-      'logo-cloud',
       'capture',
       'feature-split',
       'feature-grid',

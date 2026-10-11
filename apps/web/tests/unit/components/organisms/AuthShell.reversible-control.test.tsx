@@ -58,13 +58,25 @@ vi.mock('@/components/organisms/UnifiedSidebar', async () => {
     '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton'
   );
   const { useSidebar } = await import('@/components/organisms/sidebar');
+  const { RailStagedContent } = await import(
+    '@/components/shell/RailStagedContent'
+  );
   return {
-    UnifiedSidebar: () => {
+    UnifiedSidebar: ({
+      headerOwnsCollapsedToggle = false,
+    }: {
+      headerOwnsCollapsedToggle?: boolean;
+    }) => {
       const { state } = useSidebar();
       return (
         <aside data-testid='composed-sidebar' data-state={state}>
-          {!runtime.electron && state === 'open' ? (
-            <SidebarCollapseButton />
+          {!runtime.electron ? (
+            <RailStagedContent
+              hidden={state === 'closed' && headerOwnsCollapsedToggle}
+              stage={headerOwnsCollapsedToggle}
+            >
+              <SidebarCollapseButton />
+            </RailStagedContent>
           ) : null}
         </aside>
       );
@@ -122,7 +134,9 @@ function Shell({ defaultOpen = true }: { readonly defaultOpen?: boolean }) {
 
 function railToggles(root: HTMLElement | Document = document) {
   return [
-    ...root.querySelectorAll<HTMLButtonElement>('[data-rail-toggle="left"]'),
+    ...root.querySelectorAll<HTMLButtonElement>(
+      '[data-rail-toggle="left"]:not([inert] *)'
+    ),
   ];
 }
 
@@ -151,7 +165,12 @@ async function certifyLeftRail({
   };
 
   currentToggle().focus();
+  // Tooltip dismissal consumes the first Escape; preview owns the next.
+  await user.keyboard('{Escape}{Escape}');
   return detectReversibleControl({
+    activationSequence: Array.from({ length: 20 }, (_, index) =>
+      index % 3 === 0 ? ('keyboard' as const) : ('pointer' as const)
+    ),
     name: runtime.electron
       ? 'composed Electron AuthShell sidebar'
       : 'composed browser AuthShell sidebar',
@@ -224,6 +243,27 @@ describe('proves repeated pointer, keyboard, mixed, and hydrated cycles on compo
       screen.queryByTestId('electron-sidebar-toggle')
     ).not.toBeInTheDocument();
   });
+
+  it.each([
+    { section: 'settings' as const, isLyricsRoute: false },
+    { section: 'dashboard' as const, isLyricsRoute: true },
+  ])(
+    'preserves a reachable browser toggle on headerless routes %j',
+    async props => {
+      runtime.electron = false;
+      render(
+        <TooltipProvider>
+          <AuthShell {...props} breadcrumbs={[]} sidebarDefaultOpen={false}>
+            <main>Headerless route</main>
+          </AuthShell>
+        </TooltipProvider>
+      );
+      await certifyLeftRail({
+        initialState: 'closed',
+        requireFocusContinuity: true,
+      });
+    }
+  );
 
   it('hydrates restored collapsed state and still toggles both directions repeatedly', async () => {
     const container = document.createElement('div');

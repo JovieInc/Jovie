@@ -59,19 +59,24 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR \u2192 `main`",
+          "section": "## 1. Unit of work: one small PR → `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
     },
     ".claude/rules/code-style.md": {
       "owner": "@itstimwhite",
-      "claim": "Engineering conventions inherit the engineering canon and executable lint boundaries.",
-      "documentSha256": "bc838516396834a1f42da71b879534a7fb3f1c4c40942d5427a2eea89e54e0df",
+      "claim": "Engineering conventions inherit the engineering canon and executable lint boundaries; internal PR review is advisory and CodeRabbit is optional supplementary evidence.",
+      "documentSha256": "37d1ab1df6c3c7b495c2924c8af284457cfe24c70528b7f01ce871cc6ec02a5c",
       "sources": [
         {
           "path": "canon/ENGINEERING.md",
           "sha256": "ef3b80900618e178419090a8ee322d646d81e8f952ceb14a9372b1ac79e9c120"
+        },
+        {
+          "path": ".github/workflows/README.md",
+          "section": "## Internal PR Review (advisory)",
+          "sha256": "08986dd49baac364e92bd05a395df1af3d2aad974bc911df8de9407f686525cb"
         }
       ]
     },
@@ -216,7 +221,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR \u2192 `main`",
+          "section": "## 1. Unit of work: one small PR → `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -251,7 +256,7 @@
       "sources": [
         {
           "path": "docs/PR_FLOW.md",
-          "section": "## 1. Unit of work: one small PR \u2192 `main`",
+          "section": "## 1. Unit of work: one small PR → `main`",
           "sha256": "040d65d017d9e8e5b3d00a641fbffe00fadd4eaf1539b1124262e73527eb418e"
         }
       ]
@@ -399,7 +404,7 @@
     "docs/AI_AGENT_GUIDE.md": {
       "owner": "@itstimwhite",
       "claim": "API inventory uses Better Auth per the canonical auth rule; inventories are not runtime certification.",
-      "documentSha256": "44b4060ada4b5abc02f735ecc934446d295edf72cbd3c55dfa922fb4763ccf77",
+      "documentSha256": "cf9dea440ef7f8f4e391d687226c3e4f72bd940933fc72feb4bec584e46a0f1c",
       "sources": [
         {
           "path": ".claude/rules/auth.md",

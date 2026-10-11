@@ -21,6 +21,11 @@ import {
   type InteractionLatencySample,
 } from '@/scripts/performance-interaction-report';
 import { setTestAuthBypassSession } from '../helpers/auth';
+import {
+  installBrowserChatProbe,
+  roundTripCopy,
+  roundTripFromRequest,
+} from '../helpers/chat-performance-probe';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 const CONVERSATION_ID = 'conv-chat-performance';
@@ -113,10 +118,9 @@ async function mockChatBackend(page: Page) {
 
   await page.route('**/api/chat', async route => {
     const currentRun = runIndex;
-    const userText = `Performance message ${currentRun + 1}`;
-    const assistantText =
-      `Performance reply ${currentRun + 1}. ` +
-      'This deterministic response is long enough to exercise the real message list layout.';
+    const { userText, assistantText } = roundTripFromRequest(
+      route.request().postDataJSON()
+    );
     const turnId = `turn-chat-performance-${currentRun}`;
     const createdAt = new Date(
       Date.UTC(2026, 6, 23, 0, 0, currentRun * 2)
@@ -175,92 +179,10 @@ async function installChatProbe(
   userText: string,
   assistantText: string
 ) {
-  await page.evaluate(
-    ({ assistant, user }) => {
-      const probeWindow = window as Window & {
-        __jovieChatPerformanceProbe?: {
-          dataReadyMs?: number;
-          fetchStartedMs?: number;
-          firstFeedbackMs?: number;
-          longTaskDurations: number[];
-          longTaskObserver?: PerformanceObserver;
-          observer: MutationObserver;
-          originalFetch: typeof window.fetch;
-          renderToInteractiveMs?: number;
-          start: number;
-          usableStateMs?: number;
-        };
-      };
-      probeWindow.__jovieChatPerformanceProbe?.observer.disconnect();
-
-      const start = performance.now();
-      const probe = {
-        start,
-        observer: undefined as unknown as MutationObserver,
-        longTaskDurations: [],
-        originalFetch: window.fetch,
-      } as NonNullable<typeof probeWindow.__jovieChatPerformanceProbe>;
-      try {
-        probe.longTaskObserver = new PerformanceObserver(list => {
-          probe.longTaskDurations.push(
-            ...list.getEntries().map(entry => entry.duration)
-          );
-        });
-        probe.longTaskObserver.observe({ type: 'longtask' });
-      } catch {
-        // Long-task entries are unavailable in some browser engines.
-      }
-      const originalFetch = window.fetch.bind(window);
-      window.fetch = (input, init) => {
-        const url =
-          typeof input === 'string'
-            ? input
-            : input instanceof URL
-              ? input.href
-              : input.url;
-        if (
-          probe.fetchStartedMs === undefined &&
-          new URL(url, window.location.origin).pathname === '/api/chat'
-        ) {
-          probe.fetchStartedMs = performance.now() - start;
-        }
-        return originalFetch(input, init);
-      };
-
-      const observer = new MutationObserver(() => {
-        const bodyText = document.body.textContent ?? '';
-        const now = performance.now();
-
-        if (probe.firstFeedbackMs === undefined && bodyText.includes(user)) {
-          probe.firstFeedbackMs = now - start;
-        }
-
-        if (probe.usableStateMs === undefined && bodyText.includes(assistant)) {
-          probe.usableStateMs = now - start;
-          const renderStart = now;
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              const composer = document.querySelector<HTMLTextAreaElement>(
-                'textarea[aria-label="Chat Message Input"]'
-              );
-              if (composer && !composer.disabled) {
-                probe.renderToInteractiveMs = performance.now() - renderStart;
-              }
-            });
-          });
-        }
-      });
-
-      probe.observer = observer;
-      probeWindow.__jovieChatPerformanceProbe = probe;
-      observer.observe(document.body, {
-        childList: true,
-        characterData: true,
-        subtree: true,
-      });
-    },
-    { assistant: assistantText, user: userText }
-  );
+  await page.evaluate(installBrowserChatProbe, {
+    assistant: assistantText,
+    user: userText,
+  });
 }
 
 async function triggerMeasuredSend(
@@ -291,6 +213,7 @@ async function readChatProbe(page: Page) {
       __jovieChatPerformanceProbe?: {
         dataReadyMs?: number;
         fetchStartedMs?: number;
+        frameId?: number;
         firstFeedbackMs?: number;
         longTaskDurations: number[];
         renderToInteractiveMs?: number;
@@ -310,6 +233,7 @@ async function readChatProbe(page: Page) {
       __jovieChatPerformanceProbe?: {
         dataReadyMs?: number;
         fetchStartedMs?: number;
+        frameId?: number;
         firstFeedbackMs?: number;
         longTaskDurations: number[];
         longTaskObserver?: PerformanceObserver;
@@ -329,6 +253,7 @@ async function readChatProbe(page: Page) {
       throw new Error('Chat performance probe did not collect every metric');
     }
     probe.observer.disconnect();
+    if (probe.frameId !== undefined) cancelAnimationFrame(probe.frameId);
     probe.longTaskObserver?.disconnect();
     window.fetch = probe.originalFetch;
     return {
@@ -484,15 +409,6 @@ async function exchangeChatRoundTrip(
     page.getByTestId('chat-message-reply').filter({ hasText: assistantText })
   ).toBeVisible();
   return readChatProbe(page);
-}
-
-function roundTripCopy(label: string, index: number) {
-  return {
-    userText: `${label} message ${index + 1}`,
-    assistantText:
-      `${label} reply ${index + 1}. ` +
-      'This deterministic response is long enough to exercise the real message list layout.',
-  };
 }
 
 test.use({ storageState: { cookies: [], origins: [] } });

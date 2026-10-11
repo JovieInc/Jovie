@@ -112,8 +112,11 @@ async function callTool(
       ...(command.acceptsFull ? ['full'] : []),
       ...(command.flags ?? []).map(flag => flag.name),
     ]);
-    if (Object.keys(args).some(key => !allowed.has(key)))
-      throw new JovieInputError('Unknown tool argument.');
+    const unknown = Object.keys(args).find(key => !allowed.has(key));
+    if (unknown !== undefined)
+      throw new JovieInputError(
+        `Unknown tool argument ${JSON.stringify(unknown.slice(0, 64))}. Allowed: ${[...allowed].join(', ') || 'none'}.`
+      );
     for (const name of allowed) {
       const required =
         command.arg?.name === name ||
@@ -125,7 +128,9 @@ async function callTool(
           : typeof args[name] !== 'string' || !(args[name] as string).trim()
       )
         throw new JovieInputError(
-          'Invalid tool argument type or missing required argument.'
+          args[name] === undefined
+            ? `Missing required argument: ${name}.`
+            : `Argument ${name} must be ${name === 'full' ? 'a boolean' : 'a non-empty string'}.`
         );
     }
     const result = await command.run(

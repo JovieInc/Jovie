@@ -172,7 +172,7 @@ created for that Mac. In any browser, including the browser handoff,
 
 ## Design brief (for the Pen design session)
 
-Surface: the existing `/desktop-auth` handoff window (820 x 520, centered column, `max-w-90`, `MacCinematicSurface`). Keep the shell and brand treatment. The hierarchy below specializes JOV-6942 rules 2, 3, 5, 20, and 22 for a focused auth task. It does not create a second design canon or a whole-app button-count rule.
+Surface: the existing `/desktop-auth` handoff window (840 x 350 outer native bounds, 2.4:1, centered column, `max-w-90`, `MacCinematicSurface`). Keep the shell and brand treatment. The hierarchy below specializes JOV-6942 rules 2, 3, 5, 20, and 22 for a focused auth task. It does not create a second design canon or a whole-app button-count rule.
 
 The browser-selected default state has a visible **Finish Signing In** heading and the support line **Continue in your browser, then return to Jovie.** Exactly three task controls are exposed:
 
@@ -180,8 +180,25 @@ The browser-selected default state has a visible **Finish Signing In** heading a
    Button.
 2. Other Sign-in Options, a subordinate canonical link Button that discloses
    the fallback group.
-3. Cancel Sign-in, a separately spaced canonical link Button with quiet text
-   treatment. It remains a semantic button with the shared 44px hit target.
+3. Cancel Sign-in, a canonical link Button beside the options disclosure in
+   the same quiet utility row. It remains a semantic button with the shared 44px hit target.
+
+The heading/support/primary group uses an 8px heading gap, 20px action gap, and
+16px primary-to-utility gap (separating the 44px hit areas). The status region keeps two lines reserved with an
+8px gap, preserving the primary through pending/error updates. These are this
+focused task's geometry contract, not global control-spacing rules.
+
+Native bounds are centered within the active display work area. Narrow displays
+use a 2:1 content fallback, with a 280px preferred minimum height; smaller work
+areas take precedence over minimums and aspect ratio. The renderer scrolls for
+selected code/QR steps, long text, or text scaling; it never clips Back or Cancel
+to preserve a decorative ratio. No state-driven native resize or auth protocol
+change is introduced.
+
+Ship now: the compact bounded shell and equivalent auth states. Re-evaluate when
+exact installed Mac evidence shows clipped controls or conflicting emphasis;
+then repair this same shell and its rendered geometry regression. Browser
+fixture checks do not certify an authenticated native session.
 
 Copy Sign-in Link, Enter A Code, and Scan With Phone do not exist in the focus order until the disclosure is open. Every supported option uses the same canonical tertiary row primitive. Return-code-dependent options are hidden when the installed Mac bridge cannot redeem a code.
 

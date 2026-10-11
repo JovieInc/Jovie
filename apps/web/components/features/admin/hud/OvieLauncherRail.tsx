@@ -3,12 +3,19 @@
 // @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieLauncherRail.test.tsx
 
 import { Button, Input } from '@jovie/ui';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { launchOperatorControl } from '@/lib/desktop/electron-bridge';
 import {
   filterLaunchers,
+  OVIE_LAUNCHER_CATALOG,
   type OvieLauncherControl,
   type OvieLauncherGroup,
   type OvieLauncherInventory,
@@ -58,6 +65,35 @@ function LaunchControl({
   );
 }
 
+const LAUNCHER_GROUP_LABEL: Record<OvieLauncherGroup, string> = {
+  internal: 'Local / SSH',
+  external: 'Web',
+};
+
+function LauncherGroupFrame({
+  group,
+  testId,
+  children,
+}: Readonly<{
+  readonly group: OvieLauncherGroup;
+  readonly testId?: string;
+  readonly children: ReactNode;
+}>) {
+  return (
+    <fieldset
+      className='min-w-0 flex-1 space-y-2 border-0 p-0'
+      data-testid={testId}
+    >
+      <legend className='text-2xs font-medium text-tertiary-token'>
+        {LAUNCHER_GROUP_LABEL[group]}
+      </legend>
+      <div className='grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4'>
+        {children}
+      </div>
+    </fieldset>
+  );
+}
+
 function LauncherGroup({
   group,
   controls,
@@ -66,21 +102,45 @@ function LauncherGroup({
   readonly controls: readonly OvieLauncherControl[];
 }>) {
   if (controls.length === 0) return null;
-  const label = group === 'internal' ? 'Local / SSH' : 'Web';
   return (
-    <fieldset
-      className='min-w-0 flex-1 space-y-2 border-0 p-0'
-      data-testid={`ovie-launcher-group-${group}`}
+    <LauncherGroupFrame group={group} testId={`ovie-launcher-group-${group}`}>
+      {controls.map(control => (
+        <LaunchControl key={control.id} control={control} />
+      ))}
+    </LauncherGroupFrame>
+  );
+}
+
+// The loading state reserves the primary rail's real geometry: one slot per
+// human catalog launcher, in the same group frames, so the fetched rail
+// replaces it without pushing the HUD below it down (CLS on /hud?fs=1).
+function primarySlotIds(group: OvieLauncherGroup): string[] {
+  return OVIE_LAUNCHER_CATALOG.filter(
+    definition =>
+      definition.group === group &&
+      definition.owner === 'human' &&
+      !definition.agentCliOnly
+  ).map(definition => definition.id);
+}
+
+function LauncherRailSkeleton() {
+  return (
+    <div
+      className='flex flex-col gap-3 lg:flex-row'
+      aria-hidden
+      data-testid='ovie-launcher-skeleton'
     >
-      <legend className='text-2xs font-medium text-tertiary-token'>
-        {label}
-      </legend>
-      <div className='grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4'>
-        {controls.map(control => (
-          <LaunchControl key={control.id} control={control} />
-        ))}
-      </div>
-    </fieldset>
+      {(['internal', 'external'] as const).map(group => (
+        <LauncherGroupFrame key={group} group={group}>
+          {primarySlotIds(group).map(id => (
+            <div
+              key={id}
+              className='h-8 animate-pulse rounded-lg border border-subtle bg-surface-0 motion-reduce:animate-none'
+            />
+          ))}
+        </LauncherGroupFrame>
+      ))}
+    </div>
   );
 }
 
@@ -236,19 +296,7 @@ export function OvieLauncherRail({
           <p className='text-xs font-caption text-tertiary-token'>Launchers</p>
           <p className='text-2xs text-tertiary-token'>Human controls first</p>
         </div>
-        {isLoading && !inventory ? (
-          <div
-            className='grid min-h-16 grid-cols-2 gap-2 sm:grid-cols-4'
-            aria-hidden
-          >
-            {[1, 2, 3, 4].map(slot => (
-              <div
-                key={slot}
-                className='h-8 animate-pulse rounded-lg border border-subtle bg-surface-0 motion-reduce:animate-none'
-              />
-            ))}
-          </div>
-        ) : null}
+        {isLoading && !inventory ? <LauncherRailSkeleton /> : null}
         {inventory ? (
           <div className='flex flex-col gap-3 lg:flex-row'>
             <LauncherGroup group='internal' controls={primaryInternal} />

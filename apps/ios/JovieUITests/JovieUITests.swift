@@ -87,7 +87,7 @@ final class JovieUITests: XCTestCase {
       $0.buttons["Copy URL"]
     }
 
-    XCTAssertTrue(app.staticTexts["My Jovie Card"].exists)
+    XCTAssertTrue(app.staticTexts["Identity"].exists)
     XCTAssertTrue(app.buttons["Open navigation drawer"].exists)
     XCTAssertTrue(app.buttons["dashboard-copy-url-button"].isEnabled)
     XCTAssertTrue(app.buttons["dashboard-share-profile-button"].isEnabled)
@@ -162,7 +162,7 @@ final class JovieUITests: XCTestCase {
       $0.buttons["QR unavailable"]
     }
 
-    XCTAssertTrue(app.staticTexts["My Jovie Card"].exists)
+    XCTAssertTrue(app.staticTexts["Identity"].exists)
     let copyButton = app.buttons["dashboard-copy-url-button"]
     let shareButton = app.buttons["dashboard-share-profile-button"]
     XCTAssertTrue(copyButton.exists)
@@ -333,7 +333,7 @@ final class JovieUITests: XCTestCase {
     XCTAssertFalse(app.buttons["profile-completion-web-fallback"].exists)
   }
 
-  func testFullScreenSettingsLogsOutToSignedOut() {
+  func testFullScreenSettingsLogsOutToSignedOut() throws {
     let app = launchMockApp(
       launchArgument: "-ui-testing-settings",
       additionalLaunchArguments: ["-ui-testing-delayed-logout"],
@@ -387,28 +387,57 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "settings-logout-confirmation", app: app)
     app.buttons["Confirm Log Out"].tap()
 
-    XCTAssertTrue(
-      app.staticTexts["Logging Out"].waitForExistence(timeout: 2),
-      "Settings did not expose its deterministic pending logout state.\n\(app.debugDescription)"
+    func findSnapshot(
+      in snapshot: any XCUIElementSnapshot,
+      label: String,
+      type: XCUIElement.ElementType
+    ) -> (any XCUIElementSnapshot)? {
+      if snapshot.label == label && snapshot.elementType == type {
+        return snapshot
+      }
+      for child in snapshot.children {
+        if let match = findSnapshot(in: child, label: label, type: type) {
+          return match
+        }
+      }
+      return nil
+    }
+
+    // Capture the marker and control from one tree during the existing wait.
+    // Later live queries can run after the five-second fixture has completed.
+    var pendingLogoutSnapshot: (any XCUIElementSnapshot)?
+    let pendingState = XCTNSPredicateExpectation(
+      predicate: NSPredicate { _, _ in
+        guard let snapshot = try? app.snapshot(),
+          findSnapshot(in: snapshot, label: "Logging Out", type: .staticText) != nil,
+          let control = findSnapshot(in: snapshot, label: "Log Out", type: .button)
+        else { return false }
+        pendingLogoutSnapshot = control
+        return true
+      },
+      object: app
     )
-    let pendingLogoutButton = app.buttons["Log Out"]
-    XCTAssertTrue(
-      pendingLogoutButton.waitForExistence(timeout: 1),
-      "Pending logout control did not remain in the accessibility tree.\n\(app.debugDescription)"
+    XCTAssertEqual(
+      XCTWaiter.wait(for: [pendingState], timeout: 2),
+      .completed,
+      "Settings did not expose its pending marker and logout control together.\n\(app.debugDescription)"
     )
-    XCTAssertFalse(
-      pendingLogoutButton.isEnabled,
-      "Pending logout must reject duplicate submission."
-    )
-    XCTAssertEqual(pendingLogoutButton.frame.minX, idleFrame.minX, accuracy: 1)
-    XCTAssertEqual(pendingLogoutButton.frame.minY, idleFrame.minY, accuracy: 1)
-    XCTAssertEqual(pendingLogoutButton.frame.width, idleFrame.width, accuracy: 1)
-    XCTAssertEqual(pendingLogoutButton.frame.height, idleFrame.height, accuracy: 1)
+    let pendingSnapshot = try XCTUnwrap(pendingLogoutSnapshot)
 
     XCTAssertTrue(
       app.buttons["Continue to Jovie"].waitForExistence(timeout: 5),
       "Logout did not return to signed-out state.\n\(app.debugDescription)"
     )
+    // The live control has retired; assertions use the observed pending state.
+    XCTAssertFalse(pendingSnapshot.isEnabled, "Pending logout must reject duplicate submission.")
+    let pendingFrame = pendingSnapshot.frame
+    XCTAssertGreaterThan(pendingFrame.width, 0, "Pending logout must have a visible frame.")
+    XCTAssertGreaterThan(pendingFrame.height, 0, "Pending logout must have a visible frame.")
+    XCTAssertEqual(pendingFrame.minX, idleFrame.minX, accuracy: 1)
+    XCTAssertEqual(pendingFrame.minY, idleFrame.minY, accuracy: 1)
+    XCTAssertEqual(pendingFrame.width, idleFrame.width, accuracy: 1)
+    XCTAssertEqual(pendingFrame.height, idleFrame.height, accuracy: 1)
+
   }
 
   func testDrawerSwitchesBetweenChatAndProfile() {
@@ -1138,9 +1167,25 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertEqual(reduceMotionStatus.value as? String, "Interactive progress hidden")
 
+    XCTAssertTrue(
+      app.staticTexts["Home"].isHittable,
+      "Reduce Motion fixture did not start on Home.\n\(app.debugDescription)"
+    )
+
     let shortStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.42))
     let shortEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.42))
-    shortStart.press(forDuration: 0.4, thenDragTo: shortEnd)
+    // This phase rejects a short, slow drag. XCTest's default 500px/s can
+    // legitimately open the drawer through the projected-distance policy.
+    shortStart.press(
+      forDuration: 0.4,
+      thenDragTo: shortEnd,
+      withVelocity: XCUIGestureVelocity(rawValue: 50),
+      thenHoldForDuration: 0
+    )
+    XCTAssertTrue(
+      app.staticTexts["Home"].isHittable,
+      "The rejected drag left Home.\n\(app.debugDescription)"
+    )
     XCTAssertFalse(app.descendants(matching: .any)["shell-drawer"].isHittable)
     XCTAssertFalse(app.descendants(matching: .any)["shell-right-rail"].isHittable)
     XCTAssertEqual(

@@ -20,6 +20,7 @@
 
 import { type ReactNode, useCallback, useEffect, useId, useMemo } from 'react';
 import { type EntityRef } from '@/lib/commands/entities';
+import { DEFAULT_PALETTE_SECTION_LIMIT } from '@/lib/commands/palette-ranking';
 import { type NavCommand, type SkillCommand } from '@/lib/commands/registry';
 import { cn } from '@/lib/utils';
 import {
@@ -39,7 +40,7 @@ export interface PaletteSection {
   readonly defaultItemLimit?: number;
 }
 
-export const DEFAULT_PALETTE_SECTION_LIMIT = 5;
+export { DEFAULT_PALETTE_SECTION_LIMIT } from '@/lib/commands/palette-ranking';
 
 export function fuzzyMatch(haystack: string, needle: string): boolean {
   if (!needle) return true;

@@ -180,3 +180,41 @@ test('pen-fanout refuses a workspace under ~/Documents', () => {
   );
   assert.equal(r.status, 9, r.stderr.toString());
 });
+
+test('pen-fanout runs every job, including directions longer than 255 bytes', () => {
+  const root = mkdtempSync(join(tmpdir(), 'pen-par-run-'));
+  const ws = join(root, 'ws');
+  const bin = join(root, 'bin');
+  spawnSync('mkdir', ['-p', ws, bin]);
+  writeFileSync(join(ws, 'src.pen'), JSON.stringify(fixture()));
+  // fake pen: copy --in to --out so the runner's success path is exercised offline
+  writeFileSync(
+    join(bin, 'pen'),
+    '#!/usr/bin/env bash\nwhile [ $# -gt 0 ]; do case "$1" in --in) i=$2;; --out) o=$2;; esac; shift; done\ncp "$i" "$o"\n',
+    { mode: 0o755 }
+  );
+  const long = 'keep every label on one line '.repeat(12);
+  assert.ok(long.length > 255);
+  const jobs = ['j1', 'j2']
+    .map(id =>
+      [id, 'claude', 'm', 'page', id === 'j2' ? long : 'short'].join('\t')
+    )
+    .join('\n');
+  writeFileSync(join(root, 'jobs.tsv'), `${jobs}\n`);
+  const r = spawnSync(
+    'bash',
+    [join(here, 'pen-fanout.sh'), join(root, 'jobs.tsv'), 'b1', '2'],
+    {
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        PEN_WS: ws,
+        PEN_SKILL: '/dev/null',
+      },
+    }
+  );
+  assert.equal(r.status, 0, r.stderr.toString());
+  const out = r.stdout.toString();
+  assert.match(out, /^j1\t.*rc=0/m);
+  assert.match(out, /^j2\t.*rc=0/m);
+});

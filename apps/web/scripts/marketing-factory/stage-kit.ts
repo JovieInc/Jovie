@@ -29,6 +29,7 @@ export interface StageContext {
   readonly artifacts: Partial<Record<FactoryStage, unknown>>;
   readonly receipts: Partial<Record<FactoryStage, StageReceipt>>;
   readonly attempt: number;
+  readonly iteration?: number;
   readonly feedback: readonly string[];
   readonly runDir: string;
 }

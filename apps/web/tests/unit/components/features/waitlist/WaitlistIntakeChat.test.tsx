@@ -17,11 +17,14 @@ global.fetch = fetchMock as unknown as typeof fetch;
 
 import { WaitlistIntakeChat } from '@/components/features/waitlist/WaitlistIntakeChat';
 
+let user: ReturnType<typeof userEvent.setup>;
+
 async function answerRequired(value: string, final = false) {
   const input = screen.getByRole('textbox');
-  await userEvent.clear(input);
-  await userEvent.type(input, value);
-  await userEvent.click(
+  await user.clear(input);
+  await user.click(input);
+  await user.paste(value);
+  await user.click(
     screen.getByRole('button', {
       name: final ? /save request/i : /send answer/i,
     })
@@ -31,15 +34,16 @@ async function answerRequired(value: string, final = false) {
 describe('WaitlistIntakeChat', () => {
   beforeEach(() => {
     fetchMock.mockReset();
+    user = userEvent.setup();
   });
 
   it('does not advance required steps on incomplete ack answers', async () => {
     render(<WaitlistIntakeChat userEmail='artist@example.com' />);
 
     const input = screen.getByRole('textbox');
-    await userEvent.clear(input);
-    await userEvent.type(input, 'k');
-    await userEvent.click(screen.getByRole('button', { name: /send answer/i }));
+    await user.clear(input);
+    await user.type(input, 'k');
+    await user.click(screen.getByRole('button', { name: /send answer/i }));
 
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent(/real answer|short acks|real handle/i);
@@ -67,8 +71,8 @@ describe('WaitlistIntakeChat', () => {
 
     await answerRequired('artist');
     await answerRequired('https://instagram.com/artist');
-    await userEvent.click(screen.getByRole('button', { name: /skip/i }));
-    await userEvent.click(screen.getByRole('button', { name: /skip/i }));
+    await user.click(screen.getByRole('button', { name: /skip/i }));
+    await user.click(screen.getByRole('button', { name: /skip/i }));
     await answerRequired('A new single rollout');
     await answerRequired('Keeping assets organized');
     await answerRequired('Launch with less manual follow-up', true);

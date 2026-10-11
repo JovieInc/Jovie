@@ -5,8 +5,15 @@ import {
   type MarketingPenContractId,
 } from '../penContracts';
 import { MARKETING_RECIPE_IDS, type RecipeId } from '../recipes';
-import { MARKETING_SECTION_IDS, type MarketingSectionId } from '../sections';
-import { HERO_VARIANT_NAMES } from './heroDecision';
+import {
+  getMarketingSection,
+  MARKETING_SECTION_IDS,
+  type MarketingSectionId,
+} from '../sections';
+import {
+  HERO_CODE_BINDING_BY_VARIANT,
+  HERO_VARIANT_NAMES,
+} from './heroDecision';
 
 /**
  * Factory page records (plan §4, JOV-7275). A record is the single source a
@@ -91,6 +98,36 @@ const RoutePath = z.string().regex(/^\/[a-z0-9\-/]*$/u);
 const PEN_CONTRACT_ID_VALUES = Object.values(
   MARKETING_PEN_CONTRACT_IDS
 ).flatMap(group => Object.values(group)) as MarketingPenContractId[];
+
+/** Variants with a concrete, source-backed adapter in the solutions route. */
+export const SOLUTIONS_FACTORY_RENDERER_VARIANTS = {
+  hero: ['left-none', 'split-screenshot-right'],
+  'feature-grid': ['two-column-text'],
+  'feature-split': ['editorial', 'phone-right'],
+  faq: ['objection-handler', 'structured-data-list'],
+  cta: ['final-single-claim'],
+} as const satisfies Partial<Record<MarketingSectionId, readonly string[]>>;
+
+export function solutionsFactoryVariantIssue(
+  sectionId: MarketingSectionId,
+  variantId: string
+): string | null {
+  const registryVariant = getMarketingSection(sectionId).variants.find(
+    variant => variant.id === variantId
+  );
+  if (!registryVariant || registryVariant.status !== 'active') {
+    return `variant "${variantId}" is not an active canonical variant for section "${sectionId}"`;
+  }
+  const supported = (
+    SOLUTIONS_FACTORY_RENDERER_VARIANTS as Partial<
+      Record<MarketingSectionId, readonly string[]>
+    >
+  )[sectionId];
+  if (!supported?.includes(variantId)) {
+    return `solutions factory has no certified renderer for ${sectionId}/${variantId}`;
+  }
+  return null;
+}
 
 /** Copy slot: literal text, or a product-truth claim id resolved at build. */
 export const PageCopyValueSchema = z.union([
@@ -180,6 +217,8 @@ export const PageCompositionSectionSchema = z.strictObject({
   instanceId: Slug.optional(),
   /** Canonical section id (sections.ts) the renderer implements. */
   sectionId: z.enum(MARKETING_SECTION_IDS as [MarketingSectionId]),
+  /** Selected canonical visual variant, persisted from composition. */
+  variantId: Slug.optional(),
 });
 export type PageCompositionSection = z.infer<
   typeof PageCompositionSectionSchema
@@ -286,6 +325,47 @@ export const PageRecordSchema = z
         path: ['composition', 'sections'],
       });
     }
+    record.composition.sections.forEach((section, index) => {
+      if (!section.renderer.startsWith('factory-')) return;
+      if (!section.instanceId) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `factory section ${section.renderer} requires an instanceId`,
+          path: ['composition', 'sections', index, 'instanceId'],
+        });
+      }
+      if (!section.variantId) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `factory section ${section.renderer} requires a persisted variantId`,
+          path: ['composition', 'sections', index, 'variantId'],
+        });
+        return;
+      }
+      const variantIssue = solutionsFactoryVariantIssue(
+        section.sectionId,
+        section.variantId
+      );
+      if (variantIssue) {
+        ctx.addIssue({
+          code: 'custom',
+          message: variantIssue,
+          path: ['composition', 'sections', index, 'variantId'],
+        });
+        return;
+      }
+      if (section.sectionId === 'hero') {
+        const expectedVariant =
+          HERO_CODE_BINDING_BY_VARIANT[record.heroVariant].sectionVariantId;
+        if (expectedVariant !== section.variantId) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `hero section variant "${section.variantId}" does not match hero code binding "${record.heroVariant}" (${expectedVariant ?? 'unbound'})`,
+            path: ['composition', 'sections', index, 'variantId'],
+          });
+        }
+      }
+    });
     const claimSet = new Set(record.claims);
     for (const [slot, value] of Object.entries(record.copy)) {
       if ('claimRef' in value && !claimSet.has(value.claimRef)) {

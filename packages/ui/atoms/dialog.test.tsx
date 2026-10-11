@@ -325,3 +325,27 @@ describe('Dialog overlay layer contract', () => {
     );
   });
 });
+
+describe('Dialog full-screen takeover', () => {
+  it('keeps accessible modal semantics and Escape dismissal without centered card geometry', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <Dialog open onOpenChange={onOpenChange}>
+        <DialogContent variant='fullscreen' hideClose>
+          <DialogTitle>Workspace search</DialogTitle>
+          <DialogDescription>Search every workspace.</DialogDescription>
+        </DialogContent>
+      </Dialog>
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Workspace search' });
+    expect(dialog).toHaveClass('inset-0', 'h-dvh', 'w-full', 'max-w-none');
+    expect(dialog).not.toHaveClass(
+      'left-1/2',
+      'max-w-lg',
+      'rounded-(--system-b-radius-panel)'
+    );
+    expect(screen.queryByTestId('dialog-close-button')).not.toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});

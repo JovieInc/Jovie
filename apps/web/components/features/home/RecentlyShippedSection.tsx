@@ -1,52 +1,10 @@
-import fs from 'node:fs';
 import { Badge } from '@jovie/ui/atoms/badge';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
-import { resolveMonorepoPath } from '@/lib/filesystem-paths';
+import { readRecentReleases } from '@/lib/recent-releases';
 
-// ---------------------------------------------------------------------------
-// Lightweight changelog parser (build-time only)
-// ---------------------------------------------------------------------------
-
-interface CompactRelease {
-  version: string;
-  date: string;
-  highlights: string[];
-}
-
-const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
 const VERSION_PREFIX = 'v';
-
-function parseRecentReleases(markdown: string, count = 3): CompactRelease[] {
-  const lines = markdown.split('\n');
-  const releases: CompactRelease[] = [];
-  let current: CompactRelease | null = null;
-
-  for (const line of lines) {
-    if (releases.length >= count) break;
-
-    const vMatch = VERSION_HEADING_RE.exec(line);
-    if (vMatch) {
-      const [, version, date] = vMatch;
-      if (version.toLowerCase() === 'unreleased') {
-        current = null;
-        continue;
-      }
-      current = { version, date: date || '', highlights: [] };
-      releases.push(current);
-      continue;
-    }
-
-    if (!current) continue;
-    const trimmed = line.trim();
-    if (trimmed.startsWith('- ') && current.highlights.length < 3) {
-      current.highlights.push(trimmed.slice(2));
-    }
-  }
-
-  return releases;
-}
 
 function formatDate(iso: string): string {
   if (!iso) return '';
@@ -61,19 +19,8 @@ function formatDate(iso: string): string {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 export function RecentlyShippedSection() {
-  const changelogPath = resolveMonorepoPath('CHANGELOG.md');
-
-  let markdown = '';
-  if (fs.existsSync(changelogPath)) {
-    markdown = fs.readFileSync(changelogPath, 'utf8');
-  }
-
-  const releases = parseRecentReleases(markdown, 3);
+  const releases = readRecentReleases(3);
   if (releases.length === 0) return null;
 
   return (
@@ -99,16 +46,10 @@ export function RecentlyShippedSection() {
               return (
                 <div
                   key={release.version}
-                  className='rounded-xl p-5 transition-colors'
-                  style={{
-                    backgroundColor:
-                      'color-mix(in srgb, var(--linear-text-primary) 3%, transparent)',
-                    border:
-                      '1px solid color-mix(in srgb, var(--linear-text-primary) 8%, transparent)',
-                  }}
+                  className='rounded-xl border border-subtle bg-surface-1 p-5 transition-colors'
                 >
                   <div className='flex items-center gap-2 mb-3'>
-                    <Badge variant='outline' className='font-mono text-2xs'>
+                    <Badge variant='outline' size='sm'>
                       {versionLabel}
                     </Badge>
                     {release.date && (

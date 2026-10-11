@@ -6,7 +6,11 @@ import {
   RETRY_AFTER_SERVICE,
   RETRY_AFTER_TRANSIENT,
 } from '@/lib/http/headers';
-import { lookupCreator } from '@/lib/ingestion/creator-lookup';
+import {
+  lookupCreator,
+  validateCreatorUrl,
+} from '@/lib/ingestion/creator-lookup';
+import { findProfileForSource } from '@/lib/ingestion/creator-profile-match';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
 import {
   agentCreatorLookupLimiter,
@@ -108,13 +112,42 @@ export async function GET(request: Request) {
     );
   }
 
+  const validated = validateCreatorUrl(parsed.data.url);
+  if (!validated) {
+    return fail(422, 'UNSUPPORTED_URL', 'Use a YouTube channel URL.');
+  }
+
+  try {
+    const existing = await findProfileForSource(
+      validated.platform,
+      validated.sourceUrl
+    );
+    if (existing) {
+      return NextResponse.json(
+        {
+          platform: validated.platform,
+          sourceUrl: validated.sourceUrl,
+          exists: true,
+          ...existing,
+        },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+  } catch (error) {
+    // A profile-match outage must not blind the extraction fallback.
+    captureError('Agent creator lookup profile match failed', error);
+  }
+
   try {
     const creator = await lookupCreator(parsed.data.url);
     if (!creator) {
       return fail(422, 'UNSUPPORTED_URL', 'Use a YouTube channel URL.');
     }
 
-    return NextResponse.json(creator, { headers: NO_STORE_HEADERS });
+    return NextResponse.json(
+      { ...creator, exists: false },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     if (error instanceof ExtractionError) {
       const response = extractionFailure(error);

@@ -91,7 +91,7 @@ describe('self-hosted runner setup action', () => {
     'github.event.pull_request.head.repo.full_name': 'JovieInc/Jovie',
   };
 
-  it('never saves pnpm stores and installs the pinned pnpm from the lockfile', () => {
+  it('uses the warning-free pinned installer without saving pnpm stores', () => {
     expect(
       actionSteps.filter(step => /^actions\/cache@/.test(step.uses ?? ''))
     ).toEqual([]);
@@ -104,9 +104,10 @@ describe('self-hosted runner setup action', () => {
     );
     const pnpm = actionStep('Setup pnpm');
     expect(pnpm.uses).toBe(
-      'pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320'
+      'pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413'
     );
     expect(pnpm.with?.dest).toBe('${{ runner.temp }}/setup-pnpm');
+    expect(JSON.stringify(pnpm)).not.toContain('--no-deprecation');
   });
 
   it('checks the baked image first and skips setup and fetch when it is warm', () => {
@@ -328,12 +329,18 @@ describe('self-hosted runner setup action', () => {
       expect(kept(dir, file), dir).toBe(true);
   });
 
-  it('skips non-bundled onnxruntime downloads in both install phases', () => {
+  it('skips non-bundled onnxruntime downloads in every install phase', () => {
+    // The merge-group consumer reinstalls from the frozen lockfile when its
+    // prepared workspace was evicted from the Actions cache, so it skips too.
     expect(
       actionSteps
         .filter(step => step.env?.ONNXRUNTIME_NODE_INSTALL === 'skip')
         .map(step => step.name)
-    ).toEqual(['Warm pnpm store', 'Install dependencies']);
+    ).toEqual([
+      'Warm pnpm store',
+      'Install dependencies',
+      'Require prepared merge-group workspace',
+    ]);
   });
 
   it('disables package cache teardown only for the exact Mac product lane', () => {
@@ -372,7 +379,10 @@ describe('full browser matrix setup routing', () => {
     jobs: Record<
       string,
       {
-        strategy?: { 'max-parallel'?: number; matrix?: { browser?: string[] } };
+        strategy?: {
+          'max-parallel'?: number;
+          matrix?: { browser?: string[]; shard?: number[] };
+        };
         env?: Record<string, string>;
         steps: ActionStep[];
       }
@@ -407,12 +417,16 @@ describe('full browser matrix setup routing', () => {
     );
   });
 
-  it('serializes the matrix and never skips browser host validation', () => {
+  it('serializes browsers per shard and never skips browser host validation', () => {
     expect(matrixJob?.strategy?.matrix?.browser).toEqual([
       'chromium',
       'firefox',
     ]);
-    expect(matrixJob?.strategy?.['max-parallel']).toBe(1);
+    // Sharded four ways per browser (JOV-8001): the standalone production
+    // server removed the OOM kill (exit 143) and sharding fits the suite in
+    // the 60m job budget.
+    expect(matrixJob?.strategy?.['max-parallel']).toBe(8);
+    expect(matrixJob?.strategy?.matrix?.shard).toEqual([1, 2, 3, 4]);
     // Four workers starve the hosted runner ("lost communication", JOV-7677).
     expect(matrixJob?.env?.PLAYWRIGHT_WORKERS).toBe('2');
     const playwrightAction = parseYaml(
@@ -431,6 +445,15 @@ describe('full browser matrix setup routing', () => {
     expect(JSON.stringify([matrixWorkflow, playwrightAction])).not.toContain(
       'PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS'
     );
+  });
+
+  it('provides the standalone server the secrets its claim routes require', () => {
+    const start = (matrixJob?.steps ?? []).find(step =>
+      /Start standalone E2E server/.test(step.name ?? '')
+    );
+    // Pending-claim and lead-attribution cookies throw without this key,
+    // which 500s the token-backed claim surface (JOV-8070).
+    expect(start?.env?.URL_ENCRYPTION_KEY).toBeTruthy();
   });
 });
 
@@ -1303,8 +1326,9 @@ describe('baked runner prerequisite contract', () => {
     expect(playwrightAction).toContain(
       'node .github/runner-image/verify-prerequisites.mjs --component playwright'
     );
+    // Version resolve, cache restore and browser download all skip on a warm image.
     expect(playwrightAction.match(/playwright_warm != 'true'/g)).toHaveLength(
-      2
+      3
     );
     expect(playwrightAction).toContain('PLAYWRIGHT_BROWSERS_PATH=');
   });

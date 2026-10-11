@@ -486,6 +486,7 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   About: ['ABOUT'],
   Blog: ['BLOG'],
   Engineering: ['ENGINEERING'],
+  'AI Operating System': ['AI'],
   Changelog: ['CHANGELOG'],
   Support: ['SUPPORT'],
   Contact: ['SUPPORT'],
@@ -1023,6 +1024,14 @@ export function validateDesignSurfacesContract(registry, options = {}) {
     );
   }
   errors.push(...certifyVisualRules(policy, options).errors);
+  if (
+    policy.sharedInteractionOwners !==
+    'docs/design-system/component-ownership.json'
+  ) {
+    errors.push(
+      'sharedInteractionOwners must bind the existing component ownership map'
+    );
+  }
   return errors;
 }
 

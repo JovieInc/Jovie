@@ -87,4 +87,22 @@ describe('UnifiedTableSkeleton', () => {
       '48px'
     );
   });
+
+  it('reserves the people-row face and name for a person column', () => {
+    const { container } = render(
+      <UnifiedTableSkeleton
+        columns={COLUMNS}
+        skeletonRows={1}
+        skeletonColumnConfig={[{ variant: 'person' }, { variant: 'text' }]}
+      />
+    );
+
+    const firstCell = container.querySelector('tbody tr td');
+    expect(
+      firstCell?.querySelector('.system-b-table-skeleton-person-face')
+    ).not.toBeNull();
+    expect(
+      firstCell?.querySelector('.system-b-table-skeleton-person-name')
+    ).not.toBeNull();
+  });
 });

@@ -20,7 +20,7 @@ const {
   commandPaletteState: { open: false },
   useAuthRouteConfigMock: vi.fn(() => ({
     section: 'dashboard',
-    isArtistProfileSettings: false,
+    isProfileSettings: false,
     breadcrumbs: [],
     showMobileTabs: false,
     isTableRoute: false,
@@ -184,7 +184,7 @@ describe('AuthShellWrapper', () => {
     useAuthRouteConfigMock.mockClear();
     useAuthRouteConfigMock.mockReturnValue({
       section: 'dashboard',
-      isArtistProfileSettings: false,
+      isProfileSettings: false,
       breadcrumbs: [],
       showMobileTabs: false,
       isTableRoute: false,
@@ -239,7 +239,7 @@ describe('AuthShellWrapper', () => {
   it('keeps routine usage out of the chat header', () => {
     useAuthRouteConfigMock.mockReturnValue({
       section: 'dashboard',
-      isArtistProfileSettings: false,
+      isProfileSettings: false,
       breadcrumbs: [],
       showMobileTabs: false,
       isTableRoute: false,
@@ -304,7 +304,7 @@ describe('AuthShellWrapper', () => {
     // Override the route config mock for this test to simulate a non-dashboard route
     useAuthRouteConfigMock.mockReturnValue({
       section: 'settings',
-      isArtistProfileSettings: false,
+      isProfileSettings: false,
       breadcrumbs: [],
       showMobileTabs: false,
       isTableRoute: false,
@@ -328,7 +328,7 @@ describe('AuthShellWrapper', () => {
   it('does not default-open preview panel on chat routes', () => {
     useAuthRouteConfigMock.mockReturnValue({
       section: 'dashboard',
-      isArtistProfileSettings: false,
+      isProfileSettings: false,
       breadcrumbs: [],
       showMobileTabs: false,
       isTableRoute: false,
@@ -358,7 +358,7 @@ describe('AuthShellWrapper', () => {
     (_, overrides) => {
       useAuthRouteConfigMock.mockReturnValue({
         section: 'dashboard',
-        isArtistProfileSettings: false,
+        isProfileSettings: false,
         breadcrumbs: [],
         showMobileTabs: false,
         isTableRoute: false,

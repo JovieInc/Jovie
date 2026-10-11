@@ -3,6 +3,12 @@
 
 import { spawn } from 'node:child_process';
 import {
+  buildScreenPrompt,
+  buildScreenSchema,
+  parseScreenOutput,
+  SCREEN_RUBRIC_VERSION,
+} from './coherence-screen.mjs';
+import {
   buildCoherencePrompt,
   buildCoherenceSchema,
   buildJudgePrompt,
@@ -17,7 +23,7 @@ export const JUDGES = {
   coherence: { id: 'opus-5.5-coherence', model: 'claude-opus-5-5' },
 };
 
-/** CLI args: Read-only tools, no user/project settings or MCP, so repo hooks never run. */
+/** CLI args (imageDir may list several directories): Read-only tools, no user/project settings or MCP, so repo hooks never run. */
 export function buildClaudeArgs({ model, prompt, schema, imageDir }) {
   return [
     '-p',
@@ -27,7 +33,7 @@ export function buildClaudeArgs({ model, prompt, schema, imageDir }) {
     '--allowedTools',
     'Read',
     '--add-dir',
-    imageDir,
+    ...(Array.isArray(imageDir) ? imageDir : [imageDir]),
     '--setting-sources',
     '',
     '--strict-mcp-config',
@@ -80,24 +86,29 @@ async function runJudge(args, cwd, timeoutMs) {
 }
 
 /**
- * @param {{ persona: any, judge: { id: string, model: string, focus: 'full' | 'emotional' }, steps: Array<any>, imageDir: string, timeoutMs?: number }} args
+ * @param {{ persona: any, judge: { id: string, model: string, focus: 'full' | 'emotional' }, steps: Array<any>, objections?: Array<{ objection: string }>, imageDir: string, timeoutMs?: number }} args
  */
 export async function judgePersona({
   persona,
   judge,
   steps,
+  objections = [],
   imageDir,
   timeoutMs = 600_000,
 }) {
   const stepIds = steps.map(step => step.id);
   const args = buildClaudeArgs({
     model: judge.model,
-    prompt: buildJudgePrompt(persona, steps, judge.focus),
-    schema: buildJudgeSchema(stepIds),
+    prompt: buildJudgePrompt(persona, steps, judge.focus, objections),
+    schema: buildJudgeSchema(stepIds, objections.length),
     imageDir,
   });
   const envelope = await runJudge(args, imageDir, timeoutMs);
-  const verdict = parseJudgeOutput(envelope.structured_output, stepIds);
+  const verdict = parseJudgeOutput(
+    envelope.structured_output,
+    stepIds,
+    objections.length
+  );
   return {
     personaId: persona.id,
     judge: judge.id,
@@ -108,21 +119,58 @@ export async function judgePersona({
 }
 
 /**
- * One run over the whole sequence that scores every step-to-step hand-off.
+ * Coherence judge. One entry point, two modes:
+ * - 'sequence' (default): one run over the ordered funnel steps that scores
+ *   every step-to-step hand-off ({ transitions, story }).
+ * - 'screen': one run that scores each screen on intent, continuity,
+ *   subtraction, seams and inevitability, with located findings
+ *   ({ screens }). Gate with evaluateScreenCoherence.
  *
- * @param {{ steps: Array<any>, imageDir: string, timeoutMs?: number }} args
+ * @param {{ mode?: 'sequence' | 'screen', steps?: Array<any>, screens?: Array<import('./coherence-screen.mjs').ScreenInput>, imageDir: string | string[], timeoutMs?: number }} args
  */
-export async function judgeCoherence({ steps, imageDir, timeoutMs = 600_000 }) {
-  const stepIds = steps.map(step => step.id);
+export async function judgeCoherence({
+  mode = 'sequence',
+  steps = [],
+  screens = [],
+  imageDir,
+  timeoutMs = 600_000,
+}) {
   const judge = JUDGES.coherence;
-  const args = buildClaudeArgs({
-    model: judge.model,
-    prompt: buildCoherencePrompt(steps),
-    schema: buildCoherenceSchema(stepIds),
-    imageDir,
-  });
-  const envelope = await runJudge(args, imageDir, timeoutMs);
+  if (mode === 'screen') {
+    const screenIds = screens.map(screen => screen.id);
+    const envelope = await runJudge(
+      buildClaudeArgs({
+        model: judge.model,
+        prompt: buildScreenPrompt(screens),
+        schema: buildScreenSchema(screenIds),
+        imageDir,
+      }),
+      Array.isArray(imageDir) ? imageDir[0] : imageDir,
+      timeoutMs
+    );
+    return {
+      mode,
+      rubric: SCREEN_RUBRIC_VERSION,
+      judge: judge.id,
+      model: judge.model,
+      costUsd: envelope.total_cost_usd ?? null,
+      ...parseScreenOutput(envelope.structured_output, screenIds),
+    };
+  }
+
+  const stepIds = steps.map(step => step.id);
+  const envelope = await runJudge(
+    buildClaudeArgs({
+      model: judge.model,
+      prompt: buildCoherencePrompt(steps),
+      schema: buildCoherenceSchema(stepIds),
+      imageDir,
+    }),
+    Array.isArray(imageDir) ? imageDir[0] : imageDir,
+    timeoutMs
+  );
   return {
+    mode,
     judge: judge.id,
     model: judge.model,
     costUsd: envelope.total_cost_usd ?? null,

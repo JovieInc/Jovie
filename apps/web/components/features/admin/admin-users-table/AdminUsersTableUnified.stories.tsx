@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { DashboardStoryProviders } from '@/.storybook/dashboard-fixtures';
 import type { AdminUserRow } from '@/lib/admin/types';
+import { AdminPeopleRightPanelProvider } from '../AdminPeopleRightPanelProvider';
 import { AdminUsersTableUnified } from './AdminUsersTableUnified';
 
 const users: AdminUserRow[] = [
@@ -39,6 +41,15 @@ const meta: Meta<typeof AdminUsersTableUnified> = {
       ],
     },
   },
+  decorators: [
+    Story => (
+      <DashboardStoryProviders>
+        <AdminPeopleRightPanelProvider>
+          <Story />
+        </AdminPeopleRightPanelProvider>
+      </DashboardStoryProviders>
+    ),
+  ],
 };
 
 export default meta;

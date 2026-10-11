@@ -57,5 +57,7 @@ export -f run
 LP=$!
 trap 'kill $LP 2>/dev/null' EXIT
 T0=$(date +%s)
-grep -v '^#' "$JOBS" | grep -v '^$' | tr '\n' '\0' | xargs -0 -P "$P" -I{} bash -c 'run "$@"' _ {}
+# -n1, not -I{}: BSD xargs -I silently drops lines longer than 255 bytes (long directions).
+# shellcheck disable=SC2016 # $1 expands in the child bash, not here
+grep -v '^#' "$JOBS" | grep -v '^$' | tr '\n' '\0' | xargs -0 -n1 -P "$P" bash -c 'run "$1"' _
 echo "BATCH $B wall=$(($(date +%s) - T0))s" | tee -a "$LOG/results.tsv"

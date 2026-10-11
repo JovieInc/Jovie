@@ -156,6 +156,17 @@ describe('useRailMotionPhase (JOV-4522)', () => {
 });
 
 describe('shell rail-motion tokens (JOV-4522)', () => {
+  it('uses the shared allocation utility including the frame seam border', () => {
+    expect(SHELL_RAIL_ALLOCATION).toContain('transition-shell-rail-allocation');
+    const css = readFileSync(
+      path.join(webRoot, 'styles/tailwind-foundation.css'),
+      'utf8'
+    );
+    expect(css).toMatch(
+      /@utility transition-shell-rail-allocation\s*\{\s*transition-property: flex-basis, width, border-width, opacity, transform;/
+    );
+  });
+
   it('mirrors the cinematic duration token so phase settle matches CSS', () => {
     const css = readFileSync(
       path.join(webRoot, 'styles/design-system.css'),

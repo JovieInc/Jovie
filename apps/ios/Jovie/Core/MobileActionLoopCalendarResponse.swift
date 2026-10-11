@@ -39,6 +39,24 @@ struct MobileActionLoopCalendarResponse: Codable, Equatable, Sendable {
         confirmationStatus: "confirmed",
         statusBadge: nil
       ),
+      MobileActionLoopCalendarEventItem(
+        id: "event-3",
+        title: "Rooftop set",
+        subtitle: "Los Angeles, CA · Manual",
+        eventDate: "2026-07-24T02:00:00.000Z",
+        eventType: "tour",
+        confirmationStatus: "confirmed",
+        statusBadge: nil
+      ),
+      MobileActionLoopCalendarEventItem(
+        id: "event-4",
+        title: "Summer tour: Chicago",
+        subtitle: "Chicago, IL · Imported",
+        eventDate: "2026-07-31T01:00:00.000Z",
+        eventType: "tour",
+        confirmationStatus: "confirmed",
+        statusBadge: nil
+      ),
     ],
     pendingEvents: [
       MobileActionLoopCalendarEventItem(

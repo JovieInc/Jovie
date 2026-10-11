@@ -10,6 +10,6 @@ export default async function ProfilesPage() {
   redirect(
     profilesWorkspaceEnabled
       ? APP_ROUTES.PRESENCE
-      : `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`
+      : `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`
   );
 }

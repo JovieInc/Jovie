@@ -197,9 +197,37 @@ describe('GET /api/billing/health', () => {
     );
   });
 
-  it('warns when a string reconciliation timestamp is stale', async () => {
+  it('treats a reconciliation inside 48 hours as healthy', async () => {
     const lastReconciliationAt = new Date(
       Date.now() - 5 * 60 * 60 * 1000
+    ).toISOString();
+    mockHealthQueries([
+      [{ count: 1 }],
+      [{ count: 0 }],
+      [{ createdAt: lastReconciliationAt }],
+      [{ count: 1 }],
+      [{ lastBillingEventAt: lastReconciliationAt }],
+    ]);
+
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_1' }],
+      has_more: false,
+    });
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET(cronRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.checks.recentReconciliation.status).toBe('healthy');
+    expect(data.checks.recentReconciliation.details.lastRun).toBe(
+      lastReconciliationAt
+    );
+  });
+
+  it('warns when a string reconciliation timestamp is older than 48 hours', async () => {
+    const lastReconciliationAt = new Date(
+      Date.now() - 49 * 60 * 60 * 1000
     ).toISOString();
     mockHealthQueries([
       [{ count: 1 }],

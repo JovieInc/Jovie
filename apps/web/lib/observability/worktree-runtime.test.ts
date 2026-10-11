@@ -31,7 +31,7 @@ describe('local app and telemetry correlation', () => {
   it('publishes the launcher identity through the actual health route without cache', async () => {
     local();
     const { GET } = await import('@/app/api/health/build-info/route');
-    const response = GET();
+    const response = await GET();
     expect((await response.json()).worktree).toEqual(identity);
     expect(response.headers.get('cache-control')).toContain('no-store');
     expect(getWorktreeIdentity()).toEqual(identity);
@@ -47,7 +47,7 @@ describe('local app and telemetry correlation', () => {
       vi.stubEnv('NODE_ENV', nodeEnv);
       vi.stubEnv('VERCEL_ENV', vercelEnv);
       const { GET } = await import('@/app/api/health/build-info/route');
-      expect((await GET().json()).worktree).toBeUndefined();
+      expect((await (await GET()).json()).worktree).toBeUndefined();
       expect(getWorktreeIdentity()).toBeNull();
       expect(getWorktreeAttributes()).toEqual({});
       expect(getWorktreeSentryOptions()).toEqual({});

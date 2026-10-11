@@ -476,23 +476,22 @@ test.describe('Public profile visual audit @smoke', () => {
 test.describe('Public profile compact shell sizing', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('demo desktop shell stays materially below viewport height', async ({
+  test('desktop shell stays materially below viewport height', async ({
     page,
   }) => {
     await blockAnalytics(page);
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.setViewportSize({ width: 1280, height: 900 });
 
-    await page.goto('/demo/showcase/public-profile', {
+    // The seeded real profile, not /demo/showcase: /demo is production-blocked
+    // (JOV-7606), and this lane runs against a production build.
+    await page.goto(`/${TEST_PROFILE}`, {
       waitUntil: 'domcontentloaded',
       timeout: 120_000,
     });
 
     await waitForHydration(page);
-    await waitForVisibleSelector(
-      page,
-      '[data-testid="demo-showcase-public-profile"]'
-    );
+    await waitForVisibleSelector(page, PROFILE_READY_SELECTOR);
     await waitForImages(page);
     await waitForSettle(page);
 

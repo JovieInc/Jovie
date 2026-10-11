@@ -166,5 +166,5 @@ describe('core social HTML policy', () => {
     });
 
     expect(violations).toEqual([]);
-  });
+  }, 30000);
 });

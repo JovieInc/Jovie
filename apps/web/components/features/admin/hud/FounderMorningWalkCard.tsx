@@ -2,7 +2,8 @@
 
 import { Button } from '@jovie/ui';
 import { Circle, Square } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
@@ -14,7 +15,22 @@ import {
 import { uploadAccountVideo } from '@/lib/capture/upload-account-video';
 import { FOUNDER_WALK_CONFIRM_PATH } from '@/lib/hud/founder-walk';
 
-type WalkPhase = 'idle' | 'recording' | 'uploading';
+type WalkPhase = 'idle' | 'selecting' | 'recording' | 'uploading';
+type WalkAttempt = {
+  owner: string;
+  url: string;
+  controller: AbortController;
+  session?: ScreenRecordingSession;
+  uploading: boolean;
+};
+
+function recordingPageUrl(): string {
+  const url = new URL(globalThis.location.href);
+  // An in-page anchor does not change the document/account capture context.
+  // Next hash-only pushState does not publish a route or query change.
+  url.hash = '';
+  return url.href;
+}
 
 export function FounderMorningWalkCard(props: {
   readonly defaultStatus: string;
@@ -22,102 +38,203 @@ export function FounderMorningWalkCard(props: {
   readonly compact?: boolean;
 }) {
   const { userId } = useAuthSafe();
+  const pathname = usePathname();
+  const query = useSearchParams()?.toString() ?? '';
   const [phase, setPhase] = useState<WalkPhase>('idle');
   const [lastUrl, setLastUrl] = useState<string | null>(null);
-  const sessionRef = useRef<ScreenRecordingSession | null>(null);
+  const attemptRef = useRef<WalkAttempt | null>(null);
 
-  const finishUpload = useCallback(
-    async (session: ScreenRecordingSession) => {
-      setPhase('uploading');
-      try {
-        const recording = await session.stop();
-        const uploaded = await uploadAccountVideo(
-          recording.file,
-          userId ?? 'unknown'
-        );
-        const confirm = await fetch(FOUNDER_WALK_CONFIRM_PATH, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            blobUrl: uploaded.url,
-            durationMs: recording.durationMs,
-            byteSize: recording.byteSize,
-          }),
-        });
-        if (!confirm.ok) {
-          throw new Error('Walk confirm failed');
-        }
-        setLastUrl(uploaded.url);
-        toast.success('Walk stored. Nothing admitted until it is classified.');
-      } catch {
-        toast.error('Could not store the walk. Try again.');
-      } finally {
-        sessionRef.current = null;
-        setPhase('idle');
-      }
-    },
-    [userId]
-  );
+  const discard = useCallback(() => {
+    const attempt = attemptRef.current;
+    attemptRef.current = null;
+    attempt?.controller.abort();
+    attempt?.session?.cancel();
+  }, []);
+  useLayoutEffect(() => {
+    const documentUrl = recordingPageUrl();
+    setPhase('idle');
+    setLastUrl(null);
+    const reset = () => {
+      discard();
+      setPhase('idle');
+      setLastUrl(null);
+    };
+    const onPopstate = () => {
+      const contextUrl = attemptRef.current?.url ?? documentUrl;
+      if (recordingPageUrl() !== contextUrl) reset();
+    };
+    // Leaving the document or capture context invalidates permanently, even
+    // if navigation returns. Fragment-only history keeps the same context.
+    globalThis.addEventListener('pagehide', reset);
+    globalThis.addEventListener('popstate', onPopstate);
+    return () => {
+      discard();
+      globalThis.removeEventListener('pagehide', reset);
+      globalThis.removeEventListener('popstate', onPopstate);
+    };
+  }, [userId, pathname, query, discard]);
 
-  const startRecording = useCallback(async () => {
+  const isCurrent = (attempt: WalkAttempt) =>
+    attemptRef.current === attempt &&
+    !attempt.controller.signal.aborted &&
+    recordingPageUrl() === attempt.url;
+
+  const startRecording = async () => {
+    if (attemptRef.current || !userId) return;
     if (!canRecordScreen()) {
       toast.error('Screen recording is not available in this window.');
       return;
     }
+    const attempt: WalkAttempt = {
+      owner: userId,
+      url: recordingPageUrl(),
+      controller: new AbortController(),
+      uploading: false,
+    };
+    attemptRef.current = attempt;
+    setPhase('selecting');
     try {
-      const session = await startScreenRecording('founder_walk');
-      sessionRef.current = session;
+      const session = await startScreenRecording('founder_walk', {
+        signal: attempt.controller.signal,
+        isCurrent: () => isCurrent(attempt),
+      });
+      if (!isCurrent(attempt)) {
+        session.cancel();
+        if (attemptRef.current === attempt) {
+          discard();
+          setPhase('idle');
+        }
+        return;
+      }
+      attempt.session = session;
       setPhase('recording');
     } catch {
-      toast.error('Screen recording was blocked or cancelled.');
+      if (isCurrent(attempt))
+        toast.error('Screen recording is unavailable, blocked or cancelled.');
+      if (attemptRef.current === attempt) {
+        discard();
+        setPhase('idle');
+      }
     }
-  }, []);
+  };
 
-  const stopRecording = useCallback(() => {
-    const session = sessionRef.current;
-    if (!session) return;
-    void finishUpload(session);
-  }, [finishUpload]);
+  const stopRecording = async () => {
+    const attempt = attemptRef.current;
+    if (!attempt?.session || attempt.uploading) return;
+    if (!isCurrent(attempt)) {
+      discard();
+      setPhase('idle');
+      return;
+    }
+    attempt.uploading = true;
+    setPhase('uploading');
+    try {
+      const recording = await attempt.session.stop();
+      if (!isCurrent(attempt)) return;
+      const uploaded = await uploadAccountVideo(recording.file, attempt.owner);
+      if (!isCurrent(attempt)) return;
+      const confirm = await fetch(FOUNDER_WALK_CONFIRM_PATH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: attempt.controller.signal,
+        body: JSON.stringify({
+          blobUrl: uploaded.url,
+          durationMs: recording.durationMs,
+          byteSize: recording.byteSize,
+        }),
+      });
+      if (!isCurrent(attempt)) return;
+      if (!confirm.ok) throw new Error('Walk confirm failed');
+      setLastUrl(uploaded.url);
+      toast.success('Walk stored. Nothing admitted until it is classified.');
+    } catch {
+      if (isCurrent(attempt))
+        toast.error('Could not store the walk. Try again.');
+    } finally {
+      if (attemptRef.current === attempt) {
+        discard();
+        setPhase('idle');
+      }
+    }
+  };
+  const primaryAction = () => {
+    if (!userId || phase === 'uploading') return;
+    if (phase === 'selecting') {
+      discard();
+      setPhase('idle');
+    } else if (phase === 'recording') void stopRecording();
+    else void startRecording();
+  };
+  const stopLabel = props.compact ? 'Stop Walk' : 'Stop';
+  const recordLabel =
+    phase === 'selecting'
+      ? 'Cancel selection'
+      : phase === 'recording'
+        ? stopLabel
+        : phase === 'uploading'
+          ? 'Storing…'
+          : 'Record walk';
+  const action = (
+    <Button
+      type='button'
+      size='sm'
+      variant={props.compact ? 'secondary' : undefined}
+      onClick={primaryAction}
+      disabled={!userId}
+      aria-disabled={phase === 'uploading' || undefined}
+      aria-busy={phase === 'uploading' || undefined}
+      title={props.compact ? props.defaultStatus : undefined}
+    >
+      {phase === 'recording' ? (
+        <Square className='h-3.5 w-3.5' aria-hidden='true' />
+      ) : (
+        <Circle className='h-3.5 w-3.5 fill-current' aria-hidden='true' />
+      )}
+      <span className='grid'>
+        {['Record walk', 'Cancel selection', stopLabel, 'Storing…'].map(
+          label => (
+            <span
+              key={label}
+              aria-hidden='true'
+              className='invisible col-start-1 row-start-1'
+            >
+              {label}
+            </span>
+          )
+        )}
+        <span className='col-start-1 row-start-1'>{recordLabel}</span>
+      </span>
+    </Button>
+  );
+  const linkLabel = props.compact ? 'Last walk' : 'Last walk stored';
+  const storedLink = (
+    <span
+      className={`grid min-w-0 text-secondary-token ${props.compact ? 'text-2xs' : 'text-xs'}`}
+    >
+      <span aria-hidden='true' className='invisible col-start-1 row-start-1'>
+        {linkLabel}
+      </span>
+      {lastUrl ? (
+        <a
+          href={lastUrl}
+          className='col-start-1 row-start-1 truncate underline'
+          target='_blank'
+          rel='noreferrer'
+        >
+          {linkLabel}
+        </a>
+      ) : null}
+    </span>
+  );
 
   if (props.compact) {
     return (
       <div
-        className='flex items-center gap-2'
+        className='flex flex-wrap items-center gap-2'
         data-testid='founder-morning-walk'
       >
-        {phase === 'recording' ? (
-          <Button
-            type='button'
-            size='sm'
-            variant='secondary'
-            onClick={stopRecording}
-          >
-            <Square className='h-3.5 w-3.5' aria-hidden='true' />
-            Stop Walk
-          </Button>
-        ) : (
-          <Button
-            type='button'
-            size='sm'
-            variant='secondary'
-            onClick={() => void startRecording()}
-            disabled={phase === 'uploading'}
-            title={props.defaultStatus}
-          >
-            <Circle className='h-3.5 w-3.5 fill-current' aria-hidden='true' />
-            {phase === 'uploading' ? 'Storing…' : 'Record walk'}
-          </Button>
-        )}
-        {lastUrl ? (
-          <a
-            href={lastUrl}
-            className='truncate text-2xs text-secondary-token underline'
-            target='_blank'
-            rel='noreferrer'
-          >
-            Last walk
-          </a>
-        ) : null}
+        {action}
+        {storedLink}
       </div>
     );
   }
@@ -134,38 +251,9 @@ export function FounderMorningWalkCard(props: {
             Record the web path. Same account video store as creator capture.
             Classification is later. Nothing is admitted from this dump.
           </p>
-          {lastUrl ? (
-            <a
-              href={lastUrl}
-              className='block truncate text-xs text-secondary-token underline'
-              target='_blank'
-              rel='noreferrer'
-            >
-              Last walk stored
-            </a>
-          ) : null}
+          {storedLink}
         </div>
-        {phase === 'recording' ? (
-          <Button
-            type='button'
-            size='sm'
-            variant='secondary'
-            onClick={stopRecording}
-          >
-            <Square className='h-3.5 w-3.5' aria-hidden='true' />
-            Stop
-          </Button>
-        ) : (
-          <Button
-            type='button'
-            size='sm'
-            onClick={() => void startRecording()}
-            disabled={phase === 'uploading'}
-          >
-            <Circle className='h-3.5 w-3.5 fill-current' aria-hidden='true' />
-            {phase === 'uploading' ? 'Storing…' : 'Record walk'}
-          </Button>
-        )}
+        {action}
       </div>
     </ContentSurfaceCard>
   );

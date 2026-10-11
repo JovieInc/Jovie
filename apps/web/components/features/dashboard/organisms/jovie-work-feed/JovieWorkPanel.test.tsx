@@ -27,6 +27,14 @@ vi.mock('./JovieWorkFeed', () => ({
 
 import { JovieWorkPanel } from './JovieWorkPanel';
 
+function expectShellOwnedCanvas() {
+  const panel = screen.getByTestId('jovie-work-page');
+  expect(panel.tagName).toBe('SECTION');
+  for (const element of panel.querySelectorAll('div')) {
+    expect(element).not.toHaveClass('bg-(--app-shell-content-surface)');
+  }
+}
+
 describe('JovieWorkPanel', () => {
   beforeEach(() => {
     useDashboardDataMock.mockReset();
@@ -37,7 +45,7 @@ describe('JovieWorkPanel', () => {
 
     render(<JovieWorkPanel />);
 
-    expect(screen.getByTestId('jovie-work-page').tagName).toBe('SECTION');
+    expectShellOwnedCanvas();
     const emptyState = screen.getByTestId('jovie-work-profile-empty-state');
     expect(emptyState.tagName).toBe('OUTPUT');
     expect(emptyState.querySelector('svg')).toBeNull();
@@ -50,6 +58,7 @@ describe('JovieWorkPanel', () => {
 
     render(<JovieWorkPanel />);
 
+    expectShellOwnedCanvas();
     expect(screen.getAllByText('Jovie Did This')).toHaveLength(1);
     expect(screen.getByTestId('jovie-work-feed-fixture')).toHaveAttribute(
       'data-profile-id',

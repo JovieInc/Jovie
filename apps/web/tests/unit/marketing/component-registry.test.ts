@@ -468,6 +468,15 @@ describe('canonical marketing component registry', () => {
         'apps/web/components/marketing/artist-profile/ArtistProfileLogoBar.tsx'
       )
     ).not.toContain('<NormalizedTrustLogo');
+    // Logos render only through a placement-scoped permission (JOV-7795).
+    expect(
+      source('apps/web/components/marketing/MarketingHero.tsx')
+    ).not.toContain('<HomeTrustSection');
+    expect(
+      source(
+        'apps/web/components/marketing/artist-profile/ArtistProfileHeroAdaptiveIntro.tsx'
+      )
+    ).toContain('placement={logoPlacement}');
     expect(
       source('apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx')
     ).toContain('<MarketingTerminalCta');

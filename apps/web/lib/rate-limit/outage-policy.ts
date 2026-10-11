@@ -90,6 +90,9 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   musicBrainzLookup: mandatoryDeny,
 
   claimTokenAccess: advisoryAllow,
+  // Token-gated surface: deny on outage rather than hand brute force a fresh
+  // per-instance memory budget for the DB-backed token oracle.
+  investorPortalToken: mandatoryDenyFixed,
   libraryAssetShareAccess: advisoryAllow,
   // Password-gated surfaces: deny on outage rather than leak or hand brute
   // force a fresh per-instance memory budget.

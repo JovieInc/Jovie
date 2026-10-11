@@ -5,6 +5,7 @@ import { musicfetchCircuitBreaker } from '@/lib/discography/musicfetch-circuit-b
 import { env } from '@/lib/env-server';
 import {
   musicfetchDormantReason,
+  musicfetchNetworkAllowed,
   musicfetchRemediation,
   noteMusicfetchHttpStatus,
   noteMusicfetchMissingToken,
@@ -247,13 +248,6 @@ async function requestWithRetries<T>(
   params: URLSearchParams,
   options: MusicfetchRequestOptions
 ): Promise<T> {
-  const token = env.MUSICFETCH_API_TOKEN;
-  if (!token) {
-    const remediation = noteMusicfetchMissingToken();
-    throw new MusicfetchRequestError(
-      `MusicFetch API token is not configured (${remediation.fingerprint} ${remediation.issue})`
-    );
-  }
   const dormant = musicfetchDormantReason();
   if (dormant) {
     const remediation = musicfetchRemediation(dormant);
@@ -261,6 +255,18 @@ async function requestWithRetries<T>(
       `MusicFetch dormant ${remediation.fingerprint} ${remediation.issue}`,
       401,
       remediation.fingerprint
+    );
+  }
+  if (!musicfetchNetworkAllowed()) {
+    throw new MusicfetchVendorUnavailableError(
+      'MusicFetch vendor fallback is disabled'
+    );
+  }
+  const token = env.MUSICFETCH_API_TOKEN;
+  if (!token) {
+    const remediation = noteMusicfetchMissingToken();
+    throw new MusicfetchRequestError(
+      `MusicFetch API token is not configured (${remediation.fingerprint} ${remediation.issue})`
     );
   }
   if (!musicfetchCircuitBreaker.canExecute()) {

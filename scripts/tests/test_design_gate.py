@@ -339,78 +339,76 @@ class AdmissionTest(unittest.TestCase):
         return self.lane.Issue(f"id-{identifier}", identifier, title, description, priority,
                                "2026-09-01T00:00:00Z", list(labels))
 
-    def test_a_held_issue_gets_its_brief_run_on_the_next_claim(self):
+    def test_designated_buildable_issue_precedes_another_due_brief(self):
+        target = self.task("JOV-7896", "Repair account claim conversion", "body", 2,
+                           ["agent-ready", "dispatch-next", "devin"])
+        held = self.task("JOV-4258", "Homepage hero", "no brief", 1, ["ws:ui-ia"])
+        linear = FakeLinear([target, held])
+        picked = design_gate.pick_build_issue([held, target], {}, pick=self.lane.pick_issue,
+                                             linear=linear, provider="devin", now=NOW)
+        self.assertIs(picked, target)
+        self.assertEqual(linear.calls, [])
+        target.labels.remove("dispatch-next")
+        self.assertIs(design_gate.pick_build_issue([held, target], {}, pick=self.lane.pick_issue,
+                         linear=linear, provider="devin", now=NOW), held)
+
+    def test_designation_preserves_whole_pool_duplicate_admission(self):
+        canonical = self.task("JOV-1", "Repair account claim conversion", "body", 2, [])
+        target = self.task("JOV-7896", canonical.title, "body", 2, ["agent-ready", "dispatch-next"])
+        target.created_at = "2026-09-02T00:00:00Z"
+        self.assertIs(design_gate.pick_build_issue([canonical, target], {}, pick=self.lane.pick_issue,
+                      provider="devin", now=NOW), canonical)
+
+    def test_designation_does_not_bypass_worker_admission(self):
+        target = self.task("JOV-7896", "Homepage hero", "no brief", 2,
+                           ["agent-ready", "dispatch-next", "ws:ui-ia"])
+        other = self.task("JOV-4258", "Homepage banner", "no brief", 1, ["ws:ui-ia"])
+        # Remote-only lanes claim gated work too: the build run writes its own brief.
+        self.assertIs(design_gate.pick_build_issue([target, other], {}, pick=self.lane.pick_issue,
+                      provider="hyperagent", now=NOW), target)
+        self.assertIs(design_gate.pick_build_issue([target, other], {"JOV-7896": 3},
+                      pick=self.lane.pick_issue, provider="devin", now=NOW), other)
+
+    def test_missing_brief_is_claimed_now_and_never_held(self):
+        """Tim 2026-10-11: a UI issue without a brief never waits for another agent."""
         build = self.task("JOV-2", "Tab indicator collapses JOV-2", "body", 1, [])
-        held = self.task("JOV-1", "Homepage hero", "no brief yet", 4, ["ws:ui-ia"])
-        linear = FakeLinear([build, held])
-        # The held issue ranks below buildable work and is still taken first.
+        gated = self.task("JOV-1", "Homepage hero", "no brief yet", 4, ["ws:ui-ia"])
+        decision = design_gate.build_admission(gated)
+        self.assertEqual((decision["admit"], decision["reason"], decision["auto"]), (True, "brief-auto", True))
+        linear = FakeLinear([build, gated])
+        # Ordinary order decides; a missing brief neither jumps the queue nor holds the issue.
+        self.assertIs(design_gate.pick_build_issue(
+            [build, gated], {}, pick=self.lane.pick_issue, linear=linear, provider="devin", now=NOW), build)
+        self.assertEqual(linear.calls, [])
         picked = design_gate.pick_build_issue(
-            [build, held], {}, pick=self.lane.pick_issue, linear=linear, provider="devin", now=NOW)
-        self.assertEqual(picked.identifier, "JOV-1")
-        self.assertTrue(design_gate.wants_brief(linear.refresh(held), now=NOW))
-        self.assertIn(design_gate.NEEDS_BRIEF_LABEL, held.labels)
-        self.assertEqual(design_gate.held_at(held.description), NOW)
-        self.assertIn("brief-auto", linear.comments[0][1])
-        # Remote-only lanes never take the brief run; they skip to buildable work.
-        picked = design_gate.pick_build_issue(
-            [build, held], {}, pick=self.lane.pick_issue, provider="hyperagent", now=NOW)
-        self.assertEqual(picked.identifier, "JOV-2")
-
-    def test_label_and_hold_time_are_written_once(self):
-        held = self.task("JOV-1", "Homepage hero", "no brief", 1, ["ws:ui-ia"])
-        linear = FakeLinear([held])
-        design_gate.pick_build_issue([held], {}, pick=self.lane.pick_issue, linear=linear,
-                                     provider="devin", now=NOW)
-        writes = len(linear.calls)
-        design_gate.pick_build_issue([linear.refresh(held)], {}, pick=self.lane.pick_issue,
-                                     linear=linear, provider="devin", now=NOW + 60)
-        self.assertEqual(design_gate.held_at(linear.descriptions[held.id]), NOW)
-        self.assertEqual(len(linear.comments), 1)
-        self.assertEqual(len(linear.calls), writes)
-
-    def test_an_issue_cannot_be_held_forever(self):
-        """Regression (JOV-7717): every path out of the hold ends in a build claim."""
-        held = self.task("JOV-1", "Repair New Chat visual contracts", "no brief", 1, ["ws:ui-ia"])
-        linear = FakeLinear([held])
-        runs = []
-        now = NOW
-        for _cycle in range(4):
-            picked = design_gate.pick_build_issue(
-                [linear.refresh(held)], {}, pick=self.lane.pick_issue, linear=linear,
-                provider="devin", now=now)
-            self.assertIsNotNone(picked, "a held issue was skipped with no brief run")
-            if not design_gate.wants_brief(picked, now=now):
-                break
-            # Each brief run leaves step 9 open: no Pen or ImageGen artifact.
-            runs.append(design_gate.publish_brief(linear, picked, app_brief(pen=""),
-                                                  retry=design_gate.brief_retry(picked))["verdict"])
-            now += 600
-        self.assertEqual(runs, ["brief-incomplete", "brief-incomplete"])
-        decision = design_gate.build_admission(linear.refresh(held), now=now)
-        self.assertEqual((decision["admit"], decision["reason"], decision["missing"]),
-                         (True, "brief-auto", [9]))
-        self.assertIn(design_gate.BRIEF_AUTO_LABEL, linear.labels[held.id])
-        order = json.loads(linear.descriptions[held.id].split("```json\n")[-1].split("\n```")[0])
+            [gated], {}, pick=self.lane.pick_issue, linear=linear, provider="devin", now=NOW)
+        self.assertIs(picked, gated)
+        self.assertEqual(linear.labels[gated.id], {"ws:ui-ia", design_gate.BRIEF_AUTO_LABEL})
+        self.assertNotIn("held-at", linear.descriptions[gated.id])
+        self.assertIn("this run writes the brief", linear.comments[-1][1])
+        order = json.loads(linear.descriptions[gated.id].split("```json\n")[-1].split("\n```")[0])
         self.assertEqual((order["authorityClass"], order["requiredCapabilities"]), ("founder", ["taste"]))
-        self.assertIn("Design brief steps 9", order["founderAsk"]["blocked"])
+        # The founder order and the comment are filed once per issue.
+        design_gate.pick_build_issue([linear.refresh(gated)], {}, pick=self.lane.pick_issue,
+                                     linear=linear, provider="devin", now=NOW + 60)
+        self.assertFalse(design_gate.ensure_brief_auto(linear, linear.refresh(gated), decision, now=NOW + 60))
+        self.assertEqual(len(linear.comments), 1)
+        self.assertEqual(linear.descriptions[gated.id].count('"orderId"'), 1)
 
-    def test_a_held_issue_with_no_run_is_admitted_after_24h(self):
-        description = "Design brief: docs/design/briefs/missing.md\n" + design_gate.held_marker(NOW)
-        held = self.task("JOV-1", "Landing page copy", description, 1, ["ws:profiles-marketing"])
-        early = design_gate.build_admission(held, now=NOW + design_gate.HOLD_LIMIT_S - 1)
-        late = design_gate.build_admission(held, now=NOW + design_gate.HOLD_LIMIT_S)
-        self.assertEqual((early["admit"], early["reason"]), (False, "needs-design-brief"))
-        self.assertEqual((late["admit"], late["reason"]), (True, "brief-auto"))
-        linear = FakeLinear([held])
-        picked = design_gate.pick_build_issue([held], {}, pick=self.lane.pick_issue, linear=linear,
-                                              provider="devin", now=NOW + design_gate.HOLD_LIMIT_S)
-        self.assertEqual(picked.identifier, "JOV-1")
-        self.assertFalse(design_gate.wants_brief(picked, now=NOW + design_gate.HOLD_LIMIT_S))
-        self.assertIn("held 24h", linear.comments[-1][1])
-        # The founder order is filed once even if the label read is stale.
-        self.assertFalse(design_gate.ensure_brief_auto(
-            linear, linear.refresh(held), late, now=NOW + design_gate.HOLD_LIMIT_S))
-        self.assertEqual(linear.descriptions[held.id].count('"orderId"'), 1)
+    def test_legacy_needs_brief_hold_is_cleared_on_claim(self):
+        legacy = self.task("JOV-3", "Homepage footer", "no brief", 1, ["needs-design-brief", "ws:ui-ia"])
+        linear = FakeLinear([legacy])
+        self.assertIs(design_gate.pick_build_issue([legacy], {}, pick=self.lane.pick_issue,
+                                                   linear=linear, provider="devin", now=NOW), legacy)
+        self.assertEqual(linear.labels[legacy.id], {"ws:ui-ia", design_gate.BRIEF_AUTO_LABEL})
+
+    def test_complete_brief_is_admitted_without_records(self):
+        ready = self.task("JOV-4", "Marketing page", complete_brief(), 1, ["ws:profiles-marketing"])
+        decision = design_gate.build_admission(ready)
+        self.assertEqual((decision["admit"], decision["reason"], decision["auto"]), (True, None, False))
+        linear = FakeLinear([ready])
+        design_gate.pick_build_issue([ready], {}, pick=self.lane.pick_issue, linear=linear, provider="devin")
+        self.assertEqual(linear.calls, [])
 
 
 class FounderOrderTest(unittest.TestCase):
@@ -430,93 +428,6 @@ class FounderOrderTest(unittest.TestCase):
         self.assertRegex(block, r"^<!-- jovie-work-order:[0-9a-f]{16}:r1 -->\n```json\n\{")
 
 
-class BriefLaneTest(unittest.TestCase):
-    def test_complete_brief_is_appended_once_and_admits_the_issue(self):
-        gated = issue(labels=["ws:ui-ia", "needs-design-brief"], description="New chat")
-        linear = FakeLinear([gated])
-        result = design_gate.publish_brief(linear, gated, app_brief())
-        self.assertEqual(result["verdict"], "brief-complete")
-        self.assertNotIn(design_gate.NEEDS_BRIEF_LABEL, linear.labels[gated.id])
-        gated.description = linear.descriptions[gated.id]
-        self.assertTrue(design_gate.build_admission(gated)["admit"])
-        self.assertFalse(design_gate.wants_brief(gated, now=NOW))
-        again = design_gate.publish_brief(linear, gated, app_brief())
-        self.assertEqual(again["reasons"], ["brief-already-published"])
-        self.assertEqual(gated.description.count(design_gate.BRIEF_MARKER), 1)
-
-    def test_retry_replaces_the_first_draft_and_keeps_the_hold_time(self):
-        gated = issue(labels=["ws:ui-ia"], description="New chat\n" + design_gate.held_marker(NOW))
-        linear = FakeLinear([gated])
-        first = design_gate.publish_brief(linear, gated, app_brief(primitive="atom.made-up"))
-        self.assertEqual(first["missing"], [6])
-        self.assertIn("one frontier retry runs", linear.comments[-1][1])
-        gated.description = linear.descriptions[gated.id]
-        self.assertTrue(design_gate.brief_retry(gated))
-        second = design_gate.publish_brief(linear, gated, app_brief(), retry=True)
-        self.assertEqual(second["verdict"], "brief-complete")
-        text = linear.descriptions[gated.id]
-        self.assertNotIn("atom.made-up", text)
-        self.assertEqual(design_gate.held_at(text), NOW)
-        self.assertEqual(design_gate.brief_attempts(text), 2)
-
-    def test_empty_output_still_records_the_run(self):
-        gated = issue(labels=["ws:ui-ia"], description="New chat")
-        linear = FakeLinear([gated])
-        result = design_gate.publish_brief(linear, gated, "I could not do it.")
-        self.assertEqual((result["verdict"], result["reasons"]), ("brief-incomplete", ["brief-empty"]))
-        self.assertEqual(design_gate.brief_attempts(linear.descriptions[gated.id]), 1)
-
-    def test_prompt_is_brief_only_and_names_the_variant_template(self):
-        app = design_gate.render_brief_prompt(issue(title="Sidebar dock", labels=["ws:ui-ia"]), "ctx")
-        self.assertIn(design_gate.BRIEF_FILE, app)
-        self.assertIn("Do not build, commit, push or open a PR", app)
-        self.assertIn("leave the `Pen:` and `ImageGen:` lines empty", app)
-        self.assertIn("app-ui-brief-template.md", app)
-        retry = design_gate.render_brief_prompt(
-            issue(title="Homepage hero"), "ctx", retry=True, missing=[5, 9])
-        self.assertIn("design-brief-template.md", retry)
-        self.assertIn("Frontier retry", retry)
-        self.assertIn("Steps 5, 9", retry)
-
-    def test_runner_routes_brief_runs_and_sends_the_retry_to_the_frontier_lane(self):
-        lane = load_lane()
-        with tempfile.TemporaryDirectory() as tmp:
-            host = lane.Host(state=Path(tmp), repo=Path(tmp))
-
-            def fake_sh(args, cwd=None, timeout=600, env=None, log=None):
-                if args[:3] == ["git", "worktree", "add"]:
-                    Path(args[-2]).mkdir(parents=True)
-                return SimpleNamespace(returncode=0, stdout="0", stderr="")
-
-            commands = []
-
-            def fake_agent(cmd, cwd, log, timeout, **kwargs):
-                commands.append(cmd[0])
-                (cwd / design_gate.BRIEF_FILE).write_text(app_brief(pen=""))
-                return SimpleNamespace(returncode=0)
-
-            gated = lane.Issue("id-JOV-9", "JOV-9", "Sidebar dock stack", "Sidebar dock",
-                               1, "2026-09-01T00:00:00Z", ["ws:ui-ia"])
-            linear = FakeLinear([gated])
-            providers = {"devin": {"cmd": ["devin"]}, "codex": {"cmd": ["codex"], "health": ["true"]}}
-            with mock.patch.object(lane, "sh", fake_sh), \
-                    mock.patch.object(lane, "run_agent", fake_agent), \
-                    mock.patch.object(lane, "context_pack", lambda issue: "ctx"), \
-                    mock.patch.object(lane, "load_providers", return_value=providers), \
-                    mock.patch.object(lane, "provider_healthy", return_value=True), \
-                    mock.patch.object(lane.disk_guard, "free_pct", return_value=50.0):
-                first = lane.run_brief(host, "devin", providers["devin"], linear, gated)
-                second = lane.run_brief(host, "devin", providers["devin"], linear, linear.refresh(gated))
-            self.assertEqual((first["verdict"], first["kind"], first["briefRetry"]),
-                             ("brief-incomplete", "design-brief", False))
-            self.assertEqual((second["provider"], second["briefRetry"]), ("codex", True))
-            self.assertEqual(commands, ["devin", "codex"])
-            self.assertIsNone(second["result"]["pr"])
-            prompt = (host.state / "runs" / f"{second['runId']}.prompt.md").read_text()
-            self.assertIn("Frontier retry", prompt)
-            self.assertEqual(design_gate.build_admission(linear.refresh(gated))["reason"], "brief-auto")
-
-
 class DesignLoopPromptTest(unittest.TestCase):
     def test_ui_issues_get_the_design_loop_and_other_work_does_not(self):
         lane = load_lane()
@@ -526,6 +437,8 @@ class DesignLoopPromptTest(unittest.TestCase):
         self.assertIn("Design loop (UI issue)", ui_prompt)
         self.assertIn("pnpm design:conformance:gate", ui_prompt)
         self.assertIn("founder taste card after landing", ui_prompt)
+        self.assertIn("write it yourself first", ui_prompt)
+        self.assertIn("nobody else will write it", ui_prompt)
         self.assertNotIn("Design loop", lane.render_prompt(plain, "devin/jov-6", "ctx", provider="devin"))
 
 
@@ -555,31 +468,25 @@ class DoctorCensusTest(unittest.TestCase):
                     mock.patch.object(lane, "graphql_budget", return_value=None):
                 observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=1_000_000)
         self.assertEqual(observed["designGate"]["gated"], 2)
-        self.assertEqual(observed["designGate"]["admitted"], 1)
-        self.assertEqual(observed["designGate"]["needsBrief"], 1)
+        self.assertEqual(observed["designGate"]["admitted"], 2)
+        self.assertEqual(observed["designGate"]["autoAdmitted"], 1)
         self.assertEqual(observed["designGate"]["missingSteps"]["1"], 1)
-        self.assertEqual(observed["qualifiedJobsByProvider"]["devin"], ["JOV-GOOD", "JOV-READY"])
-        self.assertEqual(observed["rejectedByProvider"]["devin"]["needs-design-brief"], 1)
+        self.assertEqual(observed["qualifiedJobsByProvider"]["devin"], ["JOV-GOOD", "JOV-WAIT", "JOV-READY"])
+        self.assertNotIn("needs-design-brief", observed["rejectedByProvider"]["devin"])
         feed = doctor.status_feed(host, lane, observed, {}, {})
         self.assertEqual(feed["admission"]["designGate"], observed["designGate"])
 
 
 class DoctorStallTest(unittest.TestCase):
-    def test_age_histogram_and_stale_alert(self):
-        fresh = issue("JOV-1", labels=["ws:ui-ia"], title="Sidebar dock",
-                      description="x\n" + design_gate.held_marker(NOW - 600))
-        day = issue("JOV-2", labels=["ws:ui-ia"], title="Chat titlebar",
-                    description="x\n" + design_gate.held_marker(NOW - 7 * 3600))
-        stuck = issue("JOV-3", labels=["ws:ui-ia", "needs-design-brief"], title="Settings panel",
-                      description="x\n" + design_gate.held_marker(NOW - design_gate.HOLD_ALERT_S))
-        unknown = issue("JOV-4", labels=["ws:ui-ia", "needs-design-brief"], title="Library grid")
-        pool = {"devin": [fresh, day, stuck, unknown]}
-        census = design_gate.apply_to_pool(pool, {}, now=NOW)
-        self.assertEqual(census["ageHistogram"],
-                         {"<1h": 1, "1-6h": 0, "6-24h": 1, ">=24h": 1, "unknown": 1})
-        self.assertEqual((census["autoAdmitted"], census["needsBrief"]), (1, 3))
-        self.assertEqual(census["stale"], ["JOV-3"])
-        self.assertEqual([item.identifier for item in pool["devin"]], ["JOV-3"])
+    def test_census_keeps_every_gated_issue_and_has_no_hold_age(self):
+        fresh = issue("JOV-1", labels=["ws:ui-ia"], title="Sidebar dock", description="x")
+        legacy = issue("JOV-3", labels=["ws:ui-ia", "needs-design-brief"], title="Settings panel")
+        pool = {"devin": [fresh, legacy], "codex": [legacy]}
+        census = design_gate.apply_to_pool(pool)
+        self.assertEqual((census["gated"], census["admitted"], census["autoAdmitted"]), (2, 2, 2))
+        self.assertEqual(set(census), {"gated", "admitted", "autoAdmitted", "missingSteps"})
+        self.assertEqual([item.identifier for item in pool["devin"]], ["JOV-1", "JOV-3"])
+        self.assertEqual([item.identifier for item in pool["codex"]], ["JOV-3"])
 
 
 class CertifiedSyncTest(unittest.TestCase):

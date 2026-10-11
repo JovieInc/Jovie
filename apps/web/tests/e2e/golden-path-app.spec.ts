@@ -220,7 +220,7 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
         () => {
           const currentUrl = new URL(page.url());
           if (
-            currentUrl.pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE &&
+            currentUrl.pathname === APP_ROUTES.SETTINGS_PROFILE &&
             currentUrl.searchParams.get('tab') === 'music'
           ) {
             return 'settings-music';
@@ -262,7 +262,7 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   }) => {
     test.setTimeout(240_000);
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS_ARTIST_PROFILE, {
+    await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS_PROFILE, {
       timeout: 60_000,
       retries: 2,
     });
@@ -277,7 +277,7 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   test('career highlights field saves successfully', async ({ page }) => {
     test.setTimeout(240_000);
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS_ARTIST_PROFILE, {
+    await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS_PROFILE, {
       timeout: 60_000,
       retries: 2,
     });

@@ -72,24 +72,35 @@ describe('library right-rail System B structural compliance', () => {
     expect(surface).toContain('TOOLBAR_MENU_CONTENT_CLASS');
   });
 
-  it('surfaces Release + Approval on cards and Approval editor once in Details (#10384 / JOV-3333)', () => {
-    // Grid cards carry both axes with explicit aria labels.
-    expect(surface).toContain('library-release-status-');
-    expect(surface).toContain('library-approval-status-');
-    expect(surface).toContain('Release Status: ${formatLibraryStatus');
-    expect(surface).toContain('Approval Status: ${formatLibraryApprovalStatus');
-    // List view exposes a dedicated Approval column.
-    expect(surface).toContain("header: 'Approval'");
-    expect(surface).toContain('ApprovalStatusCell');
-    // Filter rail + pill search expose approval as a filter axis.
+  it('folds Release + Approval into one glyph and edits Approval once in Details (#10384 / JOV-3333)', () => {
+    // Tiles, rows, table and inspector share the one status glyph.
+    expect(surface).toContain('LibraryStatusGlyph');
+    expect(surface).not.toContain('library-card-status-stack-');
+    expect(surface).not.toContain('ApprovalStatusCell');
+    expect(surface).not.toContain("header: 'Approval'");
+    // Filter rail + pill search still expose approval as a filter axis.
     expect(surface).toContain("label='Approval Status'");
     expect(surface).toContain("case 'approval':");
     expect(surface).toMatch(/allowedFields:\s*\[[^\]]*['"]approval['"]/s);
-    // Dual-axis list columns share the same breakpoint (no lone Draft).
-    expect(surface).toContain("id: 'status',\n    header: 'Release',");
-    expect(surface).toContain("id: 'approval',\n    header: 'Approval',");
-    // Drawer hero must not render a second approval pill next to release.
     // Editable approval lives only in ApprovalStatusEditor under Details.
     expect(surface).toContain('ApprovalStatusEditor');
+  });
+});
+
+describe('library sources feeding the system-b-app.css Tailwind build', () => {
+  it('never emit a zero-width utility that would collapse the shell right rail', () => {
+    // That build's utilities load after the global sheet, so a zero-width
+    // utility here overrides the rail's lg:w-fit and hides the inspector.
+    for (const path of [
+      'app/app/(shell)/library/LibrarySurface.tsx',
+      'components/features/library/library-catalog-columns.tsx',
+    ]) {
+      const source = readSource(path);
+      expect(source).not.toMatch(/['"\s`]w-0['"\s`]/u);
+      expect(source).not.toContain('[width:0');
+    }
+    expect(readSource('styles/system-b-app.css')).toMatch(
+      /:where\(\.system-b-library-fluid-cell\)\s*\{\s*width: 0;\s*min-width: 100%;/u
+    );
   });
 });

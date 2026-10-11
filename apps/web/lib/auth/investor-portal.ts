@@ -16,7 +16,7 @@ import {
   isInvestorClaimTokenShape,
   isInvestorClaimUnexpired,
 } from '@/lib/investors/claim-token';
-import { apiLimiter } from '@/lib/rate-limit';
+import { investorPortalTokenLimiter } from '@/lib/rate-limit';
 import { analyzeHost } from '@/lib/routing/proxy-routing';
 
 const INVESTOR_TOKEN_COOKIE = '__investor_token';
@@ -57,6 +57,32 @@ function withPrivateHeaders<T extends NextResponse>(res: T): T {
 /** Neutral 404: identical for unknown, unauthorized and retired paths. */
 function investorNotFound(): NextResponse {
   return withPrivateHeaders(new NextResponse(null, { status: 404 }));
+}
+
+/**
+ * IP-bucketed throttle on token validation attempts. Runs before any DB
+ * lookup so a flood of guessed tokens cannot turn Postgres into the oracle.
+ * Returns a 429 response when over limit, null when the attempt may proceed.
+ */
+async function investorTokenRateLimit(
+  req: NextRequest
+): Promise<NextResponse | null> {
+  const clientIp =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const result = await investorPortalTokenLimiter.limit(
+    `investor-portal:token:${clientIp}`
+  );
+  if (result.success) return null;
+
+  return new NextResponse(null, {
+    status: 429,
+    headers: {
+      ...PRIVATE_HEADERS,
+      'Retry-After': String(
+        Math.max(1, Math.ceil((result.reset.getTime() - Date.now()) / 1000))
+      ),
+    },
+  });
 }
 
 function hasSignedInSession(req: NextRequest): boolean {
@@ -144,26 +170,13 @@ export async function handleInvestorRequest(
     }
 
     // Rate limit token validation to prevent brute-force enumeration.
-    // Key by IP + token-presence so legitimate investors with valid tokens
-    // are not blocked by unrelated traffic from the same IP.
-    const clientIp =
-      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-    const rateLimitKey = 'investor-portal:token:' + clientIp;
-    const rateLimitResult = await apiLimiter.limit(rateLimitKey);
-    if (!rateLimitResult.success) {
-      return new NextResponse(null, {
-        status: 429,
-        headers: {
-          ...PRIVATE_HEADERS,
-          'Retry-After': String(
-            Math.max(
-              1,
-              Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000)
-            )
-          ),
-        },
-      });
+    // Shape-check first so malformed tokens cost nothing; the dedicated
+    // per-IP bucket then bounds DB-backed guessing to 30 attempts/minute.
+    if (!isInvestorClaimTokenShape(tokenParam)) {
+      return investorNotFound();
     }
+    const limited = await investorTokenRateLimit(req);
+    if (limited) return limited;
 
     const isValid = await validateInvestorToken(tokenParam);
     if (!isValid) {
@@ -186,8 +199,14 @@ export async function handleInvestorRequest(
     return res;
   }
 
-  // Check for token in cookie (return visits)
+  // Check for token in cookie (return visits). Cookie tokens are the same
+  // brute-force surface as ?t= params, so shape-check and rate-limit them
+  // before the DB lookup too.
   const tokenCookie = req.cookies.get(INVESTOR_TOKEN_COOKIE)?.value;
+  if (tokenCookie && isInvestorClaimTokenShape(tokenCookie)) {
+    const limited = await investorTokenRateLimit(req);
+    if (limited) return limited;
+  }
   const isValid = tokenCookie
     ? await validateInvestorToken(tokenCookie)
     : false;

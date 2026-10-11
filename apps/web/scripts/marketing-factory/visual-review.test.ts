@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import type { ArtDirection } from '@/lib/agent-os/design-reference-corpus/refs-context';
 import type {
   JudgeScore,
@@ -6,6 +9,8 @@ import type {
   StageJudge,
 } from '../design-ci-judge-dispatch';
 import { loadFactoryBrief } from './brief';
+import { captureBytesDigest } from './capture-integrity';
+import { capturePng } from './capture-integrity.fixtures';
 import { dryProviders, fixtureTransport, liveProviders } from './providers';
 import { fixtureCaptures } from './render-measurer';
 import {
@@ -39,9 +44,19 @@ const ONE_LIGHT: ArtDirection = {
   updatedAt: '2026-10-03T00:00:00.000Z',
 };
 const DIGEST = `sha256:${'c'.repeat(64)}`;
+const captureDir = mkdtempSync(join(tmpdir(), 'visual-review-bytes-'));
+afterAll(() => rmSync(captureDir, { recursive: true, force: true }));
 const captures = fixtureCaptures('/solutions/founders', {
   cls: 0,
   lcpMs: 1200,
+}).map(capture => {
+  const path = join(captureDir, `${capture.viewport}.png`);
+  const bytes = capturePng(capture.width, capture.height);
+  writeFileSync(path, bytes);
+  return {
+    ...capture,
+    screenshot: { path, digest: captureBytesDigest(bytes) },
+  };
 });
 const request = {
   pageId: 'solutions-founders',
@@ -292,12 +307,17 @@ describe('visual taste admission', () => {
 });
 
 describe('liveVisualJudges', () => {
+  const loader = async () => ({
+    evaluateArt: vi.fn(),
+    subscriptionVisionTransport: () => vi.fn(),
+  });
+
   it('seats no judge when nothing is reachable', async () => {
-    const loader = vi.fn();
-    const pair = await liveVisualJudges(null, PRODUCER, loader);
+    const unused = vi.fn();
+    const pair = await liveVisualJudges(null, PRODUCER, new Set(), unused);
 
     expect(pair.cheap.id).toBeNull();
-    expect(loader).not.toHaveBeenCalled();
+    expect(unused).not.toHaveBeenCalled();
     await expect(pair.cheap.run({} as never)).rejects.toThrow(/no reachable/);
   });
 
@@ -310,6 +330,7 @@ describe('liveVisualJudges', () => {
       const pair = await liveVisualJudges(
         fixtureTransport(),
         producer,
+        new Set(),
         async () => ({
           evaluateArt: vi.fn(),
           subscriptionVisionTransport: () => vi.fn(),
@@ -335,6 +356,18 @@ describe('liveVisualJudges', () => {
       ).resolves.toMatchObject({ status: 'reviewed', verdict: 'pass' });
     }
   );
+
+  it('never seats a judge that failed calibration', async () => {
+    const pair = await liveVisualJudges(
+      fixtureTransport(),
+      PRODUCER,
+      new Set(['openai/gpt-5.6-luna']),
+      loader
+    );
+
+    expect(pair.cheap.id).not.toBe('openai/gpt-5.6-luna');
+    expect(pair.flagship.id).not.toBe('openai/gpt-5.6-luna');
+  });
 });
 
 describe('providers.reviewVisual', () => {

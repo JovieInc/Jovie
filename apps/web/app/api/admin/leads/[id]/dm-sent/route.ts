@@ -4,6 +4,11 @@ import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
+import { evaluateOutboundHistoryRecord } from '@/lib/outbound/approval';
+import {
+  outboundTargetFromLead,
+  readOutboundLedger,
+} from '@/lib/outbound/ledger.server';
 import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -38,6 +43,12 @@ export async function PATCH(
       .select({
         id: leads.id,
         firstContactedAt: leads.firstContactedAt,
+        linktreeHandle: leads.linktreeHandle,
+        displayName: leads.displayName,
+        contactEmail: leads.contactEmail,
+        instagramHandle: leads.instagramHandle,
+        creatorProfileId: leads.creatorProfileId,
+        claimToken: leads.claimToken,
       })
       .from(leads)
       .where(eq(leads.id, id))
@@ -47,6 +58,21 @@ export async function PATCH(
       return NextResponse.json(
         { error: 'Lead not found' },
         { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // This records operator-reported history; it does not deliver a DM.
+    // Preserve the existing exact-copy review requirement for this local action.
+    const ledger = await readOutboundLedger([existingLead.id]);
+    const permission = evaluateOutboundHistoryRecord({
+      target: outboundTargetFromLead(existingLead),
+      channel: 'dm',
+      rows: ledger.get(existingLead.id) ?? [],
+    });
+    if (!permission.historyRecordAllowed) {
+      return NextResponse.json(
+        { error: 'Outreach not approved', reason: permission.reason },
+        { status: 409, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -68,6 +94,11 @@ export async function PATCH(
         eventType: 'dm_sent',
         channel: 'dm',
         campaignKey: 'claim_invite',
+        metadata: {
+          approvedCopyRevision: permission.copy.revision,
+          recordingSource: 'operator_reported',
+          deliveryVerified: false,
+        },
       },
       { idempotent: true }
     );

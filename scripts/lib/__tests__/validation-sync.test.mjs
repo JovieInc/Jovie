@@ -1,9 +1,30 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+
+// The JOV-7703 contract is TypeScript in another package; load it at runtime
+// so the scripts checkJs pass does not typecheck that package.
+const CONTRACTS = new URL(
+  '../../../packages/agent-transport-contracts',
+  import.meta.url
+).href;
+const {
+  acknowledgeDispatch,
+  extractWorkBlocks,
+  renderWorkBlock,
+  sealWorkOrder,
+} = await import(`${CONTRACTS}/work-order.ts`);
+const { founderCardKey, fromSummerCard } = await import(
+  `${CONTRACTS}/work-order-adapters.ts`
+);
+
 import {
   classifyMergedRisk,
   createProductionFacts,
   githubClient,
+  listMergedFiles,
   listMergedLinkedPulls,
+  mergedUiEvidence,
+  pullImplementsIssue,
   reconcileValidation,
 } from '../validation-sync.mjs';
 import {
@@ -12,10 +33,13 @@ import {
   intercept,
   json,
   MAIN,
+  NO_UI_MATRIX,
   portFor,
   REPO,
   receiptComment,
   snapshotFor,
+  TASTE_MATRIX,
+  UI_MATRIX,
   validClosure,
 } from './fixtures/validation-world.mjs';
 
@@ -33,9 +57,12 @@ function evaluate(world, fetchImpl, options = {}) {
     repository: REPO,
     facts: createProductionFacts({ fetchImpl, github, repository: REPO }),
     harnessManifest: options.harnessManifest ?? HARNESS_MANIFEST,
+    assuranceMatrix:
+      'assuranceMatrix' in options ? options.assuranceMatrix : NO_UI_MATRIX,
     linear: portFor(world),
     eventPull: options.eventPull,
     dryRun: options.dryRun,
+    now: options.now,
     log: options.log ?? (() => {}),
   });
 }
@@ -261,6 +288,240 @@ describe('validation sync: receipts', () => {
   });
 });
 
+describe('validation sync: founder taste (JOV-7759)', () => {
+  const taste = (overrides, createdAt) =>
+    receiptComment(
+      'JOV-1',
+      {
+        kind: 'founder-taste',
+        evidence: 'https://example.test/ovie/taste/1',
+        ...overrides,
+      },
+      createdAt
+    );
+
+  it('needs machine evidence, not Tim, for a deterministic UI row', async () => {
+    const { world, fetchImpl } = createWorld();
+    await merge(world, fetchImpl, 101, { assuranceMatrix: UI_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    const held = world.issues['JOV-1'].comments.at(-1).body;
+    expect(held).toContain('Next missing receipt: screen-audit.');
+    expect(held).toContain(
+      'AM-020 ui-state-completeness on web-desktop, web-mobile'
+    );
+    expect(held).not.toContain('founder-taste');
+    expect(world.descriptions).toEqual([]);
+    world.issues['JOV-1'].comments.push(
+      receiptComment(
+        'JOV-1',
+        {
+          kind: 'screen-audit',
+          evidence: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+        },
+        '2026-10-03T13:00:00Z'
+      )
+    );
+    await evaluate(world, fetchImpl, { assuranceMatrix: UI_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
+  it('holds a UI change in Validating until the founder accepts the exact production build', async () => {
+    const { world, fetchImpl } = createWorld();
+    await merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    const held = world.issues['JOV-1'].comments.at(-1).body;
+    expect(held).toContain('Next missing receipt: founder-taste.');
+    expect(held).toContain(
+      'AM-024 ui-visual-taste on web-desktop, macos-electron'
+    );
+    expect(held).toContain('"uiEvidence":[{"row":"AM-024"');
+
+    world.issues['JOV-1'].comments.push(taste({}, '2026-10-03T13:00:00Z'));
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
+  it('routes a founder rejection to Rework with the note, and needs a fresh decision after the fix', async () => {
+    const { world, fetchImpl } = createWorld();
+    await merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX });
+    world.issues['JOV-1'].comments.push(
+      taste(
+        { status: 'fail', note: 'The rail toggle still jumps 2px on open.' },
+        '2026-10-03T13:00:00Z'
+      )
+    );
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Rework');
+    expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
+      'Note: The rail toggle still jumps 2px on open.'
+    );
+
+    addMerge(world, 103, MAIN[3], '2026-10-03T14:00:00Z');
+    world.served = MAIN[4].slice(0, 7);
+    await merge(world, fetchImpl, 103, { assuranceMatrix: TASTE_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    world.issues['JOV-1'].comments.push(
+      taste({ sha: MAIN[4] }, '2026-10-03T15:00:00Z')
+    );
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
+  /** Summer's JOV-7739 tick: read the order from the body, post the decision. */
+  function summerTick(world, status, comment = null) {
+    const issue = world.issues['JOV-1'];
+    const [raw] = extractWorkBlocks(issue.description).orders;
+    const order = sealWorkOrder(raw);
+    const card = {
+      id: `card-${order.digest.slice(0, 8)}`,
+      idempotencyKey: founderCardKey(order),
+      status,
+      comment,
+      decidedAt: '2026-10-04T02:00:00.000Z',
+    };
+    const ack = acknowledgeDispatch(order, {
+      transportRef: `ovie:summer-card/${card.id}`,
+      dispatchedAt: '2026-10-04T01:30:00.000Z',
+    });
+    const result = fromSummerCard(order, {
+      ack,
+      card,
+      observedAt: card.decidedAt,
+    });
+    world.clock += 1000;
+    issue.comments.push({
+      body: `Founder ${status} in Ovie.\n\n${renderWorkBlock(result)}`,
+      createdAt: new Date(world.clock).toISOString(),
+    });
+  }
+
+  it('files one Ovie taste order per binding and closes on the founder approval', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].description = 'Mirror the rail toggle.';
+    const now = () => new Date('2026-10-04T01:00:00Z');
+    await merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX, now });
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX, now });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    expect(world.descriptions).toEqual(['JOV-1']);
+    const body = world.issues['JOV-1'].description;
+    expect(body.startsWith('Mirror the rail toggle.')).toBe(true);
+    const [order] = extractWorkBlocks(body).orders;
+    expect(order).toMatchObject({
+      authorityClass: 'founder',
+      requiredCapabilities: ['taste'],
+      scope: { entityRefs: expect.arrayContaining([`sha:${MAIN[2]}`]) },
+    });
+
+    summerTick(world, 'approved');
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX, now });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
+  it('routes an Ovie rejection to Rework with the note, then asks again for the fix build', async () => {
+    const { world, fetchImpl } = createWorld();
+    const now = () => new Date('2026-10-04T01:00:00Z');
+    await merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX, now });
+    summerTick(world, 'rejected', 'Too much chrome around the player.');
+    await evaluate(world, fetchImpl, { assuranceMatrix: TASTE_MATRIX, now });
+    expect(world.issues['JOV-1'].state).toBe('Rework');
+    expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
+      'Note: Too much chrome around the player.'
+    );
+
+    addMerge(world, 103, MAIN[3], '2026-10-03T14:00:00Z');
+    world.served = MAIN[4].slice(0, 7);
+    await merge(world, fetchImpl, 103, { assuranceMatrix: TASTE_MATRIX, now });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    expect(world.descriptions).toEqual(['JOV-1', 'JOV-1']);
+    expect(
+      extractWorkBlocks(world.issues['JOV-1'].description).orders
+    ).toHaveLength(2);
+  });
+
+  it('surfaces a refused order write', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.refuseDescription = true;
+    await expect(
+      merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX })
+    ).rejects.toThrow(/refused the founder taste order/);
+  });
+
+  it('treats an unreadable matrix as unknown UI evidence, never as no UI change', async () => {
+    const { world, fetchImpl } = createWorld();
+    await merge(world, fetchImpl, 101, { assuranceMatrix: null });
+    expect(world.issues['JOV-1'].state).toBe('Validating');
+    expect(world.issues['JOV-1'].comments.at(-1).body).toContain(
+      'Next missing receipt: screen-audit.'
+    );
+    expect(world.descriptions).toEqual([]);
+    expect(mergedUiEvidence(null, TASTE_MATRIX)).toBeNull();
+    expect(mergedUiEvidence(['docs/README.md'], TASTE_MATRIX)).toEqual([]);
+    expect(
+      mergedUiEvidence(['apps/web/components/Card.tsx'], {
+        rows: [{ ...UI_MATRIX.rows[0], ui: { requiredEvidence: [] } }],
+      })?.[0]?.judgment
+    ).toBe('deterministic');
+  });
+
+  it('does not turn queue invariant metadata into a founder build approval', async () => {
+    const { world, fetchImpl } = createWorld();
+    // PR19749 / JOV-5117: queue controls plus the shared invariant registry.
+    world.pulls[101].files = [
+      '.github/MERGE_QUEUE.md',
+      '.github/scripts/auto-merge-stuck-triage.js',
+      'canon/invariants.jsonl',
+      'scripts/lib/source-admission-policy.mjs',
+      'scripts/merge-group-failure-hold.mjs',
+    ];
+    const matrix = JSON.parse(
+      readFileSync(
+        new URL('../../invariants/assurance-matrix.json', import.meta.url),
+        'utf8'
+      )
+    );
+    expect(mergedUiEvidence(world.pulls[101].files, matrix)).toEqual([]);
+    await merge(world, fetchImpl, 101, { assuranceMatrix: matrix });
+    expect(world.issues['JOV-1'].comments.at(-1).body).not.toContain(
+      'founder-taste'
+    );
+    expect(world.descriptions).toEqual([]);
+    // A real taste detector changed alongside metadata still owes its row.
+    expect(
+      mergedUiEvidence(
+        [
+          'canon/invariants.jsonl',
+          'apps/web/scripts/design-ci-judge-router.ts',
+        ],
+        matrix
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ row: 'AM-024', judgment: 'taste' }),
+      ])
+    );
+    expect(
+      mergedUiEvidence(
+        [
+          'canon/invariants.jsonl',
+          'apps/web/lib/animation/motion-primitives.ts',
+        ],
+        matrix
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ row: 'AM-018', judgment: 'mixed' }),
+      ])
+    );
+  });
+
+  it('does not ask for taste when the change touches no UI row', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.pulls[101].files = ['scripts/lib/thing.mjs'];
+    await merge(world, fetchImpl, 101, { assuranceMatrix: TASTE_MATRIX });
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+});
+
 describe('validation sync: writes', () => {
   it('does not write when another writer moved the issue mid-evaluation', async () => {
     const { world, fetchImpl } = createWorld();
@@ -326,6 +587,7 @@ describe('validation sync: writes', () => {
           repository: REPO,
         }),
         harnessManifest: HARNESS_MANIFEST,
+        assuranceMatrix: NO_UI_MATRIX,
         linear: portFor(stateless.world),
         eventPull: { number: 101 },
         log: () => {},
@@ -353,6 +615,40 @@ describe('validation sync: facts', () => {
     }
   });
 
+  it('binds only pull requests that implement the issue, never a passing mention (#20371 / JOV-7192)', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.pulls[101] = {
+      ...world.pulls[101],
+      title: 'feat(acquisition): derive acquisition_eligible',
+      headRef: 'feat/jov-7696-acquisition-eligible',
+      body: 'Golden path nightly is red, tracked on JOV-1. Part of JOV-1.',
+    };
+    // A sweep sees only Linear's attachment, not a merge event.
+    expect((await evaluate(world, fetchImpl)).action).toBe('skip');
+    expect(world.issues['JOV-1'].state).toBe('In Review');
+    expect(world.updates).toEqual([]);
+
+    for (const pull of [
+      { title: 'fix(profile): card (JOV-1)' },
+      { head: { ref: 'codex/jov-1-card' } },
+      { body: '<!-- linear-issue-identifier:JOV-1 -->' },
+      { body: '<!-- summer-issue-bind -->\nJOV-1\ntaskKey:abc' },
+      { body: 'Fixes JOV-1' },
+      { body: 'Resolves https://linear.app/jovie/issue/JOV-1/card' },
+    ]) {
+      expect(pullImplementsIssue(pull, 'JOV-1')).toBe(true);
+    }
+    for (const pull of [
+      { title: 'fix: card (JOV-12)' },
+      { head: { ref: 'tim/jov-12-card' } },
+      { body: 'Fixes JOV-12' },
+      { body: 'Refs JOV-1' },
+    ]) {
+      expect(pullImplementsIssue(pull, 'JOV-1')).toBe(false);
+    }
+    expect(pullImplementsIssue({ title: 'JOV-1' }, 'not-an-id')).toBe(false);
+  });
+
   it('rejects an ambiguous link set', async () => {
     const github = async () => {
       throw new Error('not reached');
@@ -361,6 +657,7 @@ describe('validation sync: facts', () => {
       listMergedLinkedPulls({
         github,
         repository: REPO,
+        identifier: 'JOV-1',
         attachmentUrls: Array.from(
           { length: 61 },
           (_, index) => `https://github.com/${REPO}/pull/${200 + index}`
@@ -376,13 +673,15 @@ describe('validation sync: facts', () => {
         body: [{ filename, previous_filename: 'apps/web/lib/old.ts' }],
         link,
       });
-    const classify = (github, harnessManifest = HARNESS_MANIFEST) =>
-      classifyMergedRisk({
-        github,
-        repository: REPO,
-        pulls: [{ number: 1 }],
-        harnessManifest,
-      });
+    const classify = async (github, harnessManifest = HARNESS_MANIFEST) =>
+      classifyMergedRisk(
+        await listMergedFiles({
+          github,
+          repository: REPO,
+          pulls: [{ number: 1 }],
+        }),
+        harnessManifest
+      );
     const risk = await classify(page('apps/web/lib/billing/new.ts'));
     expect(risk?.riskLevel).toBe('high');
     expect(risk?.matchedRules).toContain('billing-money');
@@ -416,5 +715,41 @@ describe('validation sync: facts', () => {
     await expect(github('repos/y')).rejects.toThrow(
       /GitHub HTTP 502 for repos\/y/
     );
+  });
+
+  it('retries GitHub 5xx with backoff and succeeds on a later attempt', async () => {
+    const seen = [];
+    const github = githubClient(async () => {
+      seen.push('call');
+      return seen.length < 3
+        ? { ok: false, status: 503, json: async () => ({}) }
+        : json({ ok: 1 });
+    }, 'gh_test');
+    expect((await github('repos/JovieInc/Jovie/pulls/15973')).body).toEqual({
+      ok: 1,
+    });
+    expect(seen).toHaveLength(3);
+  });
+
+  it('reports a persistent GitHub 5xx after the bounded attempts', async () => {
+    let calls = 0;
+    const github = githubClient(async () => {
+      calls += 1;
+      return { ok: false, status: 503, json: async () => ({}) };
+    }, 'gh_test');
+    await expect(github('repos/JovieInc/Jovie/pulls/15973')).rejects.toThrow(
+      /GitHub HTTP 503 for repos\/JovieInc\/Jovie\/pulls\/15973/
+    );
+    expect(calls).toBe(4);
+  });
+
+  it('does not retry a GitHub 4xx', async () => {
+    let calls = 0;
+    const github = githubClient(async () => {
+      calls += 1;
+      return { ok: false, status: 404, json: async () => ({}) };
+    }, 'gh_test');
+    await expect(github('repos/x')).rejects.toThrow(/GitHub HTTP 404/);
+    expect(calls).toBe(1);
   });
 });

@@ -426,14 +426,31 @@ export async function inspectRouteDom(
           }
           const style = getComputedStyle(heading);
           const clamp = style.getPropertyValue('-webkit-line-clamp');
+          const clipsY =
+            style.overflowY === 'hidden' || style.overflowY === 'clip';
           let hiddenY = 0;
-          if (clamp && clamp !== 'none') {
+          if ((clamp && clamp !== 'none') || clipsY) {
+            // A clamp is often paired with a block-size cap (the marketing h1
+            // two-line rule), so lifting the clamp alone measures the capped
+            // box and misses the hidden lines (/launch hero, 2026-10-04).
             const clampedHeight = heading.getBoundingClientRect().height;
-            const previous =
-              heading.style.getPropertyValue('-webkit-line-clamp');
-            heading.style.setProperty('-webkit-line-clamp', 'unset');
+            const lifted = [
+              ['-webkit-line-clamp', 'unset'],
+              ['max-block-size', 'none'],
+              ['max-height', 'none'],
+            ] as const;
+            const previous = lifted.map(([name]) => [
+              name,
+              heading.style.getPropertyValue(name),
+              heading.style.getPropertyPriority(name),
+            ]);
+            for (const [name, value] of lifted) {
+              heading.style.setProperty(name, value, 'important');
+            }
             const fullHeight = heading.getBoundingClientRect().height;
-            heading.style.setProperty('-webkit-line-clamp', previous);
+            for (const [name, value, priority] of previous) {
+              heading.style.setProperty(name, value, priority);
+            }
             hiddenY = fullHeight - clampedHeight;
           }
           const lineHeight =

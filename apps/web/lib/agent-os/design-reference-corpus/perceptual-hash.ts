@@ -129,7 +129,8 @@ export async function findRefCopies(input: {
   if (hashed.length === 0) return [];
   const matches: RefCopyMatch[] = [];
   for (const image of input.images) {
-    const { width, height } = await sharp(image).metadata();
+    // computeDHash rotates before extracting, so regions use oriented dimensions.
+    const { width, height } = (await sharp(image).metadata()).autoOrient;
     if (!width || !height) continue;
     for (const region of foldRegions(width, height)) {
       const hash = await computeDHash(image, region);

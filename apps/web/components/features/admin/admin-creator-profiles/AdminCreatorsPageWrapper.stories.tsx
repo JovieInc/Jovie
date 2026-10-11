@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { AdminCreatorsPageWrapper } from './AdminCreatorsPageWrapper';
 
 const meta = {
@@ -16,9 +17,11 @@ const meta = {
   },
   decorators: [
     Story => (
-      <HeaderActionsProvider>
-        <Story />
-      </HeaderActionsProvider>
+      <RightPanelProvider>
+        <HeaderActionsProvider>
+          <Story />
+        </HeaderActionsProvider>
+      </RightPanelProvider>
     ),
   ],
   args: {

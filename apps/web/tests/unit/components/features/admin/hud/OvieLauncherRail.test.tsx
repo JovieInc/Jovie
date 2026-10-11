@@ -125,3 +125,37 @@ describe('OvieLauncherRail', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('OvieLauncherRail loading geometry', () => {
+  it('reserves one slot per primary launcher in the loaded group frames', async () => {
+    let resolveFetch: (value: unknown) => void = () => undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockReturnValue(
+        new Promise(resolve => {
+          resolveFetch = resolve;
+        })
+      )
+    );
+    render(<OvieLauncherRail />);
+
+    const skeleton = screen.getByTestId('ovie-launcher-skeleton');
+    const frames = skeleton.querySelectorAll('fieldset');
+    const slotCounts = Array.from(frames).map(
+      frame => frame.querySelectorAll('.animate-pulse').length
+    );
+    const primaryCounts = (['internal', 'external'] as const).map(
+      group =>
+        INVENTORY.primary.filter(control => control.group === group).length
+    );
+    // Same frames, same slot count as the fetched primary rail, so the
+    // swap does not move the HUD below it.
+    expect(slotCounts).toEqual(primaryCounts);
+
+    resolveFetch({ ok: true, status: 200, json: async () => INVENTORY });
+    expect(
+      await screen.findByTestId('ovie-launcher-group-internal')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('ovie-launcher-skeleton')).toBeNull();
+  });
+});

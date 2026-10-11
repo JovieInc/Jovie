@@ -5,6 +5,7 @@ import { CODE_FLAGS, isCodeFlagEnabled } from './code-flags';
 describe('code flags', () => {
   afterEach(() => {
     delete process.env.FEATURE_CANVAS_GRAIN;
+    delete process.env.FEATURE_MUSICFETCH_FALLBACK;
   });
 
   it('keeps flag keys in alphabetical order so concurrent additions merge cleanly', () => {
@@ -21,11 +22,17 @@ describe('code flags', () => {
     expect(isCodeFlagEnabled('CANVAS_GRAIN')).toBe(false);
   });
 
-  it('keeps generic creator marketing copy off unless the env override is true', () => {
-    expect(CODE_FLAGS.MARKETING_GENERIC_CREATOR_NAV).toBe(false);
-    expect(isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')).toBe(false);
-    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'true';
+  it('defaults the final MusicFetch fallback switch off with an env rollback', () => {
+    expect(CODE_FLAGS.MUSICFETCH_FALLBACK).toBe(false);
+    process.env.FEATURE_MUSICFETCH_FALLBACK = 'true';
+    expect(isCodeFlagEnabled('MUSICFETCH_FALLBACK')).toBe(true);
+  });
+
+  it('ships generic creator marketing copy on with an env kill switch', () => {
+    expect(CODE_FLAGS.MARKETING_GENERIC_CREATOR_NAV).toBe(true);
     expect(isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')).toBe(true);
+    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'false';
+    expect(isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')).toBe(false);
     delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
   });
 

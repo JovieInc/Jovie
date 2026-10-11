@@ -86,7 +86,6 @@ _Last reviewed: 2026-04-01_
       - `X-Content-Type-Options: nosniff`
       - `Referrer-Policy: origin-when-cross-origin`
     - Caching strategy:
-      - `/api/feature-flags`: `Cache-Control: no-store`.
       - Other `/api/*`: `Cache-Control: public, max-age=300, s-maxage=300`.
       - All other routes (except `.well-known/vercel/flags`): `Cache-Control: public, max-age=0, must-revalidate`.
     - `next/image` is configured with a very strict per-image CSP (`default-src 'self'; script-src 'none'; sandbox;`) via `images.contentSecurityPolicy`. This applies only to the image optimizer, not as a global app CSP.

@@ -2,7 +2,8 @@
 
 import { IconButton } from '@jovie/ui';
 import { Sparkles, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
+import { useRailFocusReturn } from '@/components/shell/useRailFocusReturn';
 import {
   parseDailyWhatsNewPrompt,
   WHATS_NEW_DAILY_DISMISS_PATH,
@@ -106,31 +107,35 @@ interface WhatsNewBannerViewProps {
   readonly unseen: UnseenWhatsNew;
   readonly onOpen: () => void;
   readonly onDismiss: () => void;
+  readonly regionRef?: RefObject<HTMLElement | null>;
 }
 
 export function WhatsNewBannerView({
   unseen,
   onOpen,
   onDismiss,
+  regionRef: providedRegionRef,
 }: WhatsNewBannerViewProps) {
   const { entry, unseenCount, href } = unseen;
   const eyebrow =
     unseenCount > 1 ? `What's New · ${unseenCount} updates` : "What's New";
 
-  const regionRef = useRef<HTMLElement>(null);
+  const localRegionRef = useRef<HTMLElement>(null);
+  const regionRef = providedRegionRef ?? localRegionRef;
 
   // Escape dismisses only while focus is inside the banner.
   useEffect(() => {
     const region = regionRef.current;
     if (!region) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      event.preventDefault();
       event.stopPropagation();
       onDismiss();
     };
     region.addEventListener('keydown', handleKeyDown);
     return () => region.removeEventListener('keydown', handleKeyDown);
-  }, [onDismiss]);
+  }, [onDismiss, regionRef]);
 
   return (
     <aside
@@ -139,9 +144,9 @@ export function WhatsNewBannerView({
       aria-live='polite'
       data-testid='whats-new-banner'
       data-electron-no-drag='true'
-      className='fixed bottom-4 left-4 z-banner w-72 max-sm:hidden animate-in fade-in-0 slide-in-from-bottom-2 duration-subtle ease-subtle motion-reduce:animate-none'
+      className='w-full min-w-0 px-2 py-1 animate-in fade-in-0 slide-in-from-bottom-2 duration-subtle ease-subtle motion-reduce:animate-none'
     >
-      <div className='relative rounded-xl border border-subtle bg-surface-1 py-3 pl-4 pr-10 shadow-card'>
+      <div className='relative rounded-xl border border-subtle bg-surface-1 py-3 pl-3 pr-9 shadow-card'>
         <p className='flex items-center gap-1.5 text-2xs font-caption text-tertiary-token'>
           <Sparkles aria-hidden='true' className='size-3' />
           {eyebrow}
@@ -163,7 +168,7 @@ export function WhatsNewBannerView({
           See What&apos;s New
         </a>
         <IconButton
-          size='xs'
+          size='sm'
           ariaLabel="Dismiss What's New"
           data-testid='whats-new-banner-dismiss'
           onClick={onDismiss}
@@ -178,24 +183,37 @@ export function WhatsNewBannerView({
 
 interface WhatsNewBannerProps {
   readonly enabled: boolean;
+  /** Icon-only sidebar: the card has no room, so wait until it expands. */
+  readonly collapsed?: boolean;
+  /** Deterministic actual-component stories use the same loading contract. */
+  readonly fetchImpl?: typeof fetch;
 }
 
 /**
- * Bottom-left What's New banner for the Mac app and the operator shell.
- * Silent while loading, when nothing is unseen, and on any failure.
+ * In-flow What's New card for the sidebar ambient dock. Silent while loading,
+ * collapsed, when nothing is unseen, and on any failure.
  */
-export function WhatsNewBanner({ enabled }: WhatsNewBannerProps) {
+export function WhatsNewBanner({
+  enabled,
+  collapsed = false,
+  fetchImpl = fetch,
+}: WhatsNewBannerProps) {
   const [resolved, setResolved] = useState<ResolvedWhatsNew | null>(null);
+  const regionRef = useRef<HTMLElement>(null);
+  useRailFocusReturn(regionRef, !enabled || collapsed || !resolved, 'left');
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setResolved(null);
+      return;
+    }
     let cancelled = false;
     const timer = setTimeout(() => {
       void (async () => {
-        const daily = await loadDailyWhatsNew();
+        const daily = await loadDailyWhatsNew(fetchImpl);
         const result: ResolvedWhatsNew | null =
           daily ??
-          (await loadUnseenWhatsNew().then(unseen =>
+          (await loadUnseenWhatsNew(fetchImpl).then(unseen =>
             unseen ? { unseen } : null
           ));
         if (!cancelled) setResolved(result);
@@ -205,9 +223,9 @@ export function WhatsNewBanner({ enabled }: WhatsNewBannerProps) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [enabled]);
+  }, [enabled, fetchImpl]);
 
-  if (!enabled || !resolved) return null;
+  if (!enabled || collapsed || !resolved) return null;
   const { unseen, postId } = resolved;
 
   const markSeen = () => {
@@ -229,6 +247,11 @@ export function WhatsNewBanner({ enabled }: WhatsNewBannerProps) {
   };
 
   return (
-    <WhatsNewBannerView unseen={unseen} onOpen={open} onDismiss={dismiss} />
+    <WhatsNewBannerView
+      regionRef={regionRef}
+      unseen={unseen}
+      onOpen={open}
+      onDismiss={dismiss}
+    />
   );
 }

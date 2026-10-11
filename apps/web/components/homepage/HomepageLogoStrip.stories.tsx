@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Homepage logo strip (JOV-7795, Pen NLLgg). Renders only permissioned, audience-neutral logo proof from PROOF_REGISTRY; the zero-proof path renders nothing.',
+          'Homepage logo strip (JOV-7795, Pen NLLgg). Renders only logos with an active permission covering `/`; with no grants it renders nothing.',
       },
     },
   },
@@ -19,10 +19,5 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Today: no permissioned logos, so nothing renders. */
-export const ZeroProof: Story = { args: { logoIds: [] } };
-
-/** Layout fixture only; not a permission claim for these marks. */
-export const WithLogos: Story = {
-  args: { logoIds: ['awal', 'orchard', 'armada'] },
-};
+/** Today: no brand has granted permission, so nothing renders. */
+export const ZeroPermissions: Story = {};

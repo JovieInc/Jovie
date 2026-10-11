@@ -5,10 +5,13 @@ import { ArtistProfileRailToggle } from '../ArtistProfileRailToggle';
 
 const toggleMock = vi.fn();
 let mockIsOpen = false;
+let mockIsPreview = false;
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({
     isOpen: mockIsOpen,
+    isPreview: mockIsPreview,
+    isPinned: mockIsOpen && !mockIsPreview,
     toggle: toggleMock,
   }),
 }));
@@ -32,39 +35,16 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   }),
 }));
 
-vi.mock('@jovie/ui', () => ({
-  Button: ({
+vi.mock('@jovie/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@jovie/ui')>()),
+  TooltipShortcut: ({ children }: { readonly children: React.ReactNode }) =>
     children,
-    pressFeedback: _pressFeedback,
-    static: _static,
-    ...props
-  }: React.ComponentProps<'button'> & {
-    readonly pressFeedback?: boolean;
-    readonly static?: boolean;
-  }) => <button {...props}>{children}</button>,
-  IconButton: ({
-    children,
-    variant,
-    size,
-    ...props
-  }: React.ComponentProps<'button'> & {
-    readonly variant?: string;
-    readonly size?: string;
-  }) => (
-    <button
-      data-icon-button-variant={variant}
-      data-icon-button-size={size}
-      {...props}
-    >
-      {children}
-    </button>
-  ),
-  TooltipShortcut: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 describe('ArtistProfileRailToggle', () => {
   beforeEach(() => {
     mockIsOpen = false;
+    mockIsPreview = false;
     mockCreatorProfiles = [mockSelectedProfile];
     toggleMock.mockReset();
   });
@@ -78,8 +58,15 @@ describe('ArtistProfileRailToggle', () => {
     expect(button).toHaveAttribute('aria-pressed', 'false');
     expect(button).toHaveAttribute('aria-expanded', 'false');
     expect(button).toHaveAttribute('data-rail-toggle', 'right');
-    expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
-    expect(button).toHaveAttribute('data-icon-button-size', 'sm');
+    expect(button).toHaveClass(
+      'bg-transparent',
+      'rounded-full',
+      'h-7',
+      'w-7',
+      'before:h-11',
+      'before:w-11'
+    );
+    expect(button.className).not.toContain('aria-pressed:bg-');
     expect(button).toHaveAttribute('aria-label', 'Show Tim White profile');
     expect(screen.getByTestId('artist-profile-rail-icon')).toHaveAttribute(
       'aria-hidden',
@@ -104,6 +91,21 @@ describe('ArtistProfileRailToggle', () => {
     expect(screen.getByTestId('artist-profile-rail-toggle')).toHaveAttribute(
       'aria-label',
       'Hide Tim White profile'
+    );
+  });
+
+  it('offers pinning without claiming a transient preview is pinned', () => {
+    mockIsOpen = true;
+    mockIsPreview = true;
+    render(<ArtistProfileRailToggle />);
+    const control = screen.getByRole('button', {
+      name: 'Pin Tim White profile',
+    });
+    expect(control).toHaveAttribute('aria-pressed', 'false');
+    expect(control).toHaveAttribute('aria-expanded', 'true');
+    expect(control).toHaveAttribute(
+      'aria-controls',
+      'shell-artist-profile-rail'
     );
   });
 

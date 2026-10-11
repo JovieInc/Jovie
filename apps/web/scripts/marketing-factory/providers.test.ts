@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadFactoryBrief } from './brief';
 import {
   dryProviders,
@@ -54,7 +54,13 @@ describe('dryProviders', () => {
 });
 
 describe('liveProviders', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('reports credentials-unavailable for unreachable models and unwired providers', async () => {
+    // A Codex binary that cannot run: image generation fails closed.
+    vi.stubEnv('JOVIE_CODEX_BIN', '/nonexistent/codex');
     const live = liveProviders(null);
 
     await expect(live.generate(request)).resolves.toEqual({

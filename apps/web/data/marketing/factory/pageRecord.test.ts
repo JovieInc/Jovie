@@ -174,6 +174,93 @@ describe('PageRecordSchema', () => {
   });
 
   it('allows a generic renderer to serve unique section instances', () => {
+    const input = baseInput({
+      heroVariant: 'left-content',
+      composition: {
+        recipeId: 'artist-lp',
+        penContractId: 'DRJv9',
+        sections: [
+          {
+            renderer: 'factory-hero',
+            instanceId: 'hero-1',
+            sectionId: 'hero',
+            variantId: 'left-none',
+          },
+          {
+            renderer: 'factory-feature-split',
+            instanceId: 'feature-split-1',
+            sectionId: 'feature-split',
+            variantId: 'editorial',
+          },
+          {
+            renderer: 'factory-feature-split',
+            instanceId: 'feature-split-2',
+            sectionId: 'feature-split',
+            variantId: 'phone-right',
+          },
+        ],
+      },
+    });
+
+    expect(issuesFor(input)).toEqual([]);
+    const record = definePage(input);
+    expect(
+      record.composition.sections.map(section => section.variantId)
+    ).toEqual(['left-none', 'editorial', 'phone-right']);
+  });
+
+  it('rejects a factory section without its selected variant', () => {
+    expect(
+      issuesFor(
+        baseInput({
+          heroVariant: 'left-content',
+          composition: {
+            recipeId: 'artist-lp',
+            penContractId: 'DRJv9',
+            sections: [
+              {
+                renderer: 'factory-hero',
+                instanceId: 'hero-1',
+                sectionId: 'hero',
+              },
+            ],
+          },
+        })
+      )
+    ).toContain('factory section factory-hero requires a persisted variantId');
+  });
+
+  it('rejects an active section variant without a certified factory adapter', () => {
+    expect(
+      issuesFor(
+        baseInput({
+          heroVariant: 'left-content',
+          composition: {
+            recipeId: 'artist-lp',
+            penContractId: 'DRJv9',
+            sections: [
+              {
+                renderer: 'factory-hero',
+                instanceId: 'hero-1',
+                sectionId: 'hero',
+                variantId: 'left-none',
+              },
+              {
+                renderer: 'factory-feature-split',
+                instanceId: 'feature-split-1',
+                sectionId: 'feature-split',
+                variantId: 'phone-left',
+              },
+            ],
+          },
+        })
+      )
+    ).toContain(
+      'solutions factory has no certified renderer for feature-split/phone-left'
+    );
+  });
+
+  it('rejects a selected hero variant that disagrees with its locked code binding', () => {
     expect(
       issuesFor(
         baseInput({
@@ -185,22 +272,15 @@ describe('PageRecordSchema', () => {
                 renderer: 'factory-hero',
                 instanceId: 'hero-1',
                 sectionId: 'hero',
-              },
-              {
-                renderer: 'factory-feature-split',
-                instanceId: 'feature-split-1',
-                sectionId: 'feature-split',
-              },
-              {
-                renderer: 'factory-feature-split',
-                instanceId: 'feature-split-2',
-                sectionId: 'feature-split',
+                variantId: 'left-none',
               },
             ],
           },
         })
       )
-    ).toEqual([]);
+    ).toContain(
+      'hero section variant "left-none" does not match hero code binding "split-link-claim" (split-claim-card)'
+    );
   });
 
   it('rejects duplicate generic section instance ids', () => {

@@ -1,8 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Paperclip } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
-
+import { APP_ROUTES } from '@/constants/routes';
 import type { NavCommand } from '@/lib/commands/registry';
+import type { PickerNavItem } from './picker-rows';
 
 import { NavArt, PickerRow, pickerItemKey } from './picker-rows';
 
@@ -36,6 +37,38 @@ describe('picker-rows action items', () => {
     expect(pickerItemKey(item)).toBe('action:attach-files');
     fireEvent.mouseDown(screen.getByRole('option'));
     expect(onCommit).toHaveBeenCalledWith(0);
+  });
+});
+
+describe('picker-rows navigation icons', () => {
+  it.each([
+    ['CalendarDays', 'lucide-calendar-days'],
+    ['LineChart', 'lucide-line-chart'],
+    ['ListTodo', 'lucide-list-todo'],
+    ['Youtube', 'lucide-square-play'],
+  ])('renders the registered %s icon', (iconName, iconClass) => {
+    const item: PickerNavItem = {
+      kind: 'nav',
+      nav: {
+        kind: 'nav',
+        id: 'destination',
+        label: 'Destination',
+        description: 'Open workspace',
+        iconName,
+        surfaces: ['cmdk'],
+        href: APP_ROUTES.CHAT,
+      },
+    };
+    const { container } = render(
+      <PickerRow
+        item={item}
+        index={0}
+        isActive
+        onMouseEnter={vi.fn()}
+        onCommit={vi.fn()}
+      />
+    );
+    expect(container.querySelector('svg')).toHaveClass(iconClass);
   });
 });
 

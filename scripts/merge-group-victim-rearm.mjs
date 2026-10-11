@@ -3,6 +3,8 @@
 // whose own head is still green, when the failure belongs to another PR in
 // the group or to the base branch. Bounded to REARM_CAP successful rearms
 // per head SHA. A repeated decision for the same CI run does not increment.
+// A head the failure hold already blocked (its second failure on the same
+// revision) is never rearmed: it waits for a new head (JOV-7708).
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -82,6 +84,7 @@ export function planVictimRearms({
   implicatedPaths,
   candidates,
   cap = REARM_CAP,
+  heldRevision = null,
 }) {
   if (!Number.isSafeInteger(runId) || runId < 1) fail('run id is missing');
   if (!Number.isSafeInteger(cap) || cap < 1) fail('cap is missing');
@@ -97,6 +100,12 @@ export function planVictimRearms({
       reason,
     });
     if (!SHA.test(candidate.headSha ?? '')) return skip('head-sha');
+    if (
+      heldRevision?.prNumber === candidate.prNumber &&
+      heldRevision.headSha === candidate.headSha
+    ) {
+      return skip('revision-held');
+    }
     if (candidate.state !== 'OPEN' || candidate.isDraft) return skip('closed');
     if (candidate.baseRefName !== 'main' || candidate.isCrossRepository) {
       return skip('base');
@@ -139,6 +148,31 @@ export function planVictimRearms({
       runId,
     };
   });
+}
+
+/**
+ * The failure-hold job's receipt names the exact revision it blocked until a
+ * new head. Anything else (absent, unparsable, or retryable) blocks nothing.
+ * @returns {{ prNumber: number, headSha: string } | null}
+ */
+export function heldRevisionFromReceipt(raw, repository) {
+  if (!raw) return null;
+  let receipt;
+  try {
+    receipt = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (
+    receipt?.schema !== 'jovie-merge-group-failure-hold/v1' ||
+    receipt.repository !== repository ||
+    receipt.retryDisposition !== 'blocked-until-new-source-head' ||
+    !Number.isSafeInteger(receipt.prNumber) ||
+    !SHA.test(String(receipt.sourceHeadSha ?? ''))
+  ) {
+    return null;
+  }
+  return { prNumber: receipt.prNumber, headSha: receipt.sourceHeadSha };
 }
 
 export function rearmDescription({ n, headSha, runId }) {
@@ -333,6 +367,10 @@ function main() {
     runId: run.id,
     implicatedPaths,
     candidates,
+    heldRevision: heldRevisionFromReceipt(
+      process.env.FAILURE_HOLD_RECEIPT,
+      repository
+    ),
   });
   const targetUrl = `https://github.com/${repository}/actions/runs/${run.id}`;
   applyVictimRearms(decisions, {

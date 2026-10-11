@@ -397,7 +397,7 @@ export function mapRetouchJobToJovieWorkItem(input: {
     icon: 'retouch',
     timestamp,
     statusLabel: phaseToStatusLabel(phase),
-    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    href: APP_ROUTES.SETTINGS_PROFILE,
   };
 }
 

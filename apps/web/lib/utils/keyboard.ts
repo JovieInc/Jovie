@@ -19,6 +19,22 @@ export function isFormElement(target: EventTarget | null): boolean {
   return false;
 }
 
+/** Shell shortcuts yield to editors, composite overlays, and held/IME input. */
+export function isShellShortcutSuppressed(event: KeyboardEvent): boolean {
+  return (
+    event.defaultPrevented ||
+    event.repeat ||
+    event.isComposing ||
+    isFormElement(event.target) ||
+    (event.target instanceof Element &&
+      Boolean(
+        event.target.closest(
+          '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]'
+        )
+      ))
+  );
+}
+
 /**
  * Handles keyboard activation for interactive elements.
  * Triggers the handler on Enter or Space key press, but ignores

@@ -15,6 +15,8 @@ import { EntityHeader } from './EntityHeader';
 export interface EntitySidebarShellProps {
   /** Whether the sidebar drawer is open */
   readonly isOpen: boolean;
+  /** Stable target for the controlling rail affordance. */
+  readonly id?: string;
   /** Drawer width — defaults to SIDEBAR_WIDTH */
   readonly width?: number;
   /** Accessible label for the drawer landmark */
@@ -116,6 +118,7 @@ export interface EntitySidebarShellProps {
  */
 export function EntitySidebarShell({
   isOpen,
+  id,
   width = SIDEBAR_WIDTH,
   ariaLabel,
   onKeyDown,
@@ -222,6 +225,7 @@ export function EntitySidebarShell({
   const workspaceContentSurface = workspaceSurface === 'flat' ? 'flat' : 'card';
   return (
     <RightDrawer
+      id={id}
       isOpen={isOpen}
       width={width}
       ariaLabel={ariaLabel}

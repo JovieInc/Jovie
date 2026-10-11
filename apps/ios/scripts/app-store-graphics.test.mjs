@@ -15,6 +15,7 @@ import {
   RECEIPT_SCHEMA,
   REPO_ROOT,
   renderHtml,
+  screenBackground,
   screenFile,
   sourceHash,
   validateStorefront,
@@ -101,7 +102,8 @@ const CHECK = { top: 0.15, bottom: 0.85, minDensity: 0.002 };
 const blankCapture = pixelPng(40, 40, () => [7, 8, 10]).png;
 // Text-like rows: thin bright strokes on the dark shell.
 const contentCapture = pixelPng(40, 40, (x, y) =>
-  y % 6 === 0 && x % 4 === 0 ? [240, 240, 240] : [7, 8, 10]
+  // Row 1 is the status bar band (2%-5% of the height).
+  (y % 6 === 0 || y === 1) && x % 4 === 0 ? [240, 240, 240] : [7, 8, 10]
 ).png;
 
 function withScreens(screens) {
@@ -112,27 +114,36 @@ test('the committed storefront is valid', async () => {
   assert.deepEqual(await validateStorefront(loadStorefront(), context), []);
 });
 
-test('storefront validation rejects banned copy, fake fixtures and accent repeats', async () => {
+test('storefront validation rejects banned copy, fake fixtures and off-rotation accents', async () => {
   const base = loadStorefront().screens;
+  const [first, second, third, fourth, fifth] = base.map(screen => screen.id);
   const problems = await validateStorefront(
     withScreens([
-      { ...base[0], headline: 'Merch ideas — ready now.' },
+      { ...base[0], headline: 'Merch — now.' },
       { ...base[1], launchArgument: '-ui-testing-invented' },
       { ...base[2], accent: 'orange' },
       { ...base[3], accent: 'ion' },
-      { ...base[4], accent: 'ion', id: base[3].id },
+      { ...base[4], accent: 'red', id: base[3].id },
     ]),
     context
   );
   const text = problems.join('\n');
-  assert.match(text, /chat: headline em-dash/);
+  assert.match(text, new RegExp(`${first}: headline em-dash`));
   assert.match(text, /-ui-testing-invented is not a LaunchMode fixture/);
-  assert.match(text, /calendar: accent must be one of ion, ultra, pulse/);
-  assert.match(text, /neighbours must not share an accent/);
+  // Rotation is positional: blue, purple, pink, orange, then repeat.
+  assert.match(
+    text,
+    new RegExp(
+      `${third}: accent must be pulse \\(rotation ion, ultra, pulse, orange\\)`
+    )
+  );
+  assert.match(text, new RegExp(`${fourth}: accent must be orange`));
+  assert.match(text, new RegExp(`${fourth}: accent must be ion`));
   assert.match(text, /duplicate id/);
+  assert.ok(second && fifth);
 });
 
-test('a bound Pen section must name a frame for every screen', async () => {
+test('a bound Pen section names frame, headline and capture nodes for every screen', async () => {
   const spec = loadStorefront();
   const problems = await validateStorefront(
     {
@@ -141,15 +152,21 @@ test('a bound Pen section must name a frame for every screen', async () => {
         ...spec.pen,
         status: 'bound',
         sectionNodeId: 'abc12',
-        frames: { chat: 'def34' },
+        frames: {
+          ...spec.pen.frames,
+          chat: { frame: 'XC4ox', headline: 'DVed2' },
+          audience: undefined,
+        },
       },
     },
     context
   );
-  assert.deepEqual(
-    problems,
-    spec.screens.slice(1).map(screen => `${screen.id}: no Pen frame id`)
-  );
+  assert.deepEqual(problems, [
+    'chat: no Pen capture node id',
+    'audience: no Pen frame node id',
+    'audience: no Pen headline node id',
+    'audience: no Pen capture node id',
+  ]);
   assert.deepEqual(
     await validateStorefront(
       { ...spec, pen: { ...spec.pen, status: 'drafted' } },
@@ -157,6 +174,54 @@ test('a bound Pen section must name a frame for every screen', async () => {
     ),
     ['pen.status must be requested or bound']
   );
+});
+
+test('headlines are two or three words on at most two lines, with a bounded scroll', async () => {
+  const base = loadStorefront().screens;
+  const problems = await validateStorefront(
+    withScreens([
+      { ...base[0], headline: 'Merch.' },
+      { ...base[1], headline: 'Capture every single fan.' },
+      { ...base[2], headline: 'Drive\nstreams\nnow.' },
+      { ...base[3], scroll: 0.5 },
+      { ...base[4], headline: 'Share one\nlink.' },
+    ]),
+    context
+  );
+  assert.deepEqual(problems, [
+    `${base[0].id}: headline must be two or three words`,
+    `${base[1].id}: headline must be two or three words`,
+    `${base[2].id}: headline must be one or two non-empty lines`,
+    `${base[3].id}: scroll must be between 0 and 0.3`,
+  ]);
+});
+
+test('the pinned app header must be a sane fraction of the screen', async () => {
+  const spec = loadStorefront();
+  assert.deepEqual(
+    await validateStorefront(
+      { ...spec, layout: { ...spec.layout, pinnedHeader: 0.4 } },
+      context
+    ),
+    ['layout.pinnedHeader must be between 0 and 0.2']
+  );
+});
+
+test('renderHtml pins the header and scrolls only the content below it', () => {
+  const spec = loadStorefront();
+  const html = renderHtml({
+    spec,
+    screen: { ...spec.screens[0], scroll: 0.1 },
+    colorSot,
+    captureDataUri: 'data:image/png;base64,AA==',
+    fontDataUri: 'data:font/woff2;base64,AA==',
+  });
+  assert.match(html, /class="pinned"><img/);
+  assert.match(html, /\.content img\{margin-top:-\d+px\}/);
+});
+
+test('screenBackground samples the app background near the bottom left', () => {
+  assert.equal(screenBackground(blankCapture), '#07080a');
 });
 
 test('storefront validation enforces the App Store screenshot count', async () => {
@@ -311,7 +376,20 @@ test('verifyOutput passes a fresh set and fails stale or malformed ones', () => 
     capture: index => (index === 0 ? blankCapture : undefined),
   });
   assert.deepEqual(verifyOutput({ out: empty, ...current }), [
+    `raw/${spec.screens[0].id}.png: status bar (9:41) is missing`,
     `${screenFile(spec, 0)}: capture is mostly empty (content density 0.00%), so it cannot show its headline`,
+  ]);
+
+  // Content without a status bar (scrolled or cropped away) also fails.
+  const noStatusBar = pixelPng(40, 40, (x, y) =>
+    y % 6 === 0 && y > 2 && x % 4 === 0 ? [240, 240, 240] : [7, 8, 10]
+  ).png;
+  const cropped = mkdtempSync(join(tmpdir(), 'app-store-no-status-bar-'));
+  writeSet(cropped, spec, {
+    capture: index => (index === 1 ? noStatusBar : undefined),
+  });
+  assert.deepEqual(verifyOutput({ out: cropped, ...current }), [
+    `raw/${spec.screens[1].id}.png: status bar (9:41) is missing`,
   ]);
 
   assert.deepEqual(

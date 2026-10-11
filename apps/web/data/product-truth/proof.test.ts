@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import { listProductTruthClaims } from './claims';
 import {
+  admissibleProofRegistry,
   createProofPageContext,
   createProofRequest,
   DOGFOOD_METRIC_PROOF,
@@ -435,6 +436,28 @@ describe('proof evidence classes and the ProofRequest loop (JOV-7750)', () => {
         generator: 'computed',
       }).generator
     ).toBe('computed');
+  });
+
+  it('turns a market fact behind a measured claim into a request', () => {
+    const page = createProofPageContext('/pricing', AS_OF);
+    const market = metric();
+    const registry = admissibleProofRegistry(new Set(['dogfood.fixture']), [
+      market,
+    ]);
+    expect(registry).toEqual([]);
+    const selected = selectProof(
+      { id: 'proof', claimId: 'dogfood.fixture', page, kind: 'metric' },
+      registry
+    );
+    expect(selected.recordType).toBe('proof-request');
+    expect(page.usedProofIds.size).toBe(0);
+    expect(
+      admissibleProofRegistry(new Set(['dogfood.fixture']), [
+        market,
+        metric('dogfood'),
+      ]).map(item => item.id)
+    ).toEqual(['metric-dogfood']);
+    expect(admissibleProofRegistry(new Set(), [market])).toEqual([market]);
   });
 
   it('reports the pages to re-render once admissible proof lands', () => {

@@ -1,0 +1,229 @@
+{
+  "schema": "jovie.golden-path-proof/v1",
+  "asOf": "2026-10-04T02:20:20.652Z",
+  "funnelStepIds": {
+    "homepage": [],
+    "claim": ["outreach", "claim-landing"],
+    "start": ["start", "qualify-chat"],
+    "preview": ["profile-reveal"],
+    "signup": ["claim-decision"],
+    "upgrade": ["upgrade"],
+    "pricing": []
+  },
+  "claims": [
+    {
+      "id": "homepage.hero.headline",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageIdentityCopy.ts",
+      "copy": "Be found. Be understood.",
+      "nature": "outcome",
+      "evidenceClass": "dogfood",
+      "status": "admissible",
+      "detail": "dogfood proof dogfood-tim-human-link-clicks-90d"
+    },
+    {
+      "id": "homepage.hero.subhead",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageIdentityCopy.ts",
+      "copy": "Claim your name. Jovie makes you easy to reach, for people and for agents.",
+      "nature": "outcome",
+      "evidenceClass": "dogfood",
+      "status": "admissible",
+      "detail": "dogfood proof dogfood-tim-known-contacts"
+    },
+    {
+      "id": "homepage.hero.claimed-preview",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageIdentityCopy.ts",
+      "copy": "Tim White’s Jovie profile at jov.ie/tim",
+      "nature": "outcome",
+      "evidenceClass": "dogfood",
+      "status": "admissible",
+      "detail": "dogfood proof product-profile-subscribe-capture"
+    },
+    {
+      "id": "homepage.presence.headline",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageIdentityCopy.ts",
+      "copy": "Your presence, resolved.",
+      "nature": "outcome",
+      "evidenceClass": "computed",
+      "status": "admissible",
+      "detail": "computed slot presence-signals: Jovie found the visitor’s real public identity and sources."
+    },
+    {
+      "id": "homepage.presence.next-step",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageIdentityCopy.ts",
+      "copy": "Read the work. Start a conversation. Attend an event or send a payment.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: artist-profiles, public-ask, pay"
+    },
+    {
+      "id": "homepage.structure.body",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageIdentityCopy.ts",
+      "copy": "One identity. Room for everything you do, and whatever comes next.",
+      "nature": "positioning",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "no checkable assertion"
+    },
+    {
+      "id": "claim.banner.ready",
+      "step": "claim",
+      "route": "/[handle]?claim=1",
+      "source": "apps/web/components/features/profile/ClaimBanner.tsx",
+      "copy": "Your profile is ready. Claim it to turn on release emails.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: public-profile, artist-notifications"
+    },
+    {
+      "id": "start.metadata.one-conversation",
+      "step": "start",
+      "route": "/start",
+      "source": "apps/web/app/(dynamic)/start/page.tsx",
+      "copy": "Start your artist profile in one conversation.",
+      "nature": "outcome",
+      "evidenceClass": "none",
+      "status": "proof-gap",
+      "detail": "Median onboarding turns from first /start message to a live profile, measured from prod chat sessions.",
+      "request": {
+        "recordType": "proof-request",
+        "kind": "metric",
+        "claimId": "golden-path.start.metadata.one-conversation",
+        "pagesBlocked": ["/start"],
+        "suggestedLane": "measurement",
+        "generator": "dogfood"
+      }
+    },
+    {
+      "id": "preview.research.verified-signals",
+      "step": "preview",
+      "route": "/start (profile reveal)",
+      "source": "apps/web/lib/onboarding/presence-build/execute-step.ts",
+      "copy": "from your connected sources.",
+      "nature": "outcome",
+      "evidenceClass": "computed",
+      "status": "admissible",
+      "detail": "computed slot presence-signals: Jovie found the visitor’s real public identity and sources."
+    },
+    {
+      "id": "preview.work-opportunities.ready",
+      "step": "preview",
+      "route": "/start (profile reveal)",
+      "source": "apps/web/lib/onboarding/presence-build/execute-step.ts",
+      "copy": "Your Work opportunity queue is ready. Findings stay local and nothing was sent.",
+      "nature": "outcome",
+      "evidenceClass": "computed",
+      "status": "admissible",
+      "detail": "computed slot work-opportunities: Jovie found open work for this visitor in their own catalog."
+    },
+    {
+      "id": "preview.profile.live",
+      "step": "preview",
+      "route": "/start (profile reveal)",
+      "source": "apps/web/lib/onboarding/presence-build/execute-step.ts",
+      "copy": "Your public page is live at",
+      "nature": "outcome",
+      "evidenceClass": "computed",
+      "status": "admissible",
+      "detail": "computed slot live-profile-url: The visitor’s profile is live at their own URL."
+    },
+    {
+      "id": "signup.offer.free-profile",
+      "step": "signup",
+      "route": "/signup",
+      "source": "apps/web/lib/billing/offer-truth.ts",
+      "copy": "Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.",
+      "nature": "offer",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "quotes lib/billing/offer-truth.ts"
+    },
+    {
+      "id": "upgrade.pro.tagline",
+      "step": "upgrade",
+      "route": "/app/settings/billing",
+      "source": "apps/web/lib/entitlements/registry.ts",
+      "copy": "Continuous visibility monitoring, prioritized opportunities, and agentic fixes.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "uncertified-capability",
+      "detail": "uncertified capability: profile-monitoring"
+    },
+    {
+      "id": "pricing.pro.note",
+      "step": "pricing",
+      "route": "/pricing",
+      "source": "apps/web/lib/billing/offer-truth.ts",
+      "copy": "Limited access.",
+      "nature": "offer",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "quotes lib/billing/offer-truth.ts"
+    },
+    {
+      "id": "pricing.free.feature",
+      "step": "pricing",
+      "route": "/pricing",
+      "source": "apps/web/data/marketingPricingPlans.ts",
+      "copy": "Public Jovie profile and audience capture",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: public-profile, artist-profiles"
+    }
+  ],
+  "evidenceCounts": {
+    "computed": 4,
+    "dogfood": 3,
+    "pilot": 0,
+    "none": 1
+  },
+  "statusCounts": {
+    "admissible": 13,
+    "proof-gap": 1,
+    "uncertified-capability": 1,
+    "invented-number": 0,
+    "unbacked-offer": 0,
+    "checkable-positioning": 0
+  },
+  "prooflessPaywallSteps": ["upgrade", "pricing"],
+  "proofRequests": [
+    {
+      "recordType": "proof-request",
+      "kind": "metric",
+      "claimId": "golden-path.start.metadata.one-conversation",
+      "pagesBlocked": ["/start"],
+      "suggestedLane": "measurement",
+      "generator": "dogfood"
+    },
+    {
+      "recordType": "proof-request",
+      "kind": "metric",
+      "claimId": "golden-path.upgrade.paid-outcome",
+      "pagesBlocked": ["/app/settings/billing"],
+      "suggestedLane": "measurement",
+      "generator": "dogfood"
+    },
+    {
+      "recordType": "proof-request",
+      "kind": "metric",
+      "claimId": "golden-path.pricing.paid-outcome",
+      "pagesBlocked": ["/pricing"],
+      "suggestedLane": "measurement",
+      "generator": "dogfood"
+    }
+  ]
+}
