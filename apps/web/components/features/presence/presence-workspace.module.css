@@ -1,0 +1,42 @@
+/* Shared Presence geometry for creator and company adapters. */
+.table {
+  table-layout: fixed;
+}
+
+.filter {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.mobileStatus {
+  display: none;
+}
+
+.mobileArtist {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .statusColumn {
+    display: none;
+  }
+
+  .mobileStatus {
+    display: block;
+  }
+
+  .artistColumn {
+    display: none;
+  }
+
+  .mobileArtist {
+    display: block;
+    color: var(--color-text-secondary-token);
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .mobileStatus > span {
+    min-height: 0;
+  }
+}

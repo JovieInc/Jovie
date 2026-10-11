@@ -106,14 +106,16 @@ export const AppShellFrame = memo(function AppShellFrame({
           <div
             data-app-shell-main-plane='true'
             className={cn(
-              'flex min-h-0 min-w-0 flex-1 overflow-hidden',
+              // This plane clips shell chrome; route panes own scrolling.
+              // overflow:hidden is still programmatically scrollable, so a
+              // hovering inspector's travel can let scrollIntoView move the
+              // entire header and route by 6px. Clip without a scroll box.
+              'flex min-h-0 min-w-0 flex-1 overflow-clip',
               SHELL_RAIL_MAIN_PLANE
             )}
           >
-            {/* Main panel + audio dock share one column (JOV-6680): the dock
-                is exactly the main panel's width, and the right rail — an
-                in-flow sibling one elevation rung up (L3 over L1) — spans the
-                full column height so it stays above the dock. */}
+            {/* Main content and audio keep one stable width. The inspector
+                overlays within the route bounds and never allocates canvas. */}
             <div
               data-app-shell-main-column='true'
               className='flex min-h-0 min-w-0 flex-1 flex-col'
@@ -126,33 +128,37 @@ export const AppShellFrame = memo(function AppShellFrame({
                   // frame, header, and content read as unrelated backgrounds.
                   // Founder lock 2026-09-25: one rounded, borderless, clipped
                   // panel — no border, soft elevation only.
-                  'relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-(--app-shell-content-surface)',
+                  'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)',
                   'lg:rounded-(--app-shell-radius) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)'
                 )}
               >
+                {/* The wash covers the full panel, including its header. */}
+                {chatAmbientGradient ? (
+                  <div
+                    aria-hidden='true'
+                    data-testid='chat-ambient-gradient'
+                    className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
+                    style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
+                  />
+                ) : null}
+                {header ? (
+                  <div
+                    data-app-shell-header='true'
+                    className='relative z-30 shrink-0'
+                  >
+                    {header}
+                  </div>
+                ) : null}
                 <div
                   data-app-shell-main-content='true'
                   // No inset here: the header spans the panel edge-to-edge so
                   // the top row and route read as one clipped plane (JOV-7207).
                   // The route inset lives on the scroll wrapper below.
                   className={cn(
-                    'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+                    'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:shell-inspector-host',
                     SHELL_RAIL_MAIN_PLANE
                   )}
                 >
-                  {/* The chat wash belongs to the route plane, not the contextual
-                      inspector. Keeping the isolated paint layer in this column
-                      lets the in-flow rail narrow content without tinting its own
-                      raised surface. */}
-                  {chatAmbientGradient ? (
-                    <div
-                      aria-hidden='true'
-                      data-testid='chat-ambient-gradient'
-                      className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
-                      style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
-                    />
-                  ) : null}
-                  {header}
                   <div
                     data-app-shell-content-inset='true'
                     className='flex min-h-0 min-w-0 flex-1 overflow-hidden p-(--app-shell-content-inset)'
@@ -170,6 +176,9 @@ export const AppShellFrame = memo(function AppShellFrame({
                       {main}
                     </div>
                   </div>
+                  {rightPanel ? (
+                    <AppShellRightRail>{rightPanel}</AppShellRightRail>
+                  ) : null}
                 </div>
               </main>
               {/* The player is shell chrome, not content-card chrome. The dock
@@ -182,9 +191,6 @@ export const AppShellFrame = memo(function AppShellFrame({
                 </div>
               ) : null}
             </div>
-            {rightPanel ? (
-              <AppShellRightRail>{rightPanel}</AppShellRightRail>
-            ) : null}
           </div>
         </div>
       </div>

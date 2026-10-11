@@ -12,6 +12,12 @@
 
 import { type ChangelogRelease, changelogInlineText } from './changelog-parser';
 import { projectCustomerChangelog } from './customer-changelog';
+import {
+  type CustomerChangelogHero,
+  isCustomerChangelogPostUrl,
+  parseCustomerChangelogHero,
+  resolveCustomerChangelogHero,
+} from './customer-changelog-hero';
 
 export const WHATS_NEW_CONTRACT_VERSION = 1;
 export const WHATS_NEW_ENTRY_LIMIT = 5;
@@ -32,6 +38,8 @@ export interface WhatsNewEntry {
   readonly highlights: readonly string[];
   /** Optional `### Dogfood` bullets; empty when the release has none. */
   readonly dogfood: readonly string[];
+  /** Optional for v1 legacy payloads; null means text-only, never new art. */
+  readonly hero?: CustomerChangelogHero | null;
 }
 
 export interface WhatsNewFeed {
@@ -56,6 +64,7 @@ export function projectWhatsNew(
 
     entries.push({
       id: release.version,
+      hero: resolveCustomerChangelogHero(release.version),
       title: lead.title,
       date: release.date,
       // Daily sections choose the customer lead; a different story's digest
@@ -150,6 +159,11 @@ export function parseWhatsNewFeed(value: unknown): WhatsNewFeed | null {
   return {
     version: WHATS_NEW_CONTRACT_VERSION,
     changelogUrl: feed.changelogUrl,
-    entries: feed.entries.filter(isWhatsNewEntry),
+    entries: feed.entries.filter(isWhatsNewEntry).map(entry => ({
+      ...entry,
+      hero: isCustomerChangelogPostUrl(entry.url, entry.id)
+        ? parseCustomerChangelogHero(entry.hero, entry.id)
+        : null,
+    })),
   };
 }

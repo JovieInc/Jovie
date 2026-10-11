@@ -64,17 +64,114 @@ afterEach(() => {
   desktop.isDesktopEnvironment.mockReturnValue(false);
   desktop.platformProbe.mockResolvedValue(true);
   document.cookie = 'jovie_workspace_lock=; path=/; Max-Age=0';
+  delete (globalThis as Record<string, unknown>)
+    .__JOVIE_PASSKEY_STEP_UP_TIMEOUT_MS__;
 });
 
 describe('WorkspaceLockScreen', () => {
+  it('ignores a timed-out passkey after a successful retry', async () => {
+    (
+      globalThis as Record<string, unknown>
+    ).__JOVIE_PASSKEY_STEP_UP_TIMEOUT_MS__ = 25;
+    let resolveOld!: (value: { data: object; error: null }) => void;
+    client.listUserPasskeys.mockResolvedValue({
+      data: [{ id: 'pk1' }],
+      error: null,
+    });
+    client.signInPasskey
+      .mockReturnValueOnce(
+        new Promise(done => {
+          resolveOld = done;
+        })
+      )
+      .mockResolvedValue({ data: {}, error: null });
+    render(<WorkspaceLockScreen />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Unlock with passkey' })
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'prompt did not appear'
+      )
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Unlock with passkey' })
+    );
+    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
+    resolveOld({ data: {}, error: null });
+    await new Promise(done => setTimeout(done, 0));
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it('keeps passkey retry as the sole action after native cancellation', async () => {
+    desktop.isDesktopEnvironment.mockReturnValue(true);
+    client.listUserPasskeys.mockResolvedValue({
+      data: [{ id: 'pk1' }],
+      error: null,
+    });
+    client.signInPasskey.mockResolvedValue({
+      data: null,
+      error: { code: 'AUTH_CANCELLED' },
+    });
+    render(<WorkspaceLockScreen />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Unlock with passkey' })
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('canceled')
+    );
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(
+      screen.getByRole('button', { name: 'Unlock with passkey' })
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: 'Continue in browser' })
+    ).not.toBeInTheDocument();
+  });
+  it('keeps one action and a reserved status slot through desktop recovery', async () => {
+    desktop.isDesktopEnvironment.mockReturnValue(true);
+    desktop.platformProbe.mockResolvedValue(false);
+    render(<WorkspaceLockScreen />);
+    const action = screen.getByRole('button', { name: 'Unlock with passkey' });
+    const slot = screen.getByTestId('workspace-lock-status');
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+    fireEvent.click(action);
+    await screen.findByRole('button', { name: 'Continue in browser' });
+    expect(screen.getAllByRole('button')).toEqual([action]);
+    expect(screen.getByTestId('workspace-lock-status')).toBe(slot);
+  });
+
+  it('does not reload or unlock after the owning screen unmounts', async () => {
+    let resolve!: (value: { data: object; error: null }) => void;
+    client.listUserPasskeys.mockResolvedValue({
+      data: [{ id: 'pk1' }],
+      error: null,
+    });
+    client.signInPasskey.mockReturnValue(
+      new Promise(done => {
+        resolve = done;
+      })
+    );
+    const view = render(<WorkspaceLockScreen />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Unlock with passkey' })
+    );
+    await waitFor(() => expect(client.signInPasskey).toHaveBeenCalledOnce());
+    view.unmount();
+    resolve({ data: {}, error: null });
+    await new Promise(done => setTimeout(done, 0));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+  });
   it('renders a clear locked state with one primary, accessible unlock action', () => {
     render(<WorkspaceLockScreen />);
     expect(
-      screen.getByRole('heading', { name: 'Ovie Is Locked' })
+      screen.getByRole('region', { name: 'Ovie Privacy Lock' })
     ).toBeTruthy();
-    expect(screen.getByText("Verify it's you to continue.")).toBeTruthy();
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
     const unlock = screen.getByRole('button', { name: 'Unlock with passkey' });
-    expect(unlock.className).toContain('bg-btn-primary');
+    expect(unlock.className).toContain('bg-transparent');
     expect(unlock.contains(screen.getByTestId('workspace-lock-glyph'))).toBe(
       true
     );
@@ -299,8 +396,8 @@ describe('native browser recovery', () => {
     ).toBeDisabled();
     expect(
       screen.getByRole('button', { name: 'Opening browser…' })
-    ).toHaveClass('min-w-40');
-    expect(screen.getByRole('alert')).toHaveClass('min-h-12');
+    ).toHaveClass('min-w-52');
+    expect(screen.getByTestId('workspace-lock-status')).toHaveClass('min-h-12');
     resolve({ ok: false });
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(
@@ -312,8 +409,8 @@ describe('native browser recovery', () => {
     ).toBeEnabled();
     expect(
       screen.getByRole('button', { name: 'Continue in browser' })
-    ).toHaveClass('min-w-40');
-    expect(screen.getByRole('alert')).toHaveClass('min-h-12');
+    ).toHaveClass('min-w-52');
+    expect(screen.getByTestId('workspace-lock-status')).toHaveClass('min-h-12');
     expect(reload).not.toHaveBeenCalled();
   });
 });

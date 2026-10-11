@@ -69,6 +69,12 @@ export function CertificationWalkthrough({
   const [dictationError, setDictationError] = useState<string | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [finished, setFinished] = useState(false);
+  const [mediaState, setMediaState] = useState<'loading' | 'ready' | 'error'>(
+    'loading'
+  );
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   // Open a fresh review bound to the row's digest at open time; reopening
   // after a new revision binds the new digest, never a stale one.
@@ -83,6 +89,9 @@ export function CertificationWalkthrough({
       setDictating(false);
       activeRowIdRef.current = row.id;
       setReview(createWalkthroughReview(row));
+      setMediaState('loading');
+      setDecisionError(null);
+      setPlaybackRate(1);
       setFinished(false);
       setDictationError(null);
       transcriptRef.current = '';
@@ -167,22 +176,43 @@ export function CertificationWalkthrough({
     () => (review ? isWalkthroughReviewStale(review, row) : false),
     [review, row]
   );
-  const busy = pendingDecision !== null;
+  const artifact = review?.artifact ?? null;
+  const isMedia = artifact?.kind === 'video' || artifact?.kind === 'image';
+  const proofReady = Boolean(
+    artifact && (!isMedia || (artifact.href && mediaState === 'ready'))
+  );
+  const busy = pendingDecision !== null || submitting;
 
   const submitDecision = useCallback(
     async (decision: OvieCertificationDecisionKind) => {
-      if (!review || stale) return;
+      if (!review || stale || busy || submittingRef.current) return;
+      if (decision === 'approved' && !proofReady) return;
       const notes =
         findings.length > 0 ? buildWalkthroughNotes(review, findings) : null;
       if (decision === 'changes_requested' && !notes) return;
-      const recorded = await onDecide(decision, notes);
-      if (recorded === false) return;
-      onOpenChange(false);
+      submittingRef.current = true;
+      setSubmitting(true);
+      setDecisionError(null);
+      try {
+        const recorded = await onDecide(decision, notes);
+        if (recorded === false) {
+          setDecisionError(
+            'Decision was not saved. Your comments are kept. Try again.'
+          );
+          return;
+        }
+        onOpenChange(false);
+      } catch {
+        setDecisionError(
+          'Decision was not saved. Your comments are kept. Try again.'
+        );
+      } finally {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
     },
-    [review, stale, findings, onDecide, onOpenChange]
+    [review, stale, busy, proofReady, findings, onDecide, onOpenChange]
   );
-
-  const artifact = review?.artifact ?? null;
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -198,7 +228,7 @@ export function CertificationWalkthrough({
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className='min-w-0 flex-1 truncate text-2xs text-tertiary-token'>
               {row
-                ? `${row.surface} · digest ${shortSha(review?.evidenceDigest ?? '')}`
+                ? `${row.surface} · digest ${shortSha((review?.evidenceDigest ?? '').replace(/^sha256:/, ''))}`
                 : ''}
             </DialogPrimitive.Description>
             <DialogPrimitive.Close asChild>
@@ -213,29 +243,37 @@ export function CertificationWalkthrough({
             </DialogPrimitive.Close>
           </div>
 
-          <div className='flex min-h-0 flex-1'>
-            <div className='flex min-w-0 flex-1 flex-col bg-black/90'>
+          <div className='flex min-h-0 flex-1 flex-col overflow-y-auto sm:flex-row sm:overflow-hidden'>
+            <div className='flex min-h-48 min-w-0 flex-1 flex-col bg-surface-page'>
               <div className='flex min-h-0 flex-1 items-center justify-center p-4'>
                 {artifact?.kind === 'video' && artifact.href ? (
                   // biome-ignore lint/a11y/useMediaCaption: machine-generated proof artifacts carry no caption tracks; dictation is the review surface
                   <video
+                    key={`${review?.rowId}:${review?.evidenceDigest}`}
                     ref={videoRef}
                     src={artifact.href}
                     controls
                     className='max-h-full max-w-full'
+                    onLoadedData={() => setMediaState('ready')}
+                    onError={() => setMediaState('error')}
                     data-testid='walkthrough-video'
                     onRateChange={event =>
                       setPlaybackRate(event.currentTarget.playbackRate)
                     }
                   />
                 ) : artifact?.kind === 'image' && artifact.href ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- remote proof artifact URL, no optimization
+                  /* eslint-disable @next/next/no-img-element -- proof media preserves the source URL and native loading/error events */
+                  // biome-ignore lint/a11y/noNoninteractiveElementInteractions: load/error report media readiness, not user interaction
                   <img
+                    key={`${review?.rowId}:${review?.evidenceDigest}`}
                     src={artifact.href}
                     alt={artifact.label}
                     className='max-h-full max-w-full object-contain'
                     data-testid='walkthrough-image'
+                    onLoad={() => setMediaState('ready')}
+                    onError={() => setMediaState('error')}
                   />
+                  /* eslint-enable @next/next/no-img-element */
                 ) : (
                   <div
                     className='max-w-prose space-y-2 text-center'
@@ -250,6 +288,17 @@ export function CertificationWalkthrough({
                   </div>
                 )}
               </div>
+              {artifact?.kind === 'image' &&
+              artifact.href &&
+              mediaState === 'ready' ? (
+                <div className='flex justify-center border-t border-(--app-shell-frame-seam) py-2'>
+                  <Button asChild size='sm' variant='ghost'>
+                    <a href={artifact.href} target='_blank' rel='noreferrer'>
+                      Open Full-Size Proof
+                    </a>
+                  </Button>
+                </div>
+              ) : null}
               {artifact?.kind === 'video' ? (
                 <div
                   className='flex items-center justify-center gap-1 border-t border-white/10 py-1.5'
@@ -275,7 +324,7 @@ export function CertificationWalkthrough({
               ) : null}
             </div>
 
-            <aside className='flex w-80 shrink-0 flex-col border-l border-(--app-shell-frame-seam)'>
+            <aside className='flex max-h-1/2 w-full shrink-0 flex-col border-t border-(--app-shell-frame-seam) sm:max-h-none sm:w-80 sm:border-t-0 sm:border-l'>
               <div className='border-b border-(--app-shell-frame-seam) p-3'>
                 <Button
                   type='button'
@@ -342,6 +391,20 @@ export function CertificationWalkthrough({
               </ol>
 
               <div className='space-y-2 border-t border-(--app-shell-frame-seam) p-3'>
+                {!proofReady ? (
+                  <p role='status' className='text-xs text-secondary-token'>
+                    {!artifact
+                      ? 'No review evidence is available.'
+                      : mediaState === 'error' || !artifact.href
+                        ? 'Proof could not load. Certification is unavailable until the evidence is viewable.'
+                        : 'Loading proof…'}
+                  </p>
+                ) : null}
+                {decisionError ? (
+                  <p role='alert' className='text-xs text-error'>
+                    {decisionError}
+                  </p>
+                ) : null}
                 {stale ? (
                   <p
                     className='flex items-start gap-1.5 text-2xs leading-4 text-warning'
@@ -397,7 +460,7 @@ export function CertificationWalkthrough({
                   variant='primary'
                   className={cn('w-full', finished && 'order-first')}
                   loading={pendingDecision === 'approved'}
-                  disabled={busy || stale}
+                  disabled={busy || stale || !proofReady}
                   onClick={() => void submitDecision('approved')}
                 >
                   Certify

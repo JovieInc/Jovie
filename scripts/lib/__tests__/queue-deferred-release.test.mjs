@@ -14,6 +14,8 @@ const STACK_EVENT_GUARD =
 
 function assertTrustedStackHealthContract(value) {
   expect(value).toContain(STACK_LIVENESS_CRON);
+  expect(value).toContain('group: fleet-gate-receipt');
+  expect(value).toContain('cancel-in-progress: false');
   expect(value).toContain('branches: [main]');
   expect(value).not.toContain('pull_request_target:');
   expect(value).not.toContain('check_run:');
@@ -56,7 +58,7 @@ describe('retired queue release and retained fleet refresh', () => {
     assertTrustedStackHealthContract(fleetGateRefreshWorkflow);
     expect(fleetGateRefreshWorkflow).toContain('push:\n    branches: [main]');
     expect(fleetGateRefreshWorkflow).toContain('schedule:');
-    expect(fleetGateRefreshWorkflow).toContain('cancel-in-progress: true');
+    expect(fleetGateRefreshWorkflow).toContain('cancel-in-progress: false');
     const markerRecovery = readFileSync(
       resolve(repoRoot, '.github/workflows/production-marker-recovery.yml'),
       'utf8'
@@ -68,6 +70,14 @@ describe('retired queue release and retained fleet refresh', () => {
 
   it('keeps stack repair consumption fail-closed under trigger, checkout, and guard regressions', () => {
     const regressions = [
+      fleetGateRefreshWorkflow.replace(
+        'cancel-in-progress: false',
+        'cancel-in-progress: true'
+      ),
+      fleetGateRefreshWorkflow.replace(
+        'group: fleet-gate-receipt',
+        'group: fleet-gate-${{ github.run_id }}'
+      ),
       fleetGateRefreshWorkflow.replace(
         STACK_LIVENESS_CRON,
         "cron: '0 0 * * *'"

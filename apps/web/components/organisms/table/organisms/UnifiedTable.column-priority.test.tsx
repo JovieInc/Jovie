@@ -54,25 +54,35 @@ const rows: DemoRow[] = [
 ];
 
 function installObserver() {
-  let callback: ResizeObserverCallback | null = null;
-  vi.stubGlobal(
-    'ResizeObserver',
-    class MockResizeObserver {
-      constructor(next: ResizeObserverCallback) {
-        callback = next;
-      }
-
-      observe = vi.fn();
-      unobserve = vi.fn();
-      disconnect = vi.fn();
+  const observers: MockResizeObserver[] = [];
+  class MockResizeObserver {
+    readonly targets = new Set<Element>();
+    constructor(readonly callback: ResizeObserverCallback) {
+      observers.push(this);
     }
-  );
+    observe = vi.fn((target: Element) => this.targets.add(target));
+    unobserve = vi.fn((target: Element) => this.targets.delete(target));
+    disconnect = vi.fn(() => this.targets.clear());
+  }
+  vi.stubGlobal('ResizeObserver', MockResizeObserver);
   return (width: number) => {
     act(() => {
-      callback?.(
-        [{ contentRect: { width } } as ResizeObserverEntry],
-        {} as ResizeObserver
-      );
+      for (const observer of observers) {
+        const targets = [...observer.targets].filter(
+          target => target instanceof HTMLDivElement
+        );
+        if (targets.length === 0) continue;
+        observer.callback(
+          targets.map(target => ({
+            target,
+            contentRect: new DOMRect(0, 0, width, 0),
+            borderBoxSize: [],
+            contentBoxSize: [],
+            devicePixelContentBoxSize: [],
+          })),
+          observer as unknown as ResizeObserver
+        );
+      }
     });
   };
 }
@@ -170,6 +180,17 @@ describe('UnifiedTable column priority', () => {
     expect(screen.getByTestId('table-column-compacts')).toHaveTextContent(
       'SMS'
     );
+
+    resize(800);
+    expect(
+      screen.getByRole('columnheader', { name: 'State' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Alerts' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('table-column-compacts')
+    ).not.toBeInTheDocument();
 
     vi.unstubAllGlobals();
   });

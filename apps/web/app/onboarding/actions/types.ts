@@ -12,6 +12,11 @@ export interface CompletionResult {
   profileId: string | null;
 }
 
+/** Only the allowlisted expected failure crosses the Server Action boundary. */
+export type OnboardingCompletionResult =
+  | CompletionResult
+  | { error: 'CLAIM_EXPIRED' };
+
 export interface AvatarUploadResult {
   blobUrl: string;
   photoId: string;

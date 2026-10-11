@@ -4,6 +4,7 @@ import { ProfileContactSidebar } from '@/features/dashboard/organisms/profile-co
 
 const mockState = vi.hoisted(() => ({
   close: vi.fn(),
+  previewLoading: false,
   push: vi.fn(),
   replace: vi.fn(),
   setPreviewData: vi.fn(),
@@ -70,7 +71,7 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
     close: mockState.close,
   }),
   usePreviewPanelData: () => ({
-    previewData: mockState.previewData,
+    previewData: mockState.previewLoading ? null : mockState.previewData,
     setPreviewData: mockState.setPreviewData,
   }),
 }));
@@ -129,6 +130,7 @@ vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({
 describe('ProfileContactSidebar scroll contract', () => {
   beforeEach(() => {
     mockState.close.mockReset();
+    mockState.previewLoading = false;
     mockState.push.mockReset();
   });
 
@@ -152,6 +154,16 @@ describe('ProfileContactSidebar scroll contract', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('Your Live Profile')).toBeNull();
   });
+
+  it.each([false, true])(
+    'dismisses the profile drawer with Escape while loading=%s',
+    loading => {
+      mockState.previewLoading = loading;
+      render(<ProfileContactSidebar />);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(mockState.close).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('hands profile management back to Presence and closes the chat rail', () => {
     render(<ProfileContactSidebar />);

@@ -19,7 +19,25 @@ import { fixtureCaptures, sha256Digest } from './render-measurer';
 import { FACTORY_MAX_REWORKS, runFactory } from './run';
 
 const PAGE_ID = 'solutions-founders';
-const brief = loadFactoryBrief('solutions', 'founders');
+const legacy = loadFactoryBrief('solutions', 'founders');
+const brief = {
+  ...legacy,
+  media: legacy.media.map(entry => ({
+    ...entry,
+    input: {
+      ...entry.input,
+      editorial: {
+        benefit: 'Explain the tested product action',
+        focalDetail: 'One verified action',
+        rationale: 'Use the evidence available to this scenario',
+        fallback: 'Retain readable benefit text',
+        alternatives: [
+          { medium: 'video' as const, reason: 'Motion is unnecessary' },
+        ],
+      },
+    },
+  })),
+};
 
 let runsDir: string;
 const runDir = () => join(runsDir, PAGE_ID);
@@ -30,6 +48,7 @@ function run(options: Partial<Parameters<typeof runFactory>[0]> = {}) {
   return runFactory({
     family: 'solutions',
     slug: 'founders',
+    brief,
     dry: true,
     runsDir,
     ...options,
@@ -257,7 +276,7 @@ describe('factory:run generated assets', () => {
       : entry
   );
 
-  it('generates with provenance and an art verdict, then refuses to pass it unrendered', async () => {
+  it('refuses corrupt image bytes even when provenance and the art verdict pass', async () => {
     const manifest = await run({ brief: { ...brief, media } });
 
     const asset = record('12-asset.attempt-1.json');
@@ -269,7 +288,9 @@ describe('factory:run generated assets', () => {
       assets: expect.arrayContaining([
         expect.objectContaining({
           id: 'generate:cta-1',
-          path: 'assets/generate-cta-1.png',
+          path: expect.stringMatching(
+            /^assets\/iteration-0-attempt-1-[\w-]+\/generate-cta-1\.[a-f0-9]{64}\.png$/u
+          ),
         }),
       ]),
     });
@@ -287,11 +308,11 @@ describe('factory:run generated assets', () => {
       aiGenerated: true,
       artEvaluation: { ok: true },
     });
-    // The page record cannot carry generated media yet, so render fails closed.
+    // The default dry provider's single-byte image is not renderable media.
     expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'render' });
     expect(
       record('13-render.attempt-1.json').receipt.invariantsFailed
-    ).toContain('render-asset:generate:cta-1');
+    ).toContain('render-generated-media');
   });
 
   it('retries an art rejection with the judge notes and never ships the rejected asset', async () => {
@@ -321,7 +342,21 @@ describe('factory:run generated assets', () => {
       (first.artifact as { assets: { id: string }[] }).assets.map(a => a.id)
     ).not.toContain('generate:cta-1');
     expect(prompts[1]).toContain('two competing focal points');
-    expect(record('12-asset.attempt-2.json').receipt.passed).toBe(true);
+    const second = record('12-asset.attempt-2.json');
+    expect(second.receipt.passed).toBe(true);
+    const priorSidecar = (first.notes.provenance as Record<string, string>)[
+      'generate:cta-1'
+    ];
+    const nextSidecar = (second.notes.provenance as Record<string, string>)[
+      'generate:cta-1'
+    ];
+    expect(priorSidecar).not.toBe(nextSidecar);
+    expect(readJson(join(runDir(), priorSidecar ?? ''))).toMatchObject({
+      artEvaluation: { ok: false },
+    });
+    expect(readJson(join(runDir(), nextSidecar ?? ''))).toMatchObject({
+      artEvaluation: { ok: true },
+    });
     expect(manifest.stoppedAt).toBe('render');
   });
 });

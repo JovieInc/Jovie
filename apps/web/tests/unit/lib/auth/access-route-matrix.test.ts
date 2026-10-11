@@ -18,7 +18,7 @@ describe('access route matrix (JOV-3087)', () => {
       [CanonicalUserState.UNAUTHENTICATED, false, null],
       [CanonicalUserState.NEEDS_DB_USER, false, null],
       [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION, false, null],
-      [CanonicalUserState.WAITLIST_PENDING, false, APP_ROUTES.WAITLIST],
+      [CanonicalUserState.WAITLIST_PENDING, false, null],
       [CanonicalUserState.NEEDS_ONBOARDING, true, null],
       [CanonicalUserState.ACTIVE, true, APP_ROUTES.DASHBOARD],
       [CanonicalUserState.BANNED, false, APP_ROUTES.UNAVAILABLE],

@@ -20,6 +20,7 @@ import {
   getFilteredRowModel,
   getSortedRowModel,
   type OnChangeFn,
+  type Row,
   type RowData,
   type RowSelectionState,
   type SortingState,
@@ -52,6 +53,7 @@ import {
 import { useTableGrouping } from '../utils/useTableGrouping';
 import { UnifiedTableHeader } from './UnifiedTableHeader';
 import { useTableKeyboardNav } from './useTableKeyboardNav';
+import { useTableStickyOffset } from './useTableStickyOffset';
 import { useTableVirtualization } from './useTableVirtualization';
 import { VirtualizedTableBody } from './VirtualizedTableBody';
 import { VirtualizedTableRow } from './VirtualizedTableRow';
@@ -385,6 +387,7 @@ function HiddenHeaderSortStatus({
   return (
     <div
       role='status'
+      data-table-sticky-status
       className={cn(
         'sticky top-0',
         zIndex.toolbar,
@@ -643,24 +646,35 @@ function UnifiedTableContent<TData extends RowData>({
   );
 
   const groupingEnabled = Boolean(groupingConfig);
-  const groupingSourceData = useMemo(
-    () => (groupingEnabled ? rows.map(r => r.original) : []),
-    [groupingEnabled, rows]
+  const stickyOffset = useTableStickyOffset(
+    scrollRoot,
+    hideHeader,
+    table.getHeaderGroups(),
+    table.getState().sorting
   );
-
-  // Stable fallback functions for grouping (prevents recreation on every render)
-  const noopGetGroupKey = useCallback(() => '', []);
-  const identityGetGroupLabel = useCallback((key: string) => key, []);
+  // Group the actual TanStack rows so rendering and keyboard selection share
+  // one identity/order without copying originals into a second lookup map.
+  const groupingKey = groupingConfig?.getGroupKey;
+  const getGroupKey = useCallback(
+    (row: Row<TData>) => groupingKey?.(row.original) ?? '',
+    [groupingKey]
+  );
 
   // Initialize grouping (uses TanStack-sorted row order)
   const { groupedData, observeGroupHeader, visibleGroupIndex } =
     useTableGrouping({
-      data: groupingSourceData,
-      getGroupKey: groupingConfig?.getGroupKey ?? noopGetGroupKey,
-      getGroupLabel: groupingConfig?.getGroupLabel ?? identityGetGroupLabel,
+      data: rows,
+      getGroupKey,
+      getGroupLabel: groupingConfig?.getGroupLabel ?? String,
       enabled: groupingEnabled,
       scrollRoot,
+      stickyOffset,
     });
+
+  const keyboardRows = useMemo(
+    () => (groupingEnabled ? groupedData.flatMap(group => group.rows) : rows),
+    [groupingEnabled, groupedData, rows]
+  );
 
   // Initialize virtualization
   const {
@@ -684,7 +698,7 @@ function UnifiedTableContent<TData extends RowData>({
     (!onToggleRowSelection || rowSelection !== undefined);
   const toggleRowSelection = useCallback(
     (rowIndex: number) => {
-      const row = rows[rowIndex];
+      const row = keyboardRows[rowIndex];
       if (!row) return;
       if (onToggleRowSelection) {
         onToggleRowSelection(row.original, rowIndex);
@@ -692,18 +706,24 @@ function UnifiedTableContent<TData extends RowData>({
         row.toggleSelected();
       }
     },
-    [rows, onToggleRowSelection]
+    [keyboardRows, onToggleRowSelection]
   );
   const extendRowSelection = useCallback(
     (fromIndex: number, toIndex: number) => {
       // Reads the controlled `rowSelection`; pass it alongside the toggle.
       for (const index of [fromIndex, toIndex]) {
-        if (rows[index] && !rows[index].getIsSelected()) {
+        if (keyboardRows[index] && !keyboardRows[index].getIsSelected()) {
           toggleRowSelection(index);
         }
       }
     },
-    [rows, toggleRowSelection]
+    [keyboardRows, toggleRowSelection]
+  );
+
+  const revealRow = useCallback(
+    // TanStack defaults to auto alignment/behavior and supersedes pending scrolls.
+    (index: number) => rowVirtualizer.scrollToIndex(index),
+    [rowVirtualizer]
   );
 
   const { handleKeyDown } = useTableKeyboardNav({
@@ -712,6 +732,9 @@ function UnifiedTableContent<TData extends RowData>({
     rowCount: rows.length,
     rowRefsMap: rowRefs,
     setFocusedIndex,
+    revealRow: shouldVirtualize ? revealRow : undefined,
+    renderedRowWindow: virtualRows.map(row => row.index).join(','),
+    focusScope: keyboardRows,
     onRowClick,
     onRowToggle,
     onToggleSelection: hasKeyboardSelection ? toggleRowSelection : undefined,
@@ -720,25 +743,10 @@ function UnifiedTableContent<TData extends RowData>({
       : undefined,
   });
 
-  // Row lookup map for grouped table mode — rebuilt when rows change
-  const groupedRowMap = useMemo(
-    () =>
-      new Map(
-        table
-          .getRowModel()
-          .rows.map(r => [getRowId ? getRowId(r.original) : r.original, r])
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `rows` triggers table model rebuild
-    [rows, getRowId, table]
-  );
-
   // Memoized row renderer for grouped table mode
   const renderGroupedRow = useCallback(
-    (item: TData, index: number) => {
-      const row = groupedRowMap.get(getRowId ? getRowId(item) : item);
-      if (!row) return null;
-
-      const rowData = row.original as TData;
+    (row: Row<TData>, index: number) => {
+      const rowData = row.original;
 
       const rowElement = (
         <VirtualizedTableRow
@@ -802,7 +810,6 @@ function UnifiedTableContent<TData extends RowData>({
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- visibility invalidates stable TanStack rows so compiled grouped bodies recompute cells
     [
-      groupedRowMap,
       // TanStack keeps row identity stable when visibility changes. Invalidate
       // the callback so compiled GroupedTableBody renders fresh visible cells.
       resolvedColumnVisibility,
@@ -831,15 +838,21 @@ function UnifiedTableContent<TData extends RowData>({
   );
 
   // Infinite scroll sentinel — fires onLoadMore when visible
-  const sentinelRef = useRef<HTMLTableRowElement>(null);
+  const [sentinel, setSentinel] = useState<HTMLTableRowElement | null>(null);
   useEffect(() => {
-    const sentinel = sentinelRef.current;
-    const scrollContainer = tableContainerRef.current;
+    const scrollContainer = scrollRoot;
     if (!sentinel || !scrollContainer || !onLoadMore || !hasNextPage) return;
 
+    let requested = false;
     const observer = new IntersectionObserver(
       entries => {
-        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        if (
+          entries[0]?.isIntersecting &&
+          hasNextPage &&
+          !isFetchingNextPage &&
+          !requested
+        ) {
+          requested = true;
           onLoadMore();
         }
       },
@@ -847,7 +860,7 @@ function UnifiedTableContent<TData extends RowData>({
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [onLoadMore, hasNextPage, isFetchingNextPage]);
+  }, [sentinel, scrollRoot, onLoadMore, hasNextPage, isFetchingNextPage]);
 
   // Calculate column count for skeleton
   const columnCount = useMemo(() => columns.length, [columns]);
@@ -873,6 +886,30 @@ function UnifiedTableContent<TData extends RowData>({
     'w-full border-separate border-spacing-0 text-app',
     className
   );
+
+  const loadMoreBody = onLoadMore ? (
+    <tbody>
+      <tr ref={setSentinel} data-table-load-more>
+        <td
+          colSpan={columnCount}
+          style={{ height: 1, padding: 0, border: 'none' }}
+        />
+      </tr>
+      {isFetchingNextPage && (
+        <tr>
+          <td
+            colSpan={columnCount}
+            className='py-1.5 text-center text-2xs text-tertiary-token'
+          >
+            <span className='inline-flex items-center gap-1.5'>
+              <LoadingSpinner size='sm' tone='muted' label='Loading More' />
+              {' Loading more...'}
+            </span>
+          </td>
+        </tr>
+      )}
+    </tbody>
+  ) : null;
 
   // Loading state
   if (isLoading) {
@@ -972,9 +1009,11 @@ function UnifiedTableContent<TData extends RowData>({
               groupedData={groupedData}
               observeGroupHeader={observeGroupHeader}
               visibleGroupIndex={visibleGroupIndex}
+              stickyOffset={stickyOffset}
               columns={columns.length}
               renderRow={renderGroupedRow}
             />
+            {loadMoreBody}
           </table>
         </div>
       </ColumnCompactProvider>
@@ -1032,31 +1071,7 @@ function UnifiedTableContent<TData extends RowData>({
             columnCount={columnCount}
             columnSnap={snapColumns}
           />
-          {/* Infinite scroll sentinel + loading indicator */}
-          {onLoadMore && (
-            <tbody>
-              <tr ref={sentinelRef}>
-                <td style={{ height: 1, padding: 0, border: 'none' }} />
-              </tr>
-              {isFetchingNextPage && (
-                <tr>
-                  <td
-                    colSpan={columnCount}
-                    className='py-1.5 text-center text-2xs text-tertiary-token'
-                  >
-                    <span className='inline-flex items-center gap-1.5'>
-                      <LoadingSpinner
-                        size='sm'
-                        tone='muted'
-                        label='Loading More'
-                      />
-                      {' Loading more...'}
-                    </span>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          )}
+          {loadMoreBody}
         </table>
       </div>
     </ColumnCompactProvider>

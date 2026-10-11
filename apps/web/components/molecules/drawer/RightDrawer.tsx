@@ -5,11 +5,13 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   SHELL_RAIL_ALLOCATION,
   SHELL_RAIL_SHEET,
   SHELL_RAIL_TRAVEL,
 } from '@/components/shell/rail-motion';
+import { useRailFocusReturn } from '@/components/shell/useRailFocusReturn';
 import { useRailMotionPhase } from '@/components/shell/useRailMotionPhase';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
@@ -283,6 +285,7 @@ export function RightDrawer({
   // opacity/travel stage with the width give-back, instead of snapping to
   // `invisible` at frame one. `data-rail-phase` is the certification hook.
   const railPhase = useRailMotionPhase(isOpen);
+  useRailFocusReturn(asideRef, !isOpen && !isMobile, 'right');
 
   // Suppress the width/opacity transition on first paint so the panel appears
   // at its final size instead of animating in on hydration. The transition
@@ -340,7 +343,10 @@ export function RightDrawer({
 
   // Mobile: full-screen overlay with slide-in-from-right animation
   if (isMobile) {
-    return (
+    // Escape the route's isolated stacking context so its header cannot paint
+    // above this modal. React context and the existing focus boundary survive
+    // the portal; dialogs opened from the sheet retain their higher layer.
+    return createPortal(
       <aside
         {...rest}
         ref={asideRef}
@@ -352,7 +358,7 @@ export function RightDrawer({
         tabIndex={isOpen ? -1 : undefined}
         data-rail-phase={railPhase}
         className={cn(
-          'fixed inset-0 z-50 flex flex-col',
+          'fixed inset-0 z-sheet flex flex-col',
           'overflow-hidden',
           'outline-none focus:outline-none focus-visible:ring-0',
           'border-l border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',
@@ -366,11 +372,12 @@ export function RightDrawer({
         )}
       >
         {content}
-      </aside>
+      </aside>,
+      document.body
     );
   }
 
-  // Desktop: inline sidebar with width-based collapse so adjacent content reclaims space
+  // Desktop: the shared shell contains this inspector as an overlay.
   return (
     <aside
       {...rest}
@@ -381,9 +388,8 @@ export function RightDrawer({
       inert={isOpen ? undefined : true}
       data-rail-phase={railPhase}
       className={cn(
-        // Desktop inspector is an in-flow sibling of route content, but it
-        // remains its own raised surface. This gives the shell one stable
-        // elevation ladder: base/sidebar → main plane → inspector → overlays.
+        // The shell owns overlay placement and bounds. The drawer owns its
+        // raised surface, interrupted reveal, focus and interaction lifecycle.
         'z-10 shrink-0 h-full min-h-0 flex flex-col rounded-(--app-shell-radius) border border-(--app-shell-frame-seam) bg-surface-1 shadow-(--app-shell-drawer-shadow)',
         'outline-none focus:outline-none focus-visible:ring-0',
         'overflow-hidden',
@@ -407,15 +413,25 @@ export function RightDrawer({
       )}
       style={{
         width: isOpen ? width : 0,
-        maxWidth: '100vw',
+        borderWidth: isOpen ? 1 : 0,
+        maxWidth: 'calc(100cqw - var(--space-3))',
         transitionDuration: hasAnimated ? undefined : '0ms',
-        willChange: hasAnimated ? 'width, opacity, transform' : 'auto',
+        willChange:
+          railPhase === 'opening' || railPhase === 'closing'
+            ? 'opacity, transform'
+            : 'auto',
         contain: 'layout style paint',
       }}
     >
       <div
         className='relative flex h-full min-h-0 flex-col'
-        style={{ minWidth: '100%' }}
+        // Keep controls, text, and scroll geometry at their open width while
+        // the outer allocation clips/reveals them; no rewrapping per frame.
+        style={{
+          width: Math.max(0, width - 2),
+          maxWidth: 'calc(100cqw - var(--space-3) - 2px)',
+          flexShrink: 0,
+        }}
       >
         {content}
       </div>

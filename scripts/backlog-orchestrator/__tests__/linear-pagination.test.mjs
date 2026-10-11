@@ -43,6 +43,38 @@ describe('active Linear cooldown', () => {
     cyclic.cause = cyclic;
     assert.equal(activeLinearCooldown(cyclic, now), null);
   });
+
+  it('surfaces Linear rate-limit remaining/reset counters on the cooldown receipt', () => {
+    const now = 1_700_000_000_000;
+    const resetAt = now + 120_000;
+    const error = {
+      code: 'PAGE_FETCH_FAILED',
+      cause: {
+        code: 'RATE_LIMITED',
+        metadata: {
+          resetAt,
+          rateLimitRemaining: {
+            'x-ratelimit-requests-remaining': 0,
+            'x-ratelimit-complexity-remaining': 12,
+          },
+        },
+      },
+    };
+    assert.deepEqual(activeLinearCooldown(error, now), {
+      resetAt,
+      retryAt: new Date(resetAt).toISOString(),
+      rateLimitRemaining: {
+        'x-ratelimit-requests-remaining': 0,
+        'x-ratelimit-complexity-remaining': 12,
+      },
+    });
+    // no counters captured -> the key is simply absent
+    const plain = { code: 'RATE_LIMITED', resetAt };
+    assert.deepEqual(activeLinearCooldown(plain, now), {
+      resetAt,
+      retryAt: new Date(resetAt).toISOString(),
+    });
+  });
 });
 
 // Mirrors the production payload captured from Linear when the fleet-closure

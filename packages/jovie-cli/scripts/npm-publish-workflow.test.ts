@@ -34,7 +34,7 @@ function assertPublishWorkflowContract(source: string): void {
     'pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413'
   );
   expect(source).toContain(
-    'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
+    'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'
   );
   expect(source).toMatch(/node-version-file: .nvmrc/);
   expect(source).toContain('registry-url: https://registry.npmjs.org');
@@ -89,7 +89,7 @@ function assertPublishWorkflowContract(source: string): void {
     'npm publish --provenance --access public "$PACKAGE_DIR"'
   );
   expect(source).toContain('- name: Prove public registry release');
-  expect(source).toContain('for attempt in {1..12}');
+  expect(source).toContain('for attempt in {1..60}');
   expect(source).toContain('metadata.dist?.attestations?.url');
   expect(source).toContain('metadata.dist?.attestations?.provenance');
   expect(source).toContain('Array.isArray(metadata.maintainers)');

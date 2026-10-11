@@ -2,7 +2,14 @@
 import { Button } from '@jovie/ui';
 import { Plus } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelData,
@@ -270,7 +277,6 @@ export function ProfileContactSidebar() {
 
   // Keep a ref to the latest previewData so async callbacks avoid stale closures
   const previewDataRef = useRef(previewData);
-  previewDataRef.current = previewData;
 
   const mountedRef = useRef(true);
   const operationEpochRef = useRef(0);
@@ -451,7 +457,6 @@ export function ProfileContactSidebar() {
     CategoryOption | 'about'
   >('social');
   const selectedCategoryRef = useRef<CategoryOption | 'about'>('social');
-  selectedCategoryRef.current = selectedCategory;
 
   // Suggested DSP matches — used for dot indicator on Music tab
   const { data: suggestedMatches } = useDspMatchesQuery({
@@ -481,7 +486,6 @@ export function ProfileContactSidebar() {
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
   const isAddingLinkRef = useRef(false);
-  isAddingLinkRef.current = isAddingLink;
 
   // Track temp link IDs with pending server adds. If user deletes a temp link
   // while its confirm-link request is in flight, we queue a server delete for
@@ -682,7 +686,6 @@ export function ProfileContactSidebar() {
       selectedProfile,
     ]
   );
-  saveProfileFieldRef.current = saveProfileField;
 
   // Handle bio change — save to server and instantly update sidebar
   const handleBioChange = useCallback(
@@ -973,9 +976,6 @@ export function ProfileContactSidebar() {
       completeMutationSuccess,
     ]
   );
-  addLinkRef.current = link => {
-    void handleSmartAddLink(link);
-  };
 
   // Handle removing a link
   const handleRemoveLink = useCallback(
@@ -1093,7 +1093,26 @@ export function ProfileContactSidebar() {
       selectedProfile,
     ]
   );
-  removeLinkRef.current = handleRemoveLink;
+
+  // Async mutations and retry actions must observe the latest committed UI.
+  // A discarded concurrent render must not publish callbacks or values.
+  useLayoutEffect(() => {
+    previewDataRef.current = previewData;
+    selectedCategoryRef.current = selectedCategory;
+    isAddingLinkRef.current = isAddingLink;
+    saveProfileFieldRef.current = saveProfileField;
+    addLinkRef.current = link => {
+      void handleSmartAddLink(link);
+    };
+    removeLinkRef.current = handleRemoveLink;
+  }, [
+    previewData,
+    selectedCategory,
+    isAddingLink,
+    saveProfileField,
+    handleSmartAddLink,
+    handleRemoveLink,
+  ]);
 
   // Header parts hook needs to be called unconditionally
   const { overflowActions: baseOverflowActions } = useProfileHeaderParts({
@@ -1134,6 +1153,8 @@ export function ProfileContactSidebar() {
   if (!previewData) {
     return (
       <EntitySidebarShell
+        id='shell-artist-profile-rail'
+        onClose={close}
         isOpen={isOpen}
         ariaLabel='Profile Contact'
         data-testid='profile-contact-sidebar-skeleton'
@@ -1201,6 +1222,8 @@ export function ProfileContactSidebar() {
   if (mode === 'view') {
     return (
       <EntitySidebarShell
+        id='shell-artist-profile-rail'
+        onClose={close}
         isOpen={isOpen}
         ariaLabel='Profile Preview'
         data-testid='profile-contact-sidebar'
@@ -1222,6 +1245,8 @@ export function ProfileContactSidebar() {
 
   return (
     <EntitySidebarShell
+      id='shell-artist-profile-rail'
+      onClose={close}
       isOpen={isOpen}
       ariaLabel='Profile Contact'
       data-testid='profile-contact-sidebar'

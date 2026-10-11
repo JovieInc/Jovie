@@ -135,6 +135,28 @@ def run_wrapper(payload, *, consumer="fleet", expected_sha=None, extra_env=None,
         return result.returncode, outputs, json.loads(receipt.read_text()) if receipt.exists() else {}
 
 
+def run_wrapper_stdout(payload, *, consumer="fleet", dry_run="1"):
+    """Run the shipped wrapper and return (returncode, stdout)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = pathlib.Path(tmp) / "github-output"
+        receipt = pathlib.Path(tmp) / "receipt.json"
+        env = os.environ.copy()
+        env["FLEET_GATE_EVALUATE_JSON"] = json.dumps(payload)
+        env["FLEET_GATE_DRY_RUN"] = dry_run
+        env["FLEET_GATE_RECEIPT"] = str(receipt)
+        env["FLEET_GATE_CONSUMER"] = consumer
+        env["GITHUB_OUTPUT"] = str(out)
+        result = subprocess.run(
+            ["bash", str(SCRIPT)],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+            cwd=str(ROOT),
+        )
+        return result.returncode, result.stdout
+
+
 class EvaluateFleetGateWrapperTests(unittest.TestCase):
     def test_script_and_action_are_the_single_evaluate_path(self):
         self.assertTrue(SCRIPT.is_file())
@@ -175,6 +197,67 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(outputs["work_allowed"], "false")
         self.assertEqual(outputs["new_issue_intake_allowed"], "false")
         self.assertEqual(outputs["gate_rc"], "2")
+
+    def test_promotion_diagnostics_lines_are_emitted(self):
+        """JOV-8000 follow-up 26: the wrapper prints machine-readable
+        promotion mode + reasons and one status/error line per signal right
+        after the Fleet gate evaluated summary — the step log becomes
+        self-sufficient while the receipt stays Gem-host-only."""
+        payload = signals(
+            main={"status": "green", "sha": SHA},
+            controller={
+                "status": "parked",
+                "retired": True,
+                "error": "controller-endpoint-retired: Connection refused",
+            },
+            production={"status": "green", "deployedSha": "b" * 40},
+        )
+        code, stdout = run_wrapper_stdout(payload)
+        self.assertEqual(code, 0)
+        self.assertIn("fleet-gate.promotion mode=", stdout)
+        self.assertIn("reasons=[", stdout)
+        self.assertIn("fleet-gate.signal controller status=parked", stdout)
+        self.assertIn("controller-endpoint-retired", stdout)
+        self.assertIn("fleet-gate.signal production status=green", stdout)
+        self.assertIn("fleet-gate.signal main status=green", stdout)
+        # every signal family gets a line
+        for name in (
+            "controller",
+            "production",
+            "main",
+            "integrity",
+            "queue",
+            "closure-health",
+            "concurrency",
+            "independent-review",
+        ):
+            self.assertIn(f"fleet-gate.signal {name} ", stdout)
+
+    def test_promotion_diagnostics_redact_token_like_strings(self):
+        """No token-like or secret-shaped string may leak into the
+        diagnostics lines — redaction runs before any log write."""
+        payload = signals(
+            controller={
+                "status": "failed",
+                "error": (
+                    "controller-observation-failed: "
+                    "ghp_abcdefghijklmnop1234567890 and "
+                    "github_pat_ABCDEFGHIJKLMNOP_123456 and "
+                    "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9 "
+                    "and deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+                ),
+            },
+        )
+        code, stdout = run_wrapper_stdout(payload)
+        self.assertEqual(code, 0)
+        for line in stdout.splitlines():
+            if line.startswith("fleet-gate."):
+                self.assertNotIn("ghp_abcdefghijklmnop1234567890", line)
+                self.assertNotIn("github_pat_", line)
+                self.assertNotIn("Bearer eyJ", line)
+                self.assertNotIn("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", line)
+                self.assertNotRegex(line, r"gh[pousr]_[A-Za-z0-9]{8,}")
+                self.assertNotRegex(line, r"[A-Fa-f0-9]{40,}")
 
     def test_missing_review_still_allows_isolated_lease(self):
         code, outputs, receipt = run_wrapper(

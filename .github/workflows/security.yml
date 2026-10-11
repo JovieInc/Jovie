@@ -2,17 +2,26 @@
 #
 # This workflow complements CodeQL by adding:
 # - Gitleaks: Secret detection in git history
+# - osv-scanner: Open-source dependency vulnerability scanning
+# - Semgrep CE: Static application security scanning
 # - TruffleHog: Defense-in-depth secret scanning (JOV-3215)
 # - Trivy: Vulnerability scanning for dependencies and filesystem (added in subtask-1-4)
 # - OSSF Scorecard: Supply chain security scoring (added in subtask-1-5)
 #
 name: Security Scanning
+# clock-class: upstream-advisory
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Devin
+# necessary-trust-boundary: A hosted weekly schedule runs Semgrep CE and osv-scanner against the default branch and uploads SARIF with only the built-in read-contents/security-events token; no merge, deploy, or credential authority is added.
+# revisit-trigger: Remove the scheduled hop if Semgrep/osv findings are ingested by a hosted scanner and this workflow no longer needs to run inside Actions.
 
 on:
   # PR and merge-group diff scans are required through ci.yml / PR Ready.
-  # This workflow owns changed post-merge and explicit diagnostic scans only.
+  # This workflow owns changed post-merge, weekly baseline, and explicit scans.
   push:
     branches: ['main']
+  schedule:
+    - cron: '0 14 * * 1'
   workflow_dispatch:
 
 # Default permissions - each job specifies its own required permissions
@@ -88,6 +97,69 @@ jobs:
 
       - name: Verify gitleaks detects Neon/Clerk leak shapes and backup files
         run: ./scripts/security/verify-gitleaks-coverage.sh
+
+  osv:
+    name: osv-scanner
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Scan lockfiles with osv-scanner
+        run: |
+          set -euo pipefail
+          version=v2.5.1
+          sha=f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be
+          curl -fsSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/${version}/osv-scanner_linux_amd64"
+          echo "${sha}  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+          set +e
+          ./osv-scanner scan source --format sarif --output-file osv.sarif .
+          code=$?
+          set -e
+          if [[ "$code" -gt 1 ]]; then
+            exit "$code"
+          fi
+      - name: Upload osv SARIF
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: osv.sarif
+          category: osv
+
+  semgrep:
+    name: Semgrep CE
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Scan with Semgrep CE
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check semgrep==1.179.0
+          set +e
+          semgrep scan --config p/default --sarif -o semgrep.sarif --metrics=off
+          code=$?
+          set -e
+          if [[ "$code" -gt 1 ]]; then
+            exit "$code"
+          fi
+      - name: Upload Semgrep SARIF
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
 
   trufflehog:
     name: TruffleHog Secret Scanning

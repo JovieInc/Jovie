@@ -59,7 +59,7 @@ function AuthShellInner({
   isChatRoute = false,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
-  const { isMobile, state: sidebarState } = useSidebar();
+  const { isMobile, open: sidebarPinned } = useSidebar();
   const { isComposerFocused } = useComposerFocus();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
@@ -69,7 +69,7 @@ function AuthShellInner({
   // SSR; the runtime CSS hides the header slot before paint, and this hook
   // removes it after hydration without replacing the shell or losing drafts.
   const sidebarTrigger =
-    isMobile || isElectron ? null : sidebarState === 'closed' ? (
+    isMobile || isElectron ? null : !sidebarPinned ? (
       <SidebarCollapseButton />
     ) : null;
 
@@ -85,11 +85,12 @@ function AuthShellInner({
   const sidebar = useMemo(
     () => (
       <UnifiedSidebar
+        headerOwnsCollapsedToggle={!hideTopHeader}
         section={section}
         variant={section === 'ov' ? 'ov' : 'jovie'}
       />
     ),
-    [section]
+    [section, hideTopHeader]
   );
 
   // Memoize mobile bottom nav — stable across route changes

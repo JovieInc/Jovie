@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/components/molecules/inspector/InspectorRail.test.tsx
 import type { CommonDropdownItem, SegmentControlOption } from '@jovie/ui';
-import type { ReactNode } from 'react';
+import { type ReactNode, useLayoutEffect, useRef } from 'react';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
 import { InspectorEmpty } from './InspectorEmpty';
 import { InspectorLoading } from './InspectorLoading';
@@ -54,6 +54,39 @@ export function InspectorShell<T extends string>({
   testId = 'inspector-shell',
   width,
 }: InspectorRailProps<T>) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const focusedContentRef = useRef<HTMLElement | null>(null);
+  const loadingFocusRef = useRef<HTMLElement | null>(null);
+  const handingOffFocusRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      focusedContentRef.current = null;
+      loadingFocusRef.current = null;
+      return;
+    }
+    const previous = focusedContentRef.current;
+    if (isLoading && previous && contentRef.current?.contains(previous)) {
+      const tab = bodyRef.current?.querySelector<HTMLElement>(
+        '[role="tab"][aria-selected="true"]'
+      );
+      if (tab) {
+        handingOffFocusRef.current = true;
+        tab.focus({ preventScroll: true });
+        handingOffFocusRef.current = false;
+        loadingFocusRef.current = tab;
+      }
+    } else if (!isLoading && previous && loadingFocusRef.current) {
+      const shouldRestore =
+        previous.isConnected &&
+        document.activeElement === loadingFocusRef.current;
+      focusedContentRef.current = shouldRestore ? previous : null;
+      loadingFocusRef.current = null;
+      if (shouldRestore) previous.focus({ preventScroll: true });
+    }
+  }, [isLoading, isOpen]);
+
   return (
     <EntitySidebarShell
       isOpen={isOpen}
@@ -72,34 +105,65 @@ export function InspectorShell<T extends string>({
       emptyMessage={emptyMessage}
       entityHeader={objectHeader}
     >
-      {isLoading ? (
-        <InspectorLoading />
-      ) : (
-        <div
-          className='flex min-h-0 flex-1 flex-col overflow-hidden'
-          data-testid='inspector-tabbed-body'
-          data-inspector-shell='true'
-        >
-          <div className='shrink-0 border-b border-(--app-shell-frame-seam) px-3'>
-            <InspectorTabs
-              value={activeTab}
-              onValueChange={onTabChange}
-              options={tabs}
-              ariaLabel={tabsAriaLabel}
-              panelId={INSPECTOR_TAB_PANEL_ID}
-            />
-          </div>
+      <div
+        ref={bodyRef}
+        onFocusCapture={event => {
+          if (handingOffFocusRef.current) return;
+          focusedContentRef.current = contentRef.current?.contains(event.target)
+            ? event.target
+            : null;
+        }}
+        onBlurCapture={event => {
+          if (
+            !isLoading &&
+            !event.currentTarget.contains(event.relatedTarget)
+          ) {
+            focusedContentRef.current = null;
+          }
+        }}
+        onPointerDownCapture={() => {
+          if (isLoading) focusedContentRef.current = null;
+        }}
+        className='flex min-h-0 flex-1 flex-col overflow-hidden'
+        data-testid='inspector-tabbed-body'
+        data-inspector-shell='true'
+      >
+        <div className='shrink-0 border-b border-(--app-shell-frame-seam) px-3'>
+          <InspectorTabs
+            value={activeTab}
+            onValueChange={onTabChange}
+            options={tabs}
+            ariaLabel={tabsAriaLabel}
+            panelId={INSPECTOR_TAB_PANEL_ID}
+          />
+        </div>
+        <div className='relative flex min-h-0 flex-1 flex-col'>
           <div
             id={INSPECTOR_TAB_PANEL_ID}
             role='tabpanel'
             data-testid='inspector-tab-panel'
             data-scroll-mode='internal'
+            aria-busy={isLoading}
             className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3'
           >
-            {children ?? <InspectorEmpty message='Nothing to show yet.' />}
+            {/* Keep content mounted so a refresh retains edits and scroll height.
+                Inert content cannot expose stale actions while facts are loading. */}
+            <div
+              ref={contentRef}
+              inert={isLoading}
+              aria-hidden={isLoading}
+              className={isLoading ? 'invisible' : undefined}
+            >
+              {children ?? <InspectorEmpty message='Nothing to show yet.' />}
+            </div>
           </div>
+          {isLoading ? (
+            <div className='absolute inset-0 overflow-hidden'>
+              <InspectorLoading />
+            </div>
+          ) : null}
         </div>
-      )}
+      </div>
     </EntitySidebarShell>
   );
 }

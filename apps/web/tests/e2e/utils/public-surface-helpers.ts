@@ -618,10 +618,14 @@ export async function runDspInteraction(page: Page) {
     ).toBeGreaterThan(0);
     expect(url.username, 'DSP handoff must not embed credentials').toBe('');
     expect(url.password, 'DSP handoff must not embed credentials').toBe('');
-    expect(
-      isValidDspUrl(provider, url.href),
-      `DSP handoff host is not canonical for ${provider}: ${url.hostname}`
-    ).toBe(true);
+    // Generic platform links (`link_<slug>`) have no canonical host — any
+    // valid https destination is acceptable for them.
+    if (!provider.startsWith('link_')) {
+      expect(
+        isValidDspUrl(provider, url.href),
+        `DSP handoff host is not canonical for ${provider}: ${url.hostname}`
+      ).toBe(true);
+    }
     if (target === '_blank') {
       const protections = new Set(
         (relOrFeatures ?? '')
@@ -664,12 +668,16 @@ export async function runDspInteraction(page: Page) {
       'DSP action is missing its canonical provider key'
     ).toBeTruthy();
     if (!provider) return;
-    const registryEntry = getRegistryEntry(provider);
-    expect(
-      registryEntry,
-      `Unknown DSP provider key: ${provider}`
-    ).toBeDefined();
-    expect(registryEntry?.showOnListenPage).toBe(true);
+    // Generic platform links (`link_<slug>`) are rendered on the listen
+    // surface but are intentionally absent from the DSP registry.
+    if (!provider.startsWith('link_')) {
+      const registryEntry = getRegistryEntry(provider);
+      expect(
+        registryEntry,
+        `Unknown DSP provider key: ${provider}`
+      ).toBeDefined();
+      expect(registryEntry?.showOnListenPage).toBe(true);
+    }
     exercisedProviders.add(provider);
 
     const href = await action.getAttribute('href');

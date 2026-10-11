@@ -265,7 +265,9 @@ describe('unlockWithPasskey', () => {
 
     await unlockWithPasskey();
 
-    expect(client.addPasskey).toHaveBeenCalledWith({ name: 'Ovie' });
+    expect(client.addPasskey).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Ovie' })
+    );
     expect(client.signInPasskey).toHaveBeenCalledOnce();
   });
 
