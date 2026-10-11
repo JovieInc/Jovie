@@ -45,36 +45,30 @@ describe('composeHudForPresentation', () => {
     for (const { sections } of composed) {
       expect(needSignalIds(sections)).toEqual([...HUD_NEED_SECTION_IDS]);
       expect(getHudNeedBand(sections).map(entry => entry.id)).toEqual([
-        'cash-mrr',
         'action-required',
+        'cash-mrr',
         'shipper',
         'factory-health',
         'exceptions',
       ]);
       expect(getHudNeedBand(sections).map(entry => entry.testId)).toEqual([
-        HUD_SECTION_TEST_IDS['cash-mrr'],
         HUD_SECTION_TEST_IDS['action-required'],
+        HUD_SECTION_TEST_IDS['cash-mrr'],
         HUD_SECTION_TEST_IDS.shipper,
         HUD_SECTION_TEST_IDS['factory-health'],
         HUD_SECTION_TEST_IDS.exceptions,
       ]);
 
       const noiseIds = getHudNoiseBand(sections).map(entry => entry.id);
-      expect(noiseIds.slice(0, 4)).toEqual([
+      expect(noiseIds.slice(0, 3)).toEqual([
         'bottleneck',
         'morning-walk',
-        'design-jury',
         'velocity',
       ]);
       expect(noiseIds).toEqual([...HUD_NOISE_SECTION_IDS]);
 
       const lastNeedIndex = HUD_NEED_SECTION_IDS.length - 1;
-      for (const noiseId of [
-        'design-jury',
-        'velocity',
-        'agent-runs',
-        'what-shipped',
-      ] as const) {
+      for (const noiseId of ['velocity', 'agent-runs'] as const) {
         const noiseIndex = sections.findIndex(entry => entry.id === noiseId);
         expect(noiseIndex).toBeGreaterThan(lastNeedIndex);
       }

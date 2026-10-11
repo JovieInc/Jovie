@@ -63,14 +63,13 @@ function formatUtc(date: Date): string {
 
 /**
  * Recent feature flag changes for the admin Features page, newest first.
- * Fails open to an empty list (with a captured warning) so the page still
- * renders when the audit table is unavailable.
+ * Propagates read failures so callers can distinguish unavailable from empty.
  */
 export async function getFeatureFlagAuditEvents(
   filter: FeatureFlagAuditFilter = {}
 ): Promise<FeatureFlagAuditEvent[]> {
   if (!(await doesTableExist('feature_flag_audit_events'))) {
-    return [];
+    throw new Error('Feature flag audit history is unavailable.');
   }
 
   const conditions = [
@@ -117,6 +116,6 @@ export async function getFeatureFlagAuditEvents(
     }));
   } catch (error) {
     await captureWarning('Feature flag audit events read failed', error);
-    return [];
+    throw error;
   }
 }

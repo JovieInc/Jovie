@@ -337,6 +337,50 @@ struct ChatRepositoryTests {
     #expect(assistantItem?.content == "Continue on web to finish this")
   }
 
+  @Test func completionPreservesResultOnlyMerchHandoff() async throws {
+    let handoffURL = URL(string: "https://jov.ie/app/chat/conv_merch_handoff")!
+    let payload = #"{"success":true,"generationId":"generation-merch","nextStep":"Choose your design","options":[{"#
+      + #""id":"option-merch","option_number":1,"design_name":"Night Sky","product_type":"t-shirt","#
+      + #""printful_product_name":"Premium Tee","colorway":"Black","concept":"Stars above the stage","#
+      + #""mockup_urls":["https://images.example/merch.png"],"price_recommendation":{"sale_price":"29.00"}}]}"#
+    let content = "Your merch options are ready.\n"
+      + "<tool_result><name>createMerch</name><state>success</state><json>"
+      + payload + "</json></tool_result>"
+    let suite = "ie.jov.Jovie.tests.merch-handoff.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let cache = ChatCache(defaults: defaults)
+    let client = ScriptedChatClient(
+      sendTurnResult: .success([
+        .turnReserved(conversationId: "conv_merch_handoff", turnId: "turn_merch", clientTurnId: "PLACEHOLDER"),
+        .webHandoff(clientTurnId: "PLACEHOLDER", conversationId: "conv_merch_handoff",
+          url: handoffURL, summary: content),
+        .assistantCompleted(clientTurnId: "PLACEHOLDER", conversationId: "conv_merch_handoff",
+          turnId: "turn_merch", text: content),
+      ]),
+      listConversationsResult: .success([]),
+      fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 404))
+    )
+    let repository = ChatRepository(client: client, cache: cache, userID: "user_merch_handoff",
+      webBaseURL: URL(string: "https://preview.example")!)
+
+    await repository.send(text: "Create merch for my next show")
+
+    let assistant = try #require(repository.timeline.last)
+    let clientTurnID = try #require(repository.timeline.first?.clientTurnId)
+    #expect(repository.timeline.map(\.role) == [.user, .assistant])
+    #expect(repository.activeConversationID == "conv_merch_handoff")
+    #expect(!clientTurnID.isEmpty && clientTurnID != "PLACEHOLDER")
+    #expect(assistant.clientTurnId == clientTurnID && assistant.turnId == "turn_merch")
+    #expect(assistant.status == .completed && assistant.requiresWebHandoff)
+    #expect(assistant.handoffURL == handoffURL && assistant.content == content)
+    let snapshot = await cache.load(for: "user_merch_handoff")
+    let cached = try #require(snapshot?.messagesByConversationID["conv_merch_handoff"]?.last)
+    #expect(cached.requiresWebHandoff && cached.content == content && cached.turnStatus == "completed")
+    #expect(cached.clientMessageId == clientTurnID && cached.turnId == "turn_merch")
+    #expect(client.listConversationsCallCount == 0 && client.fetchConversationCallCount == 0)
+  }
+
   @Test func sendAppliesErrorEventAsFailedStatusWithoutThrowing() async {
     let client = ScriptedChatClient(
       sendTurnResult: .success([

@@ -50,8 +50,11 @@ describe('admin page access boundary', () => {
         ),
         page
       ).toBe(true);
-      expect(defaultPage.body?.statements[0]?.getText(sourceFile), page).toBe(
-        'await requireCurrentAdminPageAccess();'
+      expect(
+        defaultPage.body?.statements[0]?.getText(sourceFile),
+        page
+      ).toMatch(
+        /^(?:const actorId = )?await requireCurrentAdminPageAccess\(\);$/
       );
     }
   });

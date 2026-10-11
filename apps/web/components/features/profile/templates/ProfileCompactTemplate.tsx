@@ -290,6 +290,7 @@ export function ProfileCompactTemplate({
   releaseCredits,
   embeddedPreview = false,
 }: ProfileCompactTemplateProps) {
+  const previousLocationModeRef = useRef<ProfileMode | undefined>(undefined);
   const visibleReleaseCredits = (releaseCredits ?? []).filter(
     group => group.entries.length > 0
   );
@@ -498,7 +499,7 @@ export function ProfileCompactTemplate({
     );
   }, []);
 
-  const { notificationsContextValue, notificationsController } =
+  const { notificationsContextValue, notificationsController, locationMode } =
     useProfileShell({
       artist,
       socialLinks,
@@ -622,20 +623,29 @@ export function ProfileCompactTemplate({
     [hasContacts, hasReleases, hasTip, isDesktopLayout]
   );
 
-  const syncRequestedModeFromLocation = useCallback(() => {
-    setRequestedMode(currentMode => {
-      const nextMode = getInitialModeFromLocation(mode, true);
-      if (currentMode !== nextMode) {
-        suppressNextHistorySyncRef.current = true;
-        initialLocationModeAlignedRef.current = false;
-      }
-      return nextMode;
-    });
-  }, [mode]);
+  const syncRequestedModeFromLocation = useCallback(
+    (fallbackMode = mode) => {
+      setRequestedMode(currentMode => {
+        const nextMode = getInitialModeFromLocation(fallbackMode, true);
+        if (currentMode !== nextMode) {
+          suppressNextHistorySyncRef.current = true;
+          initialLocationModeAlignedRef.current = false;
+        }
+        return nextMode;
+      });
+    },
+    [mode]
+  );
 
   useEffect(() => {
-    syncRequestedModeFromLocation();
-  }, [mode, syncRequestedModeFromLocation]);
+    const previousMode = previousLocationModeRef.current;
+    previousLocationModeRef.current = locationMode;
+    // Reuse the shell's hydration-safe location store for client Link changes.
+    // Later query removal means Home even with a cached Contact server mode.
+    const locationChanged =
+      previousMode !== undefined && previousMode !== locationMode;
+    syncRequestedModeFromLocation(locationChanged ? 'profile' : mode);
+  }, [locationMode, mode, syncRequestedModeFromLocation]);
 
   useEffect(() => {
     if (requestedMode === getModeFromUrl()) {
@@ -709,7 +719,7 @@ export function ProfileCompactTemplate({
       profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
         globalThis.history.state
       );
-      syncRequestedModeFromLocation();
+      syncRequestedModeFromLocation('profile');
     };
 
     globalThis.addEventListener('popstate', handlePopState);

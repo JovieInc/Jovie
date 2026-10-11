@@ -56,6 +56,9 @@ describe('musicfetch resilient client', () => {
     vi.resetModules();
     vi.clearAllMocks();
     token = 'test-token';
+    delete process.env.FEATURE_MUSICFETCH_FALLBACK;
+    delete process.env.FEATURE_MUSIC_RESOLVER_PROVIDER_LINKS;
+    delete process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS;
     mockGetRedis.mockReturnValue(null);
     mockLimit.mockResolvedValue({
       success: true,
@@ -524,5 +527,25 @@ describe('musicfetch resilient client', () => {
       )
     ).rejects.toThrow(/remediation:musicfetch-missing-token JOV-7323/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not call MusicFetch when the vendor fallback switch is off', async () => {
+    process.env.FEATURE_MUSICFETCH_FALLBACK = 'false';
+    process.env.FEATURE_MUSIC_RESOLVER_PROVIDER_LINKS = 'true';
+    process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS = 'true';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { musicfetchRequest, MusicfetchVendorUnavailableError } =
+      await import('@/lib/musicfetch/resilient-client');
+
+    await expect(
+      musicfetchRequest(
+        '/isrc',
+        new URLSearchParams({ isrc: 'USUM72212345' }),
+        { timeoutMs: 2000 }
+      )
+    ).rejects.toBeInstanceOf(MusicfetchVendorUnavailableError);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockReserveMusicfetchBudget).not.toHaveBeenCalled();
   });
 });

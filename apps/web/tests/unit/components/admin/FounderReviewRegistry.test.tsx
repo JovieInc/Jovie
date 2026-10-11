@@ -9,14 +9,36 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FounderReviewRegistry } from '@/components/features/admin/FounderReviewRegistry';
 import {
+  HeaderActionsProvider,
+  useHeaderActions,
+} from '@/contexts/HeaderActionsContext';
+import {
   RightPanelProvider,
   useRightPanel,
 } from '@/contexts/RightPanelContext';
 import type { FounderReviewItem } from '@/lib/admin/founder-review-registry';
+import { fixtureRow } from '@/lib/ovie/certifications/fixtures';
+import type {
+  OvieCertificationInventory,
+  OvieCertificationRow,
+} from '@/lib/ovie/certifications/types';
 import { founderReviewItemFixture } from '@/tests/fixtures/founder-review-item';
 
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
+}));
+
+const mocks = vi.hoisted(() => ({
+  query: vi.fn(),
+  mutateAsync: vi.fn(),
+}));
+
+vi.mock('@/lib/queries/useOvieCertificationsQuery', () => ({
+  useOvieCertificationsQuery: mocks.query,
+  useOvieCertificationDecisionMutation: () => ({
+    mutateAsync: mocks.mutateAsync,
+  }),
+  getCertificationDecisionErrorMessage: () => 'The evidence changed.',
 }));
 
 const items: readonly FounderReviewItem[] = [
@@ -58,27 +80,96 @@ const items: readonly FounderReviewItem[] = [
   }),
 ];
 
+/** Server-side certification row projection for one registry item. */
+function registryRow(
+  item: FounderReviewItem,
+  overrides: Partial<OvieCertificationRow['decision']> = {}
+): OvieCertificationRow {
+  const reviewReady = item.readiness === 'ready' && !('available' in overrides);
+  return {
+    ...fixtureRow(item.id, {
+      domain: 'feature_registry',
+      surface: 'Feature Capability',
+    }),
+    id: `feature_registry:${item.id}`,
+    domain: 'feature_registry',
+    surface: 'Feature Capability',
+    subject: { id: item.id, kind: 'feature', title: item.title },
+    state: reviewReady ? 'review_ready' : 'working',
+    evidence: [],
+    blockers: [],
+    staleFounderLock: false,
+    updatedAt: '2026-10-02T00:00:00.000Z',
+    links: [],
+    history: [],
+    decision: {
+      available: reviewReady,
+      reason: reviewReady ? null : 'Evidence is incomplete: 1 blocker.',
+      evidenceDigest: item.decisionEvidenceDigest,
+      currentDecision: null,
+      ...overrides,
+    },
+    source: null,
+  };
+}
+
+function mockInventory(rows: readonly OvieCertificationRow[]) {
+  mocks.query.mockReturnValue({
+    data: {
+      rows,
+      generatedAt: '2026-10-02T00:00:00.000Z',
+    } as unknown as OvieCertificationInventory,
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  });
+}
+
 function MountedRightPanel() {
   const panel = useRightPanel();
   return <div data-testid='mounted-right-panel'>{panel}</div>;
 }
 
+function MountedHeaderActions() {
+  const { headerActions } = useHeaderActions();
+  return <div data-testid='mounted-header-actions'>{headerActions}</div>;
+}
+
 function renderRegistry() {
   return render(
-    <RightPanelProvider>
-      <FounderReviewRegistry kind='feature' items={items} />
-      <MountedRightPanel />
-    </RightPanelProvider>
+    <HeaderActionsProvider>
+      <RightPanelProvider>
+        <MountedHeaderActions />
+        <FounderReviewRegistry kind='feature' items={items} />
+        <MountedRightPanel />
+      </RightPanelProvider>
+    </HeaderActionsProvider>
   );
 }
 
 describe('FounderReviewRegistry', () => {
   afterEach(() => {
     localStorage.clear();
+    vi.clearAllMocks();
+    mocks.mutateAsync.mockReset();
+    mockInventory(items.map(item => registryRow(item)));
   });
 
   it('uses the unified selectable table and mounts media-first certification details in the right rail', async () => {
+    mockInventory(items.map(item => registryRow(item)));
     renderRegistry();
+
+    const headerActions = screen.getByTestId('mounted-header-actions');
+    expect(
+      within(headerActions).getByRole('tablist', { name: 'Registry Filter' })
+    ).toBeVisible();
+    expect(
+      within(screen.getByTestId('feature-review-registry')).queryByRole(
+        'tablist',
+        { name: 'Registry Filter' }
+      )
+    ).not.toBeInTheDocument();
 
     expect(
       screen.getByRole('columnheader', { name: 'Registry Item' })
@@ -112,27 +203,34 @@ describe('FounderReviewRegistry', () => {
     expect(within(rail).getByTestId('certify-review-item')).toBeEnabled();
   });
 
-  it('persists a ready decision bound to the kernel evidence digest and blocks incomplete atomic behavior packets', async () => {
+  it('records decisions through the certification decisions API bound to the server digest', async () => {
     const user = userEvent.setup();
     const readyItem = items.find(item => item.id === 'feature.ready');
     expect(readyItem).toBeDefined();
     if (!readyItem) return;
+    mocks.mutateAsync.mockResolvedValue({ row: registryRow(readyItem) });
+    mockInventory(items.map(item => registryRow(item)));
     renderRegistry();
 
     const rail = await screen.findByTestId('founder-review-detail-rail');
     await user.click(within(rail).getByTestId('certify-review-item'));
 
     await waitFor(() => {
+      expect(mocks.mutateAsync).toHaveBeenCalledWith({
+        rowId: 'feature_registry:feature.ready',
+        evidenceDigest: readyItem.decisionEvidenceDigest,
+        decision: 'approved',
+        notes: null,
+        actionId: expect.any(String),
+      });
+    });
+    // A recorded decision leaves no authoritative local mark behind.
+    await waitFor(() => {
       expect(
         JSON.parse(
           localStorage.getItem('ovie-founder-review-decisions-v1') ?? '{}'
         )
-      ).toMatchObject({
-        'feature.ready': {
-          outcome: 'certified',
-          evidenceDigest: readyItem.decisionEvidenceDigest,
-        },
-      });
+      ).not.toHaveProperty('feature.ready');
     });
 
     await user.click(
@@ -151,7 +249,195 @@ describe('FounderReviewRegistry', () => {
     ).toBeDisabled();
   });
 
-  it('removes a local decision recorded against a stale evidence digest', async () => {
+  it('does not restore another item draft discarded while a decision is pending', async () => {
+    const user = userEvent.setup();
+    const second = founderReviewItemFixture({
+      id: 'feature.second',
+      title: 'Second feature',
+      readiness: 'ready',
+    });
+    const registryItems = [items[0], second];
+    localStorage.setItem(
+      'ovie-founder-review-decisions-v1',
+      JSON.stringify({
+        [second.id]: {
+          outcome: 'needs-work',
+          note: 'Discard this draft',
+          draftedAt: '2026-10-02T00:00:00.000Z',
+          evidenceDigest: second.decisionEvidenceDigest,
+        },
+      })
+    );
+    let finish: (value: { row: OvieCertificationRow }) => void = () =>
+      undefined;
+    mocks.mutateAsync.mockReturnValueOnce(
+      new Promise<{ row: OvieCertificationRow }>(resolve => {
+        finish = resolve;
+      })
+    );
+    mockInventory(registryItems.map(item => registryRow(item)));
+    render(
+      <HeaderActionsProvider>
+        <RightPanelProvider>
+          <FounderReviewRegistry kind='feature' items={registryItems} />
+          <MountedRightPanel />
+        </RightPanelProvider>
+      </HeaderActionsProvider>
+    );
+    const rail = await screen.findByTestId('founder-review-detail-rail');
+    await user.click(within(rail).getByTestId('certify-review-item'));
+    await user.click(screen.getByTestId('founder-review-row-feature.second'));
+    await user.click(
+      within(
+        await screen.findByTestId('founder-review-detail-rail')
+      ).getByTestId('discard-review-draft')
+    );
+    expect(
+      JSON.parse(
+        localStorage.getItem('ovie-founder-review-decisions-v1') ?? '{}'
+      )
+    ).not.toHaveProperty(second.id);
+    finish({ row: registryRow(items[0]) });
+    await waitFor(() => expect(screen.queryByText('Recording…')).toBeNull());
+    expect(
+      JSON.parse(
+        localStorage.getItem('ovie-founder-review-decisions-v1') ?? '{}'
+      )
+    ).not.toHaveProperty(second.id);
+  });
+
+  it('keeps a ready filtered item selected during a pending decision without counting its draft as certified', async () => {
+    const user = userEvent.setup();
+    let finish: (value: { row: OvieCertificationRow }) => void = () =>
+      undefined;
+    mocks.mutateAsync.mockReturnValueOnce(
+      new Promise<{ row: OvieCertificationRow }>(resolve => {
+        finish = resolve;
+      })
+    );
+    mockInventory(items.map(item => registryRow(item)));
+    renderRegistry();
+    await user.click(screen.getByRole('tab', { name: 'Ready' }));
+    const rail = await screen.findByTestId('founder-review-detail-rail');
+    await user.click(within(rail).getByTestId('certify-review-item'));
+    expect(
+      screen.getByTestId('founder-review-row-feature.ready')
+    ).toBeVisible();
+    expect(rail).toHaveAccessibleName('Ready feature certification details');
+    expect(
+      within(screen.getByTestId('founder-review-row-feature.ready')).getByText(
+        'Draft · Certified'
+      )
+    ).toBeVisible();
+    finish({ row: registryRow(items[0]) });
+    await waitFor(() => expect(screen.queryByText('Recording…')).toBeNull());
+  });
+
+  it('keeps the draft and surfaces the server error when the decision write fails', async () => {
+    const user = userEvent.setup();
+    const readyItem = items.find(item => item.id === 'feature.ready');
+    if (!readyItem) return;
+    mocks.mutateAsync.mockRejectedValue(new Error('conflict'));
+    mockInventory(items.map(item => registryRow(item)));
+    renderRegistry();
+
+    const rail = await screen.findByTestId('founder-review-detail-rail');
+    await user.click(within(rail).getByTestId('certify-review-item'));
+
+    expect(
+      await within(rail).findByText('The evidence changed.')
+    ).toBeVisible();
+    // The unconfirmed write stays a clearly-labeled draft, never an approval.
+    await waitFor(() => {
+      expect(
+        JSON.parse(
+          localStorage.getItem('ovie-founder-review-decisions-v1') ?? '{}'
+        )
+      ).toMatchObject({
+        'feature.ready': {
+          outcome: 'certified',
+          evidenceDigest: readyItem.decisionEvidenceDigest,
+        },
+      });
+    });
+    expect(
+      within(screen.getByTestId('founder-review-row-feature.ready')).getByText(
+        'Draft · Certified'
+      )
+    ).toBeVisible();
+  });
+
+  it('requires a founder note before Needs Work can be sent', async () => {
+    const user = userEvent.setup();
+    mockInventory(items.map(item => registryRow(item)));
+    renderRegistry();
+
+    const rail = await screen.findByTestId('founder-review-detail-rail');
+    const needsWork = within(rail).getByRole('button', { name: 'Needs Work' });
+    expect(needsWork).toBeDisabled();
+
+    await user.type(
+      within(rail).getByPlaceholderText('What should stay true or change?'),
+      'Hero crop is off on mobile'
+    );
+    expect(needsWork).toBeEnabled();
+    await user.click(needsWork);
+    expect(mocks.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        decision: 'changes_requested',
+        notes: 'Hero crop is off on mobile',
+      })
+    );
+  });
+
+  it('shows certified only from the authoritative server row, not local marks', async () => {
+    const readyItem = items.find(item => item.id === 'feature.ready');
+    if (!readyItem) return;
+    // A legacy local mark must not read as an approval.
+    localStorage.setItem(
+      'ovie-founder-review-decisions-v1',
+      JSON.stringify({
+        'feature.contacts.delete-contact': {
+          outcome: 'certified',
+          note: 'Old local mark',
+          reviewedAt: '2026-08-30T12:00:00.000Z',
+          evidenceDigest: items[1].decisionEvidenceDigest,
+        },
+      })
+    );
+    mockInventory(
+      items.map(item =>
+        registryRow(item, {
+          available: false,
+          reason: 'A founder decision already exists for this evidence.',
+          currentDecision:
+            item.id === 'feature.ready'
+              ? {
+                  kind: 'approved',
+                  decidedAt: '2026-10-02T00:00:00.000Z',
+                  reviewer: 'founder@jovie.test',
+                  notes: null,
+                }
+              : null,
+        })
+      )
+    );
+    renderRegistry();
+
+    const readyRow = await screen.findByTestId(
+      'founder-review-row-feature.ready'
+    );
+    expect(within(readyRow).getByText('Certified')).toBeVisible();
+    const localOnlyRow = screen.getByTestId(
+      'founder-review-row-feature.contacts.delete-contact'
+    );
+    await waitFor(() => {
+      expect(within(localOnlyRow).getByText('Draft · Certified')).toBeVisible();
+      expect(within(localOnlyRow).queryByText('Certified')).toBeNull();
+    });
+  });
+
+  it('removes a local draft recorded against a stale evidence digest', async () => {
     const stale = {
       'feature.ready': {
         outcome: 'certified',
@@ -164,6 +450,7 @@ describe('FounderReviewRegistry', () => {
       'ovie-founder-review-decisions-v1',
       JSON.stringify(stale)
     );
+    mockInventory(items.map(item => registryRow(item)));
 
     renderRegistry();
 

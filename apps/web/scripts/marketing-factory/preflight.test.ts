@@ -14,7 +14,25 @@ import { runFactory } from './run';
 import { FACTORY_STAGE_RUNNERS } from './stages';
 import { CONTENT_STAGE_RUNNERS } from './stages-content';
 
-const brief = loadFactoryBrief('solutions', 'founders');
+const legacy = loadFactoryBrief('solutions', 'founders');
+const brief = {
+  ...legacy,
+  media: legacy.media.map(entry => ({
+    ...entry,
+    input: {
+      ...entry.input,
+      editorial: {
+        benefit: 'Explain the tested product action',
+        focalDetail: 'One action',
+        rationale: 'Use the verified capture',
+        fallback: 'Retain the benefit text',
+        alternatives: [
+          { medium: 'video' as const, reason: 'Motion is unnecessary' },
+        ],
+      },
+    },
+  })),
+};
 
 let runsDir: string;
 
@@ -42,6 +60,7 @@ describe('factory:run preflight', () => {
     const manifest = await runFactory({
       family: 'solutions',
       slug: 'founders',
+      brief,
       runsDir,
       providers: liveProviders(transport),
     });
@@ -75,9 +94,9 @@ describe('factory:run preflight', () => {
       'outcomes: outcomes needs 2 cross-family judge(s); seated 0',
       'narrative: anthropic/claude-opus-5.5 is not reachable from this machine',
       'narrative: narrative needs 2 cross-family judge(s); seated 0',
+      'proof: proof needs 1 cross-family judge(s); seated 0',
       'copy: anthropic/claude-opus-5.5 is not reachable from this machine',
       'copy: copy needs 2 cross-family judge(s); seated 0',
-      'proof: proof needs 1 cross-family judge(s); seated 0',
       'render: no render measurer (CLS/LCP) is wired',
       'adversarial-trust: adversarial-trust needs 2 cross-family judge(s); seated 0',
     ]);
@@ -88,6 +107,7 @@ describe('factory:run preflight', () => {
     const manifest = await runFactory({
       family: 'solutions',
       slug: 'founders',
+      brief,
       runsDir,
       providers: dryProviders(brief, { transport }),
       runners: CONTENT_STAGE_RUNNERS,

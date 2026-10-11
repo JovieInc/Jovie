@@ -93,3 +93,14 @@ export const ScrollContained: Story = {
   ),
   parameters: { viewport: { defaultViewport: 'mobile1' } },
 };
+
+export const Fullscreen: Story = {
+  render: () => (
+    <Dialog defaultOpen>
+      <DialogContent variant='fullscreen'>
+        <DialogTitle>Workspace search</DialogTitle>
+        <DialogDescription>Full-screen search takeover.</DialogDescription>
+      </DialogContent>
+    </Dialog>
+  ),
+};

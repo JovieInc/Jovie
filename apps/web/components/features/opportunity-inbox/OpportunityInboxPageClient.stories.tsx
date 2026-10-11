@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useQueryClient } from '@tanstack/react-query';
+import { useLayoutEffect, useState } from 'react';
 import { withDashboardProviders } from '@/.storybook/dashboard-fixtures';
+import { queryKeys } from '@/lib/queries/keys';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
 const meta = {
@@ -106,4 +109,50 @@ export const PartialSuggestionRead: Story = {
       },
     },
   },
+};
+
+function CompletedWorkFixture({ children }: { children: React.ReactNode }) {
+  const client = useQueryClient();
+  const [ready, setReady] = useState(false);
+  useLayoutEffect(() => {
+    client.setQueryData(
+      [
+        ...queryKeys.dashboard.jovieWorkFeed(
+          '11111111-1111-4111-8111-111111111111',
+          '30d'
+        ),
+        { completedOnly: true },
+      ],
+      [
+        {
+          id: 'workflow-story',
+          source: 'workflow_run',
+          phase: 'completed',
+          title: 'Release workflow completed',
+          description:
+            'Completed work fixture with unavailable outcome measurement.',
+          icon: 'workflow',
+          timestamp: '2026-01-15T10:00:00Z',
+          statusLabel: 'Done',
+        },
+      ]
+    );
+    setReady(true);
+  }, [client]);
+  return ready ? children : null;
+}
+
+export const DoneForYou: Story = {
+  args: {
+    ...Empty.args,
+    initialView: 'done',
+    profileId: '11111111-1111-4111-8111-111111111111',
+  },
+  decorators: [
+    Story => (
+      <CompletedWorkFixture>
+        <Story />
+      </CompletedWorkFixture>
+    ),
+  ],
 };

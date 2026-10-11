@@ -112,6 +112,9 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: read
+          # Auto-merge on a head that edits .github/workflows needs it
+          # ("`workflows` scope may be required"); the installation grants it.
+          permission-workflows: write
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -168,9 +171,12 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Set up pinned Node and test dependencies
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Run unit tests for triage script
         run: node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/auto-merge-stuck-triage.test.js .github/scripts/customer-notes-ready.test.js
@@ -188,6 +194,7 @@ jobs:
           permission-issues: write
           permission-pull-requests: write
           permission-statuses: read
+          permission-workflows: write
       - name: Triage stuck PRs
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -213,7 +220,10 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pinned Node and test dependencies
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Run unit tests for triage script
         run: node --test --experimental-test-coverage --test-coverage-include=.github/scripts/customer-notes-ready.js --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/auto-merge-stuck-triage.test.js .github/scripts/customer-notes-ready.test.js

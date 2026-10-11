@@ -17,3 +17,7 @@ export const Default: Story = {
     defaultStatus: 'No walk recorded yet',
   },
 };
+
+export const Compact: Story = {
+  args: { defaultStatus: 'No walk recorded yet', compact: true },
+};

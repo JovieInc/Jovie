@@ -100,6 +100,21 @@ describe('bug-to-test rule', () => {
     ]);
   });
 
+  it.each([
+    'apps/ios/JovieTests/JovieAppIntentsTests.swift',
+    'apps/ios/Packages/JovieKit/Tests/JovieKitTests/JovieKitTests.swift',
+  ])('accepts the repository Swift test target convention %s', testFile => {
+    const evaluation = evaluateBugToTestRule({
+      changedFiles: ['apps/ios/Jovie/App/JovieApp.swift', testFile],
+      commitMessages: ['fix(ios): route push notification CTA URL on tap'],
+    });
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.regressionTestSignals).toEqual([
+      `changed test files: ${testFile}`,
+    ]);
+  });
+
   it('rejects non-test lookalike extensions', () => {
     const evaluation = evaluateBugToTestRule({
       changedFiles: [

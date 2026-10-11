@@ -5,8 +5,10 @@ import {
   STREAMING_DSP_KEYS,
 } from '@/lib/dsp-registry';
 import { captureError } from '@/lib/error-tracking';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
-import { musicfetchNetworkAllowed } from '@/lib/music-resolver/musicfetch-gate';
+import {
+  isMusicResolverFamilyEnabled,
+  musicfetchNetworkAllowed,
+} from '@/lib/music-resolver/musicfetch-gate';
 import { buildSpotifyTrackUrl } from '@/lib/spotify';
 import { spotifyClient } from '@/lib/spotify/client';
 
@@ -342,7 +344,7 @@ async function runIsrcLookups(
     );
   }
 
-  const inHouse = isCodeFlagEnabled('IN_HOUSE_RESOLVER');
+  const inHouse = isMusicResolverFamilyEnabled('provider_links');
   if (
     inHouse &&
     spotifyClient.isAvailable() &&

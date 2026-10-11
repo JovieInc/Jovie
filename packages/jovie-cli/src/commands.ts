@@ -8,6 +8,7 @@ import {
   type ReportKind,
   type ResourceOptions,
   reportIssue,
+  resolveMusic,
 } from './client.js';
 import { invokeFleetAction } from './fleet-client.js';
 import { FLEET_COMMANDS } from './fleet-contract.generated.js';
@@ -80,6 +81,39 @@ function report(kind: ReportKind) {
 }
 
 export const COMMANDS: readonly CommandSpec[] = [
+  {
+    path: ['music', 'resolve'],
+    tool: 'resolve_music',
+    summary:
+      'Resolve music links and artist identities through official catalogs and MusicBrainz. Ambiguous names return choices.',
+    arg: {
+      name: 'input',
+      description:
+        'Artist name/URL/MBID, track URL/ISRC, or album URL/UPC. Use --kind and --artist for track/album title searches.',
+    },
+    flags: [
+      { name: 'kind', description: 'artist (default), track, or album' },
+      {
+        name: 'artist',
+        description: 'Artist name for a track or album title search',
+      },
+      {
+        name: 'territory',
+        description: 'Two-letter country code for catalog lookup',
+      },
+    ],
+    readOnly: true,
+    run: (input, options) =>
+      resolveMusic(
+        required(input),
+        {
+          kind: input.flags?.kind,
+          artist: input.flags?.artist,
+          territory: input.flags?.territory,
+        },
+        options
+      ),
+  },
   ...FLEET_COMMANDS.map(command => ({
     internal: true,
     path: command.path,
@@ -133,10 +167,11 @@ export const COMMANDS: readonly CommandSpec[] = [
     path: ['creator', 'lookup'],
     tool: 'lookup_creator',
     summary:
-      'Extract public creator fields from a YouTube, Instagram, TikTok, or Linktree URL without creating a profile.',
+      'Resolve a creator to their existing Jovie profile, or extract public fields from a YouTube channel. Accepts a profile URL or platform:handle (youtube, instagram, tiktok, linktree); Instagram, TikTok, and Linktree only resolve existing profiles. Never creates a profile.',
     arg: {
-      name: 'url',
-      description: 'Supported creator profile URL',
+      name: 'url-or-handle',
+      description:
+        'Creator profile URL or platform:handle, e.g. youtube:@creator',
     },
     readOnly: true,
     run: (input, options) => lookupCreator(required(input), options),
@@ -169,7 +204,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     path: ['docs', 'llms'],
     tool: 'get_docs',
     summary:
-      'Fetch the Jovie agent guide (llms.txt; full=true for llms-full.txt).',
+      'Fetch the Jovie agent guide (llms.txt, or llms-full.txt with full).',
     acceptsFull: true,
     readOnly: true,
     run: (input, options) => fetchSiteLlms(input.full === true, options),

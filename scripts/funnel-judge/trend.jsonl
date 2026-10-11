@@ -1,0 +1,1 @@
+{"runId":"2026-10-03T22-56-57-960Z","at":"2026-10-03T23:00:34.076Z","baseUrl":"https://jov.ie","rubric":"funnel-judge-rubric-v1","pass":false,"payers":0,"worst":{"stepId":"start","score":0.8},"steps":{"outreach":{"v":1.2,"c":2.7,"e":1.4},"claim-landing":{"v":3.7,"c":6.2,"e":2.9},"start":{"v":0.3,"c":1.7,"e":0.5}}}

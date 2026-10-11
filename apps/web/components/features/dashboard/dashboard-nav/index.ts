@@ -21,6 +21,7 @@ export {
   linksNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
+  navigationVisibleForFlags,
   partitionCustomerNavigation,
   presenceNavItem,
   primaryNavigation,

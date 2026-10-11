@@ -141,6 +141,64 @@ describe('ingestion scheduler helpers', () => {
     expect(where).toHaveBeenCalled();
   });
 
+  it.each([1, 3])(
+    'owns MusicFetch recovery retries and terminal status at attempt %i',
+    async attempts => {
+      const where = vi.fn().mockResolvedValue(undefined);
+      const set = vi.fn().mockReturnValue({ where });
+      const tx = { update: vi.fn().mockReturnValue({ set }) } as never;
+      const creatorProfileId = '7e093f2b-a8f9-4559-a9df-8f789b4432f8';
+      const now = new Date('2026-10-03T00:00:00Z');
+      const job: Parameters<typeof handleIngestionJobFailure>[1] = {
+        id: '22222222-2222-4222-8222-222222222222',
+        jobType: 'musicfetch_enrichment',
+        payload: {
+          creatorProfileId,
+          spotifyUrl: 'https://open.spotify.com/artist/123',
+          dedupKey: 'musicfetch_enrichment:123',
+          recoveryClaimed: true,
+        },
+        status: 'processing',
+        error: null,
+        attempts,
+        maxAttempts: 3,
+        runAt: now,
+        priority: 0,
+        nextRunAt: null,
+        dedupKey: 'musicfetch_enrichment:123',
+        createdAt: now,
+        updatedAt: now,
+      };
+      await handleIngestionJobFailure(tx, job, new Error('provider timeout'));
+      if (attempts < job.maxAttempts) {
+        expect(mockRecordErrorForRetry).toHaveBeenCalledWith(
+          tx,
+          creatorProfileId,
+          'provider timeout'
+        );
+        expect(mockMarkFailedAfterRetries).not.toHaveBeenCalled();
+        const scheduled = set.mock.calls[0]?.[0];
+        expect(scheduled).toMatchObject({
+          status: 'pending',
+          error: 'provider timeout',
+          nextRunAt: expect.any(Date),
+          runAt: expect.any(Date),
+        });
+        expect(scheduled.nextRunAt).toBe(scheduled.runAt);
+      } else {
+        expect(mockRecordErrorForRetry).not.toHaveBeenCalled();
+        expect(mockMarkFailedAfterRetries).toHaveBeenCalledWith(
+          tx,
+          creatorProfileId,
+          'provider timeout'
+        );
+        expect(set).toHaveBeenCalledWith(
+          expect.objectContaining({ status: 'failed' })
+        );
+      }
+    }
+  );
+
   it('marks permanent failures as failed immediately in handleIngestionJobFailure', async () => {
     const where = vi.fn().mockResolvedValue(undefined);
     const set = vi.fn().mockReturnValue({ where });

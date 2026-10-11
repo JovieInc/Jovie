@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   existsSync,
   globSync,
   lstatSync,
@@ -132,6 +133,12 @@ const producerStageRequired = [
 ];
 // Image and Markdown evidence widen what an artifact may carry; each job
 // that opts in is reviewed here.
+// An expression-valued flag can evaluate true, so anything but an explicit
+// false counts as an allowance.
+const allowanceEnabled = (value: unknown) =>
+  value !== undefined &&
+  value !== false &&
+  !['', 'false'].includes(String(value));
 const imageAllowedJobs = new Set([
   'agent-tick.yml:synthetic-monitoring',
   'ci.yml:ci-fast-remaining',
@@ -139,6 +146,8 @@ const imageAllowedJobs = new Set([
   'ci.yml:ci-lighthouse-pr',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-compare',
+  // Manual public-profile CTA identity captures only (dispatch-gated flag).
+  'e2e-full-matrix.yml:e2e-full-matrix',
   'screenshots.yml:generate',
   'synthetic-monitoring.yml:synthetic-test',
   'visual-regression.yml:visual-regression',
@@ -1205,16 +1214,16 @@ ${fixtureCheckout}
         String(env.PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE) !== 'true'
           ? [`${key}:missing-producer-stage`]
           : []),
-        ...(String(env.PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES) === 'true' &&
+        ...(allowanceEnabled(env.PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES) &&
         !imageAllowedJobs.has(key)
           ? [`${key}:unreviewed-job-image-allowance`]
           : []),
         ...uploads.flatMap(step => [
-          ...(String(step.with?.['allow-images']) === 'true' &&
+          ...(allowanceEnabled(step.with?.['allow-images']) &&
           !imageAllowedJobs.has(key)
             ? [`${key}:${step.with?.name}:unreviewed-image-upload`]
             : []),
-          ...(String(step.with?.['allow-markdown']) === 'true' &&
+          ...(allowanceEnabled(step.with?.['allow-markdown']) &&
           !markdownAllowedJobs.has(key)
             ? [`${key}:${step.with?.name}:unreviewed-markdown-upload`]
             : []),
@@ -1222,6 +1231,12 @@ ${fixtureCheckout}
       ];
     });
     expect(violations).toEqual([]);
+    expect(
+      allowanceEnabled("${{ github.event_name == 'workflow_dispatch' }}")
+    ).toBe(true);
+    expect(allowanceEnabled(true)).toBe(true);
+    for (const disabled of [undefined, false, 'false', ''])
+      expect(allowanceEnabled(disabled)).toBe(false);
     for (const key of producerStageRequired) {
       const [file, id] = key.split(':');
       const job = workflowJobs().find(
@@ -1802,6 +1817,100 @@ ${fixtureCheckout}
       category: 'unknown-binary',
     });
   });
+
+  it.each(
+    ['', 'tests/e2e/synthetic-status.spec.ts'].flatMap(filter =>
+      ['test-failure', 'guard-failure', 'success'].map(outcome => ({
+        filter,
+        outcome,
+      }))
+    )
+  )(
+    'preserves the full-matrix $outcome through tee (filter=$filter)',
+    ({ filter, outcome }) => {
+      const job = policyWorkflow('e2e-full-matrix.yml').jobs?.[
+        'e2e-full-matrix'
+      ];
+      const step = job?.steps?.find(candidate => candidate.id === 'e2e-matrix');
+      expect(step?.run).toBeDefined();
+      expect(step?.['continue-on-error']).toBeUndefined();
+      const expressions: Record<string, string> = {
+        'github.event.inputs.test_filter': filter,
+        'matrix.browser': 'firefox',
+        'matrix.shard': '4',
+      };
+      const command = step!.run!.replace(
+        /\$\{\{\s*([^}]+?)\s*\}\}/g,
+        (_match, expression: string) => {
+          expect(expressions).toHaveProperty(expression);
+          return expressions[expression];
+        }
+      );
+      const workspace = fixture();
+      const runner = fixture();
+      const bin = join(workspace, 'bin');
+      mkdirSync(join(workspace, 'apps/web'), { recursive: true });
+      // Keep the actual producer and artifact protections. Only Playwright's
+      // child outcome is controlled: no browser, credentials or provider call.
+      write(
+        join(workspace, '.github/scripts', guardScriptName),
+        readFileSync(guardScript)
+      );
+      write(
+        join(workspace, 'scripts/lib/playwright-png.mjs'),
+        readFileSync(join(repoRoot, 'scripts/lib/playwright-png.mjs'))
+      );
+      const artifact =
+        outcome === 'guard-failure' ? 'forbidden.zip' : 'safe.json';
+      const childExit = outcome === 'test-failure' ? 7 : 0;
+      const child = join(bin, 'pnpm');
+      write(
+        child,
+        [
+          '#!/usr/bin/env node',
+          "const fs = require('node:fs');",
+          "fs.mkdirSync('test-results', { recursive: true });",
+          `fs.writeFileSync('test-results/${artifact}', ${JSON.stringify(outcome === 'guard-failure' ? 'synthetic forbidden container' : '{"ok":true}')});`,
+          "console.log('controlled Playwright outcome: ' + process.env.PIPELINE_TEST_OUTCOME);",
+          `process.exit(${childExit});`,
+        ].join('\n')
+      );
+      chmodSync(child, 0o700);
+      const result = spawnSync(
+        'bash',
+        ['--noprofile', '--norc', '-e', '-c', command],
+        {
+          cwd: workspace,
+          encoding: 'utf8',
+          timeout: 10_000,
+          env: baseEnv(workspace, runner, {
+            PATH: `${bin}:${dirname(process.execPath)}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_PATHS: 'apps/web/test-results',
+            PIPELINE_TEST_OUTCOME: outcome,
+          }),
+        }
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(
+        outcome === 'success' ? 0 : outcome === 'test-failure' ? 7 : 1
+      );
+      expect(readFileSync(join(runner, 'e2e-full.log'), 'utf8')).toContain(
+        `controlled Playwright outcome: ${outcome}`
+      );
+      const blocked = existsSync(
+        join(runner, 'safe-playwright-producer/blocked')
+      );
+      expect(blocked).toBe(outcome === 'guard-failure');
+      if (outcome === 'guard-failure') {
+        expect(result.stdout).toContain('forbidden-container:1');
+        expect(
+          existsSync(join(runner, 'safe-playwright-producer/current'))
+        ).toBe(false);
+      } else {
+        expect(currentStage(runner).stage).toBeTruthy();
+      }
+    }
+  );
 
   it.each([0, 1])('stages safe Markdown (exit %i)', producerExit => {
     const email = 'standing-user@example.test';

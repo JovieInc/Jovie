@@ -1,5 +1,9 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { buildIosAuthCompleteUrl, sanitizeReturnTo } from '@jovie/auth-routing';
+import {
+  buildIosAuthCompleteUrl,
+  isValidNativeAttempt,
+  sanitizeReturnTo,
+} from '@jovie/auth-routing';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   ensureLiveDevTestAuthActor,
@@ -16,6 +20,7 @@ export const runtime = 'nodejs';
 
 interface MobileCallbackRequest {
   readonly codeVerifier?: unknown;
+  readonly nativeAttempt?: unknown;
   readonly persona?: unknown;
   readonly returnTo?: unknown;
 }
@@ -132,6 +137,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const nativeAttempt = body.nativeAttempt;
+  if (!isValidNativeAttempt('ios', nativeAttempt)) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid nativeAttempt' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
   let userId = await resolveConfiguredNativeTestBetterAuthUserId();
   let responsePersona = persona;
   if (!userId) {
@@ -149,13 +162,15 @@ export async function POST(request: NextRequest) {
     userId,
     returnTo,
     codeChallenge: createCodeChallenge(codeVerifier),
+    ...(nativeAttempt !== undefined ? { nativeAttempt } : {}),
   });
 
   return NextResponse.json(
     {
       success: true,
       client: 'ios',
-      callbackUrl: buildIosAuthCompleteUrl({ code, state }),
+      callbackUrl: buildIosAuthCompleteUrl({ code, state, nativeAttempt }),
+      ...(nativeAttempt !== undefined ? { nativeAttempt } : {}),
       codeVerifier,
       state,
       returnTo,

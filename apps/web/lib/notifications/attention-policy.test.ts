@@ -26,7 +26,7 @@ function recipientPreferences(
       recipientKind: 'tim',
     }),
     weekendBehavior: 'suppress_weekends',
-    channels: { email: true, sms: true, push: true, in_app: true },
+    channels: { email: true, sms: true, push: true },
     marketingOptIn: true,
     marketingConsent: {
       version: 'recipient-marketing-v1',
@@ -179,7 +179,7 @@ describe('evaluateAttentionPolicy safeguards', () => {
     expect(
       evaluate({
         preferences: recipientPreferences({
-          channels: { email: true, sms: false, push: true, in_app: true },
+          channels: { email: true, sms: false, push: true },
         }),
         urgency: 'critical',
         now: MONDAY_0300_PT,

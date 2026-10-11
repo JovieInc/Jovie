@@ -3,7 +3,7 @@
   "contract": "jovie.certification/v1",
   "issue": "JOV-6064",
   "extends": "JOV-5853",
-  "matrixRevision": "2026-10-03.2",
+  "matrixRevision": "2026-10-04.1",
   "asOf": "2026-10-03T00:00:00Z",
   "evidenceMaxAgeMs": 2592000000,
   "scope": {
@@ -1097,12 +1097,16 @@
           {
             "ref": "apps/web/lib/canonical-surface-drift.test.tsx",
             "enforcement": "merge-group-blocking"
+          },
+          {
+            "ref": "apps/web/tests/e2e/utils/shell-material-detector.ts",
+            "enforcement": "scheduled"
           }
         ],
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
         "blindSpots": [
-          "No composed real-shell route (tables, library, tasks, chat, entity rail) is checked for single-material main surface.",
-          "No computed-background assertion across header+body of one semantic level."
+          "Single-material main plane is measured on composed /demo shell routes at desktop only, after merge (screenshots.yml) and on PR Visual Review (advisory); authenticated routes (tasks, contacts, chat, library), mobile and the entity rail are not measured.",
+          "shell-material-baseline.json ratchets 10 known nested materials (earnings 6, release-tracked-links 2, links 1, settings 1)."
         ],
         "remediationOwner": "JOV-7710"
       }
@@ -1204,6 +1208,10 @@
             {
               "kind": "test",
               "ref": "apps/web/components/atoms/RailToggleButton.test.tsx"
+            },
+            {
+              "kind": "test",
+              "ref": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx"
             }
           ]
         },
@@ -1234,6 +1242,12 @@
             "enforcement": "merge-group-blocking"
           },
           {
+            "ref": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
+            "enforcement": "merge-group-blocking",
+            "deliberateRed": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
+            "liveStatus": "green"
+          },
+          {
             "ref": "apps/ovie/scripts/desktop-sidebar-contract.test.mjs",
             "enforcement": "merge-group-blocking"
           },
@@ -1244,7 +1258,7 @@
         ],
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
         "blindSpots": [
-          "No reversible-control transition-graph certification yet (expanded->collapsed->expanded, repeated, keyboard, mixed input, hydrated); detector lands in #20397.",
+          "Reversible-control certification covers the sidebar state machine in jsdom only; composed shell placement, Electron titlebar and the right rail are not yet driven.",
           "apps/ovie app-shell invariants check source strings (e.g. titlebar marker) rather than rendered geometry."
         ],
         "remediationOwner": "JOV-7710"
@@ -1608,7 +1622,8 @@
       "id": "ESC-UI-001",
       "summary": "Sidebar toggle works only from one state",
       "issue": "JOV-7207",
-      "caught": false,
+      "caught": true,
+      "fixture": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
       "row": "AM-019"
     },
     {

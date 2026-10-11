@@ -1,6 +1,25 @@
 import { APP_ROUTES } from '@/constants/routes';
 import type { MerchDesignLane } from '@/lib/merch/types';
+import { CREATOR_TYPES } from '@/types';
 import type { CreatorType } from '@/types/db';
+
+/**
+ * One broad identity type: every profile is a 'creator'. The remaining
+ * creator_type values act as optional professions on that identity rather
+ * than separate kinds of profile, so UI must never assume a musician.
+ */
+export const BASE_CREATOR_TYPE = 'creator' as const satisfies CreatorType;
+
+export type CreatorProfession = Exclude<CreatorType, typeof BASE_CREATOR_TYPE>;
+
+export const CREATOR_PROFESSIONS: readonly CreatorProfession[] =
+  CREATOR_TYPES.filter(
+    (type): type is CreatorProfession => type !== BASE_CREATOR_TYPE
+  );
+
+export function isCreatorProfession(value: string): value is CreatorProfession {
+  return (CREATOR_PROFESSIONS as readonly string[]).includes(value);
+}
 
 /**
  * Display names for the existing creator_type values.

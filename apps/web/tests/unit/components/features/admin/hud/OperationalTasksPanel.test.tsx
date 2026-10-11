@@ -1,17 +1,54 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { useState } from 'react';
+import {
+  fireEvent,
+  render as renderWithRoot,
+  screen,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { OperationalTasksPanelView } from '@/components/features/admin/hud/OperationalTasksPanel';
+import {
+  OperationalTasksPanel,
+  OperationalTasksPanelView,
+} from '@/components/features/admin/hud/OperationalTasksPanel';
+import {
+  RightPanelProvider,
+  useRightPanel,
+} from '@/contexts/RightPanelContext';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
 type OperationalTask = OperationalTaskFeed['tasks'][number];
 
-function Harness({ feed }: Readonly<{ feed: OperationalTaskFeed }>) {
+const { mockTaskQuery } = vi.hoisted(() => ({ mockTaskQuery: vi.fn() }));
+vi.mock('@/components/features/admin/hud/useHudShippingStateQuery', () => ({
+  useHudShippingStateQuery: mockTaskQuery,
+}));
+
+function ShellRail() {
+  return <div data-testid='shell-rail'>{useRightPanel()}</div>;
+}
+
+function render(ui: ReactNode) {
+  return renderWithRoot(
+    <RightPanelProvider>
+      {ui}
+      <ShellRail />
+    </RightPanelProvider>
+  );
+}
+
+function Harness({
+  feed,
+  presentation = 'section',
+}: Readonly<{
+  feed: OperationalTaskFeed;
+  presentation?: 'section' | 'page';
+}>) {
   const [selected, setSelected] = useState<OperationalTask['id'] | null>(null);
   return (
     <OperationalTasksPanelView
       feed={feed}
+      presentation={presentation}
       selectedTaskId={selected}
       onSelectTask={setSelected}
     />
@@ -49,6 +86,35 @@ function feed(
 }
 
 describe('OperationalTasksPanelView', () => {
+  it('connects the live query wrapper to page inspection and request state', () => {
+    mockTaskQuery.mockReturnValue({
+      isFetching: false,
+      operationalRequestState: 'error',
+      operationalTasks: feed(),
+    });
+    renderWithRoot(
+      <RightPanelProvider>
+        <OperationalTasksPanel presentation='page' />
+        <ShellRail />
+      </RightPanelProvider>
+    );
+
+    expect(mockTaskQuery).toHaveBeenCalledWith(null);
+    expect(screen.getByText('Stale Cache')).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('region', { name: 'Operational Tasks' })
+        .querySelector('.overflow-y-auto')
+    ).toBeNull();
+    const inspect = screen.getByRole('button', { name: /Inspect JOV-5544/ });
+    fireEvent.click(inspect);
+    expect(inspect).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('shell-rail')).toContainElement(
+      screen.getByTestId('shipping-row-rail')
+    );
+    mockTaskQuery.mockReset();
+  });
+
   it('renders the stable Linear identity from the local reconciled cache', () => {
     render(<OperationalTasksPanelView feed={feed()} />);
 
@@ -65,6 +131,27 @@ describe('OperationalTasksPanelView', () => {
     );
     expect(panel.className).toContain('overflow-hidden');
     expect(panel.className.split(/\s+/)).not.toContain('p-0');
+  });
+
+  it('uses page scrolling and exposes the full task identity as a link', () => {
+    render(<OperationalTasksPanelView feed={feed()} presentation='page' />);
+    const panel = screen.getByRole('region', { name: 'Operational Tasks' });
+    expect(panel.querySelector('.overflow-y-auto')).toBeNull();
+    expect(panel.className).not.toContain('bg-surface');
+    const link = screen.getByRole('link', { name: feed().tasks[0].title });
+    expect(link).toHaveAttribute('href', feed().tasks[0].linearUrl);
+    expect(link).toHaveAttribute('title', feed().tasks[0].title);
+  });
+
+  it('retains a readable title when the source has no Linear URL', () => {
+    render(
+      <OperationalTasksPanelView
+        feed={feed({ tasks: [{ ...feed().tasks[0], linearUrl: null }] })}
+        presentation='page'
+      />
+    );
+    expect(screen.getByText(feed().tasks[0].title)).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('makes a running-to-retrying transition visually explicit', () => {
@@ -95,7 +182,7 @@ describe('OperationalTasksPanelView', () => {
     expect(screen.getByText('Retrying')).toBeInTheDocument();
     expect(screen.getByText('Attempt 3')).toBeInTheDocument();
     expect(screen.getByText('Retry scheduled')).toBeInTheDocument();
-    expect(screen.getByText('running → retrying')).toBeInTheDocument();
+    expect(screen.getByText('Running → Retrying')).toBeInTheDocument();
   });
 
   it('keeps last-known tasks visible and labels them stale after a request error', () => {
@@ -170,6 +257,52 @@ describe('OperationalTasksPanelView', () => {
       expect(rail).toHaveTextContent('Next Expected Action');
       expect(rail).toHaveTextContent('#42 on GitHub');
       expect(rail).toHaveTextContent('JOV-5544');
+    });
+
+    it('keeps task inspection available on the flat page presentation', () => {
+      render(<Harness feed={blockedFeed()} presentation='page' />);
+
+      const inspect = screen.getByRole('button', {
+        name: 'Inspect JOV-5544: Cache Symphony workspaces on NVMe',
+      });
+      expect(
+        screen.getByRole('link', { name: feed().tasks[0].title })
+      ).toHaveAttribute('href', feed().tasks[0].linearUrl);
+      expect(
+        screen
+          .getByRole('region', { name: 'Operational Tasks' })
+          .querySelector('.overflow-y-auto')
+      ).toBeNull();
+
+      fireEvent.click(inspect);
+      expect(inspect).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByTestId('shell-rail')).toContainElement(
+        screen.getByTestId('shipping-row-rail')
+      );
+      expect(screen.getByTestId('shipping-row-rail')).toHaveTextContent(
+        'PR Ready'
+      );
+
+      fireEvent.click(inspect);
+      expect(inspect).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByTestId('shipping-row-rail')).toHaveAttribute(
+        'aria-hidden',
+        'true'
+      );
+      expect(screen.getByTestId('shipping-row-rail')).toHaveAttribute('inert');
+    });
+
+    it('offers a pointer-accessible close action inside task details', async () => {
+      const user = userEvent.setup();
+      render(<Harness feed={blockedFeed()} presentation='page' />);
+      const inspect = screen.getByRole('button', { name: /Inspect JOV-5544/ });
+
+      await user.click(inspect);
+      await user.click(screen.getByRole('button', { name: 'More actions' }));
+      await user.click(screen.getByRole('menuitem', { name: 'Close' }));
+
+      expect(inspect).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByTestId('shipping-row-rail')).toHaveAttribute('inert');
     });
 
     it('requests the canonical reconcile and shows the durable receipt', async () => {

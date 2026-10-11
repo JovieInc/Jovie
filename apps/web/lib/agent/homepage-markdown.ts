@@ -46,6 +46,14 @@ function renderIdentitySections(): string {
     .join('\n\n');
 }
 
+function renderFaq(): string {
+  const { faq } = HOMEPAGE_IDENTITY_COPY;
+  return [
+    `## ${faq.heading}`,
+    ...faq.items.map(item => `\n### ${item.question}\n\n${item.answer}`),
+  ].join('\n');
+}
+
 /**
  * Markdown representation of the public homepage for Accept: text/markdown.
  * Projects approved identity copy. The music launch document is a separate surface.
@@ -62,6 +70,8 @@ ${COMPANY_IDENTITY.definition}
 ${hero.claim.action} ${hero.claim.domain}${hero.claim.placeholder}: ${toAbsolutePublicUrl(APP_ROUTES.START)}
 
 ${renderIdentitySections()}
+
+${renderFaq()}
 
 ## ${close.headline}
 

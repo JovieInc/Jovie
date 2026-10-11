@@ -16,10 +16,10 @@
       "package.json",
       "apps/console/package.json",
       "apps/ovie/package.json",
-      "apps/web/package.json",
-      "packages/jovie-cli/package.json"
+      "apps/web/package.json"
     ],
     "minimumOnly": [
+      "packages/jovie-cli/package.json",
       "apps/docs/package.json",
       "apps/should-i-make/package.json",
       "packages/ui/package.json"

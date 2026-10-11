@@ -87,4 +87,114 @@ describe('mobile chat tool artifacts', () => {
       ])
     ).toBe('Done.');
   });
+
+  it('preserves existing bytes after JSONB key reordering and wire normalization', () => {
+    const event = merchEvent({
+      toolName: 'createMerch',
+      toolCallId: 'call-1',
+      state: 'succeeded',
+      output: { ...generationOutput, omitted: undefined },
+    });
+    const live = embedMobileMerchArtifactsInContent('Original prose.  ', [
+      event,
+    ]);
+    const reordered = {
+      options: generationOutput.options.map(option =>
+        Object.fromEntries(Object.entries(option).reverse())
+      ),
+      generationId: generationOutput.generationId,
+      success: true,
+    };
+    expect(
+      embedMobileMerchArtifactsInContent(live, [
+        { ...event, output: reordered },
+      ])
+    ).toBe(live);
+  });
+
+  it('appends only missing valid artifacts to mixed legacy and embedded content', () => {
+    const first = merchEvent({
+      toolName: 'createMerch',
+      toolCallId: 'first',
+      state: 'succeeded',
+      output: generationOutput,
+    });
+    const second = merchEvent({
+      toolName: 'previewMerchOptions',
+      toolCallId: 'second',
+      state: 'succeeded',
+      output: { success: true, generationId: 'preview', designs: [] },
+    });
+    const invalid = merchEvent({
+      toolName: 'createMerch',
+      toolCallId: 'bad',
+      state: 'succeeded',
+      output: { success: false },
+    });
+    const legacy = 'Legacy plain content';
+    const live = embedMobileMerchArtifactsInContent(legacy, [first]);
+    const missing = embedMobileMerchArtifactsInContent('', [second]);
+    const mixed = embedMobileMerchArtifactsInContent(live, [
+      first,
+      second,
+      invalid,
+    ]);
+    expect(mixed).toBe(`${live}\n${missing}`);
+    expect(
+      embedMobileMerchArtifactsInContent(mixed, [first, second, invalid])
+    ).toBe(mixed);
+    expect(embedMobileMerchArtifactsInContent(legacy, [first, second])).toBe(
+      mixed
+    );
+  });
+
+  it('retains distinct same-output call multiplicity across repeated reloads', () => {
+    const first = merchEvent({
+      toolName: 'createMerch',
+      toolCallId: 'first',
+      state: 'succeeded',
+      output: generationOutput,
+    });
+    const second = { ...first, toolCallId: 'second' };
+    const one = embedMobileMerchArtifactsInContent('', [first]);
+    const two = embedMobileMerchArtifactsInContent(one, [first, second]);
+    expect(two).toBe(`${one}\n${one}`);
+    expect(embedMobileMerchArtifactsInContent(two, [first, second])).toBe(two);
+  });
+
+  it.each([
+    'malformed-json',
+    'failed-state',
+    'unsupported-name',
+    'failed-output',
+    'different-output',
+    'lookalike',
+  ])('does not let a %s envelope suppress a valid artifact', kind => {
+    const event = merchEvent({
+      toolName: 'createMerch',
+      toolCallId: 'call-1',
+      state: 'succeeded',
+      output: generationOutput,
+    });
+    const canonical = embedMobileMerchArtifactsInContent('', [event]);
+    let existing = canonical;
+    if (kind === 'malformed-json')
+      existing = canonical.replace('<json>{', '<json>{not-json');
+    if (kind === 'failed-state')
+      existing = canonical.replace('<state>success', '<state>failed');
+    if (kind === 'unsupported-name')
+      existing = canonical.replace('<name>createMerch', '<name>unknown');
+    if (kind === 'failed-output')
+      existing = canonical.replace('"success":true', '"success":false');
+    if (kind === 'different-output')
+      existing = canonical.replace('gen-1', 'gen-other');
+    if (kind === 'lookalike')
+      existing = canonical.replace(
+        '<tool_result>',
+        '<tool_result extra="true">'
+      );
+    expect(embedMobileMerchArtifactsInContent(existing, [event])).toBe(
+      `${existing}\n${canonical}`
+    );
+  });
 });

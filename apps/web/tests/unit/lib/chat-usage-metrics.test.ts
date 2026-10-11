@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatUsageResetLabel,
   formatUsageResetTime,
   getWeeklyUsageModel,
 } from '@/lib/chat-usage/metrics';
@@ -40,5 +41,15 @@ describe('chat usage metrics', () => {
   it('formats compact reset labels for the inline menu', () => {
     expect(formatUsageResetTime('2026-05-23T19:27:00.000Z')).toMatch(/PM|AM/);
     expect(formatUsageResetTime(null)).toBe('—');
+  });
+  it('only prefixes a real reset and includes the display timezone', () => {
+    expect(formatUsageResetLabel(null)).toBe('Reset timing unavailable');
+    expect(formatUsageResetLabel('invalid')).toBe('Reset timing unavailable');
+    const value = '2026-10-08T07:00:00.000Z';
+    const zone = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
+      .formatToParts(new Date(value))
+      .find(part => part.type === 'timeZoneName')?.value;
+    expect(formatUsageResetLabel(value)).toContain(zone);
+    expect(formatUsageResetLabel(value)).toMatch(/^Resets /);
   });
 });

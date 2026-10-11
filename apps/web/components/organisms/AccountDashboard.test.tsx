@@ -12,9 +12,10 @@ describe('AccountDashboard', () => {
     expect(
       screen.getByRole('link', { name: 'Manage Billing' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Edit Profile' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Edit Profile' })).toHaveAttribute(
+      'href',
+      '/app/settings/profile'
+    );
     expect(
       screen.getByRole('link', { name: 'View Settings' })
     ).toBeInTheDocument();

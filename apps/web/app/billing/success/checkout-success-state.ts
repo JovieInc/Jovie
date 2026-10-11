@@ -132,8 +132,11 @@ export function isArtistVisibilityPlan(plan: PaidPlanId): boolean {
 export function getPaidSuccessPrimaryHref(input: {
   readonly plan: PaidPlanId;
   readonly isOnboardingUpgrade: boolean;
+  /** Paid before claiming a link: claim or create it next. */
+  readonly needsProfile?: boolean;
 }): string {
   if (input.isOnboardingUpgrade) return APP_ROUTES.DASHBOARD;
+  if (input.needsProfile) return APP_ROUTES.START;
   return isArtistVisibilityPlan(input.plan)
     ? APP_ROUTES.PRESENCE
     : APP_ROUTES.CHAT;
@@ -142,8 +145,10 @@ export function getPaidSuccessPrimaryHref(input: {
 export function getPaidSuccessPrimaryLabel(input: {
   readonly plan: PaidPlanId;
   readonly isOnboardingUpgrade: boolean;
+  readonly needsProfile?: boolean;
 }): string {
   if (input.isOnboardingUpgrade) return 'Explore your dashboard';
+  if (input.needsProfile) return 'Claim your link';
   return isArtistVisibilityPlan(input.plan)
     ? 'Open Artist Visibility'
     : 'Go to chat';

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { withDashboardProviders } from '@/.storybook/dashboard-fixtures';
 import { TasksPageClient } from './TasksPageClient';
 
 const meta = {
@@ -10,6 +11,7 @@ const meta = {
       uncoveredProps: ['loading', 'isLoading'],
     },
   },
+  decorators: [withDashboardProviders],
 } satisfies Meta<typeof TasksPageClient>;
 
 export default meta;

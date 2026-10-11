@@ -6,6 +6,7 @@ import {
   buildIosAuthCompleteUrl,
   type ElectronAuthCompleteProtocol,
   getElectronAuthCompleteProtocolForOrigin,
+  isValidNativeAttempt,
   NATIVE_HANDBACK_BOUNCE_PATHS,
   type NativeAuthClient,
   parseDesktopLoopbackPortParam,
@@ -72,7 +73,15 @@ function NativeReturnContent() {
   const nativeReturnParams = useMemo(() => {
     const code = sanitizeExchangeCode(searchParams.get('code'));
     const state = sanitizeExchangeCode(searchParams.get('state'));
-    if (!code || !state) return null;
+    const attempts = searchParams.getAll('native_attempt');
+    const nativeAttempt = attempts[0];
+    if (
+      !code ||
+      !state ||
+      attempts.length > 1 ||
+      !isValidNativeAttempt(client, nativeAttempt)
+    )
+      return null;
 
     const rawDesktopFlow = searchParams.get('desktop_flow');
     const desktopFlow =
@@ -80,8 +89,8 @@ function NativeReturnContent() {
         ? rawDesktopFlow
         : null;
 
-    return { code, state, desktopFlow };
-  }, [searchParams]);
+    return { code, state, desktopFlow, nativeAttempt };
+  }, [client, searchParams]);
 
   // Fallback when the deep link cannot reach the app: the user types this
   // into the Mac app, which redeems it with its own PKCE verifier.

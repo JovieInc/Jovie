@@ -52,6 +52,25 @@ describe('onboarding sign-in placement', () => {
     );
   });
 
+  it('keeps sign-in reachable when a taken handle tells the owner to sign in (JOV-7753)', () => {
+    render(
+      <OnboardingShell
+        sessionLabel='pending'
+        entryProfile={{
+          status: 'claimed',
+          handle: 'tim',
+          displayName: 'Tim White',
+          avatarUrl: null,
+        }}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.SIGNIN
+    );
+  });
+
   it('hides sign-in after the server resolves an authenticated session', () => {
     render(<OnboardingShell sessionLabel='pending' isSignedIn />);
 
@@ -74,6 +93,27 @@ describe('onboarding sign-in placement', () => {
       );
     }
   );
+
+  it('keeps the taken-handle intro free of a second sign-in control (JOV-7753)', () => {
+    render(
+      <OnboardingChatEmptyIntro
+        mode='handle_entry'
+        entryProfile={{
+          status: 'claimed',
+          handle: 'tim',
+          displayName: 'Tim White',
+          avatarUrl: null,
+        }}
+        onTryAnotherName={() => {}}
+      />
+    );
+
+    // The shell header owns Sign in; the intro offers the other next step.
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Try Another Name' })
+    ).toBeInTheDocument();
+  });
 
   it('removes the centered duplicate and starter rail from the blank entry', () => {
     render(<OnboardingChatEmptyIntro mode='blank' />);

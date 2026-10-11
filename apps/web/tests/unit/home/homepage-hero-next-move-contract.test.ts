@@ -159,9 +159,7 @@ describe('homepage hero contract (JOV-5864)', () => {
       'utf8'
     );
 
-    expect(smartLinkSource).toContain(
-      '`${PROFILE_URL}${release.smartLinkPath}`'
-    );
+    expect(smartLinkSource).toContain('`${BASE_URL}${release.smartLinkPath}`');
     expect(demoDataSource).toContain("? 'calvinharris'");
     expect(demoDataSource).toContain(
       'smartLinkPath: `/${publicHandle}/${release.slug}`'

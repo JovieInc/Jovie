@@ -178,6 +178,14 @@ async function runEnvironmentValidationWithRetry() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { musicResolverCutoverReceipt } = await import(
+      '@/lib/music-resolver/musicfetch-gate'
+    );
+    console.info(
+      '[STARTUP] Music resolver cutover receipt',
+      musicResolverCutoverReceipt()
+    );
+
     if (!isLocalTestRuntime() && process.env.CI !== 'true') {
       // Agnost AI analytics (Vercel AI SDK spans via OpenTelemetry).
       // Lazy import keeps OTel out of Edge bundles; init failure must not block boot.

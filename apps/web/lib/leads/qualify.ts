@@ -54,11 +54,9 @@ export interface QualifyLeadOptions {
  * Qualifies a Linktree URL by fetching, extracting, and evaluating signals.
  *
  * Rules:
- * Legacy compatibility projection for the premade artist-profile job.
- * Only an explicit Spotify artist URL satisfies the identity prerequisite,
- * and that path still does not certify commercial fit.
- * FEATURE_LEAD_QUALIFY_GENERIC=true qualifies a public name plus any public
- * link, including creators with no Spotify URL.
+ * Identity-only qualification for the legacy outreach pipeline. A public
+ * display name plus any public link qualifies; Spotify is an observed signal,
+ * never a prerequisite.
  * Public badges, branding, and tool links are observations, never proof of
  * paid access or commercial intent.
  */
@@ -110,8 +108,6 @@ export async function qualifyLead(
   const decision = decideLeadQualification({
     displayName: extraction.displayName ?? null,
     links: extraction.links,
-    hasSpotifyArtistUrl: hasSpotifyLink,
-    spotifyLinkCount: spotifyLinks.length,
   });
   const status = decision.status;
   const disqualificationReason = decision.disqualificationReason;

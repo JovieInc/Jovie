@@ -368,6 +368,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Artist research ready',
     errorTitle: "Couldn't research this artist",
   },
+  checkLinkDrift: {
+    label: 'Link check',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Checking your bio links…',
+    successTitle: 'Link check ready',
+    errorTitle: "Couldn't check your bio links",
+  },
   surfaceLibraryOpportunities: {
     label: 'Work opportunities',
     uiHint: 'artifact',

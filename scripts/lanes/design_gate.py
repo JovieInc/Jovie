@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
 """Design gate for Symphony build lanes (JOV-7541).
 
-UI and landing work is admitted to a build lane only after a design brief
-completes steps 1–9 of the founder's IA-first pipeline, and only with
-certified product-truth capability ids. Pure stdlib. No I/O at import. An
-incomplete brief is not claimed; the runner reports `needs-design-brief` and,
-at most once, adds the existing Linear label so a design pass can write the
-brief. Admission clears on its own once steps 1–9 are complete.
+UI and landing work follows a design brief that completes steps 1–9 of the
+founder's IA-first pipeline, citing only certified product-truth capability
+ids. Pure stdlib. No I/O at import.
+
+Tim 2026-10-11: no issue waits on another agent or a human for its brief. A
+gated issue whose brief is missing or incomplete is admitted as `brief-auto`:
+the claiming build run writes its own brief from the template and canon, then
+builds in the same run (lane_runner.DESIGN_LOOP_CONTRACT). The open taste call
+goes to Tim once as a founder work order and never blocks the build. App-UI
+issues use their own steps 5–7 (screens/states, canonical primitives,
+viewports); marketing keeps sections, copy and imagery.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import sys
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # Marketing and landing surfaces. The CI check imports this tuple; do not
@@ -66,17 +74,33 @@ IMAGERY_TYPES = frozenset({
     "mac mockup",
 })
 
+# Legacy hold label. Nothing adds it any more; a brief-auto claim removes it.
 NEEDS_BRIEF_LABEL = "needs-design-brief"
 NEEDS_BRIEF_LABEL_ID = "5fa70dd4-2c23-4ed7-a6db-73bf4910b333"
-NEEDS_BRIEF_REASON = "needs-design-brief"
 
-# The brief lane is the same provider, run once per issue with a brief-only
-# prompt. Its output lands inline in the issue under this marker; no PR is
-# opened, so merge sync cannot close the issue before it is built.
-BRIEF_MARKER = "<!-- design-gate:brief-lane -->"
-BRIEF_FILE = ".design-brief.md"
-# Remote-only lanes have no local worktree for the brief file.
-BRIEF_SKIP_PROVIDERS = frozenset({"hyperagent"})
+BRIEF_AUTO_LABEL = "brief-auto"
+BRIEF_AUTO_LABEL_ID = "19aa571f-3e18-499e-8256-64f62d478134"
+BRIEF_AUTO_REASON = "brief-auto"
+
+# App-UI brief steps 5–7 (JOV-7713 class 6 state vocabulary).
+APP_UI_STATES = frozenset({
+    "loading", "empty", "populated", "partial", "error", "retry", "success",
+    "disabled", "locked", "offline", "stale", "refreshing", "confirm",
+})
+APP_UI_VIEWPORTS = frozenset({"mobile", "tablet", "desktop", "mac-app", "ios"})
+TEMPLATES = {
+    "marketing": "docs/design/design-brief-template.md",
+    "app": "docs/design/app-ui-brief-template.md",
+}
+_PRIMITIVES_CACHE: dict | None = None
+
+# Titles that are routing or backend plumbing, not a visible UI change.
+_PLUMBING = re.compile(
+    r"\b(?:redirect(?:s|ed|ing)?|rewrites?|alias(?:es)?|unlinked|orphan(?:ed)?|sitemaps?|"
+    r"robots\.txt|api routes?|route handlers?|endpoints?|webhooks?|cron(?:s| jobs?)?|"
+    r"migrations?|backend)\b",
+    re.IGNORECASE,
+)
 
 BRIEF_STEPS = tuple(range(1, 10))
 _CERTIFIED_CACHE: dict | None = None
@@ -88,6 +112,8 @@ _SURFACE = re.compile(
 _BRIEF_LINK = re.compile(r"(?im)^[ \t>*-]*design brief:[ \t]*(\S+)\s*$")
 _HEADING = re.compile(r"(?m)^##[ \t]+(?P<step>10|[1-9])\.[ \t]+[^\n]*\n?")
 _ID_LINE = re.compile(r"(?m)^[ \t]*[-*][ \t]+`?([a-z0-9]+(?:-[a-z0-9]+)*)`?[ \t]*$")
+_PRIMITIVE_LINE = re.compile(
+    r"(?m)^[ \t]*[-*][ \t]+`?([a-z]+\.[a-z0-9]+(?:-[a-z0-9]+)*)`?[ \t]*$")
 _SECTION_LINE = re.compile(r"(?m)^[ \t]*[-*][ \t]+`?([a-z][a-z0-9-]*)`?[ \t]*$")
 _KEYED_LINE = re.compile(
     r"(?m)^[ \t]*[-*][ \t]+`?([a-z][a-z0-9-]*)`?[ \t]*:[ \t]*(.+?)\s*$")
@@ -131,16 +157,41 @@ def targets_gated_surface(text: str) -> bool:
     return _SURFACE.search(normalized) is not None
 
 
+def changes_visible_ui(issue) -> bool:
+    """False for redirects, aliases, orphans and backend/route plumbing titles."""
+    return _PLUMBING.search(getattr(issue, "title", "") or "") is None
+
+
+def _gated_path_in(issue) -> bool:
+    description = (getattr(issue, "description", "") or "").replace("\\", "/")
+    return any(prefix in description for prefix in GATED_PATH_PREFIXES)
+
+
 def is_design_gated(issue) -> bool:
-    """True for ws:ui-ia, ws:profiles-marketing, ws:design-gate, or a landing surface."""
+    """Visible-UI work with ws:ui-ia, ws:profiles-marketing, ws:design-gate, a
+    landing surface in the title, or a gated path in the description.
+
+    A homepage or landing page merely mentioned in the description (a link,
+    context) does not gate; neither does routing or backend plumbing.
+    """
+    if not changes_visible_ui(issue):
+        return False
     labels = getattr(issue, "labels", ()) or ()
     if _labels(issue) & GATED_WS_LABELS:
         return True
     if _explicit_workstream(labels) in GATED_WORKSTREAM_KEYS:
         return True
-    title = getattr(issue, "title", "") or ""
-    description = getattr(issue, "description", "") or ""
-    return targets_gated_surface(f"{title}\n{description}")
+    return _gated_path_in(issue) or targets_gated_surface(getattr(issue, "title", "") or "")
+
+
+def brief_variant(issue) -> str:
+    """`marketing` for landing/marketing surfaces, otherwise `app`."""
+    labels = getattr(issue, "labels", ()) or ()
+    if "ws:profiles-marketing" in _labels(issue) or _explicit_workstream(labels) == "profiles-marketing":
+        return "marketing"
+    if _gated_path_in(issue) or targets_gated_surface(getattr(issue, "title", "") or ""):
+        return "marketing"
+    return "app"
 
 
 def certified_catalog() -> dict:
@@ -160,10 +211,32 @@ def registry_ids() -> frozenset[str]:
     return frozenset(certified_catalog()["registryIds"])
 
 
+def primitive_ids() -> frozenset[str]:
+    """Checked-in projection of the canonical UI primitive registries."""
+    global _PRIMITIVES_CACHE
+    if _PRIMITIVES_CACHE is None:
+        path = Path(__file__).with_name("app-ui-primitives.gen.json")
+        _PRIMITIVES_CACHE = json.loads(path.read_text(encoding="utf-8"))
+    return frozenset(_PRIMITIVES_CACHE["ids"])
+
+
+def primitive_ids_from_sources(component_registry: str, app_screen_registry: str) -> list[str]:
+    """`DESIGN_SYSTEM_COMPONENT_IDS` plus the `AppScreenComponentId` union."""
+    ids = []
+    match = re.search(r"DESIGN_SYSTEM_COMPONENT_IDS\s*=\s*\[(.*?)\]", component_registry, re.S)
+    if match:
+        ids += re.findall(r"'([a-z]+\.[a-z0-9-]+)'", match.group(1))
+    match = re.search(r"type AppScreenComponentId\s*=(.*?);", app_screen_registry, re.S)
+    if match:
+        ids += re.findall(r"'(component\.[a-z0-9-]+)'", match.group(1))
+    return sorted(set(ids))
+
+
 def reset_catalog_cache() -> None:
     """Tests only."""
-    global _CERTIFIED_CACHE
+    global _CERTIFIED_CACHE, _PRIMITIVES_CACHE
     _CERTIFIED_CACHE = None
+    _PRIMITIVES_CACHE = None
 
 
 # ---------------------------------------------------------------- registry sync
@@ -427,6 +500,47 @@ def _artifact_ok(value: str) -> bool:
     return False
 
 
+def _marketing_steps_missing(bodies: dict[int, str]) -> list[int]:
+    missing = []
+    sections, layout_ok = _layout_sections(bodies.get(5, ""))
+    if not layout_ok:
+        missing.append(5)
+
+    copies = _keyed(bodies.get(6, ""))
+    if not sections or any(not _filled(copies.get(section_id, "")) for section_id in sections):
+        missing.append(6)
+
+    imagery = _keyed(bodies.get(7, ""))
+    if (not sections or any(section_id not in imagery or not _imagery_ok(imagery[section_id])
+                            for section_id in sections)
+            or any(not _imagery_ok(value) for value in imagery.values())):
+        missing.append(7)
+    return missing
+
+
+def _vocabulary_list(value: str, allowed: frozenset[str]) -> bool:
+    items = [item.strip().lower() for item in (value or "").split(",")]
+    return bool(items) and all(item in allowed for item in items)
+
+
+def _app_steps_missing(bodies: dict[int, str]) -> list[int]:
+    """5: `- screen: loading, empty, error`; 6: primitive ids; 7: `- screen: mobile, desktop`."""
+    missing = []
+    states = _keyed(bodies.get(5, ""))
+    if not states or any(not _vocabulary_list(value, APP_UI_STATES) for value in states.values()):
+        missing.append(5)
+
+    primitives = _PRIMITIVE_LINE.findall(bodies.get(6, ""))
+    if not primitives or any(item not in primitive_ids() for item in primitives):
+        missing.append(6)
+
+    viewports = _keyed(bodies.get(7, ""))
+    if (not states or any(screen not in viewports for screen in states)
+            or any(not _vocabulary_list(value, APP_UI_VIEWPORTS) for value in viewports.values())):
+        missing.append(7)
+    return missing
+
+
 def _empty_status(source: str, link) -> dict:
     return {
         "complete": False,
@@ -437,8 +551,12 @@ def _empty_status(source: str, link) -> dict:
     }
 
 
-def brief_status(issue_text: str, linked_doc_text: str | None = None) -> dict:
+def brief_status(issue_text: str, linked_doc_text: str | None = None,
+                 variant: str = "marketing") -> dict:
     """Completeness of steps 1–9 plus any invalid capability ids.
+
+    `variant="app"` checks steps 5–7 as screens/states, canonical primitives
+    and viewports instead of marketing sections, copy and imagery.
 
     A `Design brief:` line means the brief is the linked document. Pass that
     document as `linked_doc_text`. Without it the brief is unverified and
@@ -477,19 +595,7 @@ def brief_status(issue_text: str, linked_doc_text: str | None = None) -> dict:
     if not _filled(problem) or not _filled(solution):
         missing.append(4)
 
-    sections, layout_ok = _layout_sections(bodies.get(5, ""))
-    if not layout_ok:
-        missing.append(5)
-
-    copies = _keyed(bodies.get(6, ""))
-    if not sections or any(not _filled(copies.get(section_id, "")) for section_id in sections):
-        missing.append(6)
-
-    imagery = _keyed(bodies.get(7, ""))
-    if (not sections or any(section_id not in imagery or not _imagery_ok(imagery[section_id])
-                            for section_id in sections)
-            or any(not _imagery_ok(value) for value in imagery.values())):
-        missing.append(7)
+    missing += _app_steps_missing(bodies) if variant == "app" else _marketing_steps_missing(bodies)
 
     components = re.findall(r"(?im)^[ \t]*Component:[ \t]*(.*)$", bodies.get(8, ""))
     if len(components) != 1 or "," in components[0] or not _filled(components[0], min_len=2):
@@ -510,15 +616,16 @@ def brief_status(issue_text: str, linked_doc_text: str | None = None) -> dict:
 
 
 def build_admission(issue, linked_doc_text: str | None = None, read_text=None) -> dict:
-    """Admit, or `needs-design-brief` with the missing steps.
+    """Admit, or admit as `brief-auto` with the missing steps. Never holds.
 
     `read_text(repo_path)` optionally loads a `docs/design/*.md` link. Ungated
-    issues are admitted without reading a brief.
+    issues are admitted without reading a brief. An incomplete brief is
+    admitted as `brief-auto`: the claiming run writes the brief itself.
     """
     if not is_design_gated(issue):
         return {
             "admit": True, "reason": None, "gated": False, "missing": [],
-            "invalidCapabilityIds": [], "source": None,
+            "invalidCapabilityIds": [], "source": None, "auto": False, "variant": None,
         }
     description = getattr(issue, "description", "") or ""
     link = find_brief_link(description)
@@ -528,15 +635,18 @@ def build_admission(issue, linked_doc_text: str | None = None, read_text=None) -
             doc = read_text(link["repoPath"])
         except OSError:
             doc = None
-    status = brief_status(description, doc if link else None)
-    admit = bool(status["complete"])
+    variant = brief_variant(issue)
+    status = brief_status(description, doc if link else None, variant=variant)
+    complete = bool(status["complete"])
     return {
-        "admit": admit,
-        "reason": None if admit else NEEDS_BRIEF_REASON,
+        "admit": True,
+        "reason": None if complete else BRIEF_AUTO_REASON,
         "gated": True,
         "missing": status["missing"],
         "invalidCapabilityIds": status["invalidCapabilityIds"],
         "source": status["source"],
+        "auto": not complete,
+        "variant": variant,
     }
 
 
@@ -544,42 +654,30 @@ def empty_census() -> dict:
     return {
         "gated": 0,
         "admitted": 0,
-        "needsBrief": 0,
+        "autoAdmitted": 0,
         "missingSteps": {str(step): 0 for step in BRIEF_STEPS},
     }
 
 
-def apply_to_pool(qualified_by_provider: dict, rejected: dict, read_text=None) -> dict:
-    """Drop incomplete briefs from an already-admitted pool and count them.
-
-    Census is deduped by issue identifier. Rejection counts stay per provider,
-    matching the rest of the admission census. Ungated issues are unchanged.
-    """
+def apply_to_pool(qualified_by_provider: dict, read_text=None) -> dict:
+    """Count gated work in an already-admitted pool. Nothing is dropped: an incomplete
+    brief is `brief-auto` work the claiming run finishes itself. Deduped by identifier;
+    `missingSteps` counts the steps the claiming runs will have to write."""
     census = empty_census()
-    seen: dict[str, dict] = {}
-    for name, issues in list(qualified_by_provider.items()):
-        kept = []
+    seen: set[str] = set()
+    for issues in qualified_by_provider.values():
         for issue in issues:
             key = getattr(issue, "identifier", None) or str(id(issue))
-            if key not in seen:
-                seen[key] = build_admission(issue, read_text=read_text)
-                decision = seen[key]
-                if decision["gated"]:
-                    census["gated"] += 1
-                    if decision["admit"]:
-                        census["admitted"] += 1
-                    else:
-                        census["needsBrief"] += 1
-                        for step in decision["missing"]:
-                            census["missingSteps"][str(step)] += 1
-            decision = seen[key]
-            if decision["admit"]:
-                kept.append(issue)
-            else:
-                bucket = rejected.setdefault(name, {})
-                reason = decision["reason"] or NEEDS_BRIEF_REASON
-                bucket[reason] = bucket.get(reason, 0) + 1
-        qualified_by_provider[name] = kept
+            if key in seen:
+                continue
+            seen.add(key)
+            decision = build_admission(issue, read_text=read_text)
+            if decision["gated"]:
+                census["gated"] += 1
+                census["admitted"] += 1
+                census["autoAdmitted"] += int(decision["auto"])
+                for step in decision["missing"]:
+                    census["missingSteps"][str(step)] += 1
     return census
 
 
@@ -594,140 +692,133 @@ def repo_reader(repo):
     return read_text
 
 
-def ensure_needs_brief_label(linear, issue, decision: dict) -> bool:
-    """Add `needs-design-brief` once. False when the issue already has it."""
-    if NEEDS_BRIEF_LABEL in _labels(issue):
-        return False
-    linear.gql(
-        "mutation($id:String!,$label:String!){issueUpdate(id:$id,input:{addedLabelIds:[$label]}){success}}",
-        {"id": issue.id, "label": NEEDS_BRIEF_LABEL_ID},
-    )
-    missing = ", ".join(str(step) for step in decision["missing"]) or "unknown"
-    invalid = decision.get("invalidCapabilityIds") or []
-    extra = ""
-    if invalid:
-        extra = " Invalid capability ids: " + ", ".join(
-            f"{row['id']} ({row['reason']})" for row in invalid) + "."
-    linear.comment(
-        issue.id,
-        "🤖 design gate: needs-design-brief. Build lanes will not claim this until "
-        f"steps {missing} are complete in the issue or a linked design brief.{extra} "
-        "The brief lane drafts it once, inline; anything it cannot fill (often the "
-        "step 9 Pen or ImageGen artifact) needs a design pass against "
-        "docs/design/design-brief-template.md. "
-        "Admission clears on its own once steps 1–9 are complete.",
-    )
-    return True
-
-
-def report_needs_brief(issue, decision: dict, linear=None) -> None:
-    """Record the reason. Label at most once, and never in bulk."""
-    missing = ",".join(str(step) for step in decision["missing"])
-    sys.stderr.write(f"needs-design-brief {issue.identifier} missing={missing}\n")
-    if linear is None:
-        return
-    try:
-        ensure_needs_brief_label(linear, issue, decision)
-    except Exception as error:
-        sys.stderr.write(
-            f"needs-design-brief label skipped: {type(error).__name__}: {error}\n")
-
-
-def pick_build_issue(issues, failures, *, pick, linear=None, repo=None,
-                     now=None, in_flight=frozenset(), provider=None):
-    """The build-lane admission wrapper around `pick`.
-
-    The issue `pick` would have claimed is labeled `needs-design-brief` when
-    its brief is incomplete. It is returned for one brief-lane run when
-    `brief_due`; otherwise it is skipped and the next admissible issue is
-    returned. Later incomplete issues in the same pass are not labeled.
-    """
-    remaining = list(issues)
-    reader = repo_reader(repo)
-    reported = False
-    while remaining:
-        chosen = pick(remaining, failures, now=now, in_flight=in_flight, provider=provider)
-        if chosen is None:
-            return None
-        decision = build_admission(chosen, read_text=reader)
-        if decision["admit"]:
-            return chosen
-        if not reported:
-            report_needs_brief(chosen, decision, linear)
-            reported = True
-        if provider not in BRIEF_SKIP_PROVIDERS and brief_due(chosen, decision):
-            return chosen
-        remaining = [item for item in remaining if item.identifier != chosen.identifier]
-    return None
-
-
-def brief_due(issue, decision: dict) -> bool:
-    """Gated, incomplete, inline (no linked doc), and the brief lane has not run."""
-    description = getattr(issue, "description", "") or ""
-    return (decision["gated"] and not decision["admit"]
-            and find_brief_link(description) is None and BRIEF_MARKER not in description)
-
-
-def wants_brief(issue, repo=None) -> bool:
-    """The runner's mode switch: True means run the brief lane, not a build."""
-    return brief_due(issue, build_admission(issue, read_text=repo_reader(repo)))
-
-
-def render_brief_prompt(issue, context_pack: str = "") -> str:
-    """Brief-only instructions. Steps the agent cannot ground stay empty."""
-    return "\n".join([
-        f"# Design brief for {issue.title} ({issue.identifier})",
-        "",
-        getattr(issue, "description", "") or "(no description)",
-        "",
-        "---",
-        "## Company context (GBrain; verify against source)",
-        context_pack or "(GBrain unavailable for this run; rely on repo docs.)",
-        "",
-        "## Contract (design/brief lane, JOV-7541)",
-        "- This run writes the design brief only. Do not build, commit, push or open a PR.",
-        f"- Write `{BRIEF_FILE}` at the repository root, copying the headings `## 1.` through",
-        "  `## 9.` and their field lines from docs/design/design-brief-template.md. The lane",
-        "  validates it and appends it to the issue.",
-        "- Step 2 cites only ids from scripts/lanes/certified-capabilities.gen.json `ids`.",
-        "  Steps 5 to 7 use only the section ids and imagery types the template lists.",
-        "- Step 9 needs a real Pen node or ImageGen artifact. If this run cannot produce",
-        "  one, leave the `Pen:` and `ImageGen:` lines empty; a design pass fills them.",
-        "- Never invent a capability, claim, artifact or reference. An empty field is",
-        "  correct when the source does not support a value.",
-        "- You are unattended: nobody will answer a question. Do not run skill workflows.",
-    ])
-
-
-def publish_brief(linear, issue, text: str) -> dict:
-    """Append the lane's brief inline, once, and report what is still missing."""
-    text = (text or "").strip()
-    if not _section_bodies(text):
-        return {"verdict": "failed", "reasons": ["brief-empty"]}
+def _description(linear, issue) -> str:
     current = linear.gql("query($id:String!){issue(id:$id){description}}", {"id": issue.id})
-    description = ((current.get("issue") or {}).get("description") or "").rstrip()
-    if BRIEF_MARKER in description:  # a stale claim-scan cache; the first run stands
-        return {"verdict": "brief-incomplete", "missing": brief_status(description)["missing"],
-                "reasons": ["brief-already-published"]}
-    updated = f"{description}\n\n{BRIEF_MARKER}\n{text}\n"
+    return ((current or {}).get("issue") or {}).get("description") or ""
+
+
+def _set_description(linear, issue, description: str) -> None:
     linear.gql(
         "mutation($id:String!,$d:String!){issueUpdate(id:$id,input:{description:$d}){success}}",
-        {"id": issue.id, "d": updated},
+        {"id": issue.id, "d": description},
     )
-    status = brief_status(updated)
-    if status["complete"]:
+
+
+def _add_label(linear, issue, label_id: str) -> None:
+    linear.gql(
+        "mutation($id:String!,$label:String!){issueUpdate(id:$id,input:{addedLabelIds:[$label]}){success}}",
+        {"id": issue.id, "label": label_id},
+    )
+
+
+def founder_order(issue, decision: dict, now: float) -> dict:
+    """One `jovie.work-order/v1` founder decision for a brief-auto admission.
+
+    Summer's founder path (JOV-7739) reads open founder orders from issue
+    descriptions and posts them to Ovie with no model turn. The digest is
+    left to `sealWorkOrder`.
+    """
+    stamp = datetime.fromtimestamp(now, timezone.utc)
+    iso = stamp.strftime("%Y-%m-%dT%H:%M:%SZ")
+    missing = ", ".join(str(step) for step in decision["missing"]) or "none"
+    identifier = issue.identifier
+    title = getattr(issue, "title", "") or identifier
+    return {
+        "schema": "jovie.work-order/v1",
+        "orderId": f"design-brief-{identifier.lower()}",
+        "revision": 1,
+        "idempotencyKey": f"design-brief-{identifier.lower()}",
+        "gate": {"objectiveRef": identifier, "gateId": "design-brief"},
+        "state": "open",
+        "title": f"Design taste call: {title}"[:120],
+        "outcome": (f"Tim decides the open design taste call for {identifier}: steps {missing} "
+                    "of its design brief were missing at claim, so the build run wrote its own "
+                    "brief from canon and shipped it as brief-auto."),
+        "successPredicate": {"id": "p-design-taste", "verifier": "founder-record",
+                             "statement": "Founder decision recorded on the issue"},
+        "requiredCapabilities": ["taste"],
+        "riskTier": "low",
+        "authorityClass": "founder",
+        "scope": {"target": "JovieInc/Jovie", "entityRefs": [identifier]},
+        "evidence": [{"ref": f"linear:{identifier}", "observedAt": iso, "freshness": "fresh"}],
+        "permittedActions": ["decision"],
+        "forbiddenActions": [],
+        "budget": {"deadline": (stamp + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                   "maxAttempts": 1, "maxSpendUsd": 0, "maxConcurrency": 1, "founderMinutes": 5},
+        "stopConditions": ["The issue is canceled or its brief is completed by a design pass"],
+        "escalation": {"owner": "summer", "action": "Keep the build as shipped; revisit in the next design pass"},
+        "expectedArtifact": {"kind": "decision-record", "description": "Ovie decision on the brief-auto build"},
+        "founderAsk": {
+            "whyNow": "No build waits on a brief, so this shipped from a brief the build run wrote.",
+            "blocked": f"Design brief steps {missing} for {identifier}",
+            "options": [
+                {"id": "keep", "label": "keep",
+                 "tradeoff": "Accept the canon-derived design as built; no follow-up"},
+                {"id": "redesign", "label": "redesign",
+                 "tradeoff": "Open a design pass (Pen) for the missing steps and rebuild"},
+            ],
+            "recommendation": "keep",
+            "defaultIfSilent": "keep",
+            "materialChange": None,
+        },
+        "replyTo": {"kind": "linear-comment", "ref": identifier},
+        "createdAt": iso,
+        "createdBy": "lanes-design-gate",
+    }
+
+
+def render_order_block(order: dict) -> str:
+    """Same marker and fenced block as `renderWorkBlock` in work-order.ts."""
+    key = hashlib.sha256(order["idempotencyKey"].encode("utf-8")).hexdigest()[:16]
+    return (f"<!-- jovie-work-order:{key}:r{order['revision']} -->\n"
+            f"```json\n{json.dumps(order, indent=2)}\n```")
+
+
+def ensure_brief_auto(linear, issue, decision: dict, now: float | None = None) -> bool:
+    """Label `brief-auto`, warn, and file the founder taste decision once. Clears the
+    legacy `needs-design-brief` hold label if an older harness added it."""
+    if NEEDS_BRIEF_LABEL in _labels(issue):
         linear.gql(
             "mutation($id:String!,$label:String!){issueUpdate(id:$id,input:{removedLabelIds:[$label]}){success}}",
             {"id": issue.id, "label": NEEDS_BRIEF_LABEL_ID},
         )
-        body = "🤖 design/brief lane: steps 1–9 complete inline. A build lane admits this next."
-    else:
-        missing = ", ".join(str(step) for step in status["missing"])
-        body = ("🤖 design/brief lane: drafted the brief inline. Steps "
-                f"{missing} still need a design pass; the lane does not run again for this issue.")
-    linear.comment(issue.id, body)
-    return {"verdict": "brief-complete" if status["complete"] else "brief-incomplete",
-            "missing": status["missing"], "reasons": []}
+    if BRIEF_AUTO_LABEL in _labels(issue):
+        return False
+    now = time.time() if now is None else now
+    order = founder_order(issue, decision, now)
+    current = _description(linear, issue).rstrip()
+    if f'"orderId": "{order["orderId"]}"' not in current:
+        _set_description(linear, issue, f"{current}\n\n{render_order_block(order)}\n")
+    _add_label(linear, issue, BRIEF_AUTO_LABEL_ID)
+    missing = ", ".join(str(step) for step in decision["missing"]) or "none"
+    linear.comment(
+        issue.id,
+        f"⚠️ design gate: brief-auto. Claimed with brief steps {missing} incomplete; this run "
+        "writes the brief from the template and canon, then builds it inside the existing "
+        "guardrails. The taste call goes to Tim as one Ovie decision after the fact "
+        f"(work order `{order['orderId']}`).",
+    )
+    return True
+
+
+def pick_build_issue(issues, failures, *, pick, linear=None, repo=None,
+                     now=None, in_flight=frozenset(), provider=None):
+    """The build-lane admission wrapper around `pick`. Never waits on a brief.
+
+    `pick`'s own order and eligibility choose the issue. A gated issue whose brief is
+    incomplete is claimed as `brief-auto` (labeled and filed for the founder once); the
+    claiming run writes the brief and builds in the same run.
+    """
+    chosen = pick(issues, failures, now=now, in_flight=in_flight, provider=provider)
+    if chosen is None or linear is None:
+        return chosen
+    decision = build_admission(chosen, read_text=repo_reader(repo))
+    if decision["auto"]:
+        try:
+            ensure_brief_auto(linear, chosen, decision, now=now)
+        except Exception as error:
+            sys.stderr.write(f"brief-auto record skipped: {type(error).__name__}: {error}\n")
+    return chosen
 
 
 def enforce_enabled(value: str | None = None) -> bool:

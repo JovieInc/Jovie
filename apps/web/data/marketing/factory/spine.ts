@@ -31,18 +31,18 @@ import {
 } from './persuasionBrief';
 import { SectionRequestSchema } from './sectionRequest';
 
-export const FACTORY_SPINE_VERSION = '1.0.0';
+export const FACTORY_SPINE_VERSION = '1.1.0';
 
 export const FACTORY_STAGES = [
   'truth',
   'persuasion',
   'outcomes',
   'narrative',
-  'copy',
   'layout',
   'hero-variant',
   'proof',
   'gap-detection',
+  'copy',
   'media-decision',
   'ref-sourcing',
   'asset',
@@ -73,8 +73,8 @@ export const MARKETING_GENERATION_STAGE_TO_FACTORY: Readonly<
 };
 
 /**
- * The grammar fits copy after choosing variants, so this projection is not
- * monotonic on the spine; the spine order (copy before layout) is canonical.
+ * Structural choices precede editorial copy. Legacy generation lists remain
+ * projections; this spine is the executable prerequisite order.
  */
 export const LANDING_PAGE_PIPELINE_STAGE_TO_FACTORY: Readonly<
   Record<LandingPagePipelineStage, FactoryStage>
@@ -278,6 +278,23 @@ export const FACTORY_MEDIA_KINDS = [
   'none',
 ] as const;
 
+/** Shared authoring intent; not evidence that a rendered placement passed. */
+export const EditorialMediaIntentSchema = z.object({
+  benefit: z.string().trim().min(1),
+  focalDetail: z.string().trim().min(1),
+  rationale: z.string().trim().min(1),
+  fallback: z.string().trim().min(1),
+  alternatives: z
+    .array(
+      z.object({
+        medium: z.enum(FACTORY_MEDIA_KINDS),
+        reason: z.string().trim().min(1),
+      })
+    )
+    .min(1),
+});
+export type EditorialMediaIntent = z.infer<typeof EditorialMediaIntentSchema>;
+
 export const FactoryMediaPlanSchema = z.object({
   pageId: Id,
   sections: z
@@ -286,6 +303,8 @@ export const FactoryMediaPlanSchema = z.object({
         sectionInstanceId: SectionInstanceId,
         medium: z.enum(FACTORY_MEDIA_KINDS),
         decision: z.enum(['deterministic', 'ambiguous']),
+        editorialStatus: z.enum(['authored', 'legacy-unqualified']).optional(),
+        editorial: EditorialMediaIntentSchema.optional(),
         reason: z.string().min(1),
       })
     )
@@ -349,6 +368,13 @@ export const FactoryRenderSchema = z.object({
   cls: z.number().min(0),
   lcpMs: z.number().min(0),
   captures: z.array(FactoryRenderCaptureSchema).optional(),
+  /** Exact candidate bytes measured for this attempt; absent on legacy runs. */
+  preview: z
+    .object({
+      path: z.string().min(1),
+      digest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+    })
+    .optional(),
 });
 
 export const FactorySeoAgentSchema = z.object({

@@ -6,8 +6,16 @@
  * files. Linear writes go through a port the merge-sync writer supplies.
  */
 
+import { uiEvidenceRequirements } from '../invariants/assurance-matrix.mjs';
 import { classifyCiRisk } from './ci-harness.mjs';
 import { evaluateEscapedDefectClosure } from './escaped-defect-closure.mjs';
+import {
+  founderTasteOrder,
+  readTasteOrders,
+  renderTasteOrder,
+  tasteOrderId,
+  tasteReceiptsFromResults,
+} from './founder-taste-order.mjs';
 import {
   decideValidationTransition,
   deriveValidationManifest,
@@ -17,7 +25,9 @@ import {
   parseValidationReceipts,
 } from './validation-lifecycle.mjs';
 
-const MAX_LINKED_PULLS = 10;
+// Long-running issues collect many linked pull requests (JOV-7707 had more
+// than 10 on its first live run). The cap only bounds GitHub reads.
+const MAX_LINKED_PULLS = 60;
 const MAX_FILE_PAGES = 30;
 const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
 
@@ -74,25 +84,45 @@ export async function fetchWithRetry(fetchImpl, ...args) {
  */
 export function githubClient(fetchImpl, token) {
   return async path => {
-    const response = await fetchWithRetry(
-      fetchImpl,
-      `https://api.github.com/${path}`,
-      {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${token}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-          'User-Agent': 'jovie-linear-sync-on-merge',
-        },
+    // Bounded retry for transient GitHub upstream failures: a 503 from
+    // api.github.com used to fail the whole lifecycle evaluation (JOV-5143,
+    // run 37818346153) even though the next sweep would have converged.
+    // Mirrors the Linear retry in linear-sync-on-merge.mjs: 4 attempts,
+    // exponential backoff; persistent errors and 4xx still throw.
+    const maxAttempts = 4;
+    /** @type {Error | null} */
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const response = await fetchWithRetry(
+        fetchImpl,
+        `https://api.github.com/${path}`,
+        {
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'jovie-linear-sync-on-merge',
+          },
+        }
+      );
+      if (response.ok) {
+        return {
+          body: await response.json(),
+          link: response.headers?.get?.('link') ?? '',
+        };
       }
-    );
-    if (!response.ok) {
-      throw new Error(`GitHub HTTP ${response.status ?? 'error'} for ${path}`);
+      lastError = new Error(
+        `GitHub HTTP ${response.status ?? 'error'} for ${path}`
+      );
+      const retryable =
+        response.status === 429 ||
+        (typeof response.status === 'number' && response.status >= 500);
+      if (!retryable || attempt === maxAttempts) throw lastError;
+      // Exponential backoff, bounded for the 15-minute sweep budget.
+      const delayMs = Math.min(4_000, 2 ** (attempt - 1) * 250);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
-    return {
-      body: await response.json(),
-      link: response.headers?.get?.('link') ?? '',
-    };
+    throw lastError ?? new Error(`GitHub request failed for ${path}`);
   };
 }
 
@@ -226,12 +256,48 @@ export function createProductionFacts(input) {
 }
 
 /**
- * Merged pull requests in this repository linked to the issue, from Linear's
- * native attachments plus the merging pull request itself.
+ * Does this pull request implement the issue, rather than mention it? Linear
+ * attaches every pull request whose body names an issue, so a passing
+ * reference (#20371 naming JOV-7192) must not bind the issue's evidence. The
+ * title, the jov-N branch, the merge-sync identifier marker, Summer's issue
+ * bind, or a Linear closing keyword count; a bare mention or "Part of" does
+ * not.
+ *
+ * @param {{ title?: string, body?: string, head?: { ref?: string } }} pull
+ * @param {string} identifier
+ * @returns {boolean}
+ */
+export function pullImplementsIssue(pull, identifier) {
+  const match = /^JOV-(\d+)$/i.exec(identifier);
+  if (!match) return false;
+  const id = `JOV-${match[1]}`;
+  const exact = `${id}(?!\\d)`;
+  const title = String(pull?.title ?? '');
+  const body = String(pull?.body ?? '');
+  const branch = String(pull?.head?.ref ?? '');
+  return (
+    new RegExp(`\\b${exact}`, 'i').test(title) ||
+    new RegExp(`(?:^|[^A-Za-z0-9])jov-${match[1]}(?!\\d)`, 'i').test(branch) ||
+    new RegExp(`linear-issue-identifier:\\s*${exact}`, 'i').test(body) ||
+    new RegExp(`<!--\\s*summer-issue-bind\\s*-->\\s*${exact}`, 'i').test(
+      body
+    ) ||
+    new RegExp(
+      `\\b(?:clos(?:e[sd]?|ing)|fix(?:e[sd]|ing)?|resolv(?:e[sd]?|ing)|complet(?:e[sd]?|ing))\\b:?\\s+(?:https://linear\\.app/\\S*?/issue/)?${exact}`,
+      'i'
+    ).test(body)
+  );
+}
+
+/**
+ * Merged pull requests in this repository that implement the issue, from
+ * Linear's native attachments plus the merging pull request itself (whose
+ * link the merge sync already proved).
  *
  * @param {{
  *   readonly github: GithubGet,
  *   readonly repository: string,
+ *   readonly identifier: string,
  *   readonly attachmentUrls: readonly string[],
  *   readonly eventPull?: { number: number },
  * }} input
@@ -263,7 +329,9 @@ export async function listMergedLinkedPulls(input) {
     if (
       typeof body?.merged_at === 'string' &&
       /^[0-9a-f]{40}$/i.test(String(body?.merge_commit_sha ?? '')) &&
-      body?.base?.ref === 'main'
+      body?.base?.ref === 'main' &&
+      (number === input.eventPull?.number ||
+        pullImplementsIssue(body, input.identifier))
     ) {
       merged.push({
         number,
@@ -277,19 +345,17 @@ export async function listMergedLinkedPulls(input) {
 }
 
 /**
- * The JOV-5937 risk receipt for the merged change: the existing deterministic
- * CI classifier over the merged files. Any unread page is unknown risk.
+ * Every file the merged pull requests changed, renames included. Any unread
+ * page makes the whole list unknown (`null`).
  *
  * @param {{
  *   readonly github: GithubGet,
  *   readonly repository: string,
  *   readonly pulls: readonly { number: number }[],
- *   readonly harnessManifest: unknown,
  * }} input
- * @returns {Promise<RiskSummary | null>}
+ * @returns {Promise<string[] | null>}
  */
-export async function classifyMergedRisk(input) {
-  if (!input.harnessManifest) return null;
+export async function listMergedFiles(input) {
   const files = new Set();
   try {
     for (const pull of input.pulls) {
@@ -315,7 +381,20 @@ export async function classifyMergedRisk(input) {
   } catch {
     return null;
   }
-  const classification = classifyCiRisk([...files], input.harnessManifest);
+  return [...files];
+}
+
+/**
+ * The JOV-5937 risk receipt for the merged change: the existing deterministic
+ * CI classifier over the merged files. Unknown files are unknown risk.
+ *
+ * @param {readonly string[] | null} files
+ * @param {unknown} harnessManifest
+ * @returns {RiskSummary | null}
+ */
+export function classifyMergedRisk(files, harnessManifest) {
+  if (!harnessManifest || !files) return null;
+  const classification = classifyCiRisk([...files], harnessManifest);
   if (classification.errors.length > 0) return null;
   return {
     riskLevel: classification.riskLevel,
@@ -324,6 +403,37 @@ export async function classifyMergedRisk(input) {
       /** @param {{ id: string }} rule */ rule => rule.id
     ),
   };
+}
+
+/**
+ * The exact-build UI evidence the JOV-7713 assurance matrix says these files
+ * owe. Unknown files or an unreadable matrix are unknown (`null`), never "no
+ * UI change".
+ *
+ * @param {readonly string[] | null} files
+ * @param {unknown} assuranceMatrix
+ */
+export function mergedUiEvidence(files, assuranceMatrix) {
+  if (!files || !assuranceMatrix || typeof assuranceMatrix !== 'object') {
+    return null;
+  }
+  const rows =
+    /** @type {{ rows?: { id?: string, ui?: { judgment?: string } }[] }} */ (
+      assuranceMatrix
+    ).rows;
+  // The invariant registry is control-plane metadata. A queue/security entry
+  // must not invalidate product UI taste merely because the shared file also
+  // contains design invariants. Actual UI/detector paths remain authoritative.
+  const productPaths = files.filter(path => path !== 'canon/invariants.jsonl');
+  return uiEvidenceRequirements(assuranceMatrix, productPaths).map(entry => ({
+    row: String(entry.row),
+    failureClass: String(entry.failureClass),
+    // A row without a judgment is machine-checked; taste is never assumed.
+    judgment: String(
+      rows?.find(row => row.id === entry.row)?.ui?.judgment ?? 'deterministic'
+    ),
+    targets: entry.targets.map(String),
+  }));
 }
 
 /**
@@ -340,6 +450,7 @@ export function selectStateId(name, states) {
  * @typedef {{
  *   id: string,
  *   identifier: string,
+ *   title?: string,
  *   labels: string[],
  *   description: string,
  *   reopenedAfterDone?: boolean,
@@ -352,6 +463,8 @@ export function selectStateId(name, states) {
  *   readStateId: (issueId: string) => Promise<string>,
  *   setState: (issueId: string, stateId: string) => Promise<string>,
  *   addComment: (issueId: string, body: string) => Promise<boolean>,
+ *   readDescription: (issueId: string) => Promise<string>,
+ *   setDescription: (issueId: string, description: string) => Promise<boolean>,
  * }} LinearPort
  */
 
@@ -367,9 +480,11 @@ export function selectStateId(name, states) {
  *   readonly repository: string,
  *   readonly facts: ReturnType<typeof createProductionFacts>,
  *   readonly harnessManifest: unknown,
+ *   readonly assuranceMatrix: unknown,
  *   readonly linear: LinearPort,
  *   readonly eventPull?: { number: number },
  *   readonly dryRun?: boolean,
+ *   readonly now?: () => Date,
  *   readonly log: (message: string) => void,
  * }} ctx
  */
@@ -378,6 +493,7 @@ export async function reconcileValidation(ctx) {
   const merged = await listMergedLinkedPulls({
     github: ctx.github,
     repository: ctx.repository,
+    identifier: issue.identifier,
     attachmentUrls: issue.attachmentUrls,
     eventPull: ctx.eventPull,
   });
@@ -385,18 +501,18 @@ export async function reconcileValidation(ctx) {
     ...issue,
     comments: issue.commentRecords,
   });
-  const risk = await classifyMergedRisk({
+  const files = await listMergedFiles({
     github: ctx.github,
     repository: ctx.repository,
     pulls: merged,
-    harnessManifest: ctx.harnessManifest,
   });
   const manifest = deriveValidationManifest({
     issue,
     mergedPulls: merged,
-    risk,
+    risk: classifyMergedRisk(files, ctx.harnessManifest),
     parentReason: ctx.parentReason,
     escapedDefect: escapedDefect.applicable,
+    uiEvidence: mergedUiEvidence(files, ctx.assuranceMatrix),
   });
   if (!manifest) {
     ctx.log(
@@ -424,10 +540,14 @@ export async function reconcileValidation(ctx) {
   }
 
   const receipts = [];
-  for (const receipt of parseValidationReceipts(
-    issue.commentRecords,
-    issue.identifier
-  )) {
+  for (const receipt of [
+    ...parseValidationReceipts(issue.commentRecords, issue.identifier),
+    ...tasteReceiptsFromResults(
+      issue.description,
+      issue.commentRecords,
+      issue.identifier
+    ),
+  ]) {
     const containsBinding = await ctx.facts.contains(
       manifest.bindingSha,
       receipt.sha
@@ -532,10 +652,62 @@ export async function reconcileValidation(ctx) {
       `Linear refused the lifecycle comment on ${issue.identifier}`
     );
   }
+  if (
+    decision.target === 'Validating' &&
+    decision.missing.includes('founder-taste') &&
+    deployment.status === 'verified' &&
+    deployment.sha
+  ) {
+    await fileTasteOrder(ctx, manifest, deployment.sha);
+  }
   ctx.log(
     move
       ? `Moved ${issue.identifier} from ${issue.state.name} to ${decision.target}`
       : `Kept ${issue.identifier} in ${issue.state.name}`
   );
   return result;
+}
+
+/**
+ * Ask the founder through Ovie (JOV-7739) once per binding merge: append a
+ * sealed taste work order to the issue body, where Summer reads it. The body
+ * is re-read first so a concurrent edit or an earlier filing is kept.
+ *
+ * @param {Parameters<typeof reconcileValidation>[0]} ctx
+ * @param {import('./validation-lifecycle.mjs').ValidationManifest} manifest
+ * @param {string} deploymentSha
+ */
+async function fileTasteOrder(ctx, manifest, deploymentSha) {
+  const { issue } = ctx;
+  const orderId = tasteOrderId(issue.identifier, manifest.bindingSha);
+  const filed = (/** @type {string} */ body) =>
+    readTasteOrders(body, issue.identifier).some(
+      entry => entry.order.orderId === orderId
+    );
+  if (filed(issue.description)) return;
+  const current = await ctx.linear.readDescription(issue.id);
+  if (filed(current)) return;
+  const order = founderTasteOrder({
+    identifier: issue.identifier,
+    issueTitle: issue.title,
+    issueUrl: `https://linear.app/jovie/issue/${issue.identifier}`,
+    bindingSha: manifest.bindingSha,
+    bindingPull: manifest.bindingPull,
+    deploymentSha,
+    productionUrl: 'https://jov.ie',
+    uiEvidence: (manifest.uiEvidence ?? []).filter(
+      entry => entry.judgment === 'taste' || entry.judgment === 'mixed'
+    ),
+    reason:
+      manifest.required.find(entry => entry.kind === 'founder-taste')?.reason ??
+      'a founder taste receipt is required',
+    now: (ctx.now ?? (() => new Date()))().toISOString(),
+  });
+  const body = `${current.trimEnd()}\n\n### Founder taste (JOV-7759)\n\n${renderTasteOrder(order)}\n`;
+  if (!(await ctx.linear.setDescription(issue.id, body))) {
+    throw new Error(
+      `Linear refused the founder taste order on ${issue.identifier}`
+    );
+  }
+  ctx.log(`Filed founder taste order ${orderId} for ${deploymentSha}`);
 }

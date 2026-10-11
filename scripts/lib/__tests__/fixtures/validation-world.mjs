@@ -16,6 +16,36 @@ export const HARNESS_MANIFEST = JSON.parse(
     'utf8'
   )
 );
+/** A matrix with no UI rows: changes owe no founder taste receipt. */
+export const NO_UI_MATRIX = Object.freeze({ rows: [] });
+/** A deterministic JOV-7713 UI row that `apps/web/components/` invalidates. */
+export const UI_MATRIX = Object.freeze({
+  rows: [
+    {
+      id: 'AM-020',
+      failureClass: 'ui-state-completeness',
+      invalidatesOn: ['apps/web/components/'],
+      ui: {
+        judgment: 'deterministic',
+        requiredEvidence: ['web-desktop', 'web-mobile'],
+      },
+    },
+  ],
+});
+/** The taste row: only this owes the founder (JOV-7759). */
+export const TASTE_MATRIX = Object.freeze({
+  rows: [
+    {
+      id: 'AM-024',
+      failureClass: 'ui-visual-taste',
+      invalidatesOn: ['apps/web/components/'],
+      ui: {
+        judgment: 'taste',
+        requiredEvidence: ['web-desktop', 'macos-electron'],
+      },
+    },
+  ],
+});
 export const REPO = 'JovieInc/Jovie';
 const sha = (/** @type {string} */ seed) => seed.repeat(40).slice(0, 40);
 /** Main history, oldest first. Every later commit contains the earlier ones. */
@@ -51,7 +81,7 @@ export function createWorld(overrides = {}) {
     served: MAIN[2].slice(0, 7),
     markers: new Set([MAIN[2], MAIN[4]]),
     openPulls: [],
-    /** @type {Record<number, { mergeSha: string, mergedAt: string, files: string[], base?: string }>} */
+    /** @type {Record<number, { mergeSha: string, mergedAt: string, files: string[], base?: string, title?: string, body?: string, headRef?: string }>} */
     pulls: {
       101: {
         mergeSha: MAIN[1],
@@ -76,7 +106,10 @@ export function createWorld(overrides = {}) {
     clock: Date.parse('2026-10-03T12:00:00Z'),
     updates: [],
     comments: [],
+    /** @type {string[]} */
+    descriptions: [],
     failVersion: false,
+    refuseDescription: false,
     stateChangeDuringRead: null,
     ...overrides,
   };
@@ -117,6 +150,9 @@ export function createWorld(overrides = {}) {
           merged_at: record.mergedAt,
           merge_commit_sha: record.mergeSha,
           base: { ref: record.base ?? 'main' },
+          title: record.title ?? 'feat(profile): editorial card',
+          body: record.body ?? '',
+          head: { ref: record.headRef ?? 'tim/jov-1-editorial-card' },
         });
       }
       match = /^repos\/JovieInc\/Jovie\/commits\/([0-9a-f]+)$/.exec(path);
@@ -159,7 +195,12 @@ export function createWorld(overrides = {}) {
           issues: {
             nodes: Object.values(world.issues)
               .filter(issue => variables.states.includes(issue.state))
-              .map(issue => ({ identifier: issue.identifier })),
+              .map(issue => ({
+                identifier: issue.identifier,
+                updatedAt: issue.updatedAt ?? '2026-10-03T12:00:00Z',
+                state: { name: issue.state },
+                attachments: { nodes: issue.attachments.map(url => ({ url })) },
+              })),
             pageInfo: { hasNextPage: false, endCursor: null },
           },
         },
@@ -209,6 +250,18 @@ export function createWorld(overrides = {}) {
           },
         },
       });
+    }
+    if (query.includes('IssueLifecycleDescription')) {
+      const issue = byKey(variables.issueId);
+      return ok({
+        data: { issue: issue ? { description: issue.description } : null },
+      });
+    }
+    if (query.includes('SetLifecycleDescription')) {
+      const issue = byKey(variables.issueId);
+      issue.description = variables.description;
+      world.descriptions.push(issue.identifier);
+      return ok({ data: { issueUpdate: { success: true } } });
     }
     if (query.includes('issueUpdate')) {
       const issue = byKey(variables.issueId);
@@ -370,6 +423,14 @@ export function portFor(world) {
         createdAt: new Date(world.clock).toISOString(),
       });
       world.comments.push(`${issue.identifier}:${body.split('\n')[0]}`);
+      return true;
+    },
+    readDescription: async id => byId(id).description,
+    setDescription: async (id, description) => {
+      if (world.refuseDescription) return false;
+      const issue = byId(id);
+      issue.description = description;
+      world.descriptions.push(issue.identifier);
       return true;
     },
   };

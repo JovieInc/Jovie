@@ -126,7 +126,7 @@ describe('PostReleasePanel', () => {
       'href',
       buildReleaseDownloadsRoute('release-1')
     );
-    expect(screen.getAllByText('Not connected')).toHaveLength(2);
+    expect(screen.queryByText('Not connected')).not.toBeInTheDocument();
     expect(screen.queryByText(/license/u)).not.toBeInTheDocument();
     expect(screen.queryByText(/Email gate/u)).not.toBeInTheDocument();
     expect(
@@ -204,11 +204,7 @@ describe('PostReleasePanel', () => {
     expect(
       screen.queryByText('Add a canonical Jovie link on MusicBrainz')
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'No open repairs, collisions, or placement opportunities.'
-      )
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/No open repairs/u)).not.toBeInTheDocument();
   });
 
   it('does not render artist Presence recommendations in a track inspector', () => {

@@ -3,8 +3,11 @@ import { APP_ROUTES } from '@/constants/routes';
 import { creatorTypeEnum, merchDesignLaneEnum } from '@/lib/db/schema/enums';
 import { getCreatorTypeLabel } from '@/types';
 import {
+  BASE_CREATOR_TYPE,
   CREATOR_PROFESSION_LABELS,
+  CREATOR_PROFESSIONS,
   creatorProfessionLabel,
+  isCreatorProfession,
   MERCH_LANE_LABELS,
   MUSIC_EVENTS_ROUTE,
   merchLaneLabel,
@@ -26,6 +29,23 @@ describe('creator vocabulary', () => {
     for (const type of creatorTypeEnum.enumValues) {
       expect(creatorProfessionLabel(type)).toBe(getCreatorTypeLabel(type));
       expect(CREATOR_PROFESSION_LABELS[type]).toBe(getCreatorTypeLabel(type));
+    }
+  });
+
+  it('treats creator as the one broad type with optional professions', () => {
+    expect(BASE_CREATOR_TYPE).toBe('creator');
+    expect(creatorTypeEnum.enumValues).toContain(BASE_CREATOR_TYPE);
+    expect([...CREATOR_PROFESSIONS].sort()).toEqual([
+      'artist',
+      'influencer',
+      'podcaster',
+    ]);
+    for (const type of creatorTypeEnum.enumValues) {
+      expect(isCreatorProfession(type)).toBe(type !== BASE_CREATOR_TYPE);
+    }
+    // Every profession keeps a display label.
+    for (const profession of CREATOR_PROFESSIONS) {
+      expect(CREATOR_PROFESSION_LABELS[profession]).toBeTruthy();
     }
   });
 

@@ -3,12 +3,18 @@
 import { useEffect } from 'react';
 
 /**
- * Registers an IntersectionObserver that adds `.revealed` to every
- * `.reveal-on-scroll` element when it enters the viewport.
+ * Fallback for browsers without CSS scroll-driven animations: registers an
+ * IntersectionObserver that adds `.revealed` to every `.reveal-on-scroll`
+ * element when it enters the viewport. Where `animation-timeline: view()` is
+ * supported, globals.css runs the reveal on its own and this does nothing.
  * Rendered once in the marketing layout — no per-component setup needed.
  */
 export function ScrollRevealInit() {
   useEffect(() => {
+    if (globalThis.CSS?.supports?.('animation-timeline: view()')) {
+      return;
+    }
+
     document.documentElement.classList.add('reveal-js');
 
     const elements = document.querySelectorAll('.reveal-on-scroll');

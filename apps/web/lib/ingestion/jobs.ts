@@ -2,6 +2,8 @@ import { and, sql as drizzleSql, eq, inArray, isNull, or } from 'drizzle-orm';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
+import { musicfetchNetworkAllowed } from '@/lib/music-resolver/musicfetch-gate';
+import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import {
   canonicalIdentity,
   detectPlatform,
@@ -634,6 +636,15 @@ export async function enqueueMusicFetchEnrichmentJob(params: {
   creatorProfileId: string;
   spotifyUrl: string;
 }): Promise<string | null> {
+  if (!musicfetchNetworkAllowed()) {
+    const spotifyArtistId = extractSpotifyArtistId(params.spotifyUrl);
+    return spotifyArtistId
+      ? enqueueDspArtistDiscoveryJob({
+          creatorProfileId: params.creatorProfileId,
+          spotifyArtistId,
+        })
+      : null;
+  }
   const dedupKey = `musicfetch_enrichment:${params.creatorProfileId}`;
 
   const payload = {

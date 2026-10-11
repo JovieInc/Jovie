@@ -99,6 +99,7 @@ struct LiveRootContainer: View {
       .task {
         authCoordinator.handleLaunchInputOnce(
           verifier: LiveAuthCallbackLaunchInput.pendingCodeVerifier(),
+          nativeAttempt: LiveAuthCallbackLaunchInput.nativeAttempt(),
           callbackURL: LiveAuthCallbackLaunchInput.callbackURL())
       }
 #endif

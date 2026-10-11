@@ -122,7 +122,7 @@ describe('shell alias redirects', () => {
 
     for (const Page of [CanonicalTippingPage, DashboardTippingPage]) {
       expect(() => Page()).toThrow(
-        `REDIRECT:${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
+        `REDIRECT:${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`
       );
     }
 
@@ -131,7 +131,7 @@ describe('shell alias redirects', () => {
       redirectMock.mock.calls[0]?.[0] ?? '',
       'https://jov.ie'
     );
-    expect(destination.pathname).toBe(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    expect(destination.pathname).toBe(APP_ROUTES.SETTINGS_PROFILE);
     expect(destination.searchParams.get('tab')).toBe('earn');
     expect(destination.hash).toBe('#pay');
   });

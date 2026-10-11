@@ -12,6 +12,7 @@ import {
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
+import { runLinkDriftStep } from '@/lib/proof/link-drift.server';
 import type { PresenceBuildStepId } from './constants';
 import type { PresenceBuildArtifact, PresenceBuildFact } from './types';
 
@@ -23,6 +24,8 @@ export async function executePresenceBuildStep(
   switch (stepId) {
     case 'research_artist':
       return researchArtist(profileId);
+    case 'check_link_drift':
+      return runLinkDriftStep(profileId);
     case 'surface_library_opportunities':
       return surfaceLibraryOpportunities(profileId);
     case 'assemble_profile':

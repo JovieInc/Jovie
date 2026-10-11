@@ -27,6 +27,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Completed-run jobs/artifacts are immutable per (run id, attempt), so
+      # each wake reads only runs it has not seen (JOV-7744).
+      - name: Restore completed-run evidence
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .flaky-run-cache
+          key: flaky-run-evidence-${{ github.run_id }}
+          restore-keys: flaky-run-evidence-
+
       # Keep exhaustive seven-day quarantine collection off this hot path.
       # Merge-queue volume exceeds GitHub's 1,000-result search window, and
       # missing quarantine evidence cannot authorize a ledger change.
@@ -37,7 +46,17 @@ jobs:
           # gh run download reads Unit Tests unit-flaky-* artifacts.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          FLAKY_RUN_CACHE_DIR: .flaky-run-cache
         run: node .github/scripts/analyze-test-flakiness.js
+
+      # The analyzer bounds the cache and emits a content-digest key (also on
+      # a red high-flakiness exit); an unchanged cache matches an existing key.
+      - name: Save completed-run evidence
+        if: ${{ !cancelled() && steps.analyze.outputs.run_evidence_key != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .flaky-run-cache
+          key: ${{ steps.analyze.outputs.run_evidence_key }}
 
       - name: Check flaky-rate ratchet
         id: ratchet
@@ -55,147 +74,12 @@ jobs:
             flakiness-clusters.json
           retention-days: 90
 
-      - name: Find or create tracking issue
-        id: find-issue
-        if: ${{ github.event_name == '__retired_linear_only__' }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const { data: issues } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'test-flakiness',
-              per_page: 1
-            });
-
-            if (issues.length > 0) {
-              core.setOutput('issue_number', issues[0].number);
-              core.setOutput('issue_exists', 'true');
-            } else {
-              core.setOutput('issue_exists', 'false');
-            }
-
-      - name: Create or update tracking issue
-        if: ${{ github.event_name == '__retired_linear_only__' }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
-          ISSUE_EXISTS: ${{ steps.find-issue.outputs.issue_exists }}
-          ISSUE_NUMBER: ${{ steps.find-issue.outputs.issue_number }}
-          RATCHET_FAILED: ${{ steps.ratchet.outcome == 'failure' && 'true' || 'false' }}
-        with:
-          script: |
-            const fs = require('fs');
-            const report = fs.readFileSync('flakiness-report.md', 'utf8');
-            const flakyCount = Number.parseInt(process.env.FLAKY_COUNT || '0', 10);
-            const issueExists = process.env.ISSUE_EXISTS === 'true';
-            const issueNumber = process.env.ISSUE_NUMBER;
-            const ratchetFailed = process.env.RATCHET_FAILED === 'true';
-            const workflowUrl = `${context.payload.repository.html_url}/actions/workflows/test-flakiness-report.yml`;
-            const ratchetNote = ratchetFailed
-              ? '\n\n> ⚠️ **Ratchet exceeded**: new untracked flaky tests detected above the committed floor. Fix or quarantine before the floor may be lowered.'
-              : '';
-            const body = `${report}${ratchetNote}\n\n---\n\nThis issue is automatically updated by the [Test Flakiness Report workflow](${workflowUrl}).`;
-
-            if (flakyCount === 0) {
-              if (issueExists) {
-                await github.rest.issues.update({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issueNumber,
-                  state: 'closed',
-                  body: `${body}\n\nClosed: no flaky tests detected in the latest report.`
-                });
-                console.log(`Closed issue #${issueNumber} - no flaky tests detected`);
-              }
-              return;
-            }
-
-            if (issueExists) {
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issueNumber,
-                body
-              });
-              console.log(`Updated issue #${issueNumber} with latest flakiness report`);
-            } else {
-              const { data: newIssue } = await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `Test Flakiness Detected - ${flakyCount} flaky tests`,
-                body,
-                labels: ['test-flakiness', 'automated']
-              });
-              console.log(`Created new tracking issue #${newIssue.number}`);
-            }
-
-      - name: Auto-file deflake issues for high-severity tests
-        if: ${{ github.event_name == '__retired_linear_only__' }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          QUARANTINE_CANDIDATES: ${{ steps.analyze.outputs.quarantine_candidates || '[]' }}
-        with:
-          script: |
-            const raw = process.env.QUARANTINE_CANDIDATES || '[]';
-            let candidates;
-            try {
-              candidates = JSON.parse(raw);
-            } catch {
-              console.warn('Could not parse quarantine_candidates:', raw);
-              return;
-            }
-            if (!Array.isArray(candidates) || candidates.length === 0) return;
-
-            for (const candidate of candidates) {
-              const deflakeTitle = `[deflake] ${candidate.name} — ${candidate.failureRate}% failure rate`;
-
-              // Check for existing open deflake issue for this test
-              const { data: existing } = await github.rest.issues.listForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                state: 'open',
-                labels: 'deflake',
-                per_page: 100,
-              });
-
-              const alreadyTracked = existing.some(
-                issue => issue.title.includes(candidate.name)
-              );
-              if (alreadyTracked) {
-                console.log(`Deflake issue already open for: ${candidate.name}`);
-                continue;
-              }
-
-              const workflowUrl = `${context.payload.repository.html_url}/actions/workflows/test-flakiness-report.yml`;
-              const body = [
-                `## Flaky test detected`,
-                ``,
-                `**Test:** \`${candidate.name}\``,
-                `**Failure rate:** ${candidate.failureRate}%`,
-                `**Flakiness score:** ${candidate.flakinessScore}`,
-                ``,
-                `### Actions required`,
-                ``,
-                `1. **Investigate** — review recent CI logs for this test to identify the root cause (timing, race condition, environment dependency).`,
-                `2. **Quarantine** — add the test to \`apps/web/tests/quarantine.json\` so it runs in the non-blocking lane while being fixed. Use the existing ledger schema with a \`fixIssueUrl\` pointing to this issue.`,
-                `3. **Lower the ratchet** — once the test is fixed and removed from quarantine, the ratchet automatically adjusts to the tracked-flake count.`,
-                `4. **Close this issue** when the test is stable across ≥10 CI runs.`,
-                ``,
-                `---`,
-                `*Auto-filed by [Test Flakiness Report](${workflowUrl}) on ${new Date().toISOString().split('T')[0]}.*`,
-              ].join('\n');
-
-              const { data: issue } = await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: deflakeTitle,
-                body,
-                labels: ['deflake', 'test-flakiness', 'automated'],
-              });
-              console.log(`Created deflake issue #${issue.number}: ${deflakeTitle}`);
-            }
+      # Per-signature Linear filing lives in quarantine-recovery.yml
+      # (scripts/file-quarantine-clusters.mjs): it dedupes by cluster
+      # fingerprint, one issue per flaky signature, comments on recurrence.
+      # The ratchet-red remediation filing below (flaky-test-filing-intake.mjs)
+      # covers the aggregate signal. Retired GitHub-issue filing steps were
+      # removed — Linear is the canonical tracker.
 
       - name: File Linear remediation when the ratchet is red
         if: ${{ failure() && steps.ratchet.outcome == 'failure' }}

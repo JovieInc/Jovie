@@ -72,6 +72,21 @@ export const RELIABILITY_DETECTORS: readonly ReliabilityDetector[] = [
     ],
   },
   {
+    // Detector escape (JOV-7701, 2026-10-03): 8 sign-ups sat in
+    // waitlist_pending with no waitlist entry for weeks. The Golden Path
+    // missed it because its DB step approved every fresh test user.
+    id: 'waitlist-admission-detector',
+    sourceIssue: 'JOV-7701',
+    symptom:
+      'A gated sign-up is stranded in waitlist_pending with no waitlist entry, or waits past the review SLA',
+    kind: 'cron',
+    artifacts: [
+      'apps/web/lib/waitlist/admission-detector.ts',
+      'apps/web/app/api/cron/daily-maintenance/route.ts',
+      'apps/web/tests/unit/api/cron/daily-maintenance.test.ts',
+    ],
+  },
+  {
     id: 'bug-to-test-rule',
     sourceIssue: 'JOV-1873',
     symptom: 'Bug fix ships without a regression test or documented waiver',

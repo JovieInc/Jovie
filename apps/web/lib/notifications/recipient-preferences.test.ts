@@ -19,7 +19,6 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-import { recipientPreferences as barrelRecipientPreferences } from '@/lib/db/schema';
 import {
   MARKETING_CONSENT_VERSION,
   RECIPIENT_PREFERENCES_VERSION,
@@ -160,7 +159,7 @@ function customerWrite(
     quietHours: { start: '21:00', end: '08:00' },
     weekendBehavior: 'observe_quiet_hours',
     briefingBehavior: 'off',
-    channels: { email: false, sms: false, push: false, in_app: false },
+    channels: { email: false, sms: false, push: false },
     marketingOptIn: false,
     marketingConsent: null,
     ...overrides,
@@ -178,10 +177,6 @@ describe('recipient preference persistence', () => {
       onConflictDoUpdate: mockOnConflictDoUpdate,
     });
     mockInsert.mockReturnValue({ values: mockValues });
-  });
-
-  it('uses the schema barrel export of the Better Auth preference table', () => {
-    expect(barrelRecipientPreferences).toBe(recipientPreferences);
   });
 
   it('keeps the generated migration on the current versions', () => {
@@ -322,7 +317,7 @@ describe('recipient preference defaults', () => {
       briefingBehavior: 'weekend_summer',
       marketingOptIn: false,
       marketingConsent: null,
-      channels: { email: false, sms: false, push: false, in_app: false },
+      channels: { email: false, sms: false, push: false },
     });
   });
 
@@ -420,7 +415,7 @@ describe('recipient preference consent', () => {
   it('does not infer marketing opt-in from legacy flags or enabled channels', async () => {
     const store = memoryStore();
     const input = customerWrite({
-      channels: { email: true, sms: true, push: true, in_app: true },
+      channels: { email: true, sms: true, push: true },
       marketingEmails: true,
       marketingOptOut: false,
       clerkUserId: 'clerk_user_1',
@@ -523,7 +518,7 @@ describe('recipient preference invalid values', () => {
     const store = memoryStore();
     const written = await writeRecipientPreferences(
       customerWrite({
-        channels: { email: true, sms: false, push: false, in_app: true },
+        channels: { email: true, sms: false, push: false },
       }),
       store
     );

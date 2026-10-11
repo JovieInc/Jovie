@@ -146,9 +146,31 @@ const mockLinks = [
 const mockGenres = ['rock', 'indie', 'alternative'];
 
 describe('Public Profile Page Logic', () => {
+  // Stryker copies this suite into its sandbox with the page instrumented
+  // (stryS calls, if(stryNS().activeMutant) cover blocks, a stryNS preamble),
+  // which hides the plain source shapes several assertions match against.
+  // Strip the instrumentation so those assertions check the same structural
+  // contract in both environments instead of failing the mutation dry run on
+  // rewritten source. Non-vacuous: nothing else is removed, so every regex
+  // below still fails if the asserted code shape is deleted or mutated.
+  function stripStrykerInstrumentation(source: string): string {
+    return (
+      source
+        .replace(
+          /\bstryS(?:Thin)?\(\s*\d+\s*,\s*(?:\[[^\]]*\]\s*,\s*)?\d+\s*\)\s*,?\s*/g,
+          ''
+        )
+        // Drop the cover blocks (bounded to their closing brace) BEFORE the
+        // preamble strip so the spanning preamble match cannot eat unrelated
+        // source.
+        .replace(/if\s*\(\s*stryNS_\w+\(\)\.[\s\S]*?\n?\}\s*;?\s*/g, '')
+        .replace(/\bstryNS_\w+\(\)\s*\{[^}]*\}\s*;?/g, '')
+    );
+  }
+
   it('uses only structured Spotify links to resolve the profile owner identity', () => {
-    expect(PUBLIC_PROFILE_PAGE_SOURCE).toMatch(
-      /\.filter\(link => link\.platform === 'spotify'\)[\s\S]{0,100}\.map\(link => link\.url\)/
+    expect(stripStrykerInstrumentation(PUBLIC_PROFILE_PAGE_SOURCE)).toMatch(
+      /\.filter\(link\s*=>\s*(?:\{[^}]*?return\s+)?link\.platform === 'spotify'\s*;?\s*\}?\)[\s\S]{0,200}\.map\(link\s*=>\s*(?:\{[^}]*?return\s+)?link\.url\s*;?\s*\}?\)/
     );
   });
 
@@ -702,7 +724,7 @@ describe('Public Profile Page Logic', () => {
 
     it('guards the FAQPage script tag behind a faqs.length > 0 check', () => {
       // Prevents an empty FAQPage from being emitted for profiles with no data
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toMatch(
+      expect(stripStrykerInstrumentation(PUBLIC_PROFILE_PAGE_SOURCE)).toMatch(
         /aeoContent\.faqs\.length\s*>\s*0/
       );
     });
@@ -893,8 +915,8 @@ describe('Public Profile Page Logic', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
         'return PROFILE_NOT_FOUND_METADATA'
       );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toMatch(
-        /if \(!profile\) \{\s*notFound\(\);/
+      expect(stripStrykerInstrumentation(PUBLIC_PROFILE_PAGE_SOURCE)).toMatch(
+        /if \(\s*(?:[^()]*?)?\s*!\s*profile\s*\)\s*\{[^{}]*?notFound\(\);\s*\}/
       );
     });
   });

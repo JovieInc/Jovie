@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const MARKER_FILE = 'production-generation-verified.json';
 const RECOVERY_FILE = 'production-generation-recovery.json';
+const RELEASE_RISK_FILE = 'release-risk-receipt.json';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const CONTROLLER_PATH = '.github/workflows/production-controller.yml';
 const MARKER_RECOVERY_PATH = '.github/workflows/production-marker-recovery.yml';
@@ -16,6 +17,14 @@ const CONTROLLER_BOUNDARY_JOB =
   'Production Release / Check current main before release';
 const CONTROLLER_VERIFIED_JOB = 'Production Verified';
 const CONTROLLER_ROLLBACK_SUFFIX = 'Centralized production rollback';
+// Jobs that run only after Production Verified succeeded and never touch
+// production. Their failure files its own remediation; it must not turn a
+// verified generation into an interrupted one and freeze every later release
+// (JOV-7724, run 37144574062).
+const POST_VERIFICATION_JOBS = new Set([
+  'Publish verified customer changelog',
+  'File customer changelog remediation',
+]);
 const INTERRUPTED_CONCLUSIONS = new Set([
   'cancelled',
   'failure',
@@ -288,6 +297,41 @@ function classifyRecoveredMarkerEntry(entry, context) {
   };
 }
 
+/**
+ * A failed attempt still verified its generation when Production Verified
+ * succeeded, the rollback stayed skipped, and every unsuccessful job is a
+ * post-verification publication job. Any other failure stays interrupted.
+ */
+function verifiedBeforePublicationFailure(jobs, context, attempt) {
+  if (!jobs.every(job => validateControllerJob(job, context, attempt))) {
+    return false;
+  }
+  const verified = jobs.filter(job => job.name === CONTROLLER_VERIFIED_JOB);
+  const rollback = jobs.filter(job =>
+    job.name.endsWith(CONTROLLER_ROLLBACK_SUFFIX)
+  );
+  const unsuccessful = jobs.filter(
+    job =>
+      job.status !== 'completed' ||
+      (job.conclusion !== 'success' && job.conclusion !== 'skipped')
+  );
+  return (
+    verified.length === 1 &&
+    verified[0].status === 'completed' &&
+    verified[0].conclusion === 'success' &&
+    rollback.length === 1 &&
+    rollback[0].status === 'completed' &&
+    rollback[0].conclusion === 'skipped' &&
+    unsuccessful.length > 0 &&
+    unsuccessful.every(
+      job =>
+        POST_VERIFICATION_JOBS.has(job.name) &&
+        job.status === 'completed' &&
+        INTERRUPTED_CONCLUSIONS.has(job.conclusion)
+    )
+  );
+}
+
 function classifyMarkerEntry(entry, context) {
   if (!entry || typeof entry !== 'object') {
     return { error: 'malformed_marker_entry' };
@@ -342,6 +386,20 @@ function classifyMarkerEntry(entry, context) {
     ) {
       return { error: 'successful_attempt_without_verified_job' };
     }
+    return {
+      kind: 'verified',
+      attempt,
+      controllerRun,
+      deploymentId: entry.payload.deploymentId,
+      markerContext,
+      normalRerun,
+    };
+  }
+  if (
+    status === 'completed' &&
+    conclusion === 'failure' &&
+    verifiedBeforePublicationFailure(entry.attemptJobs, markerContext, attempt)
+  ) {
     return {
       kind: 'verified',
       attempt,
@@ -890,7 +948,12 @@ function normalizeArtifacts(payload, expectedName) {
   }));
 }
 
-function downloadJsonArtifact(repo, artifactId, expectedFile) {
+function downloadJsonArtifact(
+  repo,
+  artifactId,
+  expectedFile,
+  optionalFiles = []
+) {
   const directory = mkdtempSync(join(tmpdir(), 'jovie-production-marker-'));
   const archive = join(directory, 'artifact.zip');
   try {
@@ -901,9 +964,15 @@ function downloadJsonArtifact(repo, artifactId, expectedFile) {
     );
     writeFileSync(archive, body);
     const entries = run('unzip', ['-Z1', archive]).split('\n').filter(Boolean);
-    if (entries.length !== 1 || entries[0] !== expectedFile) {
+    const allowedEntries = new Set([expectedFile, ...optionalFiles]);
+    const uniqueEntries = new Set(entries);
+    if (
+      entries.filter(entry => entry === expectedFile).length !== 1 ||
+      uniqueEntries.size !== entries.length ||
+      entries.some(entry => !allowedEntries.has(entry))
+    ) {
       throw new Error(
-        `Artifact ${artifactId} does not contain exactly ${expectedFile}`
+        `Artifact ${artifactId} does not contain one ${expectedFile} with only allowed companion files`
       );
     }
     return JSON.parse(run('unzip', ['-p', archive, expectedFile]));
@@ -995,7 +1064,8 @@ function inspectOnline(args) {
     marker.payload = downloadJsonArtifact(
       repo,
       marker.artifact.id,
-      MARKER_FILE
+      MARKER_FILE,
+      [RELEASE_RISK_FILE]
     );
   }
   for (const marker of evidence.markers) {

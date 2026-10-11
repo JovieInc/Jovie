@@ -339,4 +339,29 @@ describe('GET /auth/callback', () => {
     });
     expect(hoisted.createStoredNativeExchangeCode).not.toHaveBeenCalled();
   });
+  it('echoes only the stored iOS attempt into the exchange and bounce', async () => {
+    const nativeAttempt = 'a'.repeat(43);
+    hoisted.consumeStoredAuthState.mockResolvedValue({
+      client: 'ios',
+      intent: 'sign_in',
+      state: 'state_123',
+      returnTo: '/app',
+      codeChallenge: 'challenge',
+      nativeAttempt,
+    });
+    const response = await GET(
+      new Request(
+        `https://jov.ie/auth/callback?state=state_123&native_attempt=${'b'.repeat(43)}`
+      )
+    );
+    expect(response.status).toBe(307);
+    expect(hoisted.createStoredNativeExchangeCode).toHaveBeenCalledWith(
+      expect.objectContaining({ nativeAttempt })
+    );
+    const bounce = new URL(response.headers.get('location')!);
+    expect(bounce.pathname).toBe('/auth/ios/complete');
+    expect(bounce.searchParams.getAll('native_attempt')).toEqual([
+      nativeAttempt,
+    ]);
+  });
 });

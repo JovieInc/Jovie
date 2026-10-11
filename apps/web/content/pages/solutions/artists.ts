@@ -48,7 +48,7 @@ export const solutionsArtistsPage = definePage({
     title: 'Music links and fan updates for artists',
     socialTitle: `For Artists | ${APP_NAME}`,
     description:
-      'Bring your music, tour dates, and fan subscriptions together on Jovie. Give listeners one artist link for releases, shows, and updates they choose to receive.',
+      'Bring your music, tour dates, and fan signups together on Jovie. Give listeners one artist link for releases, shows, and updates they choose to receive.',
     keywords: [...ARTIST_PROFILE_COPY.seo.keywords],
     schema: ['SoftwareApplication'],
     siblings: [],

@@ -14,6 +14,8 @@ import {
   listProductTruthClaims,
   slugifyClaimSegment,
 } from './claims';
+import type { DogfoodReceiptsFile } from './dogfood';
+import dogfoodReceipts from './dogfood-receipts.gen.json';
 import {
   CapabilitySchema,
   ClaimSchema,
@@ -236,7 +238,11 @@ describe('product-truth claims', () => {
     const metrics = claims.filter(
       claim => claim.kind === 'metric' || claim.kind === 'comparison'
     );
-    expect(metrics.length).toBe(EVIDENCED_CLAIMS.length);
+    // Hand-authored evidenced claims plus measured dogfood receipts.
+    expect(metrics.length).toBe(
+      EVIDENCED_CLAIMS.length +
+        (dogfoodReceipts as DogfoodReceiptsFile).receipts.length
+    );
     for (const claim of metrics) {
       expect(claim.citation, claim.id).toBeTruthy();
       expect(claim.validUntil, claim.id).toBeTruthy();

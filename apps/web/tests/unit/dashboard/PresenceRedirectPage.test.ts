@@ -109,11 +109,11 @@ describe('Presence route separation', () => {
 
     expect(redirectMock).toHaveBeenNthCalledWith(
       1,
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`
+      `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`
     );
     expect(redirectMock).toHaveBeenNthCalledWith(
       2,
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`
+      `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`
     );
   });
 });

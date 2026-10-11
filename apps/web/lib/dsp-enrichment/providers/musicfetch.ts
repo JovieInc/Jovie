@@ -12,6 +12,7 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { env } from '@/lib/env-server';
+import { musicfetchNetworkAllowed } from '@/lib/music-resolver/musicfetch-gate';
 import {
   isMusicfetchInvalidServicesError,
   isMusicfetchVendorUnavailable,
@@ -106,7 +107,7 @@ interface MusicFetchResponse {
  * Check if MusicFetch.io is configured.
  */
 export function isMusicFetchAvailable(): boolean {
-  return Boolean(env.MUSICFETCH_API_TOKEN);
+  return Boolean(env.MUSICFETCH_API_TOKEN) && musicfetchNetworkAllowed();
 }
 
 // ============================================================================

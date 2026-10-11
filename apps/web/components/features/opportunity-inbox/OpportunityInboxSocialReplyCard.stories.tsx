@@ -81,3 +81,25 @@ export const NeedsReview: Story = {
 export const Approving: Story = {
   args: { isApproving: true },
 };
+
+export const YouTubeComment: Story = {
+  args: {
+    card: {
+      ...card,
+      id: 'reply-yt-1',
+      title: 'Reply to Jordan on YouTube',
+      socialReply: {
+        ...socialReply,
+        platform: 'YouTube',
+        authorLabel: '@jordan.beats',
+        typeLabel: 'Fan Comment',
+        inboundText: 'This drop goes crazy — the bridge at 2:14 is unreal.',
+        draftedText:
+          'Appreciate you Jordan — that bridge took forever to get right. More coming soon.',
+        sourceUrl: 'https://youtube.com/watch?v=abc123',
+        videoTitle: 'Midnight Run (Official Video)',
+        likeCount: 42,
+      },
+    },
+  },
+};

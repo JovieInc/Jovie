@@ -7,6 +7,7 @@ import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardData
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { queryKeys } from '@/lib/queries/keys';
 import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
@@ -45,6 +46,8 @@ export const DASHBOARD_FIXTURE_PROFILE = {
   spotify_id: 'spotify-artist-1',
   apple_music_id: null,
   settings: {},
+  // Real rows always carry createdAt; profile-to-artist adapters serialize it.
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
 } as unknown as DashboardData['selectedProfile'];
 
 export const DEFAULT_DASHBOARD_DATA: DashboardData = {
@@ -124,7 +127,9 @@ export function DashboardStoryProviders({
         <PreviewPanelProvider>
           <RightPanelProvider>
             <HeaderActionsProvider>
-              <AudiencePanelProvider>{children}</AudiencePanelProvider>
+              <TableMetaProvider>
+                <AudiencePanelProvider>{children}</AudiencePanelProvider>
+              </TableMetaProvider>
             </HeaderActionsProvider>
           </RightPanelProvider>
         </PreviewPanelProvider>
@@ -136,7 +141,7 @@ export function DashboardStoryProviders({
 /**
  * Decorator bundling the common dashboard provider stack (react-query +
  * DashboardDataProvider + PreviewPanelProvider + RightPanelProvider +
- * HeaderActionsProvider + AudiencePanelProvider) with
+ * HeaderActionsProvider + TableMetaProvider + AudiencePanelProvider) with
  * the default fixture data. Combine with `withSignedInSession` from
  * `signed-in-session.tsx` when a story also needs an authenticated session.
  */

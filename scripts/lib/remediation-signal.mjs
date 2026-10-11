@@ -202,6 +202,16 @@ export async function resolveRemediationSignal({
   });
 }
 
+const TRANSIENT_FAILURE_RE = /_(transport|5\d\d)$/;
+
+/**
+ * Linear filing can hit short-lived upstream 5xx/transport resets; only those
+ * reasons are worth retrying inside the intake job's timeout.
+ */
+export function isTransientRemediationFailure(result) {
+  return !result?.ok && TRANSIENT_FAILURE_RE.test(String(result?.reason ?? ''));
+}
+
 /** @param {any} decision @param {any} [context] */
 export async function applyRemediationDecision(decision = {}, context = {}) {
   const { fingerprint, source, runUrl, detail, apiKey, fetchImpl } = context;
@@ -234,4 +244,27 @@ export async function applyRemediationDecision(decision = {}, context = {}) {
     if (!resolved.ok) return { ok: false, action: 'green', results };
   }
   return { ok: true, action: 'green', results };
+}
+
+const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Retry transient Linear upstream failures before letting the intake fail.
+ * Permanent failures (missing key, 4xx, GraphQL errors) return immediately.
+ */
+export async function applyRemediationDecisionWithRetry(
+  decision = {},
+  context = {},
+  { attempts = 3, delaysMs = [5_000, 15_000], sleep = defaultSleep } = {}
+) {
+  let result = await applyRemediationDecision(decision, context);
+  for (
+    let i = 0;
+    i < attempts - 1 && isTransientRemediationFailure(result);
+    i += 1
+  ) {
+    await sleep(delaysMs[Math.min(i, delaysMs.length - 1)]);
+    result = await applyRemediationDecision(decision, context);
+  }
+  return result;
 }

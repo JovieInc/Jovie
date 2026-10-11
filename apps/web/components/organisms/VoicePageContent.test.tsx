@@ -15,12 +15,17 @@ describe('VoicePageContent source contract', () => {
     const { container } = render(<VoicePageContent />);
 
     expect(container.querySelectorAll('main')).toHaveLength(1);
-    expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: /Clone your voice\. From any YouTube video\./,
-      })
-    ).toBeInTheDocument();
+    const heading = screen.getByRole('heading', {
+      level: 1,
+      name: /^Clone your voice\. From any YouTube video\.$/,
+    });
+    expect(screen.getAllByRole('heading', { level: 1 })).toEqual([heading]);
+    expect(heading).toBeVisible();
+    expect(heading).toHaveAttribute('id', 'voice-hero-heading');
+    expect(screen.getByTestId('voice-hero-section')).toHaveAttribute(
+      'aria-labelledby',
+      heading.id
+    );
     expect(screen.getByTestId('voice-demo-visual')).toBeInTheDocument();
 
     const stepArticles = screen.getAllByRole('article');

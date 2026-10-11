@@ -185,7 +185,7 @@ test.describe('Dashboard Interaction CLS Audit @nightly', () => {
       return;
     }
 
-    await gotoAppRoute(page, APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    await gotoAppRoute(page, APP_ROUTES.SETTINGS_PROFILE);
     const careerHighlightsField = await expectCareerHighlightsField(page);
 
     const testValue = `CLS audit ${Date.now()}`;
@@ -208,7 +208,7 @@ test.describe('Dashboard Interaction CLS Audit @nightly', () => {
     await attachClsResult(testInfo, 'cls-settings-save', {
       cls,
       budget: CLS_INTERACTION_BUDGET,
-      route: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+      route: APP_ROUTES.SETTINGS_PROFILE,
       interaction: 'career-highlights-save',
     });
 
@@ -268,5 +268,65 @@ test.describe('Dashboard Interaction CLS Audit @nightly', () => {
       cls,
       `CLS ${cls.toFixed(4)} during calendar first paint exceeds budget of ${CLS_INTERACTION_BUDGET}`
     ).toBeLessThan(CLS_INTERACTION_BUDGET);
+  });
+
+  // JOV-5836: the Audience workspace must not shift layout by implicitly
+  // opening the analytics panel after navigation. Measured at the reported
+  // reproduction viewport (Jovie Local 1512x949 content window).
+  test('contacts audience first paint opens no panel and stays within CLS budget', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(180_000);
+    if (shouldSkipClsInDevMode()) {
+      test.skip(
+        true,
+        'CLS budgets are unreliable in dev mode (Turbopack overhead)'
+      );
+      return;
+    }
+
+    await page.setViewportSize({ width: 1512, height: 949 });
+
+    // Warm the authenticated shell before measuring contacts paint shifts.
+    await gotoAppRoute(page, APP_ROUTES.RELEASES);
+    await expect(page.getByTestId('releases-matrix')).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT,
+    });
+
+    await installInteractionClsObserver(page);
+    await page.goto(`${APP_ROUTES.CONTACTS}?tab=audience`, {
+      waitUntil: 'domcontentloaded',
+      timeout: TIMEOUTS.NAVIGATION,
+    });
+    await waitForHydration(page);
+
+    const audienceVisible = await page
+      .getByTestId('dashboard-audience-table')
+      .isVisible({ timeout: TIMEOUTS.ELEMENT })
+      .catch(() => false);
+    if (!audienceVisible) {
+      test.skip(
+        true,
+        'Audience table did not render — cannot measure contacts CLS'
+      );
+      return;
+    }
+
+    const cls = await collectInteractionCls(page);
+
+    await attachClsResult(testInfo, 'cls-contacts-audience-first-paint', {
+      cls,
+      budget: CLS_INTERACTION_BUDGET,
+      route: APP_ROUTES.CONTACTS,
+      interaction: 'contacts-audience-route-navigation',
+    });
+
+    expect(
+      cls,
+      `CLS ${cls.toFixed(4)} during contacts audience first paint exceeds budget of ${CLS_INTERACTION_BUDGET}`
+    ).toBeLessThan(CLS_INTERACTION_BUDGET);
+
+    // The analytics panel must remain closed: route state never encodes it.
+    await expect(page.getByTestId('analytics-sidebar')).toBeHidden();
   });
 });

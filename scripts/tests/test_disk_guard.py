@@ -209,6 +209,23 @@ class CheckTest(unittest.TestCase):
             self.assertEqual(cwds["xcrun"], Path.home())
             self.assertIn("preserved shared pnpm store", report["actions"])
 
+    def test_low_disk_sheds_idle_worktree_pool_slots(self):
+        saved = (guard.free_pct, guard.worktree_pool.shed)
+        guard.free_pct = lambda path: 10.0
+        shed_repos = []
+        guard.worktree_pool.shed = lambda repo: shed_repos.append(repo) or ["slot-a"]
+
+        def run(args, **kw):
+            return self._porcelain_empty() if args[:3] == ["git", "worktree", "list"] else ok(args)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                report = guard.check(self.host(tmp), run=run, now=NOW, sweep=True)
+            finally:
+                guard.free_pct, guard.worktree_pool.shed = saved
+            self.assertEqual(shed_repos, [self.host(tmp).repo])
+            self.assertIn("drained pool slot slot-a", report["actions"])
+
     def _porcelain_empty(self):
         return SimpleNamespace(returncode=0, stdout="worktree /repo\nHEAD x\nbranch refs/heads/main\n", stderr="")
 
@@ -269,6 +286,21 @@ class CheckTest(unittest.TestCase):
             second.assert_not_called()
             self.assertFalse(report["admitted"])
 
+
+
+class HarnessArtifactTest(unittest.TestCase):
+    def test_harness_files_are_not_uncommitted_source(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+            subprocess.run(["git", "init", "-q", str(repo)], check=True, env=env)
+            for name in guard.HARNESS_ARTIFACTS:
+                (repo / name).write_text("harness\n")
+            with patch.dict(os.environ, env, clear=True):
+                self.assertTrue(guard.is_clean(repo, subprocess.run), "only harness artifacts: clean")
+                (repo / "unsaved.py").write_text("work\n")
+                self.assertFalse(guard.is_clean(repo, subprocess.run), "a real untracked file is work")
 
 if __name__ == "__main__":
     unittest.main()

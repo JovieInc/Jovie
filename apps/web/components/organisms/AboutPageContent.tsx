@@ -36,7 +36,7 @@ export function AboutPageContent() {
           <p className='text-sm font-medium text-tertiary-token'>
             {ABOUT_COPY.kicker}
           </p>
-          <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
+          <h1 className='mt-6 max-w-2xl text-3xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
             {ABOUT_COPY.headline}
           </h1>
           <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>

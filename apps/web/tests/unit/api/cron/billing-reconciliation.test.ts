@@ -8,6 +8,11 @@ const mockUpdateUserBillingStatus = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockStripeList = vi.hoisted(() => vi.fn());
+const mockReplayUnprocessedStripeWebhooks = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/billing/webhook-replay', () => ({
+  replayUnprocessedStripeWebhooks: mockReplayUnprocessedStripeWebhooks,
+}));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -68,6 +73,11 @@ describe('GET /api/cron/billing-reconciliation', () => {
     mockDbUpdateSet.mockReturnValue({ where: mockDbUpdateWhere });
     mockDbInsertValues.mockResolvedValue(undefined);
     mockStripeList.mockResolvedValue({ data: [], has_more: false });
+    mockReplayUnprocessedStripeWebhooks.mockResolvedValue({
+      processed: 0,
+      blocked: [],
+      failed: [],
+    });
   });
 
   afterEach(() => {
@@ -138,7 +148,15 @@ describe('GET /api/cron/billing-reconciliation', () => {
       expect.objectContaining({
         eventType: 'reconciliation_run',
         source: 'reconciliation',
-        metadata: { action: 'reconciliation_run' },
+        metadata: expect.objectContaining({
+          action: 'reconciliation_run',
+          success: true,
+          webhookReplay: {
+            processed: 0,
+            blocked: [],
+            failed: [],
+          },
+        }),
       })
     );
   });
@@ -299,7 +317,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
     );
   });
 
-  it('continues reconciliation when audit log insert fails', async () => {
+  it('fails closed when the reconciliation run receipt cannot be written', async () => {
     vi.stubEnv('NODE_ENV', 'production');
 
     // Audit log insert fails
@@ -362,14 +380,19 @@ describe('GET /api/cron/billing-reconciliation', () => {
     const response = await GET(request);
     const data = await response.json();
 
-    // User update should still succeed
-    expect(response.status).toBe(200);
-    expect(data.stats.fixed).toBe(1);
-    // Audit failure should be captured as critical error
+    // The user repair still happens, but the cron cannot claim success without
+    // its durable reconciliation_run receipt.
+    expect(response.status).toBe(500);
+    expect(data.success).toBe(false);
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
       'Billing audit log insert failed after user update',
       expect.any(Error),
       expect.objectContaining({ userId: 'user_1' })
+    );
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Billing reconciliation failed',
+      expect.any(Error),
+      {}
     );
     expect(mockCaptureWarning).not.toHaveBeenCalled();
   });
@@ -395,5 +418,16 @@ describe('GET /api/cron/billing-reconciliation', () => {
 
     expect(response.status).toBe(500);
     expect(data.success).toBe(false);
+    expect(mockDbInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'reconciliation_run',
+        source: 'reconciliation',
+        metadata: expect.objectContaining({
+          action: 'reconciliation_run',
+          success: false,
+          failure: { name: 'Error', message: 'Database error' },
+        }),
+      })
+    );
   });
 });

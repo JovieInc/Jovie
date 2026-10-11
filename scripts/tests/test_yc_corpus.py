@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -126,6 +127,37 @@ class YcCorpusTest(unittest.TestCase):
         self.assertEqual(second["status"], "current")
         self.assertEqual(len(spawned), 1)
         self.assertEqual(spawned[0][1:3], [str(ROOT / "scripts/lanes/yc_corpus.py"), "refresh"])
+
+
+class GbrainPutTest(unittest.TestCase):
+    """JOV-7715: a put is stored only when the read-back carries the page body."""
+
+    def run_put(self, stored, put=None):
+        calls = []
+
+        def run(args, **kw):
+            calls.append((args, kw))
+            if args[1] == "put":
+                if put:
+                    raise put
+                return subprocess.CompletedProcess(args, 0, "ok", "")
+            if isinstance(stored, BaseException):
+                raise stored
+            return stored
+        return yc.gbrain_put("s", "t", "---\ntitle: t\n---\n# T\n\nlast line\n", run=run), calls
+
+    def test_read_back_decides(self):
+        ok, calls = self.run_put(subprocess.CompletedProcess([], 0, "# T\n\nlast   line", ""))
+        self.assertEqual(ok, (True, None))
+        self.assertEqual(calls[0][0], ["gbrain", "put", "s"])
+        self.assertIn("last line", calls[0][1]["input"])
+        hung, _ = self.run_put(subprocess.CompletedProcess([], 0, "last line", ""),
+                               put=subprocess.TimeoutExpired("gbrain", 120))
+        self.assertTrue(hung[0])
+        self.assertEqual(self.run_put(subprocess.CompletedProcess([], 0, "---\ntitle: t\n---\n", ""))[0],
+                         (False, "gbrain read-back missing page body"))
+        self.assertFalse(self.run_put(OSError("down"))[0][0])
+        self.assertFalse(self.run_put(None, put=OSError("missing"))[0][0])
 
 
 if __name__ == "__main__":

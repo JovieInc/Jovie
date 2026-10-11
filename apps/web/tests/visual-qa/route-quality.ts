@@ -4,7 +4,10 @@ import type {
   VisualQaCoverageEntry,
   VisualQaPlaywrightRouteSource,
 } from '@/lib/agent-os/visual-qa/coverage';
-import { measureBufferedCls } from '../helpers/cls-measurement';
+import {
+  formatLayoutShiftAttribution,
+  measureBufferedLayoutShifts,
+} from '../helpers/cls-measurement';
 import {
   classifySameOriginRequestFailure,
   formatRequestFailure,
@@ -159,10 +162,11 @@ export async function assertRegisteredQualityChecks(
   }
 
   if (checks.has('layout-stability')) {
-    const cls = await measureBufferedCls(page, 300);
-    expect(cls, `${entry.id} cumulative layout shift`).toBeLessThanOrEqual(
-      0.05
-    );
+    const { cls, shifts } = await measureBufferedLayoutShifts(page, 300);
+    expect(
+      cls,
+      `${entry.id} cumulative layout shift\n${formatLayoutShiftAttribution(shifts)}`
+    ).toBeLessThanOrEqual(0.05);
   }
 
   if (checks.has('reduced-motion')) {

@@ -66,7 +66,7 @@ export default function ArtistProfilesPage() {
           },
         })}
       </script>
-      <ArtistProfileLandingRoute />
+      <ArtistProfileLandingRoute logoPlacement={{ page: '/artist-profiles' }} />
     </>
   );
 }

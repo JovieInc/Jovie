@@ -17,6 +17,7 @@ import {
 } from '../../data/marketing/generation';
 import type { FactoryPageBrief } from './brief';
 import type { FactoryProviders, GeneratedStage } from './providers';
+import { digestOf } from './receipts';
 
 export type Evaluator = StageReceipt['evaluators'][number];
 
@@ -28,6 +29,7 @@ export interface StageContext {
   readonly artifacts: Partial<Record<FactoryStage, unknown>>;
   readonly receipts: Partial<Record<FactoryStage, StageReceipt>>;
   readonly attempt: number;
+  readonly iteration?: number;
   readonly feedback: readonly string[];
   readonly runDir: string;
 }
@@ -43,6 +45,15 @@ export interface StageResult {
   readonly notes: Readonly<Record<string, unknown>>;
   /** Set when a model, render or media provider is unreachable. */
   readonly unavailable: string | null;
+  /**
+   * A rejection that retrying this stage cannot fix: the harness reruns
+   * from `stage` with `findings` as its feedback, then re-renders and
+   * re-judges, instead of retrying here on the same inputs.
+   */
+  readonly rework?: {
+    readonly stage: FactoryStage;
+    readonly findings: readonly string[];
+  } | null;
 }
 
 export type StageRunner = (ctx: StageContext) => Promise<StageResult>;
@@ -194,63 +205,151 @@ export async function judge(
   };
 }
 
-/** Shared shape for the strategist and copywriter stages. */
+type Evaluate = (
+  value: Record<string, unknown>,
+  checks: Checks,
+  model: string
+) => Promise<{
+  artifact: unknown;
+  evaluators?: Evaluator[];
+  critique?: string[];
+  unavailable?: string | null;
+}>;
+
+/** One generated direction, judged on its own checks and evaluators. */
+export interface DirectionRecord {
+  readonly direction: number;
+  readonly outputDigest: string;
+  readonly passed: boolean;
+  readonly score: number;
+  readonly invariantsFailed: readonly string[];
+  readonly evaluators: readonly Pick<Evaluator, 'id' | 'verdict' | 'score'>[];
+}
+
+/**
+ * Highest-scoring direction among those that passed every check and judge;
+ * with none passing, the highest-scoring one, so the retry refines the best.
+ */
+export function pickDirection(directions: readonly DirectionRecord[]): {
+  readonly direction: number;
+  readonly rationale: string;
+} {
+  const passing = directions.filter(d => d.passed);
+  const pool = passing.length > 0 ? passing : directions;
+  const winner = pool.reduce((best, d) => (d.score > best.score ? d : best));
+  const others = directions
+    .filter(d => d !== winner)
+    .map(
+      d =>
+        `${d.direction} (${d.passed ? 'passed' : 'failed'}, ${d.score.toFixed(2)})`
+    );
+  return {
+    direction: winner.direction,
+    rationale: [
+      `direction ${winner.direction} ${winner.passed ? 'passed' : 'failed'} with mean judge score ${winner.score.toFixed(2)}`,
+      passing.length > 0
+        ? `highest of ${passing.length} passing`
+        : 'none passed; refining the highest-scoring',
+      ...(others.length > 0 ? [`over ${others.join(', ')}`] : []),
+    ].join('; '),
+  };
+}
+
+/**
+ * Shared shape for the strategist and copywriter stages. With `directions`
+ * above 1 the producer writes that many distinct directions; each is judged
+ * independently and the winner (pickDirection) becomes the stage result,
+ * with every direction and the rationale in the notes.
+ */
 export async function modelStage(
   ctx: StageContext,
   stage: GeneratedStage,
   role: MarketingCreativeRole,
   task: string,
   context: unknown,
-  evaluate: (
-    value: Record<string, unknown>,
-    checks: Checks,
-    model: string
-  ) => Promise<{
-    artifact: unknown;
-    evaluators?: Evaluator[];
-    critique?: string[];
-    unavailable?: string | null;
-  }>
+  evaluate: Evaluate,
+  options: { readonly directions?: number } = {}
 ): Promise<StageResult> {
-  const checks = new Checks();
   const { model, producer, selection } = selectProducer(ctx, role);
   if (!model) {
-    return result(checks, null, {
+    return result(new Checks(), null, {
       unavailable: `no healthy ${role} model`,
       notes: { selection },
     });
   }
-  const generated = await ctx.providers.generate({
-    stage,
-    model,
-    system: `You are the ${role} for a Jovie marketing page. ${task} Never invent metrics, quotes, testimonials or logos. No em dashes. Reply with JSON only.`,
-    prompt: JSON.stringify(
-      { context, previousFailures: ctx.feedback },
-      null,
-      2
-    ),
-    feedback: ctx.feedback,
-    attempt: ctx.attempt,
-  });
-  if (generated.status !== 'ok') {
-    return result(checks, null, {
+  const count = Math.max(1, options.directions ?? 1);
+  const runs: { checks: Checks; result: StageResult }[] = [];
+  for (let direction = 1; direction <= count; direction++) {
+    const checks = new Checks();
+    const generated = await ctx.providers.generate({
+      stage,
+      model,
+      system: [
+        `You are the ${role} for a Jovie marketing page. ${task} Never invent metrics, quotes, testimonials or logos. No em dashes. Reply with JSON only.`,
+        ...(count > 1
+          ? [
+              `Write direction ${direction} of ${count}: take an angle clearly distinct from the other directions.`,
+            ]
+          : []),
+      ].join(' '),
+      prompt: JSON.stringify(
+        { context, previousFailures: ctx.feedback },
+        null,
+        2
+      ),
+      feedback: ctx.feedback,
+      attempt: ctx.attempt,
+      ...(count > 1 ? { direction: { index: direction, of: count } } : {}),
+    });
+    if (generated.status !== 'ok') {
+      return result(checks, null, {
+        producer,
+        unavailable: generated.reason,
+        notes: { selection },
+      });
+    }
+    const value =
+      generated.value && typeof generated.value === 'object'
+        ? (generated.value as Record<string, unknown>)
+        : {};
+    const evaluated = await evaluate(value, checks, model);
+    const outcome = result(checks, evaluated.artifact, {
       producer,
-      unavailable: generated.reason,
+      evaluators: evaluated.evaluators ?? [],
+      feedback: [...checks.feedback, ...(evaluated.critique ?? [])],
+      unavailable: evaluated.unavailable ?? null,
       notes: { selection },
     });
+    if (outcome.unavailable) return outcome;
+    runs.push({ checks, result: outcome });
   }
-  const value =
-    generated.value && typeof generated.value === 'object'
-      ? (generated.value as Record<string, unknown>)
-      : {};
-  const evaluated = await evaluate(value, checks, model);
-  return result(checks, evaluated.artifact, {
-    producer,
-    evaluators: evaluated.evaluators ?? [],
-    feedback: [...checks.feedback, ...(evaluated.critique ?? [])],
-    unavailable: evaluated.unavailable ?? null,
-    notes: { selection },
+  if (count === 1) return runs[0]?.result as StageResult;
+
+  const directions: DirectionRecord[] = runs.map(({ checks, result }, i) => {
+    const scores = result.evaluators.map(e => e.score);
+    return {
+      direction: i + 1,
+      outputDigest: digestOf(result.artifact),
+      passed:
+        checks.failed.length === 0 &&
+        result.evaluators.every(e => e.verdict === 'pass'),
+      score: scores.length
+        ? scores.reduce((a, b) => a + b, 0) / scores.length
+        : 0,
+      invariantsFailed: [...checks.failed],
+      evaluators: result.evaluators.map(({ id, verdict, score }) => ({
+        id,
+        verdict,
+        score,
+      })),
+    };
   });
+  const winner = pickDirection(directions);
+  const chosen = runs[winner.direction - 1]?.result as StageResult;
+  return {
+    ...chosen,
+    notes: { ...chosen.notes, directions, winner },
+  };
 }
 
 export function claimIdsOf(ctx: StageContext): Set<string> {

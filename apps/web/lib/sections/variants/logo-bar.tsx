@@ -13,7 +13,11 @@ export const LOGO_BAR_VARIANTS: readonly SectionVariant[] = [
     canonical: true,
     render: () => (
       <div className='py-12 px-6'>
-        <HomeTrustSection variant='default' presentation='card' />
+        <HomeTrustSection
+          placement={{ page: '/artist-profile' }}
+          variant='default'
+          presentation='card'
+        />
       </div>
     ),
   },
@@ -27,7 +31,11 @@ export const LOGO_BAR_VARIANTS: readonly SectionVariant[] = [
     status: 'canonical',
     render: () => (
       <div className='py-12 px-6'>
-        <HomeTrustSection variant='compact' presentation='card' />
+        <HomeTrustSection
+          placement={{ page: '/release-notification' }}
+          variant='compact'
+          presentation='card'
+        />
       </div>
     ),
   },
@@ -41,7 +49,11 @@ export const LOGO_BAR_VARIANTS: readonly SectionVariant[] = [
     status: 'canonical',
     render: () => (
       <div className='py-8 px-6'>
-        <HomeTrustSection variant='default' presentation='inline-strip' />
+        <HomeTrustSection
+          placement={{ page: '/' }}
+          variant='default'
+          presentation='inline-strip'
+        />
       </div>
     ),
   },

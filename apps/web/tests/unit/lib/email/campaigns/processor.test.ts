@@ -42,6 +42,14 @@ const {
 });
 
 // Mock database
+const coldGate = vi.hoisted(() => ({ open: true }));
+// Exercise the underlying send logic as if the path were open; the closed
+// default is proven separately below (JOV-7858).
+vi.mock('@/lib/outbound/cold-claim-invites', () => ({
+  isColdClaimInviteSendOpen: () => coldGate.open,
+  COLD_CLAIM_INVITE_CLOSED_MESSAGE: 'closed',
+}));
+
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
@@ -365,6 +373,21 @@ describe('email/campaigns/processor.ts', () => {
   });
 
   describe('processCampaigns', () => {
+    it('sends no cold follow-up while cold claim invites are closed', async () => {
+      coldGate.open = false;
+      try {
+        const { processCampaigns } = await import(
+          '@/lib/email/campaigns/processor'
+        );
+        await expect(processCampaigns()).resolves.toMatchObject({
+          processed: 0,
+          sent: 0,
+        });
+      } finally {
+        coldGate.open = true;
+      }
+    });
+
     it('returns zero counts when no pending enrollments exist', async () => {
       setupProcessingMocks({ enrollments: [] });
 

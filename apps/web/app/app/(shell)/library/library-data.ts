@@ -131,10 +131,15 @@ export interface LibraryReleaseAsset {
   readonly postReleaseDownloadCount?: number;
 }
 
+/**
+ * Tiles fill the container at a minimum width per density instead of fixed
+ * breakpoints, so an open inspector or the packaged Mac width keeps a dense
+ * grid. Phones always show two columns, so the size toggle hides there.
+ */
 export const LIBRARY_GRID_DENSITY_LAYOUT: Record<LibraryGridDensity, string> = {
-  compact: 'grid gap-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5',
-  comfortable: 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4',
-  spacious: 'grid gap-4 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3',
+  compact: 'grid grid-cols-2 gap-2 system-b-library-grid--compact',
+  comfortable: 'grid grid-cols-2 gap-3 system-b-library-grid--comfortable',
+  spacious: 'grid grid-cols-2 gap-3 sm:gap-4 system-b-library-grid--spacious',
 };
 
 export function getLibraryAssetAspectRatio(
@@ -207,8 +212,11 @@ function resolveLibraryProfileVisibility(
 export function buildLibraryReleaseAssets(
   releases: readonly ReleaseViewModel[],
   approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>,
-  profileVisibilityByAssetId?: ReadonlyMap<string, LibraryProfileVisibility>
+  profileVisibilityByAssetId?: ReadonlyMap<string, LibraryProfileVisibility>,
+  /** The profile's own name; a release with no credited artist is theirs. */
+  fallbackArtistName?: string
 ): LibraryReleaseAsset[] {
+  const ownerArtist = fallbackArtistName?.trim() || 'Unknown Artist';
   return releases.map(release => {
     const providers = release.providers.flatMap(provider => {
       const url = normalizeHttpUrl(provider.url);
@@ -241,7 +249,7 @@ export function buildLibraryReleaseAssets(
     return {
       id: release.id,
       title: release.title,
-      artist: release.artistNames?.[0]?.trim() || 'Unknown Artist',
+      artist: release.artistNames?.[0]?.trim() || ownerArtist,
       artworkUrl,
       previewUrl,
       ...(previewVerification ? { previewVerification } : {}),

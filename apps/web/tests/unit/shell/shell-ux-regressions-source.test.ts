@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { BREAKPOINTS } from '@/hooks/useBreakpoint';
 
 const webRoot = path.resolve(__dirname, '../../..');
 
@@ -19,7 +20,9 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
       'utf8'
     );
 
-    expect(sidebar).toMatch(/group peer max-lg:hidden h-full min-h-0 shrink-0/);
+    expect(sidebar).toMatch(
+      /group peer relative max-lg:hidden h-full min-h-0 shrink-0/
+    );
     expect(frame).toMatch(
       /data-testid='app-shell-sidebar-mount'[\s\S]*?h-full min-h-0/
     );
@@ -49,8 +52,23 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(previewHost).toContain('height: 100%');
     expect(previewHost).not.toContain('box-shadow');
     expect(previewHost).not.toContain('border:');
-    expect(rail).toMatch(/lg:flex-col lg:self-stretch lg:overflow-hidden/);
-    expect(rail).toMatch(/h-0 w-0[\s\S]*overflow-visible/);
+    expect(rail).toContain('shell-inspector-overlay');
+    const foundation = readFileSync(
+      path.join(webRoot, 'styles/tailwind-foundation.css'),
+      'utf8'
+    );
+    const overlay = foundation.slice(
+      foundation.indexOf('@utility shell-inspector-overlay')
+    );
+    expect(overlay).toMatch(
+      /height: 0;[\s\S]*width: 0;[\s\S]*overflow: visible;/
+    );
+    expect(overlay).toMatch(
+      new RegExp(
+        `@media \\(min-width: ${BREAKPOINTS.lg}px\\)[\\s\\S]*position: absolute;[\\s\\S]*inset-inline-end: 0;`
+      )
+    );
+    expect(overlay).toContain('width: fit-content;');
     expect(rail).not.toMatch(/lg:flex-col lg:self-start lg:overflow-hidden/);
   });
 
@@ -90,15 +108,22 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(leftToggle).toContain("side='left'");
     expect(rightToggle).toContain('<RailToggleButton');
     expect(rightToggle).toContain("side='right'");
-    expect(sharedToggle).toContain('PanelLeftClose');
-    expect(sharedToggle).toContain('PanelLeftOpen');
-    expect(sharedToggle).toContain('PanelRightClose');
-    expect(sharedToggle).toContain('PanelRightOpen');
+    // JOV-7207 (2026-10-03): the arrow-bearing Lucide panel glyphs are banned;
+    // the toggle resolves its art from the Jovie-owned rail icon family.
+    for (const banned of [
+      'PanelLeftClose',
+      'PanelLeftOpen',
+      'PanelRightClose',
+      'PanelRightOpen',
+      'Chevron',
+    ])
+      expect(sharedToggle).not.toContain(banned);
+    expect(sharedToggle).toContain('railIconName(side, open)');
     expect(sharedToggle).toContain(
       "import { IconButton, TooltipShortcut } from '@jovie/ui'"
     );
     expect(sharedToggle).toContain('<IconButton');
-    expect(sharedToggle).toContain("variant='secondary'");
+    expect(sharedToggle).toContain("variant='ghost'");
     expect(sharedToggle).toContain("size='sm'");
     expect(sharedToggle).not.toContain('<Button');
     expect(sharedToggle).not.toContain('h-7 w-7 rounded-full');

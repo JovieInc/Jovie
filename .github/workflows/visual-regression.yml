@@ -182,6 +182,13 @@ jobs:
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/chat-visual.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
 
+          # Electron titlebar/shell geometry (JOV-7713). Browser-emulated
+          # desktop runtime over seeded personas; it needs this lane's Neon
+          # seed, so it lives here rather than in the noop-DB PR lanes.
+          E2E_USE_TEST_AUTH_BYPASS=1 \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/electron-titlebar-geometry.spec.ts \
+            --config=playwright.config.ts --project=chromium --reporter=line
+
           # Admin surfaces (JOV-4062) — the same refresh server heals stale
           # admin baselines only after functional assertions pass.
           E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=admin \
@@ -237,7 +244,9 @@ jobs:
 
       - name: Check for baseline changes (refresh only)
         id: diff
-        if: env.REFRESH_MODE == 'true' && steps.visual.outcome == 'success'
+        # Only main may publish baselines: a dispatch on any other ref would
+        # commit that ref's unreviewed source into the bot PR with auto-merge.
+        if: env.REFRESH_MODE == 'true' && steps.visual.outcome == 'success' && github.ref == 'refs/heads/main'
         run: |
           if [ -z "$(git status --porcelain "$SNAPSHOT_DIR")" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"

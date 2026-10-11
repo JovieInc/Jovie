@@ -171,7 +171,8 @@ export function getClientAuthenticatedAuthEntryRedirect(
  * Redirect destination for /start based on canonical access state.
  * Anonymous visitors, missing app-user identities, and pre-receipt waitlist
  * states remain on /start so the canonical chat can continue (JOV-5001).
- * Durable pending receipts belong on /waitlist.
+ * Pending accounts may resume their own onboarding here; app admission stays
+ * enforced independently by the canonical app/checkout gates.
  */
 export function getStartRouteRedirect(
   state: CanonicalUserState
@@ -181,6 +182,7 @@ export function getStartRouteRedirect(
     case CanonicalUserState.NEEDS_DB_USER:
     case CanonicalUserState.NEEDS_WAITLIST_SUBMISSION:
     case CanonicalUserState.NEEDS_ONBOARDING:
+    case CanonicalUserState.WAITLIST_PENDING:
       return null;
     case CanonicalUserState.ACTIVE:
       return APP_ROUTES.DASHBOARD;
@@ -188,8 +190,6 @@ export function getStartRouteRedirect(
       return APP_ROUTES.UNAVAILABLE;
     case CanonicalUserState.USER_CREATION_FAILED:
       return APP_ROUTES.USER_CREATION_ERROR;
-    case CanonicalUserState.WAITLIST_PENDING:
-      return APP_ROUTES.WAITLIST;
     default:
       return null;
   }

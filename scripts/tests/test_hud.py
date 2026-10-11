@@ -6,13 +6,17 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("hud", ROOT / "scripts/lanes/hud.py")
@@ -76,6 +80,55 @@ def model(**overrides) -> dict:
     return base
 
 
+class MergeEvidenceTest(unittest.TestCase):
+    def test_initial_remote_state_does_not_claim_zero_merges(self):
+        sample = model(github=hud.Remote(None).github)
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertIn("not-read-yet", text)
+        self.assertNotIn("total 0 in 24h", text)
+        self.assertIn("landed unknown", text)
+
+    def test_complete_empty_window_remains_true_zero(self):
+        sample = model()
+        sample["github"]["merged24h"] = []
+        sample["github"]["mergedWindow"] = {"complete": True}
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("total 0 in 24h", text)
+        self.assertIn("landed 0", text)
+
+    def test_explicit_incomplete_receipt_suppresses_stale_rows(self):
+        sample = model()
+        sample["github"]["mergedWindow"] = {"complete": False, "reason": "unstable_snapshot"}
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertNotIn("total 2 in 24h", text)
+        self.assertNotIn("#18671", text)
+
+    def test_unreadable_merge_evidence_is_unknown_not_zero(self):
+        sample = model()
+        sample["github"]["errors"]["merged"] = "merged-pr-evidence:unstable_snapshot"
+        sample["github"]["merged24h"] = []
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertNotIn("total 0 in 24h", text)
+        self.assertIn("landed unknown", text)
+
+    def test_github_model_uses_shared_reader_and_retains_incomplete_reason(self):
+        evidence = {"complete": False, "reason": "max_pages_reached", "prs": [],
+                    "window": {"since": 1, "until": 2}, "pages": 20, "scans": 1}
+        with mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud.lane, "load_providers", return_value={}), \
+                mock.patch.object(hud, "promotion_model", return_value={"error": "fixture"}), \
+                mock.patch.object(hud, "gh_json", side_effect=RuntimeError("fixture")), \
+                mock.patch.object(hud.merge_evidence, "collect", return_value=evidence) as collect:
+            result = hud.github_model()
+        self.assertEqual(result["mergedWindow"]["reason"], "max_pages_reached")
+        self.assertIn("max_pages_reached", result["errors"]["merged"])
+        self.assertNotIn("merged24h", result)
+        self.assertEqual(collect.call_count, 1)
+
+
 class ParseTest(unittest.TestCase):
     def test_run_ids_name_target_kind_and_start(self):
         info = hud.parse_run_id("20260926T205354Z-PR18695-devin-fix-41d8e6")
@@ -106,6 +159,43 @@ class RenderTest(unittest.TestCase):
             for line in frame:
                 self.assertLessEqual(len(plain(line)), width, plain(line))
 
+    def test_multiline_provider_errors_do_not_scroll_header_off_console(self):
+        value = model()
+        value["github"]["promotion"] = {"error": "RuntimeError: quota read\ngh: budget-floor\rretry\tlater"}
+        frame = hud.render(value, 160, 45)
+        physical_rows = "\n".join(frame).splitlines()
+        self.assertEqual(len(physical_rows), 45)
+        self.assertIn("JOVIE · SYMPHONY", plain(physical_rows[0]))
+        self.assertIn("gh: budget-floor retry later", "\n".join(plain(row) for row in frame))
+
+    def test_unknown_capacity_is_not_colored_healthy(self):
+        value = model()
+        value["local"]["doctor"]["capacity"] = {
+            "schema": "jovie.capacity-horizon/v1", "incidents": [],
+            "topBlocker": "capacity source missing",
+            "leases": [{"alias": "current-login", "mode": "unknown", "freshness": {"status": "unknown"}}]}
+        row = next(row for row in hud.render(value, 160, 45) if "current-login ?" in row)
+        self.assertIn(hud.rgb(hud.ORANGE, "")[:-4] + "current-login ?", row)
+        self.assertNotIn(hud.rgb(hud.GREEN, "")[:-4] + "current-login ?", row)
+
+    def test_dispatcher_slots_respect_zero_overrides_and_autoscaling(self):
+        now = hud.utcnow()
+        feed = {"at": now.isoformat(), "observed": {"capacityByProvider": {
+            "devin": {"slots": 0, "base": 0}, "codex": {"slots": 2, "base": 3}}}}
+        self.assertEqual(hud.dispatcher_slots(feed, {"devin": {}, "codex": {}}, now),
+                         ({"devin": 0, "codex": 2}, {"devin": 0, "codex": 3}))
+        for bad in (None, {}, {**feed, "at": "invalid"},
+                    {**feed, "at": (now - hud.timedelta(seconds=271)).isoformat()},
+                    {**feed, "at": (now + hud.timedelta(seconds=1)).isoformat()},
+                    {**feed, "observed": {"capacityByProvider": {"devin": {"slots": True, "base": 0}}}}):
+            with self.subTest(feed=bad):
+                self.assertIsNone(hud.dispatcher_slots(bad, {"devin": {}, "codex": {}}, now))
+        value = model()
+        value["local"]["slotEvidence"] = "unknown"
+        text = "\n".join(plain(row) for row in hud.render(value, 160, 45))
+        self.assertIn("running / unknown", text)
+        self.assertIn("codex 0/?", text)
+
     def test_running_and_vacant_slots_are_truthful(self):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
         self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", text)
@@ -115,6 +205,14 @@ class RenderTest(unittest.TestCase):
         self.assertIn("✓ alpha 48% left · reset 10m · banked 2", text)
         self.assertIn("✕ beta 0% left · reset 1h30m · banked 1 · retry 1h30m", text)
         self.assertIn("● gamma 90% left · reset 2h00m · banked 0 · leased", text)
+
+    def test_workers_above_a_reduced_cap_stay_visible(self):
+        value = model()
+        value["local"]["slots"] = {"devin": 0, "codex": 1}
+        text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
+        self.assertIn("devin 1/0", text)
+        self.assertIn("JOV-6544", text, "a running worker over the reduced cap is still shown")
+        self.assertIn("worker polling", text)
 
     def test_capacity_horizon_is_show_only_and_renders_source_gaps(self):
         value = model()
@@ -130,7 +228,12 @@ class RenderTest(unittest.TestCase):
         self.assertIn("show-only", text)
 
     def test_pipeline_attention_and_backlog_rows(self):
-        text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
+        value = model()
+        value["local"]["doctor"]["fileOverlap"] = {
+            "mode": "enforce", "pairs": [{"first": "pr:#20141", "later": "pr:#20166",
+                                             "actionTaken": "stack", "files": ["scripts/lanes/lane_runner.py"]}],
+            "metrics": {"conflicts_prevented": 2, "overlap_flags": 3, "rebases_caused_by_overlap": 1}}
+        text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
         self.assertIn("#18724 devin  JOV-6544", text)
         self.assertIn("unstable", text)
         self.assertIn("in queue awaiting_checks", text)
@@ -144,6 +247,8 @@ class RenderTest(unittest.TestCase):
         self.assertIn("THROUGHPUT 24h · codex offer 0", text)
         self.assertIn("devin offer 1 start 1 productive 1 PR 1 first-pass 100%", text)
         self.assertIn("disk 3.1% free", text)
+        self.assertIn("FILE OVERLAP  enforce · active 1 · prevented 2 · flags 3 · rebases 1", text)
+        self.assertIn("pr:#20141 → pr:#20166 stack scripts/lanes/lane_runner.py", text)
 
     def test_failed_sources_render_their_reason_never_a_blank(self):
         broken = model(linear={"ok": False, "error": "HTTPError: 429"},
@@ -193,6 +298,17 @@ class RenderTest(unittest.TestCase):
         feed["at"] = "malformed"
         self.assertEqual(hud.pool_hint("devin", value["local"]), "new issues unknown (doctor unread)")
 
+    def test_native_doctor_census_explains_real_admission_backpressure(self):
+        value = model()
+        feed = value["local"]["doctor"]
+        feed.update(at=hud.utcnow().isoformat(), observed={
+            "poolByProvider": {"codex": 0}, "candidatePoolByProvider": {"codex": 20},
+            "eligiblePoolByProvider": {"codex": 8}, "rejectedByProvider": {},
+            "newIssueBudgetByProvider": {"codex": {"used": 14, "cap": 6,
+                                                    "allowed": False, "reason": "over-budget"}}})
+        self.assertEqual(hud.pool_hint("codex", value["local"]),
+                         "new issues 0 · eligible 8/20 · PRs 14/6 over-budget")
+
     def test_new_issue_hint_separates_eligibility_budget_and_unknown(self):
         local = {"doctor": {"at": hud.utcnow().isoformat(), "admission": {
             "poolByProvider": {"codex": 0}, "candidatePoolByProvider": {"codex": 25},
@@ -220,6 +336,13 @@ class LedgerSchemaTest(unittest.TestCase):
     """JOV-7497: receipts missing optional verdict/provider/kind metadata must render
     as unclassified, not crash the display or be inferred as success."""
 
+    def setUp(self):
+        # The fixtures own the worker census. Reading this host's /proc made the release
+        # self-test fail whenever a live Gem worker was running (2026-10-11: devin 1/0).
+        patcher = mock.patch.object(hud, "running_workers", return_value=[])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def host_with_ledger(self, receipts):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -231,6 +354,19 @@ class LedgerSchemaTest(unittest.TestCase):
                 row = {"runId": receipt.get("runId", "x"), "endedAt": receipt.pop("endedAt", stamp), **receipt}
                 handle.write(json.dumps(row) + "\n")
         return SimpleNamespace(state=state, slots=lambda _name, default: default, gate_slots=2)
+
+    def test_local_model_uses_dispatcher_overrides_instead_of_console_defaults(self):
+        host = self.host_with_ledger([])
+        feed = {"at": hud.utcnow().isoformat(), "observed": {"capacityByProvider": {
+            "devin": {"slots": 0, "base": 0}, "codex": {"slots": 3, "base": 3}}}}
+        (host.state / "doctor.json").write_text(json.dumps(feed))
+        with mock.patch.object(hud.lane, "load_providers", return_value={"devin": {"slots": 4}, "codex": {"slots": 3}}):
+            local = hud.local_model(host)
+        self.assertEqual(local["slots"], {"devin": 0, "codex": 3})
+        self.assertEqual(local["slotEvidence"], "fresh-dispatcher")
+        text = "\n".join(plain(row) for row in hud.render(model(local=local), 160, 45))
+        self.assertIn("running / 3 (devin 0/0 · codex 0/3)", text)
+        self.assertNotIn("running / 7", text)
 
     def test_missing_and_null_verdicts_become_unclassified_not_a_crash(self):
         host = self.host_with_ledger([
@@ -274,6 +410,71 @@ class LedgerSchemaTest(unittest.TestCase):
         self.assertIn("24h verdicts:", text)
 
 
+class ManagedReleaseRestartTest(unittest.TestCase):
+    def test_symlink_launched_process_executes_the_new_release_and_preserves_flags(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            old, new = state / "old", state / "new"
+            shutil.copytree(ROOT / "scripts/lanes", old, ignore=shutil.ignore_patterns("__pycache__"))
+            new.mkdir()
+            receipt = state / "executed.json"
+            (new / "hud.py").write_text(
+                "import json, sys\nfrom pathlib import Path\n"
+                f"Path({str(receipt)!r}).write_text(json.dumps({{'source': __file__, 'args': sys.argv[1:]}}))\n")
+            (state / "current").symlink_to(old, target_is_directory=True)
+            harness = state / "launch.py"
+            harness.write_text(f"""
+import importlib.util, os
+from pathlib import Path
+from types import SimpleNamespace
+state = Path({str(state)!r})
+spec = importlib.util.spec_from_file_location('hud', state / 'current/hud.py')
+hud = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(hud)
+hud.lane.Host = lambda: SimpleNamespace(state=state)
+hud.lane.load_github_env = lambda: None
+hud.Remote = lambda _: SimpleNamespace(start=lambda: None)
+hud.build_model = lambda *args: None
+frames = 0
+def render(*args):
+    global frames
+    if frames:
+        raise RuntimeError('old HUD rendered again instead of executing the new release')
+    frames += 1
+    replacement = state / '.current.tmp'
+    replacement.symlink_to(state / 'new', target_is_directory=True)
+    os.replace(replacement, state / 'current')
+    return ['old release before managed update']
+hud.render = render
+hud.main()
+""")
+            flags = ["--width", "160", "--height", "45", "--interval", "0.001"]
+            result = subprocess.run([sys.executable, str(harness), *flags],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(receipt.read_text()),
+                             {"source": str((new / "hud.py").resolve()), "args": flags})
+
+    def test_unchanged_or_missing_release_keeps_rendering_without_reexec(self):
+        class StopLoop(Exception):
+            pass
+        for candidate in (hud.HERE / "hud.py", None):
+            with self.subTest(candidate=candidate), \
+                    mock.patch.object(hud.lane, "Host", return_value=SimpleNamespace(state=Path('/unused'))), \
+                    mock.patch.object(hud.lane, "load_github_env"), \
+                    mock.patch.object(hud, "Remote"), \
+                    mock.patch.object(hud, "current_hud", return_value=candidate), \
+                    mock.patch.object(hud, "build_model", return_value=None), \
+                    mock.patch.object(hud, "render", return_value=["frame"]) as render, \
+                    mock.patch.object(hud.os, "execv") as execute, \
+                    mock.patch.object(hud.sys, "stdout", io.StringIO()), \
+                    mock.patch.object(hud.time, "sleep", side_effect=StopLoop):
+                with self.assertRaises(StopLoop):
+                    hud.main([])
+                render.assert_called_once()
+                execute.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
 
@@ -282,7 +483,8 @@ class PromotionTest(unittest.TestCase):
     """JOV-6836: the HUD surfaces promotion-loss metrics, cached, and never blanks on failure."""
     METRICS = {"firstPass": {"rate": 0.74}, "reenqueueMinutes": {"p75": 365, "pending": 2},
                "openToFirstEnqueueMinutes": {"p75": 106.7}, "occupancy": {"cleanNotQueued": 6},
-               "intake": {"opensPerHour": 12.6, "mergesPerHour": 7.3, "keysWithMultipleOpenPrs": 10}}
+               "intake": {"opensPerHour": 12.6, "mergesPerHour": 7.3, "keysWithMultipleOpenPrs": 10},
+               "queueEntriesPerMerge": 2.2}
 
     def setUp(self):
         hud._promotion.update(at=0.0, data=None)
@@ -291,6 +493,7 @@ class PromotionTest(unittest.TestCase):
         text = "\n".join(plain(line) for line in hud.render(model(github={**model()["github"], "promotion": self.METRICS}), 200, 45))
         self.assertIn("first-pass 74% · ejected→back p75 365m (2 waiting) · open→enqueue p75 106.7m", text)
         self.assertIn("opens/h 12.6 vs merges/h 7.3 · CLEAN not queued 6 · keys >1 PR 10", text)
+        self.assertIn("queue entries/merge 2.2", text)
         self.assertIn("PROMOTION 8h  unread", plain(hud.promotion_line(None)))
         self.assertIn("boom", plain(hud.promotion_line({"error": "boom"})))
 

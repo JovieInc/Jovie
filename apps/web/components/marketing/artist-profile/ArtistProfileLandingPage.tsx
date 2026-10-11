@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
+import type { LogoPlacement } from '@/data/product-truth/logo-permissions';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { MarketingPlatformSpecBento } from '../MarketingPlatformSpecBento';
@@ -177,11 +178,13 @@ export function ArtistProfileAnnotatedTruth({
 interface ArtistProfileLandingPageProps {
   readonly copy: ArtistProfileLandingCopy;
   readonly flags: ArtistProfileSectionFlags;
+  readonly logoPlacement: LogoPlacement;
 }
 
 export function ArtistProfileLandingPage({
   copy,
   flags,
+  logoPlacement,
 }: Readonly<ArtistProfileLandingPageProps>) {
   if (!flags.FULL_PAGE) {
     return (
@@ -196,6 +199,7 @@ export function ArtistProfileLandingPage({
       <ArtistProfileHeroAdaptiveIntro
         hero={copy.hero}
         adaptive={copy.adaptive}
+        logoPlacement={logoPlacement}
       />
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
         <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />

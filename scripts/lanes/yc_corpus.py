@@ -25,6 +25,8 @@ import urllib.parse
 import urllib.request
 import urllib.robotparser
 import xml.etree.ElementTree as ET
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 
 SCHEMA = "jovie.gbrain.external-prior-art/v1"
 STATE_SCHEMA = "jovie.yc-corpus-refresh/v1"
@@ -334,12 +336,23 @@ def robots_allowed(url: str, cache: dict, fetch=fetch_url) -> bool:
     return cache[origin].can_fetch(USER_AGENT, url)
 
 
-def gbrain_put(slug: str, title: str, body: str, run=subprocess.run) -> tuple[bool, str | None]:
+def gbrain_put(slug: str, title: str, body: str, run=lifecycle.run) -> tuple[bool, str | None]:
+    """Same contract as reason_lane.write_gbrain (JOV-7715): page on stdin (Gem's wrapper
+    ignores `--content`), and stored only when a read-back contains the page's last line."""
+    tail = next((" ".join(line.split()) for line in reversed(body.splitlines()) if line.strip()), "")
     try:
-        result = run(["gbrain", "put", slug, "--content", body], capture_output=True, text=True, timeout=120)
-    except (OSError, subprocess.SubprocessError) as error:
+        run(["gbrain", "put", slug], input=body, capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        pass
+    except OSError as error:
         return False, f"{type(error).__name__}: {error}"
-    return (True, None) if result.returncode == 0 else (False, (result.stderr or result.stdout or "gbrain put failed")[-300:])
+    try:
+        stored = run(["gbrain", "get", slug], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as error:
+        return False, f"read-back {type(error).__name__}: {error}"
+    if stored.returncode == 0 and tail and tail in " ".join((stored.stdout or "").split()):
+        return True, None
+    return False, "gbrain read-back missing page body"
 
 
 def read_state(path: Path) -> dict:
@@ -474,7 +487,8 @@ def tick(state_dir: Path, spawn=subprocess.Popen, now: float | None = None) -> d
     write_state(path, state)
     try:
         spawn([sys.executable, str(Path(__file__)), "refresh", "--state", str(path)], stdin=subprocess.DEVNULL,
-              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
+              **lifecycle.spawn_kwargs())
     except Exception as error:
         state["lastRun"] = {"status": "failed", "at": now_iso(now),
                             "failures": [f"spawn: {type(error).__name__}: {error}"]}
@@ -490,9 +504,14 @@ def main(argv: list[str] | None = None) -> int:
     command.add_argument("--state", type=Path, default=Path.home() / ".local/state/jovie-lanes/yc-corpus.json")
     command.add_argument("--max-documents", type=int, default=DEFAULT_LIMIT)
     args = parser.parse_args(argv)
-    result = refresh(args.state, args.max_documents)
-    print(json.dumps(result, indent=2))
-    return 0 if result["status"] == "ok" else 1
+    try:
+        with lifecycle.Guard(args.state.parent):
+            result = refresh(args.state, args.max_documents)
+            print(json.dumps(result, indent=2))
+            return 0 if result["status"] == "ok" else 1
+    except lifecycle.AdmissionHeld as error:
+        print(f"lifecycle admission held: {error}", file=sys.stderr)
+        return 75
 
 
 if __name__ == "__main__":

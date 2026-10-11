@@ -376,6 +376,111 @@ describe('production lane range', () => {
     });
   });
 
+  it.each([
+    ['push and queue both pass', ['merge_group', 'push'], 102, false],
+    [
+      'unique push supersedes older queue proofs',
+      ['merge_group', 'merge_group', 'push'],
+      103,
+      false,
+    ],
+    [
+      'duplicate pushes remain ambiguous',
+      ['merge_group', 'push', 'push'],
+      null,
+      false,
+    ],
+    [
+      'duplicate queue proofs remain ambiguous',
+      ['merge_group', 'merge_group'],
+      null,
+      false,
+    ],
+    ['invalid push receipt fails closed', ['merge_group', 'push'], null, true],
+  ])('historical evidence: %s', (_name, events, expectedRunId, invalidPush) => {
+    const evidenceSha = sha('b');
+    const repository = 'JovieInc/Jovie';
+    const runs = events.map((event, index) => ({
+      id: 101 + index,
+      run_attempt: 1,
+      event,
+      head_sha: evidenceSha,
+      head_branch:
+        event === 'push' ? 'main' : 'gh-readonly-queue/main/pr-1-base',
+      path: '.github/workflows/ci.yml',
+      head_repository: { full_name: repository },
+      status: 'completed',
+      conclusion: 'success',
+    }));
+    const resolveEvidence = () =>
+      resolveHistoricalLaneEvidence({
+        repository,
+        sha: evidenceSha,
+        lane: 'web',
+        ghJsonImpl: endpoint => {
+          if (endpoint.includes('/ci.yml/runs?')) {
+            const event = new URL(
+              `https://api.github.com/${endpoint}`
+            ).searchParams.get('event');
+            return { workflow_runs: runs.filter(run => run.event === event) };
+          }
+          const runId = Number(endpoint.match(/\/runs\/(\d+)/)?.[1]);
+          const run = runs.find(row => row.id === runId);
+          if (!run) throw new Error(`Unexpected fixture endpoint: ${endpoint}`);
+          if (endpoint.includes('/jobs?'))
+            return {
+              total_count: 1,
+              jobs: [
+                {
+                  name:
+                    run.event === 'push' ? 'Main Release Ready' : 'PR Ready',
+                  run_id: run.id,
+                  run_attempt: 1,
+                  head_sha: evidenceSha,
+                  status: 'completed',
+                  conclusion: 'success',
+                },
+              ],
+            };
+          if (endpoint.includes('/artifacts?'))
+            return {
+              total_count: 1,
+              artifacts: [
+                {
+                  id: run.id + 1000,
+                  name: `product-lane-final-${evidenceSha}-1`,
+                  expired: false,
+                },
+              ],
+            };
+          throw new Error(`Unexpected fixture endpoint: ${endpoint}`);
+        },
+        downloadFinalReceiptImpl: (_repository, artifactId) => {
+          const run = runs.find(row => row.id === artifactId - 1000);
+          return receipt({
+            headSha: evidenceSha,
+            runId: run.id,
+            webPassed: !(invalidPush && run.event === 'push'),
+          });
+        },
+      });
+    if (expectedRunId === null) {
+      expect(resolveEvidence).toThrow(
+        invalidPush
+          ? 'web admission did not pass'
+          : 'expected one exact passing'
+      );
+    } else {
+      expect(resolveEvidence()).toMatchObject({
+        event: 'push',
+        runId: expectedRunId,
+        runAttempt: 1,
+        sha: evidenceSha,
+        artifactId: expectedRunId + 1000,
+      });
+    }
+  });
+
   it('executes the repository-backed CLI path with exact current lane evidence', () => {
     const currentSha = execFileSync('git', ['rev-parse', 'HEAD'], {
       encoding: 'utf8',

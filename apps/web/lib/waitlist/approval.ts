@@ -19,7 +19,7 @@ export type WaitlistApprovalResult =
       entryId: string;
       profileId: string | null;
       email: string;
-      fullName: string;
+      fullName: string | null;
       clerkId: string | null;
     };
 

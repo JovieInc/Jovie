@@ -6,6 +6,7 @@ const mockCleanupExpiredKeys = vi.hoisted(() => vi.fn());
 const mockCleanupOrphanedPhotos = vi.hoisted(() => vi.fn());
 const mockCleanupSmsIntents = vi.hoisted(() => vi.fn());
 const mockRunWaitlistAutoAccept = vi.hoisted(() => vi.fn());
+const mockReconcileWaitlistAdmission = vi.hoisted(() => vi.fn());
 const mockSweepUnderEnrichedProfilesForCron = vi.hoisted(() => vi.fn());
 const mockRunOnboardingScriptAggregation = vi.hoisted(() => vi.fn());
 const mockRunProfileSearchMonitoring = vi.hoisted(() => vi.fn());
@@ -58,6 +59,16 @@ vi.mock('@/app/api/cron/cleanup-photos/route', () => ({
 vi.mock('@/app/api/cron/cleanup-sms-intents/route', () => ({
   cleanupSmsIntents: mockCleanupSmsIntents,
 }));
+
+vi.mock('@/lib/waitlist/admission-detector', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/lib/waitlist/admission-detector')
+  >('@/lib/waitlist/admission-detector');
+  return {
+    assertWaitlistAdmissionHealthy: actual.assertWaitlistAdmissionHealthy,
+    reconcileWaitlistAdmission: mockReconcileWaitlistAdmission,
+  };
+});
 
 vi.mock('@/lib/waitlist/auto-accept', () => ({
   runWaitlistAutoAccept: mockRunWaitlistAutoAccept,
@@ -121,6 +132,10 @@ describe('GET /api/cron/daily-maintenance', () => {
       skipped: 0,
       failed: 0,
       capacityRemaining: 0,
+    });
+    mockReconcileWaitlistAdmission.mockResolvedValue({
+      healedMissingEntries: 0,
+      stalePending: 0,
     });
     mockSweepUnderEnrichedProfilesForCron.mockResolvedValue({
       profilesProcessed: 1,
@@ -212,6 +227,7 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(mockGetLybDailyMrr).toHaveBeenCalledTimes(1);
     expect(data.results.cleanupSmsIntents.success).toBe(true);
     expect(data.results.waitlistAutoAccept.success).toBe(true);
+    expect(data.results.waitlistAdmission.success).toBe(true);
     expect(data.results.profileSearchMonitoring.success).toBe(true);
     expect(mockRunProfileSearchMonitoring).toHaveBeenCalledWith(
       new Date('2026-03-29T00:00:00.000Z').getTime() + 90_000
@@ -361,5 +377,28 @@ describe('GET /api/cron/daily-maintenance', () => {
       error: '1 founder-review upload lease quarantined for manual cleanup',
     });
     expect(data.results.dataRetention).toMatchObject({ success: true });
+  });
+
+  it('reports a stranded or stale pending user as a failed sub-job', async () => {
+    mockReconcileWaitlistAdmission.mockResolvedValue({
+      healedMissingEntries: 2,
+      stalePending: 1,
+    });
+    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/daily-maintenance', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(207);
+    expect(data.results.waitlistAdmission.success).toBe(false);
+    expect(data.results.waitlistAdmission.error).toContain(
+      '2 waitlist_pending user(s) had no waitlist entry'
+    );
+    expect(data.results.waitlistAdmission.error).toContain(
+      '1 external user(s) pending longer than 3 days'
+    );
   });
 });

@@ -1246,7 +1246,7 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
         encoding="utf-8"
     )
 
-    assert "max-parallel: 1" in full_matrix
+    assert "max-parallel: 8" in full_matrix
     assert "needs: [context, deterministic]" in nightly_agent
     assert "schedule:" not in nightly_agent
     assert "push:" in nightly_agent
@@ -1426,6 +1426,21 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     assert "hold-screenshot-mq-during-controller.mjs" in publication
     assert publication.count('gh pr edit --add-label "merge-queue"') == 0
     assert publication.count("if hold_screenshot_merge_queue; then") == 2
+
+
+def test_visual_bot_publication_is_main_only() -> None:
+    """A dispatch on an unmerged ref must never open an auto-merging bot PR.
+
+    2026-10-03: a visual-regression dispatch on a feature branch committed
+    that branch's unreviewed source into the baseline PR with auto-merge on.
+    """
+    baseline_diff = _step_block(
+        "visual-regression.yml", "Check for baseline changes (refresh only)"
+    )
+    publisher_job = _job_block("screenshots.yml", "publish")
+
+    assert "github.ref == 'refs/heads/main'" in baseline_diff
+    assert "github.ref == 'refs/heads/main'" in publisher_job
 
 
 def test_product_screenshots_preserve_the_active_exact_head_capture() -> None:
@@ -1653,8 +1668,9 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "synchronize" not in trigger
     assert "Production Marker Recovery]" not in trigger
     assert "fleet-gate-receipt" in workflow
-    assert "fleet-gate-triage-" in workflow
-    assert "cancel-in-progress: true" in workflow
+    assert "fleet-gate-triage-" not in workflow
+    assert "group: fleet-gate-receipt" in workflow
+    assert "cancel-in-progress: false" in workflow
     assert "github.event.label.name == 'needs-human'" not in block
     assert "0 <= age < 120" in block
     assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
@@ -1714,12 +1730,74 @@ def test_one_workflow_owns_automatic_issue_admission() -> None:
     assert not (WORKFLOWS / "linear-triage-assessment.yml").exists()
 
     workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
-    # One file-level concurrency block. Receipt refreshes share a group;
-    # triage assessments coalesce per issue and do not cancel a receipt write.
+    # One file-level fence covers both the scheduled catch-up and exact-event
+    # writer. Cancellation must not interrupt a paid call or mutation readback.
     assert workflow.count("concurrency:") == 1
     assert "fleet-gate-receipt" in workflow
-    assert "github.event.client_payload.issue_identifier" in workflow
+    assert "group: fleet-gate-receipt" in workflow
+    assert "cancel-in-progress: false" in workflow
+    assert "github.event.client_payload.issue_identifier" not in workflow
     assert workflow.index("concurrency:") < workflow.index("jobs:")
+
+
+def test_triage_catch_up_uses_trusted_main_and_preserves_wake_receipts() -> None:
+    """Missed events use the same writer, including receipt-debounced ticks."""
+    block = _job_block("fleet-gate-refresh.yml", "refresh")
+    checkout = block.split("- name: Checkout exact main gate code", 1)[1].split(
+        "- name: Setup Node.js", 1
+    )[0]
+    assert "ref: main" in checkout
+    assert "persist-credentials: false" in checkout
+    assert "if:" not in checkout
+    catch_up = block.split("- name: Recover missed Linear Triage events", 1)[1].split(
+        "- name: Wake existing picker", 1
+    )[0]
+    assert "steps.debounce" not in catch_up
+    assert (
+        "timeout 90s node scripts/backlog-orchestrator/triage-event-assess.mjs"
+        in catch_up
+    )
+    assert '--sweep > "$RECEIPT_FILE"' in catch_up
+    assert "summer-bottleneck-signing.env" in catch_up
+    wake = block.split("- name: Wake existing picker", 1)[1].split(
+        "- name: Preserve Triage", 1
+    )[0]
+    assert "if: always()" in wake
+    assert '[[ -s "$RECEIPT_FILE" ]]' in wake
+    assert ".wakeSymphony == true" in wake
+    assert "--max-time 5" in wake
+    receipt = block.split("- name: Preserve Triage catch-up receipt", 1)[1]
+    assert "if: always()" in receipt
+    assert (
+        "linear-triage-catch-up-${{ github.run_id }}-${{ github.run_attempt }}"
+        in receipt
+    )
+    assert "retention-days: 14" in receipt
+
+
+def test_triage_catch_up_survives_failed_reconciliation_with_trusted_prerequisites() -> None:
+    """Run37682841982 timed out remediation and skipped catch-up under success()."""
+    block = _job_block("fleet-gate-refresh.yml", "refresh")
+    checkout = block.split("- name: Checkout exact main gate code", 1)[1].split(
+        "- name: Setup Node.js", 1
+    )[0]
+    node_setup = block.split("- name: Setup Node.js", 1)[1].split(
+        "- name: Refresh canonical receipt", 1
+    )[0]
+    assert "id: main-checkout" in checkout
+    assert "ref: main" in checkout
+    assert "id: main-node" in node_setup
+    catch_up = block.split("- name: Recover missed Linear Triage events", 1)[1].split(
+        "- name: Wake existing picker", 1
+    )[0]
+    condition = re.search(r"if: >-\n(.*?)\n        env:", catch_up, re.DOTALL)
+    assert condition is not None, "Default success() skips recovery after upstream failure"
+    assert " ".join(condition.group(1).split()) == (
+        "always() && steps.main-checkout.outcome == 'success' && "
+        "steps.main-node.outcome == 'success'"
+    ), "Recovery must survive upstream failure but reject failed/skipped trusted setup"
+    # The timed-out remediation must still fail the job; recovery is not a CI bypass.
+    assert "continue-on-error:" not in block
 
 
 def test_symphony_wake_requires_verified_admitted_receipt() -> None:

@@ -76,7 +76,7 @@ describe('server analytics contract', () => {
   it('versions and inventories every production call site', {
     timeout: 60000,
   }, () => {
-    expect(SERVER_ANALYTICS_CONTRACT_VERSION).toBe('server-analytics/v1');
+    expect(SERVER_ANALYTICS_CONTRACT_VERSION).toBe('server-analytics/v2');
     expect(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS).toBe(2_000);
     expect(SERVER_ANALYTICS_CONSENT_POLICY).toBe(
       'first_party_operational_measurement'
@@ -136,7 +136,7 @@ describe('server analytics contract', () => {
     });
     expect(mocks.values).toHaveBeenCalledWith(
       expect.objectContaining({
-        contractVersion: 'server-analytics/v1',
+        contractVersion: 'server-analytics/v2',
         consentPolicy: 'first_party_operational_measurement',
         eventName: 'release_deleted',
         privacyClass: 'pseudonymous_ids_no_contact_data',
@@ -162,8 +162,14 @@ describe('server analytics contract', () => {
       step: 'cta_click',
       outcome: 'reached',
       surface: 'homepage',
+      cohort: 'synthetic',
     });
 
+    expect(mocks.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        properties: expect.objectContaining({ cohort: 'synthetic' }),
+      })
+    );
     expect(mocks.values.mock.calls[0][0]).not.toHaveProperty('eventIdentity');
     expect(mocks.onConflictDoNothing).not.toHaveBeenCalled();
     expect(mocks.returning).toHaveBeenCalledWith({ id: expect.anything() });
@@ -268,7 +274,7 @@ describe('server analytics contract', () => {
     expect(Sentry.captureException).toHaveBeenCalledWith(databaseError, {
       tags: {
         context: 'server_analytics_delivery',
-        contract_version: 'server-analytics/v1',
+        contract_version: 'server-analytics/v2',
         delivery_outcome: 'failed',
         event_name: 'tour_date_deleted',
       },

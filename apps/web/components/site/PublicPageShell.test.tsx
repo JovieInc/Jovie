@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { YoutubeThumbnailsLanding } from '@/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding';
 import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
@@ -13,6 +14,21 @@ vi.mock('next/navigation', async importOriginal => {
   return {
     ...actual,
     usePathname: () => pathnameRef.current,
+  };
+});
+
+const footerFlagCalls = vi.hoisted(() => ({
+  values: [] as Array<boolean | undefined>,
+}));
+
+vi.mock('./MarketingFooter', async importOriginal => {
+  const actual = await importOriginal<typeof import('./MarketingFooter')>();
+  return {
+    ...actual,
+    MarketingFooter: (props: ComponentProps<typeof actual.MarketingFooter>) => {
+      footerFlagCalls.values.push(props.genericCreatorNav);
+      return <actual.MarketingFooter {...props} />;
+    },
   };
 });
 
@@ -117,6 +133,23 @@ describe('PublicPageShell', () => {
     const main = document.getElementById('main-content');
     expect(main?.className).not.toContain('pt-(--public-shell-header-offset)');
     expect(main).not.toHaveClass('public-shell-main--docked');
+  });
+
+  it('passes MARKETING_GENERIC_CREATOR_NAV into the marketing footer', () => {
+    footerFlagCalls.values.length = 0;
+    delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
+
+    const on = render(<PublicPageShell>body</PublicPageShell>);
+    expect(footerFlagCalls.values.at(-1)).toBe(true);
+    on.unmount();
+
+    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'false';
+    try {
+      render(<PublicPageShell>body</PublicPageShell>);
+      expect(footerFlagCalls.values.at(-1)).toBe(false);
+    } finally {
+      delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
+    }
   });
 
   it('passes footer variant and className through to MarketingFooter', () => {

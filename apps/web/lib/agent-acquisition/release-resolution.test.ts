@@ -122,6 +122,7 @@ describe('agent release resolution', () => {
     vi.resetAllMocks();
     resetMusicfetchDormantForTests();
     delete process.env.FEATURE_IN_HOUSE_RESOLVER;
+    delete process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS;
     delete process.env.MUSICFETCH_API_TOKEN;
     resolveInHouse.mockResolvedValue({
       status: 'no_match',
@@ -575,7 +576,7 @@ describe('agent release resolution', () => {
   );
 
   it('resolves a release through the in-house ladder and skips MusicFetch', async () => {
-    process.env.FEATURE_IN_HOUSE_RESOLVER = 'true';
+    process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS = 'true';
     process.env.MUSICFETCH_API_TOKEN = 'unpaid-token';
     resolveInHouse.mockResolvedValue({
       status: 'resolved',
@@ -628,7 +629,7 @@ describe('agent release resolution', () => {
   });
 
   it('treats an Apple Music album URL with a song id as a track', async () => {
-    process.env.FEATURE_IN_HOUSE_RESOLVER = 'true';
+    process.env.FEATURE_MUSIC_RESOLVER_RELEASE_FACTS = 'true';
     resolveInHouse.mockResolvedValue({
       status: 'resolved',
       kind: 'track',

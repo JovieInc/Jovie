@@ -1,12 +1,4 @@
 export const FLAKY_FILING_FINGERPRINT = 'remediation:flaky-test-filing';
-export const RETIRED_GITHUB_FILING_SENTINEL = '__retired_linear_only__';
-
-export function githubIssueFilingRetired(workflowSource) {
-  return String(workflowSource ?? '').includes(
-    `github.event_name == '${RETIRED_GITHUB_FILING_SENTINEL}'`
-  );
-}
-
 export function planFlakyTestFiling({
   ratchetFailed,
   flakyCount = '0',

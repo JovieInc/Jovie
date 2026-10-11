@@ -79,7 +79,7 @@ describe('OpportunityInboxSocialReplyCard', () => {
     expect(onDismiss).toHaveBeenCalledWith('reply-1');
   });
 
-  it('submits revision feedback through onRevise and clears the field', async () => {
+  it('submits revision feedback and preserves input until the replacement is committed', async () => {
     const user = userEvent.setup();
     const onRevise = vi.fn();
     renderCard({ onRevise });
@@ -98,8 +98,8 @@ describe('OpportunityInboxSocialReplyCard', () => {
 
     await user.click(submit);
     expect(onRevise).toHaveBeenCalledWith('reply-1', 'Make it warmer');
-    expect(field).toHaveValue('');
-    expect(reviseToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(field).toHaveValue('Make it warmer');
+    expect(reviseToggle).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('surfaces the execution state label when mapped', () => {
@@ -129,6 +129,45 @@ describe('OpportunityInboxSocialReplyCard', () => {
     expect(screen.getByTestId('social-reply-draft-reply-1')).toHaveTextContent(
       'revision 2'
     );
+  });
+
+  it('renders video title and like count when present on the reply', () => {
+    renderCard({
+      card: {
+        ...CARD,
+        socialReply: {
+          ...CARD.socialReply!,
+          platform: 'YouTube',
+          videoTitle: 'Midnight Run (Official Video)',
+          likeCount: 42,
+        },
+      },
+    });
+
+    expect(screen.getByTestId('social-reply-video-reply-1')).toHaveTextContent(
+      'Midnight Run (Official Video)'
+    );
+    expect(screen.getByText('42 likes')).toBeInTheDocument();
+  });
+
+  it('uses the singular like label for a single like', () => {
+    renderCard({
+      card: {
+        ...CARD,
+        socialReply: { ...CARD.socialReply!, likeCount: 1 },
+      },
+    });
+
+    expect(screen.getByText('1 like')).toBeInTheDocument();
+  });
+
+  it('omits video and like metadata when absent', () => {
+    renderCard();
+
+    expect(
+      screen.queryByTestId('social-reply-video-reply-1')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/likes?$/)).not.toBeInTheDocument();
   });
 
   it('renders nothing when the card lacks social reply data', () => {

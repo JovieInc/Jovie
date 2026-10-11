@@ -96,7 +96,7 @@ describe('WhatsNewBannerView', () => {
     ).toHaveAttribute('href', 'https://jov.ie/changelog/26.9.2');
   });
 
-  it('sits on the banner overlay layer, below sheets and dialogs', () => {
+  it('renders in flow at dock width instead of floating over content', () => {
     render(
       <WhatsNewBannerView
         unseen={{
@@ -109,8 +109,9 @@ describe('WhatsNewBannerView', () => {
       />
     );
     const banner = screen.getByTestId('whats-new-banner');
-    expect(banner.className).toContain('z-banner');
-    expect(banner.className).not.toMatch(/(?:^|\s)z-\d/);
+    expect(banner).toHaveClass('w-full');
+    expect(banner.className).not.toMatch(/(?:^|\s)fixed(?:\s|$)/);
+    expect(banner.className).not.toMatch(/(?:^|\s)z-/);
   });
 
   it('counts multiple unseen updates and links the changelog index', () => {
@@ -148,6 +149,25 @@ describe('WhatsNewBannerView', () => {
     fireEvent.keyDown(screen.getByRole('link'), { key: 'Escape' });
     expect(onDismiss).toHaveBeenCalledTimes(2);
   });
+
+  it('leaves an Escape consumed by a child overlay alone', () => {
+    const onDismiss = vi.fn();
+    render(
+      <WhatsNewBannerView
+        unseen={{
+          entry: FEED.entries[0],
+          unseenCount: 1,
+          href: FEED.entries[0].url,
+        }}
+        onOpen={vi.fn()}
+        onDismiss={onDismiss}
+      />
+    );
+    const link = screen.getByRole('link');
+    link.addEventListener('keydown', event => event.preventDefault());
+    fireEvent.keyDown(link, { key: 'Escape' });
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
 });
 
 describe('WhatsNewBanner', () => {
@@ -182,6 +202,12 @@ describe('WhatsNewBanner', () => {
     expect(screen.getByTestId('whats-new-banner')).toBeInTheDocument();
   });
 
+  it('waits while the sidebar is collapsed to icons', async () => {
+    render(<WhatsNewBanner enabled collapsed />);
+    await settle();
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+  });
+
   it('records the entry as seen on dismiss and stays hidden', async () => {
     const { unmount } = render(<WhatsNewBanner enabled />);
     await settle();
@@ -208,6 +234,46 @@ describe('WhatsNewBanner', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     render(<WhatsNewBanner enabled />);
     await settle();
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+  });
+
+  it('returns keyboard focus to the existing sidebar control on dismissal', async () => {
+    render(
+      <>
+        <button type='button' data-rail-toggle='left'>
+          Sidebar
+        </button>
+        <WhatsNewBanner enabled />
+      </>
+    );
+    await settle();
+    const link = screen.getByTestId('whats-new-banner-link');
+    act(() => link.focus());
+    fireEvent.keyDown(link, { key: 'Escape' });
+    expect(screen.queryByTestId('whats-new-banner')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Sidebar' })).toHaveFocus();
+  });
+
+  it('does not steal editor focus when a pointer dismisses the banner', async () => {
+    render(
+      <>
+        <input aria-label='Draft' />
+        <WhatsNewBanner enabled />
+      </>
+    );
+    await settle();
+    const draft = screen.getByRole('textbox', { name: 'Draft' });
+    act(() => draft.focus());
+    fireEvent.click(screen.getByTestId('whats-new-banner-dismiss'));
+    expect(draft).toHaveFocus();
+  });
+
+  it('does not replay stale content when disabled and enabled again', async () => {
+    const { rerender } = render(<WhatsNewBanner enabled />);
+    await settle();
+    expect(screen.getByTestId('whats-new-banner')).toBeInTheDocument();
+    rerender(<WhatsNewBanner enabled={false} />);
+    rerender(<WhatsNewBanner enabled />);
     expect(screen.queryByTestId('whats-new-banner')).toBeNull();
   });
 

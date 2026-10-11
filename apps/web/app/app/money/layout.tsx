@@ -1,7 +1,8 @@
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { isCreatorFinanceEnabled } from '@/lib/finance/flags';
 import { MoneyVisibilityProvider } from '@/lib/workspace-lock/money-visibility';
 import {
   isMoneyHiddenCookieValue,
@@ -25,6 +26,9 @@ export default async function MoneyLayout({
   const { userId } = await getCachedAuth();
   if (!userId) {
     redirect(APP_ROUTES.SIGNIN);
+  }
+  if (!(await isCreatorFinanceEnabled(userId))) {
+    notFound();
   }
 
   const cookieStore = await cookies();

@@ -44,7 +44,7 @@ const baseDashboardData: DashboardData = {
         id: 'avatar',
         label: 'Add a profile photo',
         description: 'A recognizable photo makes your page feel personal.',
-        href: '/app/settings/artist-profile',
+        href: '/app/settings/profile',
       },
       {
         id: 'email',
@@ -95,7 +95,7 @@ describe('ProfileCompletionCard', () => {
             id: 'avatar',
             label: 'Add a profile photo',
             description: 'A recognizable photo makes your page feel personal.',
-            href: '/app/settings/artist-profile',
+            href: '/app/settings/profile',
           },
         ],
         profileIsLive: true,

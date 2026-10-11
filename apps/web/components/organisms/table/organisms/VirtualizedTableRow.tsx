@@ -35,7 +35,8 @@ export interface VirtualizedTableRowProps<TData extends RowData> {
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
   readonly shouldEnableKeyboardNav: boolean;
   readonly shouldVirtualize: boolean;
-  readonly focusedIndex: number;
+  /** Roving-tabindex owner. A boolean keeps j/k from re-rendering every row. */
+  readonly isFocused: boolean;
   /** Consumer-owned selected state, composed with TanStack selection. */
   readonly isSelected?: boolean;
   readonly onRowClick?: (row: TData) => void;
@@ -87,7 +88,7 @@ function VirtualizedTableRowComponent<TData extends RowData>({
   rowRefsMap,
   shouldEnableKeyboardNav,
   shouldVirtualize,
-  focusedIndex,
+  isFocused,
   isSelected = false,
   onRowClick,
   onRowContextMenu,
@@ -177,13 +178,7 @@ function VirtualizedTableRowComponent<TData extends RowData>({
       ref={handleRef}
       data-index={rowIndex}
       data-testid={getRowTestId?.(rowData, rowIndex)}
-      tabIndex={
-        shouldEnableKeyboardNav
-          ? focusedIndex === rowIndex
-            ? 0
-            : -1
-          : undefined
-      }
+      tabIndex={shouldEnableKeyboardNav ? (isFocused ? 0 : -1) : undefined}
       aria-selected={isRowSelected || htmlProps['aria-selected']}
       className={cn(
         presets.tableRow,

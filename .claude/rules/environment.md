@@ -22,7 +22,7 @@ On Windows PowerShell, use the wrapper so Git for Windows Bash is used (not the 
 
 `setup.sh` is idempotent. It checks Node.js (24.x), pnpm (9.15.9), `ripgrep`, Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
 
-Run `./scripts/setup.sh` again on every fresh Git worktree before doing anything else. Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
+Create agent worktrees with `scripts/agent/worktree-new <dir> -b <branch>`: it hands out a pre-installed, typecheck-warm worktree from the pool in `~/.cache/jovie` (~35s instead of ~5 min) and falls back to `git worktree add` + install when the pool is empty. A worktree made any other way needs `./scripts/setup.sh` before anything else, because worktrees do not share `node_modules`.
 
 ## Tool Versions (Required)
 
@@ -245,22 +245,27 @@ output-logs|outputLogs: "errors-only"|reduce log noise (full, hash-only, new-onl
 summarize|--summarize|generate JSON metadata for timing/cache analysis
 turbo-clean|pnpm turbo clean|clear local cache when debugging
 turbo-docs|turbo docs "query"|search turborepo.dev documentation from terminal (2.8+)
-worktrees|git worktree add ../dir -b branch|cache shared automatically across worktrees (2.8+)
+worktrees|scripts/agent/worktree-new ../dir -b branch|cache shared automatically across worktrees (2.8+)
 schema|$schema: turborepo.dev/schema.json|validates turbo.json in editors
 daemon|daemon: false|background process for optimization (disabled in Jovie due to gRPC issues)
 ```
 
 ## Git Worktrees for Parallel Agents
 
-Turbo 2.8 automatically shares local cache across Git worktrees.
-
 ```bash
-git worktree add ../Jovie-agent-1 -b agent/task-name
-cd ../Jovie-agent-1 && ./scripts/setup.sh && pnpm turbo build
-git worktree remove ../Jovie-agent-1
+scripts/agent/worktree-new ../Jovie-agent-1 -b agent/task-name   # fetch, take a pool slot, install
+cd ../Jovie-agent-1 && pnpm turbo build
+scripts/agent/worktree-new --recycle ../Jovie-agent-1             # clean: back to the pool; dirty/preserved: refused
 ```
 
-No configuration is needed — Turbo detects worktrees automatically. Combined with remote caching, agents in separate worktrees get near-instant cache hits.
+| Cache | Location | Shared how |
+|---|---|---|
+| Worktree pool (installed `node_modules` + warm `apps/web/.cache/tsbuildinfo`) | `~/.cache/jovie/worktree-pool/<repo>/` | `worktree-new` moves a slot to your path and refills in the background; `--status`, `--fill`, `--drain` |
+| pnpm content store | `pnpm store path` (same APFS volume) | hardlinked into each worktree; never prune it while worktrees install |
+| Turbo local cache | main checkout's `.turbo/cache` | Turbo 2.8+ resolves it through the git common dir for every worktree |
+| Git objects | main checkout's `.git` | every linked worktree shares them; `setup.sh` runs `git maintenance start` (incremental strategy, never prunes: lanes clones borrow these objects via alternates) |
+
+All shared caches live under `$JOVIE_CACHE_ROOT` (default `~/.cache/jovie`). Cleanup tools must not delete that root wholesale: `worktree-new --drain` (or `disk_guard`, below the pool's 30 GiB floor) removes pool slots safely.
 
 ### Concurrent Commits Across Worktrees
 

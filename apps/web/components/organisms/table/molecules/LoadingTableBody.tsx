@@ -26,7 +26,8 @@ interface LoadingTableBodyProps {
       | 'badge'
       | 'button'
       | 'release'
-      | 'meta';
+      | 'meta'
+      | 'person';
   }>;
 
   /**

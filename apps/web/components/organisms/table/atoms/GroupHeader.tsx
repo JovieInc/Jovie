@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/organisms/table/molecules/GroupedTableBody.test.tsx
+
 import React from 'react';
 import { cn, presets, typography } from '../table.styles';
 
@@ -23,6 +25,7 @@ interface GroupHeaderProps {
    * Whether this header is currently sticky
    */
   readonly isSticky?: boolean;
+  readonly stickyOffset?: number;
 
   /**
    * Additional CSS classes
@@ -57,6 +60,7 @@ export const GroupHeader = React.forwardRef<
     count,
     colSpan,
     isSticky = true,
+    stickyOffset = 0,
     className,
     labelClassName,
     countClassName,
@@ -66,6 +70,7 @@ export const GroupHeader = React.forwardRef<
   return (
     <tr
       ref={ref}
+      style={isSticky ? { top: stickyOffset } : undefined}
       className={cn(
         presets.stickyGroupHeader,
         isSticky && 'sticky top-0',

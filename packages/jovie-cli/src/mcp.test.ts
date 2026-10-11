@@ -75,7 +75,7 @@ describe('MCP server', () => {
     expect(create?.inputSchema.required).toEqual(['url']);
     expect(create?.annotations.readOnlyHint).toBe(false);
     const lookup = tools.find(tool => tool.name === 'lookup_creator');
-    expect(lookup?.inputSchema.required).toEqual(['url']);
+    expect(lookup?.inputSchema.required).toEqual(['url-or-handle']);
     expect(lookup?.annotations.readOnlyHint).toBe(true);
     expect(
       tools.find(tool => tool.name === 'get_artist')?.annotations
@@ -96,7 +96,7 @@ describe('MCP server', () => {
         method: 'tools/call',
         params: {
           name: 'lookup_creator',
-          arguments: { url: 'https://youtube.com/@creator' },
+          arguments: { 'url-or-handle': 'https://youtube.com/@creator' },
         },
       },
       context(fetchImpl)
@@ -209,6 +209,30 @@ describe('MCP server', () => {
       context()
     );
     expect(missingArgs?.result).toMatchObject({ isError: true });
+    const messageFor = async (args: unknown) =>
+      JSON.parse(
+        (
+          (
+            await handleMcpMessage(
+              {
+                jsonrpc: '2.0',
+                id: 11,
+                method: 'tools/call',
+                params: { name: 'get_artist', arguments: args },
+              },
+              context()
+            )
+          )?.result as { content: Array<{ text: string }> }
+        ).content[0].text
+      ).error.message;
+    // Agents self-correct only when the failing argument is named.
+    expect(await messageFor({})).toBe('Missing required argument: username.');
+    expect(await messageFor({ username: 7 })).toBe(
+      'Argument username must be a non-empty string.'
+    );
+    expect(await messageFor({ username: 'demo', user: 'x' })).toBe(
+      'Unknown tool argument "user". Allowed: username.'
+    );
   });
 
   it('serves newline JSON, skipping blanks and reporting parse errors', async () => {

@@ -213,4 +213,38 @@ struct ChatComposerAccessibilityGuardTests {
     #expect(source.contains("Spacer(minLength: 0)"))
     #expect(source.contains(".safeAreaInset(edge: .bottom, spacing: 0)"))
   }
+
+  @Test func retiredFeatureIntroSurfaceStaysDeleted() throws {
+    let iosRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let chatDirectory = iosRoot.appendingPathComponent("Jovie/Features/Chat")
+
+    #expect(
+      FileManager.default.fileExists(
+        atPath: chatDirectory.appendingPathComponent("FeatureIntroCard.swift").path
+      ) == false
+    )
+    #expect(
+      FileManager.default.fileExists(
+        atPath: chatDirectory.appendingPathComponent("FeatureIntroCatalog.swift").path
+      ) == false
+    )
+
+    let projectURL = iosRoot.appendingPathComponent("Jovie.xcodeproj/project.pbxproj")
+    let project = try String(contentsOf: projectURL, encoding: .utf8)
+    #expect(project.contains("FeatureIntro") == false)
+  }
+
+  @Test func placeholderRemainsMountedAsTheMissingRepositoryFallback() throws {
+    let rootViewURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/App/RootView.swift")
+    let source = try String(contentsOf: rootViewURL, encoding: .utf8)
+    let mountCount = source.components(separatedBy: "MobileChatPlaceholderView(").count - 1
+
+    #expect(mountCount == 2)
+    #expect(source.contains("if let chatRepository"))
+  }
 }

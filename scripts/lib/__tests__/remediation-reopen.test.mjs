@@ -18,6 +18,19 @@ const RED_CALLERS = [
   'apps/web/scripts/marketing-certification-producer.ts',
 ];
 
+describe('Golden Path nightly dispatch', () => {
+  it('retries transient GitHub failures when dispatching the Golden Path lane', () => {
+    const workflow = readFileSync(
+      '.github/workflows/golden-path-nightly.yml',
+      'utf8'
+    );
+    expect(workflow).toContain('source scripts/lib/gh-retry.sh');
+    expect(workflow).toContain(
+      'gh_retry workflow run ci.yml --repo "$REPO" --ref main'
+    );
+  });
+});
+
 describe('red intakes reopen a Done issue', () => {
   it('passes reopenTerminal at every red-run caller', () => {
     for (const path of RED_CALLERS) {

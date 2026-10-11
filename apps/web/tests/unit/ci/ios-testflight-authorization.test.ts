@@ -81,6 +81,11 @@ const CONTROLLER_WORKFLOW_ID = 101;
 const TESTFLIGHT_WORKFLOW_ID = 202;
 const CONTROLLER_RUN = 5000;
 const roots: string[] = [];
+// Fixture git must never inherit a hook's GIT_DIR (it would hit the real repo).
+const fixtureEnv = () =>
+  Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_'))
+  ) as NodeJS.ProcessEnv;
 
 afterEach(() => {
   for (const root of roots.splice(0))
@@ -351,6 +356,26 @@ describe.skipIf(!gh)('iOS TestFlight release authorization (real gh)', () => {
     }
   });
 
+  it('stands down when the controller skipped Production Verified', async () => {
+    // A successful controller run may legitimately skip verification, e.g.
+    // when the fleet gate held deployment. That is not missing evidence and
+    // must not fail main; the generation simply has nothing to release.
+    const result = await authorize({
+      controllerJobs: [job('Production Verified', RELEASE, 'skipped')],
+    });
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.outputs.authorized).toBe('false');
+    expect(result.stdout + result.stderr).toContain(
+      'yielded the release lease'
+    );
+  });
+
+  it('still fails when Production Verified is absent entirely', async () => {
+    const result = await authorize({ controllerJobs: [] });
+    expect(result.code).toBe(1);
+    expect(result.outputs.authorized).toBe('false');
+  });
+
   it('lets a manual dispatch rebuild only verified current main', async () => {
     const manual = {
       EVENT_NAME: 'workflow_dispatch',
@@ -461,7 +486,10 @@ describe('iOS TestFlight release selection', () => {
   function gitRepo() {
     const root = tempRoot('jovie-testflight-select-');
     const git = (...args: string[]) =>
-      execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim();
+      execFileSync('git', ['-C', root, ...args], {
+        encoding: 'utf8',
+        env: fixtureEnv(),
+      }).trim();
     git('init', '-q');
     git('config', 'user.email', 'select@example.test');
     git('config', 'user.name', 'select');
@@ -480,7 +508,7 @@ describe('iOS TestFlight release selection', () => {
     execFileSync('bash', ['-c', String(selectStep?.run)], {
       cwd,
       env: {
-        ...process.env,
+        ...fixtureEnv(),
         GITHUB_OUTPUT: output,
         AUTHORIZED: 'true',
         ALREADY_RELEASED: 'false',

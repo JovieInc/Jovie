@@ -49,8 +49,6 @@ export function OpportunityInboxSocialReplyCard({
 
   const submitRevision = () => {
     onRevise(card.id, comment.trim());
-    setReviseOpen(false);
-    setComment('');
   };
 
   return (
@@ -78,6 +76,35 @@ export function OpportunityInboxSocialReplyCard({
             ·
           </span>
           <span>{reply.platform}</span>
+          {reply.videoTitle ? (
+            <>
+              <span
+                aria-hidden='true'
+                className='system-b-opportunity-inbox-card-dot'
+              >
+                ·
+              </span>
+              <span
+                data-testid={`social-reply-video-${card.id}`}
+                className='text-quaternary-token'
+              >
+                {reply.videoTitle}
+              </span>
+            </>
+          ) : null}
+          {typeof reply.likeCount === 'number' ? (
+            <>
+              <span
+                aria-hidden='true'
+                className='system-b-opportunity-inbox-card-dot'
+              >
+                ·
+              </span>
+              <span className='text-quaternary-token'>
+                {reply.likeCount} {reply.likeCount === 1 ? 'like' : 'likes'}
+              </span>
+            </>
+          ) : null}
           <span
             aria-hidden='true'
             className='system-b-opportunity-inbox-card-dot'
@@ -151,6 +178,8 @@ export function OpportunityInboxSocialReplyCard({
         </label>
         <textarea
           id={commentFieldId}
+          name='revisionFeedback'
+          autoComplete='off'
           className='system-b-opportunity-inbox-comment-input'
           rows={2}
           value={comment}

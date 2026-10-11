@@ -5,8 +5,15 @@ import {
   type MarketingPenContractId,
 } from '../penContracts';
 import { MARKETING_RECIPE_IDS, type RecipeId } from '../recipes';
-import { MARKETING_SECTION_IDS, type MarketingSectionId } from '../sections';
-import { HERO_VARIANT_NAMES } from './heroDecision';
+import {
+  getMarketingSection,
+  MARKETING_SECTION_IDS,
+  type MarketingSectionId,
+} from '../sections';
+import {
+  HERO_CODE_BINDING_BY_VARIANT,
+  HERO_VARIANT_NAMES,
+} from './heroDecision';
 
 /**
  * Factory page records (plan §4, JOV-7275). A record is the single source a
@@ -92,6 +99,36 @@ const PEN_CONTRACT_ID_VALUES = Object.values(
   MARKETING_PEN_CONTRACT_IDS
 ).flatMap(group => Object.values(group)) as MarketingPenContractId[];
 
+/** Variants with a concrete, source-backed adapter in the solutions route. */
+export const SOLUTIONS_FACTORY_RENDERER_VARIANTS = {
+  hero: ['left-none', 'split-screenshot-right'],
+  'feature-grid': ['two-column-text'],
+  'feature-split': ['editorial', 'phone-right'],
+  faq: ['objection-handler', 'structured-data-list'],
+  cta: ['final-single-claim'],
+} as const satisfies Partial<Record<MarketingSectionId, readonly string[]>>;
+
+export function solutionsFactoryVariantIssue(
+  sectionId: MarketingSectionId,
+  variantId: string
+): string | null {
+  const registryVariant = getMarketingSection(sectionId).variants.find(
+    variant => variant.id === variantId
+  );
+  if (!registryVariant || registryVariant.status !== 'active') {
+    return `variant "${variantId}" is not an active canonical variant for section "${sectionId}"`;
+  }
+  const supported = (
+    SOLUTIONS_FACTORY_RENDERER_VARIANTS as Partial<
+      Record<MarketingSectionId, readonly string[]>
+    >
+  )[sectionId];
+  if (!supported?.includes(variantId)) {
+    return `solutions factory has no certified renderer for ${sectionId}/${variantId}`;
+  }
+  return null;
+}
+
 /** Copy slot: literal text, or a product-truth claim id resolved at build. */
 export const PageCopyValueSchema = z.union([
   z.strictObject({ text: z.string().trim().min(1) }),
@@ -99,12 +136,76 @@ export const PageCopyValueSchema = z.union([
 ]);
 export type PageCopyValue = z.infer<typeof PageCopyValueSchema>;
 
-export const PageAssetRefSchema = z.strictObject({
-  kind: z.enum(['screenshot-registry', 'public-path']),
-  id: z.string().min(1),
-  alt: z.string().trim().min(1),
-});
+/** A same-origin file under public/, e.g. `/marketing/factory/hero.avif`. */
+const PublicFilePath = z.string().regex(/^\/(?!\/)[^\s?#]+\.[a-z0-9]+$/u);
+
+export const GENERATED_MEDIA_MIMES = [
+  'image/avif',
+  'image/webp',
+  'image/png',
+  'image/jpeg',
+  'video/mp4',
+  'video/webm',
+] as const;
+export type GeneratedMediaMime = (typeof GENERATED_MEDIA_MIMES)[number];
+
+const GeneratedAssetRefSchema = z
+  .strictObject({
+    kind: z.literal('generated'),
+    /** Public path of the rendered file. */
+    id: PublicFilePath,
+    alt: z.string().trim().min(1),
+    mime: z.enum(GENERATED_MEDIA_MIMES),
+    /** Intrinsic size; the slot reserves this aspect ratio (CLS 0). */
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    /** Content hash of the file, so a re-render is provably a new artifact. */
+    digest: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    /** Still frame shown before a video plays. Required for video. */
+    poster: PublicFilePath.optional(),
+    /** WebVTT captions track. Required for video. */
+    captions: z
+      .string()
+      .regex(/^\/(?!\/)[^\s?#]+\.vtt$/u)
+      .optional(),
+  })
+  .superRefine((ref, ctx) => {
+    const isVideo = ref.mime.startsWith('video/');
+    for (const field of ['poster', 'captions'] as const) {
+      if (isVideo && !ref[field]) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `generated video needs ${field}`,
+          path: [field],
+        });
+      }
+      if (!isVideo && ref[field]) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `only video takes ${field}`,
+          path: [field],
+        });
+      }
+    }
+  });
+
+/**
+ * Section media. `generated` is a factory render (JOV-7765) and carries its
+ * own size and content hash; the other kinds resolve size from their source.
+ */
+export const PageAssetRefSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.enum(['screenshot-registry', 'public-path']),
+    id: z.string().min(1),
+    alt: z.string().trim().min(1),
+  }),
+  GeneratedAssetRefSchema,
+]);
 export type PageAssetRef = z.infer<typeof PageAssetRefSchema>;
+export type GeneratedPageAssetRef = Extract<
+  PageAssetRef,
+  { kind: 'generated' }
+>;
 
 export const PageCompositionSectionSchema = z.strictObject({
   /** Renderer key: one entry in the family renderer's closed section map. */
@@ -116,6 +217,8 @@ export const PageCompositionSectionSchema = z.strictObject({
   instanceId: Slug.optional(),
   /** Canonical section id (sections.ts) the renderer implements. */
   sectionId: z.enum(MARKETING_SECTION_IDS as [MarketingSectionId]),
+  /** Selected canonical visual variant, persisted from composition. */
+  variantId: Slug.optional(),
 });
 export type PageCompositionSection = z.infer<
   typeof PageCompositionSectionSchema
@@ -222,6 +325,47 @@ export const PageRecordSchema = z
         path: ['composition', 'sections'],
       });
     }
+    record.composition.sections.forEach((section, index) => {
+      if (!section.renderer.startsWith('factory-')) return;
+      if (!section.instanceId) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `factory section ${section.renderer} requires an instanceId`,
+          path: ['composition', 'sections', index, 'instanceId'],
+        });
+      }
+      if (!section.variantId) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `factory section ${section.renderer} requires a persisted variantId`,
+          path: ['composition', 'sections', index, 'variantId'],
+        });
+        return;
+      }
+      const variantIssue = solutionsFactoryVariantIssue(
+        section.sectionId,
+        section.variantId
+      );
+      if (variantIssue) {
+        ctx.addIssue({
+          code: 'custom',
+          message: variantIssue,
+          path: ['composition', 'sections', index, 'variantId'],
+        });
+        return;
+      }
+      if (section.sectionId === 'hero') {
+        const expectedVariant =
+          HERO_CODE_BINDING_BY_VARIANT[record.heroVariant].sectionVariantId;
+        if (expectedVariant !== section.variantId) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `hero section variant "${section.variantId}" does not match hero code binding "${record.heroVariant}" (${expectedVariant ?? 'unbound'})`,
+            path: ['composition', 'sections', index, 'variantId'],
+          });
+        }
+      }
+    });
     const claimSet = new Set(record.claims);
     for (const [slot, value] of Object.entries(record.copy)) {
       if ('claimRef' in value && !claimSet.has(value.claimRef)) {

@@ -31,6 +31,7 @@ interface GroupedTableBodyProps<T>
      * Currently visible group index (for smart sticky behavior)
      */
     readonly visibleGroupIndex?: number;
+    readonly stickyOffset?: number;
   }> {}
 
 /**
@@ -68,6 +69,7 @@ export function GroupedTableBody<T>({
   columns,
   renderRow,
   visibleGroupIndex = 0,
+  stickyOffset = 0,
 }: GroupedTableBodyProps<T>) {
   let globalRowIndex = 0;
 
@@ -92,6 +94,7 @@ export function GroupedTableBody<T>({
               count={group.count}
               colSpan={columns}
               isSticky
+              stickyOffset={stickyOffset}
               labelClassName={labelClassName}
               countClassName={countClassName}
               ref={(el: HTMLTableRowElement | null) =>
