@@ -4534,6 +4534,88 @@ class PreservedRecoveryTest(unittest.TestCase):
             lock.release()
 
 
+class ExecutionStatusTerminalTest(unittest.TestCase):
+    """jovie-execution/* statuses end when a repair crashes, and stale ones are swept."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+        self.ident = lane.execution_attempt.identity("pr-remediation", {"pr": 5}, {"headSha": "a" * 40})
+
+    def open_attempt(self):
+        policy = {"attempts": 2, "concurrency": 1, "wallSeconds": 60, "spend": 2, "mutations": 2, "leaseSeconds": 30}
+        claimed = lane.execution_attempt.claim(self.host.state / "runs" / "execution-attempts.jsonl", self.ident,
+                                               {"owner": "h"}, policy, {}, coordination={"kind": "local-test"})
+        return {"ident": self.ident, "fence": claimed["fencingToken"], "coordination": {"kind": "local-test"}}
+
+    def test_crashed_repair_ends_its_fenced_attempt_and_reraises(self):
+        claimed = self.open_attempt()
+        def crash(host, name, spec, pr, *, branch_held=True, opened=None):
+            opened.update(claimed)  # what _fix_red_pr records once its claim is admitted
+            raise KeyboardInterrupt
+        with patch.object(lane, "_fix_red_pr", side_effect=crash), self.assertRaises(KeyboardInterrupt):
+            lane.fix_red_pr(self.host, "devin", {}, {"number": 5})
+        rows = lane.execution_attempt._rows(self.host.state / "runs" / "execution-attempts.jsonl")
+        self.assertEqual((rows[-1]["event"], rows[-1]["terminalState"], rows[-1]["failureClass"]),
+                         ("attempt_finished", "failed_unknown", "harness_crash"))
+        self.assertEqual(lane.execution_attempt.status_state(rows[-1]), "failure")
+        self.assertTrue(Locked_free(self.host))
+
+    def test_abandon_is_a_no_op_once_finished_and_never_masks_the_crash(self):
+        self.assertIsNone(lane.end_abandoned_attempt(self.host, {}, RuntimeError("x")))
+        opened = self.open_attempt()
+        with patch.object(lane.execution_attempt, "finish", side_effect=RuntimeError("github down")):
+            self.assertIsNone(lane.end_abandoned_attempt(self.host, opened, RuntimeError("x")))
+        self.assertEqual(opened, {}, "a failed write leaves the lease-expiry sweep as the backstop")
+
+    def prs(self):
+        return [{"number": 1, "headRefOid": "1" * 40, "rollup": "SUCCESS"},
+                {"number": 2, "headRefOid": "2" * 40, "rollup": "FAILURE"},
+                {"number": 3, "headRefOid": "3" * 40, "rollup": "PENDING"},
+                {"number": 4, "headRefOid": "4" * 40, "rollup": "PENDING", "isCrossRepository": True},
+                {"number": 5, "headRefOid": "short", "rollup": "PENDING"},
+                {"number": 6, "headRefOid": "6" * 40, "rollup": None}]
+
+    def test_sweep_reads_only_unsettled_heads_pending_first_on_a_bounded_cadence(self):
+        live = lambda sha: {"kind": "github-status", "repository": "JovieInc/Jovie", "sha": sha}
+        calls = []
+        def finalize(path, coordination, now=None):
+            calls.append(coordination["sha"])
+            if coordination["sha"] == "2" * 40:
+                raise RuntimeError("execution-coordinator-http-1")
+            return [{"context": "jovie-execution/x", "outcome": "finalized"}]
+        with patch.object(lane, "execution_coordination", side_effect=live), \
+                patch.object(lane.execution_attempt, "finalize_stale_statuses", side_effect=finalize):
+            results = lane.sweep_execution_statuses(self.host, self.prs(), now=10_000)
+            self.assertEqual(calls, ["3" * 40, "2" * 40])
+            self.assertEqual([(row["pr"], row["outcome"][:24]) for row in results],
+                             [(3, "finalized"), (2, "error:RuntimeError:execu")])
+            self.assertEqual(lane.sweep_execution_statuses(self.host, self.prs(), now=10_100), [], "host cadence")
+            calls.clear()
+            self.assertEqual(lane.sweep_execution_statuses(self.host, self.prs(), now=10_000 + lane.EXECUTION_STATUS_SWEEP_S), [])
+            self.assertEqual(calls, [], "each head is re-read at most hourly")
+            lane.sweep_execution_statuses(self.host, self.prs()[:3], now=10_000 + lane.EXECUTION_STATUS_RECHECK_S + 1)
+            self.assertEqual(calls, ["3" * 40, "2" * 40])
+            many = [{"number": n, "headRefOid": f"{n:040x}", "rollup": "PENDING"} for n in range(10, 30)]
+            calls.clear()
+            lane.sweep_execution_statuses(self.host, many, now=50_000)
+            self.assertEqual(len(calls), lane.EXECUTION_STATUS_HEADS)
+        marker = json.loads((self.host.state / "execution-status-sweep.json").read_text())
+        self.assertNotIn("3" * 40, marker["heads"], "closed heads are pruned")
+
+    def test_local_backends_never_read_inventory_or_github(self):
+        with patch.object(lane, "open_prs_summary") as inventory:
+            self.assertEqual(lane.sweep_execution_statuses(self.host), [])
+        inventory.assert_not_called()
+
+
+def Locked_free(host):
+    probe = lane.Locked(host.state / "locks" / "repair-pr-5.lock", blocking=False)
+    try:
+        return probe.held
+    finally:
+        probe.release()
+
+
 class FixRedTest(unittest.TestCase):
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)

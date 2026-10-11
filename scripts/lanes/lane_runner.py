@@ -4989,13 +4989,39 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
 
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
+    opened: dict = {}
     try:
-        return _fix_red_pr(host, name, spec, pr, branch_held=lock.held)
+        return _fix_red_pr(host, name, spec, pr, branch_held=lock.held, opened=opened)
+    except BaseException as error:
+        end_abandoned_attempt(host, opened, error)
+        raise
     finally:
         lock.release()
 
 
-def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True) -> dict:
+def end_abandoned_attempt(host: Host, opened: dict, error: BaseException) -> dict | None:
+    """A repair that crashes after its claim still ends its fenced attempt.
+
+    Without this, its jovie-execution/* status on the PR head stayed pending until the
+    lease expired and a later claim of the same identity reconciled it, which may never
+    happen. Best effort: a failed write leaves the lease-expiry sweep as the backstop.
+    """
+    if not opened:
+        return None
+    try:
+        return execution_attempt.finish(
+            host.state / "runs" / "execution-attempts.jsonl", opened["ident"], opened["fence"], "failed_unknown",
+            {"failureClass": "harness_crash", "failureFingerprint": execution_attempt.digest([type(error).__name__]),
+             "evidenceDigest": execution_attempt.digest(f"{type(error).__name__}:{error}"[:300]),
+             "costs": {}, "dependencies": []}, coordination=opened["coordination"])
+    except Exception:
+        return None
+    finally:
+        opened.clear()
+
+
+def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True, opened: dict | None = None) -> dict:
+    opened = {} if opened is None else opened
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -5072,6 +5098,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         receipt.update(verdict="failed", reasons=[f"claim-error:{type(error).__name__}:{error}"[:300]])
     else:
         receipt["execution"] = claimed
+        if claimed["admitted"]:
+            opened.update(ident=ident, fence=claimed["fencingToken"], coordination=coordination)
     if not receipt.get("verdict") and not claimed["admitted"]:
         receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
                        reasons=[claimed["reason"]])
@@ -5243,6 +5271,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
          "costs": {"apiCalls": 1}, "mutationsPerformed": ["source_push"] if pushed else [],
          "confidence": "unknown" if target_unavailable else "high",
          "dependencies": [name, "github-target-state"] if target_unavailable else [name]}, coordination=coordination)
+    opened.clear()
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
@@ -5708,6 +5737,54 @@ def ended_repair_head(pr: dict, record: dict, pending: dict, now: float) -> bool
                 record.get("repairHeadBefore") == before and all(type(t) in (int, float) and math.isfinite(t) for t in stamps) and
                 0 < stamps[0] <= stamps[1] <= now and not pr.get("isCrossRepository") and
                 str(pr.get("state", "OPEN")).upper() == "OPEN")
+
+
+EXECUTION_STATUS_SWEEP_S = 900  # host-wide cadence of the stale jovie-execution/* sweep
+EXECUTION_STATUS_RECHECK_S = 3600  # one head is re-read at most hourly
+EXECUTION_STATUS_HEADS = 8  # bounded status reads per sweep (bot token, one paginated GET each)
+
+
+def sweep_execution_statuses(host: Host, prs: list[dict] | None = None, now: float | None = None) -> list[dict]:
+    """End stale jovie-execution/* statuses on open PR heads so they stop reading UNSTABLE.
+
+    Candidates come from the cached open-PR inventory (no new listing): heads whose rollup is
+    not green, pending first, each re-read at most hourly. execution_attempt decides staleness
+    from the receipts themselves; a live lease is never touched."""
+    now = time.time() if now is None else now
+    if execution_coordination("0" * 40).get("kind") != "github-status":
+        return []  # Self-test and local-test backends publish no commit statuses.
+    marker = host.state / "execution-status-sweep.json"
+    try:
+        seen = json.loads(marker.read_text())
+    except (OSError, ValueError):
+        seen = {}
+    if not isinstance(seen, dict) or not isinstance(seen.get("heads"), dict):
+        seen = {"heads": {}}
+    if now - (seen.get("at") or 0) < EXECUTION_STATUS_SWEEP_S:
+        return []
+    prs = open_prs_summary() if prs is None else prs
+    open_heads = {pr.get("headRefOid") for pr in prs}
+    heads = {sha: at for sha, at in seen["heads"].items() if sha in open_heads}
+    candidates = sorted(
+        (pr for pr in prs if re.fullmatch(r"[0-9a-f]{40}", pr.get("headRefOid") or "")
+         and pr.get("rollup") not in (None, "SUCCESS") and not pr.get("isCrossRepository")
+         and now - heads.get(pr["headRefOid"], 0) >= EXECUTION_STATUS_RECHECK_S),
+        key=lambda pr: (pr.get("rollup") not in ("PENDING", "EXPECTED"), heads.get(pr["headRefOid"], 0), pr["number"]))
+    results = []
+    for pr in candidates[:EXECUTION_STATUS_HEADS]:
+        coordination = execution_coordination(pr["headRefOid"])
+        heads[pr["headRefOid"]] = now
+        try:
+            outcomes = execution_attempt.finalize_stale_statuses(
+                host.state / "runs" / "execution-attempts.jsonl", coordination, now=now)
+        except Exception as error:  # One unreadable head never blocks the others or the worker.
+            outcomes = [{"outcome": f"error:{type(error).__name__}:{error}"[:200]}]
+        results += [{"pr": pr["number"], "sha": pr["headRefOid"], **item} for item in outcomes]
+    host.state.mkdir(parents=True, exist_ok=True)
+    tmp = marker.with_suffix(f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps({"at": now, "heads": heads, "last": results[-50:]}))
+    os.replace(tmp, marker)
+    return results
 
 
 def publish_exhausted_repairs(host: Host, name: str, prs: list[dict], now: float | None = None) -> int:
@@ -6235,6 +6312,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             sweep_lane_prs(host, name, linear)
         if local and not (red or adopt or labeled):
             publish_exhausted_repairs(host, name, candidates)
+            try:
+                sweep_execution_statuses(host)
+            except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+                pass  # Retried on the next idle pass; it never blocks new work.
             try:
                 revisit_terminal_prs(host, candidates)
             except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
