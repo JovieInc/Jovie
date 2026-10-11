@@ -35,6 +35,7 @@ import {
   type ProofCandidate,
 } from '../../data/product-truth/proof';
 import {
+  FactoryEditorialPageBriefSchema,
   type FactoryPageBrief,
   factoryPageId,
   loadFactoryBrief,
@@ -227,6 +228,11 @@ export async function runFactory(
   options: RunFactoryOptions
 ): Promise<FactoryRunManifest> {
   const brief = options.brief ?? loadFactoryBrief(options.family, options.slug);
+  // Validate before budget reservations, provider creation, or receipt writes.
+  // Dry replay is diagnostic compatibility, never a live editorial qualification.
+  if ((options.providers?.mode ?? (options.dry ? 'dry' : 'live')) === 'live') {
+    FactoryEditorialPageBriefSchema.parse(brief);
+  }
   const pageId = factoryPageId(brief.family, brief.slug);
   const runsDir = options.runsDir ?? FACTORY_RUNS_DIR;
   const runDir = join(runsDir, pageId);
