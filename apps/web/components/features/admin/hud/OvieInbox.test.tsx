@@ -71,7 +71,7 @@ describe('Ovie Inbox', () => {
     async caseId => {
       const fetcher = mountRequested(caseId, response([item]));
       await screen.findByText(
-        'This decision is no longer pending. Refresh to check its current status.'
+        'This decision is not in the current inbox. Refresh to check its status.'
       );
       expect(
         screen.queryByTestId('ovie-inbox-decision')
@@ -82,6 +82,24 @@ describe('Ovie Inbox', () => {
       expect(fetcher).toHaveBeenCalledOnce();
     }
   );
+  it('keeps a missing requested case non-actionable when a source is unavailable', async () => {
+    mountRequested(
+      item.id,
+      new Response(
+        JSON.stringify({ cases: [], issues: ['Summer is unavailable.'] }),
+        { status: 200 }
+      )
+    );
+    await screen.findByText(
+      'This decision is not in the current inbox. Refresh to check its status.'
+    );
+    expect(
+      screen.getByText(/Some sources are unavailable/)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Approve' })
+    ).not.toBeInTheDocument();
+  });
   it('keeps the requested case and its notes across a reordered refresh', async () => {
     const other = { ...item, id: 'summer:other', title: 'Other decision' };
     mountRequested(item.id, response([item, other]), response([other, item]));
@@ -115,7 +133,7 @@ describe('Ovie Inbox', () => {
       });
       fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
       await screen.findByText(
-        'This decision is no longer pending. Refresh to check its current status.'
+        'This decision is not in the current inbox. Refresh to check its status.'
       );
       expect(fetcher.mock.calls[1]?.[0]).toBe(
         '/api/ovie/summer-cards/one/decision'

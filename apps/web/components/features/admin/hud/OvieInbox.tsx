@@ -220,7 +220,7 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
             </article>
           ) : caseId !== undefined ? (
             <p role='status'>
-              This decision is no longer pending. Refresh to check its current
+              This decision is not in the current inbox. Refresh to check its
               status.
             </p>
           ) : (
