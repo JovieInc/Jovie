@@ -34,6 +34,12 @@ on:
   # how long a green dequeued head can sit unarmed.
   schedule:
     - cron: '*/15 * * * *'
+  # Gem's lanes tick wakes a full reconcile here when its cached inventory holds
+  # ready, required-green, unqueued PRs (scripts/lanes/enroll_backstop.py):
+  # GitHub cron above fires every 4-7 h, not every 15 minutes. Jovie Bot has
+  # contents: write but only actions: read, so it cannot use workflow_dispatch.
+  repository_dispatch:
+    types: [enroll-reconcile]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -46,7 +52,7 @@ permissions: {}
 concurrency:
   # A global pending slot loses another PR's final wake. Coalesce only wakes
   # attributed to the same PR; association-free receipts retain their run ID.
-  group: merge-queue-green-enroll-${{ github.event_name == 'workflow_dispatch' && 'reconcile' || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
+  group: merge-queue-green-enroll-${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch') && 'reconcile' || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -189,7 +195,7 @@ jobs:
             // on every check completion exhausts the shared app GraphQL quota.
             const validNumber = n => Number.isSafeInteger(n) && n > 0;
             let prs;
-            if (context.eventName === 'workflow_dispatch' || context.eventName === 'schedule') {
+            if (['workflow_dispatch', 'repository_dispatch', 'schedule'].includes(context.eventName)) {
               // Explicit and scheduled reconciliation retain a complete paginated inventory.
               prs = await github.paginate(github.rest.pulls.list, {
                 owner, repo, state: 'open', base: 'main', per_page: 100,

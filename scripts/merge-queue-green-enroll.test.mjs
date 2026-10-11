@@ -801,6 +801,32 @@ test('a scheduled sweep re-enqueues a dequeued PR whose repaired head turned gre
   assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
 });
 
+test('the lanes backstop repository_dispatch runs the full reconcile in the manual slot', async () => {
+  // GitHub cron fired the */15 sweep 5 times in 21 h on 2026-10-11. Gem's lanes
+  // tick wakes this reconcile with repository_dispatch: Jovie Bot has
+  // contents: write but only actions: read, so workflow_dispatch is refused.
+  assert.deepEqual(workflow.on.repository_dispatch.types, ['enroll-reconcile']);
+  const result = await fixture({
+    roster: [candidate(1), candidate(2)],
+    eventName: 'repository_dispatch',
+    payload: { action: 'enroll-reconcile' },
+  });
+  assert.equal(result.inventories.length, 1);
+  assert.deepEqual(result.gets, []);
+  assert.equal(result.mutations.length, 2);
+  const dispatched = id => ({
+    event_name: 'repository_dispatch',
+    event: { action: 'enroll-reconcile' },
+    run_id: id,
+  });
+  const manual = { event_name: 'workflow_dispatch', event: {}, run_id: 9 };
+  assert.equal(concurrencyGroup(dispatched(1)), concurrencyGroup(manual));
+  assert.equal(
+    concurrencyGroup(dispatched(1)),
+    concurrencyGroup(dispatched(2))
+  );
+});
+
 test('an unattributable automatic wake cannot authorize a global queue scan', async () => {
   for (const { eventName, payload } of [
     {

@@ -41,6 +41,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import continuity_clock  # noqa: E402
+import enroll_backstop  # noqa: E402
 import lifecycle  # noqa: E402
 import devin_free_policy  # noqa: E402
 import autoscale  # noqa: E402
@@ -111,6 +112,7 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_continuity_clock.py",
+              "scripts/tests/test_enroll_backstop.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
@@ -6519,6 +6521,12 @@ def finish_dispatch(host: Host, tick: dict) -> int:
         tick["continuity"] = continuity_clock.tick(host.state, HOST)
     except Exception as error:  # liveness must not suppress the existing doctor
         tick["continuity"] = {"status": "failed", "error": type(error).__name__}
+    try:
+        # GitHub cron fires the */15 enroll sweep every 4-7 h; wake it from the cached inventory.
+        tick["enrollBackstop"] = enroll_backstop.tick(
+            host.state, SHARED_CACHE_DIR / "open-prs-labels-v2.json", HOST)
+    except Exception as error:  # the backstop must not suppress the existing doctor
+        tick["enrollBackstop"] = {"status": "failed", "error": type(error).__name__}
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())
