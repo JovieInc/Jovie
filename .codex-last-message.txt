@@ -1,0 +1,11 @@
+JOV-8023 already auto-resolved at 03:17:15Z after the mac left the critical threshold.
+
+Handoff:
+
+- Changes: None.
+- Verified: JOV-8023 is `Done`; clean git worktree; no `disk-critical` alert on the accessible host.
+- Concern: Mac remains tracked separately by JOV-8016 (`disk-low`).
+- Deviation: Mac was not directly reachable from Gem, so no remote cleanup was attempted.
+- No commit, push, tests, or PR were appropriate.
+
+NOT-SHIPPABLE: JOV-8023 was already fixed and closed; no source change or PR is warranted.
