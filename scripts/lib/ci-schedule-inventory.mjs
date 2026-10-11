@@ -96,6 +96,7 @@ const EVENT_DRIVEN_FIX = `use pull_request/pull_request_target/merge_group/workf
  * a cron in any other workflow fails, and an entry whose workflow no longer
  * has a cron fails until it is deleted. The ceiling below only goes down.
  */
+/** @type {readonly string[]} */
 export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/actions-cache-gc.yml',
   '.github/workflows/actions-cache-supersede.yml',
@@ -148,6 +149,7 @@ export const CRON_ALLOWLIST_CEILING = 43;
  * Each names the event-driven replacement that removes its cron. No entry may
  * be added; the ceiling below only goes down.
  */
+/** @type {Readonly<Record<string, {reason: string, replacement: string}>>} */
 export const ADMISSION_CRON_DEBT = Object.freeze({
   '.github/workflows/auto-merge-default.yml': Object.freeze({
     reason:
@@ -186,6 +188,7 @@ export const ADMISSION_CRON_DEBT_CEILING = 5;
  * Workflow steps that hold a runner polling GitHub, git, or queue state. Keyed
  * `<workflow path>#<job id>`. No entry may be added; the ceiling only goes down.
  */
+/** @type {Readonly<Record<string, string>>} */
 export const POLLING_DEBT = Object.freeze({
   '.github/workflows/auto-merge-default.yml#self-test':
     'manual self-test rereads autoMergeRequest 12 times for 60 s',
@@ -208,6 +211,7 @@ export const POLLING_DEBT_CEILING = 6;
  * scripts/lib/linear-issue-intake.mjs is the measurement finding intake (file,
  * reopen, or resolve one fingerprinted issue per finding); it is not admission.
  */
+/** @type {ReadonlyArray<readonly [string, RegExp]>} */
 export const ADMISSION_SIGNALS = Object.freeze([
   ['merge-queue enqueue/dequeue', /\b(?:en|de)queuePullRequest\b/],
   [
@@ -236,6 +240,10 @@ function stripYamlComments(source) {
     .join('\n');
 }
 
+/**
+ * @param {string} [source]
+ * @param {(path: string) => string | null} [readScript]
+ */
 export function admissionSignals(source = '', readScript = () => null) {
   const text = stripYamlComments(source);
   const texts = [text];
@@ -352,6 +360,7 @@ export function pollingFindings(step = {}) {
 export function inventoryPolling(files = []) {
   const rows = [];
   for (const file of files) {
+    /** @type {any} */
     let doc;
     try {
       doc = yamlLoad(String(file.source ?? ''));
@@ -394,6 +403,18 @@ function ratchet(errors, label, entries, detected, ceiling, fix) {
   }
 }
 
+/**
+ * @param {Array<{path: string, source: string}>} [files]
+ * @param {{
+ *   readScript?: (path: string) => string | null,
+ *   cronAllowlist?: readonly string[],
+ *   cronCeiling?: number,
+ *   admissionDebt?: Readonly<Record<string, {reason: string, replacement: string}>>,
+ *   admissionCeiling?: number,
+ *   pollingDebt?: Readonly<Record<string, string>>,
+ *   pollingCeiling?: number,
+ * }} [options]
+ */
 export function checkEventDrivenContract(
   files = [],
   {
