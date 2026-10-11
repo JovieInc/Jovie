@@ -1471,6 +1471,37 @@ class LinearProtectedBudgetTest(unittest.TestCase):
             self.assertFalse(client._snapshot_budget_admitted(1))
             self.assertFalse(any(Path(tmp).glob("linear-usage*")))
 
+    def test_stale_but_healthy_evidence_is_reobserved_before_the_scan_spends_it(self):
+        # Gem: evidence 39 s old at worker admission was 82 s old when the scan ran 43 s later,
+        # so the 60 s gate refused and a quiet host never made the call that would refresh it.
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_STATE": tmp}):
+            path, client = Path(tmp) / "api-budget.json", lane.Linear.__new__(lane.Linear)
+            def budget(remaining, at):
+                path.write_text(json.dumps({"dimensions": {
+                    "requests": {"remaining": remaining, "limit": 2500, "observedAt": at},
+                    "complexity": {"remaining": 2900000, "limit": 3000000, "observedAt": at}}}))
+            def probe(remaining):
+                def answer(query, variables):
+                    self.assertEqual((query, variables), ("query{viewer{id}}", {}))
+                    budget(remaining, time.time())  # the probe's own response headers
+                    return {"viewer": {"id": "u"}}
+                return answer
+            budget(2000, time.time() - 82)
+            with patch.object(client, "gql", side_effect=probe(1999)) as read:
+                self.assertTrue(client._refresh_budget_evidence(5))
+                self.assertEqual(read.call_count, 1)
+            budget(2000, time.time() - 82)
+            with patch.object(client, "gql", side_effect=probe(600)) as read:
+                self.assertFalse(client._refresh_budget_evidence(5), "fresh evidence below the reserve still refuses")
+            for remaining, age in ((630, 82), (2000, 601)):
+                budget(remaining, time.time() - age)
+                with patch.object(client, "gql") as read:
+                    self.assertFalse(client._refresh_budget_evidence(5), (remaining, age))
+                    read.assert_not_called()
+            budget(2000, time.time() - 82)
+            with patch.object(client, "gql", side_effect=lane.LinearRateLimited(time.time() + 60)):
+                self.assertFalse(client._refresh_budget_evidence(5))
+
     def test_write_queue_bound_preserves_unresolved_intents_and_deduplicates(self):
         now = time.time()
         plan = {"events": {"fp": {"issueId": "id", "noted": []}}, "comments": [{"id": "id", "body": "safe"}]}
@@ -2299,7 +2330,10 @@ class MaintenanceDemandTest(unittest.TestCase):
 
     def test_unreadable_stale_and_corrupt_samples_are_unknown(self):
         self.assertIsNone(self.census([self.pr()], readable=False)["pending"])
-        self.assertIsNone(self.census([self.pr()], source_at=self.now - 61)["pending"])
+        self.assertIsNone(self.census([self.pr()], source_at=self.now - lane.MAINTENANCE_DEMAND_MAX_AGE_S - 1)["pending"])
+        # Gem 2026-10-11: a shared-cache hit near its 60 s expiry, held in the process summary and
+        # then scanned, published "unknown" for codex over 45 candidates.
+        self.assertEqual(self.census([self.pr()], source_at=self.now - 2 * lane.SUMMARY_TTL_S + 5)["pending"], 1)
         (self.host.state / "held.json").write_text("[]")
         self.assertIsNone(self.census([self.pr()])["pending"])
 
@@ -3617,6 +3651,32 @@ class DispatchTest(unittest.TestCase):
             tick = json.loads((host.state / "tick.json").read_text())
             self.assertEqual((tick["unhealthy"], tick["spawned"], tick["error"]), (["b"], ["a", "a"], None))
         self.assertEqual(spawned, ["a", "a"])
+
+    def test_one_faulty_provider_does_not_idle_the_other_lanes(self):
+        saved = (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
+                 lane.disk_guard.check)
+        spawned = []
+        def health(spec):
+            if spec.get("broken"):
+                raise lane.lifecycle.AdmissionHeld("probe owner unknown")
+            return True
+        lane.load_providers = lambda: {"broken": {"slots": 1, "broken": True}, "fine": {"slots": 2}}
+        lane.provider_healthy = health
+        lane.subprocess.Popen = lambda args, **kw: spawned.append(args[-1])
+        lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
+        lane.doctor.run = lambda *a, **k: {}
+        lane.disk_guard.check = lambda host: {"freePct": 50.0, "low": False, "critical": False, "admitted": True}
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                host = lane.Host(state=Path(tmp), repo=Path(tmp))
+                self.assertEqual(lane.dispatch(host), 0)
+            finally:
+                (lane.load_providers, lane.provider_healthy, lane.subprocess.Popen, lane.sh, lane.doctor.run,
+                 lane.disk_guard.check) = saved
+            tick = json.loads((host.state / "tick.json").read_text())
+        self.assertEqual((tick["unhealthy"], tick["spawned"], tick["error"]), (["broken"], ["fine", "fine"], None))
+        self.assertIn("AdmissionHeld", tick["providerErrors"]["broken"])
+        self.assertEqual(spawned, ["fine", "fine"])
 
     def test_only_the_best_pr_per_issue_gets_lane_effort(self):
         prs = [
@@ -5004,6 +5064,16 @@ class UpdateTest(unittest.TestCase):
             env = lane.selftest_env(Path("/scratch"))
         self.assertFalse(set(knobs) & set(env))
         self.assertEqual((env["PATH"], env["LANES_SELFTEST"], env["LANES_STATE"]), ("/bin", "1", "/scratch"))
+
+    def test_release_selftest_never_sees_host_credentials_or_home(self):
+        secrets = {"GH_TOKEN": "ghs_live", "GITHUB_TOKEN": "ghs_live", "LINEAR_API_KEY": "lin_live",
+                   "LINEAR_BACKOFF_STATE_DIR": "/live/backoff", "JOVIE_BOT_KEY": "/live/key.pem",
+                   "JOVIE_GITHUB_FLOOR": "600", "CODEX_HOME": "/live/codex", "XDG_CONFIG_HOME": "/live/config"}
+        with patch.dict(os.environ, {**secrets, "HOME": "/live", "LANES_STATE": "/live/state",
+                                     "PATH": "/live/state/bin:/usr/bin:/live/state/bin/"}):
+            env = lane.selftest_env(Path("/scratch"))
+        self.assertFalse(set(secrets) & set(env))
+        self.assertEqual((env["HOME"], env["PATH"]), ("/scratch/home", "/usr/bin"))
 
     def test_mesh_dependency_root_falls_back_to_an_installed_pool_slot(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -8379,12 +8449,16 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         stage = self.root / "stage"; stage.mkdir()
         stderr = "FAIL: test_bound (scripts.tests.test_fixture.Example)\n" + "x" * 4000
         replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                   subprocess.CompletedProcess([], 1, stdout="", stderr=stderr),
                    subprocess.CompletedProcess([], 1, stdout="", stderr=stderr)]
         with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
                 patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
                 patch.object(lane.lifecycle, "run", side_effect=replies) as run, contextlib.redirect_stderr(io.StringIO()) as console:
             self.assertEqual(lane.prove_staging(self.host, stage), "release tests failed")
         self.assertEqual(run.call_args_list[1].args[0], [sys.executable, "-m", "unittest", "-q", *lane.LANE_TESTS])
+        self.assertEqual(run.call_args_list[2].args[0],
+                         [sys.executable, "-m", "unittest", "-q", "scripts.tests.test_fixture.Example.test_bound"])
+        self.assertEqual(json.loads((stage / ".selftest-retry.json").read_text())["passedOnRetry"], False)
         diagnostic = json.loads((stage / ".selftest-diagnostic.json").read_text())
         self.assertEqual(diagnostic["failedSelectors"], ["test_bound (scripts.tests.test_fixture.Example)"])
         self.assertEqual(diagnostic["stderrSha256"], hashlib.sha256(stderr.encode()).hexdigest())
@@ -8393,6 +8467,36 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         self.assertNotIn("test_bound", console.getvalue())
         for name in [".selftest-diagnostic.json", ".selftest-stderr.log"]:
             self.assertEqual((stage / name).stat().st_mode & 0o777, 0o600)
+
+    def test_one_flaky_selector_is_retried_once_on_the_same_tree(self):
+        # 2026-10-11: one host-state-dependent selector refused the release carrying #21257.
+        stage = self.root / "stage"; stage.mkdir()
+        flaky = "FAIL: test_ledger (scripts.tests.test_hud.LedgerSchemaTest.test_ledger)\n----\nAssertionError"
+        replies = [subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+                   subprocess.CompletedProcess([], 1, stdout="", stderr=flaky),
+                   subprocess.CompletedProcess([], 0, stdout="", stderr="")]
+        with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+                patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                patch.object(lane.lifecycle, "run", side_effect=replies) as run, contextlib.redirect_stderr(io.StringIO()):
+            self.assertIsNone(lane.prove_staging(self.host, stage))
+        retry = run.call_args_list[2]
+        self.assertEqual(retry.args[0], [sys.executable, "-m", "unittest", "-q", "scripts.tests.test_hud.LedgerSchemaTest.test_ledger"])
+        self.assertEqual(retry.kwargs["cwd"], stage)
+        self.assertEqual(retry.kwargs["env"]["LANES_STATE"], str(stage / ".selftest-retry-state"))
+        receipt = json.loads((stage / ".selftest-retry.json").read_text())
+        self.assertEqual((receipt["selectors"], receipt["passedOnRetry"]), (["scripts.tests.test_hud.LedgerSchemaTest.test_ledger"], True))
+
+    def test_unbounded_or_structural_selftest_failures_are_never_retried(self):
+        many = "".join(f"FAIL: test_{n} (scripts.tests.test_x.Case.test_{n})\n" for n in range(lane.SELFTEST_RETRY_MAX_SELECTORS + 1))
+        for stderr in ("ERROR: scripts/tests/test_lifecycle (unittest.loader._FailedTest.scripts/tests/test_lifecycle)\n",
+                       "ERROR: setUpClass (scripts.tests.test_x.Case)\n", many,
+                       "FAIL: test_a (scripts.tests.test_x.Case.test_a)\nERROR: weird header\n", "", b"Ran 3 tests\nFAILED"):
+            with self.subTest(stderr=stderr[:40]):
+                self.assertIsNone(lane.selftest_retry_ids(stderr))
+                with patch.object(lane.lifecycle, "run") as run:
+                    self.assertFalse(lane.retry_failed_selectors(self.root, stderr))
+                    run.assert_not_called()
+        self.assertEqual(lane.selftest_retry_ids(b"FAIL: test_b (scripts.tests.test_x.Case)\n"), ["scripts.tests.test_x.Case.test_b"])
 
     def test_selftest_timeout_retains_captured_selector_and_bounded_diagnostic(self):
         # This is a red regression on a282c4f1: current timeout path discards it.

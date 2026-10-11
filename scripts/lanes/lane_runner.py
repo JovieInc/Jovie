@@ -1772,7 +1772,8 @@ class Linear:
             raise LaneInventoryUnknown("lane-snapshot-revision-invalid")
         return True
 
-    def _snapshot_budget_admitted(self, pages: int) -> bool:
+    def _snapshot_budget_admitted(self, pages: int, max_age_s: float | None = None) -> bool:
+        max_age_s = CLAIM_SCAN_TTL_S if max_age_s is None else max_age_s
         state = lane_state_dir()
         if state is None:
             return False
@@ -1788,7 +1789,7 @@ class Linear:
                 remaining, limit = row.get("remaining"), row.get("limit")
                 at = autoscale._epoch(row.get("observedAt"))
                 if any(type(value) not in (int, float) or not math.isfinite(value) for value in (remaining, limit, at)) or (
-                        limit <= 0 or not 0 <= remaining <= limit or not 0 <= time.time() - at <= CLAIM_SCAN_TTL_S):
+                        limit <= 0 or not 0 <= remaining <= limit or not 0 <= time.time() - at <= max_age_s):
                     return False
                 # Protect both quota dimensions; unknown operation complexity is
                 # never inferred from another consumer's remaining-counter delta.
@@ -1799,12 +1800,30 @@ class Linear:
         except (OSError, ValueError, TypeError):
             return False
 
+    def _refresh_budget_evidence(self, pages: int) -> bool:
+        """Re-observe the Linear budget right before spending it, then apply the unchanged gate.
+
+        Approval and execution were separate reads of one api-budget.json: on Gem the evidence
+        was 39 s old when a worker was admitted and 82 s old when its scan ran, so the 60 s gate
+        refused, and a quiet host made no other Linear call that could refresh it. Only evidence
+        that would already pass every reserve (plus this probe's own request) within the
+        autoscaler's freshness window is re-observed; the probe's real response headers are the
+        new evidence."""
+        if not self._snapshot_budget_admitted(pages + 1, max_age_s=autoscale.STALE_S):
+            return False
+        try:
+            self.gql("query{viewer{id}}", {})
+        except Exception:
+            return False
+        return self._snapshot_budget_admitted(pages)
+
     def _todo_snapshot(self, labels: list[str], pages: int, *, overflow=False) -> dict:
         started, rows, cursors, after = time.time(), {}, set(), None
         for page_index in range(pages):
             if not 0 <= time.time() - started < CLAIM_SCAN_TTL_S:
                 raise LaneInventoryUnknown("lane-inventory-scan-expired")
-            if not self._snapshot_budget_admitted(pages - page_index):
+            if not self._snapshot_budget_admitted(pages - page_index) \
+                    and not self._refresh_budget_evidence(pages - page_index):
                 raise LaneInventoryUnknown("linear-refresh-reserve-held")
             everything = labels == [TODO_POOL]
             data = self.gql(
@@ -5077,6 +5096,10 @@ def repo_prs() -> list[dict]:
 
 _SUMMARY: dict = {"at": 0.0, "prs": [], "readable": False}
 SUMMARY_TTL_S = 60
+# A demand census reads rows the shared cache served (up to one TTL old), held in this
+# process's summary (another TTL), then scanned. Requiring one TTL made a cache hit near
+# expiry publish "unknown" for codex with 45 candidates (Gem 2026-10-11).
+MAINTENANCE_DEMAND_MAX_AGE_S = 3 * SUMMARY_TTL_S
 # One claim scan per minute for every idle worker on the host. The 500-issue Linear
 # pagination runs only as this cache's fill, never as an uncached read.
 CLAIM_SCAN_TTL_S = 60
@@ -5762,7 +5785,7 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
     source_at = _SUMMARY.get("sourceAt")
     try:
         if not _SUMMARY["readable"] or type(source_at) not in (int, float) \
-                or not 0 <= now - source_at <= SUMMARY_TTL_S:
+                or not 0 <= now - source_at <= MAINTENANCE_DEMAND_MAX_AGE_S:
             raise ValueError("maintenance-inventory-unknown")
         snapshots = {}
         for filename in ("fix-attempts.json", "held.json", "verified.json", "requeue.json", "synced.json"):
@@ -5843,7 +5866,7 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
                 unknown_rows += 1
         if eligible:
             pending_count = len(eligible)
-        elif not unknown_rows and _SUMMARY["readable"] and 0 <= now - _SUMMARY["at"] <= SUMMARY_TTL_S \
+        elif not unknown_rows and _SUMMARY["readable"] and 0 <= now - _SUMMARY["at"] <= MAINTENANCE_DEMAND_MAX_AGE_S \
                 and not _SUMMARY["prs"] and not rows:
             # A complete empty repository inventory proves no PR maintenance.
             pending_count = 0
@@ -6162,18 +6185,24 @@ def dispatch(host: Host) -> int:
             except Exception as status_error:
                 tick["remediationDeliveryStatusError"] = f"{type(status_error).__name__}: {status_error}"[:200]
         for name, spec in load_providers().items():
-            slots = host.slots(name, spec.get("slots", 1))
-            # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
-            if not spec.get("enabled", True) or slots == 0 or cooling(host, name):
-                continue
-            if not provider_healthy(spec):
+            try:
+                slots = host.slots(name, spec.get("slots", 1))
+                # LANES_SLOTS_<P>=0 scopes a provider off this host: no health probe, no provider-down alert.
+                if not spec.get("enabled", True) or slots == 0 or cooling(host, name):
+                    continue
+                if not provider_healthy(spec):
+                    tick["unhealthy"].append(name)
+                    continue
+                for _ in range(slots):
+                    subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
+                                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                     start_new_session=True, **lifecycle.spawn_kwargs())
+                    tick["spawned"].append(name)
+            except Exception as error:
+                # One provider's malformed spec, probe or spawn fault holds that provider only;
+                # it must not idle every other lane's seats for the tick.
                 tick["unhealthy"].append(name)
-                continue
-            for _ in range(slots):
-                subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
-                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                 start_new_session=True, **lifecycle.spawn_kwargs())
-                tick["spawned"].append(name)
+                tick.setdefault("providerErrors", {})[name] = f"{type(error).__name__}: {error}"[:200]
     except DiskAdmissionError as error:
         # Deliberate backpressure, not a tick fault: the doctor's disk-critical/disk-low
         # alert already names the cause. Recording it as a tick error would raise a
@@ -6354,9 +6383,21 @@ def release_identity(host: Host) -> dict:
 HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_LANE_")
 
 
+# Host credentials and identity files must not reach the self-test either. A fixture that fell
+# through to the live host read ~/.config/jovie-lanes/autoscale.env, the legacy Linear backoff
+# under ~/.local/state, claude.env and linear.env, and ran real authenticated `gh pr list`
+# calls, so a selector could pass on a laptop and fail only on Gem (2026-10-11).
+HOST_CREDENTIAL_PREFIXES = ("GH_", "GITHUB_", "LINEAR_", "JOVIE_BOT_", "JOVIE_GITHUB_", "CODEX_HOME", "XDG_")
+
+
 def selftest_env(scratch: Path) -> dict:
-    env = {key: value for key, value in os.environ.items() if not key.startswith(HOST_KNOB_PREFIXES)}
-    return {**env, "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
+    env = {key: value for key, value in os.environ.items()
+           if not key.startswith(HOST_KNOB_PREFIXES + HOST_CREDENTIAL_PREFIXES)}
+    # The gh shim mints the host's installation token; the self-test resolves the plain tool.
+    shim = str(Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "bin")
+    if "PATH" in env:
+        env["PATH"] = os.pathsep.join(entry for entry in env["PATH"].split(os.pathsep) if entry.rstrip("/") != shim)
+    return {**env, "HOME": str(Path(scratch) / "home"), "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
 
 
 # The installed packages mesh-runtime-bundle.mjs compiles against (exact pins checked there).
@@ -6433,7 +6474,7 @@ def prove_staging(host: Host, staging: Path) -> str | None:
     refusal reason, or None when the tree may be activated. Writes only under `staging`."""
     # The self-test must never touch this host's live state: point it at a scratch dir.
     scratch = staging / ".selftest-state"
-    scratch.mkdir(exist_ok=True)
+    (scratch / "home").mkdir(parents=True, exist_ok=True)
     # Raw ports import workspace TypeScript/Zod. Compile from the immutable
     # archive with the host repo's existing identical pins before activation;
     # no dependency installation or running-worker mutation is permitted.
@@ -6462,8 +6503,57 @@ def prove_staging(host: Host, staging: Path) -> str | None:
     retain_selftest_diagnostic(staging, test.stderr, test.returncode)
     if test.returncode != 0:
         print(test.stderr[-2000:], file=sys.stderr)
-        return "release tests failed"
+        if not retry_failed_selectors(staging, test.stderr):
+            return "release tests failed"
     return None
+
+
+SELFTEST_RETRY_MAX_SELECTORS = 5
+SELFTEST_RETRY_TIMEOUT_S = 300
+_SELFTEST_FAILURE = re.compile(r"^(?:FAIL|ERROR): ([A-Za-z_][A-Za-z0-9_]*) \(([A-Za-z0-9_.]+)\)$", re.MULTILINE)
+
+
+def selftest_retry_ids(stderr) -> list[str] | None:
+    """Exact unittest ids of the failed test methods, or None when the failure is not a bounded
+    set of method failures (import errors, class/module fixtures, a long list)."""
+    text = stderr.decode(errors="replace") if isinstance(stderr, bytes) else (stderr or "")
+    headers = re.findall(r"^(?:FAIL|ERROR): .*$", text, re.MULTILINE)
+    found = _SELFTEST_FAILURE.findall(text)
+    if not found or len(found) != len(headers) or len(found) > SELFTEST_RETRY_MAX_SELECTORS:
+        return None
+    ids = []
+    for method, where in found:
+        if not method.startswith("test") or "_FailedTest" in where:
+            return None
+        # Python >= 3.11 prints the full id in parentheses; older versions print the class.
+        ids.append(where if where.endswith("." + method) else f"{where}.{method}")
+    return sorted(set(ids))
+
+
+def retry_failed_selectors(staging: Path, stderr) -> bool:
+    """One flaky selector must not freeze every release: rerun exactly the failed test methods
+    once on the same staged tree, with a fresh scratch state. A second failure (or anything
+    that is not a bounded set of method failures) keeps the refusal. The receipt names the
+    selectors that needed the retry."""
+    ids = selftest_retry_ids(stderr)
+    if not ids:
+        return False
+    scratch = staging / ".selftest-retry-state"
+    (scratch / "home").mkdir(parents=True, exist_ok=True)
+    try:
+        rerun = lifecycle.run([sys.executable, "-m", "unittest", "-q", *ids], cwd=staging, capture_output=True,
+                              text=True, timeout=SELFTEST_RETRY_TIMEOUT_S, env=selftest_env(scratch))
+        passed = rerun.returncode == 0
+    except subprocess.TimeoutExpired:
+        passed = False
+    receipt = {"schema": "jovie-lane-selftest-retry/v1", "selectors": ids, "passedOnRetry": passed,
+               "observedAt": now_iso()}
+    fd = os.open(staging / ".selftest-retry.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w") as handle:
+        handle.write(json.dumps(receipt))
+    print(f"release self-test retry: {len(ids)} selector(s) {'passed' if passed else 'failed again'}; "
+          "see .selftest-retry.json", file=sys.stderr)
+    return passed
 
 
 def operator_install(host: Host, expected: dict, *, owner: str, operation_id: str, admission_check) -> int:
