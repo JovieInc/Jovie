@@ -613,10 +613,14 @@ export async function runDspInteraction(page: Page) {
     ).toBeGreaterThan(0);
     expect(url.username, 'DSP handoff must not embed credentials').toBe('');
     expect(url.password, 'DSP handoff must not embed credentials').toBe('');
-    expect(
-      isValidDspUrl(provider, url.href),
-      `DSP handoff host is not canonical for ${provider}: ${url.hostname}`
-    ).toBe(true);
+    // Generic platform links (`link_<slug>`) have no canonical host — any
+    // valid https destination is acceptable for them.
+    if (!provider.startsWith('link_')) {
+      expect(
+        isValidDspUrl(provider, url.href),
+        `DSP handoff host is not canonical for ${provider}: ${url.hostname}`
+      ).toBe(true);
+    }
     if (target === '_blank') {
       const protections = new Set(
         (relOrFeatures ?? '')
@@ -652,73 +656,119 @@ export async function runDspInteraction(page: Page) {
   });
 
   const exercisedProviders = new Set<string>();
-  for (let index = 0; index < actionCount; index += 1) {
-    const action = visibleActions.nth(index);
-    const provider = await action.getAttribute('data-dsp-provider');
-    expect(
-      provider,
-      'DSP action is missing its canonical provider key'
-    ).toBeTruthy();
-    if (!provider) continue;
-    const registryEntry = getRegistryEntry(provider);
-    expect(
-      registryEntry,
-      `Unknown DSP provider key: ${provider}`
-    ).toBeDefined();
-    expect(registryEntry?.showOnListenPage).toBe(true);
-    exercisedProviders.add(provider);
+  const exerciseVisibleDspActions = async () => {
+    const visibleActionCount = await visibleActions.count();
+    for (let index = 0; index < visibleActionCount; index += 1) {
+      const action = visibleActions.nth(index);
+      const provider = await action.getAttribute('data-dsp-provider');
+      expect(
+        provider,
+        'DSP action is missing its canonical provider key'
+      ).toBeTruthy();
+      if (!provider || exercisedProviders.has(provider)) continue;
+      // Generic platform links (`link_<slug>`) are rendered on the listen
+      // surface but are intentionally absent from the DSP registry.
+      if (!provider.startsWith('link_')) {
+        const registryEntry = getRegistryEntry(provider);
+        expect(
+          registryEntry,
+          `Unknown DSP provider key: ${provider}`
+        ).toBeDefined();
+        expect(registryEntry?.showOnListenPage).toBe(true);
+      }
+      exercisedProviders.add(provider);
 
-    const href = await action.getAttribute('href');
-    if (href) {
+      const href = await action.getAttribute('href');
+      if (href) {
+        assertSafeHandoff(
+          provider,
+          href,
+          await action.getAttribute('target'),
+          await action.getAttribute('rel')
+        );
+        continue;
+      }
+
+      await expect(action).toBeEnabled();
+      await page.evaluate(() => {
+        Object.assign(globalThis, { __publicSurfaceDspHandoff: null });
+      });
+      await action.click();
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              () =>
+                (
+                  globalThis as typeof globalThis & {
+                    __publicSurfaceDspHandoff?: unknown;
+                  }
+                ).__publicSurfaceDspHandoff ?? null
+            ),
+          {
+            message: `${provider} control did not initiate a handoff`,
+            timeout: 5_000,
+          }
+        )
+        .not.toBeNull();
+      const handoff = await page.evaluate(
+        () =>
+          (
+            globalThis as typeof globalThis & {
+              __publicSurfaceDspHandoff: {
+                url: string;
+                target: string | null;
+                features: string | null;
+              };
+            }
+          ).__publicSurfaceDspHandoff
+      );
+      expect(
+        handoff.target,
+        'programmatic DSP handoff must open in an isolated browsing context'
+      ).toBe('_blank');
       assertSafeHandoff(
         provider,
-        href,
-        await action.getAttribute('target'),
-        await action.getAttribute('rel')
+        handoff.url,
+        handoff.target,
+        handoff.features
       );
-      continue;
+      await expect(action).toBeEnabled({ timeout: 2_000 });
     }
+  };
 
-    await expect(action).toBeEnabled();
-    await page.evaluate(() => {
-      Object.assign(globalThis, { __publicSurfaceDspHandoff: null });
-    });
-    await action.click();
-    await expect
-      .poll(
-        () =>
-          page.evaluate(
-            () =>
-              (
-                globalThis as typeof globalThis & {
-                  __publicSurfaceDspHandoff?: unknown;
-                }
-              ).__publicSurfaceDspHandoff ?? null
-          ),
-        {
-          message: `${provider} control did not initiate a handoff`,
+  await exerciseVisibleDspActions();
+
+  // The streaming ActionDial renders only the selected provider's action, so
+  // a Spotify-default selection hides every other DSP. Rotate the dial's
+  // selection buttons until a non-Spotify action is visible, then exercise it.
+  const dialSelects = page
+    .locator('button[data-dial-offset]')
+    .filter({ visible: true });
+  for (
+    let rotation = 0;
+    rotation < 4 &&
+    ![...exercisedProviders].some(provider => provider !== 'spotify');
+    rotation += 1
+  ) {
+    const dialSelect = dialSelects.first();
+    if (!(await dialSelect.isVisible().catch(() => false))) {
+      break;
+    }
+    const previousProvider = await visibleActions
+      .first()
+      .getAttribute('data-dsp-provider');
+    await dialSelect.click();
+    try {
+      await expect
+        .poll(() => visibleActions.first().getAttribute('data-dsp-provider'), {
           timeout: 5_000,
-        }
-      )
-      .not.toBeNull();
-    const handoff = await page.evaluate(
-      () =>
-        (
-          globalThis as typeof globalThis & {
-            __publicSurfaceDspHandoff: {
-              url: string;
-              target: string | null;
-              features: string | null;
-            };
-          }
-        ).__publicSurfaceDspHandoff
-    );
-    expect(
-      handoff.target,
-      'programmatic DSP handoff must open in an isolated browsing context'
-    ).toBe('_blank');
-    assertSafeHandoff(provider, handoff.url, handoff.target, handoff.features);
-    await expect(action).toBeEnabled({ timeout: 2_000 });
+        })
+        .not.toBe(previousProvider);
+    } catch {
+      break;
+    }
+    await exerciseVisibleDspActions();
   }
 
   expect(

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   draft: vi.fn(),
   writeLimit: vi.fn(),
   flag: vi.fn(),
+  musicbrainzLimit: vi.fn(),
 }));
 vi.mock('@/lib/spotify/client', () => ({
   spotifyClient: {
@@ -31,6 +32,7 @@ vi.mock('@/lib/dsp-enrichment/providers/apple-music', () => ({
 }));
 vi.mock('@/lib/rate-limit', () => ({
   publicArtistApiLimiter: { limit: mocks.limit },
+  musicBrainzLookupLimiter: { limit: mocks.musicbrainzLimit },
   agentProfileCreateLimiter: { limit: mocks.writeLimit },
   getClientIP: () => '192.0.2.1',
   createRateLimitHeaders: () => ({ 'Retry-After': '60' }),
@@ -43,6 +45,9 @@ vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: mocks.flag }));
 
 import { DELETE, GET, POST } from '@/app/api/music/mcp/route';
 import { BASE_URL } from '@/constants/app';
+import timArtist from '@/lib/dsp-enrichment/providers/fixtures/tim-white-musicbrainz.json';
+import timUrl from '@/lib/dsp-enrichment/providers/fixtures/tim-white-musicbrainz-url.json';
+import { musicResolveSchema } from '@/lib/music-resolver/public-read';
 import { MUSIC_READ_TIMEOUT_MS } from './music-mcp';
 import { musicFetchSchema, musicSearchSchema } from './music-read';
 
@@ -84,10 +89,18 @@ async function call(name: string, args: unknown) {
 }
 
 describe('public music identity MCP, real SDK and canonical resolver', () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.limit.mockResolvedValue({ success: true });
+    mocks.musicbrainzLimit.mockResolvedValue({
+      success: true,
+      reset: new Date(),
+      remaining: 1,
+    });
     mocks.spotifyGet.mockResolvedValue(artist());
     mocks.spotifySearch.mockResolvedValue([
       artist(),
@@ -114,7 +127,11 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
     await client.connect(transport);
     try {
       const tools = await client.listTools();
-      expect(tools.tools.map(tool => tool.name)).toEqual(['search', 'fetch']);
+      expect(tools.tools.map(tool => tool.name)).toEqual([
+        'resolve',
+        'search',
+        'fetch',
+      ]);
       for (const tool of tools.tools) {
         expect(tool.annotations).toEqual({
           readOnlyHint: true,
@@ -124,7 +141,11 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
         });
         expect(tool.inputSchema).toEqual(
           z.toJSONSchema(
-            tool.name === 'search' ? musicSearchSchema : musicFetchSchema,
+            tool.name === 'resolve'
+              ? musicResolveSchema
+              : tool.name === 'search'
+                ? musicSearchSchema
+                : musicFetchSchema,
             { target: 'draft-7' }
           )
         );
@@ -161,6 +182,30 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
       expect(JSON.stringify(fetch)).not.toMatch(
         /owner_email|access_token|draft_token|next_action/
       );
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async input =>
+          Response.json(
+            String(input).includes('/ws/2/url?') ? timUrl : timArtist
+          )
+        )
+      );
+      const resolved = await client.callTool({
+        name: 'resolve',
+        arguments: {
+          input: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+        },
+      });
+      expect(resolved.isError).toBe(false);
+      expect(resolved.structuredContent).toMatchObject({
+        status: 'resolved',
+        mbid: '51972833-bb04-46b7-9401-45a5ab449ebd',
+        artistMetadata: {
+          isnis: ['0000000427529721'],
+          wikidataIds: ['Q16762431'],
+        },
+      });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(mocks.writeLimit).not.toHaveBeenCalled();
       expect(mocks.draft).not.toHaveBeenCalled();
       expect(mocks.flag).not.toHaveBeenCalled();
@@ -431,5 +476,77 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
     expect(malformed.status).toBe(400);
     expect(await malformed.text()).not.toContain('private-token');
     expect(mocks.spotifySearch).not.toHaveBeenCalled();
+  });
+  it.each([
+    { input: 'Tim White', kind: 'creator' },
+    { input: '' },
+    { input: 'Tim White', territory: 'USA' },
+    { input: 'Tim White', token: 'private' },
+    { input: 'http://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm' },
+    {
+      input: [
+        'https://fixture-user',
+        ':fixture-password@open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+      ].join(''),
+    },
+    { input: 'Title', kind: 'track' },
+  ])(
+    'rejects invalid music resolution arguments before any external read: %j',
+    async args => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const { body } = await call('resolve', args);
+      expect(body.result.structuredContent).toEqual({
+        error: { code: 'INVALID_INPUT', retryable: false },
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(mocks.musicbrainzLimit).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns real same-name MusicBrainz choices over the MCP contract', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          artists: [
+            { id: '51972833-bb04-46b7-9401-45a5ab449ebd', name: 'Tim White' },
+            { id: '8ac57f9f-0188-450a-b177-db336e5c2870', name: 'Tim White' },
+          ],
+        })
+      )
+    );
+    const { body } = await call('resolve', { input: 'Tim White' });
+    expect(body.result.structuredContent).toMatchObject({
+      status: 'ambiguous',
+      mbid: null,
+      links: [],
+    });
+    expect(
+      body.result.structuredContent.candidates.map(
+        (candidate: { url: string }) => candidate.url
+      )
+    ).toEqual([
+      'https://musicbrainz.org/artist/51972833-bb04-46b7-9401-45a5ab449ebd',
+      'https://musicbrainz.org/artist/8ac57f9f-0188-450a-b177-db336e5c2870',
+    ]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps upstream 429s retryable without returning fabricated absence', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({}, { status: 429 }))
+    );
+    const { body } = await call('resolve', {
+      input: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+    });
+    expect(body.result).toMatchObject({
+      isError: true,
+      structuredContent: {
+        error: { code: 'UPSTREAM_FAILURE', retryable: true },
+      },
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
