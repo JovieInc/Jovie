@@ -445,19 +445,22 @@ describe('MusicBrainz Provider', () => {
       lookupMusicBrainzRecordingUrlRels('USABC1234567')
     ).resolves.toEqual([]);
   });
-  it('resolves Spotify share/locale URLs using the exact canonical artist ID', async () => {
-    mockResponse(timUrl);
-    await expect(
-      lookupMusicBrainzArtistsByUrl(
-        'https://open.spotify.com/intl-fr/artist/4Uwpa6zW3zzCSQvooQNksm/?si=share#fragment'
-      )
-    ).resolves.toEqual([expect.objectContaining({ id: TIM_ID })]);
-    expect(
-      new URL(String(vi.mocked(fetch).mock.calls[0]?.[0])).searchParams.get(
-        'resource'
-      )
-    ).toBe(TIM_SPOTIFY);
-  });
+  it.each(['fr', 'pt-br', 'zh-hant-tw'])(
+    'resolves Spotify intl-%s share URLs using the exact canonical artist ID',
+    async locale => {
+      mockResponse(timUrl);
+      await expect(
+        lookupMusicBrainzArtistsByUrl(
+          `https://open.spotify.com/intl-${locale}/artist/4Uwpa6zW3zzCSQvooQNksm/?si=share#fragment`
+        )
+      ).resolves.toEqual([expect.objectContaining({ id: TIM_ID })]);
+      expect(
+        new URL(String(vi.mocked(fetch).mock.calls[0]?.[0])).searchParams.get(
+          'resource'
+        )
+      ).toBe(TIM_SPOTIFY);
+    }
+  );
 
   it('looks up Apple URL aliases in one bounded MusicBrainz request', async () => {
     const original =
