@@ -184,9 +184,12 @@ def refusal(lane, binding: Binding, issue, failures: dict, now: float, flying: f
     missing = sorted(set(binding.labels) - labels)
     if missing:
         return f"{binding.key}:missing-label:{','.join(missing)}"
-    excluded = sorted((set(binding.excluded) | lane.HARD_EXCLUDED_LABELS) & labels)
+    excluded = sorted(set(binding.excluded) & labels)
     if excluded:
         return f"{binding.key}:excluded-label:{excluded[0]}"
+    shared_rule = lane.label_rejection(issue, provider)
+    if shared_rule:
+        return f"{binding.key}:{shared_rule}"
     if lane.issue_hits_red_line(issue):
         return f"{binding.key}:sensitive-text"
     if lane.issue_is_sensitive(issue) and provider != lane.SENSITIVE_PROVIDER:
@@ -365,8 +368,12 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
         return None
     try:
         lane.notify_issue_claim(linear, issue, name, spec)
-        receipt = run(lane, host, binding, name, spec, issue=issue)
-        finish_issue(lane, host, binding, name, linear, issue, receipt)
+        if lane.epics.is_epic(issue):  # decomposed in the binding's own team and repo
+            receipt = lane.epics.run_epic(lane, host, name, spec, linear, issue, binding.repo)
+        else:
+            receipt = run(lane, host, binding, name, spec, issue=issue)
+        if receipt.get("verdict") not in lane.epics.SETTLED_VERDICTS:
+            finish_issue(lane, host, binding, name, linear, issue, receipt)
     finally:
         lease.release()
     return receipt.get("verdict")
