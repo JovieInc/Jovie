@@ -203,6 +203,7 @@ export const APP_ROUTES = {
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */
   SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',
+  INTEGRATIONS: '/integrations',
   YOUTUBE_THUMBNAILS: '/youtube-thumbnails',
   VOICE: '/voice',
   /** Internal render-fixture index; the page itself 404s unless fixtures are enabled. */

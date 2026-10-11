@@ -1215,6 +1215,24 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/integrations/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-8012 shared connector capability projection',
+    },
+    exempt: {
+      reason:
+        'generated application reference — projects configured, implemented capabilities from the canonical connector registry; not recipe-composable',
+      linearId: 'JOV-8012',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/20958',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/integrations',
+  },
+  {
     glob: '(marketing)/changelog/page.tsx',
     renderedSections: [],
     bindingEvidence: {

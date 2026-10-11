@@ -463,7 +463,17 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
         '</button>' +
         '</main>'
     );
+    const capture = page.screenshot.bind(page);
+    let attempts = 0;
+    page.screenshot = async options => {
+      if (++attempts === 1)
+        throw new Error(
+          'Protocol error (Page.captureScreenshot): Unable to capture screenshot'
+        );
+      return capture(options);
+    };
     const snapshot = await inspectImageContrast(page);
+    expect(attempts).toBe(2);
     expect(snapshot.findings.map(finding => finding.kind)).toContain(
       'image-contrast'
     );

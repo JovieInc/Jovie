@@ -48,6 +48,7 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.marketing-launch': '/launch',
   'web.marketing-about': '/about',
   'web.marketing-support': '/support',
+  'web.marketing-integrations': '/integrations',
   'web.developers': '/developers',
   'web.api-versioning-policy': '/api-versioning',
   'web.cli-landing': '/cli',
@@ -235,6 +236,7 @@ web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desk
 web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
 web.marketing-solutions|web|marketing-solutions|apps/web/app/(marketing)/solutions/|desktop,mobile
 web.marketing-support|web|marketing-support|apps/web/app/(marketing)/support/page.tsx|desktop,mobile
+web.marketing-integrations|web|marketing-integrations|apps/web/app/(marketing)/integrations/page.tsx|desktop,mobile
 web.artist-profiles|web|marketing-artist-profiles|apps/web/app/(marketing)/artist-profiles/|desktop,mobile
 web.artist-profile|web|marketing-artist-profile|apps/web/app/(marketing)/artist-profile/page.tsx|desktop,mobile
 web.artist-notifications|web|marketing-artist-notifications|apps/web/app/(marketing)/artist-notifications/page.tsx|desktop,mobile
@@ -284,6 +286,7 @@ web.investor-pipeline|web|investor-pipeline|apps/web/app/app/(shell)/admin/inves
 web.ovie-certifications|web|ovie-certifications|apps/web/app/app/(shell)/admin/certifications/page.tsx|desktop,mobile
 web.ov-hud-shell|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/hud/page.tsx|desktop,mobile
 web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx|desktop,mobile
+web.ov-integrations|web|settings-connectors|apps/web/app/app/(shell)/admin/integrations/page.tsx|desktop,mobile
 web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat-playground/page.tsx,apps/web/app/app/(shell)/admin/chat-playground/layout.tsx|desktop,mobile
 web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/needs-you/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
 web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile

@@ -144,6 +144,29 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('registers integrations while requiring separate public and operator proofs', () => {
+    for (const [path, id] of [
+      [
+        'apps/web/app/(marketing)/integrations/page.tsx',
+        'web.marketing-integrations',
+      ],
+      [
+        'apps/web/app/app/(shell)/admin/integrations/page.tsx',
+        'web.ov-integrations',
+      ],
+    ]) {
+      const result = classifyScreenPath(path);
+      assert.equal(result.kind, 'registered');
+      assert.equal(result.entry.id, id);
+      assert.deepEqual(result.entry.viewports, ['desktop', 'mobile']);
+    }
+    assert.equal(
+      SCREEN_MARKETING_ROUTES['web.marketing-integrations'],
+      '/integrations'
+    );
+    assert.equal(SCREEN_MARKETING_ROUTES['web.ov-integrations'], undefined);
+    assert.equal(SCREEN_PROOF_ROUTES['web.ov-integrations'], undefined);
+  });
   it('keeps canonical profile settings and retained aliases under screen ownership', () => {
     for (const path of [
       'apps/web/app/app/(shell)/settings/profile/page.tsx',

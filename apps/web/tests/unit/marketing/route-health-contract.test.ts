@@ -12,6 +12,22 @@ import {
 } from '@/data/marketing';
 
 describe('marketing route health contract', () => {
+  it('registers the generated integrations directory as a sanctioned reference route', () => {
+    const entry = getRouteManifestEntry('(marketing)/integrations/page.tsx');
+    expect(entry).toMatchObject({
+      url: '/integrations',
+      status: 'active',
+      exempt: {
+        linearId: 'JOV-8012',
+        approvedBy: 'tw',
+        prUrl: 'https://github.com/JovieInc/Jovie/pull/20958',
+      },
+    });
+    expect(getMarketingRouteHealthTarget(entry!)).toMatchObject({
+      path: '/integrations',
+      expected: 'page',
+    });
+  });
   it('keeps the retired /new alias bound to the live homepage redirect', () => {
     const alias = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/new');
     expect(alias).toMatchObject({
