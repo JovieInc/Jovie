@@ -11,6 +11,9 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getAudioChromeSnapshot,
+  type MediaCanvasTransportSnapshot,
+  publishMediaCanvasTransport,
+  registerMediaCanvasTransport,
   resetAudioChromeSnapshot,
 } from '@/components/organisms/audio-chrome-state';
 import {
@@ -90,8 +93,15 @@ vi.mock('@/components/atoms/TruncatedText', () => ({
 }));
 
 vi.mock('@/components/atoms/SeekBar', () => ({
-  SeekBar: (props: { disabled?: boolean }) => (
-    <input type='range' data-testid='seek-bar' disabled={props.disabled} />
+  SeekBar: (props: { disabled?: boolean; onSeek?: (time: number) => void }) => (
+    <input
+      type='range'
+      data-testid='seek-bar'
+      disabled={props.disabled}
+      onChange={event =>
+        props.onSeek?.(Number((event.target as HTMLInputElement).value))
+      }
+    />
   ),
 }));
 
@@ -943,5 +953,150 @@ describe('PersistentAudioBar', () => {
     expect(content.style.transition).toBe('none');
     expect(content.style.transform).toBe('translateY(0)');
     expect(content.style.opacity).toBe('1');
+  });
+
+  describe('media canvas transport (JOV-7240)', () => {
+    const canvasController = {
+      toggle: vi.fn(),
+      seek: vi.fn(),
+      next: vi.fn(),
+      previous: vi.fn(),
+    };
+    let unregisterCanvas: (() => void) | null = null;
+
+    function registerCanvas() {
+      act(() => {
+        unregisterCanvas = registerMediaCanvasTransport(canvasController);
+      });
+    }
+
+    function publishCanvas(
+      overrides: Partial<MediaCanvasTransportSnapshot> = {}
+    ) {
+      act(() => {
+        publishMediaCanvasTransport({
+          title: 'Clip One',
+          index: 0,
+          count: 3,
+          isVideo: true,
+          isPlaying: true,
+          currentTime: 12,
+          duration: 40,
+          hasNext: true,
+          hasPrevious: true,
+          ...overrides,
+        });
+      });
+    }
+
+    beforeEach(() => {
+      unregisterCanvas?.();
+      unregisterCanvas = null;
+      canvasController.toggle.mockClear();
+      canvasController.seek.mockClear();
+      canvasController.next.mockClear();
+      canvasController.previous.mockClear();
+    });
+
+    it('fills the dock with the canvas transport even without an audio track', () => {
+      registerCanvas();
+      render(<PersistentAudioBar />);
+
+      // No published snapshot yet — the dock stays empty.
+      expect(screen.queryByTestId('media-canvas-dock')).toBeNull();
+
+      publishCanvas();
+
+      const rows = screen.getAllByTestId('media-canvas-dock');
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(within(row).getByText('Clip One')).toBeInTheDocument();
+        expect(within(row).getByText('1 / 3')).toBeInTheDocument();
+      }
+    });
+
+    it('wires the dock play/pause, next, and previous controls to the canvas controller', async () => {
+      const user = userEvent.setup();
+      registerCanvas();
+      render(<PersistentAudioBar />);
+      publishCanvas();
+
+      await user.click(
+        screen.getAllByRole('button', { name: 'Pause video' })[0]
+      );
+      await user.click(screen.getAllByRole('button', { name: 'Next Item' })[0]);
+      await user.click(
+        screen.getAllByRole('button', { name: 'Previous Item' })[0]
+      );
+
+      expect(canvasController.toggle).toHaveBeenCalledTimes(1);
+      expect(canvasController.next).toHaveBeenCalledTimes(1);
+      expect(canvasController.previous).toHaveBeenCalledTimes(1);
+    });
+
+    it('wires the dock seek bar to the canvas controller', () => {
+      registerCanvas();
+      render(<PersistentAudioBar />);
+      publishCanvas();
+
+      fireEvent.change(screen.getAllByTestId('seek-bar')[0], {
+        target: { value: '22' },
+      });
+
+      expect(canvasController.seek).toHaveBeenCalledWith(22);
+    });
+
+    it('hides video-only controls for photo items but keeps item stepping', () => {
+      registerCanvas();
+      render(<PersistentAudioBar />);
+      publishCanvas({ isVideo: false, isPlaying: false });
+
+      for (const row of screen.getAllByTestId('media-canvas-dock')) {
+        expect(within(row).getByText('1 / 3 · Photo')).toBeInTheDocument();
+        expect(
+          within(row).queryByRole('button', { name: /video/i })
+        ).toBeNull();
+        expect(
+          within(row).getByRole('button', { name: 'Next Item' })
+        ).toBeInTheDocument();
+        expect(
+          within(row).getByRole('button', { name: 'Previous Item' })
+        ).toBeInTheDocument();
+      }
+      expect(screen.queryByTestId('seek-bar')).toBeNull();
+    });
+
+    it('replaces the audio transport in the dock while the canvas owns playback', () => {
+      setPlaying({ artistName: 'DJ Cool' });
+      registerCanvas();
+      render(<PersistentAudioBar />);
+      publishCanvas();
+
+      expect(screen.queryByTestId('audio-surface-expanded-shell')).toBeNull();
+      expect(screen.getAllByTestId('media-canvas-dock').length).toBeGreaterThan(
+        0
+      );
+      expect(getAudioChromeSnapshot()).toEqual({
+        activeTrackId: 'track-1',
+        compactPlayerVisible: false,
+        fullPlayerVisible: true,
+      });
+    });
+
+    it('clears the dock row when the canvas session unregisters', () => {
+      registerCanvas();
+      render(<PersistentAudioBar />);
+      publishCanvas();
+      expect(screen.getAllByTestId('media-canvas-dock').length).toBeGreaterThan(
+        0
+      );
+
+      act(() => {
+        unregisterCanvas?.();
+        unregisterCanvas = null;
+      });
+
+      expect(screen.queryByTestId('media-canvas-dock')).toBeNull();
+    });
   });
 });

@@ -128,7 +128,7 @@ export function JovieCardLanding() {
         data-marketing-variant='objection-handler' /* copy-lint-allow: objection */
       >
         <FaqSection
-          heading='Jovie Card questions'
+          heading='Questions'
           items={JOVIE_CARD_COPY.faq}
           analyticsEventName='jovie_card_faq_opened'
         />

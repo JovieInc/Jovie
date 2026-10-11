@@ -100,6 +100,15 @@ describe('loadCapabilityEvidence', () => {
     expect(queries[1].params).toContain(false);
   });
 
+  it('binds the profile exposure lookback as an integer day count', async () => {
+    await loadCapabilityEvidence(now);
+    const [condition] = mocks.where.mock.calls[0]!;
+    const query = new PgDialect().sqlToQuery(condition);
+
+    expect(query.sql).toMatch(/current_date - \$\d+::int/);
+    expect(query.params[0]).toBe(7);
+  });
+
   it('keeps missing tables unmeasured and never queries them', async () => {
     mocks.exists.mockResolvedValue(false);
     const result = await loadCapabilityEvidence(now);

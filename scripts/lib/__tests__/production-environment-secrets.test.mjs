@@ -1,5 +1,13 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, resolve } from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 
@@ -78,6 +86,97 @@ describe('production environment secret contract (JOV-7237)', () => {
       'Add the name to .github/production-environment-secrets.json and the Doppler sync, or read it with doppler run'
     ).toEqual([]);
   });
+
+  it.each([
+    { hasApiKey: true, exitCode: 17 },
+    { hasApiKey: false, exitCode: 0 },
+  ])(
+    'injects optional production security credentials and propagates exit $exitCode',
+    ({ hasApiKey, exitCode }) => {
+      const workflow =
+        /** @type {{ jobs: Record<string, { steps: { name?: string, uses?: string, env?: Record<string, string>, run?: string }[] }> }} */ (
+          parseYaml(
+            readFileSync(
+              resolve(WORKFLOW_DIR, 'production-release.yml'),
+              'utf8'
+            )
+          )
+        );
+      const job = workflow.jobs['promote-production'];
+      const step = job.steps.find(
+        step => step.name === 'Security gate before production promotion'
+      );
+      if (!step?.env || !step.run) {
+        throw new Error('Missing production security gate shell step');
+      }
+      expect(step.env.DOPPLER_TOKEN).toBe('${{ secrets.DOPPLER_TOKEN_PRD }}');
+      expect(step.env).not.toHaveProperty('LINEAR_API_KEY');
+      expect(job.steps).toContainEqual({
+        uses: './.github/actions/setup-doppler',
+      });
+
+      const root = mkdtempSync(resolve(tmpdir(), 'production-security-gate-'));
+      try {
+        writeFileSync(
+          resolve(root, 'doppler'),
+          `#!/bin/bash
+set -euo pipefail
+[[ "$*" == 'run --project jovie-web --config prd --only-secrets=LINEAR_API_KEY --no-exit-on-missing-only-secrets --no-fallback -- env -u DOPPLER_TOKEN node scripts/security/security-gate.mjs' ]]
+[[ "$DOPPLER_TOKEN" == 'test-production-token' ]]
+if [[ "$TEST_HAS_API_KEY" == 'true' ]]; then
+  export LINEAR_API_KEY=test-linear-key
+fi
+while [[ "$1" != '--' ]]; do shift; done
+shift
+exec "$@"
+`,
+          { mode: 0o755 }
+        );
+        writeFileSync(
+          resolve(root, 'node'),
+          `#!/bin/bash
+set -euo pipefail
+[[ "$1" == 'scripts/security/security-gate.mjs' ]]
+if [[ "$TEST_HAS_API_KEY" == 'true' ]]; then
+  [[ "$LINEAR_API_KEY" == 'test-linear-key' ]]
+else
+  [[ -z "\${LINEAR_API_KEY+x}" ]]
+fi
+[[ -z "\${DOPPLER_TOKEN+x}" ]]
+[[ "$GH_TOKEN" == 'test-github-token' ]]
+[[ "$SECURITY_GATE_ENABLED" == 'true' ]]
+[[ "$SECURITY_GATE_MODE" == 'production' ]]
+[[ "$SECURITY_GATE_HEAD" == 'test-head' ]]
+exit "$TEST_EXIT_CODE"
+`,
+          { mode: 0o755 }
+        );
+        const result = spawnSync(
+          'bash',
+          ['-e', '-o', 'pipefail', '-c', step.run],
+          {
+            cwd: REPO_ROOT,
+            env: {
+              PATH: `${root}${delimiter}${process.env.PATH}`,
+              DOPPLER_TOKEN: 'test-production-token',
+              GH_TOKEN: 'test-github-token',
+              SECURITY_GATE_ENABLED: 'true',
+              SECURITY_GATE_MODE: 'production',
+              SECURITY_GATE_HEAD: 'test-head',
+              TEST_HAS_API_KEY: String(hasApiKey),
+              TEST_EXIT_CODE: String(exitCode),
+            },
+            encoding: 'utf8',
+            timeout: 5000,
+          }
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.status, result.stderr).toBe(exitCode);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
 
   it('keeps no stale names in the contract', () => {
     expect([...allowed].filter(name => !used.has(name))).toEqual([]);

@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { readFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 export const WRITER_PROOF_SCHEMA = 'jovie-writer-pr-proof/v1'; // JOV-INV-022
 // JOV-INV-029: writer owns review handoff; promotion and activation remain downstream.
@@ -501,9 +501,18 @@ function main(argv) {
   return 2;
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+// Node resolves the loaded module, but argv can retain /tmp or another symlink.
+// Compare filesystem identity so receipt/blocker output cannot silently vanish.
+let directExecution = false;
+if (process.argv[1]) {
+  try {
+    directExecution =
+      realpathSync(fileURLToPath(import.meta.url)) ===
+      realpathSync(process.argv[1]);
+  } catch {
+    // An import with an unavailable argv path must not execute the CLI.
+  }
+}
+if (directExecution) {
   process.exitCode = main(process.argv);
 }

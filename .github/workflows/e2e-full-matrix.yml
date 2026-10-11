@@ -222,6 +222,7 @@ jobs:
         if: ${{ matrix.shard == 1 || github.event_name == 'push' || github.event.inputs.test_filter == '' }}
         id: e2e-matrix
         run: |
+          set -o pipefail
           cd apps/web
           log="$RUNNER_TEMP/e2e-full.log"
           if [ -n "${{ github.event.inputs.test_filter }}" ]; then
