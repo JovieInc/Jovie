@@ -151,19 +151,58 @@ describe('OnboardingShell status', () => {
   it('explains identity recovery without suggesting another handle or a blind retry', () => {
     claimState.value = 'identity-conflict';
     render(<OnboardingShell sessionLabel='pending' />);
-    const alert = screen.getByText(
-      /This Spotify artist already has a Jovie profile/
-    );
+    const alert = screen.getByText(/This artist already has a Jovie profile/);
     expect(alert).toHaveAttribute('role', 'alert');
     expect(alert).toHaveTextContent('Sign in with the original account');
-    expect(alert).toHaveTextContent(
-      'Choosing another handle will not resolve this conflict'
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
+    expect(
+      screen.getByRole('link', { name: 'Sign in with original account' })
+    ).toHaveAttribute('href', '/signin');
+    expect(
+      alert.closest('[data-testid=onboarding-identity-recovery-slot]')
+    ).toBeInTheDocument();
     expect(
       screen.queryByText(
         "We couldn't save your request. Refresh this page to try again."
       )
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps recovery below navigation and above the transcript, using existing logout authority', () => {
+    claimState.value = 'identity-conflict';
+    const logout = vi.fn();
+    render(
+      <OnboardingShell
+        sessionLabel='conflict'
+        isSignedIn
+        onRestart={vi.fn()}
+        onLogout={logout}
+      />
+    );
+    const header = screen.getByTestId('onboarding-sign-in-header');
+    const slot = screen.getByTestId('onboarding-identity-recovery-slot');
+    expect(slot).toContainElement(header);
+    fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Account' }));
+    expect(logout).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Log Out' })).toBeEnabled();
+    expect(screen.queryByRole('link', { name: /claim/i })).toBeNull();
+  });
+
+  it('keeps the existing header when async conflict arrives and opens details only on request', () => {
+    claimState.value = 'idle';
+    const { rerender } = render(<OnboardingShell sessionLabel='stable' />);
+    const slot = screen.getByTestId('onboarding-identity-recovery-slot');
+    claimState.value = 'identity-conflict';
+    rerender(<OnboardingShell sessionLabel='stable' />);
+    expect(screen.getByTestId('onboarding-identity-recovery-slot')).toBe(slot);
+    expect(
+      screen.queryByRole('link', { name: 'Sign in with original account' })
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
+    expect(
+      screen.getByRole('link', { name: 'Sign in with original account' })
+    ).toBeVisible();
   });
 
   it('renders the claim-error status with the error token, not raw red-* (JOV-6773)', () => {
