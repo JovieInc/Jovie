@@ -14,7 +14,25 @@ import { runFactory } from './run';
 import { FACTORY_STAGE_RUNNERS } from './stages';
 import { CONTENT_STAGE_RUNNERS } from './stages-content';
 
-const brief = loadFactoryBrief('solutions', 'founders');
+const legacy = loadFactoryBrief('solutions', 'founders');
+const brief = {
+  ...legacy,
+  media: legacy.media.map(entry => ({
+    ...entry,
+    input: {
+      ...entry.input,
+      editorial: {
+        benefit: 'Explain the tested product action',
+        focalDetail: 'One action',
+        rationale: 'Use the verified capture',
+        fallback: 'Retain the benefit text',
+        alternatives: [
+          { medium: 'video' as const, reason: 'Motion is unnecessary' },
+        ],
+      },
+    },
+  })),
+};
 
 let runsDir: string;
 
@@ -42,6 +60,7 @@ describe('factory:run preflight', () => {
     const manifest = await runFactory({
       family: 'solutions',
       slug: 'founders',
+      brief,
       runsDir,
       providers: liveProviders(transport),
     });
@@ -88,6 +107,7 @@ describe('factory:run preflight', () => {
     const manifest = await runFactory({
       family: 'solutions',
       slug: 'founders',
+      brief,
       runsDir,
       providers: dryProviders(brief, { transport }),
       runners: CONTENT_STAGE_RUNNERS,
