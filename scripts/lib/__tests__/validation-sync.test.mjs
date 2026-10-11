@@ -716,4 +716,40 @@ describe('validation sync: facts', () => {
       /GitHub HTTP 502 for repos\/y/
     );
   });
+
+  it('retries GitHub 5xx with backoff and succeeds on a later attempt', async () => {
+    const seen = [];
+    const github = githubClient(async () => {
+      seen.push('call');
+      return seen.length < 3
+        ? { ok: false, status: 503, json: async () => ({}) }
+        : json({ ok: 1 });
+    }, 'gh_test');
+    expect((await github('repos/JovieInc/Jovie/pulls/15973')).body).toEqual({
+      ok: 1,
+    });
+    expect(seen).toHaveLength(3);
+  });
+
+  it('reports a persistent GitHub 5xx after the bounded attempts', async () => {
+    let calls = 0;
+    const github = githubClient(async () => {
+      calls += 1;
+      return { ok: false, status: 503, json: async () => ({}) };
+    }, 'gh_test');
+    await expect(github('repos/JovieInc/Jovie/pulls/15973')).rejects.toThrow(
+      /GitHub HTTP 503 for repos\/JovieInc\/Jovie\/pulls\/15973/
+    );
+    expect(calls).toBe(4);
+  });
+
+  it('does not retry a GitHub 4xx', async () => {
+    let calls = 0;
+    const github = githubClient(async () => {
+      calls += 1;
+      return { ok: false, status: 404, json: async () => ({}) };
+    }, 'gh_test');
+    await expect(github('repos/x')).rejects.toThrow(/GitHub HTTP 404/);
+    expect(calls).toBe(1);
+  });
 });

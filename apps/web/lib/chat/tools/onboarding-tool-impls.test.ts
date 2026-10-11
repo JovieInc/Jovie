@@ -1,13 +1,20 @@
 import type { UIMessage } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
 import { normalizeArtistMetrics } from '@/lib/onboarding/canonical-metrics';
+import { getSpotifyArtist } from '@/lib/spotify';
 import {
+  buildConfirmSpotifyArtistOutput,
   buildOnboardingTools,
   createOnboardingTurnState,
   deriveOnboardingTurnStateFromMessages,
 } from './onboarding-tool-impls';
 
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/spotify', () => ({
+  getSpotifyArtist: vi.fn(),
+  buildSpotifyArtistUrl: (id: string) =>
+    `https://open.spotify.com/artist/${id}`,
+}));
 
 const confirmedMetrics = normalizeArtistMetrics(
   { spotifyFollowers: 28_000_000 },
@@ -213,5 +220,105 @@ describe('confirmSpotifyArtist tool (JOV-7134)', () => {
       artist: { name: 'David Guetta', followers: 28_000_000 },
     });
     expect(state.spotifyArtistId).toBe('1Cs0zKBU1kc0i8ypK3B9ai');
+  });
+});
+
+describe('confirmed artist field provenance', () => {
+  const id = '1Cs0zKBU1kc0i8ypK3B9ai';
+  const artist = {
+    id,
+    name: 'David Guetta',
+    followers: { total: 28_000_000 },
+    images: [{ url: 'https://i.scdn.co/image/david.jpg', height: 0, width: 0 }],
+    popularity: 84,
+    genres: ['edm'],
+  };
+
+  it('exposes actual server API fixture facts in the structured tool result', async () => {
+    vi.mocked(getSpotifyArtist).mockResolvedValueOnce(artist);
+    const state = createOnboardingTurnState({
+      sessionId: 'source-fixture',
+      turnCount: 1,
+    });
+    const output = await buildConfirmSpotifyArtistOutput(id, state);
+    expect(output.subjectId).toBe(`spotify:artist:${id}`);
+    expect(output.enrichedFacts[0]).toMatchObject({
+      predicate: 'spotify.followers',
+      value: { type: 'number', value: 28_000_000 },
+      verification: 'verified',
+      permission: 'public',
+    });
+    expect(output.enrichedFacts[0].sourceRefs[0]).toMatchObject({
+      kind: 'direct',
+      provider: 'spotify',
+      originUrl: `https://open.spotify.com/artist/${id}`,
+      fetchedAt: output.metrics?.updatedAt,
+    });
+    expect(state.artistMetrics).toEqual(output.metrics);
+  });
+
+  it('rejects wrong-identity API data before it can contaminate the accumulator', async () => {
+    vi.mocked(getSpotifyArtist).mockResolvedValueOnce({
+      ...artist,
+      id: '4Uwpa6zW3zzCSQvooQNksm',
+    });
+    const state = createOnboardingTurnState({
+      sessionId: 'wrong-source',
+      turnCount: 1,
+    });
+    const output = await buildConfirmSpotifyArtistOutput(id, state);
+    expect(output).toMatchObject({
+      artist: null,
+      metrics: null,
+      enrichedFacts: [],
+    });
+    expect(state.spotifyArtistName).toBeNull();
+    expect(state.spotifyFollowers).toBeNull();
+  });
+
+  it('retains truthful unavailable output on absent or failing providers', async () => {
+    for (const failure of [false, true]) {
+      if (failure)
+        vi.mocked(getSpotifyArtist).mockRejectedValueOnce(
+          new Error('fixture unavailable')
+        );
+      else vi.mocked(getSpotifyArtist).mockResolvedValueOnce(null);
+      const output = await buildConfirmSpotifyArtistOutput(
+        id,
+        createOnboardingTurnState({ sessionId: 'missing-source', turnCount: 1 })
+      );
+      expect(output).toMatchObject({
+        artist: null,
+        metrics: null,
+        enrichedFacts: [],
+        subjectId: `spotify:artist:${id}`,
+      });
+    }
+  });
+
+  it('echoes returning-session retrieval date and exact identity without a new provider lookup', async () => {
+    const state = createOnboardingTurnState({
+      sessionId: 'returning-source',
+      turnCount: 2,
+      messages: [assistantMessage],
+    });
+    const callsBefore = vi.mocked(getSpotifyArtist).mock.calls.length;
+    const output = await buildOnboardingTools(
+      state
+    ).confirmSpotifyArtist.execute?.(
+      { spotifyArtistId: 'invented-id' },
+      {} as never
+    );
+    expect(output).toMatchObject({
+      subjectId: `spotify:artist:${id}`,
+      enrichedFacts: [
+        {
+          status: 'stale',
+          verification: 'unverified',
+          sourceRefs: [{ fetchedAt: confirmedMetrics.updatedAt }],
+        },
+      ],
+    });
+    expect(vi.mocked(getSpotifyArtist).mock.calls.length).toBe(callsBefore);
   });
 });

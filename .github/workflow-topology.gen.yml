@@ -250,7 +250,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 62
+    jobCount: 63
   - name: Claude Review (gbrain-aware)
     path: .github/workflows/claude-review.yml
     active: true
@@ -1251,9 +1251,10 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - push
+      - schedule
       - workflow_dispatch
     terminalReceipt: job:workflow-execution-posture
-    jobCount: 6
+    jobCount: 8
   - name: Sentry Autofix Recurrence
     path: .github/workflows/sentry-autofix-recurrence.yml
     active: true

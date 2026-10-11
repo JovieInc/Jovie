@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 
 import {
   assertOfficialSymphonyFeed,
+  bridgeSelectedIssueToLanes,
+  bridgeSelectedToLanes,
   buildRemediationReceipt,
   CAPACITY_MAX_AGE_MS,
   CAPACITY_SCHEMA,
@@ -23,7 +25,9 @@ import {
   feedOfficialSymphony,
   findWorkpadComment,
   inventoryBacklog,
+  isErroredPullRequest,
   OFFICIAL_SYMPHONY_REFRESH_URL,
+  pullRequestRates,
   REMEDIATION_SCHEMA,
   readHostPressure,
   readLanesCapacity,
@@ -114,6 +118,59 @@ function receiptFor(issues, options = {}) {
 }
 
 describe('official Symphony backlog remediation', () => {
+  it('keeps draft PRs in the issue attribution so a draft-only issue is not PR-less', () => {
+    // JOV-8000 follow-up 9 (a)1: the collector keeps drafts in the inventory
+    // (only pullRequestRates excludes them); inventoryBacklog maps them, so
+    // an issue whose only open PR is a draft still has an open PR and is not
+    // re-selected, and a duplicate PR row does not split the issue.
+    const draftOnly = inventoryBacklog([issue('JOV-30')], {
+      pullRequests: [
+        {
+          number: 7,
+          state: 'OPEN',
+          title: 'fix JOV-30',
+          headRefName: 'symphony/JOV-30',
+          body: 'JOV-30',
+          isDraft: true,
+          mergeStateStatus: 'DIRTY',
+          mergeable: false,
+          labels: [],
+        },
+      ],
+    });
+    assert.deepEqual(draftOnly.rows[0].openPullRequests, [7]);
+    const splitCheck = inventoryBacklog([issue('JOV-31')], {
+      pullRequests: [
+        {
+          number: 8,
+          state: 'OPEN',
+          title: 'fix JOV-31',
+          headRefName: 'symphony/JOV-31',
+          body: 'JOV-31',
+          isDraft: false,
+          mergeable: true,
+          mergeStateStatus: 'CLEAN',
+          labels: [],
+        },
+        {
+          number: 8,
+          state: 'OPEN',
+          title: 'fix JOV-31 (duplicate row)',
+          headRefName: 'symphony/JOV-31',
+          body: 'JOV-31',
+          isDraft: false,
+          mergeable: true,
+          mergeStateStatus: 'CLEAN',
+          labels: [],
+        },
+      ],
+    });
+    // Defense in depth (follow-up 10): inventoryBacklog dedupes by PR
+    // number while building byIssue, so duplicated rows never split the
+    // issue — one entry per PR.
+    assert.deepEqual(splitCheck.rows[0].openPullRequests, [8]);
+  });
+
   it('inventories Linear issues against open and merged GitHub PRs', () => {
     const inventory = inventoryBacklog(
       [
@@ -169,15 +226,23 @@ describe('official Symphony backlog remediation', () => {
     for (const candidate of [
       issue('JOV-19', { title: 'Founder steering on brand voice' }),
       issue('JOV-20', { labels: ['needs-decision', 'needs:taste'] }),
-      issue('JOV-18', {
-        title: 'Founder steering on visual identity',
-        assignee: { id: 'tim', name: 'Tim White' },
-      }),
     ]) {
       const result = classifyRemediationCandidate(candidate, { now: NOW });
       assert.equal(result.selected, true, result.reason);
       assert.notEqual(result.reason, 'human-taste-or-steering');
     }
+    // Symphony Owner 2026-10-10: an ASSIGNED issue (founder-steering or
+    // otherwise) is one the bridge can't hand off, so it is excluded at
+    // selection — the slot goes to the next eligible issue.
+    const assigned = classifyRemediationCandidate(
+      issue('JOV-18', {
+        title: 'Founder steering on visual identity',
+        assignee: { id: 'tim', name: 'Tim White' },
+      }),
+      { now: NOW }
+    );
+    assert.equal(assigned.selected, false);
+    assert.equal(assigned.reason, 'not-handoffable:assigned');
     assert.doesNotMatch(MODULE, /human-taste-or-steering/);
 
     /** @type {Array<[object, string]>} */
@@ -344,6 +409,257 @@ describe('official Symphony backlog remediation', () => {
       { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
     );
     assert.equal(conflicts.reason, 'pr-conflict-rate-high');
+
+    // JOV-8000 follow-up 9: auditable rates — the population excludes drafts
+    // and label-quarantined rows (queue-poison, hold; `gated` stays counted),
+    // BEHIND is not a conflict, UNKNOWN never counts as conflicting/clean/
+    // errored, and the rates list PR numbers with the excluded breakdown.
+    const fleet = [
+      {
+        number: 1,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: false,
+        mergeStateStatus: 'DIRTY',
+      },
+      {
+        number: 2,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 3,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'BEHIND',
+      },
+      {
+        number: 4,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'UNSTABLE',
+        statusCheckRollup: { state: 'SUCCESS' },
+      },
+      {
+        number: 5,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: true,
+        mergeStateStatus: 'UNSTABLE',
+        statusCheckRollup: { state: 'FAILURE' },
+      },
+      {
+        number: 6,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: 'UNKNOWN',
+        mergeStateStatus: 'UNKNOWN',
+      },
+      {
+        number: 7,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [{ name: 'queue-poison' }],
+        mergeable: false,
+        mergeStateStatus: 'DIRTY',
+      },
+      {
+        number: 8,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [{ name: 'hold' }],
+        mergeable: true,
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 9,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [{ name: 'gated' }],
+        mergeable: true,
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 10,
+        state: 'OPEN',
+        isDraft: true,
+        labels: [],
+        mergeable: false,
+        mergeStateStatus: 'DIRTY',
+      },
+    ];
+    const auditable = pullRequestRates(fleet);
+    assert.equal(auditable.total, 7);
+    assert.deepEqual(auditable.conflictingPullRequests, [1]);
+    assert.deepEqual(auditable.erroredPullRequests, [5]);
+    assert.deepEqual(auditable.unknownPullRequests, [6]);
+    assert.deepEqual(auditable.excluded.draft, [10]);
+    assert.deepEqual(auditable.excluded.quarantined, [7, 8]);
+    assert.equal(auditable.conflictRate, 1 / 7);
+    assert.equal(auditable.errorRate, 1 / 7);
+    // Error definition: UNSTABLE with a SUCCESS rollup is NOT errored;
+    // rollup FAILURE IS errored regardless of mergeStateStatus.
+    assert.equal(isErroredPullRequest(fleet[3]), false);
+    assert.equal(isErroredPullRequest(fleet[4]), true);
+    assert.equal(isErroredPullRequest({ mergeStateStatus: 'UNSTABLE' }), false);
+    assert.equal(
+      isErroredPullRequest({ statusCheckRollup: { state: 'FAILURE' } }),
+      true
+    );
+    assert.equal(
+      isErroredPullRequest({ reviewDecision: 'CHANGES_REQUESTED' }),
+      false
+    );
+    // UNKNOWN rows fail the gate closed above a 20% share, never silently
+    // counted as clean or conflicting.
+    const unknownHeavy = evaluateRuntimeCapacity(
+      healthySignals({
+        pullRequests: [
+          {
+            number: 1,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 2,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'UNKNOWN',
+            mergeStateStatus: 'UNKNOWN',
+          },
+          {
+            number: 3,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'UNKNOWN',
+            mergeStateStatus: 'UNKNOWN',
+          },
+        ],
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(unknownHeavy.reason, 'pr-mergeability-unknown');
+    // Follow-up 10: a missing rollup fetch NEVER reads as zero errored —
+    // the prRollups:false signal fails the gate closed with the named cause.
+    const rollupMissing = evaluateRuntimeCapacity(
+      healthySignals({
+        pullRequests: [
+          {
+            number: 1,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'MERGEABLE',
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 2,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'MERGEABLE',
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 3,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'MERGEABLE',
+            mergeStateStatus: 'CLEAN',
+          },
+        ],
+        prRollups: false,
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(rollupMissing.allowed, false);
+    assert.equal(rollupMissing.reason, 'pr-check-rollup-unavailable');
+    // mergeable CONFLICTING counts as a conflict even with a CLEAN
+    // mergeStateStatus (gh computes mergeable as MERGEABLE/CONFLICTING/UNKNOWN).
+    const mergeableConflicting = pullRequestRates([
+      {
+        number: 1,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: 'CONFLICTING',
+        mergeStateStatus: 'CLEAN',
+      },
+      {
+        number: 2,
+        state: 'OPEN',
+        isDraft: false,
+        labels: [],
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+      },
+    ]);
+    assert.deepEqual(mergeableConflicting.conflictingPullRequests, [1]);
+    assert.equal(mergeableConflicting.conflictRate, 0.5);
+    const unknownLight = evaluateRuntimeCapacity(
+      healthySignals({
+        pullRequests: [
+          {
+            number: 1,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 2,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: 'UNKNOWN',
+            mergeStateStatus: 'UNKNOWN',
+          },
+          {
+            number: 3,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 4,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+          {
+            number: 5,
+            state: 'OPEN',
+            isDraft: false,
+            labels: [],
+            mergeable: true,
+            mergeStateStatus: 'CLEAN',
+          },
+        ],
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.notEqual(unknownLight.reason, 'pr-mergeability-unknown');
 
     const missing = evaluateRuntimeCapacity(
       { schema: CAPACITY_SCHEMA, observedAt: NOW },
@@ -671,6 +987,9 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
       assert.deepEqual(capacity.provider, { accounts: 5, ready: 4 });
       assert.equal(capacity.source, 'lanes-doctor-report');
       assert.equal(typeof capacity.observedAt, 'string');
+      // The doctor's per-issue rejection reasons ride the capacity read so
+      // the remediator can log route-held / over-budget without host access.
+      assert.deepEqual(capacity.rejectedIssues, {});
       const required = evaluateRuntimeCapacity(
         {
           schema: CAPACITY_SCHEMA,
@@ -778,5 +1097,352 @@ describe('lanes-measured capacity evidence (JOV-8000)', () => {
       retrying: 0,
       maxConcurrent: 3,
     });
+  });
+  it('carries the doctor per-issue rejectedIssues through the capacity read', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lanes-capacity-rejected-'));
+    try {
+      writeReport(
+        dir,
+        lanesDoctorReport({
+          rejectedIssues: {
+            'JOV-6269': 'route-held:frontier',
+            'JOV-100': 'over-budget',
+          },
+        }),
+        30_000
+      );
+      const capacity = readLanesCapacity({ lanesStateDir: dir, nowMs: NOW_MS });
+      assert.deepEqual(capacity.rejectedIssues, {
+        'JOV-6269': 'route-held:frontier',
+        'JOV-100': 'over-budget',
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('selection exclusions for shipped and unhandoffable work (JOV-8000 follow-up 42)', () => {
+  it('excludes an issue whose work already shipped (a merged PR carries its id) and selects the next candidate', () => {
+    const shipped = issue('JOV-6022');
+    const next = issue('JOV-7000');
+    const built = receiptFor([shipped, next], {
+      pullRequests: [
+        {
+          number: 17244,
+          state: 'MERGED',
+          mergedAt: NOW,
+          title: 'ship it',
+          body: 'linear-issue-id:JOV-6022',
+        },
+      ],
+    });
+    const byId = Object.fromEntries(
+      built.matrix.map(item => [item.identifier, item])
+    );
+    assert.equal(byId['JOV-6022'].outcome, 'superseded');
+    assert.equal(byId['JOV-6022'].reason, 'merged-pr-still-open-in-linear');
+    assert.deepEqual(
+      built.cohort.selected.map(item => item.identifier),
+      ['JOV-7000']
+    );
+  });
+
+  it('excludes an assigned issue at selection so the bridge never sees it', () => {
+    const assigned = issue('JOV-7001', {
+      assignee: { id: 'u1', name: 'Someone' },
+    });
+    const eligible = issue('JOV-7002');
+    const built = receiptFor([assigned, eligible], {
+      capacitySignals: healthySignals({
+        workers: { running: 0, retrying: 0, maxConcurrent: 4 },
+      }),
+    });
+    const byId = Object.fromEntries(
+      built.matrix.map(item => [item.identifier, item])
+    );
+    assert.equal(byId['JOV-7001'].outcome, 'blocked');
+    assert.equal(byId['JOV-7001'].reason, 'already-assigned');
+    assert.deepEqual(
+      built.cohort.selected.map(item => item.identifier),
+      ['JOV-7002']
+    );
+  });
+
+  it('the bridge handoff guard and the selection guard are the same function', async () => {
+    const { selectionHandoffExclusion } = await import(
+      '../backlog-remediation.mjs'
+    );
+    const assigned = issue('JOV-7003', {
+      assignee: { id: 'u1', name: 'Someone' },
+    });
+    assert.equal(selectionHandoffExclusion(assigned), 'assigned');
+    assert.equal(
+      selectionHandoffExclusion(issue('JOV-7004', { state: 'In Progress' })),
+      'not-todo'
+    );
+    assert.equal(
+      selectionHandoffExclusion(issue('JOV-7005', { labels: ['protected'] })),
+      'protected-label'
+    );
+    assert.equal(selectionHandoffExclusion(issue('JOV-7006')), null);
+  });
+});
+
+describe('capacity workers observability (JOV-8000 follow-up 40)', () => {
+  it('carries measured worker running/max/source/observedAt onto the receipt', () => {
+    const built = buildRemediationReceipt({
+      issues: [],
+      pullRequests: [],
+      mainSha: MAIN,
+      capacitySignals: healthySignals({
+        workers: { running: 2, retrying: 0, maxConcurrent: 4 },
+        workersSource: 'lanes-doctor-report',
+        workersObservedAt: '2026-10-10T15:00:00.000Z',
+      }),
+      previousCleanStreak: CLEAN_STREAK_REQUIRED,
+      now: NOW,
+    });
+    assert.deepEqual(built.workers, {
+      running: 2,
+      maxConcurrent: 4,
+      source: 'lanes-doctor-report',
+      observedAt: '2026-10-10T15:00:00.000Z',
+    });
+  });
+
+  it('a fresh doctor report with running==maxConcurrent still yields workers-saturated and the counts on the line', () => {
+    const gate = evaluateRuntimeCapacity(
+      healthySignals({
+        workers: { running: 4, retrying: 0, maxConcurrent: 4 },
+        workersSource: 'lanes-doctor-report',
+        workersObservedAt: NOW,
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(gate.allowed, false);
+    assert.equal(gate.reason, 'workers-saturated');
+    assert.equal(gate.remaining, 0);
+  });
+
+  it('a stale/absent workers signal fails closed as capacity-evidence missing (workers)', () => {
+    const missing = evaluateRuntimeCapacity(
+      { schema: CAPACITY_SCHEMA, observedAt: NOW },
+      { now: NOW }
+    );
+    assert.match(
+      missing.reason,
+      /capacity-evidence-missing-malformed-or-stale/
+    );
+    assert.ok(missing.gaps.includes('workers'));
+  });
+});
+
+describe('selected-to-lanes bridge (JOV-8000 follow-up 38)', () => {
+  const AGENT_READY = { id: 'label-agent-ready', name: 'agent-ready' };
+  const TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
+
+  function selectedIssue(overrides = {}) {
+    return {
+      id: 'id-JOV-100',
+      identifier: 'JOV-100',
+      title: 'Repair one controller edge',
+      description: SAFE_DESCRIPTION,
+      createdAt: '2026-08-20T00:00:00.000Z',
+      updatedAt: '2026-08-30T00:00:00.000Z',
+      priority: 3,
+      state: { name: 'Todo' },
+      assignee: null,
+      labels: { nodes: [{ id: 'label-bug', name: 'bug' }] },
+      comments: { nodes: [] },
+      ...overrides,
+    };
+  }
+
+  function fakeClient(
+    issue,
+    calls = { updates: [], comments: [], fetches: 0 }
+  ) {
+    return {
+      calls,
+      async fetchIssue() {
+        calls.fetches += 1;
+        return issue;
+      },
+      async fetchTeamLabel(_team, name) {
+        return name === 'agent-ready' ? AGENT_READY : null;
+      },
+      async updateIssue(id, input) {
+        calls.updates.push({ id, input });
+        return { issueUpdate: { success: true } };
+      },
+      async addComment(id, body) {
+        calls.comments.push({ id, body });
+        return { commentCreate: { success: true } };
+      },
+    };
+  }
+
+  it('bridges a clean selected Todo issue: one updateIssue, labels preserved, one marker comment', async () => {
+    const issue = selectedIssue();
+    const client = fakeClient(issue);
+    const receipt = await bridgeSelectedIssueToLanes({
+      issue,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.equal(receipt.outcome, 'bridged');
+    assert.equal(client.calls.updates.length, 1);
+    // existing label ids preserved, agent-ready appended
+    assert.deepEqual(client.calls.updates[0].input.labelIds.sort(), [
+      'label-agent-ready',
+      'label-bug',
+    ]);
+    assert.equal(client.calls.comments.length, 1);
+    assert.match(
+      client.calls.comments[0].body,
+      /<!-- symphony-backlog-remediation\/bridge v1 fp=[0-9a-f]{24} -->/
+    );
+  });
+
+  it('no write when agent-ready already exists', async () => {
+    const issue = selectedIssue({
+      labels: { nodes: [{ id: 'label-agent-ready', name: 'agent-ready' }] },
+    });
+    const client = fakeClient(issue);
+    const receipt = await bridgeSelectedIssueToLanes({
+      issue,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.equal(receipt.outcome, 'already-ready');
+    assert.equal(client.calls.updates.length, 0);
+    // marker still posted once
+    assert.equal(client.calls.comments.length, 1);
+  });
+
+  it('skips with a named reason when assigned, wrong state, or protected', async () => {
+    // assigned
+    const assigned = selectedIssue({
+      assignee: { id: 'tim', name: 'Tim White' },
+    });
+    let client = fakeClient(assigned);
+    let receipt = await bridgeSelectedIssueToLanes({
+      issue: assigned,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.equal(receipt.outcome, 'skipped:assigned');
+    assert.equal(client.calls.updates.length, 0);
+    // wrong state
+    const inProgress = selectedIssue({ state: { name: 'In Progress' } });
+    client = fakeClient(inProgress);
+    receipt = await bridgeSelectedIssueToLanes({
+      issue: inProgress,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.match(receipt.outcome, /^skipped:not-todo$/);
+    assert.equal(client.calls.updates.length, 0);
+    // protected label
+    const protectedIssue = selectedIssue({
+      labels: { nodes: [{ id: 'l', name: 'protected' }] },
+    });
+    client = fakeClient(protectedIssue);
+    receipt = await bridgeSelectedIssueToLanes({
+      issue: protectedIssue,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.equal(receipt.outcome, 'skipped:protected-label');
+    assert.equal(client.calls.updates.length, 0);
+    assert.equal(client.calls.comments.length, 0);
+  });
+
+  it('skips when a protected-policy label trips pre-admission (e.g. no-symphony)', async () => {
+    const noSymphony = selectedIssue({
+      labels: { nodes: [{ id: 'l2', name: 'no-symphony' }] },
+    });
+    const client = fakeClient(noSymphony);
+    const receipt = await bridgeSelectedIssueToLanes({
+      issue: noSymphony,
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: {},
+    });
+    assert.equal(receipt.outcome, 'skipped:protected-label');
+    assert.equal(client.calls.updates.length, 0);
+  });
+
+  it('skips when the issue already has an open PR', async () => {
+    const client = fakeClient(selectedIssue());
+    const receipt = await bridgeSelectedIssueToLanes({
+      issue: selectedIssue(),
+      client,
+      agentReadyLabel: AGENT_READY,
+      inventory: { 'JOV-100': { openPullRequests: [555] } },
+    });
+    assert.equal(receipt.outcome, 'skipped:existing-open-pr');
+    assert.equal(client.calls.updates.length, 0);
+  });
+
+  it('an empty cohort makes zero Linear calls', async () => {
+    let touched = 0;
+    const client = {
+      async fetchIssue() {
+        touched += 1;
+      },
+      async fetchTeamLabel() {
+        touched += 1;
+      },
+    };
+    const receipt = await bridgeSelectedToLanes({
+      cohort: { selected: [] },
+      client,
+      teamId: TEAM_ID,
+    });
+    assert.equal(receipt.enabled, true);
+    assert.equal(receipt.calls, 0);
+    assert.deepEqual(receipt.bridged, []);
+    assert.equal(touched, 0);
+  });
+
+  it('the kill-switch env flag disables the bridge with zero calls', async () => {
+    let touched = 0;
+    const client = {
+      async fetchIssue() {
+        touched += 1;
+      },
+      async fetchTeamLabel() {
+        touched += 1;
+      },
+    };
+    const receipt = await bridgeSelectedToLanes({
+      cohort: { selected: [selectedIssue()] },
+      client,
+      teamId: TEAM_ID,
+      env: { JOVIE_BRIDGE_LANES: '0' },
+    });
+    assert.equal(receipt.enabled, false);
+    assert.equal(touched, 0);
+  });
+
+  it('bridges the selected set end-to-end and records per-issue receipts', async () => {
+    const client = fakeClient(selectedIssue());
+    const receipt = await bridgeSelectedToLanes({
+      cohort: { selected: [selectedIssue()] },
+      client,
+      teamId: TEAM_ID,
+      inventory: {},
+      env: {},
+    });
+    assert.equal(receipt.schema, 'symphony-bridge-lanes/v1');
+    assert.equal(receipt.bridged.length, 1);
+    assert.equal(receipt.bridged[0].outcome, 'bridged');
   });
 });

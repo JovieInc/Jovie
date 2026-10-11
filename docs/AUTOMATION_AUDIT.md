@@ -127,7 +127,7 @@ until the observer-only definition lands and is proven.
 | **Sentry Error Gate** | `sentry-error-gate.yml` | Reusable `workflow_call` | 5-minute soak watching Sentry for error spikes post-deploy; triggers rollback if spike detected | Called by deploy flow | **Keep** |
 | **Canary Health Gate** | `canary-health-gate.yml` | Reusable `workflow_call` | Verifies staging health before production promotion | Called by CI deploy flow | **Keep** |
 | **CodeQL** | `codeql.yml` | `push: main`, `36 5 * * *` UTC, manual | GitHub-native static analysis security scan | Post-merge + nightly | **Keep** |
-| **Security** | `security.yml` | `push: main`, `5 6 * * *` UTC, manual | Additional security scanning | Post-merge + nightly | **Keep** |
+| **Security** | `security.yml` | `push: main`, `0 14 * * 1` UTC (upstream-advisory), manual | Additional security scanning | Post-merge + weekly baseline | **Keep** |
 | **SonarCloud** | `sonarcloud.yml` | `0 7 * * *` UTC + manual | Code quality + security analysis | Nightly | **Keep** |
 | **Actionlint** | `actionlint.yml` | Push/PR | Lints `.github/workflows/*.yml` for errors | Per-PR | **Keep** |
 | **Desktop Release** | `desktop-release.yml` | Push/tag | Electron app build and auto-update CI | Per-release | **Keep** |

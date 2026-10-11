@@ -211,17 +211,17 @@ function renderOrderBlock(order) {
  * A founder-decision work order Summer turns into one Ovie card (JOV-7739).
  * Every field derives from the whois record, so reruns write the same digest
  * and Summer replays the same card. A record change (renewal, hold, new
- * nameservers) is a material change and asks again.
+ * nameservers) is a material change and asks again. The anchor pins to the
+ * founder-window start so the order is identical whether the issue files at
+ * the remediation tier (45 days out) or inside the founder window.
  */
 export function founderOrder(record, evaluation, nowMs) {
   const expiryMs = record.expiresAt ? Date.parse(record.expiresAt) : null;
   const windowStart =
     expiryMs === null ? null : expiryMs - FOUNDER_DAYS * DAY_MS;
   const anchorMs =
-    windowStart !== null && windowStart <= nowMs && evaluation.daysLeft >= 0
-      ? windowStart
-      : Date.parse(record.updatedAt ?? '') ||
-        Math.floor(nowMs / DAY_MS) * DAY_MS;
+    windowStart ??
+    (Date.parse(record.updatedAt ?? '') || Math.floor(nowMs / DAY_MS) * DAY_MS);
   const createdAt = new Date(anchorMs).toISOString();
   const deadline = new Date(
     Math.max(expiryMs ?? 0, anchorMs + 7 * DAY_MS)
@@ -311,7 +311,12 @@ export function founderOrder(record, evaluation, nowMs) {
   });
 }
 
-/** One remediation plan per alarming domain, fingerprint `domain-expiry:<domain>`. */
+/**
+ * One remediation plan per alarming domain, fingerprint
+ * `domain-expiry:<domain>`. Every alarm resolves at the registrar account,
+ * which only the founder holds, so each filing carries the founder work
+ * order; the founder tier only raises the Linear priority.
+ */
 export function planDomainExpiry(record, nowMs) {
   const evaluation = evaluateDomain(record, nowMs);
   if (evaluation.tier === 'ok' || evaluation.tier === 'unobserved') return null;
@@ -328,8 +333,8 @@ export function planDomainExpiry(record, nowMs) {
   const description = [
     `${record.domain}: ${evaluation.alarms.join('; ')}.`,
     ...facts,
-    `Filed under ${REMEDIATION_DAYS} days or on parking nameservers or a non-ok status; under ${FOUNDER_DAYS} days or on any parking/status alarm it carries a founder work order for an Ovie card.`,
-    founder ? renderOrderBlock(founderOrder(record, evaluation, nowMs)) : null,
+    `Filed under ${REMEDIATION_DAYS} days or on parking nameservers or a non-ok status. Renewal and nameserver repair need the registrar account only the founder holds, so every filing carries a founder work order for an Ovie card; under ${FOUNDER_DAYS} days or on any parking/status alarm the issue also files at founder priority.`,
+    renderOrderBlock(founderOrder(record, evaluation, nowMs)),
     `Fingerprint: \`${fingerprint}\``,
   ]
     .filter(Boolean)
