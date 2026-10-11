@@ -1,0 +1,11 @@
+LYB-102 is not code-shippable from this Jovie lane.
+
+- Root cause: transient Vercel upload failure (`fetch failed` / `AbortError`) after all lint, typecheck, tests, build, migrations, and prebuild steps passed.
+- Recovery attempt: `gh run rerun --failed` was rejected with `Resource not accessible by integration`.
+- The LogYourBody Deploy workflow is push-only and has no manual dispatch fallback.
+- No newer Deploy run exists; [run 37718249876](https://github.com/JovieInc/LogYourBody/actions/runs/37718249876) remains red at attempt 1.
+- Jovie branch matches `origin/main` exactly and remains clean.
+- No tests, commit, push, or PR were created because an unrelated Jovie change would not repair the LogYourBody deployment.
+- GBrain was unavailable.
+
+NOT-SHIPPABLE: the failure is a transient deployment operation in JovieInc/LogYourBody, while this contract only permits a JovieInc/Jovie PR and the available GitHub integration cannot rerun the failed workflow.
