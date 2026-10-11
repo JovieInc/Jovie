@@ -14,6 +14,11 @@ RAMP_INTERVAL_S = 300  # surge ramp: proven demand > 2x seats doubles toward dem
 MAINTENANCE_DEMAND_STALE_S = 240
 # A saturated lane keeps its last positive census this long (one lane agent timeout, 5400 s).
 BUSY_DEMAND_STALE_S = 5400
+# Run failures pressure capacity only while current (Tim 2026-10-11). The doctor's failed-runs
+# alert is a 24 h trailing diagnostic: failures from bugs fixed hours earlier froze every lane.
+# Only runs on the installed release count, as a rate over the latest completed runs, so a fix
+# (new release) or successful runs clear it at once and real current failures still back off.
+FAILURE_RATE_RUNS, FAILURE_RATE_MIN, FAILURE_RATE_MIN_COUNT, LEDGER_TAIL_BYTES = 8, 0.5, 2, 1024 * 1024
 _OFF, _OBSERVE, _APPLY = frozenset({"0", "off", "false"}), frozenset({"observe", "shadow"}), frozenset({"1", "on", "true", "apply"})
 _AVG10, _PSI = re.compile(r"avg10=([0-9.]+)"), ("cpuSomeAvg10", "memoryFullAvg10", "ioFullAvg10")
 _HARD_REASONS = ("over-budget", "terminal-pr-backlog", "provider-disabled", "pr-inventory-unavailable")
@@ -160,6 +165,41 @@ def _linear_budget_observation(api: dict, now: float) -> dict:
             "linearBudgetFresh": observed is not None and 0 <= now - observed <= STALE_S}
 
 
+def release_installed_at(state_dir: Path) -> float | None:
+    """When the running release generation was activated: the `current` symlink's own mtime."""
+    try:
+        return os.lstat(Path(state_dir) / "current").st_mtime
+    except OSError:
+        return None
+def current_run_failures(state_dir: Path) -> dict | None:
+    """Failed / completed among the latest runs that started on the installed release; None when
+    the ledger is unreadable."""
+    since = release_installed_at(state_dir) or 0.0
+    try:
+        with open(Path(state_dir) / "runs" / "ledger.jsonl", "rb") as handle:
+            handle.seek(0, os.SEEK_END); size = handle.tell(); handle.seek(max(0, size - LEDGER_TAIL_BYTES))
+            lines = handle.read().decode(errors="replace").splitlines()[1 if size > LEDGER_TAIL_BYTES else 0:]
+    except FileNotFoundError:
+        lines = []
+    except OSError:
+        return None
+    runs = []
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict) or not isinstance(row.get("verdict"), str):
+            continue
+        began = _epoch(row.get("startedAt")) or _epoch(row.get("endedAt"))
+        if began is not None and began >= since:
+            runs.append((_epoch(row.get("endedAt")) or began, row["verdict"] == "failed"))
+    latest = [failed for _, failed in sorted(runs)[-FAILURE_RATE_RUNS:]]
+    return {"failed": sum(latest), "runs": len(latest), "releaseInstalledAt": since or None}
+def _failures_current(obs: dict) -> bool:
+    row = _obj(obs.get("currentRunFailures"))
+    failed, runs = _count(row.get("failed")), _count(row.get("runs"))
+    return bool(runs) and failed is not None and failed >= FAILURE_RATE_MIN_COUNT and failed / runs >= FAILURE_RATE_MIN
 def collect(state_dir: Path, tick: dict, now: float) -> dict:
     """Local files only: no GitHub or Linear calls."""
     root, doctor = Path(state_dir), _obj(_read_json(Path(state_dir) / "doctor.json")); observed, stamp, feed = _obj(doctor.get("observed")), None, None
@@ -212,6 +252,7 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
             "codexUnleasedAvailable": _int(attribution.get("unleasedAvailable")),
             "productiveRunRate": productive, "starts": starts,
             "alerts": [key for key in _obj(doctor.get("alerts")) if isinstance(key, str)],
+            "currentRunFailures": current_run_failures(root),
             "gateWaitMedianS24h": observed.get("gateWaitMedianS24h"),
             "githubRemaining": _int(observed.get("githubRemaining")),
             **_linear_budget_observation(api, now),
@@ -290,7 +331,7 @@ def _additive_reason(obs: dict, sample: dict) -> str | None:
     if (load is not None and load >= LOAD_DECREASE_MIN) or (mem is not None and mem < MEM_HEADROOM_BYTES) or (free is not None and free < DISK_SOFT):
         return "host-pressure"
     alerts, gate = set(obs.get("alerts") or []), _num(obs.get("gateWaitMedianS24h"))
-    if "failed-runs" in alerts or "gate-timeouts" in alerts or (gate is not None and gate > GATE_WAIT_DECREASE):
+    if _failures_current(obs) or "gate-timeouts" in alerts or (gate is not None and gate > GATE_WAIT_DECREASE):
         return "gate-pressure"
     return None
 def _throughput_brake(previous: dict, obs: dict, now: float, interval: int) -> dict:
@@ -328,7 +369,7 @@ def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
         (name == "codex" and (unleased is None or unleased < 1), "codex-unleased"),
         (running is None or running < 0, "unknown-running"),
         (starts is not None and starts >= PRODUCTIVE_MIN_STARTS and (_num(rate) is None or rate < PRODUCTIVE_MIN), "low-productive-rate"),
-        ("failed-runs" in alerts or "gate-timeouts" in alerts, "gate-pressure"),
+        (_failures_current(obs) or "gate-timeouts" in alerts, "gate-pressure"),
         (gate is not None and (_num(gate) is None or gate >= GATE_WAIT_INCREASE_MAX), "gate-wait"),
         (load is None or load >= LOAD_INCREASE_MAX, "high-load"),
         (mem is None or _num(mem) is None or mem < MEM_HEADROOM_BYTES, "low-mem"),
