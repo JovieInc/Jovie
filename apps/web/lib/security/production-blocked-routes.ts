@@ -31,10 +31,21 @@ export const PRODUCTION_BLOCKED_PAGE_EXACT = [
 
 /**
  * Production builds used by the Product Screenshots workflow still capture a
- * few legacy experiment fixtures. Keep the inventory exact so the proxy can
+ * few legacy experiment fixtures and the composed-shell /demo routes that
+ * route-dom-certification measures (JOV-7710). Keep the inventory exact so the proxy can
  * allow only screenshot automation without reopening all /exp routes.
  */
-export const PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS = ['/exp/shell-v1'] as const;
+export const PRODUCT_SCREENSHOT_CAPTURE_PAGE_PATHS = [
+  '/demo',
+  '/demo/audience',
+  '/demo/showcase/analytics',
+  '/demo/showcase/earnings',
+  '/demo/showcase/links',
+  '/demo/showcase/release-tracked-links',
+  '/demo/showcase/releases',
+  '/demo/showcase/settings',
+  '/exp/shell-v1',
+] as const;
 
 /**
  * Routes that intentionally stay reachable outside development.
