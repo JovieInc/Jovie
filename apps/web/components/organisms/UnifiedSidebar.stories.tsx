@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { withSignedInSession } from '@/.storybook/signed-in-session';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
@@ -16,6 +17,7 @@ import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { queryKeys } from '@/lib/queries/keys';
+import { AppShellFrame } from './AppShellFrame';
 import { UnifiedSidebar } from './UnifiedSidebar';
 
 function StorySidebarProvider({ children }: { children: React.ReactNode }) {
@@ -101,7 +103,7 @@ const meta: Meta<typeof UnifiedSidebar> = {
   },
   decorators: [
     withSignedInSession,
-    Story => (
+    (Story, context) => (
       <QueryClientProvider client={queryClient}>
         <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
           <DashboardDataProvider value={dashboardData}>
@@ -110,14 +112,20 @@ const meta: Meta<typeof UnifiedSidebar> = {
                 <JovieAuthValuesProvider>
                   <HeaderActionsProvider>
                     <ShellSidebarOverrideProvider>
-                      <RenderedSidebarFamily
-                        name='unified-sidebar'
-                        owner='UnifiedSidebar'
-                      >
-                        <div className='h-screen w-(--app-shell-sidebar-width)'>
+                      {context.parameters.macShell ? (
+                        <div className='h-screen w-screen'>
                           <Story />
                         </div>
-                      </RenderedSidebarFamily>
+                      ) : (
+                        <RenderedSidebarFamily
+                          name='unified-sidebar'
+                          owner='UnifiedSidebar'
+                        >
+                          <div className='h-screen w-(--app-shell-sidebar-width)'>
+                            <Story />
+                          </div>
+                        </RenderedSidebarFamily>
+                      )}
                     </ShellSidebarOverrideProvider>
                   </HeaderActionsProvider>
                 </JovieAuthValuesProvider>
@@ -138,6 +146,45 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Dashboard: Story = {};
+
+/** Actual shared composition for native page-strip and rail geometry checks. */
+export const MacShell: Story = {
+  parameters: {
+    macShell: true,
+    nextjs: { navigation: { pathname: '/app/library' } },
+  },
+  render: args => (
+    <AppShellFrame
+      containerClassName='h-dvh'
+      sidebar={<UnifiedSidebar {...args} />}
+      header={<DashboardHeader breadcrumbs={[{ label: 'Library' }]} />}
+      main={
+        <div
+          className='h-full overflow-auto p-4'
+          data-testid='mac-shell-scroll'
+        >
+          <label>
+            Notes
+            <textarea
+              className='block w-full'
+              defaultValue='Retain this draft'
+            />
+          </label>
+          <div style={{ height: 1600 }}>Library content</div>
+        </div>
+      }
+    />
+  ),
+};
+
+export const MacOvieShell: Story = {
+  ...MacShell,
+  args: { section: 'ov', variant: 'ov' },
+  parameters: {
+    macShell: true,
+    nextjs: { navigation: { pathname: '/app/ov/chat' } },
+  },
+};
 
 export const LegacyAdmin: Story = {
   args: { section: 'admin' },

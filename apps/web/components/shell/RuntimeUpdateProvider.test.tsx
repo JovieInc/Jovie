@@ -20,7 +20,8 @@ const state = vi.hoisted(() => ({
   mismatch: false,
   install: vi.fn(async () => true),
 }));
-vi.mock('@/lib/desktop/electron-bridge', () => ({
+vi.mock('@/lib/desktop/electron-bridge', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/desktop/electron-bridge')>()),
   useIsElectronRuntime: () => state.desktop,
   useDesktopUpdate: () => ({
     available: state.available,

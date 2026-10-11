@@ -174,13 +174,18 @@ describe('DesktopTitlebar', () => {
   );
 
   it.each([
-    [{ state: 'closed' as const, open: false }, 'transparent'],
-    [{ isMobile: true }, 'transparent'],
-    [{}, 'rgb(var(--sidebar-background))'],
-  ])(
-    'paints window controls on the surface that owns them',
-    (overrides, expected) => {
+    [false, { state: 'closed' as const, open: false }, 'transparent'],
+    [false, { isMobile: true }, 'transparent'],
+    [false, {}, 'rgb(var(--sidebar-background))'],
+    [true, { state: 'closed' as const, open: false }, 'transparent'],
+    [true, { isMobile: true }, 'transparent'],
+    [true, {}, 'transparent'],
+  ] as const)(
+    'paints window controls on their owning surface with native tabs %s',
+    (nativeTabs, overrides, expected) => {
       document.documentElement.dataset.desktopRuntime = 'electron';
+      if (nativeTabs) document.documentElement.dataset.desktopPageTabs = 'true';
+      else delete document.documentElement.dataset.desktopPageTabs;
       const { container, unmount } = renderTitlebar(overrides);
       container.dataset.appShellFrame = 'true';
       const titlebar = screen.getByTestId('electron-titlebar-row');
@@ -190,7 +195,7 @@ describe('DesktopTitlebar', () => {
       const backgrounds: string[] = [];
       css.walkRules(rule => {
         // Evaluate the actual CSS selectors against the rendered sidebar state.
-        // This must not make the expanded sidebar transparent as a side effect.
+        // The overlay controls inherit the rail/header surface beneath them.
         if (
           rule.selector.includes('[data-electron-titlebar=') &&
           titlebar.matches(rule.selector)
@@ -203,6 +208,7 @@ describe('DesktopTitlebar', () => {
       expect(backgrounds.at(-1)).toBe(expected);
       unmount();
       document.documentElement.removeAttribute('data-desktop-runtime');
+      delete document.documentElement.dataset.desktopPageTabs;
     }
   );
 

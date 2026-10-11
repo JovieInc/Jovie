@@ -551,6 +551,7 @@ export function DashboardNav({
                 }
                 prefetch={!isDemo}
                 aria-label='New Chat'
+                data-sidebar-command='new-chat'
                 data-navigation-item-id={chatNavItem.id}
                 data-navigation-pending={
                   pendingNavigation?.itemId === chatNavItem.id || undefined

@@ -47,6 +47,29 @@ export function useSidebarCookieState({
 
   const open = openProp ?? openInternal;
   const openRef = React.useRef(open);
+  const channelRef = React.useRef<BroadcastChannel | null>(null);
+
+  React.useEffect(() => {
+    if (
+      typeof BroadcastChannel === 'undefined' ||
+      document.documentElement.getAttribute('data-desktop-runtime') !==
+        'electron'
+    )
+      return;
+    const channel = new BroadcastChannel('jovie-desktop-sidebar');
+    channelRef.current = channel;
+    channel.onmessage = event => {
+      if (typeof event.data !== 'boolean' || event.data === openRef.current)
+        return;
+      openRef.current = event.data;
+      setOpenInternal(event.data);
+      onOpenChange?.(event.data);
+    };
+    return () => {
+      channelRef.current = null;
+      channel.close();
+    };
+  }, [onOpenChange]);
 
   React.useEffect(() => {
     openRef.current = open;
@@ -60,6 +83,7 @@ export function useSidebarCookieState({
       // in one batch must compose, including controlled/sidebar IPC inputs.
       openRef.current = nextOpen;
       persistSidebarCookie(nextOpen);
+      channelRef.current?.postMessage(nextOpen);
       setOpenInternal(nextOpen);
       onOpenChange?.(nextOpen);
     },

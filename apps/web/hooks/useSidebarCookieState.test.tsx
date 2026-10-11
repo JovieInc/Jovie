@@ -4,9 +4,41 @@ import { useSidebarCookieState } from './useSidebarCookieState';
 
 afterEach(() => {
   document.cookie = 'sidebar:state=; path=/; max-age=0';
+  document.documentElement.removeAttribute('data-desktop-runtime');
+  vi.unstubAllGlobals();
 });
 
 describe('sidebar requested state', () => {
+  it('shares the pinned geometry across native page documents without echoing messages', () => {
+    const channels: {
+      onmessage: ((event: { data: unknown }) => void) | null;
+      postMessage: ReturnType<typeof vi.fn>;
+      close: ReturnType<typeof vi.fn>;
+    }[] = [];
+    class Channel {
+      onmessage: ((event: { data: unknown }) => void) | null = null;
+      postMessage = vi.fn();
+      close = vi.fn();
+      constructor() {
+        channels.push(this);
+      }
+    }
+    vi.stubGlobal('BroadcastChannel', Channel);
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    const onOpenChange = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useSidebarCookieState({ defaultOpen: true, onOpenChange })
+    );
+    act(() => result.current.setOpen(false));
+    expect(channels[0].postMessage).toHaveBeenCalledExactlyOnceWith(false);
+    act(() => channels[0].onmessage?.({ data: true }));
+    expect(result.current.open).toBe(true);
+    expect(channels[0].postMessage).toHaveBeenCalledTimes(1);
+    act(() => channels[0].onmessage?.({ data: 'false' }));
+    expect(result.current.open).toBe(true);
+    unmount();
+    expect(channels[0].close).toHaveBeenCalledOnce();
+  });
   it('honors every toggle before React commits the batch', () => {
     const { result } = renderHook(() =>
       useSidebarCookieState({ defaultOpen: true })

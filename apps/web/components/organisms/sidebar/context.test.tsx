@@ -9,6 +9,8 @@ vi.mock('@/hooks/useBreakpoint', () => ({
 
 afterEach(() => {
   document.cookie = 'sidebar:state=; path=/; max-age=0';
+  delete document.documentElement.dataset.desktopRuntime;
+  Reflect.deleteProperty(window, 'electronAPI');
 });
 
 function Controls() {
@@ -54,4 +56,26 @@ describe('sidebar resize state', () => {
     fireEvent.click(control);
     expect(control).toHaveAttribute('data-mobile-open', 'true');
   });
+  it.each([false, true])(
+    'keeps responsive behavior unless the native page-tab bridge exists (%s)',
+    nativeTabs => {
+      viewport.mobile = true;
+      document.documentElement.dataset.desktopRuntime = 'electron';
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: nativeTabs
+          ? { getPageTabs: async () => null }
+          : { versions: { app: 'older' } },
+      });
+      render(
+        <SidebarProvider defaultOpen={false}>
+          <Controls />
+        </SidebarProvider>
+      );
+      const control = screen.getByRole('button');
+      fireEvent.click(control);
+      expect(control).toHaveAttribute('data-mobile-open', String(!nativeTabs));
+      expect(control).toHaveAttribute('data-desktop-open', String(nativeTabs));
+    }
+  );
 });

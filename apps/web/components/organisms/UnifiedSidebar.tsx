@@ -236,6 +236,7 @@ function SidebarHeaderNav({
             return (
               <div className='flex w-full items-center gap-2'>
                 <Link
+                  data-sidebar-brand-entry='true'
                   href={routeBackHref}
                   aria-label={routeBackLabel}
                   className={cn(
@@ -257,6 +258,7 @@ function SidebarHeaderNav({
           if (isDemoRoute) {
             return (
               <div
+                data-sidebar-brand-entry='true'
                 className={cn(
                   'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
                   'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
@@ -295,6 +297,7 @@ function SidebarHeaderNav({
           // lives in the bottom Settings button.
           return (
             <div
+              data-sidebar-brand-entry='true'
               className={cn(
                 'flex h-7 w-full items-center gap-1.5',
                 'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'

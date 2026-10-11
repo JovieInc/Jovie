@@ -1490,7 +1490,9 @@ test('hud layout pings the desktop boot watchdog', async () => {
 test('hosted web app has an early Electron runtime marker before first paint', async () => {
   const webRoot = join(desktopRoot, '..', 'web');
   const rootLayout = await readFile(join(webRoot, 'app/layout.tsx'), 'utf8');
-  const globalsCss = await readFile(join(webRoot, 'app/globals.css'), 'utf8');
+  const globalsCss = (
+    await readFile(join(webRoot, 'app/globals.css'), 'utf8')
+  ).split('/* New native shell activates')[1];
   const titlebarSource = await readFile(
     join(webRoot, 'components/organisms/DesktopTitlebar.tsx'),
     'utf8'
@@ -1508,15 +1510,24 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
   assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
-  assert.match(globalsCss, /--electron-titlebar-height: 40px;/);
-  assert.match(globalsCss, /--electron-traffic-light-safe-width: 72px;/);
+  assert.match(
+    globalsCss,
+    /--electron-titlebar-height: var\(--app-shell-header-height\);/
+  );
+  assert.match(
+    globalsCss,
+    /--electron-traffic-light-safe-width: calc\(\s*80px\s*\/\s*var\(--electron-zoom-factor, 1\)\s*\);/
+  );
   assert.match(globalsCss, /--electron-traffic-light-x: 20px;/);
   assert.match(globalsCss, /--electron-traffic-light-y: 17px;/);
   assert.match(
     globalsCss,
     /--electron-sidebar-width: var\(--app-shell-sidebar-width\);/
   );
-  assert.match(globalsCss, /--electron-sidebar-collapsed-width: 52px;/);
+  assert.match(
+    globalsCss,
+    /--electron-sidebar-collapsed-width: calc\(\s*52px\s*\/\s*var\(--electron-zoom-factor, 1\)\s*\);/
+  );
   // The electron titlebar is an absolute flex overlay sharing one top row
   // with the page header; the retired two-column grid must stay gone.
   assert.doesNotMatch(
@@ -1524,7 +1535,7 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     /grid-template-columns: var\(--electron-sidebar-width\)/
   );
   // The overlay reserves a fixed control-row width for native window controls.
-  assert.match(globalsCss, /--electron-controls-width: 200px;/);
+  assert.match(globalsCss, /--electron-page-tabs-height: var\(--space-8\);/);
   assert.doesNotMatch(
     globalsCss,
     /grid-template-columns: var\(--linear-app-sidebar-width\)/
@@ -1541,7 +1552,9 @@ test('hosted web app has an early Electron runtime marker before first paint', a
 test('macOS titlebar reserve safely contains traffic lights at every supported window size', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
   const webRoot = join(desktopRoot, '..', 'web');
-  const globalsCss = await readFile(join(webRoot, 'app/globals.css'), 'utf8');
+  const globalsCss = (
+    await readFile(join(webRoot, 'app/globals.css'), 'utf8')
+  ).split('/* New native shell activates')[1];
 
   // These values deliberately cross the native-window and hosted-renderer
   // boundary. The renderer must reserve enough room for the native controls;
@@ -1553,10 +1566,14 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
     mainSource.match(/const MACOS_TRAFFIC_LIGHT_Y = (\d+);/)?.[1]
   );
   const titlebarHeight = Number(
-    globalsCss.match(/--electron-titlebar-height: (\d+)px;/)?.[1]
+    (await readFile(join(webRoot, 'styles/design-system.css'), 'utf8')).match(
+      /--app-shell-header-height: (\d+)px;/
+    )?.[1]
   );
   const safeWidth = Number(
-    globalsCss.match(/--electron-traffic-light-safe-width: (\d+)px;/)?.[1]
+    globalsCss.match(
+      /--electron-traffic-light-safe-width: calc\(\s*(\d+)px/
+    )?.[1]
   );
 
   assert.ok(Number.isFinite(x) && Number.isFinite(y));
@@ -1579,7 +1596,10 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
   // Main-content clearance comes from the header-inset path: the shared top
   // row reserves the fixed control-row width so chrome never overlaps the
   // native control reserve after resize.
-  assert.match(globalsCss, /padding-left: var\(--electron-controls-width\);/);
+  assert.match(
+    globalsCss,
+    /--electron-rail-axis:\s*calc\(\s*\(var\(--electron-traffic-light-x\) \+ 6px\)\s*\/\s*var\(--electron-zoom-factor, 1\)\s*\);/
+  );
   assert.match(mainSource, /minWidth: 800,/);
 });
 

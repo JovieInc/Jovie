@@ -40,7 +40,8 @@ const signOutMock = vi.hoisted(() => vi.fn());
 const userButtonPropsMock = vi.hoisted(() => vi.fn());
 const nowPlayingBridgePropsMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/desktop/electron-bridge', () => ({
+vi.mock('@/lib/desktop/electron-bridge', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/desktop/electron-bridge')>()),
   isElectronRuntime: () =>
     document.documentElement.dataset.desktopRuntime === 'electron' ||
     electronRuntimeMock.isElectronRuntime,

@@ -282,6 +282,282 @@ html[data-desktop-runtime="electron"]
   padding-left: var(--app-shell-gap);
 }
 
+/* New native shell activates only when its preload owns real page tabs. */
+[data-electron-page-tabs="true"] {
+  display: none;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"] {
+  --electron-titlebar-height: var(--app-shell-header-height);
+  --electron-page-tabs-height: var(--space-8);
+  --electron-traffic-light-safe-width: calc(
+    80px /
+    var(--electron-zoom-factor, 1)
+  );
+  --electron-traffic-light-x: 20px;
+  --electron-traffic-light-y: 17px;
+  --electron-rail-axis: calc(
+    (var(--electron-traffic-light-x) + 6px) /
+    var(--electron-zoom-factor, 1)
+  );
+  --electron-sidebar-width: var(--app-shell-sidebar-width);
+  --electron-sidebar-collapsed-width: calc(
+    52px /
+    var(--electron-zoom-factor, 1)
+  );
+}
+
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"] body {
+  background: rgb(var(--sidebar-background));
+  font-family:
+    -apple-system, BlinkMacSystemFont, var(--font-inter), "Inter", sans-serif;
+}
+
+[data-electron-titlebar="true"],
+[data-electron-page-tabs="true"] {
+  display: none;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-web-sidebar-control="true"] {
+  display: none;
+}
+
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-app-shell-frame="true"] {
+  box-sizing: border-box;
+  --electron-sidebar-width: var(--app-shell-sidebar-width);
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-app-shell-frame="true"]:has([data-electron-collapsed-rail="icon"]) {
+  --electron-sidebar-width: var(--electron-sidebar-collapsed-width);
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-app-shell-body="true"] {
+  gap: var(--app-shell-gap);
+  padding: var(--app-shell-gap) var(--app-shell-gap) var(--app-shell-gap) 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-app-shell-sidebar-mount="true"] {
+  height: calc(100% + 2 * var(--app-shell-gap));
+  margin-block: calc(-1 * var(--app-shell-gap));
+  padding-top: 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  #shell-left-rail {
+  display: block;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  #shell-left-rail
+  [data-sidebar="sidebar"] {
+  padding-top: calc(
+    var(--app-shell-gap) +
+    var(--electron-page-tabs-height) +
+    var(--electron-titlebar-height)
+  );
+  border-radius: 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  #shell-left-rail
+  [data-sidebar="header"] {
+  height: var(--app-shell-header-height);
+  padding: 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-sidebar-brand-entry="true"],
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  .ask-jovie-mark {
+  display: grid;
+  grid-template-columns: calc(2 * var(--electron-rail-axis)) minmax(0, 1fr);
+  justify-content: start;
+  gap: 0;
+  width: 100%;
+  padding-inline: 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-sidebar-brand-entry="true"]
+  > :first-child,
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  .ask-jovie-mark-icon {
+  justify-self: center;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-sidebar-brand-entry="true"]:has(.ask-jovie-mark) {
+  display: block;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  #shell-left-rail
+  [data-sidebar="content"],
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  #shell-left-rail
+  [data-sidebar="group"] {
+  padding-inline: 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  #shell-left-rail
+  [data-navigation-item-id]:not([data-sidebar-command]):not(
+    [data-inbox-attention]
+  ) {
+  grid-template-columns: calc(2 * var(--electron-rail-axis)) minmax(0, 1fr) auto;
+  justify-items: stretch;
+  padding-inline: 0;
+  margin-inline: 0;
+  width: 100%;
+  gap: 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  #shell-left-rail
+  [data-navigation-item-id]:not([data-sidebar-command]):not(
+    [data-inbox-attention]
+  )
+  > svg {
+  justify-self: center;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-electron-page-tabs="true"] {
+  display: flex;
+  height: var(--electron-page-tabs-height);
+  padding-bottom: var(--space-1);
+  user-select: none;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-electron-page-tabs="true"]
+  [data-active="true"] {
+  background: var(--app-shell-content-surface);
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-app-shell-frame="true"]:has([data-electron-collapsed-rail="icon"])
+  [data-electron-page-tabs="true"] {
+  padding-left: max(
+    0px,
+    calc(
+      var(--electron-traffic-light-safe-width) -
+      var(--electron-sidebar-width) -
+      var(--app-shell-gap)
+    )
+  );
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-electron-titlebar="true"] {
+  position: absolute;
+  top: calc(var(--app-shell-gap) + var(--electron-page-tabs-height));
+  left: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: var(--electron-titlebar-height);
+  pointer-events: none;
+  background: transparent;
+  user-select: none;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-testid="electron-titlebar-sidebar-cell"] {
+  padding: 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-testid="electron-traffic-light-safe-area"] {
+  display: none;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-testid="electron-sidebar-toggle"] {
+  position: absolute;
+  left: calc(var(--electron-rail-axis) - var(--space-3-5));
+  pointer-events: auto;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-testid="electron-nav-pill"] {
+  position: absolute;
+  left: calc(var(--electron-sidebar-width) + 2 * var(--app-shell-gap));
+  pointer-events: auto;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-top-spacing-owner="shell-header"] {
+  padding-left: calc(2 * var(--space-6) + var(--space-4));
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-top-spacing-owner="shell-header"]
+  > div {
+  height: var(--electron-titlebar-height);
+  padding-block: 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-app-shell-content-inset="true"]:has(
+    [data-testid="settings-shell-content"]
+  ) {
+  padding-top: 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-testid="settings-shell-content"]
+  > div {
+  padding-top: 0;
+  padding-inline: 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-electron-drag-region="true"] {
+  -webkit-app-region: drag;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  :where(
+    a,
+    button,
+    input,
+    textarea,
+    select,
+    summary,
+    [role="button"],
+    [role="menuitem"],
+    [data-electron-no-drag="true"],
+    [data-radix-popper-content-wrapper]
+  ) {
+  -webkit-app-region: no-drag;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-app-shell-scroll],
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-testid="chat-composer-surface"] {
+  -webkit-app-region: no-drag;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-top-spacing-owner="shell-header"]
+  h1 {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height, 1.5);
+}
+
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  #shell-left-rail
+  [data-sidebar-search-slot="true"] {
+  justify-content: flex-start;
+  margin-inline: 0;
+  padding-inline: 0;
+  gap: 0;
+  border: 0;
+  background: transparent;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  #shell-left-rail
+  [data-sidebar-command="new-chat"] {
+  order: -1;
+  margin-inline: calc(var(--electron-rail-axis) - var(--space-3));
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  #shell-left-rail
+  [data-sidebar="group-label"] {
+  margin-top: 0;
+}
+html[data-desktop-runtime="electron"][data-desktop-page-tabs="true"]
+  [data-testid="electron-traffic-light-safe-area"] {
+  display: block;
+  position: absolute;
+  top: calc(-1 * (var(--app-shell-gap) + var(--electron-page-tabs-height)));
+  left: 0;
+  width: max(
+    var(--electron-traffic-light-safe-width),
+    var(--electron-sidebar-width)
+  );
+  height: calc(var(--app-shell-gap) + var(--electron-page-tabs-height));
+  pointer-events: auto;
+}
+
 /* Public pages use document scrolling rather than app-shell scroll panes.
    Only override html — setting overflow-y:auto on body promotes overflow-x:clip
    to overflow-x:hidden, which creates a scroll container that breaks sticky. */

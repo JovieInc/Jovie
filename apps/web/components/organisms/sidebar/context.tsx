@@ -14,6 +14,10 @@ import {
   SIDEBAR_KEYBOARD_SHORTCUT,
   useSidebarKeyboardShortcut,
 } from '@/hooks/useSidebarKeyboardShortcut';
+import {
+  getRawElectronAPI,
+  useIsElectronRuntime,
+} from '@/lib/desktop/electron-bridge';
 import { cn } from '@/lib/utils';
 
 export {
@@ -43,7 +47,11 @@ export const SidebarProvider = React.forwardRef<
     ref
   ) => {
     const pathname = usePathname();
-    const isMobile = useBreakpointDown('lg');
+    const belowDesktop = useBreakpointDown('lg');
+    const isDesktop = useIsElectronRuntime();
+    const hasNativePageTabs =
+      isDesktop && typeof getRawElectronAPI()?.getPageTabs === 'function';
+    const isMobile = belowDesktop && !hasNativePageTabs;
     const [openMobile, setOpenMobile] = React.useState(false);
     const { open, setOpen } = useSidebarCookieState({
       defaultOpen,

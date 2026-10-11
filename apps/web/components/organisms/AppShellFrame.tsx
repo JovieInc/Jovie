@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { memo } from 'react';
+import { DesktopPageTabs } from '@/components/organisms/DesktopPageTabs';
 import { DesktopTitlebar } from '@/components/organisms/DesktopTitlebar';
 import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { OverlayInteractionGuard } from '@/components/shell/OverlayInteractionGuard';
@@ -103,6 +104,7 @@ export const AppShellFrame = memo(function AppShellFrame({
             SHELL_RAIL_MAIN_PLANE
           )}
         >
+          <DesktopPageTabs />
           <div
             data-app-shell-main-plane='true'
             className={cn(
