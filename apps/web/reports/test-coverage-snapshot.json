@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-11T02:21:55.871Z",
+  "generated_at": "2026-10-11T04:24:53.160Z",
   "surfaces": {
     "rls-access-control": {
       "coverage_pct": 77.6,
@@ -56,7 +56,7 @@
       "status": "YELLOW"
     },
     "marketing-static": {
-      "coverage_pct": 80.9,
+      "coverage_pct": 81,
       "branch_pct": 71.4,
       "risk_score": 10.4,
       "status": "GREEN"

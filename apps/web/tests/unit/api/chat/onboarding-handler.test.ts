@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   checkGateForUserMock: vi.fn(),
+  identityConflictMock: vi.fn(),
+  getSpotifyArtistMock: vi.fn(),
   executeChatTurnMock: vi.fn(),
   checkAnonymousChatRateLimitMock: vi.fn(),
   checkAuthenticatedOnboardingChatRateLimitMock: vi.fn(),
@@ -26,6 +28,15 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/profile/spotify-profile-identity', () => ({
+  hasSpotifyProfileIdentityConflict: hoisted.identityConflictMock,
+}));
+vi.mock('@/lib/spotify', () => ({
+  getSpotifyArtist: hoisted.getSpotifyArtistMock,
+  buildSpotifyArtistUrl: (id: string) =>
+    `https://open.spotify.com/artist/${id}`,
+}));
 
 vi.mock('@/lib/flags/server', () => ({
   checkGateForUser: hoisted.checkGateForUserMock,
@@ -163,6 +174,8 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     vi.resetModules();
     vi.resetAllMocks();
     stubRuntimeEnv();
+    hoisted.identityConflictMock.mockResolvedValue(false);
+    hoisted.getSpotifyArtistMock.mockResolvedValue(null);
     hoisted.checkGateForUserMock.mockResolvedValue(true);
     hoisted.checkAnonymousChatRateLimitMock.mockResolvedValue({
       success: true,
@@ -1299,6 +1312,198 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       'jovie_onboarding_session='
     );
     expect(result?.headers.get('x-chat-mode')).toBe('onboarding');
+  });
+
+  describe('server-authoritative Spotify conflict recovery (JOV-8038)', () => {
+    const artistId = '0000000000000000000001';
+    const confirmation = {
+      schemaVersion: 2,
+      toolCallId: 'canonical-artist',
+      toolName: 'confirmSpotifyArtist',
+      state: 'succeeded',
+      input: { spotifyArtistId: artistId },
+      output: { action: 'spotify_artist_confirmed', spotifyArtistId: artistId },
+      uiHint: 'artifact',
+    };
+    function restoreArtist() {
+      hoisted.dbSelectRowsMock
+        .mockResolvedValueOnce([{ id: 'conv_anonymous' }])
+        .mockResolvedValueOnce([{ toolCalls: [confirmation] }])
+        .mockResolvedValueOnce([]);
+    }
+    it.each([false, true])(
+      'blocks a pasted conflicting artist before model/fallback (kill switch=%s)',
+      async killSwitch => {
+        hoisted.checkGateForUserMock.mockResolvedValue(killSwitch);
+        hoisted.identityConflictMock.mockResolvedValue(true);
+        const { tryHandleAnonymousOnboardingChat } = await import(
+          '@/app/api/chat/onboarding-handler'
+        );
+        const response = await tryHandleAnonymousOnboardingChat(
+          makeRequest({
+            mode: 'onboarding',
+            messages: [
+              userMessage(`https://open.spotify.com/artist/${artistId}`),
+            ],
+          }),
+          'conflict-url'
+        );
+        expect(response?.status).toBe(200); // Chat delivers a recovery turn, not an activation receipt.
+        expect(response?.headers.get('x-onboarding-error-code')).toBe(
+          'SPOTIFY_IDENTITY_CONFLICT'
+        );
+        expect(response?.headers.get('x-fallback-reason')).toBe(
+          'ownership_conflict'
+        );
+        const stream = await response!.text();
+        expect(stream).toContain('verified profile claim flow');
+        expect(stream).not.toMatch(
+          /checkHandle|proposeCheckout|proposeNextStep|Claim.*on Jovie/
+        );
+        expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+        expect(hoisted.identityConflictMock).toHaveBeenCalledWith(
+          expect.anything(),
+          artistId,
+          null
+        );
+        expect(hoisted.dbOnConflictDoUpdateMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            set: expect.objectContaining({
+              scriptLineKey: 'ownership_conflict:v1',
+              toolCalls: [
+                expect.objectContaining({
+                  toolName: 'confirmSpotifyArtist',
+                  output: expect.objectContaining({
+                    spotifyArtistId: artistId,
+                  }),
+                }),
+              ],
+            }),
+          })
+        );
+      }
+    );
+
+    it('rechecks persisted identity on retries and later messages without re-enrichment or blocked actions', async () => {
+      hoisted.identityConflictMock.mockResolvedValue(true);
+      const message = userMessage('Claim this handle now');
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      for (const next of [
+        message,
+        message,
+        userMessage('Try another handle then'),
+      ]) {
+        restoreArtist();
+        const response = await tryHandleAnonymousOnboardingChat(
+          makeRequest({ mode: 'onboarding', messages: [next] }),
+          'conflict-retry'
+        );
+        expect(response?.headers.get('x-onboarding-error-code')).toBe(
+          'SPOTIFY_IDENTITY_CONFLICT'
+        );
+        expect(await response!.text()).not.toMatch(
+          /checkHandle|proposeCheckout|proposeNextStep/
+        );
+      }
+      expect(hoisted.identityConflictMock).toHaveBeenCalledTimes(3);
+      expect(hoisted.getSpotifyArtistMock).not.toHaveBeenCalled();
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+      // Drizzle omits undefined upsert values, preserving the original canonical tool artifact.
+      expect(hoisted.dbOnConflictDoUpdateMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          set: expect.objectContaining({ toolCalls: undefined }),
+        })
+      );
+    });
+
+    it('uses the verified app account and allows the same owner through normal dispatch', async () => {
+      hoisted.getBetterAuthSessionMock.mockResolvedValue({
+        user: { id: 'auth-owner' },
+      });
+      hoisted.appUserMock.mockResolvedValue({
+        id: 'app-owner',
+        userStatus: 'active',
+        deletedAt: null,
+      });
+      hoisted.checkGateForUserMock.mockResolvedValue(false);
+      hoisted.executeChatTurnMock.mockResolvedValue({
+        streamResult: {
+          toUIMessageStreamResponse: ({ headers }: { headers: HeadersInit }) =>
+            new Response('normal turn', { headers }),
+        },
+        selectedModel: 'test',
+        systemPrompt: '',
+        toolNames: [],
+        modelMessages: [],
+      });
+      restoreArtist();
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const response = await tryHandleAnonymousOnboardingChat(
+        makeRequest({
+          mode: 'onboarding',
+          messages: [userMessage('continue')],
+        }),
+        'same-owner'
+      );
+      expect(hoisted.identityConflictMock).toHaveBeenCalledWith(
+        expect.anything(),
+        artistId,
+        'app-owner'
+      );
+      expect(hoisted.executeChatTurnMock).toHaveBeenCalledOnce();
+      expect(response?.headers.get('x-onboarding-error-code')).toBeNull();
+    });
+
+    it('fails closed when canonical ownership cannot be read', async () => {
+      restoreArtist();
+      hoisted.identityConflictMock.mockRejectedValue(
+        new Error('db unavailable')
+      );
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const response = await tryHandleAnonymousOnboardingChat(
+        makeRequest({
+          mode: 'onboarding',
+          messages: [userMessage('continue')],
+        }),
+        'lookup-failed'
+      );
+      expect(response?.status).toBe(503);
+      expect(await response!.json()).toMatchObject({
+        errorCode: 'SPOTIFY_IDENTITY_LOOKUP_FAILED',
+      });
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+      expect(hoisted.dbOnConflictDoUpdateMock).not.toHaveBeenCalled();
+    });
+
+    it('does not escape conflict recovery when its persistence fails', async () => {
+      restoreArtist();
+      hoisted.identityConflictMock.mockResolvedValue(true);
+      hoisted.dbOnConflictDoUpdateMock.mockRejectedValueOnce(
+        new Error('recovery write failed')
+      );
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const response = await tryHandleAnonymousOnboardingChat(
+        makeRequest({
+          mode: 'onboarding',
+          messages: [userMessage('checkout now')],
+        }),
+        'recovery-write-failed'
+      );
+      expect(response?.status).toBe(503);
+      expect(await response!.json()).toMatchObject({
+        errorCode: 'ONBOARDING_CHAT_PERSISTENCE_FAILED',
+      });
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+      expect(hoisted.dbOnConflictDoUpdateMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('fails closed before streaming when anonymous persistence is unavailable', async () => {
