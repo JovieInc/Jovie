@@ -84,7 +84,9 @@ async function fixture(
   const statusWrites = [];
   const inventories = [];
   const gets = [];
+  const mainReads = [];
   const effects = {
+    mainReads,
     reads,
     mutations,
     warnings,
@@ -98,6 +100,7 @@ async function fixture(
     rest: {
       git: {
         getRef: async params => {
+          mainReads.push(params.ref);
           assert.deepEqual(params, {
             owner: 'JovieInc',
             repo: 'Jovie',
@@ -491,6 +494,33 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
     overrides: { 1: { ...removal('manual'), ...release('hold') } },
   });
   assert.deepEqual(held.mutations, []);
+});
+
+test('main is read only to resolve a held candidate, never on an ineligible wake', async () => {
+  // 2026-10-11: ~47 enroll runs/h; most wakes land before the head is green.
+  const blocked = await fixture({
+    eventName: 'pull_request_target',
+    payload: { pull_request: { number: 1 } },
+    overrides: { 1: { mergeStateStatus: 'BLOCKED' } },
+  });
+  assert.deepEqual(blocked.mainReads, []);
+  assert.deepEqual(blocked.reads, [1]);
+  const clean = await fixture({ roster: [candidate(1), candidate(2)] });
+  assert.deepEqual(clean.mainReads, []);
+  assert.equal(clean.mutations.length, 2);
+  const held = await fixture({
+    statuses: [
+      {
+        context: 'jovie-queue-failure-hold/v1',
+        state: 'success',
+        creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+        description: `class=base-branch;n=1;run=456;try=1;main=${'e'.repeat(40)}`,
+        target_url: 'https://github.com/JovieInc/Jovie/actions/runs/456',
+      },
+    ],
+    roster: [candidate(1), candidate(2)],
+  });
+  assert.deepEqual(held.mainReads, ['heads/main']);
 });
 
 test('queue mutation tokens can act on heads that edit workflow files', () => {

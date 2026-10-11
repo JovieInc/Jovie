@@ -179,7 +179,10 @@ jobs:
             const retryMs = Math.max(0, Number(process.env.MERGE_STATE_RETRY_MS ?? 3000) || 0);
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
             const { owner, repo } = context.repo;
-            const currentMainSha = (await github.rest.git.getRef({
+            // Main's SHA only resolves a base-branch failure hold, so read it
+            // once, lazily, for a held candidate (most wakes never need it).
+            let currentMainSha;
+            const readMainSha = async () => currentMainSha ??= (await github.rest.git.getRef({
               owner, repo, ref: 'heads/main',
             })).data.object.sha;
             // Use the triggering PR for automatic wakes. Scanning every eligible PR
@@ -297,7 +300,9 @@ jobs:
               const sourceFailure = failurePolicy.revisionFailureDisposition({
                 statuses,
                 repository: `${owner}/${repo}`,
-                currentMainSha,
+                currentMainSha: statuses.some(status => status?.context === failurePolicy.FAILURE_HOLD_CONTEXT)
+                  ? await readMainSha()
+                  : undefined,
               });
               let failure = sourceFailure;
               if (failure.action === 'block') {
