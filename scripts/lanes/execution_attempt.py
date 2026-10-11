@@ -49,6 +49,25 @@ def _status_pages(pages) -> list[dict]:
     return statuses
 def _trusted_creator(creator) -> bool:
     return isinstance(creator, dict) and creator.get("login") == "jovie-bot[bot]" and creator.get("type") == "Bot"
+SUCCESS_TERMINAL = frozenset({"succeeded", "no_op_stale", "superseded"})
+LIVE_EVENTS = frozenset({"attempt_started", "boundary_admitted"})
+# A completion seal stays pending until the same reconcile operation appends its
+# disposition; an interrupted reconcile resumes from it (operator-owned, never swept).
+PENDING_EVENTS = LIVE_EVENTS | {"completion_fenced"}
+# A GitHub-only receipt that ends a status the ledger already ended. It links the
+# status chain but is never a ledger row, so claim/finish/reconcile never see it.
+FINALIZED = "status_finalized"
+def status_state(row: dict) -> str:
+    """Commit-status state for one ledger row: pending only while a fenced attempt or seal is open.
+
+    An ended attempt that may be retried (or a sealed completion) is no longer running, so
+    its status is terminal; leaving it pending kept PR heads UNSTABLE forever, because a
+    retry on that exact identity may never come. Retry eligibility lives in the ledger rows.
+    """
+    terminal = row.get("terminalState")
+    if terminal in SUCCESS_TERMINAL: return "success"
+    if terminal: return "failure"
+    return "pending" if row.get("event") in PENDING_EVENTS else "success"
 def _status_rows(statuses: list[dict], ident: dict, *, strict=False) -> tuple[list[dict], int | None]:
     context, children = f"jovie-execution/{ident['identityDigest']}", {}
     seen = set()
@@ -61,15 +80,18 @@ def _status_rows(statuses: list[dict], ident: dict, *, strict=False) -> tuple[li
         if row.get("schema") != SCHEMA or row.get("identityDigest") != ident["identityDigest"]: raise RuntimeError("execution-coordinator-receipt-mismatch")
         if strict and any(row.get(key) != value for key, value in ident.items()): raise RuntimeError("reconciliation-identity-mismatch")
         remote = row.setdefault("_remote", {}); remote["statusId"] = int(status["id"])
-        if strict and (remote["statusId"] in seen or status.get("state") != ("success" if row.get("terminalState") in {"succeeded", "no_op_stale", "superseded"} else "failure" if row.get("terminalState") else "pending")):
+        # Receipts written before ended attempts became terminal still read pending.
+        legacy = status.get("state") == "pending" and not row.get("terminalState") and row.get("event") != FINALIZED
+        if strict and (remote["statusId"] in seen or (status.get("state") != status_state(row) and not legacy)):
             raise RuntimeError("reconciliation-status-mismatch")
         seen.add(remote["statusId"])
         children.setdefault(remote.get("prevStatusId"), []).append((remote["statusId"], row))
-    chain, head = [], None
+    chain, head, linked = [], None, 0
     while children.get(head):
         if strict and len(children[head]) != 1: raise RuntimeError("reconciliation-ambiguous-history")
-        head, row = min(children[head], key=lambda item: item[0]); chain.append(row)
-    if strict and len(chain) != len(seen): raise RuntimeError("reconciliation-orphan-history")
+        head, row = min(children[head], key=lambda item: item[0]); linked += 1
+        if row.get("event") != FINALIZED: chain.append(row)
+    if strict and linked != len(seen): raise RuntimeError("reconciliation-orphan-history")
     return chain, head
 def _github_rows(coordination: dict, ident: dict) -> tuple[list[dict], int | None]:
     repository, sha = coordination.get("repository", ""), coordination.get("sha", "")
@@ -82,9 +104,7 @@ def _github_append(coordination: dict, ident: dict, row: dict, head: int | None)
     target = (coordination.get("targetUrl") or f"https://github.com/{repository}/commit/{sha}").split("#", 1)[0]
     target = f"{target}#jovie-execution={_pack(candidate)}"
     if len(target) > 2000: raise RuntimeError("execution-coordinator-receipt-too-large")
-    terminal = candidate.get("terminalState")
-    state = "success" if terminal in ("succeeded", "no_op_stale", "superseded") else "failure" if terminal else "pending"
-    body = {"state": state, "context": f"jovie-execution/{ident['identityDigest']}", "target_url": target,
+    body = {"state": status_state(candidate), "context": f"jovie-execution/{ident['identityDigest']}", "target_url": target,
             "description": f"execution {candidate['event']} attempt={candidate.get('attempt', 0)} {ident['identityDigest'][:12]}"}
     # Serialize ALL dispositions, including budget decisions, against this exact
     # predecessor. The next-attempt ref alone only fences attempt_started.
@@ -128,6 +148,12 @@ def _diagnosis(rows: list[dict], terminal: str) -> dict:
         "suspectedRootCauses": sorted({row.get("failureClass") for row in finished if row.get("failureClass")}),
         "dependencies": sorted({item for row in finished for item in row.get("dependencies", [])}),
         "nextAction": "collect new authoritative evidence or certify a bounded policy override"}
+def _expired_row(rows: list[dict], ident: dict, active: dict, now: float) -> dict:
+    expired = {**ident, "schema": SCHEMA, "event": "attempt_finished", "at": now, "attempt": active["attempt"], "fencingToken": active["fencingToken"],
+        "result": "failed_unknown", "terminalState": "failed_unknown", "retryDecision": "reconcile", "failureClass": "lost_worker",
+        "failureFingerprint": "lease_expired_without_result", "evidenceDigest": active.get("evidenceDigest"), "costs": {}, "dependencies": []}
+    expired["diagnosis"] = _diagnosis([*rows, expired], "failed_unknown")
+    return expired
 def _number(value) -> bool: return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now: float | None = None, coordination: dict | None = None) -> dict:
     now = time.time() if now is None else now
@@ -145,11 +171,7 @@ def claim(path: Path, ident: dict, owner: dict, policy: dict, trigger: dict, now
         active = next((row for row in reversed(starts) if row["fencingToken"] not in finishes), None)
         if active and active["leaseExpiresAt"] > now: return {"admitted": False, "reason": "duplicate_active", "fencingToken": active["fencingToken"]}, []
         if active:
-            expired = {**ident, "schema": SCHEMA, "event": "attempt_finished", "at": now, "attempt": active["attempt"], "fencingToken": active["fencingToken"],
-                "result": "failed_unknown", "terminalState": "failed_unknown", "retryDecision": "reconcile", "failureClass": "lost_worker",
-                "failureFingerprint": "lease_expired_without_result", "evidenceDigest": active.get("evidenceDigest"), "costs": {}, "dependencies": []}
-            expired["diagnosis"] = _diagnosis([*rows, expired], "failed_unknown")
-            return {"admitted": False, "reason": "expired_attempt_reconciled", "terminalState": "failed_unknown"}, [expired]
+            return {"admitted": False, "reason": "expired_attempt_reconciled", "terminalState": "failed_unknown"}, [_expired_row(rows, ident, active, now)]
         used = _usage(rows, now)
         # Zero-cost work can claim a zero-spend/mutation policy. Its first
         # positive boundary still fails closed; positive exhausted caps retain
@@ -227,6 +249,67 @@ def finish(path: Path, ident: dict, fence: str, result: str, detail: dict, now: 
             row["diagnosis"] = _diagnosis([*rows, row], terminal)
         return row, [row]
     return _locked(Path(path), ident, coordination, decide)
+
+def finalize_stale_statuses(path: Path, coordination: dict, now: float | None = None) -> list[dict]:
+    """End every jovie-execution/* status on one head that no live attempt owns.
+
+    A status is stale when its latest receipt is pending and either (a) the ledger row behind
+    it already ended (written before ended attempts became terminal), which gets a
+    FINALIZED success receipt, or (b) its fenced attempt's lease expired without a result,
+    which gets the same lost_worker failure a later claim would append. A live lease is left
+    alone. Only jovie-bot receipts are touched; contention is skipped for the next sweep.
+    """
+    now = time.time() if now is None else now
+    if coordination.get("kind") != "github-status": raise ValueError("execution-coordination-required")
+    repository, sha = coordination.get("repository", ""), coordination.get("sha", "")
+    if not re.fullmatch(r"[\w.-]+/[\w.-]+", repository) or not re.fullmatch(r"[0-9a-fA-F]{40}", sha): raise ValueError("execution-coordinator-malformed")
+    statuses = _status_pages(_gh(coordination, "GET", f"repos/{repository}/commits/{sha}/statuses?per_page=100"))
+    latest = {}
+    for status in statuses:
+        context = status.get("context") or ""
+        if context.startswith("jovie-execution/") and isinstance(status.get("id"), int):
+            if context not in latest or status["id"] > latest[context]["id"]: latest[context] = status
+    outcomes = []
+    for context, status in sorted(latest.items()):
+        if status.get("state") != "pending" or not _trusted_creator(status.get("creator")): continue
+        packed = (status.get("target_url") or "").split("#jovie-execution=", 1)
+        try:
+            row = _unpack(packed[1]) if len(packed) == 2 else {}
+        except (ValueError, zlib.error):
+            row = {}
+        ident = {key: row.get(key) for key in ("workKey", "executionGeneration", "identityDigest")}
+        if (row.get("schema") != SCHEMA or context != f"jovie-execution/{ident['identityDigest']}"
+                or ident["identityDigest"] != digest({"workKey": ident["workKey"], "generation": ident["executionGeneration"]})):
+            outcomes.append({"context": context, "outcome": "skipped-malformed"}); continue
+        try:
+            chain, head = _status_rows(statuses, ident)
+        except (RuntimeError, ValueError, KeyError, zlib.error):
+            outcomes.append({"context": context, "outcome": "skipped-malformed"}); continue
+        if not chain or head != status["id"]:
+            outcomes.append({"context": context, "outcome": "skipped-unlinked"}); continue
+        last = chain[-1]
+        if last.get("terminalState"):  # A terminal row always posts a terminal state; never restate it.
+            outcomes.append({"context": context, "outcome": "skipped-inconsistent"}); continue
+        if last.get("event") == "completion_fenced":
+            outcomes.append({"context": context, "outcome": "skipped-sealed"}); continue
+        if last.get("event") not in LIVE_EVENTS:
+            marker = {**ident, "schema": SCHEMA, "event": FINALIZED, "at": now, "attempt": last.get("attempt", 0),
+                      "finalizes": last.get("event"), "fencingToken": last.get("fencingToken")}
+            done = _github_append(coordination, ident, marker, head)
+            outcomes.append({"context": context, "outcome": "finalized" if done else "contended"}); continue
+        def expire(all_rows):
+            rows = _for(all_rows, ident)
+            if any(r.get("terminalState") in TERMINAL or r.get("event") == "completion_fenced" for r in rows): return "ended", []
+            finishes = {r["fencingToken"] for r in rows if r["event"] == "attempt_finished"}
+            active = next((r for r in reversed(rows) if r["event"] == "attempt_started" and r["fencingToken"] not in finishes), None)
+            if not active: return "ended", []
+            if active["leaseExpiresAt"] > now: return "live", []
+            return "expired", [_expired_row(rows, ident, active, now)]
+        try:
+            outcomes.append({"context": context, "outcome": _locked(Path(path), ident, coordination, expire)})
+        except RuntimeError as error:
+            outcomes.append({"context": context, "outcome": f"contended:{error}"})
+    return outcomes
 
 RECONCILE_CHECKS = frozenset({"Source Validation", "PR Ready", "PR Size Guard", "Migration Guard", "Security Evidence", "Exact-head Coverage"})
 def _timestamp(value) -> float:

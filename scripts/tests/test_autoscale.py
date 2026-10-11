@@ -501,10 +501,10 @@ class AutoscaleTest(unittest.TestCase):
                 ("host-pressure", obs(), sample(memAvailableBytes=6 * GIB)),
                 ("host-pressure", obs(disk={"admitted": True, "freePct": 9}), sample()),
                 ("gate-pressure", obs(alerts=["gate-timeouts"]), sample()),
-                ("gate-pressure", obs(alerts=["failed-runs"]), sample()),
+                ("gate-pressure", obs(currentRunFailures={"failed": 4, "runs": 8}), sample()),
                 ("gate-pressure", obs(gateWaitMedianS24h=1201), sample())):
             state = decide({"mode": "apply", "lanes": {"devin": {"effective": 4}}}, seen, host, {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (3, reason))
-        held = decide(hot, obs(alerts=["failed-runs"]), sample(), {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (4, "hold:host-cooldown"))
+        held = decide(hot, obs(currentRunFailures={"failed": 4, "runs": 8}), sample(), {"devin": 4}, cfg(), NOW); self.assertEqual((self.lane(held, "devin")["effective"], self.lane(held, "devin")["lastReason"]), (4, "hold:host-cooldown"))
     def test_merge_throughput_is_diagnostic_and_cannot_throttle_healthy_workers(self):
         # A faulty queue must not suppress the workers that can repair it.
         deficit = obs(mergeThroughput={"queueDepth": 30, "queueWaitP50Minutes": 22, "mergedPerHour": 6,
@@ -604,6 +604,76 @@ class AutoscaleTest(unittest.TestCase):
                      sample(psi={"cpuSomeAvg10": 50.0, "memoryFullAvg10": 0.0, "ioFullAvg10": 0.0}), {"devin": 2}, cfg(), now)
         self.assertEqual((self.lane(hot, "devin")["effective"], self.lane(hot, "devin")["lastReason"]),
                          (path[-1] // 2, "host-pressure"), "pressure still halves")
+    def test_fixed_failures_stop_limiting_capacity_and_current_ones_back_off(self):
+        # Gem 21:38Z: "11 harness-failed runs in 24h" (lease collisions, cleanup-locked branches
+        # fixed that afternoon) held every lane on gate-pressure with gate wait 0 and a calm host.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); (root / "runs").mkdir(); release = root / "releases/r1/scripts/lanes"; release.mkdir(parents=True)
+            (root / "current").symlink_to(release)
+            def install(at):
+                os.utime(root / "current", (at, at), follow_symlinks=False)
+            def ledger(rows):
+                (root / "runs" / "ledger.jsonl").write_text("".join(json.dumps(
+                    {"verdict": verdict, "startedAt": A._iso(NOW - age - 60), "endedAt": A._iso(NOW - age)}) + "\n" for age, verdict in rows))
+                return A.current_run_failures(root)
+            def scaled(failures):
+                state = decide({"mode": "apply", "lanes": {"devin": {"effective": 4}}}, obs(alerts=["failed-runs"], currentRunFailures=failures),
+                               sample(), {"devin": 4}, cfg(intervalS=60), NOW)
+                return self.lane(state, "devin")
+            install(NOW - 7 * 3600)
+            # 11 failures 6 h ago, then successes on the same release: the rate clears them.
+            healed = ledger([(6 * 3600, "failed")] * 11 + [(600, "landing")] * 5 + [(300, "verified-not-queued")] * 3)
+            self.assertEqual((healed["failed"], healed["runs"]), (0, 8))
+            self.assertNotIn("gate-pressure", scaled(healed)["blockers"])
+            self.assertEqual(scaled(healed)["effective"], 5, "the 24 h alert alone never freezes scaling")
+            # Failures only before the fix was installed do not count at all.
+            install(NOW - 3600)
+            fixed = ledger([(2 * 3600, "failed")] * 11)
+            self.assertEqual((fixed["failed"], fixed["runs"]), (0, 0))
+            self.assertNotEqual(scaled(fixed)["lastReason"], "gate-pressure")
+            # Current failures on this release still back off.
+            current = ledger([(2 * 3600, "failed")] * 11 + [(900, "landing"), (600, "failed"), (300, "failed")])
+            self.assertEqual((current["failed"], current["runs"]), (2, 3))
+            self.assertEqual((scaled(current)["effective"], scaled(current)["lastReason"]), (3, "gate-pressure"))
+            one = ledger([(600, "failed")])
+            self.assertNotEqual(scaled(one)["lastReason"], "gate-pressure", "a single failure is not a rate")
+            gated = decide({"mode": "apply", "lanes": {"devin": {"effective": 4}}}, obs(alerts=["gate-timeouts"]), sample(), {"devin": 4}, cfg(), NOW)
+            self.assertEqual(self.lane(gated, "devin")["lastReason"], "gate-pressure", "gate timeouts still decrease")
+    def test_repair_seats_ramp_while_new_work_intake_is_held(self):
+        held = obs(newIssueBudgetByProvider={"devin": {"reason": "over-budget"}}, eligiblePoolByProvider={"devin": 300},
+                   maintenanceQueueByProvider={"devin": 9}, runningByProvider={"devin": 2})
+        state = decide({"mode": "apply", "lanes": {"devin": {"base": 2, "effective": 2, "target": 2, "lastChangeAt": NOW - 3600}},
+                        "host": {"lastChangeAt": NOW - 3600}}, held, sample(), {"devin": 2}, cfg(), NOW + 300)
+        state, _ = ticks(5, state, held, sample(), {"devin": 2}, cfg(), NOW + 360)
+        row = self.lane(state, "devin")
+        self.assertGreaterEqual(row["effective"], 4, "proven repair demand 9 ramps repair seats while intake is over budget")
+        self.assertEqual(A._demand("devin", held, NOW), 9, "held intake counts only repair demand")
+    def test_saturated_lane_ramps_on_recent_positive_demand(self):
+        # Gem 21:11Z: devin's one seat was in a 30+ min run, so no devin claim scan refreshed
+        # the census (6 pending at 21:06:57) and autoscale held it at 1 on unknown-demand.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "doctor.json").write_text(json.dumps({"observed": {"now": NOW, "githubRemaining": 4000,
+                "eligiblePoolByProvider": {"devin": 0}, "newIssueBudgetByProvider": {"devin": {"reason": "over-budget"}},
+                "capacityByProvider": {"devin": {"running": 1}}}}))
+            def census(age, pending=6):
+                (root / "maintenance-demand.json").write_text(json.dumps({"schema": "symphony-lanes-maintenance-demand/v1",
+                    "lanes": {"devin": {"observedAt": NOW - age, "pending": pending}}}))
+                return {**obs(), **{key: value for key, value in A.collect(root, {}, NOW).items()
+                                    if key in ("maintenanceQueueByProvider", "recentPositiveDemandByProvider",
+                                               "newIssueBudgetByProvider", "eligiblePoolByProvider", "runningByProvider")}}
+            previous = {"mode": "apply", "lanes": {"devin": {"base": 2, "effective": 1, "target": 1, "lastChangeAt": NOW - 3600}},
+                        "host": {"lastChangeAt": NOW - 3600}}
+            seen = census(254)
+            self.assertIsNone(A._demand("devin", seen, NOW), "past the fresh window on its own")
+            grown = decide(previous, seen, sample(), {"devin": 2}, cfg(intervalS=60), NOW)
+            self.assertEqual((self.lane(grown, "devin")["effective"], self.lane(grown, "devin")["lastReason"]), (2, "sustained-demand"))
+            idle = decide(previous, {**seen, "runningByProvider": {"devin": 0}}, sample(), {"devin": 2}, cfg(intervalS=60), NOW)
+            self.assertEqual((self.lane(idle, "devin")["effective"], self.lane(idle, "devin")["lastReason"]), (1, "hold:not-saturated"),
+                             "an idle seat rescans; it does not borrow old demand")
+            for age, pending in ((A.BUSY_DEMAND_STALE_S + 1, 6), (254, 0)):
+                stale = decide(previous, census(age, pending), sample(), {"devin": 2}, cfg(intervalS=60), NOW)
+                self.assertEqual(self.lane(stale, "devin")["effective"], 1, (age, pending))
     def test_unhealthy_lane_takes_no_host_share(self):
         both = {"devin": 4, "hyperagent": 4}
         seen = obs(unhealthy=["hyperagent"], runningByProvider={"devin": 4, "hyperagent": 0},
@@ -709,7 +779,7 @@ class AutoscaleTest(unittest.TestCase):
                 self.assertEqual(lane.dispatch(host), 0)
             tick = json.loads((host.state / "tick.json").read_text())
             self.assertIn("boom", tick["autoscaleError"])
-            self.assertEqual(tick["spawned"], ["devin", "devin", "devin", "devin", "codex", "codex", "codex", "claude", "claude", "hyperagent", "hyperagent"])
+            self.assertEqual(tick["spawned"], ["devin", "devin", "devin", "devin", "codex", "codex", "codex", "claude", "claude", "hyperagent", "hyperagent", "grok"])
             self.assertEqual(spawned, tick["spawned"])
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
             root = Path(tmp)

@@ -157,6 +157,72 @@ test('a red head, an armed PR, and a poison label are not rearmed', () => {
   );
 });
 
+test('a required-green UNSTABLE head is rearmed; a required-red or unknown head is not', () => {
+  // Live 2026-10-11: victims whose own head had every required check green
+  // but a lane jovie-execution/* receipt pending read UNSTABLE and were never
+  // rearmed. GitHub reads BLOCKED while a required check is pending or red.
+  const states = [
+    'CLEAN',
+    'HAS_HOOKS',
+    'UNSTABLE',
+    'BLOCKED',
+    'BEHIND',
+    'DIRTY',
+    'UNKNOWN',
+  ];
+  const decisions = planVictimRearms({
+    runId: 7,
+    implicatedPaths: ['CLAUDE.md'],
+    candidates: states.map((mergeStateStatus, i) =>
+      candidate({
+        prNumber: 20 + i,
+        headSha: String(i + 1).repeat(40),
+        mergeStateStatus,
+        files: [],
+      })
+    ),
+  });
+  assert.deepEqual(
+    decisions.map(item => item.action),
+    ['rearm', 'rearm', 'rearm', 'skip', 'skip', 'skip', 'skip']
+  );
+  assert.deepEqual(
+    decisions.slice(3).map(item => item.reason),
+    ['head-not-green', 'head-not-green', 'head-not-green', 'head-not-green']
+  );
+});
+
+test('apply re-checks the live state and skips a head that turned BLOCKED', async () => {
+  const enables = [];
+  const decision = {
+    action: 'rearm',
+    prNumber: 10,
+    headSha: sha,
+    classification: 'base-branch',
+    n: 1,
+    increment: false,
+    runId: 7,
+  };
+  for (const mergeStateStatus of ['UNSTABLE', 'BLOCKED']) {
+    await applyVictimRearms([decision], {
+      targetUrl: 'https://github.com/JovieInc/Jovie/actions/runs/7',
+      async readPullRequest() {
+        return {
+          headSha: sha,
+          mergeStateStatus,
+          inQueue: false,
+          autoMerge: false,
+        };
+      },
+      async writeStatus() {},
+      async enable(prNumber) {
+        enables.push(`${prNumber}:${mergeStateStatus}`);
+      },
+    });
+  }
+  assert.deepEqual(enables, ['10:UNSTABLE']);
+});
+
 test('untrusted or foreign-sha receipts do not count toward the cap', () => {
   assert.deepEqual(
     trustedRearmRecords([

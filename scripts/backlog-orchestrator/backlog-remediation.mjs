@@ -140,6 +140,34 @@ export function pullRequestIssueIds(pullRequest) {
   );
 }
 
+// The `linear-issue-id:JOV-<N>` tag is the deliberate link; a bare 'JOV-<N>'
+// in free body text (e.g. '#21212 merely mentions JOV-6269') is not proof the
+// PR ships that issue. Merged-PR attribution must use only the strong
+// signals so a passing mention never supersedes the issue.
+const LINEAR_ISSUE_TAG = /linear-issue-id:\s*(JOV-\d+)\b/gi;
+
+function pullRequestLinkedIssueIds(pullRequest) {
+  const tagged = [
+    ...new Set(
+      [...String(pullRequest?.body ?? '').matchAll(LINEAR_ISSUE_TAG)].map(
+        match => match[1].toUpperCase()
+      )
+    ),
+  ];
+  return [
+    ...new Set([
+      ...tagged,
+      ...extractIssueIdentifiers(
+        [
+          pullRequest?.headRefName,
+          pullRequest?.headRef,
+          pullRequest?.title,
+        ].join('\n')
+      ),
+    ]),
+  ];
+}
+
 function isMergedPullRequest(pullRequest) {
   const state = String(pullRequest?.state || '').toUpperCase();
   return (
@@ -241,7 +269,16 @@ export function inventoryBacklog(
   }
   const byIssue = new Map();
   for (const pullRequest of byNumber.values()) {
-    for (const id of pullRequestIssueIds(pullRequest)) {
+    // Merged PRs attribute to an issue only via the strong link (the
+    // linear-issue-id tag, branch name, or title) — a bare 'JOV-<N>' in free
+    // body text (a passing mention) must never mark the issue shipped
+    // (JOV-6269 was wrongly superseded by #21212/#21222 merely mentioning it).
+    // Open PRs keep the broad body match so the existing-open-PR dedupe still
+    // sees a draft whose only link is in its body.
+    const ids = isMergedPullRequest(pullRequest)
+      ? pullRequestLinkedIssueIds(pullRequest)
+      : pullRequestIssueIds(pullRequest);
+    for (const id of ids) {
       const list = byIssue.get(id) || [];
       list.push(pullRequest);
       byIssue.set(id, list);
@@ -347,6 +384,7 @@ export function classifyRemediationCandidate(issue, options = {}) {
       identifier: id,
       outcome: proven.outcome,
       reason: proven.reason,
+      reasonCode: proven.reason,
       exclusion: proven.outcome === 'blocked' ? proven.reason : null,
       selected: false,
       inventory: inventoryRow || null,
@@ -359,6 +397,7 @@ export function classifyRemediationCandidate(issue, options = {}) {
       identifier: id,
       outcome: exclusion === 'broad-epic' ? 'split' : 'blocked',
       reason: exclusion,
+      reasonCode: exclusion,
       exclusion,
       selected: false,
       inventory: inventoryRow || null,
@@ -381,6 +420,9 @@ export function classifyRemediationCandidate(issue, options = {}) {
       identifier: id,
       outcome,
       reason: mapped || admission.reason.code,
+      // The raw admission disposition code (incl. the stale-or-ambiguous
+      // sub-check) so a near-miss names which gate rejected it.
+      reasonCode: admission.reason.code,
       exclusion: mapped || admission.reason.code,
       selected: false,
       admission,
@@ -394,6 +436,7 @@ export function classifyRemediationCandidate(issue, options = {}) {
       identifier: id,
       outcome: 'blocked',
       reason: targeting.reason || 'no-jovie-artifact',
+      reasonCode: targeting.reason || 'no-jovie-artifact',
       exclusion: targeting.reason || 'no-jovie-artifact',
       selected: false,
       inventory: inventoryRow || null,
@@ -1041,6 +1084,9 @@ export function buildRemediationReceipt({
       identifier: item.identifier,
       outcome: item.outcome,
       reason: item.reason,
+      // The admission disposition code (incl. the stale-or-ambiguous
+      // sub-check) so a near-miss names which gate rejected it.
+      reasonCode: item.reasonCode ?? null,
       exclusion: item.exclusion,
     })),
     counts,

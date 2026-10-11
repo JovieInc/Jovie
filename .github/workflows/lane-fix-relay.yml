@@ -67,6 +67,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      # actions: read for a red run's failed job logs; write to re-run a run that failed only
+      # on GitHub's API quota (scripts/lib/github-rate-limit.mjs) instead of queueing repair.
+      actions: write
       contents: read
       issues: write
       pull-requests: write
@@ -78,6 +81,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts/lanes
+            scripts/lib/github-rate-limit.mjs
           sparse-checkout-cone-mode: false
 
       - name: Label the PR for the lanes
