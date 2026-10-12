@@ -115,7 +115,6 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/golden-path-nightly.yml',
   '.github/workflows/linear-sync-on-merge.yml',
   '.github/workflows/m2-revenue-path-canary.yml',
-  '.github/workflows/mac-runner-heartbeat.yml',
   '.github/workflows/main-ci-health-monitor.yml',
   '.github/workflows/marketing-certification-producer.yml',
   '.github/workflows/merge-queue-green-enroll.yml',

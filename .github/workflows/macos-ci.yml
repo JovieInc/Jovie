@@ -1,0 +1,150 @@
+name: Mac CI
+# Mac product evidence for one exact SHA: the MenuMonitor Swift package and the
+# packaged Electron desktop application. ci.yml calls it with mac-first so an
+# idle self-hosted Mac runs it (mac-lane.yml child run); otherwise hosted
+# macOS does. Policy: .claude/rules/infra.md "macOS runners".
+
+on:
+  workflow_call:
+    inputs:
+      checkout-ref:
+        description: Exact SHA to build; empty uses the event SHA.
+        required: false
+        default: ''
+        type: string
+      supersede-key:
+        description: Stable merge-queue PR identity; a newer Mac child run for it supersedes an older one.
+        required: false
+        default: ''
+        type: string
+      mac-first:
+        description: Prefer an idle self-hosted Mac (mac-lane-route.yml); hosted otherwise.
+        required: false
+        default: false
+        type: boolean
+      mac-child:
+        description: Set only by mac-lane.yml; runs the lane on the self-hosted Macs.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    name: Mac Route
+    if: ${{ inputs.mac-first && !inputs.mac-child }}
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/mac-lane-route.yml
+    with:
+      lane: macos
+      checkout-sha: ${{ inputs.checkout-ref || github.sha }}
+      supersede-key: ${{ inputs.supersede-key }}
+
+  build:
+    name: Build + Test
+    needs: [mac]
+    if: ${{ !cancelled() && (inputs.mac-child || needs.mac.result == 'skipped' || needs.mac.outputs.run_hosted == 'true') }}
+    # Hosted macos-15, not macos-26: MenuMonitor targets macOS 14 /
+    # swift-tools 5.10 and the Electron package needs no Xcode 26. Hosted
+    # macOS pickup waited 8-68 min per merge group on 2026-10-10 because the
+    # org-wide pool was full, which is why an idle Mac goes first.
+    runs-on: ${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
+    # A self-hosted run finishes in ~5 min; a laptop that sleeps mid-job must
+    # hand the lane back to hosted macOS quickly.
+    timeout-minutes: ${{ inputs.mac-child && 25 || 45 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.checkout-ref || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        # A cold macOS pnpm cache save can outlive all product evidence and
+        # consume the merge-queue deadline. Keep the exact fetch/install path,
+        # but do not register setup-node's post-job cache save for this lane.
+        with:
+          package_cache: 'false'
+      # Electron and electron-builder re-download the universal runtimes on
+      # every cold macOS VM. Restore only those immutable download caches,
+      # never build output. Save only from main pushes so a cold save cannot
+      # spend the merge-queue deadline (same reason as package_cache above).
+      - name: Restore Electron downloads
+        id: electron-downloads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ runner.os }}-electron-downloads-${{ hashFiles('pnpm-lock.yaml', 'apps/desktop/electron-builder*.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-downloads-
+      - name: Bind staging package identity to the exact CI attempt
+        id: desktop-staging-identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node apps/desktop/scripts/sync-version.mjs \
+            --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Test and package exact Mac head
+        env:
+          # The staging package is unsigned by design. Hosted runners have no
+          # signing identity; a self-hosted Mac has the owner's Developer ID in
+          # its keychain and electron-builder would try to codesign with it
+          # headless and fail (2026-10-10, tw-mac-001).
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          SOURCE_SHA: ${{ inputs.checkout-ref || github.sha }}
+        run: |
+          set -euo pipefail
+          swift test --package-path apps/macos/MenuMonitor --enable-code-coverage
+          swift build --package-path apps/macos/MenuMonitor -c release
+          pnpm --filter @jovie/desktop run typecheck
+          pnpm --filter @jovie/desktop run test
+          ELECTRON_ENV=staging \
+            DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}" \
+            JOVIE_DESKTOP_SOURCE_REVISION="$SOURCE_SHA" \
+            pnpm --filter @jovie/desktop run package:staging
+      - name: Save Electron downloads
+        if: >-
+          github.event_name == 'push' &&
+          steps.electron-downloads.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ steps.electron-downloads.outputs.cache-primary-key }}
+      - name: Verify exact Mac artifact set
+        run: |
+          set -euo pipefail
+          version="${{ steps.desktop-staging-identity.outputs.version }}"
+          for artifact in \
+            "apps/desktop/dist/Jovie-Staging-${version}-universal.dmg" \
+            "apps/desktop/dist/Jovie-Staging-${version}-universal.dmg.blockmap" \
+            "apps/desktop/dist/Jovie-Staging-${version}-universal.zip" \
+            "apps/desktop/dist/Jovie-Staging-${version}-universal.zip.blockmap" \
+            "apps/macos/MenuMonitor/.build/release/MenuMonitor"; do
+            [ -f "$artifact" ] || { echo "::error::Missing Mac artifact: $artifact"; exit 1; }
+          done
+      - name: Upload exact Mac staging package
+        # Retention-only artifact (no workflow downloads it). A self-hosted
+        # laptop uploads the ~460 MB package at ~20 KB/s and would time the
+        # job out, so only hosted runners keep it; the artifact set is still
+        # verified on every runner above.
+        if: ${{ runner.environment == 'github-hosted' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-staging-${{ inputs.checkout-ref || github.sha }}
+          path: |
+            apps/desktop/dist/Jovie-Staging-*-universal.dmg
+            apps/desktop/dist/Jovie-Staging-*-universal.dmg.blockmap
+            apps/desktop/dist/Jovie-Staging-*-universal.zip
+            apps/desktop/dist/Jovie-Staging-*-universal.zip.blockmap
+            apps/macos/MenuMonitor/.build/release/MenuMonitor
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

@@ -49,6 +49,10 @@ const IOS_CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ios-ci.yml'),
   'utf8'
 );
+const MACOS_CI_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/macos-ci.yml'),
+  'utf8'
+);
 const IOS_TESTFLIGHT_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ios-testflight.yml'),
   'utf8'
@@ -1012,33 +1016,36 @@ describe('merge_group workflow contract', () => {
       `shard: [${Array.from({ length: 14 }, (_, i) => `'${i + 1}/14'`).join(', ')}, 'packages/ui']`
     );
 
-    const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
-    // Self-hosted jovie-mac when the heartbeat is fresh; hosted GA image
-    // otherwise (macos-26 pickup waited 8-68 min per merge group, 2026-10-10).
-    expect(macos).toContain(
-      `runs-on: \${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+    const macosCaller = getJobBlock(CI_WORKFLOW, 'ci-macos');
+    const macosRoute = getJobBlock(MACOS_CI_WORKFLOW, 'mac');
+    const macos = getJobBlock(MACOS_CI_WORKFLOW, 'build');
+    // An idle self-hosted Mac (child run via mac-lane-route.yml) first; hosted
+    // GA image otherwise (macos-26 pickup waited 8-68 min per merge group,
+    // 2026-10-10).
+    expect(macosCaller).toContain('uses: ./.github/workflows/macos-ci.yml');
+    expect(macosCaller).toContain('mac-first: true');
+    expect(macosRoute).toContain(
+      'uses: ./.github/workflows/mac-lane-route.yml'
     );
+    expect(macos).toContain(
+      `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+    );
+    expect(macos).toContain("needs.mac.outputs.run_hosted == 'true'");
     expect(macos).not.toContain('runs-on: macos-26');
-    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
-    expect(pathChanges).toContain(
-      "mac_runner_class: ${{ steps.mac-route.outputs.runner_class || 'hosted' }}"
-    );
-    expect(pathChanges).toContain(
-      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
-    );
-    expect(macos).toContain(
+    expect(CI_WORKFLOW).not.toContain('mac_runner_class');
+    expect(CI_WORKFLOW).not.toContain('mac-runner-heartbeat.yml');
+    expect(macosCaller).toContain(
       "format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number)"
     );
-    expect(macos).toContain(
+    expect(macosCaller).toContain(
       "format('ci-macos-{0}-{1}', github.run_id, github.run_attempt)"
     );
-    expect(macos).toContain(
+    expect(macosCaller).toContain(
       "cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}"
     );
     expect(CI_WORKFLOW).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
-    expect(CI_WORKFLOW).not.toContain('.github/workflows/macos-ci.yml');
-    expect(macos).toContain("github.event_name == 'merge_group'");
-    expect(macos).not.toContain("github.event_name == 'pull_request'");
+    expect(macosCaller).toContain("github.event_name == 'merge_group'");
+    expect(macosCaller).not.toContain("github.event_name == 'pull_request'");
     expect(macos).toContain(
       'swift test --package-path apps/macos/MenuMonitor --enable-code-coverage'
     );
@@ -1053,7 +1060,10 @@ describe('merge_group workflow contract', () => {
     expect(macos).toContain(
       'DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}"'
     );
-    expect(macos).toContain('JOVIE_DESKTOP_SOURCE_REVISION="$GITHUB_SHA"');
+    expect(macos).toContain('JOVIE_DESKTOP_SOURCE_REVISION="$SOURCE_SHA"');
+    expect(macos).toContain(
+      'SOURCE_SHA: ${{ inputs.checkout-ref || github.sha }}'
+    );
     expect(macos).toContain(
       'version="${{ steps.desktop-staging-identity.outputs.version }}"'
     );

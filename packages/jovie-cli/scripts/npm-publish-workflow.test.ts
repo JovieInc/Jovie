@@ -124,11 +124,11 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
   expect(source).toMatch(/node: \[[^\]]*'24\.21\.0'[^\]]*'26'\]/);
   expect(source).toContain('fail-fast: false');
-  // Self-hosted Macs first, hosted macOS as the fallback.
-  expect(source).toContain('needs: [chaos-tarball, mac-runner-route]');
-  expect(source).toContain(
-    'runs-on: ${{ matrix.os == \'macos-latest\' && needs.mac-runner-route.outputs.runner_class == \'mac\' && fromJSON(\'["self-hosted","macOS","ARM64","jovie-mac"]\') || matrix.os }}'
-  );
+  // Hosted on every OS: its legs need this run's tarball and nothing in the
+  // merge queue waits on the publish (HOSTED_MACOS_ALLOWED).
+  expect(source).toContain('needs: [chaos-tarball]');
+  expect(source).toContain('runs-on: ${{ matrix.os }}');
+  expect(source).not.toContain('jovie-mac');
   expect(source).toContain('node "$PACK_DIR/chaos-blackbox.mjs"');
   expect(source).toContain('--profile release');
   expect(source).toContain('npm install --prefix "$CLEAN_DIR"');

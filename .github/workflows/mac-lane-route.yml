@@ -1,0 +1,120 @@
+name: Mac Lane Route
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Tim
+# capability-gap: GitHub has no queue timeout or fallback for self-hosted jobs, so a Mac that sleeps would hold a queued job for 24h; this dispatches the Mac work as a cancellable child run.
+# revisit-trigger: Remove when GitHub offers native self-hosted-first runner fallback or the jovie-mac pool is retired.
+# Mac-first routing for one macOS lane (policy: .claude/rules/infra.md
+# "macOS runners"). The caller runs its hosted macOS job when run_hosted is
+# true and skips it otherwise:
+#   dispatch  starts mac-lane.yml on the jovie-mac Macs and waits up to 45s for
+#             one to pick it up (the pickup IS the live runner check). No
+#             pickup -> the child run is cancelled and the caller runs hosted.
+#   join      waits on the child through a shared concurrency group (no
+#             polling) and passes, fails on a real failure, or hands an
+#             asleep/offline/timed-out Mac back to hosted.
+# The Mac work is a separate child run because a cancelled job makes its whole
+# run conclude "cancelled", which staging and production gates reject. Only
+# attempt 1 of a trusted event may use a Mac, so every rerun is hosted.
+
+on:
+  workflow_call:
+    inputs:
+      lane:
+        description: mac-lane.yml lane to run on a Mac (ios or macos).
+        required: true
+        type: string
+      checkout-sha:
+        description: Exact SHA the Mac child run checks out.
+        required: true
+        type: string
+      supersede-key:
+        description: Stable identity whose newer child run supersedes an older one; empty is run-scoped.
+        required: false
+        default: ''
+        type: string
+    outputs:
+      run_hosted:
+        description: "'true' when the caller must run its hosted macOS job."
+        value: ${{ jobs.dispatch.outputs.fallback != 'false' || jobs.join.outputs.infra != 'false' }}
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    name: Start on a Mac
+    # Reruns are hosted; fork PRs never reach the owner's laptops (public
+    # repo); vars.JOVIE_MAC_RUNNER=off sends everything hosted.
+    if: >-
+      vars.JOVIE_MAC_RUNNER != 'off' &&
+      github.run_attempt == '1' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    outputs:
+      fallback: ${{ steps.dispatch.outputs.fallback || 'true' }}
+      child_run_id: ${{ steps.dispatch.outputs.child_run_id }}
+      join_group: ${{ steps.dispatch.outputs.join_group }}
+    steps:
+      - name: Checkout trusted route policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          sparse-checkout: .github/scripts/mac-lane.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Dispatch the Mac child run and await pickup
+        id: dispatch
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          LANE: ${{ inputs.lane }}
+          CHECKOUT_SHA: ${{ inputs.checkout-sha }}
+          # The child reads mac-lane.yml from this branch: the merge-group
+          # branch, or main for pushes and dispatches from main.
+          DISPATCH_REF: ${{ github.ref_name }}
+          JOIN_GROUP: mac-lane-join-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.lane }}
+          SUPERSEDE_GROUP: mac-lane-${{ inputs.lane }}-${{ inputs.supersede-key || format('run-{0}-{1}', github.run_id, github.run_attempt) }}
+          PARENT_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/scripts/mac-lane.sh dispatch
+
+  join:
+    name: Await the Mac
+    needs: [dispatch]
+    if: ${{ needs.dispatch.outputs.fallback == 'false' && github.run_attempt == '1' }}
+    runs-on: ubuntu-latest
+    # Held (pending) by the child's Mac job, which owns this group until it
+    # finishes, so the join starts only when the Mac result exists.
+    concurrency:
+      group: ${{ needs.dispatch.outputs.join_group }}
+      cancel-in-progress: false
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      infra: ${{ steps.result.outputs.infra || 'true' }}
+    steps:
+      - name: Checkout trusted route policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          sparse-checkout: .github/scripts/mac-lane.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Read the Mac result
+        id: result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          LANE: ${{ inputs.lane }}
+          CHILD_RUN_ID: ${{ needs.dispatch.outputs.child_run_id }}
+        run: bash .github/scripts/mac-lane.sh result
