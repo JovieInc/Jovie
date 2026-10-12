@@ -35,6 +35,7 @@ Nested `.bak` / `.cursor` / `.factory` / `src` / `test` / `bin` copies are not c
 - **lavish**: .claude/skills/lavish/SKILL.md
 - **learn**: .agents/skills/gstack/learn/SKILL.md
 - **load-investors**: .claude/skills/load-investors/SKILL.md
+- **make-it-feel-better**: .claude/skills/make-it-feel-better/SKILL.md
 - **nightly-test-agent**: .agents/skills/nightly-test-agent/SKILL.md
 - **office-hours**: .agents/skills/gstack/office-hours/SKILL.md
 - **perf-loop**: .agents/skills/gstack/perf-loop/SKILL.md
