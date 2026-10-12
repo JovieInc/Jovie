@@ -58,8 +58,27 @@ runs:
     #      during action-setup's reinstall (job 86298003824)
     # runner.temp is per-job, so no sharing is possible; the pnpm tarball
     # re-download costs seconds. The package store stays shared and safe.
+    #
+    # Self-hosted Macs put the pinned pnpm on PATH (runner .env). Reuse it: over
+    # the home uplink the installer's registry fetch timed out and failed the
+    # Mac lane before any build ran (run 38311623148). Nothing is installed or
+    # shared, so neither failure mode above applies.
+    - name: Detect preinstalled pnpm (self-hosted)
+      id: preinstalled-pnpm
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment != 'github-hosted'
+      shell: bash
+      run: |
+        want="$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")"
+        have="$(pnpm --version 2>/dev/null || true)"
+        if [[ "$have" == "$want" ]]; then
+          echo "match=true" >> "$GITHUB_OUTPUT"
+          echo "Using preinstalled pnpm $have from $(command -v pnpm)"
+        else
+          echo "Preinstalled pnpm '${have:-none}' is not $want; installing"
+        fi
+
     - name: Setup pnpm
-      if: steps.runner-prereqs.outputs.dependencies_warm != 'true'
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && steps.preinstalled-pnpm.outputs.match != 'true'
       uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       with:
         dest: ${{ runner.temp }}/setup-pnpm
