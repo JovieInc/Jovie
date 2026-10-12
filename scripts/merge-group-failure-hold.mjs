@@ -679,6 +679,8 @@ export function supersededByLiveEntry(pr, sourceHeadSha, groupHeadSha) {
 // that #21384, ahead of it, broke, while the ahead group was still running.
 // GitHub removes the failing ahead entry and rebuilds this one, so the hold
 // waits. An unreadable base keeps the hold (`baseOnMain` defaults true).
+/** @typedef {{ baseOnMain?: boolean, aheadConclusion?: string | null }} AheadGroup */
+/** @param {AheadGroup} [group] */
 export function aheadEntryUnproven({
   baseOnMain = true,
   aheadConclusion,
@@ -691,7 +693,7 @@ export function aheadEntryUnproven({
 // Dequeue denial is non-fatal: this token cannot call dequeuePullRequest, and
 // GitHub already removes the PR when the merge_group run fails.
 /**
- * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string }} input
+ * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string, aheadGroup?: AheadGroup }} input
  * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function }} io
  */
 export async function applyMergeGroupFailure(
@@ -1111,6 +1113,7 @@ function instructionContractEvidence(repository, run, jobs, baseSha) {
 
 // Is the group's base on main, and how did the CI run of the group ahead end?
 // Any unreadable answer returns {} (attributable), the pre-existing behavior.
+/** @returns {AheadGroup} */
 function readAheadGroup(repository, baseSha) {
   try {
     const compare = ghJson([
