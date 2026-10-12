@@ -56,6 +56,38 @@ export const PendingAction: Story = {
   args: { pendingActionId: 'card-1' },
 };
 
+export const SocialReply: Story = {
+  args: {
+    cards: [
+      {
+        ...CARDS[0],
+        id: 'reply-story',
+        sourceKind: 'social_reply.draft',
+        signalType: 'fan_reply',
+        typeLabel: 'Fan Reply',
+        title: 'Reply to Maya on Instagram',
+        primaryActionLabel: 'Approve Reply',
+        category: 'social_reply',
+        socialReply: {
+          platform: 'Instagram',
+          authorLabel: '@maya.wav',
+          typeLabel: 'Collab Request',
+          inboundText: 'Would you be down to collab?',
+          draftedText: 'Thanks! Let’s find a time to talk.',
+          sourceUrl: 'https://instagram.com/p/story-fixture',
+          executionState: 'pending',
+          revisionCount: 0,
+        },
+      },
+    ],
+    onRevise: fn(),
+  },
+};
+
+export const PendingRevision: Story = {
+  args: { ...SocialReply.args, pendingReviseId: 'reply-story' },
+};
+
 export const Empty: Story = {
   args: { cards: [] },
 };

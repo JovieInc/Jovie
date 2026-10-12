@@ -34,5 +34,19 @@
       "ws:docs-changelog"
     ],
     "bodyMarkers": ["<!-- frozen-plan", "## Frozen plan"]
+  },
+  "bindings": {
+    "about": "Extra Linear team -> repo bindings run by the one lanes service (scripts/lanes/bindings.py). Jovie (JOV, LANES_REPO, lane gate) is the implicit default. Active on `hosts` or wherever LANES_REPO_<KEY> points at a checkout; LANES_BINDING_<KEY>=0 turns one off. Tim 2026-10-11: any Todo issue is eligible (empty `requiredLabels`; only `excludedLabels` and the harness hard exclusions hold work back) and no run waits on a plan approval. LYB shares the host seats with no open-PR ceiling, opens a ready PR then moves the issue to In Review; LYB's own required checks and native merge queue land it.",
+    "LYB": {
+      "enabled": true,
+      "hosts": ["gem"],
+      "repo": "~/LogYourBody",
+      "repoSlug": "JovieInc/LogYourBody",
+      "requiredLabels": [],
+      "excludedLabels": ["hold"],
+      "gate": "github-required-checks",
+      "install": ["pnpm", "install", "--frozen-lockfile", "--prefer-offline"],
+      "reviewState": "In Review"
+    }
   }
 }

@@ -115,7 +115,8 @@ describe('TaskListRow', () => {
     );
 
     const dueChip = getByText('Due tomorrow').closest('span');
-    expect(dueChip).toHaveClass('uppercase');
+    expect(dueChip).toHaveClass('tracking-normal');
+    expect(dueChip).not.toHaveClass('uppercase');
     expect(dueChip?.parentElement?.className).toContain('h-5');
     // The due chip now lives in the inline meta row, not a separate right rail.
     expect(getByTestId('task-list-row-meta-task-1')).toContainElement(

@@ -154,3 +154,126 @@ describe('loadJovieWorkFeed outcome readback', () => {
     ).toEqual({ state: 'unavailable', metrics: null });
   });
 });
+
+describe('creator work projection', () => {
+  it('selects completed records before per-source limits so pending work cannot crowd Done for you out', async () => {
+    mockDbSelect.mockReset();
+    const timestamp = new Date('2026-10-01T12:00:00Z');
+    const rows = [
+      ...Array.from({ length: 25 }, (_, index) => ({
+        id: `pending-${index}`,
+        agentSlug: 'gmail-event-extractor',
+        status: 'running',
+        completedAt: null,
+        startedAt: timestamp,
+      })),
+      {
+        id: 'completed',
+        agentSlug: 'gmail-event-extractor',
+        status: 'completed',
+        completedAt: timestamp,
+        startedAt: timestamp,
+      },
+    ];
+    const agents = queryChain([]);
+    agents.limit.mockImplementation(async (limit: number) => {
+      const query = new PgDialect().sqlToQuery(agents.where.mock.calls[0][0]);
+      const selected = query.params.includes('completed')
+        ? rows.filter(row => row.status === 'completed')
+        : rows;
+      return selected.slice(0, limit);
+    });
+    const chains = [
+      queryChain([]),
+      agents,
+      ...Array.from({ length: 5 }, () => queryChain([])),
+    ];
+    for (const chain of chains) mockDbSelect.mockReturnValueOnce(chain);
+    const items = await loadJovieWorkFeed({
+      userId: 'owner',
+      creatorProfileId: 'creator-profile',
+      limit: 1,
+      range: '30d',
+      phase: 'completed',
+    });
+    expect(items.map(item => item.id)).toEqual(['agent:completed']);
+    const completedStatuses = [
+      ['completed'],
+      ['completed'],
+      ['executed'],
+      ['completed', 'accepted_by_user'],
+      ['succeeded'],
+      ['live'],
+      ['sent'],
+    ];
+    for (const [index, chain] of chains.entries()) {
+      const query = new PgDialect().sqlToQuery(chain.where.mock.calls[0][0]);
+      expect(query.sql).toContain('"status"');
+      expect(query.params).toEqual(
+        expect.arrayContaining(completedStatuses[index])
+      );
+      expect(chain.where.mock.invocationCallOrder[0]).toBeLessThan(
+        chain.limit.mock.invocationCallOrder[0]
+      );
+    }
+  });
+
+  it('removes explicit operator sources before serialization and limits Done for you to completed records', async () => {
+    mockDbSelect.mockReset();
+    const timestamp = new Date('2026-10-01T12:00:00Z');
+    const agents = queryChain([
+      ...[
+        'gmail-event-extractor',
+        'founder.review',
+        'ops.healthcheck',
+        'ovie.queue',
+      ].map(agentSlug => ({
+        id: agentSlug,
+        agentSlug,
+        status: 'completed',
+        completedAt: timestamp,
+        startedAt: timestamp,
+      })),
+      {
+        id: 'pending',
+        agentSlug: 'gmail-event-extractor',
+        status: 'running',
+        completedAt: null,
+        startedAt: timestamp,
+      },
+    ]);
+    const chains = [
+      queryChain([]),
+      agents,
+      queryChain([]),
+      queryChain([]),
+      queryChain([]),
+      queryChain([]),
+      queryChain([]),
+    ];
+    for (const chain of chains) mockDbSelect.mockReturnValueOnce(chain);
+    const items = await loadJovieWorkFeed({
+      userId: 'owner',
+      creatorProfileId: 'creator-profile',
+      limit: 20,
+      range: '30d',
+      phase: 'completed',
+    });
+    expect(items.map(item => item.id)).toEqual(['agent:gmail-event-extractor']);
+    for (const index of [0, 1, 2]) {
+      const query = new PgDialect().sqlToQuery(
+        chains[index].where.mock.calls[0][0]
+      );
+      expect(query.params).toContain('owner');
+      expect(query.params).toContain('founder.%');
+      expect(query.params).toContain('ops.%');
+      expect(query.params).toContain('ovie.%');
+    }
+    for (const index of [4, 5, 6]) {
+      const query = new PgDialect().sqlToQuery(
+        chains[index].where.mock.calls[0][0]
+      );
+      expect(query.params).toContain('creator-profile');
+    }
+  });
+});

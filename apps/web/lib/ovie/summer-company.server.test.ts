@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   stripeMetrics: vi.fn(),
   lybMrr: vi.fn(),
+  founderAccounts: vi.fn(),
   sessionsList: vi.fn(),
   dbResults: [] as unknown[],
   env: { STRIPE_SECRET_KEY: 'sk_test_x' as string | undefined },
@@ -13,6 +14,9 @@ vi.mock('@/lib/admin/stripe-metrics', () => ({
   getAdminStripeOverviewMetrics: hoisted.stripeMetrics,
 }));
 vi.mock('./lyb-mrr.server', () => ({ getLybDailyMrr: hoisted.lybMrr }));
+vi.mock('./summer-founder-cohort.server', () => ({
+  getSummerFounderAccounts: hoisted.founderAccounts,
+}));
 vi.mock('@/lib/env-server', () => ({ env: hoisted.env }));
 vi.mock('@/lib/stripe/client', () => ({
   stripe: { checkout: { sessions: { list: hoisted.sessionsList } } },
@@ -145,6 +149,22 @@ describe('getSummerCohort', () => {
     vi.clearAllMocks();
     hoisted.dbResults.length = 0;
     hoisted.env.STRIPE_SECRET_KEY = 'sk_test_x';
+  });
+
+  it('reads diagnostic accounts without Stripe or outreach cohort queries', async () => {
+    hoisted.env.STRIPE_SECRET_KEY = undefined;
+    const cohort = {
+      total: 4,
+      rows: [{ id: 'u1', displayName: 'Account' }],
+      purpose: 'activation_diagnosis',
+    };
+    hoisted.founderAccounts.mockResolvedValue(cohort);
+    await expect(getSummerCohort('accounts_created', 10)).resolves.toEqual(
+      cohort
+    );
+    expect(hoisted.founderAccounts).toHaveBeenCalledExactlyOnceWith(10);
+    expect(hoisted.sessionsList).not.toHaveBeenCalled();
+    expect(hoisted.dbResults).toEqual([]);
   });
 
   it('lists claimed artists with profile links and a total', async () => {

@@ -48,7 +48,7 @@ describe('recordPacketFounderDecision', () => {
 
     const result = await recordPacketFounderDecision({
       backend,
-      file,
+      target: file,
       decidedAt: DECIDED_AT,
       decision: approve(file),
     });
@@ -75,7 +75,7 @@ describe('recordPacketFounderDecision', () => {
     const second = packetFile('b');
     await recordPacketFounderDecision({
       backend,
-      file: first,
+      target: first,
       decidedAt: DECIDED_AT,
       decision: approve(first, 'shared-action'),
     });
@@ -83,7 +83,7 @@ describe('recordPacketFounderDecision', () => {
 
     const replay = await recordPacketFounderDecision({
       backend,
-      file: second,
+      target: second,
       decidedAt: DECIDED_AT,
       decision: approve(second, 'shared-action'),
     });
@@ -100,13 +100,13 @@ describe('recordPacketFounderDecision', () => {
     const file = packetFile();
     await recordPacketFounderDecision({
       backend,
-      file,
+      target: file,
       decidedAt: DECIDED_AT,
       decision: approve(file, 'action-1'),
     });
     const again = await recordPacketFounderDecision({
       backend,
-      file,
+      target: file,
       decidedAt: DECIDED_AT,
       decision: { ...approve(file, 'action-2'), decision: 'rejected' },
     });
@@ -121,7 +121,7 @@ describe('recordPacketFounderDecision', () => {
     const file = packetFile();
     const stale = await recordPacketFounderDecision({
       backend,
-      file,
+      target: file,
       decidedAt: DECIDED_AT,
       decision: { ...approve(file), evidenceDigest: 'f'.repeat(64) },
     });
@@ -137,7 +137,7 @@ describe('recordPacketFounderDecision', () => {
     });
     const notReady = await recordPacketFounderDecision({
       backend,
-      file: incomplete,
+      target: incomplete,
       decidedAt: DECIDED_AT,
       decision: approve(incomplete, 'action-x'),
     });
@@ -153,7 +153,7 @@ describe('recordPacketFounderDecision', () => {
     await expect(
       recordPacketFounderDecision({
         backend,
-        file,
+        target: file,
         decidedAt: '2026-09-27T06:00:00.000Z',
         decision: approve(file),
       })

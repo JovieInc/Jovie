@@ -7,7 +7,6 @@ import {
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HomepageEditorialChangelog } from '@/components/homepage/HomepageEditorialChangelog';
 import { HomepageIdentityClose } from '@/components/homepage/HomepageIdentityClose';
-import { HomepageIdentityFaq } from '@/components/homepage/HomepageIdentityFaq';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
 import { HomepageIdentitySections } from '@/components/homepage/HomepageIdentitySections';
 import { HomepageLogoStrip } from '@/components/homepage/HomepageLogoStrip';
@@ -15,7 +14,6 @@ import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 import {
-  buildFaqSchema,
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
@@ -145,8 +143,6 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   description: HOMEPAGE_IDENTITY_COPY.seo.description,
 });
 
-const FAQ_SCHEMA = buildFaqSchema([...HOMEPAGE_IDENTITY_COPY.faq.items]);
-
 function HomepageHero() {
   return <HomepageIdentityHero headingId='home-hero-heading' />;
 }
@@ -170,7 +166,7 @@ function HomepageStoryStack() {
 }
 
 // Canonical Pen v3 body: the permission-gated logo strip, presence,
-// structure, FAQ, and the close, on the shared page background. The live
+// structure, and the close, on the shared page background. The live
 // story stack is unchanged while off.
 function HomepageIdentityStoryStack() {
   return (
@@ -180,8 +176,6 @@ function HomepageIdentityStoryStack() {
     >
       <HomepageLogoStrip />
       <HomepageIdentitySections />
-      <script type='application/ld+json'>{FAQ_SCHEMA}</script>
-      <HomepageIdentityFaq />
       <HomepageIdentityClose />
     </div>
   );

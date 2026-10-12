@@ -20,14 +20,24 @@ const columns: ColumnDef<Row, unknown>[] = [
 function ConsumerOwnedSelection({
   onSelection,
   provideSelectionState = true,
+  grouped = false,
 }: {
   readonly onSelection: (ids: string[]) => void;
   readonly provideSelectionState?: boolean;
+  readonly grouped?: boolean;
 }) {
   const [selected, setSelected] = useState<RowSelectionState>({});
   return (
     <UnifiedTable
-      data={data}
+      data={grouped ? data.slice(0, 3) : data}
+      groupingConfig={
+        grouped
+          ? {
+              getGroupKey: row => (row.id === 'b' ? 'Second' : 'First'),
+              getGroupLabel: key => key,
+            }
+          : undefined
+      }
       columns={columns}
       rowMode='dense'
       enableVirtualization={false}
@@ -53,6 +63,44 @@ describe('UnifiedTable keyboard selection', () => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     window.matchMedia = vi.fn().mockReturnValue({ matches: false });
   });
+
+  it.each([true, false])(
+    'keeps Space playback separate from Enter and selection (toggle=%s)',
+    hasToggle => {
+      const onRowClick = vi.fn();
+      const onRowToggle = vi.fn();
+      const onToggleRowSelection = vi.fn();
+      render(
+        <UnifiedTable
+          data={data}
+          columns={columns}
+          enableVirtualization={false}
+          enableKeyboardNavigation
+          getRowId={row => row.id}
+          getRowTestId={row => `row-${row.id}`}
+          onRowClick={onRowClick}
+          onRowToggle={hasToggle ? onRowToggle : undefined}
+          onToggleRowSelection={onToggleRowSelection}
+        />
+      );
+      const row = screen.getByTestId('row-b');
+      act(() => row.focus());
+      fireEvent.keyDown(row, { key: ' ' });
+      expect(onRowToggle).toHaveBeenCalledTimes(hasToggle ? 1 : 0);
+      expect(onRowClick).toHaveBeenCalledTimes(hasToggle ? 0 : 1);
+      expect((hasToggle ? onRowToggle : onRowClick).mock.calls[0][0]).toEqual(
+        data[1]
+      );
+      expect(onToggleRowSelection).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(row, { key: 'Enter' });
+      expect(onRowClick).toHaveBeenCalledTimes(hasToggle ? 1 : 2);
+      expect(onRowClick.mock.calls.at(-1)?.[0]).toEqual(data[1]);
+      fireEvent.keyDown(row, { key: 'x' });
+      expect(onToggleRowSelection).toHaveBeenCalledWith(data[1], 1);
+      expect(row).toHaveFocus();
+    }
+  );
 
   it('toggles the focused row with x', () => {
     const onSelection = vi.fn();
@@ -101,6 +149,22 @@ describe('UnifiedTable keyboard selection', () => {
     expect(onSelection).toHaveBeenLastCalledWith(['a', 'b', 'c', 'd']);
     expect(onSelection).toHaveBeenCalledTimes(selectionCalls);
     expect(screen.getByTestId('row-c')).toHaveFocus();
+  });
+
+  it('extends selection in grouped display order instead of interleaved source order', () => {
+    const onSelection = vi.fn();
+    render(<ConsumerOwnedSelection onSelection={onSelection} grouped />);
+    act(() => screen.getByTestId('row-a').focus());
+    fireEvent.keyDown(document.activeElement as HTMLElement, {
+      key: 'ArrowDown',
+      shiftKey: true,
+    });
+    expect(onSelection).toHaveBeenLastCalledWith(['a', 'c']);
+    expect(screen.getByTestId('row-c')).toHaveFocus();
+    expect(screen.getByTestId('row-b')).not.toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
   });
 
   it('requires controlled state before extending consumer-owned selection', () => {

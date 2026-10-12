@@ -280,6 +280,24 @@ describe('LoadingSkeleton', () => {
       );
     });
 
+    it('removes caller aspect and flex-basis geometry overrides', () => {
+      render(
+        <LoadingSkeleton
+          className='aspect-video basis-1/2 md:aspect-square grow-0'
+          height='h-6'
+          width='w-48'
+        />
+      );
+
+      const skeleton = document.querySelector('[data-slot="skeleton"]');
+      expect(skeleton).toHaveClass('h-6', 'w-48', 'grow-0');
+      expect(skeleton).not.toHaveClass(
+        'aspect-video',
+        'basis-1/2',
+        'md:aspect-square'
+      );
+    });
+
     it('applies height to all lines', () => {
       render(<LoadingSkeleton lines={2} height='h-6' />);
       const skeletons = document.querySelectorAll('.skeleton');

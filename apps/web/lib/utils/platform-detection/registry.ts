@@ -88,6 +88,10 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
     'https://soundcloud.com/username'
   ),
   bandcamp: createPlatformInfo('bandcamp', 'https://username.bandcamp.com'),
+  beatport: createPlatformInfo(
+    'beatport',
+    'https://www.beatport.com/artist/name/id'
+  ),
   amazon_music: createPlatformInfo(
     'amazon_music',
     'https://music.amazon.com/artists/...'
@@ -269,6 +273,10 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   },
   { pattern: /soundcloud\.com/i, platformId: 'soundcloud' },
   { pattern: /bandcamp\.com/i, platformId: 'bandcamp' },
+  {
+    pattern: /^https?:\/\/(?:www\.)?beatport\.com(?:\/|$)/i,
+    platformId: 'beatport',
+  },
   { pattern: /music\.amazon\.com/i, platformId: 'amazon_music' },
   { pattern: /tidal\.com/i, platformId: 'tidal' },
   { pattern: /deezer\.com/i, platformId: 'deezer' },

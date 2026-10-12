@@ -518,12 +518,20 @@ describe('ChatPageClient', () => {
     );
   });
 
-  it('does not register a right panel when the preview panel is closed', () => {
+  it('keeps the inactive profile drawer registered while its preview is closed', () => {
     mockPreviewPanelState.isOpen = false;
 
     renderChatPage();
 
-    expect(hasRegisteredRightPanel()).toBe(false);
+    expect(hasRegisteredRightPanel()).toBe(true);
+    const panel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    fastRender(panel as React.ReactElement);
+    expect(screen.getByTestId('chat-profile-preview-rail')).toHaveAttribute(
+      'data-shell-profile-only',
+      'true'
+    );
+    expect(mockPreviewPanelState.isOpen).toBe(false);
+    expect(mockOpenPreviewPanel).not.toHaveBeenCalled();
   });
 
   it('preserves profile panel deep-link hydration and opens the panel from the query param', () => {

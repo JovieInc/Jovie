@@ -147,12 +147,6 @@ export const APP_SCREEN_CANVAS_EXCEPTIONS: Readonly<
     component: 'PageShell',
     enclosingFunction: 'InsightsPanelView',
   }),
-  'apps/web/app/app/(shell)/jovie-work/page.tsx': screenOwned({
-    source:
-      'apps/web/components/features/dashboard/organisms/jovie-work-feed/JovieWorkPanel.tsx',
-    component: 'PageShell',
-    enclosingFunction: 'JovieWorkPanelView',
-  }),
   'apps/web/app/app/(shell)/youtube/page.tsx': screenOwned({
     source:
       'apps/web/components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx',

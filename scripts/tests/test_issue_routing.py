@@ -141,6 +141,11 @@ class AdmissionTest(unittest.TestCase):
 
 class AvailabilityTest(unittest.TestCase):
     def setUp(self):
+        # Route availability fixtures assume current Free eligibility; expiry is
+        # exercised against real Host slots in test_devin_free_policy.py.
+        self.free = patch.object(lane.devin_free_policy, 'admission_open', return_value=True)
+        self.free.start()
+        self.addCleanup(self.free.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name), linear_env=Path(self.tmp.name) / "none")
         self.env = patch.dict(os.environ, {"LANES_SLOTS_CODEX": "0"})

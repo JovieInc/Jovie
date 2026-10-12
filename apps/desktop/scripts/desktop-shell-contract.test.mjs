@@ -1875,3 +1875,49 @@ test('real native cancel wiring retries only an interrupted workspace document',
     'https://jov.ie/app/returned',
   ]);
 });
+
+test('auth handoff uses compact outer bounds and stays inside the active work area', async () => {
+  const source = await readFile(
+    join(desktopRoot, 'src/auth-handoff-window.ts'),
+    'utf8'
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS },
+  }).outputText;
+  const exports = {};
+  runInNewContext(compiled, { exports });
+  const bounds = exports.authHandoffWindowBounds;
+  const normal = bounds({ x: 0, y: 25, width: 1440, height: 875 });
+  assert.equal(normal.width, 840);
+  assert.equal(normal.height, 350);
+  assert.equal(normal.width / normal.height, 2.4);
+  for (const workArea of [
+    { x: -1920, y: 25, width: 1920, height: 1055 },
+    { x: 0, y: 25, width: 680, height: 420 },
+    { x: 120, y: 25, width: 390, height: 300 },
+    { x: 0, y: 0, width: 640, height: 200 },
+  ]) {
+    const actual = bounds(workArea);
+    assert.ok(actual.width <= workArea.width);
+    assert.ok(actual.height <= workArea.height);
+    assert.ok(actual.minWidth <= actual.width);
+    assert.ok(actual.minHeight <= actual.height);
+    assert.ok(
+      actual.x >= workArea.x &&
+        actual.x + actual.width <= workArea.x + workArea.width
+    );
+    assert.ok(
+      actual.y >= workArea.y &&
+        actual.y + actual.height <= workArea.y + workArea.height
+    );
+  }
+  const fallback = bounds({ x: 0, y: 25, width: 680, height: 420 });
+  assert.equal(fallback.width / fallback.height, 2);
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  assert.match(mainSource, /authHandoffWindowBounds\(/);
+  assert.match(
+    mainSource,
+    /screen\.getDisplayMatching\(mainWindow\.getBounds\(\)\)/
+  );
+  assert.doesNotMatch(mainSource, /const AUTH_HANDOFF_WINDOW_BOUNDS/);
+});

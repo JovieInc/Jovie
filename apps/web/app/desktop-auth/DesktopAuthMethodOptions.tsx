@@ -1,8 +1,9 @@
 import { Button } from '@jovie/ui';
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import type { SelectedMethod } from './desktop-auth-contract';
 
 interface DesktopAuthMethodOptionsProps {
+  readonly cancelButton: ReactNode;
   readonly browserOptionRef: RefObject<HTMLButtonElement | null>;
   readonly canRedeemCode: boolean;
   readonly codeOptionRef: RefObject<HTMLButtonElement | null>;
@@ -27,6 +28,7 @@ interface DesktopAuthMethodOptionsProps {
 const OPTION_ROW_CLASS = 'w-full justify-start';
 
 export function DesktopAuthMethodOptions({
+  cancelButton,
   browserOptionRef,
   canRedeemCode,
   codeOptionRef,
@@ -49,19 +51,25 @@ export function DesktopAuthMethodOptions({
 }: DesktopAuthMethodOptionsProps) {
   return (
     <>
-      <Button
-        ref={disclosureRef}
-        type='button'
-        variant='link'
-        size='sm'
-        aria-controls={optionsId}
-        aria-expanded={open}
-        data-auth-action='options'
-        disabled={disabled}
-        onClick={onToggle}
+      <div
+        className='flex items-center justify-center gap-4'
+        data-auth-utility-row
       >
-        Other Sign-in Options
-      </Button>
+        <Button
+          ref={disclosureRef}
+          type='button'
+          variant='link'
+          size='sm'
+          aria-controls={optionsId}
+          aria-expanded={open}
+          data-auth-action='options'
+          disabled={disabled}
+          onClick={onToggle}
+        >
+          Other Sign-in Options
+        </Button>
+        {cancelButton}
+      </div>
       {open ? (
         <fieldset
           id={optionsId}

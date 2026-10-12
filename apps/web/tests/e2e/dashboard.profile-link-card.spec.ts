@@ -44,7 +44,8 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     );
 
     // Grant clipboard permissions to avoid permission prompts
-    await context.grantPermissions(['clipboard-read']);
+    // Chromium-only: Firefox rejects 'clipboard-read' as an unknown permission.
+    await context.grantPermissions(['clipboard-read']).catch(() => {});
 
     // Set up Clerk testing token and sign in
 

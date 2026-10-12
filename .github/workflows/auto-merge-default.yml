@@ -12,7 +12,9 @@
 # stuck ones get a single diagnostic comment plus one aggregate tracking issue.
 #
 # MECHANISM:
-# 1. `enable` job — fires on opened/reopened/ready_for_review and runs
+# 1. `enable` job — fires on opened/reopened/ready_for_review/synchronize and
+#    on Source Validation completing for a same-repo PR (missed-event
+#    backstop, no timer), and runs
 #    `gh pr merge --auto --squash` with GITHUB_TOKEN (GraphQL
 #    enablePullRequestAutoMerge; GITHUB_TOKEN is sufficient — the PAT workflow-
 #    scope gap that blocks pushing workflow-file changes does NOT apply to
@@ -46,7 +48,13 @@ name: Auto-Merge Default
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review, synchronize]
+  # Event backstop for a missed enable: the PR Ready producer finishing on a
+  # same-repo PR re-runs the idempotent enable (check_suite does not fire for
+  # Actions-created suites, so Source Validation's completion is the wake).
+  workflow_run:
+    workflows: ['Source Validation']
+    types: [completed]
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
@@ -67,7 +75,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: auto-merge-default-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  group: auto-merge-default-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -79,11 +87,18 @@ jobs:
     # in-job fork notice could run. Dependabot PRs get native merge intent
     # from dependabot-auto-merge.yml (pull_request_target); forks and missed
     # events are covered by the hourly triage sweep's --enable-missing.
+    # workflow_run lists pull_requests only for same-repo heads, so forks
+    # never reach it; drafts are re-read in the step.
     if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.user.login != 'dependabot[bot]'
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.draft == false &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.actor.login != 'dependabot[bot]' &&
+       github.event.workflow_run.pull_requests[0].number != null)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -100,10 +115,7 @@ jobs:
         # Jovie Bot private key is empty and this mint fails hard (JOV-4782). The
         # dependabot lane is owned by dependabot-auto-merge.yml plus the hourly
         # triage --enable-missing sweep, which run with full secrets.
-        if: >-
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          github.event.pull_request.user.login != 'dependabot[bot]' &&
-          env.JOVIE_BOT_PRIVATE_KEY != ''
+        if: env.JOVIE_BOT_PRIVATE_KEY != ''
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -112,11 +124,14 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: read
+          # Auto-merge on a head that edits .github/workflows needs it
+          # ("`workflows` scope may be required"); the installation grants it.
+          permission-workflows: write
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.event.workflow_run.head_repository.full_name }}
           BASE_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -130,6 +145,20 @@ jobs:
           fi
           if [[ "$HEAD_REPO" != "$BASE_REPO" ]]; then
             echo "::notice::Fork PR — GITHUB_TOKEN is read-only on pull_request events from forks; skipping auto-merge enable."
+            exit 0
+          fi
+          # On a merge-queue repo, auto-merge on a CLEAN PR enqueues it at once,
+          # and a held member fails every merge group it joins. Same set as
+          # ADMISSION_BLOCKING_LABELS (scripts/lib/admission-hold-labels.mjs).
+          if gh pr view "$PR_NUMBER" --repo "$BASE_REPO" --json state,isDraft \
+            --jq '.state != "OPEN" or .isDraft' | grep -qx true; then
+            echo "PR #$PR_NUMBER is closed or a draft; ready_for_review enables it later."
+            exit 0
+          fi
+          if gh pr view "$PR_NUMBER" --repo "$BASE_REPO" --json labels \
+            --jq '[.labels[].name | ascii_downcase] | any(. == "hold" or . == "gated" or . == "incident" or . == "do-not-merge" or . == "tim-hold" or . == "tim:hold" or . == "hold:tim" or . == "queue-poison")' \
+            | grep -qx true; then
+            echo "PR #$PR_NUMBER carries an admission-blocking label; auto-merge stays off until it is removed (Merge Queue Green Enroll then admits it)."
             exit 0
           fi
           PR_HEAD=$(gh pr view "$PR_NUMBER" --repo "$BASE_REPO" --json headRefOid --jq '.headRefOid')
@@ -168,7 +197,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -191,6 +220,7 @@ jobs:
           permission-issues: write
           permission-pull-requests: write
           permission-statuses: read
+          permission-workflows: write
       - name: Triage stuck PRs
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -216,7 +246,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up pinned Node and test dependencies
         uses: ./.github/actions/setup-node-pnpm

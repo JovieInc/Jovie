@@ -16,7 +16,12 @@ vi.mock('@/lib/ovie/summer-company.server', async () => {
     getSummerRevenue: hoisted.revenue,
     getSummerCohort: hoisted.cohort,
     summerCohortQuerySchema: z.object({
-      kind: z.enum(['claimed_artists', 'checkout_abandoned', 'churned']),
+      kind: z.enum([
+        'claimed_artists',
+        'checkout_abandoned',
+        'churned',
+        'accounts_created',
+      ]),
       limit: z.coerce.number().int().min(1).max(200).default(50),
     }),
   };
@@ -71,6 +76,32 @@ describe('GET /api/internal/ovie/summer-company/cohorts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.verify.mockResolvedValue(true);
+  });
+
+  it('returns the authenticated diagnostic cohort and its definition uncached', async () => {
+    const cohort = {
+      total: 4,
+      rows: [{ id: 'u1', displayName: 'Account' }],
+      timeRange: '30d',
+      definitionVersion: 'founder-funnel.v2',
+      purpose: 'activation_diagnosis',
+      hasMore: true,
+    };
+    hoisted.cohort.mockResolvedValue(cohort);
+    const response = await cohortsRoute.GET(
+      new Request(`${BASE}/cohorts?kind=accounts_created&limit=1`)
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(hoisted.cohort).toHaveBeenCalledWith(
+      'accounts_created',
+      1,
+      expect.any(Date)
+    );
+    expect(await response.json()).toMatchObject({
+      kind: 'accounts_created',
+      ...cohort,
+    });
   });
 
   it('returns 401 when OIDC fails', async () => {

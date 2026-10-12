@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { isFormElement } from '@/lib/utils/keyboard';
+import { isShellShortcutSuppressed } from '@/lib/utils/keyboard';
 
 const RIGHT_RAIL_KEYBOARD_SHORTCUT_BARE = ']';
 
@@ -14,6 +14,7 @@ export function useRightRailKeyboardShortcut(onToggle: () => void) {
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isShellShortcutSuppressed(event)) return;
       const key = event.key;
       if (!key) return;
 
@@ -23,8 +24,7 @@ export function useRightRailKeyboardShortcut(onToggle: () => void) {
         key === RIGHT_RAIL_KEYBOARD_SHORTCUT_BARE &&
         !event.metaKey &&
         !event.ctrlKey &&
-        !event.altKey &&
-        !isFormElement(event.target)
+        !event.altKey
       ) {
         event.preventDefault();
         handlerRef.current();

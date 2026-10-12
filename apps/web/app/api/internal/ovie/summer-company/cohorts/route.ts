@@ -14,7 +14,7 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
-/** Jovie outreach cohorts for Summer. Never LYB health data. */
+/** Jovie diagnostic and outreach cohorts for Summer. Never LYB health data. */
 export async function GET(request: Request): Promise<NextResponse> {
   if (!(await verifySummerOidcRequest(request))) {
     return json({ error: 'unauthorized' }, 401);

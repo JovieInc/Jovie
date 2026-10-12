@@ -41,6 +41,7 @@ const { getLambdaOptionsFromFunction } = buildUtilsRequire(buildUtilsEntry) as {
 };
 
 type VercelConfig = {
+  crons?: Array<{ path: string; schedule: string }>;
   functions?: Record<string, unknown>;
   ignoreCommand?: string;
 };
@@ -156,6 +157,26 @@ function turbopackGlobSource(exclude: string): string {
 }
 
 describe('Vercel function config', () => {
+  it.each(['vercel.json', 'apps/web/vercel.json'])(
+    'schedules the acquisition-gating canaries in %s before their 26-hour receipts expire',
+    configPath => {
+      const crons = readVercelConfig(configPath).crons ?? [];
+      for (const [path, schedule] of [
+        ['/api/cron/public-profile-canary', '13 6 * * *'],
+        ['/api/cron/auth-signup-onboarding-canary', '23 6 * * *'],
+      ]) {
+        expect(
+          crons.filter(cron => cron.path === path),
+          configPath
+        ).toEqual([{ path, schedule }]);
+        expect(
+          existsSync(resolve(appWebRoot, `app${path}/route.ts`)),
+          path
+        ).toBe(true);
+      }
+    }
+  );
+
   it('loads the real production config with Sentry source maps enabled', () => {
     const result = spawnSync(
       process.execPath,

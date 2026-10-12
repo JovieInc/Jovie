@@ -49,12 +49,13 @@ export function HomepageIdentityHero({
       />
       <MarketingHero
         variant='split'
+        className='homepage-claim-hero__layout'
         headingId={headingId}
         testId='marketing-section-hero'
         sectionVariant='split-claim-card'
         sectionOwner='apps/web/components/homepage/HomepageIdentityHero.tsx'
       >
-        <div className='max-w-xl'>
+        <div className='homepage-claim-hero__copy max-w-xl'>
           <p className='marketing-kicker'>{copy.kicker}</p>
           <h1
             id={headingId}
@@ -74,7 +75,7 @@ export function HomepageIdentityHero({
           variant='floating'
           glowTone='none'
           testId='homepage-claim-card'
-          className='product-claim-card w-full max-w-85'
+          className='homepage-claim-hero__card product-claim-card w-full max-w-85'
           contentClassName='flex flex-col gap-4 px-5 py-5 sm:gap-5 sm:px-9 sm:py-10'
         >
           <div

@@ -459,6 +459,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   );
 
   // Define columns using TanStack Table
+  // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
   const columns = useMemo<ColumnDef<AdminUserRow, any>[]>(
     () => [
       // Checkbox column with row numbers

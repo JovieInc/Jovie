@@ -57,6 +57,14 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/public-profile-canary",
+      "schedule": "13 6 * * *"
+    },
+    {
+      "path": "/api/cron/auth-signup-onboarding-canary",
+      "schedule": "23 6 * * *"
+    },
+    {
       "path": "/api/cron/artist-daily-snapshots",
       "schedule": "15 9 * * *"
     }

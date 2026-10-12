@@ -168,6 +168,7 @@ import {
   createSummerRuntimeBridge,
   type SummerRuntimeBridge,
 } from './summer-runtime-bridge';
+import { authHandoffWindowBounds } from './auth-handoff-window';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import {
   isTrayAppState,
@@ -344,12 +345,6 @@ interface RecentDesktopAuthCompletion {
   readonly expiresAt: number;
 }
 
-const AUTH_HANDOFF_WINDOW_BOUNDS = {
-  width: 820,
-  height: 520,
-  minWidth: 680,
-  minHeight: 460,
-} as const;
 const AUTH_COMPLETION_REPLAY_TTL_MS = 60_000;
 const PUBLIC_PROFILE_PREVIEW_PARTITION = 'persist:jovie-public-profile-preview';
 const PUBLIC_PROFILE_PREVIEW_BOUNDS = {
@@ -1362,9 +1357,13 @@ function showDesktopAuthHandoff(
     return;
   }
 
+  const authDisplay =
+    mainWindow && !mainWindow.isDestroyed()
+      ? screen.getDisplayMatching(mainWindow.getBounds())
+      : screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   authHandoffWindow = new BrowserWindow({
     show: false,
-    ...AUTH_HANDOFF_WINDOW_BOUNDS,
+    ...authHandoffWindowBounds(authDisplay.workArea),
     resizable: false,
     maximizable: false,
     fullscreenable: false,

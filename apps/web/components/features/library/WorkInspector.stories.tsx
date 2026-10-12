@@ -1,5 +1,9 @@
+import '@/styles/system-b-app.css';
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import { userEvent, within } from 'storybook/test';
+import { LibraryLoadingState } from '@/app/app/(shell)/library/LibraryLoadingState';
 import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import {
@@ -100,15 +104,41 @@ function RightPanelSlot() {
   );
 }
 
-function WorkInspectorProof() {
+function WorkInspectorProof({
+  rowCount = 1,
+  width,
+  loading = false,
+}: {
+  readonly rowCount?: number;
+  readonly width?: number;
+  readonly loading?: boolean;
+}) {
+  const [revision, setRevision] = useState(0);
+  const assets = Array.from({ length: rowCount }, (_, index) => ({
+    ...release,
+    id: index === 0 ? release.id : `${release.id}-${index}`,
+    title: index === 0 ? release.title : `Work ${index}: ${release.title}`,
+    artist: 'An artist name long enough to exercise narrow table disclosure',
+    artworkUrl: index % 2 ? '/brand/Jovie-Logo-Icon.svg' : null,
+  }));
   return (
     <RightPanelProvider>
-      <div className='flex h-screen bg-(--app-shell-content-surface)'>
+      <Button onClick={() => setRevision(revision + 1)}>Refresh Fixture</Button>
+      <div
+        data-testid='library-browser-proof'
+        data-revision={revision}
+        className='flex h-screen bg-(--app-shell-content-surface)'
+        style={{ width }}
+      >
         <main className='min-w-0 flex-1 overflow-hidden'>
-          <LibrarySurface
-            assets={[release]}
-            postReleaseBundle={postReleaseBundle}
-          />
+          {loading ? (
+            <LibraryLoadingState />
+          ) : (
+            <LibrarySurface
+              assets={assets}
+              postReleaseBundle={postReleaseBundle}
+            />
+          )}
         </main>
         <RightPanelSlot />
       </div>
@@ -119,7 +149,7 @@ function WorkInspectorProof() {
 const openInspector = async (canvasElement: HTMLElement) => {
   const canvas = within(canvasElement);
   await userEvent.click(
-    await canvas.findByRole('button', { name: `View ${release.title}` })
+    await canvas.findByTestId(`library-catalog-row-${release.id}`)
   );
 };
 
@@ -148,4 +178,22 @@ export const Files: Story = {
       await within(canvasElement).findByRole('tab', { name: 'Files' })
     );
   },
+};
+
+export const DenseScanWithInspector: Story = {
+  args: { rowCount: 19, width: 892 },
+  play: async ({ canvasElement }) => {
+    await openInspector(canvasElement);
+  },
+};
+
+export const VirtualizedDenseScan: Story = {
+  args: { rowCount: 20, width: 892 },
+  play: async ({ canvasElement }) => {
+    await openInspector(canvasElement);
+  },
+};
+
+export const DenseLoading: Story = {
+  args: { width: 892, loading: true },
 };

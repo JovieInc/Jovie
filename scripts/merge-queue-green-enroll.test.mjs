@@ -74,6 +74,7 @@ async function fixture(
     afterStatusWrite,
     readCurrentSnapshot,
     effectSink,
+    env = {},
   } = {}
 ) {
   const mutations = [];
@@ -83,7 +84,9 @@ async function fixture(
   const statusWrites = [];
   const inventories = [];
   const gets = [];
+  const mainReads = [];
   const effects = {
+    mainReads,
     reads,
     mutations,
     warnings,
@@ -97,6 +100,7 @@ async function fixture(
     rest: {
       git: {
         getRef: async params => {
+          mainReads.push(params.ref);
           assert.deepEqual(params, {
             owner: 'JovieInc',
             repo: 'Jovie',
@@ -185,6 +189,8 @@ async function fixture(
         GITHUB_WORKSPACE: process.cwd(),
         FAILURE_HOLD_RECEIPT: failureReceipt,
         ADMISSION_RECOVERY_RECEIPT: admissionRecoveryReceipt,
+        MERGE_STATE_RETRY_MS: '0',
+        ...env,
       },
     },
     createRequire(import.meta.url)
@@ -265,7 +271,7 @@ test('a proven admission-quota ejection authorizes one unchanged-head retry with
   const recovered = await fixture({
     statuses,
     overrides,
-    eventName: 'schedule',
+    eventName: 'push',
   });
   assert.deepEqual(recovered.mutations, [{ id: 'PR_1', oid: sha }]);
   assert.equal(
@@ -392,6 +398,140 @@ test('preserves live holds, rejected heads, conflicts, drafts, queue membership 
   assert.deepEqual((await fixture({ roster, overrides })).mutations, []);
 });
 
+test('admits every required-green merge state and refuses blocked or conflicting ones', async () => {
+  // Live 2026-10-11: #21202 and #20203 sat UNSTABLE for a day with all four
+  // required checks green; only lane jovie-execution receipts were pending.
+  const states = [
+    'CLEAN',
+    'HAS_HOOKS',
+    'UNSTABLE',
+    'BLOCKED',
+    'BEHIND',
+    'DIRTY',
+    'DRAFT',
+  ];
+  const roster = states.map((_, i) => candidate(i + 1));
+  const overrides = Object.fromEntries(
+    states.map((mergeStateStatus, i) => [i + 1, { mergeStateStatus }])
+  );
+  const result = await fixture({ roster, overrides, eventName: 'push' });
+  assert.deepEqual(
+    result.mutations.map(mutation => mutation.id),
+    ['PR_1', 'PR_2', 'PR_3']
+  );
+});
+
+test('an UNKNOWN merge state after main moves is re-read instead of dropping the wake', async () => {
+  // Live 2026-10-11 18:57Z: every open PR read UNKNOWN right after main moved
+  // and settled within seconds; a single read skipped the PR until the next
+  // (throttled) sweep.
+  const settles = await fixture({
+    readCurrentSnapshot: (number, readCount) => ({
+      ...current(number),
+      mergeStateStatus: readCount < 3 ? 'UNKNOWN' : 'CLEAN',
+    }),
+  });
+  assert.deepEqual(settles.reads, [1, 1, 1]);
+  assert.deepEqual(settles.mutations, [{ id: 'PR_1', oid: sha }]);
+  const never = await fixture({
+    readCurrentSnapshot: number => ({
+      ...current(number),
+      mergeStateStatus: 'UNKNOWN',
+    }),
+  });
+  assert.deepEqual(never.reads, [1, 1, 1]);
+  assert.deepEqual(never.mutations, []);
+  const settled = await fixture({
+    overrides: { 1: { mergeStateStatus: 'BLOCKED' } },
+  });
+  assert.deepEqual(settled.reads, [1]);
+});
+
+test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
+  const removal = reason => ({
+    timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
+  });
+  const release = (name, createdAt = '2026-10-02T13:05:00Z') => ({
+    releases: { nodes: [{ createdAt, label: { name } }] },
+  });
+  const enqueued = async override =>
+    (await fixture({ overrides: { 1: override }, eventName: 'push' })).mutations
+      .length;
+  assert.equal(await enqueued({ ...removal('MANUAL'), ...release('hold') }), 1);
+  assert.equal(
+    await enqueued({ ...removal('manual'), ...release('Queue-Poison') }),
+    1
+  );
+  assert.equal(await enqueued(removal('manual')), 0);
+  assert.equal(
+    await enqueued({ ...removal('manual'), ...release('lane-fix-red') }),
+    0
+  );
+  assert.equal(
+    await enqueued({
+      ...removal('manual'),
+      ...release('hold', '2026-10-02T12:59:00Z'),
+    }),
+    0
+  );
+  assert.equal(
+    await enqueued({ ...removal('FAILED_CHECKS'), ...release('hold') }),
+    0
+  );
+  assert.equal(
+    await enqueued({ ...removal(undefined), ...release('hold') }),
+    0
+  );
+  const sourceFailure = {
+    context: 'jovie-queue-failure-hold/v1',
+    state: 'success',
+    creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+    description: 'class=deterministic-source;n=1;run=456;try=1',
+    target_url: 'https://github.com/JovieInc/Jovie/actions/runs/456',
+  };
+  const held = await fixture({
+    statuses: [sourceFailure],
+    overrides: { 1: { ...removal('manual'), ...release('hold') } },
+  });
+  assert.deepEqual(held.mutations, []);
+});
+
+test('main is read only to resolve a held candidate, never on an ineligible wake', async () => {
+  // 2026-10-11: ~47 enroll runs/h; most wakes land before the head is green.
+  const blocked = await fixture({
+    eventName: 'pull_request_target',
+    payload: { pull_request: { number: 1 } },
+    overrides: { 1: { mergeStateStatus: 'BLOCKED' } },
+  });
+  assert.deepEqual(blocked.mainReads, []);
+  assert.deepEqual(blocked.reads, [1]);
+  const clean = await fixture({ roster: [candidate(1), candidate(2)] });
+  assert.deepEqual(clean.mainReads, []);
+  assert.equal(clean.mutations.length, 2);
+  const held = await fixture({
+    statuses: [
+      {
+        context: 'jovie-queue-failure-hold/v1',
+        state: 'success',
+        creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+        description: `class=base-branch;n=1;run=456;try=1;main=${'e'.repeat(40)}`,
+        target_url: 'https://github.com/JovieInc/Jovie/actions/runs/456',
+      },
+    ],
+    roster: [candidate(1), candidate(2)],
+  });
+  assert.deepEqual(held.mainReads, ['heads/main']);
+});
+
+test('queue mutation tokens can act on heads that edit workflow files', () => {
+  for (const job of ['enroll', 'rearm-green-victims']) {
+    const token = workflow.jobs[job].steps.find(
+      step => step.id === 'app-token'
+    );
+    assert.equal(token.with['permission-workflows'], 'write', job);
+  }
+});
+
 test('permits a repaired head committed after rejection, and dry runs never mutate', async () => {
   const overrides = {
     1: { timelineItems: { nodes: [{ createdAt: '2026-10-02T11:00:00Z' }] } },
@@ -455,23 +595,20 @@ test('a blocking label on a queued PR dequeues only that PR', () => {
   );
 });
 
-test('wakes on completed Source Validation and on the bounded reconciliation sweep', () => {
+test('wakes on completed Source Validation and on the push-to-main reconciliation sweep', () => {
   assert.ok(workflow.on.workflow_run.workflows.includes('Source Validation'));
   assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
   assert.deepEqual(workflow.on.pull_request_target.types, [
     'labeled',
     'unlabeled',
     'reopened',
+    'synchronize',
   ]);
   // A label is never an enroll wake; only a blocking one dequeues its PR.
   assert.match(workflow.jobs.enroll.if, /github\.event\.action != 'labeled'/);
   // JOV-7589: a dequeue while checks are already green emits no completion
-  // event, so a periodic full-roster sweep re-arms within the cadence.
-  const [sweep] = workflow.on.schedule;
-  const cadenceMinutes = Number(
-    /^\*\/([1-9][0-9]*) \* \* \* \*$/.exec(sweep.cron)?.[1]
-  );
-  assert.ok(cadenceMinutes > 0 && cadenceMinutes <= 15);
+  // event, so every landing on main runs the full-roster sweep.
+  assert.deepEqual(workflow.on.push, { branches: ['main'] });
   assert.match(workflow.jobs.enroll.if, /conclusion == 'success'/);
   const ready = load(
     readFileSync('.github/workflows/auto-ready-agent-drafts.yml', 'utf8')
@@ -642,7 +779,7 @@ test('a PR wake reads only its current candidate instead of rescanning the whole
   }
 });
 
-test('a scheduled sweep re-enqueues a dequeued PR whose repaired head turned green', async () => {
+test('a push-to-main sweep re-enqueues a dequeued PR whose repaired head turned green', async () => {
   // JOV-7589 regression: after a merge-queue ejection the lane pushes a newer
   // head and the checks go green without a wake. The sweep must find and
   // re-enroll it; a still-removed head stays blocked without a bounded retry.
@@ -655,7 +792,7 @@ test('a scheduled sweep re-enqueues a dequeued PR whose repaired head turned gre
   const result = await fixture({
     roster: [candidate(1), candidate(2)],
     overrides,
-    eventName: 'schedule',
+    eventName: 'push',
   });
   assert.equal(result.inventories.length, 1);
   assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
@@ -900,7 +1037,7 @@ async function exerciseRecoveryBoundary(boundary, change) {
     await released.promise;
   }
   const pending = fixture({
-    eventName: 'schedule',
+    eventName: 'push',
     statuses: [recovery],
     effectSink: effects,
     beforeStatusResponse: () => pause('statuses'),
@@ -1231,4 +1368,26 @@ test('a deferred current-state read cannot dequeue a repaired head after its hol
     releaseRead();
     await Promise.allSettled([pending]);
   }
+});
+
+test('a landing on main reconciles the full roster and the hold contract without a timer', async () => {
+  // Tim 2026-10-12: no time-based loops. The push wake replaces the */15 sweep.
+  assert.deepEqual(workflow.on.push, { branches: ['main'] });
+  assert.ok(workflow.on.pull_request_target.types.includes('synchronize'));
+  assert.match(workflow.concurrency.group, /'push'/);
+  assert.equal(
+    concurrencyGroup({ event_name: 'push', event: {}, run_id: 1 }),
+    concurrencyGroup({ event_name: 'push', event: {}, run_id: 2 })
+  );
+  const effects = await fixture({ eventName: 'push', roster: [candidate(1)] });
+  // One paginated pulls.list inventory, as for a manual dispatch.
+  assert.equal(effects.inventories.length, 1);
+  assert.deepEqual(effects.reads, [1]);
+  assert.equal(effects.mutations.length, 1);
+  const contract = workflow.jobs['enforce-hold-contract'].if;
+  assert.equal(workflow.on.schedule, undefined);
+  for (const event of ['push', 'pull_request_target', 'workflow_dispatch']) {
+    assert.match(contract, new RegExp(`"${event}"`));
+  }
+  assert.match(contract, /workflow_run\.event == 'merge_group'/);
 });

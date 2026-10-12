@@ -58,6 +58,25 @@ After a train merges to `main`, reset the integration branch from `main` before 
 7. **Stale PR >24h without push** — close and recreate from fresh integration base.
 8. **One migration number per train** — rebase integration before adding the next `00NN_*` migration.
 
+## Event-driven only: no new controllers, clocks, or pollers (JOV-INV-042)
+
+Admission and landing (PR ready/draft, auto-merge, merge-queue enqueue/dequeue,
+PR/issue labels, Linear state) are event-driven. The Gem lanes tick
+(`scripts/lanes/`) is the only scheduler.
+
+- Check existing machinery first: extend merge-queue-green-enroll, the hold
+  contract, or the lanes tick before adding any controller.
+- New controllers trigger on `pull_request`, `pull_request_target`,
+  `merge_group`, `workflow_run`, `check_suite`, or `repository_dispatch`, or
+  extend the Gem tick. Never a cron.
+- Cron is only for measurement and scans already on the frozen
+  `CRON_ALLOWLIST` in `scripts/lib/ci-schedule-inventory.mjs`. The allowlist,
+  `ADMISSION_CRON_DEBT`, and `POLLING_DEBT` only shrink: removing a cron deletes
+  its entry and lowers the ceiling.
+- Never hold a runner polling GitHub, git, or queue state. React to the
+  completion event. A capped retry (at most 5 attempts) of one transient call
+  is the only allowed wait.
+
 ## When to use integration branches
 
 | Use integration | Go direct to `main` |

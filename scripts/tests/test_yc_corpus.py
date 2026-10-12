@@ -3,15 +3,44 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("yc_corpus", ROOT / "scripts/lanes/yc_corpus.py")
 yc = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(yc)
+
+REAL_POPEN = subprocess.Popen
+_GUARDS = []
+
+
+def _forbidden(what):
+    def refuse(*args, **kwargs):
+        raise AssertionError(f"test attempted a real {what}: {args[:1]}")
+    return refuse
+
+
+def setUpModule():
+    # Every test here must inject its effects. A real gbrain write, network fetch or detached
+    # refresh from the release self-test is a bug (2026-10-11: orphaned refresh pairs on Gem).
+    for target, name, what in ((yc.subprocess, "Popen", "process spawn"), (yc.subprocess, "run", "command"),
+                               (yc.urllib.request, "urlopen", "network fetch"), (yc.lifecycle, "run", "command")):
+        guard = patch.object(target, name, _forbidden(what))
+        guard.start()
+        _GUARDS.append(guard)
+
+
+def tearDownModule():
+    while _GUARDS:
+        _GUARDS.pop().stop()
+
 
 LIBRARY_URL = "https://www.ycombinator.com/library/Iq-how-to-talk-to-users"
 SITEMAP = f"<urlset><url><loc>{LIBRARY_URL}</loc></url><url><loc>https://www.ycombinator.com/library?categories=Pricing</loc></url></urlset>"
@@ -127,6 +156,40 @@ class YcCorpusTest(unittest.TestCase):
         self.assertEqual(second["status"], "current")
         self.assertEqual(len(spawned), 1)
         self.assertEqual(spawned[0][1:3], [str(ROOT / "scripts/lanes/yc_corpus.py"), "refresh"])
+
+
+class SelftestIsolationTest(unittest.TestCase):
+    def test_selftest_never_schedules_the_real_refresh(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
+            self.assertEqual(yc.tick(Path(tmp), now=100), {"status": "selftest-skipped"})
+            self.assertEqual(list(Path(tmp).iterdir()), [], "a skipped tick writes no schedule")
+
+    def test_selftest_refuses_real_gbrain_and_network_before_any_effect(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
+            with self.assertRaises(yc.SelftestEffectRefused):
+                yc.gbrain_put(yc.SOURCE_PREFIX + "fixture", "t", "body\n")
+            with self.assertRaises(yc.SelftestEffectRefused):
+                yc.fetch_url(yc.LIBRARY_SITEMAP)
+            result = yc.refresh(Path(tmp) / "yc.json", limit=1, now=1_797_000_000)
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("SelftestEffectRefused", result["failures"][0])
+
+    def test_standalone_run_kills_the_whole_group_on_timeout(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(yc.subprocess, "Popen", REAL_POPEN):
+            marker = Path(tmp) / "child.pid"
+            with self.assertRaises(subprocess.TimeoutExpired):
+                yc.run_in_group(["sh", "-c", f"sleep 30 & echo $! > {marker}; wait"],
+                                capture_output=True, text=True, timeout=1)
+            child = int(marker.read_text())
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                try:
+                    os.kill(child, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(.05)
+            else:
+                self.fail("grandchild survived the group kill")
 
 
 class GbrainPutTest(unittest.TestCase):
