@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { planSuperseded } from '../actions-cache-supersede.mjs';
 
@@ -34,18 +34,13 @@ it('keeps the newest per allowlisted main stem, drops dead v1/v2/v3', () => {
   expect(ids([v3])).toEqual([9]);
 });
 
-it('runs main-only with only actions: write', () => {
-  const wf = readFileSync(
-    `${import.meta.dirname}/../../../.github/workflows/actions-cache-supersede.yml`,
-    'utf8'
-  );
-  expect(wf).toContain("github.ref == 'refs/heads/main'");
-  expect(wf).toMatch(/^permissions:\n {2}actions: write\n\n/m);
-  // Each main push saves the new generation and applies the prune; no clock.
-  expect(wf).not.toMatch(/^ {2}schedule:/m);
-  expect(wf).toContain(
-    "APPLY: ${{ github.event_name == 'push' || inputs.apply }}"
-  );
+it('runs inside Actions Cache GC, not as a second listing workflow', () => {
+  const workflows = `${import.meta.dirname}/../../../.github/workflows`;
+  expect(existsSync(`${workflows}/actions-cache-supersede.yml`)).toBe(false);
+  const gc = readFileSync(`${workflows}/actions-cache-gc.yml`, 'utf8');
+  expect(gc).toContain('scripts/lib/actions-cache-supersede.mjs');
+  expect(gc).toMatch(/^ {2}push:\n {4}branches: \[main\]/m);
+  expect(gc).not.toMatch(/^ {2}schedule:/m);
 });
 
 it('keeps only the newest evidence cache of each quota-saving family', () => {

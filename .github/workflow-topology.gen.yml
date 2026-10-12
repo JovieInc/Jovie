@@ -86,18 +86,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:gc
     jobCount: 1
-  - name: Actions Cache Supersede
-    path: .github/workflows/actions-cache-supersede.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - push
-      - workflow_dispatch
-    terminalReceipt: job:prune
-    jobCount: 1
   - name: Agent Harness Health Report
     path: .github/workflows/agent-harness-health-report.yml
     active: true
