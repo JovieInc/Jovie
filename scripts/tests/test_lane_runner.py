@@ -5266,6 +5266,107 @@ class UpdateTest(unittest.TestCase):
     def git(self, *args, cwd):
         subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
 
+    def clean_env(self):
+        env = {key: value for key, value in os.environ.items() if not key.startswith(("GIT_", "LANES_SELFTEST"))}
+        env.update(GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+        return patch.dict(os.environ, env, clear=True)
+
+    def commit(self, repo, name, body="x"):
+        (repo / name).parent.mkdir(parents=True, exist_ok=True)
+        (repo / name).write_text(body)
+        self.git("add", "-A", cwd=repo)
+        self.git("commit", "-qm", name, cwd=repo)
+        self.git("push", "-q", "origin", "HEAD:main", cwd=repo)
+        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True).stdout.strip()
+
+    def test_update_refreshes_the_object_mirror_before_its_own_fetch(self):
+        with tempfile.TemporaryDirectory() as tmp, self.clean_env():
+            tmp = Path(tmp).resolve()
+            origin, work = tmp / "origin.git", tmp / "work"
+            self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
+            self.git("clone", "-q", str(origin), str(work), cwd=tmp)
+            self.commit(work, "a")
+            mirror = tmp / "git/mirrors/Jovie.git"
+            self.git("clone", "-q", "--mirror", str(origin), str(mirror), cwd=tmp)
+            clone = tmp / "lanes"
+            self.git("clone", "-q", "--reference", str(mirror), str(origin), str(clone), cwd=tmp)
+            host = lane.Host(state=tmp / "state", repo=clone)
+            self.assertEqual(lane.object_mirror(clone), mirror)
+            head = self.commit(work, "b")
+            order = []
+            real = lane.refresh_object_mirror
+            with patch.object(lane, "refresh_object_mirror", side_effect=lambda h: order.append("mirror") or real(h)), \
+                    patch.object(lane, "install_release", side_effect=lambda h: order.append("install") or 0), \
+                    patch.object(lane, "refresh_codex_skills", return_value={"status": "current"}):
+                self.assertEqual(lane.update(host), 0)
+            self.assertEqual(order, ["mirror", "install"])
+            update = json.loads((host.state / "update.json").read_text())
+            self.assertEqual((update["mirror"]["status"], update["skills"]), ("fetched", {"status": "current"}))
+            mirrored = subprocess.run(["git", "-C", str(mirror), "rev-parse", "refs/heads/main"],
+                                      capture_output=True, text=True).stdout.strip()
+            self.assertEqual(mirrored, head)
+            self.assertTrue((tmp / "git/locks/jovie-mirror.lock").exists())
+            with open(tmp / "git/locks/jovie-mirror.lock", "a") as held:
+                lane.fcntl.flock(held, lane.fcntl.LOCK_EX | lane.fcntl.LOCK_NB)
+                self.assertEqual(lane.refresh_object_mirror(host)["status"], "busy")
+            self.git("-C", str(mirror), "remote", "set-url", "origin", str(tmp / "absent.git"), cwd=tmp)
+            self.assertEqual(lane.refresh_object_mirror(host)["status"], "failed")
+            with patch.object(lane, "install_release", return_value=0), \
+                    patch.object(lane, "refresh_codex_skills", return_value={"status": "current"}):
+                self.assertEqual(lane.update(host), 0, "a failed mirror fetch never fails the update")
+
+    def test_only_a_bare_alternate_is_a_mirror(self):
+        with tempfile.TemporaryDirectory() as tmp, self.clean_env():
+            tmp = Path(tmp).resolve()
+            checkout = tmp / "Jovie"
+            self.git("init", "-q", str(checkout), cwd=tmp)
+            clone = tmp / "lanes"
+            self.git("init", "-q", str(clone), cwd=tmp)
+            self.assertIsNone(lane.object_mirror(clone))
+            (clone / ".git/objects/info/alternates").write_text(f"{checkout}/.git/objects\n")
+            self.assertIsNone(lane.object_mirror(clone), "a working checkout's refs are never mirrored over")
+            self.assertEqual(lane.refresh_object_mirror(lane.Host(state=tmp / "s", repo=clone)), {"status": "no-mirror"})
+
+    def test_selftest_update_never_touches_mirror_or_skills(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_SELFTEST": "1"}), \
+                patch.object(lane, "install_release", return_value=0), \
+                patch.object(lane, "refresh_object_mirror") as mirror, patch.object(lane, "refresh_codex_skills") as skills:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane.update(host), 0)
+            mirror.assert_not_called(); skills.assert_not_called()
+            update = json.loads((Path(tmp) / "update.json").read_text())
+            self.assertEqual(update["mirror"], {"status": "selftest-skipped"})
+
+    def test_codex_skills_install_only_when_agent_skills_main_moved(self):
+        with tempfile.TemporaryDirectory() as tmp, self.clean_env():
+            tmp = Path(tmp).resolve()
+            home, origin, work = tmp / "home", tmp / "agent-skills.git", tmp / "work"
+            self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
+            self.git("clone", "-q", str(origin), str(work), cwd=tmp)
+            calls = tmp / "installs.txt"
+            first = self.commit(work, "scripts/install-skills",
+                                f"import sys\nopen({str(calls)!r}, 'a').write(' '.join(sys.argv[1:]) + '\\n')\n")
+            home.mkdir()
+            self.git("clone", "-q", str(origin), str(home / "agent-skills"), cwd=tmp)
+            host = lane.Host(state=tmp / "state", repo=tmp)
+            host.state.mkdir()
+            result = lane.refresh_codex_skills(host, home=home)
+            self.assertEqual((result["status"], result["to"]), ("updated", first[:12]), "first run installs")
+            self.assertEqual(lane.refresh_codex_skills(host, home=home)["status"], "current")
+            self.assertEqual(len(calls.read_text().splitlines()), 1, "unchanged main: one ls-remote, no install")
+            second = self.commit(work, "skills/autoreview/SKILL.md")
+            self.assertEqual(lane.refresh_codex_skills(host, home=home),
+                             {"status": "updated", "from": first[:12], "to": second[:12]})
+            installs = calls.read_text().splitlines()
+            self.assertEqual(installs[-1], f"--target {home / '.codex/skills'} autoreview behavior-validator --force")
+            self.assertEqual(subprocess.run(["git", "-C", str(home / "agent-skills"), "rev-parse", "HEAD"],
+                                            capture_output=True, text=True).stdout.strip(), second)
+            self.git("commit", "-q", "--allow-empty", "-m", "local", cwd=home / "agent-skills")
+            self.commit(work, "c")
+            failed = lane.refresh_codex_skills(host, home=home)
+            self.assertEqual((failed["status"], failed["step"]), ("failed", "merge"), "never a non-fast-forward")
+            self.assertEqual(lane.refresh_codex_skills(host, home=tmp / "nohome"), {"status": "no-source"})
+
     def test_release_selftest_never_sees_host_tuning(self):
         knobs = {"LANES_SLOTS_DEVIN": "2", "SYMPHONY_FILE_OVERLAP_GUARD": "flag", "LANES_PARKED_RETIRE": "0",
                  "CODEX_LANE_AUTH_MODE": "current-login", "CODEX_LANE_CLI": "/host/codex"}
