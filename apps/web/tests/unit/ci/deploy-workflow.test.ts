@@ -4075,6 +4075,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(stageStep).toContain('VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"');
     expect(stageStep).toContain('NEXT_PUBLIC_BUILD_SHA="$expected"');
     expect(stageStep).toContain('--meta "githubCommitSha=${EXPECTED_SHA}"');
+    expect(stageStep).toContain('timeout-minutes: 45');
+    expect(stageStep).toContain('--timeout 30m');
     expect(stageStep).toContain('[ "$production_deploy_state" != "READY" ]');
     expect(stageStep).toContain(
       '[ "$production_deploy_target" != "production" ]'
