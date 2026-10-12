@@ -88,8 +88,8 @@ const FORK_GATE_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/fork-pr-gate.yml'),
   'utf8'
 );
-const AUTO_MERGE_DEFAULT_WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/auto-merge-default.yml'),
+const GREEN_ENROLL_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/merge-queue-green-enroll.yml'),
   'utf8'
 );
 const SIZE_GUARD_WORKFLOW = readFileSync(
@@ -374,28 +374,31 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('reserves ready_for_review for auto-merge enable only', () => {
+  it('reserves ready_for_review for the green-enroll admission wake only', () => {
     const workflowDir = resolve(REPO_ROOT, '.github/workflows');
     const offenders = readdirSync(workflowDir)
       .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
-      .filter(file => file !== 'auto-merge-default.yml')
+      .filter(file => file !== 'merge-queue-green-enroll.yml')
       .filter(file => {
         const source = readFileSync(resolve(workflowDir, file), 'utf8');
         return workflowDeclaresReadyForReviewType(source);
       });
 
     // A ready transition must never earn an unchanged head a second CI
-    // flight. auto-merge-default.yml is the sole subscriber: it enables
-    // native auto-merge and still skips drafts.
+    // flight. merge-queue-green-enroll.yml is the sole subscriber: it admits
+    // the already-green head and still skips drafts.
     expect(offenders).toEqual([]);
-    expect(
-      workflowDeclaresReadyForReviewType(AUTO_MERGE_DEFAULT_WORKFLOW)
-    ).toBe(true);
-    expect(AUTO_MERGE_DEFAULT_WORKFLOW).toContain(
-      'types: [opened, reopened, ready_for_review, synchronize]'
+    expect(existsSync(resolve(workflowDir, 'auto-merge-default.yml'))).toBe(
+      false
     );
-    expect(getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable')).toContain(
-      'github.event.pull_request.draft == false'
+    expect(workflowDeclaresReadyForReviewType(GREEN_ENROLL_WORKFLOW)).toBe(
+      true
+    );
+    expect(GREEN_ENROLL_WORKFLOW).toContain(
+      'types: [labeled, unlabeled, reopened, ready_for_review, synchronize]'
+    );
+    expect(getJobBlock(GREEN_ENROLL_WORKFLOW, 'enroll')).toContain(
+      "(github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)"
     );
   });
 
@@ -2887,44 +2890,6 @@ ${selectedGateScript}`,
     );
     expect(dependabotGate).toContain('actions/create-github-app-token');
     expect(dependabotGate).toContain('-f context="Fork PR Gate"');
-  });
-
-  it('skips the auto-merge app token for Dependabot-authored PRs and forks', () => {
-    const enable = getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable');
-    const tokenStep = getStepBlock(enable, 'Generate Jovie Bot token');
-    const enableStep = getStepBlock(enable, 'Enable auto-merge');
-    const enableScript = getStepRunScript(enable, 'Enable auto-merge');
-
-    // Dependabot pull_request runs receive an empty secrets context, so the
-    // step also bails when JOVIE_BOT_PRIVATE_KEY is unavailable; the hourly
-    // triage sweep enables auto-merge with full secrets.
-    // The job if: admits only same-repo, non-Dependabot PRs for both the
-    // pull_request and the Source Validation workflow_run wake.
-    expect(enable).toContain(
-      'github.event.pull_request.head.repo.full_name == github.repository &&'
-    );
-    expect(enable).toContain(
-      "github.event.pull_request.user.login != 'dependabot[bot]')"
-    );
-    expect(enable).toContain(
-      'github.event.workflow_run.head_repository.full_name == github.repository &&'
-    );
-    expect(enable).toContain(
-      "github.event.workflow_run.actor.login != 'dependabot[bot]' &&"
-    );
-    expect(tokenStep).toContain(`        if: env.JOVIE_BOT_PRIVATE_KEY != ''
-        id: app-token`);
-    expect(enable).toContain(
-      '      JOVIE_BOT_PRIVATE_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
-    );
-    expect(tokenStep).not.toContain("github.actor != 'dependabot[bot]'");
-    expect(enableStep).toContain(
-      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
-    );
-    expect(enableScript).toMatch(
-      /^set -euo pipefail\nif \[\[ -z "\$GH_TOKEN" \]\]; then\n/
-    );
-    expect(enableScript).toContain('exit 0');
   });
 
   it.each([

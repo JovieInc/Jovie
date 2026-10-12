@@ -101,8 +101,6 @@ const EVENT_DRIVEN_FIX = `use pull_request/pull_request_target/merge_group/workf
  */
 /** @type {Readonly<Record<string, string>>} */
 export const CRON_KEEP_REASONS = Object.freeze({
-  '.github/workflows/auto-merge-default.yml':
-    'owner-tracked (admissions): stuck-PR reporting + fork enable backstop; see ADMISSION_CRON_DEBT',
   '.github/workflows/ci-duration-ratchet.yml':
     'calendar window: daily rollup of rolling p95 CI wall time; a per-run trigger would re-alert on every completion',
   '.github/workflows/cli-chaos-nightly.yml':
@@ -159,8 +157,9 @@ export const CRON_KEEP_REASONS = Object.freeze({
 
 /** @type {readonly string[]} */
 export const CRON_ALLOWLIST = Object.freeze(Object.keys(CRON_KEEP_REASONS));
-// 27 = main's 26 after mac-runner-heartbeat removal, plus gem-producer-drift.
-export const CRON_ALLOWLIST_CEILING = 27;
+// 26 = 27 minus auto-merge-default (retired: merge-queue-green-enroll admits,
+// the lanes stuck-PR ladder reports).
+export const CRON_ALLOWLIST_CEILING = 26;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
@@ -169,12 +168,6 @@ export const CRON_ALLOWLIST_CEILING = 27;
  */
 /** @type {Readonly<Record<string, {reason: string, replacement: string}>>} */
 export const ADMISSION_CRON_DEBT = Object.freeze({
-  '.github/workflows/auto-merge-default.yml': Object.freeze({
-    reason:
-      'hourly triage: auto-merge enable for fork PRs (workflow_run lists no fork pull_requests) and stuck-PR reporting; same-repo enable is event-driven (synchronize + Source Validation workflow_run)',
-    replacement:
-      'fork enable via a pull_request_target enable path; stuck-PR reporting moves to the Gem lanes tick',
-  }),
   '.github/workflows/desktop-release.yml': Object.freeze({
     reason:
       'daily staging desktop build in the same workflow that opens and labels the release stamp PR',
@@ -188,7 +181,7 @@ export const ADMISSION_CRON_DEBT = Object.freeze({
       'Gem lanes tick emits the receipt natively (its removal-trigger); push and repository_dispatch stay',
   }),
 });
-export const ADMISSION_CRON_DEBT_CEILING = 3;
+export const ADMISSION_CRON_DEBT_CEILING = 2;
 
 /**
  * Workflow steps that hold a runner polling GitHub, git, or queue state. Keyed
@@ -196,14 +189,12 @@ export const ADMISSION_CRON_DEBT_CEILING = 3;
  */
 /** @type {Readonly<Record<string, string>>} */
 export const POLLING_DEBT = Object.freeze({
-  '.github/workflows/auto-merge-default.yml#self-test':
-    'manual self-test rereads autoMergeRequest 12 times for 60 s',
   '.github/workflows/golden-path-nightly.yml#golden-path':
     'dispatches ci.yml then waits up to 80 min for that run to complete',
   '.github/workflows/pr-conflict-handler.yml#record_cohort':
     'polls candidate CI runs until a deadline to record cohort outcomes',
 });
-export const POLLING_DEBT_CEILING = 3;
+export const POLLING_DEBT_CEILING = 2;
 
 /**
  * Mutations that change PR, merge-queue, issue, or label state. A workflow is

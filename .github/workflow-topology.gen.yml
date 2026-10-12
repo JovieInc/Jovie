@@ -40,7 +40,6 @@ blockingPrChecks:
   - llm-review
 normalPrWorkflows:
   - Source Validation
-  - Auto-Merge Default
   - Fork PR Gate
   - PR Size Guard
   - PR targets main
@@ -61,7 +60,7 @@ inactiveWorkflows:
   - Taste Classifier
   - Taste Label Guard
 generatedAt: deterministic
-normalPrCheckRecords: 25
+normalPrCheckRecords: 22
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -131,20 +130,6 @@ nodes:
       - workflow_run
     terminalReceipt: job:exhaust
     jobCount: 5
-  - name: Auto-Merge Default
-    path: .github/workflows/auto-merge-default.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - pull_request
-      - schedule
-      - workflow_dispatch
-      - workflow_run
-    terminalReceipt: job:self-test
-    jobCount: 3
   - name: Auto-Ready Agent Drafts
     path: .github/workflows/auto-ready-agent-drafts.yml
     active: false
@@ -1317,7 +1302,6 @@ nodes:
     authoritativeFor:
       - source-validation
     allowedConsumers:
-      - Auto-Merge Default
       - Auto-Ready Agent Drafts
       - Lane Fix Relay
       - Merge Queue Green Enroll
@@ -1507,9 +1491,6 @@ nodes:
     terminalReceipt: job:mine
     jobCount: 1
 edges:
-  - from: Source Validation
-    to: Auto-Merge Default
-    type: workflow_run
   - from: CI
     to: iOS CI
     type: workflow_call
