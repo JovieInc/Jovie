@@ -2342,58 +2342,38 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
   });
 });
 
-describe('native merge-queue cohort (JOV-5047)', () => {
-  it('waits below five entries until the bounded low-traffic timeout', () => {
+describe('native merge-queue singleton groups (JOV-8112)', () => {
+  it('starts a queued PR immediately without a group-formation wait', () => {
     expect(
       evaluateNativeCohortMergeDecision({ queuedCount: 1, waitedMinutes: 0 })
-    ).toMatchObject({ action: 'awaiting-cohort', reason: 'below-min-entries' });
+    ).toMatchObject({ action: 'merge', reason: 'cohort-full' });
     expect(
-      evaluateNativeCohortMergeDecision({ queuedCount: 4, waitedMinutes: 9 })
-    ).toMatchObject({ action: 'awaiting-cohort', reason: 'below-min-entries' });
-    expect(
-      evaluateNativeCohortMergeDecision({ queuedCount: 0, waitedMinutes: 10 })
+      evaluateNativeCohortMergeDecision({ queuedCount: 0, waitedMinutes: 0 })
     ).toMatchObject({ action: 'empty', reason: 'no-queued-entries' });
   });
 
-  it('merges a five-entry cohort immediately and a partial cohort after 10 minutes', () => {
+  it('locks one PR per merge group while preserving concurrent builds', () => {
     expect(NATIVE_QUEUE_COHORT_POLICY).toMatchObject({
       schema: 'jovie-native-queue-cohort/v1',
-      minEntriesToMerge: 5,
-      minEntriesToMergeWaitMinutes: 10,
+      minEntriesToMerge: 1,
+      minEntriesToMergeWaitMinutes: 0,
       alreadyAdmittedOnStaleProduction: 'preserve',
       newIntakeOnStaleProduction: 'freeze',
       deterministicMemberFailure: 'isolate-and-remove',
       transientFailure: 'bounded-retry',
+      liveRulesetCutover: 'applied',
     });
     expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(10);
-    expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(5);
-    expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(10);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_merge).toBe(1);
+    expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(1);
+    expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(0);
     expect(
-      evaluateNativeCohortMergeDecision({ queuedCount: 5, waitedMinutes: 0 })
+      evaluateNativeCohortMergeDecision({ queuedCount: 1, waitedMinutes: 0 })
     ).toMatchObject({ action: 'merge', reason: 'cohort-full' });
-    expect(
-      evaluateNativeCohortMergeDecision({ queuedCount: 1, waitedMinutes: 10 })
-    ).toMatchObject({ action: 'merge', reason: 'low-traffic-timeout' });
   });
 
-  it('emits a deterministic policy readback receipt', () => {
-    const matched = buildNativeQueuePolicyReadback(NATIVE_QUEUE_POLICY);
-    expect(matched).toMatchObject({
-      schema: 'jovie-native-queue-policy-readback/v1',
-      matched: true,
-      drift: [],
-    });
-    const drifted = buildNativeQueuePolicyReadback({
-      ...NATIVE_QUEUE_POLICY,
-      min_entries_to_merge: 1,
-      min_entries_to_merge_wait_minutes: 0,
-    });
-    expect(drifted.matched).toBe(false);
-    expect(drifted.drift).toEqual([
-      'min_entries_to_merge',
-      'min_entries_to_merge_wait_minutes',
-    ]);
-    const liveUntilCutover = validateLiveMergeQueueRuleset(
+  it('reports the observed value when live max group size drifts', () => {
+    const result = validateLiveMergeQueueRuleset(
       {
         bypass_actors: [],
         rules: [
@@ -2413,16 +2393,70 @@ describe('native merge-queue cohort (JOV-5047)', () => {
             type: 'merge_queue',
             parameters: {
               ...NATIVE_QUEUE_POLICY,
-              min_entries_to_merge: 1,
-              min_entries_to_merge_wait_minutes: 0,
+              max_entries_to_merge: 5,
             },
           },
         ],
       },
       { backend: 'native' }
     );
-    expect(NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover).toBe('pending');
-    expect(liveUntilCutover.ok).toBe(true);
+
+    expect(result.errors).toContain(
+      'live native merge_queue max_entries_to_merge must be 1 (observed 5)'
+    );
+  });
+
+  it('emits a deterministic policy readback receipt', () => {
+    const matched = buildNativeQueuePolicyReadback(NATIVE_QUEUE_POLICY);
+    expect(matched).toMatchObject({
+      schema: 'jovie-native-queue-policy-readback/v1',
+      matched: true,
+      drift: [],
+    });
+    const drifted = buildNativeQueuePolicyReadback({
+      ...NATIVE_QUEUE_POLICY,
+      max_entries_to_merge: 5,
+      min_entries_to_merge: 5,
+      min_entries_to_merge_wait_minutes: 10,
+    });
+    expect(drifted.matched).toBe(false);
+    expect(drifted.drift).toEqual([
+      'max_entries_to_merge',
+      'min_entries_to_merge',
+      'min_entries_to_merge_wait_minutes',
+    ]);
+    const retiredCohort = validateLiveMergeQueueRuleset(
+      {
+        bypass_actors: [],
+        rules: [
+          {
+            type: 'required_status_checks',
+            parameters: {
+              strict_required_status_checks_policy: false,
+              required_status_checks: [
+                'PR Ready',
+                'Migration Guard',
+                'Fork PR Gate',
+                'PR Size Guard',
+              ].map(context => ({ context })),
+            },
+          },
+          {
+            type: 'merge_queue',
+            parameters: {
+              ...NATIVE_QUEUE_POLICY,
+              max_entries_to_merge: 5,
+              min_entries_to_merge: 5,
+              min_entries_to_merge_wait_minutes: 10,
+            },
+          },
+        ],
+      },
+      { backend: 'native' }
+    );
+    expect(NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover).toBe('applied');
+    expect(retiredCohort.ok).toBe(false);
+    expect(retiredCohort.errors.join('\n')).toContain('max_entries_to_merge');
   });
 
   it('normalizes GraphQL maximumEntriesToBuild onto the REST lock key', () => {
@@ -2516,14 +2550,14 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         liveQueueConfiguration: {
           checkResponseTimeout: 1200,
           maximumEntriesToBuild: 1,
-          maximumEntriesToMerge: 5,
+          maximumEntriesToMerge: 1,
           mergeMethod: 'SQUASH',
           minimumEntriesToMerge: 1,
           minimumEntriesToMergeWaitTime: 0,
         },
       }
     );
-    expect(NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover).toBe('pending');
+    expect(NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover).toBe('applied');
     expect(liveGraphql.ok).toBe(true);
     expect(
       liveGraphql.errors.some(error =>

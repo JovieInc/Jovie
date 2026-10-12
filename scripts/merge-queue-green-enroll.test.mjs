@@ -271,7 +271,7 @@ test('a proven admission-quota ejection authorizes one unchanged-head retry with
   const recovered = await fixture({
     statuses,
     overrides,
-    eventName: 'schedule',
+    eventName: 'push',
   });
   assert.deepEqual(recovered.mutations, [{ id: 'PR_1', oid: sha }]);
   assert.equal(
@@ -414,7 +414,7 @@ test('admits every required-green merge state and refuses blocked or conflicting
   const overrides = Object.fromEntries(
     states.map((mergeStateStatus, i) => [i + 1, { mergeStateStatus }])
   );
-  const result = await fixture({ roster, overrides, eventName: 'schedule' });
+  const result = await fixture({ roster, overrides, eventName: 'push' });
   assert.deepEqual(
     result.mutations.map(mutation => mutation.id),
     ['PR_1', 'PR_2', 'PR_3']
@@ -455,8 +455,8 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
     releases: { nodes: [{ createdAt, label: { name } }] },
   });
   const enqueued = async override =>
-    (await fixture({ overrides: { 1: override }, eventName: 'schedule' }))
-      .mutations.length;
+    (await fixture({ overrides: { 1: override }, eventName: 'push' })).mutations
+      .length;
   assert.equal(await enqueued({ ...removal('MANUAL'), ...release('hold') }), 1);
   assert.equal(
     await enqueued({ ...removal('manual'), ...release('Queue-Poison') }),
@@ -779,7 +779,7 @@ test('a PR wake reads only its current candidate instead of rescanning the whole
   }
 });
 
-test('a scheduled sweep re-enqueues a dequeued PR whose repaired head turned green', async () => {
+test('a push-to-main sweep re-enqueues a dequeued PR whose repaired head turned green', async () => {
   // JOV-7589 regression: after a merge-queue ejection the lane pushes a newer
   // head and the checks go green without a wake. The sweep must find and
   // re-enroll it; a still-removed head stays blocked without a bounded retry.
@@ -792,7 +792,7 @@ test('a scheduled sweep re-enqueues a dequeued PR whose repaired head turned gre
   const result = await fixture({
     roster: [candidate(1), candidate(2)],
     overrides,
-    eventName: 'schedule',
+    eventName: 'push',
   });
   assert.equal(result.inventories.length, 1);
   assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
@@ -1037,7 +1037,7 @@ async function exerciseRecoveryBoundary(boundary, change) {
     await released.promise;
   }
   const pending = fixture({
-    eventName: 'schedule',
+    eventName: 'push',
     statuses: [recovery],
     effectSink: effects,
     beforeStatusResponse: () => pause('statuses'),
@@ -1380,17 +1380,13 @@ test('a landing on main reconciles the full roster and the hold contract without
     concurrencyGroup({ event_name: 'push', event: {}, run_id: 2 })
   );
   const effects = await fixture({ eventName: 'push', roster: [candidate(1)] });
-  // One paginated pulls.list inventory, as for the schedule and dispatch.
+  // One paginated pulls.list inventory, as for a manual dispatch.
   assert.equal(effects.inventories.length, 1);
   assert.deepEqual(effects.reads, [1]);
   assert.equal(effects.mutations.length, 1);
   const contract = workflow.jobs['enforce-hold-contract'].if;
-  for (const event of [
-    'push',
-    'pull_request_target',
-    'schedule',
-    'workflow_dispatch',
-  ]) {
+  assert.equal(workflow.on.schedule, undefined);
+  for (const event of ['push', 'pull_request_target', 'workflow_dispatch']) {
     assert.match(contract, new RegExp(`"${event}"`));
   }
   assert.match(contract, /workflow_run\.event == 'merge_group'/);

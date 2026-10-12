@@ -38,6 +38,7 @@
     "lint:contrast-computed": "tsx scripts/lint-contrast-computed.ts",
     "lint:motion-css": "node scripts/lint-motion-css.mjs",
     "lint:touch-target": "tsx scripts/lint-touch-target.ts",
+    "lint:ui-feel": "node scripts/lint-ui-feel.mjs",
     "tokens:build": "node scripts/build-design-tokens.mjs",
     "tokens:check": "node scripts/build-design-tokens.mjs --check",
     "lint:button-canon-ratchet": "vitest run --config=vitest.config.mts tests/unit/design-system/button-canon-ratchet.test.ts",

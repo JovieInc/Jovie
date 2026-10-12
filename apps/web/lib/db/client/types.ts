@@ -79,8 +79,12 @@ export interface PerformanceCheckResult {
 
 /** Pool metrics for monitoring */
 export interface PoolMetrics {
+  connectionErrors: number;
+  endpointMode: 'direct' | 'other' | 'transaction-pooled';
   total: number;
   idle: number;
+  max: number;
+  peak: number;
   waiting: number;
   utilization: number;
 }
