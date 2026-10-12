@@ -97,6 +97,22 @@ export function bodyContainsInitializedInterview(body: string): boolean {
 }
 
 /**
+ * SSR-visible marker for the `/start` onboarding session boundary.
+ * `OnboardingSessionBoundary` (JOV-7689) resolves conversation history on the
+ * client before mounting the chat, so the SSR/HTML body only ever contains the
+ * boundary's restore shell — the `INITIALIZED_INTERVIEW_MARKERS` can never
+ * appear over plain HTTP. This marker proves `/start` dispatched to the
+ * onboarding session flow without a surface error; the Playwright spec still
+ * asserts real interview initialization in the browser.
+ */
+export function bodyContainsOnboardingSessionBoundary(body: string): boolean {
+  return (
+    body.includes('data-testid="onboarding-session-boundary"') ||
+    body.includes("data-testid='onboarding-session-boundary'")
+  );
+}
+
+/**
  * Known, acceptable fallback strings the onboarding turn can surface when the
  * AI provider is degraded. The full-turn spec asserts the visible end state is
  * either a real assistant reply OR one of these — never "any text" (which would
