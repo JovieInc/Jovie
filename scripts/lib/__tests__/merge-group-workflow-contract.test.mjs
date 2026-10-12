@@ -1594,6 +1594,14 @@ describe('merge_group workflow contract', () => {
     );
     expect(noopBranch).toContain('mkdir -p "$PRODUCT_LANE_DIR"');
     expect(noopBranch).toContain(': > "$PRODUCT_LANE_DIR/changed-paths.txt"');
+    // The classified branch runs the classifier from a physical path and
+    // fails closed when it wrote no receipt.
+    expect(detectStep).toContain(
+      'PRODUCT_LANE_DIR="$(cd "$RUNNER_TEMP" && pwd -P)/product-lane-classification"'
+    );
+    expect(detectStep).toMatch(
+      /--github-output "\$GITHUB_OUTPUT"\n\s*# [^\n]*\n\s*test -s "\$PRODUCT_LANE_DIR\/receipt\.json"/
+    );
 
     const homepageVisualScript = getStepRunScript(
       pathChanges,
