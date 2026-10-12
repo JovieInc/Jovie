@@ -191,10 +191,23 @@ jobs:
           node scripts/lockfile-specifier-preflight.mjs
           node scripts/ci-release-incident-contract.mjs
           pnpm ci:harness:check
+          # The web test and story tsc programs (100s + 66s) ran after the
+          # workspace typecheck (112s), serially, in this step (PR p50 7.6m).
+          # They share no tsbuildinfo, so they run alongside it under their
+          # own singleflight lock; any failure still fails this step.
+          web_types_log="$(mktemp)"
+          (
+            export TYPECHECK_SINGLEFLIGHT_DIR="$(mktemp -d)"
+            pnpm --filter @jovie/web run typecheck:tests
+            pnpm --filter @jovie/web run typecheck:stories
+          ) > "$web_types_log" 2>&1 &
+          web_types_pid=$!
           pnpm typecheck
           pnpm run typecheck:scripts
-          pnpm --filter @jovie/web run typecheck:tests
-          pnpm --filter @jovie/web run typecheck:stories
+          web_types_status=0
+          wait "$web_types_pid" || web_types_status=$?
+          cat "$web_types_log"
+          test "$web_types_status" -eq 0 || exit "$web_types_status"
           pnpm biome:check
           ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
           pnpm --filter @jovie/web run lint:motion-css
