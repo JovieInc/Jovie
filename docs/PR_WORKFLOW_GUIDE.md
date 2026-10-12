@@ -15,7 +15,7 @@ Todo → [agent: In Progress] → [PR opened: In Review] → [PR merged: Merging
 
 **Troubleshooting**: if the auto-transitions don't fire, the issue→PR link is broken. Verify:
 
-1. The PR body contains `<!-- linear-issue-id:... -->` (injected by `.github/workflows/auto-pr-on-push.yml`), OR
+1. The PR body contains `<!-- linear-issue-id:... -->`, OR
 2. The branch name contains `jov-NNNN` (e.g., `codex/jov-1433-foo`, `itstimwhite/jov-1433-foo`).
 
 If neither is present, the workflows cannot find the Linear issue and state stays stuck.

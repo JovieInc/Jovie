@@ -21,7 +21,6 @@ FULL_CHECKOUT_JOBS = (
 )
 
 FLEET_CONTROLLER_JOBS = (
-    ("auto-pr-on-push.yml", "open-pr"),
     ("auto-ready-agent-drafts.yml", "auto-ready"),
     ("auto-ready-agent-drafts.yml", "green-source"),
     ("agent-tick.yml", "auto-ready"),
@@ -63,8 +62,6 @@ HOSTED_DEEP_EVIDENCE_JOBS = (
     ("ci-duration-ratchet.yml", "measure"),
     ("sentry-error-gate.yml", "sentry-gate"),
     ("cost-anomaly-gate.yml", "evaluate"),
-    ("main-ci-health-monitor.yml", "monitor"),
-    ("main-ci-health-monitor.yml", "auto-rerun"),
     ("visual-a11y.yml", "ci-visual-path-changes"),
     ("visual-a11y.yml", "storybook-a11y"),
     ("visual-regression.yml", "visual-regression"),
@@ -891,47 +888,16 @@ def test_standalone_health_monitors_have_independent_bounded_schedules() -> None
         assert "schedule:" in content, workflow
         assert cron in content, workflow
 
-    # Main CI health changes only when a main CI run completes; no clock.
-    main_health = (WORKFLOWS / "main-ci-health-monitor.yml").read_text(
-        encoding="utf-8"
-    )
-    assert "\n  schedule:" not in main_health
-    assert "workflows: [CI]" in main_health
-    assert "branches: [main]" in main_health
+    # The disabled Main CI health monitor was deleted on 2026-10-12; red main
+    # is owned by the lanes fix loop.
+    assert not (WORKFLOWS / "main-ci-health-monitor.yml").exists()
 
-    for workflow, job_name in (
-        ("main-ci-health-monitor.yml", "monitor"),
-        ("main-ci-health-monitor.yml", "auto-rerun"),
-        ("runner-health-monitor.yml", "monitor"),
-    ):
+    for workflow, job_name in (("runner-health-monitor.yml", "monitor"),):
         assert "runs-on: ubuntu-latest" in _job_block(workflow, job_name)
 
 
-def test_main_health_monitor_alerts_once_and_reruns_once() -> None:
-    """Schedule ticks fail closed on evidence gaps and self-heal with one rerun."""
-    evaluator = (
-        REPO_ROOT / ".github/actions/eval-main-health/action.yml"
-    ).read_text(encoding="utf-8")
-    monitor = (WORKFLOWS / "main-ci-health-monitor.yml").read_text(
-        encoding="utf-8"
-    )
-
-    assert "const failingRunAttempt = Number(latestFailure?.run_attempt ?? 0)" in evaluator
-    assert "github.rest.repos.getCommit" in evaluator
-    assert "latestFailure.head_sha !== currentMainSha" in evaluator
-    assert "const shouldAlert =" in evaluator
-    assert "detectedIssue && evidenceKnown" in evaluator
-    assert "failingRunAttempt === 1" in evaluator
-    assert "canaryOrSentryFailed" in evaluator
-    # The retired main-autofix workflow must not be dispatched or inspected.
-    assert "main-autofix" not in evaluator
-    assert "needs_autofix" not in evaluator
-    assert "main-autofix" not in monitor
-    assert "needs_autofix" not in monitor
-
-    monitor_job = _job_block("main-ci-health-monitor.yml", "monitor")
-    assert "statuses: write" not in monitor_job
-
+def test_agent_tick_stays_manual_without_main_health() -> None:
+    """Agent Tick stays manual and carries no main-health job."""
     agent_tick = (WORKFLOWS / "agent-tick.yml").read_text(encoding="utf-8")
     assert "\n  main-ci-health:\n" not in agent_tick
     agent_tick_trigger = agent_tick.split("\non:\n", 1)[1].split(
@@ -1535,14 +1501,6 @@ def test_cost_anomaly_alerts_on_ratio_or_absolute_floor(tmp_path: Path) -> None:
         outputs = output.read_text(encoding="utf-8")
         assert f"status={status}" in outputs
         assert reason in outputs
-
-
-def test_auto_pr_compares_trigger_branch_without_executing_its_checkout() -> None:
-    """The pushed branch is controller input; current main supplies helpers."""
-    block = _job_block("auto-pr-on-push.yml", "open-pr")
-    assert 'git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"' in block
-    assert 'git diff --name-only "origin/main...origin/$BRANCH"' in block
-    assert "origin/main...HEAD" not in block
 
 
 def test_claude_review_uses_hosted_bun_prerequisites() -> None:

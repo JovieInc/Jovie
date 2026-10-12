@@ -2545,13 +2545,26 @@ class WorkerTest(unittest.TestCase):
         finally: contender.release()
 
     def setUp(self):
+        # No live host state: a lane run exports LANES_*/SYMPHONY_*/LINEAR_* vars that
+        # Host.base_slots, lane_state_dir, cooldown scopes and autoscale.mode all read.
+        # Without this scrub the class inherits the host's slot counts and shared state.
+        env = patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+        for key in list(os.environ):
+            if key != "LANES_EXECUTION_BACKEND" and key.startswith(
+                    ("LANES_", "SYMPHONY_", "LINEAR_", "DESIGN_GATE_")):
+                os.environ.pop(key)
+        os.environ["SYMPHONY_AUTOSCALE"] = "off"
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
         disk.start()
         self.addCleanup(disk.stop)
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
                       lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
                       lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
-                      lane.pr_events.claim_event_pr, lane.sweep_lane_prs, lane.read_new_issue_budget)
+                      lane.pr_events.claim_event_pr, lane.sweep_lane_prs, lane.read_new_issue_budget,
+                      lane.open_hotspot_holds)
+        lane.open_hotspot_holds = lambda: {}  # never a real `gh pr list` from a unit test
         lane.sweep_lane_prs = lambda host, name, linear, now=None: None
         lane.pr_events.queued_prs = lambda module, kinds: []
         lane.pr_events.claim_event_pr = lambda host, module, name, prs: None
@@ -2587,7 +2600,8 @@ class WorkerTest(unittest.TestCase):
         (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
          lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
          lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
-         lane.pr_events.claim_event_pr, lane.sweep_lane_prs, lane.read_new_issue_budget) = self.saved
+         lane.pr_events.claim_event_pr, lane.sweep_lane_prs, lane.read_new_issue_budget,
+         lane.open_hotspot_holds) = self.saved
         self.tmp.cleanup()
 
     def test_initial_claim_failure_is_nonfatal_without_fabricating_delivery(self):

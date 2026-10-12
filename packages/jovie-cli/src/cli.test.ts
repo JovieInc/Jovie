@@ -49,18 +49,47 @@ describe('jovie CLI', () => {
     );
   });
 
-  it('lists public commands before internal fleet ones and accepts `help`', async () => {
+  it('hides internal fleet commands from default help', async () => {
     const stdout = createOutput();
     await expect(runCli(['help'], { stdout: stdout.output })).resolves.toBe(0);
     const help = stdout.read();
-    expect(help.indexOf('artist get <username>')).toBeLessThan(
-      help.indexOf('Internal fleet')
-    );
-    expect(help.indexOf('Internal fleet')).toBeLessThan(
-      help.indexOf('fleet register')
-    );
-    // Long command names wrap instead of pushing summaries out of the column.
-    expect(help).toMatch(/--input <text>\n {31}Invoke canonical/);
+    expect(help).toContain('artist get <username>');
+    expect(help).not.toContain('Internal fleet');
+    expect(help).not.toContain('fleet register');
+    const json = createOutput();
+    await expect(
+      runCli(['--help', '--json'], { stdout: json.output })
+    ).resolves.toBe(0);
+    const payload = JSON.parse(json.read()) as { content: string };
+    expect(payload.content).not.toContain('Internal fleet');
+  });
+
+  it('lists internal fleet commands behind --fleet or a worker token', async () => {
+    for (const args of [
+      ['--help', '--fleet'],
+      ['help', '--fleet'],
+    ]) {
+      const stdout = createOutput();
+      await expect(runCli(args, { stdout: stdout.output })).resolves.toBe(0);
+      const help = stdout.read();
+      expect(help.indexOf('artist get <username>')).toBeLessThan(
+        help.indexOf('Internal fleet')
+      );
+      expect(help.indexOf('Internal fleet')).toBeLessThan(
+        help.indexOf('fleet register')
+      );
+      // Long command names wrap instead of pushing summaries out of the column.
+      expect(help).toMatch(/--input <text>\n {31}Invoke canonical/);
+    }
+
+    const tokenHelp = createOutput();
+    await expect(
+      runCli(['--help'], {
+        stdout: tokenHelp.output,
+        workerToken: 'test-worker-token',
+      })
+    ).resolves.toBe(0);
+    expect(tokenHelp.read()).toContain('fleet register');
   });
 
   it('names the unknown option without parseArgs escaping advice', async () => {

@@ -98,14 +98,6 @@ const costAnomalyWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/cost-anomaly-gate.yml'
 );
-const mainHealthWorkflowPath = resolve(
-  repoRoot,
-  '.github/workflows/main-ci-health-monitor.yml'
-);
-const mainHealthActionPath = resolve(
-  repoRoot,
-  '.github/actions/eval-main-health/action.yml'
-);
 const productionControllerHealthPath = resolve(
   repoRoot,
   '.github/workflows/production-controller-health.yml'
@@ -4709,10 +4701,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryAction).toContain('echo "gate_status=failed"');
   });
 
-  it('keeps cost and main-health observers strict and bounded without GitHub Issue intake', () => {
+  it('keeps the cost observer strict and bounded without GitHub Issue intake', () => {
     const cost = readFileSync(costAnomalyWorkflowPath, 'utf8');
-    const monitor = readFileSync(mainHealthWorkflowPath, 'utf8');
-    const evaluator = readFileSync(mainHealthActionPath, 'utf8');
 
     expect(cost).toContain("cron: '*/15 * * * *'");
     expect(cost).toContain('name: Production – jovie');
@@ -4728,14 +4718,6 @@ describe('production promotion exact-artifact contract', () => {
     expect(cost).not.toContain('INCIDENT_TITLE=');
     expect(cost).not.toContain('issues: write');
     expect(cost).not.toContain('DRY_RUN');
-    expect(monitor).toContain('group: main-ci-health-monitor');
-    expect(monitor).toContain('main-ci-health-alert-$ALERT_KEY');
-    expect(monitor).toContain('main-ci-rerun-request-${FAILED_RUN_ID}');
-    expect(monitor).toContain('gh run rerun "$FAILED_RUN_ID" --failed');
-    expect(evaluator).toContain("default: '5'");
-    expect(evaluator).toContain('failingRunAttempt === 1');
-    expect(evaluator).toContain('attemptEvidenceTrusted');
-    expect(evaluator).toContain('evidence_known');
   });
 
   it('recovers one payload-bound interrupted marker with a full leased rerun', () => {
