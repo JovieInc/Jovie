@@ -83,11 +83,11 @@ import {
   getPresenceHandle,
   getPresencePlatformLabel,
 } from '@/lib/profile-surfaces/presence-identity';
+import { derivePresenceInspector } from '@/lib/profile-surfaces/presence-inspector';
 import {
   formatProfileRankChange,
   getConnectionPrimaryAction,
   getConnectionStatus,
-  getPresenceSignals,
 } from '@/lib/profile-surfaces/workspace';
 import {
   FetchError,
@@ -103,6 +103,7 @@ import {
 } from './AddConnectionRail';
 import { buildConnectionActions } from './connection-actions';
 import type {
+  PresenceSignal,
   ProfilesWorkspaceData,
   ProfileWorkspaceRow,
   ProfileWorkspaceSurfaceRow,
@@ -624,9 +625,11 @@ function ConnectionRail({
   onRetrySource?: () => void;
   contextMenuItems: CommonDropdownItem[];
 }>) {
-  const primaryAction = row ? getConnectionPrimaryAction(row) : null;
-  const status = row ? getConnectionStatus(row, data.providerAvailable) : null;
-  const searchUnavailable = status?.label === 'Search Unavailable';
+  const inspector = row
+    ? derivePresenceInspector(row, data.providerAvailable)
+    : null;
+  const primaryAction = inspector?.primaryAction ?? null;
+  const status = inspector?.status ?? null;
   const rankChange =
     row?.rowType === 'surface'
       ? formatProfileRankChange(row.rank, row.previousRank)
@@ -699,160 +702,194 @@ function ConnectionRail({
         ) : undefined
       }
     >
-      {row ? (
+      {row && inspector ? (
         <div
           className='space-y-3 px-3 py-3'
           data-testid='profiles-rail-content'
         >
-          {!searchUnavailable ? (
-            <DrawerAnalyticsSummaryCard
-              state='ready'
-              metrics={[
-                {
-                  id: 'status',
-                  label: 'Status',
-                  value: getConnectionStatus(row, data?.providerAvailable)
-                    .label,
-                  hint: MONITORING_LABELS[row.monitoringState],
-                },
-                {
-                  id: 'rank',
-                  label: 'Search Rank',
-                  value:
-                    row.rowType === 'surface' &&
-                    row.monitoringState !== 'locked'
-                      ? String(row.rank ?? '—')
-                      : '—',
-                  hint: rankChange === '—' ? 'No change yet' : rankChange,
-                },
-              ]}
-              footer={null}
-              stableLayout
-              reserveFooterSlot={false}
-              testId='profiles-rail-summary'
-            />
-          ) : null}
-          {!searchUnavailable ? (
-            <DrawerSection title='Profile / Page' sectionKind='facts'>
-              <div className='space-y-2'>
-                <RailMetric label='Type' value={kindLabel(row)} />
-                <RailMetric
-                  label='Monitoring'
-                  value={MONITORING_LABELS[row.monitoringState]}
-                />
-              </div>
-            </DrawerSection>
-          ) : null}
-          {row.rowType === 'surface' && row.kind !== 'jovie' ? (
-            <DrawerSection title='Source Identity' sectionKind='facts'>
-              <p className='text-xs text-secondary-token'>
-                {sourceLoading
-                  ? 'Checking Public Profile…'
-                  : sourceIdentity?.status === 'unsupported'
-                    ? 'Automatic inspection is unavailable for this source. Open the profile to compare.'
-                    : sourceIdentity?.status === 'available'
-                      ? sourceIdentity.photo.kind === 'profile'
-                        ? 'Profile photo observed at this source. Ownership is reviewed separately.'
-                        : 'Public page metadata is available; no profile portrait was identified.'
-                      : 'Source unavailable. Your profile link and identity decisions are still available.'}
-              </p>
-              {sourceIdentity?.pageTitle ? (
-                <p className='truncate text-xs text-secondary-token'>
-                  {sourceIdentity.pageTitle}
-                </p>
-              ) : null}
-              {onRetrySource && sourceIdentity?.status !== 'unsupported' ? (
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  disabled={sourceLoading}
-                  onClick={onRetrySource}
-                >
-                  Retry Source
-                </Button>
-              ) : null}
-            </DrawerSection>
-          ) : null}
-          {!searchUnavailable ? (
-            <PresenceSignalSection
-              row={row}
-              providerAvailable={data.providerAvailable}
-            />
-          ) : null}
-          {row.rowType === 'surface' &&
-          (row.qualificationStatus === 'suggested' ||
-            row.qualificationStatus === 'conflicting') ? (
-            <IdentityConfirmationSection
-              row={row}
-              onDecision={onIdentityDecision}
-            />
-          ) : null}
-          <DrawerSection sectionKind='details'>
-            <div
-              className={cn(
-                'grid gap-2 px-1',
-                primaryAction === 'open' ||
-                  (primaryAction === 'review' && row.rowType === 'surface')
-                  ? 'grid-cols-1'
-                  : 'grid-cols-2'
-              )}
-            >
-              <Button asChild variant='secondary' size='sm'>
-                <Link
-                  href={row.url}
-                  target={row.url.startsWith('http') ? '_blank' : undefined}
-                  rel={row.url.startsWith('http') ? 'noreferrer' : undefined}
-                >
-                  <ExternalLink className='h-3.5 w-3.5' />{' '}
-                  {primaryAction === 'review' && row.rowType === 'surface'
-                    ? 'Inspect Source'
-                    : 'Open'}
-                </Link>
-              </Button>
-              {primaryAction !== 'open' &&
-              !(primaryAction === 'review' && row.rowType === 'surface') ? (
-                <Button asChild size='sm'>
-                  <Link
-                    href={
-                      primaryAction === 'upgrade'
-                        ? APP_ROUTES.SETTINGS_BILLING
-                        : row.rowType === 'connector'
-                          ? APP_ROUTES.SETTINGS_CONNECTORS
-                          : APP_ROUTES.SETTINGS_PROFILE
-                    }
+          {inspector.sections.map(section => {
+            switch (section.key) {
+              case 'observation_summary':
+                return (
+                  <DrawerAnalyticsSummaryCard
+                    key={section.key}
+                    state='ready'
+                    metrics={[
+                      {
+                        id: 'status',
+                        label: 'Status',
+                        value: status?.label ?? '—',
+                        hint: MONITORING_LABELS[row.monitoringState],
+                      },
+                      {
+                        id: 'rank',
+                        label: 'Search Rank',
+                        value:
+                          row.rowType === 'surface' &&
+                          row.monitoringState !== 'locked'
+                            ? String(row.rank ?? '—')
+                            : '—',
+                        hint: rankChange === '—' ? 'No change yet' : rankChange,
+                      },
+                    ]}
+                    footer={null}
+                    stableLayout
+                    reserveFooterSlot={false}
+                    testId='profiles-rail-summary'
+                  />
+                );
+              case 'object_facts':
+                return (
+                  <DrawerSection
+                    key={section.key}
+                    title='Profile / Page'
+                    sectionKind='facts'
                   >
-                    {primaryAction === 'upgrade'
-                      ? 'Upgrade'
-                      : primaryAction === 'connect'
-                        ? 'Connect'
-                        : primaryAction === 'reconnect'
-                          ? 'Reconnect'
-                          : 'Review'}
-                  </Link>
-                </Button>
-              ) : null}
-            </div>
-          </DrawerSection>
-          {searchUnavailable && status ? (
-            <DrawerSection
-              title='Monitoring details'
-              sectionKind='status'
-              defaultOpen={false}
-              lazyMount
-              testId='profiles-monitoring-details'
-            >
-              <div className='space-y-2 text-xs text-secondary-token'>
-                <p>
-                  {status.label}. {status.nextAction}
-                </p>
-                <RailMetric
-                  label='Monitoring'
-                  value={MONITORING_LABELS[row.monitoringState]}
-                />
-                <RailMetric label='Search Rank' value='—' />
-              </div>
-            </DrawerSection>
-          ) : null}
+                    <div className='space-y-2'>
+                      <RailMetric label='Type' value={kindLabel(row)} />
+                      <RailMetric
+                        label='Monitoring'
+                        value={MONITORING_LABELS[row.monitoringState]}
+                      />
+                    </div>
+                  </DrawerSection>
+                );
+              case 'source_identity':
+                return (
+                  <DrawerSection
+                    key={section.key}
+                    title='Source Identity'
+                    sectionKind='facts'
+                  >
+                    <p className='text-xs text-secondary-token'>
+                      {sourceLoading
+                        ? 'Checking Public Profile…'
+                        : sourceIdentity?.status === 'unsupported'
+                          ? 'Automatic inspection is unavailable for this source. Open the profile to compare.'
+                          : sourceIdentity?.status === 'available'
+                            ? sourceIdentity.photo.kind === 'profile'
+                              ? 'Profile photo observed at this source. Ownership is reviewed separately.'
+                              : 'Public page metadata is available; no profile portrait was identified.'
+                            : 'Source unavailable. Your profile link and identity decisions are still available.'}
+                    </p>
+                    {sourceIdentity?.pageTitle ? (
+                      <p className='truncate text-xs text-secondary-token'>
+                        {sourceIdentity.pageTitle}
+                      </p>
+                    ) : null}
+                    {onRetrySource &&
+                    sourceIdentity?.status !== 'unsupported' ? (
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        disabled={sourceLoading}
+                        onClick={onRetrySource}
+                      >
+                        Retry Source
+                      </Button>
+                    ) : null}
+                  </DrawerSection>
+                );
+              case 'signals':
+                return (
+                  <PresenceSignalSection
+                    key={section.key}
+                    signals={inspector.signals}
+                  />
+                );
+              case 'identity_check':
+                return row.rowType === 'surface' ? (
+                  <IdentityConfirmationSection
+                    key={section.key}
+                    row={row}
+                    onDecision={onIdentityDecision}
+                  />
+                ) : null;
+              case 'actions':
+                return (
+                  <DrawerSection key={section.key} sectionKind='details'>
+                    <div
+                      className={cn(
+                        'grid gap-2 px-1',
+                        primaryAction === 'open' ||
+                          (primaryAction === 'review' &&
+                            row.rowType === 'surface')
+                          ? 'grid-cols-1'
+                          : 'grid-cols-2'
+                      )}
+                    >
+                      <Button asChild variant='secondary' size='sm'>
+                        <Link
+                          href={row.url}
+                          target={
+                            row.url.startsWith('http') ? '_blank' : undefined
+                          }
+                          rel={
+                            row.url.startsWith('http')
+                              ? 'noreferrer'
+                              : undefined
+                          }
+                        >
+                          <ExternalLink className='h-3.5 w-3.5' />{' '}
+                          {primaryAction === 'review' &&
+                          row.rowType === 'surface'
+                            ? 'Inspect Source'
+                            : 'Open'}
+                        </Link>
+                      </Button>
+                      {primaryAction !== 'open' &&
+                      !(
+                        primaryAction === 'review' && row.rowType === 'surface'
+                      ) ? (
+                        <Button asChild size='sm'>
+                          <Link
+                            href={
+                              primaryAction === 'upgrade'
+                                ? APP_ROUTES.SETTINGS_BILLING
+                                : row.rowType === 'connector'
+                                  ? APP_ROUTES.SETTINGS_CONNECTORS
+                                  : APP_ROUTES.SETTINGS_PROFILE
+                            }
+                          >
+                            {primaryAction === 'upgrade'
+                              ? 'Upgrade'
+                              : primaryAction === 'connect'
+                                ? 'Connect'
+                                : primaryAction === 'reconnect'
+                                  ? 'Reconnect'
+                                  : 'Review'}
+                          </Link>
+                        </Button>
+                      ) : null}
+                    </div>
+                  </DrawerSection>
+                );
+              case 'monitoring_details':
+                return status ? (
+                  <DrawerSection
+                    key={section.key}
+                    title='Monitoring details'
+                    sectionKind='status'
+                    defaultOpen={false}
+                    lazyMount
+                    testId='profiles-monitoring-details'
+                  >
+                    <div className='space-y-2 text-xs text-secondary-token'>
+                      <p>
+                        {status.label}. {status.nextAction}
+                      </p>
+                      <RailMetric
+                        label='Monitoring'
+                        value={MONITORING_LABELS[row.monitoringState]}
+                      />
+                      <RailMetric label='Search Rank' value='—' />
+                    </div>
+                  </DrawerSection>
+                ) : null;
+              default:
+                return null;
+            }
+          })}
         </div>
       ) : null}
     </EntitySidebarShell>
@@ -1003,12 +1040,9 @@ function CanonicalSourceDrills({ identity }: Readonly<{ identity: string }>) {
 }
 
 function PresenceSignalSection({
-  row,
-  providerAvailable,
-}: Readonly<{ row: ProfileWorkspaceRow; providerAvailable: boolean }>) {
-  return (
-    <PresenceSignalList signals={getPresenceSignals(row, providerAvailable)} />
-  );
+  signals,
+}: Readonly<{ signals: readonly PresenceSignal[] }>) {
+  return <PresenceSignalList signals={signals} />;
 }
 
 function SuggestedConnectionsLoading() {

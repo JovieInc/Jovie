@@ -213,6 +213,7 @@ nodes:
       - Agent Pipeline
       - iOS CI
       - Mac CI
+      - Fleet Gate Refresh
       - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Conflict Handler
@@ -489,6 +490,7 @@ nodes:
       - repository_dispatch
       - schedule
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:assess
     jobCount: 2
   - name: Fork PR Gate
@@ -508,6 +510,18 @@ nodes:
       - pull_request_target
     terminalReceipt: job:fork-gate
     jobCount: 3
+  - name: Gem Producer Drift
+    path: .github/workflows/gem-producer-drift.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:drift
+    jobCount: 1
   - name: GitHub AI Dispatcher
     path: .github/workflows/github-ai-dispatcher.yml
     active: false
@@ -1521,6 +1535,9 @@ edges:
     type: workflow_run
   - from: Production Controller
     to: desktop-release
+    type: workflow_run
+  - from: CI
+    to: Fleet Gate Refresh
     type: workflow_run
   - from: iOS CI
     to: Mac Lane Route

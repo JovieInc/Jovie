@@ -115,6 +115,8 @@ export const CRON_KEEP_REASONS = Object.freeze({
     'owner-tracked: daily signed staging desktop build until staging rides the Production Controller event without the 2026-09 supersession livelock; see ADMISSION_CRON_DEBT',
   '.github/workflows/fleet-gate-refresh.yml':
     'owner-tracked (Gem lanes): keeps the fleet receipt inside its wall-clock stale window until the lanes tick writes it; see ADMISSION_CRON_DEBT',
+  '.github/workflows/gem-producer-drift.yml':
+    'external: Gem host attestation drift (JOV-7223) emits no repository event; the symphony-control install owner runs host installs manually',
   '.github/workflows/golden-path-nightly.yml':
     'external: real auth plus Stripe test mode drift without a repository event, and acquisition eligibility needs Golden Path proof under 48 h old',
   '.github/workflows/m2-revenue-path-canary.yml':
@@ -157,7 +159,8 @@ export const CRON_KEEP_REASONS = Object.freeze({
 
 /** @type {readonly string[]} */
 export const CRON_ALLOWLIST = Object.freeze(Object.keys(CRON_KEEP_REASONS));
-export const CRON_ALLOWLIST_CEILING = 26;
+// 27 = main's 26 after mac-runner-heartbeat removal, plus gem-producer-drift.
+export const CRON_ALLOWLIST_CEILING = 27;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
