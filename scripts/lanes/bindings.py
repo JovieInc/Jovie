@@ -18,12 +18,13 @@ land it. It never runs Jovie's gate against another repo.
 
 PR maintenance (Tim 2026-10-11: every open PR lands on its own) covers every open same-repo PR
 in a binding's repo, not only lane-authored ones, and never reads Linear. Each pass first takes
-the cheap, idempotent steps (`maintain`): enqueue a green ready PR the native queue dropped or
-never took, re-enqueue a GITHUB_TOKEN queue entry with the host's token (merge-group events a
-GITHUB_TOKEN causes start no CI, so such an entry only times out), ready a green draft idle past
-the draft SLO, and ask Dependabot to rebase its conflicting bumps. Then one agent run repairs
-the oldest PR that is conflicting, red on the repo's own required checks, rejected by the merge
-queue twice at one head (the poison guard: no third enqueue), or has changes requested.
+the cheap, idempotent steps (`maintain`): enqueue a green ready PR that is not in the queue (a
+queued PR is never re-enqueued: that sends it to the back), ready a green draft idle past the
+draft SLO, and ask Dependabot to rebase its conflicting bumps. Then one agent run repairs the
+oldest PR that is conflicting, red on the repo's own required checks, rejected by a merge group
+at its head, or has changes requested. LYB runs iOS only in merge groups (LYB #1333), so a
+failed_checks ejection is the iOS failure signal: the repair prompt carries that merge-group
+run's failed-job log, and the failed head is not re-enqueued unchanged.
 """
 from __future__ import annotations
 
@@ -54,19 +55,18 @@ GREEN = frozenset({"SUCCESS", "NEUTRAL", "SKIPPED"})
 RED_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR", "ACTION_REQUIRED"})
 ENQUEUE_STATES = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
 DRAFT_STATES = ENQUEUE_STATES | {"DRAFT"}
-POISON_FAILURES = 2                 # failed merge groups at one head before enqueue stops
+POISON_FAILURES = 1                 # a failed merge group at one head: repair, never re-enqueue as is
 MANUAL_QUIET_S = 2 * 3600           # someone dequeued it by hand: leave it this long
 REPAIR_IDLE_S = 2 * 3600            # a session that pushed within this window still owns its PR
 DRAFT_SLO_S = 48 * 3600
 ATTEMPT_RESET_S = 24 * 3600         # repair attempts at one head may retry after a day
 ACTION_RETRY_S = 3600
 MAX_ACTIONS = 10                    # GitHub writes per maintenance pass
-TOKEN_ENQUEUER = re.compile(r"^github-actions(\[bot\])?$")
 DEPENDENCY = re.compile(r"(?i)\b(?:depends on|blocked by|waits? (?:on|for)|stacked on)\s+#(\d+)"
                         r"|#(\d+)\s+(?:must|has to|needs to)\s+(?:be merged|merge|land)")
 ENQUEUE_MUTATION = ('mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,'
                     'expectedHeadOid:$head}){mergeQueueEntry{position}}}')
-DEQUEUE_MUTATION = 'mutation($id:ID!){dequeuePullRequest(input:{id:$id}){mergeQueueEntry{id}}}'
+MERGE_GROUP_LOG_CHARS = 6000        # tail of the failed merge-group jobs' log in a repair prompt
 
 
 @dataclass(frozen=True)
@@ -375,8 +375,8 @@ def repair_candidate(lane, binding: Binding, prs: list[dict], attempts: dict, bu
 
 def maintenance_actions(binding: Binding, prs: list[dict], now: float) -> list[tuple[str, dict]]:
     """The idempotent GitHub steps this snapshot calls for, as (kind, pr):
-    `requeue` a green GITHUB_TOKEN queue entry with this host's token, `enqueue` a green ready PR
-    out of the queue (never past the poison guard or within MANUAL_QUIET_S of a manual dequeue),
+    `enqueue` a green ready PR out of the queue (never one already queued, never a head a merge
+    group rejected, never within MANUAL_QUIET_S of a manual dequeue),
     `ready` a green draft idle past the draft SLO, `rebase` a conflicting Dependabot bump."""
     open_numbers = {pr["number"] for pr in prs}
     actions = []
@@ -385,10 +385,7 @@ def maintenance_actions(binding: Binding, prs: list[dict], now: float) -> list[t
             continue
         green, state, queue = pr.get("gate") == "green", pr.get("mergeStateStatus"), pr.get("queue")
         if queue:
-            if green and TOKEN_ENQUEUER.match(queue.get("enqueuer") or "") \
-                    and queue.get("state") in ("QUEUED", "AWAITING_CHECKS"):
-                actions.append(("requeue", pr))
-            continue
+            continue  # in the queue: re-enqueueing would send it to the back
         if _is_dependabot(pr) and state == "DIRTY":
             actions.append(("rebase", pr))
             continue
@@ -414,9 +411,6 @@ def _apply(lane, binding: Binding, kind: str, pr: dict) -> bool:
     number = str(pr["number"])
     if kind == "enqueue":
         return _enqueue(lane, pr)
-    if kind == "requeue":
-        return lane.sh(["gh", "api", "graphql", "-f", f"query={DEQUEUE_MUTATION}", "-f",
-                        f"id={pr['id']}"]).returncode == 0 and _enqueue(lane, pr)
     if kind == "ready":
         if lane.sh(["gh", "pr", "ready", number, "--repo", binding.slug]).returncode:
             return False
@@ -611,6 +605,21 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
 
 # ---------------------------------------------------------------- runs
 
+def merge_group_evidence(lane, binding: Binding, pr: dict) -> str:
+    """The failed merge-group run for this PR (`gh-readonly-queue/main/pr-<n>-*`) and the tail of
+    its failed jobs' log, read once when the repair starts. Empty when none is readable."""
+    listed = lane.sh(["gh", "api", f"repos/{binding.slug}/actions/runs?event=merge_group&status=failure&per_page=50",
+                      "--jq", ".workflow_runs[] | [.id, .head_branch, .html_url] | @tsv"], timeout=60)
+    prefix = f"gh-readonly-queue/main/pr-{pr['number']}-"
+    for line in (listed.stdout or "").splitlines() if listed.returncode == 0 else []:
+        run_id, branch, url = (line.split("\t") + ["", "", ""])[:3]
+        if branch.startswith(prefix) and run_id.isdigit():
+            log = lane.sh(["gh", "run", "view", run_id, "--repo", binding.slug, "--log-failed"], timeout=120)
+            tail = (log.stdout or "")[-MERGE_GROUP_LOG_CHARS:] if log.returncode == 0 else ""
+            return f"Failed merge-group run {url}\n```\n{tail or '(log unreadable)'}\n```"
+    return ""
+
+
 def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context: str = "",
                   goal: list[str] | tuple = ()) -> str:
     common = [
@@ -634,9 +643,12 @@ def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context
         reasons = pr.get("repairReasons") or []
         extra = []
         if "merge-group-failed" in reasons:
-            extra.append("- The merge queue rejected this exact head twice (failed merge-group CI). Find the "
-                         "failed run with `gh run list --repo " + binding.slug + " --event merge_group`, "
-                         "reproduce against origin/main merged in, and fix the cause in this branch.")
+            extra.append("- The merge queue rejected this exact head (failed merge-group CI; iOS runs only in "
+                         "merge groups). Reproduce against origin/main merged in and fix the cause in this "
+                         "branch. If the failure is another PR's in the same group, merging origin/main is "
+                         "the whole fix: the new head re-enters the queue.")
+            if context:
+                extra.append(context)
         if "changes-requested" in reasons:
             extra.append(f"- A review requested changes. Read `gh pr view {pr['number']} --repo {binding.slug} "
                          "--comments` and the inline review comments, and address each one.")
@@ -694,7 +706,9 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
             if binding.install and lane.sh(list(binding.install), cwd=worktree, timeout=1800, log=log).returncode:
                 raise RuntimeError("install-failed")
             prompt = render_prompt(binding, branch, issue=issue, pr=pr,
-                                   context=lane.context_pack(issue) if issue is not None else "",
+                                   context=lane.context_pack(issue) if issue is not None else
+                                   merge_group_evidence(lane, binding, pr)
+                                   if "merge-group-failed" in (pr.get("repairReasons") or []) else "",
                                    goal=lane.goal_contract(issue) if issue is not None else ())
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
