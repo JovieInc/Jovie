@@ -1373,7 +1373,9 @@ ${fixtureCheckout}
     const upload = action.runs.steps.find(step =>
       /^actions\/upload-artifact@/.test(step.uses ?? '')
     );
-    expect(upload?.uses).toMatch(/^actions\/upload-artifact@[0-9a-f]{40}$/);
+    expect(upload?.uses).toBe(
+      'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
+    );
     expect(upload?.with?.path).toBe('${{ steps.guard.outputs.path }}');
     expect(upload?.with?.['include-hidden-files']).toBe(true);
   });
