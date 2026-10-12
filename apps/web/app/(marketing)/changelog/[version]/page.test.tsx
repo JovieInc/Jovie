@@ -210,7 +210,7 @@ it('uses the same published hero descriptor as the validated update feed', async
     ...release,
     customerOutcomes: Object.entries(release.sections).flatMap(
       ([section, entries]) =>
-        entries.map((summary, index) => ({
+        (entries as readonly string[]).map((summary, index) => ({
           storyId: `${section}-${index}`,
           entryId: `customer-update:${section}-${index}`,
           slug: `update-${section}-${index}`,
