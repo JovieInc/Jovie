@@ -18,7 +18,8 @@ const ACTION = resolve(
   import.meta.dirname,
   '../../../.github/actions/setup-node-pnpm/action.yml'
 );
-const steps = load(readFileSync(ACTION, 'utf8')).runs.steps;
+const steps = /** @type {any} */ (load(readFileSync(ACTION, 'utf8'))).runs
+  .steps;
 const detect = steps.find(step => step.id === 'preinstalled-pnpm');
 const setup = steps.find(step => step.name === 'Setup pnpm');
 
