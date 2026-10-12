@@ -9096,12 +9096,26 @@ class RepositoryBindingTest(unittest.TestCase):
         older = self.row(22, removed=[("failed_checks", "2026-09-01T00:00:00Z")] * 2)  # before this head
         timeouts = self.row(23, removed=[("checks_timed_out", after)] * 5)  # capacity, never poison
         actions = lane.bindings.maintenance_actions(self.binding, [once, twice, older, timeouts], time.time())
-        self.assertEqual([(kind, pr["number"]) for kind, pr in actions],
-                         [("enqueue", 20), ("enqueue", 22), ("enqueue", 23)])
-        self.assertEqual(lane.bindings.repair_reasons(lane, self.binding, twice), ["merge-group-failed"])
-        prompt = lane.bindings.render_prompt(self.binding, "fix/thing-21",
-                                             pr={**twice, "repairReasons": ["merge-group-failed"]})
-        self.assertIn("--event merge_group", prompt)
+        # LYB #1333: iOS runs only in merge groups, so one failed_checks ejection is the failure
+        # signal: that head goes to repair and is never re-enqueued unchanged.
+        self.assertEqual([(kind, pr["number"]) for kind, pr in actions], [("enqueue", 22), ("enqueue", 23)])
+        for row in (once, twice):
+            self.assertEqual(lane.bindings.repair_reasons(lane, self.binding, row), ["merge-group-failed"])
+        self.assertEqual(lane.bindings.repair_reasons(lane, self.binding, timeouts), [], "timeouts are transient")
+        runs = "\n".join(["11\tgh-readonly-queue/main/pr-210-abc\thttps://x/runs/11",
+                           "12\tgh-readonly-queue/main/pr-20-def\thttps://x/runs/12"])
+        def gh(args, **kwargs):
+            if args[:2] == ["gh", "api"]:
+                self.assertIn("event=merge_group", args[2])
+                return SimpleNamespace(returncode=0, stdout=runs, stderr="")
+            self.assertEqual(args[:4], ["gh", "run", "view", "12"])
+            return SimpleNamespace(returncode=0, stdout="iOS\tbuild\terror: missing symbol", stderr="")
+        with patch.object(lane, "sh", side_effect=gh):
+            evidence = lane.bindings.merge_group_evidence(lane, self.binding, once)
+        self.assertIn("https://x/runs/12", evidence); self.assertIn("missing symbol", evidence)
+        prompt = lane.bindings.render_prompt(self.binding, "fix/thing-20", context=evidence,
+                                             pr={**once, "repairReasons": ["merge-group-failed"]})
+        self.assertIn("missing symbol", prompt); self.assertIn("merge groups", prompt)
 
     def test_maintenance_actions_cover_dropped_token_draft_and_dependabot_prs(self):
         now = time.time()
@@ -9120,31 +9134,31 @@ class RepositoryBindingTest(unittest.TestCase):
             self.row(11, state="UNKNOWN"),
         ]
         actions = lane.bindings.maintenance_actions(self.binding, rows, now)
+        # LYB 2026-10-12: a queued PR is never re-enqueued (it would go to the back), whoever queued it.
         self.assertEqual([(kind, pr["number"]) for kind, pr in actions],
-                         [("requeue", 1), ("enqueue", 3), ("ready", 5), ("rebase", 8)])
+                         [("enqueue", 3), ("ready", 5), ("rebase", 8)])
 
     def test_maintain_writes_once_per_head_and_retries_a_failed_write_later(self):
         (self.host.state / "bindings" / "LYB").mkdir(parents=True)
         rows = [self.row(3), self.row(1, queue={"state": "QUEUED", "enqueuer": {"login": "github-actions[bot]"}})]
 
         def gh(args, *rest, **kwargs):
-            if "dequeuePullRequest" in args[4]:
-                return SimpleNamespace(returncode=0, stdout="{}", stderr="")
+            self.assertNotIn("dequeuePullRequest", args[4], "a queued PR is never dequeued to re-enqueue")
             return SimpleNamespace(returncode=1 if args[args.index("-f", 5) + 1] == "id=PR_3" else 0,
                                    stdout="", stderr="")
         now = time.time()
         with patch.object(lane, "sh", side_effect=gh) as sh:
             self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, rows, now=now),
-                             {"requeue": 1, "enqueue-failed": 1})
+                             {"enqueue-failed": 1})
             self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, rows, now=now + 60), {})
-            self.assertEqual(sh.call_count, 3)  # enqueue #3, dequeue + enqueue #1
+            self.assertEqual(sh.call_count, 1)  # enqueue #3 only; queued #1 is left alone
             self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, rows,
                                                     now=now + lane.bindings.ACTION_RETRY_S + 1),
                              {"enqueue-failed": 1})
             moved = self.row(3, head="c" * 40)  # a new head is new work
             self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, [moved], now=now + 120),
                              {"enqueue-failed": 1})
-        enqueue = next(args for args in [call.args[0] for call in sh.call_args_list] if "id=PR_1" in args
+        enqueue = next(args for args in [call.args[0] for call in sh.call_args_list] if "id=PR_3" in args
                        and "enqueuePullRequest" in args[4])
         self.assertIn("head=" + "a" * 40, enqueue)  # exact-head proof on every enqueue
 
