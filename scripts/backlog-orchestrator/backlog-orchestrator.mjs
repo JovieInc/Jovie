@@ -17,7 +17,7 @@
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs report
  */
 
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -540,6 +540,61 @@ export function loadFleetGateReceipt(
     : null;
 }
 
+/**
+ * Live state of the Gem lanes fleet-gate emitter (scripts/lanes/fleet_gate_emitter.py),
+ * read locally with no network call:
+ * - key: the emitter's current input generation (fleet-gate-emit.json);
+ * - mainSha: origin/main in the lanes repo, the ref the emitter keys on;
+ * - tickAt: lanes-status.json `at`, rewritten every dispatch tick.
+ * Null off Gem or when the emit record is unreadable.
+ *
+ * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env]
+ * @param {{ readMain?: (repo: string | null) => string | null }} [options]
+ */
+export function loadFleetGateEmitter(env = process.env, { readMain } = {}) {
+  const home = env.HOME || '';
+  const stateDir =
+    env.LANES_STATE ||
+    (home ? resolve(home, '.local/state/jovie-lanes') : null);
+  if (!stateDir) return null;
+  const readJson = name => {
+    try {
+      return JSON.parse(readFileSync(resolve(stateDir, name), 'utf8'));
+    } catch {
+      return null;
+    }
+  };
+  const record = readJson('fleet-gate-emit.json');
+  if (!record) return null;
+  const status = readJson('lanes-status.json');
+  const repo =
+    env.LANES_REPO || (home ? resolve(home, 'devin-sweep/Jovie') : null);
+  const mainSha = (readMain ?? readLanesMain)(repo);
+  return {
+    key: typeof record.key === 'string' ? record.key : null,
+    mainSha: typeof mainSha === 'string' ? mainSha : null,
+    tickAt:
+      status?.schema === 'symphony-lanes-status/v1' &&
+      typeof status.at === 'string'
+        ? status.at
+        : null,
+  };
+}
+
+function readLanesMain(repo) {
+  if (!repo) return null;
+  try {
+    const sha = execFileSync(
+      'git',
+      ['-C', repo, 'rev-parse', 'refs/remotes/origin/main'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }
+    ).trim();
+    return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fleetGateForTeam(team, now = new Date().toISOString()) {
   const loaded = loadFleetGateReceipt(team, { now });
   const receipt = loaded?.receipt ?? null;
@@ -584,6 +639,8 @@ export async function fleetGateForTeam(team, now = new Date().toISOString()) {
       concurrencyEvidence: receipt?.signals?.concurrencyEvidence,
       independentReview: receipt?.signals?.independentReview,
       observedAt: receipt?.observedAt,
+      inputGeneration: receipt?.inputGeneration,
+      emitter: team.key === 'JOV' ? loadFleetGateEmitter() : null,
     },
     { now }
   );

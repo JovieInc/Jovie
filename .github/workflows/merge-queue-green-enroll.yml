@@ -3,7 +3,6 @@
 # capability-gap: GitHub merge queue has no native auto-enroll for green PRs; GITHUB_TOKEN-created merge groups start no CI, so a hosted hop with the Jovie Bot app token must enqueue.
 # removal-trigger: Remove when GitHub offers native auto-enqueue of CLEAN PRs with merge-group CI, or when Summer's own enqueue tool proves 30 consecutive days of queue admission.
 name: Merge Queue Green Enroll
-# clock-class: temporal-resource
 
 # Tim 2026-09-26: production holds never stall merging. A held production
 # promote and a red main are separate issues from source admission, so green
@@ -15,25 +14,26 @@ name: Merge Queue Green Enroll
 # ruleset does not gate on), that carry no hold/gated/incident label. GitHub
 # recomputes mergeability lazily, so a read right after main moves returns
 # UNKNOWN; the controller re-reads it briefly instead of dropping the wake. It runs when a required-check workflow finishes on a PR, or a PR loses
-# a hold label, plus a 15-minute reconciliation sweep: a queue ejection while
-# checks are already green produces no new check completion, so without the
-# sweep a dequeued green head is never re-armed (JOV-7589).
+# a hold label, plus a reconciliation sweep on every push to main: a queue
+# ejection while checks are already green produces no new check completion, so
+# without the sweep a dequeued green head is never re-armed (JOV-7589).
 # The ruleset's required checks on the merge group stay the only gate. Uses the
 # Jovie Bot app token because GITHUB_TOKEN-created merge groups start no CI.
-# Automatic wakes inspect only the signaled PR. The sweep and manual dispatch
-# scan the complete roster.
+# Automatic wakes inspect only the signaled PR. The push-to-main sweep and
+# manual dispatch scan the complete roster.
 
 on:
   workflow_run:
     workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
     types: [completed]
   pull_request_target:
-    types: [labeled, unlabeled, reopened]
-  # Reconciliation sweep (JOV-7589): re-enrolls green PRs whose dequeue left no
-  # event-driven wake. Bounded by the shared concurrency group; 15 minutes caps
-  # how long a green dequeued head can sit unarmed.
-  schedule:
-    - cron: '*/15 * * * *'
+    types: [labeled, unlabeled, reopened, synchronize]
+  # Event-driven reconciliation (JOV-7589): every landing on main re-scans the
+  # roster (re-enrolls green heads whose dequeue left no wake) and re-checks
+  # hold receipts, so neither waits on a timer. Pushes coalesce into the one
+  # `reconcile` concurrency slot.
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -46,7 +46,7 @@ permissions: {}
 concurrency:
   # A global pending slot loses another PR's final wake. Coalesce only wakes
   # attributed to the same PR; association-free receipts retain their run ID.
-  group: merge-queue-green-enroll-${{ github.event_name == 'workflow_dispatch' && 'reconcile' || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
+  group: merge-queue-green-enroll-${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && 'reconcile' || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -194,8 +194,9 @@ jobs:
             // on every check completion exhausts the shared app GraphQL quota.
             const validNumber = n => Number.isSafeInteger(n) && n > 0;
             let prs;
-            if (context.eventName === 'workflow_dispatch' || context.eventName === 'schedule') {
-              // Explicit and scheduled reconciliation retain a complete paginated inventory.
+            if (['workflow_dispatch', 'push'].includes(context.eventName)) {
+              // Reconciliation (a landing on main or a manual run)
+              // keeps a complete paginated inventory.
               prs = await github.paginate(github.rest.pulls.list, {
                 owner, repo, state: 'open', base: 'main', per_page: 100,
               });
@@ -404,10 +405,14 @@ jobs:
   # comment naming an owner plus an expiry or a head-change release.
   # Ownerless holds past their grace period and expired or released receipts
   # are removed with one comment. The Jovie Bot unlabel event then wakes the
-  # enroll job above; required checks still gate admission.
+  # enroll job above; required checks still gate admission. Expiry is checked
+  # on the next event after it lapses: a landing on main, a merge-group CI
+  # result, or a PR label/push event.
   enforce-hold-contract:
     name: Release ownerless or expired holds
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: >-
+      contains(fromJSON('["workflow_dispatch","push","pull_request_target"]'), github.event_name) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'merge_group')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

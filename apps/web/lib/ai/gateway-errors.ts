@@ -212,6 +212,49 @@ export function toUserFacingGatewayError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+export interface GatewayAlert {
+  readonly title: string;
+  readonly error: Error;
+  readonly errorType: string;
+  readonly alert: string;
+}
+
+/**
+ * Operational classification for the two Gateway hard walls (JOV-7994).
+ * Returns a sanitized, distinctly named error plus alert tags so Sentry
+ * groups the incident under a stable title instead of the raw
+ * `GatewayInternalServerError` message, which leaks account-funding detail
+ * (the credit top-up URL) into events, logs and response bodies.
+ */
+export function classifyGatewayAlert(error: unknown): GatewayAlert | null {
+  if (isGatewayInsufficientFundsError(error)) {
+    return {
+      title: 'AI Gateway insufficient funds',
+      error: Object.assign(new Error('AI Gateway insufficient funds'), {
+        name: 'GatewayInsufficientFundsError',
+        code: GATEWAY_INSUFFICIENT_FUNDS_ERROR_CODE,
+        isRetryable: false,
+        cause: error,
+      }),
+      errorType: 'gateway_insufficient_funds',
+      alert: 'ai_gateway_insufficient_funds',
+    };
+  }
+  if (isGatewayBudgetExceededError(error)) {
+    return {
+      title: 'AI Gateway API key budget exceeded',
+      error: Object.assign(new Error('AI Gateway API key budget exceeded'), {
+        name: 'GatewayBudgetExceededError',
+        code: GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
+        cause: error,
+      }),
+      errorType: 'gateway_budget_exceeded',
+      alert: 'ai_gateway_budget',
+    };
+  }
+  return null;
+}
+
 export function classifyChatStreamFailure(error: unknown): ChatStreamFailure {
   if (isGatewayInsufficientFundsError(error)) {
     return {

@@ -693,6 +693,11 @@ jobs:
     name: Full iOS release regression
     needs: [authorize-release]
     if: ${{ needs.authorize-release.result == 'success' && needs.authorize-release.outputs.should_release == 'true' }}
+    # ios-ci's opt-in Mac route job declares actions: write; a release never
+    # opts in (full-regression stays on hosted macOS), but the grant must exist.
+    permissions:
+      actions: write
+      contents: read
     uses: ./.github/workflows/ios-ci.yml
     with:
       checkout-ref: ${{ needs.authorize-release.outputs.release_sha }}

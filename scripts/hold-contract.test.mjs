@@ -218,7 +218,7 @@ test('the enroll workflow runs the trusted hold contract with a Jovie Bot token'
     readFileSync('.github/workflows/merge-queue-green-enroll.yml', 'utf8')
   );
   const job = workflow.jobs['enforce-hold-contract'];
-  assert.match(job.if, /schedule/);
+  assert.match(job.if, /push/);
   const checkout = job.steps.find(step => step.uses?.includes('checkout'));
   assert.equal(
     checkout.with.ref,

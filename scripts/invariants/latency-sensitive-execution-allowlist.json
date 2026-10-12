@@ -18,10 +18,6 @@
       "spawnSync": 1,
       "readFileSync": 1
     },
-    "apps/web/lib/changelog-source.ts": {
-      "existsSync": 1,
-      "readFileSync": 1
-    },
     "apps/web/lib/chat/knowledge/topics.ts": {
       "readFileSync": 1
     },

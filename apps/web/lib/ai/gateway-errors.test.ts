@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildGatewayRetryChain,
   classifyChatStreamFailure,
+  classifyGatewayAlert,
   createRotatingGatewayLanguageModel,
   GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
   GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
@@ -92,6 +93,46 @@ describe('classifyChatStreamFailure', () => {
     expect(toUserFacingGatewayError(gatewayBudgetError()).message).toBe(
       GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE
     );
+  });
+});
+
+describe('classifyGatewayAlert', () => {
+  it('sanitizes the positive-credit-balance wall into a named alert', () => {
+    const raw = Object.assign(
+      new Error(
+        'A positive credit balance is required for all requests, including BYOK, so fallback providers remain available. Add credits at https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dtop-up to continue.'
+      ),
+      { name: 'GatewayInternalServerError', statusCode: 402 }
+    );
+    const alert = classifyGatewayAlert(raw);
+    expect(alert).toMatchObject({
+      title: 'AI Gateway insufficient funds',
+      errorType: 'gateway_insufficient_funds',
+      alert: 'ai_gateway_insufficient_funds',
+    });
+    expect(alert?.error).toMatchObject({
+      name: 'GatewayInsufficientFundsError',
+      message: 'AI Gateway insufficient funds',
+      code: 'AI_UNAVAILABLE',
+    });
+    expect(alert?.error.cause).toBe(raw);
+  });
+
+  it('keeps budget walls under the budget alert', () => {
+    const alert = classifyGatewayAlert(gatewayBudgetError());
+    expect(alert).toMatchObject({
+      title: 'AI Gateway API key budget exceeded',
+      errorType: 'gateway_budget_exceeded',
+      alert: 'ai_gateway_budget',
+    });
+    expect(alert?.error).toMatchObject({
+      name: 'GatewayBudgetExceededError',
+      code: GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
+    });
+  });
+
+  it('returns null for ordinary provider failures', () => {
+    expect(classifyGatewayAlert(new Error('model not found'))).toBeNull();
   });
 });
 

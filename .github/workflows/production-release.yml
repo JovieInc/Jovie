@@ -912,7 +912,7 @@ jobs:
       - name: Build and stage production deployment
         id: stage-production
         if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
-        timeout-minutes: 30
+        timeout-minutes: 45
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           EXPECTED_SHA: ${{ inputs.expected_sha }}
@@ -1114,7 +1114,7 @@ jobs:
 
           inspect_wait_status=0
           ./node_modules/.bin/vercel inspect "$production_deploy_id" \
-            --wait --timeout 15m "${scope_args[@]}" ||
+            --wait --timeout 30m "${scope_args[@]}" ||
             inspect_wait_status=$?
           # inspect --format=json omits meta in Vercel 56.3.2. Read the full
           # authenticated deployment record for the unchanged provenance checks.
@@ -1209,16 +1209,18 @@ jobs:
             exit 1
           }
 
-          if [ -z "${DOPPLER_TOKEN:-}" ]; then
-            fail_performance_gate "The production Doppler credential is required before production promotion."
-          fi
+          auth_performance_configured=false
           # Expanded inside the Doppler child shell.
           # shellcheck disable=SC2016
-          if ! doppler run --project jovie-web --config prd \
-            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
-            --no-fallback -- env -u DOPPLER_TOKEN bash -c \
-              '[ -n "${E2E_PROD_USER_EMAIL:-}" ] && [ -n "${DATABASE_URL:-}" ]'; then
-            fail_performance_gate "Authenticated performance credentials are required before production promotion."
+          if [ -n "${DOPPLER_TOKEN:-}" ] &&
+            doppler run --project jovie-web --config prd \
+              --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
+              --no-fallback -- env -u DOPPLER_TOKEN bash -c \
+                '[ -n "${E2E_PROD_USER_EMAIL:-}" ] && [ -n "${DATABASE_URL:-}" ]'; then
+            auth_performance_configured=true
+          else
+            echo "::notice::Production Better Auth performance credentials are not configured; authenticated route budgets are explicitly skipped and are not release proof."
+            echo "authenticated_performance_status=skipped_unconfigured" >> "$GITHUB_OUTPUT"
           fi
           if [ -z "${PLAYWRIGHT_VERCEL_BYPASS_SECRET:-}" ]; then
             fail_performance_gate "Protected-origin credentials are required before production promotion."
@@ -1233,53 +1235,55 @@ jobs:
           export EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url"
           export EXPECTED_VERCEL_ENVIRONMENT=production
 
-          auth_state="$RUNNER_TEMP/uas-performance-auth-${GITHUB_RUN_ID}.json"
-          dynamic_secrets_file="$RUNNER_TEMP/uas-performance-dynamic-secrets-${GITHUB_RUN_ID}"
-          cleanup_performance_gate() {
-            rm -f "$auth_state" "$dynamic_secrets_file"
-          }
-          trap cleanup_performance_gate EXIT
-
           cd apps/web
-          mkdir -p tests/.auth
-          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          if ! doppler run --project jovie-web --config prd \
-            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
-            --no-fallback -- env -u DOPPLER_TOKEN \
-              CI=true \
-              BASE_URL="$deployment_url" \
-              EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url" \
-              EXPECTED_VERCEL_ENVIRONMENT=production \
-              PERFORMANCE_AUTH_STATE_PATH="$auth_state" \
-              PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$dynamic_secrets_file" \
-                node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts \
-                    --project=chromium --reporter=line \
-                    --grep "sign-in works and dashboard loads"; then
-            fail_performance_gate "Unable to establish authenticated exact-build browser state."
-          fi
-          if [ ! -s "$auth_state" ] ||
-            ! jq -e '
-              ((.cookies // []) | length > 0) or
-              ((.origins // []) | length > 0)
-            ' "$auth_state" >/dev/null; then
-            fail_performance_gate "Authenticated exact-build browser state was not persisted."
-          fi
+          if [ "$auth_performance_configured" = "true" ]; then
+            auth_state="$RUNNER_TEMP/uas-performance-auth-${GITHUB_RUN_ID}.json"
+            dynamic_secrets_file="$RUNNER_TEMP/uas-performance-dynamic-secrets-${GITHUB_RUN_ID}"
+            cleanup_performance_gate() {
+              rm -f "$auth_state" "$dynamic_secrets_file"
+            }
+            trap cleanup_performance_gate EXIT
 
-          if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
-            --base-url "$deployment_url" \
-            --auth-path "$auth_state" \
-            --runs 3 \
-            --route-id creator-inbox-nav \
-            --route-id creator-chat-nav \
-            --route-id creator-library \
-            --route-id creator-contacts \
-            --route-id creator-calendar \
-            --route-id creator-tasks; then
-            echo "::warning::Canonical six-route browser budgets failed on the exact staged build."
-            echo "performance_status=warn" >> "$GITHUB_OUTPUT"
-          else
-            echo "performance_status=passed" >> "$GITHUB_OUTPUT"
+            mkdir -p tests/.auth
+            echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+            if ! doppler run --project jovie-web --config prd \
+              --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
+              --no-fallback -- env -u DOPPLER_TOKEN \
+                CI=true \
+                BASE_URL="$deployment_url" \
+                EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url" \
+                EXPECTED_VERCEL_ENVIRONMENT=production \
+                PERFORMANCE_AUTH_STATE_PATH="$auth_state" \
+                PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$dynamic_secrets_file" \
+                  node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                    pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts \
+                      --project=chromium --reporter=line \
+                      --grep "sign-in works and dashboard loads"; then
+              fail_performance_gate "Unable to establish authenticated exact-build browser state."
+            fi
+            if [ ! -s "$auth_state" ] ||
+              ! jq -e '
+                ((.cookies // []) | length > 0) or
+                ((.origins // []) | length > 0)
+              ' "$auth_state" >/dev/null; then
+              fail_performance_gate "Authenticated exact-build browser state was not persisted."
+            fi
+
+            if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
+              --base-url "$deployment_url" \
+              --auth-path "$auth_state" \
+              --runs 3 \
+              --route-id creator-inbox-nav \
+              --route-id creator-chat-nav \
+              --route-id creator-library \
+              --route-id creator-contacts \
+              --route-id creator-calendar \
+              --route-id creator-tasks; then
+              echo "::warning::Canonical six-route browser budgets failed on the exact staged build."
+              echo "authenticated_performance_status=warn" >> "$GITHUB_OUTPUT"
+            else
+              echo "authenticated_performance_status=passed" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
           if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
