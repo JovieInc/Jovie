@@ -9,7 +9,7 @@ import {
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const GENERATED_PR_TRAILER_PATTERN = /\(#(\d+)\)$/;
 // Fail closed at the checked-in native queue's max_entries_to_merge ceiling.
-const MAX_GROUP_MEMBERS = 5;
+const MAX_GROUP_MEMBERS = 1;
 const SIZE_BYPASS_LABELS = new Set(['big-pr', 'codemod']);
 // Mirrors scripts/lanes/pr_events.py HOLD_LABELS. Native auto-merge checks
 // labels only when it is armed, so a hold added later is enforced here, on the

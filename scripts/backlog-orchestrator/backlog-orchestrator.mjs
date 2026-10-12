@@ -17,7 +17,7 @@
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs report
  */
 
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -540,6 +540,61 @@ export function loadFleetGateReceipt(
     : null;
 }
 
+/**
+ * Live state of the Gem lanes fleet-gate emitter (scripts/lanes/fleet_gate_emitter.py),
+ * read locally with no network call:
+ * - key: the emitter's current input generation (fleet-gate-emit.json);
+ * - mainSha: origin/main in the lanes repo, the ref the emitter keys on;
+ * - tickAt: lanes-status.json `at`, rewritten every dispatch tick.
+ * Null off Gem or when the emit record is unreadable.
+ *
+ * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env]
+ * @param {{ readMain?: (repo: string | null) => string | null }} [options]
+ */
+export function loadFleetGateEmitter(env = process.env, { readMain } = {}) {
+  const home = env.HOME || '';
+  const stateDir =
+    env.LANES_STATE ||
+    (home ? resolve(home, '.local/state/jovie-lanes') : null);
+  if (!stateDir) return null;
+  const readJson = name => {
+    try {
+      return JSON.parse(readFileSync(resolve(stateDir, name), 'utf8'));
+    } catch {
+      return null;
+    }
+  };
+  const record = readJson('fleet-gate-emit.json');
+  if (!record) return null;
+  const status = readJson('lanes-status.json');
+  const repo =
+    env.LANES_REPO || (home ? resolve(home, 'devin-sweep/Jovie') : null);
+  const mainSha = (readMain ?? readLanesMain)(repo);
+  return {
+    key: typeof record.key === 'string' ? record.key : null,
+    mainSha: typeof mainSha === 'string' ? mainSha : null,
+    tickAt:
+      status?.schema === 'symphony-lanes-status/v1' &&
+      typeof status.at === 'string'
+        ? status.at
+        : null,
+  };
+}
+
+function readLanesMain(repo) {
+  if (!repo) return null;
+  try {
+    const sha = execFileSync(
+      'git',
+      ['-C', repo, 'rev-parse', 'refs/remotes/origin/main'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }
+    ).trim();
+    return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fleetGateForTeam(team, now = new Date().toISOString()) {
   const loaded = loadFleetGateReceipt(team, { now });
   const receipt = loaded?.receipt ?? null;
@@ -584,6 +639,8 @@ export async function fleetGateForTeam(team, now = new Date().toISOString()) {
       concurrencyEvidence: receipt?.signals?.concurrencyEvidence,
       independentReview: receipt?.signals?.independentReview,
       observedAt: receipt?.observedAt,
+      inputGeneration: receipt?.inputGeneration,
+      emitter: team.key === 'JOV' ? loadFleetGateEmitter() : null,
     },
     { now }
   );
@@ -2049,7 +2106,6 @@ async function runRemediate(isDryRun) {
   // with retries and a hard deadline; merge-queue rows (still null after
   // retries with a gh-readonly-queue pr-<N>- ref) count as known and not
   // conflicting. The receipt carries the full evidence.
-  /** @type {Record<string, any> | null} */
   let mergeabilityEvidence = null;
   if (Array.isArray(pullRequests)) {
     mergeabilityEvidence = await measureMergeability(
@@ -2101,6 +2157,15 @@ async function runRemediate(isDryRun) {
       schema: backlogRemediation.CAPACITY_SCHEMA,
       observedAt: new Date().toISOString(),
       workers,
+      // Worker evidence provenance for the capacity line + receipt (the
+      // lanes doctor report vs the legacy 4041 feed) — a workers-saturated
+      // stop names its source and freshness.
+      workersSource: lanes
+        ? 'lanes-doctor-report'
+        : workers
+          ? 'legacy-4041'
+          : null,
+      workersObservedAt: lanes?.observedAt ?? null,
       host: backlogRemediation.readHostPressure('/proc'),
       provider: provider
         ? { accounts: provider.accounts, ready: provider.ready }
@@ -2183,6 +2248,7 @@ async function runRemediate(isDryRun) {
         },
     feed: receipt.feed,
     workpadUpsert: null,
+    bridge: null,
     // JOV-8000 follow-up 36: the mergeability evidence also rides the
     // printed result top-level (it already sits inside
     // capacitySignals.mergeabilityEvidence) so the deadline/starvation
@@ -2208,14 +2274,13 @@ async function runRemediate(isDryRun) {
         .filter(row => row?.identifier)
         .map(row => [row.identifier, { openPullRequests: [] }])
     );
-    /** @type {Record<string, any>} */ (result).bridge =
-      await backlogRemediation.bridgeSelectedToLanes({
-        cohort: receipt.cohort,
-        client: linear,
-        inventory: bridgeInventory,
-        teamId: team.id,
-        env: process.env,
-      });
+    result.bridge = await backlogRemediation.bridgeSelectedToLanes({
+      cohort: receipt.cohort,
+      client: linear,
+      inventory: bridgeInventory,
+      teamId: team.id,
+      env: process.env,
+    });
     // Surface lane rejection reasons for the selected issues next to the
     // bridge receipt, so route-held:frontier / over-budget is visible without
     // host access (the lanes doctor carries observed.rejectedIssues).
@@ -2259,10 +2324,22 @@ async function runRemediate(isDryRun) {
     ? backlogRemediation.pullRequestRates(pullRequests)
     : null;
   if (ratesSummary) {
-    const mm = mergeabilityEvidence ?? {};
+    const mm = /** @type {Record<string, any>} */ (mergeabilityEvidence ?? {});
     console.log(
-      `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')} mm.queueSource=${mm.queueSource ?? 'none'} mm.errors=${(mm.errors ?? []).length}`
+      `capacity.rates total=${ratesSummary.total} conflicting=${ratesSummary.conflicting}(${ratesSummary.conflictingPullRequests.join(',')}) errored=${ratesSummary.errored}(${ratesSummary.erroredPullRequests.join(',')}) unknown=${ratesSummary.unknown}(${ratesSummary.unknownPullRequests.join(',')}) unknownRate=${ratesSummary.unknownRate.toFixed(3)} conflictRate=${ratesSummary.conflictRate.toFixed(3)} errorRate=${ratesSummary.errorRate.toFixed(3)} allowed=${result?.capacity?.allowed === true} selected=${result?.capacity?.cohortSize ?? 0} reason=${result?.capacity?.reason ?? 'none'} mm.measured=${mm.measured ?? 0} mm.polls=${mm.polls ?? 0} mm.inMergeQueue=${(mm.inMergeQueue ?? []).length} mm.deadlineHit=${mm.deadlineHit === true} mm.elapsedMs=${mm.elapsedMs ?? 0} mm.unpolled=${(mm.unpolled ?? []).join(',')} mm.queueSource=${mm.queueSource ?? 'none'} mm.errors=${(mm.errors ?? []).length} workers.running=${workers?.running ?? 'n/a'} workers.max=${workers?.maxConcurrent ?? 'n/a'} workers.source=${lanes ? 'lanes-doctor-report' : workers ? 'legacy-4041' : 'none'} workers.observedAt=${lanes?.observedAt ?? 'n/a'}`
     );
+    // Per-reason exclusion counts (JOV-8000 follow-up 42): near-misses are
+    // diagnosable from the log without reading the full matrix.
+    const reasonCounts = {};
+    for (const row of receipt.matrix ?? []) {
+      const code = row?.reasonCode ?? row?.reason ?? 'none';
+      reasonCounts[code] = (reasonCounts[code] ?? 0) + 1;
+    }
+    const reasonLine = Object.entries(reasonCounts)
+      .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+      .map(([code, count]) => `${code}=${count}`)
+      .join(' ');
+    console.log(`capacity.exclusions ${reasonLine}`);
   }
 }
 

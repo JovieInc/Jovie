@@ -187,6 +187,7 @@ interface ActivityTableSkeletonProps {
 export function ActivityTableSkeleton({
   rows = 8,
 }: Readonly<ActivityTableSkeletonProps> = {}) {
+  // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
   const columns = useMemo<ColumnDef<AdminActivityItem, any>[]>(
     () => ACTIVITY_COLUMNS,
     []

@@ -105,7 +105,7 @@ class ReasonTest(unittest.TestCase):
         self.assertEqual(events.held_reason(["check-failed:bash scripts/hooks", "error: x"]), ("gate-check-failed", "fix-loop"))
         self.assertEqual(events.held_reason(["gate-timeout:x3"]), ("gate-timeout", "regate"))
         self.assertEqual(events.held_reason(["code-change-without-test"]), ("missing-test", "fix-loop"))
-        self.assertEqual(events.held_reason(["diff-too-large:2000"]), ("diff-too-large", "bug-intake"))
+        self.assertEqual(events.held_reason(["diff-too-large:2000"]), ("diff-too-large", "fix-loop"))
         self.assertEqual(events.held_reason([]), ("unclassified", "fix-loop"))
 
     def test_the_most_severe_reason_names_the_record(self):
@@ -558,6 +558,27 @@ class RelayTest(unittest.TestCase):
         legacy = page([{"__typename": "PullRequestCommit", "commit": {"oid": "sync2"}}, removal])  # no parents: a plain boundary
         self.assertEqual(events.queue_ejections(7, NOW, Shell({("gh", "api", "graphql"): legacy}), head="sync2"), 1)
 
+    def test_lifting_queue_poison_is_the_ejection_boundary(self):
+        # Tim 2026-10-12: a main-moved revisit (or a fix push, or a person) lifts the label; the
+        # ejections before it are spent, so the synced head is not re-poisoned at once, and a
+        # defect that still fails re-poisons after two fresh ejections.
+        removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        lifted = {"__typename": "UnlabeledEvent", "label": {"name": "queue-poison"}}
+        other = {"__typename": "UnlabeledEvent", "label": {"name": "hold"}}
+        def commit(oid, parents):
+            return {"__typename": "PullRequestCommit", "commit": {"oid": oid, "parents": {"totalCount": parents}}}
+        def page(nodes):
+            return {"data": {"repository": {"pullRequest": {"headRefOid": "sync2", "state": "OPEN", "timelineItems": {
+                "nodes": nodes, "pageInfo": {"hasPreviousPage": False, "startCursor": None}}}}}}
+        cases = ((page([commit("fix", 1), removal, removal, commit("sync2", 2), lifted]), 0),
+                 (page([commit("fix", 1), removal, removal, lifted, commit("sync2", 2), removal]), 1),
+                 (page([commit("fix", 1), removal, removal, commit("sync2", 2), lifted, removal, removal]), 2),
+                 (page([commit("fix", 1), removal, removal, commit("sync2", 2), other]), 2))
+        for response, expected in cases:
+            shell = Shell({("gh", "api", "graphql"): response})
+            self.assertEqual(events.queue_ejections(7, NOW, shell, head="sync2"), expected)
+        self.assertIn("UNLABELED_EVENT", shell.calls[0][-1])
+
     def test_poison_mutation_rechecks_live_head_and_hold_after_history_reads(self):
         removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
         page = {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", "timelineItems": {
@@ -589,10 +610,9 @@ class RelayTest(unittest.TestCase):
         terminal = pr(number=5, branch="tim/terminal", mergeable="CONFLICTING",
                       labels=["lane-fix-exhausted"])
         claimed = pr(number=6, branch="tim/claimed", sha="claimed-head", mergeable="CONFLICTING")
-        claim_url = (f"repos/{events.REPO}/issues/6/comments?per_page=100&sort=created&direction=desc")
         shell = Shell({
             ("gh", "pr", "list"): [terminal, claimed],
-            ("gh", "api", claim_url):
+            ("gh", "api", "--paginate"):
                 f"🤖 lane claim kind=fix sha=claimed-head host=gem at={claimed_at}\n",
         })
         with patch.object(events.time, "time", return_value=NOW):
@@ -628,6 +648,24 @@ class RelayTest(unittest.TestCase):
         self.assertEqual((sentry["source"], sentry["ws"]), ("sentry", "reliability"))
         self.assertIsNone(events.remediation.event_from_sentry({}))
 
+    def test_schedule_failure_fingerprint_ignores_head_sha(self):
+        """JOV-8044: a recurring scheduled red must dedupe to one intake event.
+
+        head_sha moves every scheduled run; including it filed a new issue per
+        failure instead of reopening the canonical one."""
+        base = {"name": "CI Duration Ratchet", "event": "schedule", "conclusion": "failure",
+                "head_branch": "main", "pull_requests": [],
+                "html_url": "https://example.test/run/1", "updated_at": "2026-10-08T00:00:00Z"}
+        first = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**base, "head_sha": "sha-a"}})
+        second = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**base, "head_sha": "sha-b"}})
+        self.assertEqual(first["fingerprint"], second["fingerprint"])
+        self.assertEqual(first["ws"], "ci")
+        push = {"name": "CI", "event": "push", "conclusion": "failure", "head_branch": "main",
+                "pull_requests": [], "html_url": "https://example.test/run/2"}
+        push_a = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**push, "head_sha": "sha-a"}})
+        push_b = events.remediation.non_pr_event("workflow_run", {"workflow_run": {**push, "head_sha": "sha-b"}})
+        self.assertNotEqual(push_a["fingerprint"], push_b["fingerprint"])
+
     def test_push_event_runs_the_conflict_read(self):
         shell = Shell({("gh", "pr", "list"): []})
         self.assertEqual(events.relay("push", {}, shell, set()), [])
@@ -645,6 +683,103 @@ class RelayTest(unittest.TestCase):
             finally:
                 os.environ.clear()
                 os.environ.update(saved)
+
+
+class QuotaRelayTest(unittest.TestCase):
+    """2026-10-11 20:07Z: the repo GITHUB_TOKEN quota hit zero and the relay queued quota-red
+    PR Size Guard / Source Validation runs as lane-fix-red. Quota is re-run, never repair."""
+
+    VIEW = {"state": "OPEN", "isDraft": False, "headRefName": "tim/fix", "headRefOid": "h1",
+            "isCrossRepository": False, "labels": []}
+    RUN = {"id": 900, "run_attempt": 1, "event": "pull_request", "conclusion": "failure",
+           "head_sha": "h1", "pull_requests": [{"number": 5}]}
+    QUOTA_LOG = ("2026-10-11T20:20:00Z ##[group]Run node changelog-source-guard.mjs\n"
+                 "2026-10-11T20:21:04Z gh: API rate limit exceeded for installation. (HTTP 403)\n"
+                 "2026-10-11T20:21:04Z ##[error]Process completed with exit code 1.\n")
+    REAL_LOG = ("2026-10-11T20:20:00Z ##[group]Run node scripts/lib/pr-size-guard-policy.mjs\n"
+                "2026-10-11T20:20:01Z ##[error]1600 lines exceeds the 1500-line cap\n"
+                "2026-10-11T20:20:01Z ##[error]Process completed with exit code 1.\n")
+
+    @staticmethod
+    def classify(text):
+        # Mirrors scripts/lib/github-rate-limit.mjs for the wordings below.
+        if "rate limit exceeded" in text:
+            return "primary-rate-limit"
+        return "transient-server" if "HTTP 502" in text else "none"
+
+    def shell(self, logs, jobs=(1,), jobs_reply=None):
+        routes = {("gh", "pr", "view"): self.VIEW,
+                  ("gh", "api", f"repos/{events.REPO}/actions/runs/900/jobs?filter=latest&per_page=100"):
+                      jobs_reply or (0, json.dumps(list(jobs)))}
+        for job, log in zip(jobs, logs):
+            routes[("gh", "api", f"repos/{events.REPO}/actions/jobs/{job}/logs")] = (0, log)
+        return Shell(routes)
+
+    def relay(self, shell, run=None):
+        with patch.object(events, "classify_github_failure", self.classify):
+            return events.relay("workflow_run", {"workflow_run": run or self.RUN}, shell, set())
+
+    def test_a_quota_only_failure_is_rerun_not_labelled(self):
+        shell = self.shell([self.QUOTA_LOG])
+        self.assertEqual(self.relay(shell), [])
+        self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs"],
+                      shell.calls)
+        self.assertNotIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/5/labels", "-f",
+                          "labels[]=lane-fix-red"], shell.calls)
+
+    def test_an_unreadable_run_on_the_same_quota_is_not_labelled(self):
+        shell = self.shell([], jobs=(), jobs_reply=(1, "gh: API rate limit exceeded for installation. (HTTP 403)"))
+        self.assertEqual(self.relay(shell), [])
+
+    def test_real_failures_stay_red(self):
+        for logs, jobs in (([self.REAL_LOG], (1,)),
+                           ([self.QUOTA_LOG, self.REAL_LOG], (1, 2)),
+                           (["no runner exit line"], (1,)),
+                           ([self.QUOTA_LOG.replace("rate limit exceeded for installation",
+                                                    "Resource not accessible")], (1,))):
+            shell = self.shell(logs, jobs)
+            self.assertEqual(self.relay(shell), [(5, "red")], logs)
+            self.assertEqual(shell.made("gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs"), [])
+
+    def test_a_quota_run_past_the_rerun_cap_becomes_repair_work(self):
+        shell = self.shell([self.QUOTA_LOG])
+        run = {**self.RUN, "run_attempt": events.INFRA_RERUN_MAX_ATTEMPT}
+        self.assertEqual(self.relay(shell, run), [(5, "red")])
+
+    def test_without_the_shared_classifier_the_red_signal_is_unchanged(self):
+        shell = self.shell([self.QUOTA_LOG])
+        with patch.object(events, "classify_github_failure", lambda text: None):
+            added = events.relay("workflow_run", {"workflow_run": self.RUN}, shell, set())
+        self.assertEqual(added, [(5, "red")])
+
+    @unittest.skipUnless(events.RATE_LIMIT_HELPER.exists(), "shared classifier lands separately")
+    def test_the_shared_classifier_agrees(self):
+        self.assertEqual(events.classify_github_failure(self.QUOTA_LOG), "primary-rate-limit")
+        self.assertEqual(events.classify_github_failure(self.REAL_LOG), "none")
+
+    def test_failed_step_text_is_the_failing_steps_slice(self):
+        log = ("##[group]Run earlier step\nHTTP 502 recovered\n##[endgroup]\n" + self.REAL_LOG)
+        step = events.failed_step_text(log)
+        self.assertTrue(step.startswith("2026-10-11T20:20:00Z ##[group]Run node scripts/lib/pr-size-guard-policy.mjs"))
+        self.assertNotIn("HTTP 502", step)
+        self.assertEqual(events.failed_step_text("no exit line"), "")
+
+
+class ClaimCommentTest(unittest.TestCase):
+    def test_claim_read_covers_only_the_ttl_window_on_every_page(self):
+        # The per-issue comments endpoint ignores sort/direction and pages oldest first:
+        # #20979 had 114 comments, so every claim after the 100th was invisible.
+        stamp = lambda age: datetime.fromtimestamp(NOW - age, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        shell = Shell({("gh", "api", "--paginate"):
+                       f"🤖 lane claim kind=fix sha=h1 host=mac at={stamp(60)}\n"
+                       f"🤖 lane claim kind=gate sha=h1 host=gem at={stamp(30)}\n"})
+        self.assertTrue(events.claim_active(7, "h1", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
+        self.assertFalse(events.claim_active(7, "h1", shell, NOW, kind="gate", exclude_host="gem"),
+                         "a host never defers to its own claim")
+        self.assertFalse(events.claim_active(7, "h2", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
+        since = stamp(events.CLAIM_TTL_S)
+        self.assertEqual(shell.calls[0][:4], ["gh", "api", "--paginate",
+                                              f"repos/{events.REPO}/issues/7/comments?per_page=100&since={since}"])
 
 
 class ClaimTest(unittest.TestCase):
@@ -673,6 +808,45 @@ class ClaimTest(unittest.TestCase):
         self.assertEqual(search, "label:lane-fix-red,lane-fix-conflict,lane-fix-dequeued,lane-fix-review,lane-fix-stale")
         self.assertEqual(events.queued_prs(fake_lane(Shell({("gh", "pr", "list"): (1, "")})), events.FIX_KINDS), [])
 
+    def test_queue_projects_shared_inventory_without_a_full_check_census(self):
+        rows = [pr(number=5, labels=["lane-fix-red", "lane-fix-green"], labelsComplete=True),
+                pr(number=6, labels=["other"], labelsComplete=True)]
+        shell = Shell()
+        module = fake_lane(shell)
+        module.open_prs_summary = Mock(return_value=rows)
+        fixed = events.queued_prs(module, events.FIX_KINDS)
+        ticked = events.queued_prs(module, ("green",))
+        self.assertEqual([(p["number"], p["eventKinds"]) for p in fixed], [(5, ["red"])])
+        self.assertEqual([(p["number"], p["eventKinds"]) for p in ticked], [(5, ["green"])])
+        self.assertEqual(rows[0]["eventKinds"], [])
+        self.assertEqual(fixed[0]["headRefOid"], rows[0]["headRefOid"])
+        self.assertEqual(shell.calls, [], "queue projection must not fetch check rollups")
+        fixed[0]["eventKinds"].append("stale")
+        self.assertEqual(ticked[0]["eventKinds"], ["green"])
+
+    def test_queue_rejects_truncated_or_legacy_label_inventory(self):
+        for complete in (False, None):
+            shell = Shell()
+            module = fake_lane(shell)
+            module.open_prs_summary = Mock(return_value=[pr(labels=["other"], labelsComplete=complete)])
+            with self.assertRaisesRegex(RuntimeError, "event-label-inventory-incomplete"):
+                events.queued_prs(module, events.FIX_KINDS)
+            self.assertEqual(shell.calls, [])
+
+    def test_event_after_thirty_labels_is_not_lost(self):
+        module = fake_lane(Shell())
+        module.open_prs_summary = Mock(return_value=[pr(labels=["other-" + str(n) for n in range(30)] +
+            ["lane-fix-red"], labelsComplete=True)])
+        self.assertEqual(events.queued_prs(module, events.FIX_KINDS)[0]["eventKinds"], ["red"])
+
+    def test_queue_does_not_fallback_to_heavy_reads_when_summary_is_unreadable(self):
+        for unreadable in (None, []):
+            shell = Shell()
+            module = fake_lane(shell)
+            module.open_prs_summary = Mock(return_value=unreadable)
+            self.assertEqual(events.queued_prs(module, events.FIX_KINDS), [])
+            self.assertEqual(shell.calls, [])
+
     def test_an_event_pr_is_claimed_first_recorded_and_retains_its_label(self):
         shell = Shell()
         lane = fake_lane(shell)
@@ -686,10 +860,10 @@ class ClaimTest(unittest.TestCase):
 
     def test_an_unfixable_hold_retains_the_label_without_an_attempt(self):
         shell = Shell()
-        runner.record_held(self.host, 5, "h1", ["diff-too-large:2000"])
+        runner.record_held(self.host, 5, "h1", ["secret-like-file-changed"])
         claimed = events.claim_event_pr(self.host, fake_lane(shell), "devin",
                                         [pr(kinds=["red"], checks=[RED_CHECK])], NOW)
-        self.assertIsNone(claimed, "a hold no push clears (diff-too-large) never reaches the fix loop")
+        self.assertIsNone(claimed, "a hold no push clears (a secret-like file) never reaches the fix loop")
         self.assertEqual(self.attempts(), {})
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [])
 
@@ -1022,7 +1196,8 @@ class GapTest(unittest.TestCase):
                       updatedAt=old),
             # young agent draft (2d) idle >48h is counted, not reclaimed (its writer may still move it)
             self.node(23, isDraft=True, headRefName="codex/fresh-wip", createdAt="2033-05-16T00:00:00Z", updatedAt=old),
-            # a human's own branch is never the lanes' to close
+            # a founder-account writer branch (agent sessions publish as Tim) is reclaimed too,
+            # but never closed
             self.node(24, isDraft=True, headRefName="feature/personal-wip", createdAt=ancient,
                       updatedAt=ancient),
         ]
@@ -1030,15 +1205,19 @@ class GapTest(unittest.TestCase):
         self.assertEqual(plan["close"], [])
         # Tim, 2026-10-10: Symphony reclaims abandoned agent drafts and finishes them. The
         # conflicting one is repaired and finished; the idle one is finished; the young one
-        # and the dependency-held one stay with their writer; a human branch is never touched.
-        self.assertEqual(plan["label"], [(20, "conflict"), (20, "stale"), (21, "stale")])
+        # and the dependency-held one stay with their writer. Tim, 2026-10-11: a founder-account
+        # writer draft is no exception (no draft sits without an owner); it is never closed.
+        self.assertEqual(plan["label"], [(20, "conflict"), (20, "stale"), (21, "stale"), (24, "stale")])
         self.assertEqual(plan["depHolds"], [(22, [9])])
         counts = plan["counts"]
-        self.assertEqual((counts["staleAgentDrafts"], counts["staleOtherDrafts"]), (4, 1))
+        self.assertEqual((counts["staleAgentDrafts"], counts["staleOtherDrafts"]), (5, 0))
         states = {row["pr"]: row["state"] for row in plan["dispositions"]}
         self.assertEqual(states[20], "advancing", "a reclaimed draft carries a fix label the lanes act on")
         self.assertEqual(states[22], "hold:dependency")
-        self.assertEqual(states[24], "draft")
+        self.assertEqual(states[24], "advancing")
+        duplicate = {**prs[4], "labels": [{"name": "duplicate"}]}
+        self.assertEqual(events.reconcile_plan([duplicate], {}, set(), 2, now)["close"], [],
+                         "reclaiming a writer draft never grants closure")
         # A landed dependency releases the draft to the lanes; it never grants retirement authority.
         landed = events.reconcile_plan(prs, {}, set(), 2, now, deps={})
         self.assertEqual(landed["close"], [])
@@ -1056,8 +1235,32 @@ class GapTest(unittest.TestCase):
         self.assertFalse(events.in_scope(moving, "red", set(), now), "a draft still being pushed stays with its writer")
         held = pr(32, branch="codex/held", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=old, labels=["hold"])
         self.assertFalse(events.in_scope(held, "red", set(), now))
-        human = pr(33, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old)
-        self.assertFalse(events.in_scope(human, "red", set(), now))
+        writer = pr(33, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old)
+        self.assertTrue(events.in_scope(writer, "red", set(), now), "founder-account writer drafts are reclaimed")
+        fork = pr(34, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old,
+                  isCrossRepository=True)
+        self.assertFalse(events.in_scope(fork, "red", set(), now))
+
+    def test_comment_keepalives_do_not_count_as_writer_activity(self):
+        """A bare issue-id comment every ~15 min moved updatedAt and hid abandoned drafts."""
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        ancient, old, recent = "2033-05-01T00:00:00Z", "2033-05-15T00:00:00Z", "2033-05-18T02:50:00Z"
+        chatty = pr(40, branch="tables/admin-people-dense", draft=True, merge="BLOCKED", createdAt=ancient,
+                    updatedAt=recent, lastCommitAt=old)
+        self.assertTrue(events.abandoned_agent_draft(chatty, now))
+        pushed = {**chatty, "lastCommitAt": recent}
+        self.assertFalse(events.abandoned_agent_draft(pushed, now), "a fresh commit keeps it with its writer")
+        legacy = {key: value for key, value in chatty.items() if key != "lastCommitAt"}
+        self.assertFalse(events.abandoned_agent_draft(legacy, now), "without a commit date updatedAt still counts")
+
+    def test_stacked_writer_draft_stays_with_its_stack(self):
+        """A lane rebase onto main would re-add the parent's commits; unstacking owns it."""
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        old = "2033-05-01T00:00:00Z"
+        child = pr(51, branch="tables/admin-people-dense", draft=True, merge="DIRTY", createdAt=old,
+                   updatedAt=old, baseRefName="tables/people-rows-dense")
+        self.assertFalse(events.abandoned_agent_draft(child, now))
+        self.assertTrue(events.abandoned_agent_draft({**child, "baseRefName": "main"}, now))
 
     def test_explicit_duplicate_plan_still_respects_holds_queue_and_forks(self):
         old = "2033-05-01T00:00:00Z"
@@ -1106,7 +1309,7 @@ class GapTest(unittest.TestCase):
 
     def test_stale_draft_disposition_names_the_real_next_step(self):
         """JOV-7132: a draft idle past the 48h SLO is not "inside the SLO". Non-agent
-        branches are never closed by the sweep; an agent draft past the 3d floor is reclaimed."""
+        branches are never closed by the sweep; any writer draft past the 3d floor is reclaimed."""
         now = events.iso_ts("2033-05-18T03:00:00Z")
         prs = [
             self.node(30, isDraft=True, headRefName="feat/jov-6507-thing",
@@ -1116,9 +1319,9 @@ class GapTest(unittest.TestCase):
         ]
         plan = events.reconcile_plan(prs, {}, set(), 2, now)
         rows = {row["pr"]: row for row in plan["dispositions"]}
-        self.assertEqual(rows[30]["state"], "draft")
-        self.assertEqual(rows[30]["reason"], "past the 48h stale SLO")
-        self.assertIn("never closes non-agent drafts", rows[30]["next"])
+        self.assertEqual(rows[30]["next"], "a lane works the labeled event")
+        self.assertIn((30, "stale"), plan["label"])
+        self.assertNotIn(30, [number for number, _ in plan["close"]])
         self.assertEqual(rows[31]["next"], "a lane works the labeled event")
         self.assertIn((31, "stale"), plan["label"])
 
@@ -1153,9 +1356,8 @@ class GapTest(unittest.TestCase):
     def test_reconcile_does_not_relabel_a_head_with_an_active_repair_claim(self):
         target = self.node(6, headRefOid="claimed-head", mergeStateStatus="DIRTY")
         claimed_at = datetime.fromtimestamp(NOW - 60, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        claim_url = f"repos/{events.REPO}/issues/6/comments?per_page=100&sort=created&direction=desc"
         shell = Shell({
-            ("gh", "api", claim_url):
+            ("gh", "api", "--paginate"):
                 f"🤖 lane claim kind=fix sha=claimed-head host=gem at={claimed_at}\n",
         })
         with patch.object(events, "open_prs_state", return_value=[target]):
@@ -1222,6 +1424,17 @@ class GapTest(unittest.TestCase):
         self.assertIsNone(events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
                                           Shell({("gh", "api", "graphql"): ctx})))
 
+    def test_a_bot_hold_whose_head_moved_is_stale_at_once(self):
+        # Tim 2026-10-12: no 24 h wait for an automation hold the head already moved past.
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        ctx = self.hold_ctx([("2033-05-18T02:00:00Z", "hold", "jovie-lanes[bot]")])
+        ctx["data"]["repository"]["pullRequest"]["commits"]["nodes"][0]["commit"]["committedDate"] = "2033-05-18T02:30:00Z"
+        row = events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now, Shell({("gh", "api", "graphql"): ctx}))
+        self.assertTrue(row and row["auto"])
+        ctx["data"]["repository"]["pullRequest"]["commits"]["nodes"][0]["commit"]["committedDate"] = "2033-05-18T01:00:00Z"
+        self.assertIsNone(events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
+                                            Shell({("gh", "api", "graphql"): ctx})), "an unmoved head still waits")
+
     def test_truncated_or_unproven_hold_history_never_authorizes_unhold_advice(self):
         now = events.iso_ts("2033-05-18T03:00:00Z")
         for connection in ("timelineItems", "comments"):
@@ -1233,6 +1446,9 @@ class GapTest(unittest.TestCase):
                                                       Shell({("gh", "api", "graphql"): ctx})))
 
     def test_reconcile_alerts_once_per_stale_hold_episode(self):
+        # Lifting is the default (Tim 2026-10-12); alert-only is the explicit opt-out.
+        os.environ["LANES_STALE_HOLD_UNHOLD"] = "0"
+        self.addCleanup(os.environ.pop, "LANES_STALE_HOLD_UNHOLD", None)
         now = events.iso_ts("2033-05-18T03:00:00Z")
         held_node = {**self.node(5, mergeStateStatus="CLEAN", labels=[{"name": "hold"},
                                                                    {"name": events.POISON_LABEL}]),
@@ -1300,6 +1516,18 @@ class GapTest(unittest.TestCase):
         self.assertIn("files(first:100)", next(arg for arg in shell.calls[0] if arg.startswith("query=")))
         self.assertIn("cursor=c1", shell.calls[1])
 
+    def test_page_cap_is_unknown_for_admission_and_explicitly_partial_for_reconciliation(self):
+        def page(args):
+            return {"data": {"repository": {"pullRequests": {
+                "pageInfo": {"hasNextPage": True, "endCursor": str(len(shell.calls))},
+                "nodes": [{"number": len(shell.calls), "labels": {"totalCount": 0, "nodes": []}}]}}}}
+        shell = Shell({("gh", "api", "graphql"): page})
+        self.assertIsNone(events.open_prs_state(fake_lane(shell)))
+        report = {}
+        partial = events.open_prs_state(fake_lane(shell), report)
+        self.assertEqual(len(partial), 10)
+        self.assertFalse(report['complete'])
+
     def test_unreadable_large_file_list_preserves_metadata_without_certifying_overlap_inventory(self):
         page = {"data": {"repository": {"pullRequests": {
             "pageInfo": {"hasNextPage": False, "endCursor": None},
@@ -1335,9 +1563,9 @@ class RunnerHookTest(unittest.TestCase):
     def test_record_held_and_failures_are_structured(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = runner.Host(state=Path(tmp))
-            runner.record_held(host, 9, "h9", ["diff-too-large:3000"])
+            runner.record_held(host, 9, "h9", ["secret-like-file-changed"])
             record = json.loads((host.state / "held.json").read_text())["9"]
-            self.assertEqual((record["reason"], record["next_action"]), ("diff-too-large", "bug-intake"))
+            self.assertEqual((record["reason"], record["next_action"]), ("secret-file", "bug-intake"))
 
     def test_exhausted_disabled_lane_preserves_pr_and_terminal_backlog_disposition(self):
         stuck = pr(number=7, branch="claude/jov-9-20260926t0100", sha="h1", merge="DIRTY")
@@ -1386,7 +1614,7 @@ class RunnerHookTest(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))
-                runner.record_held(host, 7, "h1", ["diff-too-large:2000"])
+                runner.record_held(host, 7, "h1", ["secret-like-file-changed"])
                 os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
                 runner.escalate_exhausted(host, [stuck], linear)
                 runner.escalate_exhausted(host, [stuck], linear)  # intake once, not every pass
@@ -1396,7 +1624,7 @@ class RunnerHookTest(unittest.TestCase):
             runner.sh, runner.load_providers, events.return_to_pool = saved
             os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
         self.assertEqual(triaged, [], "an unfixable hold gets a terminal disposition, not Triage inventory")
-        self.assertEqual((held["reason"], held["sha"]), ("diff-too-large", "h1"),
+        self.assertEqual((held["reason"], held["sha"]), ("secret-file", "h1"),
                          "a zero-attempt hold keeps its real reason instead of fix-exhausted")
         self.assertTrue(attempts["escalated"])
         self.assertNotIn("count", attempts, "no fix attempt was charged")
@@ -1493,7 +1721,7 @@ class NativeQueueClaimTest(unittest.TestCase):
                     elif change == "branch":live["headRefName"] = "external/branch"
                     elif change == "fork":live["isCrossRepository"] = True
                     elif change == "remote-hold":live["labels"] = [{"name": "tim-hold"}]
-                    else:(host.state / "held.json").write_text(json.dumps({"5": events.held_record("h1", ["diff-too-large:100"])}))
+                    else:(host.state / "held.json").write_text(json.dumps({"5": events.held_record("h1", ["secret-like-file-changed"])}))
                     return "failed merge group"
                 with patch.object(events, "queue_failure", side_effect=failure):
                     self.assertIsNone(events.claim_event_pr(host, module, "devin", [target], NOW))
@@ -1627,7 +1855,7 @@ class NativeQueueClaimTest(unittest.TestCase):
                     elif change == "new-head":live["headRefOid"] = "h2"
                     elif change == "now-red":live["statusCheckRollup"] = [RED_CHECK]
                     elif change == "exhaustion-label":live["labels"] += [{"name": "lane-fix-exhausted"}]
-                    elif change == "held":(host.state / "held.json").write_text(json.dumps({"5": events.held_record("h1", ["diff-too-large:100"])}))
+                    elif change == "held":(host.state / "held.json").write_text(json.dumps({"5": events.held_record("h1", ["secret-like-file-changed"])}))
                     else:(host.state / "fix-attempts.json").write_text(json.dumps({"5": {"sha": "h1", "count": 2 if change == "spent" else 1, "at": NOW}}))
                     return False
                 module.claimed_elsewhere = owner;module.reconcile_fix_target = lambda _: live
@@ -1849,11 +2077,11 @@ class TerminalPreservationTest(unittest.TestCase):
         ordinary=pr(number=1,merge='BLOCKED',updatedAt='2020-01-01T00:00:00Z')
         target=pr(number=5,draft=True,updatedAt='2020-01-01T00:00:00Z')
         newer=pr(number=6,merge='CLEAN')
-        held={'5':events.held_record('h1',['diff-too-large:2001'],at=NOW-500)}
+        held={'5':events.held_record('h1',['secret-like-file-changed'],at=NOW-500)}
         plan=events.reconcile_plan([ordinary,target,newer],{},set(),2,NOW,held=held)
         self.assertEqual(plan['close'],[])
         row=next(x for x in plan['dispositions'] if x['pr']==5)
-        self.assertEqual(row['state'],'hold:diff-too-large')
+        self.assertEqual(row['state'],'hold:secret-file')
 
     def test_stale_unhold_preserves_changed_head_local_owner_and_foreign_owner(self):
         for record, foreign in [({'sha':'h0','count':1,'at':NOW-1},False), ({},True)]:

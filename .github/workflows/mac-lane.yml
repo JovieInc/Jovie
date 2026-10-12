@@ -1,0 +1,90 @@
+name: Mac Lane
+run-name: Mac lane ${{ inputs.lane }} @ ${{ inputs.sha }} for ${{ inputs.parent }}
+# Child run of mac-lane-route.yml: one lane on the jovie-mac runners, cancelled
+# by the parent when no Mac picks it up (.claude/rules/infra.md). It gets no
+# repository secrets, only GITHUB_TOKEN, as the same jobs get when hosted.
+
+on:
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: Lane to run on a Mac.
+        required: true
+        type: choice
+        options: [ios, macos, cli-chaos]
+      sha:
+        description: Exact SHA to check out.
+        required: true
+        type: string
+      join-group:
+        description: Concurrency group the parent's join job waits on.
+        required: true
+        type: string
+      supersede-group:
+        description: A newer child run in this group cancels an older one.
+        required: true
+        type: string
+      parent:
+        description: Parent run URL.
+        required: true
+        type: string
+      args:
+        description: JSON object of lane-specific inputs.
+        required: false
+        default: '{}'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ inputs.supersede-group }}
+  cancel-in-progress: true
+
+jobs:
+  # Each lane holds the parent's join group from queue to completion.
+  ios:
+    name: iOS
+    if: ${{ inputs.lane == 'ios' }}
+    concurrency:
+      group: ${{ inputs.join-group }}
+      cancel-in-progress: false
+    # Ceiling for ios-ci's (skipped here) route job; the Mac job reads only.
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/ios-ci.yml
+    with:
+      checkout-ref: ${{ inputs.sha }}
+      concurrency-key: ${{ inputs.join-group }}
+      mac-child: true
+
+  macos:
+    name: Mac
+    if: ${{ inputs.lane == 'macos' }}
+    concurrency:
+      group: ${{ inputs.join-group }}
+      cancel-in-progress: false
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/macos-ci.yml
+    with:
+      checkout-ref: ${{ inputs.sha }}
+      mac-child: true
+
+  cli-chaos:
+    name: CLI chaos
+    if: ${{ inputs.lane == 'cli-chaos' }}
+    concurrency:
+      group: ${{ inputs.join-group }}
+      cancel-in-progress: false
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/cli-chaos.yml
+    with:
+      os: macos-latest
+      node: ${{ fromJSON(inputs.args).node }}
+      artifact-run-id: ${{ fromJSON(inputs.args).artifact-run-id }}
+      mac-child: true

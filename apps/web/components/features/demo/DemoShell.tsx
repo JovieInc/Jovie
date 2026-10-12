@@ -100,10 +100,7 @@ export function DemoShell({
   }, [hasRightPanel]);
 
   return (
-    <SidebarProvider
-      defaultOpen
-      style={{ '--sidebar-width': '244px' } as React.CSSProperties}
-    >
+    <SidebarProvider defaultOpen>
       <AppShellFrame
         containerClassName={containerClassName}
         sidebar={

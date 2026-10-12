@@ -437,7 +437,7 @@ jobs:
     name: Production Synthetic Monitoring
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true' }
     permissions:
       contents: read
 

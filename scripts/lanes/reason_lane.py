@@ -106,18 +106,27 @@ def now_iso() -> str:
 
 # ---------------------------------------------------------------- job parsing
 
-def parse_job(identifier: str, title: str, description: str) -> dict:
-    """The `summer.reasoning-job/v1` block Summer writes; a hand-filed issue without one is
-    still a valid ranking job whose question is its title and body."""
-    job = None
+def job_block(description: str) -> dict | None:
     for block in re.findall(r"```json\s*(\{.*?\})\s*```", description or "", re.S):
         try:
             candidate = json.loads(block)
         except json.JSONDecodeError:
             continue
         if isinstance(candidate, dict) and candidate.get("schema") == JOB_SCHEMA:
-            job = candidate
-            break
+            return candidate
+    return None
+
+
+def has_job_block(description: str) -> bool:
+    """Summer-filed jobs carry the block and stay with this lane; a `reasoning-job` issue
+    without one is ordinary work the build lanes take (Tim 2026-10-11)."""
+    return job_block(description) is not None
+
+
+def parse_job(identifier: str, title: str, description: str) -> dict:
+    """The `summer.reasoning-job/v1` block Summer writes; a hand-filed issue without one is
+    still a valid ranking job whose question is its title and body."""
+    job = job_block(description)
     if job is None:
         job = {"question": f"{title}\n\n{description or ''}".strip(), "decisionType": "ranking",
                "contextRefs": []}
@@ -778,7 +787,8 @@ def queued_jobs(linear, label: str) -> list[dict]:
                           'labels:{name:{eq:$l}}}){nodes{id identifier title description createdAt}}}', {"l": label})
         return sorted(data["issues"]["nodes"], key=lambda node: node["createdAt"])
 
-    return lane.shared(f"claim-reason-jobs-{lane._cache_token(label)}", lane.CLAIM_SCAN_TTL_S, fetch) or []
+    jobs = lane.shared(f"claim-reason-jobs-{lane._cache_token(label)}", lane.CLAIM_SCAN_TTL_S, fetch) or []
+    return [job for job in jobs if has_job_block(job.get("description") or "")]
 
 
 def one_job(linear, issue: dict, config: dict, state: Path, run=lifecycle.run) -> dict:
