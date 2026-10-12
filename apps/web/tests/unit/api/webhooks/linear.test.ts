@@ -47,7 +47,10 @@ function sign(body: string): string {
   return createHmac('sha256', 'linear-secret').update(body).digest('hex');
 }
 
-function eventId(body: string, kind: 'plan' | 'triage-assess'): string {
+function eventId(
+  body: string,
+  kind: 'plan' | 'triage-assess' | 'validation-receipt' | 'quality-gap-input'
+): string {
   return `${sign(body)}:${kind}`;
 }
 
@@ -449,6 +452,180 @@ describe('POST /api/webhooks/linear', () => {
       expect(await response.json()).toEqual({ received: true, ignored: true });
     }
     expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+    expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+
+  it('bridges a JOV validation receipt comment to the lifecycle re-evaluation', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const body = JSON.stringify({
+      type: 'Comment',
+      action: 'create',
+      data: {
+        id: 'comment-receipt',
+        body: 'Validation receipt: outcome pass\n\n<!-- validation-receipt:v1\n{"schema":"jovie.validation-receipt/v1"}\n-->',
+        user: { name: 'Jovie Bot' },
+        issue: { id: 'issue-receipt', identifier: 'JOV-7001' },
+      },
+    });
+    const response = await POST(
+      new Request('https://example.com/api/webhooks/linear', {
+        method: 'POST',
+        headers: { 'linear-signature': sign(body) },
+        body,
+      }) as never
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      dispatched: true,
+      eventId: eventId(body, 'validation-receipt'),
+    });
+    const dispatch = JSON.parse(mockServerFetch.mock.calls[0]?.[1]?.body);
+    expect(dispatch.event_type).toBe('linear_validation_receipt');
+    expect(dispatch.client_payload).toMatchObject({
+      issue_id: 'issue-receipt',
+      issue_identifier: 'JOV-7001',
+      action: 'create',
+    });
+  });
+
+  it('bridges a closed post-mortem action or escaped defect, or a gained defect label, to the quality gap scan', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    for (const label of ['postmortem-action', 'bug']) {
+      const body = JSON.stringify({
+        type: 'Issue',
+        action: 'update',
+        updatedFrom: { stateId: 'in-progress' },
+        data: {
+          id: `issue-${label}`,
+          identifier: 'JOV-7002',
+          teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+          state: { id: 'done', name: 'Done', type: 'completed' },
+          labels: [{ name: label }],
+        },
+      });
+      const response = await POST(
+        new Request('https://example.com/api/webhooks/linear', {
+          method: 'POST',
+          headers: { 'linear-signature': sign(body) },
+          body,
+        }) as never
+      );
+      expect(await response.json()).toMatchObject({
+        dispatched: true,
+        eventId: eventId(body, 'quality-gap-input'),
+      });
+    }
+    const gained = JSON.stringify({
+      type: 'Issue',
+      action: 'update',
+      updatedFrom: { labelIds: ['label-feature'] },
+      data: {
+        id: 'issue-gained',
+        identifier: 'JOV-7004',
+        teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+        state: { id: 'todo', name: 'Todo', type: 'unstarted' },
+        labels: [
+          { id: 'label-feature', name: 'feature' },
+          { id: 'label-dogfood', name: 'dogfood' },
+        ],
+      },
+    });
+    const response = await POST(
+      new Request('https://example.com/api/webhooks/linear', {
+        method: 'POST',
+        headers: { 'linear-signature': sign(gained) },
+        body: gained,
+      }) as never
+    );
+    expect(await response.json()).toMatchObject({ dispatched: true });
+    expect(
+      mockServerFetch.mock.calls.map(
+        call => JSON.parse(call[1].body).event_type
+      )
+    ).toEqual(['quality-gap-scan', 'quality-gap-scan', 'quality-gap-scan']);
+  });
+
+  it('ignores receipts off JOV, open defects, unlabeled closes, non-state edits, and kept labels', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const closed = { id: 'done', name: 'Done', type: 'completed' };
+    const jov = {
+      id: 'issue-x',
+      identifier: 'JOV-7003',
+      teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+    };
+    for (const payload of [
+      {
+        type: 'Comment',
+        action: 'create',
+        data: {
+          body: '<!-- validation-receipt:v1\n{}\n-->',
+          issue: { id: 'issue-lyb', identifier: 'LYB-1' },
+        },
+      },
+      {
+        type: 'Comment',
+        action: 'create',
+        data: {
+          body: 'plain comment',
+          issue: { id: 'issue-x', identifier: 'JOV-7003' },
+        },
+      },
+      {
+        type: 'Issue',
+        action: 'update',
+        updatedFrom: { stateId: 'todo' },
+        data: {
+          ...jov,
+          state: { id: 'started', name: 'In Progress', type: 'started' },
+          labels: [{ name: 'bug' }],
+        },
+      },
+      {
+        type: 'Issue',
+        action: 'update',
+        updatedFrom: { stateId: 'todo' },
+        data: { ...jov, state: closed, labels: [{ name: 'feature' }] },
+      },
+      {
+        type: 'Issue',
+        action: 'update',
+        updatedFrom: { title: 'old title' },
+        data: { ...jov, state: closed, labels: [{ name: 'bug' }] },
+      },
+      {
+        type: 'Issue',
+        action: 'update',
+        updatedFrom: { labelIds: ['label-bug'] },
+        data: {
+          ...jov,
+          state: { id: 'todo', name: 'Todo', type: 'unstarted' },
+          labels: [
+            { id: 'label-bug', name: 'bug' },
+            { id: 'label-p1', name: 'p1' },
+          ],
+        },
+      },
+    ]) {
+      const body = JSON.stringify(payload);
+      const response = await POST(
+        new Request('https://example.com/api/webhooks/linear', {
+          method: 'POST',
+          headers: { 'linear-signature': sign(body) },
+          body,
+        }) as never
+      );
+      expect(await response.json()).toEqual({ received: true, ignored: true });
+    }
     expect(mockServerFetch).not.toHaveBeenCalled();
   });
 });

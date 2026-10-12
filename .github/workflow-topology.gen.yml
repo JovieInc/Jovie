@@ -705,7 +705,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request
-      - schedule
+      - repository_dispatch
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:sync_done
@@ -1092,7 +1092,6 @@ nodes:
     triggeringStateTransition:
       - push
       - repository_dispatch
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:find
     jobCount: 1
