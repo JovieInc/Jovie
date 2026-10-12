@@ -547,6 +547,9 @@ export function loadFleetGateReceipt(
  * - mainSha: origin/main in the lanes repo, the ref the emitter keys on;
  * - tickAt: lanes-status.json `at`, rewritten every dispatch tick.
  * Null off Gem or when the emit record is unreadable.
+ *
+ * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env]
+ * @param {{ readMain?: (repo: string | null) => string | null }} [options]
  */
 export function loadFleetGateEmitter(env = process.env, { readMain } = {}) {
   const home = env.HOME || '';
