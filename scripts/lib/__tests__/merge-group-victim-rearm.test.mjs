@@ -157,6 +157,17 @@ test('a red head, an armed PR, and a poison label are not rearmed', () => {
   );
 });
 
+test('every admission-blocking label, including the tim-hold variants, prevents a rearm', () => {
+  for (const label of ['tim:hold', 'hold:tim', 'tim-hold', 'do-not-merge']) {
+    const [decision] = planVictimRearms({
+      runId: 7,
+      implicatedPaths: ['CLAUDE.md'],
+      candidates: [candidate({ labels: [label], files: [] })],
+    });
+    assert.equal(decision.reason, 'blocking-label', label);
+  }
+});
+
 test('a required-green UNSTABLE head is rearmed; a required-red or unknown head is not', () => {
   // Live 2026-10-11: victims whose own head had every required check green
   // but a lane jovie-execution/* receipt pending read UNSTABLE and were never
