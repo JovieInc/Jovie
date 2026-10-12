@@ -49,11 +49,13 @@ describe('retired queue release and retained fleet refresh', () => {
     ).toBe(false);
   });
 
-  it('keeps Fleet Gate Refresh as the one-way workflow_run bridge', () => {
-    // CI and Production Controller are direct upstream semantic inputs.
-    // Marker Recovery dispatches the gate after durable bytes so it remains
-    // within GitHub's workflow_run chain cap.
-    expect(fleetGateRefreshWorkflow).not.toContain('workflow_run:');
+  it('keeps Fleet Gate Refresh keyed to the main CI completion signal', () => {
+    // Main CI going pending -> green has no local signal on Gem, so its
+    // completion refreshes the receipt. The bridge is main-only and
+    // completion-only; PR runs never wake the gate.
+    expect(fleetGateRefreshWorkflow).toContain(
+      'workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]'
+    );
     expect(fleetGateRefreshWorkflow).not.toContain('pull_request_target:');
     assertTrustedStackHealthContract(fleetGateRefreshWorkflow);
     expect(fleetGateRefreshWorkflow).toContain('push:\n    branches: [main]');
