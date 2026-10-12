@@ -255,7 +255,7 @@
     },
     {
       "id": "agent-ops-reports",
-      "producer": "Summer/Symphony/Ovie operational reports and commissioning receipts (apps/eve-pilot identities, scripts/summer-commissioning, scripts/lanes)",
+      "producer": "Symphony doctor reports routed to Summer through Ovie's existing company-operations boundary (scripts/lanes/doctor.py)",
       "repository": "JovieInc/Jovie",
       "owner": "Summer",
       "audience": "Founder and operators reading agent output",
@@ -268,11 +268,11 @@
         "canon/FLEET.md",
         "canon/VOICE.md"
       ],
-      "deliveryAdapter": "ovie-desktop; linear-issue; ops-report artifacts",
+      "deliveryAdapter": "existing Symphony doctor Linear issue adapter; Ovie consumes company-operations state",
       "policyVersion": "canon/VOICE.md action-only agent communication; FLEET admission policy",
       "reviewMode": "advisory",
-      "reviewPoint": "post-generation-advisory",
-      "proofLink": "scripts/summer-commissioning/canonical-registry.test.mjs",
+      "reviewPoint": "pre-send",
+      "proofLink": "scripts/lanes/ops-report.test.mjs",
       "checks": {
         "truth": {
           "enforcement": "enforced",
@@ -303,7 +303,7 @@
       "bypassCandidates": [],
       "pilot": {
         "kind": "ops-report",
-        "scope": "one bounded Summer/Symphony ops report routed through the advisory Jev text review",
+        "scope": "one bounded Symphony doctor report routed to Summer through the advisory Jev review before existing Linear notification",
         "via": "JOV-3720"
       },
       "rollout": null
