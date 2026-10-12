@@ -8721,6 +8721,41 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         self.assertEqual(diagnostic["failedSelectors"], ["test_partial (scripts.tests.test_fixture.Example)"])
         self.assertEqual((stage / ".selftest-stderr.log").read_bytes(), stderr)
 
+    def test_selftest_leaves_zero_processes_even_detached_ones(self):
+        # 2026-10-11: a self-test fixture detached a yc refresh + gbrain helper pair
+        # (start_new_session) that outlived the run by days. The per-run marker finds it.
+        stage = self.root / "stage"; stage.mkdir()
+        spawned = []
+
+        def run(args, **kwargs):
+            if args[0] == "node":
+                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+            spawned.append(subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"],
+                                            env=kwargs["env"], start_new_session=True,
+                                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+            return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+        try:
+            with patch.object(lane, "mesh_dependency_root", return_value=self.host.repo), \
+                    patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
+                    patch.object(lane.lifecycle, "run", side_effect=run), \
+                    contextlib.redirect_stderr(io.StringIO()) as console:
+                self.assertIsNone(lane.prove_staging(self.host, stage))
+            self.assertEqual(len(spawned), 1)
+            self.assertIsNotNone(spawned[0].wait(timeout=10), "detached self-test child was stopped")
+            diagnostic = json.loads((stage / ".selftest-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["leftoverProcesses"], 1)
+            self.assertIn("left 1 process(es) running", console.getvalue())
+        finally:
+            for child in spawned:
+                if child.poll() is None:
+                    child.kill(); child.wait()
+
+    def test_each_selftest_run_gets_its_own_process_marker(self):
+        first, second = lane.selftest_env(self.root), lane.selftest_env(self.root)
+        self.assertNotEqual(first[lane.SELFTEST_RUN_ENV], second[lane.SELFTEST_RUN_ENV])
+        self.assertEqual(lane.marked_processes(first[lane.SELFTEST_RUN_ENV]), [])
+
 
 class RepositoryBindingTest(unittest.TestCase):
     """Extra Linear team -> repo bindings (LYB) inside the one lanes service."""
