@@ -1,11 +1,11 @@
 name: Security Suppression Audit
-# clock-class: skip-if-unchanged
 
 on:
   pull_request_review:
     types: [submitted, edited, dismissed]
-  schedule:
-    - cron: '15 6 * * *' # Offset from the heavier security scan.
+  # Each bot review is audited on its own pull_request_review event, so there
+  # is no clock: re-reading every open PR's reviews daily repeated that work
+  # and spent one REST call per open PR. Dispatch keeps the full-roster audit.
   workflow_dispatch:
 
 permissions:
@@ -64,10 +64,10 @@ jobs:
             echo "::notice title=Security suppressions::Suppressed findings and reasons remain visible in the audit summary."
           fi
 
-  nightly-audit:
-    name: Nightly Security Suppression Audit
+  roster-audit:
+    name: Open PR Security Suppression Audit
     if: >-
-      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
+      github.event_name == 'workflow_dispatch' &&
       github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -135,7 +135,7 @@ jobs:
       - name: Count suppressions by type and author
         run: |
           set -euo pipefail
-          report="$RUNNER_TEMP/nightly-security-suppressions.json"
+          report="$RUNNER_TEMP/roster-security-suppressions.json"
           python3 .github/scripts/security-suppression-audit.py \
             --mode audit \
             --input "$RUNNER_TEMP/security-review-output.json" \
@@ -143,5 +143,5 @@ jobs:
             --summary-output "$GITHUB_STEP_SUMMARY"
           cat "$report"
           if [[ "$(jq -r '.total' "$report")" -gt 0 ]]; then
-            echo "::notice title=Security suppressions::Nightly audit found suppressed findings; reasons remain visible in the summary."
+            echo "::notice title=Security suppressions::Open PR audit found suppressed findings; reasons remain visible in the summary."
           fi

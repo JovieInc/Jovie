@@ -558,6 +558,59 @@ describe('ProfileCompactSurface', () => {
     );
   });
 
+  it('reserves dock clearance from the content column on every compact mode', () => {
+    const modes = ['profile', 'listen', 'tour', 'about', 'subscribe'] as const;
+
+    for (const activeMode of modes) {
+      const view = renderSurface({ activeMode });
+      const surface = screen.getByTestId('profile-compact-surface');
+      const column = screen.getByTestId('profile-content-scroll').parentElement;
+      const tabBar = screen.getByTestId('profile-tab-bar');
+
+      if (!(column instanceof HTMLElement)) {
+        throw new Error('content scroll has no column parent');
+      }
+
+      expect(surface).toHaveAttribute('data-presentation', 'standalone');
+      expect(column.parentElement).toBe(surface);
+      expect(column).toHaveClass('profile-content-column');
+      // The dock is a direct sibling, so the compact reservation selector
+      // (`:has(> .profile-floating-tab-bar) > .profile-content-column`)
+      // applies on every mode. BottomTabBar owns the floating class.
+      expect(tabBar.parentElement).toBe(surface);
+      expect(screen.getByTestId('profile-content-scroll')).toHaveClass(
+        'profile-content-scroll-region'
+      );
+      if (activeMode === 'profile') {
+        expect(column).toHaveClass('profile-home-content-column');
+      } else {
+        expect(column).not.toHaveClass('profile-home-content-column');
+      }
+
+      view.unmount();
+    }
+  });
+
+  it('keeps the content column when an embedded preview renders no dock', () => {
+    renderSurface({
+      activeMode: 'listen',
+      renderMode: 'preview',
+      presentation: 'embedded',
+    });
+
+    const surface = screen.getByTestId('profile-compact-surface');
+    const column = screen.getByTestId('profile-content-scroll').parentElement;
+
+    if (!(column instanceof HTMLElement)) {
+      throw new Error('content scroll has no column parent');
+    }
+
+    expect(surface).toHaveAttribute('data-presentation', 'embedded');
+    expect(column).toHaveClass('profile-content-column');
+    expect(column).not.toHaveClass('profile-home-content-column');
+    expect(screen.queryByTestId('profile-tab-bar')).toBeNull();
+  });
+
   it('anchors the mode-card accents on the featured artwork, matching the Pen', () => {
     renderSurface({
       latestRelease: {

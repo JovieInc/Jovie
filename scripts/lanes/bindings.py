@@ -10,11 +10,21 @@ Extra bindings share the host's provider seats, state dir and autoscale ceiling:
 run happens inside a seat a provider worker already holds, so the host's autoscaled seats
 (compute and credits) are the only concurrency limit unless a binding sets `concurrency`.
 Jovie-only holds (new-intake budget, hotspots, file overlap, routing) do not apply, and no
-binding state holds Jovie. A binding's own open-PR budget (`maxOpenPrs`) limits only new
-issue intake, never repair of its existing PRs; a per-PR lease keeps two seats off one PR. Linear and GitHub reads go through lane_runner.shared(), on the
+binding state holds Jovie. No open-PR ceiling limits a binding's intake (Tim 2026-10-12: only
+real limits); a per-PR lease keeps two seats off one PR. Linear and GitHub reads go through lane_runner.shared(), on the
 same TTLs as the Jovie claim scan. The binding's own CI is the gate: the harness opens a
 ready PR and moves the issue to In Review; the repo's required checks and native merge queue
 land it. It never runs Jovie's gate against another repo.
+
+PR maintenance (Tim 2026-10-11: every open PR lands on its own) covers every open same-repo PR
+in a binding's repo, not only lane-authored ones, and never reads Linear. Each pass first takes
+the cheap, idempotent steps (`maintain`): enqueue a green ready PR that is not in the queue (a
+queued PR is never re-enqueued: that sends it to the back), ready a green draft idle past the
+draft SLO, and ask Dependabot to rebase its conflicting bumps. Then one agent run repairs the
+oldest PR that is conflicting, red on the repo's own required checks, rejected by a merge group
+at its head, or has changes requested. LYB runs iOS only in merge groups (LYB #1333), so a
+failed_checks ejection is the iOS failure signal: the repair prompt carries that merge-group
+run's failed-job log, and the failed head is not re-enqueued unchanged.
 """
 from __future__ import annotations
 
@@ -28,19 +38,35 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 POLICY = Path(__file__).resolve().parent / "routing.json"
-TODO_QUERY = (
-    'query($team:String!,$labels:[String!]!,$after:String){issues(first:100,after:$after,'
-    'filter:{team:{key:{eq:$team}},state:{name:{eq:"Todo"}},labels:{name:{in:$labels}}}){'
-    'pageInfo{hasNextPage endCursor} '
-    'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}')
-# Tim 2026-10-11: any issue is eligible. A binding with no required labels scans every Todo issue.
-TODO_ALL_QUERY = (
-    'query($team:String!,$after:String){issues(first:100,after:$after,'
-    'filter:{team:{key:{eq:$team}},state:{name:{eq:"Todo"}}}){'
-    'pageInfo{hasNextPage endCursor} '
-    'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}')
-LIGHT_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,mergeStateStatus"
 REPAIR_STATES = frozenset({"BEHIND", "DIRTY"})
+# Every open PR of a binding repo with what maintenance needs, 50 per GraphQL page (cost 2).
+OPEN_PRS_QUERY = (
+    'query($owner:String!,$name:String!,$after:String){repository(owner:$owner,name:$name){'
+    'pullRequests(states:OPEN,first:50,after:$after,orderBy:{field:CREATED_AT,direction:ASC}){'
+    'pageInfo{hasNextPage endCursor} nodes{id number title url isDraft isCrossRepository headRefName '
+    'headRefOid mergeStateStatus reviewDecision body author{login} labels(first:20){nodes{name}} '
+    'mergeQueueEntry{state enqueuer{login}} commits(last:1){nodes{commit{committedDate '
+    'statusCheckRollup{state contexts(first:80){nodes{__typename ... on CheckRun{name status conclusion} '
+    '... on StatusContext{context state}}}}}}} timelineItems(last:6,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT]){'
+    'nodes{... on RemovedFromMergeQueueEvent{createdAt reason}}}}}}}')
+OPEN_PR_PAGES = 8                   # 400 open PRs; more reads as unreadable, never as a partial list
+REQUIRED_TTL_S = 3600               # branch rules change rarely
+GREEN = frozenset({"SUCCESS", "NEUTRAL", "SKIPPED"})
+RED_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR", "ACTION_REQUIRED"})
+ENQUEUE_STATES = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
+DRAFT_STATES = ENQUEUE_STATES | {"DRAFT"}
+POISON_FAILURES = 1                 # a failed merge group at one head: repair, never re-enqueue as is
+MANUAL_QUIET_S = 2 * 3600           # someone dequeued it by hand: leave it this long
+REPAIR_IDLE_S = 2 * 3600            # a session that pushed within this window still owns its PR
+DRAFT_SLO_S = 48 * 3600
+ATTEMPT_RESET_S = 24 * 3600         # repair attempts at one head may retry after a day
+ACTION_RETRY_S = 3600
+MAX_ACTIONS = 10                    # GitHub writes per maintenance pass
+DEPENDENCY = re.compile(r"(?i)\b(?:depends on|blocked by|waits? (?:on|for)|stacked on)\s+#(\d+)"
+                        r"|#(\d+)\s+(?:must|has to|needs to)\s+(?:be merged|merge|land)")
+ENQUEUE_MUTATION = ('mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,'
+                    'expectedHeadOid:$head}){mergeQueueEntry{position}}}')
+MERGE_GROUP_LOG_CHARS = 6000        # tail of the failed merge-group jobs' log in a repair prompt
 
 
 @dataclass(frozen=True)
@@ -52,7 +78,6 @@ class Binding:
     gate: str                     # "lane-gate" (Jovie) | "github-required-checks"
     excluded: tuple[str, ...] = ()
     concurrency: int | None = None  # None: only the host's provider seats limit it
-    max_open_prs: int = 3
     providers: tuple[str, ...] = ()
     install: tuple[str, ...] = ()
     review_state: str = "In Review"
@@ -98,7 +123,7 @@ def extra_bindings(lane, policy: dict | None = None, env=None, hostname: str | N
             key, repo, slug, tuple(label.lower() for label in labels), str(row.get("gate") or "github-required-checks"),
             tuple(str(x).lower() for x in row.get("excludedLabels") or ()),
             None if row.get("concurrency") is None else max(1, int(row["concurrency"])),
-            max(1, int(row.get("maxOpenPrs", 3))), tuple(row.get("providers") or ()),
+            tuple(row.get("providers") or ()),
             tuple(row.get("install") or ()), str(row.get("reviewState") or "In Review")))
     return active
 
@@ -109,47 +134,99 @@ def team_of(identifier: str) -> str:
 
 # ---------------------------------------------------------------- cached reads
 
-def todo_issues(lane, linear, binding: Binding) -> list:
+def todo_issues(lane, host, binding: Binding) -> list:
     """Todo issues carrying any required label (every Todo issue when none is required),
-    one cached Linear read per host per TTL."""
-    def fetch():
-        nodes = (linear._bounded_lane_nodes(TODO_QUERY, {"team": binding.key, "labels": list(binding.labels)})
-                 if binding.labels else linear._bounded_lane_nodes(TODO_ALL_QUERY, {"team": binding.key}))
-        return [{"id": n["id"], "identifier": n["identifier"], "title": n.get("title") or "",
-                 "description": n.get("description") or "", "priority": n.get("priority") or 0,
-                 "created_at": n.get("createdAt") or "",
-                 "labels": sorted(label["name"] for label in (n.get("labels") or {}).get("nodes") or [])}
-                for n in nodes]
-    scope = lane._linear_scope_id(linear.key)
-    catalog = lane._cache_token(",".join(binding.labels) or "*")
-    rows = lane.shared(f"binding-todo-v2-{binding.key}-{catalog}-{lane._cache_token(scope)}",
-                       lane.CLAIM_SCAN_TTL_S, fetch)
-    if rows is None:
-        raise lane.LaneInventoryUnknown("binding-inventory-unavailable")
+    from the host's local mirror of the binding's team: no Linear request (2026-10-11)."""
+    wanted = set(binding.labels)
     return [lane.Issue(r["id"], r["identifier"], r["title"], r["description"], r["priority"],
-                       r["created_at"], list(r["labels"])) for r in rows]
+                       r["createdAt"], list(r["labels"]))
+            for r in lane.linear_sync.todo(host.state, binding.key) if not wanted or wanted & set(r["labels"])]
+
+
+def required_checks(lane, binding: Binding) -> list[str] | None:
+    """The repo's own required status checks on main (its gate), cached per repo."""
+    def fetch():
+        ran = lane.sh(["gh", "api", f"repos/{binding.slug}/rules/branches/main"])
+        if ran.returncode:
+            return None
+        try:
+            rules = json.loads(ran.stdout or "[]")
+            return sorted({check["context"] for rule in rules if rule.get("type") == "required_status_checks"
+                           for check in rule["parameters"]["required_status_checks"]})
+        except (ValueError, KeyError, TypeError):
+            return None
+    return lane.shared(f"binding-required-v1-{lane._cache_token(binding.slug)}", REQUIRED_TTL_S, fetch)
+
+
+def gate_state(checks: list[dict], required: list[str], rollup: str | None) -> str:
+    """green | red | pending on the repo's required checks (the aggregate rollup when none)."""
+    if not required:
+        return {"SUCCESS": "green", "FAILURE": "red", "ERROR": "red"}.get(rollup or "", "pending")
+    latest = {check.get("name"): (check.get("conclusion") or check.get("state") or "").upper()
+              for check in checks}
+    states = [latest.get(name, "") for name in required]
+    if any(state in RED_STATES for state in states):
+        return "red"
+    return "green" if all(state in GREEN for state in states) else "pending"
+
+
+
+def pr_row(node: dict, required: list[str]) -> dict:
+    """One PR in the shape the binding pass uses (the old `gh pr list` fields plus maintenance facts)."""
+    commit = (((node.get("commits") or {}).get("nodes") or [{}])[-1] or {}).get("commit") or {}
+    rollup = commit.get("statusCheckRollup") or {}
+    checks = []
+    for item in (rollup.get("contexts") or {}).get("nodes") or []:
+        if item.get("__typename") == "StatusContext":
+            checks.append({"name": item.get("context"), "state": item.get("state")})
+        elif item.get("name"):
+            checks.append({"name": item["name"], "status": item.get("status"), "conclusion": item.get("conclusion")})
+    entry = node.get("mergeQueueEntry")
+    return {
+        "id": node.get("id"), "number": node["number"], "title": node.get("title") or "", "url": node.get("url"),
+        "isDraft": bool(node.get("isDraft")), "crossRepository": bool(node.get("isCrossRepository")),
+        "headRefName": node.get("headRefName") or "", "headRefOid": node.get("headRefOid") or "",
+        "mergeStateStatus": node.get("mergeStateStatus"), "reviewDecision": node.get("reviewDecision"),
+        "author": (node.get("author") or {}).get("login") or "",
+        "labels": sorted(label["name"].lower() for label in (node.get("labels") or {}).get("nodes") or []),
+        "committedAt": commit.get("committedDate") or "",
+        "queue": {"state": entry.get("state"), "enqueuer": (entry.get("enqueuer") or {}).get("login") or ""}
+        if entry else None,
+        "removals": [{"reason": (item.get("reason") or "").lower(), "at": item.get("createdAt") or ""}
+                     for item in (node.get("timelineItems") or {}).get("nodes") or [] if item],
+        "dependsOn": sorted({int(n) for pair in DEPENDENCY.findall(node.get("body") or "") for n in pair if n}),
+        "statusCheckRollup": checks,
+        "gate": gate_state(checks, required, rollup.get("state")),
+    }
 
 
 def open_prs(lane, binding: Binding) -> list[dict] | None:
-    """Every open PR in the binding's repo; lane-branch PRs also carry their check rollup.
-    One cached fill per host per TTL, keyed per repo. None when GitHub cannot be read."""
-    pattern = binding.branch_pattern()
+    """Every open PR in the binding's repo with its required-check gate, queue entry and queue
+    removals, in a few GraphQL pages. One cached fill per host per TTL, keyed per repo. None
+    when GitHub cannot be read."""
+    owner, name = binding.slug.split("/", 1)
 
     def fetch():
-        listed = lane.sh(["gh", "pr", "list", "--repo", binding.slug, "--state", "open",
-                          "--limit", "200", "--json", LIGHT_FIELDS])
-        if listed.returncode:
+        required = required_checks(lane, binding)
+        if required is None:
             return None
-        prs = json.loads(listed.stdout or "[]")
-        for pr in prs:
-            if pattern.match(pr.get("headRefName") or ""):
-                viewed = lane.sh(["gh", "pr", "view", str(pr["number"]), "--repo", binding.slug,
-                                  "--json", "statusCheckRollup"])
-                if viewed.returncode:
-                    return None
-                pr["statusCheckRollup"] = json.loads(viewed.stdout or "{}").get("statusCheckRollup") or []
-        return prs
-    return lane.shared(f"binding-open-prs-v1-{lane._cache_token(binding.slug)}", lane.SUMMARY_TTL_S, fetch)
+        nodes, after = [], None
+        for _ in range(OPEN_PR_PAGES):
+            args = ["gh", "api", "graphql", "-f", f"query={OPEN_PRS_QUERY}", "-F", f"owner={owner}",
+                    "-F", f"name={name}", *(["-f", f"after={after}"] if after else [])]
+            listed = lane.sh(args)
+            if listed.returncode:
+                return None
+            try:
+                page = json.loads(listed.stdout or "{}")["data"]["repository"]["pullRequests"]
+                nodes.extend(page["nodes"])
+            except (ValueError, KeyError, TypeError):
+                return None
+            if not page["pageInfo"]["hasNextPage"]:
+                return [pr_row(node, required) for node in nodes if node]
+            after = page["pageInfo"]["endCursor"]
+        return None
+    return lane.shared(f"binding-open-prs-v2-{lane._cache_token(binding.slug)}", lane.SUMMARY_TTL_S, fetch)
 
 
 def in_flight(binding: Binding, prs: list[dict]) -> frozenset[str]:
@@ -168,8 +245,55 @@ def lane_owned(binding: Binding, prs: list[dict], lanes=None) -> list[dict]:
 
 
 def is_red(lane, pr: dict) -> bool:
+    """Red on the repo's required checks; any red check when the gate is unknown."""
+    if pr.get("gate"):
+        return pr["gate"] == "red"
     return any((check.get("conclusion") or check.get("state") or "").upper() in lane.RED
                for check in pr.get("statusCheckRollup") or [])
+
+
+def _age(stamp: str, now: float) -> float:
+    try:
+        return now - datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
+    except (AttributeError, ValueError):
+        return float("inf")  # unknown age never holds work back
+
+
+def queue_failures(pr: dict) -> int:
+    """Merge groups that failed at the current head (removals since its commit)."""
+    since = pr.get("committedAt") or ""
+    return sum(1 for item in pr.get("removals") or ()
+               if item.get("reason") == "failed_checks" and item.get("at", "") >= since)
+
+
+def _waits_on_open_pr(pr: dict, open_numbers: set) -> bool:
+    return any(number in open_numbers and number != pr["number"] for number in pr.get("dependsOn") or ())
+
+
+def _is_dependabot(pr: dict) -> bool:
+    return pr.get("author", "").startswith("dependabot") or pr.get("headRefName", "").startswith("dependabot/")
+
+
+def repair_reasons(lane, binding: Binding, pr: dict) -> list[str]:
+    """Why an agent should repair this PR; empty when the queue, a person or a cheap step owns it."""
+    if pr.get("crossRepository") or pr.get("queue") or set(pr.get("labels") or ()) & set(binding.excluded):
+        return []
+    reasons = []
+    if pr.get("mergeStateStatus") in REPAIR_STATES and not _is_dependabot(pr):  # Dependabot rebases its own
+        reasons.append("conflict" if pr["mergeStateStatus"] == "DIRTY" else "behind")
+    if is_red(lane, pr):
+        reasons.append("red-checks")
+    if queue_failures(pr) >= POISON_FAILURES:
+        reasons.append("merge-group-failed")
+    if pr.get("reviewDecision") == "CHANGES_REQUESTED":
+        reasons.append("changes-requested")
+    return reasons
+
+
+def _attempt_count(value, now: float) -> int:
+    if isinstance(value, dict):
+        return 0 if now - float(value.get("at") or 0) > ATTEMPT_RESET_S else int(value.get("count") or 0)
+    return int(value or 0)
 
 
 # ---------------------------------------------------------------- admission
@@ -195,49 +319,110 @@ def refusal(lane, binding: Binding, issue, failures: dict, now: float, flying: f
     if lane.issue_is_sensitive(issue) and provider != lane.SENSITIVE_PROVIDER:
         return f"{binding.key}:sensitive-provider"
     record = lane.failure_record(failures.get(issue.identifier))
-    if record["count"] >= lane.MAX_FAILURES:
-        return f"{binding.key}:retry-exhausted"
-    if now - record["at"] < lane.RETRY_BACKOFF_S:
-        return f"{binding.key}:retry-backoff"
+    if rejected := lane.failure_rejection(record):
+        return f"{binding.key}:{rejected}"
     if issue.identifier.upper() in flying:
         return f"{binding.key}:in-flight-pr"
     return None
 
 
-def intake_refusal(binding: Binding, prs: list[dict], running: int = 0) -> str | None:
-    """The binding's own new-intake budget: open lane PRs, whatever their check state, plus
-    issue runs still working toward a PR. It never limits repair of existing PRs."""
-    count = len(lane_owned(binding, prs)) + running
-    return f"{binding.key}:intake-budget:{count}/{binding.max_open_prs}" if count >= binding.max_open_prs else None
-
-
-def running_issue_runs(lane, host, binding: Binding) -> int:
-    """Issue runs of this binding still in progress on this host (their lease is held)."""
-    count = 0
-    for path in sorted((host.state / "bindings" / binding.key).glob("issue.*.lock")):
-        probe = lane.Locked(path, blocking=False)
-        free = probe.held
-        probe.release()
-        if free:
-            try:
-                path.unlink()
-            except OSError:
-                pass
-        else:
-            count += 1
-    return count
-
-
-def repair_candidate(lane, binding: Binding, prs: list[dict], attempts: dict, busy=lambda pr: False) -> dict | None:
-    """The oldest lane PR that is red or behind/conflicting at a head not yet tried twice
-    and not under repair in another seat (`busy`)."""
-    for pr in sorted(lane_owned(binding, prs, lane.load_providers()), key=lambda row: row["number"]):
-        if not (is_red(lane, pr) or pr.get("mergeStateStatus") in REPAIR_STATES):
+def repair_candidate(lane, binding: Binding, prs: list[dict], attempts: dict, busy=lambda pr: False,
+                     now: float | None = None) -> dict | None:
+    """The PR an agent repairs next: lane PRs first, then ready before draft, oldest first. Any
+    open same-repo PR qualifies (`repair_reasons`); another author's PR only once its head has
+    been idle REPAIR_IDLE_S. At most MAX_FIX_ATTEMPTS per head per day, never one another seat
+    is repairing (`busy`)."""
+    now = time.time() if now is None else now
+    owned = {pr["number"] for pr in lane_owned(binding, prs, lane.load_providers())}
+    for pr in sorted(prs, key=lambda row: (row["number"] not in owned, bool(row.get("isDraft")), row["number"])):
+        reasons = repair_reasons(lane, binding, pr)
+        if not reasons or (pr["number"] not in owned and _age(pr.get("committedAt") or "", now) < REPAIR_IDLE_S):
             continue
-        if attempts.get(f"{binding.key}#{pr['number']}:{pr['headRefOid']}", 0) < lane.MAX_FIX_ATTEMPTS \
-                and not busy(pr):
-            return pr
+        if _attempt_count(attempts.get(f"{binding.key}#{pr['number']}:{pr['headRefOid']}"), now) \
+                < lane.MAX_FIX_ATTEMPTS and not busy(pr):
+            return {**pr, "repairReasons": reasons}
     return None
+
+
+# ---------------------------------------------------------------- cheap maintenance
+
+def maintenance_actions(binding: Binding, prs: list[dict], now: float) -> list[tuple[str, dict]]:
+    """The idempotent GitHub steps this snapshot calls for, as (kind, pr):
+    `enqueue` a green ready PR out of the queue (never one already queued, never a head a merge
+    group rejected, never within MANUAL_QUIET_S of a manual dequeue),
+    `ready` a green draft idle past the draft SLO, `rebase` a conflicting Dependabot bump."""
+    open_numbers = {pr["number"] for pr in prs}
+    actions = []
+    for pr in sorted(prs, key=lambda row: row["number"]):
+        if pr.get("crossRepository") or not pr.get("id") or set(pr.get("labels") or ()) & set(binding.excluded):
+            continue
+        green, state, queue = pr.get("gate") == "green", pr.get("mergeStateStatus"), pr.get("queue")
+        if queue:
+            continue  # in the queue: re-enqueueing would send it to the back
+        if _is_dependabot(pr) and state == "DIRTY":
+            actions.append(("rebase", pr))
+            continue
+        if not green or _waits_on_open_pr(pr, open_numbers) or queue_failures(pr) >= POISON_FAILURES:
+            continue
+        if pr.get("isDraft"):
+            if state in DRAFT_STATES and _age(pr.get("committedAt") or "", now) >= DRAFT_SLO_S:
+                actions.append(("ready", pr))
+            continue
+        last = (pr.get("removals") or [{}])[-1]
+        if state in ENQUEUE_STATES and not (last.get("reason") == "manual"
+                                             and _age(last.get("at") or "", now) < MANUAL_QUIET_S):
+            actions.append(("enqueue", pr))
+    return actions
+
+
+def _enqueue(lane, pr: dict) -> bool:
+    return lane.sh(["gh", "api", "graphql", "-f", f"query={ENQUEUE_MUTATION}", "-f", f"id={pr['id']}",
+                    "-f", f"head={pr['headRefOid']}"]).returncode == 0
+
+
+def _apply(lane, binding: Binding, kind: str, pr: dict) -> bool:
+    number = str(pr["number"])
+    if kind == "enqueue":
+        return _enqueue(lane, pr)
+    if kind == "ready":
+        if lane.sh(["gh", "pr", "ready", number, "--repo", binding.slug]).returncode:
+            return False
+        lane.sh(["gh", "pr", "comment", number, "--repo", binding.slug, "--body",
+                 "Lanes readied this draft: required checks are green on this head and it has been "
+                 "idle past the 48h draft SLO. The native merge queue lands it."])
+        return True
+    if kind == "rebase":
+        return lane.sh(["gh", "pr", "comment", number, "--repo", binding.slug, "--body",
+                        "@dependabot rebase"]).returncode == 0
+    return False
+
+
+def maintain(lane, host, binding: Binding, prs: list[dict], now: float | None = None) -> dict:
+    """Apply `maintenance_actions` once per (kind, PR, head, queue removals); a failed write
+    retries after ACTION_RETRY_S. Returns counts per kind for the status record."""
+    now = time.time() if now is None else now
+    path = host.state / "bindings" / binding.key / "maintenance.json"
+    done = lane.read_json(path)
+    applied: dict[str, int] = {}
+    writes = 0
+    for kind, pr in maintenance_actions(binding, prs, now):
+        key = f"{kind}:{pr['number']}:{pr['headRefOid']}:{len(pr.get('removals') or ())}"
+        prior = done.get(key) or {}
+        if prior.get("ok") or now - float(prior.get("at") or 0) < ACTION_RETRY_S:
+            continue
+        if writes >= MAX_ACTIONS:
+            break
+        writes += 1
+        ok = _apply(lane, binding, kind, pr)
+        done[key] = {"at": now, "ok": ok}
+        applied[kind if ok else f"{kind}-failed"] = applied.get(kind if ok else f"{kind}-failed", 0) + 1
+    if writes:
+        def merge(data: dict) -> None:
+            data.update(done)
+            for key in [key for key, row in data.items() if now - float(row.get("at") or 0) > 14 * 86400]:
+                del data[key]
+        lane.update_json(path, merge)
+    return applied
 
 
 def record_status(lane, host, binding: Binding, **fields) -> None:
@@ -328,6 +513,10 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
         if prs is None:
             record_status(lane, host, binding, worker=name, outcome="github-unreadable")
             return None
+        try:  # a maintenance fault never holds back repair or intake
+            maintained = maintain(lane, host, binding, prs)
+        except Exception as error:
+            maintained = {"error": f"{type(error).__name__}: {error}"[:200]}
         attempts_path = host.state / "bindings" / binding.key / "fix-attempts.json"
         attempts = lane.read_json(attempts_path)
         pr = repair_candidate(lane, binding, prs, attempts, busy)
@@ -336,26 +525,33 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
             other.release()
         if pr is not None:
             key = f"{binding.key}#{pr['number']}:{pr['headRefOid']}"
-            lane.update_json(attempts_path, lambda data: data.update({key: data.get(key, 0) + 1}))
-            record_status(lane, host, binding, worker=name, outcome="repair", pr=pr["number"])
+            stamp = time.time()
+            lane.update_json(attempts_path, lambda data: data.update(
+                {key: {"count": _attempt_count(data.get(key), stamp) + 1, "at": stamp}}))
+            record_status(lane, host, binding, worker=name, outcome="repair", pr=pr["number"],
+                          reasons=pr.get("repairReasons") or [], maintained=maintained)
         elif not maintenance_only:
-            budget = intake_refusal(binding, prs, running_issue_runs(lane, host, binding))
-            linear = lane.Linear(host.linear_env)
-            pool = todo_issues(lane, linear, binding)
+            linear = lane.linear_sync.Outboxed(host.state, lane.Linear(host.linear_env))
+            pool = todo_issues(lane, host, binding)
             failures = lane.read_json(lane.failures_path(host))
             now, flying = time.time(), in_flight(binding, prs)
             refused = {item.identifier: refusal(lane, binding, item, failures, now, flying, name) for item in pool}
             eligible = sorted((item for item in pool if refused[item.identifier] is None),
                               key=lambda item: lane.admission_order(item, now))
-            if eligible and budget is None and linear.state_of(eligible[0].id) == "Todo":
+            # The local ledger is the claim; In Progress reaches Linear through the outbox.
+            if eligible and lane.linear_sync.claim(
+                    host.state, eligible[0].id, eligible[0].identifier, name):
                 issue = eligible[0]
                 lease = lane.Locked(host.state / "bindings" / binding.key / f"issue.{issue.identifier}.lock",
                                     blocking=False)
                 linear.move(issue.id, "In Progress")
-            outcome = budget or ("claimed" if issue else "claim-raced" if eligible else "none-eligible")
+            outcome = "claimed" if issue else "claim-raced" if eligible else "none-eligible"
             record_status(lane, host, binding, worker=name, outcome=outcome, pool=len(pool),
                           eligible=len(eligible), claimed=issue.identifier if issue else None,
-                          refusals={key: value for key, value in refused.items() if value})
+                          refusals={key: value for key, value in refused.items() if value},
+                          maintained=maintained)
+        else:
+            record_status(lane, host, binding, worker=name, outcome="no-repair", maintained=maintained)
     finally:
         claim.release()
     if pr is not None:
@@ -381,6 +577,21 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
 
 # ---------------------------------------------------------------- runs
 
+def merge_group_evidence(lane, binding: Binding, pr: dict) -> str:
+    """The failed merge-group run for this PR (`gh-readonly-queue/main/pr-<n>-*`) and the tail of
+    its failed jobs' log, read once when the repair starts. Empty when none is readable."""
+    listed = lane.sh(["gh", "api", f"repos/{binding.slug}/actions/runs?event=merge_group&status=failure&per_page=50",
+                      "--jq", ".workflow_runs[] | [.id, .head_branch, .html_url] | @tsv"], timeout=60)
+    prefix = f"gh-readonly-queue/main/pr-{pr['number']}-"
+    for line in (listed.stdout or "").splitlines() if listed.returncode == 0 else []:
+        run_id, branch, url = (line.split("\t") + ["", "", ""])[:3]
+        if branch.startswith(prefix) and run_id.isdigit():
+            log = lane.sh(["gh", "run", "view", run_id, "--repo", binding.slug, "--log-failed"], timeout=120)
+            tail = (log.stdout or "")[-MERGE_GROUP_LOG_CHARS:] if log.returncode == 0 else ""
+            return f"Failed merge-group run {url}\n```\n{tail or '(log unreadable)'}\n```"
+    return ""
+
+
 def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context: str = "",
                   goal: list[str] | tuple = ()) -> str:
     common = [
@@ -401,13 +612,29 @@ def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context
                           for check in pr.get("statusCheckRollup") or []
                           if (check.get("conclusion") or check.get("state") or "").upper()
                           in {"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"}})
+        reasons = pr.get("repairReasons") or []
+        extra = []
+        if "merge-group-failed" in reasons:
+            extra.append("- The merge queue rejected this exact head (failed merge-group CI; iOS runs only in "
+                         "merge groups). Reproduce against origin/main merged in and fix the cause in this "
+                         "branch. If the failure is another PR's in the same group, merging origin/main is "
+                         "the whole fix: the new head re-enters the queue.")
+            if context:
+                extra.append(context)
+        if "changes-requested" in reasons:
+            extra.append(f"- A review requested changes. Read `gh pr view {pr['number']} --repo {binding.slug} "
+                         "--comments` and the inline review comments, and address each one.")
         return "\n".join([
             f"# Repair PR #{pr['number']} in {binding.slug}: {pr.get('title') or ''}", "",
             f"Branch `{branch}` at {pr['headRefOid']} is checked out. Merge state: "
-            f"{pr.get('mergeStateStatus') or 'unknown'}. Failing checks: {', '.join(failing) or 'none'}.", "",
+            f"{pr.get('mergeStateStatus') or 'unknown'}. Failing checks: {', '.join(failing) or 'none'}. "
+            f"Repair reasons: {', '.join(reasons) or 'red or behind'}.", "",
             "## Contract",
             "- Merge origin/main into this branch first (no rebase), resolving conflicts.",
             "- Then fix what the failing checks report. Read their logs with `gh run view --log-failed`.",
+            *extra,
+            "- Keep the PR's intent. If origin/main already contains this change, commit nothing and end",
+            "  with `NOT-SHIPPABLE: superseded by <commit or PR>`.",
             *common])
     return "\n".join([
         f"# {issue.title} ({issue.identifier})", "", issue.description or "(no description)", "", "---",
@@ -451,7 +678,9 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
             if binding.install and lane.sh(list(binding.install), cwd=worktree, timeout=1800, log=log).returncode:
                 raise RuntimeError("install-failed")
             prompt = render_prompt(binding, branch, issue=issue, pr=pr,
-                                   context=lane.context_pack(issue) if issue is not None else "",
+                                   context=lane.context_pack(issue) if issue is not None else
+                                   merge_group_evidence(lane, binding, pr)
+                                   if "merge-group-failed" in (pr.get("repairReasons") or []) else "",
                                    goal=lane.goal_contract(issue) if issue is not None else ())
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
@@ -546,19 +775,20 @@ def finish_issue(lane, host, binding: Binding, name: str, linear, issue, receipt
         linear.comment(issue.id, f"🤖 lane `{name}` judged this not code-shippable: {receipt['reasons'][0]}")
         return
     if verdict == "provider-error":
-        lane.cool_down(host, name)
+        lane.cool_down(host, name, lane.provider_exit(receipt.get("reasons")))
         linear.move(issue.id, "Todo")
         return
     claim = lane.Locked(host.state / "claim.lock", blocking=True)  # the lock the Jovie path writes under
     try:
         failures = lane.read_json(lane.failures_path(host))
         count = lane.failure_record(failures.get(issue.identifier))["count"] + 1
-        failures[issue.identifier] = {"count": count, "at": time.time(),
+        failures[issue.identifier] = {"count": count, "at": time.time(), "release": lane.release_generation(),
                                       **lane.pr_events.failure_reason(receipt, count >= lane.MAX_FAILURES)}
         lane.failures_path(host).write_text(json.dumps(failures))
     finally:
         claim.release()
     exhausted = count >= lane.MAX_FAILURES
-    linear.move(issue.id, "Backlog" if exhausted else "Todo")
+    linear.move(issue.id, "Todo")  # exhausted: parked until the next lanes release, no human
     linear.comment(issue.id, f"🤖 lane `{name}`: {verdict} ({', '.join(receipt.get('reasons', []))}). "
-                             + ("Terminal after 3 attempts; needs a human decision." if exhausted else "Back to Todo."))
+                             + (f"{lane.MAX_FAILURES} attempts on this release; parked until the next lanes release."
+                                if exhausted else "Back to Todo."))

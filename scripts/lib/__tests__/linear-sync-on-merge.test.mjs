@@ -592,10 +592,13 @@ describe('linear sync on merge', () => {
     expect(workflow).toContain('node scripts/lib/linear-sync-on-merge.mjs');
     expect(workflow).toContain('runs-on: ubuntu-latest');
     expect(workflow).not.toContain('issueUpdate');
+    // Receipts arrive through the Linear webhook bridge; no clock.
+    expect(workflow).not.toMatch(/^\s+schedule:/m);
     for (const trigger of [
       'pull_request:',
       'workflow_run:',
-      'schedule:',
+      'repository_dispatch:',
+      'linear_validation_receipt',
       'workflow_dispatch:',
       'Production Controller',
       'actions: read',

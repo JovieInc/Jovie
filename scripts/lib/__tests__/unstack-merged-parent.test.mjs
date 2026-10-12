@@ -214,6 +214,19 @@ describe('unstack-merged-parent.sh', () => {
     expect(calls).not.toContain('pr edit');
   });
 
+  it('is idempotent: the retarget wake after a successful unstack is a no-op', () => {
+    const fx = fixture();
+    expect(run(fx).status).toBe(0);
+    const rebased = git(fx.remote, 'rev-parse', 'child');
+    const prs = JSON.parse(readFileSync(join(fx.dir, 'prs.json'), 'utf8'));
+    prs[11] = { ...prs[11], headRefOid: rebased, baseRefName: 'main' };
+    writeFileSync(join(fx.dir, 'prs.json'), JSON.stringify(prs));
+    const again = run(fx, { OLD_BASE_REF: 'parent' });
+    expect(again.status, again.stdout + again.stderr).toBe(0);
+    expect(again.stdout).toContain('already unstacked');
+    expect(git(fx.remote, 'rev-parse', 'child')).toBe(rebased);
+  });
+
   it('dry-run pushes nothing', () => {
     const fx = fixture();
     const result = run(fx, { DRY_RUN: '1' });

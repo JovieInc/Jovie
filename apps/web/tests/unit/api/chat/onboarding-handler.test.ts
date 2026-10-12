@@ -637,6 +637,49 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     );
   });
 
+  it('alerts a distinct insufficient-funds event and still serves the scripted fallback', async () => {
+    vi.resetModules();
+    stubRuntimeEnv();
+    hoisted.executeChatTurnMock.mockRejectedValue(
+      Object.assign(
+        new Error(
+          'A positive credit balance is required for all requests, including BYOK, so fallback providers remain available. Add credits at https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dtop-up to continue.'
+        ),
+        { name: 'GatewayInternalServerError', statusCode: 402 }
+      )
+    );
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      mode: 'onboarding',
+      messages: [userMessage('hi, I want in')],
+    });
+    const result = await tryHandleAnonymousOnboardingChat(
+      req,
+      'req-insufficient-funds-wall'
+    );
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBe('llm_error');
+    const body = await result?.text();
+    expect(body).toContain("I'm Jovie");
+    expect(body).not.toContain('positive credit balance');
+    expect(hoisted.captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'AI Gateway insufficient funds',
+        name: 'GatewayInsufficientFundsError',
+      }),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          errorType: 'gateway_insufficient_funds',
+          alert: 'ai_gateway_insufficient_funds',
+          chat_mode: 'onboarding',
+        }),
+      })
+    );
+  });
+
   it('opens the artist picker via fallback on a later turn when the LLM is down', async () => {
     vi.resetModules();
     stubRuntimeEnv();
@@ -839,6 +882,42 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(result?.status).toBe(200);
     expect(hoisted.dbOnConflictDoUpdateMock).not.toHaveBeenCalled();
   });
+
+  it('uses safe unavailable copy when insufficient funds arrive mid-stream', async () => {
+    const error = Object.assign(
+      new Error('A positive credit balance is required to use AI Gateway.'),
+      {
+        name: 'GatewayInternalServerError',
+        statusCode: 402,
+      }
+    );
+    hoisted.executeChatTurnMock.mockResolvedValue({
+      streamResult: {
+        toUIMessageStreamResponse: ({
+          headers,
+          onError,
+        }: {
+          headers: Record<string, string>;
+          onError: (error: unknown) => string;
+        }) => new Response(onError({ error }), { status: 200, headers }),
+      },
+      selectedModel: 'test-model',
+      systemPrompt: '',
+      toolNames: [],
+      modelMessages: [],
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const result = await tryHandleAnonymousOnboardingChat(
+      makeRequest({ mode: 'onboarding', messages: [userMessage('hi')] }),
+      'req-insufficient-funds-stream'
+    );
+    expect(await result?.text()).toBe(
+      'Jovie AI is currently unavailable. Please try again later.'
+    );
+    expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+  }, 15_000);
 
   it('does not persist an assistant reply when the model stream fails', async () => {
     let finishPromise: PromiseLike<void> | void = undefined;

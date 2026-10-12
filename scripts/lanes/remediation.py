@@ -64,9 +64,15 @@ GENERATED_RESOLVERS = {
     ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
     "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
 }
-DIFF_POLICY = frozenset({"secret-file", "diff-too-large", "lockfile-without-manifest"})
+# Only a secret-like file is a human call; an oversize diff is split by a repair lane and a
+# lockfile without its manifest is fixed by one (Tim 2026-10-12: no dead-end holds).
+DIFF_POLICY = frozenset({"secret-file"})
 STALE_LABELS = frozenset({"lane-fix-exhausted", "queue-poison", "lane-fix-escalating"})
 FLAKY_CONCLUSIONS = frozenset({"CANCELLED", "TIMED_OUT", "STARTUP_FAILURE", "CANCELED"})
+# Summary checks that only restate their underlying jobs. Their own FAILURE carries no cause
+# of its own, so they never decide whether a failure is infrastructure (2026-10-11: a runner
+# outage cancelled jobs, PR Ready failed, and the PR went to a model that had nothing to fix).
+AGGREGATE_CHECKS = frozenset({"pr ready", "ci summary", "rollup"})
 RED_CONCLUSIONS = FLAKY_CONCLUSIONS | {"FAILURE"}
 PENDING_STATUS = frozenset({"IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED"})
 INFRA_TEXT = re.compile(
@@ -168,6 +174,11 @@ def _conclusion(check: dict) -> str:
 
 def _failing(pr: dict) -> list[dict]:
     return [check for check in _checks(pr) if _conclusion(check) in RED_CONCLUSIONS]
+
+
+def _aggregate(check: dict) -> bool:
+    return bool(check.get("synthetic")) or str(check.get("name") or check.get("context") or "").strip().lower() \
+        in AGGREGATE_CHECKS
 
 
 def _pending(pr: dict) -> list[dict]:
@@ -313,8 +324,14 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     failing = _failing(pr)
     flaky = [check for check in failing if _conclusion(check) in FLAKY_CONCLUSIONS
              or INFRA_TEXT.search(str(check.get("excerpt") or check.get("name") or ""))]
+    underlying = [check for check in failing if not _aggregate(check)]
     if overlap:
         return blocker("flaky-infra", "main-red", [f"main is red on {', '.join(overlap)}"], "wait")
+    if underlying and all(check in flaky for check in underlying):
+        # Every real failure is a cancellation/timeout/runner fault; a red summary over
+        # them is the same outage, so rerun instead of spending a model attempt.
+        return blocker("flaky-infra", "infra",
+                       [f"{check.get('name')}: {_conclusion(check)}" for check in underlying], "rerun")
     if failing and len(flaky) == len(failing):
         return blocker("flaky-infra", "infra",
                        [f"{check.get('name')}: {_conclusion(check)}" for check in flaky], "rerun")
@@ -1019,14 +1036,10 @@ HISTORY_STATE_NAMES = frozenset({"done", "canceled", "cancelled", "closed"})
 
 
 def stuck_pr_escalation_enabled() -> bool:
-    """In-process stuck-PR ladder. Default off, and only while the router flag is on.
-
-    Detection belongs to remediation-sweep. It files ordinary labeled issues:
-    ``remediation:pr-<n>-hold`` and ``remediation:pr-<n>-conflict`` (the
-    lane-fix-exhausted case). ``LANES_ESCALATION_STUCK_PRS=1`` restores the
-    in-process ladder.
-    """
-    return escalation_enabled() and _flag("LANES_ESCALATION_STUCK_PRS", False)
+    """In-process stuck-PR ladder, on by default while the router flag is on (Tim 2026-10-12:
+    every exhausted head needs an automatic exit; the daily remediation sweep was the only
+    other one). ``LANES_ESCALATION_STUCK_PRS=0`` turns it off."""
+    return escalation_enabled() and _flag("LANES_ESCALATION_STUCK_PRS", True)
 
 
 def alert_key_slug(key: str) -> str | None:
@@ -1314,6 +1327,11 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                 if row.get("status") in {"done", "human", "exhausted"}:
                     row["status"] = "open"
                     row["asked"] = False
+                # A recurrence is new evidence: its ladder starts fresh. Kept attempts made the
+                # reopened event `exhausted` again at once, forever (Tim 2026-10-12: every
+                # exhausted state needs an automatic exit).
+                row["priorAttempts"] = [*(row.get("priorAttempts") or []), *prior_attempts][-20:]
+                row["attempts"] = []  # attemptCount keeps the history count
         else:
             by_id = {issue.get("id"): issue for issue in group}
             canonical = by_id.get(recorded_id) or group[0]

@@ -10,7 +10,9 @@ import { and, asc, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
+  classifyGatewayAlert,
   isGatewayBudgetExceededError,
+  isGatewayInsufficientFundsError,
   resolveChatStreamErrorMessage,
 } from '@/lib/ai/gateway-errors';
 import { getAppUserByBetterAuthId } from '@/lib/auth/app-user';
@@ -883,6 +885,7 @@ export async function tryHandleAnonymousOnboardingChat(
     // Mid-stream failures cannot swap the Response for the scripted
     // fallback; the lint-clean script line is the recovery copy instead.
     const streamErrorText = (error: unknown) =>
+      isGatewayInsufficientFundsError(error) ||
       isGatewayBudgetExceededError(error)
         ? resolveChatStreamErrorMessage(error)
         : STREAM_ERROR_LINE.text;
@@ -925,34 +928,23 @@ export async function tryHandleAnonymousOnboardingChat(
     // The LLM failure still pages — the fallback masks the user impact, not
     // the incident. The logger line keeps the failure visible in local dev,
     // where Sentry is a no-op and the fallback would otherwise hide it.
-    const budgetExceeded = isGatewayBudgetExceededError(error);
+    const gatewayAlert = classifyGatewayAlert(error);
     logger.error(
-      budgetExceeded
-        ? '[onboarding-chat] AI Gateway budget exceeded; serving scripted fallback'
+      gatewayAlert
+        ? `[onboarding-chat] ${gatewayAlert.title}; serving scripted fallback`
         : '[onboarding-chat] LLM turn failed; serving scripted fallback',
       { error, requestId, turnCount }
     );
-    Sentry.captureException(
-      budgetExceeded
-        ? Object.assign(new Error('AI Gateway API key budget exceeded'), {
-            name: 'GatewayBudgetExceededError',
-            cause: error,
-          })
-        : error,
-      {
-        tags: {
-          feature: 'ai-chat',
-          chat_mode: 'onboarding',
-          ...(budgetExceeded
-            ? {
-                errorType: 'gateway_budget_exceeded',
-                alert: 'ai_gateway_budget',
-              }
-            : {}),
-        },
-        extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
-      }
-    );
+    Sentry.captureException(gatewayAlert?.error ?? error, {
+      tags: {
+        feature: 'ai-chat',
+        chat_mode: 'onboarding',
+        ...(gatewayAlert
+          ? { errorType: gatewayAlert.errorType, alert: gatewayAlert.alert }
+          : {}),
+      },
+      extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
+    });
     try {
       return await serveScriptedFallback('llm_error');
     } catch (fallbackError) {

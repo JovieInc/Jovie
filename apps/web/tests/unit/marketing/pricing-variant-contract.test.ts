@@ -84,7 +84,7 @@ describe('section.pricing variant contract', () => {
     expect(homepagePricing).toContain("variant='tier-cards-recommended'");
   });
 
-  it('resolves the pricing recipe to neutral and homepage to recommended', () => {
+  it('resolves pricing to neutral and keeps pricing out of the selected identity homepage', () => {
     const sharedBrief = {
       businessObjective: 'Convert visitors to start',
       targetAudience: 'general' as const,
@@ -105,10 +105,10 @@ describe('section.pricing variant contract', () => {
       pricing.sections.find(section => section.sectionId === 'pricing')
         ?.variantId
     ).toBe('tier-cards-neutral');
+    expect(homepage.recipeId).toBe('homepage');
     expect(
-      homepage.sections.find(section => section.sectionId === 'pricing')
-        ?.variantId
-    ).toBe('tier-cards-recommended');
+      homepage.sections.some(section => section.sectionId === 'pricing')
+    ).toBe(false);
   });
 
   it('keeps the canonical section and pricing-recipe stories neutral', () => {

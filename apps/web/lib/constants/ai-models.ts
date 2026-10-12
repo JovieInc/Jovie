@@ -9,14 +9,27 @@
  */
 
 /**
- * Founder gateway policy (Tim STRICT 2026-09-17, extended 2026-09-28): the Jovie
- * AI Gateway allowlist is zai/glm-5.3 and zai/glm-5.3-flash. Anything else is
- * rejected `forbidden`, which surfaced as empty chat turns (JOV-6533). Keep
- * every runtime model on the allowlist.
+ * Founder gateway policy (Tim STRICT 2026-09-17, locked 2026-09-17 per
+ * JOV-8109): the Jovie AI Gateway allowlist is exactly zai/glm-5.3,
+ * zai/glm-5.3-flash, and typesafe-ai/jev. Anything else is rejected
+ * `forbidden`, which surfaced as empty chat turns (JOV-6533). Keep every
+ * runtime text model on the allowlist — `gateway()` enforces this list
+ * fail-closed. Expensive work goes through subscriptions, never the Gateway.
  */
 export const GATEWAY_ALLOWED_MODELS: readonly string[] = [
+  'typesafe-ai/jev',
   'zai/glm-5.3',
   'zai/glm-5.3-flash',
+];
+
+/**
+ * Gateway image-model allowlist (JOV-8109): `gateway.image()` is also
+ * fail-closed. Only models in live use (album art + the enabled merch A/B
+ * entry) may pass; anything else throws before it can bill the gateway.
+ */
+export const GATEWAY_ALLOWED_IMAGE_MODELS: readonly string[] = [
+  'recraft/recraft-v3',
+  'spacexai/grok-imagine-image',
 ];
 
 /**
@@ -36,11 +49,36 @@ export function isGatewayBannedModel(modelId: string): boolean {
   return GATEWAY_BANNED_PROVIDERS.includes(provider);
 }
 
-/** Throws when a gateway model id uses a banned provider (JOV-7119). */
+/**
+ * Throws when a gateway text model id is not on the fail-closed allowlist
+ * (JOV-8109). Banned providers (JOV-7119) get their own clearer error.
+ */
 export function assertGatewayModelAllowed(modelId: string): void {
   if (isGatewayBannedModel(modelId)) {
     throw new Error(
       `AI Gateway model "${modelId}" uses a banned provider (${GATEWAY_BANNED_PROVIDERS.join('/')}) — OpenAI and Anthropic are not billed through the gateway (JOV-7119).`
+    );
+  }
+  if (!GATEWAY_ALLOWED_MODELS.includes(modelId)) {
+    throw new Error(
+      `AI Gateway model "${modelId}" is not on the allowlist (${GATEWAY_ALLOWED_MODELS.join(', ')}) — the gateway is fail-closed and everything else is denied (${GATEWAY_ALLOWLIST_NAME}, JOV-8109).`
+    );
+  }
+}
+
+/**
+ * Throws when a gateway image model id is not on the image allowlist
+ * (JOV-8109). Same fail-closed policy as {@link assertGatewayModelAllowed}.
+ */
+export function assertGatewayImageModelAllowed(modelId: string): void {
+  if (isGatewayBannedModel(modelId)) {
+    throw new Error(
+      `AI Gateway image model "${modelId}" uses a banned provider (${GATEWAY_BANNED_PROVIDERS.join('/')}) — OpenAI and Anthropic are not billed through the gateway (JOV-7119).`
+    );
+  }
+  if (!GATEWAY_ALLOWED_IMAGE_MODELS.includes(modelId)) {
+    throw new Error(
+      `AI Gateway image model "${modelId}" is not on the image allowlist (${GATEWAY_ALLOWED_IMAGE_MODELS.join(', ')}) — the gateway is fail-closed (JOV-8109).`
     );
   }
 }
