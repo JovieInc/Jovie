@@ -202,6 +202,23 @@ jobs:
           pnpm screen-registration-gate
           pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts
           pnpm ci:control:test
+      # The merge group's ci-fast runs the same path-aware shadcn baseline
+      # probe; Source Validation previously skipped it, so a restyle that fit
+      # a PR's diff still ejected the whole merge group (group 36902907269,
+      # shadcn/no-restyle 65 > baseline 63). Run it here against the pinned
+      # event head and merge base so the regression fails before enqueue.
+      # Non-web diffs exit before the ESLint module load.
+      - name: Lint changed web files against the shadcn baseline
+        if: steps.reuse.outputs.reuse != 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" "$EXPECTED_HEAD")"
+          SHADCN_LINT_DIFF_BASE="$base_sha" \
+            pnpm --filter @jovie/web exec node eslint-rules/__tests__/shadcn-lint-changed.mjs
       - name: Verify changed CLI publication behavior
         if: steps.reuse.outputs.reuse != 'true'
         shell: bash

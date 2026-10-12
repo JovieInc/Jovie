@@ -156,17 +156,6 @@ nodes:
       - workflow_run
     terminalReceipt: job:self-test
     jobCount: 3
-  - name: Auto-PR on Agent Push
-    path: .github/workflows/auto-pr-on-push.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - push
-    terminalReceipt: job:open-pr
-    jobCount: 1
   - name: Auto-Ready Agent Drafts
     path: .github/workflows/auto-ready-agent-drafts.yml
     active: false
@@ -224,10 +213,8 @@ nodes:
       - Agent Pipeline
       - iOS CI
       - Lane Fix Relay
-      - Main CI health monitor
       - Merge Queue Green Enroll
       - PR Conflict Handler
-      - Quarantine Recovery
       - Rolling CI Dispatch
       - Staging Controller
       - Test Flakiness Report
@@ -269,8 +256,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:remediation
-    jobCount: 2
+    terminalReceipt: job:mcp-drift-remediation
+    jobCount: 4
   - name: CODEOWNERS Path Drift
     path: .github/workflows/codeowners-drift.yml
     active: true
@@ -723,18 +710,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:heartbeat
     jobCount: 1
-  - name: Main CI health monitor
-    path: .github/workflows/main-ci-health-monitor.yml
-    active: false
-    category: telemetry-aggregation
-    authoritativeProducer: Delivery Control Receipts
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-      - workflow_run
-    terminalReceipt: job:auto-rerun
-    jobCount: 2
   - name: Marketing Certification Producer
     path: .github/workflows/marketing-certification-producer.yml
     active: true
@@ -757,7 +732,6 @@ nodes:
     triggeringStateTransition:
       - pull_request_target
       - push
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:rearm-green-victims
@@ -1081,18 +1055,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:find
     jobCount: 1
-  - name: Quarantine Recovery
-    path: .github/workflows/quarantine-recovery.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-      - workflow_run
-    terminalReceipt: job:publish-queue-results
-    jobCount: 2
   - name: Remediation Sweep
     path: .github/workflows/remediation-sweep.yml
     active: true
@@ -1575,9 +1537,6 @@ edges:
   - from: Production Release
     to: Canary Health Gate
     type: workflow_call
-  - from: CI
-    to: Quarantine Recovery
-    type: workflow_run
   - from: Eve Pilot
     to: Safe PR Remediation
     type: workflow_run

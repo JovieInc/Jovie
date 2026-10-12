@@ -3,7 +3,6 @@
 # capability-gap: GitHub merge queue has no native auto-enroll for green PRs; GITHUB_TOKEN-created merge groups start no CI, so a hosted hop with the Jovie Bot app token must enqueue.
 # removal-trigger: Remove when GitHub offers native auto-enqueue of CLEAN PRs with merge-group CI, or when Summer's own enqueue tool proves 30 consecutive days of queue admission.
 name: Merge Queue Green Enroll
-# clock-class: temporal-resource
 
 # Tim 2026-09-26: production holds never stall merging. A held production
 # promote and a red main are separate issues from source admission, so green
@@ -35,9 +34,6 @@ on:
   # `reconcile` concurrency slot.
   push:
     branches: [main]
-  # Retired by ci-timers once the event wakes above are live.
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -50,7 +46,7 @@ permissions: {}
 concurrency:
   # A global pending slot loses another PR's final wake. Coalesce only wakes
   # attributed to the same PR; association-free receipts retain their run ID.
-  group: merge-queue-green-enroll-${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event_name == 'schedule') && 'reconcile' || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
+  group: merge-queue-green-enroll-${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && 'reconcile' || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -198,8 +194,8 @@ jobs:
             // on every check completion exhausts the shared app GraphQL quota.
             const validNumber = n => Number.isSafeInteger(n) && n > 0;
             let prs;
-            if (['workflow_dispatch', 'schedule', 'push'].includes(context.eventName)) {
-              // Reconciliation (a landing on main, the schedule, or a manual run)
+            if (['workflow_dispatch', 'push'].includes(context.eventName)) {
+              // Reconciliation (a landing on main or a manual run)
               // keeps a complete paginated inventory.
               prs = await github.paginate(github.rest.pulls.list, {
                 owner, repo, state: 'open', base: 'main', per_page: 100,
@@ -415,7 +411,7 @@ jobs:
   enforce-hold-contract:
     name: Release ownerless or expired holds
     if: >-
-      contains(fromJSON('["schedule","workflow_dispatch","push","pull_request_target"]'), github.event_name) ||
+      contains(fromJSON('["workflow_dispatch","push","pull_request_target"]'), github.event_name) ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'merge_group')
     runs-on: ubuntu-latest
     timeout-minutes: 5

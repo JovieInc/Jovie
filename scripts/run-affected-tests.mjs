@@ -367,7 +367,6 @@ const CI_CONTROL_SCRIPT_TESTS = [
   OWNERLESS_RECOVERY_POLICY_TEST,
   'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
   'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
-  'scripts/lib/__tests__/eval-main-health-action.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
   'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
   'scripts/lib/__tests__/pr-conflict-event.test.mjs',
