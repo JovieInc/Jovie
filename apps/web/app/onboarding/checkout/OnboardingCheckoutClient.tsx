@@ -151,23 +151,25 @@ export function ClaimTimeProofCard({
     .slice(0, PROOF_FACT_LIMIT);
   if (facts.length === 0) return null;
   return (
-    <ContentSurfaceCard className='mb-4 p-4' data-testid='claim-time-proof'>
-      <p className='text-xs font-medium text-tertiary-token'>
-        Found From Your Profile
-      </p>
-      <dl className='mt-2 space-y-1.5'>
-        {facts.map(fact => (
-          <div
-            key={`${fact.label}:${fact.value}`}
-            className='flex items-baseline justify-between gap-3'
-          >
-            <dt className='text-app text-secondary-token'>{fact.label}</dt>
-            <dd className='truncate text-app font-medium text-primary-token'>
-              {fact.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
+    <ContentSurfaceCard className='mb-4' data-testid='claim-time-proof'>
+      <div className='p-4'>
+        <p className='text-xs font-medium text-tertiary-token'>
+          Found From Your Profile
+        </p>
+        <dl className='mt-2 space-y-1.5'>
+          {facts.map(fact => (
+            <div
+              key={`${fact.label}:${fact.value}`}
+              className='flex items-baseline justify-between gap-3'
+            >
+              <dt className='text-app text-secondary-token'>{fact.label}</dt>
+              <dd className='truncate text-app font-medium text-primary-token'>
+                {fact.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     </ContentSurfaceCard>
   );
 }
