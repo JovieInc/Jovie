@@ -1048,6 +1048,33 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
   });
 
+  it('orders rail content evidence → next action → secondary metadata (JOV-8106)', async () => {
+    const user = userEvent.setup();
+    renderWorkspace(data);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for Spotify' })
+    );
+    await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+
+    const content = screen.getByTestId('profiles-rail-content');
+    const ordered = [
+      screen.getByTestId('profiles-rail-summary'),
+      screen.getByText('Signals'),
+      screen.getByRole('link', { name: 'Open' }),
+      screen.getByText('Profile / Page'),
+    ];
+    for (let index = 1; index < ordered.length; index += 1) {
+      expect(
+        ordered[index - 1].compareDocumentPosition(ordered[index]) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    }
+    expect(content).toContainElement(ordered[0]);
+  });
+
   it('uses the canonical Jovie URL only for supported social connections', async () => {
     const user = userEvent.setup();
     renderWorkspace(data);
