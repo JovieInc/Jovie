@@ -3919,7 +3919,10 @@ class TerminalRevisitTest(unittest.TestCase):
         git = lambda *args: subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True,
                                            check=True).stdout.strip()
         git("init", "-q", "-b", "main")
-        for key, value in (("user.name", "t"), ("user.email", "t@example.test"), ("commit.gpgsign", "false")):
+        # merge-tree writes objects; a detached auto-gc would still be writing .git
+        # when the temporary directory is removed (CI: "Directory not empty").
+        for key, value in (("user.name", "t"), ("user.email", "t@example.test"), ("commit.gpgsign", "false"),
+                           ("gc.auto", "0"), ("maintenance.auto", "false")):
             git("config", key, value)
         (repo / "a.txt").write_text("base\n")
         git("add", "a.txt")
