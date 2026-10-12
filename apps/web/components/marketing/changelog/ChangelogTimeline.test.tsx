@@ -62,6 +62,10 @@ describe('ChangelogTimeline', () => {
     expect(
       container.querySelector('#published-workspace-fragment')
     ).toHaveAttribute('aria-hidden', 'true');
+    // The row is a flex container; an in-flow alias would add a gap.
+    expect(
+      container.querySelector('#published-workspace-fragment')
+    ).toHaveClass('absolute');
     expect(
       screen.getByText('release:status', { selector: 'code' })
     ).toBeVisible();

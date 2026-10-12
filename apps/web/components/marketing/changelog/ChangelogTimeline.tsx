@@ -202,14 +202,15 @@ function ReleaseSectionBlock({
               key={itemKey}
               id={publication?.slug}
               data-changelog-entry-id={publication?.entryId}
-              className='flex items-start gap-4 border-t border-subtle py-5'
+              className='relative flex items-start gap-4 border-t border-subtle py-5'
             >
+              {/* Out of flow so aliases add no flex gap before the icon. */}
               {publication?.aliases.map(alias => (
                 <span
                   key={alias}
                   id={alias}
                   aria-hidden='true'
-                  className='h-0 scroll-mt-24'
+                  className='absolute left-0 top-0 h-0 w-0 scroll-mt-24'
                 />
               ))}
               <Icon
