@@ -143,6 +143,19 @@ class CurrentLoginTest(Isolated):
         self.assertEqual(codex.pick({}, 1.0), (None, None), "default stays one exclusive run")
         handle.close()
 
+    def test_logged_in_cli_clears_an_auth_bank_before_picking(self):
+        self.fake_cli()
+        codex.write_state({codex.CURRENT_LOGIN: {"lastKind": "auth", "lastError": "429", "exhaustedUntil": 10_000.0}})
+        name, handle = codex.pick(codex.read_state(), 1.0)
+        self.assertEqual(name, codex.CURRENT_LOGIN)
+        handle.close()
+        row = codex.read_state()[codex.CURRENT_LOGIN]
+        self.assertNotIn("exhaustedUntil", row)
+        self.assertEqual(row["lastKind"], "auth-reverified")
+        self.fake_cli(auth="Not logged in", auth_code=1)
+        codex.write_state({codex.CURRENT_LOGIN: {"lastKind": "auth", "exhaustedUntil": 10_000.0}})
+        self.assertEqual(codex.pick(codex.read_state(), 1.0), (None, None), "a real logout stays benched")
+
     def test_existing_cli_login_without_opening_credentials_or_scanning_profiles(self):
         self.fake_cli()
         with patch.object(Path, "glob", side_effect=AssertionError("profile discovery")):
@@ -522,6 +535,14 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual((kind, until), ("auth", 86400.0))
         self.assertEqual(codex.classify("codex\nOK\ntokens used\n12", 0, 0.0), ("ok", None))
         self.assertEqual(codex.classify("boom", 3, 0.0), ("error", None))
+
+    def test_auth_words_inside_the_agents_work_do_not_bench_the_login(self):
+        # 2026-10-12 on Gem: a run ending on a 429 whose work mentioned 401/unauthorized was
+        # classified auth and benched the only login for 24h with 96% capacity left.
+        transcript = "editing auth-guard.ts\nexpect(res.status).toBe(401) // unauthorized\n" + "work\n" * 40 \
+            + "error: 429 Too Many Requests"
+        self.assertEqual(codex.classify(transcript, 1, 0.0)[0], "rate")
+        self.assertEqual(codex.classify("work\n" * 40 + "error: not logged in", 1, 0.0), ("auth", 86400.0))
 
     def test_successful_run_that_mentions_rate_limits_is_not_exhausted(self):
         transcript = "reading rate-limiter.test.ts\nexpect 429 Too Many Requests\nquota fallback\n" + "work\n" * 40 + "Done."
