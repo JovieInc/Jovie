@@ -58,21 +58,21 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
   latest-`main` validation.
 - Merge method: `SQUASH`
 - Grouping strategy: `ALLGREEN`
-- Minimum entries to merge: live `1`; checked-in target `5` remains unapplied.
-- Minimum entries wait: live `0` minutes; checked-in target `10` remains
-  unapplied (live readback 2026-09-24). Do not apply the cohort target as part
-  of documentation or controller retirement.
-- Maximum entries per merge: `5` (synced to the live ruleset 10512119 readback on 2026-09-04, JOV-5867)
-- Maximum entries building concurrently: `2` — the live ruleset builds up to
-  two combined heads at a time (live readback 2026-09-20, JOV-6107; the 1→2
-  apply is complete; do not restore the superseded 2026-08-15 three-prefix
-  canary value)
+- Minimum entries to merge: `1`.
+- Minimum entries wait: `0` minutes. A source-green PR forms a group
+  immediately instead of waiting for a cohort.
+- Maximum entries per merge: `1`. A slow or starved PR can invalidate only its
+  own synthetic head; it cannot batch-block an unrelated fast PR.
+- Maximum entries building concurrently: checked-in ceiling `10`. Lower live
+  values from `1` through `10` remain supported as a reversible runner-capacity
+  brake.
 - Check response timeout: `60` minutes (source-first cutover and live readback
   verified 2026-09-24). Required checks and ALLGREEN remain unchanged.
 - Production health governs deployment and promotion through the existing
   production controls. Native source admission uses the required checks above;
   the retired Auto-Enroll fleet gate does not create a second admission gate.
-- Re-read live ruleset `10512119` before claiming the source cohort settings are active; the custom Auto-Enroll workflow is retired.
+- Re-read live ruleset `10512119` before claiming the singleton-group settings
+  are active.
 - Signed-commit and non-fast-forward rules: dormant/not applied. The checked-in
   payload intentionally matches live ruleset `10512119`; enabling either is a
   separate reviewed cutover, not an implicit source reapply.
@@ -98,6 +98,18 @@ Bare local controller/check commands default to `native`, matching the live
 repository variable. Unknown backends fail closed. Native enrollment/dequeue
 mutations additionally require the dedicated controller authorization, so a
 bare local command cannot mutate queue state accidentally.
+
+The repository still has one native queue for `main`; lane separation happens
+inside each singleton synthetic head. The trusted changed-path classifier runs
+only the selected Web, Mac, iOS, operations/tooling, and shared-contract lanes,
+so a fast-only change does not inherit an unrelated PR's slow product lane.
+
+**Ship now:** immediate singleton groups (`min=1`, `max=1`, `wait=0`) with up
+to ten entries building concurrently. **Re-evaluate when:** seven days of
+same-method evidence shows hosted-runner pickup above three minutes or lower
+merges/hour. **Then:** reduce `max_entries_to_build`; do not couple PRs into
+larger groups unless the data shows the throughput gain exceeds slow-sibling
+blocking.
 
 ## Reconciliation and loop prevention
 
