@@ -757,7 +757,6 @@ nodes:
     triggeringStateTransition:
       - pull_request_target
       - push
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:rearm-green-victims
