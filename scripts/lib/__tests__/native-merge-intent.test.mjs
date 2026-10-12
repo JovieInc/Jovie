@@ -197,7 +197,9 @@ test('concurrent completion events issue at most one mutation', async () => {
   assert.equal(f.mutations().length, 1);
 });
 
-test('a removal of the unchanged head blocks ordinary callers even when beforeCommit is a synthetic group SHA', async () => {
+test('every removal blocks ordinary callers even when beforeCommit is a synthetic group SHA', async () => {
+  // JOV-INV-011 evidence name. Every removal of the *unchanged* head blocks;
+  // a later commit is a new head (see the next test).
   for (const oid of [head, null, 'b'.repeat(40)]) {
     const f = fixture({
       states: [
