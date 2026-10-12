@@ -28,11 +28,11 @@ function writeShot(dir, name, bytes = PNG_BYTES) {
 }
 
 function visionProvider({
-  classify,
-  analyze,
+  classify = undefined,
+  analyze = undefined,
   name = 'fake-vision',
   ok = true,
-}) {
+} = {}) {
   return {
     name,
     available: () => true,
@@ -54,7 +54,8 @@ function fakeIntake(calls) {
   };
 }
 
-function deps(extra = {}) {
+/** @param {any} extra */
+function deps(extra) {
   return { now: () => '2026-10-12T00:00:00.000Z', env: {}, ...extra };
 }
 
@@ -87,7 +88,7 @@ test('product screenshot is classified, analyzed and filed as one issue', async 
       })
     );
     assert.equal(receipt.status, 'filed');
-    assert.equal(receipt.issue, 'JOV-1');
+    assert.equal(/** @type {any} */ (receipt).issue, 'JOV-1');
     assert.equal(receipt.stages.verify.status, 'chain-verified');
     assert.equal(intakeCalls.length, 1);
     assert.equal(

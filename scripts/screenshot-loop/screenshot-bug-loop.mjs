@@ -231,7 +231,7 @@ export function anthropicProvider(env = process.env) {
       if (!response.ok) {
         return { ok: false, reason: `http_${response.status}` };
       }
-      const body = await response.json();
+      const body = /** @type {any} */ (await response.json());
       const text = (body?.content ?? [])
         .filter(part => part?.type === 'text')
         .map(part => part.text)
@@ -278,7 +278,7 @@ export function gatewayProvider(env = process.env) {
       if (!response.ok) {
         return { ok: false, reason: `http_${response.status}` };
       }
-      const body = await response.json();
+      const body = /** @type {any} */ (await response.json());
       const text = body?.choices?.[0]?.message?.content ?? '';
       return { ok: true, text };
     },
