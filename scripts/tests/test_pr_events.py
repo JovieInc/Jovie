@@ -410,9 +410,12 @@ class RelayTest(unittest.TestCase):
     def test_queue_removal_and_review_feedback_are_relayed(self):
         base = {"pull_request": {"number": 7, "head": {"sha": "h7"}}}
         self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued"}), [(7, "dequeued", "h7")])
-        for reason in ("MANUAL", "manual", "ALREADY_MERGED", "merged", "BRANCH_REMOVED"):
+        for reason in ("ALREADY_MERGED", "merged", "BRANCH_REMOVED"):
             self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued", "reason": reason}),
                              [], f"{reason} removal is not a code failure")
+        for reason in ("MANUAL", "manual"):
+            self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued", "reason": reason}),
+                             [(7, events.HOLD_DEQUEUE, "h7")], "a hand removal needs the hold receipt to count")
         self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued", "reason": "CI_FAILURE"}),
                          [(7, "dequeued", "h7")])
         review = {**base, "action": "submitted", "review": {"state": "CHANGES_REQUESTED", "user": {"type": "Bot"}}}
@@ -468,6 +471,21 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, exhausted, set()), [])
         self.assertEqual(exhausted.made("gh", "api", "-X", "POST"), [],
                          "a terminal head never gets another repair signal")
+
+    def test_a_failure_hold_dequeue_is_relayed_and_a_plain_hand_dequeue_is_not(self):
+        view = {"state": "OPEN", "isDraft": False, "headRefName": "codex/jov-6577-20261012t075744",
+                "headRefOid": "h7", "isCrossRepository": False, "labels": []}
+        payload = {"action": "dequeued", "reason": "MANUAL", "pull_request": {"number": 7, "head": {"sha": "h7"}}}
+        statuses = ("gh", "api", f"repos/{events.REPO}/commits/h7/statuses?per_page=100")
+        for writers, expected in (("jovie-bot[bot]", [(7, "dequeued")]), ("", []), ("someone-else", [])):
+            shell = Shell({statuses: writers, ("gh", "pr", "view"): view, ("gh", "api", "graphql"): []})
+            self.assertEqual(events.relay("pull_request_target", payload, shell, set()), expected, writers)
+            labeled = shell.made("gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/7/labels")
+            self.assertEqual(len(labeled), len(expected))
+            if not expected:
+                self.assertEqual(shell.made("gh", "pr", "view"), [], "an unheld hand dequeue reads nothing more")
+        unreadable = Shell({statuses: (1, ""), ("gh", "pr", "view"): view})
+        self.assertEqual(events.relay("pull_request_target", payload, unreadable, set()), [])
 
     def test_a_second_failed_ejection_in_a_day_marks_the_pr_queue_poison(self):
         now = time.time()
