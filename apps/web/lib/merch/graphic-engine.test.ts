@@ -57,6 +57,15 @@ describe('alphaProviderOptions', () => {
       expect(alphaProviderOptions(m)).toBeDefined();
     }
   });
+
+  it('every enabled roster model is on the gateway image allowlist (JOV-8109)', async () => {
+    const { GATEWAY_ALLOWED_IMAGE_MODELS } = await import(
+      '@/lib/constants/ai-models'
+    );
+    for (const m of MERCH_IMAGE_MODELS.filter(m => m.enabled)) {
+      expect(GATEWAY_ALLOWED_IMAGE_MODELS).toContain(m.id);
+    }
+  });
 });
 
 describe('weightedPick', () => {

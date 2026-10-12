@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { deliverReport } from '../../shipping-slo-intake.mjs';
-import { collectRaw } from '../../shipping-slo-report.mjs';
+import { buildReport, collectRaw } from '../../shipping-slo-report.mjs';
 import { fakeGh } from './fixtures/shipping-slo-fake-gh.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
@@ -82,7 +82,7 @@ const baseline = metrics => ({
 const seedBaseline = () =>
   baseline(
     Object.fromEntries(
-      METRIC_DEFS.map(d => [
+      METRIC_DEFS.filter(d => !d.unsupported).map(d => [
         d.key,
         { value: 100, unit: d.unit, direction: d.direction },
       ])
@@ -242,8 +242,20 @@ describe('productionLag', () => {
     ];
     const lag = productionLag(prs, deployments, NOW - 7 * DAY, NOW);
     expect(lag.merged).toBe(2);
-    expect(lag.verified).toBe(1);
+    // 'bbb' is also covered: a verified generation ships its ancestors.
+    expect(lag.verified).toBe(2);
     expect(lag.lag.p95).toBe(300);
+  });
+
+  it('does not verify merges that landed after the last success', () => {
+    const prs = [
+      { mergedAt: ago(3), mergeCommitSha: 'aaa' },
+      { mergedAt: ago(0.1), mergeCommitSha: 'bbb' },
+    ];
+    const deployments = [{ status: 'success', createdAt: ago(2), sha: 'aaa' }];
+    const lag = productionLag(prs, deployments, NOW - 7 * DAY, NOW);
+    expect(lag.merged).toBe(2);
+    expect(lag.verified).toBe(1);
   });
 });
 
@@ -544,5 +556,144 @@ describe('shipping SLO intake delivery', () => {
     run(state, 'oct07');
     assert.equal(state.issues.length, 1);
     assert.equal(state.issues[0].comments.length, 1);
+  });
+});
+
+describe('production verification sources (JOV-8082)', () => {
+  const verifiedBaseline = () =>
+    baseline({
+      'production_lag.merged_to_verified.p95': {
+        value: 1800,
+        unit: 'seconds',
+        direction: 'lower',
+      },
+      'throughput.verified_per_day': {
+        value: 15,
+        unit: 'per_day',
+        direction: 'higher',
+      },
+    });
+
+  it('counts a merge as verified by a later generation, not only exact sha', () => {
+    const prs = [
+      { mergedAt: ago(2), mergeCommitSha: 'older-ancestor' },
+      { mergedAt: ago(1), mergeCommitSha: 'tip' },
+    ];
+    const events = [
+      {
+        status: 'success',
+        createdAt: new Date(NOW - DAY / 2).toISOString(),
+        sha: 'tip',
+      },
+    ];
+    const lag = productionLag(prs, events, NOW - 7 * DAY, NOW);
+    expect(lag.merged).toBe(2);
+    expect(lag.verified).toBe(2);
+  });
+
+  it('writes non-null lag and verified/day when controller verifications exist', () => {
+    const report = buildReport(
+      {
+        runs: { pull_request: [], merge_group: [], main: [] },
+        mergedPrs: [
+          {
+            number: 1,
+            title: 'x',
+            headRefName: 'devin/x',
+            createdAt: ago(3),
+            mergedAt: ago(2),
+            mergeCommitSha: 'ancestor',
+          },
+        ],
+        timelines: {},
+        deployments: [],
+        productionVerifications: [{ sha: 'tip', verifiedAt: ago(1) }],
+      },
+      verifiedBaseline(),
+      { now: NOW }
+    );
+    expect(
+      report.flat['production_lag.merged_to_verified.p95']
+    ).toBeGreaterThan(0);
+    expect(report.flat['throughput.verified_per_day']).toBeCloseTo(1 / 7);
+  });
+
+  it('honours per-PR Production Verified check evidence', () => {
+    const report = buildReport(
+      {
+        runs: { pull_request: [], merge_group: [], main: [] },
+        mergedPrs: [
+          {
+            number: 1,
+            title: 'x',
+            headRefName: 'devin/x',
+            createdAt: ago(3),
+            mergedAt: ago(2),
+            mergeCommitSha: 'abc',
+            productionVerifiedAt: ago(1),
+          },
+        ],
+        timelines: {},
+        deployments: [],
+      },
+      verifiedBaseline(),
+      { now: NOW }
+    );
+    expect(report.flat['throughput.verified_per_day']).toBeCloseTo(1 / 7);
+  });
+
+  it('nulls verified metrics instead of filing a regression on zero evidence', () => {
+    const report = buildReport(
+      {
+        runs: { pull_request: [], merge_group: [], main: [] },
+        mergedPrs: [
+          {
+            number: 1,
+            title: 'x',
+            headRefName: 'devin/x',
+            createdAt: ago(3),
+            mergedAt: ago(2),
+            mergeCommitSha: 'abc',
+          },
+        ],
+        timelines: {},
+        deployments: [],
+      },
+      verifiedBaseline(),
+      { now: NOW }
+    );
+    expect(report.flat['throughput.verified_per_day']).toBeNull();
+    expect(report.evaluation.regressions.map(r => r.key)).not.toContain(
+      'throughput.verified_per_day'
+    );
+  });
+});
+
+describe('unsupported promote-hold metric (JOV-8082)', () => {
+  it('is never evaluated even when a flat value is present', () => {
+    const flat = { 'remediation.production_promote_hold.p95': 99999 };
+    const base = baseline({
+      'remediation.production_promote_hold.p95': {
+        value: 100,
+        unit: 'seconds',
+        direction: 'lower',
+      },
+    });
+    const { regressions, tightenCandidates } = evaluateShippingSlo(flat, base);
+    expect(regressions).toEqual([]);
+    expect(tightenCandidates).toEqual([]);
+  });
+
+  it('validateBaseline rejects baselining an unsupported metric', () => {
+    const base = baseline({
+      'remediation.production_promote_hold.p95': {
+        value: 3600,
+        unit: 'seconds',
+        direction: 'lower',
+      },
+    });
+    const { ok, errors } = validateBaseline(base);
+    expect(ok).toBe(false);
+    expect(errors.join(' ')).toContain('unsupported');
   });
 });

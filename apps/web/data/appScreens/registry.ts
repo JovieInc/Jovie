@@ -99,7 +99,7 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     penRootId: 'JwsdW',
     penReferenceEligible: false,
     penIdentityReason:
-      'Bound to Pen JwsdW (Canonical / App Shell / Runtime) by read-only readback 2026-09-27 (pen-geometry.json). Not reference-eligible while D1 is pending: the Pen sidebar slot is 256 and header slot 48, code locks 244/44.',
+      'Bound to Pen JwsdW (Canonical / App Shell / Runtime) by read-only readback 2026-09-27 (pen-geometry.json). Not reference-eligible while D1 is pending: the Pen sidebar slot is 256 and header slot 48, code locks 224/44.',
   },
   {
     id: 'component.app-shell-content-panel',

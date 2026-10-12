@@ -299,8 +299,8 @@ to Done; a key that fires again within six hours reopens the same issue. Keys:
 `pool-empty`, `no-landing`, `gate-timeouts`, `failed-runs`, `disk-low`, `disk-critical`,
 `github-quota`, `hud-stale`, `orphan-prs`, `aged-prs`, `spawn-exit`.
 `provider-idle:<lane>` is urgent: after five continuous minutes with compatible work, a
-healthy provider, configured slots, repeated dispatch attempts, and zero workers, capacity
-is being lost. `spawn-exit` fires when workers spawn every tick but no run starts or ends
+healthy provider, configured slots, repeated dispatch attempts, and one or more vacant slots,
+capacity is being lost. `spawn-exit` fires when workers spawn every tick but no run starts or ends
 and no worktree exists; a worker that finishes its claim scan with nothing to do records a
 clean exit in `worker-idle.json`, so the alert only means workers are dying before or during
 the claim — a clean 'nothing claimable' exit is not a deadlock. `workers-without-completions`

@@ -2040,6 +2040,16 @@ def observe_queue(
         }
 
 
+def input_generation() -> str | None:
+    """The lanes emitter's input key for this run (FLEET_GATE_INPUT_GENERATION).
+
+    Consumers treat a receipt whose generation matches the live emitter's key
+    as current regardless of its age; runs outside the emitter carry None.
+    """
+    value = os.environ.get("FLEET_GATE_INPUT_GENERATION", "").strip()
+    return value or None
+
+
 def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     reasons: list[dict[str, str]] = []
     integrity_value = signals.get("integrity")
@@ -2482,6 +2492,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA,
         "observedAt": observed_at,
+        "inputGeneration": input_generation(),
         "state": state,
         "promotionMode": promotion_mode,
         "alreadyAdmittedCohort": cohort,
@@ -3117,6 +3128,7 @@ def failed_evaluation_receipt(
     return {
         "schema": SCHEMA,
         "observedAt": observed,
+        "inputGeneration": input_generation(),
         "state": "RED",
         "promotionMode": promotion_mode,
         "alreadyAdmittedCohort": already_admitted_cohort_semantics(promotion_mode),

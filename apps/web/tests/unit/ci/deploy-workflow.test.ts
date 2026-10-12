@@ -5249,7 +5249,11 @@ describe('production marker recovery workflow (JOV-4965)', () => {
       'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );
     const fleetRefresh = readFileSync(fleetGateRefreshWorkflowPath, 'utf8');
-    expect(fleetRefresh).not.toContain('workflow_run:');
+    // Only main CI completion wakes the refresh; release workflows never do.
+    expect(fleetRefresh).toContain(
+      'workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]'
+    );
+    expect(fleetRefresh.match(/workflow_run:/g)).toHaveLength(1);
     expect(fleetRefresh).not.toContain('Production Marker Recovery]');
   });
 
