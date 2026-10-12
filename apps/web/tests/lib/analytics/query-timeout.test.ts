@@ -131,6 +131,7 @@ describe('Query Timeout', () => {
         { queryChunks?: unknown[] },
       ];
       expect(JSON.stringify(statement)).toContain('set_config');
+      expect(JSON.stringify(statement)).toContain('true');
       expect(JSON.stringify(statement)).not.toContain('SET statement_timeout');
     });
 
