@@ -10,7 +10,7 @@
   "protectedPullRequest": 16419,
   "landing": "native-github-merge-queue",
   "cadence": {
-    "weekdayBeat": true,
+    "trigger": "main-push",
     "workflow": ".github/workflows/design-governance.yml",
     "forbiddenIntervalMinutes": 15
   },

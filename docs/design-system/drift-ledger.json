@@ -159,6 +159,7 @@
     "/app/settings/delete-account": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
     "/app/settings/payments": {"files":26,"rawPalette":25,"arbitrary":8,"rawButton":2,"linearToken":0,"oversizeControl":0,"dangerAlias":4},
     "/app/settings/profile": {"files":1,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
+    "/app/settings/referral": {"files":4,"rawPalette":0,"arbitrary":0,"rawButton":0,"linearToken":0,"oversizeControl":0,"dangerAlias":0},
     "/app/settings/retargeting-ads": {"files":3,"rawPalette":0,"arbitrary":1,"rawButton":0,"linearToken":0,"oversizeControl":2,"dangerAlias":0},
     "/app/settings/touring": {"files":34,"rawPalette":26,"arbitrary":6,"rawButton":4,"linearToken":0,"oversizeControl":0,"dangerAlias":3},
     "/app/settings/usage": {"files":30,"rawPalette":25,"arbitrary":9,"rawButton":2,"linearToken":0,"oversizeControl":0,"dangerAlias":6},

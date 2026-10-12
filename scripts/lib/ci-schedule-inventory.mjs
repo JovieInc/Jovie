@@ -108,12 +108,10 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/cost-anomaly-gate.yml',
   '.github/workflows/deepsec-native.yml',
   '.github/workflows/deprecation-intake.yml',
-  '.github/workflows/design-governance.yml',
   '.github/workflows/desktop-release.yml',
   '.github/workflows/doc-gardening-agent.yml',
   '.github/workflows/fleet-gate-refresh.yml',
   '.github/workflows/golden-path-nightly.yml',
-  '.github/workflows/linear-sync-on-merge.yml',
   '.github/workflows/m2-revenue-path-canary.yml',
   '.github/workflows/mac-runner-heartbeat.yml',
   '.github/workflows/main-ci-health-monitor.yml',
@@ -127,7 +125,6 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/production-continuity.yml',
   '.github/workflows/production-controller-health.yml',
   '.github/workflows/public-benchmark.yml',
-  '.github/workflows/quality-gap-finder.yml',
   '.github/workflows/quarantine-recovery.yml',
   '.github/workflows/remediation-sweep.yml',
   '.github/workflows/runner-health-monitor.yml',
@@ -138,11 +135,10 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/shipping-slo.yml',
   '.github/workflows/summer-eve-pin.yml',
   '.github/workflows/synthetic-monitoring.yml',
-  '.github/workflows/visual-a11y.yml',
   '.github/workflows/visual-regression.yml',
   '.github/workflows/voc-mine.yml',
 ]);
-export const CRON_ALLOWLIST_CEILING = 43;
+export const CRON_ALLOWLIST_CEILING = 39;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
@@ -169,12 +165,6 @@ export const ADMISSION_CRON_DEBT = Object.freeze({
     replacement:
       'Gem lanes tick emits the receipt natively (its removal-trigger); push and repository_dispatch stay',
   }),
-  '.github/workflows/linear-sync-on-merge.yml': Object.freeze({
-    reason:
-      '30-minute sweep catches validation receipts recorded as Linear comments, which emit no GitHub event',
-    replacement:
-      'Linear comment webhook bridged to repository_dispatch, like linear_triage_assess in fleet-gate-refresh.yml',
-  }),
   '.github/workflows/merge-queue-green-enroll.yml': Object.freeze({
     reason:
       '*/15 full reconcile re-arms green PRs whose completion events were missed',
@@ -182,7 +172,7 @@ export const ADMISSION_CRON_DEBT = Object.freeze({
       'Gem lanes enroll backstop dispatching repository_dispatch enroll-reconcile (PR #21291)',
   }),
 });
-export const ADMISSION_CRON_DEBT_CEILING = 5;
+export const ADMISSION_CRON_DEBT_CEILING = 4;
 
 /**
  * Workflow steps that hold a runner polling GitHub, git, or queue state. Keyed
@@ -198,10 +188,8 @@ export const POLLING_DEBT = Object.freeze({
     'dispatches ci.yml then waits up to 80 min for that run to complete',
   '.github/workflows/pr-conflict-handler.yml#record_cohort':
     'polls candidate CI runs until a deadline to record cohort outcomes',
-  '.github/workflows/production-controller.yml#coalesce-production':
-    'sleeps up to the coalescing cap scaled by merge-queue depth before rereading main',
 });
-export const POLLING_DEBT_CEILING = 5;
+export const POLLING_DEBT_CEILING = 4;
 
 /**
  * Mutations that change PR, merge-queue, issue, or label state. A workflow is
@@ -278,7 +266,7 @@ export function shellLoops(script = '') {
   const lines = String(script).split('\n').map(stripShellComment);
   const loops = [];
   for (let start = 0; start < lines.length; start += 1) {
-    const header = lines[start].match(/(?:^|[|;&]\s*)(while|until|for)\s/);
+    const header = lines[start].match(/(?:^\s*|[|;&]\s*)(while|until|for)\s/);
     if (!header) continue;
     let depth = 0;
     let end = start;

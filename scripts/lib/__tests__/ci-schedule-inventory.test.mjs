@@ -265,6 +265,12 @@ describe('event-driven admission contract (JOV-INV-042)', () => {
       })
     ).toEqual([]);
     expect(pollingFindings({ run: 'gh api repos/x\nsleep 5' })).toEqual([]);
+    // A retry helper nested in a shell function is still a bounded retry.
+    expect(
+      pollingFindings({
+        run: 'gh_api() {\n  for attempt in 1 2 3; do\n    gh api "$@" && return 0\n    sleep "$RETRY_SECONDS"\n  done\n  return 1\n}\nsha="$(gh_api repos/x/commits/main)"',
+      })
+    ).toEqual([]);
   });
 
   it('counts literal attempts and treats variable loops as open-ended', () => {

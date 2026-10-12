@@ -389,7 +389,6 @@ nodes:
       - pull_request
       - push
       - repository_dispatch
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:invariant-stewardship
     jobCount: 2
@@ -682,7 +681,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:relay
-    jobCount: 1
+    jobCount: 2
   - name: Legacy Human Hold Scrub
     path: .github/workflows/legacy-human-hold-scrub.yml
     active: true
@@ -705,7 +704,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request
-      - schedule
+      - repository_dispatch
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:sync_done
@@ -1092,7 +1091,6 @@ nodes:
     triggeringStateTransition:
       - push
       - repository_dispatch
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:find
     jobCount: 1
@@ -1490,7 +1488,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
+      - push
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
     jobCount: 3

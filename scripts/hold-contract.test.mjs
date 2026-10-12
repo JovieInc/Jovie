@@ -225,9 +225,59 @@ test('the enroll workflow runs the trusted hold contract with a Jovie Bot token'
     '${{ github.event.repository.default_branch }}'
   );
   assert.match(checkout.with['sparse-checkout'], /scripts\/hold-contract\.mjs/);
+  assert.match(
+    checkout.with['sparse-checkout'],
+    /scripts\/lib\/admission-hold-labels\.mjs/
+  );
   const token = job.steps.find(step => step.id === 'app-token');
   assert.equal(token.with['permission-pull-requests'], 'write');
   assert.ok(
     job.steps.some(step => step.run === 'node scripts/hold-contract.mjs')
   );
+});
+
+test('every stop label is held to the contract, each on its own labeled time', () => {
+  // #21014 / #20953: `gated` applied 2026-10-08 with no owner or expiry sat
+  // outside the contract and blocked admission indefinitely.
+  const pr = {
+    state: 'OPEN',
+    headRefOid: HEAD,
+    labels: {
+      nodes: [{ name: 'gated' }, { name: 'tim:hold' }, { name: 'ui' }],
+    },
+    timelineItems: {
+      nodes: [
+        { createdAt: LABELED, label: { name: 'gated' } },
+        { createdAt: '2026-10-09T10:00:00Z', label: { name: 'tim:hold' } },
+      ],
+    },
+    comments: { nodes: [] },
+  };
+  const writes = [];
+  const log = console.log;
+  console.log = () => {};
+  try {
+    const results = sweepHolds({
+      now: T0 + 30 * HOUR,
+      dryRun: false,
+      io: {
+        listHeld: () => [9],
+        read: () => pr,
+        comment: (number, body) => writes.push(['comment', number, body]),
+        unlabel: (number, label) => writes.push(['unlabel', number, label]),
+      },
+    });
+    assert.deepEqual(
+      results.map(r => [r.label, r.action, r.reason]),
+      [
+        ['gated', 'release', 'ownerless'],
+        ['tim:hold', 'keep', 'ownerless-grace'],
+      ]
+    );
+  } finally {
+    console.log = log;
+  }
+  assert.deepEqual(writes[1], ['unlabel', 9, 'gated']);
+  assert.match(writes[0][2], /removed `gated`/);
+  assert.equal(writes.length, 2);
 });

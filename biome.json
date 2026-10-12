@@ -147,9 +147,7 @@
         "**/*.stories.tsx",
         "**/tests/**",
         "**/.storybook/**",
-        "**/scripts/**",
-        "**/*TableUnified.tsx",
-        "**/*ProfilesUnified.tsx"
+        "**/scripts/**"
       ],
       "linter": {
         "rules": {

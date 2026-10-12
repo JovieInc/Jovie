@@ -50,11 +50,15 @@ def now_iso() -> str:
 
 
 def guard_mode(value: str | None = None) -> str:
-    value = os.environ.get("SYMPHONY_FILE_OVERLAP_GUARD", "1") if value is None else value
+    """Default `flag` (Tim 2026-10-12): an overlap is recorded, never a plain `hold` plus
+    --disable-auto on a PR; the merge queue's own conflict detection serializes PRs. A hold
+    left by the old enforce default is released on the next reconcile. Enforcement must be
+    asked for explicitly (`1`/`enforce`)."""
+    value = os.environ.get("SYMPHONY_FILE_OVERLAP_GUARD", "flag") if value is None else value
     lowered = str(value).strip().lower()
     if lowered in {"0", "false", "off", "no"}:
         return "off"
-    return "flag" if lowered == "flag" else "enforce"
+    return "enforce" if lowered in {"1", "true", "on", "yes", "enforce"} else "flag"
 
 
 def _issue_labels(issue) -> list[str]:

@@ -197,6 +197,7 @@ const settingsRoutes = [
   ['connectors', 'Connections', '/app/settings/connectors'],
   ['billing', 'Billing', '/app/settings/billing'],
   ['usage', 'Usage', '/app/settings/usage'],
+  ['referral', 'Referral', '/app/settings/referral'],
   ['payments', 'Payments', '/app/settings/payments'],
   ['touring', 'Touring', '/app/settings/touring'],
   ['analytics', 'Analytics settings', '/app/settings/analytics'],
