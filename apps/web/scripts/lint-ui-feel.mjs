@@ -168,14 +168,14 @@ export function regressions(current, baseline) {
     .filter(entry => entry.current > entry.baseline);
 }
 
-function writeBaseline(counts) {
+export function writeBaseline(counts, path = BASELINE_PATH) {
   const sorted = Object.fromEntries(
     Object.keys(counts)
       .sort()
       .map(key => [key, counts[key]])
   );
   writeFileSync(
-    BASELINE_PATH,
+    path,
     `${JSON.stringify(
       {
         _comment:
@@ -190,13 +190,21 @@ function writeBaseline(counts) {
 
 // ── cli ────────────────────────────────────────────────────────────────────
 
-export async function main(argv = process.argv.slice(2), log = console.log) {
+export async function main(
+  argv = process.argv.slice(2),
+  log = console.log,
+  {
+    loadRule = loadUiFeelRule,
+    collect = collectViolations,
+    baselinePath = BASELINE_PATH,
+  } = {}
+) {
   const isUpdate = argv.includes('--update');
   const isList = argv.includes('--list');
 
   let rule;
   try {
-    rule = loadUiFeelRule();
+    rule = loadRule();
   } catch (error) {
     console.error(`[lint:ui-feel] ${error.message}`);
     return 1;
@@ -209,7 +217,7 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
     return 0;
   }
 
-  const violations = await collectViolations({ rule });
+  const violations = await collect({ rule });
   const counts = countByCheck(violations);
 
   if (isList) {
@@ -218,15 +226,15 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
     }
   }
 
-  if (isUpdate || !existsSync(BASELINE_PATH)) {
-    writeBaseline(counts);
+  if (isUpdate || !existsSync(baselinePath)) {
+    writeBaseline(counts, baselinePath);
     log(
       `[lint:ui-feel] baseline ${isUpdate ? 'updated' : 'written'}: ${JSON.stringify(counts)}`
     );
     return 0;
   }
 
-  const baseline = readBaseline();
+  const baseline = readBaseline(baselinePath);
   const failures = regressions(counts, baseline);
   if (failures.length === 0) {
     log(
