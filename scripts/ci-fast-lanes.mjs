@@ -462,6 +462,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/postmortem-linkage-check.test.mjs',
   'scripts/public-benchmark/public-benchmark.test.mjs',
   'scripts/quality-gap-finder.test.mjs',
+  'scripts/screenshot-loop/screenshot-bug-loop.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
   'scripts/security/findings.test.mjs',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
