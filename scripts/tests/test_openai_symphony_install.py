@@ -20,12 +20,50 @@ RETIRED_INTAKE_ARTIFACTS = (
 
 
 class OpenAISymphonyInstallTests(unittest.TestCase):
-    def test_official_workflow_uses_jovie_linear_and_codex_app_server(self) -> None:
+    def test_official_workflow_uses_jovie_team_scope_and_codex_app_server(
+        self,
+    ) -> None:
         workflow = WORKFLOW.read_text()
 
         self.assertRegex(workflow, re.compile(r"^\s+kind: linear$", re.MULTILINE))
-        self.assertIn('project_slug: "ba6736cbfbb9"', workflow)
+        self.assertIn('team_key: "JOV"', workflow)
+        self.assertNotIn("project_slug:", workflow)
         self.assertIn("api_key: $LINEAR_API_KEY", workflow)
+        self.assertIn("    excluded_labels:\n      - no-symphony", workflow)
+        self.assertRegex(
+            workflow,
+            re.compile(r"^  required_labels: \[\]$", re.MULTILINE),
+        )
+
+        active_states = re.search(
+            r"^  active_states:\n(?P<items>(?:    - .+\n)+)(?=  terminal_states:)",
+            workflow,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(active_states)
+        assert active_states is not None
+        self.assertEqual(
+            [
+                line.removeprefix("    - ")
+                for line in active_states["items"].splitlines()
+            ],
+            ["Todo", "In Progress", "Merging", "Rework"],
+        )
+
+        terminal_states = re.search(
+            r"^  terminal_states:\n(?P<items>(?:    - .+\n)+)(?=^polling:)",
+            workflow,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(terminal_states)
+        assert terminal_states is not None
+        self.assertEqual(
+            {
+                line.removeprefix("    - ")
+                for line in terminal_states["items"].splitlines()
+            },
+            {"Closed", "Cancelled", "Canceled", "Duplicate", "Done"},
+        )
         self.assertIn(
             "git clone --depth 1 git@github.com:JovieInc/Jovie.git .", workflow
         )
@@ -33,15 +71,28 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
             workflow,
             re.compile(r"^\s+command: codex .* app-server$", re.MULTILINE),
         )
+        self.assertIn(
+            "retain the exact failed run, attempt, deployment identity,\n  and owner",
+            workflow,
+        )
+        self.assertIn(
+            "must not become a global source-merge gate",
+            workflow,
+        )
 
-    def test_burrito_note_is_bounded_and_uses_only_upstream_release(self) -> None:
+    def test_burrito_note_binds_the_supported_team_adapter(self) -> None:
         note = BURRITO_NOTE.read_text()
 
         self.assertLessEqual(len(note.splitlines()), 20)
-        self.assertIn("symphony-${version}-macos_arm64", note)
-        self.assertIn("github.com/openai/symphony/releases/download", note)
-        self.assertIn("shasum -a 256 -c", note)
-        self.assertNotIn("JovieInc/symphony", note)
+        self.assertIn("JovieInc/symphony-ops", note)
+        self.assertIn("fae11882085d83d8d2a58f0f864a9eb1b6e40db8", note)
+        self.assertIn("1c0fb6c8e8ef9031a2c861e62af5f9e66cee39cb", note)
+        self.assertIn(
+            "aa7159e51fe41d3c712e3870ba82a314e93eb384e8189c649dd0f69aec1ef989",
+            note,
+        )
+        self.assertIn("must not be started with this workflow", note)
+        self.assertNotIn("github.com/openai/symphony/releases/download", note)
 
     def test_homemade_intake_and_admission_wrappers_stay_deleted(self) -> None:
         for artifact in RETIRED_INTAKE_ARTIFACTS:
