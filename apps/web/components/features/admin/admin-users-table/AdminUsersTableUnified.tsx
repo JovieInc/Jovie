@@ -92,6 +92,7 @@ function AdminUserMobileCard({
   contextMenuItems,
 }: Readonly<AdminUserMobileCardProps>) {
   const actionItems = convertContextMenuItems(contextMenuItems);
+  const displayName = user.name || 'Email Subscriber';
 
   return (
     <ContentSurfaceCard
@@ -109,7 +110,7 @@ function AdminUserMobileCard({
           />
           <div className='min-w-0'>
             <p className='truncate text-sm font-semibold tracking-tight text-primary-token'>
-              {user.name || 'Email Subscriber'}
+              {displayName}
             </p>
             <p className='truncate text-xs text-secondary-token'>
               {user.email ?? 'No email'}
