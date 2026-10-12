@@ -73,7 +73,12 @@ const macJob = (status, conclusion = null, failedStep = false) => ({
   conclusion,
   runner_name: status === 'queued' ? null : 'tw-mac-001',
   labels: ['self-hosted', 'macOS', 'ARM64', 'jovie-mac'],
-  steps: [{ name: 'Test', conclusion: failedStep ? 'failure' : 'success' }],
+  steps: [
+    {
+      name: failedStep || 'Test',
+      conclusion: failedStep ? 'failure' : 'success',
+    },
+  ],
 });
 const dispatchEnv = {
   GH_TOKEN: 'token',
@@ -142,7 +147,7 @@ describe('mac-lane.sh result', () => {
   });
 
   it('fails the lane on a real failure', () => {
-    const failed = result([macJob('completed', 'failure', true)]);
+    const failed = result([macJob('completed', 'failure', 'Test')]);
     expect(failed.status).toBe(1);
     expect(failed.outputs.infra).toBe('false');
   });
@@ -159,6 +164,34 @@ describe('mac-lane.sh result', () => {
       expect(lost.status).toBe(0);
       expect(lost.outputs.infra).toBe('true');
     }
+  });
+
+  it('hands a Mac that failed only in checkout or setup back to hosted', () => {
+    for (const step of [
+      'Set up job',
+      'Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+      'Run ./.github/actions/setup-node-pnpm',
+      'Setup Xcode',
+    ]) {
+      const setup = result([macJob('completed', 'failure', step)]);
+      expect(setup.status).toBe(0);
+      expect(setup.outputs.infra).toBe('true');
+    }
+  });
+
+  it('still fails the lane when a build step fails after setup', () => {
+    const job = macJob(
+      'completed',
+      'failure',
+      'Test and package exact Mac head'
+    );
+    job.steps.unshift({
+      name: 'Run ./.github/actions/setup-node-pnpm',
+      conclusion: 'success',
+    });
+    const failed = result([job]);
+    expect(failed.status).toBe(1);
+    expect(failed.outputs.infra).toBe('false');
   });
 
   it('never treats a child for another SHA, or an unreadable one, as evidence', () => {
