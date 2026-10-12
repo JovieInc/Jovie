@@ -573,6 +573,10 @@ describe('CustomerChangelogArchive', () => {
         .querySelector('#published-august-brand-deals')
         ?.closest('[data-changelog-entry-id]')
     ).toHaveAttribute('data-changelog-entry-id', 'customer-update:brand-deals');
+    // `.changelog-entry` is a grid; an in-flow alias would take a grid cell.
+    expect(
+      container.querySelector('#published-august-brand-deals')
+    ).toHaveClass('absolute');
     expect(
       container.querySelector('#published-june-withdrawn')
     ).toHaveTextContent('This update is no longer published.');

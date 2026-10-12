@@ -113,12 +113,14 @@ function PermalinkAnchors({
   const fragments = includeCanonical
     ? [entry.slug, ...entry.aliases]
     : entry.aliases;
+  // Out of flow: `.changelog-entry` is a grid, so in-flow anchors would take
+  // grid cells and push the date rail and body into the wrong columns.
   return fragments.map(fragment => (
     <span
       key={fragment}
       id={fragment}
       aria-hidden='true'
-      className='block h-0 scroll-mt-24'
+      className='absolute left-0 top-0 h-0 w-0 scroll-mt-24'
     />
   ));
 }
