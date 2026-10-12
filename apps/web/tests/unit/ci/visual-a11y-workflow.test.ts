@@ -32,6 +32,7 @@ type Job = {
   if?: string;
   env?: Record<string, unknown>;
   'continue-on-error'?: unknown;
+  strategy?: unknown;
   steps: Step[];
 };
 type Workflow = { on: Record<string, unknown>; jobs: Record<string, Job> };
