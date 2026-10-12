@@ -212,6 +212,7 @@ nodes:
     allowedConsumers:
       - Agent Pipeline
       - iOS CI
+      - Mac CI
       - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Conflict Handler
@@ -258,6 +259,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:mcp-drift-remediation
     jobCount: 4
+  - name: CLI Chaos
+    path: .github/workflows/cli-chaos.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Mac Lane Route
+    triggeringStateTransition:
+      - workflow_call
+    terminalReceipt: job:chaos
+    jobCount: 2
   - name: CODEOWNERS Path Drift
     path: .github/workflows/codeowners-drift.yml
     active: true
@@ -601,14 +614,15 @@ nodes:
       - workflow_call
       - workflow_dispatch
     terminalReceipt: job:graphics
-    jobCount: 2
+    jobCount: 1
   - name: iOS CI
     path: .github/workflows/ios-ci.yml
     active: true
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Mac Lane Route
     triggeringStateTransition:
       - workflow_call
       - workflow_dispatch
@@ -709,19 +723,43 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:m2-revenue-path
     jobCount: 1
-  - name: Mac Runner Heartbeat
-    path: .github/workflows/mac-runner-heartbeat.yml
+  - name: Mac Lane Route
+    path: .github/workflows/mac-lane-route.yml
     active: true
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - push
-      - schedule
+      - workflow_call
+    terminalReceipt: job:join
+    jobCount: 2
+  - name: Mac Lane
+    path: .github/workflows/mac-lane.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - iOS CI
+      - Mac CI
+      - CLI Chaos
+    triggeringStateTransition:
       - workflow_dispatch
-    terminalReceipt: job:heartbeat
-    jobCount: 1
+    terminalReceipt: job:cli-chaos
+    jobCount: 3
+  - name: Mac CI
+    path: .github/workflows/macos-ci.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Mac Lane Route
+    triggeringStateTransition:
+      - workflow_call
+    terminalReceipt: job:build
+    jobCount: 2
   - name: Marketing Certification Producer
     path: .github/workflows/marketing-certification-producer.yml
     active: true
@@ -851,12 +889,13 @@ nodes:
     category: release-orchestration
     authoritativeProducer: Production Controller
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - CLI Chaos
     triggeringStateTransition:
       - push
       - workflow_dispatch
     terminalReceipt: job:publish
-    jobCount: 4
+    jobCount: 3
   - name: Observability Report (Linear)
     path: .github/workflows/observability-issue.yml
     active: true
@@ -1483,12 +1522,21 @@ edges:
   - from: CI
     to: iOS CI
     type: workflow_call
+  - from: CI
+    to: Mac CI
+    type: workflow_call
+  - from: CLI Chaos
+    to: Mac Lane Route
+    type: workflow_call
   - from: Production Controller
     to: Delivery Control Receipts
     type: workflow_run
   - from: Production Controller
     to: desktop-release
     type: workflow_run
+  - from: iOS CI
+    to: Mac Lane Route
+    type: workflow_call
   - from: Production Controller
     to: iOS TestFlight
     type: workflow_run
@@ -1525,6 +1573,18 @@ edges:
   - from: Production Controller
     to: Linear Sync on Merge
     type: workflow_run
+  - from: Mac Lane
+    to: iOS CI
+    type: workflow_call
+  - from: Mac Lane
+    to: Mac CI
+    type: workflow_call
+  - from: Mac Lane
+    to: CLI Chaos
+    type: workflow_call
+  - from: Mac CI
+    to: Mac Lane Route
+    type: workflow_call
   - from: Source Validation
     to: Merge Queue Green Enroll
     type: workflow_run
@@ -1537,6 +1597,9 @@ edges:
   - from: PR Size Guard
     to: Merge Queue Green Enroll
     type: workflow_run
+  - from: Publish @jovie/cli to npm
+    to: CLI Chaos
+    type: workflow_call
   - from: Source Validation
     to: PR Review (shadow)
     type: workflow_run

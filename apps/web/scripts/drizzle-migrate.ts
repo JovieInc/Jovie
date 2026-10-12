@@ -100,6 +100,16 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/** Session-sensitive migrations must bypass PgBouncer transaction pooling. */
+export function resolveMigrationDatabaseUrl(databaseUrl: string): string {
+  const parsed = new URL(databaseUrl);
+  parsed.hostname = parsed.hostname.replace(
+    /^(ep-[a-z0-9-]+?)-pooler\./,
+    '$1.'
+  );
+  return parsed.toString();
+}
+
 function extractErrorCode(error: unknown) {
   if (!error || typeof error !== 'object') {
     return undefined;
@@ -484,7 +494,7 @@ async function runMigrations() {
     log.info('Connecting to database...');
 
     // Clean the URL for Neon (remove the +neon suffix correctly, preserving 'postgres' or 'postgresql')
-    const rawUrl = process.env.DATABASE_URL!;
+    const rawUrl = resolveMigrationDatabaseUrl(process.env.DATABASE_URL!);
     const databaseUrl = rawUrl.replace(NEON_URL_PATTERN, 'postgres$2$4');
     const connection = await connectWithRetry(databaseUrl);
     pool = connection.pool;

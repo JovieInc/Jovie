@@ -2372,6 +2372,40 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
     ).toMatchObject({ action: 'merge', reason: 'cohort-full' });
   });
 
+  it('reports the observed value when live max group size drifts', () => {
+    const result = validateLiveMergeQueueRuleset(
+      {
+        bypass_actors: [],
+        rules: [
+          {
+            type: 'required_status_checks',
+            parameters: {
+              strict_required_status_checks_policy: false,
+              required_status_checks: [
+                'PR Ready',
+                'Migration Guard',
+                'Fork PR Gate',
+                'PR Size Guard',
+              ].map(context => ({ context })),
+            },
+          },
+          {
+            type: 'merge_queue',
+            parameters: {
+              ...NATIVE_QUEUE_POLICY,
+              max_entries_to_merge: 5,
+            },
+          },
+        ],
+      },
+      { backend: 'native' }
+    );
+
+    expect(result.errors).toContain(
+      'live native merge_queue max_entries_to_merge must be 1 (observed 5)'
+    );
+  });
+
   it('emits a deterministic policy readback receipt', () => {
     const matched = buildNativeQueuePolicyReadback(NATIVE_QUEUE_POLICY);
     expect(matched).toMatchObject({
