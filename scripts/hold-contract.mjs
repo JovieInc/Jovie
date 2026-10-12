@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Hold contract (jovie-hold/v1).
 //
-// A `hold` label pauses admission. It may not pause it forever on prose alone.
-// Whoever applies `hold` posts a receipt comment on the PR:
+// A stop label (`hold`, `gated`, `incident`, `do-not-merge`, or a `tim-hold`
+// variant; scripts/lib/admission-hold-labels.mjs) pauses admission. It may not
+// pause it forever on prose alone. Whoever applies one posts a receipt comment
+// on the PR:
 //
 //   <!-- jovie-hold/v1 {"owner":"agent:<task>","until":"2026-10-12T18:00:00Z","reason":"..."} -->
 //   <!-- jovie-hold/v1 {"owner":"gem-lanes","head":"<40-hex sha>","reason":"waiting for a fix push"} -->
@@ -15,8 +17,10 @@
 // Jovie Bot unlabel event wakes Merge Queue Green Enroll, whose required
 // checks remain the only merge gate.
 import { execFileSync } from 'node:child_process';
+import { STOP_HOLD_LABELS } from './lib/admission-hold-labels.mjs';
 
 export const HOLD_LABEL = 'hold';
+export const CONTRACT_LABELS = STOP_HOLD_LABELS;
 export const HOLD_RECEIPT_SCHEMA = 'jovie-hold/v1';
 export const OWNERLESS_GRACE_MS = 24 * 3600 * 1000;
 export const MAX_HOLD_MS = 7 * 24 * 3600 * 1000;
@@ -96,15 +100,15 @@ export function evaluateHold({ labeledAt, now, headSha, comments = [] }) {
   return { action: 'keep', reason: 'receipt-valid', owner };
 }
 
-/** @param {{ reason: string, owner?: string }} verdict */
-export function releaseComment({ reason, owner }) {
+/** @param {{ reason: string, owner?: string, label?: string }} verdict */
+export function releaseComment({ reason, owner, label = HOLD_LABEL }) {
   const why = {
     ownerless: `it has no \`${HOLD_RECEIPT_SCHEMA}\` receipt naming an owner and a release condition, and the ${OWNERLESS_GRACE_MS / 3600000}h grace period has passed`,
     expired: `its \`${HOLD_RECEIPT_SCHEMA}\` receipt (owner \`${owner}\`) expired`,
     'head-changed': `its \`${HOLD_RECEIPT_SCHEMA}\` receipt (owner \`${owner}\`) released on a head change, and the head has moved`,
   }[reason];
   return [
-    `Hold contract: removed \`${HOLD_LABEL}\` because ${why}.`,
+    `Hold contract: removed \`${label}\` because ${why}.`,
     'Required checks still gate the merge queue. To hold again, re-apply the label and post a receipt:',
     `\`<!-- ${HOLD_RECEIPT_SCHEMA} {"owner":"<who>","until":"<ISO time>","reason":"<why>"} -->\``,
     `(or \`"head":"<sha>"\` to release when the head moves; no receipt lasts past ${MAX_HOLD_MS / 86400000} days).`,
@@ -126,27 +130,32 @@ export function sweepHolds({ now, dryRun, io }) {
   for (const number of io.listHeld()) {
     const pr = io.read(number);
     if (pr?.state !== 'OPEN') continue;
-    if (!(pr.labels?.nodes ?? []).some(l => l?.name === HOLD_LABEL)) continue;
-    const labeledAt = (pr.timelineItems?.nodes ?? [])
-      .filter(event => event?.label?.name === HOLD_LABEL)
-      .map(event => event.createdAt)
-      .sort()
-      .pop();
-    if (!labeledAt) continue;
-    const verdict = evaluateHold({
-      labeledAt,
-      now,
-      headSha: pr.headRefOid,
-      comments: pr.comments?.nodes ?? [],
-    });
-    results.push({ number, ...verdict });
-    if (verdict.action !== 'release' || dryRun) continue;
-    io.comment(number, releaseComment(verdict));
-    io.unlabel(number);
+    const present = new Set((pr.labels?.nodes ?? []).map(l => l?.name));
+    // Each stop label is its own hold with its own labeled time; one receipt
+    // on the PR covers every label applied within its window.
+    for (const label of CONTRACT_LABELS) {
+      if (!present.has(label)) continue;
+      const labeledAt = (pr.timelineItems?.nodes ?? [])
+        .filter(event => event?.label?.name === label)
+        .map(event => event.createdAt)
+        .sort()
+        .pop();
+      if (!labeledAt) continue;
+      const verdict = evaluateHold({
+        labeledAt,
+        now,
+        headSha: pr.headRefOid,
+        comments: pr.comments?.nodes ?? [],
+      });
+      results.push({ number, label, ...verdict });
+      if (verdict.action !== 'release' || dryRun) continue;
+      io.comment(number, releaseComment({ ...verdict, label }));
+      io.unlabel(number, label);
+    }
   }
   for (const result of results) {
     console.log(
-      `${result.action} #${result.number}: ${result.reason}${result.owner ? ` (owner ${result.owner})` : ''}${dryRun && result.action === 'release' ? ' [dry run]' : ''}`
+      `${result.action} #${result.number} ${result.label}: ${result.reason}${result.owner ? ` (owner ${result.owner})` : ''}${dryRun && result.action === 'release' ? ' [dry run]' : ''}`
     );
   }
   return results;
@@ -160,6 +169,7 @@ function main() {
     now: Date.now(),
     dryRun: process.env.DRY_RUN === 'true',
     io: {
+      // One open-PR read; `gh pr list --label` ANDs repeated labels.
       listHeld: () =>
         JSON.parse(
           gh([
@@ -169,14 +179,16 @@ function main() {
             repository,
             '--state',
             'open',
-            '--label',
-            HOLD_LABEL,
             '--limit',
-            '200',
+            '1000',
             '--json',
-            'number',
+            'number,labels',
           ])
-        ).map(pr => pr.number),
+        )
+          .filter(pr =>
+            (pr.labels ?? []).some(l => CONTRACT_LABELS.includes(l?.name))
+          )
+          .map(pr => pr.number),
       read: number =>
         JSON.parse(
           gh([
@@ -199,12 +211,12 @@ function main() {
           '-f',
           `body=${body}`,
         ]),
-      unlabel: number =>
+      unlabel: (number, label) =>
         gh([
           'api',
           '--method',
           'DELETE',
-          `repos/${repository}/issues/${number}/labels/${HOLD_LABEL}`,
+          `repos/${repository}/issues/${number}/labels/${encodeURIComponent(label)}`,
         ]),
     },
   });

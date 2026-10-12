@@ -6662,17 +6662,117 @@ def read_marker(host: Host) -> str | None:
         return None
 
 
+MIRROR_FETCH_TIMEOUT_S = 300
+SKILLS_TIMEOUT_S = 120
+CODEX_LANE_SKILLS = ("autoreview", "behavior-validator")
+
+
+def object_mirror(repo: Path) -> Path | None:
+    """The bare mirror this clone borrows objects from (objects/info/alternates). Only a bare
+    repository qualifies: on the Mac the alternate is Tim's own checkout, whose branches a
+    mirror fetch would overwrite."""
+    try:
+        lines = (repo / ".git/objects/info/alternates").read_text().splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        objects = Path(line.strip())
+        mirror = objects.parent
+        if objects.name != "objects" or mirror.name == ".git" or not mirror.name.endswith(".git"):
+            continue
+        bare = subprocess.run(["git", "config", "--file", str(mirror / "config"), "--bool", "core.bare"],
+                              capture_output=True, text=True, timeout=10)
+        if bare.returncode == 0 and bare.stdout.strip() == "true":
+            return mirror
+    return None
+
+
+def refresh_object_mirror(host: Host) -> dict:
+    """Refresh the shared object mirror right before update's own origin fetch, under the lock
+    every mirror writer takes (/srv/git/locks/<name>-mirror.lock). Replaces Gem's retired
+    jovie-git-mirror-refresh timer: the mirror moves on the same event the clone does."""
+    mirror = object_mirror(host.repo)
+    if mirror is None:
+        return {"status": "no-mirror"}
+    lock_path = mirror.parent.parent / "locks" / f"{mirror.name.removesuffix('.git').lower()}-mirror.lock"
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(lock_path, "a") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return {"status": "busy", "mirror": str(mirror)}
+            fetched = lifecycle.run(["git", "-C", str(mirror), "fetch", "--quiet", "--prune", "origin", "+refs/*:refs/*"],
+                                    capture_output=True, text=True, timeout=MIRROR_FETCH_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return {"status": "timeout", "mirror": str(mirror)}
+    except OSError as error:
+        return {"status": "error", "mirror": str(mirror), "error": f"{type(error).__name__}: {error}"[:200]}
+    if fetched.returncode:
+        return {"status": "failed", "mirror": str(mirror), "error": (fetched.stderr or "").strip()[-200:]}
+    return {"status": "fetched", "mirror": str(mirror), "at": now_iso()}
+
+
+def refresh_codex_skills(host: Host, home: Path | None = None) -> dict:
+    """Keep the codex lanes' skills current from ~/agent-skills (retired update-agent-skills.sh
+    cron). One ls-remote per update; fetch, fast-forward and reinstall only when main moved or
+    the last install did not finish."""
+    home = Path.home() if home is None else home
+    source, receipt = home / "agent-skills", host.state / "codex-skills.json"
+    if not (source / ".git").exists():
+        return {"status": "no-source"}
+    def git(*args):
+        return lifecycle.run(["git", "-C", str(source), *args], capture_output=True, text=True, timeout=SKILLS_TIMEOUT_S)
+    try:
+        remote = git("ls-remote", "origin", "refs/heads/main")
+        head = git("rev-parse", "HEAD").stdout.strip()
+        wanted = remote.stdout.split()[0] if remote.returncode == 0 and remote.stdout.split() else None
+        if not wanted:
+            return {"status": "remote-unavailable"}
+        installed = read_json(receipt).get("installed")
+        if wanted == head and installed == head:
+            return {"status": "current", "head": head[:12]}
+        if wanted != head:
+            for step in (("fetch", "-q", "origin", "main"), ("merge", "--ff-only", "-q", "FETCH_HEAD")):
+                result = git(*step)
+                if result.returncode:
+                    return {"status": "failed", "step": step[0], "error": (result.stderr or "").strip()[-200:]}
+        install = lifecycle.run([sys.executable, "scripts/install-skills", "--target", str(home / ".codex/skills"),
+                                 *CODEX_LANE_SKILLS, "--force"], cwd=source, capture_output=True, text=True,
+                                timeout=SKILLS_TIMEOUT_S)
+        if install.returncode:
+            return {"status": "failed", "step": "install", "error": (install.stderr or "").strip()[-200:]}
+    except subprocess.TimeoutExpired:
+        return {"status": "timeout"}
+    except OSError as error:
+        return {"status": "error", "error": f"{type(error).__name__}: {error}"[:200]}
+    receipt.write_text(json.dumps({"installed": wanted, "at": now_iso()}))
+    return {"status": "updated", "from": head[:12], "to": wanted[:12]}
+
+
+def host_maintenance(host: Host, step) -> dict:
+    """Host upkeep riding the update event; never fatal, never inside a release self-test."""
+    if os.environ.get("LANES_SELFTEST"):
+        return {"status": "selftest-skipped"}
+    try:
+        return step(host)
+    except Exception as error:
+        return {"status": "error", "error": f"{type(error).__name__}: {error}"[:200]}
+
+
 def update(host: Host) -> int:
     """Install origin/main's scripts/lanes as a new release after its own tests pass.
     Only the `current` symlink moves; running workers finish on their release. The outcome is
     written to update.json so a refused release is an alert, not a traceback in a journal."""
+    mirror = host_maintenance(host, refresh_object_mirror)  # before install_release's origin fetch
     try:
         code = install_release(host)
         error = None if code == 0 else "release tests failed"
     except Exception as failure:
         code, error = 1, f"{type(failure).__name__}: {failure}"[:300]
+    skills = host_maintenance(host, refresh_codex_skills)
     update_json(host.state / "update.json", lambda data: (data.clear(), data.update(
-        at=now_iso(), ok=code == 0, error=error, current=read_marker(host))))
+        at=now_iso(), ok=code == 0, error=error, current=read_marker(host), mirror=mirror, skills=skills)))
     return code
 
 
@@ -6705,6 +6805,12 @@ HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_LANE_")
 HOST_CREDENTIAL_PREFIXES = ("GH_", "GITHUB_", "LINEAR_", "JOVIE_BOT_", "JOVIE_GITHUB_", "CODEX_HOME", "XDG_")
 
 
+# Every process a release self-test starts inherits this per-run marker. A detached child
+# (start_new_session) leaves the helper's process group and can outlive it, but it cannot shed
+# its environment, so the marker finds it. Not under LANES_: nested selftest_env calls keep it.
+SELFTEST_RUN_ENV = "JOVIE_SELFTEST_RUN"
+
+
 def selftest_env(scratch: Path) -> dict:
     env = {key: value for key, value in os.environ.items()
            if not key.startswith(HOST_KNOB_PREFIXES + HOST_CREDENTIAL_PREFIXES)}
@@ -6712,7 +6818,61 @@ def selftest_env(scratch: Path) -> dict:
     shim = str(Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "bin")
     if "PATH" in env:
         env["PATH"] = os.pathsep.join(entry for entry in env["PATH"].split(os.pathsep) if entry.rstrip("/") != shim)
-    return {**env, "HOME": str(Path(scratch) / "home"), "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
+    return {SELFTEST_RUN_ENV: uuid.uuid4().hex, **env, "HOME": str(Path(scratch) / "home"),
+            "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
+
+
+def marked_processes(marker: str) -> list[int]:
+    """Live processes (other than this one) whose environment carries this self-test's marker."""
+    token = f"{SELFTEST_RUN_ENV}={marker}"
+    found = []
+    proc = Path("/proc")
+    if proc.is_dir():
+        for entry in proc.iterdir():
+            if not entry.name.isdigit() or int(entry.name) == os.getpid():
+                continue
+            try:
+                environ = (entry / "environ").read_bytes()
+            except OSError:
+                continue
+            if token.encode() in environ.split(b"\0"):
+                found.append(int(entry.name))
+        return found
+    # Darwin: `ps -E` appends the environment of this user's processes to the command.
+    listing = subprocess.run(["ps", "-E", "-ww", "-axo", "pid=,stat=,command="],
+                             capture_output=True, text=True, errors="replace", timeout=30)
+    for line in listing.stdout.splitlines():
+        fields = line.split()
+        if (len(fields) > 2 and fields[0].isdigit() and int(fields[0]) != os.getpid()
+                and not fields[1].startswith("Z") and token in fields[2:]):
+            found.append(int(fields[0]))
+    return found
+
+
+def reap_selftest_processes(marker: str) -> int:
+    """Stop everything the self-test left running (orphaned yc refresh/gbrain pairs lived 4-5
+    days on Gem, 2026-10-11). Returns how many processes were still alive when it ended."""
+    import signal
+    try:
+        leftovers = marked_processes(marker)
+    except (OSError, subprocess.SubprocessError):
+        return 0
+    for sig, grace in ((signal.SIGTERM, 3), (signal.SIGKILL, 2)):
+        try:
+            alive = marked_processes(marker)
+        except (OSError, subprocess.SubprocessError):
+            break
+        if not alive:
+            break
+        for pid in alive:
+            try:
+                os.kill(pid, sig)
+            except (ProcessLookupError, PermissionError):
+                pass
+        deadline = time.monotonic() + grace
+        while time.monotonic() < deadline and marked_processes(marker):
+            time.sleep(.05)
+    return len(leftovers)
 
 
 # The installed packages mesh-runtime-bundle.mjs compiles against (exact pins checked there).
@@ -6737,10 +6897,10 @@ def mesh_dependency_root(host: Host) -> Path | None:
     return next((slot for slot in slots if installed(slot)), None)
 
 
-def retain_selftest_diagnostic(staging: Path, stderr, returncode, *, timed_out=False) -> None:
+def retain_selftest_diagnostic(staging: Path, stderr, returncode, *, timed_out=False, leftovers=0) -> None:
     raw = stderr if isinstance(stderr, bytes) else (stderr or "").encode()
     diagnostic = {"schema": "jovie-lane-selftest-diagnostic/v1", "returncode": returncode,
-                  "timedOut": timed_out, "observedAt": now_iso(),
+                  "timedOut": timed_out, "observedAt": now_iso(), "leftoverProcesses": leftovers,
                   "failedSelectors": re.findall(r"^(?:FAIL|ERROR): ([A-Za-z0-9_.]+ \([A-Za-z0-9_.]+\))",
                                                 raw.decode(errors="replace"), re.MULTILINE),
                   "stderrSha256": hashlib.sha256(raw).hexdigest(), "stderrBytes": len(raw)}
@@ -6806,16 +6966,23 @@ def prove_staging(host: Host, staging: Path) -> str | None:
         return "mesh runtime dependency closure failed"
     # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
     # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
+    env = selftest_env(scratch)
+    leftovers = 0
     try:
-        test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
-                              cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
-                              env=selftest_env(scratch))
+        try:
+            test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+                                  cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
+                                  env=env)
+        finally:
+            leftovers = reap_selftest_processes(env[SELFTEST_RUN_ENV])
+            if leftovers:
+                print(f"release self-test left {leftovers} process(es) running; stopped", file=sys.stderr)
     except subprocess.TimeoutExpired as error:
-        retain_selftest_diagnostic(staging, error.stderr, None, timed_out=True)
+        retain_selftest_diagnostic(staging, error.stderr, None, timed_out=True, leftovers=leftovers)
         return f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s"
     # Retain the original proof diagnostic privately; console truncation must not
     # lose a failing selector or force repeated release attempts to diagnose it.
-    retain_selftest_diagnostic(staging, test.stderr, test.returncode)
+    retain_selftest_diagnostic(staging, test.stderr, test.returncode, leftovers=leftovers)
     if test.returncode != 0:
         print(test.stderr[-2000:], file=sys.stderr)
         if not retry_failed_selectors(staging, test.stderr):
@@ -6855,12 +7022,15 @@ def retry_failed_selectors(staging: Path, stderr) -> bool:
         return False
     scratch = staging / ".selftest-retry-state"
     (scratch / "home").mkdir(parents=True, exist_ok=True)
+    env = selftest_env(scratch)
     try:
         rerun = lifecycle.run([sys.executable, "-m", "unittest", "-q", *ids], cwd=staging, capture_output=True,
-                              text=True, timeout=SELFTEST_RETRY_TIMEOUT_S, env=selftest_env(scratch))
+                              text=True, timeout=SELFTEST_RETRY_TIMEOUT_S, env=env)
         passed = rerun.returncode == 0
     except subprocess.TimeoutExpired:
         passed = False
+    finally:
+        reap_selftest_processes(env[SELFTEST_RUN_ENV])
     receipt = {"schema": "jovie-lane-selftest-retry/v1", "selectors": ids, "passedOnRetry": passed,
                "observedAt": now_iso()}
     fd = os.open(staging / ".selftest-retry.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)

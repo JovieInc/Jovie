@@ -436,8 +436,22 @@ export function reenrollmentDisposition({
       };
 }
 
+// Failures that say something about the source revision. A runner, checkout or
+// startup failure (transient-infrastructure) and a red queue base say nothing,
+// so they never count toward exhausting the revision's retry.
+const NON_ATTRIBUTABLE_CLASSES = new Set([
+  'transient-infrastructure',
+  'base-branch',
+]);
+export function attributableFailureCount(failures) {
+  return failures.filter(
+    item => !NON_ATTRIBUTABLE_CLASSES.has(item.classification)
+  ).length;
+}
+
 // The exact commit endpoint scopes failures: deterministic blocks immediately;
-// other failures receive one queue-authority retry.
+// other failures receive one queue-authority retry. Each infrastructure failure
+// gets its own retry and never exhausts the revision.
 /** @param {{ statuses?: unknown[], repository?: string, currentMainSha?: string }} input */
 export function revisionFailureDisposition({
   statuses,
@@ -468,7 +482,10 @@ export function revisionFailureDisposition({
       currentMainSha !== latest.mainSha;
     if (!resolved) return result('block', 'base-branch-failure');
   }
-  if (latest.classification !== 'base-branch' && latest.failureNumber >= 2) {
+  if (
+    !NON_ATTRIBUTABLE_CLASSES.has(latest.classification) &&
+    attributableFailureCount(failures) >= 2
+  ) {
     return result('block', 'revision-retry-exhausted');
   }
   // Newest statuses win: a proven rejection releases only its reservation.
@@ -859,7 +876,12 @@ export async function applyMergeGroupFailure(
     retryDisposition:
       classification === 'base-branch'
         ? 'requeue-after-base-moves'
-        : classification === 'deterministic-source' || failureNumber >= 2
+        : classification === 'deterministic-source' ||
+            (!NON_ATTRIBUTABLE_CLASSES.has(classification) &&
+              attributableFailureCount([
+                ...existing.failures.filter(item => item !== duplicate),
+                { classification },
+              ]) >= 2)
           ? 'blocked-until-new-source-head'
           : 'one-queue-authority-retry',
     statusWritten: !duplicate,

@@ -790,7 +790,10 @@ def classify(output: str, code: int, now: float) -> tuple[str, float | None]:
         if not USAGE.search(closing):
             return "rate", parse_reset(closing, now) or now + RATE_BACKOFF_S
         return "limit", parse_reset(closing, now) or now + DEFAULT_COOLDOWN_S
-    if code != 0 and AUTH.search(tail):
+    # Same rule as limits: only codex's closing lines can say the login failed. An agent
+    # working on auth code prints "401"/"unauthorized" all run long; scanning the whole tail
+    # benched Gem's only login for 24h on a plain 429 (2026-10-12, 96% capacity left).
+    if code != 0 and AUTH.search(closing):
         return "auth", now + 24 * 3600
     return ("ok" if code == 0 else "error"), None
 
@@ -826,8 +829,25 @@ def lease(name: str):
     return None
 
 
+def reverify_auth_bank(state: dict, now: float) -> dict:
+    """An auth bank on the current login is only as good as the login: `codex login status`
+    (local, no quota) is the authority. A logged-in CLI clears the bank instead of idling
+    the lane for a day on a misread transcript."""
+    entry = state.get(CURRENT_LOGIN) or {}
+    if not (current_login_mode() and entry.get("lastKind") == "auth"
+            and float(entry.get("exhaustedUntil") or 0) > now and current_login_available()):
+        return state
+    def clear(st: dict) -> None:
+        row = st.setdefault(CURRENT_LOGIN, {})
+        row.pop("exhaustedUntil", None)
+        row.update(lastKind="auth-reverified", authReverifiedAt=now)
+    update_state(clear)
+    return read_state()
+
+
 def pick(state: dict, now: float, names: list[str] | None = None):
     """Least-recently-used available account that nobody else has leased right now."""
+    state = reverify_auth_bank(state, now)
     names = accounts() if names is None else names
     order = sorted((n for n in names if available(n, state, now)),
                    key=lambda n: float(state.get(n, {}).get("lastUsed") or 0))
