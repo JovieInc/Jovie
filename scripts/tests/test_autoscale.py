@@ -359,7 +359,7 @@ class AutoscaleTest(unittest.TestCase):
                     patch.object(lane.continuity_clock, "tick", return_value={"status": "current"}), \
                     patch.object(lane.urllib.request, "urlopen", side_effect=AssertionError("network")):
                 self.assertEqual(lane.dispatch(lane.Host(state=root, repo=root)), 1)
-            history.assert_not_called(); spawn.assert_not_called(); saved = json.loads((root / "autoscale.json").read_text()); self.assertEqual((saved["lanes"]["devin"]["effective"], saved["lanes"]["devin"]["lastReason"]), (2, "host-pressure"))
+            history.assert_not_called(); spawn.assert_not_called(); saved = json.loads((root / "autoscale.json").read_text()); self.assertEqual((saved["lanes"]["devin"]["effective"], saved["lanes"]["devin"]["lastReason"]), (2, "host-pressure")); self.assertTrue((root / "capacity-limit-tracker.json").exists(), "the dispatch tick runs the capacity record")
         recorded = {}
         def budget(name, slots):
             recorded["slots"] = slots; result = lane.new_issue_budget(name, slots, []); recorded["cap"], recorded["terminalCap"] = result["cap"], result["terminalCap"]; return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": None, "terminal": 0, "terminalCap": None}
