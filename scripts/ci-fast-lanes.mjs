@@ -1942,6 +1942,11 @@ const STRUCTURAL_LONG_POLES = Object.freeze([
   // order started the 42s one 16th of 22, so it set the web-only wall.
   'lib/__tests__/component-live-storybook-certification.test.mjs',
   'YoutubeThumbnailsLanding.test.tsx',
+  // 2026-10-12 merge group 38247843089 (ci-fast remaining, wall 260s): the
+  // lanes coverage pytest (174.5s) and the script-contract Vitest run (74.6s)
+  // were the slowest commands, yet list order started the pytest last.
+  'scripts/tests/test_lane_runner.py',
+  'lib/__tests__/merge-group-failure-hold.test.mjs',
 ]);
 
 const PACKAGE_DIRS = Object.freeze({ '@jovie/web': 'apps/web' });

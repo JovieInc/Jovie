@@ -55,6 +55,10 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     'apps/web/lib/leads/qualify.ts',
     ['apps/web/tests/lib/leads/qualify.test.ts'],
   ],
+  [
+    'apps/web/lib/notifications/campaign-scheduling.ts',
+    ['apps/web/lib/notifications/campaign-scheduling.test.ts'],
+  ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
@@ -199,6 +203,17 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+// Audience-denial scheduling is covered by its co-located test. The mapping
+// lives in this selector, so the complete selector pair may accompany the lane.
+// A partial pair or an unknown peer still falls closed to the full suite.
+const AUDIENCE_RELEASE_DENIAL_LANE = new Set([
+  'apps/web/app/api/cron/schedule-release-notifications/route.ts',
+  'apps/web/app/api/cron/send-release-notifications/route.ts',
+  'apps/web/lib/notifications/campaign-scheduling.ts',
+  'apps/web/lib/notifications/campaign-scheduling.test.ts',
+  'apps/web/tests/unit/api/cron/schedule-release-notifications.test.ts',
+  'apps/web/tests/unit/api/cron/send-release-notifications.test.ts',
+]);
 const PLAYWRIGHT_SENTRY_ISOLATION_PROOF =
   'apps/web/tests/unit/ci/sentry-ci-reporter.test.ts';
 const PLAYWRIGHT_SENTRY_ISOLATION_INPUTS = new Set([
@@ -1852,6 +1867,18 @@ function planAffectedTests(
   const isExactAffectedTestSelector =
     affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
     files.length === AFFECTED_TEST_SELECTOR_MANIFEST.size;
+  const audienceReleaseDenialInputCount = files.filter(file =>
+    AUDIENCE_RELEASE_DENIAL_LANE.has(file)
+  ).length;
+  const isBoundedAudienceReleaseDenial =
+    audienceReleaseDenialInputCount > 0 &&
+    files.every(
+      file =>
+        AUDIENCE_RELEASE_DENIAL_LANE.has(file) ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+    ) &&
+    (affectedTestSelectorInputCount === 0 ||
+      affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
   const authenticatedA11yRepairInputCount = files.filter(file =>
     AUTHENTICATED_A11Y_REPAIR_CORE.has(file)
   ).length;
@@ -2164,6 +2191,7 @@ function planAffectedTests(
       ? SCANNER_LOAD_REPAIR_SCRIPT_TESTS
       : []),
     ...(isExactAffectedTestSelector ||
+    (isBoundedAudienceReleaseDenial && affectedTestSelectorInputCount > 0) ||
     (isExactAuthenticatedA11yRepair && affectedTestSelectorInputCount > 0) ||
     isExactPrSizeGuardWithSelector ||
     isExactGoldenPathSmokeContractRepair ||
@@ -2297,6 +2325,7 @@ function planAffectedTests(
     !isExactVercelCongestionControl;
   const hasIncompleteAffectedTestSelector =
     hasManifestInputBeyondDirectTests(AFFECTED_TEST_SELECTOR_MANIFEST) &&
+    !isBoundedAudienceReleaseDenial &&
     !isExactAffectedTestSelector &&
     !isExactAuthenticatedA11yRepair &&
     !isExactGoldenPathSmokeContractRepair &&
@@ -2325,6 +2354,7 @@ function planAffectedTests(
     !isExactLayoutGuardContract;
   const hasIncompleteScannerLoadRepair =
     hasManifestInputBeyondDirectTests(SCANNER_LOAD_REPAIR_MANIFEST) &&
+    !isBoundedAudienceReleaseDenial &&
     !isExactScannerLoadRepairPrimary &&
     !isExactScannerLoadRepairWithSelector &&
     !isExactAffectedTestSelector &&
@@ -2344,6 +2374,7 @@ function planAffectedTests(
     hasManifestInputBeyondDirectTests(
       MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST
     ) &&
+    !isBoundedAudienceReleaseDenial &&
     !isExactMobileOverflowNavigationRace &&
     !isExactAuthenticatedA11yRepair &&
     !isExactAffectedTestSelector &&
@@ -2358,6 +2389,7 @@ function planAffectedTests(
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteRunnerIoPressure =
     hasManifestInputBeyondDirectTests(RUNNER_IO_PRESSURE_MANIFEST) &&
+    !isBoundedAudienceReleaseDenial &&
     !isExactRunnerIoPressure &&
     !isExactAuthenticatedA11yRepair &&
     !isExactGoldenPathSmokeContractRepair &&
@@ -2372,6 +2404,7 @@ function planAffectedTests(
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteRunnerPrerequisiteContract =
     hasManifestInputBeyondDirectTests(RUNNER_PREREQUISITE_CONTRACT_MANIFEST) &&
+    !isBoundedAudienceReleaseDenial &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactAuthenticatedA11yRepair &&
     !isExactAffectedTestSelector &&
@@ -2387,6 +2420,7 @@ function planAffectedTests(
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteLayoutGuardContract =
     hasManifestInputBeyondDirectTests(LAYOUT_GUARD_CONTRACT_MANIFEST) &&
+    !isBoundedAudienceReleaseDenial &&
     !isExactLayoutGuardContract &&
     !isExactAuthenticatedA11yRepair &&
     !isExactPrerequisiteTrain &&
@@ -2402,6 +2436,7 @@ function planAffectedTests(
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteNeonAttemptArtifactRepair =
     hasManifestInputBeyondDirectTests(NEON_ATTEMPT_ARTIFACT_MANIFEST) &&
+    !isBoundedAudienceReleaseDenial &&
     !isExactNeonAttemptArtifactRepair &&
     !isExactAuthenticatedA11yRepair &&
     !isExactPrerequisiteTrain &&
