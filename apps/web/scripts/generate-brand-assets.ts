@@ -26,8 +26,11 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { wordmarkGeometry } from '../lib/brand/primitives';
-import { JOVIE_PATH, JOVIE_VIEWBOX } from '../lib/brand/tokens';
+import {
+  JOVIE_PATH,
+  JOVIE_VIEWBOX,
+  wordmarkGeometry,
+} from '../lib/brand/tokens';
 import { DESIGN_TOKENS } from '../lib/design/generated/design-tokens';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

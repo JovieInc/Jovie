@@ -1,6 +1,11 @@
-import { JOVIE_BRAND_GEOMETRY } from '@jovie/ui/brand/geometry.gen';
 import type { CSSProperties } from 'react';
-import { JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand/tokens';
+import {
+  JOVIE_PATH,
+  JOVIE_VIEWBOX,
+  wordmarkGeometry,
+} from '@/lib/brand/tokens';
+
+export { wordmarkGeometry };
 
 /**
  * Server-renderable SVG primitives for the Jovie brand. No state, no hooks,
@@ -60,26 +65,6 @@ export function Mark({
       <path fill={color} d={JOVIE_PATH} />
     </svg>
   );
-}
-
-type WordmarkMaster = keyof typeof JOVIE_BRAND_GEOMETRY.wordmark;
-
-/**
- * The "Jovie" wordmark as static outlines from the construction
- * (packages/brand). Its o is the mark itself. Below 24 px the Text master
- * (open seam, looser spacing) is used. For the animated wordmark that folds
- * into the O, render <JovieWordmark> from @jovie/ui/brand.
- */
-export function wordmarkGeometry(height: number) {
-  const master: WordmarkMaster = height < 24 ? 'text' : 'display';
-  const w = JOVIE_BRAND_GEOMETRY.wordmark[master];
-  const [, , width, boxHeight] = w.viewBox;
-  return {
-    master,
-    viewBox: `0 0 ${width} ${boxHeight}`,
-    aspect: width / boxHeight,
-    glyphs: w.glyphs.map(g => ({ char: g.char, d: g.d })),
-  };
 }
 
 interface WordmarkProps {

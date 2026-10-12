@@ -34,6 +34,26 @@ export function jovieMarkAtSize(px: number): {
   return { viewBox: `0 0 ${m.size} ${m.size}`, d: m.mark };
 }
 
+type WordmarkMaster = keyof typeof JOVIE_BRAND_GEOMETRY.wordmark;
+
+/**
+ * The "Jovie" wordmark as static outlines from the construction
+ * (packages/brand). Its o is the mark itself. Below 24 px the Text master
+ * (open seam, looser spacing) is used. For the animated wordmark that folds
+ * into the O, render <JovieWordmark> from @jovie/ui/brand.
+ */
+export function wordmarkGeometry(height: number) {
+  const master: WordmarkMaster = height < 24 ? 'text' : 'display';
+  const w = JOVIE_BRAND_GEOMETRY.wordmark[master];
+  const [, , width, boxHeight] = w.viewBox;
+  return {
+    master,
+    viewBox: `0 0 ${width} ${boxHeight}`,
+    aspect: width / boxHeight,
+    glyphs: w.glyphs.map(g => ({ char: g.char, d: g.d })),
+  };
+}
+
 /**
  * Locked mark size ladder (KEEP 2026-09-10 / splash-b-everywhere-v1).
  * Matches the existing Logo.tsx icon scale (xs/sm/md/lg) — no new mark shape.
