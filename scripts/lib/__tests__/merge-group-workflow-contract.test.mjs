@@ -4541,7 +4541,10 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     expect(ENROLL).toContain("failure.action === 'block'");
     expect(ENROLL).toContain("failure.action === 'retry-once'");
     expect(ENROLL).toContain(
-      "(removedUnchangedHead && failure.action !== 'retry-once' && !releasedAfterManualRemoval)"
+      "(removedUnchangedHead && failure.action !== 'retry-once'"
+    );
+    expect(ENROLL).toContain(
+      "failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval"
     );
     // Only a manual removal with a later blocking-label release, and no
     // revision failure hold, may re-enroll an unchanged removed head.

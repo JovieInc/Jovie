@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto';
 import { denyAudienceEffect } from './audience-effect-policy';
+import type {
+  OutboundChannel,
+  OutboundCopy,
+  OutboundCopyState,
+  OutboundRejectReason,
+  OutboundTargetState,
+} from './types';
+import { OUTBOUND_CHANNELS, OUTBOUND_REJECT_REASONS } from './types';
 
 /**
  * Founder approval is append-only review evidence bound to target and copy
@@ -7,37 +15,6 @@ import { denyAudienceEffect } from './audience-effect-policy';
  * both newest rows are founder yes decisions. Ledger helpers support review
  * and drafting; only the deterministic policy governs dispatch refusal.
  */
-
-export const OUTBOUND_CHANNELS = ['email', 'dm'] as const;
-export type OutboundChannel = (typeof OUTBOUND_CHANNELS)[number];
-
-export const OUTBOUND_DECISIONS = ['yes', 'no', 'unsure'] as const;
-export type OutboundDecision = (typeof OUTBOUND_DECISIONS)[number];
-
-/** Why Tim rejected a target. Feeds qualification learning (JOV-6650). */
-export const OUTBOUND_REJECT_REASONS = [
-  'wrong_person',
-  'not_an_artist',
-  'has_team',
-  'too_big',
-  'not_a_fit',
-  'bad_data',
-  'other',
-] as const;
-export type OutboundRejectReason = (typeof OUTBOUND_REJECT_REASONS)[number];
-
-export const OUTBOUND_REJECT_REASON_LABELS: Record<
-  OutboundRejectReason,
-  string
-> = {
-  wrong_person: 'Wrong person',
-  not_an_artist: 'Not an artist',
-  has_team: 'Has a team',
-  too_big: 'Too big',
-  not_a_fit: 'Not a fit',
-  bad_data: 'Bad data',
-  other: 'Other',
-};
 
 export function outboundTargetEvidenceKey(leadId: string): string {
   return `outbound:target:${leadId}`;
@@ -55,12 +32,6 @@ export interface OutboundTarget {
   readonly instagramHandle: string | null;
   readonly creatorProfileId: string | null;
   readonly claimUrl: string | null;
-}
-
-export interface OutboundCopy {
-  readonly channel: OutboundChannel;
-  readonly subject: string | null;
-  readonly body: string;
 }
 
 function digest(value: unknown): string {
@@ -103,15 +74,6 @@ export interface OutboundLedgerRow {
   readonly actorUserId: string | null;
   readonly createdAt: Date | string;
 }
-
-export type OutboundTargetState =
-  | 'unreviewed'
-  | 'approved'
-  | 'held'
-  | 'rejected'
-  | 'stale';
-
-export type OutboundCopyState = 'draft' | 'approved' | 'rejected' | 'stale';
 
 export interface OutboundApprovalState {
   readonly targetRevision: string;
