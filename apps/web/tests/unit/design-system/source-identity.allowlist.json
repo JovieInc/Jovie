@@ -26,6 +26,12 @@
       "reason": "JOV-5905: zod character-class regex for opaque analytics ids, not a Tailwind arbitrary property. No canonical design token applies."
     },
     {
+      "file": "apps/web/lib/db/client/connection.ts",
+      "rule": "arbitrary-value",
+      "value": "ep-[a-z0-9-]",
+      "reason": "JOV-3066: regex literal matching Neon endpoint hostnames (ep-<id>[-pooler].<region>.neon.tech) to classify direct vs transaction-pooled connections, not a Tailwind class or visual token. No canonical design token applies."
+    },
+    {
       "file": "apps/web/lib/discography/playlist-context.ts",
       "rule": "arbitrary-value",
       "value": "intl-[a-z]",
