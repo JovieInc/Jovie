@@ -518,7 +518,9 @@ def codex_attribution(report: dict, now: float) -> dict:
             return unknown
         counts["leased"] += int(row["leased"])
         counts["eligibleByCooldown"] += int(row["available"])
-        counts["unleasedAvailable"] += int(row["available"] and not row["leased"])
+        free = row.get("freeSlots", 0 if row["leased"] else 1)
+        counts["unleasedAvailable"] += (free if type(free) is int and free >= 0 else int(not row["leased"])) \
+            if row["available"] else 0
         if not row["available"]:
             until = age_s(row.get("exhaustedUntil"), now)
             if until is None or until >= 0:

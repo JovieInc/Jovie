@@ -795,17 +795,35 @@ def classify(output: str, code: int, now: float) -> tuple[str, float | None]:
     return ("ok" if code == 0 else "error"), None
 
 
-def lease(name: str):
-    """Exclusive per-account flock; released by the kernel if the run dies."""
-    locks = STATE.parent / "codex-locks"
-    locks.mkdir(parents=True, exist_ok=True)
-    handle = open(locks / f"{name}.lock", "w")
+def login_slots(name: str) -> int:
+    """Concurrent runs one account may hold. Only the single current-login account can be
+    widened (CODEX_LANE_LOGIN_SLOTS, Tim 2026-10-11: more runs on one login, no account
+    rotation); every other account keeps one exclusive run."""
+    if not (current_login_mode() and name == CURRENT_LOGIN):
+        return 1
     try:
-        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        handle.close()
-        return None
-    return handle
+        return max(1, int(os.environ.get("CODEX_LANE_LOGIN_SLOTS", "1")))
+    except ValueError:
+        return 1
+
+
+def _slot_paths(name: str) -> list[Path]:
+    locks = STATE.parent / "codex-locks"
+    return [locks / (f"{name}.lock" if slot == 0 else f"{name}.{slot}.lock") for slot in range(login_slots(name))]
+
+
+def lease(name: str):
+    """One flock per concurrent run slot; released by the kernel if the run dies."""
+    (STATE.parent / "codex-locks").mkdir(parents=True, exist_ok=True)
+    for path in _slot_paths(name):
+        handle = open(path, "w")
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            handle.close()
+            continue
+        return handle
+    return None
 
 
 def pick(state: dict, now: float, names: list[str] | None = None):
@@ -945,7 +963,8 @@ def status(now: float | None = None, names: list[str] | None = None, state: dict
         credit_count = (capacity_lease.get("credits") or {}).get("availableCount")
         rows[name] = {
             "available": until <= now,
-            "leased": (STATE.parent / "codex-locks" / f"{name}.lock").exists() and not _lockable(name),
+            "leased": (free := _free_slots(name)) == 0,
+            "freeSlots": free,
             "exhaustedUntil": iso(until) if until > now else None,
             "resetsInS": max(0, int(until - now)) if until > now else 0,
             "lastKind": entry.get("lastKind"), "lastError": entry.get("lastError"),
@@ -962,12 +981,22 @@ def status(now: float | None = None, names: list[str] | None = None, state: dict
             "accounts": rows, "available": banked, "count": len(rows), "ledger": state.get("_ledger")}
 
 
-def _lockable(name: str) -> bool:
-    handle = lease(name)
-    if handle is None:
-        return False
-    handle.close()
-    return True
+def _free_slots(name: str) -> int:
+    """Slots nobody holds right now; probe each with a non-blocking flock and release it."""
+    free = 0
+    for path in _slot_paths(name):
+        if not path.exists():
+            free += 1
+            continue
+        handle = open(path, "a")
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            free += 1
+        except BlockingIOError:
+            pass
+        finally:
+            handle.close()
+    return free
 
 
 def main(argv=None) -> int:
