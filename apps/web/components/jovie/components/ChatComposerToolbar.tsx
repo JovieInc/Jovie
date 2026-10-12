@@ -85,10 +85,8 @@ export function ComposerSendButton({
           !isInteractive && 'cursor-not-allowed'
         )}
       >
-        <Button
+        <button
           type='button'
-          variant='primary'
-          size='icon'
           onMouseDown={onMouseDown}
           onClick={
             showStop
@@ -99,7 +97,10 @@ export function ComposerSendButton({
           }
           disabled={!showStop && !canSend && !canInterruptAndSend}
           className={cn(
-            'system-b-chat-composer-primary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+            // 36px face, 44px hit target (JOV-4411): enlarge the pointer area
+            // via a pseudo-element, never the visible control.
+            'system-b-chat-composer-primary-action relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+            'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
             !isInteractive && 'cursor-not-allowed'
           )}
           aria-label={actionLabel}
@@ -116,7 +117,7 @@ export function ComposerSendButton({
               {icon}
             </motion.span>
           </AnimatePresence>
-        </Button>
+        </button>
       </span>
     </SimpleTooltip>
   );

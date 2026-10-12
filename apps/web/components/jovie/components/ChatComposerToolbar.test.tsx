@@ -159,9 +159,12 @@ describe('ComposerSendButton', () => {
       );
 
       const send = screen.getByRole('button');
-      expect(send).toHaveAttribute('data-variant', 'primary');
-      expect(send).toHaveAttribute('data-size', 'icon');
-      expect(send).toHaveClass('h-9', 'w-9');
+      expect(send).toHaveClass(
+        'system-b-chat-composer-primary-action',
+        'relative',
+        'h-9',
+        'w-9'
+      );
       expect(send.className).toContain('before:h-11');
       expect(send.className).toContain('before:w-11');
       expect(send.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
