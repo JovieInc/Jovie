@@ -1,5 +1,9 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
+import { InspectorSection } from '@/components/molecules/inspector/InspectorSection';
+import { toLibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import type { WorkLaunchSummary } from '@/lib/library/work-actions';
 import { WorkInspectorActions } from './WorkInspectorActions';
 
@@ -92,5 +96,89 @@ export const LaunchStates: Story = {
       readyLaunch,
     ],
     onRetryLaunchKit: () => undefined,
+  },
+};
+
+type WorkActionsLayoutProps = Parameters<typeof WorkInspectorActions>[0];
+
+function WorkActionsLayoutFixture(props: WorkActionsLayoutProps) {
+  const [privateActivations, setPrivateActivations] = useState(0);
+  return (
+    <>
+      <div
+        data-testid='work-actions-layout-host'
+        className='font-sans text-primary-token'
+        style={{ width: 245, maxWidth: '100%' }}
+      >
+        <InspectorSection title='Actions'>
+          <WorkInspectorActions
+            {...props}
+            onSharePrivately={() => setPrivateActivations(count => count + 1)}
+          />
+        </InspectorSection>
+      </div>
+      <output
+        data-testid='work-actions-private-activations'
+        aria-label='Private share fixture activations'
+      >
+        {privateActivations}
+      </output>
+    </>
+  );
+}
+
+// These are component input fixtures, not assertions that a live public route
+// is eligible. Publication/access helpers and their production callers are held.
+const layoutPublicAsset = {
+  ...asset,
+  itemKind: 'release',
+  approvalStatus: 'approved',
+  profileVisibility: 'visible',
+  share: toLibraryAssetShareViewModel({
+    assetId: asset.id,
+    visibility: 'public',
+    shareSlug: 'take-me-over',
+    accessToken: 'storybook-actions-layout-fixture',
+    artistHandle: 'tim',
+    itemKind: 'release',
+    smartLinkPath: asset.smartLinkPath,
+  }),
+} satisfies LibraryReleaseAsset;
+
+const layoutStory = {
+  parameters: { layout: 'padded', themes: { themeOverride: 'light' } },
+  render: (args: WorkActionsLayoutProps) => (
+    <WorkActionsLayoutFixture {...args} />
+  ),
+} satisfies Partial<Story>;
+
+export const LayoutPublicVisible: Story = {
+  ...layoutStory,
+  args: { asset: layoutPublicAsset },
+};
+
+export const LayoutPrivateHidden: Story = {
+  ...layoutStory,
+  args: {
+    asset: {
+      ...layoutPublicAsset,
+      status: 'draft',
+      profileVisibility: 'hidden',
+      share: toLibraryAssetShareViewModel({
+        assetId: asset.id,
+        visibility: 'private',
+        shareSlug: 'take-me-over',
+        accessToken: 'storybook-actions-layout-fixture',
+        artistHandle: 'tim',
+        itemKind: 'release',
+      }),
+    },
+  },
+};
+
+export const LayoutUnknownHidden: Story = {
+  ...layoutStory,
+  args: {
+    asset: { ...layoutPublicAsset, profileVisibility: 'hidden', share: null },
   },
 };

@@ -1,18 +1,20 @@
-# Official Symphony Burrito (macOS arm64)
+# Official Symphony team-scope compatibility
 
-Use the upstream `openai/symphony` v0.0.3 Burrito asset; do not build or publish a Jovie fork.
+Jovie's `WORKFLOW.md` uses a JOV team key and rejects `no-symphony`;
+stock `openai/symphony` v0.0.3 must not be started with this workflow
+because it only supports project scope.
 
-Prerequisites: Apple Silicon macOS, `codex`, `git`, and `LINEAR_API_KEY` supplied by the host secret manager.
+Use the reviewed `JovieInc/symphony-ops` adapter at these immutable identities:
 
-```sh
-version=v0.0.3
-asset="symphony-${version}-macos_arm64"
-curl -fLO "https://github.com/openai/symphony/releases/download/${version}/${asset}"
-curl -fLO "https://github.com/openai/symphony/releases/download/${version}/${asset}.sha256"
-shasum -a 256 -c "${asset}.sha256"
-install -d "$HOME/.local/bin"
-install -m 0755 "$asset" "$HOME/.local/bin/symphony"
-"$HOME/.local/bin/symphony" /path/to/Jovie/WORKFLOW.md
-```
+- integration source `fae11882085d83d8d2a58f0f864a9eb1b6e40db8`
+- upstream source `1c0fb6c8e8ef9031a2c861e62af5f9e66cee39cb` (`v0.0.3`)
+- overlay SHA-256 `aa7159e51fe41d3c712e3870ba82a314e93eb384e8189c649dd0f69aec1ef989`
 
-The workflow retains `$LINEAR_API_KEY`; never commit a token.
+Before installation, the runtime owner must verify the platform artifact, source
+tuple, current workflow, process identity, existing claims, and known-good
+rollback. An identity mismatch or malformed scope holds new dispatch; it never
+authorizes a project/label fallback or duplicate poller.
+
+Supply `LINEAR_API_KEY` through the host secret manager. Source review and merge
+remain independent of adapter promotion; only the existing runtime owner may
+install, restart, canary, roll back, or certify activation.
