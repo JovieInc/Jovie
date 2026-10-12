@@ -198,12 +198,10 @@ export const ADMISSION_CRON_DEBT_CEILING = 3;
 export const POLLING_DEBT = Object.freeze({
   '.github/workflows/auto-merge-default.yml#self-test':
     'manual self-test rereads autoMergeRequest 12 times for 60 s',
-  '.github/workflows/golden-path-nightly.yml#golden-path':
-    'dispatches ci.yml then waits up to 80 min for that run to complete',
   '.github/workflows/pr-conflict-handler.yml#record_cohort':
     'polls candidate CI runs until a deadline to record cohort outcomes',
 });
-export const POLLING_DEBT_CEILING = 3;
+export const POLLING_DEBT_CEILING = 2;
 
 /**
  * Mutations that change PR, merge-queue, issue, or label state. A workflow is

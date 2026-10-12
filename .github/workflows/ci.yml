@@ -6555,6 +6555,29 @@ jobs:
             -H "Content-Type: application/json" \
             "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
+  ci-golden-path-report:
+    name: Golden Path Report
+    # JOV-6920 revenue gate: the dispatched main run reports its own Golden
+    # Path result, so golden-path-nightly.yml dispatches and exits instead of
+    # holding a runner for the whole lane (JOV-INV-042).
+    needs: [ci-golden-path]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve the Golden Path Linear issue
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          GOLDEN_PATH_RESULT: ${{ needs.ci-golden-path.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          MAIN_SHA: ${{ github.sha }}
+        run: node scripts/golden-path-nightly-intake.mjs
+
   ci-admin-smoke:
     name: Admin E2E Smoke
     environment: Preview – jovie
