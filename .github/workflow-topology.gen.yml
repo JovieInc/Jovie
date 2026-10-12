@@ -682,7 +682,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:relay
-    jobCount: 1
+    jobCount: 2
   - name: Legacy Human Hold Scrub
     path: .github/workflows/legacy-human-hold-scrub.yml
     active: true
