@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "7f3b0dba3ee3214064fe9d7d78c2374d1de1193497df38338aba883fece617b2"
+    "bodySha256": "b0c5be920c0f2f5b75be43e8325735d313b0167fd9148cdb49aa1af176ec59b1"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -44,7 +44,7 @@
   {
     "file": ".claude/rules/hermes-air.md",
     "paths": ["docs/HERMES_AIR.md"],
-    "bodySha256": "96281ca1e3039407a003dff93b13642902ae4368fa8a9157ee4f8fed4cca27c1"
+    "bodySha256": "d495fddaadb7e03ab601b6076351bc0aa0e507c61fc4065a096146ab345bd89c"
   },
   {
     "file": ".claude/rules/infra.md",
@@ -54,7 +54,7 @@
       "apps/web/app/api/cron/**",
       "vercel.json"
     ],
-    "bodySha256": "3445c11bf18605ed70b71dc93eae6167ac6f6b1bfa33b828cfee5a5534330188"
+    "bodySha256": "6d35e726878f810fea9671ebadc6eb90094787ddcf74723e44c47bab71d86513"
   },
   {
     "file": ".claude/rules/ios.md",
@@ -154,6 +154,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "bd51a598658a675f387b87581a44f6c06a32223396b9a75cef86ea21a727447a"
+    "bodySha256": "b4917647952118f17104236747a29588fbdc07dfee9bc8632653f04c08636723"
   }
 ]

@@ -1486,7 +1486,9 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
         !isSupportedNativeBuildConcurrency(field, observed[field]) &&
         !isPendingNativeCheckTimeoutCutover(field, observed[field])
       )
-        errors.push(`live native merge_queue ${field} must be ${expected}`);
+        errors.push(
+          `live native merge_queue ${field} must be ${expected} (observed ${String(observed[field])})`
+        );
   }
 
   const statusRule = rules.find(
