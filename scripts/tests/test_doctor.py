@@ -183,7 +183,7 @@ class JudgeTest(unittest.TestCase):
             obs(**idle, idleExitAge={"devin": 30, "codex": 301})))
         self.assertIn("spawn-exit", doctor.judge(obs(**idle, idleExitAge={"devin": 30})))
 
-    def test_available_provider_capacity_with_compatible_work_and_no_starts_is_p0(self):
+    def test_available_provider_capacity_with_compatible_work_and_vacant_slots_is_p0(self):
         idle = {"tick": {"at": "x", "unhealthy": [], "error": None,
                          "spawned": ["devin"] * 4 + ["codex"] * 3},
                 "poolByProvider": {"codex": 12, "devin": 10},
@@ -194,8 +194,14 @@ class JudgeTest(unittest.TestCase):
         alerts = doctor.judge(obs(**idle), previous)
         self.assertIn("0/3 workers", alerts["provider-idle:codex"])
         self.assertIn("0/4 workers", alerts["provider-idle:devin"])
-        self.assertNotIn("provider-idle:devin", doctor.judge(obs(**{**idle, "capacityByProvider": {
-            **idle["capacityByProvider"], "devin": {"running": 1, "slots": 4}}}), previous))
+        partially_idle = obs(**{**idle, "capacityByProvider": {
+            **idle["capacityByProvider"], "devin": {"running": 1, "slots": 4}}})
+        self.assertIn("1/4 workers", doctor.judge(partially_idle, previous)["provider-idle:devin"])
+        self.assertEqual(doctor.provider_idle_since(partially_idle, {})["devin"], partially_idle["now"])
+        fully_occupied = obs(**{**idle, "capacityByProvider": {
+            **idle["capacityByProvider"], "devin": {"running": 4, "slots": 4}}})
+        self.assertNotIn("provider-idle:devin", doctor.judge(fully_occupied, previous))
+        self.assertNotIn("devin", doctor.provider_idle_since(fully_occupied, previous))
         self.assertNotIn("provider-idle:codex", doctor.judge(
             obs(**idle), {"providerIdleSince": {"codex": 1_000_000.0 - doctor.PROVIDER_IDLE_S + 1}}))
 
@@ -274,7 +280,7 @@ class ConditionReceiptTest(unittest.TestCase):
         observed = obs(now=1000.0, tickAge=3,
                        tick={"at": "x", "unhealthy": [], "error": None, "spawned": ["devin"] * 4},
                        poolByProvider={"devin": 20},
-                       capacityByProvider={"devin": {"running": 0, "slots": 4}})
+                       capacityByProvider={"devin": {"running": 3, "slots": 4}})
         previous = {"providerIdleSince": {"devin": 699.0}}
         alerts = doctor.judge(observed, previous)
         events = doctor.condition_receipts(alerts, previous, observed, "gem")
@@ -283,6 +289,8 @@ class ConditionReceiptTest(unittest.TestCase):
         event = state["conditions"]["provider-idle:devin"]
         self.assertEqual(event["idempotencyKey"], "gem:provider-idle:devin:1")
         self.assertEqual(event["firstObservedAt"], doctor.epoch_iso(699.0))
+        self.assertEqual(event["affectedResources"], ["devin"])
+        self.assertEqual(event["severity"], "critical")
         self.assertEqual(event["recovery"], {"action": "dispatch-provider-workers", "outcome": "failed"})
         self.assertEqual(event["summerEscalation"]["outcome"], "requested")
         self.assertEqual(tracker.contradicted, [event["idempotencyKey"]])
@@ -295,11 +303,15 @@ class ConditionReceiptTest(unittest.TestCase):
         self.assertEqual(len(tracker.contradicted), 1)
 
         observed["now"] += 60
-        cleared = doctor.condition_receipts({}, state, observed, "gem")
-        state = doctor.reconcile({}, state, tracker, observed["now"], cleared)
+        observed["capacityByProvider"]["devin"]["running"] = 4
+        cleared_alerts = doctor.judge(observed, state)
+        self.assertNotIn("provider-idle:devin", cleared_alerts)
+        cleared = doctor.condition_receipts(cleared_alerts, state, observed, "gem")
+        state = doctor.reconcile(cleared_alerts, state, tracker, observed["now"], cleared)
         self.assertEqual(state["conditions"]["provider-idle:devin"]["terminalOutcome"], "health-proven")
 
         observed["now"] += 60
+        observed["capacityByProvider"]["devin"]["running"] = 3
         refired = doctor.condition_receipts(alerts, state, observed, "gem")
         state = doctor.reconcile(alerts, state, tracker, observed["now"], refired)
         self.assertEqual(state["conditions"]["provider-idle:devin"]["generation"], 2)
