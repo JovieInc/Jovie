@@ -292,6 +292,9 @@ The same minute tick schedules `yc_corpus.py refresh` at most daily. Each run ro
 40 public YC Library/blog/YouTube records, respects robots, writes metadata plus bounded excerpts into
 the existing GBrain store, and content-hash skips unchanged source and derived-playbook pages. Refresh
 health is recorded under `ycCorpus` in `tick.json`; it never silently converts an outage into a miss.
+A release self-test (`LANES_SELFTEST`) never schedules the refresh, and its default fetch and `gbrain`
+helpers refuse to run there; every self-test process carries a per-run `JOVIE_SELFTEST_RUN` marker and
+`prove_staging` stops any still running when the tests end (`leftoverProcesses` in the diagnostic).
 
 ## Nothing fails silently
 
