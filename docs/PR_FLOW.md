@@ -178,14 +178,12 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 ### Native build capacity (JOV-6107)
 
-**Ship now:** two concurrent native speculative groups. The
-`max_entries_to_build: 1 → 2` apply to live ruleset 10512119 is complete — the
-2026-09-20 live readback shows `max_entries_to_build=2`, with the then 20-minute
-budget, ALLGREEN, all required checks, empty bypass actors, and min/max merge
-1/5 with wait zero preserved. The separate pending source cohort minimum/wait
-cutover is not part of this apply and remains pending. Roll back only the
-build count to one if runner waits or speculative invalidation outweigh the
-measured throughput gain.
+**Ship now:** immediate singleton groups (`min_entries_to_merge=1`,
+`max_entries_to_merge=1`, wait zero) keep a fast PR independent from slow or
+starved siblings. The changed-path classifier selects the Web, Mac, iOS,
+operations/tooling, and shared-contract lanes inside that isolated synthetic
+head. The checked-in `max_entries_to_build=10` ceiling preserves concurrency;
+any lower live count remains a supported runner-capacity brake.
 
 On 2026-09-23 the 20-minute response deadline proved shorter than required
 CI paths configured for 30 and 40 minutes. The source-first repair landed and
@@ -217,15 +215,17 @@ figures above — and return live to `2` if deep queues starve required CI.
 
 Source preflight accepts integer build counts from one through the reviewed
 ceiling of ten and records the actual count and any difference from the target.
-This permits source-first rollout and a one-field rollback without blocking
-normal admission.
+All other group fields fail closed, including the retired five-entry cohort.
+This permits a one-field capacity rollback without restoring group-formation
+wait or slow-sibling coupling.
 
 **Re-evaluate when:** a complete simultaneous-group window supplies job waits,
 peak fanout, Mac usage, invalidations and actual merges/hour, or verified account
-limits change. **Then:** raise the source ceiling only when measured total and
-Mac demand fit with background headroom. This is a capacity ceiling, not a
-permanent preference for two. Required tests run on every synthetic head;
-GitHub's merge batch limit does not combine their builds or reuse stale results.
+limits change. **Then:** lower live build concurrency when measured total or Mac
+demand exceeds background headroom, and restore it only after the same evidence
+recovers. This is a capacity ceiling, not a permanent preference for ten.
+Required tests run on every synthetic head; singleton groups never reuse stale
+results.
 
 ### Native admission and production health
 

@@ -26,26 +26,22 @@ export const MERGE_QUEUE_POLICY = Object.freeze({
 });
 
 /**
- * Typed immutable native cohort (JOV-5047). GitHub merges when the queue
- * reaches this size or the bounded low-traffic wait elapses. Live ruleset
- * 10512119 still has 1/0 until the post-merge apply + canary; source is the
- * desired contract. A 1/0 policy serializes source-green landings behind
- * exact-production deploy latency (2026-08-13: #15903 then dequeue of
- * #15901/#15896 during Production Controller run 31699751815).
+ * Typed immutable native group policy (JOV-8112). Singleton groups start
+ * immediately and keep each PR's synthetic head and path-selected product
+ * lanes independent from slow or starved siblings.
  */
 export const NATIVE_QUEUE_COHORT_POLICY = Object.freeze({
   schema: 'jovie-native-queue-cohort/v1',
-  minEntriesToMerge: 5,
-  minEntriesToMergeWaitMinutes: 10,
+  minEntriesToMerge: 1,
+  minEntriesToMergeWaitMinutes: 0,
   alreadyAdmittedOnStaleProduction: 'preserve',
   newIntakeOnStaleProduction: 'freeze',
   deterministicMemberFailure: 'isolate-and-remove',
   transientFailure: 'bounded-retry',
-  // Source is 5/10. Live ruleset 10512119 is still 1/0 until the post-merge
-  // PUT. While pending, live preflight records drift and does not fail closed
-  // on these two fields so auto-enroll keeps working. Flip to `applied` in
-  // the same change that updates the live ruleset.
-  liveRulesetCutover: 'pending',
+  // The live queue already uses immediate 1/0 formation. Marking the cutover
+  // applied makes future drift fail closed instead of preserving the retired
+  // five-entry cohort exception.
+  liveRulesetCutover: 'applied',
 });
 
 const COHORT_LIVE_CUTOVER_FIELDS = Object.freeze([
@@ -72,7 +68,7 @@ export const NATIVE_QUEUE_POLICY = Object.freeze({
   check_response_timeout_minutes: 60,
   grouping_strategy: 'ALLGREEN',
   max_entries_to_build: 10,
-  max_entries_to_merge: 5,
+  max_entries_to_merge: 1,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
   min_entries_to_merge_wait_minutes:
