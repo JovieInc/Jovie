@@ -189,6 +189,13 @@ class AutoscaleTest(unittest.TestCase):
                 ("host-pressure", obs(), sample(psi={"cpuSomeAvg10": 40, "memoryFullAvg10": 0, "ioFullAvg10": 0}))):
             state = decide(hot, seen, host, {"devin": 4}, cfg(), NOW)
             self.assertEqual((self.lane(state, "devin")["effective"], self.lane(state, "devin")["lastReason"]), (2, reason))
+        # One halving per limit event: a later tick inside the window does not halve again.
+        once = decide(hot, obs(cooldownAt={"devin": NOW - 100}), sample(), {"devin": 4}, cfg(), NOW)
+        again = decide(once, obs(cooldownAt={"devin": NOW - 100}, runningByProvider={"devin": 2}), sample(), {"devin": 4}, cfg(), NOW + 60)
+        self.assertEqual((self.lane(once, "devin")["effective"], self.lane(again, "devin")["effective"]), (2, 2))
+        self.assertNotEqual(self.lane(again, "devin")["lastReason"], "rate-limited")
+        fresh = decide(once, obs(cooldownAt={"devin": NOW + 30}), sample(), {"devin": 4}, cfg(), NOW + 60)
+        self.assertEqual((self.lane(fresh, "devin")["effective"], self.lane(fresh, "devin")["lastReason"]), (1, "rate-limited"))
         for reason, seen, host in (("host-pressure", obs(), sample(load1=16)),
                                    ("host-pressure", obs(disk={"admitted": True, "freePct": 9}), sample()),
                                    ("gate-pressure", obs(currentRunFailures={"failed": 4, "runs": 8}), sample())):
