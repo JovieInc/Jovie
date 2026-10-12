@@ -10,9 +10,11 @@
 import { NextResponse } from 'next/server';
 import { BASE_URL } from '@/constants/app';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { getChangelogReleases } from '@/lib/changelog-source';
 import { captureError } from '@/lib/error-tracking';
 import { DrizzleReleaseCommunicationsAdapter } from '@/lib/release-communications/drizzle-adapter';
 import { resolveDailyWhatsNewPrompt } from '@/lib/release-communications/prompt';
+import { projectWhatsNew } from '@/lib/whats-new';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,7 +38,16 @@ export async function GET() {
     const dismissed = post
       ? await adapter.isPostDismissed({ postId: post.id, userId })
       : false;
+    const publishedUpdate =
+      post && !dismissed
+        ? projectWhatsNew(
+            await getChangelogReleases().catch(() => []),
+            BASE_URL,
+            Number.POSITIVE_INFINITY
+          ).entries.find(entry => entry.id === post.localDate)
+        : null;
     const prompt = resolveDailyWhatsNewPrompt({
+      publishedUpdate,
       post,
       dismissed,
       changelogUrl: `${BASE_URL}/changelog`,

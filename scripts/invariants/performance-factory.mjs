@@ -45,6 +45,21 @@ export const KIMI_REMEDIATOR_PATHS = Object.freeze([
   '.agents/skills/gstack/perf-loop',
 ]);
 
+/** The workflow's `on.push.paths` globs as regular expressions. */
+function pushPathGlobs(workflow) {
+  const push = workflow.split(/^ {2}push:\n/m)[1]?.split(/^ {2}\S/m)[0] ?? '';
+  return [...push.matchAll(/^ {6}- '([^']+)'$/gm)].map(
+    ([, glob]) =>
+      new RegExp(
+        `^${glob
+          .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+          .replaceAll('**', '<globstar>')
+          .replaceAll('*', '[^/]*')
+          .replaceAll('<globstar>', '.*')}$`
+      )
+  );
+}
+
 export function buildGbrainPage(pack) {
   const rows = pack.budgets
     .filter(item => item.surface !== 'wildcard')
@@ -93,7 +108,7 @@ export function projectPerformancePack({
     protectedPullRequest: PROTECTED_PULL_REQUEST,
     landing: 'native-github-merge-queue',
     cadence: {
-      weekdayBeat: true,
+      trigger: 'main-push',
       workflow: GOVERNANCE_WORKFLOW,
       forbiddenIntervalMinutes: FORBIDDEN_INTERVAL_MINUTES,
     },
@@ -199,8 +214,11 @@ export function validateFactoryContract(
     existsSync(
       resolve(repoRoot, '.github/workflows/performance-invariants.yml')
     ) && 'a second performance-invariants scheduler is forbidden',
-    !/cron: '17 8 \* \* 1'/.test(workflow) &&
-      'weekday beat must reuse the existing Monday governance cron',
+    /^\s+schedule:/m.test(workflow) &&
+      'performance pack runs on main pushes of its budget sources, not a clock',
+    ...BUDGET_SOURCE_PATHS.filter(
+      path => !pushPathGlobs(workflow).some(glob => glob.test(path))
+    ).map(path => `design-governance.yml must run on a main push of ${path}`),
     (workflow.includes('*/15') || workflow.includes("cron: '*/15")) &&
       '15-minute cron is forbidden',
     policy.optimizationContract?.class !== 'non-product' &&

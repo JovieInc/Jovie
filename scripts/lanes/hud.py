@@ -236,33 +236,27 @@ def read_text(path: Path) -> str:
 
 
 def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
-    """Pool counts, triage returns, and the titles of exactly the issues this host is working."""
-    numbers = sorted({int(target.split("-")[1]) for target in in_flight if target.startswith("JOV-")})
+    """Pool counts, triage returns and the titles of the issues this host is working, read
+    from the local Linear mirror: the HUD spends no Linear request (2026-10-11)."""
     try:
-        client = lane.Linear(env_file)
-        token = lane._cache_token("-".join(str(number) for number in numbers) or "idle")
-
-        def fetch():
-            return client.gql(
-            'query($labels:[String!]!' + (',$numbers:[Float!]!' if numbers else '') + '){'
-            'pool: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},labels:{name:{in:$labels}}})'
-            '{nodes{identifier priority labels{nodes{name}}}}'
-            + ('active: issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}})'
-               '{nodes{identifier title state{name}}}' if numbers else '')
-            + 'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
-            '{nodes{identifier}}}', {"labels": list(LANE_LABELS), **({"numbers": numbers} if numbers else {})})
-
-        data = lane.shared(f"claim-hud-linear-{token}", lane.CLAIM_SCAN_TTL_S, fetch)
+        state = lane.lane_state_dir()
+        if state is None:
+            raise RuntimeError("no lanes state dir")
+        mirror = lane.linear_sync.read_mirror(state, "JOV")
+        view = lane.linear_sync.status(state)
     except Exception as error:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"[:100]}
-    pool = Counter()
-    for node in data["pool"]["nodes"]:
-        for label in node["labels"]["nodes"]:
-            if label["name"] in LANE_LABELS:
-                pool[label["name"]] += 1
-    active = {n["identifier"]: n["title"] for n in (data.get("active") or {"nodes": []})["nodes"]}
-    return {"ok": True, "pool": dict(pool), "poolTotal": len(data["pool"]["nodes"]), "active": active,
-            "triage": len(data["triage"]["nodes"]), "fetchedAt": utcnow().isoformat()}
+    rows = list((mirror.get("issues") or {}).values())
+    todo = lane.linear_sync.todo(state, "JOV")
+    pool = Counter(label for row in todo for label in row["labels"] if label in LANE_LABELS)
+    wanted = set(in_flight)
+    active = {row["identifier"]: row["title"] for row in rows if row["identifier"] in wanted}
+    triage = sum(1 for row in rows if row["state"] == "Triage" and set(row["labels"]) & set(LANE_LABELS))
+    jov = view["mirror"]["JOV"]
+    synced = mirror.get("syncedAt")
+    return {"ok": synced is not None, "error": "mirror filling", "pool": dict(pool), "poolTotal": len(todo),
+            "active": active, "triage": triage, "mirrorAgeS": jov["ageS"], "outbox": view["outbox"]["depth"],
+            "fetchedAt": datetime.fromtimestamp(synced, timezone.utc).isoformat() if synced else None}
 
 
 def gh_json(args: list[str], timeout: int = 40):
@@ -493,15 +487,19 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     now = utcnow()
     local, linear, github, system = model["local"], model["linear"], model["github"], model["system"]
     lines: list[str] = []
+    open_error = github.get("errors", {}).get("open")
+    open_known = not open_error and isinstance(github.get("open"), list)
+    open_prs = github["open"] if open_known else []
     titles = {}
-    for pr in github.get("open", []):
+    for pr in open_prs:
         titles[f"PR{pr['number']}"] = pr["title"]
     titles.update(linear.get("active", {}))
 
     # header
     gh_note = (f"GitHub {github['rate']['graphql']}/5000" if github.get("rate") else
                "GitHub " + rgb(RED, github.get("errors", {}).get("rate", "unread")))
-    linear_note = "Linear ok" if linear.get("ok") else "Linear " + rgb(RED, linear.get("error", "unread"))
+    linear_note = (f"Linear mirror {age(linear['fetchedAt'], now)} · outbox {linear.get('outbox', 0)}" if linear.get("ok")
+                   else "Linear " + rgb(RED, linear.get("error", "unread")))
     stale_flags = []
     if github.get("fetchedAt") and (now - datetime.fromisoformat(github["fetchedAt"])).total_seconds() > 3 * REFRESH_REMOTE_S:
         stale_flags.append("github stale " + age(github["fetchedAt"], now))
@@ -538,7 +536,9 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     shown = 0
     for name, count in local["slots"].items():
         mine = [w for w in workers if w["provider"] == name]
-        for index in range(count):
+        # Seats taken before an autoscale reduction finish naturally; hiding them showed
+        # "codex 2/0" with no rows while two codex workers were still running.
+        for index in range(max(count, len(mine))):
             if shown >= rows_budget:
                 break
             worker = mine[index] if index < len(mine) else None
@@ -608,12 +608,13 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
             lines.append(pad("  " + part, width))
 
     # pipeline
-    open_prs = github.get("open", [])
     queue = github.get("queue", {})
     queued = {e["number"]: e for e in queue.get("entries", [])}
-    head = f"PIPELINE · open lane PRs {len(open_prs)} · draft {sum(1 for p in open_prs if p['draft'])} · ready {sum(1 for p in open_prs if not p['draft'])} · merge queue {queue.get('depth', rgb(RED, github.get('errors', {}).get('queue', 'unread')))}"
-    if "open" in github.get("errors", {}):
-        head += " · " + rgb(RED, "PR list: " + github["errors"]["open"])
+    counts = (f"open lane PRs {len(open_prs)} · draft {sum(1 for p in open_prs if p['draft'])} · ready {sum(1 for p in open_prs if not p['draft'])}"
+              if open_known else "open lane PRs unknown · draft unknown · ready unknown")
+    head = f"PIPELINE · {counts} · merge queue {queue.get('depth', rgb(RED, github.get('errors', {}).get('queue', 'unread')))}"
+    if not open_known:
+        head += " · " + rgb(RED, "PR list: " + (open_error or "not-read-yet"))
     lines.append(rgb(FG, head, bold=True))
     pipeline_budget = max(4, height - len(lines) - 15)
     merge_colors = {"CLEAN": GREEN, "UNSTABLE": ORANGE, "BLOCKED": ORANGE, "DIRTY": RED, "BEHIND": DIM, "HAS_HOOKS": DIM, "UNKNOWN": DIM}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChangelogRelease } from './changelog-parser';
+import { resolveCustomerChangelogHero } from './customer-changelog';
 import {
   parseWhatsNewFeed,
   projectWhatsNew,
@@ -45,6 +46,7 @@ function entry(id: string): WhatsNewEntry {
     url: `${BASE_URL}/changelog/${id}`,
     highlights: [],
     dogfood: [],
+    hero: null,
   };
 }
 
@@ -81,6 +83,7 @@ describe('projectWhatsNew', () => {
       entries: [
         {
           id: '3.0.0',
+          hero: resolveCustomerChangelogHero('3.0.0'),
           title: 'Chat is home',
           date: '2026-09-01',
           summary: 'A bigger release.',
@@ -203,5 +206,44 @@ describe('parseWhatsNewFeed', () => {
       ],
     });
     expect(parsed?.entries.map(e => e.id)).toEqual(['3']);
+  });
+});
+
+describe('published hero inheritance', () => {
+  it('round trips the post authority through the real feed parser', () => {
+    const projected = projectWhatsNew([release('2026-10-02')], BASE_URL);
+    const parsed = parseWhatsNewFeed(JSON.parse(JSON.stringify(projected)));
+    expect(parsed?.entries[0]?.hero).toEqual(
+      resolveCustomerChangelogHero('2026-10-02')
+    );
+    expect(parsed?.entries[0]?.url).toBe('https://jov.ie/changelog/2026-10-02');
+  });
+  it.each([
+    undefined,
+    null,
+    {},
+    { kind: 'video', src: 'javascript:alert(1)' },
+    { ...resolveCustomerChangelogHero('old'), postId: 'old' },
+    { ...resolveCustomerChangelogHero('3'), src: '/invented.webp' },
+  ])('retains text and link for missing, malformed or stale hero %j', hero => {
+    const original = entry('3');
+    const parsed = parseWhatsNewFeed({
+      ...feed(['3']),
+      entries: [{ ...original, hero }],
+    });
+    expect(parsed?.entries[0]).toEqual({ ...original, hero: null });
+  });
+  it('does not associate media with a different post destination', () => {
+    const parsed = parseWhatsNewFeed({
+      ...feed(['3']),
+      entries: [
+        {
+          ...entry('3'),
+          url: BASE_URL + '/changelog/old',
+          hero: resolveCustomerChangelogHero('3'),
+        },
+      ],
+    });
+    expect(parsed?.entries[0]?.hero).toBeNull();
   });
 });

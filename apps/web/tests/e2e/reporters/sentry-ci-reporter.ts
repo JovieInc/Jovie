@@ -77,24 +77,36 @@ function parseStackLocation(stack?: string): { file: string; line?: number } {
   };
 }
 
-function isE2eSentryReportingEnabled(): boolean {
-  return (
-    process.env.SENTRY_E2E_REPORTING === '1' &&
-    Boolean(process.env.SENTRY_DSN_DEV ?? process.env.SENTRY_DSN)
-  );
+interface SentryCiEnvironment {
+  [key: string]: string | undefined;
+  SENTRY_DSN_DEV?: string;
+  SENTRY_E2E_REPORTING?: string;
+}
+
+export function resolveSentryCiDestination(
+  env: SentryCiEnvironment = process.env
+): { dsn: string; environment: 'synthetic' } | null {
+  if (env.SENTRY_E2E_REPORTING !== '1' || !env.SENTRY_DSN_DEV) {
+    return null;
+  }
+
+  return {
+    dsn: env.SENTRY_DSN_DEV,
+    environment: 'synthetic',
+  };
 }
 
 class SentryCiReporter implements Reporter {
-  private enabled = isE2eSentryReportingEnabled();
+  private destination = resolveSentryCiDestination();
 
   onBegin(config: FullConfig, suite: Suite): void {
-    if (!this.enabled) {
+    if (!this.destination) {
       return;
     }
 
     Sentry.init({
-      dsn: process.env.SENTRY_DSN_DEV ?? process.env.SENTRY_DSN,
-      environment: process.env.SENTRY_ENVIRONMENT ?? 'ci-e2e',
+      dsn: this.destination.dsn,
+      environment: this.destination.environment,
       release: process.env.SENTRY_RELEASE,
       tracesSampleRate: 0,
       sendDefaultPii: false,
@@ -114,7 +126,7 @@ class SentryCiReporter implements Reporter {
   onTestEnd(test: TestCase, result: TestResult): void {
     // Only report on the final retry attempt to avoid noise from transient failures
     if (
-      !this.enabled ||
+      !this.destination ||
       result.status !== 'failed' ||
       result.retry < test.retries
     ) {
@@ -207,7 +219,7 @@ class SentryCiReporter implements Reporter {
   }
 
   async onEnd(result: FullResult): Promise<void> {
-    if (!this.enabled) {
+    if (!this.destination) {
       return;
     }
 

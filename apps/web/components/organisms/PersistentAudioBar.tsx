@@ -1,7 +1,14 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/organisms/PersistentAudioBar.test.tsx
-import { ChevronDown, ChevronUp, Play, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Play,
+  SkipBack,
+  SkipForward,
+  X,
+} from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -26,9 +33,11 @@ import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { isFormElement } from '@/lib/utils/keyboard';
 import {
+  mediaCanvasTransport,
   resetAudioChromeSnapshot,
   setAudioChromeSnapshot,
   useFullAudioPlayerExpandRequests,
+  useMediaCanvasTransport,
 } from './audio-chrome-state';
 
 function isLyricsRoutePath(pathname: string | null): boolean {
@@ -90,6 +99,10 @@ export function PersistentAudioBar() {
     onError,
   } = useTrackAudioPlayer();
   const [imgError, setImgError] = useState(false);
+  // While the media canvas is open it owns playback (JOV-7240): the dock
+  // renders the canvas transport — play/pause, scrub, time, next/previous
+  // item — instead of the audio track, which the canvas pauses on play.
+  const canvasTransport = useMediaCanvasTransport();
   // Compact is the default surface for an active track (founder spec
   // 2026-09-25). The dock's PlayerVisibilityToggle closes it to the sidebar
   // mini (JOV-3511); idle/dismissed playback leaves no dock at all (JOV-6680).
@@ -280,31 +293,119 @@ export function PersistentAudioBar() {
   ]);
 
   useEffect(() => {
-    if (!hasActiveTrack || !activeTrackId) {
+    if (!hasActiveTrack && !canvasTransport) {
       resetAudioChromeSnapshot();
       return;
     }
 
     setAudioChromeSnapshot({
       activeTrackId,
-      compactPlayerVisible,
-      fullPlayerVisible: !compactPlayerVisible,
+      compactPlayerVisible: canvasTransport ? false : compactPlayerVisible,
+      fullPlayerVisible: canvasTransport ? true : !compactPlayerVisible,
     });
-  }, [activeTrackId, compactPlayerVisible, hasActiveTrack]);
+  }, [activeTrackId, compactPlayerVisible, hasActiveTrack, canvasTransport]);
 
   useEffect(() => {
     return resetAudioChromeSnapshot;
   }, []);
 
+  // Canvas transport row — shown in the dock whenever MediaCanvasViewer owns
+  // playback, with or without an audio track loaded (JOV-7240). Same dock
+  // surface and reveal; next/previous step through photo and video items.
+  const canvasDockRow = canvasTransport ? (
+    <section
+      aria-label='Media Player'
+      data-testid='media-canvas-dock'
+      className='flex items-center gap-3 px-4 py-1.5 lg:px-6'
+    >
+      <div className='w-30 min-w-0 shrink-0 lg:w-45'>
+        <TruncatedText
+          lines={1}
+          className='text-xs font-caption leading-[1.2] text-primary-token'
+        >
+          {canvasTransport.title}
+        </TruncatedText>
+        <TruncatedText
+          lines={1}
+          className='text-2xs leading-[1.3] text-tertiary-token'
+        >
+          {`${canvasTransport.index + 1} / ${canvasTransport.count}${canvasTransport.isVideo ? '' : ' · Photo'}`}
+        </TruncatedText>
+      </div>
+      <div className='flex min-w-0 flex-1 items-center gap-2'>
+        {canvasTransport.hasPrevious ? (
+          <IconBtn
+            label='Previous Item'
+            tooltipSide='top'
+            tone='ghost'
+            onClick={() => mediaCanvasTransport.previous()}
+          >
+            <SkipBack
+              className='h-4 w-4'
+              strokeWidth={2.5}
+              fill='currentColor'
+            />
+          </IconBtn>
+        ) : null}
+        {canvasTransport.isVideo ? (
+          <AudioPlayButton
+            isPlaying={canvasTransport.isPlaying}
+            onClick={() => mediaCanvasTransport.toggle()}
+            label={canvasTransport.isPlaying ? 'Pause video' : 'Play video'}
+            size='persistent'
+          />
+        ) : null}
+        {canvasTransport.hasNext ? (
+          <IconBtn
+            label='Next Item'
+            tooltipSide='top'
+            tone='ghost'
+            onClick={() => mediaCanvasTransport.next()}
+          >
+            <SkipForward
+              className='h-4 w-4'
+              strokeWidth={2.5}
+              fill='currentColor'
+            />
+          </IconBtn>
+        ) : null}
+        {canvasTransport.isVideo ? (
+          <>
+            <span className='w-8 shrink-0 text-right text-3xs tabular-nums text-quaternary-token'>
+              {formatDuration(Math.round(canvasTransport.currentTime) * 1000)}
+            </span>
+            <SeekBar
+              currentTime={canvasTransport.currentTime}
+              duration={canvasTransport.duration}
+              onSeek={time => mediaCanvasTransport.seek(time)}
+              className='h-1 min-w-15 flex-1 bg-surface-1'
+            />
+            <span className='w-8 shrink-0 text-3xs tabular-nums text-quaternary-token'>
+              {canvasTransport.duration > 0
+                ? formatDuration(Math.round(canvasTransport.duration) * 1000)
+                : null}
+            </span>
+          </>
+        ) : null}
+      </div>
+    </section>
+  ) : null;
+
   if (!hasActiveTrack || !activeTrackId) {
     // Idle/stopped: keep the dock mounted but empty so ShellAudioDock can
     // animate 0-height after the snapshot clears (the panel slides back down
     // instead of the player vanishing). Zero reserved space — the closed
-    // dock's max-height is 0.
+    // dock's max-height is 0. A live media-canvas session fills the dock
+    // instead (JOV-7240).
     return (
-      <div className='hidden shrink-0 lg:block'>
-        <ShellAudioDock>{null}</ShellAudioDock>
-      </div>
+      <>
+        <div className='hidden shrink-0 lg:block'>
+          <ShellAudioDock>{canvasDockRow}</ShellAudioDock>
+        </div>
+        {canvasTransport ? (
+          <div className='lg:hidden'>{canvasDockRow}</div>
+        ) : null}
+      </>
     );
   }
 
@@ -432,61 +533,67 @@ export function PersistentAudioBar() {
           JOV-3511 keeps full + mini exclusive. */}
       <div className='hidden shrink-0 lg:block'>
         <ShellAudioDock>
-          <div
-            data-testid='audio-surface-expanded-shell'
-            data-shell-audio-surface='persistent-expanded'
-            aria-hidden={!playerOpen}
-            className='flex items-center gap-3 px-4 py-1.5 lg:px-6'
-          >
-            <AudioBar
-              isPlaying={playbackState.isPlaying}
-              onPlay={handleToggle}
-              onPrevious={
-                playbackState.hasPrevious
-                  ? () => playPrevious().catch(() => {})
-                  : undefined
-              }
-              onNext={
-                playbackState.hasNext
-                  ? () => playNext().catch(() => {})
-                  : undefined
-              }
-              currentTime={playbackState.currentTime}
-              duration={playbackState.duration}
-              onSeek={seek}
-              waveformOn={waveformOn}
-              onToggleWaveform={() => setWaveformOn(current => !current)}
-              lyricsActive={pathname === lyricsPath}
-              onOpenLyrics={
-                playbackState.hasLyrics ? handleOpenLyrics : undefined
-              }
-              onLyricsIntent={prefetchLyricsRoute}
-              track={shellTrack}
-              className='min-w-0 flex-1 px-0 py-0'
-            />
-            <div className='flex shrink-0 items-center gap-1'>
-              <PlayerVisibilityToggle
-                open={playerOpen}
-                onClick={() => setPlayerOpen(value => !value)}
+          {canvasDockRow ?? (
+            <div
+              data-testid='audio-surface-expanded-shell'
+              data-shell-audio-surface='persistent-expanded'
+              aria-hidden={!playerOpen}
+              className='flex items-center gap-3 px-4 py-1.5 lg:px-6'
+            >
+              <AudioBar
+                isPlaying={playbackState.isPlaying}
+                onPlay={handleToggle}
+                onPrevious={
+                  playbackState.hasPrevious
+                    ? () => playPrevious().catch(() => {})
+                    : undefined
+                }
+                onNext={
+                  playbackState.hasNext
+                    ? () => playNext().catch(() => {})
+                    : undefined
+                }
+                currentTime={playbackState.currentTime}
+                duration={playbackState.duration}
+                onSeek={seek}
+                waveformOn={waveformOn}
+                onToggleWaveform={() => setWaveformOn(current => !current)}
+                lyricsActive={pathname === lyricsPath}
+                onOpenLyrics={
+                  playbackState.hasLyrics ? handleOpenLyrics : undefined
+                }
+                onLyricsIntent={prefetchLyricsRoute}
+                track={shellTrack}
+                className='min-w-0 flex-1 px-0 py-0'
               />
-              <IconBtn
-                label='Dismiss Player'
-                onClick={handleDismiss}
-                tooltipSide='top'
-                tone='ghost'
-                testId='audio-player-dismiss'
-              >
-                <X
-                  aria-hidden='true'
-                  className='h-3.5 w-3.5'
-                  strokeWidth={2.25}
+              <div className='flex shrink-0 items-center gap-1'>
+                <PlayerVisibilityToggle
+                  open={playerOpen}
+                  onClick={() => setPlayerOpen(value => !value)}
                 />
-              </IconBtn>
+                <IconBtn
+                  label='Dismiss Player'
+                  onClick={handleDismiss}
+                  tooltipSide='top'
+                  tone='ghost'
+                  testId='audio-player-dismiss'
+                >
+                  <X
+                    aria-hidden='true'
+                    className='h-3.5 w-3.5'
+                    strokeWidth={2.25}
+                  />
+                </IconBtn>
+              </div>
             </div>
-          </div>
+          )}
         </ShellAudioDock>
       </div>
-      {mobileBar('lg:hidden')}
+      {canvasTransport ? (
+        <div className='lg:hidden'>{canvasDockRow}</div>
+      ) : (
+        mobileBar('lg:hidden')
+      )}
     </>
   );
 }

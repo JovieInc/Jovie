@@ -162,6 +162,17 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(admin.entry?.id, 'web.settings-admin-redirect');
     assert.deepEqual(admin.entry?.viewports, ['desktop', 'mobile']);
   });
+  it('registers the referral settings page and its copy interaction', () => {
+    for (const path of [
+      'apps/web/app/app/(shell)/settings/referral/page.tsx',
+      'apps/web/app/app/(shell)/settings/referral/ReferralCodeCopyClient.tsx',
+    ]) {
+      const classified = classifyScreenPath(path);
+      assert.equal(classified.kind, 'registered');
+      assert.equal(classified.entry?.id, 'web.settings-referral');
+      assert.deepEqual(classified.entry?.viewports, ['desktop', 'mobile']);
+    }
+  });
   it('registers the money route and layout for both viewports', () => {
     for (const path of [
       'apps/web/app/app/money/page.tsx',
@@ -930,6 +941,82 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         `route ${route} is bound to more than one screen id`
       );
       seenRoutes.add(route);
+    }
+  });
+
+  it('keeps the JOV-8170 public-screens batch producer bindings synchronized', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    // These screens were registered but uncovered (no rendered producer).
+    // Two bind to already-captured marketing routes; the rest share one
+    // multi-screen proof spec whose entries must match these bindings.
+    assert.equal(SCREEN_MARKETING_ROUTES['web.marketing-renders'], '/renders');
+    assert.equal(
+      SCREEN_MARKETING_ROUTES['web.profile-admission'],
+      '/renders/profile-admission'
+    );
+    const batchScreens = [
+      'web.root-document',
+      'web.root-layout',
+      'web.legal-shell',
+      'web.legal-privacy',
+      'web.legal-terms',
+      'web.legal-cookies',
+      'web.legal-dmca',
+      'web.playlists-index',
+      'web.brand',
+      'web.report',
+      'web.start',
+      'web.marketing-solutions',
+      'web.public-profile-about',
+    ];
+    const spec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/public-screens-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    for (const screenId of batchScreens) {
+      const route = SCREEN_PROOF_ROUTES[screenId];
+      assert.ok(route, `${screenId} must be bound to a proof route`);
+      const suffix = screenId.slice(screenId.indexOf('.') + 1);
+      assert.equal(
+        screenProofArtifactName(screenId),
+        `${PRODUCER.artifact}-${suffix}`
+      );
+      assert.match(
+        spec,
+        new RegExp(
+          `screenId: '${screenId.replace(/\./g, '\\.')}', route: '${route.replace(/[/.?]/g, '\\$&')}'`
+        ),
+        `${screenId} must be captured by public-screens-proof.spec.ts`
+      );
+      assert.match(
+        workflow,
+        new RegExp(`\\b${screenId.replace(/\./g, '\\.')}\\b`)
+      );
+      assert.match(
+        workflow,
+        new RegExp(`name: ${screenProofArtifactName(screenId)}\\b`),
+        `${screenId} must upload its own proof artifact`
+      );
+      assert.match(
+        workflow,
+        new RegExp(
+          `${suffix}-artifact-id: \\$\\{\\{ steps\\.${suffix}-proof\\.outputs\\.artifact-id \\}\\}`
+        ),
+        `${screenId} must expose its artifact id as a job output`
+      );
+      assert.match(
+        workflow,
+        new RegExp(
+          `"${screenId.replace(/\./g, '\\.')}\\|\\$\\{\\{ needs\\.generate\\.outputs\\.${suffix}-artifact-id \\}\\}"`
+        ),
+        `${screenId} must be certified from its own artifact in the certify job`
+      );
     }
   });
 
@@ -3469,23 +3556,17 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
-  it('retains scheduled whole-system sweeps', () => {
+  it('retains event-driven whole-system sweeps', () => {
     assert.deepEqual(validateRetainedSweeps(), []);
     for (const workflow of RETAINED_SWEEP_WORKFLOWS) {
       const text = readFileSync(resolve(ROOT, workflow.path), 'utf8');
-      assert.match(text, /\n  schedule:\n/);
-      const cron = workflow.cron.replace(/\*/g, '\\*');
-      assert.match(text, new RegExp(cron));
+      assert.match(text, /\n {2}push:\n {4}branches: \[main\]\n/);
+      assert.doesNotMatch(text, /\n {2}schedule:\n/);
     }
     const dropped = validateRetainedSweeps({
-      workflows: [
-        {
-          path: 'scripts/invariants/screen-certification.test.mjs',
-          cron: '0 9 * * *',
-        },
-      ],
+      workflows: [{ path: 'scripts/invariants/screen-certification.test.mjs' }],
     });
-    assert.match(dropped.join('\n'), /dropped its schedule/);
+    assert.match(dropped.join('\n'), /dropped its main-push trigger/);
   });
 
   it('does not require proof for excluded Ovie, auth, MenuMonitor, or iOS shell changes', () => {

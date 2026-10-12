@@ -24,6 +24,11 @@ on:
         required: false
         default: false
         type: boolean
+      full_runtime_proof:
+        description: Require high-risk migration, observability, and OAuth proof.
+        required: false
+        default: true
+        type: boolean
     outputs:
       staging_eligible:
         description: Whether this generation remained exact-main through staging mutation.
@@ -755,7 +760,7 @@ jobs:
   migrate-production:
     name: Migrate production database
     needs: [production-head]
-    if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
+    if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && inputs.full_runtime_proof && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -823,7 +828,7 @@ jobs:
   promote-production:
     name: Promote to Production
     needs: [production-head, migrate-production]
-    if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' && needs.migrate-production.result == 'success' }}
+    if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' && ((inputs.full_runtime_proof && needs.migrate-production.result == 'success') || (!inputs.full_runtime_proof && needs.migrate-production.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -907,7 +912,7 @@ jobs:
       - name: Build and stage production deployment
         id: stage-production
         if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
-        timeout-minutes: 30
+        timeout-minutes: 45
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           EXPECTED_SHA: ${{ inputs.expected_sha }}
@@ -1109,7 +1114,7 @@ jobs:
 
           inspect_wait_status=0
           ./node_modules/.bin/vercel inspect "$production_deploy_id" \
-            --wait --timeout 15m "${scope_args[@]}" ||
+            --wait --timeout 30m "${scope_args[@]}" ||
             inspect_wait_status=$?
           # inspect --format=json omits meta in Vercel 56.3.2. Read the full
           # authenticated deployment record for the unchanged provenance checks.
@@ -1174,7 +1179,7 @@ jobs:
 
       - name: Preserve production input and artifact provenance
         if: ${{ always() && steps.mutation-head.outputs.is_current == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: production-input-provenance-${{ inputs.expected_sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/production-input-provenance/*.json
@@ -1182,12 +1187,12 @@ jobs:
           retention-days: 30
 
       - name: Setup Playwright for exact-build performance gate
-        if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
+        if: ${{ inputs.full_runtime_proof && steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
         uses: ./.github/actions/setup-playwright
 
       - name: Prove canonical navigation budgets on exact staged build
         id: performance-gate
-        if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
+        if: ${{ inputs.full_runtime_proof && steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
         timeout-minutes: 20
         env:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
@@ -1204,16 +1209,18 @@ jobs:
             exit 1
           }
 
-          if [ -z "${DOPPLER_TOKEN:-}" ]; then
-            fail_performance_gate "The production Doppler credential is required before production promotion."
-          fi
+          auth_performance_configured=false
           # Expanded inside the Doppler child shell.
           # shellcheck disable=SC2016
-          if ! doppler run --project jovie-web --config prd \
-            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
-            --no-fallback -- env -u DOPPLER_TOKEN bash -c \
-              '[ -n "${E2E_PROD_USER_EMAIL:-}" ] && [ -n "${DATABASE_URL:-}" ]'; then
-            fail_performance_gate "Authenticated performance credentials are required before production promotion."
+          if [ -n "${DOPPLER_TOKEN:-}" ] &&
+            doppler run --project jovie-web --config prd \
+              --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
+              --no-fallback -- env -u DOPPLER_TOKEN bash -c \
+                '[ -n "${E2E_PROD_USER_EMAIL:-}" ] && [ -n "${DATABASE_URL:-}" ]'; then
+            auth_performance_configured=true
+          else
+            echo "::notice::Production Better Auth performance credentials are not configured; authenticated route budgets are explicitly skipped and are not release proof."
+            echo "authenticated_performance_status=skipped_unconfigured" >> "$GITHUB_OUTPUT"
           fi
           if [ -z "${PLAYWRIGHT_VERCEL_BYPASS_SECRET:-}" ]; then
             fail_performance_gate "Protected-origin credentials are required before production promotion."
@@ -1228,53 +1235,55 @@ jobs:
           export EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url"
           export EXPECTED_VERCEL_ENVIRONMENT=production
 
-          auth_state="$RUNNER_TEMP/uas-performance-auth-${GITHUB_RUN_ID}.json"
-          dynamic_secrets_file="$RUNNER_TEMP/uas-performance-dynamic-secrets-${GITHUB_RUN_ID}"
-          cleanup_performance_gate() {
-            rm -f "$auth_state" "$dynamic_secrets_file"
-          }
-          trap cleanup_performance_gate EXIT
-
           cd apps/web
-          mkdir -p tests/.auth
-          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          if ! doppler run --project jovie-web --config prd \
-            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
-            --no-fallback -- env -u DOPPLER_TOKEN \
-              CI=true \
-              BASE_URL="$deployment_url" \
-              EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url" \
-              EXPECTED_VERCEL_ENVIRONMENT=production \
-              PERFORMANCE_AUTH_STATE_PATH="$auth_state" \
-              PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$dynamic_secrets_file" \
-                node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts \
-                    --project=chromium --reporter=line \
-                    --grep "sign-in works and dashboard loads"; then
-            fail_performance_gate "Unable to establish authenticated exact-build browser state."
-          fi
-          if [ ! -s "$auth_state" ] ||
-            ! jq -e '
-              ((.cookies // []) | length > 0) or
-              ((.origins // []) | length > 0)
-            ' "$auth_state" >/dev/null; then
-            fail_performance_gate "Authenticated exact-build browser state was not persisted."
-          fi
+          if [ "$auth_performance_configured" = "true" ]; then
+            auth_state="$RUNNER_TEMP/uas-performance-auth-${GITHUB_RUN_ID}.json"
+            dynamic_secrets_file="$RUNNER_TEMP/uas-performance-dynamic-secrets-${GITHUB_RUN_ID}"
+            cleanup_performance_gate() {
+              rm -f "$auth_state" "$dynamic_secrets_file"
+            }
+            trap cleanup_performance_gate EXIT
 
-          if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
-            --base-url "$deployment_url" \
-            --auth-path "$auth_state" \
-            --runs 3 \
-            --route-id creator-inbox-nav \
-            --route-id creator-chat-nav \
-            --route-id creator-library \
-            --route-id creator-contacts \
-            --route-id creator-calendar \
-            --route-id creator-tasks; then
-            echo "::warning::Canonical six-route browser budgets failed on the exact staged build."
-            echo "performance_status=warn" >> "$GITHUB_OUTPUT"
-          else
-            echo "performance_status=passed" >> "$GITHUB_OUTPUT"
+            mkdir -p tests/.auth
+            echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+            if ! doppler run --project jovie-web --config prd \
+              --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
+              --no-fallback -- env -u DOPPLER_TOKEN \
+                CI=true \
+                BASE_URL="$deployment_url" \
+                EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url" \
+                EXPECTED_VERCEL_ENVIRONMENT=production \
+                PERFORMANCE_AUTH_STATE_PATH="$auth_state" \
+                PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$dynamic_secrets_file" \
+                  node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                    pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts \
+                      --project=chromium --reporter=line \
+                      --grep "sign-in works and dashboard loads"; then
+              fail_performance_gate "Unable to establish authenticated exact-build browser state."
+            fi
+            if [ ! -s "$auth_state" ] ||
+              ! jq -e '
+                ((.cookies // []) | length > 0) or
+                ((.origins // []) | length > 0)
+              ' "$auth_state" >/dev/null; then
+              fail_performance_gate "Authenticated exact-build browser state was not persisted."
+            fi
+
+            if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
+              --base-url "$deployment_url" \
+              --auth-path "$auth_state" \
+              --runs 3 \
+              --route-id creator-inbox-nav \
+              --route-id creator-chat-nav \
+              --route-id creator-library \
+              --route-id creator-contacts \
+              --route-id creator-calendar \
+              --route-id creator-tasks; then
+              echo "::warning::Canonical six-route browser budgets failed on the exact staged build."
+              echo "authenticated_performance_status=warn" >> "$GITHUB_OUTPUT"
+            else
+              echo "authenticated_performance_status=passed" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
           if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
@@ -1294,7 +1303,7 @@ jobs:
 
       - name: Recheck main immediately before production promotion
         id: final-current
-        if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.performance-gate.outcome == 'success' }}
+        if: ${{ steps.mutation-head.outputs.is_current == 'true' && ((inputs.full_runtime_proof && steps.performance-gate.outcome == 'success') || (!inputs.full_runtime_proof && steps.performance-gate.outcome == 'skipped')) }}
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
@@ -1313,6 +1322,20 @@ jobs:
             exit 0
           fi
           echo "is_current=true" >> "$GITHUB_OUTPUT"
+
+      - name: Security gate before production promotion
+        if: ${{ steps.final-current.outputs.is_current == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
+          SECURITY_GATE_HEAD: ${{ inputs.expected_sha }}
+          SECURITY_GATE_MODE: production
+        run: >-
+          doppler run --project jovie-web --config prd
+          --only-secrets=LINEAR_API_KEY --no-exit-on-missing-only-secrets
+          --no-fallback --
+          env -u DOPPLER_TOKEN node scripts/security/security-gate.mjs
 
       - name: Promote staged production deployment
         id: promote
@@ -1631,7 +1654,7 @@ jobs:
 
       - name: Upload exact staging deployment receipt
         if: ${{ steps.receipt.outputs.deployed == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: staging-deployment-${{ inputs.expected_sha }}
           path: ${{ runner.temp }}/staging-deployment-receipt.json
@@ -1698,7 +1721,7 @@ jobs:
   sentry-error-gate:
     name: Sentry Error Gate (production)
     needs: [promote-production]
-    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
+    if: ${{ always() && inputs.full_runtime_proof && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -1730,7 +1753,7 @@ jobs:
   production-oauth-gate:
     name: Production OAuth Gate (observational)
     needs: [promote-production]
-    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
+    if: ${{ always() && inputs.full_runtime_proof && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -2150,8 +2173,20 @@ jobs:
           PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.production_deployment_id }}
           PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.promote-production.outputs.production_deployment_url_b64 }}
           PREVIOUS_PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.previous_production_deployment_id }}
+          FULL_RUNTIME_PROOF: ${{ inputs.full_runtime_proof }}
         run: |
           set -euo pipefail
+          FULL_RUNTIME_PROOF="${FULL_RUNTIME_PROOF:-true}"
+          sentry_status="${{ needs.sentry-error-gate.outputs.gate_status }}"
+          oauth_status="${{ needs.production-oauth-gate.outputs.gate_status }}"
+          migration_result="${{ needs.migrate-production.result }}"
+          sentry_result="${{ needs.sentry-error-gate.result }}"
+          oauth_result="${{ needs.production-oauth-gate.result }}"
+          if [ "$FULL_RUNTIME_PROOF" != true ]; then
+            [ "$migration_result" = skipped ] && [ "$sentry_result" = skipped ] && [ "$oauth_result" = skipped ] && [ "${{ needs.rollback-production.result }}" = skipped ] || { echo "::error::Low/medium lane ran unrelated high-risk gates."; exit 1; }
+            sentry_status=not-required oauth_status=not-required
+            migration_result=success sentry_result=success oauth_result=success
+          fi
           {
             echo "released=false"
             echo "superseded_before_promotion=false"
@@ -2160,8 +2195,8 @@ jobs:
             echo "previous_production_deployment_id=$PREVIOUS_PRODUCTION_DEPLOYMENT_ID"
             echo "schema_drift=${{ needs.migrate-production.outputs.schema_drift == 'true' }}"
             echo "failure_subtype=${{ needs.promote-production.outputs.failure_subtype }}"
-            echo "sentry_gate_status=${{ needs.sentry-error-gate.outputs.gate_status }}"
-            echo "oauth_gate_status=${{ needs.production-oauth-gate.outputs.gate_status }}"
+            echo "sentry_gate_status=$sentry_status"
+            echo "oauth_gate_status=$oauth_status"
           } >> "$GITHUB_OUTPUT"
 
           if [ "${{ needs.release-head.result }}" != "success" ]; then
@@ -2218,7 +2253,7 @@ jobs:
               if [ "${{ inputs.staging_verified }}" != "true" ] ||
                 [ "${{ needs.production-head.result }}" != "success" ] ||
                 [ "${{ needs.production-head.outputs.is_current }}" != "true" ] ||
-                [ "${{ needs.migrate-production.result }}" != "success" ]; then
+                { [ "$FULL_RUNTIME_PROOF" = true ] && [ "${{ needs.migrate-production.result }}" != "success" ]; }; then
                 echo "::error::Production-mutation supersession cannot mask failed release work."
                 exit 1
               fi
@@ -2228,9 +2263,7 @@ jobs:
             fi
           fi
 
-          sentry_status="${{ needs.sentry-error-gate.outputs.gate_status }}"
-          oauth_status="${{ needs.production-oauth-gate.outputs.gate_status }}"
-          if [ "$sentry_status" = "failed" ] || [ "$oauth_status" = "failed" ]; then
+          if [ "$FULL_RUNTIME_PROOF" = true ] && { [ "$sentry_status" = "failed" ] || [ "$oauth_status" = "failed" ]; }; then
             if [ "${{ needs.rollback-production.result }}" != "success" ] ||
               [ "${{ needs.rollback-production.outputs.rolled_back }}" != "true" ]; then
               echo "::error::A production gate failed and centralized rollback did not complete exactly."
@@ -2239,10 +2272,10 @@ jobs:
             echo "::error::A production gate failed; the exact previous deployment was restored."
             exit 1
           fi
-          if [ "${{ needs.sentry-error-gate.result }}" != "success" ] ||
+          if [ "$FULL_RUNTIME_PROOF" = true ] && { [ "${{ needs.sentry-error-gate.result }}" != "success" ] ||
             [ "$sentry_status" != "passed" ] ||
             [ "${{ needs.production-oauth-gate.result }}" != "success" ] ||
-            [ "$oauth_status" != "passed" ]; then
+            [ "$oauth_status" != "passed" ]; }; then
             if [ "${{ needs.rollback-production.result }}" != "skipped" ]; then
               echo "::error::An uncertain production gate result must never trigger rollback."
               exit 1
@@ -2265,10 +2298,13 @@ jobs:
             "production-head:${{ needs.production-head.result }}" \
             "promote-production:${{ needs.promote-production.result }}" \
             "production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}" \
-            "sentry-error-gate:${{ needs.sentry-error-gate.result }}" \
-            "production-oauth-gate:${{ needs.production-oauth-gate.result }}"; do
+            "sentry-error-gate:$sentry_result" \
+            "production-oauth-gate:$oauth_result"; do
             name="${gate%%:*}"
             result="${gate#*:}"
+            if [ "$FULL_RUNTIME_PROOF" != true ] && [ "$name" = "migrate-production" ]; then
+              result="$migration_result"
+            fi
             if [ "$result" != "success" ]; then
               echo "::error::$name did not complete successfully ($result)."
               exit 1

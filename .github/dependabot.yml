@@ -45,6 +45,17 @@ updates:
         dependency-type: 'development'
         update-types:
           - 'patch'
+      # 2026-10-10: one daily batch opened 15 single-package runtime bumps. Each
+      # needs the full merge group (Mac build included) under ALLGREEN with
+      # max_entries_to_build 3, and the queue sat 18 deep for 90 min with no
+      # merge. Non-major runtime bumps land as one PR per day; majors stay one
+      # PR per package. Re-evaluate when the grouped PR fails more than one run
+      # in three (then split by family instead of by package).
+      runtime-non-major:
+        dependency-type: 'production'
+        update-types:
+          - 'minor'
+          - 'patch'
     ignore:
       # Temporary workaround: these packages do not publish 10.3.2.
       # Dependabot currently attempts that version and fails the update job.
@@ -75,6 +86,14 @@ updates:
       # (#18529), which fails the structural pin test.
       - dependency-name: 'vercel'
         versions: ['>=56.4']
+      # Pinned at 2.5.14 (2026-10-10): 2.5.15 crashes ("Biome encountered an
+      # unexpected error") on a file outside the project root, which the
+      # structural Biome contract probes (scripts/lib/__tests__/biome-*.test.mjs)
+      # write to os.tmpdir(). The dev-patch group PR #21118 carried that bump
+      # and failed six merge groups in a row. Re-evaluate at 2.5.16: run those
+      # two probe files locally against the new binary, then drop this ignore.
+      - dependency-name: '@biomejs/biome'
+        versions: ['2.5.15']
 
   # Isolated Eve pilot manifest (JOV-5214). This directory entry exists so
   # SECURITY advisories are tracked for the standalone install; version

@@ -14,6 +14,7 @@ import type { HeroDecisionInput } from '../../data/marketing/factory/heroDecisio
 import { FactoryMediaDecisionInputSchema } from '../../data/marketing/factory/mediaDecision';
 import { CompetitiveResearchSchema } from '../../data/marketing/factory/persuasionBrief';
 import { SectionJobNeedSchema } from '../../data/marketing/factory/sectionRequest';
+import { EditorialMediaIntentSchema } from '../../data/marketing/factory/spine';
 import { PROOF_KINDS } from '../../data/product-truth/proof';
 
 const Id = z.string().min(1);
@@ -72,6 +73,20 @@ export const FactoryPageBriefSchema = z.object({
       render: z.object({ cls: z.number(), lcpMs: z.number() }),
     })
     .optional(),
+});
+
+/** Legacy receipts remain readable; newly executed live work requires authored intent. */
+export const FactoryEditorialPageBriefSchema = FactoryPageBriefSchema.extend({
+  media: z
+    .array(
+      z.object({
+        sectionInstanceId: Id,
+        input: FactoryMediaDecisionInputSchema.extend({
+          editorial: EditorialMediaIntentSchema,
+        }),
+      })
+    )
+    .min(1),
 });
 
 export type FactoryPageBrief = z.infer<typeof FactoryPageBriefSchema>;

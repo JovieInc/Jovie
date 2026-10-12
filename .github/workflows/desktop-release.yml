@@ -268,8 +268,28 @@ jobs:
               exit 1
             }
             ci_workflow_id="$(jq -r '.id' <<<"$ci_workflow")"
+            # The scheduled reconciliation can fire while the tip's exact push CI
+            # is still running. That is a defer, not a failure: exit 0 so the
+            # neutral skip lands and tomorrow's reconciliation (or a
+            # workflow_run hop) owns the generation. A completed failed run
+            # still fails closed.
             ci_runs="$(gh api \
-              "repos/$REPOSITORY/actions/workflows/$ci_workflow_id/runs?branch=main&head_sha=$release_sha&status=completed&per_page=100")"
+              "repos/$REPOSITORY/actions/workflows/$ci_workflow_id/runs?branch=main&head_sha=$release_sha&per_page=100")"
+            if jq -e --arg repo "$REPOSITORY" --arg sha "$release_sha" '
+              type == "object" and
+              (.workflow_runs | type == "array") and
+              ([.workflow_runs[]? | select(
+                .head_sha == $sha and
+                .head_branch == "main" and
+                .head_repository.full_name == $repo and
+                .event == "push" and
+                .path == ".github/workflows/ci.yml" and
+                .status != "completed"
+              )] | length) >= 1
+            ' >/dev/null <<<"$ci_runs"; then
+              echo "::notice::Exact push CI for staging generation $release_sha is still running; deferring staging publication to the next reconciliation."
+              exit 0
+            fi
             jq -e --arg repo "$REPOSITORY" --arg sha "$release_sha" '
               type == "object" and
               (.workflow_runs | type == "array") and
@@ -1243,7 +1263,7 @@ jobs:
       # store; action-setup reads the root packageManager pin (pnpm@9.15.9).
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: pnpm
@@ -1489,7 +1509,7 @@ jobs:
 
       - name: Upload staging desktop package
         if: env.ENVIRONMENT == 'staging'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-staging-${{ steps.staging-version.outputs.version }}-attempt-${{ github.run_attempt }}
           path: |
@@ -1666,7 +1686,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
 
@@ -1786,7 +1806,7 @@ jobs:
             }' > "$RUNNER_TEMP/desktop-production-published.json"
 
       - name: Upload production desktop publish marker
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-production-published
           path: ${{ runner.temp }}/desktop-production-published.json
