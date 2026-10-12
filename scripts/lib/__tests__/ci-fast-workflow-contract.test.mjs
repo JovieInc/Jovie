@@ -31,6 +31,9 @@ import {
   NODE_RUNTIME_CONTRACT_COMMAND,
   NODE_RUNTIME_CONTRACT_PATHS,
   OFFLINE_FAILURE_COVERAGE_COMMAND,
+  runBiome,
+  runCopyGate,
+  runEslintServerBoundaries,
   SOURCE_GUARDS_COMMAND,
   STRUCTURAL_PYTEST_FILES,
   STRUCTURAL_PYTEST_SHARD_COMMANDS,
@@ -754,6 +757,28 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
+  it('selects physical-pointer onboarding recovery through the guarded Storybook matrix', () => {
+    const surfaces = jobBlock(
+      'ci-storybook-surfaces',
+      'ci-cross-product-integration'
+    );
+    const invocation = surfaces.match(
+      /pnpm exec playwright test ([\s\S]*?)--config=playwright\.config\.storybook\.ts/
+    );
+    expect(
+      invocation,
+      'dedicated Storybook invocation must remain present'
+    ).not.toBeNull();
+    const selected =
+      invocation[1].match(/tests\/e2e\/storybook-[a-z0-9-]+\.spec\.ts/g) ?? [];
+    const recovery = 'tests/e2e/storybook-onboarding-recovery.spec.ts';
+    expect(selected.filter(path => path === recovery)).toHaveLength(1);
+    expect(existsSync(resolve(REPO_ROOT, 'apps/web', recovery))).toBe(true);
+    expect(surfaces).toContain('guard-playwright-artifacts.mjs" --run --');
+    expect(surfaces).toContain('--project=chromium --reporter=line');
+    expect(surfaces).toContain('--workers=2');
+  });
+
   it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
@@ -1446,7 +1471,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
       'design-exception-registry': 'pnpm design:exception-registry:check',
       'design-governance-enforcement':
-        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
+        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel',
       'ios-fast': 'pnpm run ios:lint && pnpm run ios:app-store:test',
       'merge-group-guards':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
@@ -1823,7 +1848,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(fxCoverage).toContain('--coverage.thresholds.functions=70');
   });
 
-  it('enforces external shared health contract coverage for package and test changes', () => {
+  it('enforces external shared agent transport contract coverage for package and test changes', () => {
     expect(STRUCTURAL_CONTROL_PATHS).toContain(
       'packages/agent-transport-contracts/'
     );
@@ -1834,11 +1859,15 @@ describe('ci-fast bounded parallel workflow', () => {
       "selected.has('operations') || selected.has('web')"
     );
     expect(CI_FAST_SOURCE).toContain(
-      'lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal'
+      'lib/__tests__/provider-incident-contract.test.mjs --coverage --coverage.allowExternal'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      '--coverage.include="$PWD/packages/agent-transport-contracts/provider-incident.ts"'
     );
     expect(CI_FAST_SOURCE).toContain(
       '--coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts"'
     );
+    expect(CI_FAST_SOURCE).toContain('--coverage.thresholds.lines=95');
     expect(CI_FAST_SOURCE).toContain('--coverage.thresholds.lines=100');
   });
 
@@ -2398,9 +2427,8 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('keeps deleted files in public-profile admission selection', () => {
-    expect(CI_FAST_SOURCE).toContain(
-      'git diff --diff-filter=ACDMRT --name-only'
-    );
+    expect(CI_FAST_SOURCE).toContain("'--diff-filter=ACDMRT',");
+    expect(CI_FAST_SOURCE).toContain("'--name-only',");
     expect(CI_FAST_SOURCE).not.toContain(
       'git diff --diff-filter=d --name-only'
     );
@@ -2546,6 +2574,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/scripts/check-reliability-detectors.ts',
       'apps/web/scripts/lint-contrast-ratchet.mjs',
       'apps/web/scripts/lint-no-native-dialogs.mjs',
+      'apps/web/scripts/lint-ui-feel.mjs',
       'apps/web/scripts/next-proxy-guard.mjs',
       'apps/web/scripts/seo-ratchet-guard.mjs',
       'apps/web/scripts/tailwind-guard.mjs',
@@ -2619,6 +2648,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(uiRe.test('apps/web/scripts/lint-contrast-ratchet.mjs')).toBe(true);
     expect(uiRe.test('apps/web/scripts/lint-no-native-dialogs.mjs')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/lint-ui-feel.mjs')).toBe(true);
     expect(uiRe.test('apps/web/scripts/next-proxy-guard.mjs')).toBe(true);
     expect(uiRe.test('apps/web/scripts/seo-ratchet-guard.mjs')).toBe(true);
     expect(uiRe.test('apps/web/scripts/tailwind-guard.mjs')).toBe(true);
@@ -2878,6 +2908,160 @@ describe('CI diff selection on a divergent PR', () => {
     } finally {
       vi.unstubAllEnvs();
       rmSync(repository, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('CI filename argv boundary (JOV-7573)', () => {
+  // Changed filenames are attacker-adjacent input: a name like
+  // `$(touch marker).ts` must reach git/biome/eslint literally, never via
+  // /bin/sh, and must survive newline splitting (git -z) intact.
+  function makeRepo(files) {
+    const repository = mkdtempSync(join(tmpdir(), 'ci-argv-boundary-'));
+    const git = (...args) =>
+      execFileSync('git', args, { cwd: repository, encoding: 'utf8' });
+    git('init', '-b', 'main');
+    git('config', 'user.name', 'CI test');
+    git('config', 'user.email', 'ci-test@example.invalid');
+    writeFileSync(join(repository, 'base.txt'), 'base\n');
+    git('add', '.');
+    git('commit', '-m', 'base');
+    for (const name of files) {
+      mkdirSync(dirname(join(repository, name)), { recursive: true });
+      writeFileSync(join(repository, name), 'x\n');
+    }
+    git('add', '-A');
+    git('commit', '-m', 'hostile names');
+    return repository;
+  }
+
+  function stubPnpm(directory, exit = '0') {
+    const log = join(directory, 'pnpm-argv.log');
+    writeFileSync(
+      join(directory, 'pnpm'),
+      `#!/bin/sh\nprintf '%s\\n' "$@" >> "$ARGV_LOG"\nexit "$STUB_EXIT"\n`,
+      { mode: 0o755 }
+    );
+    vi.stubEnv('ARGV_LOG', log);
+    vi.stubEnv('STUB_EXIT', exit);
+    vi.stubEnv('PATH', `${directory}:${process.env.PATH}`);
+    return () =>
+      existsSync(log)
+        ? readFileSync(log, 'utf8').split('\n').filter(Boolean)
+        : [];
+  }
+
+  it('returns hostile filenames literally without shell interpretation', () => {
+    const repository = makeRepo([
+      'pwned$(touch SHOULD_NOT_EXIST_A).ts',
+      'pwned`touch SHOULD_NOT_EXIST_B`.ts',
+      'with space.ts',
+      "apost'rophe.ts",
+      'uni-é.ts',
+      'line\nbreak.ts',
+      '-leading-dash.ts',
+    ]);
+    try {
+      vi.stubEnv('GITHUB_EVENT_NAME', 'push');
+      vi.stubEnv('TURBO_SCM_BASE', '');
+      const files = changedFiles(['*.ts'], repository);
+      expect([...files].sort()).toEqual(
+        [
+          '-leading-dash.ts',
+          "apost'rophe.ts",
+          'line\nbreak.ts',
+          'pwned$(touch SHOULD_NOT_EXIST_A).ts',
+          'pwned`touch SHOULD_NOT_EXIST_B`.ts',
+          'uni-é.ts',
+          'with space.ts',
+        ].sort()
+      );
+      expect(existsSync(join(repository, 'SHOULD_NOT_EXIST_A'))).toBe(false);
+      expect(existsSync(join(repository, 'SHOULD_NOT_EXIST_B'))).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(repository, { recursive: true, force: true });
+    }
+  });
+
+  it('passes hostile filenames to biome literally and propagates its exit', () => {
+    const name = 'pwned$(touch SHOULD_NOT_EXIST_BIOME).ts';
+    const repository = makeRepo([name]);
+    const bin = mkdtempSync(join(tmpdir(), 'ci-argv-bin-'));
+    const readArgs = stubPnpm(bin, '7');
+    try {
+      vi.stubEnv('GITHUB_EVENT_NAME', 'push');
+      vi.stubEnv('TURBO_SCM_BASE', '');
+      const result = runBiome(repository);
+      expect(result.code, result.output).toBe(7);
+      const args = readArgs();
+      expect(args.slice(0, 4)).toEqual([
+        'biome',
+        'ci',
+        '--reporter=github',
+        '--no-errors-on-unmatched',
+      ]);
+      expect(args).toContain(name);
+      expect(existsSync(join(repository, 'SHOULD_NOT_EXIST_BIOME'))).toBe(
+        false
+      );
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(repository, { recursive: true, force: true });
+      rmSync(bin, { recursive: true, force: true });
+    }
+  });
+
+  it('passes hostile filenames to the copy gate literally and propagates its exit', () => {
+    const name = 'apps/web/content/pwned$(touch SHOULD_NOT_EXIST_COPY).md';
+    const repository = makeRepo([name]);
+    const bin = mkdtempSync(join(tmpdir(), 'ci-argv-bin-'));
+    const readArgs = stubPnpm(bin, '7');
+    try {
+      vi.stubEnv('GITHUB_EVENT_NAME', 'push');
+      vi.stubEnv('TURBO_SCM_BASE', '');
+      vi.stubEnv('GITHUB_BASE_REF', 'main');
+      const result = runCopyGate(repository);
+      expect(result.code, result.output).toBe(7);
+      const args = readArgs();
+      expect(args.slice(0, 5)).toEqual([
+        'exec',
+        'tsx',
+        'packages/copy/cli.ts',
+        'check',
+        '--diff-base',
+      ]);
+      expect(args).toContain(name);
+      expect(existsSync(join(repository, 'SHOULD_NOT_EXIST_COPY'))).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(repository, { recursive: true, force: true });
+      rmSync(bin, { recursive: true, force: true });
+    }
+  });
+
+  it('passes hostile filenames to server-boundary lint literally and propagates its exit', () => {
+    const name = 'apps/web/lib/pwned$(touch SHOULD_NOT_EXIST_LINT).ts';
+    const repository = makeRepo([name]);
+    const bin = mkdtempSync(join(tmpdir(), 'ci-argv-bin-'));
+    const readArgs = stubPnpm(bin, '7');
+    try {
+      vi.stubEnv('GITHUB_EVENT_NAME', 'push');
+      vi.stubEnv('TURBO_SCM_BASE', '');
+      const result = runEslintServerBoundaries(repository);
+      expect(result.code, result.output).toBe(7);
+      const args = readArgs();
+      expect(args.slice(0, 3)).toEqual([
+        '--filter=@jovie/web',
+        'run',
+        'lint:server-boundaries',
+      ]);
+      expect(args).toContain(name);
+      expect(existsSync(join(repository, 'SHOULD_NOT_EXIST_LINT'))).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(repository, { recursive: true, force: true });
+      rmSync(bin, { recursive: true, force: true });
     }
   });
 });

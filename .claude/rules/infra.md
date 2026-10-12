@@ -187,3 +187,36 @@ All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge
 | `docs/API_ROUTE_MAP.md` | Does an API endpoint already exist for this? What auth does it need? |
 | `docs/FEATURE_REGISTRY.md` | What feature flags exist? What are their current states? |
 | `docs/COST_MONITORING.md` | What stops a runaway code path from blowing up the bill? Provider spend caps + the cost-anomaly auto-rollback gate. |
+
+## macOS runners: self-hosted first, hosted fallback (org-wide)
+
+Applies to every JovieInc repo. Hosted macOS is one small org-wide pool (Team
+plan) that LogYourBody often saturates, so macOS jobs that something waits on
+(merge-group, push and release gates, CLI publish chaos) try an idle
+self-hosted `jovie-mac` Mac first. Nothing is held on a Mac being asleep, busy
+or offline:
+
+- Never queue a job straight on `jovie-mac`: GitHub has no queue timeout for
+  self-hosted jobs. Mac work runs only in a `mac-lane.yml` child run started by
+  the shared `mac-lane-route.yml` (copy the `mac` job from `ios-ci.yml`,
+  `macos-ci.yml` or `cli-chaos.yml`). If no Mac picks it up within
+  `MAC_PICKUP_SECONDS` (45s, the only wait; no retry), the child is cancelled
+  and the caller's hosted job runs. A Mac lost mid-run (runner lost, timeout,
+  cancel) also hands the lane to hosted; a real failure fails the lane. The
+  join checks the child ran the exact SHA and links it in the step summary.
+- The parent never carries the cancelled job: one cancelled job makes the whole
+  run conclude `cancelled`, which the staging and production gates reject.
+- Jovie and LogYourBody are public and the Macs are the owner's laptops: only
+  same-repo `pull_request`, `merge_group`, `push` and `workflow_dispatch` on
+  run attempt 1 reach a Mac (never forks or `pull_request_target`; every rerun
+  is hosted). The child gets no secrets. `vars.JOVIE_MAC_RUNNER=off` forces
+  hosted.
+- Caches and artifact uploads stay hosted-only (home uplink ~0.3 MB/s). No
+  heartbeat crons or rescue pollers (JOV-INV-042).
+
+Stay on hosted only when the Mac buys nothing or costs something, and record
+why in `HOSTED_MACOS_ALLOWED` in
+`scripts/lib/__tests__/mac-runner-route-contract.test.mjs`:
+- nothing waits on it (nightly, scheduled, rare manual runs);
+- it signs or notarizes (the Macs' login keychains hold real identities);
+- it uploads large artifacts (home-uplink uploads take hours).

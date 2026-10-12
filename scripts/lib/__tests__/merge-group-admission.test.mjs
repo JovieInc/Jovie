@@ -4,10 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import * as sharedClassifier from '../github-rate-limit.mjs';
 import {
   ADMISSION_CONTRACT_VERSION,
   buildLiveQueueAdmissionReceipt,
   classifyRequiredCheckPage,
+  isTransientAdmissionFailureMessage,
   isTransientApiError,
   MERGE_GROUP_ADMISSION_WAIT_MS,
   MergeGroupAdmissionError,
@@ -434,7 +436,7 @@ describe('merge-group admission evidence', () => {
         checkPage('Fork PR Gate', 'completed', 'failure'),
         { checkName: 'Fork PR Gate', headSha: HEAD }
       )
-    ).toEqual({ state: 'terminal-failure', detail: 'failure' });
+    ).toEqual({ state: 'terminal-failure', detail: 'failure', runId: 1 });
   });
 
   it('fails closed on incomplete, ambiguous, or malformed check pages', () => {
@@ -497,6 +499,94 @@ describe('merge-group admission evidence', () => {
     expect(loadCheckRuns).toHaveBeenCalledTimes(4);
     expect(statuses).toHaveLength(2);
     expect(statuses.at(-1)).toMatch(/admission passed/);
+  });
+
+  describe('a producer that failed only on GitHub quota', () => {
+    const { classifyGitHubFailure } = sharedClassifier;
+    const classifyFailureText = message =>
+      classifyGitHubFailure({ message }).kind;
+    const failedSizeGuard = () => ({
+      loadQueueRef: vi.fn(async () => queueRef()),
+      loadLiveQueueEntries: vi.fn(async () => [liveEntry()]),
+      loadCheckRuns: vi.fn(async ({ checkName }) =>
+        checkPage(
+          checkName,
+          'completed',
+          checkName === 'PR Size Guard' ? 'failure' : 'success'
+        )
+      ),
+    });
+    const annotation = message => ({ annotation_level: 'failure', message });
+    const admit = (loaders, annotations) =>
+      waitForMergeGroupAdmission({
+        event: event(),
+        ...loaders,
+        classifyFailureText,
+        loadCheckRunAnnotations: annotations,
+        maxWaitMs: 10,
+        pollIntervalMs: 3,
+      });
+
+    it('fails as infrastructure the failure hold will not charge to the source', async () => {
+      const annotations = vi.fn(async () => [
+        annotation(
+          'GitHub API 403 for /repos/JovieInc/Jovie/compare/a...b: API rate limit exceeded for installation. If you reach out to GitHub Support'
+        ),
+        annotation('Process completed with exit code 1.'),
+      ]);
+      const error = await admit(failedSizeGuard(), annotations).catch(e => e);
+      expect(error.message).toBe(
+        'PR Size Guard failed on GitHub primary-rate-limit, not on the combined head'
+      );
+      expect(isTransientApiError(error)).toBe(false);
+      expect(isTransientAdmissionFailureMessage(error.message)).toBe(true);
+      expect(annotations).toHaveBeenCalledWith(
+        expect.objectContaining({ checkRunId: 2 })
+      );
+    });
+
+    it('treats an annotations read that hits the same quota as quota', async () => {
+      const annotations = vi.fn(async () => {
+        throw new MergeGroupAdmissionError(
+          'GitHub API 403 for /x: API rate limit exceeded for installation.',
+          { status: 403 }
+        );
+      });
+      await expect(admit(failedSizeGuard(), annotations)).rejects.toThrow(
+        'PR Size Guard failed on GitHub primary-rate-limit, not on the combined head'
+      );
+    });
+
+    it.each([
+      ['a real policy failure', ['PR #12 failed size merge-group policy']],
+      [
+        'mixed quota and real errors',
+        [
+          'GitHub API 403 for /x: API rate limit exceeded for installation.',
+          'PR #12 failed size merge-group policy',
+        ],
+      ],
+      ['no error annotations', []],
+    ])('keeps %s a real red', async (_label, messages) => {
+      const annotations = vi.fn(async () => messages.map(annotation));
+      const error = await admit(failedSizeGuard(), annotations).catch(e => e);
+      expect(error.message).toBe('PR Size Guard completed with failure');
+      expect(isTransientAdmissionFailureMessage(error.message)).toBe(false);
+    });
+
+    it('keeps the old verdict without the shared classifier', async () => {
+      const annotations = vi.fn(async () => []);
+      await expect(
+        waitForMergeGroupAdmission({
+          event: event(),
+          ...failedSizeGuard(),
+          loadCheckRunAnnotations: annotations,
+          maxWaitMs: 10,
+          pollIntervalMs: 3,
+        })
+      ).rejects.toThrow('PR Size Guard completed with failure');
+      expect(annotations).not.toHaveBeenCalled();
+    });
   });
 
   it('stops immediately on a terminal gate failure', async () => {
@@ -1065,7 +1155,9 @@ async function withQuotaResponses(respond, verify) {
             ? 'graphql'
             : href.includes('/git/ref/')
               ? 'ref'
-              : new URL(href).searchParams.get('check_name');
+              : href.includes('/annotations')
+                ? 'annotations'
+                : new URL(href).searchParams.get('check_name');
           const request = {
             kind,
             at: state.elapsed,
@@ -1086,6 +1178,7 @@ async function withQuotaResponses(respond, verify) {
           if (kind === 'graphql')
             return Response.json(liveQueuePayload([liveQueueNode()]));
           if (kind === 'ref') return Response.json(queueRef());
+          if (kind === 'annotations') return Response.json([]);
           expect(['Fork PR Gate', 'PR Size Guard']).toContain(kind);
           return Response.json(checkPage(kind, 'completed', 'success').data);
         })();
@@ -1440,7 +1533,8 @@ describe('HTTP quota scheduling and structured GraphQL errors', () => {
             ).toEqual(
               outcome === 'success'
                 ? completeProofKinds
-                : completeProofKinds.slice(0, 4)
+                : // A failed producer's annotations decide quota vs. real red.
+                  [...completeProofKinds.slice(0, 4), 'annotations']
             );
           }
         }

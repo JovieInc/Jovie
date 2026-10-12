@@ -1,10 +1,14 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { evaluateRatchet, statistics } from '../../typecheck-performance.mjs';
+import {
+  evaluateRatchet,
+  sampleEnv,
+  statistics,
+} from '../../typecheck-performance.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
 const require = createRequire(import.meta.url);
@@ -35,6 +39,14 @@ describe('typecheck performance', () => {
         policy
       ).status
     ).toBe('fail');
+  });
+
+  it('gives every sample a fresh singleflight state dir so replays cannot warm the ratchet', () => {
+    const first = sampleEnv(0).TYPECHECK_SINGLEFLIGHT_DIR;
+    const second = sampleEnv(0).TYPECHECK_SINGLEFLIGHT_DIR;
+    expect(first).not.toBe(second);
+    expect(existsSync(first)).toBe(true);
+    expect(existsSync(second)).toBe(true);
   });
 
   it('keeps ignored tests out of the product cache while retaining ambient types and package edges', () => {

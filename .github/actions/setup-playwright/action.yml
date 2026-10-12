@@ -17,12 +17,26 @@ runs:
       run: |
         echo "PLAYWRIGHT_BROWSERS_PATH=${{ steps.runner-prereqs.outputs.playwright_browsers_path }}" >> "$GITHUB_ENV"
 
+    # Key by the installed Playwright version, not the whole lockfile: the
+    # browser build only changes with the package, and a lockfile-hashed key
+    # saved one identical 260 MB entry per dependabot lockfile (9 copies on
+    # 2026-10-10), crowding the 10 GB repo cache and evicting merge-group
+    # workspaces mid-group.
+    - name: Resolve Playwright version
+      id: playwright-version
+      if: steps.runner-prereqs.outputs.playwright_warm != 'true'
+      shell: bash
+      run: |
+        version="$(node -p "require('@playwright/test/package.json').version" 2>/dev/null || true)"
+        [[ -n "$version" ]] || version="lock-${{ hashFiles('pnpm-lock.yaml') }}"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
     - name: Cache Playwright Browsers
       if: steps.runner-prereqs.outputs.playwright_warm != 'true'
       uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+        key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright-version.outputs.version }}
         restore-keys: |
           ${{ runner.os }}-playwright-chromium-
 

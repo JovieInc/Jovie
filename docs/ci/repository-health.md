@@ -134,6 +134,20 @@ largest blobs (9.06 MiB pitch PDF, 4.04 MiB demo video, catalog PNGs, ~32 MiB
 migration metadata) have live consumers. No safe removal approaches the scale
 of the shortfall, so the budget, test, and this rationale change together.
 
+Approved raise (measured 2026-10-10, visual-baseline auto-refresh PR #21189):
+`maxSnapshotFiles` 100 → 110 (+10%, the per-raise cap). Exact `origin/main`
+measured 100 canonical baselines in `apps/web/tests/e2e/__snapshots__/` — 100%
+of the prior budget — so the admin-surface coverage added by the JOV-4326
+consolidation (`admin-surface-manifest.ts` grew to 24 desktop + 10 mobile
+slugs) could not land its generated baselines. The refresh also surfaced 10
+orphaned baselines whose slugs no longer exist in the manifest
+(`admin-algorithm-health-*`, `admin-overview-*`, `admin-growth-outreach-{all,dm,email,review}-desktop`,
+`admin-growth-leads-mobile`, `admin-people-waitlist-mobile`); no spec
+references them, so they were pruned in the same change. Resulting tree: 106
+files (~8.7 MiB of the unchanged 12 MiB `maxSnapshotBytes` budget). The +10%
+raise restores a small headroom so ordinary new coverage does not trip the
+guard on every landing.
+
 All must hold: exact-main is at least 90% of an absolute byte budget or two ordinary changes exceed a p99 delta; 30/90-day tree/new-blob, contributor, checkout, and CI measurements are included; Knip, hashes, generated paths, and owners prove no safe removal; increase is at most p99 +25% for deltas or 10% for payloads; tests and rationale change together. Larger changes require a separate decision and Linear issue. A number-only change fails review and never promotes rollout mode.
 
 ### Prune or archive

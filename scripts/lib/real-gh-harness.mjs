@@ -120,13 +120,13 @@ export function storedZip(files) {
 
 /**
  * Run a bash script with the real gh against fixture routes.
- * `route(pathWithQuery)` returns `{ status?, body }` (string, Buffer or JSON
+ * `route(pathWithQuery)` returns `{ status?, headers?, body }` (string, Buffer or JSON
  * value) or null for a 404. Resolves with exit code, output and the API paths
  * gh actually requested.
  * @param {object} opts
  * @param {string} opts.script
  * @param {Record<string, string | undefined>} [opts.env]
- * @param {(path: string) => { status?: number, body: unknown } | null} opts.route
+ * @param {(path: string) => { status?: number, headers?: Record<string, string>, body: unknown } | null} opts.route
  * @param {string} [opts.gh]
  * @param {boolean} [opts.allowCallerGhOverride] Let a deliberate caller `gh`
  * fixture win for negative-control tests. Normal harness runs must leave this
@@ -160,6 +160,7 @@ export async function runWithRealGh({
       'content-type': Buffer.isBuffer(raw)
         ? 'application/zip'
         : 'application/json',
+      ...hit.headers,
     });
     res.end(raw);
   });

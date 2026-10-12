@@ -79,3 +79,7 @@ function SingleItemHarness() {
 export const SingleItem: Story = {
   render: () => <SingleItemHarness />,
 };
+
+export const VideoTransport: Story = {
+  render: () => <ViewerHarness start={1} />,
+};

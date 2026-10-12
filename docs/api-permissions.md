@@ -11,6 +11,7 @@ This document tracks required privilege levels by API namespace so new routes ar
 | `/api/admin/**` | Admin-only | Must explicitly verify `isAuthenticated` and `isAdmin` (or `requireAdmin`) in handler. |
 | `/api/dashboard/**` | Authenticated user | Must scope all reads/writes to the current authenticated user. |
 | `/api/account/**` | Authenticated user | User self-service only; never accept arbitrary target user IDs without ownership checks. |
+| `/api/referrals/**` | Authenticated user | Must derive the app `users.id` UUID from Better Auth and never accept a target user ID from the request. |
 | `/api/v1/actions` | Authenticated user | Read-only discovery. Must prove profile ownership and must not write. Invoke paths are not live. |
 | `/api/billing/**` | Authenticated user | Return only caller billing context; no cross-user lookup by untrusted input. `/api/billing/health` is the exception: anonymous callers get `{healthy, timestamp}` only; sync counts and check details require an admin session or `CRON_SECRET`. |
 | `/api/analytics/navigation` | Authenticated user (POST); admin-only (GET) | POST uses authenticated identity only as a rate-limit key, then discards it before aggregate storage. Payloads are strict low-cardinality buckets; GET returns only privacy-suppressed aggregate baselines. |

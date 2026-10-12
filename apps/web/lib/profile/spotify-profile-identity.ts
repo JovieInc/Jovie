@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, sql as drizzleSql, eq, ne } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq, ne } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
@@ -51,4 +51,46 @@ export async function assertSpotifyProfileIdentityAvailable(
     )
     .limit(1);
   if (conflict) throw new SpotifyProfileIdentityConflictError();
+}
+
+/** Read-only mirror of materialization admission; matching an artist grants no ownership. */
+export async function hasSpotifyProfileIdentityConflict(
+  tx: DbOrTransaction,
+  spotifyArtistId: string,
+  verifiedAppUserId: string | null
+): Promise<boolean> {
+  // Use the same preferred profile as claim-profile.ts. An account cannot
+  // replace its bound artist or silently adopt another exact-ID row.
+  const [existingProfile] = verifiedAppUserId
+    ? await tx
+        .select({
+          id: creatorProfiles.id,
+          spotifyId: creatorProfiles.spotifyId,
+        })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.userId, verifiedAppUserId))
+        .orderBy(
+          desc(creatorProfiles.isClaimed),
+          desc(creatorProfiles.onboardingCompletedAt),
+          desc(creatorProfiles.updatedAt)
+        )
+        .limit(1)
+    : [];
+  if (
+    existingProfile?.spotifyId &&
+    existingProfile.spotifyId !== spotifyArtistId
+  ) {
+    return true;
+  }
+  const [conflict] = await tx
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.spotifyId, spotifyArtistId),
+        existingProfile ? ne(creatorProfiles.id, existingProfile.id) : undefined
+      )
+    )
+    .limit(1);
+  return Boolean(conflict);
 }

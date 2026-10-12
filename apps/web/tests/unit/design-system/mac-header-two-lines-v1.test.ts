@@ -67,6 +67,9 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // copy at desktop and 390px (route DOM clipped-heading, JOV-7713).
   'apps/web/app/(marketing)/launch/page.tsx',
   'apps/web/app/(marketing)/download/page.tsx',
+  // /ai hero headline: the two-line clamp truncated the page's value
+  // proposition at phone widths (route DOM clipped-heading, JOV-8164).
+  'apps/web/app/(marketing)/ai/page.tsx',
 ]);
 
 function hasEditorialTitleContract(

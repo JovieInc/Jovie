@@ -47,7 +47,7 @@ import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-hand
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import {
   classifyChatStreamFailure,
-  isGatewayBudgetExceededError,
+  classifyGatewayAlert,
   resolveChatStreamErrorMessage,
 } from '@/lib/ai/gateway-errors';
 import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
@@ -2225,18 +2225,10 @@ async function buildChatErrorResponse(
   corsHeaders: Record<string, string>
 ) {
   const failure = classifyChatStreamFailure(error);
-  const budgetExceeded = isGatewayBudgetExceededError(error);
+  const gatewayAlert = classifyGatewayAlert(error);
   await captureError(
-    budgetExceeded
-      ? 'AI Gateway API key budget exceeded'
-      : 'Chat stream failed',
-    budgetExceeded
-      ? Object.assign(new Error('AI Gateway API key budget exceeded'), {
-          name: 'GatewayBudgetExceededError',
-          code: failure.errorCode,
-          cause: error,
-        })
-      : error,
+    gatewayAlert?.title ?? 'Chat stream failed',
+    gatewayAlert?.error ?? error,
     {
       feature: 'ai-chat',
       mode: 'route-catch',
@@ -2245,8 +2237,8 @@ async function buildChatErrorResponse(
       requestId,
       profileId,
       conversationId,
-      ...(budgetExceeded
-        ? { errorType: 'gateway_budget_exceeded', alert: 'ai_gateway_budget' }
+      ...(gatewayAlert
+        ? { errorType: gatewayAlert.errorType, alert: gatewayAlert.alert }
         : {}),
     }
   );
@@ -2262,7 +2254,7 @@ async function buildChatErrorResponse(
           error instanceof Error ? (error as { code?: string }).code : undefined
         ) ??
         'CHAT_STREAM_FAILED',
-      debugMessage: budgetExceeded
+      debugMessage: gatewayAlert
         ? failure.userMessage
         : error instanceof Error
           ? error.message
@@ -3035,17 +3027,21 @@ export async function POST(req: Request) {
       // on-screen requestId + SDK-guarded Sentry send) and flush before
       // yielding (GH #13300).
       captureException: async (error, context) => {
-        const budgetExceeded = isGatewayBudgetExceededError(error);
+        const gatewayAlert = classifyGatewayAlert(error);
         await captureError(
-          budgetExceeded
-            ? 'AI Gateway API key budget exceeded'
-            : 'Chat stream failed',
-          error,
+          gatewayAlert?.title ?? 'Chat stream failed',
+          gatewayAlert?.error ?? error,
           {
             feature: 'ai-chat',
             mode: 'stream',
             requestId,
             userId,
+            ...(gatewayAlert
+              ? {
+                  errorType: gatewayAlert.errorType,
+                  alert: gatewayAlert.alert,
+                }
+              : {}),
             ...(context?.tags ?? {}),
             ...(context?.extra ?? {}),
           }

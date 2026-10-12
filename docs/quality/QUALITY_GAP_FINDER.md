@@ -7,14 +7,13 @@ Workflow: [`.github/workflows/quality-gap-finder.yml`](../../.github/workflows/q
 The finder looks for missing tests, guardrails, and invariants and proposes
 them as Linear issues. It is deterministic and model-free. One run is one
 filesystem walk, one `git log`, and at most four Linear queries. That makes it
-cheap enough to run daily and on every relevant event.
+cheap enough to run on every relevant event. It has no clock.
 
 ## When it runs
 
 | Trigger | Why |
 | --- | --- |
-| Daily cron (`41 14 * * *` UTC) | Churn, coverage, and route drift accumulate |
-| Push to `main` touching `docs/postmortems/**` or `canon/invariants.jsonl` | A merged post-mortem or invariant change can open or close a gap |
+| Push to `main` touching its repo evidence: post-mortems, invariants, route budgets, the coverage heatmap, the CI incident ledger, ci-fast lanes, or `apps/web/{app,components,lib}` | Churn, coverage, route, post-mortem, and invariant gaps can only change on one of these pushes. Runs coalesce: one runs, the newest waits |
 | `repository_dispatch` type `quality-gap-scan` | Bug intake, dogfood labels, and Sentry mirrors fire this (see "Event hooks") |
 | `workflow_dispatch` (optional `dry_run`) | Manual run |
 
@@ -75,17 +74,17 @@ labeled issue keeps one writer for the inbox and one system of record (Linear).
 
 ## Event hooks
 
-The workflow accepts `repository_dispatch` with type `quality-gap-scan`. Two
-emitters should fire it:
+The workflow accepts `repository_dispatch` with type `quality-gap-scan`.
+The Linear webhook route (`apps/web/app/api/webhooks/linear/route.ts`) fires
+it when a JOV issue gains a `postmortem-action`, `bug`, `dogfood`, `sentry`,
+`intake`, or `escaped-defect` label, or closes while carrying one (a closed
+post-mortem action can turn a handled class into a gap).
 
-- The Linear webhook route (`apps/web/app/api/webhooks/linear/route.ts`), when
-  an issue is created with, or gains, a `bug`, `dogfood`, `sentry`, `intake`,
-  or `escaped-defect` label.
-- The bug intake loop (`docs/design-system/BUG_INTAKE_LOOP.md`), when it files
-  a Linear bug.
-
-Until those emitters land, the daily cron covers these events with up to a
-one-day delay.
+An issue created in Triage with one of those labels takes the Triage
+assessment dispatch instead. The next `apps/web` push to `main` re-runs the
+finder, which then reads it. The bug intake loop
+(`docs/design-system/BUG_INTAKE_LOOP.md`) may also fire the dispatch when it
+files a Linear bug.
 
 ## Summer handoff: instruction for summer-config
 

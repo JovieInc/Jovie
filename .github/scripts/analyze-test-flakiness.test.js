@@ -601,3 +601,68 @@ test('the evidence cache keeps the newest runs and keys on content', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('unit-flaky artifacts are downloaded once per completed run attempt', async t => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const flakiness = require('./analyze-test-flakiness');
+  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'unit-flaky-cache-'));
+  t.mock.method(console, 'warn', () => {});
+  flakiness.setRunEvidenceCacheDir(cacheDir);
+  const downloads = [];
+  let failRun = 12;
+  const download = (runId, _repo, dest) => {
+    downloads.push(runId);
+    if (runId === failRun) return false;
+    const artifact = path.join(dest, 'unit-flaky-1-1-0');
+    fs.mkdirSync(artifact, { recursive: true });
+    fs.writeFileSync(
+      path.join(artifact, 'test-report.1-1.flaky.json'),
+      JSON.stringify({
+        flaky: [{ file: 'a.test.ts', name: 'flips', retryCount: 1 }],
+      })
+    );
+    return true;
+  };
+  const runs = [
+    { id: 11, run_attempt: 1 },
+    { id: 12, run_attempt: 1 },
+  ];
+  try {
+    const rootDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'unit-flaky-'));
+    await flakiness.collectCachedUnitRetryFlakes(runs, 'JovieInc/Jovie', {
+      download,
+      rootDir: rootDir(),
+    });
+    assert.deepEqual(downloads, [11, 12]);
+    failRun = null;
+    downloads.length = 0;
+    const second = await flakiness.collectCachedUnitRetryFlakes(
+      runs,
+      'JovieInc/Jovie',
+      {
+        download,
+        rootDir: rootDir(),
+      }
+    );
+    // Run 11 comes from the cache; only the earlier failed download repeats.
+    assert.deepEqual(downloads, [12]);
+    downloads.length = 0;
+    await flakiness.collectCachedUnitRetryFlakes(
+      [...runs, { id: 11, run_attempt: 2 }],
+      'JovieInc/Jovie',
+      { download, rootDir: rootDir() }
+    );
+    // A new attempt is new evidence.
+    assert.deepEqual(downloads, [11]);
+    // Both runs' cached and fresh reports reach the aggregate.
+    assert.deepEqual(
+      [...second.get('Unit › a.test.ts › flips').runIds].sort(),
+      ['11', '12']
+    );
+  } finally {
+    flakiness.setRunEvidenceCacheDir('');
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+  }
+});

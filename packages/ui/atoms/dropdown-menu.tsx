@@ -116,6 +116,7 @@ const DropdownMenuContent = React.forwardRef<
       collisionPadding = OVERLAY_COLLISION_PADDING,
       portalProps,
       disablePortal = false,
+      style,
       ...props
     },
     ref
@@ -125,6 +126,12 @@ const DropdownMenuContent = React.forwardRef<
         ref={ref}
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
+        style={{
+          ...submenuViewportFitStyle('dropdown-menu'),
+          maxHeight:
+            'min(24rem, var(--radix-dropdown-menu-content-available-height))',
+          ...style,
+        }}
         className={cn(dropdownMenuContentClasses, className)}
         {...props}
       />
