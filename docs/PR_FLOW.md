@@ -178,14 +178,11 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 ### Native build capacity (JOV-6107)
 
-**Ship now:** two concurrent native speculative groups. The
-`max_entries_to_build: 1 → 2` apply to live ruleset 10512119 is complete — the
-2026-09-20 live readback shows `max_entries_to_build=2`, with the then 20-minute
-budget, ALLGREEN, all required checks, empty bypass actors, and min/max merge
-1/5 with wait zero preserved. The separate pending source cohort minimum/wait
-cutover is not part of this apply and remains pending. Roll back only the
-build count to one if runner waits or speculative invalidation outweigh the
-measured throughput gain.
+**Ship now:** source reflects the applied three concurrent native speculative
+groups. The 2026-10-12 live readback shows `max_entries_to_build=3`, a 60-minute
+budget, ALLGREEN, min/max merge 1/5, and wait zero. JOV-8115 makes the checked-in
+ruleset the sole parameter owner, so admission no longer tolerates an unapplied
+cohort target or a stale build-count range.
 
 On 2026-09-23 the 20-minute response deadline proved shorter than required
 CI paths configured for 30 and 40 minutes. The source-first repair landed and
@@ -208,23 +205,16 @@ groups. The five self-hosted Linux runners do not provide capacity for these
 hosted product lanes.
 
 On 2026-09-25 a ruleset admin raised live `max_entries_to_build` to GitHub's
-10-group ceiling (`updated_at` 2026-09-25T22:20Z, during the production-freeze
-incident window). Source-of-record synced to the applied live value under
-JOV-6815; the live-parity check keeps accepting any lower build count so a
-rollback to the JOV-6107 bound stays green. Re-evaluate against measured
-runner saturation — ten full groups (~190 hosted jobs) exceeds both capacity
-figures above — and return live to `2` if deep queues starve required CI.
-
-Source preflight accepts integer build counts from one through the reviewed
-ceiling of ten and records the actual count and any difference from the target.
-This permits source-first rollout and a one-field rollback without blocking
-normal admission.
+10-group ceiling. The 2026-10-12 readback is now three. JOV-8115 records that
+applied value in the ruleset source and removes the former lower-count drift
+exception; future capacity changes update source and live configuration as one
+reviewed cutover.
 
 **Re-evaluate when:** a complete simultaneous-group window supplies job waits,
 peak fanout, Mac usage, invalidations and actual merges/hour, or verified account
-limits change. **Then:** raise the source ceiling only when measured total and
-Mac demand fit with background headroom. This is a capacity ceiling, not a
-permanent preference for two. Required tests run on every synthetic head;
+limits change. **Then:** change the source-owned value and live ruleset together
+only when measured total and Mac demand fit with background headroom. Required
+tests run on every synthetic head;
 GitHub's merge batch limit does not combine their builds or reuse stale results.
 
 ### Native admission and production health

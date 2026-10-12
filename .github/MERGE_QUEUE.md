@@ -58,21 +58,19 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
   latest-`main` validation.
 - Merge method: `SQUASH`
 - Grouping strategy: `ALLGREEN`
-- Minimum entries to merge: live `1`; checked-in target `5` remains unapplied.
-- Minimum entries wait: live `0` minutes; checked-in target `10` remains
-  unapplied (live readback 2026-09-24). Do not apply the cohort target as part
-  of documentation or controller retirement.
+- Minimum entries to merge: `1`.
+- Minimum entries wait: `0` minutes.
 - Maximum entries per merge: `5` (synced to the live ruleset 10512119 readback on 2026-09-04, JOV-5867)
-- Maximum entries building concurrently: `2` — the live ruleset builds up to
-  two combined heads at a time (live readback 2026-09-20, JOV-6107; the 1→2
-  apply is complete; do not restore the superseded 2026-08-15 three-prefix
-  canary value)
-- Check response timeout: `60` minutes (source-first cutover and live readback
-  verified 2026-09-24). Required checks and ALLGREEN remain unchanged.
+- Maximum entries building concurrently: `3`.
+- Check response timeout: `60` minutes.
+- The queue parameters above match the live ruleset readback from 2026-10-12.
+  `branch-protection.yml` is their sole checked-in owner; admission and policy
+  readback load that file and fail closed on any live mismatch.
 - Production health governs deployment and promotion through the existing
   production controls. Native source admission uses the required checks above;
   the retired Auto-Enroll fleet gate does not create a second admission gate.
-- Re-read live ruleset `10512119` before claiming the source cohort settings are active; the custom Auto-Enroll workflow is retired.
+- Re-read live ruleset `10512119` before claiming these settings are active;
+  the custom Auto-Enroll workflow is retired.
 - Signed-commit and non-fast-forward rules: dormant/not applied. The checked-in
   payload intentionally matches live ruleset `10512119`; enabling either is a
   separate reviewed cutover, not an implicit source reapply.

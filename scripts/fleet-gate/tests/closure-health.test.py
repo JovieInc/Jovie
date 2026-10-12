@@ -663,17 +663,19 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(by_pr[31]["owner"], "controller")
         self.assertIsNone(by_pr[31]["headSha"])
 
-    def test_native_merge_queue_policy_scales_builds_with_60_minute_budget(self):
+    def test_native_merge_queue_policy_is_owned_by_ruleset_source(self):
         ruleset = (ROOT / ".github/rulesets/branch-protection.yml").read_text(
             encoding="utf-8"
         )
         guard = (ROOT / "scripts/lib/merge-queue-guard.mjs").read_text(
             encoding="utf-8"
         )
-        for source in (ruleset, guard):
-            self.assertRegex(source, r"check_response_timeout_minutes:\s*60")
-            self.assertRegex(source, r"max_entries_to_build:\s*10")
-            self.assertRegex(source, r"max_entries_to_merge:\s*5")
+        self.assertRegex(ruleset, r"check_response_timeout_minutes:\s*60")
+        self.assertRegex(ruleset, r"max_entries_to_build:\s*3")
+        self.assertRegex(ruleset, r"max_entries_to_merge:\s*5")
+        self.assertRegex(ruleset, r"min_entries_to_merge:\s*1")
+        self.assertRegex(ruleset, r"min_entries_to_merge_wait_minutes:\s*0")
+        self.assertIn("from './native-queue-policy.mjs'", guard)
 
     def test_clean_pr_with_stale_base_is_repair_not_promote(self):
         evidence = exact_green_promotion_evidence(12)

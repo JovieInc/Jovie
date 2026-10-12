@@ -1,4 +1,7 @@
+import { NATIVE_QUEUE_POLICY } from './native-queue-policy.mjs';
 import { evaluatePreLandChangelogAdmission } from './pre-land-changelog.mjs';
+
+export { NATIVE_QUEUE_POLICY } from './native-queue-policy.mjs';
 
 export const MERGE_QUEUE_LABEL = 'merge-queue';
 export const FAST_TRACK_LABEL = 'fast';
@@ -25,79 +28,17 @@ export const MERGE_QUEUE_POLICY = Object.freeze({
   rulesetId: '10512119',
 });
 
-/**
- * Typed immutable native cohort (JOV-5047). GitHub merges when the queue
- * reaches this size or the bounded low-traffic wait elapses. Live ruleset
- * 10512119 still has 1/0 until the post-merge apply + canary; source is the
- * desired contract. A 1/0 policy serializes source-green landings behind
- * exact-production deploy latency (2026-08-13: #15903 then dequeue of
- * #15901/#15896 during Production Controller run 31699751815).
- */
+/** Typed projection of the source-owned native cohort parameters (JOV-5047). */
 export const NATIVE_QUEUE_COHORT_POLICY = Object.freeze({
   schema: 'jovie-native-queue-cohort/v1',
-  minEntriesToMerge: 5,
-  minEntriesToMergeWaitMinutes: 10,
+  minEntriesToMerge: NATIVE_QUEUE_POLICY.min_entries_to_merge,
+  minEntriesToMergeWaitMinutes:
+    NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes,
   alreadyAdmittedOnStaleProduction: 'preserve',
   newIntakeOnStaleProduction: 'freeze',
   deterministicMemberFailure: 'isolate-and-remove',
   transientFailure: 'bounded-retry',
-  // Source is 5/10. Live ruleset 10512119 is still 1/0 until the post-merge
-  // PUT. While pending, live preflight records drift and does not fail closed
-  // on these two fields so auto-enroll keeps working. Flip to `applied` in
-  // the same change that updates the live ruleset.
-  liveRulesetCutover: 'pending',
 });
-
-const COHORT_LIVE_CUTOVER_FIELDS = Object.freeze([
-  'min_entries_to_merge',
-  'min_entries_to_merge_wait_minutes',
-]);
-
-export function isPendingNativeCohortCutoverField(field) {
-  return (
-    NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover === 'pending' &&
-    COHORT_LIVE_CUTOVER_FIELDS.includes(field)
-  );
-}
-
-export const NATIVE_QUEUE_POLICY = Object.freeze({
-  // JOV-6107 measured peak 19 hosted jobs/group plus >=7 background jobs on
-  // Team's 60-job budget permits two groups (45), not three (64). JOV-6815:
-  // a ruleset admin raised live build concurrency to GitHub's 10-group
-  // ceiling on 2026-09-25 (production-freeze incident window); source syncs
-  // to the applied live value and every lower live count stays supported
-  // for rollback. Re-evaluate against measured runner saturation if deep
-  // queues starve required CI. Preserve ALLGREEN. The 60-minute response
-  // budget covers the 30/40-minute required CI paths.
-  check_response_timeout_minutes: 60,
-  grouping_strategy: 'ALLGREEN',
-  max_entries_to_build: 10,
-  max_entries_to_merge: 5,
-  merge_method: 'SQUASH',
-  min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
-  min_entries_to_merge_wait_minutes:
-    NATIVE_QUEUE_COHORT_POLICY.minEntriesToMergeWaitMinutes,
-});
-
-/** Exact old value during the source-first timeout cutover; no broad drift. */
-export function isPendingNativeCheckTimeoutCutover(field, observed) {
-  return field === 'check_response_timeout_minutes' && observed === 20;
-}
-
-/**
- * A lower native build count is safe for source-first rollout and rollback.
- * @param {string} field
- * @param {unknown} observed
- */
-export function isSupportedNativeBuildConcurrency(field, observed) {
-  return (
-    field === 'max_entries_to_build' &&
-    typeof observed === 'number' &&
-    Number.isInteger(observed) &&
-    observed >= 1 &&
-    observed <= NATIVE_QUEUE_POLICY.max_entries_to_build
-  );
-}
 
 export const NATIVE_QUEUE_POLICY_READBACK_SCHEMA =
   'jovie-native-queue-policy-readback/v1';
@@ -1484,12 +1425,7 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
       options.liveQueueConfiguration
     );
     for (const [field, expected] of Object.entries(NATIVE_QUEUE_POLICY))
-      if (
-        observed[field] !== expected &&
-        !isPendingNativeCohortCutoverField(field) &&
-        !isSupportedNativeBuildConcurrency(field, observed[field]) &&
-        !isPendingNativeCheckTimeoutCutover(field, observed[field])
-      )
+      if (observed[field] !== expected)
         errors.push(`live native merge_queue ${field} must be ${expected}`);
   }
 

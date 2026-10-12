@@ -5,9 +5,6 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {
   buildNativeQueuePolicyReadback,
-  isPendingNativeCheckTimeoutCutover,
-  isPendingNativeCohortCutoverField,
-  isSupportedNativeBuildConcurrency,
   mergeNativeQueuePolicyObservations,
   NATIVE_QUEUE_POLICY,
 } from './lib/merge-queue-guard.mjs';
@@ -469,10 +466,7 @@ function matchingAdmissionPolicy(live, rest, repository) {
     return (
       value !== undefined &&
       value === restQueue?.[restField] &&
-      (value === NATIVE_QUEUE_POLICY[restField] ||
-        isSupportedNativeBuildConcurrency(restField, value) ||
-        isPendingNativeCheckTimeoutCutover(restField, value) ||
-        isPendingNativeCohortCutoverField(restField))
+      value === NATIVE_QUEUE_POLICY[restField]
     );
   });
 }
@@ -631,10 +625,7 @@ export function validateNativePreflightEvidence({
     ...Object.fromEntries(
       Object.entries(NATIVE_QUEUE_POLICY).map(([field, expected]) => [
         `merge_queue ${field} must be ${expected}`,
-        mergeQueue[field] === expected ||
-          isSupportedNativeBuildConcurrency(field, mergeQueue[field]) ||
-          isPendingNativeCheckTimeoutCutover(field, mergeQueue[field]) ||
-          isPendingNativeCohortCutoverField(field),
+        mergeQueue[field] === expected,
       ])
     ),
     [`ruleset is missing required checks: ${missingChecks.join(', ')}`]:
@@ -663,15 +654,9 @@ export function validateNativePreflightEvidence({
     if (!condition) errors.push(message);
   }
   const policyReadback = buildNativeQueuePolicyReadback(mergeQueue);
-  const blockingDrift = policyReadback.drift.filter(
-    field =>
-      !isPendingNativeCohortCutoverField(field) &&
-      !isSupportedNativeBuildConcurrency(field, mergeQueue[field]) &&
-      !isPendingNativeCheckTimeoutCutover(field, mergeQueue[field])
-  );
-  if (blockingDrift.length > 0) {
+  if (policyReadback.drift.length > 0) {
     errors.push(
-      `native queue policy readback drifted: ${blockingDrift.join(', ')}`
+      `native queue policy readback drifted: ${policyReadback.drift.join(', ')}`
     );
   }
   return {

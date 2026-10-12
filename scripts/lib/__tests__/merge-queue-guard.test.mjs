@@ -450,6 +450,31 @@ describe('aggregate required checks', () => {
     }
   });
 
+  it('uses the live-aligned checked-in queue parameters for policy readback (JOV-8115)', () => {
+    const branchProtectionYaml = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.branchProtection),
+      'utf8'
+    );
+    const configuredPolicy = normalizeBranchProtectionSource(
+      branchProtectionYaml
+    ).rules.find(rule => rule.type === 'merge_queue')?.parameters;
+
+    expect(configuredPolicy).toEqual({
+      check_response_timeout_minutes: 60,
+      grouping_strategy: 'ALLGREEN',
+      max_entries_to_build: 3,
+      max_entries_to_merge: 5,
+      merge_method: 'SQUASH',
+      min_entries_to_merge: 1,
+      min_entries_to_merge_wait_minutes: 0,
+    });
+    expect(NATIVE_QUEUE_POLICY).toEqual(configuredPolicy);
+    expect(buildNativeQueuePolicyReadback(configuredPolicy)).toMatchObject({
+      matched: true,
+      drift: [],
+    });
+  });
+
   it('keeps Storybook A11y scheduled-only and outside source PR Ready', () => {
     const branchProtectionYaml = readFileSync(
       resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.branchProtection),
@@ -2343,37 +2368,31 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
 });
 
 describe('native merge-queue cohort (JOV-5047)', () => {
-  it('waits below five entries until the bounded low-traffic timeout', () => {
+  it('treats an empty queue as empty and invalid evidence as unknown', () => {
     expect(
-      evaluateNativeCohortMergeDecision({ queuedCount: 1, waitedMinutes: 0 })
-    ).toMatchObject({ action: 'awaiting-cohort', reason: 'below-min-entries' });
-    expect(
-      evaluateNativeCohortMergeDecision({ queuedCount: 4, waitedMinutes: 9 })
-    ).toMatchObject({ action: 'awaiting-cohort', reason: 'below-min-entries' });
-    expect(
-      evaluateNativeCohortMergeDecision({ queuedCount: 0, waitedMinutes: 10 })
+      evaluateNativeCohortMergeDecision({ queuedCount: 0, waitedMinutes: 0 })
     ).toMatchObject({ action: 'empty', reason: 'no-queued-entries' });
+    expect(
+      evaluateNativeCohortMergeDecision({ queuedCount: -1, waitedMinutes: 0 })
+    ).toMatchObject({ action: 'awaiting-cohort', reason: 'invalid-evidence' });
   });
 
-  it('merges a five-entry cohort immediately and a partial cohort after 10 minutes', () => {
+  it('projects the source-owned one-entry cohort and merges immediately', () => {
     expect(NATIVE_QUEUE_COHORT_POLICY).toMatchObject({
       schema: 'jovie-native-queue-cohort/v1',
-      minEntriesToMerge: 5,
-      minEntriesToMergeWaitMinutes: 10,
+      minEntriesToMerge: 1,
+      minEntriesToMergeWaitMinutes: 0,
       alreadyAdmittedOnStaleProduction: 'preserve',
       newIntakeOnStaleProduction: 'freeze',
       deterministicMemberFailure: 'isolate-and-remove',
       transientFailure: 'bounded-retry',
     });
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(10);
-    expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(5);
-    expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(10);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(3);
+    expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(1);
+    expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(0);
     expect(
-      evaluateNativeCohortMergeDecision({ queuedCount: 5, waitedMinutes: 0 })
+      evaluateNativeCohortMergeDecision({ queuedCount: 1, waitedMinutes: 0 })
     ).toMatchObject({ action: 'merge', reason: 'cohort-full' });
-    expect(
-      evaluateNativeCohortMergeDecision({ queuedCount: 1, waitedMinutes: 10 })
-    ).toMatchObject({ action: 'merge', reason: 'low-traffic-timeout' });
   });
 
   it('emits a deterministic policy readback receipt', () => {
@@ -2385,15 +2404,15 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     });
     const drifted = buildNativeQueuePolicyReadback({
       ...NATIVE_QUEUE_POLICY,
-      min_entries_to_merge: 1,
-      min_entries_to_merge_wait_minutes: 0,
+      min_entries_to_merge: 5,
+      min_entries_to_merge_wait_minutes: 10,
     });
     expect(drifted.matched).toBe(false);
     expect(drifted.drift).toEqual([
       'min_entries_to_merge',
       'min_entries_to_merge_wait_minutes',
     ]);
-    const liveUntilCutover = validateLiveMergeQueueRuleset(
+    const deliberateDrift = validateLiveMergeQueueRuleset(
       {
         bypass_actors: [],
         rules: [
@@ -2413,16 +2432,21 @@ describe('native merge-queue cohort (JOV-5047)', () => {
             type: 'merge_queue',
             parameters: {
               ...NATIVE_QUEUE_POLICY,
-              min_entries_to_merge: 1,
-              min_entries_to_merge_wait_minutes: 0,
+              min_entries_to_merge: 5,
+              min_entries_to_merge_wait_minutes: 10,
             },
           },
         ],
       },
       { backend: 'native' }
     );
-    expect(NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover).toBe('pending');
-    expect(liveUntilCutover.ok).toBe(true);
+    expect(deliberateDrift.ok).toBe(false);
+    expect(deliberateDrift.errors).toEqual(
+      expect.arrayContaining([
+        'live native merge_queue min_entries_to_merge must be 1',
+        'live native merge_queue min_entries_to_merge_wait_minutes must be 0',
+      ])
+    );
   });
 
   it('normalizes GraphQL maximumEntriesToBuild onto the REST lock key', () => {
@@ -2515,7 +2539,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         backend: 'native',
         liveQueueConfiguration: {
           checkResponseTimeout: 1200,
-          maximumEntriesToBuild: 1,
+          maximumEntriesToBuild: 3,
           maximumEntriesToMerge: 5,
           mergeMethod: 'SQUASH',
           minimumEntriesToMerge: 1,
@@ -2523,13 +2547,12 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         },
       }
     );
-    expect(NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover).toBe('pending');
-    expect(liveGraphql.ok).toBe(true);
+    expect(liveGraphql.ok).toBe(false);
     expect(
       liveGraphql.errors.some(error =>
         error.includes('check_response_timeout_minutes')
       )
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('ejects UNMERGEABLE native entries and refuses to re-enqueue the same head', () => {

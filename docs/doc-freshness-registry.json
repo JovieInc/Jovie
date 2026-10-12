@@ -326,18 +326,18 @@
       "sources": [
         {
           "path": ".github/rulesets/branch-protection.yml",
-          "sha256": "e491722a51d611a5e727f0c15ce179af0a358b33fe5d7d7d976a6143818aa93f"
+          "sha256": "ff4e4011d061d92b7c1f32fcdffc7557650e933c47892c0e22c024ecd0903a7d"
         }
       ]
     },
     ".github/MERGE_QUEUE.md": {
       "owner": "@itstimwhite",
-      "claim": "Native queue settings derive from the ruleset; documented unapplied targets remain distinct.",
-      "documentSha256": "3124ec0a107afe37eefc7d4dbf2401e36d623ff346035dc052a085daba4c9c55",
+      "claim": "Native queue settings derive from the checked-in ruleset; live operation needs separate readback.",
+      "documentSha256": "7c46deb53107d1e335bfc69c07823d51bd23ee76ddf75dbb198c68af90a34621",
       "sources": [
         {
           "path": ".github/rulesets/branch-protection.yml",
-          "sha256": "e491722a51d611a5e727f0c15ce179af0a358b33fe5d7d7d976a6143818aa93f"
+          "sha256": "ff4e4011d061d92b7c1f32fcdffc7557650e933c47892c0e22c024ecd0903a7d"
         }
       ]
     },
@@ -439,11 +439,11 @@
     "docs/PR_FLOW.md": {
       "owner": "@itstimwhite",
       "claim": "Native queue authority is represented in the checked-in ruleset; live operation needs separate receipts.",
-      "documentSha256": "86719983ab97b7497a9428a050642beb58049cd27d613144bf6bb0276b913dc9",
+      "documentSha256": "14969e21af66d41fece6a45b1bd0731a7b1e1179b6e7727948af08d2179f4dcf",
       "sources": [
         {
           "path": ".github/rulesets/branch-protection.yml",
-          "sha256": "e491722a51d611a5e727f0c15ce179af0a358b33fe5d7d7d976a6143818aa93f"
+          "sha256": "ff4e4011d061d92b7c1f32fcdffc7557650e933c47892c0e22c024ecd0903a7d"
         }
       ]
     },
