@@ -95,7 +95,11 @@ export function useOnboardingClaim(
     };
 
     const attemptClaim = async (attempt: number): Promise<void> => {
-      setStatus('pending');
+      // Keep an unresolved ownership conflict visible while a later turn is
+      // checked; an in-flight retry is not evidence the conflict cleared.
+      setStatus(current =>
+        current === 'identity-conflict' ? current : 'pending'
+      );
       const startedAt = Date.now();
       let response: Response;
       try {

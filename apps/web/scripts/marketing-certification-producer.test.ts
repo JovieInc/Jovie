@@ -269,7 +269,7 @@ describe('marketing certification producer', () => {
       'utf8'
     );
     const paths =
-      workflow.split('    paths:\n')[1]?.split('  schedule:')[0] ?? '';
+      workflow.split('    paths:\n')[1]?.split('  workflow_dispatch:')[0] ?? '';
     const actual = [...paths.matchAll(/^      - '([^']+)'$/gmu)].map(
       match => match[1]
     );
@@ -278,6 +278,9 @@ describe('marketing certification producer', () => {
       "--jq '.files[] | .filename, .previous_filename // empty'"
     );
     expect(workflow).toContain('cancel-in-progress: false');
+    // A replaced or failed run's pushes are covered by the next run's range.
+    expect(workflow).not.toMatch(/^  schedule:/mu);
+    expect(workflow).toContain('select(.conclusion == "success")');
   });
 
   it('selects entries whose source, declared tests or story changed', () => {
@@ -428,6 +431,18 @@ describe('marketing certification producer', () => {
     for (const packet of [noTest, brokenStory, wrongStory, penFlagged]) {
       expect(evaluateCertificationAdmission({ packet }).state).toBe('working');
     }
+  });
+
+  it('reports an explicitly unknown pen identity as missing, never a defect', () => {
+    const homepage = MARKETING_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'recipe.homepage'
+    );
+    if (!homepage) throw new Error('fixture entry recipe.homepage must exist');
+    const packet = packetFor({ entry: homepage });
+    expect(homepage.penRootIds).toEqual([]);
+    expect(homepage.penIdentityReason?.trim()).toBeTruthy();
+    expect(packet.canonicalReferences[0].status).toBe('missing');
+    expect(defectReceipts(packet)).toEqual([]);
   });
 
   it('files real defects once per entry and tier, never missing evidence', () => {

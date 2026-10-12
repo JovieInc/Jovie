@@ -59,7 +59,7 @@ describe('parity probes', () => {
         albumByUrl: async () => null,
         searchAlbums: async () => [],
         artistCandidates: async () => [],
-        artistByUrl: async () => null,
+        artistByUrl: async () => [],
         artistByMbid: async () => null,
         urlRelsForIsrc: async () => [],
       }
@@ -79,7 +79,7 @@ describe('parity probes', () => {
         albumByUrl: async () => null,
         searchAlbums: async () => [],
         artistCandidates: async () => [],
-        artistByUrl: async () => null,
+        artistByUrl: async () => [],
         artistByMbid: async () => null,
         urlRelsForIsrc: async () => [],
       }
@@ -102,7 +102,7 @@ describe('parity probes', () => {
         albumByUrl: async () => null,
         searchAlbums: async () => [],
         artistCandidates: async () => [],
-        artistByUrl: async () => null,
+        artistByUrl: async () => [],
         artistByMbid: async () => null,
         urlRelsForIsrc: async () => [],
       }

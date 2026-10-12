@@ -204,8 +204,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         # Runner-minutes per merged PR is opt-in (`--runner-minutes`): one jobs call per CI run
-        # is too many API calls for this 8-minute job.
-        run: node scripts/promotion-loss-metrics.mjs --since 24h >> "$GITHUB_STEP_SUMMARY"
+        # is too many API calls for this 8-minute job. JOV-8044: metrics are
+        # informational — a collection failure reports in the summary and must
+        # not turn the p95 gate job red.
+        run: |
+          node scripts/promotion-loss-metrics.mjs --since 24h >> "$GITHUB_STEP_SUMMARY" || {
+            echo "::warning::promotion-loss metrics collection failed; the p95 gate is unaffected."
+            {
+              echo "### Promotion-loss metrics (last 24 h)"
+              echo
+              echo "Unavailable: GitHub API collection failed. See the step log."
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
 
       - name: Fail when SLO is breached
         if: ${{ steps.measure.outputs.p95_seconds != '' && steps.ratchet.outputs.ratchet_ok != 'true' }}

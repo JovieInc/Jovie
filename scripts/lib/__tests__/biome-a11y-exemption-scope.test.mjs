@@ -43,6 +43,8 @@ const FORMER_WHOLE_FILE_EXEMPTIONS = [
   'AvatarUploadable.tsx',
   'PlatformPill.tsx',
   'YouTubeCrossCategoryPrompt.tsx',
+  '*TableUnified.tsx',
+  '*ProfilesUnified.tsx',
 ];
 
 const PRODUCTION_A11Y_PATHS = [
@@ -72,8 +74,6 @@ const REMAINING_GLOB_A11Y_INCLUDES = [
   '**/tests/**',
   '**/.storybook/**',
   '**/scripts/**',
-  '**/*TableUnified.tsx',
-  '**/*ProfilesUnified.tsx',
 ];
 
 function runBiome(paths) {

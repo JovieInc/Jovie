@@ -38,7 +38,6 @@ import {
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
-import { findVenmoLink } from '@/features/profile/utils/venmo';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
@@ -641,7 +640,6 @@ export function ProfileCompactSurface({
       }),
     [hasListenArtwork]
   );
-  const paymentsVenmoLink = hasTip ? findVenmoLink(socialLinks) : null;
   const homeProfileSettings = homeLatestRelease
     ? { ...profileSettings, showOldReleases: true }
     : profileSettings;
@@ -723,7 +721,7 @@ export function ProfileCompactSurface({
 
         <div
           className={cn(
-            'relative z-10 flex min-h-0 flex-1 flex-col px-(--page-pad)',
+            'profile-content-column relative z-10 flex min-h-0 flex-1 flex-col px-(--page-pad)',
             isHomeMode && 'profile-home-content-column'
           )}
         >
@@ -862,7 +860,6 @@ export function ProfileCompactSurface({
                 onFlowClosed={returnToProfileAfterNotifications}
                 onSubscriptionActivated={handleSubscriptionActivated}
                 modeCardAccents={modeCardAccents}
-                paymentsVenmoLink={paymentsVenmoLink}
               />
             )}
           </div>

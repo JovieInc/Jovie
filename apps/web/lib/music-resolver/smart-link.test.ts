@@ -22,7 +22,7 @@ function sources(overrides: Partial<InHouseSources> = {}): InHouseSources {
     albumByUrl: async () => null,
     searchAlbums: async () => [],
     artistCandidates: async () => [],
-    artistByUrl: async () => null,
+    artistByUrl: async () => [],
     artistByMbid: async () => null,
     urlRelsForIsrc: async () => [],
     ...overrides,

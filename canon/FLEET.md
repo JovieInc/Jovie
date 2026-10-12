@@ -3,8 +3,8 @@
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
 Owner: Tim White
-Last updated: 2026-09-04
-Source: founder interviews, 2026-08-17 and 2026-09-04
+Last updated: 2026-10-10
+Source: founder interviews, 2026-08-17, 2026-09-04 and 2026-10-10
 
 The fleet exists to make Jovie default alive. It does not exist to file issues, keep agents busy, or maximize merges.
 
@@ -83,11 +83,17 @@ Work admission and production promotion stay separate typed authorities (GREEN /
 
 ## Commitment closure
 
-Every accepted commitment remains open until it has one durable, destination-bound receipt:
+Every accepted repository job must declare its **terminal, destination-bound success check before work begins**, independent of whether it arrives through a WorkOrder, Linear, a CLI command, CI, an agent, or an ad-hoc founder instruction. When feasible, make that check a reproducible CLI command, API/state readback, or deterministic end-to-end test against the intended environment, identity and artifact. Record its expected observable state, freshness/timeout, falsifying outcome, and where its evidence will be returned. For work that cannot have a mechanical oracle (such as a human judgment), require an explicit authenticated decision/result receipt. A test of the **actual promised outcome** is the exit condition; command completion is not.
 
-1. **Verified progress** — evidence that the work product moved materially closer to its destination.
-2. **Verified outcome** — evidence that the promised result exists at the intended destination.
-3. **Current blocker** — the exact blocking condition, one accountable owner, and the next action or objective revisit trigger.
+Keep one durable, destination-bound state receipt throughout execution:
+
+1. **Verified progress (not Done)** — evidence that work materially advanced, with the still-unmet exit check.
+2. **Verified outcome (eligible for Done)** — an independently checked, fresh receipt proving the promised result exists at its intended destination.
+3. **Current blocker (not Done)** — the exact blocking condition, one accountable owner, and a next action or objective revisit trigger.
+
+An accepted job must remain open while its exit check is **failed, pending, stale or unknown**. An HTTP 200, successful process exit, PR merge, green CI, deployment status, agent assertion or work-order acknowledgment is never by itself proof that a different promised effect happened. A merged documentation change can satisfy a documentation goal; an installed runtime behavior change must be measured on that runtime; a customer-facing change requires the relevant deployed experience/customer-state readback. Do not impose a deployment on tasks whose destination is not production.
+
+The canonical WorkOrder/WorkResult lifecycle ([JOV-7703](https://linear.app/jovie/issue/JOV-7703)) must carry that predeclared predicate and its exact-subject, exact-revision result receipt, and the existing certification/Linear closure consumers must refuse terminal success without a matching passing receipt. On failure/unknown, preserve the current owner and artifacts, perform only bounded authorized retry/repair, re-run the original check, and record the next accountable action. Retest and invalidate/reopen if later evidence contradicts a prior pass. Preserve independent verification and scoped safety gates; do not add a second coordinator or let the verification loop block its own narrow recovery.
 
 Activity, assignment, dispatch, handoff, local completion, and an agent saying “done” are not progress or outcome receipts by themselves. A source change is not a merge; a merge is not a deployment; a deployment is not an exact-runtime or customer outcome.
 
@@ -132,6 +138,7 @@ Tim does not open Linear in the morning. Tim does not enroll PRs.
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-10 | Required a predeclared runnable exit check for every repo job; Done needs exact destination proof, not a CLI/HTTP/PR activity receipt. | Tim White |
 | 2026-09-21 | Deleted the ownerless-recovery-sweep workflow (chronic infra red on the jovie-fixed runner; ownerless-recovery role folded into the event-driven production controller). | Tim White |
 | 2026-09-04 | Made commitment closure explicit: destination-bound proof, accountable blockers, reconcile-before-duplicate, and independent missed-event recovery. | Tim White |
 | 2026-08-17 | Created. Constraint-packet fleet. Web-first sellability. Admission ≠ filing. Scoreboard: both accounts $0, $0 MRR; $935/mo known tool floor; gifted credits; $25k SAFE spent. | Tim White |

@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  MESH_CURRENT_WIRE_COVERAGE_COMMAND,
   MESH_HOST_ACK_COVERAGE_COMMAND,
   MESH_NATIVE_TERMINAL_COVERAGE_COMMAND,
   MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND,
@@ -52,6 +53,10 @@ describe('scripts test inventory guard', () => {
       expect(commands).toContain(MESH_HOST_ACK_COVERAGE_COMMAND);
       expect(commands).toContain(MESH_NATIVE_TERMINAL_COVERAGE_COMMAND);
       expect(commands).toContain(MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND);
+      expect(commands).toContain(MESH_CURRENT_WIRE_COVERAGE_COMMAND);
+      expect(SCRIPT_CONTRACT_VITEST_TESTS).toContain(
+        'scripts/lib/__tests__/mesh-current-wire.test.mjs'
+      );
       expect(SCRIPT_CONTRACT_VITEST_TESTS).toContain(
         'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs'
       );
