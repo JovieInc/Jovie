@@ -97,6 +97,9 @@ describe('independent application source export', () => {
             'utf8'
           );
           expect(entrypoint).toContain("export * from './symphony-outage.js'");
+          expect(entrypoint).toContain(
+            "export * from './provider-incident.js'"
+          );
           for (const [, target] of entrypoint.matchAll(
             /from ['"](\.\/[^'"]+)['"]/gu
           ))
@@ -105,6 +108,11 @@ describe('independent application source export', () => {
                 join(contractDirectory, `${target.replace(/\.js$/u, '')}.ts`)
               )
             ).toBe(true);
+          expect(
+            receipt.files[
+              'vendor/agent-transport-contracts/provider-incident.ts'
+            ]
+          ).toBeDefined();
           expect(
             receipt.files['vendor/agent-transport-contracts/symphony-outage.ts']
           ).toBeDefined();
