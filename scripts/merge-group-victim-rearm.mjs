@@ -8,6 +8,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
 
 export const REARM_CONTEXT = 'jovie-queue-victim-rearm/v1';
 export const REARM_CAP = 2;
@@ -21,13 +22,8 @@ const BUDGET_FILE = /([A-Za-z0-9_./-]+\.md): \d+ bytes exceeds \d+/;
 // controller admits the same states; requiring CLEAN stranded victims whose
 // head carried a pending lane receipt.
 export const REARM_MERGE_STATES = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
-const BLOCKING = new Set([
-  'hold',
-  'gated',
-  'incident',
-  'do-not-merge',
-  'queue-poison',
-]);
+// Rearming a held PR enqueues it, and a held member fails every group.
+const BLOCKING = new Set(ADMISSION_BLOCKING_LABELS);
 
 function fail(message) {
   throw new Error(`merge-group-victim-rearm: ${message}`);
