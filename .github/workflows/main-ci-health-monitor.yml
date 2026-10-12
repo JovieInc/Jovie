@@ -1,10 +1,19 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: GitHub has no native alert or one-shot rerun for a red main CI run; this hop holds actions:write only to rerun a first failed attempt once and records a dedupe artifact, and it never merges, labels, or deploys.
+# revisit-trigger: Remove when the lanes fix loop owns red-main alerting and first-attempt reruns from the same CI completion event.
 name: Main CI health monitor
-# clock-class: production-liveness
 
+# No clock: main CI health only changes when a CI run on main finishes, so
+# that completion re-evaluates it at once (failure, rerun eligibility, and
+# "no green main while PRs merge"). A run that never finishes is a runner
+# outage; Runner Health Monitor owns that signal, and job timeouts end hung
+# hosted runs with a completion event.
 on:
-  schedule:
-    # Hosted API monitor, offset from runner routing and cost checks.
-    - cron: '8,28,48 * * * *'
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -43,6 +52,9 @@ jobs:
       - name: Evaluate main CI health
         id: evaluate
         uses: ./.github/actions/eval-main-health
+        with:
+          # The completion event is the wake, so a failed run is final now.
+          completed-failure-grace-minutes: ${{ github.event_name == 'workflow_run' && '0' || '5' }}
 
       - name: Deduplicate exact unhealthy run attempt
         id: dedupe
