@@ -9,9 +9,13 @@ A lane is a provider command in `providers.json` plus a Linear label that expres
 preference. Every JOV Todo issue is eligible (Tim 2026-10-11: no `agent-ready`, plan or
 approval label is required): every lane reads one shared all-Todo snapshot per TTL (at most
 `TODO_POOL_PAGES` x 100 issues; a larger pool fails closed) and the cost-aware router (below)
-decides which lane takes each issue. Issues carrying `hold`, `no-symphony`, `type:epic`,
-`codex-blocked` or `reasoning-job` are never taken; auth, billing and infra labels route only
-to the guarded Codex lane. Issue runs get a goal and a definition of done (the issue's own
+decides which lane takes each issue. `hold` is the one stop signal, and it expires: the
+reconcile pass removes a `hold` with no issue activity for 72h (with a comment on how to
+re-hold). `codex-blocked` only keeps the issue off the codex lane; `no-symphony` no longer
+excludes (the claiming agent decides what the issue needs, closing an obsolete one with
+`NOT-SHIPPABLE` included); a `reasoning-job` issue belongs to the reason lane only when it
+carries Summer's job block; `type:epic` is a decomposition unit (see Epics). Auth, billing and
+infra labels route only to the guarded Codex lane. Issue runs get a goal and a definition of done (the issue's own
 acceptance section when it has one) instead of a pre-approved plan, may run gstack
 `/autoplan` themselves for non-trivial work, and never wait for an approval label.
 
@@ -237,11 +241,27 @@ Held reason codes (`held.json`): `secret-file`, `fix-exhausted`, `empty-diff`, `
 Green CI overrides only `gate-check-failed` and `gate-timeout`, which are verdicts from the local
 gate. The other codes are diff policy or unknown, and the PR stays a draft.
 
+## Epics (`type:epic`)
+
+An epic is a unit of work, not an exclusion (`epics.py`). A lane that claims an epic with no
+open child issues runs a planning pass in a detached origin/main checkout: the agent reads the
+epic and the repo and ends with a `jovie.epic-plan/v1` JSON block; the harness (never the agent)
+files up to 12 children in the epic's team (Todo, parent = the epic, a Goal and a Definition of
+done each, no labels), skipping titles that already exist under the epic, verifies each
+`issueCreate` readback, comments a summary and leaves the epic In Progress. An epic with open
+children is not decomposed: the children carry the work. Remote lanes (hyperagent) never take
+epics. The dispatch reconcile pass (`epics.reconcile`, every 15 minutes on
+`LANES_RECONCILE_OWNER`, default `gem`) moves an epic to Done with a comment once every child is
+terminal and at least one is Done, moves a Todo epic with open children to In Progress, and
+expires stale `hold` labels (one filtered read per kind, no per-issue reads, at most 10 writes
+per kind per pass).
+
 ## Reason lane (Summer's tier-3 decisions)
 
 Ranking, prioritization and strategy decisions are not made on Summer's flash model. Summer
 files a JOV issue labeled `reasoning-job` in Todo, carrying a `summer.reasoning-job/v1` JSON block
-(question, decision type, context refs, deadline). The label is excluded from the shipping lanes.
+(question, decision type, context refs, deadline). Only issues with that block are reason-lane
+jobs; a `reasoning-job` issue without one is ordinary work for the build lanes.
 Each dispatch tick checks for queued jobs and starts one detached `reason_lane.py drain` per host
 (flock `reason.lock`), so a job starts within a minute. Per job:
 
@@ -341,8 +361,8 @@ or release hold.
 Auth, billing, payment, infrastructure, and Vercel labels are admitted only by this lane.
 Those runs use maximum reasoning effort, carry the `sensitive-surface` PR label across
 hosts, and stay draft until the normal Migration Guard/security/boundary checks plus a
-separate max-effort Codex review pass. `no-symphony`, secret/credential rotation, and
-live billing pricing remain excluded. Other providers retain their sensitive-label
+separate max-effort Codex review pass. Secret/credential rotation and live billing pricing
+remain excluded; a `codex-blocked` sensitive issue has no lane and waits for its label to change. Other providers retain their sensitive-label
 exclusions.
 
 ## Routing (JOV-7706)
@@ -535,15 +555,6 @@ Examples: `remediation:asc-agreements`, `remediation:billing-health-public`,
 `remediation:flaky-test-filing`, `remediation:codeowners-drift`.
 
 The bare label `remediation` (no colon) is the relay intake label, not an event.
-
-### Precedence over `no-symphony`
-
-An issue that carries any `remediation:*` label is never skipped because it also
-carries `no-symphony`. JOV-7540 and JOV-7551 carry `no-symphony`. The bare
-`remediation` label does not override that exclusion. `type:epic`,
-`codex-blocked`, and `reasoning-job` still exclude the issue. The exception
-follows `LANES_ESCALATION` (default on). When that flag is off, `no-symphony`
-excludes the issue again.
 
 ### Dedupe is the label, and closed issues are history
 

@@ -614,7 +614,7 @@ async function analyzeFlakiness(token, owner, repo) {
     if (runHadFailure) runsWithFailures++;
   }
 
-  const unitStats = collectUnitRetryFlakes(
+  const unitStats = await collectCachedUnitRetryFlakes(
     await runsWithUnitFlakeArtifacts(token, owner, repo, runs),
     `${owner}/${repo}`
   );
@@ -841,6 +841,45 @@ function collectUnitRetryFlakes(
     const dir = path.join(baseDir, String(run.id));
     download(run.id, repository, dir);
     perRun.push({ runId: run.id, entries: readUnitFlakeReports(dir) });
+  }
+  return aggregateUnitFlakes(perRun);
+}
+
+/**
+ * collectUnitRetryFlakes with each run's parsed reports cached per (run id,
+ * attempt). A completed run's artifacts never change, yet re-downloading them
+ * cost 1 list + 14 zip REST calls per run on every wake (~7 runs, ~21 wakes/h:
+ * the largest GITHUB_TOKEN consumer when the repo quota hit zero on
+ * 2026-10-11). A failed download is not cached, so the next wake retries it.
+ * @param {Array<{ id: number, run_attempt?: number }>} runs
+ * @param {string} repository
+ * @param {{ download?: typeof downloadUnitFlakeArtifacts, rootDir?: string, evidence?: (kind: string, run: any, load: () => any) => Promise<any> }} [options]
+ */
+async function collectCachedUnitRetryFlakes(
+  runs,
+  repository,
+  { download = downloadUnitFlakeArtifacts, rootDir, evidence } = {}
+) {
+  const cached = evidence ?? runEvidence;
+  const baseDir =
+    rootDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'unit-flaky-'));
+  const perRun = [];
+  for (const run of runs) {
+    let entries = [];
+    try {
+      entries = await cached('unit-flaky', run, () => {
+        const dir = path.join(baseDir, String(run.id));
+        if (!download(run.id, repository, dir)) {
+          throw new Error('artifact download failed');
+        }
+        return readUnitFlakeReports(dir);
+      });
+    } catch (error) {
+      console.warn(
+        `Could not read unit-flaky artifacts for run ${run.id}: ${error.message}`
+      );
+    }
+    perRun.push({ runId: run.id, entries });
   }
   return aggregateUnitFlakes(perRun);
 }
@@ -1163,6 +1202,7 @@ module.exports = {
   aggregateUnitFlakes,
   analyzeFlakiness,
   calculateUnitRetryFlakes,
+  collectCachedUnitRetryFlakes,
   collectUnitRetryFlakes,
   downloadUnitFlakeArtifacts,
   readUnitFlakeReports,

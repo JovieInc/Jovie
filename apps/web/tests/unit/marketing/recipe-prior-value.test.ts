@@ -77,13 +77,17 @@ describe('semantic prior value requirements', () => {
     const sectionIds = composition.sections.map(section => section.sectionId);
 
     expect(composition.recipeId).toBe('homepage');
-    expect(sectionIds).not.toContain('feature-grid');
-    expect(
-      sectionIds.filter(sectionId => sectionId === 'feature-split')
-    ).toHaveLength(3);
-    expect(sectionIds).toContain('spec-wall');
-    expect(sectionIds).toContain('pricing');
-    expect(sectionIds).toContain('cta');
+    expect(sectionIds).toEqual([
+      'hero',
+      'feature-split',
+      'feature-split',
+      'cta',
+    ]);
+    for (const [index, sectionId] of sectionIds.entries()) {
+      expect(hasRequiredPrior(sectionId, sectionIds.slice(0, index))).toBe(
+        true
+      );
+    }
   });
 
   it('keeps explicit request and content beats in the recipes that need them', () => {

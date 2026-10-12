@@ -15,6 +15,7 @@
  * Post-charter stubs per ARCHITECTURE.md §15: newsletter-signup (JOV-4067).
  */
 
+import { HOMEPAGE_IDENTITY_COPY } from '../homepageIdentityCopy';
 import type { MarketingAudience, MarketingSectionId } from './sections';
 
 export type RecipeId =
@@ -161,94 +162,59 @@ export interface MarketingRecipe {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
-  // ── homepage (proven — reference: /new per codebase-baseline §2.2) ─────────
+  // ── homepage (proven — selected company-level identity route: /) ─────────
   {
     id: 'homepage',
     label: 'Homepage',
     status: 'proven',
-    referenceRoute: '/new', // richest shipped homepage composition; live '/' currently renders hero-only
+    referenceRoute: '/', // /new is a retired redirect, not a rendered reference
     audience: 'general',
-    sectionOrder: [
-      'hero',
-      'logo-cloud',
-      'feature-split', // system overview
-      'feature-split', // spotlight (adaptive)
-      'feature-split', // capture + reactivation fused
-      'spec-wall',
-      'social-proof',
-      'pricing',
-      'cta',
-    ],
+    // The selected identity homepage owns presence and structure as distinct
+    // editorial occurrences. Available FAQ/proof copy does not mount a section.
+    sectionOrder: ['hero', 'feature-split', 'feature-split', 'cta'],
     arc: [
-      { beat: 'promise', feeling: 'this is what Jovie is', section: 'hero' },
-      { beat: 'permission', feeling: 'others trust it', section: 'logo-cloud' },
+      {
+        beat: 'promise',
+        feeling: HOMEPAGE_IDENTITY_COPY.hero.headline,
+        section: 'hero',
+      },
       {
         beat: 'comprehension',
-        feeling: 'how it works at a glance',
+        feeling: HOMEPAGE_IDENTITY_COPY.sections[0].headline,
         section: 'feature-split',
       },
       {
         beat: 'depth',
-        feeling: 'I see the product in action',
+        feeling: HOMEPAGE_IDENTITY_COPY.sections[1].headline,
         section: 'feature-split',
       },
       {
-        beat: 'capability',
-        feeling: 'I could use this for capture/reactivation',
-        section: 'feature-split',
+        beat: 'action',
+        feeling: HOMEPAGE_IDENTITY_COPY.close.headline,
+        section: 'cta',
       },
-      { beat: 'detail', feeling: 'the specifics matter', section: 'spec-wall' },
-      {
-        beat: 'belief',
-        feeling: 'real artists use this',
-        section: 'social-proof',
-      },
-      { beat: 'price', feeling: 'what does it cost', section: 'pricing' },
-      { beat: 'action', feeling: 'ready to start', section: 'cta' },
     ],
     hierarchy: {
-      oneBigIdea:
-        'Jovie is the artist platform that captures every fan and reactivates them automatically',
+      oneBigIdea: HOMEPAGE_IDENTITY_COPY.hero.subhead,
       seeFirst: 'hero',
       second: 'feature-split',
-      third: 'spec-wall',
+      third: 'feature-split',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
         maxFullBleedBreaks: 1,
         maxHeroWeightProofElements: 1,
       },
       aboveTheFoldContract: {
-        desktop: ['hero'], // hero carries headline + CTA + phone media (hero-weight proof)
+        desktop: ['hero'], // identity hero carries headline + claim action + real profile proof
         mobile: ['hero'],
       },
     },
     ctaCadence: {
       strategy: 'sparse',
-      primaryLabel: 'Get started',
-      secondaryLabel: 'See a live profile',
+      primaryLabel: HOMEPAGE_IDENTITY_COPY.hero.claim.action,
       cadence: 'hero-and-close',
     },
-    substitutions: [
-      {
-        replace: 'social-proof',
-        with: 'stats',
-        when: 'socialProof verified data absent but stats aggregate verified',
-      },
-      {
-        replace: 'pricing',
-        with: 'monetization',
-        when: 'audience=artist (one-liner-link variant, not a full pricing table)',
-      },
-    ],
     fallbacks: [
-      {
-        missing: 'social-proof verified data',
-        fallback: 'omit section social-proof (zero-proof path)',
-      },
-      {
-        missing: 'stats verified data',
-        fallback: 'omit section stats (zero-proof path)',
-      },
       {
         missing: 'logo-cloud verified logos',
         fallback: 'omit section logo-cloud (zero-proof path)',

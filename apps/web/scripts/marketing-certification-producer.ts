@@ -367,6 +367,20 @@ export function buildPacket(input: {
     entry.penRootIds.length > 0 &&
     entry.rootProofs.length > 0 &&
     !input.penIssueIds.has(entry.id);
+  // Mirrors validateMarketingPenRegistry: an entry that deliberately declares
+  // its Pen identity unknown (penRootId null + reason, no roots or variants)
+  // is valid registry state — not yet certifiable, so `missing`, never a
+  // defect. Only a flagged or malformed identity is `failed`.
+  const penExplicitUnknown =
+    entry.penRootId === null &&
+    Boolean(entry.penIdentityReason?.trim()) &&
+    entry.penRootIds.length === 0 &&
+    Object.keys(entry.penVariantRoots ?? {}).length === 0;
+  const canonicalStatus: CertificationEvidenceStatus = penOk
+    ? 'passed'
+    : penExplicitUnknown && !input.penIssueIds.has(entry.id)
+      ? 'missing'
+      : 'failed';
   const invariantResults = INVARIANT_SUITES.map(suite =>
     vitestEvidence(input.invariants, suite)
   );
@@ -425,12 +439,14 @@ export function buildPacket(input: {
       receipt(
         entry,
         'canonical_references',
-        penOk ? 'passed' : 'failed',
+        canonicalStatus,
         sha,
         'apps/web/data/marketing/componentRegistry.ts',
-        penOk
+        canonicalStatus === 'passed'
           ? `Pen roots ${entry.penRootIds.join(', ')} resolve with ${entry.rootProofs.length} source proof(s).`
-          : 'Pen identity unresolved or flagged by validateMarketingPenRegistry.',
+          : canonicalStatus === 'missing'
+            ? `Pen identity explicitly unresolved: ${entry.penIdentityReason}`
+            : 'Pen identity unresolved or flagged by validateMarketingPenRegistry.',
         { penRootIds: entry.penRootIds, rootProofs: entry.rootProofs }
       ),
     ],

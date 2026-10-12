@@ -430,6 +430,18 @@ describe('marketing certification producer', () => {
     }
   });
 
+  it('reports an explicitly unknown pen identity as missing, never a defect', () => {
+    const homepage = MARKETING_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'recipe.homepage'
+    );
+    if (!homepage) throw new Error('fixture entry recipe.homepage must exist');
+    const packet = packetFor({ entry: homepage });
+    expect(homepage.penRootIds).toEqual([]);
+    expect(homepage.penIdentityReason?.trim()).toBeTruthy();
+    expect(packet.canonicalReferences[0].status).toBe('missing');
+    expect(defectReceipts(packet)).toEqual([]);
+  });
+
   it('files real defects once per entry and tier, never missing evidence', () => {
     expect(defectReceipts(packetFor())).toEqual([]);
     expect(

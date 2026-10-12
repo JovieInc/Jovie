@@ -40,6 +40,24 @@ describe('central Inbox bell', () => {
       runtimeUpdate.available = false;
     }
   });
+
+  it('consolidates pending work and runtime updates into one attention indicator', () => {
+    runtimeUpdate.available = true;
+    try {
+      render(
+        <SidebarInboxLink
+          availability={{ state: 'available', pendingCount: 3 }}
+        />
+      );
+      const link = screen.getByRole('link', {
+        name: 'Inbox — 3 Items Need Attention; App Update Available',
+      });
+      expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(1);
+    } finally {
+      runtimeUpdate.available = false;
+    }
+  });
+
   it.each([
     [{ state: 'empty' as const, pendingCount: 0 }, 'Inbox — All Caught Up'],
     [
