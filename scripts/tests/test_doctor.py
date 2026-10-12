@@ -276,6 +276,15 @@ class ConditionReceiptTest(unittest.TestCase):
         self.assertEqual(event["owner"], "symphony-lanes-doctor")
         self.assertEqual(event["owningInvariant"], "JOV-6004")
 
+    def test_a_five_minute_tick_still_counts_as_live_demand_evidence(self):
+        for tick_age, known in ((330, True), (doctor.TICK_FRESH_S + 1, False)):
+            observed = obs(now=1000.0, tickAge=tick_age, pool=20, poolByProvider={"devin": 20},
+                           tick={"at": "x", "unhealthy": [], "error": None, "spawned": ["devin"],
+                                 "disk": {"admitted": True}},
+                           capacityByProvider={"devin": {"running": 1, "slots": 2, "base": 2}})
+            runnable = doctor.delivery_evidence(observed, {})["admission"]["runnablePool"]
+            self.assertEqual(runnable is not None, known, tick_age)
+
     def test_failed_devin_restarts_emit_one_bounded_summer_escalation_generation(self):
         observed = obs(now=1000.0, tickAge=3,
                        tick={"at": "x", "unhealthy": [], "error": None, "spawned": ["devin"] * 4},
