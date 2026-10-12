@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { isFormElement } from '@/lib/utils/keyboard';
+import { isShellShortcutSuppressed } from '@/lib/utils/keyboard';
 
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
 const SIDEBAR_KEYBOARD_SHORTCUT_BARE = '[';
@@ -18,13 +18,16 @@ export function useSidebarKeyboardShortcut(
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isShellShortcutSuppressed(event)) return;
       const key = event.key?.toLowerCase();
       if (!key) return;
 
       // Modified shortcut: Cmd/Ctrl + B (legacy alias, still wired).
       if (
         key === shortcutKey.toLowerCase() &&
-        (event.metaKey || event.ctrlKey)
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey
       ) {
         event.preventDefault();
         handlerRef.current();
@@ -37,8 +40,7 @@ export function useSidebarKeyboardShortcut(
         key === SIDEBAR_KEYBOARD_SHORTCUT_BARE &&
         !event.metaKey &&
         !event.ctrlKey &&
-        !event.altKey &&
-        !isFormElement(event.target)
+        !event.altKey
       ) {
         event.preventDefault();
         handlerRef.current();

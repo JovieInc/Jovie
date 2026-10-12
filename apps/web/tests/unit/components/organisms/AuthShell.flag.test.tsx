@@ -19,6 +19,7 @@ const { unifiedSidebarMock, sidebarMock } = vi.hoisted(() => ({
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({ toggle: vi.fn() }),
+  useOptionalPreviewPanelState: () => null,
 }));
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({

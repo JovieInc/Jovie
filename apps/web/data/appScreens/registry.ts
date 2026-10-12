@@ -99,7 +99,7 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     penRootId: 'JwsdW',
     penReferenceEligible: false,
     penIdentityReason:
-      'Bound to Pen JwsdW (Canonical / App Shell / Runtime) by read-only readback 2026-09-27 (pen-geometry.json). Not reference-eligible while D1 is pending: the Pen sidebar slot is 256 and header slot 48, code locks 244/44.',
+      'Bound to Pen JwsdW (Canonical / App Shell / Runtime) by read-only readback 2026-09-27 (pen-geometry.json). Not reference-eligible while D1 is pending: the Pen sidebar slot is 256 and header slot 48, code locks 224/44.',
   },
   {
     id: 'component.app-shell-content-panel',
@@ -312,6 +312,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/settings/page.tsx',
   'apps/web/app/app/(shell)/settings/payments/page.tsx',
   'apps/web/app/app/(shell)/settings/profile/page.tsx',
+  'apps/web/app/app/(shell)/settings/referral/page.tsx',
   'apps/web/app/app/(shell)/settings/touring/page.tsx',
   'apps/web/app/app/(shell)/settings/usage/page.tsx',
   'apps/web/app/app/(shell)/tasks/page.tsx',
@@ -337,6 +338,7 @@ const LEGACY_SOURCES = new Set<string>([
 ]);
 
 const ALIAS_SOURCES = new Set<string>([
+  'apps/web/app/app/(shell)/jovie-work/page.tsx',
   'apps/web/app/app/(shell)/settings/admin/page.tsx',
   'apps/web/app/app/(shell)/settings/artist-profile/page.tsx',
   'apps/web/app/app/(shell)/settings/delete-account/page.tsx',
@@ -422,6 +424,10 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
   'apps/web/app/app/(shell)/contact/page.tsx': {
     conceptId: '/app/settings/contacts',
     redirectTo: '/app/settings/contacts',
+  },
+  'apps/web/app/app/(shell)/jovie-work/page.tsx': {
+    conceptId: '/app',
+    redirectTo: '/app?view=done',
   },
   'apps/web/app/app/(shell)/feature-flags/page.tsx': {
     conceptId: '/app/admin/features',

@@ -5,6 +5,7 @@ import {
   resolveBypassFallbackUserId,
   setTestAuthBypassSession,
   signInUser,
+  waitForAuthenticatedHealth,
 } from '../../helpers/auth';
 
 describe('fillControlledInputUntilEnabled', () => {
@@ -96,7 +97,7 @@ describe('signInUser test-auth bypass navigation', () => {
     await withBypassEnv(() => signInUser(page));
 
     expect(requestGet).toHaveBeenCalledWith(
-      'http://localhost:3100/api/dev/test-auth/enter?persona=creator&redirect=/app',
+      'http://localhost:3100/api/dev/test-auth/enter?persona=creator&redirect=/app&session=better-auth',
       expect.objectContaining({
         maxRedirects: 0,
         timeout: expect.any(Number),
@@ -190,5 +191,41 @@ describe('setTestAuthBypassSession', () => {
     await expect(
       setTestAuthBypassSession(page, null, 'unknown-real-user')
     ).rejects.toMatchObject({ code: 'CLERK_SETUP_FAILED' });
+  });
+});
+
+describe('waitForAuthenticatedHealth', () => {
+  function buildHealthPage(payload: unknown, ok = true) {
+    const requestGet = vi.fn(async () => ({
+      ok: () => ok,
+      status: () => (ok ? 200 : 500),
+      json: () => Promise.resolve(payload),
+    }));
+    const page = { request: { get: requestGet } } as unknown as Page;
+    return { page, requestGet };
+  }
+
+  it('accepts a null expected user id for persona sessions (JOV-7559)', async () => {
+    const { page, requestGet } = buildHealthPage({
+      active: true,
+      userId: 'ba_dev_creator-ready',
+    });
+
+    await waitForAuthenticatedHealth(page, null, { timeout: 5_000 });
+
+    expect(requestGet).toHaveBeenCalledWith(
+      'http://localhost:3100/api/dev/test-auth/session',
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'x-test-mode': 'bypass-auth' }),
+      })
+    );
+  });
+
+  it('rejects while the session belongs to a different user', async () => {
+    const { page } = buildHealthPage({ active: true, userId: 'other-user' });
+
+    await expect(
+      waitForAuthenticatedHealth(page, 'expected-user', { timeout: 3_000 })
+    ).rejects.toThrow();
   });
 });

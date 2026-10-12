@@ -35,11 +35,16 @@ vi.mock('@/components/organisms/PersistentAudioBar', () => ({
   PersistentAudioBar: () => null,
 }));
 
-vi.mock('@/components/organisms/sidebar', () => ({
-  SidebarProvider: ({ children }: { children: ReactNode }) => children,
-  SidebarTrigger: () => null,
-  useSidebar: () => ({ isMobile: false, state: 'open' }),
-}));
+vi.mock('@/components/organisms/sidebar', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/components/organisms/sidebar')
+  >('@/components/organisms/sidebar');
+  return {
+    ...actual,
+    SidebarTrigger: () => null,
+    useSidebar: () => ({ isMobile: false, state: 'open', open: true }),
+  };
+});
 
 vi.mock('@/components/organisms/UnifiedSidebar', () => ({
   UnifiedSidebar: () => (

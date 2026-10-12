@@ -693,6 +693,11 @@ jobs:
     name: Full iOS release regression
     needs: [authorize-release]
     if: ${{ needs.authorize-release.result == 'success' && needs.authorize-release.outputs.should_release == 'true' }}
+    # ios-ci's opt-in Mac route job declares actions: write; a release never
+    # opts in (full-regression stays on hosted macOS), but the grant must exist.
+    permissions:
+      actions: write
+      contents: read
     uses: ./.github/workflows/ios-ci.yml
     with:
       checkout-ref: ${{ needs.authorize-release.outputs.release_sha }}
@@ -747,7 +752,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
         with:
-          ruby-version: "3.1"
+          ruby-version: "3.3"
           bundler-cache: true
 
       - name: Validate TestFlight secrets
@@ -896,7 +901,7 @@ jobs:
             }' > "$RUNNER_TEMP/testflight-upload-verified.json"
 
       - name: Preserve upload-only TestFlight baseline marker
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: testflight-upload-verified
           path: ${{ runner.temp }}/testflight-upload-verified.json

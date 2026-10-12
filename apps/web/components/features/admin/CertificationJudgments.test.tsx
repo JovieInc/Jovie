@@ -414,6 +414,7 @@ describe('CertificationJudgments', () => {
                 available: false,
                 reason: 'Only review-ready items take a founder decision.',
                 evidenceDigest: row.decision.evidenceDigest,
+                currentDecision: null,
               },
             }
           : row

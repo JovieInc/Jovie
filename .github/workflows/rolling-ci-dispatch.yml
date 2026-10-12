@@ -69,7 +69,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
 
@@ -363,7 +363,7 @@ jobs:
             fi
           done < <(jq -er '.allowedPaths[]' "$PLAN_PATH")
       - name: Upload prelaunch receipt before model execution
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hosted-ci-prelaunch-${{ needs.plan.outputs.pr_number }}-${{ needs.plan.outputs.expected_head }}
           path: ${{ runner.temp }}/hosted-repair/prelaunch.json
@@ -505,7 +505,7 @@ jobs:
           }' > "$RUNNER_TEMP/hosted-repair/staged/executor.json"
       - name: Upload immutable patch artifact
         id: upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hosted-ci-patch-${{ needs.plan.outputs.pr_number }}-${{ needs.plan.outputs.expected_head }}
           path: ${{ runner.temp }}/hosted-repair/staged
@@ -548,7 +548,7 @@ jobs:
             scripts/run-affected-tests.mjs
           sparse-checkout-cone-mode: false
       - name: Download immutable patch artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
           path: ${{ runner.temp }}/hosted-repair
@@ -593,7 +593,7 @@ jobs:
         with:
           version: 9.15.9
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: pnpm
@@ -660,7 +660,7 @@ jobs:
           test -z "$(git -C candidate status --porcelain=v1 --untracked-files=all)"
       - name: Upload raw test report and coverage
         id: upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hosted-ci-test-proof-${{ needs.plan.outputs.pr_number }}-${{ needs.plan.outputs.expected_head }}
           path: ${{ runner.temp }}/hosted-repair/test-proof/*.json
@@ -687,12 +687,12 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Download immutable tested patch artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact_id }}
           path: ${{ runner.temp }}/hosted-repair
       - name: Download raw test report and coverage artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.test.outputs.test_artifact_id }}
           path: ${{ runner.temp }}/hosted-repair/test-proof
@@ -780,7 +780,7 @@ jobs:
           echo "terminal_b64=$TERMINAL_B64" >> "$GITHUB_OUTPUT"
       - name: Upload acceptance and terminal receipts
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hosted-ci-write-receipts-${{ needs.plan.outputs.pr_number }}-${{ needs.plan.outputs.expected_head }}
           path: |
@@ -836,7 +836,7 @@ jobs:
             scripts/version-fanout-guard.mjs
           sparse-checkout-cone-mode: false
       - name: Setup Node.js for trusted policy
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: Discover provider-bound FX write receipts
@@ -853,7 +853,7 @@ jobs:
       - name: Download trusted writer receipts
         if: steps.discover.outputs.eligible == 'true'
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ steps.discover.outputs.write_artifact_id }}
           run-id: ${{ steps.discover.outputs.run_id }}
@@ -862,7 +862,7 @@ jobs:
       - name: Download immutable patch and original repair plan
         if: steps.discover.outputs.eligible == 'true'
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ steps.discover.outputs.patch_artifact_id }}
           run-id: ${{ steps.discover.outputs.run_id }}
@@ -871,7 +871,7 @@ jobs:
       - name: Download published terminal receipt
         if: steps.discover.outputs.eligible == 'true'
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ steps.discover.outputs.terminal_artifact_id }}
           run-id: ${{ steps.discover.outputs.run_id }}
@@ -978,7 +978,7 @@ jobs:
               --output "$RUNNER_TEMP/hosted-terminal/terminal.json"
           fi
       - name: Upload terminal receipt
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hosted-ci-terminal-${{ needs.plan.outputs.pr_number }}-${{ needs.plan.outputs.expected_head }}
           path: ${{ runner.temp }}/hosted-terminal/terminal.json

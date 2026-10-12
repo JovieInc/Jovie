@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   lookupMusicBrainzReleaseByBarcode: vi.fn(),
   lookupSpotifyByIsrc: vi.fn(),
   matchMusicBrainzArtistByName: vi.fn(),
+  lookupMusicBrainzArtistsByUrl: vi.fn(),
   spotifyRequestJson: vi.fn(),
 }));
 
@@ -30,6 +31,7 @@ vi.mock('@/lib/dsp-enrichment/providers/musicbrainz', () => ({
   lookupMusicBrainzRecordingUrlRels: mocks.lookupMusicBrainzRecordingUrlRels,
   lookupMusicBrainzReleaseByBarcode: mocks.lookupMusicBrainzReleaseByBarcode,
   matchMusicBrainzArtistByName: mocks.matchMusicBrainzArtistByName,
+  lookupMusicBrainzArtistsByUrl: mocks.lookupMusicBrainzArtistsByUrl,
 }));
 
 import { createDefaultInHouseSources } from './in-house-sources';
@@ -64,6 +66,7 @@ describe('createDefaultInHouseSources', () => {
     mocks.lookupMusicBrainzReleaseByBarcode.mockResolvedValue(null);
     mocks.matchMusicBrainzArtistByName.mockResolvedValue({ status: 'none' });
     mocks.getMusicBrainzArtist.mockResolvedValue(null);
+    mocks.lookupMusicBrainzArtistsByUrl.mockResolvedValue([]);
     mocks.lookupMusicBrainzRecordingUrlRels.mockResolvedValue([]);
   });
 
@@ -319,7 +322,7 @@ describe('createDefaultInHouseSources', () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      'https://itunes.apple.com/lookup?id=123&entity=album',
+      'https://itunes.apple.com/lookup?id=123&entity=album&country=us',
       expect.any(Object)
     );
     await expect(sources.searchAlbums('Artist', 'Album')).resolves.toEqual([
@@ -378,18 +381,33 @@ describe('createDefaultInHouseSources', () => {
     mocks.matchMusicBrainzArtistByName.mockResolvedValue({
       status: 'ambiguous',
       count: 2,
+      artists: [
+        { id: MBID, name: 'Artist' },
+        { id: '8ac57f9f-0188-450a-b177-db336e5c2870', name: 'Artist' },
+      ],
     });
 
     await expect(
       createDefaultInHouseSources().artistCandidates('Artist')
     ).resolves.toEqual([
-      expect.objectContaining({ mbid: 'ambiguous-0' }),
-      expect.objectContaining({ mbid: 'ambiguous-1' }),
+      expect.objectContaining({ mbid: MBID }),
+      expect.objectContaining({ mbid: '8ac57f9f-0188-450a-b177-db336e5c2870' }),
     ]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('resolves artist URLs, MBIDs, and recording url-rels', async () => {
+    fetchMock.mockResolvedValue(
+      json({
+        results: [
+          {
+            wrapperType: 'artist',
+            artistId: 44,
+            artistName: 'Artist',
+          },
+        ],
+      })
+    );
     const relations = [
       relation('http://open.spotify.com/artist/artist-id?app=music'),
       relation('https://example.com/not-a-dsp'),
@@ -405,12 +423,12 @@ describe('createDefaultInHouseSources', () => {
 
     await expect(
       sources.artistByUrl('https://music.apple.com/us/artist/artist/44')
-    ).resolves.toEqual(
+    ).resolves.toEqual([
       expect.objectContaining({
         mbid: null,
         links: [expect.objectContaining({ provider: 'apple_music' })],
-      })
-    );
+      }),
+    ]);
     await expect(sources.artistByMbid(MBID)).resolves.toEqual(
       expect.objectContaining({
         name: 'Artist',
@@ -438,9 +456,87 @@ describe('createDefaultInHouseSources', () => {
       sources.albumByUrl('https://example.com:444/album')
     ).resolves.toBeNull();
     await expect(sources.searchAlbums('Artist', 'Album')).resolves.toEqual([]);
-    await expect(sources.artistByMbid(MBID)).resolves.toBeNull();
+    await expect(sources.artistByMbid(MBID)).rejects.toThrow('offline');
     await expect(sources.urlRelsForIsrc('US-FAIL-12-34567')).resolves.toEqual(
       []
     );
+  });
+  it('retains storefronts for URL reads and honors explicit territories for searches', async () => {
+    const sources = createDefaultInHouseSources();
+    await sources.trackByUrl('https://music.apple.com/gb/album/song/123?i=456');
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain(
+      'id=456&entity=song&country=gb'
+    );
+    await sources.albumByUrl('https://music.apple.com/ca/album/release/123');
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain(
+      'id=123&entity=album&country=ca'
+    );
+    await sources.searchTracks('Tim White', 'Take Me Over', 'GB');
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('entity=song&limit=8&country=gb')
+      )
+    ).toBe(true);
+    await sources.searchAlbums('Tim White', 'Release', 'CA');
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain(
+      'entity=album&limit=8&country=ca'
+    );
+    await sources.albumByUpc('123456789012', 'GB');
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('upc=123456789012&entity=album&country=gb')
+      )
+    ).toBe(true);
+    await sources.trackByUrl(
+      `https://open.spotify.com/track/${SPOTIFY_ID}`,
+      'GB'
+    );
+    expect(mocks.spotifyRequestJson).toHaveBeenCalledWith(
+      `/tracks/${SPOTIFY_ID}?market=GB`
+    );
+  });
+
+  it('rejects track/album URLs and malformed MusicBrainz URLs as artist identities', async () => {
+    const sources = createDefaultInHouseSources();
+    for (const url of [
+      `https://open.spotify.com/track/${SPOTIFY_ID}`,
+      'https://music.apple.com/us/album/release/123',
+      'https://musicbrainz.org/artist/invalid',
+      'file:///etc/passwd',
+      ['https://fixture-user', ':fixture-password@example.com'].join(''),
+    ]) {
+      await expect(sources.artistByUrl(url)).resolves.toEqual([]);
+    }
+    expect(mocks.lookupMusicBrainzArtistsByUrl).not.toHaveBeenCalled();
+    expect(mocks.getMusicBrainzArtist).not.toHaveBeenCalled();
+  });
+
+  it('marks an embedded release-group collection as incomplete at the API cap', async () => {
+    mocks.getMusicBrainzArtist.mockResolvedValue({
+      id: MBID,
+      name: 'Artist',
+      'release-groups': Array.from({ length: 25 }, (_, i) => ({
+        id: String(i),
+        title: 'Release',
+      })),
+      aliases: [{ name: 'Alias' }, { name: 'Alias' }],
+      relations: [
+        relation('https://www.instagram.com/artist/'),
+        relation('https://example.com/ended', true),
+        relation('javascript:alert(1)'),
+        relation(
+          ['https://fixture-user', ':fixture-password@example.com'].join('')
+        ),
+        relation('https://example.com:999/profile'),
+      ],
+    });
+    const result = await createDefaultInHouseSources().artistByMbid(MBID);
+    expect(result?.metadata).toMatchObject({
+      releaseGroupsComplete: false,
+      aliases: ['Alias'],
+      externalLinks: [expect.objectContaining({ provider: 'instagram' })],
+    });
+    expect(result?.metadata?.releaseGroups).toHaveLength(25);
+    expect(result?.links).toEqual([]);
   });
 });

@@ -144,20 +144,19 @@ rules:
     parameters:
       merge_method: 'SQUASH'
       grouping_strategy: 'ALLGREEN'
-      # JOV-5047: cohort of 5 or a bounded 10-minute low-traffic wait so
-      # source-green PRs land together instead of serializing behind exact
-      # production deploy latency. Live ruleset 10512119 stays 1/0 until the
-      # post-merge apply + canary.
-      min_entries_to_merge: 5
+      # JOV-8112: form singleton groups immediately. Each PR keeps its own
+      # synthetic head and path-selected product lanes, so a slow sibling or
+      # an unformed cohort cannot hold a source-green PR at AWAITING_CHECKS.
+      min_entries_to_merge: 1
+      max_entries_to_merge: 1
       # JOV-6815: a ruleset admin raised live build concurrency to GitHub's
       # 10-group ceiling on 2026-09-25; source syncs to the applied live
       # value. JOV-6107's measured bound was 2 groups under the conservative
       # 60-job readback; any lower live count remains supported for rollback.
-      max_entries_to_merge: 5
       max_entries_to_build: 10
-      min_entries_to_merge_wait_minutes: 10
-      # Source-first cutover: live stays at 20 until this guard lands, then
-      # apply 60 without changing required checks or ALLGREEN.
+      min_entries_to_merge_wait_minutes: 0
+      # The 60-minute budget covers required CI paths configured for 30 and
+      # 40 minutes without changing required checks or ALLGREEN.
       check_response_timeout_minutes: 60
 
   # Dormant rules are intentionally absent from this applied payload:

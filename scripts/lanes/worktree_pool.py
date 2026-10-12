@@ -35,6 +35,8 @@ import sys
 import time
 import uuid
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 
 CACHE_ROOT = Path(os.environ.get("JOVIE_CACHE_ROOT", Path.home() / ".cache" / "jovie"))
 POOL_SIZE = int(os.environ.get("JOVIE_WORKTREE_POOL_SIZE", "2"))
@@ -67,7 +69,7 @@ def run(args: list[str], cwd: Path | None = None, log=None, timeout: int = 1800,
         stream = log if log is not None and log.fileno() >= 0 else None
     except (AttributeError, OSError, ValueError):
         stream = None  # an in-memory log: capture, then copy the output in
-    result = subprocess.run(args, cwd=cwd, stdout=stream or subprocess.PIPE, stderr=subprocess.STDOUT,
+    result = lifecycle.run(args, cwd=cwd, stdout=stream or subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, timeout=timeout, env=env)
     if stream is None and log is not None:
         log.write(result.stdout or "")
@@ -76,7 +78,7 @@ def run(args: list[str], cwd: Path | None = None, log=None, timeout: int = 1800,
 
 
 def git_common_dir(repo: Path) -> Path:
-    out = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=repo,
+    out = lifecycle.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=repo,
                          capture_output=True, text=True, check=True).stdout.strip()
     return Path(out).resolve()
 
@@ -140,13 +142,13 @@ def recently_claimed(slot: Path, now: float) -> bool:
 
 
 def branch_exists(repo: Path, branch: str) -> bool:
-    return subprocess.run(["git", "rev-parse", "-q", "--verify", f"refs/heads/{branch}"], cwd=repo,
+    return lifecycle.run(["git", "rev-parse", "-q", "--verify", f"refs/heads/{branch}"], cwd=repo,
                           capture_output=True).returncode == 0
 
 
 def is_clean(path: Path) -> bool:
     try:
-        result = subprocess.run(["git", "status", "--porcelain"], cwd=path, capture_output=True, text=True)
+        result = lifecycle.run(["git", "status", "--porcelain"], cwd=path, capture_output=True, text=True)
     except OSError:
         return False
     return result.returncode == 0 and not result.stdout.strip()
@@ -266,7 +268,7 @@ def fill(repo: Path, size: int = POOL_SIZE, base: str = "origin/main", warm: boo
                 release(child)
                 remove_worktree(repo, child, log)
                 actions.append(f"removed stale {child.name}")
-        subprocess.run(["git", "worktree", "prune"], cwd=repo, capture_output=True)
+        lifecycle.run(["git", "worktree", "prune"], cwd=repo, capture_output=True)
         while len(ready_slots(pool)) < size:
             if free_gb(pool) < min_free_gb:
                 actions.append(f"stopped: {free_gb(pool):.0f} GiB free < {min_free_gb:.0f} GiB floor")
@@ -278,7 +280,7 @@ def fill(repo: Path, size: int = POOL_SIZE, base: str = "origin/main", warm: boo
                 if warm:
                     # A warm tsbuildinfo turns the first web typecheck from ~2 min into ~30s.
                     # tsc writes it even when main has type errors, so a red check is fine.
-                    subprocess.run(WARM, cwd=slot, stdout=log or subprocess.DEVNULL,
+                    lifecycle.run(WARM, cwd=slot, stdout=log or subprocess.DEVNULL,
                                    stderr=subprocess.STDOUT, timeout=1800)
                 if not is_clean(slot):
                     raise RuntimeError("install or warm-up left tracked changes")
@@ -325,7 +327,7 @@ def refill_in_background(repo: Path, log_path: Path | None = None) -> None:
     with open(log_path, "a") as log:
         subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--repo", str(repo), "--fill"],
                          cwd=repo, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                         start_new_session=True)
+                         start_new_session=True, **lifecycle.spawn_kwargs())
 
 
 def node_env(worktree: Path) -> dict:
@@ -341,7 +343,7 @@ def node_env(worktree: Path) -> dict:
     return env
 
 
-def main(argv: list[str] | None = None) -> int:
+def guarded_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="worktree-new", description=__doc__.split("\n\n")[0])
     parser.add_argument("dest", nargs="?", type=Path)
     parser.add_argument("-b", "--branch")
@@ -357,7 +359,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--recycle", type=Path, metavar="DIR")
     parser.add_argument("--status", action="store_true")
     args = parser.parse_args(argv)
-    repo = Path(subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=args.repo, capture_output=True,
+    repo = Path(lifecycle.run(["git", "rev-parse", "--show-toplevel"], cwd=args.repo, capture_output=True,
                                text=True, check=True).stdout.strip())
     os.environ.update(node_env(repo))
     if args.status:
@@ -390,7 +392,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.fill:
         if not args.no_fetch:
-            subprocess.run(["git", "fetch", "-q", "origin", "main"], cwd=repo)
+            lifecycle.run(["git", "fetch", "-q", "origin", "main"], cwd=repo)
         print("\n".join(fill(repo, args.size, args.base, warm=not args.no_warm, log=sys.stdout)) or "pool full")
         return 0
     if args.dest is None:
@@ -405,6 +407,19 @@ def main(argv: list[str] | None = None) -> int:
         refill_in_background(repo)
     print(f"worktree-new: {args.dest} ready from {source} in {time.monotonic() - started:.0f}s")
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    # Preserve the standalone developer utility. Only lane-owned detached fills
+    # inherit host controller ownership and must join that same lifecycle fence.
+    if lifecycle.FD_ENV not in os.environ:
+        return guarded_main(argv)
+    try:
+        with lifecycle.Guard(Path(os.environ["LANES_STATE"])):
+            return guarded_main(argv)
+    except (KeyError, lifecycle.AdmissionHeld) as error:
+        print(f"lifecycle admission held: {error}", file=sys.stderr)
+        return 75
 
 
 if __name__ == "__main__":

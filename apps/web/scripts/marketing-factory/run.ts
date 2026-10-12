@@ -35,6 +35,7 @@ import {
   type ProofCandidate,
 } from '../../data/product-truth/proof';
 import {
+  FactoryEditorialPageBriefSchema,
   type FactoryPageBrief,
   factoryPageId,
   loadFactoryBrief,
@@ -68,6 +69,7 @@ import {
 } from './receipts';
 import type { StageContext, StageResult, StageRunner } from './stage-kit';
 import { FACTORY_STAGE_RUNNERS } from './stages';
+import { visualFeedbackStage } from './stages-page';
 
 const MODEL_JUDGED = new Set(['llm', 'vision']);
 
@@ -226,6 +228,11 @@ export async function runFactory(
   options: RunFactoryOptions
 ): Promise<FactoryRunManifest> {
   const brief = options.brief ?? loadFactoryBrief(options.family, options.slug);
+  // Validate before budget reservations, provider creation, or receipt writes.
+  // Dry replay is diagnostic compatibility, never a live editorial qualification.
+  if ((options.providers?.mode ?? (options.dry ? 'dry' : 'live')) === 'live') {
+    FactoryEditorialPageBriefSchema.parse(brief);
+  }
   const pageId = factoryPageId(brief.family, brief.slug);
   const runsDir = options.runsDir ?? FACTORY_RUNS_DIR;
   const runDir = join(runsDir, pageId);
@@ -379,7 +386,6 @@ export async function runFactory(
     return manifest;
   };
 
-  const reworkFeedback = new Map<FactoryStage, readonly string[]>();
   const renderDigest = () =>
     manifest.chain.find(link => link.stage === 'render')?.outputDigest ?? null;
 
@@ -399,8 +405,20 @@ export async function runFactory(
       manifest.chain.map(link => link.outputDigest),
       factoryStageSourceDigest(stage, brief)
     );
-    let feedback: readonly string[] = reworkFeedback.get(stage) ?? [];
-    reworkFeedback.delete(stage);
+    // Retained corrections survive retries, later upstream rewinds and resumes.
+    const stageReworkFeedback = (manifest.reworks ?? []).flatMap(entry => {
+      if (entry.trigger === 'proof-landed') return [];
+      const findings = entry.findings.filter(
+        finding => (visualFeedbackStage(finding) ?? entry.reworkFrom) === stage
+      );
+      return findings.length > 0
+        ? [
+            `rework ${entry.iteration} after ${entry.rejectedAt} rejected the render:`,
+            ...findings,
+          ]
+        : [];
+    });
+    let feedback: readonly string[] = stageReworkFeedback;
     let passed = false;
     const maxAttempts = paidBudget ? 1 : FACTORY_STAGE_MAX_ATTEMPTS;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -551,6 +569,7 @@ export async function runFactory(
         break;
       }
       feedback = [
+        ...stageReworkFeedback,
         ...receipt.invariantsFailed,
         ...harness.feedback,
         ...result.feedback,
@@ -590,10 +609,6 @@ export async function runFactory(
           delete artifacts[later];
           delete receipts[later];
         }
-        reworkFeedback.set(result.rework.stage, [
-          `rework ${entry.iteration} after ${stage} rejected the render:`,
-          ...entry.findings,
-        ]);
         finish({
           chain: manifest.chain.slice(0, from),
           reworks: [...(manifest.reworks ?? []), entry],

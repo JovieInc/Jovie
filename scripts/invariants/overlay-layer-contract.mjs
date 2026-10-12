@@ -335,6 +335,17 @@ export function validateOverlayLayerPolicy(registry) {
   if (policy.localStackingMax !== LOCAL_STACKING_MAX) {
     errors.push(`policy localStackingMax must be ${LOCAL_STACKING_MAX}`);
   }
+  const menu = policy.menuHierarchy;
+  if (
+    menu?.maxGroupActions !== 8 ||
+    menu?.maxRootActions !== 12 ||
+    menu?.maxSubmenuDepth !== 1 ||
+    menu?.overflow !== 'searchable-chooser-no-truncation'
+  ) {
+    errors.push(
+      'menuHierarchy must retain 8 actions per group, 12 at root, one submenu and a searchable chooser without truncation'
+    );
+  }
   return errors;
 }
 
@@ -347,10 +358,38 @@ export function validateOverlayLayerContract(
   const tokenErrors = existsSync(tokenPath)
     ? validateLayerOrder(parseLayerTokens(readFileSync(tokenPath, 'utf8')))
     : [`missing ${TOKEN_SOURCE}`];
+  const policy = registry.invariants.find(
+    item => item.id === OVERLAY_LAYER_INVARIANT_ID
+  )?.policy?.value;
+  const menuSource = policy?.menuHierarchy?.source;
+  const menuErrors = [];
+  if (
+    menuSource !== 'packages/ui/atoms/common-dropdown-utils.ts' ||
+    !existsSync(resolve(repoRoot, menuSource))
+  ) {
+    menuErrors.push(
+      'menuHierarchy must bind the canonical CommonDropdown owner'
+    );
+  } else {
+    const source = readFileSync(resolve(repoRoot, menuSource), 'utf8');
+    for (const [name, field] of [
+      ['MENU_MAX_GROUP_ACTIONS', 'maxGroupActions'],
+      ['MENU_MAX_ROOT_ACTIONS', 'maxRootActions'],
+      ['MENU_MAX_SUBMENU_DEPTH', 'maxSubmenuDepth'],
+    ]) {
+      if (
+        !new RegExp(
+          `export const ${name} = ${policy.menuHierarchy[field]};`
+        ).test(source)
+      )
+        menuErrors.push(`${name} drifted from the menu hierarchy contract`);
+    }
+  }
   return [
     ...validateOverlayLayerPolicy(registry),
     ...tokenErrors,
     ...validatePrimitiveBindings(repoRoot),
+    ...menuErrors,
   ];
 }
 

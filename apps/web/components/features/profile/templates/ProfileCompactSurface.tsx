@@ -721,7 +721,7 @@ export function ProfileCompactSurface({
 
         <div
           className={cn(
-            'relative z-10 flex min-h-0 flex-1 flex-col px-(--page-pad)',
+            'profile-content-column relative z-10 flex min-h-0 flex-1 flex-col px-(--page-pad)',
             isHomeMode && 'profile-home-content-column'
           )}
         >

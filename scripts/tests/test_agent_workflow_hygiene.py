@@ -21,7 +21,6 @@ FULL_CHECKOUT_JOBS = (
 )
 
 FLEET_CONTROLLER_JOBS = (
-    ("auto-pr-on-push.yml", "open-pr"),
     ("auto-ready-agent-drafts.yml", "auto-ready"),
     ("auto-ready-agent-drafts.yml", "green-source"),
     ("agent-tick.yml", "auto-ready"),
@@ -63,8 +62,6 @@ HOSTED_DEEP_EVIDENCE_JOBS = (
     ("ci-duration-ratchet.yml", "measure"),
     ("sentry-error-gate.yml", "sentry-gate"),
     ("cost-anomaly-gate.yml", "evaluate"),
-    ("main-ci-health-monitor.yml", "monitor"),
-    ("main-ci-health-monitor.yml", "auto-rerun"),
     ("visual-a11y.yml", "ci-visual-path-changes"),
     ("visual-a11y.yml", "storybook-a11y"),
     ("visual-regression.yml", "visual-regression"),
@@ -422,7 +419,6 @@ def test_workflow_test_tooling_is_hash_pinned() -> None:
     )
     for workflow_name in (
         "actionlint.yml",
-        "brand-scrub.yml",
         "ci.yml",
     ):
         workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
@@ -530,7 +526,8 @@ def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
     assert "pull_request_target:" in trigger
     assert "issues:" in trigger
     assert "types: [labeled]" in trigger
-    assert "schedule:" in trigger
+    # Event-driven only (JOV-INV-042): the labeled event deletes the label.
+    assert "schedule:" not in trigger
     assert "workflow_dispatch:" in trigger
     assert "actions/checkout" not in scrub
     assert 'gh api --method DELETE "repos/$GH_REPO/labels/$LABEL"' in scrub
@@ -883,7 +880,6 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
 def test_standalone_health_monitors_have_independent_bounded_schedules() -> None:
     """Critical monitors must not depend on the disabled Agent Tick monolith."""
     schedules = {
-        "main-ci-health-monitor.yml": "'8,28,48 * * * *'",
         "runner-health-monitor.yml": "'2,12,22,32,42,52 * * * *'",
         "synthetic-monitoring.yml": "'17 */6 * * *'",
     }
@@ -892,39 +888,16 @@ def test_standalone_health_monitors_have_independent_bounded_schedules() -> None
         assert "schedule:" in content, workflow
         assert cron in content, workflow
 
-    for workflow, job_name in (
-        ("main-ci-health-monitor.yml", "monitor"),
-        ("main-ci-health-monitor.yml", "auto-rerun"),
-        ("runner-health-monitor.yml", "monitor"),
-    ):
+    # The disabled Main CI health monitor was deleted on 2026-10-12; red main
+    # is owned by the lanes fix loop.
+    assert not (WORKFLOWS / "main-ci-health-monitor.yml").exists()
+
+    for workflow, job_name in (("runner-health-monitor.yml", "monitor"),):
         assert "runs-on: ubuntu-latest" in _job_block(workflow, job_name)
 
 
-def test_main_health_monitor_alerts_once_and_reruns_once() -> None:
-    """Schedule ticks fail closed on evidence gaps and self-heal with one rerun."""
-    evaluator = (
-        REPO_ROOT / ".github/actions/eval-main-health/action.yml"
-    ).read_text(encoding="utf-8")
-    monitor = (WORKFLOWS / "main-ci-health-monitor.yml").read_text(
-        encoding="utf-8"
-    )
-
-    assert "const failingRunAttempt = Number(latestFailure?.run_attempt ?? 0)" in evaluator
-    assert "github.rest.repos.getCommit" in evaluator
-    assert "latestFailure.head_sha !== currentMainSha" in evaluator
-    assert "const shouldAlert =" in evaluator
-    assert "detectedIssue && evidenceKnown" in evaluator
-    assert "failingRunAttempt === 1" in evaluator
-    assert "canaryOrSentryFailed" in evaluator
-    # The retired main-autofix workflow must not be dispatched or inspected.
-    assert "main-autofix" not in evaluator
-    assert "needs_autofix" not in evaluator
-    assert "main-autofix" not in monitor
-    assert "needs_autofix" not in monitor
-
-    monitor_job = _job_block("main-ci-health-monitor.yml", "monitor")
-    assert "statuses: write" not in monitor_job
-
+def test_agent_tick_stays_manual_without_main_health() -> None:
+    """Agent Tick stays manual and carries no main-health job."""
     agent_tick = (WORKFLOWS / "agent-tick.yml").read_text(encoding="utf-8")
     assert "\n  main-ci-health:\n" not in agent_tick
     agent_tick_trigger = agent_tick.split("\non:\n", 1)[1].split(
@@ -1246,7 +1219,7 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
         encoding="utf-8"
     )
 
-    assert "max-parallel: 1" in full_matrix
+    assert "max-parallel: 8" in full_matrix
     assert "needs: [context, deterministic]" in nightly_agent
     assert "schedule:" not in nightly_agent
     assert "push:" in nightly_agent
@@ -1263,7 +1236,8 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
     )[0]
     assert "push:" in screenshot_triggers
     assert "schedule:" not in screenshot_triggers
-    assert "'0 9 * * 2'" in harness
+    assert "schedule:" not in harness
+    assert "workflow_dispatch:" in harness
 
 
 def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
@@ -1381,6 +1355,15 @@ def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     ):
         assert result in all_success
     assert "env.SLACK_WEBHOOK_URL != ''" in all_success
+
+
+def test_product_screenshot_servers_bind_to_loopback() -> None:
+    """Both production server forms must enforce the fixture trust boundary."""
+    start = _step_block("screenshots.yml", "Start production server")
+    assert "HOSTNAME: localhost" in start
+    assert "SERVER_COMMAND=(node .next/standalone/apps/web/server.js)" in start
+    assert "SERVER_COMMAND=(pnpm run start --hostname localhost)" in start
+    assert 'setsid "${SERVER_COMMAND[@]}"' in start
 
 
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
@@ -1520,14 +1503,6 @@ def test_cost_anomaly_alerts_on_ratio_or_absolute_floor(tmp_path: Path) -> None:
         assert reason in outputs
 
 
-def test_auto_pr_compares_trigger_branch_without_executing_its_checkout() -> None:
-    """The pushed branch is controller input; current main supplies helpers."""
-    block = _job_block("auto-pr-on-push.yml", "open-pr")
-    assert 'git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"' in block
-    assert 'git diff --name-only "origin/main...origin/$BRANCH"' in block
-    assert "origin/main...HEAD" not in block
-
-
 def test_claude_review_uses_hosted_bun_prerequisites() -> None:
     """setup-bun must not land on self-hosted images missing unzip."""
     block = _job_block("claude-review.yml", "review")
@@ -1658,7 +1633,8 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
 
     assert "schedule:" in trigger
     assert "cron: '*/5 * * * *'" in trigger
-    assert "workflow_run:" not in trigger
+    assert "workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]" in trigger
+    assert trigger.count("workflow_run:") == 1
     assert "pull_request:" not in trigger
     assert "pull_request_target:" not in trigger
     assert "check_run:" not in trigger
@@ -1668,8 +1644,9 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "synchronize" not in trigger
     assert "Production Marker Recovery]" not in trigger
     assert "fleet-gate-receipt" in workflow
-    assert "fleet-gate-triage-" in workflow
-    assert "cancel-in-progress: true" in workflow
+    assert "fleet-gate-triage-" not in workflow
+    assert "group: fleet-gate-receipt" in workflow
+    assert "cancel-in-progress: false" in workflow
     assert "github.event.label.name == 'needs-human'" not in block
     assert "0 <= age < 120" in block
     assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
@@ -1679,6 +1656,8 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "steps.refresh.outputs.receipt_path" in block
     assert "state/gem-priority-gate/latest.json" not in block
     assert "steps.stack-actions.outcome == 'success'" in block
+    assert "LANES_STATE: /home/timwhite/.local/state/jovie-lanes" in block
+    assert "LANES_REPO: /home/timwhite/devin-sweep/Jovie" in block
     assert "push:" in trigger and "branches: [main]" in trigger
 
 
@@ -1729,12 +1708,74 @@ def test_one_workflow_owns_automatic_issue_admission() -> None:
     assert not (WORKFLOWS / "linear-triage-assessment.yml").exists()
 
     workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
-    # One file-level concurrency block. Receipt refreshes share a group;
-    # triage assessments coalesce per issue and do not cancel a receipt write.
+    # One file-level fence covers both the scheduled catch-up and exact-event
+    # writer. Cancellation must not interrupt a paid call or mutation readback.
     assert workflow.count("concurrency:") == 1
     assert "fleet-gate-receipt" in workflow
-    assert "github.event.client_payload.issue_identifier" in workflow
+    assert "group: fleet-gate-receipt" in workflow
+    assert "cancel-in-progress: false" in workflow
+    assert "github.event.client_payload.issue_identifier" not in workflow
     assert workflow.index("concurrency:") < workflow.index("jobs:")
+
+
+def test_triage_catch_up_uses_trusted_main_and_preserves_wake_receipts() -> None:
+    """Missed events use the same writer, including receipt-debounced ticks."""
+    block = _job_block("fleet-gate-refresh.yml", "refresh")
+    checkout = block.split("- name: Checkout exact main gate code", 1)[1].split(
+        "- name: Setup Node.js", 1
+    )[0]
+    assert "ref: main" in checkout
+    assert "persist-credentials: false" in checkout
+    assert "if:" not in checkout
+    catch_up = block.split("- name: Recover missed Linear Triage events", 1)[1].split(
+        "- name: Wake existing picker", 1
+    )[0]
+    assert "steps.debounce" not in catch_up
+    assert (
+        "timeout 90s node scripts/backlog-orchestrator/triage-event-assess.mjs"
+        in catch_up
+    )
+    assert '--sweep > "$RECEIPT_FILE"' in catch_up
+    assert "summer-bottleneck-signing.env" in catch_up
+    wake = block.split("- name: Wake existing picker", 1)[1].split(
+        "- name: Preserve Triage", 1
+    )[0]
+    assert "if: always()" in wake
+    assert '[[ -s "$RECEIPT_FILE" ]]' in wake
+    assert ".wakeSymphony == true" in wake
+    assert "--max-time 5" in wake
+    receipt = block.split("- name: Preserve Triage catch-up receipt", 1)[1]
+    assert "if: always()" in receipt
+    assert (
+        "linear-triage-catch-up-${{ github.run_id }}-${{ github.run_attempt }}"
+        in receipt
+    )
+    assert "retention-days: 14" in receipt
+
+
+def test_triage_catch_up_survives_failed_reconciliation_with_trusted_prerequisites() -> None:
+    """Run37682841982 timed out remediation and skipped catch-up under success()."""
+    block = _job_block("fleet-gate-refresh.yml", "refresh")
+    checkout = block.split("- name: Checkout exact main gate code", 1)[1].split(
+        "- name: Setup Node.js", 1
+    )[0]
+    node_setup = block.split("- name: Setup Node.js", 1)[1].split(
+        "- name: Refresh canonical receipt", 1
+    )[0]
+    assert "id: main-checkout" in checkout
+    assert "ref: main" in checkout
+    assert "id: main-node" in node_setup
+    catch_up = block.split("- name: Recover missed Linear Triage events", 1)[1].split(
+        "- name: Wake existing picker", 1
+    )[0]
+    condition = re.search(r"if: >-\n(.*?)\n        env:", catch_up, re.DOTALL)
+    assert condition is not None, "Default success() skips recovery after upstream failure"
+    assert " ".join(condition.group(1).split()) == (
+        "always() && steps.main-checkout.outcome == 'success' && "
+        "steps.main-node.outcome == 'success'"
+    ), "Recovery must survive upstream failure but reject failed/skipped trusted setup"
+    # The timed-out remediation must still fail the job; recovery is not a CI bypass.
+    assert "continue-on-error:" not in block
 
 
 def test_symphony_wake_requires_verified_admitted_receipt() -> None:
