@@ -25,8 +25,7 @@ the queue and production topology have produced bounded proof. GitHub AI
 Orchestrator, GitHub AI Dispatcher, Agent Tick, Main Autofix, and Auto-Fix Lint
 on Agent Drafts are retired at source — the lanes fix loop owns PR and red-main
 repair. Keep Agent Pipeline, PR
-Conflict Handler, Stuck Draft Auto-Close, Taste
-Classifier/Guard, Auto-PR on Agent Push, and the legacy Release Loop disabled
+Conflict Handler, Stuck Draft Auto-Close, Auto-PR on Agent Push, and the legacy Release Loop disabled
 throughout the drain. The newly added Production
 Controller, Production Controller Health, and Production Release workflows
 should register active on land; verify their live state before relying on

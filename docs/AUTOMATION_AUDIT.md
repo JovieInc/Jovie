@@ -85,7 +85,7 @@ have produced bounded proof. **GitHub AI Orchestrator**, **GitHub AI
 Dispatcher**, and **Agent Tick** are retired at source under the Linear-only
 intake contract. Keep **Agent Pipeline**,
 **PR Conflict Handler**, **Stuck Draft Auto-Close**, **Auto-Fix
-Lint on Agent Drafts**, **Taste Classifier**, **Taste Label Guard**, **Auto-PR on
+Lint on Agent Drafts**, **Auto-PR on
 Agent Push**, and the legacy **Release Loop** disabled throughout the drain. The new **Production
 Controller**, **Production Controller Health**, and **Production Release**
 workflows are intended to register active on land; verify that state explicitly

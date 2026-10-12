@@ -58,8 +58,6 @@ inactiveWorkflows:
   - Real-Model Eval Lane
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
-  - Taste Classifier
-  - Taste Label Guard
 generatedAt: deterministic
 normalPrCheckRecords: 25
 nodes:
@@ -1386,28 +1384,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:docs-deploy-jovie
     jobCount: 6
-  - name: Taste Classifier
-    path: .github/workflows/taste-classifier.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - pull_request_target
-    terminalReceipt: job:classify
-    jobCount: 1
-  - name: Taste Label Guard
-    path: .github/workflows/taste-label-guard.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - pull_request_target
-    terminalReceipt: job:guard
-    jobCount: 1
   - name: Test Coverage Audit
     path: .github/workflows/test-coverage-audit.yml
     active: true
