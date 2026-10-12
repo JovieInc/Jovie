@@ -32,6 +32,7 @@ import design_gate  # noqa: E402  (design-brief admission census)
 import gh_app_token  # noqa: E402  (canonical GitHub read-budget floor)
 import merge_evidence  # noqa: E402  (shared complete merge-window reader)
 import file_overlap  # noqa: E402
+import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
 import remediation  # noqa: E402
 
 COOL_OFF_S = 6 * 3600
@@ -186,35 +187,31 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             linear_skipped = "cooldown"
     except (Exception, SystemExit):
         linear_skipped = None
-    if linear_skipped:
-        pool, candidate_pool, pool_by_provider, qualified_jobs = None, None, {}, {}
+    # The runnable pool comes from the local Linear mirror, so a Linear cooldown no longer
+    # hides it; the cooldown still skips the doctor's own Linear writes below.
+    try:
+        (qualified_by_provider, candidate_pool, candidate_counts,
+         rejected, rejected_issues) = qualified_pool(host, lane, capacity_by_provider, now)
+        design_census = design_gate.apply_to_pool(
+            qualified_by_provider, read_text=design_gate.repo_reader(host.repo))
+        eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
+        eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
+        budgets = {name: lane.read_new_issue_budget(name, seats.get("base", seats["slots"]))
+                   for name, seats in capacity_by_provider.items()}
+        qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
+                                 for name, issues in qualified_by_provider.items()}
+        pool_by_provider = {name: (None if budgets[name]["used"] is None else len(issues))
+                            for name, issues in qualified_by_provider.items()}
+        qualified_jobs = {name: [issue.identifier for issue in issues]
+                          for name, issues in qualified_by_provider.items()}
+        pool = (None if any(value is None for value in pool_by_provider.values()) else
+                len({issue.identifier for issues in qualified_by_provider.values() for issue in issues}))
+        linear_error = None
+    except (Exception, SystemExit) as error:
+        design_census = None
+        pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
         candidate_counts, rejected, rejected_issues = {}, {}, {}
         eligible_pool, eligible_by_provider, budgets = None, {}, {}
-        linear_error = None
-    else:
-        try:
-            (qualified_by_provider, candidate_pool, candidate_counts,
-             rejected, rejected_issues) = qualified_pool(host, lane, capacity_by_provider, now)
-            design_census = design_gate.apply_to_pool(
-                qualified_by_provider, read_text=design_gate.repo_reader(host.repo))
-            eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
-            eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
-            budgets = {name: lane.read_new_issue_budget(name, seats.get("base", seats["slots"]))
-                       for name, seats in capacity_by_provider.items()}
-            qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
-                                     for name, issues in qualified_by_provider.items()}
-            pool_by_provider = {name: (None if budgets[name]["used"] is None else len(issues))
-                                for name, issues in qualified_by_provider.items()}
-            qualified_jobs = {name: [issue.identifier for issue in issues]
-                              for name, issues in qualified_by_provider.items()}
-            pool = (None if any(value is None for value in pool_by_provider.values()) else
-                    len({issue.identifier for issues in qualified_by_provider.values() for issue in issues}))
-            linear_error = None
-        except (Exception, SystemExit) as error:
-            design_census = None
-            pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
-            candidate_counts, rejected, rejected_issues = {}, {}, {}
-            eligible_pool, eligible_by_provider, budgets = None, {}, {}
     github = None
     merged, merged_error, merged_window, merge_throughput, merge_throughput_error = [], None, None, None, None
     try:
@@ -280,6 +277,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "designGate": design_census,
         "fileOverlap": file_overlap.doctor_view(state),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
+        "linearSync": linear_sync.status(state, now),
         "merged24h": merged, "mergedAttributionError": merged_error,
         "mergeThroughput": merge_throughput, "mergeThroughputError": merge_throughput_error,
         "autoscale": _autoscale_block(host),
@@ -520,7 +518,9 @@ def codex_attribution(report: dict, now: float) -> dict:
             return unknown
         counts["leased"] += int(row["leased"])
         counts["eligibleByCooldown"] += int(row["available"])
-        counts["unleasedAvailable"] += int(row["available"] and not row["leased"])
+        free = row.get("freeSlots", 0 if row["leased"] else 1)
+        counts["unleasedAvailable"] += (free if type(free) is int and free >= 0 else int(not row["leased"])) \
+            if row["available"] else 0
         if not row["available"]:
             until = age_s(row.get("exhaustedUntil"), now)
             if until is None or until >= 0:
@@ -641,6 +641,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                 continue
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
+    alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
     if obs.get("linearError"):
         alerts["linear-down"] = f"Linear unreadable: {obs['linearError']}"
     elif obs.get("linearSkipped") or obs.get("pool") is None:
@@ -1179,7 +1180,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
         overlap = (file_overlap.doctor_view(host.state) if getattr(host, "state", None) else
                    {"mode": file_overlap.guard_mode(), "pairs": [], "metrics": {}})
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
-            "fileOverlap": overlap,
+            "fileOverlap": overlap, "linear": obs.get("linearSync") or tick.get("linear"),
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),

@@ -6,6 +6,7 @@
 >
 > Before creating a new cron job, read [AGENTS.md — Infrastructure & Scheduling Guardrails](../AGENTS.md#infrastructure--scheduling-guardrails-critical).
 > **JOV-5852:** execution follows information, not time. A GitHub Actions cron must declare `# clock-class:` (`skip-if-unchanged` | `production-liveness` | `temporal-resource` | `upstream-advisory`). Do not add a clock when a causal event already exists.
+> **JOV-INV-042 (2026-10-11):** GitHub cron is frozen. `scripts/lib/ci-schedule-inventory.mjs` keeps `CRON_ALLOWLIST` (measurement/scans only), `ADMISSION_CRON_DEBT`, and `POLLING_DEBT`; each list only shrinks. Admission and landing are event-driven or run from the Gem lanes tick; no workflow polls GitHub state.
 
 ## Codex Workspace Automations
 

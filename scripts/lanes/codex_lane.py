@@ -790,26 +790,64 @@ def classify(output: str, code: int, now: float) -> tuple[str, float | None]:
         if not USAGE.search(closing):
             return "rate", parse_reset(closing, now) or now + RATE_BACKOFF_S
         return "limit", parse_reset(closing, now) or now + DEFAULT_COOLDOWN_S
-    if code != 0 and AUTH.search(tail):
+    # Same rule as limits: only codex's closing lines can say the login failed. An agent
+    # working on auth code prints "401"/"unauthorized" all run long; scanning the whole tail
+    # benched Gem's only login for 24h on a plain 429 (2026-10-12, 96% capacity left).
+    if code != 0 and AUTH.search(closing):
         return "auth", now + 24 * 3600
     return ("ok" if code == 0 else "error"), None
 
 
-def lease(name: str):
-    """Exclusive per-account flock; released by the kernel if the run dies."""
-    locks = STATE.parent / "codex-locks"
-    locks.mkdir(parents=True, exist_ok=True)
-    handle = open(locks / f"{name}.lock", "w")
+def login_slots(name: str) -> int:
+    """Concurrent runs one account may hold. Only the single current-login account can be
+    widened (CODEX_LANE_LOGIN_SLOTS, Tim 2026-10-11: more runs on one login, no account
+    rotation); every other account keeps one exclusive run."""
+    if not (current_login_mode() and name == CURRENT_LOGIN):
+        return 1
     try:
-        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        handle.close()
-        return None
-    return handle
+        return max(1, int(os.environ.get("CODEX_LANE_LOGIN_SLOTS", "1")))
+    except ValueError:
+        return 1
+
+
+def _slot_paths(name: str) -> list[Path]:
+    locks = STATE.parent / "codex-locks"
+    return [locks / (f"{name}.lock" if slot == 0 else f"{name}.{slot}.lock") for slot in range(login_slots(name))]
+
+
+def lease(name: str):
+    """One flock per concurrent run slot; released by the kernel if the run dies."""
+    (STATE.parent / "codex-locks").mkdir(parents=True, exist_ok=True)
+    for path in _slot_paths(name):
+        handle = open(path, "w")
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            handle.close()
+            continue
+        return handle
+    return None
+
+
+def reverify_auth_bank(state: dict, now: float) -> dict:
+    """An auth bank on the current login is only as good as the login: `codex login status`
+    (local, no quota) is the authority. A logged-in CLI clears the bank instead of idling
+    the lane for a day on a misread transcript."""
+    entry = state.get(CURRENT_LOGIN) or {}
+    if not (current_login_mode() and entry.get("lastKind") == "auth"
+            and float(entry.get("exhaustedUntil") or 0) > now and current_login_available()):
+        return state
+    def clear(st: dict) -> None:
+        row = st.setdefault(CURRENT_LOGIN, {})
+        row.pop("exhaustedUntil", None)
+        row.update(lastKind="auth-reverified", authReverifiedAt=now)
+    update_state(clear)
+    return read_state()
 
 
 def pick(state: dict, now: float, names: list[str] | None = None):
     """Least-recently-used available account that nobody else has leased right now."""
+    state = reverify_auth_bank(state, now)
     names = accounts() if names is None else names
     order = sorted((n for n in names if available(n, state, now)),
                    key=lambda n: float(state.get(n, {}).get("lastUsed") or 0))
@@ -945,7 +983,8 @@ def status(now: float | None = None, names: list[str] | None = None, state: dict
         credit_count = (capacity_lease.get("credits") or {}).get("availableCount")
         rows[name] = {
             "available": until <= now,
-            "leased": (STATE.parent / "codex-locks" / f"{name}.lock").exists() and not _lockable(name),
+            "leased": (free := _free_slots(name)) == 0,
+            "freeSlots": free,
             "exhaustedUntil": iso(until) if until > now else None,
             "resetsInS": max(0, int(until - now)) if until > now else 0,
             "lastKind": entry.get("lastKind"), "lastError": entry.get("lastError"),
@@ -962,12 +1001,22 @@ def status(now: float | None = None, names: list[str] | None = None, state: dict
             "accounts": rows, "available": banked, "count": len(rows), "ledger": state.get("_ledger")}
 
 
-def _lockable(name: str) -> bool:
-    handle = lease(name)
-    if handle is None:
-        return False
-    handle.close()
-    return True
+def _free_slots(name: str) -> int:
+    """Slots nobody holds right now; probe each with a non-blocking flock and release it."""
+    free = 0
+    for path in _slot_paths(name):
+        if not path.exists():
+            free += 1
+            continue
+        handle = open(path, "a")
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            free += 1
+        except BlockingIOError:
+            pass
+        finally:
+            handle.close()
+    return free
 
 
 def main(argv=None) -> int:

@@ -615,7 +615,7 @@ nodes:
       - workflow_call
       - workflow_dispatch
     terminalReceipt: job:graphics
-    jobCount: 1
+    jobCount: 2
   - name: iOS CI
     path: .github/workflows/ios-ci.yml
     active: true
@@ -682,7 +682,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:relay
-    jobCount: 1
+    jobCount: 2
   - name: Legacy Human Hold Scrub
     path: .github/workflows/legacy-human-hold-scrub.yml
     active: true
@@ -693,7 +693,6 @@ nodes:
     triggeringStateTransition:
       - issues
       - pull_request_target
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:sweep
     jobCount: 2
@@ -706,7 +705,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request
-      - schedule
+      - repository_dispatch
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:sync_done
@@ -882,9 +881,10 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - push
       - workflow_dispatch
     terminalReceipt: job:publish
-    jobCount: 3
+    jobCount: 4
   - name: Observability Report (Linear)
     path: .github/workflows/observability-issue.yml
     active: true
@@ -1092,7 +1092,6 @@ nodes:
     triggeringStateTransition:
       - push
       - repository_dispatch
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:find
     jobCount: 1

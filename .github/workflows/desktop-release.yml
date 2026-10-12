@@ -1489,7 +1489,7 @@ jobs:
 
       - name: Upload staging desktop package
         if: env.ENVIRONMENT == 'staging'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-staging-${{ steps.staging-version.outputs.version }}-attempt-${{ github.run_attempt }}
           path: |
@@ -1786,7 +1786,7 @@ jobs:
             }' > "$RUNNER_TEMP/desktop-production-published.json"
 
       - name: Upload production desktop publish marker
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-production-published
           path: ${{ runner.temp }}/desktop-production-published.json
