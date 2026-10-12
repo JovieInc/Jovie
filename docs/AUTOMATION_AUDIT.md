@@ -120,9 +120,9 @@ until the observer-only definition lands and is proven.
 | **Auto-Resolve Conflicts** | retired (workflow disabled and removed) | none | Merged `main` into PR branches from label events | none | **Retired** — conflict remediation uses the exact-head GitHub Update Branch `REBASE` path; no automatic merge commit or force-push controller remains |
 | **Neon Scheduled Cleanup** | `neon-scheduled-cleanup.yml` | `workflow_dispatch` only | Cleans up orphaned Neon ephemeral branches from E2E / nightly runs | Manual | **Manual-only** — no active schedule |
 | **Neon Ephemeral Branch Cleanup** | `neon-ephemeral-branch-cleanup.yml` | Event-driven (PR close) | Deletes Neon branch created for a PR when PR closes | Per-PR close | **Keep** |
-| **Periodic Evals** | `evals-periodic.yml` | `workflow_dispatch` with typed `RUN_LIVE_EVALS` confirmation | Runs legacy live LLM eval tests; builds Docker image | Manual-only, concurrency 1 | **Keep manual-only** — no scheduled live-eval spend; verify coverage before any scheduled trigger returns |
+| **Periodic Evals** | retired (deleted 2026-10-12) | none | Legacy live LLM eval workflow | No runs in 30 days | **Deleted** |
 | **CI** | `ci.yml` | source PR, native `merge_group`, `main`, and explicit manual dispatch | Source fast gate; exact combined-head integration; queue-proof reuse or direct-main fallback; release-readiness handoff to the production controller | Stage-specific | **Keep** — production mutation is owned outside CI by the fixed controller lease |
-| **Sentry Error Gate** | `sentry-error-gate.yml` | Reusable `workflow_call` | 5-minute soak watching Sentry for error spikes post-deploy; triggers rollback if spike detected | Called by deploy flow | **Keep** |
+| **Sentry Error Gate** | `.github/actions/sentry-error-gate` | `production-release.yml` job | 5-minute soak watching Sentry for error spikes post-deploy; triggers rollback if spike detected | Composite action called by the production release (the reusable workflow wrapper had no callers and was deleted 2026-10-12) | **Keep** |
 | **Canary Health Gate** | `canary-health-gate.yml` | Reusable `workflow_call` | Verifies staging health before production promotion | Called by CI deploy flow | **Keep** |
 | **CodeQL** | `codeql.yml` | `push: main`, `36 5 * * *` UTC, manual | GitHub-native static analysis security scan | Post-merge + nightly | **Keep** |
 | **Security** | `security.yml` | `push: main`, `0 14 * * 1` UTC (upstream-advisory), manual | Additional security scanning | Post-merge + weekly baseline | **Keep** |
@@ -155,7 +155,6 @@ Founder priorities (current cycle): **product stability → design system transf
 
 | Automation | Current Status | Pause Risk |
 |------------|---------------|------------|
-| `Periodic Evals` (`evals-periodic.yml`) | Manual-only with `RUN_LIVE_EVALS` confirmation | Low — no scheduled spend. If this returns to a schedule, add measured per-run cost and current product-surface coverage before relying on results. |
 | `generate-playlist` cron route | Missing from `vercel.json` (runs never) | None — it's already not running. Decide if AI playlist feature is active before adding schedule. |
 | `monitor-metadata-submissions` cron route | Missing from `vercel.json` (runs never) | None — not running. Add schedule only if metadata-submission feature is user-facing. |
 
