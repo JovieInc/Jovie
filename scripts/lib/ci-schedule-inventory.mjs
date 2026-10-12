@@ -98,8 +98,6 @@ const EVENT_DRIVEN_FIX = `use pull_request/pull_request_target/merge_group/workf
  */
 /** @type {readonly string[]} */
 export const CRON_ALLOWLIST = Object.freeze([
-  '.github/workflows/actions-cache-gc.yml',
-  '.github/workflows/actions-cache-supersede.yml',
   '.github/workflows/agent-harness-health-report.yml',
   '.github/workflows/auto-merge-default.yml',
   '.github/workflows/brand-scrub.yml',
@@ -116,7 +114,6 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/linear-sync-on-merge.yml',
   '.github/workflows/m2-revenue-path-canary.yml',
   '.github/workflows/mac-runner-heartbeat.yml',
-  '.github/workflows/main-ci-health-monitor.yml',
   '.github/workflows/marketing-certification-producer.yml',
   '.github/workflows/merge-queue-green-enroll.yml',
   '.github/workflows/merge-queue-ruleset-verify.yml',
@@ -142,7 +139,7 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/visual-regression.yml',
   '.github/workflows/voc-mine.yml',
 ]);
-export const CRON_ALLOWLIST_CEILING = 43;
+export const CRON_ALLOWLIST_CEILING = 40;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
