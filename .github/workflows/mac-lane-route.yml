@@ -76,9 +76,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           LANE: ${{ inputs.lane }}
           CHECKOUT_SHA: ${{ inputs.checkout-sha }}
-          # The child reads mac-lane.yml from this branch: the merge-group
-          # branch, or main for pushes and dispatches from main.
-          DISPATCH_REF: ${{ github.ref_name }}
+          # The child reads mac-lane.yml from this branch: a same-repo PR's
+          # head branch, the merge-group branch, or main.
+          DISPATCH_REF: ${{ github.head_ref || github.ref_name }}
           JOIN_GROUP: mac-lane-join-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.lane }}
           SUPERSEDE_GROUP: mac-lane-${{ inputs.lane }}-${{ inputs.supersede-key || format('run-{0}-{1}', github.run_id, github.run_attempt) }}
           PARENT_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
