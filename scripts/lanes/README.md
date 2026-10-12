@@ -427,6 +427,20 @@ provider's credits: codex is capped at running plus unleased login runs.
 The kill switch is `SYMPHONY_AUTOSCALE=0`. Missing, stale or corrupt input fails safe to base;
 an unknown GitHub budget never exceeds base; a disabled lane stays at 0.
 
+When growth is blocked only by a real limit, `capacity_limit.py` names it after the spawn loop
+of the same tick. It maps the hold to a resource: `host-cpu`, `host-memory`, `host-disk`,
+`codex-accounts`, `codex-credits`, `claude-credits` or `github-api-quota`. A resource is
+published after 3 consecutive binding ticks and cleared after 3 clear ticks. The local record
+`capacity-limit.json` (`symphony-lanes-capacity-limit/v1`) feeds the status feed's
+`capacityLimit`. Each change is also POSTed once to Summer as a signed
+`jovie.capacity-limit/v1` record (`limited`, or `cleared` once). The signature is Ed25519 over
+the triage client's canonical JSON. The key is read from `~/.config/symphony/summer-bottleneck*.env`
+on every send and is never put into the service env, which agents inherit. Each release install
+replays the current state once. There is no heartbeat. An undelivered record is retried on the
+next tick, and a failed POST never touches dispatch. Software holds are never sent as a
+capacity limit; they set `bottleneckFound` locally. Those holds are: current failures, stale
+doctor, unknown measurements, unhealthy, and a cooldown without provider bank evidence.
+
 ## Worktree pool and shared caches (JOV-7705)
 
 `worktree_pool.py` (CLI: `scripts/agent/worktree-new`) keeps `JOVIE_WORKTREE_POOL_SIZE`

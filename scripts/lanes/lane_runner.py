@@ -44,6 +44,7 @@ import continuity_clock  # noqa: E402
 import lifecycle  # noqa: E402
 import devin_free_policy  # noqa: E402
 import autoscale  # noqa: E402
+import capacity_limit  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
@@ -118,6 +119,7 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
+              "scripts/tests/test_capacity_limit.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
               "scripts/tests/test_linear_sync.py"]
@@ -6551,6 +6553,15 @@ def finish_dispatch(host: Host, tick: dict) -> int:
         tick["continuity"] = continuity_clock.tick(host.state, HOST)
     except Exception as error:  # liveness must not suppress the existing doctor
         tick["continuity"] = {"status": "failed", "error": type(error).__name__}
+    if autoscale.mode() == "apply":
+        try:
+            # After the spawn loop: a slow or failed Summer POST never delays or blocks a worker.
+            record = capacity_limit.tick(host.state, tick)
+            if record is not None:
+                tick["capacityLimit"] = {"changed": True, "bottleneckFound": record["bottleneckFound"],
+                                         "limited": [row["resource"] for row in record["limited"]]}
+        except Exception as error:  # the record is observability, never dispatch
+            tick["capacityLimitError"] = f"{type(error).__name__}: {error}"[:200]
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())
