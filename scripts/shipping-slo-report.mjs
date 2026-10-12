@@ -35,6 +35,7 @@ import {
   findBlogQualificationRun,
   isStrictBlogContentPr,
 } from './lib/blog-publish-latency.mjs';
+import { formatBiomeJson } from './lib/format-biome-json.mjs';
 import {
   buildGistSloBlock,
   ciWalltimeByEvent,
@@ -568,7 +569,7 @@ function main() {
       { tightenCandidates: report.evaluation?.tightenCandidates ?? [] },
       { now: report.generatedAt ?? Date.now() }
     );
-    writeFileSync(BASELINE_PATH, `${JSON.stringify(next, null, 2)}\n`);
+    writeFileSync(BASELINE_PATH, formatBiomeJson(next));
     console.log(
       tightened.length
         ? `[shipping-slo] baseline tightened: ${tightened.join(', ')}`
@@ -616,7 +617,7 @@ function main() {
       { tightenCandidates: report.evaluation.tightenCandidates },
       { now: report.generatedAt }
     );
-    writeFileSync(BASELINE_PATH, `${JSON.stringify(next, null, 2)}\n`);
+    writeFileSync(BASELINE_PATH, formatBiomeJson(next));
     report.tightened = tightened;
     console.log(
       tightened.length
@@ -626,10 +627,10 @@ function main() {
   }
 
   if (hasArg(args, '--write-latest')) {
-    writeFileSync(LATEST_PATH, `${JSON.stringify(report.gistSlo, null, 2)}\n`);
+    writeFileSync(LATEST_PATH, formatBiomeJson(report.gistSlo));
     writeFileSync(
       BLOG_LATENCY_PATH,
-      `${JSON.stringify(report.blogPublishLatency, null, 2)}\n`
+      formatBiomeJson(report.blogPublishLatency)
     );
   }
 
