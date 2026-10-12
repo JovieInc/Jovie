@@ -575,7 +575,7 @@ export function DesktopAuthHandoffActions({
         <section
           ref={qrInstructionsRef}
           aria-label='Phone Sign-in Instructions'
-          className='mt-6 flex w-full flex-col items-center justify-center gap-3 focus-visible:outline-none'
+          className='mt-5 flex w-full flex-col items-center justify-center gap-4 focus-visible:outline-none'
           data-desktop-auth-state={
             qrError ? 'qr-error' : qrSvg ? 'qr' : 'qr-loading'
           }
@@ -591,7 +591,7 @@ export function DesktopAuthHandoffActions({
               role='img'
             />
           ) : null}
-          <div className='flex items-center justify-center gap-4'>
+          <div className='flex flex-wrap items-center justify-center gap-x-4 gap-y-4'>
             {canRedeemCode ? (
               <Button
                 type='button'
@@ -610,12 +610,12 @@ export function DesktopAuthHandoffActions({
             >
               Back To Sign-in Options
             </Button>
+            {cancelButton}
           </div>
-          {cancelButton}
         </section>
       ) : (
         <div
-          className='mt-6 flex w-full flex-col items-center justify-center gap-3'
+          className='mt-5 flex w-full flex-col items-center justify-center gap-4'
           data-desktop-auth-state={
             selectedMethod === 'touch-id'
               ? `touch-id-${touchIdState}`
@@ -644,6 +644,7 @@ export function DesktopAuthHandoffActions({
             </Button>
           )}
           <DesktopAuthMethodOptions
+            cancelButton={cancelButton}
             browserOptionRef={browserOptionRef}
             canRedeemCode={canRedeemCode}
             codeOptionRef={codeOptionRef}
@@ -672,7 +673,6 @@ export function DesktopAuthHandoffActions({
             showTouchId={showTouchId}
             touchIdOptionRef={touchIdOptionRef}
           />
-          {cancelButton}
         </div>
       )}
       <DesktopAuthStatus

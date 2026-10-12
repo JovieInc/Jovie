@@ -110,20 +110,13 @@ function sizedPr(labels) {
 }
 
 describe('merge-group member discovery', () => {
-  it('resolves every member from the exact synthetic first-parent chain', () => {
+  it('resolves the singleton member from the exact synthetic first-parent chain', () => {
     const members = resolveMergeGroupMembers({
       event: event(),
-      comparison: comparison([
-        commit(FIRST, BASE, 101),
-        commit(HEAD, FIRST, 102),
-      ]),
+      comparison: comparison([commit(HEAD, BASE, 102)]),
     });
 
     expect(members).toEqual([
-      {
-        number: 101,
-        syntheticHeadSha: FIRST,
-      },
       {
         number: 102,
         syntheticHeadSha: HEAD,
@@ -185,7 +178,7 @@ describe('merge-group member discovery', () => {
           commit(HEAD, FIRST, 101),
         ]),
       })
-    ).toThrow(/repeats PR #101/);
+    ).toThrow(/exceeds trusted 1-member bound/);
   });
 
   it('rejects commits without canonical GitHub generation evidence', () => {
@@ -241,10 +234,10 @@ describe('merge-group member discovery', () => {
       resolveMergeGroupMembers({
         event: event(),
         comparison: comparison(
-          Array.from({ length: 11 }, () => commit(HEAD, BASE, 102))
+          Array.from({ length: 2 }, () => commit(HEAD, BASE, 102))
         ),
       })
-    ).toThrow(/exceeds trusted 5-member bound/);
+    ).toThrow(/exceeds trusted 1-member bound/);
   });
 
   it('requires current open main-bound PR metadata after discovery', () => {
@@ -670,5 +663,118 @@ describe('merge-group hold labels (JOV-6843)', () => {
       })
     ).rejects.toThrow('PR #101 failed fork merge-group policy');
     expect(logs).toContain('PR #101: FAIL — carries the hold label');
+  });
+});
+
+describe('combined size + fork merge-group producer (JOV-7744)', () => {
+  const internalPr = labels => ({
+    number: 101,
+    state: 'open',
+    base: { ref: 'main' },
+    head: { sha: SOURCE_101, repo: { fork: false } },
+    labels: labels.map(name => ({ name })),
+  });
+  const unapprovedFork = {
+    ...internalPr(['big-pr']),
+    head: { sha: SOURCE_101, repo: { fork: true } },
+  };
+
+  function combinedRun({ pr, treeBytes = 10, reviews = [] }) {
+    const paths = [];
+    const outputs = [];
+    const logs = [];
+    const run = runPolicy({
+      argv: ['--policy=size', '--also=fork'],
+      env: { GH_TOKEN: 'test-token' },
+      event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
+      log: line => logs.push(line),
+      now: () => 1,
+      writeOutput: line => outputs.push(line),
+      async request(path) {
+        paths.push(path);
+        if (path.includes('/compare/')) {
+          return { data: comparison([commit(FIRST, BASE, 101)]) };
+        }
+        if (path.endsWith('/pulls/101')) return { data: pr };
+        if (path.includes('/pulls/101/reviews?')) {
+          return { data: reviews, link: null };
+        }
+        if (path.endsWith(`/git/commits/${FIRST}`)) {
+          return { data: { sha: FIRST, tree: { sha: TREE } } };
+        }
+        if (path.includes('/git/trees/')) {
+          return {
+            data: treePayload([
+              treeEntry('100644', 'blob', treeBytes, 'payload.bin'),
+            ]),
+          };
+        }
+        throw new Error(`unexpected request: ${path}`);
+      },
+    });
+    return { run, paths, outputs, logs };
+  }
+
+  it('reads the comparison and each member once for both policies', async () => {
+    const { run, paths, outputs } = combinedRun({ pr: internalPr(['big-pr']) });
+    await run;
+    expect(paths).toEqual([
+      `/repos/JovieInc/Jovie/compare/${BASE}...${FIRST}`,
+      '/repos/JovieInc/Jovie/pulls/101',
+      `/repos/JovieInc/Jovie/git/commits/${FIRST}`,
+      `/repos/JovieInc/Jovie/git/trees/${TREE}?recursive=1`,
+    ]);
+    expect(outputs).toEqual(['fork_verdict=pass']);
+  });
+
+  it('hands off a failing fork verdict while the size policy still passes', async () => {
+    const { run, outputs, logs } = combinedRun({ pr: unapprovedFork });
+    await run;
+    expect(outputs).toEqual(['fork_verdict=fail']);
+    expect(
+      logs.some(line => line.startsWith('fork policy PR #101: FAIL'))
+    ).toBe(true);
+    expect(logs).toContain(
+      'Validated 1 merge-group member(s) for size policy.'
+    );
+  });
+
+  it('fails both verdicts for a held member', async () => {
+    const { run, outputs } = combinedRun({
+      pr: internalPr(['big-pr', 'hold']),
+    });
+    await expect(run).rejects.toThrow('PR #101 failed size merge-group policy');
+    expect(outputs).toEqual(['fork_verdict=fail']);
+  });
+
+  it('publishes the fork verdict before an over-budget tree fails the size gate', async () => {
+    const { run, outputs } = combinedRun({
+      pr: internalPr(['big-pr']),
+      treeBytes: HYGIENE_LIMITS.maxTrackedBytes + 1,
+    });
+    await expect(run).rejects.toThrow('combined-tree budget');
+    expect(outputs).toEqual(['fork_verdict=pass']);
+  });
+
+  it('refuses an --also hand-off it cannot publish or that names the wrong policy', async () => {
+    await expect(
+      runPolicy({
+        argv: ['--policy=size', '--also=fork'],
+        env: { GH_TOKEN: 'test-token' },
+        event: event(),
+        request: async () => {
+          throw new Error('must not reach the API');
+        },
+      })
+    ).rejects.toThrow('GITHUB_OUTPUT is required');
+    for (const argv of [
+      ['--policy=fork', '--also=size'],
+      ['--policy=size', '--also=size'],
+      ['--policy=size', '--also='],
+    ]) {
+      await expect(
+        runPolicy({ argv, env: { GH_TOKEN: 'test-token' }, event: event() })
+      ).rejects.toThrow('expected --also=fork only with --policy=size');
+    }
   });
 });

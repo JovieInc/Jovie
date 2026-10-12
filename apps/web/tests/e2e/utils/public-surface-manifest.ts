@@ -317,8 +317,9 @@ const MARKETING_SURFACES = [
   {
     id: 'marketing-new',
     family: 'marketing',
-    expectedState: 'ok',
+    expectedState: 'redirect',
     path: APP_ROUTES.LANDING_NEW,
+    expectedRedirects: [/^\/$/],
     readySelectors: ['h1', 'main'],
     mainSelector: 'main',
     minMainTextLength: 120,

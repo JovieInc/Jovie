@@ -638,6 +638,9 @@ describe('ReleaseProviderMatrix', () => {
           spotifyConnected={false}
         />
       );
+      await React.act(async () => {
+        await vi.dynamicImportSettled();
+      });
       expect(
         await screen.findByTestId('releases-empty-state')
       ).toBeInTheDocument();

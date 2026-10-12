@@ -232,6 +232,8 @@ export function mapSuggestedActionToInboxCard(
             inboundText: socialReply.inboundText,
             draftedText: socialReply.draftedText,
             sourceUrl: socialReply.sourceUrl,
+            videoTitle: socialReply.provenance?.videoTitle ?? null,
+            likeCount: socialReply.provenance?.likeCount ?? null,
             executionState: socialReply.executionState,
             revisionCount: socialReply.revisions.length,
           },

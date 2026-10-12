@@ -5,9 +5,24 @@ import {
   type TrustLogoAssetId,
 } from '@/components/media/trustLogoAssets';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import {
+  type LogoPermission,
+  type LogoPlacement,
+  permittedLogoAssetIds,
+} from '@/data/product-truth/logo-permissions';
 import { cn } from '@/lib/utils';
 
 interface HomeTrustSectionProps {
+  /**
+   * Where the strip renders. Only logos with an active permission covering
+   * this placement render (JOV-7795); with none, the section renders nothing.
+   */
+  readonly placement: LogoPlacement;
+  /**
+   * Stories and tests only: grants to evaluate instead of the registry. The
+   * logo-permission gate rejects this prop anywhere else.
+   */
+  readonly fixturePermissions?: readonly LogoPermission[];
   readonly sectionVariant?: string;
   readonly variant?: 'default' | 'compact';
   readonly className?: string;
@@ -56,6 +71,8 @@ export function HomeTrustSection({
   ariaLabel,
   logoIds,
   sectionVariant,
+  placement,
+  fixturePermissions,
 }: Readonly<HomeTrustSectionProps>) {
   const isInlineStrip = presentation === 'inline-strip';
   const accessibleLabel =
@@ -63,9 +80,14 @@ export function HomeTrustSection({
   const logoTone = isInlineStrip ? '' : 'text-white/55';
   const innerBoxClass = getInnerBoxClass(isInlineStrip, variant);
   const labelMarginClass = getLabelMarginClass(isInlineStrip, variant);
-  const assets = logoIds
-    ? TRUST_LOGO_ASSETS.filter(asset => logoIds.includes(asset.id))
-    : TRUST_LOGO_ASSETS;
+  const permitted = permittedLogoAssetIds(placement, {
+    permissions: fixturePermissions,
+  });
+  const assets = TRUST_LOGO_ASSETS.filter(
+    asset =>
+      permitted.includes(asset.id) && (!logoIds || logoIds.includes(asset.id))
+  );
+  if (assets.length === 0) return null;
 
   if (presentation === 'artist-profile') {
     return (

@@ -1,6 +1,8 @@
+/* eslint @next/next/no-img-element: "off" -- ImageResponse requires standard img */
 import { ImageResponse } from 'next/og';
 import { BASE_URL } from '@/constants/app';
 import { getProfileWithLinks } from '@/lib/services/profile';
+import { toDataUrl } from '@/lib/share/image-utils';
 
 export const runtime = 'nodejs';
 export const revalidate = 900; // 15 min — matches previous Cache-Control max-age
@@ -14,41 +16,6 @@ export const contentType = 'image/png';
 
 function truncateName(name: string): string {
   return name.length > 44 ? `${name.slice(0, 43)}…` : name;
-}
-
-async function toDataUrl(imageUrl: string): Promise<string | null> {
-  try {
-    const response = await fetch(imageUrl, {
-      headers: { Accept: 'image/*' },
-      cache: 'force-cache',
-      signal: AbortSignal.timeout(3000),
-    });
-
-    if (!response.ok) return null;
-
-    const contentType = response.headers.get('content-type') ?? '';
-    if (!contentType.startsWith('image/')) return null;
-
-    // Limit to 2MB to avoid memory pressure during OG render
-    const contentLength = response.headers.get('content-length');
-    if (contentLength && Number.parseInt(contentLength, 10) > 2 * 1024 * 1024) {
-      return null;
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    if (arrayBuffer.byteLength > 2 * 1024 * 1024) return null;
-    const bytes = new Uint8Array(arrayBuffer);
-    // Convert to binary string in chunks to avoid call stack limits
-    // and O(n²) string concatenation during image generation
-    const CHUNK = 8192;
-    const chunks: string[] = [];
-    for (let i = 0; i < bytes.length; i += CHUNK) {
-      chunks.push(String.fromCodePoint(...bytes.subarray(i, i + CHUNK)));
-    }
-    return `data:${contentType};base64,${btoa(chunks.join(''))}`;
-  } catch {
-    return null;
-  }
 }
 
 function gradientCard(headline: string, subtitle: string) {
@@ -65,7 +32,6 @@ function gradientCard(headline: string, subtitle: string) {
         fontFamily: 'Inter, sans-serif',
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */}
       <img
         src={`${BASE_URL}/Jovie-logo.png`}
         alt='Jovie'
@@ -135,7 +101,6 @@ function heroImage(
         fontFamily: 'Inter, sans-serif',
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */}
       <img
         src={photoDataUrl}
         alt={`${name} profile`}
@@ -160,7 +125,6 @@ function heroImage(
       />
 
       {/* Jovie logo */}
-      {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */}
       <img
         src={`${BASE_URL}/Jovie-logo.png`}
         alt='Jovie'

@@ -3,6 +3,8 @@ import {
   getPublicPriceClaims,
 } from '@/lib/billing/offer-truth';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+import { type DogfoodReceiptsFile, dogfoodClaims } from './dogfood';
+import dogfoodReceipts from './dogfood-receipts.gen.json';
 import {
   type CapabilityDefinition,
   type Claim,
@@ -166,6 +168,8 @@ export function listProductTruthClaims(): readonly Claim[] {
     ...deriveEntitlementClaims(),
     ...deriveFeatureClaims(),
     ...EVIDENCED_CLAIMS,
+    // Measured dogfood receipts (JOV-7750): `pnpm proof:dogfood`.
+    ...dogfoodClaims(dogfoodReceipts as DogfoodReceiptsFile),
   ];
   return cachedClaims;
 }

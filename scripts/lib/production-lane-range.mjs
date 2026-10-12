@@ -495,12 +495,20 @@ export function resolveHistoricalLaneEvidence({
       });
     }
   }
-  if (candidates.length !== 1) {
+  // Main-push evidence is canonical after landing. A merge-group proof is
+  // the fallback when that exact SHA never received a passing main push.
+  const mainCandidates = candidates.filter(
+    candidate => candidate.event === 'push'
+  );
+  const preferredCandidates = mainCandidates.length
+    ? mainCandidates
+    : candidates;
+  if (preferredCandidates.length !== 1) {
     throw new Error(
-      `expected one exact passing ${lane} receipt for ${sha}; found ${candidates.length}`
+      `expected one exact passing ${lane} receipt for ${sha}; found ${preferredCandidates.length}`
     );
   }
-  return candidates[0];
+  return preferredCandidates[0];
 }
 
 function parseArgs(argv) {

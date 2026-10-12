@@ -19,8 +19,11 @@ import {
 } from './component-live-storybook-certification.mjs';
 import {
   killProcessGroup,
+  requireStorybookBuildMemory,
   spawnProcessGroup,
+  storybookBuildEnvironment,
   waitForUrl,
+  watchStorybookBuildResources,
   withBoundedLifecycle,
 } from './component-live-storybook-lifecycle.mjs';
 import { oklchToRgb, parseOklch } from './lib/oklch.mjs';
@@ -138,6 +141,7 @@ function ownerSelector(owner) {
  * @param {{ register: (child: import('node:child_process').ChildProcess) => import('node:child_process').ChildProcess, signal: AbortSignal }} ctx
  */
 async function buildStorybook(outputDir, ctx) {
+  requireStorybookBuildMemory();
   const child = ctx.register(
     spawnProcessGroup(
       'pnpm',
@@ -153,7 +157,7 @@ async function buildStorybook(outputDir, ctx) {
       ],
       {
         cwd: REPO_ROOT,
-        env: { ...process.env, JOVIE_LIVE_STORYBOOK_CERT: '1' },
+        env: storybookBuildEnvironment(),
         stdio: ['ignore', 'pipe', 'pipe'],
       }
     )
@@ -166,7 +170,9 @@ async function buildStorybook(outputDir, ctx) {
     output.stderr += chunk;
   });
   const code = await new Promise((resolveExit, reject) => {
+    const resources = watchStorybookBuildResources(child, reject);
     const onAbort = () => {
+      resources.stop();
       killProcessGroup(child, 'SIGKILL');
       reject(new Error('live Storybook build aborted; fail closed'));
     };
@@ -175,8 +181,12 @@ async function buildStorybook(outputDir, ctx) {
       return;
     }
     ctx.signal?.addEventListener('abort', onAbort, { once: true });
-    child.once('error', reject);
+    child.once('error', error => {
+      resources.stop();
+      reject(error);
+    });
     child.once('exit', (status, signalName) => {
+      resources.stop();
       ctx.signal?.removeEventListener('abort', onAbort);
       resolveExit(status ?? (signalName ? 1 : 0));
     });

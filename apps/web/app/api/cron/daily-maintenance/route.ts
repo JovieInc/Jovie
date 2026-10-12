@@ -39,6 +39,10 @@ import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
 import { runProfileSearchMonitoring } from '@/lib/profile-search/runner';
 import { reconcileReleaseWorkflowRunOutcomes } from '@/lib/release-to-revenue/outcome-reconciliation';
 import { logger } from '@/lib/utils/logger';
+import {
+  assertWaitlistAdmissionHealthy,
+  reconcileWaitlistAdmission,
+} from '@/lib/waitlist/admission-detector';
 import { runWaitlistAutoAccept } from '@/lib/waitlist/auto-accept';
 import { runReconciliation } from '../billing-reconciliation/route';
 import { cleanupExpiredKeys } from '../cleanup-idempotency-keys/route';
@@ -137,6 +141,12 @@ export async function GET(request: Request) {
   results.waitlistAutoAccept = await runSubJob(
     'waitlistAutoAccept',
     runWaitlistAutoAccept
+  );
+
+  // 5b. Admission detector: every pending user has a waitlist entry and no
+  //     external customer waits past the review SLA (JOV-7701).
+  results.waitlistAdmission = await runSubJob('waitlistAdmission', async () =>
+    assertWaitlistAdmissionHealthy(await reconcileWaitlistAdmission())
   );
 
   // 6. Profile search monitoring — bounded to a 90-second sub-budget.

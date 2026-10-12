@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "labeledAt": "2026-10-04T07:08:55.000Z",
+  "items": [
+    {
+      "id": "esc-ui-h1-clipped-launch-1440",
+      "caseId": "esc-ui-h1-clipped-launch-1440.png",
+      "humanLabel": "fail",
+      "notes": "/launch @1440: JOV-6906/JOV-7772: hero H1 clipped by the two-line clamp (\"Your entire music caree...\")."
+    },
+    {
+      "id": "esc-ui-h1-clipped-launch-390",
+      "caseId": "esc-ui-h1-clipped-launch-390.png",
+      "humanLabel": "fail",
+      "notes": "/launch @390: JOV-7772: hero H1 clipped at 390."
+    },
+    {
+      "id": "esc-ui-h1-clipped-ai-390",
+      "caseId": "esc-ui-h1-clipped-ai-390.png",
+      "humanLabel": "fail",
+      "notes": "/ai @390: JOV-7772: hero H1 clipped at 390."
+    },
+    {
+      "id": "esc-ui-h1-clipped-youtube-thumbnails-390",
+      "caseId": "esc-ui-h1-clipped-youtube-thumbnails-390.png",
+      "humanLabel": "fail",
+      "notes": "/youtube-thumbnails @390: JOV-7772: hero H1 clipped at 390."
+    },
+    {
+      "id": "esc-ui-005-table-strip-1440",
+      "caseId": "esc-ui-005-table-strip-1440.png",
+      "humanLabel": "fail",
+      "notes": "/demo @1440: ESC-UI-005 (JOV-7710): table sort strip paints a second material on the main plane."
+    },
+    {
+      "id": "esc-ui-010-inset-header-strip-1440",
+      "caseId": "esc-ui-010-inset-header-strip-1440.png",
+      "humanLabel": "fail",
+      "notes": "/app/chat @1440: ESC-UI-010 (JOV-7207): inset darker header strip inside the rounded main surface."
+    },
+    {
+      "id": "esc-ui-009-top-row-stagger-1440",
+      "caseId": "esc-ui-009-top-row-stagger-1440.png",
+      "humanLabel": "fail",
+      "notes": "/app/chat @1440: ESC-UI-009 (JOV-7207): header row starts inside an extra content inset, off the titlebar row."
+    },
+    {
+      "id": "esc-ui-002-chevron-rail-1440",
+      "caseId": "esc-ui-002-chevron-rail-1440.png",
+      "humanLabel": "fail",
+      "notes": "/app/chat @1440: ESC-UI-002 (JOV-7207): legacy arrow/chevron rail toggle glyph re-entered."
+    },
+    {
+      "id": "esc-ui-008-duplicate-toggle-1440",
+      "caseId": "esc-ui-008-duplicate-toggle-1440.png",
+      "humanLabel": "fail",
+      "notes": "/app/chat @1440: ESC-UI-008 (JOV-7207): two left-sidebar toggles in one top row."
+    },
+    {
+      "id": "esc-ui-006-artwork-compressed-1440",
+      "caseId": "esc-ui-006-artwork-compressed-1440.png",
+      "humanLabel": "fail",
+      "notes": "/demo/showcase/release-landing @1440: ESC-UI-006: release artwork compressed (aspect-ratio damage)."
+    },
+    {
+      "id": "esc-ui-007-phone-column-overflow-390",
+      "caseId": "esc-ui-007-phone-column-overflow-390.png",
+      "humanLabel": "fail",
+      "notes": "/app/chat @390: ESC-UI-007 (JOV-6929): phone column overflows horizontally; content cut at the right edge."
+    },
+    {
+      "id": "esc-ui-005-card-on-card-earnings-1440",
+      "caseId": "esc-ui-005-card-on-card-earnings-1440.png",
+      "humanLabel": "fail",
+      "notes": "/demo/showcase/earnings @1440: JOV-7779: card-on-card boxing, several background materials inside one main plane (current main)."
+    },
+    {
+      "id": "esc-ui-005-card-on-card-settings-1440",
+      "caseId": "esc-ui-005-card-on-card-settings-1440.png",
+      "humanLabel": "fail",
+      "notes": "/demo/showcase/settings @1440: JOV-7779: settings panel boxed on the main plane (current main)."
+    },
+    {
+      "id": "ok-home-1440",
+      "caseId": "ok-home-1440.png",
+      "humanLabel": "pass",
+      "notes": "/ @1440: Certified homepage (route DOM green)."
+    },
+    {
+      "id": "ok-home-390",
+      "caseId": "ok-home-390.png",
+      "humanLabel": "pass",
+      "notes": "/ @390: Certified homepage at 390."
+    },
+    {
+      "id": "ok-pricing-1440",
+      "caseId": "ok-pricing-1440.png",
+      "humanLabel": "pass",
+      "notes": "/pricing @1440: Certified pricing."
+    },
+    {
+      "id": "ok-pricing-390",
+      "caseId": "ok-pricing-390.png",
+      "humanLabel": "pass",
+      "notes": "/pricing @390: Certified pricing at 390."
+    },
+    {
+      "id": "ok-product-1440",
+      "caseId": "ok-product-1440.png",
+      "humanLabel": "pass",
+      "notes": "/product @1440: Certified product page."
+    },
+    {
+      "id": "ok-artist-profiles-390",
+      "caseId": "ok-artist-profiles-390.png",
+      "humanLabel": "pass",
+      "notes": "/artist-profiles @390: Certified artist-profiles at 390."
+    },
+    {
+      "id": "ok-changelog-1440",
+      "caseId": "ok-changelog-1440.png",
+      "humanLabel": "pass",
+      "notes": "/changelog @1440: Certified changelog."
+    },
+    {
+      "id": "ok-app-chat-1440",
+      "caseId": "ok-app-chat-1440.png",
+      "humanLabel": "pass",
+      "notes": "/app/chat @1440: Chat shell: one top row, single toggle, mirrored rail family."
+    },
+    {
+      "id": "ok-app-chat-390",
+      "caseId": "ok-app-chat-390.png",
+      "humanLabel": "pass",
+      "notes": "/app/chat @390: Chat shell at 390."
+    },
+    {
+      "id": "ok-legal-privacy-1440",
+      "caseId": "ok-legal-privacy-1440.png",
+      "humanLabel": "pass",
+      "notes": "/legal/privacy @1440: Legal document page."
+    },
+    {
+      "id": "ok-voice-390",
+      "caseId": "ok-voice-390.png",
+      "humanLabel": "pass",
+      "notes": "/voice @390: Voice hero fits two lines (JOV-7772 fix)."
+    },
+    {
+      "id": "ok-artist-notifications-1440",
+      "caseId": "ok-artist-notifications-1440.png",
+      "humanLabel": "pass",
+      "notes": "/artist-notifications @1440: Notifications hero fits two lines (JOV-7772 fix)."
+    }
+  ]
+}

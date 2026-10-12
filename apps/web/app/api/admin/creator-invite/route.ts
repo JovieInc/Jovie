@@ -8,6 +8,10 @@ import { enqueueClaimInviteJob } from '@/lib/email/jobs/enqueue';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import {
+  COLD_CLAIM_INVITE_CLOSED_MESSAGE,
+  isColdClaimInviteSendOpen,
+} from '@/lib/outbound/cold-claim-invites';
 import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 
@@ -50,6 +54,16 @@ export async function POST(request: Request) {
     }
 
     const { creatorProfileId, email, sendImmediately } = parsed.data;
+
+    if (sendImmediately && !isColdClaimInviteSendOpen()) {
+      return NextResponse.json(
+        {
+          error: COLD_CLAIM_INVITE_CLOSED_MESSAGE,
+          code: 'COLD_OUTBOUND_CLOSED',
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
 
     // Verify the creator profile exists and is not claimed
     const [profile] = await db

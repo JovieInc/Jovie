@@ -60,6 +60,21 @@ export const socialReplyRevisionSchema = z.object({
 
 export type SocialReplyRevision = z.infer<typeof socialReplyRevisionSchema>;
 
+/**
+ * Provider-side provenance for the inbound object (JOV-5860). Optional so
+ * drafts authored before inbound sync shipped remain valid.
+ */
+export const socialReplyProvenanceSchema = z.object({
+  threadId: z.string().trim().min(1).max(512).optional(),
+  videoId: z.string().trim().min(1).max(128).optional(),
+  videoTitle: z.string().trim().max(512).nullable().optional(),
+  authorChannelId: z.string().trim().min(1).max(128).optional(),
+  likeCount: z.number().int().nonnegative().safe().nullable().optional(),
+  moderationStatus: z.string().trim().min(1).max(64).optional(),
+});
+
+export type SocialReplyProvenance = z.infer<typeof socialReplyProvenanceSchema>;
+
 export const socialReplyDraftPayloadSchema = z.object({
   schemaVersion: z.literal(1),
   title: z.string().trim().min(1).max(256),
@@ -80,6 +95,7 @@ export const socialReplyDraftPayloadSchema = z.object({
   /** Current draft shown for approval. Replaced on each revision round. */
   draftedText: z.string().trim().min(1).max(4_000),
   sourceUrl: z.string().url().nullable().default(null),
+  provenance: socialReplyProvenanceSchema.optional(),
   executionState: socialReplyExecutionStateSchema.default('pending'),
   /** Ordered revision history; oldest first. Never rewritten in place. */
   revisions: z.array(socialReplyRevisionSchema).max(50).default([]),

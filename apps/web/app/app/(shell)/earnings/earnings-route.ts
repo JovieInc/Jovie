@@ -13,5 +13,5 @@ export async function redirectFromEarningsRoute(returnPath: string) {
     return routeContext.error;
   }
 
-  redirect(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`);
+  redirect(`${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`);
 }

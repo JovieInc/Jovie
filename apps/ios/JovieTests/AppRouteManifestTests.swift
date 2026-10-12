@@ -94,6 +94,25 @@ struct AppRouteManifestTests {
     #expect(AppRouteManifest.entries(classification: .deprecated).isEmpty)
   }
 
+  // JOV-7632: every web-only path the boundary guards must be documented in
+  // the manifest, and no web-only entry may present as an in-app surface.
+  @Test func webOnlyBoundariesAreDocumented() {
+    let webOnly = AppRouteManifest.entries(classification: .webOnly)
+    #expect(webOnly.count == MobileWebOnlyRouteBoundary.pathPrefixes.count + 1)
+    for prefix in MobileWebOnlyRouteBoundary.pathPrefixes {
+      #expect(
+        webOnly.contains { $0.stateOwner.contains(prefix) },
+        "\(prefix) must be documented as web-only"
+      )
+    }
+    // Merch checkout (/<handle>/merch/<cardId>) is web-only too but lives
+    // outside /app/*, so it is documented without a boundary prefix.
+    #expect(webOnly.contains { $0.id == "webOnly.merchCheckout" })
+    for entry in webOnly {
+      #expect(entry.presentation == .externalLink, "\(entry.id) must leave the app")
+    }
+  }
+
   @Test func liveRoutesDeclareVisibleEntryAndExit() {
     for route in AppRouteManifest.entries
     where route.classification == .shipped || route.classification == .gated {

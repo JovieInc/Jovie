@@ -283,9 +283,9 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'JOV-6220 source owner reconciliation 2026-09-29; HomepageIdentityHero and HomepageIdentitySections render tests',
+        'JOV-8188 selected identity source reconciliation 2026-10-11; homepage-v3-page and homepage anatomy render contracts; JOV-6220 / JOV-7795 ownership',
       notes:
-        'Identity v3 supersedes the legacy relationships/changelog composition (Tim 2026-09-28). Source inventory only; exact deployed mounted-section, visual, and outcome receipts remain separate. Pen identity is unknown.',
+        'Selected branch: SHOW_HOME_V1_DESIGN=false, HOMEPAGE_V3_ENABLED=true, and no permissioned homepage logos. FAQ copy remains available but no FAQ is mounted. Rollback compositions, exact deployment, native mapping, visual and outcome receipts remain separate.',
     },
     status: 'active',
     specVersion: '1.4.0',
@@ -367,11 +367,8 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'hero',
         'centered-phone'
       ),
-      approvedVariantBinding(
-        'apps/web/components/features/home/HomeTrustSection.tsx',
-        'logo-cloud',
-        'inline-strip'
-      ),
+      // logo-cloud renders only once a brand grants permission for this page
+      // (data/product-truth/logo-permissions.ts, JOV-7795).
       approvedVariantBinding(
         'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx',
         'feature-split',
@@ -462,7 +459,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     renderedSections: approvedBindings(
       'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
       'hero',
-      'logo-cloud',
       'feature-split',
       'feature-grid',
       'capture',
@@ -502,7 +498,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     renderedSections: approvedBindings(
       'components/marketing/artist-profile/ArtistProfileLandingRoute.tsx',
       'hero',
-      'logo-cloud',
       'feature-split',
       'feature-grid',
       'capture',
@@ -540,7 +535,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     renderedSections: approvedBindings(
       'components/marketing/artist-notifications/ArtistNotificationsLanding.tsx',
       'hero',
-      'logo-cloud',
       'capture',
       'feature-split',
       'feature-grid',
@@ -795,14 +789,14 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       'apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx',
       'hero',
       'how-it-works',
-      'feature-split',
       'cta'
     ),
     bindingEvidence: {
       status: 'unverified',
-      source: 'JOV-6560 source and canonical Pen draft',
+      source:
+        'JOV-8188 source reconciliation 2026-10-11; JOV-6560 interactive dial owner',
       notes:
-        'Interactive two-release dial is source-backed; mounted render and native save proof are pending.',
+        'Hero contains the interactive two-release dial; the three-step handoff is one how-it-works section, followed by the closing CTA. There is no separate feature-split section. Local product-evidence render contract covers these jobs; exact deployed binding and native save proof remain separate.',
     },
     status: 'active',
     specVersion: '1.4.0',

@@ -10,6 +10,7 @@ import {
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AboutSection } from '@/components/features/profile/AboutSection';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
@@ -39,6 +40,7 @@ const {
   mockProfileUnifiedDrawer,
   mockProfilePrimaryTabPanel,
   MockProfileDesktopSurface,
+  mockClientNavigation,
 } = vi.hoisted(() => {
   const mockProfileDesktopSurface = vi.fn();
   function MockProfileDesktopSurface(props: {
@@ -72,6 +74,7 @@ const {
     mockProfileUnifiedDrawer: vi.fn(),
     mockProfilePrimaryTabPanel: vi.fn(),
     MockProfileDesktopSurface,
+    mockClientNavigation: vi.fn((_href: string) => false),
   };
 });
 
@@ -106,7 +109,21 @@ vi.mock('next/link', () => ({
     readonly href: string;
     readonly prefetch?: boolean;
     readonly [key: string]: unknown;
-  }) => React.createElement('a', { href, ...props }, children),
+  }) =>
+    React.createElement(
+      'a',
+      {
+        href,
+        ...props,
+        onClick: (event: React.MouseEvent<HTMLAnchorElement>) => {
+          if (mockClientNavigation(href)) {
+            event.preventDefault();
+            window.history.pushState(window.history.state, '', href);
+          }
+        },
+      },
+      children
+    ),
 }));
 
 vi.mock('@/components/atoms/ImageWithFallback', () => ({
@@ -286,6 +303,7 @@ describe('ProfileCompactTemplate', () => {
   beforeEach(() => {
     originalMatchMedia = window.matchMedia;
     cleanup();
+    mockClientNavigation.mockReturnValue(false);
     mockCanonicalProfileDSPs.mockReturnValue([]);
     mockUseIsAuthenticated.mockReturnValue(false);
     mockUseProfileShell.mockReset();
@@ -356,6 +374,8 @@ describe('ProfileCompactTemplate', () => {
       )
     );
     mockUseProfileShell.mockImplementation(() => ({
+      locationMode:
+        new URLSearchParams(window.location.search).get('mode') ?? 'profile',
       notificationsContextValue: {
         subscribedChannels: {},
         subscriptionDetails: {},
@@ -2116,6 +2136,137 @@ describe('ProfileCompactTemplate', () => {
         name: `Open This Is playlist for ${mockArtist.name}`,
       })
     ).not.toBeInTheDocument();
+  });
+
+  describe('contact query navigation', () => {
+    afterEach(() => vi.restoreAllMocks());
+    const profile = (mode: 'profile' | 'contact' = 'profile') => (
+      <ProfileCompactTemplate
+        mode={mode}
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={mockContacts}
+      />
+    );
+    const drawer = () => screen.getByTestId('mock-profile-unified-drawer');
+
+    beforeEach(() => {
+      mockClientNavigation.mockReturnValue(true);
+      mockProfilePrimaryTabPanel.mockImplementation(
+        (props: { readonly mode: string }) => (
+          <div data-testid='mock-primary-tab-panel' data-mode={props.mode}>
+            {props.mode === 'about' && (
+              <AboutSection artist={mockArtist} contacts={mockContacts} />
+            )}
+          </div>
+        )
+      );
+      mockProfileUnifiedDrawer.mockImplementation(
+        (props: {
+          readonly open: boolean;
+          readonly view: string;
+          readonly onOpenChange: (open: boolean) => void;
+        }) => (
+          <div
+            data-testid='mock-profile-unified-drawer'
+            data-open={String(props.open)}
+            data-view={props.view}
+          >
+            <button type='button' onClick={() => props.onOpenChange(false)}>
+              Close contact
+            </button>
+          </div>
+        )
+      );
+    });
+
+    it.each(['profile', 'contact'] as const)(
+      'opens direct contact navigation with server mode %s',
+      async mode => {
+        window.history.replaceState(null, '', '/test-artist?mode=contact');
+        render(profile(mode));
+        await waitFor(() => {
+          expect(drawer()).toHaveAttribute('data-open', 'true');
+          expect(drawer()).toHaveAttribute('data-view', 'contact');
+        });
+      }
+    );
+
+    it('opens Contact from the real About action across repeated client transitions', async () => {
+      window.history.replaceState(null, '', '/test-artist?mode=about');
+      const view = render(profile());
+      const pushState = vi.spyOn(window.history, 'pushState');
+
+      for (let transition = 0; transition < 2; transition += 1) {
+        await waitFor(() => {
+          expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+            'data-mode',
+            'about'
+          );
+        });
+        fireEvent.click(screen.getByRole('link', { name: /Booking/ }));
+        expect(window.location.search).toBe('?mode=contact');
+        // Next publishes new search params without changing the cached server
+        // mode prop or dispatching popstate. Keep this component mounted.
+        view.rerender(profile());
+        await waitFor(() => {
+          expect(drawer()).toHaveAttribute('data-open', 'true');
+          expect(drawer()).toHaveAttribute('data-view', 'contact');
+        });
+        expect(pushState).toHaveBeenCalledTimes(transition + 1);
+
+        if (transition === 0) {
+          window.history.replaceState(null, '', '/test-artist?mode=about');
+          view.rerender(profile());
+        }
+      }
+    });
+
+    it('restores About and Contact with browser Back and Forward without extra entries', async () => {
+      window.history.replaceState(null, '', '/test-artist?mode=about');
+      const view = render(profile());
+      const pushState = vi.spyOn(window.history, 'pushState');
+      fireEvent.click(await screen.findByRole('link', { name: /Booking/ }));
+      view.rerender(profile());
+      await waitFor(() =>
+        expect(drawer()).toHaveAttribute('data-view', 'contact')
+      );
+
+      act(() => window.history.back());
+      await waitFor(() => {
+        expect(window.location.search).toBe('?mode=about');
+        expect(drawer()).toHaveAttribute('data-open', 'false');
+        expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+          'data-mode',
+          'about'
+        );
+      });
+      act(() => window.history.forward());
+      await waitFor(() => {
+        expect(window.location.search).toBe('?mode=contact');
+        expect(drawer()).toHaveAttribute('data-open', 'true');
+        expect(drawer()).toHaveAttribute('data-view', 'contact');
+      });
+      expect(pushState).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays closed when Next publishes query removal with a cached contact server mode', async () => {
+      window.history.replaceState(null, '', '/test-artist?mode=contact');
+      const view = render(profile('contact'));
+      await waitFor(() =>
+        expect(drawer()).toHaveAttribute('data-open', 'true')
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Close contact' }));
+      await waitFor(() => expect(window.location.search).toBe(''));
+      view.rerender(profile('contact'));
+      await waitFor(() => {
+        expect(drawer()).toHaveAttribute('data-open', 'false');
+        expect(window.location.search).toBe('');
+        expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+          expect.objectContaining({ modeOverride: 'profile' })
+        );
+      });
+    });
   });
 
   it('clears the mode query and closes a deep-linked secondary drawer', async () => {

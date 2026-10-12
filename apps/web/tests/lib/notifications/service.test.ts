@@ -95,6 +95,7 @@ import {
   logDelivery,
 } from '@/lib/notifications/suppression';
 import type {
+  NotificationDeliveryChannel,
   NotificationMessage,
   NotificationTarget,
 } from '@/types/notifications';
@@ -115,7 +116,7 @@ describe('Notification Service', () => {
 
     // Default mock for preferences
     vi.mocked(getNotificationPreferences).mockResolvedValue({
-      channels: { email: true, sms: true, push: false, in_app: true },
+      channels: { email: true, sms: true, push: false },
       marketingEmails: true,
       dismissedNotificationIds: [],
       email: 'user@example.com',
@@ -187,7 +188,7 @@ describe('Notification Service', () => {
 
     it('should skip notification when channel is disabled', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: false, sms: true, push: false, in_app: true },
+        channels: { email: false, sms: true, push: false },
         marketingEmails: true,
         dismissedNotificationIds: [],
         email: 'user@example.com',
@@ -202,7 +203,7 @@ describe('Notification Service', () => {
 
     it('should skip dismissed notifications', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: true,
         dismissedNotificationIds: ['test-notification-1'],
         email: 'user@example.com',
@@ -217,7 +218,7 @@ describe('Notification Service', () => {
 
     it('should respect dismissible flag', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: true,
         dismissedNotificationIds: ['test-notification-1'],
         email: 'user@example.com',
@@ -247,7 +248,7 @@ describe('Notification Service', () => {
 
     it('should skip email when no email address available', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: true,
         dismissedNotificationIds: [],
         email: null,
@@ -266,7 +267,7 @@ describe('Notification Service', () => {
 
     it('should skip marketing emails when preference is disabled', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: false,
         dismissedNotificationIds: [],
         email: 'user@example.com',
@@ -286,7 +287,7 @@ describe('Notification Service', () => {
 
     it('should send transactional emails regardless of marketing preference', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: false,
         dismissedNotificationIds: [],
         email: 'user@example.com',
@@ -326,9 +327,15 @@ describe('Notification Service', () => {
       expect(result.results).toHaveLength(1);
     });
 
-    it('skips in-app delivery even when preferences enable it', async () => {
+    it('skips stale in-app channel requests instead of dispatching them', async () => {
+      // `in_app` is not a delivery channel until a transport exists; a stale
+      // caller must degrade to a preference-disabled skip, never a
+      // "not implemented" dispatch result.
       const result = await sendNotification(
-        { ...baseMessage, channels: ['in_app'] },
+        {
+          ...baseMessage,
+          channels: ['in_app' as unknown as NotificationDeliveryChannel],
+        },
         baseTarget
       );
 
@@ -337,14 +344,14 @@ describe('Notification Service', () => {
         {
           channel: 'in_app',
           status: 'skipped',
-          detail: 'Channel not implemented yet',
+          detail: 'Channel disabled by preferences',
         },
       ]);
     });
 
     it('should deliver push through APNs', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, sms: true, push: true, in_app: true },
+        channels: { email: true, sms: true, push: true },
         marketingEmails: true,
         dismissedNotificationIds: [],
         email: 'user@example.com',
@@ -366,7 +373,7 @@ describe('Notification Service', () => {
 
     it('should respect respectUserPreferences flag', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, sms: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false },
         marketingEmails: false,
         dismissedNotificationIds: [],
         email: 'user@example.com',
@@ -575,7 +582,7 @@ describe('Notification Service', () => {
 
     it('honors the channels=disabled preference for SMS', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, sms: false, push: false, in_app: true },
+        channels: { email: true, sms: false, push: false },
         marketingEmails: true,
         dismissedNotificationIds: [],
         email: null,

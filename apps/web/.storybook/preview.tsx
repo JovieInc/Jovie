@@ -163,10 +163,34 @@ if (typeof window !== 'undefined') {
       if (urlObj.pathname === '/api/auth/get-session') {
         return Response.json(null);
       }
-      return new Response(JSON.stringify({}), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      // Endpoints whose consumers dereference the response shape get a
+      // truthful empty/unavailable payload; the generic `{}` below crashed
+      // SlashCommandMenu/CmdKPalette (`tools.albumArt`) and DmQueuePanel.
+      if (urlObj.pathname === '/api/chat/capabilities') {
+        return Response.json({
+          tools: {
+            albumArt: {
+              availability: 'unavailable',
+              reason: 'Not available in Storybook.',
+              reasonCode: 'storybook',
+            },
+          },
+        });
+      }
+      if (urlObj.pathname === '/api/admin/outreach') {
+        return Response.json({ items: [], total: 0 });
+      }
+      // Unmocked endpoints answer like an unavailable service. A fabricated
+      // `200 {}` let components dereference fields that real responses
+      // always carry and crash (OvieLauncherRail, DmQueuePanel, CmdK);
+      // every client already has an error state for a failed request.
+      return new Response(
+        JSON.stringify({ error: 'Not mocked in Storybook' }),
+        {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
     }
     return originalFetch(input, init);
   };

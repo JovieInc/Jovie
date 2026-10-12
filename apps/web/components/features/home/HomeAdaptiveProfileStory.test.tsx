@@ -21,10 +21,12 @@ vi.mock('./HomeHeroPhoneComposition', () => ({
   ),
 }));
 
+const trustPlacements = vi.hoisted(() => [] as unknown[]);
 vi.mock('./HomeTrustSection', () => ({
-  HomeTrustSection: () => (
-    <section data-testid='homepage-trust'>trusted logo strip</section>
-  ),
+  HomeTrustSection: ({ placement }: { placement: unknown }) => {
+    trustPlacements.push(placement);
+    return <section data-testid='homepage-trust'>trusted logo strip</section>;
+  },
 }));
 
 describe('HomeAdaptiveProfileStory', () => {
@@ -46,5 +48,7 @@ describe('HomeAdaptiveProfileStory', () => {
     expect(claimForm).toBeInTheDocument();
     expect(heroComposition).toBeInTheDocument();
     expect(trustStrip).toBeInTheDocument();
+    // The strip is scoped to `/`, so only logos permitted there render.
+    expect(trustPlacements).toContainEqual({ page: '/' });
   });
 });

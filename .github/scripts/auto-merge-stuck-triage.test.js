@@ -300,6 +300,54 @@ test('the customer-notes handoff requests auto-merge only for its checked head',
   assert.equal(calls.length, before);
 });
 
+test('one refused enable does not abort the sweep for the remaining PRs', () => {
+  // Live 2026-10-10..11: GitHub refused auto-merge on workflow-file PR #21145
+  // and every scheduled triage died there, so no later PR was enabled.
+  const calls = [];
+  const logs = [];
+  const log = console.log;
+  console.log = message => logs.push(message);
+  let failures;
+  try {
+    failures = enableMissingAutoMerge(
+      'o/r',
+      [
+        {
+          ...basePr,
+          number: 1,
+          autoMergeRequest: null,
+          headRefOid: 'a'.repeat(40),
+        },
+        {
+          ...basePr,
+          number: 2,
+          autoMergeRequest: null,
+          headRefOid: 'b'.repeat(40),
+        },
+      ],
+      false,
+      args => {
+        calls.push(args[2]);
+        if (args[2] === '1') {
+          const err = new Error('Command failed: gh pr merge 1');
+          err.stderr =
+            '! The merge strategy for main is set by the merge queue\nGraphQL: `workflows` scope may be required. (enablePullRequestAutoMerge)\n';
+          throw err;
+        }
+      },
+      () => []
+    );
+  } finally {
+    console.log = log;
+  }
+  assert.deepEqual(calls, ['1', '2']);
+  assert.deepEqual(failures, [1]);
+  assert.ok(
+    logs.some(line => /::warning::PR #1: .*workflows. scope/.test(line))
+  );
+  assert.ok(logs.includes('PR #2: enabled auto-merge (squash).'));
+});
+
 test('enable pass skips missing heads and preserves an exact-head revision hold', () => {
   const pr = { ...basePr, autoMergeRequest: null, headRefOid: 'a'.repeat(40) };
   const calls = [];
@@ -380,3 +428,31 @@ test('isTransientGhError only matches transient shapes', () => {
     false
   );
 });
+
+for (const jobName of ['triage', 'self-test']) {
+  test(`${jobName} installs workflow-test dependencies before running tests`, () => {
+    const workflow = load(
+      readFileSync('.github/workflows/auto-merge-default.yml', 'utf8')
+    );
+    const steps = workflow.jobs[jobName].steps;
+    const checkoutIndex = steps.findIndex(step =>
+      step.uses?.startsWith('actions/checkout@')
+    );
+    const setupIndex = steps.findIndex(
+      step => step.uses === './.github/actions/setup-node-pnpm'
+    );
+    const testIndex = steps.findIndex(step =>
+      step.run?.includes('.github/scripts/auto-merge-stuck-triage.test.js')
+    );
+    assert.ok(
+      checkoutIndex >= 0,
+      `${jobName} checks out its dependency inputs`
+    );
+    assert.ok(setupIndex > checkoutIndex, `${jobName} installs after checkout`);
+    assert.ok(
+      testIndex > setupIndex,
+      `${jobName} installs before the test command`
+    );
+    assert.equal(steps[setupIndex].if, undefined);
+  });
+}

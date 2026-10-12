@@ -46,20 +46,69 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
+  # A pull_request job GitHub never handed to a hosted runner is cancelled after
+  # ~15 minutes and pins its required context CANCELLED/FAILED at an unchanged
+  # head (#20767, #20786 stuck six days after the 2026-10-05 acquisition
+  # incident). Re-request that exact run instead of sending infra to a model
+  # lane; the rerun's completion relays again. Capped per run attempt. GitHub
+  # reports such runs as failure (observed for every 2026-10-05 casualty).
+  rerun-unacquired:
+    name: Rerun jobs no hosted runner acquired
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+    outputs:
+      requested: ${{ steps.rerun.outputs.requested }}
+    steps:
+      - name: Checkout trusted rerun policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/pr-unacquired-runner-rerun.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Re-request a run with hosted-acquisition failures
+        id: rerun
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: node scripts/pr-unacquired-runner-rerun.mjs
+
+  # A `green` signal only readies a lane draft (`<lane>/jov-<id>-<date>`, pr_events.in_scope),
+  # so success on any other branch is skipped before a runner starts: 129 of ~170 executed
+  # relays in the hour to 01:30Z on 2026-10-04 were such no-ops, each spending GITHUB_TOKEN quota
+  # that Merge Group Admission needs. pr_events.py still applies the exact LANE_BRANCH match.
   relay:
     name: Queue lane repair
+    needs: rerun-unacquired
     if: >-
+      always() && needs.rerun-unacquired.outputs.requested != 'true' && (
       (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'failure') ||
       (github.event_name == 'repository_dispatch' && github.event.action == 'sentry-issue') ||
       (github.event_name != 'workflow_run' && github.event_name != 'deployment_status' && github.event_name != 'repository_dispatch') ||
       (github.event.workflow_run.event == 'pull_request' &&
-       contains(fromJSON('["failure","timed_out","startup_failure","success"]'), github.event.workflow_run.conclusion)) ||
+       contains(fromJSON('["failure","timed_out","startup_failure"]'), github.event.workflow_run.conclusion)) ||
+      (github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       contains(github.event.workflow_run.head_branch, '/jov-')) ||
       (github.event.workflow_run.head_branch == 'main' &&
        contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event.workflow_run.event) &&
-       contains(fromJSON('["failure","timed_out","startup_failure","cancelled"]'), github.event.workflow_run.conclusion))
+       contains(fromJSON('["failure","timed_out","startup_failure","cancelled"]'), github.event.workflow_run.conclusion)))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      # actions: read for a red run's failed job logs; write to re-run a run that failed only
+      # on GitHub's API quota (scripts/lib/github-rate-limit.mjs) instead of queueing repair.
+      actions: write
       contents: read
       issues: write
       pull-requests: write
@@ -71,6 +120,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts/lanes
+            scripts/lib/github-rate-limit.mjs
           sparse-checkout-cone-mode: false
 
       - name: Label the PR for the lanes

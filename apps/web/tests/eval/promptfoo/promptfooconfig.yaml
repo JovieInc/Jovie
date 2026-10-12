@@ -1579,6 +1579,7 @@ tests:
           - unpauseMerchCard
           - writeWorldClassBio
           - researchArtistPresence
+          - checkLinkDrift
           - surfaceLibraryOpportunities
           - assembleArtistProfile
           - generateSmartLink
@@ -3333,6 +3334,27 @@ tests:
       plan: pro
       toolInput:
         stepId: draft_welcome_post
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts presence-build link-drift artifact event
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Presence-build link-drift artifact."
+      target: tool-contract
+      toolName: checkLinkDrift
+      mode: app
+      plan: pro
+      toolInput:
+        stepId: check_link_drift
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend

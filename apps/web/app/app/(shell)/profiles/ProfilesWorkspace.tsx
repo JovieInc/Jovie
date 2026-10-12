@@ -1,7 +1,12 @@
 'use client';
 
 import { Button, type CommonDropdownItem, SimpleTooltip } from '@jovie/ui';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  type UseQueryResult,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -40,6 +45,18 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActio
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import {
+  PresenceSignalList,
+  PresenceStatusBadge,
+} from '@/components/features/presence/PresenceStatusParts';
+import styles from '@/components/features/presence/presence-workspace.module.css';
+import { CREATOR_PRESENCE_ADAPTER } from '@/components/features/presence/workspace-adapters';
+import {
+  PresenceWorkspaceBoundary,
+  type PresenceWorkspaceScope,
+  presenceWorkspaceScopeKey,
+  usePresenceWorkspaceController,
+} from '@/components/features/presence/workspace-controller';
+import {
   DrawerAnalyticsSummaryCard,
   DrawerSection,
   EntityHeader,
@@ -54,26 +71,23 @@ import {
   convertContextMenuItems,
   convertToCommonDropdownItems,
   PageToolbar,
-  PageToolbarTabButton,
   TableEmptyState,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import type { SourceIdentity } from '@/lib/profile-surfaces/presence-identity';
 import {
   getPresenceEntityName,
   getPresenceHandle,
   getPresencePlatformLabel,
 } from '@/lib/profile-surfaces/presence-identity';
+import { derivePresenceInspector } from '@/lib/profile-surfaces/presence-inspector';
 import {
-  filterProfileWorkspaceRows,
   formatProfileRankChange,
   getConnectionPrimaryAction,
   getConnectionStatus,
-  getPresenceSignals,
-  selectPresenceReviewRows,
-  sortProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
 import {
   FetchError,
@@ -81,11 +95,7 @@ import {
   queryKeys,
   STANDARD_CACHE,
 } from '@/lib/queries';
-import {
-  type CellContext,
-  type ColumnDef,
-  createColumnHelper,
-} from '@/lib/tanstack-table';
+import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import {
   AddConnectionRail,
@@ -93,34 +103,25 @@ import {
 } from './AddConnectionRail';
 import { buildConnectionActions } from './connection-actions';
 import type {
+  PresenceSignal,
   ProfilesWorkspaceData,
-  ProfilesWorkspaceFilter,
   ProfileWorkspaceRow,
   ProfileWorkspaceSurfaceRow,
 } from './data';
 import { PresenceIdentityPhoto } from './PresenceIdentityPhoto';
 import { PresenceLockAffordance } from './PresenceLockAffordance';
-import {
-  PresenceOutcomeStrip as PresenceOutcomeBoard,
-  presenceFilterForGroup,
-} from './PresenceOutcomes';
-import { PresenceSignalList, PresenceStatusBadge } from './PresenceStatusParts';
-import styles from './profiles-workspace.module.css';
+
+function combineSourceIdentityQueries(
+  results: readonly UseQueryResult<SourceIdentity>[]
+) {
+  return results.map(({ data, isFetching, refetch }) => ({
+    data,
+    isFetching,
+    refetch,
+  }));
+}
 
 const columnHelper = createColumnHelper<ProfileWorkspaceRow>();
-type ProfilesWorkspaceView = ProfilesWorkspaceFilter | 'suggested' | 'review';
-const FILTERS: ReadonlyArray<{
-  readonly id: ProfilesWorkspaceView;
-  readonly label: string;
-}> = [
-  { id: 'review', label: 'Review Pages' },
-  { id: 'all', label: 'All Pages' },
-  { id: 'identity', label: 'Identity' },
-  { id: 'profiles', label: 'Profiles' },
-  { id: 'catalog', label: 'Catalog' },
-  { id: 'suggested', label: 'Suggested' },
-  { id: 'connector', label: 'Connectors' },
-];
 
 type ConnectionSuggestion = ProfileSuggestion & {
   readonly type: 'dsp_match' | 'social_link';
@@ -181,8 +182,15 @@ const SUGGESTED_CONNECTION_SKELETON_IDS = [
   'suggested-connection-loading-3',
 ] as const;
 
-function connectionSuggestionsQueryKey(profileId: string) {
-  return [...queryKeys.suggestions.list(profileId), 'connections-review'];
+function connectionSuggestionsQueryKey(
+  profileId: string,
+  scope: PresenceWorkspaceScope
+) {
+  return [
+    ...queryKeys.suggestions.list(profileId),
+    'connections-review',
+    presenceWorkspaceScopeKey(scope),
+  ];
 }
 
 function isConnectionSuggestion(
@@ -516,14 +524,6 @@ function ConnectionSecondaryIdentity({
   );
 }
 
-function ArtistCell(context: CellContext<ProfileWorkspaceRow, string>) {
-  return (
-    <span className='truncate text-sm text-primary-token'>
-      {context.getValue()}
-    </span>
-  );
-}
-
 function TypeCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   const label = kindLabel(row);
   return (
@@ -546,8 +546,19 @@ function StatusCell({
   row,
   providerAvailable,
 }: Readonly<{ row: ProfileWorkspaceRow; providerAvailable: boolean }>) {
+  const status = getConnectionStatus(row, providerAvailable);
+  if (status.label !== 'Search Unavailable')
+    return <PresenceStatusBadge status={status} />;
   return (
-    <PresenceStatusBadge status={getConnectionStatus(row, providerAvailable)} />
+    <span role='img' aria-label='Monitoring Unknown: Search Unavailable'>
+      <PresenceStatusBadge
+        status={{
+          ...status,
+          label: 'Unknown',
+          nextAction: `${status.label}. ${status.nextAction}`,
+        }}
+      />
+    </span>
   );
 }
 
@@ -597,6 +608,9 @@ function ConnectionRail({
   row,
   onClose,
   onIdentityDecision,
+  sourceIdentity,
+  sourceLoading = false,
+  onRetrySource,
   contextMenuItems,
 }: Readonly<{
   data: ProfilesWorkspaceData;
@@ -606,9 +620,16 @@ function ConnectionRail({
     surfaceId: string,
     decision: IdentityDecision
   ) => Promise<void>;
+  sourceIdentity?: SourceIdentity;
+  sourceLoading?: boolean;
+  onRetrySource?: () => void;
   contextMenuItems: CommonDropdownItem[];
 }>) {
-  const primaryAction = row ? getConnectionPrimaryAction(row) : null;
+  const inspector = row
+    ? derivePresenceInspector(row, data.providerAvailable)
+    : null;
+  const primaryAction = inspector?.primaryAction ?? null;
+  const status = inspector?.status ?? null;
   const rankChange =
     row?.rowType === 'surface'
       ? formatProfileRankChange(row.rank, row.previousRank)
@@ -681,99 +702,194 @@ function ConnectionRail({
         ) : undefined
       }
     >
-      {row ? (
-        <div className='space-y-2'>
-          <DrawerAnalyticsSummaryCard
-            state='ready'
-            metrics={[
-              {
-                id: 'status',
-                label: 'Status',
-                value: getConnectionStatus(row, data?.providerAvailable).label,
-                hint: MONITORING_LABELS[row.monitoringState],
-              },
-              {
-                id: 'rank',
-                label: 'Search Rank',
-                value:
-                  row.rowType === 'surface' && row.monitoringState !== 'locked'
-                    ? String(row.rank ?? '—')
-                    : '—',
-                hint: rankChange === '—' ? 'No change yet' : rankChange,
-              },
-            ]}
-            footer={null}
-            stableLayout
-            reserveFooterSlot={false}
-            testId='profiles-rail-summary'
-          />
-          <DrawerSection title='Profile / Page' sectionKind='facts'>
-            <div className='space-y-2'>
-              <RailMetric label='Type' value={kindLabel(row)} />
-              <RailMetric
-                label='Monitoring'
-                value={MONITORING_LABELS[row.monitoringState]}
-              />
-            </div>
-          </DrawerSection>
-          <PresenceSignalSection
-            row={row}
-            providerAvailable={data.providerAvailable}
-          />
-          {row.rowType === 'surface' &&
-          (row.qualificationStatus === 'suggested' ||
-            row.qualificationStatus === 'conflicting') ? (
-            <IdentityConfirmationSection
-              row={row}
-              onDecision={onIdentityDecision}
-            />
-          ) : null}
-          <DrawerSection sectionKind='details'>
-            <div
-              className={cn(
-                'grid gap-2 px-1',
-                primaryAction === 'open' ||
-                  (primaryAction === 'review' && row.rowType === 'surface')
-                  ? 'grid-cols-1'
-                  : 'grid-cols-2'
-              )}
-            >
-              <Button asChild variant='secondary' size='sm'>
-                <Link
-                  href={row.url}
-                  target={row.url.startsWith('http') ? '_blank' : undefined}
-                  rel={row.url.startsWith('http') ? 'noreferrer' : undefined}
-                >
-                  <ExternalLink className='h-3.5 w-3.5' />{' '}
-                  {primaryAction === 'review' && row.rowType === 'surface'
-                    ? 'Inspect Source'
-                    : 'Open'}
-                </Link>
-              </Button>
-              {primaryAction !== 'open' &&
-              !(primaryAction === 'review' && row.rowType === 'surface') ? (
-                <Button asChild size='sm'>
-                  <Link
-                    href={
-                      primaryAction === 'upgrade'
-                        ? APP_ROUTES.SETTINGS_BILLING
-                        : row.rowType === 'connector'
-                          ? APP_ROUTES.SETTINGS_CONNECTORS
-                          : APP_ROUTES.SETTINGS_ARTIST_PROFILE
-                    }
+      {row && inspector ? (
+        <div
+          className='space-y-3 px-3 py-3'
+          data-testid='profiles-rail-content'
+        >
+          {inspector.sections.map(section => {
+            switch (section.key) {
+              case 'observation_summary':
+                return (
+                  <DrawerAnalyticsSummaryCard
+                    key={section.key}
+                    state='ready'
+                    metrics={[
+                      {
+                        id: 'status',
+                        label: 'Status',
+                        value: status?.label ?? '—',
+                        hint: MONITORING_LABELS[row.monitoringState],
+                      },
+                      {
+                        id: 'rank',
+                        label: 'Search Rank',
+                        value:
+                          row.rowType === 'surface' &&
+                          row.monitoringState !== 'locked'
+                            ? String(row.rank ?? '—')
+                            : '—',
+                        hint: rankChange === '—' ? 'No change yet' : rankChange,
+                      },
+                    ]}
+                    footer={null}
+                    stableLayout
+                    reserveFooterSlot={false}
+                    testId='profiles-rail-summary'
+                  />
+                );
+              case 'object_facts':
+                return (
+                  <DrawerSection
+                    key={section.key}
+                    title='Profile / Page'
+                    sectionKind='facts'
                   >
-                    {primaryAction === 'upgrade'
-                      ? 'Upgrade'
-                      : primaryAction === 'connect'
-                        ? 'Connect'
-                        : primaryAction === 'reconnect'
-                          ? 'Reconnect'
-                          : 'Review'}
-                  </Link>
-                </Button>
-              ) : null}
-            </div>
-          </DrawerSection>
+                    <div className='space-y-2'>
+                      <RailMetric label='Type' value={kindLabel(row)} />
+                      <RailMetric
+                        label='Monitoring'
+                        value={MONITORING_LABELS[row.monitoringState]}
+                      />
+                    </div>
+                  </DrawerSection>
+                );
+              case 'source_identity':
+                return (
+                  <DrawerSection
+                    key={section.key}
+                    title='Source Identity'
+                    sectionKind='facts'
+                  >
+                    <p className='text-xs text-secondary-token'>
+                      {sourceLoading
+                        ? 'Checking Public Profile…'
+                        : sourceIdentity?.status === 'unsupported'
+                          ? 'Automatic inspection is unavailable for this source. Open the profile to compare.'
+                          : sourceIdentity?.status === 'available'
+                            ? sourceIdentity.photo.kind === 'profile'
+                              ? 'Profile photo observed at this source. Ownership is reviewed separately.'
+                              : 'Public page metadata is available; no profile portrait was identified.'
+                            : 'Source unavailable. Your profile link and identity decisions are still available.'}
+                    </p>
+                    {sourceIdentity?.pageTitle ? (
+                      <p className='truncate text-xs text-secondary-token'>
+                        {sourceIdentity.pageTitle}
+                      </p>
+                    ) : null}
+                    {onRetrySource &&
+                    sourceIdentity?.status !== 'unsupported' ? (
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        disabled={sourceLoading}
+                        onClick={onRetrySource}
+                      >
+                        Retry Source
+                      </Button>
+                    ) : null}
+                  </DrawerSection>
+                );
+              case 'signals':
+                return (
+                  <PresenceSignalSection
+                    key={section.key}
+                    signals={inspector.signals}
+                  />
+                );
+              case 'identity_check':
+                return row.rowType === 'surface' ? (
+                  <IdentityConfirmationSection
+                    key={section.key}
+                    row={row}
+                    onDecision={onIdentityDecision}
+                  />
+                ) : null;
+              case 'actions':
+                return (
+                  <DrawerSection key={section.key} sectionKind='details'>
+                    <div
+                      className={cn(
+                        'grid gap-2 px-1',
+                        primaryAction === 'open' ||
+                          (primaryAction === 'review' &&
+                            row.rowType === 'surface')
+                          ? 'grid-cols-1'
+                          : 'grid-cols-2'
+                      )}
+                    >
+                      <Button asChild variant='secondary' size='sm'>
+                        <Link
+                          href={row.url}
+                          target={
+                            row.url.startsWith('http') ? '_blank' : undefined
+                          }
+                          rel={
+                            row.url.startsWith('http')
+                              ? 'noreferrer'
+                              : undefined
+                          }
+                        >
+                          <ExternalLink className='h-3.5 w-3.5' />{' '}
+                          {primaryAction === 'review' &&
+                          row.rowType === 'surface'
+                            ? 'Inspect Source'
+                            : 'Open'}
+                        </Link>
+                      </Button>
+                      {primaryAction !== 'open' &&
+                      !(
+                        primaryAction === 'review' && row.rowType === 'surface'
+                      ) ? (
+                        <Button asChild size='sm'>
+                          <Link
+                            href={
+                              primaryAction === 'upgrade'
+                                ? APP_ROUTES.SETTINGS_BILLING
+                                : row.rowType === 'connector'
+                                  ? APP_ROUTES.SETTINGS_CONNECTORS
+                                  : APP_ROUTES.SETTINGS_PROFILE
+                            }
+                          >
+                            {primaryAction === 'upgrade'
+                              ? 'Upgrade'
+                              : primaryAction === 'connect'
+                                ? 'Connect'
+                                : primaryAction === 'reconnect'
+                                  ? 'Reconnect'
+                                  : 'Review'}
+                          </Link>
+                        </Button>
+                      ) : null}
+                    </div>
+                  </DrawerSection>
+                );
+              case 'monitoring_details':
+                return status ? (
+                  <DrawerSection
+                    key={section.key}
+                    title='Monitoring details'
+                    sectionKind='status'
+                    defaultOpen={false}
+                    lazyMount
+                    testId='profiles-monitoring-details'
+                  >
+                    <div className='space-y-2 text-xs text-secondary-token'>
+                      <p>
+                        {status.label}. {status.nextAction}
+                      </p>
+                      <RailMetric
+                        label='Monitoring'
+                        value={MONITORING_LABELS[row.monitoringState]}
+                      />
+                      <RailMetric label='Search Rank' value='—' />
+                    </div>
+                  </DrawerSection>
+                ) : null;
+              default:
+                return null;
+            }
+          })}
         </div>
       ) : null}
     </EntitySidebarShell>
@@ -924,12 +1040,9 @@ function CanonicalSourceDrills({ identity }: Readonly<{ identity: string }>) {
 }
 
 function PresenceSignalSection({
-  row,
-  providerAvailable,
-}: Readonly<{ row: ProfileWorkspaceRow; providerAvailable: boolean }>) {
-  return (
-    <PresenceSignalList signals={getPresenceSignals(row, providerAvailable)} />
-  );
+  signals,
+}: Readonly<{ signals: readonly PresenceSignal[] }>) {
+  return <PresenceSignalList signals={signals} />;
 }
 
 function SuggestedConnectionsLoading() {
@@ -1169,12 +1282,68 @@ function SuggestedConnectionsReview({
 
 export function ProfilesWorkspace({
   data,
-}: Readonly<{ data: ProfilesWorkspaceData | null }>) {
-  const [filter, setFilter] = useState<ProfilesWorkspaceView>(() =>
-    selectPresenceReviewRows(data?.rows ?? []).length > 0 ? 'review' : 'all'
+  scope,
+}: Readonly<{
+  data: ProfilesWorkspaceData | null;
+  scope: PresenceWorkspaceScope;
+}>) {
+  return (
+    <PresenceWorkspaceBoundary scope={scope}>
+      <ProfilesWorkspaceContent data={data} scope={scope} />
+    </PresenceWorkspaceBoundary>
   );
-  const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(null);
+}
+
+function ProfilesWorkspaceContent({
+  data,
+  scope,
+}: Readonly<{
+  data: ProfilesWorkspaceData | null;
+  scope: PresenceWorkspaceScope;
+}>) {
+  const sourceIdentityQueries = useQueries({
+    combine: combineSourceIdentityQueries,
+    queries: (data?.rows ?? []).map(row => ({
+      queryKey: [
+        'profile-source-identity',
+        presenceWorkspaceScopeKey(scope),
+        row.id,
+        row.url,
+      ],
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchWithTimeout<SourceIdentity>(
+          `/api/profile-surfaces/${row.id}/source`,
+          { signal }
+        ),
+      enabled:
+        row.rowType === 'surface' &&
+        row.kind !== 'jovie' &&
+        /^[0-9a-f-]{36}$/i.test(row.id),
+      staleTime: 10 * 60 * 1000,
+      retry: false,
+      refetchOnWindowFocus: false,
+    })),
+  });
+  const observedRows = useMemo(
+    () =>
+      (data?.rows ?? []).map((row, index) => {
+        const source = sourceIdentityQueries[index]?.data;
+        if (row.rowType !== 'surface' || source?.status !== 'available')
+          return row;
+        return {
+          ...row,
+          label: source.displayName || row.label,
+          identityPhoto:
+            source.photo.kind === 'profile' ||
+            row.identityPhoto?.kind !== 'profile'
+              ? source.photo
+              : row.identityPhoto,
+        };
+      }),
+    [data?.rows, sourceIdentityQueries]
+  );
   const [isAddConnectionOpen, setIsAddConnectionOpen] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [pendingCandidate, setPendingCandidate] =
     useState<ConnectionIntakeCandidate | null>(null);
   const [suggestionActionError, setSuggestionActionError] =
@@ -1182,6 +1351,52 @@ export function ProfilesWorkspace({
   const [acceptedSuggestionRows, setAcceptedSuggestionRows] = useState<
     ProfileWorkspaceSurfaceRow[]
   >([]);
+  const persistedAcceptedRows = useMemo(() => {
+    const currentSurfaceKeys = new Set(
+      (data?.rows ?? [])
+        .filter(row => row.rowType === 'surface')
+        .map(row => `${row.platform}:${row.url}`)
+    );
+
+    return acceptedSuggestionRows.filter(
+      row => !currentSurfaceKeys.has(`${row.platform}:${row.url}`)
+    );
+  }, [acceptedSuggestionRows, data?.rows]);
+  const pendingRow = useMemo<ProfileWorkspaceRow | null>(() => {
+    if (!pendingCandidate) return null;
+    return {
+      id: `preview:${pendingCandidate.id}`,
+      rowType: 'surface',
+      kind:
+        pendingCandidate.category === 'website'
+          ? 'website'
+          : pendingCandidate.category,
+      platform: pendingCandidate.platformId,
+      label: pendingCandidate.title,
+      handle: 'Preview only · not saved',
+      url: pendingCandidate.url,
+      trackedUrl: null,
+      qualificationStatus: 'suggested',
+      isOfficial: false,
+      monitoringState: 'unavailable',
+      rank: null,
+      previousRank: null,
+      lastObservedAt: null,
+    };
+  }, [pendingCandidate]);
+  const sourceRows = useMemo(
+    () =>
+      (pendingRow
+        ? [pendingRow, ...persistedAcceptedRows, ...observedRows]
+        : [...persistedAcceptedRows, ...observedRows]
+      ).filter(row => row.rowType === 'surface'),
+    [pendingRow, persistedAcceptedRows, observedRows]
+  );
+  const { selected, setSelected, rows } = usePresenceWorkspaceController({
+    sourceRows,
+    adapter: CREATOR_PRESENCE_ADAPTER,
+    initialFilter: 'all',
+  });
   const suggestionActionRefs = useRef(new Map<string, HTMLButtonElement>());
   const suggestedRegionRef = useRef<HTMLDivElement>(null);
   const pendingSuggestionFocusTargetRef = useRef<string | null>(null);
@@ -1190,8 +1405,8 @@ export function ProfilesWorkspace({
   const queryClient = useQueryClient();
   const profileId = data?.profileId ?? null;
   const connectionSuggestionKey = useMemo(
-    () => connectionSuggestionsQueryKey(profileId ?? ''),
-    [profileId]
+    () => connectionSuggestionsQueryKey(profileId ?? '', scope),
+    [profileId, scope]
   );
   const connectionSuggestionsQuery = useQuery({
     ...STANDARD_CACHE,
@@ -1229,9 +1444,9 @@ export function ProfilesWorkspace({
     setSelected(null);
     setPendingCandidate(null);
     setIsAddConnectionOpen(false);
-    setFilter('suggested');
+    setShowSuggestions(true);
     router.replace(APP_ROUTES.PRESENCE);
-  }, [router, searchParams]);
+  }, [router, searchParams, setSelected]);
   useEffect(() => {
     const target = pendingSuggestionFocusTargetRef.current;
     if (!target) return;
@@ -1257,17 +1472,6 @@ export function ProfilesWorkspace({
       },
     []
   );
-  const persistedAcceptedRows = useMemo(() => {
-    const currentSurfaceKeys = new Set(
-      (data?.rows ?? [])
-        .filter(row => row.rowType === 'surface')
-        .map(row => `${row.platform}:${row.url}`)
-    );
-
-    return acceptedSuggestionRows.filter(
-      row => !currentSurfaceKeys.has(`${row.platform}:${row.url}`)
-    );
-  }, [acceptedSuggestionRows, data?.rows]);
   const handleSuggestionAction = useCallback(
     async (suggestion: ConnectionSuggestion, action: SuggestionAction) => {
       if (!profileId) return;
@@ -1358,46 +1562,13 @@ export function ProfilesWorkspace({
       setSelected(null);
       router.refresh();
     },
-    [router]
+    [router, setSelected]
   );
-  const pendingRow = useMemo<ProfileWorkspaceRow | null>(() => {
-    if (!pendingCandidate) return null;
-    return {
-      id: `preview:${pendingCandidate.id}`,
-      rowType: 'surface',
-      kind:
-        pendingCandidate.category === 'website'
-          ? 'website'
-          : pendingCandidate.category,
-      platform: pendingCandidate.platformId,
-      label: pendingCandidate.title,
-      handle: 'Preview only · not saved',
-      url: pendingCandidate.url,
-      trackedUrl: null,
-      qualificationStatus: 'suggested',
-      isOfficial: false,
-      monitoringState: 'unavailable',
-      rank: null,
-      previousRank: null,
-      lastObservedAt: null,
-    };
-  }, [pendingCandidate]);
-  const rows = useMemo(() => {
-    if (filter === 'suggested') return [];
-    const sourceRows = pendingRow
-      ? [pendingRow, ...persistedAcceptedRows, ...(data?.rows ?? [])]
-      : [...persistedAcceptedRows, ...(data?.rows ?? [])];
-    return sortProfileWorkspaceRows(
-      filter === 'review'
-        ? selectPresenceReviewRows(sourceRows)
-        : filterProfileWorkspaceRows(sourceRows, filter)
-    );
-  }, [data?.rows, filter, pendingRow, persistedAcceptedRows]);
   const handleAddConnection = useCallback(() => {
     setSelected(null);
     setPendingCandidate(null);
     setIsAddConnectionOpen(true);
-  }, []);
+  }, [setSelected]);
   const headerActions = useMemo(
     () => (
       <DashboardHeaderActionGroup>
@@ -1405,7 +1576,7 @@ export function ProfilesWorkspace({
           ariaLabel='Add Profile Or Site'
           onClick={handleAddConnection}
           icon={<Plus className='h-3.5 w-3.5' />}
-          label='Add Page'
+          label='Add Profile'
           hideLabelOnMobile
         />
       </DashboardHeaderActionGroup>
@@ -1437,17 +1608,17 @@ export function ProfilesWorkspace({
               ? APP_ROUTES.SETTINGS_BILLING
               : connection.rowType === 'connector'
                 ? APP_ROUTES.SETTINGS_CONNECTORS
-                : APP_ROUTES.SETTINGS_ARTIST_PROFILE
+                : APP_ROUTES.SETTINGS_PROFILE
           );
         },
       });
     },
-    [router]
+    [router, setSelected]
   );
   const columns = useMemo(
     () => [
       columnHelper.accessor('label', {
-        header: 'Platform / Page',
+        header: 'Profile',
         size: 200,
         minSize: 140,
         meta: { className: 'px-3' },
@@ -1465,15 +1636,15 @@ export function ProfilesWorkspace({
                 <PresenceIdentityPhoto
                   subject={row}
                   artistName={data?.artist.name ?? row.label}
-                  size='lg'
+                  size='sm'
+                  className={styles.profilePhoto}
                 />
               )}
-              <div className='min-w-0'>
+              <div className='flex min-w-0 items-center gap-2'>
                 <div className='truncate text-sm font-medium text-primary-token'>
                   {row.label}
                 </div>
                 <ConnectionSecondaryIdentity row={row} />
-                <div className={styles.mobileArtist}>{data?.artist.name}</div>
                 <div className={styles.mobileStatus}>
                   <StatusCell
                     row={row}
@@ -1484,13 +1655,6 @@ export function ProfilesWorkspace({
             </div>
           );
         },
-      }),
-      columnHelper.accessor(() => data?.artist.name ?? '', {
-        id: 'artist',
-        header: 'Artist',
-        size: 180,
-        meta: { className: cn('px-3', styles.artistColumn) },
-        cell: ArtistCell,
       }),
       columnHelper.display({
         id: 'type',
@@ -1616,19 +1780,15 @@ export function ProfilesWorkspace({
           onCandidatePreview={candidate => {
             setPendingCandidate(candidate);
             if (!candidate) return;
-            setFilter(
-              candidate.category === 'website' ? 'identity' : 'profiles'
-            );
+            setShowSuggestions(false);
           }}
           onReviewCandidate={candidate => {
             setPendingCandidate(candidate);
-            setFilter(
-              candidate.category === 'website' ? 'identity' : 'profiles'
-            );
+            setShowSuggestions(false);
             setIsAddConnectionOpen(false);
           }}
           onReviewSuggestions={() => {
-            setFilter('suggested');
+            setShowSuggestions(true);
             setSelected(null);
             setPendingCandidate(null);
             setIsAddConnectionOpen(false);
@@ -1640,6 +1800,21 @@ export function ProfilesWorkspace({
           row={selected}
           onClose={() => setSelected(null)}
           onIdentityDecision={handleIdentityDecision}
+          sourceIdentity={
+            sourceIdentityQueries[
+              (data.rows ?? []).findIndex(row => row.id === selected.id)
+            ]?.data
+          }
+          sourceLoading={
+            sourceIdentityQueries[
+              (data.rows ?? []).findIndex(row => row.id === selected.id)
+            ]?.isFetching ?? false
+          }
+          onRetrySource={() => {
+            void sourceIdentityQueries[
+              (data.rows ?? []).findIndex(row => row.id === selected.id)
+            ]?.refetch();
+          }}
           contextMenuItems={convertToCommonDropdownItems(
             getContextMenuItems(selected)
           )}
@@ -1662,7 +1837,7 @@ export function ProfilesWorkspace({
           presentation='workspace'
           action={{
             label: 'Set Up Identity',
-            href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+            href: APP_ROUTES.SETTINGS_PROFILE,
           }}
           testId='profiles-workspace-empty-state'
           className='min-h-75'
@@ -1680,89 +1855,77 @@ export function ProfilesWorkspace({
       toolbar={
         <PageToolbar
           data-testid='connections-workspace-toolbar'
-          start={FILTERS.map(option => (
-            <PageToolbarTabButton
-              key={option.id}
-              className={styles.filter}
-              label={
-                option.id === 'review'
-                  ? `Review Pages (${selectPresenceReviewRows(data.rows).length})`
-                  : option.label
-              }
-              active={filter === option.id}
-              onClick={() => {
-                setFilter(option.id);
-                setSelected(null);
-              }}
-            />
-          ))}
+          start={
+            <span className='text-app font-medium text-primary-token'>
+              Profiles
+            </span>
+          }
+          end={
+            <Button
+              variant='ghost'
+              size='sm'
+              aria-expanded={showSuggestions}
+              aria-controls='profile-suggestions'
+              onClick={() => setShowSuggestions(value => !value)}
+            >
+              {showSuggestions
+                ? 'Close Suggestions'
+                : `Review Suggestions (${connectionSuggestions.length})`}
+            </Button>
+          }
         />
       }
     >
-      <PresenceOutcomeBoard
-        data={data}
-        onSelectGroup={group => {
-          setFilter(presenceFilterForGroup(group));
-          setSelected(null);
+      {showSuggestions ? (
+        <div id='profile-suggestions'>
+          <SuggestedConnectionsReview
+            groups={suggestedGroups}
+            isLoading={connectionSuggestionsQuery.isLoading}
+            isError={connectionSuggestionsQuery.isError}
+            actionError={suggestionActionError}
+            onAction={handleSuggestionAction}
+            onRetry={() => {
+              void connectionSuggestionsQuery.refetch();
+            }}
+            registerActionRef={registerSuggestionActionRef}
+            regionRef={suggestedRegionRef}
+          />
+        </div>
+      ) : null}
+      <UnifiedTable
+        data={rows}
+        columns={columns as ColumnDef<ProfileWorkspaceRow, unknown>[]}
+        getRowId={row => row.id}
+        onRowClick={row => {
+          if (!row.id.startsWith('preview:')) setSelected(row);
         }}
+        onRowContextMenu={(row, event) => {
+          if (row.id.startsWith('preview:')) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
+        getContextMenuItems={getContextMenuItems}
+        rowMode='list'
+        containerClassName='min-h-0 flex-1'
+        minWidth='0'
+        className={styles.table}
+        isRowSelected={row =>
+          !row.id.startsWith('preview:') && selected?.id === row.id
+        }
+        getRowClassName={row =>
+          cn(
+            'group/connection-row',
+            row.id.startsWith('preview:') && 'cursor-default'
+          )
+        }
+        emptyState={
+          <TableEmptyState
+            heading='No Profiles Yet'
+            description='Add a profile or website to get started.'
+          />
+        }
       />
-      {filter === 'suggested' ? (
-        <SuggestedConnectionsReview
-          groups={suggestedGroups}
-          isLoading={connectionSuggestionsQuery.isLoading}
-          isError={connectionSuggestionsQuery.isError}
-          actionError={suggestionActionError}
-          onAction={handleSuggestionAction}
-          onRetry={() => {
-            void connectionSuggestionsQuery.refetch();
-          }}
-          registerActionRef={registerSuggestionActionRef}
-          regionRef={suggestedRegionRef}
-        />
-      ) : (
-        <UnifiedTable
-          data={rows}
-          columns={columns as ColumnDef<ProfileWorkspaceRow, unknown>[]}
-          getRowId={row => row.id}
-          onRowClick={row => {
-            if (!row.id.startsWith('preview:')) setSelected(row);
-          }}
-          onRowContextMenu={(row, event) => {
-            if (row.id.startsWith('preview:')) {
-              event.preventDefault();
-              event.stopPropagation();
-            }
-          }}
-          getContextMenuItems={getContextMenuItems}
-          rowHeight={56}
-          containerClassName='min-h-0 flex-1'
-          minWidth='0'
-          className={styles.table}
-          isRowSelected={row =>
-            !row.id.startsWith('preview:') && selected?.id === row.id
-          }
-          getRowClassName={row =>
-            cn(
-              'group/connection-row',
-              row.id.startsWith('preview:') && 'cursor-default'
-            )
-          }
-          emptyState={
-            <TableEmptyState
-              heading={
-                filter === 'review'
-                  ? 'No Pages Awaiting Identity Review'
-                  : 'No Presence in This Category'
-              }
-              description={
-                filter === 'review'
-                  ? 'Your pages remain available in All Pages. Monitoring coverage is separate.'
-                  : 'Try another filter.'
-              }
-            />
-          }
-        />
-      )}
     </PageShell>
   );
 }

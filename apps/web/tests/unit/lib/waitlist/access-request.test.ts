@@ -48,9 +48,13 @@ vi.mock('@/lib/utils/social-platform', () => ({
   }),
 }));
 
-vi.mock('@/lib/utils/email', () => ({
-  normalizeEmail: (e: string) => e.toLowerCase().trim(),
-}));
+vi.mock('@/lib/utils/email', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/utils/email')>();
+  return {
+    ...actual,
+    normalizeEmail: (e: string) => e.toLowerCase().trim(),
+  };
+});
 
 // Mock the ingestion session wrapper to invoke the operation with a tx
 // stub that the test can shape.
@@ -89,7 +93,13 @@ function createTxMock() {
     })),
   }));
 
-  const updateWhere = vi.fn().mockResolvedValue(undefined);
+  // `.where()` is awaited directly, or chained into `.returning()` when the
+  // chat qualifies an existing sign-up entry.
+  const updateWhere = vi.fn(() =>
+    Object.assign(Promise.resolve(undefined), {
+      returning: vi.fn().mockResolvedValue([{ id: 'entry-signup' }]),
+    })
+  );
   const updateSet = vi.fn(values => {
     if (values && typeof values === 'object') {
       updatedRows.push(values as Record<string, unknown>);
@@ -247,6 +257,38 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     expect(result.status).toBe('waitlisted');
     expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
     expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
+    expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
+  });
+
+  it('qualifies an unqualified sign-up entry instead of treating it as a resubmission', async () => {
+    userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
+    findLatestEntryByEmail.mockReturnValueOnce([
+      {
+        id: 'entry-signup',
+        status: 'waitlisted',
+        source: 'signup',
+        waitlistedAt: new Date('2026-10-01T00:00:00.000Z'),
+      },
+    ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    const result = await submitWaitlistAccessRequest(baseInput);
+
+    // Full qualification ran on the sign-up entry: no new row, no
+    // already_waitlisted short-circuit.
+    expect(result).toMatchObject({
+      entryId: 'entry-signup',
+      status: 'waitlisted',
+      outcome: 'waitlisted_gate_on',
+    });
+    expect(
+      insertedEntries.some(entry => 'emailNormalized' in (entry.vals as object))
+    ).toBe(false);
+    expect(
+      updatedRows.find(row => row.statusReason === 'chat_started')
+    ).toMatchObject({ source: 'waitlist_form', fullName: 'Test Creator' });
     expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
   });
 

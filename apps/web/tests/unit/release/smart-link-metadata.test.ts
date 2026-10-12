@@ -294,14 +294,12 @@ describe('smart-link metadata', () => {
     expect(getUnpublishedReleasePresenceMock).toHaveBeenCalledOnce();
   });
 
-  it('keeps collision-safe alias decisions eligible for on-demand ISR', async () => {
-    const { generateStaticParams, preferredRegion, revalidate } = await import(
-      '@/app/[username]/[...slug]/page'
-    );
+  it('keeps collision-safe alias decisions eligible for on-demand ISR without deprecated route config', async () => {
+    const routeModule = await import('@/app/[username]/[...slug]/page');
 
-    expect(generateStaticParams()).toEqual([]);
-    expect(revalidate).toBe(300);
-    expect(preferredRegion).toEqual(['iad1', 'sfo1']);
+    expect(routeModule.generateStaticParams()).toEqual([]);
+    expect(routeModule.revalidate).toBe(300);
+    expect(routeModule).not.toHaveProperty('preferredRegion');
   });
 
   it('returns redirect-sink metadata without loading the smart-link resolver after definite content misses', async () => {

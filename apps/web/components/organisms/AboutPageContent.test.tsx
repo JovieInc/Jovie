@@ -14,8 +14,14 @@ vi.mock('@/lib/analytics', () => ({
 
 describe('AboutPageContent', () => {
   it('answers what Jovie does and whom it serves before the founder story', () => {
-    const { container } = render(<AboutPageContent />);
-    const opening = container.querySelector('h1')?.nextElementSibling;
+    render(<AboutPageContent />);
+    const heading = screen.getByRole('heading', {
+      level: 1,
+      name: 'Presence, relationships, and growth.',
+    });
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(heading).toBeVisible();
+    const opening = heading.nextElementSibling;
     expect(opening).toHaveTextContent(COMPANY_IDENTITY.definition);
     expect(opening).toHaveTextContent(COMPANY_IDENTITY.seoDescription);
     expect(opening?.textContent).not.toMatch(/#1|number one|guaranteed/i);

@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import {
   applyVictimRearms,
+  heldRevisionFromReceipt,
   implicatedPathsFromAnnotations,
   planVictimRearms,
   REARM_CAP,
@@ -156,6 +157,83 @@ test('a red head, an armed PR, and a poison label are not rearmed', () => {
   );
 });
 
+test('every admission-blocking label, including the tim-hold variants, prevents a rearm', () => {
+  for (const label of ['tim:hold', 'hold:tim', 'tim-hold', 'do-not-merge']) {
+    const [decision] = planVictimRearms({
+      runId: 7,
+      implicatedPaths: ['CLAUDE.md'],
+      candidates: [candidate({ labels: [label], files: [] })],
+    });
+    assert.equal(decision.reason, 'blocking-label', label);
+  }
+});
+
+test('a required-green UNSTABLE head is rearmed; a required-red or unknown head is not', () => {
+  // Live 2026-10-11: victims whose own head had every required check green
+  // but a lane jovie-execution/* receipt pending read UNSTABLE and were never
+  // rearmed. GitHub reads BLOCKED while a required check is pending or red.
+  const states = [
+    'CLEAN',
+    'HAS_HOOKS',
+    'UNSTABLE',
+    'BLOCKED',
+    'BEHIND',
+    'DIRTY',
+    'UNKNOWN',
+  ];
+  const decisions = planVictimRearms({
+    runId: 7,
+    implicatedPaths: ['CLAUDE.md'],
+    candidates: states.map((mergeStateStatus, i) =>
+      candidate({
+        prNumber: 20 + i,
+        headSha: String(i + 1).repeat(40),
+        mergeStateStatus,
+        files: [],
+      })
+    ),
+  });
+  assert.deepEqual(
+    decisions.map(item => item.action),
+    ['rearm', 'rearm', 'rearm', 'skip', 'skip', 'skip', 'skip']
+  );
+  assert.deepEqual(
+    decisions.slice(3).map(item => item.reason),
+    ['head-not-green', 'head-not-green', 'head-not-green', 'head-not-green']
+  );
+});
+
+test('apply re-checks the live state and skips a head that turned BLOCKED', async () => {
+  const enables = [];
+  const decision = {
+    action: 'rearm',
+    prNumber: 10,
+    headSha: sha,
+    classification: 'base-branch',
+    n: 1,
+    increment: false,
+    runId: 7,
+  };
+  for (const mergeStateStatus of ['UNSTABLE', 'BLOCKED']) {
+    await applyVictimRearms([decision], {
+      targetUrl: 'https://github.com/JovieInc/Jovie/actions/runs/7',
+      async readPullRequest() {
+        return {
+          headSha: sha,
+          mergeStateStatus,
+          inQueue: false,
+          autoMerge: false,
+        };
+      },
+      async writeStatus() {},
+      async enable(prNumber) {
+        enables.push(`${prNumber}:${mergeStateStatus}`);
+      },
+    });
+  }
+  assert.deepEqual(enables, ['10:UNSTABLE']);
+});
+
 test('untrusted or foreign-sha receipts do not count toward the cap', () => {
   assert.deepEqual(
     trustedRearmRecords([
@@ -232,7 +310,67 @@ test('the rearm job is a later step of the existing enroll workflow', () => {
     job.steps.at(-1).run,
     /node scripts\/merge-group-victim-rearm\.mjs --event-path "\$GITHUB_EVENT_PATH"/
   );
+  assert.match(
+    job.steps.at(-1).env.FAILURE_HOLD_RECEIPT,
+    /needs\.hold-failed-revision\.outputs\.failure_receipt/
+  );
   const enroll = workflow.jobs.enroll.steps.find(step => step.with?.script).with
     .script;
   assert.equal(enroll.includes('merge-group-victim-rearm'), false);
+});
+
+test('a revision the failure hold blocked is never rearmed, even as a base-branch victim (JOV-7708)', () => {
+  // #20354: no PR owned the failed paths, so the culprit classified as a
+  // base-branch victim and was rearmed on the same head it kept failing.
+  const receipt = JSON.stringify({
+    schema: 'jovie-merge-group-failure-hold/v1',
+    repository: 'JovieInc/Jovie',
+    prNumber: 10,
+    sourceHeadSha: sha,
+    retryDisposition: 'blocked-until-new-source-head',
+  });
+  const heldRevision = heldRevisionFromReceipt(receipt, 'JovieInc/Jovie');
+  assert.deepEqual(heldRevision, { prNumber: 10, headSha: sha });
+  const plan = planVictimRearms({
+    runId: 300,
+    implicatedPaths: ['scripts/unowned.mjs'],
+    candidates: [candidate(), candidate({ prNumber: 11, headSha: other })],
+    heldRevision,
+  });
+  assert.deepEqual(plan[0], {
+    action: 'skip',
+    prNumber: 10,
+    reason: 'revision-held',
+  });
+  assert.equal(plan[1].action, 'rearm');
+  // A new head on the same PR is a new revision and may be rearmed.
+  const moved = planVictimRearms({
+    runId: 301,
+    implicatedPaths: ['scripts/unowned.mjs'],
+    candidates: [candidate({ headSha: other })],
+    heldRevision,
+  });
+  assert.equal(moved[0].action, 'rearm');
+});
+
+test('only a trusted blocked receipt for this repository names a held revision', () => {
+  const base = {
+    schema: 'jovie-merge-group-failure-hold/v1',
+    repository: 'JovieInc/Jovie',
+    prNumber: 10,
+    sourceHeadSha: sha,
+    retryDisposition: 'blocked-until-new-source-head',
+  };
+  for (const raw of [
+    '',
+    undefined,
+    'not json',
+    JSON.stringify({ ...base, retryDisposition: 'one-queue-authority-retry' }),
+    JSON.stringify({ ...base, retryDisposition: 'requeue-after-base-moves' }),
+    JSON.stringify({ ...base, repository: 'someone/else' }),
+    JSON.stringify({ ...base, schema: 'other/v1' }),
+    JSON.stringify({ ...base, sourceHeadSha: 'abc' }),
+  ]) {
+    assert.equal(heldRevisionFromReceipt(raw, 'JovieInc/Jovie'), null);
+  }
 });

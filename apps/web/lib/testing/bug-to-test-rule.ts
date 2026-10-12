@@ -1,5 +1,5 @@
 const TEST_FILE_PATTERN =
-  /(?:\.(?:test|spec)\.[cm]?[jt]sx?|(?:^|\/)test_[^/]+\.py)$/i;
+  /(?:\.(?:test|spec)\.[cm]?[jt]sx?|(?:^|\/)test_[^/]+\.py|(?:^|\/)apps\/ios\/(?:[^/]+\/)*[^/]*Tests\/(?:[^/]+\/)*[^/]+\.swift)$/i;
 
 const BUG_FIX_COMMIT_PATTERN = /^fix[(:]/i;
 const BUG_FIX_BRANCH_PATTERN = /^(fix\/|.*\/fix-)/i;

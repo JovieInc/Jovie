@@ -57,6 +57,10 @@ enum LiveAuthCallbackLaunchInput {
     return verifier
   }
 
+  static func nativeAttempt(processInfo: ProcessInfo = .processInfo) -> String? {
+    processInfo.environment["JOVIE_IOS_PENDING_NATIVE_ATTEMPT"]
+  }
+
   static func callbackURL(processInfo: ProcessInfo = .processInfo) -> URL? {
     guard let value = argumentValue(
       after: "-ui-testing-open-auth-callback",
@@ -116,6 +120,7 @@ struct UITestingAuthCallbackRoot: View {
 
   private let expectedCode = "test_code"
   private let expectedVerifier = "test_verifier"
+  private static let expectedAttempt = String(repeating: "A", count: 43)
   private let statusKey = "ie.jov.Jovie.authCallbackUITestStatus"
   private let handledCountKey = "ie.jov.Jovie.authCallbackUITestHandledCount"
 
@@ -124,7 +129,8 @@ struct UITestingAuthCallbackRoot: View {
     self.authCoordinator = authCoordinator
     // Seed the verifier before the first onOpenURL from a cold launch via
     // XCUIApplication.open(_:) — the async .task below is too late on CI.
-    MobileAuthPendingStore.shared.save(codeVerifier: "test_verifier")
+    MobileAuthPendingStore.shared.save(codeVerifier: "test_verifier",
+      nativeAttempt: Self.expectedAttempt, baseURL: appState.configuration.webBaseURL)
   }
 
   var body: some View {
@@ -150,7 +156,8 @@ struct UITestingAuthCallbackRoot: View {
         UserDefaults.standard.removeObject(forKey: handledCountKey)
         UserDefaults.standard.set("waiting", forKey: statusKey)
         UserDefaults.standard.set(0, forKey: handledCountKey)
-        MobileAuthPendingStore.shared.save(codeVerifier: expectedVerifier)
+        MobileAuthPendingStore.shared.save(codeVerifier: expectedVerifier,
+          nativeAttempt: Self.expectedAttempt, baseURL: appState.configuration.webBaseURL)
         if let callbackURL = LiveAuthCallbackLaunchInput.callbackURL() {
           handleCallbackURL(callbackURL)
         }
@@ -170,6 +177,8 @@ struct UITestingAuthCallbackRoot: View {
     }
 
     Task { @MainActor in
+      guard MobileAuthPendingStore.shared.matches(url, snapshot: MobileAuthPendingStore.shared.snapshot(),
+        baseURL: appState.configuration.webBaseURL) else { return }
       if let providerError = MobileAuthReturnParser.parseProviderError(url) {
         authErrorMessage = providerError.userMessage
         UserDefaults.standard.set("error", forKey: statusKey)
@@ -182,12 +191,10 @@ struct UITestingAuthCallbackRoot: View {
         return
       }
 
-      if let authReturn = await Self.parseAuthReturnWhenReady(
-        url,
-        pendingStore: .shared,
-        codeVerifier: expectedVerifier
-      ) {
-        handleAuthReturn(authReturn)
+      if let claim = MobileAuthPendingStore.shared.claim(url,
+        matching: MobileAuthPendingStore.shared.snapshot(), baseURL: appState.configuration.webBaseURL) {
+        MobileAuthPendingStore.shared.finish(claim)
+        handleAuthReturn(claim.authReturn)
         return
       }
 
@@ -220,23 +227,6 @@ struct UITestingAuthCallbackRoot: View {
     UserDefaults.standard.set("ready", forKey: statusKey)
   }
 
-  @MainActor
-  private static func parseAuthReturnWhenReady(
-    _ url: URL,
-    pendingStore: MobileAuthPendingStore,
-    codeVerifier: String,
-    maxAttempts: Int = 40
-  ) async -> MobileAuthReturn? {
-    for _ in 0..<maxAttempts {
-      if let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: pendingStore) {
-        return authReturn
-      }
 
-      pendingStore.save(codeVerifier: codeVerifier)
-      try? await Task.sleep(nanoseconds: 50_000_000)
-    }
-
-    return nil
-  }
 }
 #endif

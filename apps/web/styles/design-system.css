@@ -68,10 +68,12 @@
   --ds-marketing-display-size: clamp(4rem, 6.9vw, 6.25rem);
   --ds-marketing-display-leading: 0.94;
   --ds-marketing-display-tracking: -0.045em;
+  /* Section titles cap at the 56px marketing hero headline so no h2 ever
+     outranks the page h1 (route DOM heading-hierarchy-inversion). */
   --ds-marketing-title-size: clamp(
     var(--text-4xl),
     4.6vw,
-    calc(var(--text-5xl) + var(--space-4))
+    calc(var(--text-5xl) + var(--space-2))
   );
   --ds-marketing-title-leading: 1.08;
   --ds-marketing-title-tracking: 0;
@@ -96,10 +98,11 @@
   /* Shell V1 canonical app-shell tokens — app chrome should prefer these
      names when touching shared shell geometry. Values are centralized here
      (migrated from linear-tokens.css, JOV-5466). Dark-mode overrides below.
-     Founder lock 2026-09-25 (Linear-scale density): sidebar 244px, header
+     Founder lock 2026-09-25 (Linear-scale density): sidebar 224px
+     (left-sidebar-width-invariant-v1, JOV-8108 — hard ceiling 260px), header
      44px everywhere (single token — the former 36px "compact" variant is
      retired), 28px nav/history rows, 16px sidebar icons. */
-  --app-shell-sidebar-width: 244px;
+  --app-shell-sidebar-width: 224px;
   --app-shell-sidebar-icon-size: 1rem;
   --app-shell-sidebar-badge-font-size: 0.5rem;
   --app-shell-sidebar-history-font-size: 0.78125rem;
@@ -868,26 +871,27 @@
   flex: 0 0 auto;
 }
 
-/* Reserve the floating dock outside the home scroll box at every compact
-   breakpoint. End padding makes the last row reachable after scrolling, but
-   it cannot stop an absolute dock from covering the current viewport. The
-   desktop shell is a fixed-height phone card, so without this the last card
-   renders half-covered by the dock at rest even though it can technically
-   scroll into view (JOV-7192). Embedded previews render no dock, so they keep
-   the in-box padding instead. */
+/* Reserve the floating dock outside the scroll box at every compact
+   breakpoint, on every mode. End padding makes the last row reachable after
+   scrolling, but it cannot stop an absolute dock from covering the current
+   viewport. The desktop shell is a fixed-height phone card, so without this
+   the last card renders half-covered by the dock at rest even though it can
+   technically scroll into view (JOV-7192, JOV-6617 for the non-home modes).
+   Embedded previews render no dock, so they keep the in-box padding
+   instead. */
 :where(
-  [data-testid="profile-compact-surface"][data-mode="profile"]:not(
+  [data-testid="profile-compact-surface"]:not(
       [data-presentation="embedded"]
-    )
-    > .profile-home-content-column
+    ):has(> .profile-floating-tab-bar)
+    > .profile-content-column
 ) {
   margin-bottom: var(--profile-bottom-nav-height);
 }
 
-[data-testid="profile-compact-surface"][data-mode="profile"]:not(
-    [data-presentation="embedded"]
+[data-testid="profile-compact-surface"]:not([data-presentation="embedded"]):has(
+    > .profile-floating-tab-bar
   )
-  .profile-home-content-scroll {
+  .profile-content-scroll-region {
   padding-bottom: 0;
 }
 
@@ -1198,8 +1202,9 @@
      one big step from primary, then a compressed ordered tail. */
   --color-text-primary-token: lch(9.894% 0 282);
   --color-text-secondary-token: #5a606a;
-  --color-text-tertiary-token: #666c76;
-  --color-text-quaternary-token: #6a7078;
+  /* Tail steps clear 4.5:1 on the selected row tint (JOV-7861). */
+  --color-text-tertiary-token: #626872;
+  --color-text-quaternary-token: #646a72;
   --color-text-disabled-token: oklch(
     70% var(--theme-base-chroma) var(--theme-base-hue)
   );
@@ -1437,7 +1442,8 @@
      compressed ordered tail. */
   --noir-ion-text-secondary: #a0a5af;
   --noir-ion-text-muted: #8f95a0;
-  --noir-ion-text-tertiary: #858b96;
+  /* Clears 4.5:1 on the selected row tint over surface-1 (JOV-7861). */
+  --noir-ion-text-tertiary: #8c939e;
   --noir-ion-text-disabled: #525d75;
   --noir-ion-text-inverse: #020307;
   --noir-ion-ion: #11afff;
@@ -2755,6 +2761,10 @@
      Always prefer these over hardcoded numbers; they pick up reduced-motion. */
   --duration-subtle: var(--ds-motion-subtle-duration);
   --duration-cinematic: var(--ds-motion-cinematic-duration);
+  /* Step between sibling blocks entering in sequence (hero children, scroll
+     reveals, chat cards). Zeroed with the durations under reduced motion so
+     nothing waits on a step that no longer animates. */
+  --stagger-block: 80ms;
 
   /* Easings - Linear uses cubic-bezier for smooth feel */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -2807,6 +2817,7 @@
     --duration-slowest: 0ms;
     --duration-subtle: 0ms;
     --duration-cinematic: 0ms;
+    --stagger-block: 0ms;
   }
 }
 
@@ -3058,6 +3069,13 @@ html:not(.dark) .smart-link-powered-by {
 
 html:not(.dark) .smart-link-powered-by {
   color: rgb(64 64 64) !important;
+}
+
+/* Marketing headings balance their lines so no headline strands one word on
+   its last line (route DOM orphaned-line). Zero specificity: an explicit
+   text-wrap on a heading still wins. */
+:where(.system-b-marketing) :where(h1, h2, h3) {
+  text-wrap: balance;
 }
 
 /* Marketing typography: headings use Satoshi (display font). Product controls

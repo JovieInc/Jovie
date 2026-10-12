@@ -1,8 +1,8 @@
 /**
  * `pnpm factory:truth-sync` (JOV-7247).
  *
- * Hashes every product-truth claim and compares against the committed
- * digest. Reports added/changed/removed claims and the routes they affect.
+ * Hashes product-truth claims, capabilities, and proof records and compares
+ * against the committed digest. Reports changed source records and routes.
  *
  *   --check (default)  exit 1 when the digest is out of date
  *   --write            rewrite the digest file
@@ -39,13 +39,25 @@ function main(): number {
   for (const claim of claims) ClaimSchema.parse(claim);
 
   const next = buildTruthDigest(claims);
-  const diff = diffTruthDigest(readDigest(), next);
+  const previous = readDigest();
+  const diff = diffTruthDigest(previous, next);
 
   console.log(`[truth-sync] ${claims.length} claims hashed`);
+  if (diff.schemaChanged) {
+    console.log(
+      `[truth-sync] digest schema changed; refreshing version ${next.version} baseline`
+    );
+  }
   for (const [label, ids] of [
     ['added', diff.added],
     ['changed', diff.changed],
     ['removed', diff.removed],
+    ['added capabilities', diff.addedCapabilities],
+    ['changed capabilities', diff.changedCapabilities],
+    ['removed capabilities', diff.removedCapabilities],
+    ['added proofs', diff.addedProofs],
+    ['changed proofs', diff.changedProofs],
+    ['removed proofs', diff.removedProofs],
   ] as const) {
     if (ids.length > 0) console.log(`[truth-sync] ${label}: ${ids.join(', ')}`);
   }

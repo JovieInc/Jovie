@@ -101,6 +101,66 @@ export const LAYOUT_AUDIT_SOURCE = `(() => {
   };
 })()`;
 
+/**
+ * Runs in the browser before each screenshot. A stuck-to-bottom chat lands at
+ * an arbitrary scroll offset, so a message can straddle the top of the
+ * thread: half hidden, half drawn in the fade under the header row. For every
+ * scroll container with top clearance (padding-top), nudge scrollTop to the
+ * nearest message boundary so no [data-message-id] is drawn partly inside the
+ * visible part of that band (all of it, or only the fade ramp when the
+ * container masks the rest). Prefer scrolling down (hide the
+ * message, keep the latest turn in view); scroll up only when already at the
+ * bottom and the lowest content still fits. Returns how many nudges ran. Plain JavaScript for the same
+ * reason as LAYOUT_AUDIT_SOURCE.
+ */
+export const SETTLE_SCROLL_SOURCE = `(() => {
+  let moved = 0;
+  const scrollers = Array.from(document.querySelectorAll('*')).filter(el => {
+    const style = getComputedStyle(el);
+    return (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1;
+  });
+  for (const scroller of scrollers) {
+    const clearance = parseFloat(getComputedStyle(scroller).paddingTop) || 0;
+    if (clearance <= 0) continue;
+    // Matches .system-b-chat-thread-top-fade: clear until the last 16px of
+    // the clearance band, so only content drawn below that line is visible.
+    const visibleFrom = scroller.classList.contains('system-b-chat-thread-top-fade') ? clearance - 16 : 0;
+    for (let pass = 0; pass < 3; pass += 1) {
+      const edge = scroller.getBoundingClientRect().top;
+      const straddler = Array.from(scroller.querySelectorAll('[data-message-id]')).find(el => {
+        const box = el.getBoundingClientRect();
+        const top = box.top - edge;
+        const bottom = box.bottom - edge;
+        return bottom > visibleFrom + 0.5 && top < clearance - 0.5;
+      });
+      if (!straddler) break;
+      const box = straddler.getBoundingClientRect();
+      const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+      const down = box.bottom - edge - visibleFrom;
+      const up = clearance - (box.top - edge);
+      const before = scroller.scrollTop;
+      if (before + down <= maxScroll + 0.5) {
+        scroller.scrollTop = before + down;
+      } else {
+        // Scrolling up pushes everything down; only do it while the lowest
+        // drawn content still clears the container's bottom padding.
+        const frame = scroller.getBoundingClientRect();
+        const floor = frame.bottom - (parseFloat(getComputedStyle(scroller).paddingBottom) || 0);
+        const lowest = Array.from(scroller.querySelectorAll('*')).reduce((max, el) => {
+          if (el.children.length > 0) return max;
+          const leaf = el.getBoundingClientRect();
+          return leaf.height > 0 && leaf.width > 0 ? Math.max(max, leaf.bottom) : max;
+        }, -Infinity);
+        if (lowest + up > floor + 0.5) break;
+        scroller.scrollTop = Math.max(0, before - up);
+      }
+      if (scroller.scrollTop === before) break;
+      moved += 1;
+    }
+  }
+  return moved;
+})()`;
+
 /** Starts collecting console/page errors so the first keyframe sees them too. */
 export function watchKeyframeErrors(page: Page): void {
   if (process.env.GOLDEN_PATH_KEYFRAME_DIR) trackErrors(page);
@@ -114,6 +174,7 @@ export async function captureKeyframe(page: Page, id: string): Promise<void> {
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {
     // A long-poll or analytics beacon must not block evidence capture.
   });
+  await page.evaluate(SETTLE_SCROLL_SOURCE);
   sequence += 1;
   const file = `${String(sequence).padStart(2, '0')}-${id}.png`;
   const image = await page.screenshot({

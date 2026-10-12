@@ -4,6 +4,7 @@ const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockEq = vi.hoisted(() => vi.fn(() => 'eq-clause'));
 const mockRecordLeadFunnelEvent = vi.hoisted(() => vi.fn());
+const mockReadOutboundLedger = vi.hoisted(() => vi.fn());
 
 const { mockDb, mockSelectLimit, mockUpdateSet, mockUpdateReturning } =
   vi.hoisted(() => {
@@ -60,7 +61,62 @@ vi.mock('@/lib/leads/funnel-events', () => ({
   recordLeadFunnelEvent: mockRecordLeadFunnelEvent,
 }));
 
+vi.mock('@/lib/outbound/ledger.server', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/outbound/ledger.server')>()),
+  readOutboundLedger: mockReadOutboundLedger,
+}));
+
 import { PATCH } from '@/app/api/admin/leads/[id]/dm-sent/route';
+import {
+  outboundCopyEvidenceKey,
+  outboundCopyRevision,
+  outboundTargetEvidenceKey,
+  outboundTargetRevision,
+} from '@/lib/outbound/approval';
+import { outboundTargetFromLead } from '@/lib/outbound/ledger.server';
+
+const LEAD = {
+  id: 'lead-1',
+  linktreeHandle: 'artist',
+  displayName: 'Artist',
+  contactEmail: null,
+  instagramHandle: 'artist',
+  creatorProfileId: 'profile-1',
+  claimToken: 'tok',
+};
+
+function approvedDmLedger(body?: string) {
+  const target = outboundTargetFromLead(LEAD);
+  const targetRevision = outboundTargetRevision(target);
+  const copy = {
+    channel: 'dm' as const,
+    subject: null,
+    body: body ?? `Hey Artist, your page: ${target.claimUrl}`,
+  };
+  return new Map([
+    [
+      LEAD.id,
+      [
+        {
+          evidenceKey: outboundCopyEvidenceKey(LEAD.id),
+          evidenceRevision: outboundCopyRevision(targetRevision, copy),
+          decision: 'yes',
+          snapshot: { targetRevision, ...copy },
+          actorUserId: 'tim',
+          createdAt: new Date('2026-10-04T01:00:00Z'),
+        },
+        {
+          evidenceKey: outboundTargetEvidenceKey(LEAD.id),
+          evidenceRevision: targetRevision,
+          decision: 'yes',
+          snapshot: {},
+          actorUserId: 'tim',
+          createdAt: new Date('2026-10-04T00:59:00Z'),
+        },
+      ],
+    ],
+  ]);
+}
 
 describe('PATCH /api/admin/leads/[id]/dm-sent', () => {
   beforeEach(() => {
@@ -70,6 +126,7 @@ describe('PATCH /api/admin/leads/[id]/dm-sent', () => {
       isAuthenticated: true,
       isAdmin: true,
     });
+    mockReadOutboundLedger.mockResolvedValue(approvedDmLedger());
   });
 
   it('preserves the first contact timestamp when a lead is contacted again', async () => {
@@ -77,7 +134,7 @@ describe('PATCH /api/admin/leads/[id]/dm-sent', () => {
 
     mockSelectLimit.mockResolvedValue([
       {
-        id: 'lead-1',
+        ...LEAD,
         firstContactedAt: originalFirstContactedAt,
       },
     ]);
@@ -98,9 +155,30 @@ describe('PATCH /api/admin/leads/[id]/dm-sent', () => {
       expect.objectContaining({
         leadId: 'lead-1',
         eventType: 'dm_sent',
+        metadata: {
+          approvedCopyRevision: approvedDmLedger().get(LEAD.id)?.[0]
+            .evidenceRevision,
+          recordingSource: 'operator_reported',
+          deliveryVerified: false,
+        },
       }),
       { idempotent: true }
     );
+  });
+
+  it.each([
+    { isAuthenticated: false, isAdmin: false, status: 401 },
+    { isAuthenticated: true, isAdmin: false, status: 403 },
+  ])('refuses history recording without operator access (%s)', async access => {
+    mockGetCurrentUserEntitlements.mockResolvedValue(access);
+    const response = await PATCH(new Request('http://localhost') as never, {
+      params: Promise.resolve({ id: LEAD.id }),
+    });
+    expect(response.status).toBe(access.status);
+    expect(mockDb.select).not.toHaveBeenCalled();
+    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(mockReadOutboundLedger).not.toHaveBeenCalled();
+    expect(mockRecordLeadFunnelEvent).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the lead does not exist', async () => {
@@ -113,5 +191,34 @@ describe('PATCH /api/admin/leads/[id]/dm-sent', () => {
     expect(response.status).toBe(404);
     expect(mockDb.update).not.toHaveBeenCalled();
     expect(mockRecordLeadFunnelEvent).not.toHaveBeenCalled();
+  });
+
+  it('refuses to record a DM Tim has not approved', async () => {
+    mockSelectLimit.mockResolvedValue([{ ...LEAD, firstContactedAt: null }]);
+    mockReadOutboundLedger.mockResolvedValue(new Map());
+
+    const response = await PATCH(new Request('http://localhost') as never, {
+      params: Promise.resolve({ id: 'lead-1' }),
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      reason: 'target_not_approved',
+    });
+    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(mockRecordLeadFunnelEvent).not.toHaveBeenCalled();
+  });
+
+  it('refuses when the lead changed after Tim approved it', async () => {
+    mockSelectLimit.mockResolvedValue([
+      { ...LEAD, instagramHandle: 'someone-else', firstContactedAt: null },
+    ]);
+
+    const response = await PATCH(new Request('http://localhost') as never, {
+      params: Promise.resolve({ id: 'lead-1' }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(mockDb.update).not.toHaveBeenCalled();
   });
 });

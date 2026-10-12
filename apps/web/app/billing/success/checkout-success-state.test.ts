@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   getPaidSuccessPrimaryHref,
+  getPaidSuccessPrimaryLabel,
   resolveCheckoutSuccessView,
   shouldCelebratePaidSuccess,
 } from './checkout-success-state';
@@ -37,5 +38,15 @@ describe('resolveCheckoutSuccessView', () => {
     expect(
       getPaidSuccessPrimaryHref({ plan: 'pro', isOnboardingUpgrade: false })
     ).toBe(APP_ROUTES.PRESENCE);
+  });
+
+  it('routes a paid buyer without a claimed profile to claim a link', () => {
+    const input = {
+      plan: 'pro' as const,
+      isOnboardingUpgrade: false,
+      needsProfile: true,
+    };
+    expect(getPaidSuccessPrimaryHref(input)).toBe(APP_ROUTES.START);
+    expect(getPaidSuccessPrimaryLabel(input)).toBe('Claim your link');
   });
 });

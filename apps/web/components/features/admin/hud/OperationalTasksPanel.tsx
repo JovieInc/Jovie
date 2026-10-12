@@ -10,7 +10,13 @@ import {
   Loader2,
   RotateCcw,
 } from 'lucide-react';
-import { type ComponentType, type SVGProps, useState } from 'react';
+import {
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+  useMemo,
+  useState,
+} from 'react';
 import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
 import {
   buildMatrixRows,
@@ -18,6 +24,7 @@ import {
 } from '@/app/app/(shell)/admin/shipping/ShippingMatrix';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { TaskProjectionListRow } from '@/components/organisms/table';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import { cn } from '@/lib/utils';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
@@ -94,17 +101,25 @@ function formatTimestamp(value: string | null): string {
   })}`;
 }
 
+function RegisteredTaskRail({ panel }: Readonly<{ panel: ReactNode }>) {
+  useRegisterRightPanel(panel);
+  return null;
+}
+
 export function OperationalTasksPanelView({
   feed,
   requestState = 'idle',
+  presentation = 'section',
   selectedTaskId = null,
   onSelectTask,
 }: Readonly<{
   readonly feed: OperationalTaskFeed;
   readonly requestState?: 'idle' | 'fetching' | 'error';
+  readonly presentation?: 'section' | 'page';
   readonly selectedTaskId?: OperationalTask['id'] | null;
   readonly onSelectTask?: (taskId: OperationalTask['id'] | null) => void;
 }>) {
+  const Surface = presentation === 'page' ? 'section' : ContentSurfaceCard;
   const effectiveSyncState =
     requestState === 'error' && feed.tasks.length > 0
       ? 'stale'
@@ -117,15 +132,27 @@ export function OperationalTasksPanelView({
   const deltas = new Map(feed.deltas.map(delta => [delta.taskId, delta]));
   const rows = buildMatrixRows(feed, Date.now());
   const selectedRow = rows.find(row => row.id === selectedTaskId) ?? null;
+  const taskRail = useMemo(
+    () => (
+      <ShippingRowRail row={selectedRow} onClose={() => onSelectTask?.(null)} />
+    ),
+    [selectedRow, onSelectTask]
+  );
 
   return (
     <>
-      <ContentSurfaceCard
-        surface='details'
-        className='overflow-hidden'
+      <Surface
+        {...(presentation === 'section' ? { surface: 'details' as const } : {})}
+        aria-label='Operational Tasks'
+        className={presentation === 'section' ? 'overflow-hidden' : undefined}
         data-testid='ovie-operational-tasks'
       >
-        <div className='flex min-h-16 items-center justify-between gap-3 border-b border-subtle px-3 py-2'>
+        <div
+          className={cn(
+            'flex min-h-16 items-center justify-between gap-3 py-2',
+            presentation === 'section' && 'border-b border-subtle px-3'
+          )}
+        >
           <div className='min-w-0'>
             <h2 className='text-app font-semibold text-primary-token'>
               Operational Tasks
@@ -137,9 +164,14 @@ export function OperationalTasksPanelView({
           </div>
           <HudStatusPill label={sync.label} tone={sync.tone} />
         </div>
-        <div className='h-72 overflow-y-auto p-2' aria-live='polite'>
+        <div
+          className={
+            presentation === 'section' ? 'h-72 overflow-y-auto p-2' : undefined
+          }
+          aria-live='polite'
+        >
           {feed.tasks.length === 0 ? (
-            <div className='grid h-full place-items-center text-center'>
+            <div className='grid min-h-32 h-full place-items-center text-center'>
               <p className='text-app text-secondary-token'>
                 {effectiveSyncState === 'syncing'
                   ? 'Loading the local task cache…'
@@ -156,7 +188,7 @@ export function OperationalTasksPanelView({
                 const delta = deltas.get(task.id);
                 const transition = delta
                   ? delta.fromState
-                    ? `${delta.fromState} → ${delta.toState ?? 'removed'}`
+                    ? `${workflowVisual(delta.fromState).label} → ${delta.toState ? workflowVisual(delta.toState).label : 'Removed'}`
                     : 'New'
                   : null;
                 return (
@@ -174,10 +206,22 @@ export function OperationalTasksPanelView({
                         aria-hidden='true'
                       />
                     }
-                    title={task.title}
+                    title={
+                      task.linearUrl ? (
+                        <a
+                          href={task.linearUrl}
+                          title={task.title}
+                          className='hover:underline focus-visible:underline'
+                        >
+                          {task.title}
+                        </a>
+                      ) : (
+                        task.title
+                      )
+                    }
                     metadata={
                       <div className='mt-px flex min-w-0 flex-wrap items-center gap-x-1.5 overflow-hidden text-3xs leading-4 text-tertiary-token'>
-                        <span className={cn('font-medium', visual.className)}>
+                        <span className='font-medium text-secondary-token'>
                           {visual.label}
                         </span>
                         <span className='font-semibold'>
@@ -214,15 +258,23 @@ export function OperationalTasksPanelView({
             </div>
           )}
         </div>
-      </ContentSurfaceCard>
-      <ShippingRowRail row={selectedRow} onClose={() => onSelectTask?.(null)} />
+      </Surface>
+      {presentation === 'page' ? (
+        <RegisteredTaskRail panel={taskRail} />
+      ) : (
+        taskRail
+      )}
     </>
   );
 }
 
 export function OperationalTasksPanel({
   kioskToken = null,
-}: Readonly<{ readonly kioskToken?: string | null }>) {
+  presentation = 'section',
+}: Readonly<{
+  readonly kioskToken?: string | null;
+  readonly presentation?: 'section' | 'page';
+}>) {
   const [selectedTaskId, setSelectedTaskId] = useState<
     OperationalTask['id'] | null
   >(null);
@@ -234,6 +286,7 @@ export function OperationalTasksPanel({
       : 'idle';
   return (
     <OperationalTasksPanelView
+      presentation={presentation}
       feed={query.operationalTasks}
       requestState={requestState}
       selectedTaskId={selectedTaskId}

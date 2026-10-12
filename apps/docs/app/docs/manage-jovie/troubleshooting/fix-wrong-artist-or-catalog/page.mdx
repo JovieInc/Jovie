@@ -6,27 +6,27 @@ documentType: guide
 category: manage-jovie
 productBacked: false
 productRoute: /support
-status: certified
-lastVerifiedAt: 2026-09-27
-verifiedBy: human
+status: stale
+searchable: false
+lastVerifiedAt: null
+verifiedBy: unverified
 keywords:
   - wrong music
   - wrong artist
   - wrong catalog
   - incorrect releases
 redirectAliases: []
-visualProofRefs:
-  - proof/wrong-artist-not-me.png
-  - proof/wrong-artist-support.png
+visualProofRefs: []
 uiLabels:
   - Suggested
   - Not me
-  - Artist
+  - Profile
   - Contact Support
-  - Send email
+  - Email support with this context
 productSourceRefs:
+  - apps/docs/components/ContactSupport.tsx
   - apps/web/app/app/(shell)/profiles/ProfilesWorkspace.tsx
-  - apps/web/app/app/(shell)/settings/artist-profile/ArtistProfileContent.tsx
+  - apps/web/app/app/(shell)/settings/profile/ArtistProfileContent.tsx
   - apps/web/app/(marketing)/support/SupportContent.tsx
   - apps/web/components/organisms/SupportPageContent.tsx
 launchPath: true
@@ -45,19 +45,19 @@ Compare the Jovie profile with the provider page. Treat another artist's image, 
 </HelpStep>
 
 <HelpStep title="Reject an unconfirmed suggestion">
-In **Presence → Suggested**, choose **Not me** beside an incorrect identity. This is the safe self-service correction before a suggestion is attached.
+In **Identity → Suggested**, choose **Not me** beside an incorrect identity. This is the safe self-service correction before a suggestion is attached.
 
 <HelpScreenshot src="/proof/wrong-artist-not-me.png" alt="Suggested Connections row with the Not me action for an incorrect artist identity" caption="Reject an incorrect suggestion instead of adding it." />
 </HelpStep>
 
 <HelpStep title="Separate editable profile details from provider data">
-For your claimed profile, you may edit your own display name, image, location, bio, and links under **Artist**. Do not rewrite those fields to disguise a wrong provider identity, release, or catalog owner; those require review.
+For your claimed profile, you may edit your own display name, username, image, location, hometown, and career highlights under **Settings → Profile**. Do not rewrite those fields to disguise a wrong provider identity, release, or catalog owner; those require review.
 </HelpStep>
 
 <HelpStep title="Send the mismatch to support">
-Open [Support](https://jov.ie/support), choose **Send email**, and include the Jovie profile URL, incorrect provider URL, expected artist URL, affected release title, and a screenshot. Include UPC or ISRC only when it is visible to you.
+Open [Support](https://jov.ie/support), choose **Contact Support**, then **Email support with this context**, and include the Jovie profile URL, incorrect provider URL, expected artist URL, affected release title, and a screenshot. Include UPC or ISRC only when it is visible to you.
 
-<HelpScreenshot src="/proof/wrong-artist-support.png" alt="Jovie Support page showing the Email Support card and Send email action" caption="Send both the incorrect and expected identities so support can reproduce the mismatch." />
+<HelpScreenshot src="/proof/wrong-artist-support.png" alt="Jovie Support page showing the Contact Support card and action" caption="Send both the incorrect and expected identities so support can reproduce the mismatch." />
 </HelpStep>
 
 </HelpSteps>

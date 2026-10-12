@@ -1,0 +1,59 @@
+{
+  "schema": "jovie.art-direction/v1",
+  "id": "composer-is-the-page",
+  "title": "The Composer Is the Page",
+  "status": "active",
+  "surfaces": ["golden-path"],
+  "thesis": "From search-your-name to claim, the first screen of each step is one field; value appears in the conversation, not in chrome around it.",
+  "referenceIds": [
+    "perplexity-ai",
+    "v0-app",
+    "lumalabs-ai",
+    "vercel-com-signup",
+    "cal-com"
+  ],
+  "principles": {
+    "light": [
+      "Flat, quiet surface; at most one soft glow behind the active field to say 'start here'."
+    ],
+    "composition": [
+      "One centred composer per step; suggestions sit as chips directly beneath it.",
+      "Auth is a short centred stack of provider choices with no marketing around it."
+    ],
+    "type": [
+      "One question as the headline at UI-large scale; placeholder text does the teaching."
+    ],
+    "motion": [
+      "Zero layout shift as tokens stream; the composer never jumps (DESIGN.md /start canonical example).",
+      "Step changes cross-fade on the subtle tier."
+    ],
+    "color": [
+      "Neutral surface; the accent only on the primary action and focus ring (focus blue never rotates)."
+    ]
+  },
+  "tokenMap": [
+    {
+      "principle": "centred composer",
+      "jovie": "ChatInput on /start with constant child structure (Layout Shift Prevention)"
+    },
+    {
+      "principle": "suggestion chips",
+      "jovie": "existing chip/pill primitives at 28px; no new component"
+    },
+    {
+      "principle": "provider choice stack",
+      "jovie": "auth surface ActionButtons, one primary"
+    },
+    {
+      "principle": "step transitions",
+      "jovie": "subtle tier 150ms; cinematic only for the profile reveal"
+    }
+  ],
+  "antiGoals": [
+    "A marketing hero on any golden-path step.",
+    "Copying a reference's composer chrome, icons or suggestion copy.",
+    "Status words where a glyph would do."
+  ],
+  "decidedBy": "refs agent, provisional (taste feedback rides post-ship review, JOV-7081)",
+  "updatedAt": "2026-10-04T00:00:00.000Z"
+}

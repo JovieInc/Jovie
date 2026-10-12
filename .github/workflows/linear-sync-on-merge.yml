@@ -1,48 +1,110 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# necessary-trust-boundary: GitHub owns merge and deployment facts and Linear owns issue state; this existing writer is the only hop that reads both (read-only GitHub scope, Linear key) to project post-merge lifecycle state.
+# removal-trigger: Remove the sweep triggers when Summer's reconciler consumes the same validation manifest and receipts from the deployment event directly.
+
 name: Linear Sync on Merge
+
+# Projects merged pull requests onto the Linear validation lifecycle
+# (JOV-7694): Merging -> Validating -> Done, with Rework on a required
+# failure. A merge event evaluates its linked issue; a completed Production
+# Controller run, a validation receipt, or a manual dispatch re-evaluates
+# every issue in Merging, Validating, or Rework. Both paths run the same
+# evaluation, so replayed and out-of-order events converge. Receipts are
+# Linear comments; /api/webhooks/linear bridges each one to the
+# linear_validation_receipt dispatch, so there is no clock. The lifecycle has
+# no time-based transition, and every Production Controller completion
+# re-evaluates all open issues if a bridged dispatch is ever lost.
 
 on:
   pull_request:
     types: [closed]
+  workflow_run:
+    workflows: [Production Controller]
+    types: [completed]
+  repository_dispatch:
+    types: [linear_validation_receipt]
+  workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: read
+  actions: read
 
 jobs:
   sync_done:
-    name: Mark Linear issue Done
-    if: github.event.pull_request.merged == true
+    name: Project merge and deploy evidence onto Linear
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    # Sweeps serialize so two runs never decide from different snapshots.
+    # Merge events stay unqueued: a pending run replaced in a concurrency
+    # group would drop its event, and each write re-reads state first.
+    concurrency:
+      group: linear-validation-lifecycle-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'sweep' }}
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: read
+      actions: read
     steps:
-      - name: Checkout merge sync script
+      - name: Checkout the current lifecycle writer
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          # Always the default branch: a replayed event must not run an
+          # older closer revision from its merge commit.
+          ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 1
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            .github/ci-harness/manifest.json
             scripts/lib/linear-sync-on-merge.mjs
+            scripts/lib/validation-lifecycle.mjs
+            scripts/lib/validation-sync.mjs
             scripts/lib/escaped-defect-closure.mjs
+            scripts/lib/founder-taste-order.mjs
+            scripts/lib/ci-harness.mjs
+            scripts/lib/remediation-signal.mjs
+            scripts/lib/deprecation-observation.mjs
+            scripts/lib/linear-issue-intake.mjs
+            scripts/lib/linear-cooldown.mjs
+            scripts/invariants/assurance-matrix.mjs
+            scripts/invariants/assurance-matrix.json
           sparse-checkout-cone-mode: false
 
       - name: Set up pinned Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
 
-      - name: Sync Linear without closing open stacks or parent issues
+      # Merged pull requests, their files and exact-commit compares never
+      # change; each sweep re-reads ~280 issues' worth of them from the
+      # repo's shared 1,000/h GITHUB_TOKEN quota otherwise (2026-10-11).
+      - name: Restore immutable GitHub reads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .linear-sync-github-cache
+          key: linear-sync-github-v1-${{ github.run_id }}
+          restore-keys: linear-sync-github-v1-
+
+      - name: Evaluate the validation lifecycle
+        id: evaluate
         env:
+          LINEAR_SYNC_GITHUB_CACHE_DIR: .linear-sync-github-cache
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          LIFECYCLE_MODE: ${{ github.event_name == 'pull_request' && 'merge' || 'sweep' }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
           PR_BODY: ${{ github.event.pull_request.body }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
         run: node scripts/lib/linear-sync-on-merge.mjs
+
+      # Main-scoped only: a pull_request (merge) run restores but never saves.
+      - name: Save immutable GitHub reads
+        if: ${{ !cancelled() && github.event_name != 'pull_request' && steps.evaluate.outputs.github_cache_key != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .linear-sync-github-cache
+          key: ${{ steps.evaluate.outputs.github_cache_key }}

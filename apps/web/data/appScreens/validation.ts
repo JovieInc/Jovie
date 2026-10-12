@@ -1,3 +1,4 @@
+import type { SettingsAdmissionItem } from '@/components/features/settings/settings-decision-admission';
 import {
   APP_SCREEN_ARCHETYPE_IDS,
   APP_SCREEN_ARCHETYPE_REGISTRY,
@@ -116,7 +117,7 @@ const BROWSER_SAFE_STORY_ID =
 
 const SLOT_ID_SET: ReadonlySet<string> = new Set(APP_SCREEN_SLOT_IDS);
 const STATE_ID_SET: ReadonlySet<string> = new Set(APP_SCREEN_STATE_IDS);
-const REQUIRED_ARCHETYPE_IDS: readonly string[] = APP_SCREEN_ARCHETYPE_IDS;
+const REQUIRED_ARCHETYPE_IDS = APP_SCREEN_ARCHETYPE_IDS;
 
 const LEGACY_BODY_SOURCE_SET: ReadonlySet<string> = new Set(
   APP_SCREEN_LEGACY_BODY_SOURCES
@@ -679,4 +680,51 @@ export function buildAppScreenArchetypeReceipt(input: {
       storyId: entry.representativeStoryId,
     })),
   };
+}
+
+/** Existing screen authority validates settings admission; this is not a second registry. */
+export function validateSettingsAdmission(
+  groups: readonly {
+    items: readonly Pick<SettingsAdmissionItem, 'id' | 'href' | 'admission'>[];
+  }[],
+  screens: readonly AppScreenRegistryEntry[] = APP_SCREEN_REGISTRY
+): { itemId: string; code: string }[] {
+  const issues: { itemId: string; code: string }[] = [];
+  const ids = new Set<string>();
+  const allowedRoles = new Set([
+    'preference',
+    'consent',
+    'account-control',
+    'status',
+  ]);
+  for (const item of groups.flatMap(group => group.items)) {
+    const reject = (code: string) => issues.push({ itemId: item.id, code });
+    if (ids.has(item.id)) reject('duplicate-item');
+    ids.add(item.id);
+    const admission = item.admission;
+    if (!admission?.userJob.trim() || !admission.screenRationale.trim()) {
+      reject('missing-rationale');
+    }
+    if (!admission) continue;
+    if (!['profile', 'account', 'workspace'].includes(admission.scope))
+      reject('invalid-scope');
+    if (
+      !admission.roles.length ||
+      admission.roles.some(role => !allowedRoles.has(role))
+    )
+      reject('invalid-role');
+    const screen = screens.find(entry => entry.route === item.href);
+    const canonical = screens.find(
+      entry => entry.route === admission.canonicalRoute
+    );
+    if (
+      !screen ||
+      screen.conceptId !== admission.canonicalRoute ||
+      canonical?.kind !== 'canonical'
+    )
+      reject('canonical-screen-mismatch');
+    if (admission.defaultBehavior && !admission.overrideReason?.trim())
+      reject('missing-override-reason');
+  }
+  return issues;
 }

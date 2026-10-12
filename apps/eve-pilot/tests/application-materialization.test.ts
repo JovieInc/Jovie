@@ -16,7 +16,7 @@ describe('independent application source export', () => {
         expect(receipt.status).toBe('prepared-not-commissioned');
         expect(receipt.sourceCommit).toMatch(/^[a-f0-9]{40}$/u);
         expect(existsSync(join(destination, 'pnpm-lock.yaml'))).toBe(true);
-        expect(existsSync(join(destination, 'patches/eve@0.68.0.patch'))).toBe(
+        expect(existsSync(join(destination, 'patches/eve@0.72.1.patch'))).toBe(
           true
         );
         expect(
@@ -24,8 +24,8 @@ describe('independent application source export', () => {
         ).toBe(true);
         expect(
           JSON.parse(readFileSync(join(destination, 'package.json'), 'utf8'))
-            .pnpm.patchedDependencies['eve@0.68.0']
-        ).toBe('patches/eve@0.68.0.patch');
+            .pnpm.patchedDependencies['eve@0.72.1']
+        ).toBe('patches/eve@0.72.1.patch');
         // Eve 0.63 retired task_update; an orphan disableTool slot fails
         // discovery before the generated agent can enforce its tool boundary.
         expect(
@@ -45,9 +45,12 @@ describe('independent application source export', () => {
           existsSync(join(destination, 'agent/tools/connection_search.ts'))
         ).toBe(false);
         expect(existsSync(join(destination, 'agent/connections'))).toBe(false);
+        // Eve 0.70 reserves task_cancel and task_wait for built-in task
+        // tools; an authored file at either path fails compilation, so the
+        // export must not carry the former disableTool stub.
         expect(
           existsSync(join(destination, 'agent/tools/task_cancel.ts'))
-        ).toBe(true);
+        ).toBe(false);
         expect(existsSync(join(destination, '.env'))).toBe(false);
         expect(
           JSON.parse(readFileSync(join(destination, 'package.json'), 'utf8'))
@@ -94,6 +97,9 @@ describe('independent application source export', () => {
             'utf8'
           );
           expect(entrypoint).toContain("export * from './symphony-outage.js'");
+          expect(entrypoint).toContain(
+            "export * from './provider-incident.js'"
+          );
           for (const [, target] of entrypoint.matchAll(
             /from ['"](\.\/[^'"]+)['"]/gu
           ))
@@ -102,6 +108,11 @@ describe('independent application source export', () => {
                 join(contractDirectory, `${target.replace(/\.js$/u, '')}.ts`)
               )
             ).toBe(true);
+          expect(
+            receipt.files[
+              'vendor/agent-transport-contracts/provider-incident.ts'
+            ]
+          ).toBeDefined();
           expect(
             receipt.files['vendor/agent-transport-contracts/symphony-outage.ts']
           ).toBeDefined();

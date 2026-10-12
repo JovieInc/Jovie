@@ -32,6 +32,7 @@ describe('ArtistProfileAdaptiveSection', () => {
     render(
       <ArtistProfileHeroAdaptiveIntro
         hero={ARTIST_PROFILE_COPY.hero}
+        logoPlacement={{ page: '/artist-profiles' }}
         adaptive={ARTIST_PROFILE_COPY.adaptive}
       />
     );

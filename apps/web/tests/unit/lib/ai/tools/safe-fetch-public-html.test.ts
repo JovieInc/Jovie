@@ -140,6 +140,24 @@ describe('safeFetchPublicHtml — SSRF guards', () => {
 });
 
 describe('safeFetchPublicHtml — redirects', () => {
+  it('rejects a social redirect before resolving or fetching the page host', async () => {
+    const fetch = fetchMock(
+      () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: 'https://vm.tiktok.com/artist' },
+        })
+    );
+    vi.stubGlobal('fetch', fetch);
+    await expect(
+      safeFetchPublicHtml('https://example.com/profile')
+    ).resolves.toEqual({
+      ok: false,
+      error: 'blocked_host',
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(mockLookup).toHaveBeenCalledTimes(1);
+  });
   it('follows up to 3 redirects then succeeds', async () => {
     let hops = 0;
     vi.stubGlobal(

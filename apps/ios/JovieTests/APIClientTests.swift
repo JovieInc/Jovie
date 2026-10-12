@@ -1503,26 +1503,33 @@ final class NativeExchangeReplyProtocol: URLProtocol {
 }
 
 extension APIClientTests {
-  @Test(arguments: ["missing", "wrong_code", "wrong_client", "wrong_state", "wrong_verifier", "expired", "replayed"])
+  @Test(arguments: ["missing", "wrong_code", "wrong_client", "wrong_state", "wrong_attempt", "wrong_verifier", "expired", "replayed"])
   func nativeExchangeRecognizesExplicitPreconsumeRejection(reason: String) async throws {
     try await withNativeSessionTokenStoreTestIsolation {
       let session = NativeExchangeReplyProtocol.session(status: 401,
         body: "{\"exchangePhase\":\"preconsume\",\"reason\":\"\(reason)\"}")
       defer { session.invalidateAndCancel() }
       let client = NativeAuthExchangeClient(baseURL: URL(string: "https://jov.ie")!, session: session)
+      let nonce = reason == "wrong_attempt" ? String(repeating: "A", count: 43) : nil
       await #expect(throws: NativeAuthExchangeError.rejectedBeforeConsume(reason: reason)) {
-        _ = try await client.exchange(MobileAuthReturn(code: "code", state: "state", codeVerifier: "verifier"))
+        _ = try await client.exchange(MobileAuthReturn(code: "code", state: "state",
+          codeVerifier: "verifier", nativeAttempt: nonce))
       }
       let request = try #require(NativeExchangeReplyProtocol.requests.first)
       #expect(NativeExchangeReplyProtocol.requests.count == 1)
       #expect(request.url?.path == "/api/auth/native/exchange" && request.httpMethod == "POST")
       let body = try #require(JSONSerialization.jsonObject(with: requestBodyData(request)) as? [String: String])
-      #expect(body == ["client": "ios", "code": "code", "state": "state", "codeVerifier": "verifier"])
+      var expected = ["client": "ios", "code": "code", "state": "state", "codeVerifier": "verifier"]
+      if let nonce { expected["nativeAttempt"] = nonce }
+      #expect(body == expected)
     }
   }
 
   @Test(arguments: [
     (401, "{\"reason\":\"missing\"}", "missing"),
+    (401, "{\"reason\":\"wrong_attempt\"}", "wrong_attempt"),
+    (401, "{\"exchangePhase\":\"consumed\",\"reason\":\"wrong_attempt\"}", "wrong_attempt"),
+    (400, "{\"exchangePhase\":\"preconsume\",\"reason\":\"wrong_attempt\"}", "wrong_attempt"),
     (401, "{\"exchangePhase\":\"consumed\",\"reason\":\"missing\"}", "missing"),
     (401, "{\"exchangePhase\":\"preconsume\",\"reason\":\"ott_invalid\"}", "ott_invalid"),
     (401, "{\"exchangePhase\":\"preconsume\",\"reason\":\"future_reason\"}", "future_reason"),

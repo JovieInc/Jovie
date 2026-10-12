@@ -8,15 +8,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import { createReferral, getInternalUserId } from '@/lib/referrals/service';
+import { createReferral } from '@/lib/referrals/service';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId: clerkUserId } = await getCachedAuth();
-    if (!clerkUserId) {
+    const { userId: appUserId } = await getCachedAuth();
+    if (!appUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
@@ -42,17 +42,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Look up internal user ID
-    const internalUserId = await getInternalUserId(clerkUserId);
-
-    if (!internalUserId) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const result = await createReferral(internalUserId, code);
+    const result = await createReferral(appUserId, code);
 
     if (!result.success) {
       return NextResponse.json(

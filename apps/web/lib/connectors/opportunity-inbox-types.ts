@@ -27,6 +27,8 @@ export interface OpportunityInboxSocialReplyData {
   readonly inboundText: string;
   readonly draftedText: string;
   readonly sourceUrl: string | null;
+  readonly videoTitle?: string | null;
+  readonly likeCount?: number | null;
   readonly executionState: OpportunityInboxSocialReplyExecutionState;
   readonly revisionCount: number;
 }

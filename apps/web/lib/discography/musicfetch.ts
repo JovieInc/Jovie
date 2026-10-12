@@ -113,7 +113,9 @@ export function isMusicfetchConfigured(): boolean {
 
 export function isMusicfetchAvailable(): boolean {
   return (
-    isMusicfetchConfigured() && musicfetchCircuitBreaker.getState() !== 'OPEN'
+    isMusicfetchConfigured() &&
+    musicfetchNetworkAllowed() &&
+    musicfetchCircuitBreaker.getState() !== 'OPEN'
   );
 }
 

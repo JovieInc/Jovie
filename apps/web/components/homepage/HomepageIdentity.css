@@ -13,6 +13,7 @@
 /* One page spine: the shared public content column inside the shared page
    gutter (home.css), identical for header, hero, and every chapter. */
 .homepage-identity-hero,
+.homepage-claim-hero,
 .homepage-identity-section,
 .homepage-identity-close {
   --homepage-identity-width: min(
@@ -605,6 +606,38 @@
 /* ── Claim hero: identity + link claim (Pen STAGING Cyuz2 / xm2iz, 2026-09-28).
    The rules above for .homepage-identity-hero* are retired with the old hero
    and removed in the follow-up cleanup PR. ─────────────────────────────── */
+
+/* This homepage instance shares the chapters' usable content width.
+   The shared split hero retains vertical spacing and responsive behavior;
+   remove its extra horizontal inset so reading caps do not place columns. */
+.homepage-claim-hero .homepage-claim-hero__layout {
+  width: var(--homepage-identity-width);
+  max-width: none;
+  padding-inline: 0;
+}
+
+@media (min-width: 1024px) {
+  .homepage-claim-hero .homepage-claim-hero__layout {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--space-6);
+  }
+
+  .homepage-claim-hero__layout > .homepage-claim-hero__copy {
+    grid-column: 1 / span 6;
+  }
+
+  .homepage-claim-hero__layout > .homepage-claim-hero__card {
+    grid-column: 7 / span 6;
+  }
+}
+
+/* Keep the technical texture's seam clear of supporting copy on phones.
+   The desktop split composition retains the shared right-aligned crop. */
+@media (max-width: 767px) {
+  .homepage-claim-hero .marketing-hero-photo__img {
+    object-position: 70% center;
+  }
+}
 
 /* This hero's split shell breaks into two columns at md (768), a whole
    breakpoint earlier than the shared marketing H1 ramp expects (that ramp

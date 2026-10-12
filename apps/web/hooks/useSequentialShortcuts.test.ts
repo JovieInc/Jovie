@@ -62,7 +62,7 @@ describe('useSequentialShortcuts', () => {
       fireKey('p');
     });
 
-    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_PROFILE);
   });
 
   it('navigates on valid G then O sequence (tour dates)', () => {

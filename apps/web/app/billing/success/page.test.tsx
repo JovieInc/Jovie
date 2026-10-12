@@ -313,6 +313,22 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     ).toHaveAttribute('href', '/app/presence');
   });
 
+  it('sends a buyer who paid before claiming a link on to claim it', async () => {
+    setSearchParams('session_id=cs_test&plan_id=pro');
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ plan: 'pro', needsProfile: true }),
+    });
+    mockBilling('pro');
+    render(<CheckoutSuccessPage />);
+    expect(
+      await screen.findByRole('link', { name: /claim your link/i })
+    ).toHaveAttribute('href', '/start');
+    expect(
+      screen.queryByRole('link', { name: /open artist visibility/i })
+    ).not.toBeInTheDocument();
+  });
+
   it('secondary CTA routes to /app/releases on Max', () => {
     mockBilling('max');
     render(<CheckoutSuccessPage />);

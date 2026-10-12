@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getAccountMetricCohort,
   getEmailDomain,
   getEmailSendBlockReason,
   INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN,
@@ -104,5 +105,15 @@ describe('isInternalOrTestAccountEmail', () => {
     ['fan+synthetic@gmail.com'],
   ])('SQL pattern keeps %s external', email => {
     expect(sqlPattern.test(email.toLowerCase())).toBe(false);
+  });
+});
+
+describe('getAccountMetricCohort', () => {
+  it('separates customers, synthetic principals, and unknown traffic', () => {
+    expect(getAccountMetricCohort('artist@band.com')).toBe('customer');
+    expect(getAccountMetricCohort('auth-surface-qa@test.jovie.com')).toBe(
+      'synthetic'
+    );
+    expect(getAccountMetricCohort(null)).toBe('unattributed');
   });
 });

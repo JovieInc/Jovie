@@ -42,9 +42,11 @@ describe('UnifiedTable sort provenance (eval G4)', () => {
       />
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Sorted by Name, ascending'
-    );
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Sorted by Name, ascending');
+    // JOV-7710: the sticky status paints the main plane's own material.
+    expect(status).toHaveClass('bg-(--app-shell-content-surface)');
+    expect(status.className).not.toContain('bg-surface-1');
   });
 
   it('announces descending sort direction when the header is hidden', () => {

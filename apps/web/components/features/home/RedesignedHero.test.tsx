@@ -9,8 +9,8 @@ vi.mock('./claim-handle', () => ({
 }));
 
 describe('RedesignedHero', () => {
-  it('renders bounded launch copy and the hero claim form', async () => {
-    render(await RedesignedHero());
+  it('renders bounded launch copy and the hero claim form', () => {
+    render(<RedesignedHero />);
 
     expect(
       screen.getByRole('heading', {

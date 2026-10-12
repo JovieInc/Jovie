@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import WaitlistPage from '@/app/waitlist/page';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 
 const {
@@ -28,8 +29,9 @@ vi.mock('next/navigation', () => ({
   },
 }));
 
-vi.mock('@/lib/auth/gate', () => ({
-  CanonicalUserState,
+vi.mock('@/lib/auth/gate', async () => ({
+  CanonicalUserState: (await import('@/lib/auth/canonical-user-state'))
+    .CanonicalUserState,
   getWaitlistAccess: mockGetWaitlistAccess,
   getWaitlistReservedHandle: mockGetWaitlistReservedHandle,
   resolveUserState: mockResolveUserState,
@@ -78,8 +80,6 @@ describe('WaitlistPage', () => {
         context: { email: 'artist@example.com' },
       });
 
-      const { default: WaitlistPage } = await import('../../app/waitlist/page');
-
       await expect(WaitlistPage()).rejects.toThrow('NEXT_REDIRECT');
       expect(mockRedirect).toHaveBeenCalledTimes(1);
       expect(mockRedirect).toHaveBeenCalledWith(expectedRedirect);
@@ -95,7 +95,6 @@ describe('WaitlistPage', () => {
       context: { email: null },
     });
 
-    const { default: WaitlistPage } = await import('../../app/waitlist/page');
     const { WaitlistPublicLanding } = await import(
       '@/components/features/waitlist/WaitlistPublicLanding'
     );
@@ -118,7 +117,6 @@ describe('WaitlistPage', () => {
     mockNotFound.mockClear();
     mockResolveUserState.mockClear();
 
-    const { default: WaitlistPage } = await import('../../app/waitlist/page');
     const { WaitlistPublicLanding } = await import(
       '@/components/features/waitlist/WaitlistPublicLanding'
     );
@@ -141,7 +139,6 @@ describe('WaitlistPage', () => {
       new Error('waitlist table unavailable')
     );
 
-    const { default: WaitlistPage } = await import('../../app/waitlist/page');
     const { WaitlistSuccessView } = await import(
       '@/components/features/waitlist/WaitlistSuccessView'
     );
@@ -169,7 +166,6 @@ describe('WaitlistPage', () => {
     });
     mockGetWaitlistReservedHandle.mockResolvedValue('tim');
 
-    const { default: WaitlistPage } = await import('../../app/waitlist/page');
     const { WaitlistSuccessView } = await import(
       '@/components/features/waitlist/WaitlistSuccessView'
     );
@@ -201,8 +197,6 @@ describe('WaitlistPage', () => {
         context: { email: 'artist@example.com' },
       });
       mockGetWaitlistAccess.mockResolvedValue({ entryId: null, status: null });
-
-      const { default: WaitlistPage } = await import('../../app/waitlist/page');
 
       if (state === CanonicalUserState.WAITLIST_PENDING) {
         const { WaitlistSuccessView } = await import(

@@ -79,7 +79,17 @@ describe('createUsageMeterModel', () => {
   it('fails closed for invalid or non-positive counters', () => {
     expect(createUsageMeterModel({ used: Number.NaN, limit: 100 })).toBeNull();
     expect(createUsageMeterModel({ used: -1, limit: 100 })).toBeNull();
-    expect(createUsageMeterModel({ used: 0, limit: 0 })).toBeNull();
+    expect(createUsageMeterModel({ used: 0, limit: 0 })).toMatchObject({
+      used: 0,
+      remaining: 0,
+      limit: 0,
+      state: 'exhausted',
+    });
+    expect(createUsageMeterModel({ used: 18, limit: 15 })).toMatchObject({
+      used: 18,
+      remaining: 0,
+      limit: 15,
+    });
     expect(
       createUsageMeterModel({ used: 0, limit: 100, remaining: Infinity })
     ).toBeNull();

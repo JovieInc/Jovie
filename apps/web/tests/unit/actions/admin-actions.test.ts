@@ -20,6 +20,7 @@ const {
   mockInvalidateProxyUserStateCache,
   mockEnqueueMusicFetchEnrichmentJob,
   mockEnqueueDspArtistDiscoveryJob,
+  mockClaimAndEnqueueCustomerRecovery,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockIsAdmin: vi.fn(),
@@ -32,6 +33,7 @@ const {
   mockInvalidateProxyUserStateCache: vi.fn(),
   mockEnqueueMusicFetchEnrichmentJob: vi.fn(),
   mockEnqueueDspArtistDiscoveryJob: vi.fn(),
+  mockClaimAndEnqueueCustomerRecovery: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -68,10 +70,15 @@ vi.mock('@/lib/ingestion/jobs', () => ({
   },
 }));
 
+vi.mock('@/lib/db/customer-recovery', () => ({
+  claimAndEnqueueCustomerRecovery: mockClaimAndEnqueueCustomerRecovery,
+}));
+
 vi.mock('@/constants/routes', () => ({
   APP_ROUTES: {
     ADMIN: '/admin',
     ADMIN_CREATORS: '/admin/creators',
+    ADMIN_PEOPLE: '/app/ov/people',
   },
 }));
 
@@ -213,6 +220,11 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     id: 'creatorProfiles.id',
     username: 'creatorProfiles.username',
     usernameNormalized: 'creatorProfiles.usernameNormalized',
+    spotifyId: 'creatorProfiles.spotifyId',
+    spotifyUrl: 'creatorProfiles.spotifyUrl',
+    ingestionStatus: 'creatorProfiles.ingestionStatus',
+    lastIngestionError: 'creatorProfiles.lastIngestionError',
+    updatedAt: 'creatorProfiles.updatedAt',
   },
   userProfileClaims: {
     userId: 'userProfileClaims.userId',
@@ -238,6 +250,7 @@ function makeFormData(entries: Record<string, string>): FormData {
 describe('admin/actions.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockClaimAndEnqueueCustomerRecovery.mockReset();
     // Default: authenticated admin
     mockGetCachedAuth.mockResolvedValue({ userId: 'admin_123' });
     mockIsAdmin.mockResolvedValue(true);
@@ -270,6 +283,7 @@ describe('admin/actions.ts', () => {
     const actionNames = [
       'toggleCreatorVerifiedAction',
       'bulkRerunCreatorIngestionAction',
+      'rerunCustomerIngestionAction',
       'bulkSetCreatorsVerifiedAction',
       'toggleCreatorFeaturedAction',
       'bulkSetCreatorsFeaturedAction',
@@ -528,6 +542,101 @@ describe('admin/actions.ts', () => {
       await expect(bulkRerunCreatorIngestionAction(fd)).rejects.toThrow(
         'profileIds must contain at least one id'
       );
+    });
+  });
+
+  // =========================================================================
+  // rerunCustomerIngestionAction
+  // =========================================================================
+  describe('rerunCustomerIngestionAction', () => {
+    const failedProfile = {
+      id: 'p1',
+      spotifyId: 'spotify-1',
+      spotifyUrl: 'https://open.spotify.com/artist/spotify-1',
+      ingestionStatus: 'failed',
+      lastIngestionError: 'provider timeout',
+    };
+
+    it('atomically claims a failed profile and queues the supported recovery', async () => {
+      createMultiSelectChain([
+        [{ userStatus: 'active', deletedAt: null }],
+        [failedProfile],
+      ]);
+      mockClaimAndEnqueueCustomerRecovery.mockResolvedValue('job-1');
+      mockEnqueueDspArtistDiscoveryJob.mockResolvedValue('dsp-job-1');
+
+      const { rerunCustomerIngestionAction } = await import(
+        '@/app/app/(shell)/admin/actions'
+      );
+      const result = await rerunCustomerIngestionAction(
+        makeFormData({ profileId: 'p1' })
+      );
+
+      expect(result).toMatchObject({ state: 'requested', queuedCount: 1 });
+      expect(mockClaimAndEnqueueCustomerRecovery).toHaveBeenCalledWith({
+        creatorProfileId: 'p1',
+        spotifyUrl: 'https://open.spotify.com/artist/spotify-1',
+      });
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/ov/people');
+    });
+
+    it('refuses a healthy profile without enqueuing work', async () => {
+      createMultiSelectChain([
+        [{ userStatus: 'active', deletedAt: null }],
+        [{ ...failedProfile, ingestionStatus: 'idle' }],
+      ]);
+
+      const { rerunCustomerIngestionAction } = await import(
+        '@/app/app/(shell)/admin/actions'
+      );
+      const result = await rerunCustomerIngestionAction(
+        makeFormData({ profileId: 'p1' })
+      );
+
+      expect(result).toMatchObject({ state: 'not-failed', queuedCount: 0 });
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect(mockEnqueueMusicFetchEnrichmentJob).not.toHaveBeenCalled();
+    });
+
+    it('treats a lost failed-to-pending claim as an in-flight recovery', async () => {
+      createMultiSelectChain([
+        [{ userStatus: 'active', deletedAt: null }],
+        [failedProfile],
+      ]);
+      mockClaimAndEnqueueCustomerRecovery.mockResolvedValue(null);
+
+      const { rerunCustomerIngestionAction } = await import(
+        '@/app/app/(shell)/admin/actions'
+      );
+      const result = await rerunCustomerIngestionAction(
+        makeFormData({ profileId: 'p1' })
+      );
+
+      expect(result).toMatchObject({
+        state: 'already-running',
+        queuedCount: 0,
+      });
+      expect(mockEnqueueMusicFetchEnrichmentJob).not.toHaveBeenCalled();
+    });
+
+    it('leaves the failed state unchanged when the atomic enqueue fails', async () => {
+      createMultiSelectChain([
+        [{ userStatus: 'active', deletedAt: null }],
+        [failedProfile],
+      ]);
+      mockClaimAndEnqueueCustomerRecovery.mockRejectedValue(
+        new Error('queue unavailable')
+      );
+
+      const { rerunCustomerIngestionAction } = await import(
+        '@/app/app/(shell)/admin/actions'
+      );
+
+      await expect(
+        rerunCustomerIngestionAction(makeFormData({ profileId: 'p1' }))
+      ).rejects.toThrow('queue unavailable');
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect(mockEnqueueDspArtistDiscoveryJob).not.toHaveBeenCalled();
     });
   });
 

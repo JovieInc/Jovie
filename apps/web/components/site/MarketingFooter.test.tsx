@@ -52,6 +52,37 @@ describe('MarketingFooter', () => {
     themeState.setTheme.mockReset();
   });
 
+  it('keeps the Music column until generic creator nav is passed', () => {
+    render(<MarketingFooter />);
+    expect(screen.getByRole('heading', { name: 'Music' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Customers' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Fan Capture' })).toHaveAttribute(
+      'href',
+      '/artist-profiles#capture-every-fan'
+    );
+  });
+
+  it('renames the Music column when generic creator nav is passed', () => {
+    render(<MarketingFooter genericCreatorNav />);
+    expect(screen.getByRole('heading', { name: 'Customers' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Music' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
+      'href',
+      '/solutions/artists'
+    );
+    expect(screen.getByRole('link', { name: 'Smart Links' })).toHaveAttribute(
+      'href',
+      '/smart-links'
+    );
+    expect(
+      screen.getByRole('link', { name: 'Audience Capture' })
+    ).toHaveAttribute('href', '/artist-profiles#capture-every-fan');
+    expect(
+      screen.getByRole('link', { name: 'Audience Reactivation' })
+    ).toHaveAttribute('href', '/artist-profiles#bring-them-back-automatically');
+    expect(screen.queryByRole('link', { name: 'Fan Capture' })).toBeNull();
+  });
+
   it('keeps the current footer columns while the about refresh flag is off', () => {
     mockUsePathname.mockReturnValue('/about');
     render(<MarketingFooter />);
@@ -72,6 +103,7 @@ describe('MarketingFooter', () => {
     render(<MarketingFooter />);
 
     const footer = screen.getByTestId('marketing-footer');
+    expect(footer).toHaveAttribute('data-footer-variant', 'expanded');
     expect(footer).toHaveAttribute(
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.shell.footer
@@ -154,6 +186,10 @@ describe('MarketingFooter', () => {
 
     render(<MarketingFooter />);
 
+    expect(screen.getByTestId('marketing-footer')).toHaveAttribute(
+      'data-footer-variant',
+      'minimal'
+    );
     expect(screen.getByTestId('marketing-footer')).toHaveClass(
       'system-b-mounted-home-footer'
     );

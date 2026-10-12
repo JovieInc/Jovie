@@ -247,10 +247,11 @@ describe('Actions cache GC', () => {
     expect(snapshot.openRefs.has('refs/pull/17/merge')).toBe(true);
   });
 
-  it('schedules automatic GC with actions: write and no human smash', () => {
+  it('runs automatic GC on main pushes with actions: write and no human smash', () => {
+    expect(WORKFLOW).not.toMatch(/^ {2}schedule:/m);
     for (const token of [
       'name: Actions Cache GC',
-      "cron: '19 4 * * *'",
+      'push:\n    branches: [main]',
       'workflow_dispatch:',
       'actions: write',
       'node scripts/lib/actions-cache-gc.mjs',

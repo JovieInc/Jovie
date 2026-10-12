@@ -5,17 +5,17 @@
 Every PR tied to a Linear issue follows this three-state flow:
 
 ```
-Todo → [agent: In Progress] → [PR opened: In Review] → [PR merged: Done]
-         ^ manual              ^ auto (orchestrator)    ^ auto (sync-on-merge)
+Todo → [agent: In Progress] → [PR opened: In Review] → [PR merged: Merging] → [deployed: Validating] → [receipts pass: Done]
+         ^ manual              ^ auto (orchestrator)    ^ auto (sync-on-merge, receipt-gated)
 ```
 
 - **In Progress** — the agent marks the issue before editing files. Dispatched work (via `linear-ai-orchestrator.yml`) sets this automatically; ad-hoc work is the agent's responsibility. See `.claude/rules/linear.md` → "Linear Ownership Contract".
 - **In Review** — `.github/workflows/linear-ai-orchestrator.yml` (`sync_linear_in_review` job) sets this when the PR is opened.
-- **Done** — `.github/workflows/linear-sync-on-merge.yml` sets this when the PR merges and no linked PR is still open or draft, and the issue is not a commissioning or parent issue. Otherwise the issue stays open and the workflow comments with the reason.
+- **Merging → Validating → Done** — `.github/workflows/linear-sync-on-merge.yml` moves a merged issue to `Merging` until a verified production generation contains the merge, to `Validating` while a required receipt is missing, to `Rework` when a required receipt fails, and to `Done` only when every required receipt passes (JOV-7694). It re-evaluates after each Production Controller run and whenever a validation receipt comment lands (bridged by `/api/webhooks/linear`), and comments the manifest and the next missing receipt. Linked PRs still open or draft, or open sub-issues, hold the issue in place with a comment. See `.claude/rules/linear.md` for the receipt kinds.
 
 **Troubleshooting**: if the auto-transitions don't fire, the issue→PR link is broken. Verify:
 
-1. The PR body contains `<!-- linear-issue-id:... -->` (injected by `.github/workflows/auto-pr-on-push.yml`), OR
+1. The PR body contains `<!-- linear-issue-id:... -->`, OR
 2. The branch name contains `jov-NNNN` (e.g., `codex/jov-1433-foo`, `itstimwhite/jov-1433-foo`).
 
 If neither is present, the workflows cannot find the Linear issue and state stays stuck.

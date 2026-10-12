@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   stripeMetrics: vi.fn(),
   lybMrr: vi.fn(),
+  founderAccounts: vi.fn(),
   sessionsList: vi.fn(),
   dbResults: [] as unknown[],
   env: { STRIPE_SECRET_KEY: 'sk_test_x' as string | undefined },
@@ -13,6 +14,9 @@ vi.mock('@/lib/admin/stripe-metrics', () => ({
   getAdminStripeOverviewMetrics: hoisted.stripeMetrics,
 }));
 vi.mock('./lyb-mrr.server', () => ({ getLybDailyMrr: hoisted.lybMrr }));
+vi.mock('./summer-founder-cohort.server', () => ({
+  getSummerFounderAccounts: hoisted.founderAccounts,
+}));
 vi.mock('@/lib/env-server', () => ({ env: hoisted.env }));
 vi.mock('@/lib/stripe/client', () => ({
   stripe: { checkout: { sessions: { list: hoisted.sessionsList } } },
@@ -65,10 +69,14 @@ describe('getSummerRevenue', () => {
     await expect(getSummerRevenue(NOW)).resolves.toEqual({
       observedAt: NOW.toISOString(),
       jovie: {
+        metricScope: 'customer_only',
         mrrUsd: 120,
         activeSubscriptions: 3,
         excludedInternal: 1,
         excludedInternalMrrUsd: 199,
+        rawMrrUsd: 319,
+        rawActiveSubscriptions: 4,
+        syntheticHealth: { mrrUsd: 199, activeSubscriptions: 1 },
         source: 'stripe',
       },
       lyb: lybRecord,
@@ -143,6 +151,22 @@ describe('getSummerCohort', () => {
     hoisted.env.STRIPE_SECRET_KEY = 'sk_test_x';
   });
 
+  it('reads diagnostic accounts without Stripe or outreach cohort queries', async () => {
+    hoisted.env.STRIPE_SECRET_KEY = undefined;
+    const cohort = {
+      total: 4,
+      rows: [{ id: 'u1', displayName: 'Account' }],
+      purpose: 'activation_diagnosis',
+    };
+    hoisted.founderAccounts.mockResolvedValue(cohort);
+    await expect(getSummerCohort('accounts_created', 10)).resolves.toEqual(
+      cohort
+    );
+    expect(hoisted.founderAccounts).toHaveBeenCalledExactlyOnceWith(10);
+    expect(hoisted.sessionsList).not.toHaveBeenCalled();
+    expect(hoisted.dbResults).toEqual([]);
+  });
+
   it('lists claimed artists with profile links and a total', async () => {
     hoisted.dbResults.push(
       [
@@ -158,8 +182,12 @@ describe('getSummerCohort', () => {
       [{ total: 50 }]
     );
     await expect(getSummerCohort('claimed_artists', 10)).resolves.toEqual({
+      metricScope: 'customer_only',
       total: 7,
       excludedInternal: 50,
+      customerTotal: 7,
+      rawTotal: 57,
+      syntheticHealth: { total: 50 },
       rows: [
         {
           id: 'p1',
@@ -186,8 +214,12 @@ describe('getSummerCohort', () => {
       [{ total: 2 }]
     );
     await expect(getSummerCohort('churned', 10)).resolves.toEqual({
+      metricScope: 'customer_only',
       total: 1,
       excludedInternal: 2,
+      customerTotal: 1,
+      rawTotal: 3,
+      syntheticHealth: { total: 2 },
       rows: [
         {
           id: 'u1',
@@ -254,8 +286,12 @@ describe('getSummerCohort', () => {
       expect.objectContaining({ status: 'expired' })
     );
     expect(cohort).toEqual({
+      metricScope: 'customer_only',
       total: 1,
       excludedInternal: 2,
+      customerTotal: 1,
+      rawTotal: 3,
+      syntheticHealth: { total: 2 },
       rows: [
         {
           id: 'u1',
@@ -271,6 +307,14 @@ describe('getSummerCohort', () => {
     hoisted.sessionsList.mockResolvedValue({ has_more: false, data: [] });
     await expect(
       getSummerCohort('checkout_abandoned', 10, NOW)
-    ).resolves.toEqual({ total: 0, excludedInternal: 0, rows: [] });
+    ).resolves.toEqual({
+      metricScope: 'customer_only',
+      total: 0,
+      excludedInternal: 0,
+      customerTotal: 0,
+      rawTotal: 0,
+      syntheticHealth: { total: 0 },
+      rows: [],
+    });
   });
 });

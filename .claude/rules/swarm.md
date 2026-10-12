@@ -158,6 +158,7 @@ scripts/agent/worktree-new /private/tmp/jovie-worktrees/chunk-a -b tim/chunk-a
 scripts/agent/worktree-new /private/tmp/jovie-worktrees/chunk-b -b tim/chunk-b
 scripts/agent/worktree-new /private/tmp/jovie-worktrees/chunk-c -b tim/chunk-c
 # ... then spawn all agents in parallel
+# When a chunk is merged: scripts/agent/worktree-new --recycle <dir> (returns clean ones to the pool)
 ```
 
 Worktrees share the Turbo cache automatically (Turbo 2.8+). No configuration needed.

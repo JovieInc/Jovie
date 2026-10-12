@@ -4,6 +4,7 @@ import { Container } from '@/components/site/Container';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 import { NotFoundPageContent } from '@/components/site/NotFoundPageContent';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 
 export default function NotFound() {
   return (
@@ -22,7 +23,9 @@ export default function NotFound() {
         </Container>
       </main>
 
-      <MarketingFooter />
+      <MarketingFooter
+        genericCreatorNav={isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')}
+      />
     </div>
   );
 }

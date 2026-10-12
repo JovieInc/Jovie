@@ -3,14 +3,44 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("yc_corpus", ROOT / "scripts/lanes/yc_corpus.py")
 yc = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(yc)
+
+REAL_POPEN = subprocess.Popen
+_GUARDS = []
+
+
+def _forbidden(what):
+    def refuse(*args, **kwargs):
+        raise AssertionError(f"test attempted a real {what}: {args[:1]}")
+    return refuse
+
+
+def setUpModule():
+    # Every test here must inject its effects. A real gbrain write, network fetch or detached
+    # refresh from the release self-test is a bug (2026-10-11: orphaned refresh pairs on Gem).
+    for target, name, what in ((yc.subprocess, "Popen", "process spawn"), (yc.subprocess, "run", "command"),
+                               (yc.urllib.request, "urlopen", "network fetch"), (yc.lifecycle, "run", "command")):
+        guard = patch.object(target, name, _forbidden(what))
+        guard.start()
+        _GUARDS.append(guard)
+
+
+def tearDownModule():
+    while _GUARDS:
+        _GUARDS.pop().stop()
+
 
 LIBRARY_URL = "https://www.ycombinator.com/library/Iq-how-to-talk-to-users"
 SITEMAP = f"<urlset><url><loc>{LIBRARY_URL}</loc></url><url><loc>https://www.ycombinator.com/library?categories=Pricing</loc></url></urlset>"
@@ -126,6 +156,71 @@ class YcCorpusTest(unittest.TestCase):
         self.assertEqual(second["status"], "current")
         self.assertEqual(len(spawned), 1)
         self.assertEqual(spawned[0][1:3], [str(ROOT / "scripts/lanes/yc_corpus.py"), "refresh"])
+
+
+class SelftestIsolationTest(unittest.TestCase):
+    def test_selftest_never_schedules_the_real_refresh(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
+            self.assertEqual(yc.tick(Path(tmp), now=100), {"status": "selftest-skipped"})
+            self.assertEqual(list(Path(tmp).iterdir()), [], "a skipped tick writes no schedule")
+
+    def test_selftest_refuses_real_gbrain_and_network_before_any_effect(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
+            with self.assertRaises(yc.SelftestEffectRefused):
+                yc.gbrain_put(yc.SOURCE_PREFIX + "fixture", "t", "body\n")
+            with self.assertRaises(yc.SelftestEffectRefused):
+                yc.fetch_url(yc.LIBRARY_SITEMAP)
+            result = yc.refresh(Path(tmp) / "yc.json", limit=1, now=1_797_000_000)
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("SelftestEffectRefused", result["failures"][0])
+
+    def test_standalone_run_kills_the_whole_group_on_timeout(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(yc.subprocess, "Popen", REAL_POPEN):
+            marker = Path(tmp) / "child.pid"
+            with self.assertRaises(subprocess.TimeoutExpired):
+                yc.run_in_group(["sh", "-c", f"sleep 30 & echo $! > {marker}; wait"],
+                                capture_output=True, text=True, timeout=1)
+            child = int(marker.read_text())
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                try:
+                    os.kill(child, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(.05)
+            else:
+                self.fail("grandchild survived the group kill")
+
+
+class GbrainPutTest(unittest.TestCase):
+    """JOV-7715: a put is stored only when the read-back carries the page body."""
+
+    def run_put(self, stored, put=None):
+        calls = []
+
+        def run(args, **kw):
+            calls.append((args, kw))
+            if args[1] == "put":
+                if put:
+                    raise put
+                return subprocess.CompletedProcess(args, 0, "ok", "")
+            if isinstance(stored, BaseException):
+                raise stored
+            return stored
+        return yc.gbrain_put("s", "t", "---\ntitle: t\n---\n# T\n\nlast line\n", run=run), calls
+
+    def test_read_back_decides(self):
+        ok, calls = self.run_put(subprocess.CompletedProcess([], 0, "# T\n\nlast   line", ""))
+        self.assertEqual(ok, (True, None))
+        self.assertEqual(calls[0][0], ["gbrain", "put", "s"])
+        self.assertIn("last line", calls[0][1]["input"])
+        hung, _ = self.run_put(subprocess.CompletedProcess([], 0, "last line", ""),
+                               put=subprocess.TimeoutExpired("gbrain", 120))
+        self.assertTrue(hung[0])
+        self.assertEqual(self.run_put(subprocess.CompletedProcess([], 0, "---\ntitle: t\n---\n", ""))[0],
+                         (False, "gbrain read-back missing page body"))
+        self.assertFalse(self.run_put(OSError("down"))[0][0])
+        self.assertFalse(self.run_put(None, put=OSError("missing"))[0][0])
 
 
 if __name__ == "__main__":

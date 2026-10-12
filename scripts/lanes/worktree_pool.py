@@ -6,12 +6,15 @@ load: pnpm materialises ~230k files per worktree and every one is a filesystem o
 whatever the import method. A pooled slot already has `node_modules` and a warm
 `apps/web/.cache/tsbuildinfo`; taking one is a rename (`git worktree move`), a checkout
 of the diff since the slot was built, and an incremental install (~35s measured).
+Finished clean worktrees go back into the pool (`recycle`) instead of being deleted:
+removing 230k files took 3 to 32 minutes per worktree under load (JOV-7723).
 
 This is the local analogue of a Cursor cloud-agent Build snapshot: prepare the disk
 once in the background, start every agent from the prepared disk.
 
     scripts/agent/worktree-new <dest> -b <branch> [--base origin/main]
     scripts/agent/worktree-new --fill [--size N]     # build slots (background-safe)
+    scripts/agent/worktree-new --recycle <dir>       # done with a clean worktree: back to the pool
     scripts/agent/worktree-new --drain               # remove every idle slot
     scripts/agent/worktree-new --status
 
@@ -32,6 +35,8 @@ import sys
 import time
 import uuid
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 
 CACHE_ROOT = Path(os.environ.get("JOVIE_CACHE_ROOT", Path.home() / ".cache" / "jovie"))
 POOL_SIZE = int(os.environ.get("JOVIE_WORKTREE_POOL_SIZE", "2"))
@@ -42,6 +47,10 @@ SLOT_MAX_AGE_S = 3 * 24 * 3600
 INSTALL = ["pnpm", "install", "--frozen-lockfile", "--prefer-offline", "--package-import-method=hardlink"]
 WARM = ["pnpm", "--filter", "@jovie/web", "run", "typecheck"]
 READY = ".ready"
+PRESERVED_REPAIR = ".jovie-preserved-repair.json"  # disk_guard's marker; never recycle those
+# Build output that would otherwise ride along into the next agent's checkout. Installed
+# dependencies and the tsc cache (`.cache/`) are what make a slot worth keeping.
+RECYCLE_KEEP = ["node_modules", ".cache"]
 CLAIMED = ".claimed"
 CLAIM_GRACE_S = 15 * 60
 
@@ -60,7 +69,7 @@ def run(args: list[str], cwd: Path | None = None, log=None, timeout: int = 1800,
         stream = log if log is not None and log.fileno() >= 0 else None
     except (AttributeError, OSError, ValueError):
         stream = None  # an in-memory log: capture, then copy the output in
-    result = subprocess.run(args, cwd=cwd, stdout=stream or subprocess.PIPE, stderr=subprocess.STDOUT,
+    result = lifecycle.run(args, cwd=cwd, stdout=stream or subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, timeout=timeout, env=env)
     if stream is None and log is not None:
         log.write(result.stdout or "")
@@ -69,7 +78,7 @@ def run(args: list[str], cwd: Path | None = None, log=None, timeout: int = 1800,
 
 
 def git_common_dir(repo: Path) -> Path:
-    out = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=repo,
+    out = lifecycle.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=repo,
                          capture_output=True, text=True, check=True).stdout.strip()
     return Path(out).resolve()
 
@@ -133,12 +142,15 @@ def recently_claimed(slot: Path, now: float) -> bool:
 
 
 def branch_exists(repo: Path, branch: str) -> bool:
-    return subprocess.run(["git", "rev-parse", "-q", "--verify", f"refs/heads/{branch}"], cwd=repo,
+    return lifecycle.run(["git", "rev-parse", "-q", "--verify", f"refs/heads/{branch}"], cwd=repo,
                           capture_output=True).returncode == 0
 
 
 def is_clean(path: Path) -> bool:
-    result = subprocess.run(["git", "status", "--porcelain"], cwd=path, capture_output=True, text=True)
+    try:
+        result = lifecycle.run(["git", "status", "--porcelain"], cwd=path, capture_output=True, text=True)
+    except OSError:
+        return False
     return result.returncode == 0 and not result.stdout.strip()
 
 
@@ -184,8 +196,55 @@ def take(repo: Path, dest: Path, branch: str | None, base: str = "origin/main", 
                     log.write(f"worktree-pool: discarding slot: {error}\n")
                 remove_worktree(repo, dest, log)
     args = ["git", "worktree", "add", "-q"] + (["-b", branch] if branch else ["--detach"]) + [str(dest), base]
-    (sh or (lambda a, cwd=None, log=None: run(a, cwd=cwd, log=log, timeout=600)))(args, cwd=repo, log=log)
+    result = (sh or (lambda a, cwd=None, log=None: run(a, cwd=cwd, log=log, timeout=600)))(args, cwd=repo, log=log)
+    # The lanes `sh` records and returns instead of raising; a failed add must not
+    # let the caller install into, and hand an agent, a directory that is not there.
+    if getattr(result, "returncode", 0):
+        raise subprocess.CalledProcessError(result.returncode, args, getattr(result, "stdout", ""))
     return "fresh"
+
+
+def recycle(repo: Path, path: Path, base: str = "origin/main", size: int = POOL_SIZE, log=None,
+            root: Path | None = None, min_free_gb: float = MIN_FREE_GB) -> str | None:
+    """Return a finished worktree to the pool instead of deleting it. Returns the slot name,
+    or None when it must be removed the normal way: pool off or full, low disk, another
+    volume, a preserved repair, or any uncommitted change. The caller decides whether its
+    commits are published; the branch ref itself survives in the repository either way."""
+    repo, path = Path(repo), Path(path)
+    moved = False
+    marker = None
+    try:
+        if not enabled() or not path.is_dir() or (path / PRESERVED_REPAIR).exists() or not is_clean(path):
+            return None
+        pool = pool_dir(repo, root)
+        if not same_volume(pool, path) or len(ready_slots(pool)) >= size or free_gb(pool) < min_free_gb:
+            return None
+        slot = pool / f"slot-{uuid.uuid4().hex[:8]}"
+        run(["git", "checkout", "-q", "--detach", base], cwd=path, log=log, timeout=300)
+        run(["git", "clean", "-ffdxq"] + [arg for keep in RECYCLE_KEEP for arg in ("-e", keep)],
+            cwd=path, log=log, timeout=900)
+        pool.mkdir(parents=True, exist_ok=True)
+        run(["git", "worktree", "move", str(path), str(slot)], cwd=repo, log=log, timeout=120)
+        moved = True
+        marker = pool / f"{slot.name}{READY}"
+        marker.touch()
+    except (subprocess.SubprocessError, OSError) as error:
+        if moved:
+            try:
+                run(["git", "worktree", "move", str(slot), str(path)], cwd=repo, log=log, timeout=120)
+            except (subprocess.SubprocessError, OSError):
+                # The finished, clean checkout is eligible for normal removal; branch
+                # refs survive. A failed rollback must not leave an unusable pool slot.
+                remove_worktree(repo, slot, log)
+        if marker is not None:
+            try:
+                marker.unlink(missing_ok=True)
+            except OSError:
+                pass  # without a slot directory this marker cannot be consumed
+        if log is not None:
+            log.write(f"worktree-pool: not recycled: {error}\n")
+        return None
+    return slot.name
 
 
 def fill(repo: Path, size: int = POOL_SIZE, base: str = "origin/main", warm: bool = True, log=None,
@@ -209,7 +268,7 @@ def fill(repo: Path, size: int = POOL_SIZE, base: str = "origin/main", warm: boo
                 release(child)
                 remove_worktree(repo, child, log)
                 actions.append(f"removed stale {child.name}")
-        subprocess.run(["git", "worktree", "prune"], cwd=repo, capture_output=True)
+        lifecycle.run(["git", "worktree", "prune"], cwd=repo, capture_output=True)
         while len(ready_slots(pool)) < size:
             if free_gb(pool) < min_free_gb:
                 actions.append(f"stopped: {free_gb(pool):.0f} GiB free < {min_free_gb:.0f} GiB floor")
@@ -221,7 +280,7 @@ def fill(repo: Path, size: int = POOL_SIZE, base: str = "origin/main", warm: boo
                 if warm:
                     # A warm tsbuildinfo turns the first web typecheck from ~2 min into ~30s.
                     # tsc writes it even when main has type errors, so a red check is fine.
-                    subprocess.run(WARM, cwd=slot, stdout=log or subprocess.DEVNULL,
+                    lifecycle.run(WARM, cwd=slot, stdout=log or subprocess.DEVNULL,
                                    stderr=subprocess.STDOUT, timeout=1800)
                 if not is_clean(slot):
                     raise RuntimeError("install or warm-up left tracked changes")
@@ -268,7 +327,7 @@ def refill_in_background(repo: Path, log_path: Path | None = None) -> None:
     with open(log_path, "a") as log:
         subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--repo", str(repo), "--fill"],
                          cwd=repo, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                         start_new_session=True)
+                         start_new_session=True, **lifecycle.spawn_kwargs())
 
 
 def node_env(worktree: Path) -> dict:
@@ -284,7 +343,7 @@ def node_env(worktree: Path) -> dict:
     return env
 
 
-def main(argv: list[str] | None = None) -> int:
+def guarded_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="worktree-new", description=__doc__.split("\n\n")[0])
     parser.add_argument("dest", nargs="?", type=Path)
     parser.add_argument("-b", "--branch")
@@ -297,9 +356,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--size", type=int, default=POOL_SIZE)
     parser.add_argument("--no-warm", action="store_true")
     parser.add_argument("--drain", action="store_true")
+    parser.add_argument("--recycle", type=Path, metavar="DIR")
     parser.add_argument("--status", action="store_true")
     args = parser.parse_args(argv)
-    repo = Path(subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=args.repo, capture_output=True,
+    repo = Path(lifecycle.run(["git", "rev-parse", "--show-toplevel"], cwd=args.repo, capture_output=True,
                                text=True, check=True).stdout.strip())
     os.environ.update(node_env(repo))
     if args.status:
@@ -310,13 +370,33 @@ def main(argv: list[str] | None = None) -> int:
     if args.drain:
         print("\n".join(drain(repo)) or "pool empty")
         return 0
+    if args.recycle:
+        if not args.recycle.is_dir():
+            print(f"worktree-new: {args.recycle} is missing or not a directory", file=sys.stderr)
+            return 1
+        if (args.recycle / PRESERVED_REPAIR).exists():
+            print(f"worktree-new: {args.recycle} contains a preserved repair; left in place", file=sys.stderr)
+            return 1
+        slot = recycle(repo, args.recycle, args.base, args.size, log=sys.stdout)
+        if slot:
+            print(f"worktree-new: {args.recycle} recycled into the pool as {slot}")
+            return 0
+        if not args.recycle.is_dir():
+            print(f"worktree-new: {args.recycle} is no longer available after recycling failed", file=sys.stderr)
+            return 1
+        if not is_clean(args.recycle):
+            print(f"worktree-new: {args.recycle} has uncommitted changes; left in place", file=sys.stderr)
+            return 1
+        remove_worktree(repo, args.recycle, sys.stdout)
+        print(f"worktree-new: {args.recycle} removed (pool full, off, or low on disk)")
+        return 0
     if args.fill:
         if not args.no_fetch:
-            subprocess.run(["git", "fetch", "-q", "origin", "main"], cwd=repo)
+            lifecycle.run(["git", "fetch", "-q", "origin", "main"], cwd=repo)
         print("\n".join(fill(repo, args.size, args.base, warm=not args.no_warm, log=sys.stdout)) or "pool full")
         return 0
     if args.dest is None:
-        parser.error("dest is required unless --fill, --drain or --status")
+        parser.error("dest is required unless --fill, --drain, --recycle or --status")
     started = time.monotonic()
     if not args.no_fetch:
         run(["git", "fetch", "-q", "origin", "main"], cwd=repo, timeout=300)
@@ -327,6 +407,19 @@ def main(argv: list[str] | None = None) -> int:
         refill_in_background(repo)
     print(f"worktree-new: {args.dest} ready from {source} in {time.monotonic() - started:.0f}s")
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    # Preserve the standalone developer utility. Only lane-owned detached fills
+    # inherit host controller ownership and must join that same lifecycle fence.
+    if lifecycle.FD_ENV not in os.environ:
+        return guarded_main(argv)
+    try:
+        with lifecycle.Guard(Path(os.environ["LANES_STATE"])):
+            return guarded_main(argv)
+    except (KeyError, lifecycle.AdmissionHeld) as error:
+        print(f"lifecycle admission held: {error}", file=sys.stderr)
+        return 75
 
 
 if __name__ == "__main__":

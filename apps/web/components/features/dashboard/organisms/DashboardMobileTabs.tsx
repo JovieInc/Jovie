@@ -7,6 +7,7 @@ import {
   artistNavigation,
   CUSTOMER_NAV_CAPACITY,
   isNavigationItemActive,
+  navigationVisibleForFlags,
   partitionCustomerNavigation,
   primaryNavigation,
   settingsNavItem,
@@ -16,6 +17,7 @@ import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useProfileData } from '@/hooks/useProfileData';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { useAppFlag } from '@/lib/flags/client';
 import {
   type NavigationTelemetryContext,
   startNavigationTelemetry,
@@ -48,6 +50,14 @@ export function DashboardMobileTabs({
   const isMobile = useMediaQuery('(max-width: 1023px)');
   const isElectron = useIsElectronRuntime();
   const { profileHref } = useProfileData(true);
+  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
+  const customerNavigation = useMemo(
+    () =>
+      navigationVisibleForFlags(primaryNavigation, {
+        PROFILES_WORKSPACE: profilesWorkspaceEnabled,
+      }),
+    [profilesWorkspaceEnabled]
+  );
   const telemetryContext = useMemo<NavigationTelemetryContext>(
     () => ({
       isElectron,
@@ -58,14 +68,14 @@ export function DashboardMobileTabs({
   );
 
   const activeItemId = useMemo(() => {
-    const active = primaryNavigation.find(item =>
+    const active = customerNavigation.find(item =>
       isNavigationItemActive(item, pathname, searchParams)
     );
     return active?.id ?? null;
-  }, [pathname, searchParams]);
+  }, [customerNavigation, pathname, searchParams]);
 
   const { primaryItems, expandedItems } = useMemo(() => {
-    const partition = partitionCustomerNavigation(primaryNavigation, {
+    const partition = partitionCustomerNavigation(customerNavigation, {
       visibleCap: CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible,
       activeItemId,
     });
@@ -73,7 +83,7 @@ export function DashboardMobileTabs({
       primaryItems: partition.visible.map(toMenuItem),
       expandedItems: [...partition.more, ...artistNavigation].map(toMenuItem),
     };
-  }, [activeItemId]);
+  }, [activeItemId, customerNavigation]);
 
   const utilityItems = useMemo<LiquidGlassMenuItem[]>(
     () => [

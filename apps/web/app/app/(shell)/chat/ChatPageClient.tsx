@@ -495,23 +495,22 @@ export function ChatPageClient({
   );
 
   useEffect(() => {
-    if (currentThreadTitle) {
-      setHeaderBadge(<ChatTitleBadge title={currentThreadTitle} />);
-      return;
-    }
+    setHeaderBadge(
+      currentThreadTitle ? <ChatTitleBadge title={currentThreadTitle} /> : null
+    );
 
-    setHeaderBadge(null);
+    return () => {
+      setHeaderBadge(null);
+    };
   }, [currentThreadTitle, setHeaderBadge]);
 
-  // Clean up header badge when leaving the chat page
   useEffect(() => {
     setHeaderActions(headerActions);
 
     return () => {
-      setHeaderBadge(null);
       setHeaderActions(null);
     };
-  }, [headerActions, setHeaderBadge, setHeaderActions]);
+  }, [headerActions, setHeaderActions]);
 
   const rawQuery = useMemo(() => searchParams.get('q'), [searchParams]);
   const initialSkillId = useMemo(

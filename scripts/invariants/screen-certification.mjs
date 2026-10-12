@@ -82,6 +82,11 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.demo-video': '/demo/video',
   'web.demovideo': '/demovideo',
   'web.waitlist-invite': '/waitlist/invite',
+  // JOV-8170: both routes are active MARKETING_ROUTE_MANIFEST entries already
+  // captured every run; the screens were registered but never bound, so the
+  // nightly audit could never see their evidence.
+  'web.marketing-renders': '/renders',
+  'web.profile-admission': '/renders/profile-admission',
 });
 export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.public-profile': '/unfazed',
@@ -120,6 +125,30 @@ export const SCREEN_PROOF_ROUTES = Object.freeze({
   // — see apps/web/lib/screen-cert/app-shell-fixture-gate.ts.
   'web.tasks': '/app/tasks',
   'web.contacts': '/app/contacts',
+  // JOV-8170: anonymous public screens share one multi-screen producer —
+  // tests/product-screenshots/public-screens-proof.spec.ts captures every
+  // route below in a single run, then the workflow emits and uploads one
+  // `screen-browser-proof-<suffix>` artifact per screen. web.root-document
+  // and web.root-layout both register apps/web/app/layout.tsx, which every
+  // route renders; '/' is their concrete producer route. web.legal-shell
+  // registers only the (dynamic)/legal layout, so its producer route is any
+  // legal page. /unfazed/about rides the same reserved capture profile and
+  // noop-DB fallback as the web.public-profile producer.
+  'web.root-document': '/',
+  'web.root-layout': '/',
+  'web.legal-shell': '/legal/privacy',
+  'web.legal-privacy': '/legal/privacy',
+  'web.legal-terms': '/legal/terms',
+  'web.legal-cookies': '/legal/cookies',
+  'web.legal-dmca': '/legal/dmca',
+  'web.playlists-index': '/playlists',
+  'web.brand': '/brand',
+  'web.report': '/report',
+  'web.start': '/start',
+  // /solutions/* registers the whole (marketing)/solutions directory;
+  // /solutions/artists is the family's declared concrete health-check path.
+  'web.marketing-solutions': '/solutions/artists',
+  'web.public-profile-about': '/unfazed/about',
 });
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
 export const EXCLUDED_OWNERS = Object.freeze([
@@ -130,8 +159,9 @@ export const EXCLUDED_OWNERS = Object.freeze([
 ]);
 export const RETAINED_SWEEP_WORKFLOWS = Object.freeze([
   // JOV-5852: screenshots.yml is path-complete on push to main + manual
-  // dispatch (its daily cron was retired); live external drift keeps a sweep.
-  { path: '.github/workflows/visual-a11y.yml', cron: '37 7 * * *' },
+  // dispatch. The Storybook axe sweep stays whole-system but has no clock
+  // (2026-10-12): it runs on every main push of the inputs it renders.
+  { path: '.github/workflows/visual-a11y.yml' },
 ]);
 
 /**
@@ -201,6 +231,7 @@ web.marketing-pay|web|marketing-pay|apps/web/app/(marketing)/pay/page.tsx|deskto
 web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx|desktop,mobile
 web.marketing-new|web|marketing-new|apps/web/app/(marketing)/new/page.tsx|desktop,mobile
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
+web.root-not-found|web|root-not-found|apps/web/app/not-found.tsx|desktop,mobile
 web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desktop,mobile
 web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
 web.marketing-solutions|web|marketing-solutions|apps/web/app/(marketing)/solutions/|desktop,mobile
@@ -233,7 +264,7 @@ web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.t
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
 web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
-web.smartlink-release|web|release-landing|apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
+web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
 web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
 web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|desktop,mobile
 web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
@@ -247,7 +278,9 @@ web.profiles|web|profiles|apps/web/app/app/(shell)/profiles/page.tsx|desktop,mob
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.links|web|links|apps/web/app/app/(shell)/links/page.tsx,apps/web/app/app/(shell)/dashboard/links/page.tsx|desktop,mobile
 web.library-private-share|web|library-asset-share|apps/web/app/p/[token]/|desktop,mobile
-web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop,mobile
+web.settings-admin-redirect|web|settings-admin-redirect|apps/web/app/app/(shell)/settings/admin/page.tsx|desktop,mobile
+web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/profile/page.tsx,apps/web/app/app/(shell)/settings/artist-profile/page.tsx,apps/web/app/app/(shell)/tipping/page.tsx|desktop,mobile
+web.settings-referral|web|settings-referral|apps/web/app/app/(shell)/settings/referral/page.tsx,apps/web/app/app/(shell)/settings/referral/ReferralCodeCopyClient.tsx|desktop,mobile
 web.investor-updates|web|investor-updates|apps/web/app/app/(shell)/admin/investors/updates/page.tsx|desktop,mobile
 web.investor-pipeline|web|investor-pipeline|apps/web/app/app/(shell)/admin/investors/page.tsx|desktop,mobile
 web.ovie-certifications|web|ovie-certifications|apps/web/app/app/(shell)/admin/certifications/page.tsx|desktop,mobile
@@ -256,6 +289,8 @@ web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx|desk
 web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat-playground/page.tsx,apps/web/app/app/(shell)/admin/chat-playground/layout.tsx|desktop,mobile
 web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/needs-you/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
 web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile
+web.admin-costs|web|admin-costs|apps/web/app/app/(shell)/admin/costs/page.tsx|desktop,mobile
+web.admin-features|web|admin-features|apps/web/app/app/(shell)/admin/features/page.tsx|desktop,mobile
 web.admin-feature-registry|web|admin-feature-registry|apps/web/app/app/(shell)/admin/feature-registry/page.tsx|desktop,mobile
 web.admin-platform-connections|web|admin-platform-connections|apps/web/app/app/(shell)/admin/platform-connections/|desktop,mobile
 web.admin-growth|web|admin-growth|apps/web/app/app/(shell)/admin/growth/page.tsx|desktop,mobile
@@ -263,6 +298,7 @@ web.admin-people|web|admin-people|apps/web/app/app/(shell)/admin/people/page.tsx
 web.admin-agent-runs|web|admin-agent-runs|apps/web/app/app/(shell)/admin/agent-runs/|desktop,mobile
 web.admin-ops-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/ops/page.tsx|desktop,mobile
 web.admin-screenshots|web|admin-screenshots|apps/web/app/app/(shell)/admin/screenshots/|desktop,mobile
+web.admin-share-studio|web|admin-share-studio|apps/web/app/app/(shell)/admin/share-studio/page.tsx|desktop,mobile
 web.admin-wiki|web|admin-wiki|apps/web/app/app/(shell)/admin/wiki/|desktop,mobile
 web.hud-isolated|web|ovie-ops-isolated|apps/web/app/hud/page.tsx,apps/web/app/hud/layout.tsx|desktop,mobile
 web.hud-tv|web|ovie-ops-isolated|apps/web/app/hud-tv/page.tsx|desktop,mobile
@@ -847,21 +883,23 @@ export function validateRetainedSweeps({
 } = {}) {
   const issues = [];
   if (!Array.isArray(workflows) || workflows.length === 0) {
-    return ['scheduled whole-system sweeps are missing'];
+    return ['whole-system sweeps are missing'];
   }
   for (const workflow of workflows) {
     const abs = resolve(repoRoot, workflow.path);
     if (!existsSync(abs)) {
-      issues.push(`scheduled sweep ${workflow.path} is missing`);
+      issues.push(`whole-system sweep ${workflow.path} is missing`);
       continue;
     }
     const text = readFileSync(abs, 'utf8');
-    if (!/\n  schedule:\n/.test(`\n${text}`) || !/cron:/.test(text)) {
-      issues.push(`scheduled sweep ${workflow.path} dropped its schedule`);
-    }
-    if (workflow.cron && !text.includes(workflow.cron)) {
+    if (!/\n {2}push:\n {4}branches: \[main\]\n/.test(`\n${text}`)) {
       issues.push(
-        `scheduled sweep ${workflow.path} dropped cron ${workflow.cron}`
+        `whole-system sweep ${workflow.path} dropped its main-push trigger`
+      );
+    }
+    if (/\n {2}schedule:\n/.test(`\n${text}`)) {
+      issues.push(
+        `whole-system sweep ${workflow.path} runs on a clock; run it on main pushes of its inputs`
       );
     }
   }

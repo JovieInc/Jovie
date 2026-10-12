@@ -15,6 +15,8 @@ Current direction: one System B token foundation, compact product and editorial
 marketing languages. Inter is the body/UI face; Satoshi is the approved display
 exception. Do not revive System A or DM Sans from historical examples.
 
+Follow the founder-locked [settings decisions](docs/design-system/DETAILS.md#settings-decisions) (2026-10-02).
+
 ## Authority and precedence
 
 After `canon/OPERATING_SYSTEM.md` and `canon/DESIGN.md`, this file is the
@@ -221,7 +223,7 @@ for full tokens and sizing when changing this area.
 
 | Token | Light | Dark |
 |-------|-------|------|
-| Width | 244px | 244px |
+| Width | 224px | 224px |
 | Background RGB | `247 248 248` | `7 8 10` |
 
 

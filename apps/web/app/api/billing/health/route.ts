@@ -21,6 +21,7 @@ import { unstable_cache } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
 import { hasBetterAuthSessionCookie } from '@/lib/auth/auth-session-cookies';
+import { RECONCILIATION_STALE_AFTER_MS } from '@/lib/billing/sync-remediation-policy';
 import { extractBearerToken, verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -74,6 +75,7 @@ interface HealthCheckResult {
     unprocessedWebhookCount: number;
     oldestUnprocessedWebhookAt: string | null;
     lastReconciliationAt: string | null;
+    lastReconciliationSuccess: boolean | null;
     lastBillingEventAt: string | null;
   };
 }
@@ -137,7 +139,9 @@ export async function GET(request: Request) {
   try {
     const now = new Date();
     const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
-    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const reconciliationStaleBefore = new Date(
+      now.getTime() - RECONCILIATION_STALE_AFTER_MS
+    );
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     // Run all checks in parallel for efficiency
@@ -171,13 +175,19 @@ export async function GET(request: Request) {
           )
         ),
 
-      // Get last reconciliation event
+      // A per-user repair does not prove the complete run succeeded.
       db
         .select({
           createdAt: billingAuditLog.createdAt,
+          metadata: billingAuditLog.metadata,
         })
         .from(billingAuditLog)
-        .where(eq(billingAuditLog.source, 'reconciliation'))
+        .where(
+          and(
+            eq(billingAuditLog.source, 'reconciliation'),
+            eq(billingAuditLog.eventType, 'reconciliation_run')
+          )
+        )
         .orderBy(drizzleSql`${billingAuditLog.createdAt} DESC`)
         .limit(1),
 
@@ -207,6 +217,9 @@ export async function GET(request: Request) {
       stuckWebhooks[0]?.oldestCreatedAt ?? null;
     const proUsersInDb = Number(proUserCount[0]?.count ?? 0);
     const lastReconciliationAt = lastReconciliation[0]?.createdAt ?? null;
+    const recordedSuccess = lastReconciliation[0]?.metadata?.success;
+    const lastReconciliationSuccess =
+      typeof recordedSuccess === 'boolean' ? recordedSuccess : null;
     const lastBillingEventAt = lastBillingEvent[0]?.lastBillingEventAt ?? null;
 
     // Perform health checks
@@ -215,7 +228,8 @@ export async function GET(request: Request) {
     const noStuckWebhooks = checkNoStuckWebhooks(unprocessedWebhookCount);
     const recentReconciliation = checkRecentReconciliation(
       lastReconciliationAt,
-      twoHoursAgo
+      reconciliationStaleBefore,
+      lastReconciliationSuccess
     );
     const proCountSync = checkProCountSync(
       proUsersInDb,
@@ -251,6 +265,7 @@ export async function GET(request: Request) {
           oldestUnprocessedWebhookAt
         ),
         lastReconciliationAt: toISOStringOrNull(lastReconciliationAt),
+        lastReconciliationSuccess,
         lastBillingEventAt: toISOStringOrNull(lastBillingEventAt),
       },
     };
@@ -449,9 +464,17 @@ function checkNoStuckWebhooks(stuckCount: number): HealthCheck {
  */
 function checkRecentReconciliation(
   lastRun: Date | string | null,
-  threshold: Date
+  threshold: Date,
+  success: boolean | null
 ): HealthCheck {
   const lastRunDate = parseDate(lastRun);
+  if (success === false) {
+    return {
+      status: 'critical',
+      message: 'The latest reconciliation run failed',
+      details: { lastRun: lastRunDate?.toISOString() ?? null, success },
+    };
+  }
   if (!lastRunDate) {
     return {
       status: 'warning',

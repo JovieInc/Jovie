@@ -14,6 +14,8 @@ enum ObservabilityRedactor {
     "email",
     "id_token",
     "idtoken",
+    "native_attempt",
+    "nativeattempt",
     "phone",
     "refresh_token",
     "refreshtoken",
@@ -38,7 +40,7 @@ enum ObservabilityRedactor {
   private static let jwtPattern =
     #"[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"#
   private static let querySecretPattern =
-    #"(?i)(?:code|state|token|access_token|refresh_token|id_token|cookie|authorization)=[^&\s]+"#
+    #"(?i)(?:native_attempt|nativeAttempt|code|state|token|access_token|refresh_token|id_token|cookie|authorization)=[^&\s]+"#
   private static let longTokenPattern =
     #"(?i)\b(?=[A-Z0-9_-]{40,}\b)(?=[A-Z0-9_-]*[A-Z])(?=[A-Z0-9_-]*\d)[A-Z0-9_-]+\b"#
   private static let uuidPathSegmentPattern =

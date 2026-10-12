@@ -10,23 +10,12 @@
     "apps/desktop/src/tray.ts": {
       "deflateSync": 1
     },
-    "apps/web/app/api/health/build-info/route.ts": {
-      "readFileSync": 1
-    },
-    "apps/web/components/features/home/RecentlyShippedSection.tsx": {
-      "existsSync": 1,
-      "readFileSync": 1
-    },
     "apps/web/lib/a11y-gates/contrast-engine.ts": {
       "readFileSync": 2
     },
     "apps/web/lib/a11y-gates/touch-target-engine.ts": {
       "readdirSync": 1,
       "spawnSync": 1,
-      "readFileSync": 1
-    },
-    "apps/web/lib/changelog-source.ts": {
-      "existsSync": 1,
       "readFileSync": 1
     },
     "apps/web/lib/chat/knowledge/topics.ts": {
@@ -50,6 +39,10 @@
       "readFileSync": 1
     },
     "apps/web/lib/ovie/mcp/artist-profile-inventory.ts": {
+      "readFileSync": 1
+    },
+    "apps/web/lib/recent-releases.ts": {
+      "existsSync": 1,
       "readFileSync": 1
     },
     "apps/web/lib/seo/ratchet.ts": {

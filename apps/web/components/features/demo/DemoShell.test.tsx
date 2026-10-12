@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { TooltipProvider } from '@jovie/ui';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DemoShell } from './DemoShell';
 
@@ -24,6 +25,35 @@ describe('DemoShell', () => {
     expect(container.querySelector('svg.lucide-circle-dot')).toBeNull();
   });
 
+  it('draws the details toggle from the rail icon family in both states', () => {
+    const { container } = render(
+      <TooltipProvider>
+        <DemoShell
+          activeTab='inbox'
+          onTabChange={vi.fn()}
+          rightPanel={<div>Details</div>}
+        >
+          <div>Demo content</div>
+        </DemoShell>
+      </TooltipProvider>
+    );
+
+    const toggle = screen.getByRole('button', { name: /details panel/i });
+    const glyph = () => toggle.querySelector('svg');
+    const wasOpen = toggle.getAttribute('aria-label') === 'Hide details panel';
+    const first = glyph()?.getAttribute('class') ?? '';
+    expect(first).toContain(
+      wasOpen ? 'lucide-rail-right-open' : 'lucide-rail-right-closed'
+    );
+
+    fireEvent.click(toggle);
+    const second = glyph()?.getAttribute('class') ?? '';
+    expect(second).toContain(
+      wasOpen ? 'lucide-rail-right-closed' : 'lucide-rail-right-open'
+    );
+    expect(container.querySelector('svg[class*="lucide-panel-"]')).toBeNull();
+  });
+
   it('renders the provided children', () => {
     render(
       <DemoShell activeTab='inbox' onTabChange={vi.fn()}>
@@ -38,5 +68,10 @@ describe('DemoShell', () => {
     const source = readWebSource('components/features/demo/DemoShell.tsx');
     expect(source).toContain("@/components/organisms/sidebar'");
     expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
+  });
+
+  it('inherits --sidebar-width from the design-system token, not a px override', () => {
+    const source = readWebSource('components/features/demo/DemoShell.tsx');
+    expect(source).not.toMatch(/--sidebar-width['"]?\s*:\s*['"]?\d+px/);
   });
 });

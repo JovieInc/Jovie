@@ -1,0 +1,218 @@
+# CLI Chaos Nightly (JOV-7714)
+#
+# PURPOSE: Run the black-box chaos gate against the @jovie/cli that users
+# actually install from npm, on macOS, Linux, and Windows, plus read-only
+# production probes. A red run files or updates one remediation issue through
+# the shared intake; the next green run resolves it.
+#
+# clock-class: production-liveness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Tim
+# necessary-trust-boundary: Only a hosted schedule proves the npm-published bytes users install still pass the chaos gate; PR and release gates test source and candidates, never the live registry artifact.
+# revisit-trigger: Fold into production-controller probes once they install and exercise @jovie/cli from npm on macOS, Linux, and Windows.
+name: CLI Chaos Nightly
+
+on:
+  schedule:
+    - cron: '23 9 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published @jovie/cli version or dist-tag to test
+        type: string
+        required: false
+        default: latest
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-chaos-nightly
+  cancel-in-progress: false
+
+jobs:
+  chaos:
+    name: Published CLI chaos (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: packages/jovie-cli/scripts
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install the published CLI into a clean directory and run the chaos gate
+        shell: bash
+        env:
+          CLI_VERSION: ${{ inputs.version || 'latest' }}
+          CLEAN_DIR: ${{ runner.temp }}/jovie-cli-published
+        run: |
+          set -euo pipefail
+          mkdir -p "$CLEAN_DIR"
+          npm install --prefix "$CLEAN_DIR" --ignore-scripts --no-audit --no-fund \
+            --package-lock=false "@jovie/cli@$CLI_VERSION"
+          shim="$CLEAN_DIR/node_modules/.bin/jovie"
+          if [ "$RUNNER_OS" = Windows ]; then shim="$shim.cmd"; fi
+          prod=()
+          # Production is probed once, from Linux, with read-only GETs.
+          if [ "$RUNNER_OS" = Linux ]; then prod=(--prod); fi
+          node packages/jovie-cli/scripts/chaos-blackbox.mjs \
+            --bin "$CLEAN_DIR/node_modules/@jovie/cli/dist/cli.js" \
+            --shim "$shim" \
+            --profile nightly \
+            ${prod[@]+"${prod[@]}"} \
+            --report "$RUNNER_TEMP/chaos-report.json"
+
+  remediation:
+    name: File or resolve CLI chaos remediation
+    needs: [chaos]
+    if: ${{ always() && needs.chaos.result != 'skipped' && needs.chaos.result != 'cancelled' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve cli-chaos-nightly
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: cli-chaos-nightly
+          REMEDIATION_SOURCE: cli-chaos-nightly.yml
+          REMEDIATION_CONCLUSION: ${{ needs.chaos.result }}
+          REMEDIATION_DETAIL: >-
+            The published @jovie/cli failed the black-box chaos gate
+            (packages/jovie-cli/scripts/chaos-blackbox.mjs) on at least one OS.
+            The run log lists each failing scenario. Reproduce locally with
+            `node packages/jovie-cli/scripts/chaos-blackbox.mjs --bin <installed dist/cli.js> --profile nightly`.
+            Fix forward in packages/jovie-cli, then publish via npm-publish.yml.
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
+
+  # JOV-8088: the official MCP registry listing used to drift silently because
+  # npm-publish.yml only published it on a manual publish_mcp_only re-dispatch.
+  # npm-publish.yml now chains the listing, and this read-only job alarms when
+  # the registry still differs from npm latest 24h after that npm publish.
+  # JOV-6864 skill-hub listings are explicitly out of scope until named there.
+  mcp-drift:
+    name: MCP registry listing tracks npm latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Compare npm latest with the MCP registry listing
+        shell: bash
+        env:
+          DRIFT_GRACE_MS: '86400000'
+          NPM_PACKUMENT_URL: https://registry.npmjs.org/@jovie%2Fcli
+          MCP_LATEST_URL: https://registry.modelcontextprotocol.io/v0.1/servers/io.github.JovieInc%2Fjovie/versions/latest
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const packument = await (
+            await fetch(process.env.NPM_PACKUMENT_URL)
+          ).json();
+          const npmLatest = packument['dist-tags']?.latest;
+          const npmPublishedAt = Date.parse(packument.time?.[npmLatest] ?? '');
+          const listing = await (
+            await fetch(process.env.MCP_LATEST_URL)
+          ).json();
+          const mcpVersion = listing.server?.version;
+          const mcpPublishedAt = Date.parse(
+            listing._meta?.['io.modelcontextprotocol.registry/official']
+              ?.publishedAt ?? ''
+          );
+          if (!npmLatest || !mcpVersion || !npmPublishedAt) {
+            throw new Error(
+              `Could not prove listing parity (npm=${npmLatest} mcp=${mcpVersion}).`
+            );
+          }
+          if (mcpVersion === npmLatest) {
+            console.log(
+              `MCP registry io.github.JovieInc/jovie ${mcpVersion} matches npm latest.`
+            );
+            process.exit(0);
+          }
+          // Drift started when the listing first fell behind: the publish
+          // time of the oldest npm release newer than the listed version.
+          // Measuring from npm latest would reset the clock on every release.
+          const newer = Object.entries(packument.time ?? {})
+            .filter(([name, stamp]) => {
+              if (name === 'created' || name === 'modified') return false;
+              const parse = value =>
+                value.split('.').map(part => Number(part));
+              const [a, b, c] = parse(name);
+              const [x, y, z] = parse(mcpVersion);
+              return Date.parse(stamp) && (a > x || (a === x && (b > y || (b === y && c > z))));
+            })
+            .map(([, stamp]) => Date.parse(stamp));
+          if (newer.length === 0) {
+            throw new Error(
+              `MCP registry ${mcpVersion} is not an ancestor of any npm release.`
+            );
+          }
+          const divergedAt = Math.min(...newer);
+          const driftMs = Date.now() - divergedAt;
+          const graceMs = Number(process.env.DRIFT_GRACE_MS);
+          console.log(
+            `npm latest ${npmLatest} (${new Date(npmPublishedAt).toISOString()}) vs MCP ${mcpVersion} (${new Date(mcpPublishedAt).toISOString()}), diverged ${new Date(divergedAt).toISOString()}`
+          );
+          if (driftMs <= graceMs) {
+            console.log(
+              '::notice::MCP registry is behind npm latest but inside the 24h grace window.'
+            );
+            process.exit(0);
+          }
+          console.error(
+            `::error::MCP registry ${mcpVersion} has differed from npm latest ${npmLatest} for more than 24h. Re-dispatch npm-publish.yml with publish_mcp_only: true after release-owner approval.`
+          );
+          process.exit(1);
+          NODE
+
+  mcp-drift-remediation:
+    name: File or resolve MCP registry drift
+    needs: [mcp-drift]
+    if: ${{ always() && needs.mcp-drift.result != 'skipped' && needs.mcp-drift.result != 'cancelled' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: File or resolve mcp-registry-drift
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: mcp-registry-drift
+          REMEDIATION_SOURCE: cli-chaos-nightly.yml
+          REMEDIATION_CONCLUSION: ${{ needs.mcp-drift.result }}
+          REMEDIATION_DETAIL: >-
+            The official MCP registry listing io.github.JovieInc/jovie differs
+            from npm `@jovie/cli` latest for more than 24h. Agents installing
+            Jovie from the MCP registry get the stale build. npm-publish.yml
+            now chains the listing on every release; to repair existing drift,
+            re-dispatch npm-publish.yml with publish_mcp_only: true after
+            release-owner approval (external registry publication).
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs

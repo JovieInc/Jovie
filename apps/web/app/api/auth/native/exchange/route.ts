@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   createAuthAnalyticsEvent,
   isAuthClient,
+  isValidNativeAttempt,
   type NativeAuthClient,
 } from '@jovie/auth-routing';
 import { APIError } from 'better-auth/api';
@@ -44,6 +45,7 @@ interface NativeExchangeRequest {
   code?: unknown;
   state?: unknown;
   codeVerifier?: unknown;
+  nativeAttempt?: unknown;
 }
 
 /**
@@ -116,6 +118,7 @@ export async function POST(request: Request) {
     const code = payload.code;
     const state = payload.state;
     const codeVerifier = payload.codeVerifier;
+    const nativeAttempt = payload.nativeAttempt;
     if (!isRealBrowserAuthHarnessEnabled()) {
       const rateLimit = allowIfRateLimitBackendDegraded(
         await generalLimiter.limit(
@@ -152,7 +155,8 @@ export async function POST(request: Request) {
       !isNativeClient(client) ||
       typeof code !== 'string' ||
       typeof state !== 'string' ||
-      typeof codeVerifier !== 'string'
+      typeof codeVerifier !== 'string' ||
+      !isValidNativeAttempt(client, nativeAttempt)
     ) {
       return NextResponse.json(
         { error: 'Invalid native auth exchange request' },
@@ -165,6 +169,7 @@ export async function POST(request: Request) {
       code,
       state,
       codeVerifier,
+      ...(nativeAttempt !== undefined ? { nativeAttempt } : {}),
       createCodeChallenge,
     });
 

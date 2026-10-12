@@ -47,6 +47,14 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
       'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
     ],
   ],
+  [
+    'apps/web/lib/leads/qualification-decision.ts',
+    ['apps/web/tests/lib/leads/qualification-decision.test.ts'],
+  ],
+  [
+    'apps/web/lib/leads/qualify.ts',
+    ['apps/web/tests/lib/leads/qualify.test.ts'],
+  ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
@@ -191,6 +199,19 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const PLAYWRIGHT_SENTRY_ISOLATION_PROOF =
+  'apps/web/tests/unit/ci/sentry-ci-reporter.test.ts';
+const PLAYWRIGHT_SENTRY_ISOLATION_INPUTS = new Set([
+  '.github/workflows/ci.yml',
+  'apps/web/playwright.config.ts',
+  'apps/web/tests/e2e/reporters/sentry-ci-reporter.ts',
+  'apps/web/tests/e2e/sentry.spec.ts',
+  PLAYWRIGHT_SENTRY_ISOLATION_PROOF,
+]);
+const PLAYWRIGHT_SENTRY_ISOLATION_LANE = new Set([
+  ...PLAYWRIGHT_SENTRY_ISOLATION_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
 const SUMMER_COMMISSIONING_PRIMARY_INPUTS = new Set([
   'scripts/summer-commissioning/architecture-freshness-registry.json',
   'scripts/summer-commissioning/capability-access-registry.json',
@@ -340,6 +361,7 @@ const CI_UI_DRIFT_GUARDRAIL_NODE_TESTS = [
 const OWNERLESS_RECOVERY_POLICY_TEST =
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs';
 const CI_CONTROL_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
@@ -358,7 +380,6 @@ const CI_CONTROL_SCRIPT_TESTS = [
   OWNERLESS_RECOVERY_POLICY_TEST,
   'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
   'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
-  'scripts/lib/__tests__/eval-main-health-action.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
   'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
   'scripts/lib/__tests__/pr-conflict-event.test.mjs',
@@ -1050,9 +1071,17 @@ const LINEAR_SYNC_ON_MERGE_PRIMARY = new Set([
   '.github/workflows/linear-sync-on-merge.yml',
   'scripts/lib/linear-sync-on-merge.mjs',
   'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+  'scripts/lib/validation-lifecycle.mjs',
+  'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+  'scripts/lib/validation-sync.mjs',
+  'scripts/lib/__tests__/validation-sync.test.mjs',
+  'scripts/lib/__tests__/fixtures/validation-world.mjs',
+  'scripts/lib/founder-taste-order.mjs',
+  'scripts/lib/__tests__/founder-taste-order.test.mjs',
 ]);
 const LINEAR_SYNC_ON_MERGE_LANE = new Set([
   ...LINEAR_SYNC_ON_MERGE_PRIMARY,
+  '.github/workflow-topology.gen.yml',
   '.claude/rules/linear.md',
   '.github/MERGE_QUEUE.md',
   '.github/workflows/README.md',
@@ -1075,21 +1104,62 @@ export function classifyBlogContentForAffectedTests(base, head, options) {
   }
 }
 
-const LANE_PYTHON_COVERAGE_INPUTS = new Set(
-  [
+const LANE_PYTHON_COVERAGE_INPUTS = new Set([
+  ...[
     'lane_runner',
     'pr_events',
     'reason_lane',
     'doctor',
+    'hud',
     'disk_guard',
     'worktree_sweep',
+    'service_census',
     'hyperagent_lane',
+    'codex_lane',
+    'devin_free_policy',
     'execution_attempt',
+    'gh_app_token',
   ].flatMap(name => [
     `scripts/lanes/${name}.py`,
     `scripts/tests/test_${name}.py`,
-  ])
-);
+  ]),
+  // The merge reader is exercised by the doctor transport/window regressions.
+  'scripts/lanes/merge_evidence.py',
+  // Immutable dependency classification is covered by the real lane gate tests.
+  'scripts/lanes/dependency_diff.py',
+]);
+
+// Service ownership and maintenance qualification changes are Python controls.
+// Permit only the complete reviewed control/coverage-plumbing signature; extra
+// peers retain the existing full fallback, including selector infrastructure.
+const SERVICE_CENSUS_QUALIFICATION_MANIFEST = new Set([
+  'scripts/lanes/service_census.py',
+  'scripts/lanes/worktree_sweep.py',
+  'scripts/lanes/lane_runner.py',
+  'scripts/tests/test_service_census.py',
+  'scripts/tests/test_worktree_sweep.py',
+  'scripts/ci-fast-lanes.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS = [
+  ...AFFECTED_TEST_SELECTOR_TESTS,
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+];
+const DEPENDENCY_GATE_QUALIFICATION_MANIFEST = new Set([
+  'scripts/lanes/dependency_diff.py',
+  'scripts/lanes/lane_runner.py',
+  'scripts/tests/test_lane_runner.py',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const CODEX_CAPACITY_QUALIFICATION_MANIFEST = new Set([
+  'scripts/lanes/codex_lane.py',
+  'scripts/tests/test_codex_lane.py',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
 
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
@@ -1102,6 +1172,25 @@ export function buildAffectedTestPlan(changedFiles, options) {
     files.some(
       file => file.endsWith('.py') && !LANE_PYTHON_COVERAGE_INPUTS.has(file)
     );
+  const isFileAvailable =
+    options?.isFileAvailable ?? (file => existsSync(resolve(REPO_ROOT, file)));
+  const missingMergeEvidenceProof =
+    files.some(file =>
+      [
+        'scripts/lanes/merge_evidence.py',
+        'scripts/lanes/hud.py',
+        'scripts/tests/test_hud.py',
+      ].includes(file)
+    ) &&
+    !['scripts/tests/test_doctor.py', 'scripts/tests/test_hud.py'].every(
+      isFileAvailable
+    );
+  const missingDevinFreeProof =
+    files.includes('scripts/lanes/devin_free_policy.py') &&
+    !isFileAvailable('scripts/tests/test_devin_free_policy.py');
+  const missingCodexCapacityProof =
+    files.includes('scripts/lanes/codex_lane.py') &&
+    !isFileAvailable('scripts/tests/test_codex_lane.py');
   // Global/full early returns need the same command fields as focused plans.
   // Retain lane coverage even when an unrelated input requires the full suite.
   return {
@@ -1118,16 +1207,36 @@ export function buildAffectedTestPlan(changedFiles, options) {
     ...(lanePythonCoverage
       ? {
           lanePythonCoverage: true,
-          mode: unknownPythonPeer
-            ? 'full'
-            : plan.mode === 'none'
-              ? 'selected'
-              : plan.mode,
-          ...(unknownPythonPeer
+          mode:
+            unknownPythonPeer ||
+            missingMergeEvidenceProof ||
+            missingDevinFreeProof ||
+            missingCodexCapacityProof
+              ? 'full'
+              : plan.mode === 'none'
+                ? 'selected'
+                : plan.mode,
+          ...(missingCodexCapacityProof
             ? {
-                fallbackReason: 'unmapped Python peer mixed with lane coverage',
+                fallbackReason:
+                  'Codex subscription capacity coverage proof is unavailable',
               }
-            : {}),
+            : missingDevinFreeProof
+              ? {
+                  fallbackReason:
+                    'Devin Free expiry coverage proof is unavailable',
+                }
+              : missingMergeEvidenceProof
+                ? {
+                    fallbackReason:
+                      'merge evidence coverage proof is unavailable',
+                  }
+                : unknownPythonPeer
+                  ? {
+                      fallbackReason:
+                        'unmapped Python peer mixed with lane coverage',
+                    }
+                  : {}),
         }
       : {}),
   };
@@ -1145,6 +1254,156 @@ function planAffectedTests(
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  const sentryGateInputs = new Set([
+    '.github/actions/sentry-error-gate/action.yml',
+    '.github/scripts/sentry-read-json.sh',
+    'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
+  ]);
+  const sentryDeploymentContract =
+    'apps/web/tests/unit/ci/deploy-workflow.test.ts';
+  if (
+    files.some(file => sentryGateInputs.has(file)) &&
+    files.every(
+      file =>
+        sentryGateInputs.has(file) ||
+        file === sentryDeploymentContract ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file) ||
+        file === 'docs/runbooks/production-sentry-uncertainty-recovery.md'
+    )
+  ) {
+    if (!isFileAvailable(sentryDeploymentContract)) {
+      return fullSuitePlan(
+        'Sentry deployment workflow contract is unavailable'
+      );
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [sentryDeploymentContract],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      nodeTests: [],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
+        'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+        'scripts/lib/__tests__/ci-harness.test.mjs',
+        'scripts/lib/__tests__/production-release-supersession.test.mjs',
+      ],
+    };
+  }
+  const hasPlaywrightSentryIsolationSource = files.includes(
+    'apps/web/tests/e2e/reporters/sentry-ci-reporter.ts'
+  );
+  if (hasPlaywrightSentryIsolationSource) {
+    const sentryIsolationInputCount = files.filter(file =>
+      PLAYWRIGHT_SENTRY_ISOLATION_INPUTS.has(file)
+    ).length;
+    const selectorInputCount = files.filter(file =>
+      AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+    ).length;
+    const isBoundedPlaywrightSentryIsolationChange =
+      sentryIsolationInputCount === PLAYWRIGHT_SENTRY_ISOLATION_INPUTS.size &&
+      files.every(file => PLAYWRIGHT_SENTRY_ISOLATION_LANE.has(file)) &&
+      (selectorInputCount === 0 ||
+        selectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+    if (!isBoundedPlaywrightSentryIsolationChange) {
+      return fullSuitePlan(
+        'Playwright Sentry isolation change exceeds its focused lane'
+      );
+    }
+    if (!isFileAvailable(PLAYWRIGHT_SENTRY_ISOLATION_PROOF)) {
+      return fullSuitePlan('Playwright Sentry isolation proof is unavailable');
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [PLAYWRIGHT_SENTRY_ISOLATION_PROOF],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      nodeTests: [],
+      scriptVitestTests:
+        selectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size
+          ? AFFECTED_TEST_SELECTOR_TESTS
+          : [],
+    };
+  }
+  if (
+    files.length === CODEX_CAPACITY_QUALIFICATION_MANIFEST.size &&
+    files.every(file => CODEX_CAPACITY_QUALIFICATION_MANIFEST.has(file))
+  ) {
+    if (![...CODEX_CAPACITY_QUALIFICATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan(
+        'Codex subscription capacity qualification proof is unavailable'
+      );
+    }
+    // The reviewed source and selector closure retains the entire structural
+    // Python runner and both CI plumbing suites, including every coverage floor.
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
+  if (
+    files.length === DEPENDENCY_GATE_QUALIFICATION_MANIFEST.size &&
+    files.every(file => DEPENDENCY_GATE_QUALIFICATION_MANIFEST.has(file))
+  ) {
+    if (![...DEPENDENCY_GATE_QUALIFICATION_MANIFEST].every(isFileAvailable)) {
+      return fullSuitePlan(
+        'dependency gate qualification proof is unavailable'
+      );
+    }
+    // Preserve the entire canonical structural Python command and its floors,
+    // plus the selector and CI plumbing tests, for this exact source closure.
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
+  const isExactServiceCensusQualification =
+    files.length === SERVICE_CENSUS_QUALIFICATION_MANIFEST.size &&
+    files.every(file => SERVICE_CENSUS_QUALIFICATION_MANIFEST.has(file));
+  if (isExactServiceCensusQualification) {
+    if (
+      ![
+        ...SERVICE_CENSUS_QUALIFICATION_MANIFEST,
+        ...SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return fullSuitePlan('service census qualification proof is unavailable');
+    }
+    // buildAffectedTestPlan retains the complete structural Python coverage
+    // command. This selector only supplies both coverage-plumbing test suites.
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SERVICE_CENSUS_QUALIFICATION_SELECTOR_TESTS,
+      nodeTests: [],
+    };
   }
   if (files.some(isBlogContentCandidatePath)) {
     if (
@@ -1202,11 +1461,17 @@ function planAffectedTests(
       pythonUnittestTests: [],
       scriptVitestTests: [
         'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+        'scripts/lib/__tests__/validation-lifecycle.test.mjs',
+        'scripts/lib/__tests__/validation-sync.test.mjs',
+        'scripts/lib/__tests__/founder-taste-order.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
       ],
       scriptVitestCoverageArgs: [
         '--coverage',
         '--coverage.include=lib/linear-sync-on-merge.mjs',
+        '--coverage.include=lib/validation-lifecycle.mjs',
+        '--coverage.include=lib/validation-sync.mjs',
+        '--coverage.include=lib/founder-taste-order.mjs',
         '--coverage.reporter=text',
         '--coverage.reporter=json-summary',
         '--coverage.thresholds.perFile=true',
@@ -2521,6 +2786,27 @@ export function buildControlCoverageCommands() {
   return [
     ['pnpm', nativeCoverageArgs],
     ['pnpm', ownerlessCoverageArgs],
+    [
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        'lib/__tests__/production-lane-range.test.mjs',
+        '--coverage',
+        '--coverage.include=lib/production-lane-range.mjs',
+        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.statements=75',
+        '--coverage.thresholds.lines=75',
+        '--coverage.thresholds.branches=70',
+        '--coverage.thresholds.functions=90',
+        controlCoverageReportsDirectory('production-lane-range'),
+      ],
+    ],
   ];
 }
 

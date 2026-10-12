@@ -403,12 +403,28 @@ function isProcessAlive(pid) {
   }
   try {
     process.kill(pid, 0);
-    return true;
   } catch (error) {
     // EPERM means the pid exists but we cannot signal it — treat as alive so
     // we never spawn a duplicate owner for a protected live process.
     return error?.code === 'EPERM';
   }
+  if (process.platform === 'linux') {
+    try {
+      // Unreaped exited processes retain a PID and pass kill(pid, 0), but
+      // cannot finish a typecheck or release its lock. Only confirmed exit
+      // states permit recovery; unavailable /proc evidence preserves liveness.
+      if (
+        /^State:\s+[ZX](?:\s|$)/m.test(
+          readFileSync(`/proc/${pid}/status`, 'utf8')
+        )
+      ) {
+        return false;
+      }
+    } catch {
+      // Restricted or unavailable procfs is not evidence of a dead owner.
+    }
+  }
+  return true;
 }
 
 function readJson(path) {

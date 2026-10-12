@@ -1,10 +1,9 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 
+import { linearRequest } from '../lib/linear-cooldown.mjs';
 import { getQaSwarmPaths } from './paths.mjs';
 import { getRecipe } from './registry.mjs';
-
-const LINEAR_API = 'https://api.linear.app/graphql';
 
 /**
  * @param {import('./types.mjs').QaSwarmFinding} finding
@@ -106,37 +105,29 @@ function queueLinearIssue(input, error) {
   return true;
 }
 
-async function linearGql(query, variables, caller) {
+async function linearGql(query, variables, caller, fetchImpl = fetch) {
   const key = process.env.LINEAR_API_KEY;
   if (!key) {
     throw new Error('LINEAR_API_KEY missing');
   }
-
-  const response = await fetch(LINEAR_API, {
-    method: 'POST',
-    headers: {
-      Authorization: key,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(15_000),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(`Linear ${response.status} (${caller}): ${body}`);
+  const result = await linearRequest({ key, query, variables, fetchImpl });
+  if (result.rateLimited) {
+    throw new Error('linear rate limited');
   }
-
-  const json = await response.json();
-  if (json.errors?.length) {
+  if (!result.ok) {
     throw new Error(
-      `Linear GraphQL errors (${caller}): ${JSON.stringify(json.errors)}`
+      `Linear ${result.status || result.reason} (${caller}): ${result.text || JSON.stringify(result.data ?? '')}`
     );
   }
-  if (!json.data) {
+  if (result.data?.errors?.length) {
+    throw new Error(
+      `Linear GraphQL errors (${caller}): ${JSON.stringify(result.data.errors)}`
+    );
+  }
+  if (!result.data?.data) {
     throw new Error(`Linear empty response (${caller})`);
   }
-  return json.data;
+  return result.data.data;
 }
 
 async function findTeamId(teamKey = 'JOV') {

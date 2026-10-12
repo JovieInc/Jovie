@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
+import { CapabilityEvidenceMatrix } from '@/components/features/admin/CapabilityEvidenceMatrix';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
+import { loadCapabilityEvidence } from '@/lib/admin/capability-evidence';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 
 export const metadata: Metadata = { title: 'Product | Ovie' };
@@ -19,12 +21,13 @@ const lifecycle = [
 ] as const;
 
 const evidenceGaps = [
-  'Web and client version distribution is not observed by an authoritative source.',
-  'Feature flags expose configured state, but user exposure counts and outcomes are not yet measured.',
+  'Web and client version distribution is not observed by an authoritative source; running-client evidence stays unknown.',
+  'Only public profile pages join configured state to observed exposure and outcome; other capabilities still show configured state only.',
 ] as const;
 
 export default async function ProductPage() {
   await requireCurrentAdminPageAccess();
+  const capabilityEvidence = await loadCapabilityEvidence();
 
   return (
     <AdminPage
@@ -49,6 +52,8 @@ export default async function ProductPage() {
       </ol>
 
       <OvieShippingStateCard />
+
+      <CapabilityEvidenceMatrix record={capabilityEvidence} />
 
       <ContentSurfaceCard surface='details'>
         <div className='space-y-3 p-3'>

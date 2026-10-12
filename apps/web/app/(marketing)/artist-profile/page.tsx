@@ -50,5 +50,7 @@ export const metadata: Metadata = {
 };
 
 export default function ArtistProfilePage() {
-  return <ArtistProfileLandingRoute />;
+  return (
+    <ArtistProfileLandingRoute logoPlacement={{ page: '/artist-profile' }} />
+  );
 }

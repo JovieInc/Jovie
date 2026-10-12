@@ -77,6 +77,8 @@ describe('canonical contacts page', () => {
     expect(routerPushMock).toHaveBeenCalledWith(
       `${APP_ROUTES.CONTACTS}?tab=audience`
     );
+    await user.click(screen.getByRole('tab', { name: 'Insights' }));
+    expect(routerPushMock).toHaveBeenCalledWith(APP_ROUTES.INSIGHTS);
   });
 
   it('normalizes workspace state and preserves audience filters in the tab URL', async () => {

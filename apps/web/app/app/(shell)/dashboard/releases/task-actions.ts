@@ -12,12 +12,9 @@ import {
   requireTasksWorkspaceAccess,
 } from '@/lib/entitlements/tasks-gate';
 import { captureError } from '@/lib/error-tracking';
-import {
-  DEFAULT_RELEASE_TASK_TEMPLATE,
-  type DefaultTemplateItem,
-} from '@/lib/release-tasks/default-template';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
-import { computeTaskDueDate } from '@/lib/tasks/task-due-date';
+import { buildPlaybookStepRows } from '@/lib/tasks/playbooks/instantiate';
+import { MUSIC_RELEASE_PLAYBOOK } from '@/lib/tasks/playbooks/music-release';
 import type { TaskView } from '@/lib/tasks/types';
 import { requireProfileId } from '../requireProfileId';
 import { createTask, deleteTask, updateTask } from '../tasks/task-actions';
@@ -139,51 +136,29 @@ export async function instantiateReleaseTasks(releaseId: string) {
     return getReleaseTasks(releaseId);
   }
 
+  const stepCount = MUSIC_RELEASE_PLAYBOOK.steps.length;
   const [counterRow] = await db
     .update(creatorProfiles)
     .set({
-      nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + ${DEFAULT_RELEASE_TASK_TEMPLATE.length}`,
+      nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + ${stepCount}`,
       updatedAt: new Date(),
     })
     .where(eq(creatorProfiles.id, profileId))
     .returning({ nextTaskNumber: creatorProfiles.nextTaskNumber });
 
   const firstTaskNumber =
-    (counterRow?.nextTaskNumber ?? DEFAULT_RELEASE_TASK_TEMPLATE.length + 1) -
-    DEFAULT_RELEASE_TASK_TEMPLATE.length;
+    (counterRow?.nextTaskNumber ?? stepCount + 1) - stepCount;
   const startPosition = (positionRow?.maxPosition ?? -1) + 1;
   const releaseDate = release?.releaseDate ?? null;
 
-  const taskRows = DEFAULT_RELEASE_TASK_TEMPLATE.map(
-    (item: DefaultTemplateItem, index: number) => ({
-      taskNumber: firstTaskNumber + index,
-      creatorProfileId: profileId,
-      title: item.title,
-      description: item.description ?? null,
-      status: 'todo' as const,
-      priority: item.priority,
-      assigneeKind:
-        item.assigneeType === 'ai_workflow'
-          ? ('jovie' as const)
-          : ('human' as const),
-      agentType: item.aiWorkflowId ?? null,
-      agentStatus: 'idle' as const,
-      releaseId,
-      category: item.category,
-      dueAt: computeTaskDueDate(releaseDate, item.dueDaysOffset),
-      position: startPosition + index,
-      sourceTemplateId: null,
-      metadata: {
-        dueDaysOffset: item.dueDaysOffset,
-        explainerText: item.explainerText ?? null,
-        learnMoreUrl: item.learnMoreUrl ?? null,
-        videoUrl: null,
-        ...(item.descriptionHelper
-          ? { descriptionHelper: item.descriptionHelper }
-          : {}),
-      },
-    })
-  );
+  const taskRows = buildPlaybookStepRows({
+    template: MUSIC_RELEASE_PLAYBOOK,
+    creatorProfileId: profileId,
+    targetDate: releaseDate,
+    firstTaskNumber,
+    startPosition,
+    releaseId,
+  });
 
   await db.insert(tasks).values(taskRows);
 

@@ -196,7 +196,6 @@ async function sendFirstSaleSms(params: {
           sms: true,
           email: false,
           push: false,
-          in_app: false,
         },
       },
     }

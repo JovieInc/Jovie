@@ -272,6 +272,20 @@ export async function claimPrebuiltProfileForUser(
     profile.onboardingCompletedAt !== null;
   assertTokenBackedClaimAuthorization(profile, params, isCompletedOwnerRetry);
 
+  // A signed cookie proves the original handoff, not that its bearer token
+  // remains valid. Recheck revocation and expiry while this row is locked.
+  if (
+    params.source === 'token_backed_onboarding' &&
+    (!params.claimTokenHash ||
+      params.claimTokenHash !== profile.claimToken ||
+      !profile.claimTokenExpiresAt ||
+      profile.claimTokenExpiresAt <= now)
+  ) {
+    throw new Error(
+      '[CLAIM_EXPIRED] Open the original claim link to try again.'
+    );
+  }
+
   await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
 
   if (isCompletedOwnerRetry) {

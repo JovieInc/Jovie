@@ -1,9 +1,7 @@
 import 'server-only';
 
-import { isInstantlyOutboundEnabled } from './outbound-gates';
-import { pipelineError, pipelineLog } from './pipeline-logger';
-
-const INSTANTLY_API_BASE = 'https://api.instantly.ai/api/v2';
+import type { OutboundCopy } from '@/lib/outbound/approval';
+import { denyAudienceEffect } from '@/lib/outbound/audience-effect-policy';
 
 interface PushLeadParams {
   email: string;
@@ -11,107 +9,31 @@ interface PushLeadParams {
   claimLink: string;
   artistName: string;
   priorityScore: number;
+  /**
+   * Review metadata only. Approval never grants delivery permission.
+   */
+  approvedCopy: OutboundCopy & { readonly revision: string };
 }
 
-function isRateLimitRetry(status: number, attempt: number): boolean {
-  return status === 429 && attempt === 0;
-}
+/** Terminal policy refusal; contains no recipient, copy or credentials. */
+export class InstantlyAudienceDeliveryBlockedError extends Error {
+  readonly policyReceipt = denyAudienceEffect('audience.campaign.enroll');
+  readonly code = this.policyReceipt.reason;
+  readonly retryable = false;
 
-function shouldRethrowImmediately(error: unknown, attempt: number): boolean {
-  return (
-    attempt === 0 && !(error instanceof Error && error.message.includes('429'))
-  );
-}
-
-async function attemptLeadPush(
-  apiKey: string,
-  body: object,
-  email: string
-): Promise<string> {
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const response = await fetch(`${INSTANTLY_API_BASE}/leads`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(15_000),
-      });
-
-      if (isRateLimitRetry(response.status, attempt)) {
-        pipelineLog('instantly', 'Rate limited, retrying after 2s', { email });
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        continue;
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        throw new Error(`Instantly API error ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
-      const instantlyLeadId = data.id ?? data.lead_id ?? '';
-      pipelineLog('instantly', 'Lead pushed successfully', {
-        email,
-        instantlyLeadId,
-      });
-      return instantlyLeadId;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      if (shouldRethrowImmediately(error, attempt)) {
-        throw lastError;
-      }
-    }
+  constructor() {
+    super('audience_delivery_disabled');
+    this.name = 'InstantlyAudienceDeliveryBlockedError';
   }
-
-  throw lastError ?? new Error('Instantly push failed after retries');
 }
 
+/**
+ * Direct calls, replayed work and retries cannot enroll an audience recipient.
+ * No provider client, credential lookup, HTTP path or retry timer is available
+ * through this entry point while audience delivery is closed.
+ */
 export async function pushLeadToInstantly(
-  params: PushLeadParams
+  _params: PushLeadParams
 ): Promise<string> {
-  if (!isInstantlyOutboundEnabled()) {
-    throw new Error('Instantly outbound is disabled');
-  }
-
-  const apiKey = process.env.INSTANTLY_API_KEY;
-  const campaignId = process.env.INSTANTLY_CAMPAIGN_ID;
-
-  if (!apiKey || !campaignId) {
-    const missing = [
-      !apiKey && 'INSTANTLY_API_KEY',
-      !campaignId && 'INSTANTLY_CAMPAIGN_ID',
-    ].filter(Boolean);
-    pipelineError(
-      'instantly',
-      'Instantly API not configured',
-      new Error(`Missing: ${missing.join(', ')}`),
-      { missing }
-    );
-    throw new Error(
-      'Instantly API not configured: missing INSTANTLY_API_KEY or INSTANTLY_CAMPAIGN_ID'
-    );
-  }
-
-  pipelineLog('instantly', 'Pushing lead to Instantly', {
-    email: params.email,
-    campaignId,
-  });
-
-  const body = {
-    campaign_id: campaignId,
-    email: params.email,
-    first_name: params.firstName,
-    custom_variables: {
-      claim_link: params.claimLink,
-      artist_name: params.artistName,
-      priority_score: String(params.priorityScore),
-    },
-  };
-
-  return attemptLeadPush(apiKey, body, params.email);
+  throw new InstantlyAudienceDeliveryBlockedError();
 }

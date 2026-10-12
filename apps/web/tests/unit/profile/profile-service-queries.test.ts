@@ -403,6 +403,40 @@ describe('Profile Service Queries', () => {
       expect(result?.contacts).toEqual([mockContact]);
     });
 
+    it.each([
+      [false, 'therealeternia | Instagram, Facebook', 'therealeternia'],
+      [true, 'Name | Owner Chose This', 'Name | Owner Chose This'],
+    ])(
+      'cleans scraped title chrome only on unclaimed pages (claimed=%s, JOV-7753)',
+      async (isClaimed, stored, shown) => {
+        mockRedisGet.mockResolvedValue(null);
+        mockGetLatestRelease.mockResolvedValue(null);
+        let selectCallCount = 0;
+        mockDbSelect.mockImplementation(() => {
+          selectCallCount++;
+          const rows =
+            selectCallCount === 1
+              ? [{ ...mockProfileWithUser, isClaimed, displayName: stored }]
+              : [];
+          return {
+            from: vi.fn().mockReturnThis(),
+            leftJoin: vi.fn().mockReturnThis(),
+            innerJoin: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            orderBy: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue(rows),
+          };
+        });
+
+        const { getProfileWithLinks } = await import(
+          '@/lib/services/profile/queries'
+        );
+        const result = await getProfileWithLinks(`scraped${String(isClaimed)}`);
+
+        expect(result?.displayName).toBe(shown);
+      }
+    );
+
     it('returns null when profile not found in database', async () => {
       mockRedisGet.mockResolvedValue(null);
 

@@ -7,6 +7,7 @@ import {
   requestSummerAssessment,
   summerAssessmentConfig,
   TRIAGE_ASSESSMENT_DOMAIN,
+  validJevTriageAssessment,
 } from '../summer-triage-assessment-client.mjs';
 
 const pair = generateKeyPairSync('ed25519');
@@ -36,6 +37,70 @@ const receipt = {
   acceptedInvestigation: false,
   authorizesDispatch: false,
 };
+
+test('validates bounded Jev recommendations and rejects completion, invalid priorities and non-finite confidence', async () => {
+  const assessment = {
+    schema: 'summer.jev-triage/v1',
+    model: 'typesafe-ai/jev',
+    status: 'decided',
+    destination: 'Todo',
+    priority: 2,
+    category: 'bug',
+    confidence: 0.98,
+    reason: 'bounded repair',
+    assessmentKey: 'key-1',
+  };
+  for (const destination of ['Todo', 'Backlog'])
+    assert.equal(
+      validJevTriageAssessment({ ...assessment, destination }),
+      true
+    );
+  for (const status of ['ambiguous', 'unavailable'])
+    assert.equal(
+      validJevTriageAssessment({
+        ...assessment,
+        status,
+        destination: null,
+        priority: null,
+      }),
+      true
+    );
+  for (const invalid of [
+    { destination: 'Done' },
+    { priority: 0 },
+    { priority: 5 },
+    { confidence: NaN },
+    { confidence: -1 },
+    { confidence: 2 },
+    { schema: 'other' },
+    { model: 'other' },
+    { category: '' },
+    { reason: '' },
+    { assessmentKey: '' },
+    { status: 'unavailable' },
+  ]) {
+    assert.equal(
+      validJevTriageAssessment({ ...assessment, ...invalid }),
+      false
+    );
+  }
+  const result = await requestSummerAssessment(delivery, {
+    environment,
+    fetchImpl: async () => Response.json({ ...receipt, assessment }),
+  });
+  assert.deepEqual(result.assessment, assessment);
+  await assert.rejects(
+    requestSummerAssessment(delivery, {
+      environment,
+      fetchImpl: async () =>
+        Response.json({
+          ...receipt,
+          assessment: { ...assessment, destination: 'Done' },
+        }),
+    }),
+    /assessment-invalid/
+  );
+});
 
 test('signs a bounded host request and validates Summer identity and authority', async () => {
   const result = await requestSummerAssessment(delivery, {

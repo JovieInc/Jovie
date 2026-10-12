@@ -38,6 +38,7 @@ def _load(name: str):
 
 lane = _load("lane_runner")
 codex = _load("codex_lane")
+merge_evidence = _load("merge_evidence")
 
 RUN_ID = re.compile(r"^(?P<stamp>\d{8}T\d{6}Z)-(?P<target>PR\d+|JOV-\d+)-(?P<provider>[a-z0-9]+)(?:-(?P<kind>adopt|fix))?-[0-9a-f]{6}$")
 PHASES = [
@@ -157,6 +158,15 @@ def local_model(host) -> dict:
     providers = lane.load_providers()
     enabled = {name: spec for name, spec in providers.items() if spec.get("enabled", True)}
     slots = {name: host.slots(name, spec.get("slots", 1)) for name, spec in enabled.items()}
+    base_reader = getattr(host, "base_slots", None)
+    base_slots = ({name: base_reader(name, spec.get("slots", 1)) for name, spec in enabled.items()}
+                  if base_reader else dict(slots))
+    doctor = read_json(state / "doctor.json", {})
+    # The console unit has its own environment. Dispatcher observations carry the
+    # effective host overrides and autoscaler result; HUD defaults are not capacity.
+    slot_evidence = dispatcher_slots(doctor, enabled)
+    if slot_evidence is not None:
+        slots, base_slots = slot_evidence
     tree = read_text(state / "current" / ".tree")
     current = (state / "current").resolve()
     all_receipts = ledger_rows(state)
@@ -183,16 +193,39 @@ def local_model(host) -> dict:
     return {
         "host": lane.HOST, "release": tree[:7] if tree else None,
         "releaseMatchesHud": current == HERE, "hudDir": str(HERE),
-        "providers": enabled, "slots": slots, "workers": running_workers(state),
+        "providers": enabled, "slots": slots, "baseSlots": base_slots,
+        "slotEvidence": "fresh-dispatcher" if slot_evidence is not None else "unknown",
+        "autoscaleMode": lane.autoscale.mode(), "workers": running_workers(state),
         "ledger24h": dict(verdicts), "runs24h": len(receipts),
         "receipts24h": receipts, "attributionReceipts": all_receipts,
         "lastLanding": landed[0].get("endedAt") if landed else None,
         "held": read_json(state / "held.json", {}), "failures": read_json(state / "failures.json", {}),
         "gateTimeouts": read_json(state / "gate-timeouts.json", {}), "requeue": read_json(state / "requeue.json", {}),
-        "cooldowns": cooldowns, "codex": accounts, "doctor": read_json(state / "doctor.json", {}),
+        "cooldowns": cooldowns, "codex": accounts, "doctor": doctor,
         "tick": read_json(state / "tick.json", {}),
         "gateSeats": host.gate_slots, "generatedAt": utcnow().isoformat(),
     }
+
+
+
+def dispatcher_slots(doctor: dict, providers: dict, now: datetime | None = None):
+    """Use a complete fresh native census; unknown must never become default seats."""
+    now = utcnow() if now is None else now
+    try:
+        age_s = (now - datetime.fromisoformat(doctor["at"].replace("Z", "+00:00"))).total_seconds()
+        rows = doctor["observed"]["capacityByProvider"]
+        if not 0 <= age_s <= 3 * REFRESH_REMOTE_S:
+            return None
+        slots, bases = {}, {}
+        for name in providers:
+            row = rows[name]
+            count, base = row["slots"], row["base"]
+            if type(count) is not int or type(base) is not int or min(count, base) < 0:
+                return None
+            slots[name], bases[name] = count, base
+        return slots, bases
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return None
 
 
 def read_text(path: Path) -> str:
@@ -203,28 +236,27 @@ def read_text(path: Path) -> str:
 
 
 def linear_model(env_file: Path, in_flight: list[str] = ()) -> dict:
-    """Pool counts, triage returns, and the titles of exactly the issues this host is working."""
-    numbers = sorted({int(target.split("-")[1]) for target in in_flight if target.startswith("JOV-")})
+    """Pool counts, triage returns and the titles of the issues this host is working, read
+    from the local Linear mirror: the HUD spends no Linear request (2026-10-11)."""
     try:
-        client = lane.Linear(env_file)
-        data = client.gql(
-            'query($labels:[String!]!' + (',$numbers:[Float!]!' if numbers else '') + '){'
-            'pool: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}},labels:{name:{in:$labels}}})'
-            '{nodes{identifier priority labels{nodes{name}}}}'
-            + ('active: issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}})'
-               '{nodes{identifier title state{name}}}' if numbers else '')
-            + 'triage: issues(first:100,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Triage"}},labels:{name:{in:$labels}}})'
-            '{nodes{identifier}}}', {"labels": list(LANE_LABELS), **({"numbers": numbers} if numbers else {})})
+        state = lane.lane_state_dir()
+        if state is None:
+            raise RuntimeError("no lanes state dir")
+        mirror = lane.linear_sync.read_mirror(state, "JOV")
+        view = lane.linear_sync.status(state)
     except Exception as error:
         return {"ok": False, "error": f"{type(error).__name__}: {error}"[:100]}
-    pool = Counter()
-    for node in data["pool"]["nodes"]:
-        for label in node["labels"]["nodes"]:
-            if label["name"] in LANE_LABELS:
-                pool[label["name"]] += 1
-    active = {n["identifier"]: n["title"] for n in (data.get("active") or {"nodes": []})["nodes"]}
-    return {"ok": True, "pool": dict(pool), "poolTotal": len(data["pool"]["nodes"]), "active": active,
-            "triage": len(data["triage"]["nodes"]), "fetchedAt": utcnow().isoformat()}
+    rows = list((mirror.get("issues") or {}).values())
+    todo = lane.linear_sync.todo(state, "JOV")
+    pool = Counter(label for row in todo for label in row["labels"] if label in LANE_LABELS)
+    wanted = set(in_flight)
+    active = {row["identifier"]: row["title"] for row in rows if row["identifier"] in wanted}
+    triage = sum(1 for row in rows if row["state"] == "Triage" and set(row["labels"]) & set(LANE_LABELS))
+    jov = view["mirror"]["JOV"]
+    synced = mirror.get("syncedAt")
+    return {"ok": synced is not None, "error": "mirror filling", "pool": dict(pool), "poolTotal": len(todo),
+            "active": active, "triage": triage, "mirrorAgeS": jov["ageS"], "outbox": view["outbox"]["depth"],
+            "fetchedAt": datetime.fromtimestamp(synced, timezone.utc).isoformat() if synced else None}
 
 
 def gh_json(args: list[str], timeout: int = 40):
@@ -259,10 +291,10 @@ def github_model() -> dict:
     except Exception as error:
         model["errors"]["open"] = f"{type(error).__name__}: {error}"[:100]
     try:
-        since = (utcnow() - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        merged = gh_json(["pr", "list", "--repo", lane.REPO_SLUG, "--state", "merged", "--limit", "100",
-                          "--search", f"merged:>={since}", "--json",
-                          "number,title,headRefName,createdAt,mergedAt"])
+        until = utcnow().timestamp()
+        evidence = merge_evidence.collect(lane.REPO_SLUG, until - 86400, until)
+        model["mergedWindow"] = {k: v for k, v in evidence.items() if k != "prs"}
+        merged = merge_evidence.require_complete(evidence)
         model["merged24h"] = [{"number": m["number"], "title": m["title"], "mergedAt": m["mergedAt"],
                                "createdAt": m["createdAt"], "headRefName": m["headRefName"],
                                "lane": (lambda found: found.group("lane") if found else None)(lane.LANE_BRANCH.match(m["headRefName"]))}
@@ -373,6 +405,9 @@ def visible(text: str) -> int:
 
 def clip(text: str, width: int) -> str:
     """Clip by visible width, keeping ANSI sequences balanced."""
+    # Provider errors and issue titles can contain line breaks. Keep each model
+    # row on one physical row so failures cannot scroll the header off tty1.
+    text = re.sub(r"[\r\n\t]", " ", text)
     out, seen = [], 0
     for token in re.split(r"(\x1b\[[0-9;]*[A-Za-z])", text):
         if token.startswith("\x1b"):
@@ -452,15 +487,19 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     now = utcnow()
     local, linear, github, system = model["local"], model["linear"], model["github"], model["system"]
     lines: list[str] = []
+    open_error = github.get("errors", {}).get("open")
+    open_known = not open_error and isinstance(github.get("open"), list)
+    open_prs = github["open"] if open_known else []
     titles = {}
-    for pr in github.get("open", []):
+    for pr in open_prs:
         titles[f"PR{pr['number']}"] = pr["title"]
     titles.update(linear.get("active", {}))
 
     # header
     gh_note = (f"GitHub {github['rate']['graphql']}/5000" if github.get("rate") else
                "GitHub " + rgb(RED, github.get("errors", {}).get("rate", "unread")))
-    linear_note = "Linear ok" if linear.get("ok") else "Linear " + rgb(RED, linear.get("error", "unread"))
+    linear_note = (f"Linear mirror {age(linear['fetchedAt'], now)} · outbox {linear.get('outbox', 0)}" if linear.get("ok")
+                   else "Linear " + rgb(RED, linear.get("error", "unread")))
     stale_flags = []
     if github.get("fetchedAt") and (now - datetime.fromisoformat(github["fetchedAt"])).total_seconds() > 3 * REFRESH_REMOTE_S:
         stale_flags.append("github stale " + age(github["fetchedAt"], now))
@@ -480,13 +519,26 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     workers = local["workers"]
     busy = [w for w in workers if w["run"]]
     total_slots = sum(local["slots"].values())
-    per = " · ".join(f"{name} {sum(1 for w in busy if w['provider'] == name)}/{count}" for name, count in local["slots"].items())
-    lines.append(section(f"ACTIVE SLOTS · {len(busy)} running / {total_slots} ({per}) · gate seats {local['gateSeats']}", width))
+    slots_known = local.get("slotEvidence") != "unknown"
+    autoscale_mode = local.get("autoscaleMode") or "off"
+    bases = local.get("baseSlots") or {}
+    parts = []
+    for name, count in local["slots"].items():
+        label = f"{name} {sum(1 for w in busy if w['provider'] == name)}/{count if slots_known else '?'}"
+        base = bases.get(name)
+        if autoscale_mode != "off" and isinstance(base, int) and base != count:
+            label += f"{'↑' if count > base else '↓'}{base}"
+        parts.append(label)
+    per = " · ".join(parts)
+    auto = f" · auto:{autoscale_mode}" if autoscale_mode != "off" else ""
+    lines.append(section(f"ACTIVE SLOTS · {len(busy)} running / {total_slots if slots_known else 'unknown'} ({per}){auto} · gate seats {local['gateSeats']}", width))
     rows_budget = max(3, min(total_slots, height - 30))
     shown = 0
     for name, count in local["slots"].items():
         mine = [w for w in workers if w["provider"] == name]
-        for index in range(count):
+        # Seats taken before an autoscale reduction finish naturally; hiding them showed
+        # "codex 2/0" with no rows while two codex workers were still running.
+        for index in range(max(count, len(mine))):
             if shown >= rows_budget:
                 break
             worker = mine[index] if index < len(mine) else None
@@ -532,7 +584,7 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
             freshness = row.get("freshness") or {}
             detail = (f"{row.get('alias', '?')} {remaining} · banked {banked} · {event.get('label', 'source gap')} "
                       f"{deadline} · drain {drain} @ {rate} · unused {unused} · coverage {len(forecast.get('qualifiedWork') or [])} · {mode} · {job} · {freshness.get('status', 'unknown')}")
-            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else ORANGE if mode == "FAST" else GREEN, detail), width))
+            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else GREEN if mode == "NORMAL" and freshness.get("status") == "fresh" else ORANGE, detail), width))
         blocker = capacity.get("topBlocker") or "no material blocker"
         lines.append(pad("  " + rgb(RED if incidents else DIM, f"top blocker: {blocker}"), width))
     elif accounts.get("error"):
@@ -556,12 +608,13 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
             lines.append(pad("  " + part, width))
 
     # pipeline
-    open_prs = github.get("open", [])
     queue = github.get("queue", {})
     queued = {e["number"]: e for e in queue.get("entries", [])}
-    head = f"PIPELINE · open lane PRs {len(open_prs)} · draft {sum(1 for p in open_prs if p['draft'])} · ready {sum(1 for p in open_prs if not p['draft'])} · merge queue {queue.get('depth', rgb(RED, github.get('errors', {}).get('queue', 'unread')))}"
-    if "open" in github.get("errors", {}):
-        head += " · " + rgb(RED, "PR list: " + github["errors"]["open"])
+    counts = (f"open lane PRs {len(open_prs)} · draft {sum(1 for p in open_prs if p['draft'])} · ready {sum(1 for p in open_prs if not p['draft'])}"
+              if open_known else "open lane PRs unknown · draft unknown · ready unknown")
+    head = f"PIPELINE · {counts} · merge queue {queue.get('depth', rgb(RED, github.get('errors', {}).get('queue', 'unread')))}"
+    if not open_known:
+        head += " · " + rgb(RED, "PR list: " + (open_error or "not-read-yet"))
     lines.append(rgb(FG, head, bold=True))
     pipeline_budget = max(4, height - len(lines) - 15)
     merge_colors = {"CLEAN": GREEN, "UNSTABLE": ORANGE, "BLOCKED": ORANGE, "DIRTY": RED, "BEHIND": DIM, "HAS_HOOKS": DIM, "UNKNOWN": DIM}
@@ -592,15 +645,22 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
         lines.append(rgb(DIM, f" … {len(open_prs) - pipeline_budget} more"))
 
     # recently merged
-    merged = github.get("merged24h", [])
+    merge_error = github.get("errors", {}).get("merged")
+    if not merge_error and "merged24h" not in github:
+        merge_error = "merged-pr-evidence:not-read-yet"
+    if not merge_error and (github.get("mergedWindow") or {}).get("complete") is False:
+        merge_error = "merged-pr-evidence:" + str(github["mergedWindow"].get("reason") or "incomplete")
+    merged = [] if merge_error else github.get("merged24h", [])
     attribution_receipts = local.get("attributionReceipts") or []
     attributions = {m["number"]: lane.pr_attribution(m, attribution_receipts) for m in merged}
     autonomous = sum(value.get("origin") == lane.AUTONOMOUS_ORIGIN for value in attributions.values())
     manual_codex = sum(value.get("originCategory") == "manual-codex-app-created" for value in attributions.values())
     old_codex = sum(value.get("originCategory") == "old-codex-branch-landed-later" for value in attributions.values())
-    lines.append(rgb(FG, f"RECENTLY MERGED · autonomous {autonomous} · manual Codex app {manual_codex} · "
-                     f"old codex/* {old_codex} · total {len(merged)} in 24h · last lane gate {age(local.get('lastLanding'), now)}", bold=True)
-                 + ("" if "merged" not in github.get("errors", {}) else "  " + rgb(RED, github["errors"]["merged"])))
+    if merge_error:
+        lines.append(rgb(FG, "RECENTLY MERGED · unknown · ", bold=True) + rgb(RED, merge_error))
+    else:
+        lines.append(rgb(FG, f"RECENTLY MERGED · autonomous {autonomous} · manual Codex app {manual_codex} · "
+                         f"old codex/* {old_codex} · total {len(merged)} in 24h · last lane gate {age(local.get('lastLanding'), now)}", bold=True))
     for m in merged[:3]:
         label = attribution_label(attributions[m["number"]])
         lines.append(pad(f" {rgb(GREEN, '✓')} #{m['number']} {clip(m['title'], 90)} "
@@ -635,10 +695,11 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     provider_parts = []
     for provider, metric in throughput["providers"].items():
         first_pass = metric["firstPassGreenRate"]
+        landed = "unknown" if merge_error else str(metric["landedOutput"])
         provider_parts.append(f"{provider} offer {metric['eligibleWorkOffered']} start {metric['workerStarts']} "
                               f"productive {metric['productiveRuns']} PR {metric['prsCreated']} "
                               f"first-pass {'n/a' if first_pass is None else f'{round(first_pass * 100)}%'} "
-                              f"repair {metric['remediationRuns']} landed {metric['landedOutput']}")
+                              f"repair {metric['remediationRuns']} landed {landed}")
     counts = " · ".join(f"{k} {v}" for k, v in sorted(ledger.items(), key=lambda item: str(item[0]))) or "no runs"
     lines.append(rgb(DIM, f"  24h verdicts: {counts}"))
     lines.append(rgb(DIM, "  THROUGHPUT 24h · " + " | ".join(provider_parts)))
@@ -669,7 +730,9 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
 
 def pool_hint(name: str, local: dict) -> str:
     feed = local.get("doctor") or {}
-    admission = feed.get("admission") or {}
+    # doctor.json persists the census under observed; admission is the published
+    # status-feed projection. Read the native source used by worker admission.
+    admission = feed.get("observed") if isinstance(feed.get("observed"), dict) else feed.get("admission") or {}
     try:
         stamp = datetime.fromisoformat(feed["at"].replace("Z", "+00:00"))
         elapsed = (utcnow() - stamp).total_seconds()
@@ -759,7 +822,9 @@ def main(argv=None) -> int:
     try:
         while True:
             newer = current_hud(host)
-            if newer and newer != Path(__file__).resolve():
+            # HERE binds the loaded release. Resolving __file__ again can follow
+            # the moved `current` symlink and incorrectly compare new to new.
+            if newer and newer != HERE / "hud.py":
                 sys.stdout.write("\x1b[?25h")
                 sys.stdout.flush()
                 os.execv(sys.executable, [sys.executable, str(newer), *sys.argv[1:]])

@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 export const DESIGN_TASTE_JURY_DISPOSITIONS = ['ship', 'taste'] as const;
 
 export type DesignTasteJuryDisposition =
@@ -80,72 +78,3 @@ export interface DesignTasteIssueFiling {
   readonly referenceComps: readonly DesignTasteBenchmarkReference[];
   readonly queue: 'visual-qa' | 'tim-taste';
 }
-
-export const DesignTasteJuryRunManifestSchema = z
-  .object({
-    runId: z.string().trim().min(1).max(80),
-    gitSha: z.union([z.string().trim().min(1).max(64), z.null()]),
-    computedAt: z.string().datetime(),
-    capturePlan: z.object({
-      isNonUiPush: z.boolean(),
-      capture: z.array(
-        z
-          .object({
-            scenarioId: z.string().trim().min(1),
-            reason: z.string().trim().min(1),
-            captureStyle: z.enum(DESIGN_TASTE_JURY_CAPTURE_STYLES),
-          })
-          .strict()
-      ),
-      skipped: z.array(z.string().trim().min(1)),
-      changedFiles: z.array(z.string().trim().min(1)),
-    }),
-    consensus: z.array(
-      z
-        .object({
-          runId: z.string().trim().min(1),
-          surfaceId: z.string().trim().min(1),
-          computedAt: z.string().datetime(),
-          findings: z.array(
-            z
-              .object({
-                id: z.string().trim().min(1),
-                summary: z.string().trim().min(1),
-                disposition: z.enum(DESIGN_TASTE_JURY_DISPOSITIONS),
-                consensusRank: z.number().int().positive(),
-                voteCount: z.number().int().positive(),
-                jurorIds: z.array(z.string().trim().min(1)),
-                objective: z.boolean(),
-              })
-              .strict()
-          ),
-        })
-        .strict()
-    ),
-    issueFilings: z.array(
-      z
-        .object({
-          id: z.string().trim().min(1),
-          disposition: z.enum(DESIGN_TASTE_JURY_DISPOSITIONS),
-          title: z.string().trim().min(1),
-          body: z.string().trim().min(1),
-          referenceComps: z.array(
-            z
-              .object({
-                id: z.string().trim().min(1),
-                label: z.string().trim().min(1),
-                url: z.string().url(),
-                rationale: z.string().trim().min(1),
-              })
-              .strict()
-          ),
-          queue: z.enum(['visual-qa', 'tim-taste']),
-        })
-        .strict()
-    ),
-  })
-  .strict();
-
-export type DesignTasteJuryRunManifest = z.infer<
-  typeof DesignTasteJuryRunManifestSchema
->;

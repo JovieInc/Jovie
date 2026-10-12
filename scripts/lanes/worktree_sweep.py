@@ -32,7 +32,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from disk_guard import ensure_sbin_on_path  # noqa: E402  (sibling module of the release)
+from disk_guard import LOW_PCT as DISK_LOW_PCT, ensure_sbin_on_path  # noqa: E402  (sibling module of the release)
+import lifecycle  # noqa: E402
 
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
 IDLE_S = 12 * 3600
@@ -43,7 +44,8 @@ LOW_INTERVAL_S = 600
 # Regenerable output, plus per-checkout pnpm stores (never the shared store, which lives outside checkouts).
 BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".build", "DerivedData",
                         ".pnpm-store", ".pnpm-store-private"})
-EXCLUDE = [f":(exclude,glob)**/{name}/**" for name in sorted(BUILD_DIRS)] + [f":(exclude){PRESERVED_REPAIR}"]
+EXCLUDE = [f":(exclude,glob)**/{name}/**" for name in sorted(BUILD_DIRS)] + [f":(exclude){PRESERVED_REPAIR}",
+                                                                          ":(exclude).codex-last-message.txt"]
 
 
 def default_roots(home: Path, state: Path) -> list[Path]:
@@ -188,6 +190,16 @@ def preserved_age(path: Path, now: float) -> float | None:
         return None
 
 
+def cleanup_preserved(path: Path) -> bool:
+    """A marker written by cleanup (reasons all `cleanup-*`), not by a cancelled repair."""
+    try:
+        reasons = json.loads((path / PRESERVED_REPAIR).read_text()).get("reason")
+    except (OSError, ValueError, AttributeError):
+        return False
+    return isinstance(reasons, list) and bool(reasons) and all(
+        isinstance(reason, str) and reason.startswith("cleanup-") for reason in reasons)
+
+
 def decide(path: Path, branch: str | None, info: dict, now: float, closed: set[str], *,
            idle_s: float, preserved_ttl_s: float) -> str | None:
     """Why this checkout may retire now, or None to keep it."""
@@ -197,6 +209,10 @@ def decide(path: Path, branch: str | None, info: dict, now: float, closed: set[s
     if age is not None:
         if closed_pr and idle >= CLOSED_GRACE_S:
             return "preserved-pr-closed"
+        # Cleanup preserved it only because its source looked unverified; once it is provably
+        # clean and published, keeping it just locks the PR branch against every repair.
+        if cleanup_preserved(path) and info["dirty"] == 0 and info["unpushed"] == "0" and idle >= CLOSED_GRACE_S:
+            return "preserved-clean"
         return "preserved-expired" if age >= preserved_ttl_s and idle >= idle_s else None
     if closed_pr and idle >= CLOSED_GRACE_S:
         return "pr-closed"
@@ -230,26 +246,40 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
         report["errors"].append(f"remove:{path}:{removed.stderr.strip()[:120]}")
 
 
-def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=subprocess.run,
+def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,
           now: float | None = None, closed: dict[Path, set[str]] | None = None, idle_s: float = IDLE_S,
           preserved_ttl_s: float = PRESERVED_TTL_S, prefix: str = "backup/mac",
-          date: str | None = None) -> dict:
+          date: str | None = None, state: Path | None = None) -> dict:
     now = time.time() if now is None else now
     date = date or datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
     closed = closed or {}
     report = {"at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
               "removed": [], "backups": [], "stripped": [], "kept": 0, "errors": []}
+    def yield_to_drain():
+        if state is not None and lifecycle.draining(state):
+            report["drained"] = True
+            return True
+        return False
+
+    if yield_to_drain():
+        return report
     live = live_paths(run)
     if live is None:
         report["errors"].append("process-state-unavailable")
         return report
     for repo in repos:
+        if yield_to_drain():
+            return report
         try:
             entries = linked_worktrees(repo, run)
         except (OSError, subprocess.SubprocessError) as error:
             report["errors"].append(f"list:{repo}:{type(error).__name__}")
             continue
         for path, branch in entries:
+            # A retirement is one unit: finish its preservation/removal before
+            # yielding, retaining the inherited lifecycle lease throughout.
+            if yield_to_drain():
+                return report
             if not path.exists() or not in_scope(path, roots, never):
                 continue
             try:
@@ -260,6 +290,8 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=subpro
                 # the sweep; it stays in place and is retried next interval.
                 report["kept"] += 1
                 report["errors"].append(f"{path}:{type(error).__name__}"[:200])
+        if yield_to_drain():
+            return report
         try:
             git(repo, run, "worktree", "prune", timeout=120)
         except (OSError, subprocess.SubprocessError):
@@ -293,24 +325,18 @@ def maybe_spawn(state: Path, repo: Path, free_pct: float | None, *, now: float |
         last = json.loads(stamp.read_text()).get("startedAt", 0)
     except (OSError, ValueError, AttributeError):
         last = 0
-    interval = LOW_INTERVAL_S if free_pct is not None and free_pct < 15 else INTERVAL_S
+    interval = LOW_INTERVAL_S if free_pct is not None and free_pct <= DISK_LOW_PCT else INTERVAL_S
     if now - last < interval:
         return "not-due"
     state.mkdir(parents=True, exist_ok=True)
     stamp.write_text(json.dumps({"startedAt": now}))
     subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--state", str(state), "--repo", str(repo)],
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     start_new_session=True)
+                     start_new_session=True, **lifecycle.spawn_kwargs())
     return "spawned"
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--state", type=Path, default=Path(os.environ.get(
-        "LANES_STATE", Path.home() / ".local/state/jovie-lanes")))
-    parser.add_argument("--repo", type=Path, default=Path(os.environ.get(
-        "LANES_REPO", Path.home() / "devin-sweep/Jovie")))
-    args = parser.parse_args(argv)
+def guarded_main(args) -> int:
     ensure_sbin_on_path()
     home = Path.home()
     args.state.mkdir(parents=True, exist_ok=True)
@@ -320,9 +346,14 @@ def main(argv: list[str] | None = None) -> int:
         except BlockingIOError:
             return 0  # disk_guard or an earlier sweep owns cleanup
         repos = default_repos(home, args.repo)
-        closed = {repo: closed_branches(repo, subprocess.run) for repo in repos}
+        closed = {}
+        for repo in repos:
+            if lifecycle.draining(args.state):
+                break
+            closed[repo] = closed_branches(repo, subprocess.run)
         prefix = "backup/mac" if sys.platform == "darwin" else f"backup/{os.uname().nodename.split('.')[0]}"
-        report = sweep(repos, default_roots(home, args.state), default_never(home), closed=closed, prefix=prefix)
+        report = sweep(repos, default_roots(home, args.state), default_never(home),
+                       closed=closed, prefix=prefix, state=args.state)
     stamp = args.state / "worktree-sweep.json"
     try:
         started = json.loads(stamp.read_text()).get("startedAt")
@@ -330,6 +361,21 @@ def main(argv: list[str] | None = None) -> int:
         started = None
     stamp.write_text(json.dumps({"startedAt": started or time.time(), **report}, indent=1))
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--state", type=Path, default=Path(os.environ.get(
+        "LANES_STATE", Path.home() / ".local/state/jovie-lanes")))
+    parser.add_argument("--repo", type=Path, default=Path(os.environ.get(
+        "LANES_REPO", Path.home() / "devin-sweep/Jovie")))
+    args = parser.parse_args(argv)
+    try:
+        with lifecycle.Guard(args.state):
+            return guarded_main(args)
+    except lifecycle.AdmissionHeld as error:
+        print(f"lifecycle admission held: {error}", file=sys.stderr)
+        return 75
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ import {
   assertTurnstileClientServerPairCompatible,
   getBrowserTurnstileHostname,
   normalizeTurnstileHostname,
+  resolveOnboardingTurnstileSiteKey,
   resolveTurnstileSecretKey,
   resolveTurnstileSiteKey,
   shouldUseTurnstileDummyKeys,
@@ -59,6 +60,29 @@ describe('shouldUseTurnstileDummyKeys', () => {
   it('does not force dummy keys when hostname is unknown (SSR-safe)', () => {
     expect(shouldUseTurnstileDummyKeys(null)).toBe(false);
     expect(shouldUseTurnstileDummyKeys(undefined)).toBe(false);
+  });
+});
+
+describe('resolveOnboardingTurnstileSiteKey (JOV-7697)', () => {
+  it('keeps the production key on jov.ie for everyone by default', () => {
+    expect(resolveOnboardingTurnstileSiteKey('jov.ie', REAL_SITE_KEY)).toBe(
+      REAL_SITE_KEY
+    );
+    expect(
+      resolveOnboardingTurnstileSiteKey('jov.ie', REAL_SITE_KEY, false)
+    ).toBe(REAL_SITE_KEY);
+  });
+
+  it('mounts the test sitekey only in server-resolved test mode', () => {
+    expect(
+      resolveOnboardingTurnstileSiteKey('jov.ie', REAL_SITE_KEY, true)
+    ).toBe(TURNSTILE_ALWAYS_PASS_SITE_KEY);
+  });
+
+  it('still uses dummy keys on preview hosts outside test mode', () => {
+    expect(
+      resolveOnboardingTurnstileSiteKey('x.vercel.app', REAL_SITE_KEY)
+    ).toBe(TURNSTILE_ALWAYS_PASS_SITE_KEY);
   });
 });
 

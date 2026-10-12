@@ -266,7 +266,7 @@ const optedInPreferences: RecipientPreferences = {
   quietHours: { start: '21:00', end: '08:00' },
   weekendBehavior: 'weekend_briefing_eligible',
   briefingBehavior: 'weekend_summer',
-  channels: { email: true, sms: false, push: false, in_app: true },
+  channels: { email: true, sms: false, push: false },
   marketingOptIn: true,
   marketingConsent: {
     version: 'recipient-marketing-v1',

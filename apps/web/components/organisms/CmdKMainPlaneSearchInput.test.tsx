@@ -13,6 +13,31 @@ const baseProps = {
 };
 
 describe('CmdKMainPlaneSearchInput', () => {
+  it('keeps each mounted search independently addressable for focus recovery', () => {
+    render(
+      <>
+        <CmdKMainPlaneSearchInput {...baseProps} open={false} />
+        <CmdKMainPlaneSearchInput
+          {...baseProps}
+          open={false}
+          listId='second-results'
+        />
+      </>
+    );
+    const [first, second] = screen.getAllByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    expect(first.id).not.toBe(second.id);
+    for (const input of [first, second]) {
+      const recovered = document.getElementById(
+        `${input.getAttribute('aria-controls')}-input`
+      );
+      expect(recovered).toBe(input);
+      recovered?.focus();
+      expect(input).toHaveFocus();
+    }
+  });
+
   it('focuses on open and exposes the combobox relationships', () => {
     render(<CmdKMainPlaneSearchInput {...baseProps} />);
 

@@ -41,7 +41,8 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-vi.mock('@/lib/db/schema/content', () => ({
+vi.mock('@/lib/db/schema/content', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/db/schema/content')>()),
   discogReleases: { id: 'id' },
   discogRecordings: { id: 'recordingId' },
   discogReleaseTracks: { releaseId: 'releaseId' },

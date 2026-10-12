@@ -9,6 +9,7 @@ import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { RefreshLockBusyError } from '@/lib/connectors/token-vault';
 import { createYouTubeLibraryProvider } from '@/lib/connectors/youtube/provider';
 import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
+import { syncYouTubeInboundComments } from '@/lib/connectors/youtube/sync-inbound-comments';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
@@ -111,6 +112,24 @@ export async function POST(request: Request) {
     }
     const now = new Date();
     const provider = createYouTubeLibraryProvider({ accessToken });
+    const freshAccessToken = accessToken;
+    // Inbound comment sync (JOV-5860) is best-effort: a comment-threads outage
+    // must not fail the library sync that triggered it.
+    const syncInbox = () =>
+      syncYouTubeInboundComments({
+        userId,
+        connectorAccountId: accountId,
+        channelId,
+        accessToken: freshAccessToken,
+      }).catch(async (inboxError: unknown) => {
+        await captureError(
+          'YouTube inbound comment sync failed',
+          inboxError instanceof Error
+            ? inboxError
+            : new Error(String(inboxError))
+        );
+        return null;
+      });
     if (parsed.data.mode === 'page') {
       const snapshot = await importYouTubeChannelPage({
         userId,
@@ -118,7 +137,9 @@ export async function POST(request: Request) {
         provider,
         now,
       });
-      return NextResponse.json(snapshot);
+      // Run once when a paged import finishes instead of once per page.
+      const inbox = snapshot.resumable ? null : await syncInbox();
+      return NextResponse.json({ ...snapshot, ...(inbox ? { inbox } : {}) });
     }
     const result = await syncChannelVideos({
       creatorProfileId: profileId,
@@ -126,6 +147,7 @@ export async function POST(request: Request) {
       provider,
       now,
     });
+    const inbox = await syncInbox();
     await db
       .update(connectorAccounts)
       .set({
@@ -137,7 +159,7 @@ export async function POST(request: Request) {
       })
       .where(eq(connectorAccounts.id, accountId))
       .catch(() => undefined);
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, ...(inbox ? { inbox } : {}) });
   } catch (error) {
     if (error instanceof RefreshLockBusyError) {
       return NextResponse.json(

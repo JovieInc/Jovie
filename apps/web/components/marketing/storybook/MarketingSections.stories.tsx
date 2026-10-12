@@ -45,6 +45,7 @@ import {
   MARKETING_SECTION_IDS,
   type MarketingSectionId,
 } from '@/data/marketing';
+import { LOGO_PERMISSION_FIXTURES } from '@/data/product-truth/logo-permissions.fixture';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import {
   MARKETING_SECTION_STORY_GAPS,
@@ -166,6 +167,8 @@ export const logoCloud: Story = {
         adaptive={ARTIST_PROFILE_COPY.adaptive}
         phoneCaption={ARTIST_PROFILE_COPY.hero.phoneCaption}
         phoneSubcaption={ARTIST_PROFILE_COPY.hero.phoneSubcaption}
+        logoPlacement={{ page: '/artist-profiles' }}
+        fixturePermissions={LOGO_PERMISSION_FIXTURES}
       />
     </SectionFrame>
   ),
@@ -205,6 +208,7 @@ export const artistProfileAssembly: Story = {
       <ArtistProfileLandingPage
         copy={ARTIST_PROFILE_COPY}
         flags={{ FULL_PAGE: false, SOCIAL_PROOF: false, FAQ: false }}
+        logoPlacement={{ page: '/artist-profiles' }}
       />
     </SectionFrame>
   ),

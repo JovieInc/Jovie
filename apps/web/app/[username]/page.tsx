@@ -418,7 +418,7 @@ async function ArtistPageContent({
     releaseDate: r.releaseDate,
     artworkUrl: r.artworkUrl,
     artistNames: r.artistNames,
-    previewUrl: null,
+    previewUrl: r.primaryPreviewUrl ?? null,
   }));
 
   // Entity-linked bio/AEO context: own releases (→ /{handle}/{slug}) and

@@ -89,6 +89,34 @@ describe('DrawerSection', () => {
     expect(screen.getByText('Details')).toBeInTheDocument();
   });
 
+  it('keeps plain collapsible headings on the same inset as their body', () => {
+    render(
+      <DrawerSection title='Details'>
+        <div data-testid='drawer-section-content'>Body content</div>
+      </DrawerSection>
+    );
+
+    expect(screen.getByRole('button', { name: 'Details' })).toHaveClass('px-0');
+    expect(
+      screen.getByTestId('drawer-section-content').parentElement
+    ).not.toHaveClass('px-2.5');
+  });
+
+  it('preserves the shared card inset for card headings and bodies', () => {
+    render(
+      <DrawerSection title='Details' surface='card'>
+        <div data-testid='drawer-section-content'>Body content</div>
+      </DrawerSection>
+    );
+
+    expect(screen.getByRole('button', { name: 'Details' })).toHaveClass(
+      'px-2.5'
+    );
+    expect(
+      screen.getByTestId('drawer-section-content').parentElement
+    ).toHaveClass('px-2.5');
+  });
+
   it('renders children without a heading when no title is provided', () => {
     render(
       <DrawerSection>

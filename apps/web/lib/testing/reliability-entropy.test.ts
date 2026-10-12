@@ -128,17 +128,17 @@ describe('reliability entropy projection', () => {
         .entropyProjection.summary;
     try {
       run('emit-delta');
-      expect(outcomes()).toEqual({ clear: 1, attention: 0, unknown: 5 });
+      expect(outcomes()).toEqual({ clear: 1, attention: 0, unknown: 6 });
       run('publish-status', '--workflow-conclusion', 'cancelled');
-      expect(outcomes()).toEqual({ clear: 1, attention: 0, unknown: 5 });
+      expect(outcomes()).toEqual({ clear: 1, attention: 0, unknown: 6 });
       run('publish-status', '--workflow-conclusion', 'success');
-      expect(outcomes()).toEqual({ clear: 2, attention: 0, unknown: 4 });
+      expect(outcomes()).toEqual({ clear: 2, attention: 0, unknown: 5 });
       rmSync(quarantine);
       run('publish-status', '--workflow-conclusion', 'success');
-      expect(outcomes()).toEqual({ clear: 1, attention: 0, unknown: 5 });
+      expect(outcomes()).toEqual({ clear: 1, attention: 0, unknown: 6 });
       writeFileSync(quarantine, 'not JSON');
       run('publish-status', '--workflow-conclusion', 'success');
-      expect(outcomes()).toEqual({ clear: 1, attention: 0, unknown: 5 });
+      expect(outcomes()).toEqual({ clear: 1, attention: 0, unknown: 6 });
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
@@ -212,7 +212,7 @@ describe('reliability entropy projection', () => {
             'jovie-reliability-entropy/v1'
           );
           const fresh = observedAt === fixture.generatedAt;
-          expect(delta.entropyProjection.summary.unknown).toBe(fresh ? 4 : 5);
+          expect(delta.entropyProjection.summary.unknown).toBe(fresh ? 5 : 6);
           expect(
             delta.entropyProjection.detectors.find(
               (item: { detectorId: string }) =>
@@ -248,7 +248,7 @@ describe('reliability entropy projection', () => {
     expect(output.detectors.map(item => item.detectorId)).toEqual(
       RELIABILITY_DETECTORS.map(item => item.id)
     );
-    expect(output.summary).toEqual({ clear: 0, attention: 0, unknown: 6 });
+    expect(output.summary).toEqual({ clear: 0, attention: 0, unknown: 7 });
     expect(
       output.detectors.every(
         item => item.reason === 'missing-result' && item.findingCount === null
@@ -266,7 +266,7 @@ describe('reliability entropy projection', () => {
       })
     );
     const output = projectReliabilityEntropy(events, now);
-    expect(output.summary).toEqual({ clear: 5, attention: 1, unknown: 0 });
+    expect(output.summary).toEqual({ clear: 6, attention: 1, unknown: 0 });
     expect(output.detectors[1]).toMatchObject({
       sourceIssue: 'JOV-1871',
       findingCount: 2,
@@ -343,7 +343,7 @@ describe('reliability entropy projection', () => {
       nightlyReliabilityEvents(status(), ledger()),
       now
     );
-    expect(result.summary).toEqual({ clear: 2, attention: 0, unknown: 4 });
+    expect(result.summary).toEqual({ clear: 2, attention: 0, unknown: 5 });
     expect(
       result.detectors.find(item => item.detectorId === 'nightly-testing-agent')
     ).toMatchObject({

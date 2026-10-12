@@ -22,6 +22,7 @@ import {
   inspectRouteDom,
   type RouteDomFindingKind,
 } from '../../tests/e2e/utils/route-dom-detector';
+import { CAPTURE_VIEWPORTS } from './capture-integrity';
 import type { RenderMeasurement, Unavailable } from './providers';
 
 export const RENDER_BUDGETS = {
@@ -31,10 +32,7 @@ export const RENDER_BUDGETS = {
   lcpMs: 2500,
 } as const;
 
-export const RENDER_VIEWPORTS = [
-  { id: 'mobile', width: 390, height: 844 },
-  { id: 'desktop', width: 1440, height: 900 },
-] as const;
+export const RENDER_VIEWPORTS = CAPTURE_VIEWPORTS;
 
 export type RenderCapture = z.infer<typeof FactoryRenderCaptureSchema>;
 
@@ -163,6 +161,11 @@ export async function measureRoute(options: {
   for (const viewport of RENDER_VIEWPORTS) {
     const context = await options.browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
+      reducedMotion: 'reduce',
+      locale: 'en-US',
+      timezoneId: 'UTC',
+      colorScheme: 'dark',
+      deviceScaleFactor: 1,
     });
     try {
       // tsx (factory:run) compiles with keepNames, so functions handed to
@@ -177,9 +180,15 @@ export async function measureRoute(options: {
         cls: number;
         lcp: number | null;
       };
-      const bytes = await page.screenshot({ fullPage: true });
+      // Fonts and a stationary animation state keep rerender identity meaningful.
+      await page.evaluate('document.fonts.ready');
+      const bytes = await page.screenshot({
+        fullPage: true,
+        animations: 'disabled',
+        caret: 'hide',
+      });
       const path = join(options.outDir, `${viewport.id}-${viewport.width}.png`);
-      writeFileSync(path, bytes);
+      writeFileSync(path, bytes, { flag: 'wx' });
       const dom = await inspectRouteDom(page, { surface: 'marketing' });
       captures.push({
         viewport: viewport.id,

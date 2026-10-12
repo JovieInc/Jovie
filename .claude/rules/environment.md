@@ -255,7 +255,7 @@ daemon|daemon: false|background process for optimization (disabled in Jovie due 
 ```bash
 scripts/agent/worktree-new ../Jovie-agent-1 -b agent/task-name   # fetch, take a pool slot, install
 cd ../Jovie-agent-1 && pnpm turbo build
-git worktree remove --force ../Jovie-agent-1
+scripts/agent/worktree-new --recycle ../Jovie-agent-1             # clean: back to the pool; dirty/preserved: refused
 ```
 
 | Cache | Location | Shared how |
@@ -263,7 +263,7 @@ git worktree remove --force ../Jovie-agent-1
 | Worktree pool (installed `node_modules` + warm `apps/web/.cache/tsbuildinfo`) | `~/.cache/jovie/worktree-pool/<repo>/` | `worktree-new` moves a slot to your path and refills in the background; `--status`, `--fill`, `--drain` |
 | pnpm content store | `pnpm store path` (same APFS volume) | hardlinked into each worktree; never prune it while worktrees install |
 | Turbo local cache | main checkout's `.turbo/cache` | Turbo 2.8+ resolves it through the git common dir for every worktree |
-| Git objects | main checkout's `.git` | every linked worktree shares them |
+| Git objects | main checkout's `.git` | every linked worktree shares them; `setup.sh` runs `git maintenance start` (incremental strategy, never prunes: lanes clones borrow these objects via alternates) |
 
 All shared caches live under `$JOVIE_CACHE_ROOT` (default `~/.cache/jovie`). Cleanup tools must not delete that root wholesale: `worktree-new --drain` (or `disk_guard`, below the pool's 30 GiB floor) removes pool slots safely.
 
@@ -324,7 +324,7 @@ Three workspaces, each on a different machine, with a clear separation of concer
 
 - **Houston** (this repo, MacBook Pro 32 GB) — the **code** workspace. Default profile: `coder`. Claude Code, Codex CLI, Conductor worktrees, and Hermes issue runners all live here. PRs originate here.
 - **Raleigh** (`/Users/timwhite/conductor/workspaces/ops/raleigh`) — the **ops / FounderOS** workspace. Source of truth for `company_state.md`, daily briefings, and task routing.
-- **Hermes-Air** (MacBook Air 16 GB, dedicated): since 2026-09-29 the fleet's always-on **Mac lane**. It hosts the heartbeat-gated self-hosted macOS Actions runner (`jovie-mac`) and a nightly Mac dogfood verifier that files `mac-dogfood` Linear issues. It is a gbrain client of the ops Mac, and the Hermes gateway is retired. **Does not author code unattended.** See [`.claude/rules/hermes-air.md`](hermes-air.md) and [`docs/HERMES_AIR.md`](../../docs/HERMES_AIR.md).
+- **Hermes-Air** (MacBook Air 16 GB, dedicated): since 2026-09-29 the fleet's always-on **Mac lane**. It hosts a self-hosted macOS Actions runner (`jovie-mac`) that runs Mac-first CI lanes with a hosted fallback and a nightly Mac dogfood verifier that files `mac-dogfood` Linear issues. It is a gbrain client of the ops Mac, and the Hermes gateway is retired. **Does not author code unattended.** See [`.claude/rules/hermes-air.md`](hermes-air.md) and [`docs/HERMES_AIR.md`](../../docs/HERMES_AIR.md).
 
 The contract between Hermes-Air and Houston is Linear issues. The contract between Hermes-Air and Raleigh is gbrain over Tailscale. Keep code changes in Houston; keep orchestration on the Air; keep company-state in Raleigh.
 

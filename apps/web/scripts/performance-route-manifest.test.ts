@@ -169,7 +169,7 @@ describe('performance route manifest', () => {
     expect(legacyProfiles?.measureMode).toBe('redirect');
     expect(legacyProfiles?.readySelectors.redirectDestinations).toEqual([
       APP_ROUTES.PRESENCE,
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
+      `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`,
     ]);
     expect(legacyProfiles?.readySelectors.content).toEqual([
       '[data-testid="profiles-workspace"]',

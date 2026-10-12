@@ -36,6 +36,13 @@ export interface WebhookContext {
 
   /** When Stripe created the event (used for event ordering to skip stale events) */
   stripeEventTimestamp: Date;
+
+  /**
+   * Live deliveries may cancel a subscription after a refund or dispute.
+   * Stored-event replay sets this false so a retry cannot call Stripe writes.
+   * Defaults to allowed when omitted.
+   */
+  stripeWritesAllowed?: boolean;
 }
 
 /**

@@ -7,12 +7,18 @@ import {
   FACTORY_CERTIFIER_HARNESS,
   FACTORY_RECEIPT_SCHEMA,
 } from '../../data/marketing/factory/spine';
+import { PROOF_REGISTRY } from '../../data/product-truth/proof';
+import {
+  type Capability,
+  listCapabilities,
+} from '../../data/product-truth/registry';
 import { loadFactoryBrief } from './brief';
 import {
   attemptFileName,
   digestOf,
   FACTORY_RUN_SCHEMA,
   type FactoryRunManifest,
+  factoryStageSourceDigest,
   readJson,
   type StageAttemptRecord,
   stageInputDigest,
@@ -87,7 +93,8 @@ function writeChain(): FactoryRunManifest {
         attempt: 1,
         inputDigest: stageInputDigest(
           briefDigest,
-          chain.map(item => item.outputDigest)
+          chain.map(item => item.outputDigest),
+          factoryStageSourceDigest(link.stage, brief)
         ),
         outputDigest: digestOf(link.artifact),
         producer: link.producer,
@@ -182,6 +189,87 @@ describe('verifyFactoryRun', () => {
     expect(verifyFactoryRun(runDir)).toEqual([]);
   });
 
+  it.each([
+    'maturity',
+    'access',
+    'contentRevision',
+    'proofAuthorized',
+  ] as const)(
+    'invalidates the truth receipt when capability %s changes with claim text fixed',
+    field => {
+      writeChain();
+      const capabilities = listCapabilities().map(capability => {
+        if (capability.id !== 'artist-profiles') return capability;
+        const marketing = capability.marketing!;
+        switch (field) {
+          case 'maturity':
+            return { ...capability, maturity: 'public_beta' as const };
+          case 'access':
+            return { ...capability, access: 'enrolled' as const };
+          case 'contentRevision':
+            return {
+              ...capability,
+              marketing: { ...marketing, contentRevision: '2026-10-01' },
+            };
+          case 'proofAuthorized':
+            return {
+              ...capability,
+              marketing: { ...marketing, proofAuthorized: false },
+            };
+        }
+      }) as Capability[];
+
+      // Stored claim text is unchanged; the current source record alone makes
+      // the earlier truth receipt ineligible for resume.
+      expect(
+        readJson<StageAttemptRecord>(join(runDir, '01-truth.attempt-1.json'))
+          .artifact
+      ).toEqual(truthArtifact);
+      expect(verifyFactoryRun(runDir, { capabilities })).toContain(
+        'truth#1: input digest does not bind current stage inputs'
+      );
+    }
+  );
+
+  it('binds proof revisions and withdrawals to only the page proof source digest', () => {
+    const proof = PROOF_REGISTRY.find(
+      item => item.id === 'product-profile-subscribe-capture'
+    )!;
+    const source = factoryStageSourceDigest('proof', brief);
+    const revisedProofs = PROOF_REGISTRY.map(item =>
+      item.id === proof.id &&
+      item.kind === 'product-proof' &&
+      item.artifact.kind === 'screenshot-scenario'
+        ? {
+            ...item,
+            artifact: { ...item.artifact, capturedAt: '2026-10-01' },
+          }
+        : item
+    );
+    const revisedSource = factoryStageSourceDigest('proof', brief, {
+      proofs: revisedProofs,
+    });
+    const withdrawnSource = factoryStageSourceDigest('proof', brief, {
+      proofs: PROOF_REGISTRY.filter(item => item.id !== proof.id),
+    });
+
+    expect(source).not.toBe(revisedSource);
+    expect(source).not.toBe(withdrawnSource);
+    expect(stageInputDigest('sha256:brief', ['sha256:prior'], source)).not.toBe(
+      stageInputDigest('sha256:brief', ['sha256:prior'], revisedSource)
+    );
+    expect(
+      factoryStageSourceDigest(
+        'proof',
+        {
+          ...brief,
+          proof: [],
+        },
+        { proofs: revisedProofs }
+      )
+    ).not.toBe(revisedSource);
+  });
+
   it('catches a tampered artifact and every later link', () => {
     writeChain();
     editRecord('01-truth.attempt-1.json', record => ({
@@ -245,7 +333,7 @@ describe('verifyFactoryRun', () => {
         'brief.json digest does not match run.json',
         'complete run has 2/16 stages',
         'truth#1: run.json digest does not match the receipt',
-        'persuasion#1: input digest does not bind the prior chain',
+        'persuasion#1: input digest does not bind current stage inputs',
       ])
     );
   });

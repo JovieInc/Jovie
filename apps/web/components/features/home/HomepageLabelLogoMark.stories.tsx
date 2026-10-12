@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { LOGO_PERMISSION_FIXTURES } from '@/data/product-truth/logo-permissions.fixture';
 import { HomepageLabelLogoMark } from './HomepageLabelLogoMark';
 
 const meta = {
@@ -6,6 +7,11 @@ const meta = {
   component: HomepageLabelLogoMark,
   parameters: {
     layout: 'centered',
+  },
+  args: {
+    partner: 'awal',
+    placement: { page: '/' },
+    fixturePermissions: LOGO_PERMISSION_FIXTURES,
   },
 } satisfies Meta<typeof HomepageLabelLogoMark>;
 

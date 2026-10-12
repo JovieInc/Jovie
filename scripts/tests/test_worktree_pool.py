@@ -48,8 +48,11 @@ class PoolTest(unittest.TestCase):
         self.env.start()
         self.install = patch.object(pool_mod, "INSTALL", ["true"])
         self.install.start()
+        self.disk = patch.object(pool_mod, "free_gb", return_value=100)
+        self.disk.start()
 
     def tearDown(self):
+        self.disk.stop()
         self.install.stop()
         self.env.stop()
         self.tmp.cleanup()
@@ -72,6 +75,14 @@ class PoolTest(unittest.TestCase):
         self.assertEqual(source, "fresh")
         self.assertEqual(calls, [["git", "worktree", "add", "-q", "-b", "feat/x", str(self.out / "w"), "main"]])
         self.assertEqual(git(self.out / "w", "branch", "--show-current"), "feat/x")
+
+    def test_a_failed_fresh_add_through_a_non_raising_sh_raises(self):
+        def sh(args, cwd=None, log=None):
+            return subprocess.run(args, cwd=cwd, capture_output=True, text=True)  # records, never raises
+        git(self.repo, "branch", "exists")
+        with self.assertRaises(subprocess.CalledProcessError):
+            pool_mod.take(self.repo, self.out / "w", "exists", "main", sh=sh, root=self.root)
+        self.assertFalse((self.out / "w").exists())
 
     def test_filled_slot_is_moved_to_dest_on_the_new_branch_at_the_latest_base(self):
         self.assertEqual(len([a for a in self.fill() if a.startswith("built")]), 1)
@@ -158,6 +169,122 @@ class PoolTest(unittest.TestCase):
         self.assertEqual(len(pool_mod.shed(self.repo, self.root, min_free_gb=10**9)), 1)
         self.assertEqual(pool_mod.ready_slots(self.pool()), [])
         self.assertEqual(pool_mod.shed(self.out, self.root, min_free_gb=10**9), [])
+
+    def finished(self, name="done") -> Path:
+        path = self.out / name
+        pool_mod.take(self.repo, path, f"feat/{name}", "main", root=self.root)
+        (path / "node_modules").mkdir()
+        (path / "node_modules" / "dep.js").write_text("installed")
+        (path / ".next").mkdir()
+        git(self.repo, "config", "core.excludesFile", str(self.out / "ignore"))
+        (self.out / "ignore").write_text("node_modules\n.next\n")
+        return path
+
+    def test_a_clean_finished_worktree_is_recycled_with_its_install_and_without_build_output(self):
+        path = self.finished()
+        slot = pool_mod.recycle(self.repo, path, "main", root=self.root)
+        self.assertIsNotNone(slot)
+        self.assertFalse(path.exists())
+        moved = self.pool() / slot
+        self.assertEqual(pool_mod.ready_slots(self.pool()), [moved])
+        self.assertEqual((moved / "node_modules" / "dep.js").read_text(), "installed")
+        self.assertFalse((moved / ".next").exists())
+        self.assertEqual(git(moved, "branch", "--show-current"), "")
+        self.assertIn("feat/done", git(self.repo, "branch", "--list", "feat/done"))  # the work survives
+        self.assertEqual(pool_mod.take(self.repo, self.out / "next", "feat/next", "main", root=self.root), "pool")
+        self.assertTrue((self.out / "next" / "node_modules" / "dep.js").exists())
+
+    def test_dirty_preserved_full_or_disabled_worktrees_are_not_recycled(self):
+        path = self.finished()
+        (path / "a.txt").write_text("uncommitted\n")
+        self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root))
+        git(path, "checkout", "--", "a.txt")
+        (path / pool_mod.PRESERVED_REPAIR).write_text("{}")
+        self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root))
+        (path / pool_mod.PRESERVED_REPAIR).unlink()
+        self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root, min_free_gb=10**9))
+        self.assertIsNone(pool_mod.recycle(self.repo, path, "main", size=0, root=self.root))
+        with patch.dict(os.environ, {"JOVIE_WORKTREE_POOL": "0"}):
+            self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root))
+        self.assertIsNone(pool_mod.recycle(self.repo, self.out / "missing", "main", root=self.root))
+        log = io.StringIO()
+        self.assertIsNone(pool_mod.recycle(self.repo, path, "no-such-base", log=log, root=self.root))
+        self.assertIn("not recycled", log.getvalue())
+        self.assertTrue(path.exists())
+
+    def test_cli_never_removes_an_ignored_preserved_repair(self):
+        path = self.finished("preserved")
+        ignore = self.out / "ignore"
+        ignore.write_text(ignore.read_text() + pool_mod.PRESERVED_REPAIR + "\n")
+        marker = path / pool_mod.PRESERVED_REPAIR
+        marker.write_text('{"unpublished": true}')
+        self.assertTrue(pool_mod.is_clean(path), "the preservation marker is ignored")
+        with patch.object(pool_mod, "CACHE_ROOT", self.root), redirect_stdout(io.StringIO()), \
+             patch("sys.stderr", new_callable=io.StringIO):
+            code = pool_mod.main(["--recycle", str(path), "--repo", str(self.repo), "--base", "main"])
+        self.assertEqual(code, 1)
+        self.assertTrue(path.exists())
+        self.assertEqual(marker.read_text(), '{"unpublished": true}')
+        self.assertIn("feat/preserved", git(self.repo, "branch", "--list", "feat/preserved"))
+
+    def test_failed_ready_marker_restores_the_finished_checkout(self):
+        path = self.finished("marker-failure")
+        original_touch = Path.touch
+        def fail_ready(marker, *args, **kwargs):
+            if marker.suffix == pool_mod.READY:
+                raise OSError("ready marker unavailable")
+            return original_touch(marker, *args, **kwargs)
+        log = io.StringIO()
+        with patch.object(Path, "touch", fail_ready):
+            self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root, log=log))
+        self.assertEqual((path / "node_modules/dep.js").read_text(), "installed")
+        self.assertTrue(pool_mod.is_clean(path))
+        self.assertIn(str(path), git(self.repo, "worktree", "list", "--porcelain"))
+        self.assertEqual(list(self.pool().glob("slot-*")), [])
+        self.assertIn("feat/marker-failure", git(self.repo, "branch", "--list", "feat/marker-failure"))
+        self.assertIn("not recycled", log.getvalue())
+
+    def test_cli_missing_recycle_path_refuses_without_mutation(self):
+        missing = self.out / "missing"
+        before = git(self.repo, "worktree", "list", "--porcelain")
+        with patch.object(pool_mod, "CACHE_ROOT", self.root), redirect_stdout(io.StringIO()), \
+                patch("sys.stderr", new_callable=io.StringIO) as errors:
+            code = pool_mod.main(["--recycle", str(missing), "--repo", str(self.repo), "--base", "main"])
+        self.assertEqual(code, 1)
+        self.assertIn("missing", errors.getvalue())
+        self.assertFalse(missing.exists())
+        self.assertEqual(git(self.repo, "worktree", "list", "--porcelain"), before)
+        self.assertFalse(self.pool().exists())
+        self.assertFalse(pool_mod.is_clean(missing))
+
+    def test_marker_and_rollback_failures_leave_no_orphan_and_keep_branch(self):
+        path = self.finished("rollback-failure")
+        original_run = pool_mod.run
+        def fail_rollback(args, **kwargs):
+            if args[:3] == ["git", "worktree", "move"] and args[-1] == str(path):
+                raise subprocess.CalledProcessError(1, args)
+            return original_run(args, **kwargs)
+        with patch.object(Path, "touch", side_effect=OSError("marker unavailable")), \
+                patch.object(pool_mod, "run", side_effect=fail_rollback):
+            self.assertIsNone(pool_mod.recycle(self.repo, path, "main", root=self.root))
+        self.assertEqual(list(self.pool().glob("slot-*")), [])
+        self.assertNotIn(str(path), git(self.repo, "worktree", "list", "--porcelain"))
+        self.assertNotIn(str(self.pool()), git(self.repo, "worktree", "list", "--porcelain"))
+        self.assertIn("feat/rollback-failure", git(self.repo, "branch", "--list", "feat/rollback-failure"))
+
+    def test_cli_recycles_removes_or_refuses(self):
+        clean, full, dirty = self.finished("clean"), self.finished("full"), self.finished("dirty")
+        (dirty / "a.txt").write_text("uncommitted\n")
+        with patch.object(pool_mod, "CACHE_ROOT", self.root), redirect_stdout(io.StringIO()) as out, \
+             patch("sys.stderr", new_callable=io.StringIO):
+            common = ["--repo", str(self.repo), "--base", "main", "--size", "1"]
+            self.assertEqual(pool_mod.main(["--recycle", str(clean), *common]), 0)
+            self.assertEqual(pool_mod.main(["--recycle", str(full), *common]), 0)
+            self.assertEqual(pool_mod.main(["--recycle", str(dirty), *common]), 1)
+        self.assertIn("recycled into the pool", out.getvalue())
+        self.assertIn("removed (pool full", out.getvalue())
+        self.assertFalse(full.exists())
+        self.assertTrue(dirty.exists())
 
     def test_cli_creates_a_worktree_and_reports_status(self):
         self.fill()

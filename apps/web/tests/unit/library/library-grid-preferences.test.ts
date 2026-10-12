@@ -75,9 +75,9 @@ describe('library view mode preferences', () => {
     vi.unstubAllGlobals();
   });
 
-  it('defaults to grid view when no preference is stored', () => {
+  it('defaults to the table scan when no preference is stored', () => {
     expect(readLibraryViewMode()).toBe(DEFAULT_LIBRARY_VIEW_MODE);
-    expect(readLibraryViewMode()).toBe('grid');
+    expect(readLibraryViewMode()).toBe('table');
   });
 
   it('persists and reads grid, list, and table view modes', () => {
@@ -94,6 +94,19 @@ describe('library view mode preferences', () => {
 
   it('falls back to the default for invalid stored view modes', () => {
     storage.set(LIBRARY_VIEW_MODE_STORAGE_KEY, 'gallery');
-    expect(readLibraryViewMode()).toBe(DEFAULT_LIBRARY_VIEW_MODE);
+    expect(readLibraryViewMode()).toBe('table');
+  });
+
+  it('keeps the table default when browser storage is blocked', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => {
+        throw new DOMException('Storage blocked', 'SecurityError');
+      },
+      setItem: () => {
+        throw new DOMException('Storage blocked', 'SecurityError');
+      },
+    });
+    expect(readLibraryViewMode()).toBe('table');
+    expect(() => writeLibraryViewMode('grid')).not.toThrow();
   });
 });

@@ -5,6 +5,7 @@
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { linearRequest } from './lib/linear-cooldown.mjs';
 import {
   JOVIE_TEAM_ID,
   upsertLinearIssueByTitleFingerprint,
@@ -14,6 +15,9 @@ const ANSI = /\u001b\[[0-9;]*m/g;
 // GitHub log lines are `<job>\t<step>\t<ISO time> <text>`; keep only the text.
 const LOG_PREFIX = /^.*?\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*/;
 const DEPRECATION = /\bdeprecat(ed|ion)\b|\[DEP\d{4}\]/i;
+// Ref names may contain "deprecated" without reporting a deprecation warning.
+const GIT_REF_UPDATE =
+  /^(?:[+*!=t-]\s+)?(?:\[(?:new branch|new tag|new ref|deleted|up to date|rejected|tag update)\]|[0-9a-f]+\.\.\.?[0-9a-f]+)\s+\S+\s+->\s+\S+(?:\s+\(.*\))?$/i;
 // ponytail: 10 per run caps Linear spam if a toolchain bump floods warnings.
 export const MAX_ISSUES_PER_RUN = 10;
 
@@ -33,25 +37,29 @@ export function extractDeprecations(log) {
   for (const raw of log.split('\n')) {
     if (!DEPRECATION.test(raw)) continue;
     const text = normalizeWarning(raw);
-    if (text.length < 12 || /^(\+|echo\b)/.test(text)) continue;
+    if (
+      text.length < 12 ||
+      /^(\+|echo\b)/.test(text) ||
+      GIT_REF_UPDATE.test(text)
+    )
+      continue;
     const fingerprint = `deprecation-${createHash('sha256').update(text).digest('hex').slice(0, 12)}`;
     if (!seen.has(fingerprint)) seen.set(fingerprint, text.slice(0, 500));
   }
   return [...seen].map(([fingerprint, text]) => ({ fingerprint, text }));
 }
 
-async function resolveLabelId(name, apiKey) {
-  const response = await fetch('https://api.linear.app/graphql', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: apiKey },
-    body: JSON.stringify({
-      query: `query($teamId: String!, $name: String!) { team(id: $teamId) { labels(filter: { name: { eq: $name } }) { nodes { id } } } }`,
-      variables: { teamId: JOVIE_TEAM_ID, name },
-    }),
+export async function resolveLabelId(name, apiKey, fetchImpl = fetch) {
+  const result = await linearRequest({
+    key: apiKey,
+    query: `query($teamId: String!, $name: String!) { team(id: $teamId) { labels(filter: { name: { eq: $name } }) { nodes { id } } } }`,
+    variables: { teamId: JOVIE_TEAM_ID, name },
+    fetchImpl,
   });
-  /** @type {{ data?: { team?: { labels?: { nodes?: Array<{ id: string }> } } } }} */
-  const body = await response.json();
-  return body?.data?.team?.labels?.nodes?.[0]?.id ?? null;
+  if (result.rateLimited) throw new Error('linear rate limited');
+  if (!result.ok)
+    throw new Error(result.reason || 'linear label lookup failed');
+  return result.data?.data?.team?.labels?.nodes?.[0]?.id ?? null;
 }
 
 async function main() {

@@ -53,5 +53,8 @@ describe('DashboardAudienceTableUnified', () => {
       screen.getByRole('heading', { name: 'Audience', hidden: true })
     ).toBeInTheDocument();
     expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Open Profile Settings' })
+    ).toHaveAttribute('href', '/app/settings/profile');
   });
 });

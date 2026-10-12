@@ -197,6 +197,7 @@ const settingsRoutes = [
   ['connectors', 'Connections', '/app/settings/connectors'],
   ['billing', 'Billing', '/app/settings/billing'],
   ['usage', 'Usage', '/app/settings/usage'],
+  ['referral', 'Referral', '/app/settings/referral'],
   ['payments', 'Payments', '/app/settings/payments'],
   ['touring', 'Touring', '/app/settings/touring'],
   ['analytics', 'Analytics settings', '/app/settings/analytics'],
@@ -208,7 +209,7 @@ const settingsSurfaces = settingsRoutes.map(([id, title, route]) =>
     route,
     sources: [
       ROUTE_SOURCE,
-      'apps/web/components/features/settings/settings-sidebar-config.ts',
+      'apps/web/components/features/dashboard/dashboard-nav/config.ts',
     ],
   })
 );

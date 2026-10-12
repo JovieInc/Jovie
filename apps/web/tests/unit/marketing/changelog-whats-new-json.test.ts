@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolveCustomerChangelogHero } from '@/lib/customer-changelog';
 
 const getChangelogSnapshot = vi.fn();
 
@@ -62,10 +63,11 @@ describe('GET /changelog/whats-new.json', () => {
       entries: [
         {
           id: '26.9.0',
+          hero: resolveCustomerChangelogHero('26.9.0'),
           title: "What's new on Mac",
           date: '2026-09-26',
           summary: 'A banner links the changelog post.',
-          url: 'https://jov.ie/changelog#update-added-0',
+          url: 'https://jov.ie/changelog/26.9.0',
           highlights: ['The Mac app recovers from blank screens.'],
           dogfood: ['Relaunch the Mac app and open the banner link'],
         },

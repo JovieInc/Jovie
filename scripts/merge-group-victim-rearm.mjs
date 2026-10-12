@@ -3,9 +3,12 @@
 // whose own head is still green, when the failure belongs to another PR in
 // the group or to the base branch. Bounded to REARM_CAP successful rearms
 // per head SHA. A repeated decision for the same CI run does not increment.
+// A head the failure hold already blocked (its second failure on the same
+// revision) is never rearmed: it waits for a new head (JOV-7708).
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
 
 export const REARM_CONTEXT = 'jovie-queue-victim-rearm/v1';
 export const REARM_CAP = 2;
@@ -13,13 +16,14 @@ const SHA = /^[0-9a-f]{40}$/;
 const REARM_DESCRIPTION =
   /^n=([1-9][0-9]*);sha=([0-9a-f]{40});run=([1-9][0-9]*)$/;
 const BUDGET_FILE = /([A-Za-z0-9_./-]+\.md): \d+ bytes exceeds \d+/;
-const BLOCKING = new Set([
-  'hold',
-  'gated',
-  'incident',
-  'do-not-merge',
-  'queue-poison',
-]);
+// GitHub reports BLOCKED while any required check is pending or red, so
+// UNSTABLE means every required check is green and only a non-required context
+// (for example a lane's jovie-execution/* receipt) is pending or red. The enroll
+// controller admits the same states; requiring CLEAN stranded victims whose
+// head carried a pending lane receipt.
+export const REARM_MERGE_STATES = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
+// Rearming a held PR enqueues it, and a held member fails every group.
+const BLOCKING = new Set(ADMISSION_BLOCKING_LABELS);
 
 function fail(message) {
   throw new Error(`merge-group-victim-rearm: ${message}`);
@@ -82,6 +86,7 @@ export function planVictimRearms({
   implicatedPaths,
   candidates,
   cap = REARM_CAP,
+  heldRevision = null,
 }) {
   if (!Number.isSafeInteger(runId) || runId < 1) fail('run id is missing');
   if (!Number.isSafeInteger(cap) || cap < 1) fail('cap is missing');
@@ -97,6 +102,12 @@ export function planVictimRearms({
       reason,
     });
     if (!SHA.test(candidate.headSha ?? '')) return skip('head-sha');
+    if (
+      heldRevision?.prNumber === candidate.prNumber &&
+      heldRevision.headSha === candidate.headSha
+    ) {
+      return skip('revision-held');
+    }
     if (candidate.state !== 'OPEN' || candidate.isDraft) return skip('closed');
     if (candidate.baseRefName !== 'main' || candidate.isCrossRepository) {
       return skip('base');
@@ -106,7 +117,9 @@ export function planVictimRearms({
       return skip('blocking-label');
     }
     if (candidate.inQueue || candidate.autoMerge) return skip('already-armed');
-    if (candidate.mergeStateStatus !== 'CLEAN') return skip('head-not-green');
+    if (!REARM_MERGE_STATES.has(candidate.mergeStateStatus)) {
+      return skip('head-not-green');
+    }
     if (candidate.filesTruncated || candidate.statusesTruncated) {
       return skip('evidence-truncated');
     }
@@ -141,6 +154,31 @@ export function planVictimRearms({
   });
 }
 
+/**
+ * The failure-hold job's receipt names the exact revision it blocked until a
+ * new head. Anything else (absent, unparsable, or retryable) blocks nothing.
+ * @returns {{ prNumber: number, headSha: string } | null}
+ */
+export function heldRevisionFromReceipt(raw, repository) {
+  if (!raw) return null;
+  let receipt;
+  try {
+    receipt = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (
+    receipt?.schema !== 'jovie-merge-group-failure-hold/v1' ||
+    receipt.repository !== repository ||
+    receipt.retryDisposition !== 'blocked-until-new-source-head' ||
+    !Number.isSafeInteger(receipt.prNumber) ||
+    !SHA.test(String(receipt.sourceHeadSha ?? ''))
+  ) {
+    return null;
+  }
+  return { prNumber: receipt.prNumber, headSha: receipt.sourceHeadSha };
+}
+
 export function rearmDescription({ n, headSha, runId }) {
   const description = `n=${n};sha=${headSha};run=${runId}`;
   if (description.length > 140)
@@ -157,7 +195,7 @@ export async function applyVictimRearms(decisions, io) {
       current?.headSha !== decision.headSha ||
       current.inQueue ||
       current.autoMerge ||
-      current.mergeStateStatus !== 'CLEAN'
+      !REARM_MERGE_STATES.has(current.mergeStateStatus)
     ) {
       continue;
     }
@@ -333,6 +371,10 @@ function main() {
     runId: run.id,
     implicatedPaths,
     candidates,
+    heldRevision: heldRevisionFromReceipt(
+      process.env.FAILURE_HOLD_RECEIPT,
+      repository
+    ),
   });
   const targetUrl = `https://github.com/${repository}/actions/runs/${run.id}`;
   applyVictimRearms(decisions, {

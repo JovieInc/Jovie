@@ -2378,6 +2378,45 @@ class TestExactHeadQueueReceipt:
 
 
 class TestGhRetryHelper:
+    def test_retries_transient_500_then_succeeds(self, tmp_path: Path) -> None:
+        counter = tmp_path / "calls"
+        counter.write_text("0", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                count_file="${GH_RETRY_TEST_COUNTER:?}"
+                count=$(<"$count_file")
+                count=$((count + 1))
+                echo "$count" >"$count_file"
+                if [[ "$count" -lt 2 ]]; then
+                  echo "HTTP 500: Failed to run workflow dispatch" >&2
+                  exit 1
+                fi
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        script = textwrap.dedent(
+            f"""\
+            set -euo pipefail
+            source "{_GH_RETRY}"
+            export PATH="{tmp_path}:$PATH"
+            export GH_RETRY_ATTEMPTS=3
+            export GH_RETRY_BASE_DELAY=0
+            export GH_RETRY_TEST_COUNTER="{counter}"
+            gh_retry workflow run ci.yml --repo JovieInc/Jovie --ref main
+            """
+        )
+        result = _run_bash(script)
+        assert result.returncode == 0, result.stderr
+        assert "gh-retry" in result.stderr
+        assert counter.read_text(encoding="utf-8").strip() == "2"
+
     def test_retries_transient_504_then_succeeds(self, tmp_path: Path) -> None:
         counter = tmp_path / "calls"
         counter.write_text("0", encoding="utf-8")
@@ -2502,8 +2541,16 @@ class TestGhRetryHelper:
         result = _run_bash(script)
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
 
+    @pytest.mark.parametrize(
+        "quota_error",
+        [
+            "GraphQL: API rate limit already exceeded for installation ID 112037986.",
+            # Actions GITHUB_TOKEN wording seen in the JOV-7744 storm.
+            "GraphQL: API rate limit already exceeded for site ID installation.",
+        ],
+    )
     def test_does_not_retry_exhausted_installation_quota(
-        self, tmp_path: Path
+        self, tmp_path: Path, quota_error: str
     ) -> None:
         counter = tmp_path / "calls"
         counter.write_text("0", encoding="utf-8")
@@ -2516,7 +2563,7 @@ class TestGhRetryHelper:
                 count_file="${GH_RETRY_TEST_COUNTER:?}"
                 count=$(<"$count_file")
                 echo "$((count + 1))" >"$count_file"
-                echo "GraphQL: API rate limit already exceeded for installation ID 112037986." >&2
+                echo "${GH_RETRY_TEST_ERROR:?}" >&2
                 exit 1
                 """
             ),
@@ -2533,10 +2580,11 @@ class TestGhRetryHelper:
             export GH_RETRY_ATTEMPTS=8
             export GH_RETRY_BASE_DELAY=0
             export GH_RETRY_TEST_COUNTER="{counter}"
+            export GH_RETRY_TEST_ERROR="{quota_error}"
             if gh_retry api graphql 2>"{stderr_file}"; then
               exit 2
             fi
-            grep -q "rate limit already exceeded for installation ID" "{stderr_file}"
+            grep -qF "{quota_error}" "{stderr_file}"
             test "$(wc -l <"{stderr_file}" | tr -d ' ')" = "1"
             """
         )
@@ -3998,7 +4046,7 @@ JSON
                 if [[ "$1" == api && "$2" == *"/commits/{head}"* ]]; then echo '2026-09-05T00:00:00Z'; exit 0; fi
                 if [[ "$1" == api && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '[]'; exit 0; fi
                 if [[ "$1" == api && "$2" == "repos/JovieInc/Jovie" ]]; then echo '{{"default_branch":"main","allow_auto_merge":true,"allow_squash_merge":true}}'; exit 0; fi
-                if [[ "$1" == api && "$2" == *"/rulesets/10512119"* ]]; then echo '{{"id":10512119,"enforcement":"active","target":"branch","conditions":{{"ref_name":{{"include":["refs/heads/main"],"exclude":[]}}}},"bypass_actors":[],"rules":[{{"type":"required_status_checks","parameters":{{"strict_required_status_checks_policy":false,"required_status_checks":[{{"context":"PR Ready"}},{{"context":"Migration Guard"}},{{"context":"Fork PR Gate"}},{{"context":"PR Size Guard"}}]}}}},{{"type":"merge_queue","parameters":{{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":1,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}}}]}}'; exit 0; fi
+                if [[ "$1" == api && "$2" == *"/rulesets/10512119"* ]]; then echo '{{"id":10512119,"enforcement":"active","target":"branch","conditions":{{"ref_name":{{"include":["refs/heads/main"],"exclude":[]}}}},"bypass_actors":[],"rules":[{{"type":"required_status_checks","parameters":{{"strict_required_status_checks_policy":false,"required_status_checks":[{{"context":"PR Ready"}},{{"context":"Migration Guard"}},{{"context":"Fork PR Gate"}},{{"context":"PR Size Guard"}}]}}}},{{"type":"merge_queue","parameters":{{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":1,"max_entries_to_merge":1,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}}}]}}'; exit 0; fi
                 if [[ "$1" == api && "$*" == *"/contents/.github/workflows/ci.yml"* ]]; then printf 'name: CI\non:\n  pull_request:\n    branches: [main]\n  merge_group:\n    types: [checks_requested]\n'; exit 0; fi
                 if [[ "$1 $2" == "api graphql" ]]; then
                   args="$*"
@@ -4014,7 +4062,7 @@ JSON
                   fi
                   if [[ "$args" == *"MergeQueueOpenPullRequestStates"* ]]; then state=$(state_json); jq -nc --argjson state "$state" '{{data:{{repository:{{pullRequests:{{nodes:[$state],pageInfo:{{hasNextPage:false}}}}}}}}}}'; exit 0; fi
                   if [[ "$args" == *"MergeQueueBranchProtection"* ]]; then echo '{{"data":{{"repository":{{"ref":{{"name":"main","branchProtectionRule":null}}}}}}}}'; exit 0; fi
-                  if [[ "$args" == *"MergeQueueLiveConfiguration"* ]]; then echo '{{"data":{{"repository":{{"mergeQueue":{{"configuration":{{"checkResponseTimeout":1200,"maximumEntriesToBuild":1,"maximumEntriesToMerge":5,"mergeMethod":"SQUASH","minimumEntriesToMerge":5,"minimumEntriesToMergeWaitTime":10}}}}}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"MergeQueueLiveConfiguration"* ]]; then echo '{{"data":{{"repository":{{"mergeQueue":{{"configuration":{{"checkResponseTimeout":1200,"maximumEntriesToBuild":1,"maximumEntriesToMerge":1,"mergeMethod":"SQUASH","minimumEntriesToMerge":1,"minimumEntriesToMergeWaitTime":0}}}}}}}}}}'; exit 0; fi
                 fi
                 echo "unexpected gh args: $*" >&2; exit 2
                 """

@@ -6,13 +6,17 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("hud", ROOT / "scripts/lanes/hud.py")
@@ -76,6 +80,88 @@ def model(**overrides) -> dict:
     return base
 
 
+class MergeEvidenceTest(unittest.TestCase):
+    def test_unread_open_inventory_is_unknown_not_zero(self):
+        sample = model()
+        sample["github"].pop("open")
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("open lane PRs unknown · draft unknown · ready unknown", text)
+        self.assertIn("PR list: not-read-yet", text)
+        self.assertNotIn("open lane PRs 0", text)
+
+    def test_failed_inventory_suppresses_partial_or_stale_rows(self):
+        sample = model()
+        sample["github"]["errors"]["open"] = "github-budget-floor: 529 (< 600) until reset"
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("open lane PRs unknown · draft unknown · ready unknown", text)
+        self.assertIn("github-budget-floor: 529 (< 600) until reset", text)
+        self.assertNotIn("#18724", text)
+        self.assertNotIn("#18712", text)
+
+    def test_non_list_inventory_renders_unknown_without_iterating_titles(self):
+        for inventory in (None, {"partial": "unread"}):
+            with self.subTest(inventory=inventory):
+                sample = model()
+                sample["github"]["open"] = inventory
+                text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+                self.assertIn("open lane PRs unknown · draft unknown · ready unknown", text)
+                self.assertNotIn("open lane PRs 0", text)
+
+    def test_complete_empty_open_inventory_keeps_true_zero(self):
+        sample = model()
+        sample["github"]["open"] = []
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("open lane PRs 0 · draft 0 · ready 0", text)
+        self.assertNotIn("PR list: not-read-yet", text)
+
+    def test_initial_remote_state_does_not_claim_zero_merges(self):
+        sample = model(github=hud.Remote(None).github)
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertIn("not-read-yet", text)
+        self.assertNotIn("total 0 in 24h", text)
+        self.assertIn("landed unknown", text)
+
+    def test_complete_empty_window_remains_true_zero(self):
+        sample = model()
+        sample["github"]["merged24h"] = []
+        sample["github"]["mergedWindow"] = {"complete": True}
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("total 0 in 24h", text)
+        self.assertIn("landed 0", text)
+
+    def test_explicit_incomplete_receipt_suppresses_stale_rows(self):
+        sample = model()
+        sample["github"]["mergedWindow"] = {"complete": False, "reason": "unstable_snapshot"}
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertNotIn("total 2 in 24h", text)
+        self.assertNotIn("#18671", text)
+
+    def test_unreadable_merge_evidence_is_unknown_not_zero(self):
+        sample = model()
+        sample["github"]["errors"]["merged"] = "merged-pr-evidence:unstable_snapshot"
+        sample["github"]["merged24h"] = []
+        text = "\n".join(plain(line) for line in hud.render(sample, width=200))
+        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertNotIn("total 0 in 24h", text)
+        self.assertIn("landed unknown", text)
+
+    def test_github_model_uses_shared_reader_and_retains_incomplete_reason(self):
+        evidence = {"complete": False, "reason": "max_pages_reached", "prs": [],
+                    "window": {"since": 1, "until": 2}, "pages": 20, "scans": 1}
+        with mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud.lane, "load_providers", return_value={}), \
+                mock.patch.object(hud, "promotion_model", return_value={"error": "fixture"}), \
+                mock.patch.object(hud, "gh_json", side_effect=RuntimeError("fixture")), \
+                mock.patch.object(hud.merge_evidence, "collect", return_value=evidence) as collect:
+            result = hud.github_model()
+        self.assertEqual(result["mergedWindow"]["reason"], "max_pages_reached")
+        self.assertIn("max_pages_reached", result["errors"]["merged"])
+        self.assertNotIn("merged24h", result)
+        self.assertEqual(collect.call_count, 1)
+
+
 class ParseTest(unittest.TestCase):
     def test_run_ids_name_target_kind_and_start(self):
         info = hud.parse_run_id("20260926T205354Z-PR18695-devin-fix-41d8e6")
@@ -106,6 +192,43 @@ class RenderTest(unittest.TestCase):
             for line in frame:
                 self.assertLessEqual(len(plain(line)), width, plain(line))
 
+    def test_multiline_provider_errors_do_not_scroll_header_off_console(self):
+        value = model()
+        value["github"]["promotion"] = {"error": "RuntimeError: quota read\ngh: budget-floor\rretry\tlater"}
+        frame = hud.render(value, 160, 45)
+        physical_rows = "\n".join(frame).splitlines()
+        self.assertEqual(len(physical_rows), 45)
+        self.assertIn("JOVIE · SYMPHONY", plain(physical_rows[0]))
+        self.assertIn("gh: budget-floor retry later", "\n".join(plain(row) for row in frame))
+
+    def test_unknown_capacity_is_not_colored_healthy(self):
+        value = model()
+        value["local"]["doctor"]["capacity"] = {
+            "schema": "jovie.capacity-horizon/v1", "incidents": [],
+            "topBlocker": "capacity source missing",
+            "leases": [{"alias": "current-login", "mode": "unknown", "freshness": {"status": "unknown"}}]}
+        row = next(row for row in hud.render(value, 160, 45) if "current-login ?" in row)
+        self.assertIn(hud.rgb(hud.ORANGE, "")[:-4] + "current-login ?", row)
+        self.assertNotIn(hud.rgb(hud.GREEN, "")[:-4] + "current-login ?", row)
+
+    def test_dispatcher_slots_respect_zero_overrides_and_autoscaling(self):
+        now = hud.utcnow()
+        feed = {"at": now.isoformat(), "observed": {"capacityByProvider": {
+            "devin": {"slots": 0, "base": 0}, "codex": {"slots": 2, "base": 3}}}}
+        self.assertEqual(hud.dispatcher_slots(feed, {"devin": {}, "codex": {}}, now),
+                         ({"devin": 0, "codex": 2}, {"devin": 0, "codex": 3}))
+        for bad in (None, {}, {**feed, "at": "invalid"},
+                    {**feed, "at": (now - hud.timedelta(seconds=271)).isoformat()},
+                    {**feed, "at": (now + hud.timedelta(seconds=1)).isoformat()},
+                    {**feed, "observed": {"capacityByProvider": {"devin": {"slots": True, "base": 0}}}}):
+            with self.subTest(feed=bad):
+                self.assertIsNone(hud.dispatcher_slots(bad, {"devin": {}, "codex": {}}, now))
+        value = model()
+        value["local"]["slotEvidence"] = "unknown"
+        text = "\n".join(plain(row) for row in hud.render(value, 160, 45))
+        self.assertIn("running / unknown", text)
+        self.assertIn("codex 0/?", text)
+
     def test_running_and_vacant_slots_are_truthful(self):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
         self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", text)
@@ -115,6 +238,14 @@ class RenderTest(unittest.TestCase):
         self.assertIn("✓ alpha 48% left · reset 10m · banked 2", text)
         self.assertIn("✕ beta 0% left · reset 1h30m · banked 1 · retry 1h30m", text)
         self.assertIn("● gamma 90% left · reset 2h00m · banked 0 · leased", text)
+
+    def test_workers_above_a_reduced_cap_stay_visible(self):
+        value = model()
+        value["local"]["slots"] = {"devin": 0, "codex": 1}
+        text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
+        self.assertIn("devin 1/0", text)
+        self.assertIn("JOV-6544", text, "a running worker over the reduced cap is still shown")
+        self.assertIn("worker polling", text)
 
     def test_capacity_horizon_is_show_only_and_renders_source_gaps(self):
         value = model()
@@ -200,6 +331,17 @@ class RenderTest(unittest.TestCase):
         feed["at"] = "malformed"
         self.assertEqual(hud.pool_hint("devin", value["local"]), "new issues unknown (doctor unread)")
 
+    def test_native_doctor_census_explains_real_admission_backpressure(self):
+        value = model()
+        feed = value["local"]["doctor"]
+        feed.update(at=hud.utcnow().isoformat(), observed={
+            "poolByProvider": {"codex": 0}, "candidatePoolByProvider": {"codex": 20},
+            "eligiblePoolByProvider": {"codex": 8}, "rejectedByProvider": {},
+            "newIssueBudgetByProvider": {"codex": {"used": 14, "cap": 6,
+                                                    "allowed": False, "reason": "over-budget"}}})
+        self.assertEqual(hud.pool_hint("codex", value["local"]),
+                         "new issues 0 · eligible 8/20 · PRs 14/6 over-budget")
+
     def test_new_issue_hint_separates_eligibility_budget_and_unknown(self):
         local = {"doctor": {"at": hud.utcnow().isoformat(), "admission": {
             "poolByProvider": {"codex": 0}, "candidatePoolByProvider": {"codex": 25},
@@ -227,10 +369,22 @@ class LedgerSchemaTest(unittest.TestCase):
     """JOV-7497: receipts missing optional verdict/provider/kind metadata must render
     as unclassified, not crash the display or be inferred as success."""
 
+    def setUp(self):
+        # The fixtures own the worker census. Reading this host's /proc made the release
+        # self-test fail whenever a live Gem worker was running (2026-10-11: devin 1/0).
+        patcher = mock.patch.object(hud, "running_workers", return_value=[])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def host_with_ledger(self, receipts):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         state = Path(tmp.name)
+        # A temporary ledger has its own process snapshot. Real host workers
+        # must not make fixture assertions depend on whether Gem is shipping.
+        worker_snapshot = mock.patch.object(hud, "running_workers", return_value=[])
+        self.worker_snapshot = worker_snapshot.start()
+        self.addCleanup(worker_snapshot.stop)
         (state / "runs").mkdir()
         stamp = hud.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         with open(state / "runs" / "ledger.jsonl", "w") as handle:
@@ -238,6 +392,40 @@ class LedgerSchemaTest(unittest.TestCase):
                 row = {"runId": receipt.get("runId", "x"), "endedAt": receipt.pop("endedAt", stamp), **receipt}
                 handle.write(json.dumps(row) + "\n")
         return SimpleNamespace(state=state, slots=lambda _name, default: default, gate_slots=2)
+
+    def test_local_model_uses_dispatcher_overrides_instead_of_console_defaults(self):
+        host = self.host_with_ledger([])
+        feed = {"at": hud.utcnow().isoformat(), "observed": {"capacityByProvider": {
+            "devin": {"slots": 0, "base": 0}, "codex": {"slots": 3, "base": 3}}}}
+        (host.state / "doctor.json").write_text(json.dumps(feed))
+        with mock.patch.object(hud.lane, "load_providers", return_value={"devin": {"slots": 4}, "codex": {"slots": 3}}):
+            local = hud.local_model(host)
+        self.assertEqual(local["slots"], {"devin": 0, "codex": 3})
+        self.assertEqual(local["slotEvidence"], "fresh-dispatcher")
+        text = "\n".join(plain(row) for row in hud.render(model(local=local), 160, 45))
+        self.assertIn("running / 3 (devin 0/0 · codex 0/3)", text)
+        self.assertNotIn("running / 7", text)
+
+    def test_temporary_ledger_uses_its_process_snapshot(self):
+        host = self.host_with_ledger([])
+        local = hud.local_model(host)
+        self.assertEqual(local["workers"], [])
+        self.worker_snapshot.assert_called_once_with(host.state)
+
+    def test_dispatcher_slot_override_retains_an_explicit_busy_worker(self):
+        host = self.host_with_ledger([])
+        feed = {"at": hud.utcnow().isoformat(), "observed": {"capacityByProvider": {
+            "devin": {"slots": 0, "base": 0}, "codex": {"slots": 3, "base": 3}}}}
+        (host.state / "doctor.json").write_text(json.dumps(feed))
+        worker = {"pid": 123, "provider": "codex", "run": {
+            "runId": "fixture", "provider": "codex", "kind": "fix", "target": "PR1",
+            "startedAt": hud.utcnow().isoformat(), "phase": "agent"}}
+        self.worker_snapshot.return_value = [worker]
+        with mock.patch.object(hud.lane, "load_providers", return_value={"devin": {"slots": 4}, "codex": {"slots": 3}}):
+            local = hud.local_model(host)
+        self.assertEqual(local["workers"], [worker])
+        text = "\n".join(plain(row) for row in hud.render(model(local=local), 160, 45))
+        self.assertIn("running / 3 (devin 0/0 · codex 1/3)", text)
 
     def test_missing_and_null_verdicts_become_unclassified_not_a_crash(self):
         host = self.host_with_ledger([
@@ -281,6 +469,71 @@ class LedgerSchemaTest(unittest.TestCase):
         self.assertIn("24h verdicts:", text)
 
 
+class ManagedReleaseRestartTest(unittest.TestCase):
+    def test_symlink_launched_process_executes_the_new_release_and_preserves_flags(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            old, new = state / "old", state / "new"
+            shutil.copytree(ROOT / "scripts/lanes", old, ignore=shutil.ignore_patterns("__pycache__"))
+            new.mkdir()
+            receipt = state / "executed.json"
+            (new / "hud.py").write_text(
+                "import json, sys\nfrom pathlib import Path\n"
+                f"Path({str(receipt)!r}).write_text(json.dumps({{'source': __file__, 'args': sys.argv[1:]}}))\n")
+            (state / "current").symlink_to(old, target_is_directory=True)
+            harness = state / "launch.py"
+            harness.write_text(f"""
+import importlib.util, os
+from pathlib import Path
+from types import SimpleNamespace
+state = Path({str(state)!r})
+spec = importlib.util.spec_from_file_location('hud', state / 'current/hud.py')
+hud = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(hud)
+hud.lane.Host = lambda: SimpleNamespace(state=state)
+hud.lane.load_github_env = lambda: None
+hud.Remote = lambda _: SimpleNamespace(start=lambda: None)
+hud.build_model = lambda *args: None
+frames = 0
+def render(*args):
+    global frames
+    if frames:
+        raise RuntimeError('old HUD rendered again instead of executing the new release')
+    frames += 1
+    replacement = state / '.current.tmp'
+    replacement.symlink_to(state / 'new', target_is_directory=True)
+    os.replace(replacement, state / 'current')
+    return ['old release before managed update']
+hud.render = render
+hud.main()
+""")
+            flags = ["--width", "160", "--height", "45", "--interval", "0.001"]
+            result = subprocess.run([sys.executable, str(harness), *flags],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(receipt.read_text()),
+                             {"source": str((new / "hud.py").resolve()), "args": flags})
+
+    def test_unchanged_or_missing_release_keeps_rendering_without_reexec(self):
+        class StopLoop(Exception):
+            pass
+        for candidate in (hud.HERE / "hud.py", None):
+            with self.subTest(candidate=candidate), \
+                    mock.patch.object(hud.lane, "Host", return_value=SimpleNamespace(state=Path('/unused'))), \
+                    mock.patch.object(hud.lane, "load_github_env"), \
+                    mock.patch.object(hud, "Remote"), \
+                    mock.patch.object(hud, "current_hud", return_value=candidate), \
+                    mock.patch.object(hud, "build_model", return_value=None), \
+                    mock.patch.object(hud, "render", return_value=["frame"]) as render, \
+                    mock.patch.object(hud.os, "execv") as execute, \
+                    mock.patch.object(hud.sys, "stdout", io.StringIO()), \
+                    mock.patch.object(hud.time, "sleep", side_effect=StopLoop):
+                with self.assertRaises(StopLoop):
+                    hud.main([])
+                render.assert_called_once()
+                execute.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
 
@@ -321,35 +574,29 @@ class PromotionTest(unittest.TestCase):
 class LinearAndBudgetTest(unittest.TestCase):
     """2026-09-27: Linear rejects `number in [0]` and REST rate_limit misreports GraphQL."""
 
-    def fake_linear(self, calls):
-        class Client:
-            def __init__(self, _env):
-                pass
-
-            def gql(self, query, variables):
-                calls.append((query, variables))
-                data = {"pool": {"nodes": [{"identifier": "JOV-1", "priority": 1, "labels": {"nodes": [{"name": "devin"}]}}]},
-                        "triage": {"nodes": []}}
-                if "$numbers" in query:
-                    data["active"] = {"nodes": [{"identifier": "JOV-7", "title": "t", "state": {"name": "In Progress"}}]}
-                return data
-        return Client
-
-    def test_idle_host_never_sends_a_zero_issue_number(self):
-        calls = []
-        original = hud.lane.Linear
-        hud.lane.Linear = self.fake_linear(calls)
-        try:
-            idle = hud.linear_model(Path("/x"))
+    def test_linear_panel_reads_the_local_mirror_without_a_linear_request(self):
+        """2026-10-11: the HUD spends no Linear budget; it reads the dispatch tick's mirror."""
+        import os
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"LANES_STATE": tmp}), \
+                mock.patch.object(hud.lane, "Linear", side_effect=AssertionError("no Linear client")):
+            self.assertFalse(hud.linear_model(Path("/x"))["ok"])  # never filled: said so, not faked
+            def row(n, state, labels):
+                return {"id": f"i{n}", "identifier": f"JOV-{n}", "title": f"t{n}", "description": "",
+                        "priority": 1, "createdAt": "2026-10-01T00:00:00.000Z",
+                        "updatedAt": "2026-10-11T00:00:00.000Z", "state": {"name": state, "type": "unstarted"},
+                        "labels": {"pageInfo": {"hasNextPage": False}, "nodes": [{"name": l} for l in labels]}}
+            hud.lane.linear_sync.apply(Path(tmp), "JOV", [row(1, "Todo", ["devin"]), row(7, "In Progress", []),
+                                                         row(9, "Triage", ["codex"])])
+            with hud.lane.linear_sync._mutating(hud.lane.linear_sync.mirror_path(Path(tmp), "JOV"),
+                                                hud.lane.linear_sync.MIRROR) as data:
+                data.update(cursor="x", syncedAt=1_800_000_000.0)
+            hud.lane.linear_sync.enqueue(Path(tmp), "comment", "i1", body="claimed")
             busy = hud.linear_model(Path("/x"), ["JOV-7"])
-        finally:
-            hud.lane.Linear = original
-        self.assertTrue(idle["ok"])
-        self.assertEqual(idle["active"], {})
-        self.assertNotIn("numbers", calls[0][1])
-        self.assertNotIn("$numbers", calls[0][0])
-        self.assertEqual(calls[1][1]["numbers"], [7])
-        self.assertEqual(busy["active"], {"JOV-7": "t"})
+        self.assertTrue(busy["ok"])
+        self.assertEqual((busy["active"], busy["poolTotal"], busy["triage"], busy["outbox"]),
+                         ({"JOV-7": "t7"}, 1, 1, 1))
+        self.assertEqual(busy["pool"].get("devin"), 1)
 
     def test_graphql_budget_reads_graphql_not_rest(self):
         seen = []

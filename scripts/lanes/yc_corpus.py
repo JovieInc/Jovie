@@ -16,6 +16,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -25,6 +26,8 @@ import urllib.parse
 import urllib.request
 import urllib.robotparser
 import xml.etree.ElementTree as ET
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lifecycle  # noqa: E402
 
 SCHEMA = "jovie.gbrain.external-prior-art/v1"
 STATE_SCHEMA = "jovie.yc-corpus-refresh/v1"
@@ -124,6 +127,52 @@ PLAYBOOKS = (
      ("https://www.ycombinator.com/library/9u-why-do-startups-fail", "https://www.ycombinator.com/library/5l-how-not-to-fail"),
      "What evidence makes this real work for Jovie, what user learning results, and what failure mode are we avoiding?"),
 )
+
+
+class SelftestEffectRefused(RuntimeError):
+    """A release self-test reached a real gbrain write or network fetch (never allowed)."""
+
+
+def selftest() -> bool:
+    # Same switch as lane_runner's Linear gating: the release self-test sets LANES_SELFTEST.
+    return bool(os.environ.get("LANES_SELFTEST"))
+
+
+def refuse_in_selftest(effect: str) -> None:
+    if selftest():
+        raise SelftestEffectRefused(f"release self-test refused a real {effect}")
+
+
+def run_in_group(args, *, input=None, timeout=None, capture_output=False, **kwargs) -> subprocess.CompletedProcess:
+    """subprocess.run in its own session; a timeout kills the whole group, not just the leader,
+    so a hung `gbrain` cannot leave helpers behind (2026-10-11: 104 orphaned refresh pairs)."""
+    if capture_output:
+        kwargs.update(stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    with subprocess.Popen(args, stdin=subprocess.PIPE if input is not None else subprocess.DEVNULL,
+                          start_new_session=True, **kwargs) as process:
+        try:
+            stdout, stderr = process.communicate(input, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            process.communicate()
+            raise
+        except BaseException:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            raise
+    return subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
+
+
+def default_run(args, **kwargs):
+    """Controller-owned runs go through the lifecycle helper (which drains the command's whole
+    tree); a standalone run gets its own process group, killed on timeout."""
+    refuse_in_selftest(f"command: {' '.join(args[:2])}")
+    return lifecycle.run(args, **kwargs) if lifecycle.active() else run_in_group(args, **kwargs)
 
 
 def now_iso(now: float | None = None) -> str:
@@ -255,6 +304,7 @@ def render_playbook(item: tuple) -> tuple[str, str, str]:
 
 
 def fetch_url(url: str, headers: dict | None = None) -> dict:
+    refuse_in_selftest(f"network fetch: {url}")
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT,
                                                    "Accept": "text/html,application/atom+xml,application/xml,text/xml",
                                                    **(headers or {})})
@@ -334,12 +384,25 @@ def robots_allowed(url: str, cache: dict, fetch=fetch_url) -> bool:
     return cache[origin].can_fetch(USER_AGENT, url)
 
 
-def gbrain_put(slug: str, title: str, body: str, run=subprocess.run) -> tuple[bool, str | None]:
+def gbrain_put(slug: str, title: str, body: str, run=None) -> tuple[bool, str | None]:
+    """Same contract as reason_lane.write_gbrain (JOV-7715): page on stdin (Gem's wrapper
+    ignores `--content`), and stored only when a read-back contains the page's last line.
+    The release self-test never reaches the real brain: `default_run` refuses under it."""
+    run = run or default_run
+    tail = next((" ".join(line.split()) for line in reversed(body.splitlines()) if line.strip()), "")
     try:
-        result = run(["gbrain", "put", slug, "--content", body], capture_output=True, text=True, timeout=120)
-    except (OSError, subprocess.SubprocessError) as error:
+        run(["gbrain", "put", slug], input=body, capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        pass
+    except OSError as error:
         return False, f"{type(error).__name__}: {error}"
-    return (True, None) if result.returncode == 0 else (False, (result.stderr or result.stdout or "gbrain put failed")[-300:])
+    try:
+        stored = run(["gbrain", "get", slug], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as error:
+        return False, f"read-back {type(error).__name__}: {error}"
+    if stored.returncode == 0 and tail and tail in " ".join((stored.stdout or "").split()):
+        return True, None
+    return False, "gbrain read-back missing page body"
 
 
 def read_state(path: Path) -> dict:
@@ -463,7 +526,13 @@ def refresh(state_path: Path, limit: int = DEFAULT_LIMIT, fetch=fetch_url, put=g
     return result
 
 
-def tick(state_dir: Path, spawn=subprocess.Popen, now: float | None = None) -> dict:
+def tick(state_dir: Path, spawn=None, now: float | None = None) -> dict:
+    if spawn is None:
+        if selftest():
+            # A release self-test never schedules the real refresh: it fetched YC and wrote
+            # fixture-state pages into GBrain from deleted staging dirs (2026-10-11).
+            return {"status": "selftest-skipped"}
+        spawn = subprocess.Popen
     now = now or time.time()
     path = state_dir / "yc-corpus.json"
     state = read_state(path)
@@ -474,7 +543,8 @@ def tick(state_dir: Path, spawn=subprocess.Popen, now: float | None = None) -> d
     write_state(path, state)
     try:
         spawn([sys.executable, str(Path(__file__)), "refresh", "--state", str(path)], stdin=subprocess.DEVNULL,
-              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
+              **lifecycle.spawn_kwargs())
     except Exception as error:
         state["lastRun"] = {"status": "failed", "at": now_iso(now),
                             "failures": [f"spawn: {type(error).__name__}: {error}"]}
@@ -490,9 +560,14 @@ def main(argv: list[str] | None = None) -> int:
     command.add_argument("--state", type=Path, default=Path.home() / ".local/state/jovie-lanes/yc-corpus.json")
     command.add_argument("--max-documents", type=int, default=DEFAULT_LIMIT)
     args = parser.parse_args(argv)
-    result = refresh(args.state, args.max_documents)
-    print(json.dumps(result, indent=2))
-    return 0 if result["status"] == "ok" else 1
+    try:
+        with lifecycle.Guard(args.state.parent):
+            result = refresh(args.state, args.max_documents)
+            print(json.dumps(result, indent=2))
+            return 0 if result["status"] == "ok" else 1
+    except lifecycle.AdmissionHeld as error:
+        print(f"lifecycle admission held: {error}", file=sys.stderr)
+        return 75
 
 
 if __name__ == "__main__":

@@ -44,10 +44,15 @@ describe('chat route error capture contract (GH #13300)', () => {
     expect(routeCatch).toContain('requestId');
   });
 
-  it('classifies gateway budget walls as a distinct alertable event (JOV-5856)', () => {
-    expect(routeSource).toContain('isGatewayBudgetExceededError');
-    expect(routeSource).toContain('AI Gateway API key budget exceeded');
-    expect(routeSource).toContain('gateway_budget_exceeded');
+  it('classifies gateway hard walls as a distinct alertable event (JOV-5856, JOV-7994)', () => {
+    // Both terminal paths route through classifyGatewayAlert, which emits the
+    // sanitized 'AI Gateway API key budget exceeded' /
+    // 'AI Gateway insufficient funds' titles and gateway_* errorType/alert
+    // tags (unit-tested in lib/ai/gateway-errors.test.ts).
+    const alerts = routeSource.match(/classifyGatewayAlert\(/g);
+    expect(alerts?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(routeSource).toContain("from '@/lib/ai/gateway-errors'");
+    expect(routeSource).toContain('gatewayAlert?.error ?? error');
   });
 
   it('flushes Sentry before the lambda can suspend on both paths', () => {

@@ -17,11 +17,12 @@ test.skip(
   'Requires E2E_USE_TEST_AUTH_BYPASS=1'
 );
 
-const CANONICAL_LABELS = ['Home', 'Identity', 'Work', 'Audience'] as const;
+// Identity stays off the rail while PROFILES_WORKSPACE defaults off. The
+// creator-ready persona does not receive the admin default-on exception.
+const CANONICAL_LABELS = ['Home', 'Work', 'Audience'] as const;
 
 const CANONICAL_HREFS = [
   APP_ROUTES.DASHBOARD,
-  APP_ROUTES.PRESENCE,
   APP_ROUTES.LIBRARY,
   APP_ROUTES.CONTACTS_AUDIENCE,
 ] as const;
@@ -115,7 +116,7 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
     });
     await expect(expanded).toBeVisible();
     const expandedLinks = expanded.getByRole('link');
-    await expect(expandedLinks).toHaveCount(5);
+    await expect(expandedLinks).toHaveCount(4);
     expect(await linkContract(expandedLinks)).toEqual([
       ...CANONICAL_LABELS.map((label, index) => ({
         label,

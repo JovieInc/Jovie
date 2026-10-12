@@ -16,7 +16,25 @@ vi.mock('@jovie/copy/transport', () => ({ routedTransport: vi.fn() }));
 let runsDir: string;
 const dispatched = vi.fn();
 const budgetConfig = { id: 'homepage-test', maxEstimatedUsd: 6.1034496 };
-const brief = loadFactoryBrief('solutions', 'founders');
+const legacy = loadFactoryBrief('solutions', 'founders');
+const brief = {
+  ...legacy,
+  media: legacy.media.map(entry => ({
+    ...entry,
+    input: {
+      ...entry.input,
+      editorial: {
+        benefit: 'Explain the tested action',
+        focalDetail: 'One action',
+        rationale: 'Use the verified capture',
+        fallback: 'Keep the benefit text',
+        alternatives: [
+          { medium: 'video' as const, reason: 'Motion is unnecessary' },
+        ],
+      },
+    },
+  })),
+};
 const request = { model: 'zai/glm-5.3', system: 'Judge', prompt: 'Test' };
 
 beforeEach(() => {

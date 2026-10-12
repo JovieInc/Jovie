@@ -1,6 +1,6 @@
 import { ClaimHandleForm } from './claim-handle';
 
-export async function RedesignedHero() {
+export function RedesignedHero() {
   return (
     <section className='relative flex flex-col items-center overflow-hidden px-5 pt-[8.2rem] pb-[5rem] sm:px-6 md:pt-[5.7rem] md:pb-[4rem] xl:pt-[12.5rem] xl:pb-[7rem]'>
       <div

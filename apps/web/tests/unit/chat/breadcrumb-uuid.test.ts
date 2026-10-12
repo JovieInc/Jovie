@@ -12,13 +12,13 @@ describe('getBreadcrumbLabel', () => {
   });
 
   it('returns "Presence" for the internal profiles route', () => {
-    expect(getBreadcrumbLabel('profiles')).toBe('Identity');
-    expect(getBreadcrumbLabel('presence')).toBe('Identity');
+    expect(getBreadcrumbLabel('profiles')).toBe('Profiles');
+    expect(getBreadcrumbLabel('presence')).toBe('Profiles');
     expect(getBreadcrumbLabel('library')).toBe('Work');
   });
 
-  it('returns "Inbox" for the app root segment', () => {
-    expect(getBreadcrumbLabel('app')).toBe('Inbox');
+  it('returns "Home" for the app root segment', () => {
+    expect(getBreadcrumbLabel('app')).toBe('Home');
   });
 
   it('converts unknown kebab-case to sentence case', () => {

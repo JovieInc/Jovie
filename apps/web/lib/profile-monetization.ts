@@ -184,7 +184,7 @@ export function resolveProfileMonetizationSummary(
   const manageHref: AppRoute =
     input.stripeConnectEnabled && paymentState !== 'needs_profile_url'
       ? APP_ROUTES.SETTINGS_PAYMENTS
-      : APP_ROUTES.SETTINGS_ARTIST_PROFILE;
+      : APP_ROUTES.SETTINGS_PROFILE;
 
   const tipUrl =
     hasProfileUrl && (stripeReady || hasVenmoSetup)

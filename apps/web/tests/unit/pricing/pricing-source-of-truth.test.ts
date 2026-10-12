@@ -36,14 +36,6 @@ const MAX_ONLY_MARKETING_FEATURES = [
     label: 'Metadata submission agent',
     entitlement: 'canAccessMetadataSubmissionAgent',
   },
-  {
-    label: 'Email campaigns',
-    entitlement: 'canAccessEmailCampaigns',
-  },
-  {
-    label: 'API access',
-    entitlement: 'canAccessApiKeys',
-  },
 ] as const;
 
 describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2178)', () => {

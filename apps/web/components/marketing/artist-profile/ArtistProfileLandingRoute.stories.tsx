@@ -13,6 +13,7 @@ const meta = {
       },
     },
   },
+  args: { logoPlacement: { page: '/artist-profiles' } },
 } satisfies Meta<typeof ArtistProfileLandingRoute>;
 
 export default meta;

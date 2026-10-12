@@ -58,6 +58,73 @@ function issuesFor(input: PageRecordInput): string[] {
   return result.success ? [] : result.error.issues.map(i => i.message);
 }
 
+const DIGEST = `sha256:${'a'.repeat(64)}`;
+
+function withMedia(media: Record<string, unknown>): PageRecordInput {
+  return baseInput({ media: { 'hero-1': media } as PageRecordInput['media'] });
+}
+
+describe('generated section media (JOV-7765)', () => {
+  const image = {
+    kind: 'generated',
+    id: '/marketing/factory/hero.avif',
+    alt: 'Generated hero',
+    mime: 'image/avif',
+    width: 1600,
+    height: 1000,
+    digest: DIGEST,
+  };
+
+  it('accepts a sized, hashed render and a video with its poster', () => {
+    expect(issuesFor(withMedia(image))).toEqual([]);
+    expect(
+      issuesFor(
+        withMedia({
+          ...image,
+          id: '/marketing/factory/hero.mp4',
+          mime: 'video/mp4',
+          poster: '/marketing/factory/hero-poster.avif',
+          captions: '/marketing/factory/hero.vtt',
+        })
+      )
+    ).toEqual([]);
+  });
+
+  it.each([
+    [
+      'a video without a poster',
+      { id: '/f/a.mp4', mime: 'video/mp4', captions: '/f/a.vtt' },
+    ],
+    [
+      'a video without captions',
+      { id: '/f/a.mp4', mime: 'video/mp4', poster: '/f/p.avif' },
+    ],
+    ['a poster on an image', { poster: '/f/p.avif' }],
+    ['captions on an image', { captions: '/f/a.vtt' }],
+  ])('rejects %s', (_label, change) => {
+    expect(issuesFor(withMedia({ ...image, ...change }))).toHaveLength(1);
+  });
+
+  it.each([
+    ['an unhashed render', { digest: 'abc' }],
+    ['an unsized render', { width: 0 }],
+    ['an off-origin file', { id: 'https://cdn.example.com/a.avif' }],
+    ['a protocol-relative file', { id: '//cdn.example.com/a.avif' }],
+    ['an unsupported type', { mime: 'image/gif' }],
+    ['an unknown field', { autoplay: true }],
+  ])('rejects %s', (_label, change) => {
+    expect(issuesFor(withMedia({ ...image, ...change }))).not.toEqual([]);
+  });
+
+  it('keeps the existing registry and public-path refs valid', () => {
+    expect(
+      issuesFor(
+        withMedia({ kind: 'public-path', id: '/og/default.png', alt: 'OG' })
+      )
+    ).toEqual([]);
+  });
+});
+
 describe('PageRecordSchema', () => {
   it('accepts a minimal record and fills defaults', () => {
     const record = definePage(baseInput());
@@ -107,6 +174,93 @@ describe('PageRecordSchema', () => {
   });
 
   it('allows a generic renderer to serve unique section instances', () => {
+    const input = baseInput({
+      heroVariant: 'left-content',
+      composition: {
+        recipeId: 'artist-lp',
+        penContractId: 'DRJv9',
+        sections: [
+          {
+            renderer: 'factory-hero',
+            instanceId: 'hero-1',
+            sectionId: 'hero',
+            variantId: 'left-none',
+          },
+          {
+            renderer: 'factory-feature-split',
+            instanceId: 'feature-split-1',
+            sectionId: 'feature-split',
+            variantId: 'editorial',
+          },
+          {
+            renderer: 'factory-feature-split',
+            instanceId: 'feature-split-2',
+            sectionId: 'feature-split',
+            variantId: 'phone-right',
+          },
+        ],
+      },
+    });
+
+    expect(issuesFor(input)).toEqual([]);
+    const record = definePage(input);
+    expect(
+      record.composition.sections.map(section => section.variantId)
+    ).toEqual(['left-none', 'editorial', 'phone-right']);
+  });
+
+  it('rejects a factory section without its selected variant', () => {
+    expect(
+      issuesFor(
+        baseInput({
+          heroVariant: 'left-content',
+          composition: {
+            recipeId: 'artist-lp',
+            penContractId: 'DRJv9',
+            sections: [
+              {
+                renderer: 'factory-hero',
+                instanceId: 'hero-1',
+                sectionId: 'hero',
+              },
+            ],
+          },
+        })
+      )
+    ).toContain('factory section factory-hero requires a persisted variantId');
+  });
+
+  it('rejects an active section variant without a certified factory adapter', () => {
+    expect(
+      issuesFor(
+        baseInput({
+          heroVariant: 'left-content',
+          composition: {
+            recipeId: 'artist-lp',
+            penContractId: 'DRJv9',
+            sections: [
+              {
+                renderer: 'factory-hero',
+                instanceId: 'hero-1',
+                sectionId: 'hero',
+                variantId: 'left-none',
+              },
+              {
+                renderer: 'factory-feature-split',
+                instanceId: 'feature-split-1',
+                sectionId: 'feature-split',
+                variantId: 'phone-left',
+              },
+            ],
+          },
+        })
+      )
+    ).toContain(
+      'solutions factory has no certified renderer for feature-split/phone-left'
+    );
+  });
+
+  it('rejects a selected hero variant that disagrees with its locked code binding', () => {
     expect(
       issuesFor(
         baseInput({
@@ -118,22 +272,15 @@ describe('PageRecordSchema', () => {
                 renderer: 'factory-hero',
                 instanceId: 'hero-1',
                 sectionId: 'hero',
-              },
-              {
-                renderer: 'factory-feature-split',
-                instanceId: 'feature-split-1',
-                sectionId: 'feature-split',
-              },
-              {
-                renderer: 'factory-feature-split',
-                instanceId: 'feature-split-2',
-                sectionId: 'feature-split',
+                variantId: 'left-none',
               },
             ],
           },
         })
       )
-    ).toEqual([]);
+    ).toContain(
+      'hero section variant "left-none" does not match hero code binding "split-link-claim" (split-claim-card)'
+    );
   });
 
   it('rejects duplicate generic section instance ids', () => {

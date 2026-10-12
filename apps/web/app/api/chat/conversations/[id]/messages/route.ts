@@ -4,6 +4,7 @@ import { gateway, generateText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import { getSessionContext } from '@/lib/auth/session';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
+import { conversationTitleSource } from '@/lib/chat/title-source';
 import {
   type ChatPersistenceMessage,
   chatPersistenceBatchSchema,
@@ -32,16 +33,34 @@ interface RouteParams {
 async function maybeGenerateTitle(
   conversationId: string,
   messages: ChatPersistenceMessage[],
-  identity?: { userId?: string | null }
+  identity: { userId?: string | null; creatorProfileId: string }
 ): Promise<void> {
   const userMessage = messages.find(m => m.role === 'user');
-  const titleSource = sanitizeConversationTitle(userMessage?.content, 200);
+  const { text: titleSource, deterministic } = conversationTitleSource(
+    userMessage?.content
+  );
   if (!titleSource) return;
+
+  const saveTitle = (title: string) =>
+    db
+      .update(chatConversations)
+      .set({ title })
+      .where(
+        and(
+          eq(chatConversations.id, conversationId),
+          eq(chatConversations.creatorProfileId, identity.creatorProfileId),
+          isNull(chatConversations.title)
+        )
+      );
+  if (deterministic) {
+    await saveTitle(titleSource);
+    return;
+  }
 
   try {
     const context = messages
       .map(m => {
-        const content = sanitizeConversationTitle(m.content, 200);
+        const content = conversationTitleSource(m.content).text;
         return content ? `${m.role}: ${content}` : null;
       })
       .filter((line): line is string => line !== null)
@@ -67,28 +86,12 @@ async function maybeGenerateTitle(
 
     if (!title) throw new Error('Empty title generated');
 
-    await db
-      .update(chatConversations)
-      .set({ title })
-      .where(
-        and(
-          eq(chatConversations.id, conversationId),
-          isNull(chatConversations.title)
-        )
-      );
+    await saveTitle(title);
   } catch (error) {
     logger.error('AI title generation failed, using fallback:', error);
     const fallback = sanitizeConversationTitle(titleSource, 50);
     if (!fallback) return;
-    await db
-      .update(chatConversations)
-      .set({ title: fallback })
-      .where(
-        and(
-          eq(chatConversations.id, conversationId),
-          isNull(chatConversations.title)
-        )
-      );
+    await saveTitle(fallback);
   }
 }
 
@@ -206,6 +209,7 @@ export async function POST(req: Request, { params }: RouteParams) {
         try {
           await maybeGenerateTitle(conversationId, messagesToInsert, {
             userId: clerkUserId,
+            creatorProfileId: profile.id,
           });
         } catch (error) {
           logger.error('Title generation error:', error);

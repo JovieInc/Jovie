@@ -130,53 +130,53 @@ export const CANONICAL_SURFACES = [
   {
     id: 'dashboard-earnings',
     label: 'Dashboard Earnings',
-    liveRoutes: [APP_ROUTES.SETTINGS_ARTIST_PROFILE],
+    liveRoutes: [APP_ROUTES.SETTINGS_PROFILE],
     reviewRoute: '/demo/showcase/earnings',
-    sourceRoute: `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`,
+    sourceRoute: `${APP_ROUTES.SETTINGS_PROFILE}?tab=earn#pay`,
     sourceComponent:
       'features/dashboard/dashboard-pay/DashboardPay.tsx -> DashboardPay',
     demoRoute: '/demo/showcase/earnings',
     fixtureSetId: 'settings-earnings-demo',
     screenshotIds: ['dashboard-earnings-desktop'],
     routeOwner:
-      'app/app/(shell)/settings/artist-profile/page.tsx -> ArtistProfileContent',
+      'app/app/(shell)/settings/profile/page.tsx -> ArtistProfileContent',
     componentFamily: 'features/dashboard/dashboard-pay',
     description:
-      'Canonical pay and earnings workspace rendered inside the artist profile settings route and mirrored by the demo showcase.',
+      'Canonical pay and earnings workspace rendered inside the profile settings route and mirrored by the demo showcase.',
   },
   {
     id: 'settings-artist-profile',
-    label: 'Settings Artist Profile',
-    liveRoutes: [APP_ROUTES.SETTINGS_ARTIST_PROFILE],
+    label: 'Settings Profile',
+    liveRoutes: [APP_ROUTES.SETTINGS_PROFILE],
     reviewRoute: '/demo/showcase/settings',
-    sourceRoute: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    sourceRoute: APP_ROUTES.SETTINGS_PROFILE,
     sourceComponent:
-      'app/app/(shell)/settings/artist-profile/ArtistProfileContent.tsx -> ArtistProfileContent',
+      'app/app/(shell)/settings/profile/ArtistProfileContent.tsx -> ArtistProfileContent',
     demoRoute: '/demo/showcase/settings',
     fixtureSetId: 'settings-artist-profile-demo',
     screenshotIds: ['settings-profile-desktop'],
     routeOwner:
-      'app/app/(shell)/settings/artist-profile/page.tsx -> ArtistProfileContent',
+      'app/app/(shell)/settings/profile/page.tsx -> ArtistProfileContent',
     componentFamily: 'features/dashboard/organisms/settings-profile-section',
     description:
-      'Canonical artist profile settings surface mirrored by the demo showcase route.',
+      'Canonical profile settings surface mirrored by the demo showcase route.',
   },
   {
     id: 'settings-links',
     label: 'Settings Links',
-    liveRoutes: [APP_ROUTES.SETTINGS_ARTIST_PROFILE],
+    liveRoutes: [APP_ROUTES.SETTINGS_PROFILE],
     reviewRoute: '/demo/showcase/links',
-    sourceRoute: `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=links#preview`,
+    sourceRoute: `${APP_ROUTES.SETTINGS_PROFILE}?tab=links#preview`,
     sourceComponent:
       'features/dashboard/organisms/grouped-links/GroupedLinksManager.tsx -> GroupedLinksManager',
     demoRoute: '/demo/showcase/links',
     fixtureSetId: 'settings-links-demo',
     screenshotIds: ['settings-links-desktop'],
     routeOwner:
-      'app/app/(shell)/settings/artist-profile/page.tsx -> ArtistProfileContent',
+      'app/app/(shell)/settings/profile/page.tsx -> ArtistProfileContent',
     componentFamily: 'features/dashboard/organisms/grouped-links',
     description:
-      'Canonical links manager workspace rendered from the artist profile settings route and mirrored by the demo showcase.',
+      'Canonical links manager workspace rendered from the profile settings route and mirrored by the demo showcase.',
   },
 ] as const satisfies readonly CanonicalSurfaceDefinition[];
 

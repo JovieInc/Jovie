@@ -306,8 +306,8 @@ export function EntityHeader({
           data-testid='entity-header-title'
           className={cn(
             'min-w-0 flex-1 text-sm font-semibold leading-[18px] tracking-[-0.015em] text-primary-token',
-            resolvedTitleLineClamp
-              ? STABLE_HEADER_LINE_CLAMP_CLASSNAME[resolvedTitleLineClamp]
+            resolvedTitleLineClamp === 2
+              ? STABLE_HEADER_LINE_CLAMP_CLASSNAME[2]
               : 'truncate',
             stableLayout &&
               resolvedTitleLineClamp &&

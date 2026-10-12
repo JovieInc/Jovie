@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { withDashboardProviders } from '@/.storybook/dashboard-fixtures';
 import { AuthShellWrapper } from './AuthShellWrapper';
 
 const ShellContent = ({ label }: { label: string }) => (
@@ -21,6 +22,7 @@ const meta: Meta<typeof AuthShellWrapper> = {
   args: {
     children: <ShellContent label='Customer shell' />,
   },
+  decorators: [withDashboardProviders],
 };
 
 export default meta;

@@ -1,15 +1,19 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { use, useMemo } from 'react';
+import { type ReactNode, use } from 'react';
 import { OperatorBannerWrapper as OperatorBannerWrapperAsync } from './OperatorBannerWrapper';
 
-// OperatorBannerWrapper is an async server component; unwrap it with `use`
-// (same pattern as WikiPageArticle.stories.tsx) so the story can preview the
-// resolved banner.
+// OperatorBannerWrapper is an async server component; unwrap it with `use`.
+// The promise is cached outside render: React discards hook state (useMemo
+// included) while a first mount suspends, so an in-render promise was new on
+// every retry and React rejected it as an async client component.
+const resolved = new Map<boolean, Promise<ReactNode>>();
+
 function OperatorBannerWrapper({ isAdmin }: { readonly isAdmin: boolean }) {
-  const node = useMemo(
-    () => OperatorBannerWrapperAsync({ isAdmin }),
-    [isAdmin]
-  );
+  let node = resolved.get(isAdmin);
+  if (!node) {
+    node = OperatorBannerWrapperAsync({ isAdmin });
+    resolved.set(isAdmin, node);
+  }
   return use(node);
 }
 

@@ -70,6 +70,58 @@ export function isScreenMediaPermissionCheck(details: unknown): boolean {
   return (details as { mediaType?: unknown }).mediaType === 'video';
 }
 
+/** Display capture reaches Electron's media permission with an empty device list.
+ * Legacy desktop capture has the same shape; this grants the HUD principal,
+ * not proof that arbitrary HUD scripts use the system picker.
+ */
+function isDesktopMediaRequest(details: unknown): boolean {
+  if (details === null || typeof details !== 'object') return false;
+  const mediaTypes = (details as { mediaTypes?: unknown }).mediaTypes;
+  return Array.isArray(mediaTypes) && mediaTypes.length === 0;
+}
+
+function isCurrentHudDocument(input: {
+  readonly details: unknown;
+  readonly webContents: WebContents | null;
+  readonly requestingOrigin?: string;
+  readonly parseUrl: (value: string) => URL | null;
+  readonly appOrigin: string;
+}): boolean {
+  const { details, webContents, parseUrl, appOrigin } = input;
+  if (
+    !webContents ||
+    webContents.isDestroyed() ||
+    !details ||
+    typeof details !== 'object'
+  )
+    return false;
+  const request = details as {
+    requestingUrl?: unknown;
+    isMainFrame?: unknown;
+    securityOrigin?: unknown;
+  };
+  if (request.isMainFrame !== true || typeof request.requestingUrl !== 'string')
+    return false;
+  const url = parseUrl(request.requestingUrl);
+  if (
+    !url ||
+    url.origin !== appOrigin ||
+    !isDesktopCaptureRouteUrl(url.href, parseUrl)
+  )
+    return false;
+  if (parseUrl(webContents.getURL())?.href !== url.href) return false;
+  if (
+    input.requestingOrigin !== undefined &&
+    !isTrustedPermissionOrigin(input.requestingOrigin, parseUrl, appOrigin)
+  )
+    return false;
+  return (
+    request.securityOrigin === undefined ||
+    (typeof request.securityOrigin === 'string' &&
+      isTrustedPermissionOrigin(request.securityOrigin, parseUrl, appOrigin))
+  );
+}
+
 export function shouldGrantTrustedHudScreenPermission(input: {
   readonly permission: string;
   readonly details: unknown;
@@ -78,22 +130,7 @@ export function shouldGrantTrustedHudScreenPermission(input: {
   readonly parseUrl: (value: string) => URL | null;
   readonly appOrigin: string;
 }): boolean {
-  if (
-    !isTrustedPermissionRequest(
-      input.webContents,
-      input.requestingOrigin,
-      input.parseUrl,
-      input.appOrigin
-    )
-  ) {
-    return false;
-  }
-
-  const originUrl =
-    input.requestingOrigin ?? input.webContents?.getURL() ?? undefined;
-  if (!isDesktopCaptureRouteUrl(originUrl, input.parseUrl)) {
-    return false;
-  }
+  if (!isCurrentHudDocument(input)) return false;
 
   if (isDisplayCapturePermission(input.permission)) {
     return true;
@@ -101,7 +138,8 @@ export function shouldGrantTrustedHudScreenPermission(input: {
 
   return (
     input.permission === 'media' &&
-    isScreenMediaPermissionRequest(input.details)
+    (isScreenMediaPermissionRequest(input.details) ||
+      isDesktopMediaRequest(input.details))
   );
 }
 
@@ -113,19 +151,7 @@ export function shouldGrantTrustedHudScreenPermissionCheck(input: {
   readonly parseUrl: (value: string) => URL | null;
   readonly appOrigin: string;
 }): boolean {
-  if (
-    !isTrustedPermissionRequest(
-      input.webContents,
-      input.requestingOrigin,
-      input.parseUrl,
-      input.appOrigin
-    )
-  ) {
-    return false;
-  }
-  if (!isDesktopCaptureRouteUrl(input.requestingOrigin, input.parseUrl)) {
-    return false;
-  }
+  if (!isCurrentHudDocument(input)) return false;
   if (isDisplayCapturePermission(input.permission)) {
     return true;
   }

@@ -54,6 +54,7 @@ import * as Route24 from '@/app/api/admin/hud/visual-qa/[runId]/[surfaceId]/[kin
 import * as Route25 from '@/app/api/admin/hud/visual-qa/[runId]/review/route.ts';
 import * as Route26 from '@/app/api/admin/hud/visual-qa/route.ts';
 import * as Route27 from '@/app/api/admin/leads/[id]/dm-sent/route.ts';
+import * as RouteLeadEvidence from '@/app/api/admin/leads/[id]/refresh-evidence/route.ts';
 import * as Route28 from '@/app/api/admin/leads/[id]/route.ts';
 import * as Route29 from '@/app/api/admin/leads/[id]/skip/route.ts';
 import * as Route30 from '@/app/api/admin/leads/discover/route.ts';
@@ -137,6 +138,7 @@ const cases = [
   ['POST', '/api/admin/test-user/set-plan', Route44.POST],
   ['GET', '/api/admin/users', Route45.GET],
   ['GET', '/api/admin/waitlist', Route46.GET],
+  ['POST', '/api/admin/leads/[id]/refresh-evidence', RouteLeadEvidence.POST],
 ] as const;
 // The real handlers must invoke scoped operator access before private data or
 // side effects. The access helper's own tests verify locked/role/MFA decisions.

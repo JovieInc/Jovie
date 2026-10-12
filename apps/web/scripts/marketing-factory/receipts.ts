@@ -9,7 +9,13 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -21,6 +27,19 @@ import {
   type StageReceipt,
   validateStageReceipt,
 } from '../../data/marketing/factory/spine';
+import { listProductTruthClaims } from '../../data/product-truth/claims';
+import { PROOF_REGISTRY, type ProofItem } from '../../data/product-truth/proof';
+import {
+  type Capability,
+  type Claim,
+  listCapabilities,
+} from '../../data/product-truth/registry';
+import {
+  buildTruthDigest,
+  hashProof,
+} from '../../data/product-truth/truth-sync';
+import type { FactoryPageBrief } from './brief';
+import { verifyRenderBytes } from './capture-integrity';
 
 export const FACTORY_RUN_SCHEMA = 'jovie.factory-run/v1' as const;
 
@@ -50,9 +69,70 @@ export function digestOf(value: unknown): string {
 
 export function stageInputDigest(
   briefDigest: string,
-  priorOutputDigests: readonly string[]
+  priorOutputDigests: readonly string[],
+  sourceDigest?: string | null
 ): string {
-  return digestOf({ brief: briefDigest, prior: priorOutputDigests });
+  const input = { brief: briefDigest, prior: priorOutputDigests };
+  return digestOf(sourceDigest ? { ...input, source: sourceDigest } : input);
+}
+
+export interface FactoryTruthSources {
+  readonly claims?: readonly Claim[];
+  readonly capabilities?: readonly Capability[];
+  readonly proofs?: readonly ProofItem[];
+}
+
+/**
+ * Source records owned directly by a factory stage. These snapshots are scoped
+ * to the page brief so a change for one capability does not invalidate other
+ * page runs.
+ */
+export function factoryStageSourceDigest(
+  stage: FactoryStage,
+  brief: Pick<FactoryPageBrief, 'claimIds' | 'proof' | 'asOf'>,
+  source: FactoryTruthSources = {}
+): string | null {
+  const claims = source.claims ?? listProductTruthClaims();
+  const capabilities = source.capabilities ?? listCapabilities();
+  const proofs = source.proofs ?? PROOF_REGISTRY;
+
+  if (stage === 'truth') {
+    const claimIds = new Set(brief.claimIds);
+    const relevantClaims = claims.filter(claim => claimIds.has(claim.id));
+    const capabilityIds = new Set(
+      relevantClaims.map(claim => claim.capabilityId)
+    );
+    const relevantCapabilities = capabilities.filter(capability =>
+      capabilityIds.has(capability.id)
+    );
+    return digestOf({
+      requestedClaimIds: [...claimIds].sort(),
+      truth: buildTruthDigest(relevantClaims, relevantCapabilities, []),
+    });
+  }
+
+  if (stage === 'proof') {
+    const claimIds = new Set(brief.proof.map(need => need.claimId));
+    const capabilityByClaim = new Map(
+      claims.map(claim => [claim.id, claim.capabilityId])
+    );
+    const evidence = proofs
+      .filter(proof => claimIds.has(proof.claimId))
+      .map(proof => ({
+        id: proof.id,
+        claimId: proof.claimId,
+        capabilityId: capabilityByClaim.get(proof.claimId) ?? null,
+        digest: hashProof(proof),
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id));
+    return digestOf({
+      asOf: brief.asOf,
+      requestedClaimIds: [...claimIds].sort(),
+      evidence,
+    });
+  }
+
+  return null;
 }
 
 export interface StageAttemptRecord {
@@ -91,6 +171,21 @@ export const FactoryRunManifestSchema = z.object({
     })
   ),
   attempts: z.array(z.string().min(1)),
+  /** Each rejection routed back to its owning stage, oldest first. */
+  reworks: z
+    .array(
+      z.object({
+        iteration: z.number().int().min(1),
+        /** What started the rework; absent on runs before JOV-7750. */
+        trigger: z.enum(['visual-rejection', 'proof-landed']).optional(),
+        rejectedAt: z.enum(FACTORY_STAGES),
+        reworkFrom: z.enum(FACTORY_STAGES),
+        /** The render output the rejection judged; a rework must replace it. */
+        rejectedRenderDigest: z.string().min(1).nullable(),
+        findings: z.array(z.string()),
+      })
+    )
+    .optional(),
   paidBudget: z
     .object({
       id: z.string().min(1),
@@ -112,14 +207,24 @@ export const FactoryRunManifestSchema = z.object({
 
 export type FactoryRunManifest = z.infer<typeof FactoryRunManifestSchema>;
 
-export function attemptFileName(stage: FactoryStage, attempt: number): string {
+export function attemptFileName(
+  stage: FactoryStage,
+  attempt: number,
+  rework = 0
+): string {
   const index = String(FACTORY_STAGES.indexOf(stage) + 1).padStart(2, '0');
-  return `${index}-${stage}.attempt-${attempt}.json`;
+  const pass = rework > 0 ? `.rework-${rework}` : '';
+  return `${index}-${stage}${pass}.attempt-${attempt}.json`;
 }
 
 export function writeJson(path: string, value: unknown): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+export function writeImmutableJson(path: string, value: unknown): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' });
 }
 
 export function readJson<T = unknown>(path: string): T {
@@ -129,7 +234,9 @@ export function readJson<T = unknown>(path: string): T {
 function verifyLink(
   runDir: string,
   manifest: FactoryRunManifest,
-  index: number
+  index: number,
+  brief: FactoryPageBrief | null,
+  source: FactoryTruthSources
 ): string[] {
   const entry = manifest.chain[index];
   if (!entry) return [];
@@ -170,8 +277,17 @@ function verifyLink(
     issues.push(`${where}: run.json digest does not match the receipt`);
   }
   const prior = manifest.chain.slice(0, index).map(link => link.outputDigest);
-  if (receipt.inputDigest !== stageInputDigest(manifest.briefDigest, prior)) {
-    issues.push(`${where}: input digest does not bind the prior chain`);
+  const sourceDigest = brief
+    ? factoryStageSourceDigest(entry.stage, brief, source)
+    : null;
+  // Archived evidence has no historical registry snapshot. Recheck its
+  // structural/output bindings without judging old truth against today's sources.
+  if (
+    brief &&
+    receipt.inputDigest !==
+      stageInputDigest(manifest.briefDigest, prior, sourceDigest)
+  ) {
+    issues.push(`${where}: input digest does not bind current stage inputs`);
   }
   if (
     entry.stage === 'publish' &&
@@ -182,8 +298,81 @@ function verifyLink(
   return issues;
 }
 
+function verifyRetainedAttempts(
+  runDir: string,
+  manifest: FactoryRunManifest
+): string[] {
+  const issues: string[] = [];
+  const rejectedRenderDigests = new Set(
+    (manifest.reworks ?? []).flatMap(rework =>
+      rework.rejectedRenderDigest ? [rework.rejectedRenderDigest] : []
+    )
+  );
+  const missingRejectedRenders = new Set(rejectedRenderDigests);
+  // Rejected and superseded attempts remain evidence, not just the final chain.
+  for (const file of new Set([
+    ...manifest.attempts,
+    ...manifest.chain.map(link => link.file),
+  ])) {
+    const path = join(runDir, file);
+    try {
+      const record = readJson<StageAttemptRecord>(path);
+      const where = `${record.receipt.stage}#${record.receipt.attempt} (${file})`;
+      if (record.receipt.outputDigest !== digestOf(record.artifact)) {
+        issues.push(
+          `${where}: retained artifact digest does not match the receipt`
+        );
+      }
+      const rejectedRender = rejectedRenderDigests.has(
+        record.receipt.outputDigest
+      );
+      if (rejectedRender) {
+        missingRejectedRenders.delete(record.receipt.outputDigest);
+        if (record.receipt.stage !== 'render') {
+          issues.push(
+            `${where}: capture-integrity: rejected render receipt stage does not match rework`
+          );
+        }
+      }
+      const retainedRender =
+        rejectedRender ||
+        record.receipt.stage === 'render' ||
+        manifest.chain.some(
+          link => link.file === file && link.stage === 'render'
+        );
+      if (retainedRender && record.artifact !== null) {
+        const parsed = FACTORY_STAGE_ARTIFACT_SCHEMAS.render.safeParse(
+          record.artifact
+        );
+        if (parsed.success) {
+          issues.push(
+            ...verifyRenderBytes(parsed.data, manifest.mode).map(
+              issue => `${where}: ${issue}`
+            )
+          );
+        } else {
+          issues.push(
+            `${where}: retained render artifact fails the render schema`
+          );
+        }
+      }
+    } catch {
+      issues.push(`retained attempt missing or unreadable: ${file}`);
+    }
+  }
+  for (const digest of missingRejectedRenders) {
+    issues.push(
+      `capture-integrity: missing rejected render for rework digest ${digest}`
+    );
+  }
+  return issues;
+}
+
 /** Re-checks every receipt digest and rule in a run directory. Empty = valid. */
-export function verifyFactoryRun(runDir: string): string[] {
+export function verifyFactoryRun(
+  runDir: string,
+  source: FactoryTruthSources = {}
+): string[] {
   const manifestPath = join(runDir, 'run.json');
   if (!existsSync(manifestPath)) return [`no run.json in ${runDir}`];
   const parsed = FactoryRunManifestSchema.safeParse(readJson(manifestPath));
@@ -195,10 +384,15 @@ export function verifyFactoryRun(runDir: string): string[] {
   const manifest = parsed.data;
   const issues: string[] = [];
   const briefPath = join(runDir, 'brief.json');
+  let brief: FactoryPageBrief | null = null;
   if (!existsSync(briefPath)) {
     issues.push('missing brief.json');
-  } else if (digestOf(readJson(briefPath)) !== manifest.briefDigest) {
-    issues.push('brief.json digest does not match run.json');
+  } else {
+    const savedBrief = readJson<FactoryPageBrief>(briefPath);
+    brief = savedBrief;
+    if (digestOf(savedBrief) !== manifest.briefDigest) {
+      issues.push('brief.json digest does not match run.json');
+    }
   }
   if (
     manifest.status === 'complete' &&
@@ -209,7 +403,39 @@ export function verifyFactoryRun(runDir: string): string[] {
     );
   }
   for (let index = 0; index < manifest.chain.length; index++) {
-    issues.push(...verifyLink(runDir, manifest, index));
+    issues.push(...verifyLink(runDir, manifest, index, brief, source));
+  }
+  issues.push(...verifyRetainedAttempts(runDir, manifest));
+  const history = join(runDir, 'history');
+  if (existsSync(history)) {
+    for (const prior of readdirSync(history, { withFileTypes: true })) {
+      if (prior.isDirectory()) {
+        const priorDir = join(history, prior.name);
+        try {
+          const saved = FactoryRunManifestSchema.parse(
+            readJson(join(priorDir, 'run.json'))
+          );
+          const retained: string[] = [];
+          for (let index = 0; index < saved.chain.length; index++) {
+            retained.push(...verifyLink(priorDir, saved, index, null, {}));
+          }
+          retained.push(...verifyRetainedAttempts(priorDir, saved));
+          if (
+            digestOf(readJson(join(priorDir, 'brief.json'))) !==
+            saved.briefDigest
+          ) {
+            retained.push('brief digest does not match archived manifest');
+          }
+          issues.push(
+            ...retained.map(issue => `history/${prior.name}: ${issue}`)
+          );
+        } catch {
+          issues.push(
+            `history/${prior.name}: missing or unreadable archived run`
+          );
+        }
+      }
+    }
   }
   return issues;
 }

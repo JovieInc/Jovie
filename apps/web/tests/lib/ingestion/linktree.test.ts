@@ -345,48 +345,19 @@ describe('Linktree Strategy', () => {
       ).rejects.toThrow(ExtractionError);
     });
 
-    it('throws ExtractionError on 404', async () => {
-      // Use mockResolvedValue (not Once) to handle all retry attempts
+    it('fails closed for a valid profile and does not fetch HTML', async () => {
       vi.mocked(fetch).mockResolvedValue({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        url: 'https://linktr.ee/username',
-        headers: new Headers(),
-      } as Response);
-
-      await expect(
-        fetchLinktreeDocument('https://linktr.ee/username')
-      ).rejects.toThrow(ExtractionError);
-    });
-
-    it('throws ExtractionError on 429 rate limit', async () => {
-      // Use mockResolvedValue (not Once) to handle all retry attempts
-      vi.mocked(fetch).mockResolvedValue({
-        ok: false,
-        status: 429,
-        statusText: 'Too Many Requests',
-        url: 'https://linktr.ee/username',
-        headers: new Headers(),
-      } as Response);
-
-      await expect(
-        fetchLinktreeDocument('https://linktr.ee/username')
-      ).rejects.toThrow(ExtractionError);
-    });
-
-    it('returns HTML on success', async () => {
-      const mockHtml = '<html><body>Test</body></html>';
-      vi.mocked(fetch).mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve(mockHtml),
+        text: () => Promise.resolve('<html></html>'),
         url: 'https://linktr.ee/username',
         headers: new Headers({ 'content-type': 'text/html' }),
       } as Response);
 
-      const result = await fetchLinktreeDocument('https://linktr.ee/username');
-      expect(result).toBe(mockHtml);
+      await expect(
+        fetchLinktreeDocument('https://linktr.ee/username')
+      ).rejects.toMatchObject({ code: 'SOCIAL_HTML_DISABLED' });
+      expect(fetch).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,7 +1,11 @@
+import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   type PlanId,
   resolveCanonicalPlanId,
@@ -46,6 +50,21 @@ function getLineItemPriceId(
   return typeof price === 'string' ? price : price.id;
 }
 
+/**
+ * Anyone may buy the offer before they have a link (EVENT 2026-10-03,
+ * JOV-7701), so a paid buyer without a claimed profile is sent on to claim
+ * or create one instead of into the app.
+ */
+async function buyerNeedsProfile(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ isClaimed: creatorProfiles.isClaimed })
+    .from(users)
+    .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+    .where(eq(users.id, userId))
+    .limit(1);
+  return row?.isClaimed !== true;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { userId } = await getCachedAuth();
@@ -77,20 +96,15 @@ export async function GET(request: NextRequest) {
     }
 
     const lineItemPriceId = getLineItemPriceId(session.line_items?.data);
-    const metadataPlan = resolvePaidPlan(session.metadata?.plan ?? null);
-    if (metadataPlan) {
-      return NextResponse.json(
-        { plan: metadataPlan, priceId: lineItemPriceId },
-        { headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const mappedPlan = lineItemPriceId
-      ? resolvePaidPlan(getPriceMappingDetails(lineItemPriceId)?.plan ?? null)
-      : null;
+    const plan =
+      resolvePaidPlan(session.metadata?.plan ?? null) ??
+      (lineItemPriceId
+        ? resolvePaidPlan(getPriceMappingDetails(lineItemPriceId)?.plan ?? null)
+        : null);
+    const needsProfile = plan ? await buyerNeedsProfile(userId) : false;
 
     return NextResponse.json(
-      { plan: mappedPlan, priceId: lineItemPriceId },
+      { plan, priceId: lineItemPriceId, needsProfile },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {

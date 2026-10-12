@@ -65,7 +65,8 @@ struct NativeAuthExchangeClient: Sendable {
         client: "ios",
         code: authReturn.code,
         state: authReturn.state,
-        codeVerifier: authReturn.codeVerifier
+        codeVerifier: authReturn.codeVerifier,
+        nativeAttempt: authReturn.nativeAttempt
       )
     )
 
@@ -98,7 +99,7 @@ struct NativeAuthExchangeClient: Sendable {
       if httpResponse.statusCode == 401,
          object?["exchangePhase"] as? String == "preconsume",
          let rawReason = object?["reason"] as? String,
-         ["missing", "wrong_code", "wrong_client", "wrong_state", "wrong_verifier", "expired", "replayed"]
+         ["missing", "wrong_code", "wrong_client", "wrong_state", "wrong_attempt", "wrong_verifier", "expired", "replayed"]
            .contains(rawReason) {
         throw NativeAuthExchangeError.rejectedBeforeConsume(reason: rawReason)
       }
@@ -135,4 +136,5 @@ private struct NativeAuthExchangeRequest: Encodable {
   let code: String
   let state: String
   let codeVerifier: String
+  let nativeAttempt: String?
 }

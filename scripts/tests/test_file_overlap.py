@@ -70,6 +70,14 @@ class IncidentPolicyTest(unittest.TestCase):
 
 
 class PredictionAndAdmissionTest(unittest.TestCase):
+    def test_default_only_flags_overlap(self):
+        # Tim 2026-10-12: no plain `hold` + disabled auto-merge unless enforcement is asked for.
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SYMPHONY_FILE_OVERLAP_GUARD", None)
+            self.assertEqual(overlap.guard_mode(), "flag")
+        self.assertEqual([overlap.guard_mode(v) for v in ("1", "enforce", "flag", "0", "maybe")],
+                         ["flag", "flag", "flag", "off", "flag"])
+
     def test_real_worker_module_records_overlap_in_the_existing_ledger(self):
         import lane_runner
         issue = SimpleNamespace(identifier="JOV-9", title="Lane change", labels=[],
@@ -79,7 +87,7 @@ class PredictionAndAdmissionTest(unittest.TestCase):
             host = SimpleNamespace(state=Path(tmp))
             result = overlap.admission_decisions(host, lane_runner, issue,
                 [pr(20139, [changed("scripts/lanes/lane_runner.py")])], [], workstreams.classify)
-            self.assertFalse(result["allowed"])
+            self.assertTrue(result["allowed"], "an overlap is recorded, never a block")
             records = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
             self.assertEqual(records[0]["kind"], "file-overlap-admission")
             self.assertEqual(records[0]["prs"], [20139])
@@ -94,31 +102,6 @@ class PredictionAndAdmissionTest(unittest.TestCase):
         self.assertEqual(prediction["source"], "workstream:symphony-throughput")
         self.assertIn("scripts/lanes/lane_runner.py", prediction["files"])
 
-    def test_admission_blocks_in_enforce_mode_and_only_flags_in_flag_mode(self):
-        issue = SimpleNamespace(identifier="JOV-9", title="Lane change", labels=[],
-                                description="Edit `scripts/lanes/lane_runner.py`.")
-        existing = pr(20139, [changed("scripts/lanes/lane_runner.py")])
-        with tempfile.TemporaryDirectory() as tmp:
-            rows = []
-            host = SimpleNamespace(state=Path(tmp))
-            lane = SimpleNamespace(ledger=lambda _host, row: rows.append(row))
-            with patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
-                result = overlap.admission_decisions(host, lane, issue, [existing], [], workstreams.classify)
-            self.assertFalse(result["allowed"])
-            self.assertEqual(result["decisions"][0]["actionTaken"], "block")
-            rows = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
-            self.assertEqual(rows[0]["prs"], [20139])
-            state = overlap.read_state(host.state)
-            self.assertEqual(state["metrics"]["conflicts_prevented"], 1)
-            with patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
-                overlap.admission_decisions(host, lane, issue, [existing], [], workstreams.classify)
-            self.assertEqual(overlap.read_state(host.state)["metrics"]["conflicts_prevented"], 1)
-
-            with patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "flag"}):
-                result = overlap.admission_decisions(host, lane, issue, [existing], [], workstreams.classify)
-            self.assertTrue(result["allowed"])
-            self.assertEqual(result["decisions"][0]["actionTaken"], "flag")
-
     def test_kill_switch_allows_without_a_decision(self):
         issue = SimpleNamespace(identifier="JOV-10", title="Lane change", labels=[],
                                 description="Edit `scripts/lanes/lane_runner.py`.")
@@ -132,37 +115,32 @@ class PredictionAndAdmissionTest(unittest.TestCase):
             self.assertEqual(result["decisions"], [])
 
 
-class SequencingTest(unittest.TestCase):
-    def test_child_targets_main_then_rebases_after_parent_lands(self):
-        calls, ledger = [], []
-        lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie",
-                               sh=lambda args, **_kwargs: calls.append(args) or SimpleNamespace(returncode=0),
-                               ledger=lambda _host, row: ledger.append(row))
-        parent = pr(20141, [changed("scripts/lanes/lane_runner.py")], branch="codex/parent")
-        child = pr(20166, [changed("scripts/lanes/lane_runner.py")], base="codex/parent")
-        with tempfile.TemporaryDirectory() as tmp, \
-                patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
-            host = SimpleNamespace(state=Path(tmp))
-            first = overlap.reconcile_open_prs(host, lane, [parent, child])
-            self.assertEqual(first["pairs"][0]["actionTaken"], "stack")
-            self.assertIn(["gh", "pr", "edit", "20166", "--repo", "JovieInc/Jovie", "--base", "main"], calls)
-            self.assertTrue(any("labels[]=hold" in call for args in calls for call in args))
-
-            calls.clear()
-            child["baseRefName"] = "main"
-            repeated = overlap.reconcile_open_prs(host, lane, [parent, child])
-            self.assertEqual(repeated["created"], 0)
-            self.assertEqual(calls, [])
-
-            second = overlap.reconcile_open_prs(host, lane, [child])
-            self.assertEqual(second["released"], 1)
-            self.assertTrue(any("labels[]=lane-fix-dequeued" in call for args in calls for call in args))
-            self.assertEqual(second["metrics"]["rebases_caused_by_overlap"], 1)
-            ledger = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
-            self.assertEqual([row["kind"] for row in ledger],
-                             ["file-overlap-sequence", "file-overlap-release"])
-            written = json.loads((host.state / "file-overlap.json").read_text())
-            self.assertEqual(written["active"], {})
+class LegacyHoldReleaseTest(unittest.TestCase):
+    def test_the_guard_never_holds_and_releases_a_hold_it_applied_before(self):
+        # Tim 2026-10-12 / hold contract #21275: overlaps are recorded only; the merge queue
+        # serializes. A `hold` the old enforce mode applied is removed on the next reconcile.
+        first = pr(1, [changed("scripts/lanes/lane_runner.py")])
+        later = pr(2, [changed("scripts/lanes/lane_runner.py")], body="Land after #1.")
+        later["labels"] = [{"name": "hold"}]
+        calls = []
+        lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie", ledger=lambda *_a: None,
+                               sh=lambda args, **_k: calls.append(list(args)) or SimpleNamespace(returncode=0, stderr=""))
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            legacy = {"schema": "symphony-file-overlap/v1", "events": [], "tasks": {},
+                      "metrics": {"conflicts_prevented": 0, "overlap_flags": 0, "rebases_caused_by_overlap": 0},
+                      "active": {"1:2": {"firstPr": 1, "laterPr": 2, "policyAction": "sequence",
+                                         "actionTaken": "sequence", "holdApplied": True}}}
+            (state / "file-overlap.json").write_text(json.dumps(legacy))
+            for mode in ("1", "enforce", "flag"):
+                with patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": mode}):
+                    result = overlap.reconcile_open_prs(SimpleNamespace(state=state), lane, [first, later])
+                self.assertEqual(result["mode"], "flag")
+                self.assertTrue(all(row["actionTaken"] == "flag" for row in result["pairs"]))
+        self.assertFalse(any("labels[]=hold" in call or "--disable-auto" in call for args in calls for call in args))
+        self.assertEqual([args[4] for args in calls if args[:4] == ["gh", "api", "-X", "DELETE"]],
+                         ["repos/JovieInc/Jovie/issues/2/labels/hold"], "the legacy hold is released once")
+        self.assertFalse(hasattr(overlap, "_hold"))
 
 
 if __name__ == "__main__":
