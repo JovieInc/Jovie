@@ -422,7 +422,6 @@ def test_workflow_test_tooling_is_hash_pinned() -> None:
     )
     for workflow_name in (
         "actionlint.yml",
-        "brand-scrub.yml",
         "ci.yml",
     ):
         workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")

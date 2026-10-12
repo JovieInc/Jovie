@@ -4,15 +4,28 @@
 # removal-trigger: Remove when Summer or the build pipeline emits deprecation findings into Linear intake natively.
 name: Deprecation Intake (Linear devin lane)
 
-# clock-class: skip-if-unchanged
-# Daily: read the latest successful merge-queue build log (main push runs
-# skip the Build jobs; the queue exercises the exact head that lands), file
-# one deduped Linear issue per distinct deprecation warning (Todo + label
-# devin) so the autonomous lane fixes deprecations without a human.
+# When a dependency or toolchain change lands: read the latest successful
+# merge-queue build log (main push runs skip the Build jobs; the queue
+# exercises the exact head that lands), file one deduped Linear issue per
+# distinct deprecation warning (Todo + label devin) so the autonomous lane
+# fixes deprecations without a human, and clear the ones that went away.
+# Deprecation warnings come from the versions and config below, so a landed
+# change to one of them is the trigger; there is no clock.
 
 on:
-  schedule:
-    - cron: '17 13 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'pnpm-lock.yaml'
+      - '**/package.json'
+      - '.nvmrc'
+      - '.node-version'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - '**/next.config.*'
+      - '**/tsconfig*.json'
+      - 'scripts/deprecation-*.mjs'
+      - '.github/workflows/deprecation-intake.yml'
   workflow_dispatch:
 
 permissions: {}
