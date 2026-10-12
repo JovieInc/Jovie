@@ -33,7 +33,7 @@ test('desktop packaging restores the immutable pnpm store', () => {
 
 test('Mac packaging lanes cache only Electron download artifacts', () => {
   for (const file of [
-    '.github/workflows/ci.yml',
+    '.github/workflows/macos-ci.yml',
     '.github/workflows/desktop-release.yml',
   ]) {
     const workflow = read(file);
