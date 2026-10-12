@@ -76,6 +76,37 @@ const CAPACITY_POLICY = invariantPolicy('JOV-INV-007');
 const FLEET_AUTHORITY = invariantPolicy('JOV-INV-008');
 const DEFAULT_GEM_CONCURRENCY = CAPACITY_POLICY.baseline;
 export const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
+/**
+ * The Gem lanes tick emits the fleet receipt only when its inputs change
+ * (scripts/lanes/fleet_gate_emitter.py). A receipt older than
+ * CONTROLLER_RECEIPT_MAX_AGE_MS is still current when the live emitter
+ * confirms it: the receipt's input generation is the emitter's current key,
+ * its main SHA is live origin/main in the lanes repo, and lanes-status.json
+ * `at` shows a tick within this window. Anything else (SHA mismatch, newer
+ * inputs, or a dead emitter) is real staleness and fails closed.
+ */
+export const FLEET_EMITTER_TICK_MAX_AGE_MS = 3 * 60 * 1000;
+
+/**
+ * @param {{ inputGeneration?: unknown, mainSha?: unknown }} receipt
+ * @param {{ key?: unknown, mainSha?: unknown, tickAt?: unknown } | null | undefined} emitter
+ * @param {number} nowMs
+ */
+export function emitterConfirmsReceipt(receipt, emitter, nowMs) {
+  return Boolean(
+    emitter &&
+      typeof emitter.key === 'string' &&
+      emitter.key.length > 0 &&
+      receipt?.inputGeneration === emitter.key &&
+      validCommitSha(receipt?.mainSha, { exact: true }) &&
+      receipt.mainSha === emitter.mainSha &&
+      isFreshTimestamp(
+        /** @type {string} */ (emitter.tickAt),
+        nowMs,
+        FLEET_EMITTER_TICK_MAX_AGE_MS
+      )
+  );
+}
 const CONCURRENCY_EVIDENCE_MAX_AGE_MS =
   CAPACITY_POLICY.freshnessHours * 60 * 60 * 1000;
 const CAPACITY_MAX_TARGET = 40;
@@ -517,14 +548,28 @@ export function evaluateFleetGate(
   const integrityStatus = evidence?.integrity?.status;
   const integrityReason = evidence?.integrity?.reason;
   const controllerReceiptPresent = Boolean(evidence?.observedAt);
+  const emitterCurrent =
+    controllerReceiptPresent &&
+    emitterConfirmsReceipt(
+      {
+        inputGeneration: evidence?.inputGeneration,
+        mainSha: evidence?.main?.sha,
+      },
+      evidence?.emitter,
+      nowMs
+    );
   const controllerFresh =
     controllerReceiptPresent &&
-    isFreshTimestamp(evidence.observedAt, nowMs, controllerMaxAgeMs);
+    (emitterCurrent ||
+      isFreshTimestamp(evidence.observedAt, nowMs, controllerMaxAgeMs));
   const reviewAdmission = evaluateIndependentReviewReceipt(
     evidence?.independentReview,
     {
       expectedHeadSha: evidence?.main?.sha,
       now,
+      // The review is of the receipt's main head; while the live emitter
+      // confirms that head is still current, the review cannot go stale.
+      ...(emitterCurrent ? { maxAgeMs: Number.POSITIVE_INFINITY } : {}),
     }
   );
   const closureAdmission = evaluateClosureAdmission(evidence?.closureHealth);

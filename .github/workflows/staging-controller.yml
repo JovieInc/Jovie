@@ -132,7 +132,7 @@ jobs:
             mv "$RUNNER_TEMP/staging-lineage-next.json" "$RUNNER_TEMP/staging-lineage.json"
           fi
           printf 'outcome=%s\n' "$outcome" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with: {name: "staging-lineage-${{ github.event.workflow_run.head_sha }}-${{ github.run_attempt }}", path: "${{ runner.temp }}/staging-lineage.json", if-no-files-found: error, retention-days: 30}
   staging-release:
     needs: [authorize-staging]
@@ -165,5 +165,5 @@ jobs:
             --arg controllerRunId '${{ github.run_id }}' --arg controllerRunAttempt '${{ github.run_attempt }}' \
             '{schema:"jovie-staging-completion/v1", terminal:true, repository:$repository, sha:$sha, outcome:$outcome, sourceCiRunId:$sourceCiRunId, sourceCiRunAttempt:$sourceCiRunAttempt, controllerRunId:$controllerRunId, controllerRunAttempt:$controllerRunAttempt}' > "$RUNNER_TEMP/staging-completion.json"
           echo "Staging generation $EXACT_SHA finished as $outcome ($STAGING_STATE)."
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with: {name: "staging-completion-${{ github.run_attempt }}", path: "${{ runner.temp }}/staging-completion.json", if-no-files-found: error, retention-days: 30}

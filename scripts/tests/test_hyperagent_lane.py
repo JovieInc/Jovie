@@ -333,8 +333,7 @@ class ProductionRemoteEntryTest(unittest.TestCase):
                 self.assertEqual(lane.fix_candidates("hyperagent"), [draft, dated])
         with patch.object(lane, "sh", return_value=type("Read", (), {"stdout": json.dumps([draft, dated]), "returncode": 0})()):
             light = lane.lane_prs("hyperagent", providers, fields=lane.LIGHT_PR_FIELDS)
-            self.assertTrue(lane.over_budget("hyperagent", light, slots=1))
-            self.assertFalse(lane.over_budget("hyperagent", light[:1], slots=1))
+            self.assertTrue(lane.new_issue_budget("hyperagent", 1, light)["allowed"], "open drafts are never a ceiling")
             self.assertIn("JOV-6871", lane.in_flight_issues())
         with patch.object(lane, "claimed_elsewhere", return_value=False), patch.object(lane, "post_claim"):
             first = lane.claim_adoptable_pr(self.host, "hyperagent", found)

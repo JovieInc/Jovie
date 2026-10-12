@@ -7,7 +7,6 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ESLint } from 'eslint';
 
 export const webRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -41,7 +40,9 @@ export function changedWebTsx({
   diffBase,
   head = 'HEAD',
 } = {}) {
-  let resolvedBase = diffBase;
+  // An explicit base (option or SHADCN_LINT_DIFF_BASE) is immutable proof the
+  // caller pinned; it wins over the mutable origin/<baseRef> fallback.
+  let resolvedBase = diffBase ?? process.env.SHADCN_LINT_DIFF_BASE;
   if (!resolvedBase) {
     resolvedBase = 'HEAD^1';
     if (event === 'pull_request') {
@@ -64,6 +65,9 @@ export function changedWebTsx({
       'diff',
       '--diff-filter=ACMRT',
       '--name-only',
+      // NUL termination keeps Unicode and whitespace filenames intact; the
+      // default quoting would pass a literal "caf\u00e9.tsx" to ESLint.
+      '-z',
       `${resolvedBase}...${head}`,
       '--',
       ...CHANGED_WEB_PATHSPECS,
@@ -72,14 +76,37 @@ export function changedWebTsx({
   );
   if (result.status !== 0) return null;
   return result.stdout
-    .split('\n')
-    .map(line => line.trim())
+    .split('\0')
     .filter(Boolean)
     .filter(isProductionWebTs)
     .map(file => path.relative(web, path.join(root, file)));
 }
 
-async function main() {
+/**
+ * shadcn/no-restyle counts above baseline are violations; a fatal parser
+ * diagnostic means the file could not be checked at all, which must also
+ * fail rather than read as zero restyle hits.
+ */
+export function baselineViolations(results, baseline, web = webRoot) {
+  const errors = [];
+  for (const result of results) {
+    const rel = path.relative(web, result.filePath).split(path.sep).join('/');
+    const restyle = result.messages.filter(
+      message => message.ruleId === 'shadcn/no-restyle'
+    ).length;
+    const allowed = baseline.files[rel] ?? 0;
+    if (restyle > allowed) {
+      errors.push(`${rel}: shadcn/no-restyle ${restyle} > baseline ${allowed}`);
+    }
+    const fatal = result.messages.filter(message => message.fatal).length;
+    if (fatal > 0) {
+      errors.push(`${rel}: ${fatal} fatal parser diagnostic(s)`);
+    }
+  }
+  return errors;
+}
+
+export async function main({ files = changedWebTsx() } = {}) {
   const baseline = JSON.parse(
     readFileSync(
       path.join(
@@ -96,16 +123,18 @@ async function main() {
     )
   );
 
-  const files = changedWebTsx();
   if (files === null) {
     console.error('shadcn-lint-changed: unreadable git diff; fail closed');
-    process.exit(1);
+    return 1;
   }
   if (files.length === 0) {
     console.log('shadcn-lint-changed: no production web TS files changed');
-    process.exit(0);
+    return 0;
   }
 
+  // Import only once a real web file must lint so non-web diffs never pay
+  // (or require) the ESLint module load.
+  const { ESLint } = await import('eslint');
   const eslint = new ESLint({
     cwd: webRoot,
     overrideConfigFile: path.join(webRoot, 'eslint.config.js'),
@@ -117,31 +146,19 @@ async function main() {
   });
 
   const results = await eslint.lintFiles(files);
-  const errors = [];
-  for (const result of results) {
-    const rel = path
-      .relative(webRoot, result.filePath)
-      .split(path.sep)
-      .join('/');
-    const count = result.messages.filter(
-      message => message.ruleId === 'shadcn/no-restyle'
-    ).length;
-    const allowed = baseline.files[rel] ?? 0;
-    if (count > allowed) {
-      errors.push(`${rel}: shadcn/no-restyle ${count} > baseline ${allowed}`);
-    }
-  }
+  const errors = baselineViolations(results, baseline);
 
   if (errors.length > 0) {
     console.error(errors.join('\n'));
-    process.exit(1);
+    return 1;
   }
   console.log(
     `shadcn-lint-changed: ${files.length} file(s) within shrink-only baseline`
   );
+  return 0;
 }
 
 const entry = process.argv[1];
 if (entry && path.resolve(entry) === fileURLToPath(import.meta.url)) {
-  await main();
+  process.exitCode = await main();
 }

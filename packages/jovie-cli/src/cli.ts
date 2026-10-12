@@ -16,7 +16,7 @@ import {
   normalizeBaseUrl,
   safeDiagnostic,
 } from './client.js';
-import { COMMANDS, findCommand } from './commands.js';
+import { COMMANDS, type CommandSpec, findCommand } from './commands.js';
 import { installSkill } from './init.js';
 import { serveMcp } from './mcp.js';
 import {
@@ -85,6 +85,7 @@ type CliValues = {
   readonly flags: Readonly<Record<string, string | undefined>>;
   readonly meshFlags: Readonly<Record<string, string | undefined>>;
   readonly dir?: string;
+  readonly fleet?: boolean;
   readonly full?: boolean;
   readonly help?: boolean;
   readonly json?: boolean;
@@ -111,38 +112,51 @@ class UsageError extends Error {
   readonly code = 'USAGE_ERROR' as const;
 }
 
-function usage(): string {
+function usage(showFleet: boolean): string {
   const width = 28;
-  const lines = COMMANDS.map(command => {
-    const name = [
-      ...command.path,
-      ...(command.arg ? [`<${command.arg.name}>`] : []),
-      ...(command.flags ?? [])
-        .filter(flag => flag.required)
-        .map(flag => `--${flag.name} <text>`),
-    ].join(' ');
-    return `  ${name.padEnd(width)} ${command.summary}`;
-  });
+  const line = (name: string, summary: string) =>
+    name.length < width
+      ? `  ${name.padEnd(width)} ${summary}`
+      : `  ${name}\n  ${''.padEnd(width)} ${summary}`;
+  const row = (command: CommandSpec) =>
+    line(
+      [
+        ...command.path,
+        ...(command.arg ? [`<${command.arg.name}>`] : []),
+        ...(command.flags ?? [])
+          .filter(flag => flag.required)
+          .map(flag => `--${flag.name} <text>`),
+      ].join(' '),
+      command.summary
+    );
+  const lines = COMMANDS.filter(command => !command.internal).map(row);
+  const internal = showFleet
+    ? `\nInternal fleet (operators only; needs a scoped JOVIE_WORKER_TOKEN):\n${COMMANDS.filter(
+        command => command.internal
+      )
+        .map(row)
+        .join('\n')}\n`
+    : '';
   return `Usage: jovie <command> [options]
 
 Jovie for agents: extract public creator data, create artist profiles from
 Spotify, and read public artist data.
-No login or API key is needed for public commands.
-Internal fleet commands require a scoped JOVIE_WORKER_TOKEN supplied by the
-operator. Every command supports --json.
+No login or API key is needed for public commands. Every command supports --json.
 
 Commands:
 ${lines.join('\n')}
-  ${'mcp'.padEnd(width)} Run as an MCP server over stdio (same tools as above)
-  ${'init'.padEnd(width)} Install the Jovie skill into Claude, Codex, OpenClaw, Hermes
-  ${'skill'.padEnd(width)} Print the Jovie SKILL.md
-
+${line('mcp', 'Run as an MCP server over stdio (same tools as above)')}
+${line('init', 'Install the Jovie skill into Claude, Codex, OpenClaw, Hermes')}
+${line('skill', 'Print the Jovie SKILL.md')}
+${line('help', 'Show this help')}
+${internal}
 ${MESH_USAGE}
 
 Options:
   --base-url <url>       Compatible Jovie deployment origin (default: ${DEFAULT_BASE_URL})
   --json                 Emit compact JSON; text resources use {"content":"..."}
   --full                 Fetch /llms-full.txt (only with docs llms)
+  --fleet                With --help, also list internal operator commands
   --dir <path>           Skills directory for init (default: every installed agent)
   --debug                Print error details (stack and cause) to stderr
   -h, --help             Show this help
@@ -217,6 +231,13 @@ const COMMAND_FLAG_NAMES = [
   ...new Set(COMMANDS.flatMap(command => command.flags ?? []).map(f => f.name)),
 ];
 
+function strayFlags(
+  flags: Readonly<Record<string, unknown>>,
+  allowed: readonly string[]
+): boolean {
+  return Object.keys(flags).some(name => !allowed.includes(name));
+}
+
 function commandFamily(argv: readonly string[]): string | undefined {
   const stringOptions = new Set([
     'base-url',
@@ -248,6 +269,7 @@ function parseCliArgs(argv: readonly string[]): {
       'base-url': { type: 'string' },
       debug: { type: 'boolean' },
       dir: { type: 'string' },
+      fleet: { type: 'boolean' },
       full: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       json: { type: 'boolean' },
@@ -267,6 +289,7 @@ function parseCliArgs(argv: readonly string[]): {
     readonly 'base-url'?: string;
     readonly debug?: boolean;
     readonly dir?: string;
+    readonly fleet?: boolean;
     readonly full?: boolean;
     readonly help?: boolean;
     readonly json?: boolean;
@@ -289,6 +312,7 @@ function parseCliArgs(argv: readonly string[]): {
         ])
       ),
       dir: values.dir,
+      fleet: values.fleet,
       full: values.full,
       help: values.help,
       json: values.json,
@@ -315,18 +339,24 @@ async function execute(
       throw new UsageError('Unsupported option for this command.');
   }
   if (first === 'mesh') {
-    if (values.full || values.dir || Object.keys(values.flags).length)
+    // Shared names (--kind) parse into both sets; only foreign ones are stray.
+    if (values.full || values.dir || strayFlags(values.flags, MESH_FLAG_NAMES))
       throw new UsageError('Unsupported option for mesh.');
     return runMesh(positionals, values.meshFlags, {
       userAgent: `jovie-cli/${CLI_VERSION}`,
       ...dependencies.mesh,
     });
   }
-  if (Object.keys(values.meshFlags).length)
+  if (strayFlags(values.meshFlags, COMMAND_FLAG_NAMES))
     throw new UsageError('Mesh options are only supported by mesh commands.');
   if (positionals.length === 1 && first === 'skill') return SKILL_MD;
   if (positionals.length === 1 && first === 'init') {
-    return installSkill(dependencies.homeDir ?? homedir(), values.dir);
+    const result = installSkill(dependencies.homeDir ?? homedir(), values.dir);
+    if (!result.installed.length)
+      throw new UsageError(
+        'No supported agent found (~/.claude, ~/.codex, ~/.openclaw, ~/.hermes). Pass --dir <skills directory>.'
+      );
+    return result;
   }
 
   const command = findCommand(positionals);
@@ -398,8 +428,10 @@ export async function runCli(
   try {
     parsed = parseCliArgs(argv);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // parseArgs explains positional escaping, which hides the actual problem.
     const usageError = new UsageError(
-      error instanceof Error ? error.message : String(error)
+      message.replace(/^Unknown option '([^']+)'\..*$/s, 'Unknown option $1.')
     );
     const payload = errorPayload(usageError);
     if (requestedJson) {
@@ -423,9 +455,17 @@ export async function runCli(
     return 0;
   }
 
-  if (values.help || positionals.length === 0) {
-    if (values.json) writeLine(stdout, JSON.stringify({ content: usage() }));
-    else writeText(stdout, usage());
+  if (
+    values.help ||
+    positionals.length === 0 ||
+    (positionals.length === 1 && positionals[0] === 'help')
+  ) {
+    const showFleet = Boolean(
+      values.fleet ?? dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN
+    );
+    if (values.json)
+      writeLine(stdout, JSON.stringify({ content: usage(showFleet) }));
+    else writeText(stdout, usage(showFleet));
     return 0;
   }
 

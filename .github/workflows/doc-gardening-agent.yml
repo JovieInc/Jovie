@@ -1,14 +1,21 @@
-# Recurring doc-gardening agent (JOV-3644).
+# Doc-gardening agent (JOV-3644).
 #
 # Scans gardening-only stale docs (docs/doc-gardening/**) and opens fix-up PRs
 # when freshness markers drift from computed repo facts.
 name: Doc Gardening Agent
-# clock-class: skip-if-unchanged
 
 on:
-  schedule:
-    - cron: '15 3 * * 1'
-      timezone: 'America/Los_Angeles'
+  # The gardened facts are computed from these files, so a change to one of
+  # them is the only thing that can make a freshness marker stale.
+  push:
+    branches: [main]
+    paths:
+      - '.claude/rules/*.md'
+      - 'docs/doc-gardening/**'
+      - 'docs/doc-freshness-registry.json'
+      - 'scripts/lib/doc-freshness.mjs'
+      - 'scripts/doc-gardening-agent.mjs'
+      - '.github/workflows/doc-gardening-agent.yml'
   workflow_dispatch:
     inputs:
       dry_run:

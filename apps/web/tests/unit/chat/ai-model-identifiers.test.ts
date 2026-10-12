@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALBUM_ART_GATEWAY_IMAGE_MODEL,
+  assertGatewayImageModelAllowed,
   assertGatewayModelAllowed,
   CHAT_MODEL,
   CHAT_MODEL_LIGHT,
   CHAT_MODEL_ROTATION_CHAIN,
   DESIGN_TASTE_SWEEP_MODEL,
+  GATEWAY_ALLOWED_IMAGE_MODELS,
   GATEWAY_ALLOWED_MODELS,
   GATEWAY_ALLOWLIST_NAME,
   INSIGHT_MODEL,
@@ -62,7 +64,33 @@ describe('AI Gateway model identifiers', () => {
     }
   });
 
-  it('rejects openai/anthropic gateway ids and allows the rest (JOV-7119)', () => {
+  it('text allowlist is exactly the founder-locked set (JOV-8109)', () => {
+    expect([...GATEWAY_ALLOWED_MODELS].sort()).toEqual([
+      'typesafe-ai/jev',
+      'zai/glm-5.3',
+      'zai/glm-5.3-flash',
+    ]);
+  });
+
+  it('fails closed: only allowlisted text models pass (JOV-8109)', () => {
+    for (const allowed of GATEWAY_ALLOWED_MODELS) {
+      expect(() => assertGatewayModelAllowed(allowed)).not.toThrow();
+    }
+    for (const denied of [
+      'google/gemini-2.5-flash-image',
+      'google/gemini-3-flash',
+      'deepseek/deepseek-v4',
+      'xai/grok-5',
+      'zai/glm-5.2',
+      'typesafe-ai/other',
+    ]) {
+      expect(() => assertGatewayModelAllowed(denied)).toThrow(
+        /not on the allowlist/
+      );
+    }
+  });
+
+  it('rejects openai/anthropic gateway ids with the banned-provider error (JOV-7119)', () => {
     for (const banned of [
       'openai/gpt-6-sol',
       'openai/gpt-6-luna',
@@ -74,13 +102,27 @@ describe('AI Gateway model identifiers', () => {
         /banned provider/
       );
     }
-    for (const allowed of [
-      ...GATEWAY_ALLOWED_MODELS,
-      ALBUM_ART_GATEWAY_IMAGE_MODEL,
-      'google/gemini-2.5-flash-image',
-    ]) {
-      expect(() => assertGatewayModelAllowed(allowed)).not.toThrow();
+  });
+
+  it('fails closed on image models: only allowlisted image ids pass (JOV-8109)', () => {
+    for (const allowed of GATEWAY_ALLOWED_IMAGE_MODELS) {
+      expect(() => assertGatewayImageModelAllowed(allowed)).not.toThrow();
     }
+    expect(GATEWAY_ALLOWED_IMAGE_MODELS).toContain(
+      ALBUM_ART_GATEWAY_IMAGE_MODEL
+    );
+    for (const denied of [
+      'google/imagen-4.0-ultra-generate-001',
+      'bfl/flux-2-pro',
+      'xai/grok-imagine-image',
+    ]) {
+      expect(() => assertGatewayImageModelAllowed(denied)).toThrow(
+        /not on the image allowlist/
+      );
+    }
+    expect(() =>
+      assertGatewayImageModelAllowed('openai/gpt-image-1.5')
+    ).toThrow(/banned provider/);
   });
 
   it('names the founder allowlist for production health receipts', () => {

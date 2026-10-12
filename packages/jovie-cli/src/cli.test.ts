@@ -49,6 +49,59 @@ describe('jovie CLI', () => {
     );
   });
 
+  it('hides internal fleet commands from default help', async () => {
+    const stdout = createOutput();
+    await expect(runCli(['help'], { stdout: stdout.output })).resolves.toBe(0);
+    const help = stdout.read();
+    expect(help).toContain('artist get <username>');
+    expect(help).not.toContain('Internal fleet');
+    expect(help).not.toContain('fleet register');
+    const json = createOutput();
+    await expect(
+      runCli(['--help', '--json'], { stdout: json.output })
+    ).resolves.toBe(0);
+    const payload = JSON.parse(json.read()) as { content: string };
+    expect(payload.content).not.toContain('Internal fleet');
+  });
+
+  it('lists internal fleet commands behind --fleet or a worker token', async () => {
+    for (const args of [
+      ['--help', '--fleet'],
+      ['help', '--fleet'],
+    ]) {
+      const stdout = createOutput();
+      await expect(runCli(args, { stdout: stdout.output })).resolves.toBe(0);
+      const help = stdout.read();
+      expect(help.indexOf('artist get <username>')).toBeLessThan(
+        help.indexOf('Internal fleet')
+      );
+      expect(help.indexOf('Internal fleet')).toBeLessThan(
+        help.indexOf('fleet register')
+      );
+      // Long command names wrap instead of pushing summaries out of the column.
+      expect(help).toMatch(/--input <text>\n {31}Invoke canonical/);
+    }
+
+    const tokenHelp = createOutput();
+    await expect(
+      runCli(['--help'], {
+        stdout: tokenHelp.output,
+        workerToken: 'test-worker-token',
+      })
+    ).resolves.toBe(0);
+    expect(tokenHelp.read()).toContain('fleet register');
+  });
+
+  it('names the unknown option without parseArgs escaping advice', async () => {
+    const stderr = createOutput();
+    await expect(
+      runCli(['artist', 'get', 'tim', '--bogus'], { stderr: stderr.output })
+    ).resolves.toBe(2);
+    expect(stderr.read()).toBe(
+      'Unknown option --bogus.\nRun `jovie --help` for usage.\n'
+    );
+  });
+
   it('prints the source fallback version before command validation', async () => {
     const stdout = createOutput();
 
@@ -394,6 +447,12 @@ describe('jovie CLI', () => {
       join(dir, 'jovie/SKILL.md'),
     ]);
 
+    const noAgents = createOutput();
+    await expect(
+      runCli(['init'], { homeDir: dir, stderr: noAgents.output })
+    ).resolves.toBe(2);
+    expect(noAgents.read()).toContain('No supported agent found');
+
     const stderr = createOutput();
     await expect(
       runCli(['mcp', '--base-url', 'ftp://x'], {
@@ -508,6 +567,44 @@ describe('jovie music resolve', () => {
     ).resolves.toBe(0);
     expect(JSON.parse(stdout.read())).toEqual(result);
     expect(stderr.read()).toBe('');
+  });
+
+  it('accepts --kind, which mesh commands also declare', async () => {
+    const stdout = createOutput();
+    const fetchImpl: FetchImplementation = async (_url, init) => {
+      expect(JSON.parse(String(init?.body)).params.arguments).toEqual({
+        kind: 'track',
+        input: 'Karma Police',
+        artist: 'Radiohead',
+      });
+      return Response.json({
+        jsonrpc: '2.0',
+        id: 'jovie-music-resolve',
+        result: { structuredContent: { status: 'resolved' }, isError: false },
+      });
+    };
+    await expect(
+      runCli(
+        [
+          'music',
+          'resolve',
+          'Karma Police',
+          '--kind',
+          'track',
+          '--artist',
+          'Radiohead',
+          '--json',
+        ],
+        { fetchImpl, stdout: stdout.output }
+      )
+    ).resolves.toBe(0);
+    expect(JSON.parse(stdout.read())).toEqual({ status: 'resolved' });
+
+    const mesh = createOutput();
+    await runCli(['mesh', 'register', '--kind', 'not-a-kind'], {
+      stderr: mesh.output,
+    });
+    expect(mesh.read()).not.toContain('Unsupported option for mesh');
   });
 
   it('exits with a structured retryable failure when the resolver fails', async () => {

@@ -150,8 +150,15 @@
     "slots": 1,
     "health": ["grok", "models"],
     "healthy": "logged in",
-    "cmd": ["grok", "-m", "grok-4.7", "--prompt-file", "{prompt_file}"],
-    "enabled": false
+    "cmd": [
+      "grok",
+      "-m",
+      "grok-4.7",
+      "--permission-mode",
+      "bypassPermissions",
+      "--prompt-file",
+      "{prompt_file}"
+    ]
   },
   "kimi": {
     "label": "kimi",
