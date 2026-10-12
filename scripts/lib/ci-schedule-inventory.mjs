@@ -113,8 +113,6 @@ export const CRON_KEEP_REASONS = Object.freeze({
     'AI credits: one subscription-bounded native security scan of main per day; per push would multiply native scanner spend',
   '.github/workflows/desktop-release.yml':
     'owner-tracked: daily signed staging desktop build until staging rides the Production Controller event without the 2026-09 supersession livelock; see ADMISSION_CRON_DEBT',
-  '.github/workflows/fleet-gate-refresh.yml':
-    'owner-tracked (Gem lanes): keeps the fleet receipt inside its wall-clock stale window until the lanes tick writes it; see ADMISSION_CRON_DEBT',
   '.github/workflows/gem-producer-drift.yml':
     'external: Gem host attestation drift (JOV-7223) emits no repository event; the symphony-control install owner runs host installs manually',
   '.github/workflows/golden-path-nightly.yml':
@@ -159,8 +157,8 @@ export const CRON_KEEP_REASONS = Object.freeze({
 
 /** @type {readonly string[]} */
 export const CRON_ALLOWLIST = Object.freeze(Object.keys(CRON_KEEP_REASONS));
-// 27 = main's 26 after mac-runner-heartbeat removal, plus gem-producer-drift.
-export const CRON_ALLOWLIST_CEILING = 27;
+// 26 = 27 minus fleet-gate-refresh (the Gem lanes tick emits its receipt).
+export const CRON_ALLOWLIST_CEILING = 26;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
@@ -181,14 +179,8 @@ export const ADMISSION_CRON_DEBT = Object.freeze({
     replacement:
       'staging builds from the existing Production Controller workflow_run trigger; drop the daily clock',
   }),
-  '.github/workflows/fleet-gate-refresh.yml': Object.freeze({
-    reason:
-      '*/5 rewrite keeps the Gem fleet-gate receipt (issue admission) inside its stale window',
-    replacement:
-      'Gem lanes tick emits the receipt natively (its removal-trigger); push and repository_dispatch stay',
-  }),
 });
-export const ADMISSION_CRON_DEBT_CEILING = 3;
+export const ADMISSION_CRON_DEBT_CEILING = 2;
 
 /**
  * Workflow steps that hold a runner polling GitHub, git, or queue state. Keyed

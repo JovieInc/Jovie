@@ -764,13 +764,12 @@ def test_merge_group_allocates_no_fixed_runner_probe() -> None:
     assert "group: runner-heartbeat" in heartbeat
     assert "cancel-in-progress: true" in heartbeat
     assert "matrix:" not in heartbeat
-    assert "remediation-clock:" in heartbeat
-    assert "if: github.event_name == 'schedule'" in heartbeat
-    assert "runs-on: ubuntu-latest" in heartbeat
-    assert "GH_TOKEN: ${{ github.token }}" in heartbeat
-    assert "GH_REPO: ${{ github.repository }}" in heartbeat
-    assert "gh workflow run fleet-gate-refresh.yml --ref main" in heartbeat
-    assert "actions: write" in heartbeat
+    # The heartbeat is a no-op liveness probe; it dispatches nothing (the Gem
+    # lanes tick re-emits the fleet-gate receipt, JOV-INV-042).
+    assert "remediation-clock:" not in heartbeat
+    assert "gh workflow run" not in heartbeat
+    assert "actions: write" not in heartbeat
+    assert "GH_TOKEN" not in heartbeat
     assert "if: github.event_name == 'workflow_dispatch'" in route
     assert "github.event_name == 'merge_group'" not in route
     assert "actions: write" not in route
