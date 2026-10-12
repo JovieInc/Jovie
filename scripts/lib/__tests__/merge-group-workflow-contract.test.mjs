@@ -388,7 +388,7 @@ describe('merge_group workflow contract', () => {
       workflowDeclaresReadyForReviewType(AUTO_MERGE_DEFAULT_WORKFLOW)
     ).toBe(true);
     expect(AUTO_MERGE_DEFAULT_WORKFLOW).toContain(
-      'types: [opened, reopened, ready_for_review]'
+      'types: [opened, reopened, ready_for_review, synchronize]'
     );
     expect(getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable')).toContain(
       'github.event.pull_request.draft == false'
@@ -1584,6 +1584,14 @@ describe('merge_group workflow contract', () => {
     );
     expect(noopBranch).toContain('mkdir -p "$PRODUCT_LANE_DIR"');
     expect(noopBranch).toContain(': > "$PRODUCT_LANE_DIR/changed-paths.txt"');
+    // The classified branch runs the classifier from a physical path and
+    // fails closed when it wrote no receipt.
+    expect(detectStep).toContain(
+      'PRODUCT_LANE_DIR="$(cd "$RUNNER_TEMP" && pwd -P)/product-lane-classification"'
+    );
+    expect(detectStep).toMatch(
+      /--github-output "\$GITHUB_OUTPUT"\n\s*# [^\n]*\n\s*test -s "\$PRODUCT_LANE_DIR\/receipt\.json"/
+    );
 
     const homepageVisualScript = getStepRunScript(
       pathChanges,
@@ -2882,10 +2890,21 @@ ${selectedGateScript}`,
     // Dependabot pull_request runs receive an empty secrets context, so the
     // step also bails when JOVIE_BOT_PRIVATE_KEY is unavailable; the hourly
     // triage sweep enables auto-merge with full secrets.
-    expect(tokenStep).toContain(`        if: >-
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          github.event.pull_request.user.login != 'dependabot[bot]' &&
-          env.JOVIE_BOT_PRIVATE_KEY != ''
+    // The job if: admits only same-repo, non-Dependabot PRs for both the
+    // pull_request and the Source Validation workflow_run wake.
+    expect(enable).toContain(
+      'github.event.pull_request.head.repo.full_name == github.repository &&'
+    );
+    expect(enable).toContain(
+      "github.event.pull_request.user.login != 'dependabot[bot]')"
+    );
+    expect(enable).toContain(
+      'github.event.workflow_run.head_repository.full_name == github.repository &&'
+    );
+    expect(enable).toContain(
+      "github.event.workflow_run.actor.login != 'dependabot[bot]' &&"
+    );
+    expect(tokenStep).toContain(`        if: env.JOVIE_BOT_PRIVATE_KEY != ''
         id: app-token`);
     expect(enable).toContain(
       '      JOVIE_BOT_PRIVATE_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
