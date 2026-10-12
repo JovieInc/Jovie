@@ -8,6 +8,7 @@
 import { join } from 'node:path';
 import { type CopyTier, type JudgeTransport, selectJudges } from '@jovie/copy';
 import { pickRoleModel, visionAvailability } from '../design-ci-judge-dispatch';
+import { liveRefGuard } from '../design-refs-store';
 import {
   createCodexImageAdapter,
   resolveCodexBinary,
@@ -269,7 +270,8 @@ export function liveProviders(
           transport,
           request.producerModel,
           failedCalibrationJudges()
-        )
+        ),
+        liveRefGuard()
       );
     },
     generateAsset: request => images.generate(request),

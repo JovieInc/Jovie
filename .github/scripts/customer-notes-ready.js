@@ -5,16 +5,11 @@ const REQUIRED = [
   'Fork PR Gate',
   'PR Size Guard',
 ];
-// ADMISSION_BLOCKING_LABELS (scripts/lib/admission-hold-labels.mjs).
+// Single source: scripts/lib/admission-hold-labels.json.
+const HOLD_LABELS = require('../../scripts/lib/admission-hold-labels.json');
 const BLOCKING_LABELS = new Set([
-  'hold',
-  'gated',
-  'incident',
-  'do-not-merge',
-  'tim-hold',
-  'tim:hold',
-  'hold:tim',
-  'queue-poison',
+  ...HOLD_LABELS.stopHoldLabels,
+  HOLD_LABELS.queuePoisonLabel,
 ]);
 function finishCustomerNotes(repo, prs, dryRun, command) {
   for (const pr of prs) {

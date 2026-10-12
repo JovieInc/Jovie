@@ -3,12 +3,12 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38175041115)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38199326776)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-10-11T21:28:23.867Z
+Generated: 2026-10-12T03:40:13.334Z
 Workflow conclusion: failure
 
 ## Evidence warnings
@@ -19,10 +19,10 @@ Workflow conclusion: failure
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 8100 | 8068 | 2 | 0 | 30 |
-| unit | 8052 | 7997 | 0 | 0 | 55 |
-| unit | 10186 | 10178 | 0 | 0 | 8 |
-| unit | 8177 | 8166 | 0 | 0 | 11 |
+| unit | 10309 | 10274 | 2 | 0 | 33 |
+| unit | 8256 | 8243 | 0 | 0 | 13 |
+| unit | 7904 | 7860 | 0 | 0 | 44 |
+| unit | 8146 | 8132 | 0 | 0 | 14 |
 
 ## Selected Targets
 
@@ -46,5 +46,5 @@ Workflow conclusion: failure
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-WaCfWh/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
-| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-5xz5QK/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > inherits child env without JSON disclosure and rejects a real credential trace |  |  Running 1 test using 1 worker F    1) .artifact-json-6T6TlC/sentinel.spec.ts:1:47 › env ─────────────────────────────────────────────       |
+| unit | tests/unit/ci/playwright-artifact-secrets.test.ts Playwright artifact secret boundary > accepts only decoded metadata-free Playwright PNG bytes |  |  Running 1 test using 1 worker  [1A[2K[1/1] .artifact-comparison-l3h9iS/comparison.spec.ts:1:47 › comparison [1A[2K  1) .artifact-comparison |

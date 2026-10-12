@@ -380,6 +380,15 @@ class LabeledEventTest(unittest.TestCase):
         self.assertEqual(recur["reopens"], [])
         self.assertFalse(any(row.get("id") == "id-JOV-8" and "not a second event" in row["body"]
                              for row in recur["comments"]))
+        # An exhausted fingerprint that recurs gets a fresh ladder (Tim 2026-10-12: no sticky exhaustion).
+        spent = [{"kind": "model", "lane": lane_name, "head": "e2e-login-timeout", "at": NOW - 100000 + i}
+                 for i, lane_name in enumerate(("codex", "devin", "codex", "devin"))]
+        again = remediation.plan_labeled_events(
+            [opened, closed], {"e2e-login-timeout": {"issueId": "id-JOV-1", "status": "exhausted", "attempts": spent}},
+            providers(), NOW, healthy=lambda *_: True)
+        row = again["events"]["e2e-login-timeout"]
+        self.assertEqual(row["status"], "claimed")
+        self.assertEqual(len(row["priorAttempts"]), 4)
 
     def test_human_and_exhausted_ping_is_behind_the_flag(self):
         human = linear_issue("JOV-3", "asc-agreements", title="ASC agreements blocked")

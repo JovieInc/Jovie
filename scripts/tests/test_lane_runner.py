@@ -1035,7 +1035,7 @@ class VerifyAndLandTest(unittest.TestCase):
 
     def test_older_prs_for_the_same_issue_are_ignored(self):
         stale = {**self.pr, "createdAt": "2026-09-20T00:00:00Z"}
-        self.assertEqual(self.run_gate(FakeShell([stale]))["verdict"], "no-change")
+        self.assertEqual(self.run_gate(FakeShell([stale]))["verdict"], "pr-readback-pending")
 
     def test_fallback_pr_is_nonclosing_from_creation_and_retains_merge_sync_identity(self):
         fake = FakeShell([], ahead="2")
@@ -1048,9 +1048,105 @@ class VerifyAndLandTest(unittest.TestCase):
         self.assertIn("<!-- linear-issue-identifier:JOV-1 -->", body)
         self.assertNotIn("Closes", body)
 
+    def test_unavailable_or_malformed_inventory_is_not_empty(self):
+        for code, out, err in [(1, "", "gh: github-budget-floor: 523 < 600 private-token"),
+                               (1, "[]", "transport failure"), (0, "", ""),
+                               (0, "not-json", ""), (0, "null", ""),
+                               (0, json.dumps([{"number": 21010}]), "")]:
+            with self.subTest(code=code, out=out):
+                fake = FakeShell([], ahead="2")
+                def shell(args, **kwargs):
+                    result = fake(args, **kwargs)
+                    return SimpleNamespace(returncode=code, stdout=out, stderr=err) if args[:3] == ["gh", "pr", "list"] else result
+                result = self.run_gate(shell)
+                self.assertEqual(result["verdict"], "pr-readback-pending")
+                self.assertEqual(result["prReadback"]["state"], "unknown")
+                self.assertNotIn("private-token", json.dumps(result))
+                self.assertFalse(any(call[:2] == ["git", "push"] or call[:3] == ["gh", "pr", "create"] for call in fake.calls))
+
+    def test_inventory_timeout_retains_unknown_without_publication(self):
+        fake = FakeShell([], ahead="2"); fake.hanging = ("list",)
+        result = self.run_gate(fake)
+        self.assertEqual(result["verdict"], "pr-readback-pending")
+        self.assertEqual(len(fake.calls), 1)
+
+    def test_wrong_branch_and_ambiguous_inventory_cannot_adopt_or_create(self):
+        for prs in ([{**self.pr, "headRefName": "another-owner"}], [self.pr, self.pr]):
+            with self.subTest(prs=prs):
+                fake = FakeShell(prs, ahead="2")
+                result = self.run_gate(fake)
+                self.assertEqual(result["verdict"], "pr-readback-pending")
+                self.assertEqual(len(fake.calls), 1)
+
+    def test_already_exists_then_refused_read_is_pending_not_definitive_failure(self):
+        fake = FakeShell([], ahead="2"); reads = []
+        def shell(args, **kwargs):
+            result = fake(args, **kwargs)
+            if args[:3] == ["gh", "pr", "list"]:
+                reads.append(args)
+                if len(reads) == 2:
+                    return SimpleNamespace(returncode=1, stdout="", stderr="github-budget-floor")
+            if args[:3] == ["gh", "pr", "create"]:
+                return SimpleNamespace(returncode=1, stdout="", stderr="already exists: https://github.com/JovieInc/Jovie/pull/21010")
+            return result
+        result = self.run_gate(shell)
+        self.assertEqual(result["verdict"], "pr-readback-pending")
+        self.assertEqual(result["prReadback"]["branch"], "devin/jov-1")
+        self.assertNotIn("pr", result)  # create output is not authoritative readback
+        self.assertEqual(sum(call[:3] == ["gh", "pr", "create"] for call in fake.calls), 1)
+
+    def test_same_branch_existing_pr_recovered_only_from_authoritative_read(self):
+        fake = FakeShell([], ahead="2")
+        def shell(args, **kwargs):
+            if args[:3] == ["gh", "pr", "create"]:
+                fake.prs = [self.pr]
+                result = fake(args, **kwargs)
+                return SimpleNamespace(returncode=1, stdout="", stderr="already exists, untrusted private payload")
+            return fake(args, **kwargs)
+        result = self.run_gate(shell)
+        self.assertEqual(result["verdict"], "landing")
+        self.assertEqual(result["pr"], 7)
+        self.assertEqual(sum(call[:3] == ["gh", "pr", "create"] for call in fake.calls), 1)
+
+    def test_failed_push_does_not_create_a_pr(self):
+        fake = FakeShell([], ahead="2", failing=("push",))
+        result = self.run_gate(fake)
+        self.assertEqual(result["verdict"], "pr-readback-pending")
+        self.assertFalse(any(call[:3] == ["gh", "pr", "create"] for call in fake.calls))
+
+    def test_create_applied_then_timed_out_recovers_existing_pr_without_resend(self):
+        fake = FakeShell([], ahead="2")
+        def shell(args, **kwargs):
+            result = fake(args, **kwargs)
+            if args[:3] == ["gh", "pr", "create"]:
+                fake.prs = [self.pr]
+                raise subprocess.TimeoutExpired(args, 600, output="private-payload")
+            return result
+        result = self.run_gate(shell)
+        self.assertEqual((result["verdict"], result["pr"]), ("landing", 7))
+        self.assertEqual(sum(call[:3] == ["gh", "pr", "create"] for call in fake.calls), 1)
+
+    def test_ambiguous_transport_preserves_pending_when_authoritative_read_is_unavailable(self):
+        for step, error in [("push", OSError("private-payload")), ("create", subprocess.TimeoutExpired(["gh"], 600))]:
+            with self.subTest(step=step):
+                fake = FakeShell([], ahead="2"); reads = []
+                def shell(args, **kwargs):
+                    result = fake(args, **kwargs)
+                    if args[:3] == ["gh", "pr", "list"]:
+                        reads.append(args)
+                        if len(reads) > 1: return SimpleNamespace(returncode=1, stdout="", stderr="budget-floor")
+                    if step in args: raise error
+                    return result
+                result = self.run_gate(shell)
+                self.assertEqual(result["verdict"], "pr-readback-pending")
+                self.assertEqual(result["prReadback"]["state"], "unknown")
+                self.assertNotIn("private-payload", json.dumps(result))
+                self.assertLessEqual(sum(call[:3] == ["gh", "pr", "create"] for call in fake.calls), 1)
+
     def test_pr_creation_failure_does_not_loop(self):
         result = self.run_gate(FakeShell([], ahead="2"))
-        self.assertEqual(result, {"verdict": "failed", "reasons": ["pr-create-failed"]})
+        self.assertEqual(result["verdict"], "pr-readback-pending")
+        self.assertEqual(result["reasons"], ["pr-create-readback-unconfirmed"])
 
 
 class ProviderAndLockTest(unittest.TestCase):
@@ -1142,6 +1238,25 @@ class LinearClientTest(unittest.TestCase):
         budget = patch.object(lane.Linear, "_snapshot_budget_admitted", return_value=True)
         budget.start()
         self.addCleanup(budget.stop)
+
+    def test_unknown_graphql_code_and_private_message_are_not_retained(self):
+        error = lane.LinearRequestError({"message": "secret-token", "extensions": {"code": "secret-token", "statusCode": "secret-token"}})
+        self.assertEqual(error.diagnostic, {"class": "linear-graphql", "code": "UNKNOWN"})
+        self.assertEqual(str(error), "linear: request rejected")
+        missing = lane.LinearRequestError({"message": "Entity not found: Comment"})
+        self.assertEqual(str(missing), "linear: Entity not found: Comment")
+
+    def test_graphql_error_diagnostics_retain_only_allowlisted_metadata(self):
+        client = lane.Linear.__new__(lane.Linear); client.key = "test-only-no-live-credential"
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self): return json.dumps({"errors": [{"message": "private payload secret-token", "extensions": {"code": "FORBIDDEN", "statusCode": 403, "payload": "secret-token"}}]}).encode()
+        with patch.object(lane, "linear_cooldown_until", return_value=None), patch.object(lane, "record_linear_budget"), patch.object(lane.urllib.request, "urlopen", return_value=Response()):
+            with self.assertRaises(lane.LinearRequestError) as caught:
+                client.gql("mutation", {"body": "private payload"})
+        self.assertEqual(caught.exception.diagnostic, {"class": "linear-graphql", "code": "FORBIDDEN", "httpStatus": 403})
+        self.assertNotIn("secret-token", str(caught.exception))
 
     def test_comment_rejects_malformed_success_payloads_as_known_failure(self):
         for payload in (None, {"commentCreate": None}, {"commentCreate": []}, {"commentCreate": {"success": None}}):
@@ -1793,6 +1908,18 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual(context["prompt"]["sha256"], hashlib.sha256(prompt.encode()).hexdigest())
         self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
 
+    def test_unknown_pr_readback_preserves_source_and_failed_unknown_attempt(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "pr-readback-pending", "reasons": ["pr-inventory-unavailable"],
+                                               "prReadback": {"state": "unknown", "branch": "existing-branch"}}
+        with patch.object(lane, "remove_worktree") as remove:
+            receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue("JOV-8034"))
+        remove.assert_not_called()
+        self.assertTrue(Path(receipt["preservedWorktree"]).is_dir())
+        self.assertEqual(receipt["result"]["prReadback"]["state"], "unknown")
+        self.assertEqual(receipt["execution"]["result"], "failed_unknown")
+        self.assertEqual(receipt["execution"]["retryDecision"], "stop")
+        self.assertEqual(self.ledger()[-1]["result"], receipt["result"])
+
     def test_deferred_or_reused_gate_does_not_quarantine_completed_implementation(self):
         for index, verdict in enumerate(("gate-in-progress", "gate-deferred", "gate-already-completed")):
             with self.subTest(verdict=verdict):
@@ -2371,16 +2498,16 @@ class WorkerTest(unittest.TestCase):
         finally:
             contender.release()
 
-    def test_blocked_last_overlap_candidate_never_runs_or_claims_the_issue(self):
+    def test_an_overlapping_candidate_is_recorded_and_still_runs(self):
+        # Tim 2026-10-12: the overlap guard records, the merge queue serializes; it never blocks.
         self.linear.issues[0].description = "Edit `scripts/lanes/lane_runner.py`."
         existing = {"number": 1, "files": ["scripts/lanes/lane_runner.py"], "isDraft": False}
         with patch.object(lane, "overlap_inventory", return_value=([existing], [])), \
                 patch.object(lane, "open_hotspot_holds", return_value={}), \
-                patch.object(lane, "run_issue") as run, \
+                patch.object(lane, "run_issue", return_value={"verdict": "landing", "prUrl": "u"}) as run, \
                 patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
             lane.worker(self.host, "devin")
-        run.assert_not_called()
-        self.assertEqual(self.linear.moves, [])
+        run.assert_called_once()
 
     def test_event_cleanup_waits_until_all_productive_selections_decline(self):
         for chosen in ("event", "poll", "adopt", "issue", "idle"):
@@ -2394,6 +2521,16 @@ class WorkerTest(unittest.TestCase):
                      patch.object(lane.pr_events, "cleanup_one_event") as cleanup:
                     lane.worker(self.host, "devin")
                     self.assertEqual(cleanup.call_count, int(chosen == "idle"))
+
+    def test_pending_readback_does_not_reclaim_downgrade_or_charge_generic_retry(self):
+        lane.run_issue = lambda *args: {"verdict": "pr-readback-pending", "reasons": ["pr-inventory-unavailable"]}
+        self.assertEqual(lane.worker(self.host, "devin"), 1)
+        self.assertEqual(self.execs, [])
+        self.assertEqual(self.linear.moves, [("id-JOV-3", "In Progress")])
+        self.assertFalse(lane.failures_path(self.host).exists())
+        seat = lane.Locked(self.host.state / "slots/devin.0.lock", blocking=False)
+        try: self.assertTrue(seat.held)
+        finally: seat.release()
 
     def test_notification_error_releases_the_slot_even_while_traceback_is_retained(self):
         lane.run_issue = lambda *args: {"verdict": "landing", "prUrl": "u"}
@@ -2651,8 +2788,14 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(self.execs, [])
         lane.run_issue = lambda *a: {"verdict": "provider-error", "reasons": [f"agent-exit:{lane.PROVIDER_LIMIT_EXIT}"]}
         self.assertEqual(lane.worker(self.host, "devin"), 1)
-        self.assertTrue(lane.cooling(self.host, "devin"))
+        self.assertFalse(lane.cooling(self.host, "devin"), "a raw CLI's 75 is not our limit contract")
         self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Todo"))
+        # codex_lane / claude_lane exit 75 only on a measured limit: that cools the lane.
+        self.assertTrue(lane.cool_down(self.host, "codex", lane.PROVIDER_LIMIT_EXIT))
+        self.assertTrue(lane.cooling(self.host, "codex"))
+        self.assertFalse(lane.cool_down(self.host, "claude", 1))
+        self.assertEqual(lane.provider_exit(["harness-error:x"]), -1)
+        self.assertFalse(lane.cool_down(self.host, "claude", lane.provider_exit([])))
 
     def test_red_prs_are_fixed_before_new_issues_are_claimed(self):
         fixed = []
@@ -5289,6 +5432,64 @@ class UpdateTest(unittest.TestCase):
             with patch.object(lane, "install_release", return_value=0), \
                     patch.object(lane, "refresh_codex_skills", return_value={"status": "current"}):
                 self.assertEqual(lane.update(host), 0, "a failed mirror fetch never fails the update")
+
+    def test_mirror_prune_and_gc_never_break_the_borrowing_clone(self):
+        # 2026-10-12 on Gem: a mirror fetch --prune plus the mirror's auto-gc dropped the objects
+        # of three lanes rebase branches and every later origin fetch died "bad object".
+        with tempfile.TemporaryDirectory() as tmp, self.clean_env():
+            tmp = Path(tmp).resolve()
+            origin, work = tmp / "origin.git", tmp / "work"
+            self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
+            self.git("clone", "-q", str(origin), str(work), cwd=tmp)
+            self.commit(work, "a")
+            self.git("checkout", "-q", "-b", "rebase/1", cwd=work)
+            (work / "only-on-branch").write_text("x")
+            self.git("add", "-A", cwd=work); self.git("commit", "-qm", "branch", cwd=work)
+            self.git("push", "-q", "origin", "rebase/1", cwd=work)
+            mirror = tmp / "git/mirrors/Jovie.git"
+            self.git("clone", "-q", "--mirror", str(origin), str(mirror), cwd=tmp)
+            clone = tmp / "lanes"
+            self.git("clone", "-q", "--reference", str(mirror), str(origin), str(clone), cwd=tmp)
+            self.git("branch", "-q", "rebase/1", "origin/rebase/1", cwd=clone)
+            kept = subprocess.run(["git", "rev-parse", "rebase/1"], cwd=clone, capture_output=True, text=True).stdout.strip()
+            self.git("push", "-q", "origin", "--delete", "rebase/1", cwd=work)
+            self.git("-C", str(origin), "reflog", "expire", "--expire=now", "--all", cwd=tmp)
+            self.git("-C", str(origin), "gc", "-q", "--prune=now", cwd=tmp)
+            host = lane.Host(state=tmp / "state", repo=clone)
+            self.assertEqual(lane.refresh_object_mirror(host)["status"], "fetched")
+            for key, value in lane.MIRROR_KEEP_OBJECTS:
+                self.assertEqual(subprocess.run(["git", "config", "--file", str(mirror / "config"), key],
+                                                capture_output=True, text=True).stdout.strip(), value)
+            self.git("-C", str(mirror), "gc", "-q", cwd=tmp)  # what auto-gc would run
+            self.git("cat-file", "-e", kept, cwd=clone)
+            self.assertEqual(lane.missing_object_refs(clone), [])
+            self.commit(work, "b")
+            self.assertEqual(lane.fetch_release_source(host).returncode, 0)
+
+    def test_update_fetch_deletes_only_refs_whose_objects_are_gone_then_retries(self):
+        with tempfile.TemporaryDirectory() as tmp, self.clean_env():
+            tmp = Path(tmp).resolve()
+            origin, clone = tmp / "origin.git", tmp / "lanes"
+            self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
+            self.git("clone", "-q", str(origin), str(clone), cwd=tmp)
+            self.commit(clone, "a")
+            self.git("branch", "-q", "keep", cwd=clone)
+            (clone / ".git/refs/heads/rebase").mkdir(parents=True)
+            (clone / ".git/refs/heads/rebase/2").write_text("c9a2a2e2b695c6b75eb52d204fc3fe8d29c5f1cc\n")
+            host = lane.Host(state=tmp / "state", repo=clone)
+            self.assertEqual(lane.missing_object_refs(clone), ["refs/heads/rebase/2"])
+            with contextlib.redirect_stderr(io.StringIO()) as console:
+                fetched = lane.fetch_release_source(host)
+            self.assertEqual(fetched.returncode, 0, fetched.stderr)
+            refs = subprocess.run(["git", "for-each-ref", "--format=%(refname)"], cwd=clone,
+                                  capture_output=True, text=True).stdout.split()
+            self.assertIn("refs/heads/keep", refs)
+            self.assertNotIn("refs/heads/rebase/2", refs)
+            self.assertIn("deleted 1 ref(s) with missing objects", console.getvalue())
+            with patch.object(lane, "sh", return_value=subprocess.CompletedProcess([], 1, "", "fatal: unable to access")) as shell, \
+                    patch.object(lane, "missing_object_refs") as scan:
+                self.assertEqual(lane.fetch_release_source(host).returncode, 1)
+                scan.assert_not_called(); self.assertEqual(shell.call_count, 1, "an unrelated failure is not retried")
 
     def test_only_a_bare_alternate_is_a_mirror(self):
         with tempfile.TemporaryDirectory() as tmp, self.clean_env():
@@ -8210,6 +8411,56 @@ class EventDeliveryTest(unittest.TestCase):
         self.assertTrue(any(x.get('error') == 'event-mutation-rejected' for x in row['history']))
         self.assertEqual(row['attempts'], 3)
 
+    def test_comment_send_failure_records_safe_phase_without_reset_or_fake_ack(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+        original = self.linear.gql
+        def rejected(query, variables):
+            if query.startswith('mutation'):
+                self.writes.append((query, variables))
+                raise lane.LinearRequestError({'message': 'secret-token private payload', 'extensions': {'code': 'FORBIDDEN', 'statusCode': 403}})
+            return original(query, variables)
+        self.linear.gql = rejected
+        for now in [100, 160, 460]: self.drain(now)
+        before = lane._event_delivery_state(self.host)
+        row = next(iter(before['actions'].values()))
+        self.assertEqual((row['attempts'], row['status']), (3, 'exhausted'))
+        self.assertEqual(row['diagnostic'], {'phase': 'send', 'operation': 'comments', 'class': 'linear-graphql', 'code': 'FORBIDDEN', 'httpStatus': 403})
+        self.assertEqual(row['history'][-1]['diagnostic'], row['diagnostic'])
+        self.assertNotIn('secret-token', json.dumps(before))
+        self.drain(1000)
+        after = next(iter(lane._event_delivery_state(self.host)['actions'].values()))
+        self.assertEqual((after['attempts'], after['commentId'], after['deadline']), (3, row['commentId'], row['deadline']))
+        self.assertEqual(len(self.writes), 3)
+        self.assertNotEqual(after['status'], 'acknowledged')
+        self.assertEqual(lane.load_escalation(self.host)['events'], self.events)
+
+    def test_readback_failure_classification_never_serializes_provider_messages(self):
+        cases = [(lane.LinearRateLimited(1000), "linear-rate-limited"),
+                 (TimeoutError("private-payload"), "transport-timeout"),
+                 (subprocess.TimeoutExpired(["private-command"], 10), "transport-timeout"),
+                 (lane.urllib.error.URLError("private-payload"), "transport-unavailable"),
+                 (OSError("private-payload"), "transport-unavailable"),
+                 (RuntimeError("event-private-payload"), "controller-error")]
+        for index, (error, expected) in enumerate(cases):
+            with self.subTest(expected=expected):
+                self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+                self.linear.gql = lambda *args, error=error: (_ for _ in ()).throw(error)
+                self.drain(100 + 600 * index)
+                row = next(iter(lane._event_delivery_state(self.host)['actions'].values()))
+                self.assertEqual(row['diagnostic']['class'], expected)
+                self.assertEqual(row['attempts'], 0)
+                self.assertNotIn('private-payload', json.dumps(row))
+
+    def test_readback_errors_log_safe_http_status_and_no_attempt(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])
+        error = lane.urllib.error.HTTPError('private-url', 403, 'secret-token', {}, None)
+        self.linear.gql = lambda *args: (_ for _ in ()).throw(error)
+        self.drain()
+        row = next(iter(lane._event_delivery_state(self.host)['actions'].values()))
+        self.assertEqual(row['attempts'], 0)
+        self.assertEqual(row['diagnostic'], {'phase': 'readback', 'operation': 'comments', 'class': 'linear-http', 'httpStatus': 403})
+        self.assertNotIn('secret-token', json.dumps(row))
+
     def test_partial_plan_retries_only_unacknowledged_actions(self):
         self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}], labels=[{'id': 'issue', 'labelId': 'label'}])
         self.assertEqual(self.drain()['deliveryAcknowledged'], 1)
@@ -9096,12 +9347,26 @@ class RepositoryBindingTest(unittest.TestCase):
         older = self.row(22, removed=[("failed_checks", "2026-09-01T00:00:00Z")] * 2)  # before this head
         timeouts = self.row(23, removed=[("checks_timed_out", after)] * 5)  # capacity, never poison
         actions = lane.bindings.maintenance_actions(self.binding, [once, twice, older, timeouts], time.time())
-        self.assertEqual([(kind, pr["number"]) for kind, pr in actions],
-                         [("enqueue", 20), ("enqueue", 22), ("enqueue", 23)])
-        self.assertEqual(lane.bindings.repair_reasons(lane, self.binding, twice), ["merge-group-failed"])
-        prompt = lane.bindings.render_prompt(self.binding, "fix/thing-21",
-                                             pr={**twice, "repairReasons": ["merge-group-failed"]})
-        self.assertIn("--event merge_group", prompt)
+        # LYB #1333: iOS runs only in merge groups, so one failed_checks ejection is the failure
+        # signal: that head goes to repair and is never re-enqueued unchanged.
+        self.assertEqual([(kind, pr["number"]) for kind, pr in actions], [("enqueue", 22), ("enqueue", 23)])
+        for row in (once, twice):
+            self.assertEqual(lane.bindings.repair_reasons(lane, self.binding, row), ["merge-group-failed"])
+        self.assertEqual(lane.bindings.repair_reasons(lane, self.binding, timeouts), [], "timeouts are transient")
+        runs = "\n".join(["11\tgh-readonly-queue/main/pr-210-abc\thttps://x/runs/11",
+                           "12\tgh-readonly-queue/main/pr-20-def\thttps://x/runs/12"])
+        def gh(args, **kwargs):
+            if args[:2] == ["gh", "api"]:
+                self.assertIn("event=merge_group", args[2])
+                return SimpleNamespace(returncode=0, stdout=runs, stderr="")
+            self.assertEqual(args[:4], ["gh", "run", "view", "12"])
+            return SimpleNamespace(returncode=0, stdout="iOS\tbuild\terror: missing symbol", stderr="")
+        with patch.object(lane, "sh", side_effect=gh):
+            evidence = lane.bindings.merge_group_evidence(lane, self.binding, once)
+        self.assertIn("https://x/runs/12", evidence); self.assertIn("missing symbol", evidence)
+        prompt = lane.bindings.render_prompt(self.binding, "fix/thing-20", context=evidence,
+                                             pr={**once, "repairReasons": ["merge-group-failed"]})
+        self.assertIn("missing symbol", prompt); self.assertIn("merge groups", prompt)
 
     def test_maintenance_actions_cover_dropped_token_draft_and_dependabot_prs(self):
         now = time.time()
@@ -9120,31 +9385,31 @@ class RepositoryBindingTest(unittest.TestCase):
             self.row(11, state="UNKNOWN"),
         ]
         actions = lane.bindings.maintenance_actions(self.binding, rows, now)
+        # LYB 2026-10-12: a queued PR is never re-enqueued (it would go to the back), whoever queued it.
         self.assertEqual([(kind, pr["number"]) for kind, pr in actions],
-                         [("requeue", 1), ("enqueue", 3), ("ready", 5), ("rebase", 8)])
+                         [("enqueue", 3), ("ready", 5), ("rebase", 8)])
 
     def test_maintain_writes_once_per_head_and_retries_a_failed_write_later(self):
         (self.host.state / "bindings" / "LYB").mkdir(parents=True)
         rows = [self.row(3), self.row(1, queue={"state": "QUEUED", "enqueuer": {"login": "github-actions[bot]"}})]
 
         def gh(args, *rest, **kwargs):
-            if "dequeuePullRequest" in args[4]:
-                return SimpleNamespace(returncode=0, stdout="{}", stderr="")
+            self.assertNotIn("dequeuePullRequest", args[4], "a queued PR is never dequeued to re-enqueue")
             return SimpleNamespace(returncode=1 if args[args.index("-f", 5) + 1] == "id=PR_3" else 0,
                                    stdout="", stderr="")
         now = time.time()
         with patch.object(lane, "sh", side_effect=gh) as sh:
             self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, rows, now=now),
-                             {"requeue": 1, "enqueue-failed": 1})
+                             {"enqueue-failed": 1})
             self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, rows, now=now + 60), {})
-            self.assertEqual(sh.call_count, 3)  # enqueue #3, dequeue + enqueue #1
+            self.assertEqual(sh.call_count, 1)  # enqueue #3 only; queued #1 is left alone
             self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, rows,
                                                     now=now + lane.bindings.ACTION_RETRY_S + 1),
                              {"enqueue-failed": 1})
             moved = self.row(3, head="c" * 40)  # a new head is new work
             self.assertEqual(lane.bindings.maintain(lane, self.host, self.binding, [moved], now=now + 120),
                              {"enqueue-failed": 1})
-        enqueue = next(args for args in [call.args[0] for call in sh.call_args_list] if "id=PR_1" in args
+        enqueue = next(args for args in [call.args[0] for call in sh.call_args_list] if "id=PR_3" in args
                        and "enqueuePullRequest" in args[4])
         self.assertIn("head=" + "a" * 40, enqueue)  # exact-head proof on every enqueue
 

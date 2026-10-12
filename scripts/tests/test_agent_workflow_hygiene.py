@@ -422,7 +422,6 @@ def test_workflow_test_tooling_is_hash_pinned() -> None:
     )
     for workflow_name in (
         "actionlint.yml",
-        "brand-scrub.yml",
         "ci.yml",
     ):
         workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
@@ -884,7 +883,6 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
 def test_standalone_health_monitors_have_independent_bounded_schedules() -> None:
     """Critical monitors must not depend on the disabled Agent Tick monolith."""
     schedules = {
-        "main-ci-health-monitor.yml": "'8,28,48 * * * *'",
         "runner-health-monitor.yml": "'2,12,22,32,42,52 * * * *'",
         "synthetic-monitoring.yml": "'17 */6 * * *'",
     }
@@ -892,6 +890,14 @@ def test_standalone_health_monitors_have_independent_bounded_schedules() -> None
         content = (WORKFLOWS / workflow).read_text(encoding="utf-8")
         assert "schedule:" in content, workflow
         assert cron in content, workflow
+
+    # Main CI health changes only when a main CI run completes; no clock.
+    main_health = (WORKFLOWS / "main-ci-health-monitor.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "\n  schedule:" not in main_health
+    assert "workflows: [CI]" in main_health
+    assert "branches: [main]" in main_health
 
     for workflow, job_name in (
         ("main-ci-health-monitor.yml", "monitor"),

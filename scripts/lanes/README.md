@@ -56,7 +56,7 @@ The harness, not the model, owns:
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
 | Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash, HTTP 404, unhealthy) hands the same worktree to the next enabled, healthy, uncooled lane in `providers.json` tier order, up to 2 handoffs; the receipt records `handoffs` (with `reason`) and `finishedBy`. Disabled entries and remote-only lanes (`repairs: false`, Hyperagent) are never chosen | `run_issue()`, `next_provider()`, `remediation.route_lane()` |
-| Repository bindings: the one service also routes LogYourBody (Linear `LYB` -> `JovieInc/LogYourBody`, `~/LogYourBody` on Gem, `LANES_REPO_LYB` overrides, `LANES_BINDING_LYB=0` disables). A worker spends its held seat on one LYB repair (red or behind lane PR, 2 tries per head, a per-PR lease so two seats never repair one PR) or one claim (any Todo issue without `hold` or a hard-excluded label; sensitive labels only on the Codex lane; no LYB-specific concurrency cap or open-PR ceiling, only the host's seats) before Jovie intake. Jovie-only holds never block LYB and a binding fault never blocks Jovie. The harness pushes, opens a ready PR (never draft: LYB's native merge queue skips drafts; a repair readies a draft lane PR) and moves the issue to In Review; LYB required checks and its native queue land it. Refusal reasons land in `bindings.json`. LYB remediation events never run in the Jovie repo | `bindings.py`, `routing.json` `bindings`, `worker_with_slot()` |
+| Repository bindings: the one service also routes LogYourBody (Linear `LYB` -> `JovieInc/LogYourBody`, `~/LogYourBody` on Gem, `LANES_REPO_LYB` overrides, `LANES_BINDING_LYB=0` disables). A worker spends its held seat on one LYB repair (red or behind lane PR, 2 tries per head, a per-PR lease so two seats never repair one PR) or one claim (any Todo issue without `hold` or a hard-excluded label; sensitive labels only on the Codex lane; no LYB-specific concurrency cap or open-PR ceiling, only the host's seats) before Jovie intake. Jovie-only holds never block LYB and a binding fault never blocks Jovie. The harness pushes, opens a ready PR (never draft: LYB's native merge queue skips drafts; a repair readies a draft lane PR) and moves the issue to In Review; LYB required checks and its native queue land it. LYB runs iOS only in merge groups, so one failed_checks ejection sends that head to repair with the failed merge-group run's log in the prompt, and a queued PR is never re-enqueued Refusal reasons land in `bindings.json`. LYB remediation events never run in the Jovie repo | `bindings.py`, `routing.json` `bindings`, `worker_with_slot()` |
 | Cost-aware routing: one capability floor per issue (`routing.json`), then the cheapest available `(lane, model)` route that clears it by effective cost; every claim is logged with its rationale | `remediation.route_issue()`, `issue_router()`, `runs/routing.jsonl` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
@@ -74,17 +74,11 @@ available worker capacity. Slot occupancy, account leases and PR work remain
 separate facts. Empty-demand alerts require known zero eligibility and no open
 PR maintenance; unknown evidence and backpressure reset the empty timer.
 
-The file-overlap guard flags by default (Tim 2026-10-12): classification, ledger, doctor
-and HUD visibility, no holds; the merge queue's own conflict detection serializes PRs and a
-hold left by the old default is released. `SYMPHONY_FILE_OVERLAP_GUARD=enforce` (or `1`)
-turns holds on; `=0` disables it and releases automation-owned holds. With enforcement on, Existing non-draft PR overlaps are ordered by
-an explicit stack/dependency first, then foundational/shared work, smaller diffs,
-creation time, and PR number. The later PR receives `hold`; after the earlier PR
-lands, Symphony removes only the hold it applied and queues `lane-fix-dequeued` for
-the existing rebase lane. A stacked child is retargeted to `main`, never merged into
-its parent branch. Generated workflow topology and migration journals are regenerated
-after rebasing rather than hand-merged. `doctor.json.fileOverlap` publishes active
-pairs, files, actions, and the prevention/flag/rebase counters.
+The file-overlap guard never holds a PR (Tim 2026-10-12; hold contract #21275). It records
+overlapping open PRs and new issues for the ledger, doctor and HUD, and the merge queue's own
+conflict detection serializes PRs. A `hold` the retired enforce mode applied is released on
+the next reconcile; `SYMPHONY_FILE_OVERLAP_GUARD=0` turns the recording off and `1`/`enforce`
+read as flag. `doctor.json.fileOverlap` publishes active pairs, files and the flag counters.
 
 Account attribution uses the existing status rows without changing account
 admission. Lease occupancy and cooldown are independent; an account can be both

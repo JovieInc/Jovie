@@ -3,11 +3,13 @@ name: Quarantine Recovery
 # accountable-writer: Gem
 # capability-gap: Complete execution artifacts and canonical Linear intake must precede a guarded ledger-only draft; the fast flakiness report cannot collect seven days of evidence on every main completion.
 # removal-trigger: Retire when the canonical producer provides an authenticated complete history and guarded proposal receipt in-band.
-# clock-class: temporal-resource
+#
+# No clock: new quarantine evidence only appears when CI completes on main, so
+# that completion runs the recovery. The workflow-wide concurrency slot keeps
+# one run going and one waiting, so a busy main coalesces into back-to-back
+# runs instead of one per CI completion.
 
 on:
-  schedule:
-    - cron: '23 */6 * * *'
   workflow_dispatch:
   workflow_run:
     workflows: [CI]
@@ -18,12 +20,19 @@ permissions:
   actions: read
 
 concurrency:
-  group: quarantine-recovery
+  # Merge-group result publishing and main recovery wait in separate slots so
+  # a queue completion never replaces a waiting recovery run.
+  group: quarantine-recovery-${{ github.event.workflow_run.event || github.event_name }}
   cancel-in-progress: false
 
 jobs:
   recover-quarantine:
-    if: ${{ vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true' && github.event_name != 'workflow_run' }}
+    if: >-
+      ${{ vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
