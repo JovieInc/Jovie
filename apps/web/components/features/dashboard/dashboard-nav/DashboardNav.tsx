@@ -1,7 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell } from 'lucide-react';
+import { Bell, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -467,7 +467,12 @@ export function DashboardNav({
           <SidebarGroup className='p-0'>
             <div
               data-sidebar-search-slot='true'
-              className='flex min-h-9 shrink-0 items-center gap-(--space-2-5)'
+              className={cn(
+                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) rounded-full border border-subtle bg-surface-1 pr-1.5',
+                // The command slot keeps its vertical allocation while the
+                // surrounding rail narrows; navigation below never moves.
+                'group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pr-0'
+              )}
             >
               <RailStagedContent
                 hidden={sidebarState === 'closed' && !isMobile}
@@ -531,9 +536,31 @@ export function DashboardNav({
                   </Link>
                 )}
               </RailStagedContent>
-              <SidebarMenu className='min-w-0 flex-1'>
-                {renderNavItem(chatNavItem, -1)}
-              </SidebarMenu>
+              <Link
+                href={APP_ROUTES.CHAT}
+                onClick={event => handleCommandClick(event, chatNavItem)}
+                aria-busy={
+                  pendingNavigation?.itemId === chatNavItem.id || undefined
+                }
+                aria-current={
+                  normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
+                  searchParams.get('panel') !== 'profile'
+                    ? 'page'
+                    : undefined
+                }
+                prefetch={!isDemo}
+                aria-label='New Chat'
+                data-navigation-item-id={chatNavItem.id}
+                data-navigation-pending={
+                  pendingNavigation?.itemId === chatNavItem.id || undefined
+                }
+                className={cn(
+                  'relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
+                  pendingNavigation?.itemId === chatNavItem.id && 'opacity-70'
+                )}
+              >
+                <Plus className='size-3.5' aria-hidden='true' />
+              </Link>
             </div>
             <SidebarGroupContent className='pb-2 pt-5'>
               {navSections.map(section => (

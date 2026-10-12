@@ -26,7 +26,7 @@ test('collapsed demo keeps its command allocation and stages secondary controls'
   const secondary = page.locator('[data-sidebar-search-slot] > [inert]');
   await expect(secondary).toHaveAttribute('aria-hidden', 'true');
   await expect(
-    nav.getByRole('link', { name: 'Home', exact: true })
+    nav.getByRole('link', { name: 'Inbox', exact: true })
   ).toHaveCount(1);
 });
 
@@ -53,7 +53,10 @@ for (const theme of ['dark', 'light']) {
       page.viewportSize()!.height,
       0
     );
-    const home = nav.getByRole('link', { name: 'Home' });
+    // The Inbox row (canonical `home` destination), not the slot's Inbox bell.
+    const home = nav
+      .getByRole('link', { name: 'Inbox', exact: true })
+      .and(page.locator('[data-navigation-item-id="home"]'));
     const row = await home.boundingBox();
     expect(row!.height).toBe(28);
     const create = nav.getByRole('link', { name: 'New Chat' });
