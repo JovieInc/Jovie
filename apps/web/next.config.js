@@ -451,12 +451,8 @@ const nextConfig = {
         destination: '/app/settings/audience',
       },
       {
-        source: '/app/settings/referral',
-        destination: '/app/settings/account',
-      },
-      {
         source: '/app/referrals',
-        destination: '/app/settings/account',
+        destination: '/app/settings/referral',
       },
       {
         source: '/app/settings/remove-branding',
