@@ -3,6 +3,11 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getDeterministicDevTestAuthPersonaUserId } from '@/lib/auth/dev-test-auth-identity';
 import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 import {
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_HEADER,
+  TEST_USER_ID_HEADER,
+} from '@/lib/auth/test-mode-constants';
+import {
   smokeNavigateWithRetry,
   withRetry,
 } from '../e2e/utils/smoke-test-utils';
@@ -450,20 +455,49 @@ export async function prepareBetterAuthEmailOtp(
   };
 }
 
+/**
+ * Poll the dev test-auth session endpoint until the bypass session is
+ * active for `expectedUserId`. The second parameter is an expected user id,
+ * not an options bag: callers pass `null` for persona sessions, so an
+ * `{timeout}` signature crashed them on `options.timeout` (JOV-7559).
+ */
 export async function waitForAuthenticatedHealth(
   page: Page,
+  expectedUserId?: string | null,
   options: { readonly timeout?: number } = {}
-): Promise<boolean> {
-  const timeout = options.timeout ?? 30_000;
-  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
-  try {
-    const response = await page.request.get(`${baseUrl}/api/health`, {
-      timeout,
-    });
-    return response.ok();
-  } catch {
-    return false;
-  }
+): Promise<void> {
+  const timeout = options.timeout ?? 90_000;
+  const configuredBaseUrl = process.env.BASE_URL?.trim();
+  const baseUrl =
+    configuredBaseUrl && configuredBaseUrl !== '/'
+      ? configuredBaseUrl.replace(/\/$/, '')
+      : 'http://localhost:3100';
+  const sessionUrl = `${baseUrl}/api/dev/test-auth/session`;
+  const headers = {
+    [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
+    ...(expectedUserId ? { [TEST_USER_ID_HEADER]: expectedUserId } : {}),
+  };
+
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request
+          .get(sessionUrl, { failOnStatusCode: false, headers })
+          .catch(() => null);
+        if (!response?.ok()) return `http-${response?.status() ?? 'error'}`;
+        const payload = (await response.json().catch(() => null)) as {
+          active?: boolean;
+          userId?: string | null;
+        } | null;
+        if (!payload?.active) return 'anonymous';
+        if (expectedUserId && payload.userId !== expectedUserId) {
+          return `user-mismatch:${payload.userId ?? 'unknown'}`;
+        }
+        return 'authenticated';
+      },
+      { timeout, intervals: [500, 1_000, 2_000, 5_000] }
+    )
+    .toBe('authenticated');
 }
 
 export async function waitForClerkSignInApi(page: Page): Promise<boolean> {

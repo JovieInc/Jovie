@@ -30,7 +30,11 @@ jobs:
     permissions:
       contents: read
       actions: read
-    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
+    # Failed attempts leave error-context.md behind. The artifact guard must
+    # scan and redact it (allow-markdown); otherwise it is counted as
+    # unknown-binary, poisons the shared producer root, and every later spec
+    # dies with inspection-error before its results file exists.
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true' }
 
     steps:
       - name: Safety check - only run on schedule or manual dispatch

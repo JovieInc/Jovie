@@ -102,19 +102,15 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/actions-cache-supersede.yml',
   '.github/workflows/agent-harness-health-report.yml',
   '.github/workflows/auto-merge-default.yml',
-  '.github/workflows/brand-scrub.yml',
   '.github/workflows/ci-duration-ratchet.yml',
   '.github/workflows/cli-chaos-nightly.yml',
   '.github/workflows/cost-anomaly-gate.yml',
   '.github/workflows/deepsec-native.yml',
-  '.github/workflows/deprecation-intake.yml',
   '.github/workflows/desktop-release.yml',
-  '.github/workflows/doc-gardening-agent.yml',
   '.github/workflows/fleet-gate-refresh.yml',
   '.github/workflows/golden-path-nightly.yml',
   '.github/workflows/m2-revenue-path-canary.yml',
   '.github/workflows/main-ci-health-monitor.yml',
-  '.github/workflows/marketing-certification-producer.yml',
   '.github/workflows/merge-queue-green-enroll.yml',
   '.github/workflows/merge-queue-ruleset-verify.yml',
   '.github/workflows/neon-scheduled-cleanup.yml',
@@ -124,11 +120,9 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/production-continuity.yml',
   '.github/workflows/production-controller-health.yml',
   '.github/workflows/public-benchmark.yml',
-  '.github/workflows/quarantine-recovery.yml',
   '.github/workflows/remediation-sweep.yml',
   '.github/workflows/runner-health-monitor.yml',
   '.github/workflows/runner-heartbeat.yml',
-  '.github/workflows/security-suppression-audit.yml',
   '.github/workflows/security.yml',
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/shipping-slo.yml',
@@ -137,7 +131,7 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/visual-regression.yml',
   '.github/workflows/voc-mine.yml',
 ]);
-export const CRON_ALLOWLIST_CEILING = 38;
+export const CRON_ALLOWLIST_CEILING = 32;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.

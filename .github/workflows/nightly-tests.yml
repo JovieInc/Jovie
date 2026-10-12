@@ -83,9 +83,10 @@ jobs:
       github.event.inputs.suite == 'unit'
     runs-on: ubuntu-latest
     # The unsharded suite was still making steady progress when the 30m cap
-    # cancelled it repeatedly (Jul 15-20, JOV-4326). 60m fits the current
-    # suite with headroom.
-    timeout-minutes: 60
+    # cancelled it repeatedly (Jul 15-20, JOV-4326). The suite grew ~11.5m on
+    # Oct 8 (15 new test files in ~50 commits) and the 17:19Z run was cancelled
+    # AT the 60m ceiling; 75m = measured 49.7m + ~50% headroom.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
