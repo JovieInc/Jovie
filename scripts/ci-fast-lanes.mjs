@@ -667,7 +667,7 @@ const LANES = [
     id: 'design-governance-enforcement',
     name: 'Design governance enforcement',
     nextLocalCommand:
-      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
+      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel',
     run: runDesignGovernanceEnforcement,
   },
   {
