@@ -881,7 +881,7 @@ describe('failure classification and revision-scoped suppression', () => {
   });
 
   it('newest trusted release restores the unused retry; a later reservation blocks it', () => {
-    const first = status({ classification: 'transient-infrastructure' });
+    const first = status({ classification: 'unclassified' });
     const spent = status({
       context: 'jovie-queue-failure-retry/v1',
       description: retrySpentDescription({ runId: 123, runAttempt: 1 }),
@@ -917,7 +917,8 @@ describe('failure classification and revision-scoped suppression', () => {
       disposition([
         released,
         spent,
-        status({ classification: 'transient-infrastructure', number: 2 }),
+        first,
+        status({ classification: 'unclassified', number: 2, runId: 124 }),
       ])
     ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
   });
@@ -930,8 +931,41 @@ describe('failure classification and revision-scoped suppression', () => {
     expect(disposition([])).toMatchObject({ action: 'allow' });
   });
 
+  it('gives every infrastructure failure its own retry without exhausting the revision', () => {
+    const infra = (number, runId) =>
+      status({ classification: 'transient-infrastructure', number, runId });
+    const spent = runId =>
+      status({
+        runId,
+        context: 'jovie-queue-failure-retry/v1',
+        description: retrySpentDescription({ runId, runAttempt: 1 }),
+      });
+    expect(
+      disposition([infra(1, 123), spent(123), infra(2, 124)])
+    ).toMatchObject({
+      action: 'retry-once',
+      reason: 'bounded-infrastructure-recovery',
+    });
+    expect(
+      disposition([infra(1, 123), spent(123), infra(2, 124), spent(124)])
+    ).toMatchObject({ action: 'block', reason: 'revision-retry-spent' });
+    // One attributable failure plus infrastructure noise keeps its retry; a
+    // second attributable failure still exhausts the revision.
+    const unclassified = (number, runId) =>
+      status({ classification: 'unclassified', number, runId });
+    expect(
+      disposition([infra(1, 123), spent(123), unclassified(2, 124)])
+    ).toMatchObject({ action: 'retry-once' });
+    expect(
+      disposition([unclassified(1, 123), spent(123), unclassified(2, 124)])
+    ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
+    expect(
+      disposition([unclassified(1, 123), spent(123), infra(2, 124)])
+    ).toMatchObject({ action: 'retry-once' });
+  });
+
   it('allows one non-deterministic retry, then blocks the same revision', () => {
-    const first = status({ classification: 'transient-infrastructure' });
+    const first = status({ classification: 'unclassified' });
     expect(disposition([first])).toMatchObject({ action: 'retry-once' });
     const spent = status({
       context: 'jovie-queue-failure-retry/v1',
@@ -945,7 +979,7 @@ describe('failure classification and revision-scoped suppression', () => {
       disposition([
         first,
         status({
-          classification: 'transient-infrastructure',
+          classification: 'unclassified',
           number: 2,
           runId: 124,
         }),
@@ -1082,6 +1116,65 @@ describe('terminal failure hold application', () => {
       retryDisposition: 'blocked-until-new-source-head',
       dequeued: true,
       autoMergeDisabled: true,
+    });
+  });
+
+  it('keeps a second infrastructure failure retryable but blocks a second attributable one', async () => {
+    const io = () => ({
+      writeStatus: vi.fn(),
+      readPullRequest: vi.fn(async () => ({
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: SOURCE,
+        isInMergeQueue: false,
+        mergeQueueEntry: null,
+        autoMergeRequest: null,
+      })),
+      dequeuePullRequest: vi.fn(),
+      disableAutoMerge: vi.fn(),
+    });
+    const prior = classification => [
+      status({ classification, number: 1, runId: 120 }),
+    ];
+    const infra = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        run: { ...run, conclusion: 'startup_failure' },
+        failedSteps: [],
+        statuses: prior('unclassified'),
+      },
+      io()
+    );
+    expect(infra).toMatchObject({
+      classification: 'transient-infrastructure',
+      failureNumber: 2,
+      retryDisposition: 'one-queue-authority-retry',
+    });
+    const attributable = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        failedSteps: ['Run ./.github/actions/setup-node-pnpm'],
+        statuses: prior('unclassified'),
+      },
+      io()
+    );
+    expect(attributable).toMatchObject({
+      classification: 'unclassified',
+      failureNumber: 2,
+      retryDisposition: 'blocked-until-new-source-head',
+    });
+    const afterInfra = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        failedSteps: ['Run ./.github/actions/setup-node-pnpm'],
+        statuses: prior('transient-infrastructure'),
+      },
+      io()
+    );
+    expect(afterInfra).toMatchObject({
+      classification: 'unclassified',
+      failureNumber: 2,
+      retryDisposition: 'one-queue-authority-retry',
     });
   });
 

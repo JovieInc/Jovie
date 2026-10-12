@@ -4,22 +4,31 @@
 # removal-trigger: Remove when Summer's improvement loop runs scripts/quality-gap-finder.mjs natively on the same evidence and caps.
 name: Quality Gap Finder
 
-# clock-class: skip-if-unchanged
-# Daily, and when a post-mortem or the invariant registry lands on main:
-# propose missing tests, guardrails, and invariants from repo and Linear
-# evidence. High confidence -> Linear Backlog `quality-gap` (+ `agent-ready`
-# when mechanical). Low confidence -> `quality-gap:needs-tim`, which Summer
-# turns into Ovie inbox cards (max 3/day). See docs/quality/QUALITY_GAP_FINDER.md.
-# Bug-intake and dogfood events trigger it through repository_dispatch.
+# When its evidence changes: propose missing tests, guardrails, and
+# invariants from repo and Linear evidence. High confidence -> Linear Backlog
+# `quality-gap` (+ `agent-ready` when mechanical). Low confidence ->
+# `quality-gap:needs-tim`, which Summer turns into Ovie inbox cards (max
+# 3/day). See docs/quality/QUALITY_GAP_FINDER.md.
+# No clock. Repo evidence arrives as a main push of the paths below. Linear
+# evidence arrives as quality-gap-scan: bug intake and dogfood events, and
+# /api/webhooks/linear when a post-mortem action or escaped defect closes.
 
 on:
-  schedule:
-    - cron: '41 14 * * *'
   push:
     branches: [main]
     paths:
       - 'docs/postmortems/**'
       - 'canon/invariants.jsonl'
+      - 'docs/performance/route-budgets.json'
+      - 'docs/TEST_COVERAGE_HEATMAP.md'
+      - '.github/ci-harness/ci-release-incidents.json'
+      - 'scripts/ci-fast-lanes.mjs'
+      - 'scripts/quality-gap-finder.mjs'
+      - 'apps/web/app/**'
+      - 'apps/web/components/**'
+      - 'apps/web/lib/**'
+      - 'apps/web/scripts/performance-route-manifest.ts'
+      - '.github/workflows/quality-gap-finder.yml'
   repository_dispatch:
     types: [quality-gap-scan]
   workflow_dispatch:

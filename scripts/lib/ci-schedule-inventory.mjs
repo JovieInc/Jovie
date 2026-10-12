@@ -110,7 +110,6 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/desktop-release.yml',
   '.github/workflows/fleet-gate-refresh.yml',
   '.github/workflows/golden-path-nightly.yml',
-  '.github/workflows/linear-sync-on-merge.yml',
   '.github/workflows/m2-revenue-path-canary.yml',
   '.github/workflows/mac-runner-heartbeat.yml',
   '.github/workflows/main-ci-health-monitor.yml',
@@ -123,7 +122,6 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/production-continuity.yml',
   '.github/workflows/production-controller-health.yml',
   '.github/workflows/public-benchmark.yml',
-  '.github/workflows/quality-gap-finder.yml',
   '.github/workflows/remediation-sweep.yml',
   '.github/workflows/runner-health-monitor.yml',
   '.github/workflows/runner-heartbeat.yml',
@@ -136,7 +134,7 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/visual-regression.yml',
   '.github/workflows/voc-mine.yml',
 ]);
-export const CRON_ALLOWLIST_CEILING = 37;
+export const CRON_ALLOWLIST_CEILING = 35;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
@@ -163,12 +161,6 @@ export const ADMISSION_CRON_DEBT = Object.freeze({
     replacement:
       'Gem lanes tick emits the receipt natively (its removal-trigger); push and repository_dispatch stay',
   }),
-  '.github/workflows/linear-sync-on-merge.yml': Object.freeze({
-    reason:
-      '30-minute sweep catches validation receipts recorded as Linear comments, which emit no GitHub event',
-    replacement:
-      'Linear comment webhook bridged to repository_dispatch, like linear_triage_assess in fleet-gate-refresh.yml',
-  }),
   '.github/workflows/merge-queue-green-enroll.yml': Object.freeze({
     reason:
       '*/15 full reconcile re-arms green PRs whose completion events were missed',
@@ -176,7 +168,7 @@ export const ADMISSION_CRON_DEBT = Object.freeze({
       'Gem lanes enroll backstop dispatching repository_dispatch enroll-reconcile (PR #21291)',
   }),
 });
-export const ADMISSION_CRON_DEBT_CEILING = 5;
+export const ADMISSION_CRON_DEBT_CEILING = 4;
 
 /**
  * Workflow steps that hold a runner polling GitHub, git, or queue state. Keyed
