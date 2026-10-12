@@ -23,9 +23,6 @@
     "wowGrowth": null,
     "growthTrend": "unknown"
   },
-  "regressions": [
-    "lead_time.codex.p95",
-    "remediation.main_red_to_green.p95"
-  ],
+  "regressions": ["lead_time.codex.p95", "remediation.main_red_to_green.p95"],
   "flatStall": false
 }
