@@ -387,6 +387,9 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-launch-hero-copy) {
   max-width: 38rem;
+  /* JOV-8167: the hero title sizes against this column (cqi), not the
+     viewport, so "intelligent link." never strands "link." at 1024-1440. */
+  container-type: inline-size;
 }
 
 :where(.system-b-launch-kicker) {
@@ -412,7 +415,7 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
   color: var(--system-b-text-primary);
   font-size: clamp(
     var(--text-5xl),
-    6.4vw,
+    13cqi,
     calc(var(--text-5xl) + var(--space-8))
   );
   font-weight: var(--font-weight-bold);
