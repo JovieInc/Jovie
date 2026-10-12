@@ -3395,6 +3395,81 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  describe('audience release denial lane', () => {
+    const productFiles = [
+      'apps/web/app/api/cron/schedule-release-notifications/route.ts',
+      'apps/web/app/api/cron/send-release-notifications/route.ts',
+      'apps/web/lib/notifications/campaign-scheduling.ts',
+      'apps/web/lib/notifications/campaign-scheduling.test.ts',
+      'apps/web/tests/unit/api/cron/schedule-release-notifications.test.ts',
+      'apps/web/tests/unit/api/cron/send-release-notifications.test.ts',
+    ];
+    const selectorFiles = [
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ];
+    const focusedTests = [
+      'apps/web/lib/notifications/campaign-scheduling.test.ts',
+      'apps/web/tests/unit/api/cron/schedule-release-notifications.test.ts',
+      'apps/web/tests/unit/api/cron/send-release-notifications.test.ts',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+    ];
+
+    it('keeps the product files on their focused tests', () => {
+      const plan = buildAffectedTestPlan(productFiles);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.selectedTests).toEqual(focusedTests);
+      expect(plan.scriptVitestTests).toEqual([]);
+      expect(
+        JSON.stringify(buildSelectedTestCommands(plan, '2'))
+      ).not.toContain('--shard');
+    });
+
+    it('runs the selector proof when the complete selector pair accompanies the lane', () => {
+      const plan = buildAffectedTestPlan([...productFiles, ...selectorFiles]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.selectedTests).toEqual(focusedTests);
+      expect(plan.scriptVitestTests).toEqual([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ]);
+    });
+
+    it('fails closed when only one selector file accompanies the lane', () => {
+      expect(
+        buildAffectedTestPlan([...productFiles, selectorFiles[0]]).mode
+      ).toBe('full');
+    });
+
+    it('fails closed when an unknown lib peer accompanies the lane', () => {
+      expect(
+        buildAffectedTestPlan([
+          ...productFiles,
+          ...selectorFiles,
+          'apps/web/lib/unknown.ts',
+        ]).mode
+      ).toBe('full');
+    });
+
+    it('maps campaign scheduling source to its co-located test', () => {
+      const source = 'apps/web/lib/notifications/campaign-scheduling.ts';
+      const testFile = 'apps/web/lib/notifications/campaign-scheduling.test.ts';
+      const plan = buildAffectedTestPlan([source]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toContain(testFile);
+      expect(plan.selectedTests).toContain(testFile);
+      expect(plan.scriptVitestTests).toEqual([]);
+
+      const missing = buildAffectedTestPlan([source], {
+        isFileAvailable: file => file !== testFile,
+      });
+      expect(missing.mode).toBe('full');
+      expect(missing.fallbackReason).toContain(source);
+    });
+  });
+
   describe('marketing Pen contract bindings', () => {
     const source = 'apps/web/data/marketing/penContracts.ts';
     const bindingTests = [

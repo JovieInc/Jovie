@@ -174,7 +174,11 @@ def relay_targets(event: str, payload: dict) -> list[tuple[int, str, str | None]
         # code; treating it as a failure sent the fix loop after healthy queued PRs and
         # escalated #18873 as exhausted (2026-09-28). A missing reason keeps the old behaviour.
         reason = str(payload.get("reason") or "").lower()
-        if any(word in reason for word in ("manual", "merged", "branch_removed", "branch removed")):
+        if "manual" in reason:
+            # The merge-group failure hold dequeues by hand, often before the queue's own
+            # failed_checks removal. `relay` keeps it only with the hold's receipt on the head.
+            return [(pr["number"], HOLD_DEQUEUE, head)]
+        if any(word in reason for word in ("merged", "branch_removed", "branch removed")):
             return []
         return [(pr["number"], "dequeued", head)]
     if event == "pull_request_review" and payload.get("action") == "submitted":
@@ -699,6 +703,23 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
     return sorted(kinds)[0]
 
 
+HOLD_DEQUEUE = "dequeued-by-hand"
+FAILURE_HOLD_CONTEXT = "jovie-queue-failure-hold/v1"
+FAILURE_HOLD_WRITERS = frozenset({"jovie-bot[bot]", "jovie-bot"})
+
+
+def failure_held(sha: str | None, sh=run) -> bool:
+    """The merge-group failure hold wrote its receipt on this exact head before dequeuing it.
+    On 2026-10-12 #21393 was held this way and got no repair signal: the PR sat CLEAN, refused
+    by the enroll controller until a new head that nothing was asked to push."""
+    if not sha:
+        return False
+    listed = sh(["gh", "api", f"repos/{REPO}/commits/{sha}/statuses?per_page=100", "--jq",
+                 f'[.[] | select(.context == "{FAILURE_HOLD_CONTEXT}" and .state == "success") '
+                 '| .creator.login] | unique | join(" ")'])
+    return listed.returncode == 0 and bool(set((listed.stdout or "").split()) & FAILURE_HOLD_WRITERS)
+
+
 def rerun_after_quota(workflow_run: dict, kind: str, sh=run) -> bool:
     """Re-run the failed jobs instead of queueing repair; False past the attempt cap."""
     attempt = workflow_run.get("run_attempt")
@@ -722,6 +743,10 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         if infra and rerun_after_quota(workflow_run, infra, sh):
             targets = [target for target in targets if target[1] != "red"]
     for number, kind, sha in targets:
+        if kind == HOLD_DEQUEUE:
+            if not failure_held(sha, sh):
+                continue
+            kind = "dequeued"
         viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
                      "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
         if viewed.returncode != 0:

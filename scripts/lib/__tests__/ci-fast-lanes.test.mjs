@@ -1148,18 +1148,40 @@ describe('structural command pool', () => {
       return started;
     };
     const parallel = await startOrder(3);
-    const head = parallel.slice(0, 3).join('\n');
+    const head = parallel.slice(0, 5).join('\n');
     expect(head).toContain('pnpm invariants:check');
-    expect(head).toContain('python3 -m pytest ');
+    expect(head).toContain('scripts/tests/test_lane_runner.py');
+    expect(head).toContain('lib/__tests__/merge-group-failure-hold.test.mjs');
     // Both complementary pytest shards are long poles.
     expect(
       parallel
-        .slice(0, 4)
+        .slice(0, 5)
         .filter(command => command.includes('python3 -m pytest '))
     ).toHaveLength(2);
     const serial = await startOrder(1);
     expect(serial[0]).toBe(WEB_CI_CONTRACT_TESTS_COMMAND);
     expect([...serial].sort()).toEqual([...parallel].sort());
+  });
+
+  it('starts the remaining job long poles first once the python job takes its parts', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', 'skip');
+    vi.stubEnv('CI_FAST_STRUCTURAL_WEB', 'skip');
+    const started = [];
+    await runStructural({
+      concurrency: 3,
+      execute: command => {
+        started.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    // Merge group 38247843089: the 174.5s lanes pytest started last and set
+    // the 260s remaining wall; it must hold a slot from the start.
+    const head = started.slice(0, 2).join('\n');
+    expect(head).toContain('scripts/tests/test_lane_runner.py');
+    expect(head).toContain('lib/__tests__/merge-group-failure-hold.test.mjs');
   });
 
   it('starts the slowest web commands first', async () => {
