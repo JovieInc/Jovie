@@ -188,10 +188,8 @@ export const POLLING_DEBT = Object.freeze({
     'dispatches ci.yml then waits up to 80 min for that run to complete',
   '.github/workflows/pr-conflict-handler.yml#record_cohort':
     'polls candidate CI runs until a deadline to record cohort outcomes',
-  '.github/workflows/production-controller.yml#coalesce-production':
-    'sleeps up to the coalescing cap scaled by merge-queue depth before rereading main',
 });
-export const POLLING_DEBT_CEILING = 5;
+export const POLLING_DEBT_CEILING = 4;
 
 /**
  * Mutations that change PR, merge-queue, issue, or label state. A workflow is
@@ -268,7 +266,7 @@ export function shellLoops(script = '') {
   const lines = String(script).split('\n').map(stripShellComment);
   const loops = [];
   for (let start = 0; start < lines.length; start += 1) {
-    const header = lines[start].match(/(?:^|[|;&]\s*)(while|until|for)\s/);
+    const header = lines[start].match(/(?:^\s*|[|;&]\s*)(while|until|for)\s/);
     if (!header) continue;
     let depth = 0;
     let end = start;
