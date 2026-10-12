@@ -21,6 +21,7 @@ import { HOLD_LABELS as MEMBER_POLICY_HOLD_LABELS } from '../merge-group-member-
 
 const require = createRequire(import.meta.url);
 const { load } = require('js-yaml');
+/** @param {string} name @returns {any} */
 const readWorkflow = name =>
   load(readFileSync(`.github/workflows/${name}`, 'utf8'));
 const sorted = values => [...values].sort();
