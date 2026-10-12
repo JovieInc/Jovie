@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import {
+  command,
   resolveStagingReleaseSource,
   runStagingReleaseSource,
 } from './staging-release-source.mjs';
@@ -392,6 +393,90 @@ function transportFixture() {
     output,
   };
 }
+
+test('gh evidence reads recover from transient transport failures but reject permanent failures', () => {
+  let transientCalls = 0;
+  const sleeps = [];
+  const output = command(
+    ['gh', 'api', 'route'],
+    {},
+    {
+      spawn: () => {
+        transientCalls++;
+        if (transientCalls < 3) {
+          return {
+            status: 1,
+            stderr: 'gh: temporary server error (HTTP 502)',
+            stdout: '',
+          };
+        }
+        return { status: 0, stderr: '', stdout: '{"ok":true}' };
+      },
+      sleep: ms => sleeps.push(ms),
+    }
+  );
+  assert.equal(output, '{"ok":true}');
+  assert.equal(transientCalls, 3);
+  assert.deepEqual(sleeps, [5_000, 10_000]);
+
+  let exhaustedCalls = 0;
+  assert.throws(
+    () =>
+      command(
+        ['gh', 'api', 'route'],
+        {},
+        {
+          spawn: () => {
+            exhaustedCalls++;
+            return { status: 1, stderr: 'HTTP 503', stdout: '' };
+          },
+          sleep: () => {},
+        }
+      ),
+    /evidence transport failed: gh/
+  );
+  assert.equal(exhaustedCalls, 3);
+
+  let defaultSleepCalls = 0;
+  assert.equal(
+    command(
+      ['gh', 'api', 'route'],
+      {},
+      {
+        retryDelayMs: 0,
+        spawn: () => {
+          defaultSleepCalls++;
+          return defaultSleepCalls === 1
+            ? { status: 1, stderr: 'Bad Gateway', stdout: '' }
+            : { status: 0, stderr: '', stdout: 'recovered' };
+        },
+      }
+    ),
+    'recovered'
+  );
+
+  let permanentCalls = 0;
+  assert.throws(
+    () =>
+      command(
+        ['gh', 'api', 'route'],
+        {},
+        {
+          spawn: () => {
+            permanentCalls++;
+            return {
+              status: 1,
+              stderr: 'gh: Bad credentials (HTTP 401)',
+              stdout: '',
+            };
+          },
+          sleep: () => assert.fail('permanent failures must not sleep'),
+        }
+      ),
+    /evidence transport failed: gh/
+  );
+  assert.equal(permanentCalls, 1);
+});
 
 test('real workflow command reads only authenticated data ZIP entries and writes original CI fields', () => {
   const f = transportFixture(),
