@@ -29,7 +29,6 @@ def step(text: str, name: str) -> str:
 def test_dispatchers_and_claude_cannot_select_github_issues() -> None:
     dispatcher = read(WF / "github-ai-dispatcher.yml")
     orchestrator = read(WF / "github-ai-orchestrator.yml")
-    tick = read(WF / "agent-tick.yml")
     for workflow in (dispatcher, orchestrator):
         triggers = block(workflow, 0, "on")
         assert "workflow_dispatch:" in triggers and "issues:" not in triggers
@@ -37,8 +36,7 @@ def test_dispatchers_and_claude_cannot_select_github_issues() -> None:
     assert RETIRED in block(dispatcher, 2, "dispatch")
     for job in ("guard", "claim_issue", "implement_and_open_pr", "finalize_claim"):
         assert RETIRED in block(orchestrator, 2, job)
-    for job in ("dispatch", "cost-anomaly"):
-        assert RETIRED in block(tick, 2, job)
+    assert not (WF / "agent-tick.yml").exists()
     claude = read(WF / "claude.yml")
     assert "issues:" not in block(claude, 0, "on")
     assert "github.event.issue.pull_request" in block(claude, 2, "claude")

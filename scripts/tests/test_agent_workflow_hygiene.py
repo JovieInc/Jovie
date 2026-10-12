@@ -12,7 +12,6 @@ WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 
 HOT_PATH_WORKFLOWS = (
     "auto-ready-agent-drafts.yml",
-    "agent-tick.yml",
     "stuck-draft-autoclose.yml",
 )
 
@@ -23,7 +22,6 @@ FULL_CHECKOUT_JOBS = (
 FLEET_CONTROLLER_JOBS = (
     ("auto-ready-agent-drafts.yml", "auto-ready"),
     ("auto-ready-agent-drafts.yml", "green-source"),
-    ("agent-tick.yml", "auto-ready"),
 )
 
 MODEL_OR_ADVISORY_JOBS = (
@@ -121,12 +119,6 @@ HOSTED_API_ONLY_PR_CONTROLLERS = (
 
 HOSTED_BACKGROUND_CONTROLLER_JOBS = (
     ("agent-harness-health-report.yml", "report"),
-    ("agent-landing-sweep.yml", "sweep"),
-    ("agent-tick.yml", "landing-sweep"),
-    ("agent-tick.yml", "cost-anomaly"),
-    ("agent-tick.yml", "dispatch"),
-    ("agent-tick.yml", "neon-cleanup"),
-    ("agent-tick.yml", "synthetic-monitoring"),
     ("doc-gardening-agent.yml", "garden"),
     ("github-ai-dispatcher.yml", "dispatch"),
     ("github-ai-orchestrator.yml", "guard"),
@@ -381,9 +373,6 @@ def test_agent_pipeline_retires_dead_qc_wires() -> None:
     assert "needs-human-autoclose.mjs" not in workflow
     assert "scripts/lib/agent-branch-pattern.mjs" in workflow
     assert "scripts/lib/agent-branch-pattern.mjs --match" in workflow
-    landing = (WORKFLOWS / "agent-landing-sweep.yml").read_text(encoding="utf-8")
-    assert "scope-judge" not in landing
-    assert "Scope Judge" not in landing.split("\njobs:", 1)[1]
 
 
 def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
@@ -502,8 +491,6 @@ def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> N
     """Autonomous shipping uses machine gates and never creates a human hold."""
     for workflow_name in (
         "agent-pipeline.yml",
-        "agent-landing-sweep.yml",
-        "agent-tick.yml",
         "sentry-autofix.yml",
         "github-ai-orchestrator.yml",
     ):
@@ -878,7 +865,7 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
 
 
 def test_standalone_health_monitors_have_independent_bounded_schedules() -> None:
-    """Critical monitors must not depend on the disabled Agent Tick monolith."""
+    """Critical monitors keep their own bounded schedules."""
     schedules = {
         "runner-health-monitor.yml": "'2,12,22,32,42,52 * * * *'",
         "synthetic-monitoring.yml": "'17 */6 * * *'",
@@ -896,20 +883,24 @@ def test_standalone_health_monitors_have_independent_bounded_schedules() -> None
         assert "runs-on: ubuntu-latest" in _job_block(workflow, job_name)
 
 
-def test_agent_tick_stays_manual_without_main_health() -> None:
-    """Agent Tick stays manual and carries no main-health job."""
-    agent_tick = (WORKFLOWS / "agent-tick.yml").read_text(encoding="utf-8")
-    assert "\n  main-ci-health:\n" not in agent_tick
-    agent_tick_trigger = agent_tick.split("\non:\n", 1)[1].split(
-        "\npermissions:", 1
-    )[0]
-    assert "workflow_dispatch:" in agent_tick_trigger
-    assert "schedule:" not in agent_tick_trigger
+def test_retired_agent_landing_duplicates_stay_deleted() -> None:
+    """Agent Tick and Agent Landing Sweep copied jobs that have one live owner.
 
-    landing_sweep = _job_block("agent-tick.yml", "landing-sweep")
-    assert "statuses: read" in landing_sweep
-    assert "statuses: write" not in landing_sweep
-
+    Queue admission is merge-queue-green-enroll.yml, green-draft undraft is
+    auto-ready-agent-drafts.yml, and runner/synthetic/cost/neon monitors run
+    as their own workflows. A second copy only adds a competing writer.
+    """
+    for retired in ("agent-tick.yml", "agent-landing-sweep.yml"):
+        assert not (WORKFLOWS / retired).exists(), retired
+    for owner in (
+        "merge-queue-green-enroll.yml",
+        "auto-ready-agent-drafts.yml",
+        "runner-health-monitor.yml",
+        "synthetic-monitoring.yml",
+        "cost-anomaly-gate.yml",
+        "neon-scheduled-cleanup.yml",
+    ):
+        assert (WORKFLOWS / owner).exists(), owner
 
 def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
     """A hold racing in after a writer-proofed promotion restores draft."""
