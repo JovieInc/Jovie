@@ -17,6 +17,7 @@ import {
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { classifyConnectionInput } from './AddConnectionRail';
 import type { ProfilesWorkspaceData } from './data';
+import { PRESENCE_BUTTON_DESKTOP_DENSITY } from './PresenceStatusParts';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
 
 const navigationMock = vi.hoisted(() => ({
@@ -1322,6 +1323,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     // contract.
     const lockButton = screen.getAllByTestId('presence-lock')[0];
     expect(lockButton).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
+
+    // Text controls collapse both hit-target axes on desktop, not just height.
+    expect(PRESENCE_BUTTON_DESKTOP_DENSITY.split(' ')).toEqual(
+      expect.arrayContaining(['sm:before:min-h-8', 'sm:before:min-w-0'])
+    );
   });
 
   it('keeps generic OG images unverified and lock explanations keyboard-reachable', async () => {

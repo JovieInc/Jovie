@@ -10,7 +10,8 @@ import type { ConnectionStatus, PresenceSignal } from './types';
  * JOV-5063: Presence desktop density lock — 32px visible controls with no
  * 44px hit target above the sm breakpoint; mobile keeps the 44px target.
  */
-export const PRESENCE_BUTTON_DESKTOP_DENSITY = 'min-h-8 sm:before:min-h-8';
+export const PRESENCE_BUTTON_DESKTOP_DENSITY =
+  'min-h-8 sm:before:min-h-8 sm:before:min-w-0';
 
 /**
  * Presence status primitives shared by the creator Presence workspace and
