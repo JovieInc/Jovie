@@ -269,8 +269,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:remediation
-    jobCount: 2
+    terminalReceipt: job:mcp-drift-remediation
+    jobCount: 4
   - name: CODEOWNERS Path Drift
     path: .github/workflows/codeowners-drift.yml
     active: true

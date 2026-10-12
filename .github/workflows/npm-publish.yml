@@ -569,8 +569,10 @@ jobs:
           echo "Public npm registry, provenance, ownership, fresh install, and runtime receipts passed." \
             >> "$GITHUB_STEP_SUMMARY"
 
+      # JOV-8088: the listing is chained on every path — normal publication
+      # continues straight into the exact-bytes MCP listing once the public
+      # readback passes, and publish_mcp_only only resumes a stranded release.
       - name: Verify exact staged bytes and prepare MCP manifest
-        if: ${{ inputs.publish_mcp_only }}
         shell: bash
         env:
           STAGING_DIR: ${{ steps.package.outputs.path }}
@@ -588,13 +590,17 @@ jobs:
           npm audit signatures --prefix '${{ steps.public_release.outputs.install_root }}'
 
       - name: Publish exact MCP listing using GitHub OIDC
-        if: ${{ inputs.publish_mcp_only }}
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin main
-          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" || {
-            echo "::error::Main advanced before MCP publication."
+          # Main advances while the chaos matrix runs; the tested commit only
+          # has to stay on main, matching the npm publication guard above.
+          git fetch --no-tags origin main
+          checked_out_sha="$(git rev-parse HEAD)"
+          current_main_sha="$(git rev-parse origin/main)"
+          [[ "$checked_out_sha" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$checked_out_sha" "$current_main_sha" || {
+            echo "::error::Checkout left origin/main before MCP publication."
             exit 1
           }
           publisher_archive="$RUNNER_TEMP/mcp-publisher.tar.gz"
