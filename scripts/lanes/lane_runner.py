@@ -139,7 +139,6 @@ LANE_BRANCH = re.compile(
     r"(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-(?:\d{8}|[a-f0-9]{15}\Z)"
 )
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
-RETRY_BACKOFF_S = 1800
 # JOV-7690: a recovery-handoff run does no work, so the issue backs off exponentially
 # (5 min doubling to 6 h) instead of being re-claimed on the next reexec. Linear hears
 # about the first handoff and once more at HANDOFF_COMMENT_AT, never once per loop.
@@ -147,13 +146,6 @@ HANDOFF_BACKOFF_S = 300
 HANDOFF_BACKOFF_CAP_S = 6 * 3600
 HANDOFF_COMMENT_AT = 3
 PRESERVED_RUN_NAME = re.compile(r"^\d{8}T\d{6}Z-(?P<issue>[A-Z]+-\d+)-")
-# JOV-6833: a lane may hold this many open non-green PRs per slot before it stops claiming
-# new issues and only fixes/adopts what it already opened.
-OPEN_PRS_PER_SLOT = 2
-# Held/exhausted lane PRs wait for a human and cannot be advanced by the owning lane
-# (codex may not adopt/gate). They are bounded separately so they cannot pin the
-# active budget at its cap forever (JOV-7514: codex idle with 7 terminal PRs).
-TERMINAL_PRS_PER_SLOT = 4
 STALE_DRAFT_S = 24 * 3600
 SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
@@ -528,6 +520,24 @@ def failure_record(value) -> dict:
     return value if isinstance(value, dict) else {"count": int(value or 0), "at": 0}
 
 
+def release_generation() -> str | None:
+    """The installed release tree; a new one is new evidence for an exhausted issue."""
+    state = lane_state_dir()
+    try:
+        return (state / "current" / ".tree").read_text().strip() or None if state else None
+    except OSError:
+        return None
+
+
+def failure_rejection(record: dict) -> str | None:
+    """MAX_FAILURES identical runs on one release park the issue on this host; the next
+    release (a harness fix) is its automatic exit. No fixed backoff between runs (Tim
+    2026-10-12): the count bounds identical retries, the release generation reopens them."""
+    if record["count"] >= MAX_FAILURES and record.get("release") == release_generation():
+        return "retry-exhausted"
+    return None
+
+
 def created_at_epoch(value: str) -> float | None:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -596,10 +606,8 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
         return "sensitive-provider"
     record = failure_record(failures.get(issue.identifier))
-    if record["count"] >= MAX_FAILURES:
-        return "retry-exhausted"
-    if now - record["at"] < RETRY_BACKOFF_S:
-        return "retry-backoff"
+    if rejected := failure_rejection(record):
+        return rejected
     if issue.identifier.lower() in in_flight:
         return "in-flight-pr"
     if route is not None:
@@ -2221,10 +2229,29 @@ HANDOFF_NOTE = ("A previous agent (lane `{prev}`) stopped before finishing (exit
                 "start over.\n\n")
 
 
-def cool_down(host: Host, name: str) -> None:
+# EX_TEMPFAIL: the provider wrapper measured a limit, an auth failure or no capacity
+# (codex_lane NO_ACCOUNT_EXIT, claude_lane NO_CAPACITY_EXIT).
+PROVIDER_LIMIT_EXIT = 75
+
+
+def provider_exit(reasons) -> int | None:
+    for reason in reasons or []:
+        found = re.fullmatch(r"agent-exit:(-?\d+)", str(reason))
+        if found:
+            return int(found.group(1))
+    return None
+
+
+def cool_down(host: Host, name: str, code: int | None = PROVIDER_LIMIT_EXIT) -> bool:
+    """Cool a provider only on a measured provider limit (Tim 2026-10-12): a crash or any other
+    non-zero exit is a failure, which the current failure rate already backs off on. Returns
+    whether a cooldown was written."""
+    if code != PROVIDER_LIMIT_EXIT:
+        return False
     path = host.state / "cooldown" / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
+    return True
 
 
 def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
@@ -2505,7 +2532,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                 nxt = next_provider(host, {name, *(h["to"] for h in handoffs)})
                 if nxt is None:
                     break
-                cool_down(host, current)
+                cool_down(host, current, agent.returncode)
                 nxt_name, nxt_spec = nxt
                 handoff_note = HANDOFF_NOTE.format(prev=current, code=agent.returncode)
                 handoff_prompt = handoff_note + prompt
@@ -3466,7 +3493,7 @@ def _legacy_terminal(host: Host, pr: dict, record: dict, held: dict, linear, att
         pass
 
 
-TERMINAL_REVISIT_S = 24 * 3600
+# GitHub writes per idle pass; the rest go on the next pass (main moving is the trigger).
 TERMINAL_REVISITS_PER_PASS = 3
 TERMINAL_LABELS = frozenset({pr_events.PREFIX + pr_events.EXHAUSTED, pr_events.POISON_LABEL})
 
@@ -3494,11 +3521,14 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
     """The material-change exit for terminal generations, fired without a human (2026-10-11).
 
     A terminal head waits for "a new PR head", which nothing produced: 26 PRs sat exhausted,
-    poisoned or escalated for days. Main moving is new evidence, so at most once per PR per
-    TERMINAL_REVISIT_S, and only when main moved since the last revisit, the PR gets a
-    deterministic no-model sync: GitHub merges main into it (exact expected head), or a
-    Dependabot bump asks Dependabot to recreate itself on main. The new head is ordinary
-    re-entry: a new bounded generation with its own attempts and the queue's failure log.
+    poisoned or escalated for days. Main moving is new evidence, so each time main moved since
+    the PR's last revisit (no clock: Tim 2026-10-12) the PR gets a deterministic no-model sync:
+    GitHub merges main into it (exact expected head), or a Dependabot bump asks Dependabot to
+    recreate itself on main. The new head is ordinary re-entry: a new bounded generation with
+    its own attempts and the queue's failure log. A `queue-poison` label is lifted with it:
+    main moved past the base that failed, and the label's removal is the boundary
+    `queue_ejections` counts from, so a defect that still fails re-poisons after two more
+    ejections, whoever authored the PR (bots and Dependabot included).
     Conflicted (DIRTY) non-Dependabot heads cannot merge main without a model and stay with
     the escalation ladder. No attempt or rung is refunded or reset.
     """
@@ -3512,8 +3542,6 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
         last = visits.get(str(pr["number"])) if isinstance(visits.get(str(pr["number"])), dict) else {}
         dependabot = (pr.get("headRefName") or "").startswith("dependabot/")
         if pr.get("mergeStateStatus") == "DIRTY" and not dependabot:
-            continue
-        if type(last.get("at")) in (int, float) and now - last["at"] < TERMINAL_REVISIT_S:
             continue
         due.append((pr, last, dependabot))
     if not due:
@@ -3537,6 +3565,8 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
         else:
             action = "update-branch"
             ok = pr_events.sync_main(host, THIS, pr, now, terminal_ok=True) == "synced"
+        if ok and pr_events.POISON_LABEL in pr_events.label_names(pr):
+            sh(["gh", "api", "-X", "DELETE", f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{pr_events.POISON_LABEL}"])
         visit = {"at": now, "head": pr["headRefOid"], "main": main, "action": action, "ok": ok}
         update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
         pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "terminal-revisit", "origin": AUTONOMOUS_ORIGIN,
@@ -4193,6 +4223,11 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     if pr.get("gateEvidence"):
         excerpt = "Lane gate (the repo's pre-push-gate) held this PR:\n" + "\n".join(pr["gateEvidence"]) + \
             ("\n\n" + excerpt if excerpt else "")
+        if any(str(line).startswith("diff-too-large") for line in pr["gateEvidence"]):
+            excerpt = (f"Split this PR: keep at most {MAX_REVIEWABLE_LINES} reviewable changed lines (tests "
+                       "included, generated files excluded) on this branch, and move the rest to a new branch "
+                       "based on this one, opened as a follow-up PR whose body says it stacks on this one. "
+                       "Each part must build and pass its own tests.\n\n") + excerpt
     if pr.get("mergeStateStatus") == "DIRTY":
         problem = ["This PR conflicts with main. Merge origin/main into the branch and resolve every",
                    "conflict keeping both sides' intent. If both sides added a migration with the same",
@@ -5328,7 +5363,8 @@ def repo_prs() -> list[dict]:
     """Every open, non-draft PR whose branch lives in this repo (forks cannot be pushed to).
     Tim: no open PR should ever need his action; the fix loop owns them all."""
     ready = [pr for pr in open_prs_summary() if not pr.get("isDraft") and not pr.get("isCrossRepository")]
-    return sorted(ready, key=lambda pr: pr.get("updatedAt") or "", reverse=True)[:60]
+    # No top-N window: an old red PR outside the 60 most recently updated was never repaired.
+    return sorted(ready, key=lambda pr: pr.get("updatedAt") or "", reverse=True)
 
 
 _SUMMARY: dict = {"at": 0.0, "prs": [], "readable": False}
@@ -5520,13 +5556,6 @@ def is_green(pr: dict) -> bool:
     return not pr.get("isDraft") and pr.get("mergeStateStatus") in ("CLEAN", "HAS_HOOKS")
 
 
-def over_budget(name: str, prs: list[dict], slots: int) -> bool:
-    """Slots bound worktrees, not open PRs; without this a lane keeps opening while its earlier
-    PRs rot (84 devin PRs, 0 green drafts on 2026-09-27). Over budget = fix/adopt only."""
-    own = [pr for pr in prs if (pr.get("headRefName") or "").startswith(f"{name}/")]
-    return sum(not is_green(pr) for pr in own) >= slots * OPEN_PRS_PER_SLOT
-
-
 def pr_is_terminal(pr: dict) -> bool:
     """Held or repair-exhausted: only a human (or another lane's adopt) can move it."""
     labels = {label.lower() for label in pr_events.label_names(pr)}
@@ -5534,59 +5563,23 @@ def pr_is_terminal(pr: dict) -> bool:
                                                    pr_events.PREFIX + "escalating"}))
 
 
-def new_issue_budget(name: str, slots: int, inventory: list[dict] | None) -> dict:
-    """One owning lane's new-issue budget; maintenance/orphan work is separate.
-
-    Active (advanceable) non-green PRs are capped at slots x OPEN_PRS_PER_SLOT.
-    Terminal PRs (hold / lane-fix-exhausted / lane-fix-escalating) are capped separately at
-    slots x TERMINAL_PRS_PER_SLOT so a lane cannot accumulate unbounded parked work,
-    but parked work alone can no longer pin a lane idle (JOV-7514)."""
-    cap = max(0, slots) * OPEN_PRS_PER_SLOT
-    terminal_cap = max(0, slots) * TERMINAL_PRS_PER_SLOT
+def new_issue_budget(name: str, slots: int, inventory: list[dict] | None = None) -> dict:
+    """A lane's new-issue admission. Tim 2026-10-12: no PR-count ceilings (the JOV-6833
+    `slots x 2` active and JOV-7514 `slots x 4` terminal caps are gone); only real limits
+    (compute, credits, quotas) bound a lane, and those live in autoscale. Repair of existing
+    PRs never consulted this. `inventory` is reported for visibility only."""
     if slots <= 0:
-        return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": cap,
-                "terminal": 0, "terminalCap": terminal_cap}
-    if inventory is None:
-        return {"allowed": False, "reason": "pr-inventory-unavailable", "used": None, "cap": cap,
-                "terminal": None, "terminalCap": terminal_cap}
+        return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": None, "terminal": 0, "terminalCap": None}
     dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
-    own = {pr["number"]: pr for pr in inventory if dated.match(pr["headRefName"])}
-    terminal = sum(pr_is_terminal(pr) for pr in own.values())
-    used = sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own.values())
-    reason = ("over-budget" if used >= cap else
-              "terminal-pr-backlog" if terminal >= terminal_cap else "within-budget")
-    return {"allowed": reason == "within-budget", "reason": reason, "used": used, "cap": cap,
-            "terminal": terminal, "terminalCap": terminal_cap}
+    own = [pr for pr in inventory or [] if dated.match(pr.get("headRefName") or "")]
+    return {"allowed": True, "reason": "within-budget",
+            "used": None if inventory is None else sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own),
+            "cap": None, "terminal": None if inventory is None else sum(pr_is_terminal(pr) for pr in own), "terminalCap": None}
 
 
 def read_new_issue_budget(name: str, slots: int) -> dict:
-    """Fail closed on incomplete budget reads without disrupting maintenance reads."""
-    inventory, error = None, None
-    if slots <= 0:
-        return new_issue_budget(name, slots, [])
-    try:
-        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open",
-                     "--search", f"head:{name}/", "--limit", "200", "--json", LIGHT_PR_FIELDS],
-                    timeout=60)
-        if listed.returncode:
-            raise ValueError("pr-read-failed")
-        rows = json.loads(listed.stdout)
-        # Validate before filtering: 200 manual rows can hide dated lane PRs.
-        if not isinstance(rows, list) or len(rows) >= 200:
-            raise ValueError("pr-inventory-incomplete")
-        for row in rows:
-            if (not isinstance(row, dict) or type(row.get("number")) is not int or row["number"] <= 0
-                    or not isinstance(row.get("headRefName"), str) or not row["headRefName"].strip()
-                    or type(row.get("isDraft")) is not bool
-                    or not isinstance(row.get("mergeStateStatus"), str) or not row["mergeStateStatus"].strip()):
-                raise ValueError("pr-inventory-malformed")
-        if len({row["number"] for row in rows}) != len(rows):
-            raise ValueError("pr-inventory-duplicate")
-        inventory = rows
-    except (OSError, ValueError, subprocess.SubprocessError) as failure:
-        error = str(failure) if isinstance(failure, ValueError) else type(failure).__name__
-    result = new_issue_budget(name, slots, inventory)
-    return {**result, "observedAt": now_iso(), "error": error}
+    """No GitHub read: with no PR ceiling there is nothing to count before claiming."""
+    return {**new_issue_budget(name, slots), "observedAt": now_iso(), "error": None}
 
 
 def last_pushes() -> dict[int, float]:
@@ -6257,8 +6250,6 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                 revisit_terminal_prs(host, candidates)
             except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
                 pass  # The exit is retried next idle pass; it never blocks new work.
-        # JOV-7514 budgets stay on configured base slots. Scaling the cap with the
-        # autoscaled count would admit more parked PRs as capacity rises.
         budget = None if red or adopt or labeled or maintenance_only else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked or labeled or maintenance_only else in_flight_issues()
@@ -6379,14 +6370,13 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         slot.release()
         return reexec(host, name)
     if verdict == "provider-error":
-        cooldown = host.state / "cooldown" / name
-        cooldown.parent.mkdir(parents=True, exist_ok=True)
-        cooldown.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
-        linear.move(issue.id, "Backlog")
+        cooled = cool_down(host, name, provider_exit(receipt.get("reasons")))
+        # Back to Todo, not Backlog: a provider fault says nothing about the issue, and Backlog
+        # needed a human to come back (Tim 2026-10-12: every hold needs an automatic exit).
+        linear.move(issue.id, "Todo")
         linear.comment(issue.id, f"🤖 lane `{name}` provider failed before working the issue "
-                                 f"({', '.join(receipt.get('reasons', []))}); unknown outcome quarantined, lane "
-                                 "cooling down. Disposition: blocked on the provider dependency; re-entry "
-                                 "once a healthy lane or a human clears it.")
+                                 f"({', '.join(receipt.get('reasons', []))}); back to Todo"
+                                 + (", lane cooling on the provider's limit." if cooled else "."))
         slot.release()
         return 1
     if verdict == "remote-held":
@@ -6419,19 +6409,18 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         try:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             count = failure_record(failures.get(issue.identifier))["count"] + 1
-            failures[issue.identifier] = {"count": count, "at": time.time(),
+            failures[issue.identifier] = {"count": count, "at": time.time(), "release": release_generation(),
                                           **pr_events.failure_reason(receipt, count >= MAX_FAILURES)}
             failures_path(host).write_text(json.dumps(failures))
         finally:
             claim.release()
         exhausted = failures[issue.identifier]["count"] >= MAX_FAILURES
-        # A run that exhausted its bounded retries is terminal: Backlog under an explicit
-        # disposition, not generic Triage admission (JOV-7089).
-        linear.move(issue.id, "Backlog" if exhausted else "Todo")
+        # Exhausted runs stay in Todo, parked on this host until the next lanes release
+        # (failure_rejection): Backlog needed a human to come back (Tim 2026-10-12).
+        linear.move(issue.id, "Todo")
         linear.comment(issue.id, f"🤖 lane `{name}`: {verdict} ({', '.join(receipt.get('reasons', []))}). "
-                                 + ("Terminal after 3 attempts — disposition: needs human decision; "
-                                    "re-entry requires new authoritative evidence or a certified policy "
-                                    "override (JOV-7089)." if exhausted else "Back to Todo."))
+                                 + (f"{MAX_FAILURES} attempts on this release; parked until the next lanes "
+                                    "release, then retried automatically." if exhausted else "Back to Todo."))
     slot.release()
     return reexec(host, name)
 

@@ -70,6 +70,14 @@ class IncidentPolicyTest(unittest.TestCase):
 
 
 class PredictionAndAdmissionTest(unittest.TestCase):
+    def test_default_only_flags_overlap(self):
+        # Tim 2026-10-12: no plain `hold` + disabled auto-merge unless enforcement is asked for.
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SYMPHONY_FILE_OVERLAP_GUARD", None)
+            self.assertEqual(overlap.guard_mode(), "flag")
+        self.assertEqual([overlap.guard_mode(v) for v in ("1", "enforce", "flag", "0", "maybe")],
+                         ["enforce", "enforce", "flag", "off", "flag"])
+
     def test_real_worker_module_records_overlap_in_the_existing_ledger(self):
         import lane_runner
         issue = SimpleNamespace(identifier="JOV-9", title="Lane change", labels=[],

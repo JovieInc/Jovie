@@ -179,7 +179,6 @@ class SelectionTest(unittest.TestCase):
             ({"in_flight": frozenset({"jov-pin"})}, {}),
             ({"held_back": frozenset({"JOV-PIN"})}, {}),
             ({}, {"JOV-PIN": 3}),
-            ({}, {"JOV-PIN": {"count": 1, "at": 9990}}),
         ]:
             with self.subTest(kwargs=kwargs, failures=failures):
                 self.assertIs(lane.pick_issue([target, other], failures, now=now, **kwargs), other)
@@ -198,11 +197,13 @@ class SelectionTest(unittest.TestCase):
     def test_rejection_reasons_match_final_worker_admission(self):
         red = issue("JOV-RED")
         red.title = "Rotate production credentials"
-        failures = {"JOV-EXHAUSTED": 3, "JOV-BACKOFF": {"count": 1, "at": 9990}}
+        failures = {"JOV-EXHAUSTED": 3, "JOV-RECENT": {"count": 1, "at": 9990},
+                    "JOV-OLD-RELEASE": {"count": 3, "at": 9990, "release": "older-tree"}}
         cases = [(issue(labels=["Hold"]), "excluded-label:hold"),
                  (red, "sensitive-text"), (issue(labels=["AUTH"]), "sensitive-provider"),
                  (issue("JOV-EXHAUSTED"), "retry-exhausted"),
-                 (issue("JOV-BACKOFF"), "retry-backoff"),
+                 (issue("JOV-RECENT"), None),  # no fixed backoff (Tim 2026-10-12)
+                 (issue("JOV-OLD-RELEASE"), None),  # a new release is the exhausted issue's exit
                  (issue("JOV-OWNED"), "in-flight-pr"), (issue("JOV-GOOD"), None)]
         for task, expected in cases:
             with self.subTest(expected=expected):
@@ -292,10 +293,15 @@ class SelectionTest(unittest.TestCase):
         self.assertIsNone(lane.LANE_BRANCH.match("tim/jov-6544-fix"))
         self.assertIsNone(lane.LANE_BRANCH.match("devin/other-work"))
 
-    def test_recent_failures_back_off_before_retry(self):
+    def test_failures_retry_without_a_timer_and_reopen_on_a_new_release(self):
         failures = {"JOV-1": {"count": 1, "at": 1000.0}}
-        self.assertIsNone(lane.pick_issue([issue("JOV-1")], failures, now=1000.0 + 60))
-        self.assertEqual(lane.pick_issue([issue("JOV-1")], failures, now=1000.0 + 1801).identifier, "JOV-1")
+        self.assertEqual(lane.pick_issue([issue("JOV-1")], failures, now=1000.0 + 60).identifier, "JOV-1")
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_STATE": tmp}):
+            (Path(tmp) / "current").mkdir(); (Path(tmp) / "current" / ".tree").write_text("tree-a\n")
+            parked = {"JOV-1": {"count": 3, "at": 1000.0, "release": "tree-a"}}
+            self.assertIsNone(lane.pick_issue([issue("JOV-1")], parked, now=1000.0 + 86400))
+            (Path(tmp) / "current" / ".tree").write_text("tree-b\n")
+            self.assertEqual(lane.pick_issue([issue("JOV-1")], parked, now=1000.0 + 60).identifier, "JOV-1")
         self.assertIsNone(lane.pick_issue([issue("JOV-9", labels=["infra"])], {}))
 
     def test_only_codex_guarded_lane_admits_sensitive_work(self):
@@ -2082,7 +2088,7 @@ class MaintenanceDemandTest(unittest.TestCase):
             (self.host.state / "fix-attempts.json").write_text(json.dumps({"7": record}))
             self.assertIsNone(self.census([self.pr()])["pending"])
         (self.host.state / "fix-attempts.json").unlink()
-        (self.host.state / "held.json").write_text(json.dumps({"7": lane.pr_events.held_record("h7", ["diff-too-large:100"])}))
+        (self.host.state / "held.json").write_text(json.dumps({"7": lane.pr_events.held_record("h7", ["secret-like-file-changed"])}))
         self.assertIsNone(self.census([self.pr()])["pending"])
 
     def test_unreadable_stale_and_corrupt_samples_are_unknown(self):
@@ -2172,7 +2178,7 @@ class MaintenanceDemandTest(unittest.TestCase):
         self.assertIsNone(self.census([self.pr()])["pending"])
         marker.unlink()
         (self.host.state / "held.json").write_text(json.dumps({"7": {
-            "sha": "h7", "evidence": "diff-too-large:100", "next_action": "bug-intake"}}))
+            "sha": "h7", "evidence": "secret-like-file-changed", "next_action": "bug-intake"}}))
         self.assertIsNone(self.census([self.pr()])["pending"])
 
     def test_dequeued_only_event_waits_for_existing_sync(self):
@@ -2621,14 +2627,12 @@ class WorkerTest(unittest.TestCase):
         self.assertIsNone(lane.claim_labeled_event(self.host, "devin", self.linear))
         self.assertFalse(lane.load_escalation(self.host)["events"]["disk-low"].get("running"))
 
-    def test_failures_retry_then_return_to_triage(self):
+    def test_failures_retry_then_park_in_todo_until_the_next_release(self):
         lane.run_issue = lambda *a: {"verdict": "held", "reasons": ["code-change-without-test"]}
         for _ in range(3):
             lane.worker(self.host, "devin")
-            failures = json.loads((self.host.state / "failures.json").read_text())
-            failures["JOV-3"]["at"] = 0  # skip the retry backoff between attempts
-            (self.host.state / "failures.json").write_text(json.dumps(failures))
-        self.assertEqual([m[1] for m in self.linear.moves if m[1] != "In Progress"], ["Todo", "Todo", "Backlog"])
+        # No Backlog sink (it needed a human): parked locally, retried on the next release.
+        self.assertEqual([m[1] for m in self.linear.moves if m[1] != "In Progress"], ["Todo", "Todo", "Todo"])
         self.assertEqual(json.loads((self.host.state / "failures.json").read_text())["JOV-3"]["count"], 3)
 
     def test_not_shippable_gets_a_terminal_disposition_without_a_failure(self):
@@ -2638,13 +2642,17 @@ class WorkerTest(unittest.TestCase):
         self.assertFalse((self.host.state / "failures.json").exists())
         self.assertEqual(len(self.execs), 1)
 
-    def test_provider_error_cools_the_lane_without_charging_the_issue(self):
+    def test_provider_error_returns_the_issue_and_cools_only_on_a_measured_limit(self):
         lane.run_issue = lambda *a: {"verdict": "provider-error", "reasons": ["agent-exit:2"]}
         self.assertEqual(lane.worker(self.host, "devin"), 1)
-        self.assertTrue(lane.cooling(self.host, "devin"))
+        self.assertFalse(lane.cooling(self.host, "devin"), "a crash is a failure, not a provider limit")
         self.assertFalse((self.host.state / "failures.json").exists())
-        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Backlog"))
+        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Todo"))
         self.assertEqual(self.execs, [])
+        lane.run_issue = lambda *a: {"verdict": "provider-error", "reasons": [f"agent-exit:{lane.PROVIDER_LIMIT_EXIT}"]}
+        self.assertEqual(lane.worker(self.host, "devin"), 1)
+        self.assertTrue(lane.cooling(self.host, "devin"))
+        self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Todo"))
 
     def test_red_prs_are_fixed_before_new_issues_are_claimed(self):
         fixed = []
@@ -2742,12 +2750,7 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(record["reason"], "none-eligible")
         self.assertTrue(record["at"].endswith("Z"))
 
-    def test_over_budget_and_unknown_in_flight_exits_name_their_reason(self):
-        lane.lane_prs = lambda name, fields="": [{"number": 1, "headRefName": "devin/jov-1-20261002", "isDraft": True},
-                                                 {"number": 2, "headRefName": "devin/jov-2-20261002", "isDraft": True}]
-        self.assertEqual(lane.worker(self.host, "devin"), 0)
-        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())
-                         ["devin"]["reason"], "over-budget")
+    def test_unknown_in_flight_exit_names_its_reason(self):
         lane.lane_prs = lambda name, fields="": []
         lane.in_flight_issues = lambda: None
         self.assertEqual(lane.worker(self.host, "devin"), 0)
@@ -2760,12 +2763,14 @@ class WorkerTest(unittest.TestCase):
         self.assertFalse((self.host.state / "worker-idle.json").exists())
         self.assertEqual(self.linear.moves, [])
 
-    def test_a_lane_over_its_open_pr_budget_claims_nothing_new(self):
-        red = [{"number": n, "headRefName": f"devin/jov-{n}-20260927t000000", "isDraft": True} for n in (1, 2)]
-        lane.lane_prs = lambda name, fields="": red if fields else []  # slots=1 -> budget 2 non-green
-        lane.run_issue = lambda *a: self.fail("over budget: fix/adopt only")
-        self.assertEqual(lane.worker(self.host, "devin"), 0)
-        self.assertEqual(self.linear.moves, [])
+    def test_open_red_prs_never_stop_a_lane_claiming_new_work(self):
+        # Tim 2026-10-12: no open-PR ceiling; only real limits bound a lane.
+        red = [{"number": n, "headRefName": f"devin/jov-{n}-20260927t000000", "isDraft": True} for n in range(1, 9)]
+        lane.lane_prs = lambda name, fields="": red if fields else []
+        ran = []
+        lane.run_issue = lambda *a: ran.append(1) or {"verdict": "landing", "prUrl": "u"}
+        lane.worker(self.host, "devin")
+        self.assertEqual(ran, [1])
 
     def test_new_issue_budget_uses_base_slots_not_autoscaled(self):
         """JOV-7514: parked-PR caps stay on configured slots as autoscale capacity rises."""
@@ -2776,15 +2781,6 @@ class WorkerTest(unittest.TestCase):
                 patch.object(lane.autoscale, "effective_slots", return_value=5):
             lane.worker(self.host, "devin")
         self.assertEqual(seen, [2])
-
-    def test_unknown_budget_defers_without_claim_or_failure_charge(self):
-        lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, None)
-        lane.run_issue = lambda *a: self.fail("unknown inventory cannot authorize new work")
-        self.assertEqual(lane.worker(self.host, "devin"), 0)
-        self.assertEqual(self.linear.moves, [])
-        self.assertFalse(lane.failures_path(self.host).exists())
-        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["devin"]["reason"],
-                         "pr-inventory-unavailable")
 
     def test_existing_repair_never_consults_new_issue_budget(self):
         lane.claim_red_pr = lambda *a: {"number": 9}
@@ -2884,7 +2880,6 @@ class ExhaustedRepairPublicationTest(unittest.TestCase):
 
     def test_finished_exhaustion_publishes_terminal_label_and_unblocks_original_budget(self):
         rows = [self.pr, {**self.pr, "number": 20672, "headRefName": "devin/jov-2135-20261005", "labels": []}]
-        self.assertFalse(lane.new_issue_budget("devin", 1, rows)["allowed"])
         def publish(number, kind, sh):
             self.assertEqual((number, kind), (20590, "exhausted"))
             self.pr["labels"].append({"name": "lane-fix-exhausted"})
@@ -2895,8 +2890,7 @@ class ExhaustedRepairPublicationTest(unittest.TestCase):
             self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", rows, now=300), 1)
             self.assertEqual(lane.publish_exhausted_repairs(self.host, "devin", rows, now=300), 0)
         result = lane.new_issue_budget("devin", 1, rows)
-        self.assertEqual((result["allowed"], result["used"], result["cap"], result["terminal"],
-                          result["terminalCap"]), (True, 1, 2, 1, 4))
+        self.assertEqual((result["allowed"], result["used"], result["terminal"]), (True, 1, 1))
         self.assertEqual(published.call_count, 1)
         self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text())["20590"], self.record)
 
@@ -2972,62 +2966,39 @@ class ExhaustedRepairPublicationTest(unittest.TestCase):
 
 
 class NewIssueBudgetTest(unittest.TestCase):
-    def row(self, number=1, branch=None, draft=True, state="CLEAN"):
+    """Tim 2026-10-12: no open-PR ceiling (JOV-6833 x2 active / JOV-7514 x4 terminal are gone)."""
+    def row(self, number=1, branch=None, draft=True, state="CLEAN", labels=()):
         return {"number": number, "headRefName": branch or f"codex/jov-{number}-20261002",
-                "isDraft": draft, "mergeStateStatus": state}
+                "isDraft": draft, "mergeStateStatus": state, "labels": [{"name": name} for name in labels]}
 
-    def test_dated_ownership_and_each_head_count_once_without_issue_collapse(self):
-        rows = [self.row(n, branch=f"codex/jov-7-20261002t00000{n}") for n in range(1, 7)]
-        rows += [self.row(8, branch="codex/manual-repair"), self.row(9, branch="devin/jov-9-20261002"),
-                 self.row(10, draft=False), self.row(11, draft=False, state="HAS_HOOKS")]
-        result = lane.new_issue_budget("codex", 3, rows)
-        self.assertEqual((result["used"], result["cap"], result["reason"]), (6, 6, "over-budget"))
-        self.assertFalse(result["allowed"])
-        self.assertTrue(lane.new_issue_budget("codex", 4, rows)["allowed"])
+    def test_no_pr_count_ever_refuses_new_issues(self):
+        parked = [self.row(n, labels=("hold",)) for n in range(1, 40)]
+        active = [self.row(n, state="BLOCKED") for n in range(40, 80)]
+        result = lane.new_issue_budget("codex", 1, parked + active + [self.row(99, branch="codex/manual")])
+        self.assertEqual((result["allowed"], result["reason"], result["cap"], result["terminalCap"]),
+                         (True, "within-budget", None, None))
+        self.assertEqual((result["used"], result["terminal"]), (40, 39), "counts stay visible, never a ceiling")
         self.assertEqual(lane.new_issue_budget("codex", 0, None)["reason"], "provider-disabled")
+        self.assertFalse(hasattr(lane, "OPEN_PRS_PER_SLOT") or hasattr(lane, "TERMINAL_PRS_PER_SLOT")
+                         or hasattr(lane, "over_budget"))
 
-    def test_terminal_prs_cannot_pin_the_lane_idle(self):
-        """JOV-7514 live shape: codex held 7 hold/exhausted PRs + 1 advanceable -> idle forever."""
-        terminal = [["hold", "lane-fix-exhausted"], ["lane-fix-exhausted"], ["hold"],
-                    ["lane-fix-exhausted", "queue-poison"], ["lane-fix-red", "lane-fix-exhausted"],
-                    ["lane-fix-exhausted"], ["hold", "queue-poison"]]
-        rows = [{**self.row(n), "labels": [{"name": name} for name in labels]}
-                for n, labels in enumerate(terminal, start=1)]
-        rows.append({**self.row(99), "labels": []})
-        rows.append({**self.row(50), "labels": [{"name": "lane-fix-escalating"}]})
-        result = lane.new_issue_budget("codex", 3, rows)
-        self.assertEqual((result["used"], result["terminal"], result["reason"]), (1, 8, "within-budget"))
-        self.assertTrue(result["allowed"])
-        # Parked work is still bounded: slots x TERMINAL_PRS_PER_SLOT.
-        parked = [{**self.row(n), "labels": [{"name": "hold"}]} for n in range(1, 13)]
-        result = lane.new_issue_budget("codex", 3, parked)
-        self.assertEqual((result["used"], result["terminal"], result["terminalCap"], result["reason"]),
-                         (0, 12, 12, "terminal-pr-backlog"))
-        self.assertFalse(result["allowed"])
-        # Active non-green work keeps its original cap and precedence.
-        active = [self.row(n) for n in range(20, 26)]
-        self.assertEqual(lane.new_issue_budget("codex", 3, parked + active)["reason"], "over-budget")
-
-    def test_failed_malformed_and_truncated_reads_cannot_certify_empty_inventory(self):
-        cases = [(1, "[]"), (1, json.dumps([self.row()])), (0, ""), (0, "{}"), (0, "null"),
-                 (0, json.dumps([self.row(n, branch=f"codex/manual-{n}") for n in range(1, 201)])),
-                 (0, json.dumps([self.row(), self.row()]))]
-        for field, value in [("number", True), ("number", 0), ("headRefName", ""),
-                             ("isDraft", 1), ("mergeStateStatus", None)]:
-            row = self.row(branch="codex/manual")
-            row[field] = value
-            cases.append((0, json.dumps([row])))
-        for code, output in cases:
-            with self.subTest(code=code, output=output[:80]), patch.object(
-                    lane, "sh", return_value=subprocess.CompletedProcess([], code, output, "")):
-                result = lane.read_new_issue_budget("codex", 3)
-                self.assertEqual(result["reason"], "pr-inventory-unavailable")
-                self.assertIsNone(result["used"])
-                self.assertFalse(result["allowed"])
-        with patch.object(lane, "sh", return_value=subprocess.CompletedProcess([], 0, "[]", "")):
+    def test_the_claim_path_makes_no_pr_count_read(self):
+        with patch.object(lane, "sh", side_effect=AssertionError("no GitHub read")):
             result = lane.read_new_issue_budget("codex", 3)
-            self.assertTrue(result["allowed"])
-            self.assertEqual(result["used"], 0)
+        self.assertEqual((result["allowed"], result["reason"], result["used"], result["error"]),
+                         (True, "within-budget", None, None))
+
+
+class OversizeDiffExitTest(unittest.TestCase):
+    def test_an_oversize_diff_goes_to_a_repair_lane_that_splits_it(self):
+        # Tim 2026-10-12: diff-too-large had no exit (bug intake, a human split).
+        self.assertEqual(lane.pr_events.held_reason(["diff-too-large:3036"]), ("diff-too-large", "fix-loop"))
+        self.assertTrue(lane.pr_events.fixable_hold(lane.pr_events.held_record("h", ["diff-too-large:3036"]), "h"))
+        self.assertNotIn("diff-too-large", lane.remediation.DIFF_POLICY)
+        prompt = lane.render_fix_prompt({"number": 7, "headRefName": "devin/jov-7-20261012", "mergeStateStatus": "BLOCKED",
+                                         "gateEvidence": ["diff-too-large:3036"]}, "")
+        self.assertIn(f"keep at most {lane.MAX_REVIEWABLE_LINES} reviewable changed lines", prompt)
+        self.assertIn("follow-up PR", prompt)
 
 
 class RunAgentTest(unittest.TestCase):
@@ -3742,13 +3713,13 @@ class TerminalRevisitTest(unittest.TestCase):
     def updates(self):
         return [args for args in self.calls if args[:3] == ["gh", "api", "-X"] and args[-1].startswith("expected_head_sha=")]
 
-    def test_terminal_heads_get_one_deterministic_sync_per_main_and_window(self):
+    def test_terminal_heads_get_one_deterministic_sync_each_time_main_moves(self):
         spent = {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}
         self.write("fix-attempts.json", {"1": spent, "2": {"sha": "h2", "count": lane.MAX_FIX_ATTEMPTS},
                                           "5": {"sha": "h5", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True},
                                           "6": {"sha": "h6", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True},
                                           "7": {"sha": "h7", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}})
-        self.write("held.json", {"7": {"sha": "h7", "evidence": ["diff-too-large:3036"]}})
+        self.write("held.json", {"7": {"sha": "h7", "evidence": ["secret-like-file-changed"]}})
         prs = [self.pr(1),
                self.pr(2),  # spent but still on the ladder (not escalated): the ladder owns it
                self.pr(3, labels=[{"name": "queue-poison"}]),  # poisoned head nobody moved
@@ -3763,13 +3734,16 @@ class TerminalRevisitTest(unittest.TestCase):
                          "no attempt, rung or escalation is refunded or reset")
         ledger = [json.loads(line) for line in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
         self.assertEqual({row["kind"] for row in ledger if row.get("kind") != "sync-main"}, {"terminal-revisit"})
+        # Main moved past the poisoned head's failing base: the label is lifted with the sync.
+        lifts = [args for args in self.calls if args[:4] == ["gh", "api", "-X", "DELETE"]]
+        self.assertEqual([args[4] for args in lifts], [f"repos/{lane.REPO_SLUG}/issues/3/labels/queue-poison"])
         self.calls.clear()
-        self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW + 3600), [], "once per window")
-        self.main = "m1"
-        self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW + lane.TERMINAL_REVISIT_S + 1), [],
+        self.assertFalse(hasattr(lane, "TERMINAL_REVISIT_S"), "no clock (Tim 2026-10-12)")
+        self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW + 60), [],
                          "main has not moved: nothing new to merge")
         self.main = "m2"
-        self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW + lane.TERMINAL_REVISIT_S + 2), [1, 3])
+        self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW + 120), [1, 3],
+                         "main moving is the only trigger, minutes later")
 
     def test_dependabot_bumps_are_recreated_by_dependabot_even_when_conflicted(self):
         self.write("fix-attempts.json", {"9": {"sha": "h9", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}})
@@ -4681,10 +4655,10 @@ class FixRedTest(unittest.TestCase):
     def test_an_unfixable_gate_hold_never_reaches_the_fix_loop(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp))
-            lane.record_held(host, 5, "h1", ["diff-too-large:2000"])
+            lane.record_held(host, 5, "h1", ["secret-like-file-changed"])
             held = json.loads((host.state / "held.json").read_text())
             self.assertIsNone(lane.red_pr([self.pr()], {}, held),
-                              "diff-too-large needs a human split, not MAX_FIX_ATTEMPTS model calls")
+                              "a secret-like file needs a human, not MAX_FIX_ATTEMPTS model calls")
             self.assertEqual(lane.exhausted_prs([self.pr()], {}, held)[0]["number"], 5,
                              "the hold escalates to intake on the first pass")
             self.assertEqual(lane.exhausted_prs([self.pr()], {"5": {"escalated": True}}, held), [])
@@ -4926,10 +4900,11 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][:4], ["gh", "pr", "view", "8"])
 
-    def test_stuck_pr_escalation_stays_off_unless_the_flag_is_on(self):
+    def test_stuck_pr_escalation_turns_off_only_when_the_flag_says_so(self):
         stuck = {**self.pr(number=7), "headRefName": "devin/jov-7-20260928000000",
                  "isDraft": False, "mergeStateStatus": "DIRTY", "title": "stuck one"}
-        os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
+        os.environ["LANES_ESCALATION_STUCK_PRS"] = "0"
+        self.addCleanup(os.environ.pop, "LANES_ESCALATION_STUCK_PRS", None)
         real = lane.sh
         calls = []
         lane.sh = lambda args, **k: calls.append(args) or SimpleNamespace(returncode=0, stderr="", stdout="")
@@ -7159,8 +7134,8 @@ class EscalationQueueAuthorityTest(unittest.TestCase):
             held.write_text("{}")
             held_faults = {"legacy-secret": ["secret-like-file-changed:file"], "empty-diff": ["empty-diff"],
                            "exhausted-secret": ["fix-exhausted", "secret-like-file-changed:file"],
-                           "exhausted-size": ["fix-exhausted", "diff-too-large:100"],
-                           "legacy-lockfile": ["lockfile-without-manifest"], "only-exhausted": ["fix-exhausted"]}
+                           "exhausted-size": ["fix-exhausted", "secret-like-file-changed"],
+                           "only-exhausted": ["fix-exhausted"]}
             if fault in held_faults:
                 held.write_text(json.dumps({"7": {"sha": "head-A", "evidence": held_faults[fault]}}))
             if fault == "declared-empty-diff":
@@ -7181,7 +7156,7 @@ class EscalationQueueAuthorityTest(unittest.TestCase):
                     else: current["7"]["escalations"].append({"rung": "concurrent"})
                     path.write_text(json.dumps(current)); expected.clear(); expected.update(current)
                 if fault in {"new-held", "changed-held-prescription"}:
-                    held.write_text(json.dumps({"7": lane.pr_events.held_record("head-A", ["diff-too-large:100"])}))
+                    held.write_text(json.dumps({"7": lane.pr_events.held_record("head-A", ["secret-like-file-changed"])}))
                 if fault == "corrupt-held": held.write_text("[")
                 if fault == "malformed-held": held.write_text("[]")
                 if fault == "revoked": lane.revoke_publication(host, branch=pr["headRefName"], reason="new-revocation")
@@ -7277,7 +7252,7 @@ class EscalationQueueAuthorityTest(unittest.TestCase):
                       "head", "branch", "fork", "closed", "merged", "new-hold", "human-decision", "foreign-draft",
                       "active-recorded-head", "attempt-race", "pending-race", "late-CAS-race", "new-held",
                       "corrupt-held", "malformed-held", "revoked", "legacy-secret", "empty-diff", "exhausted-secret",
-                      "exhausted-size", "legacy-lockfile", "declared-empty-diff", "ready-green", "ready-pending",
+                      "exhausted-size", "declared-empty-diff", "ready-green", "ready-pending",
                       "summary-corrupt", "summary-list", "summary-null", "summary-attempts-null", "summary-attempts-string",
                       "summary-write-fails", "changed-class", "changed-subtype", "malformed-dossier", "empty-dossier",
                       "rungs-string", "rungs-object", "rungs-mixed", "prior-string", "count-string", "count-bool", "count-negative"):
@@ -7313,11 +7288,6 @@ class OnePrPerIssueTest(unittest.TestCase):
             self.assertIsNone(lane.in_flight_issues())
         finally:
             lane.sh = saved
-
-    def test_budget_counts_only_own_non_green_prs(self):
-        prs = [self.pr(1), self.pr(2, draft=False, state="CLEAN"), self.pr(3, lane_name="codex")]
-        self.assertFalse(lane.over_budget("devin", prs, slots=1))
-        self.assertTrue(lane.over_budget("devin", prs + [self.pr(4, issue="jov-8")], slots=1))
 
     def test_sweep_supersedes_duplicates_and_closes_stale_red_drafts(self):
         day = lane.STALE_DRAFT_S
@@ -9037,14 +9007,13 @@ class RepositoryBindingTest(unittest.TestCase):
             verdict, linear, _, _ = self.claim([epic], [])
         self.assertEqual(linear.moves[-1], ("id-LYB-60", "Todo"))
 
-    def test_lyb_intake_budget_is_its_own_and_counts_open_lane_prs(self):
+    def test_lyb_open_prs_never_hold_new_intake(self):
+        # Tim 2026-10-12: no open-PR ceiling (the old maxOpenPrs 3); only real limits.
         prs = [{"number": n, "headRefName": f"codex/lyb-{n}-20261011t000000", "headRefOid": "a" * 40,
-                "title": "t", "mergeStateStatus": "BLOCKED", "statusCheckRollup": []} for n in (1, 2, 3)]
+                "title": "t", "mergeStateStatus": "BLOCKED", "statusCheckRollup": []} for n in (1, 2, 3, 4)]
         verdict, linear, run, status = self.claim([self.lyb("LYB-7")], prs)
-        self.assertIsNone(verdict)
-        run.assert_not_called()
-        self.assertEqual(linear.moves, [])
-        self.assertEqual(status["outcome"], "LYB:intake-budget:3/3")
+        self.assertEqual((verdict, status["outcome"]), ("pr-opened", "claimed"))
+        self.assertFalse(hasattr(lane.bindings, "intake_refusal"))
 
     def test_intake_budget_never_holds_repair_of_existing_lyb_prs(self):
         prs = [{"number": n, "headRefName": f"codex/lyb-{n}-20261011t000000", "headRefOid": "a" * 40,
@@ -9056,20 +9025,6 @@ class RepositoryBindingTest(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs["pr"]["number"], 2)
         self.assertEqual(status["outcome"], "repair")
         self.assertEqual(linear.moves, [])
-
-    def test_running_issue_runs_count_toward_new_intake_only(self):
-        held = [lane.Locked(self.host.state / "bindings" / "LYB" / f"issue.LYB-{n}.lock", blocking=False)
-                for n in (1, 2, 3)]
-        for lock in held:
-            self.addCleanup(lambda lock=lock: lock.handle.closed or lock.release())
-        verdict, linear, run, status = self.claim([self.lyb("LYB-7")], [])
-        self.assertIsNone(verdict)
-        run.assert_not_called()
-        self.assertEqual(status["outcome"], "LYB:intake-budget:3/3")
-        held[0].release()
-        verdict, linear, run, status = self.claim([self.lyb("LYB-7")], [])
-        self.assertEqual(verdict, "pr-opened")
-        self.assertFalse((self.host.state / "bindings" / "LYB" / "issue.LYB-1.lock").exists())
 
     def test_claim_race_does_not_run(self):
         verdict, linear, run, status = self.claim([self.lyb("LYB-7")], [], states={"id-LYB-7": "In Progress"})
