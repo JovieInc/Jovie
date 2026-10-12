@@ -20,7 +20,10 @@ import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
 import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
 import { pushLeadToInstantly } from '@/lib/leads/instantly';
-import { isInstantlyOutboundEnabled } from '@/lib/leads/outbound-gates';
+import {
+  isInstantlyOutboundEnabled,
+  isOutreachQuietHours,
+} from '@/lib/leads/outbound-gates';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   evaluateOutboundSend,
@@ -68,6 +71,9 @@ function getPendingEmailWhereClause(now = new Date()) {
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
     isNotNull(leads.claimToken),
+    // Consent gate: only leads with recorded outbound consent may be sent.
+    // Until a consent-capture path writes this column, the batch sends nothing.
+    isNotNull(leads.outreachConsentAt),
     // Review-only prefilter. Matching approval never grants delivery.
     drizzleSql`exists (select 1 from ${contactEvidenceReviews} where ${contactEvidenceReviews.evidenceKey} = (${outboundCopyEvidenceKey('')} || ${leads.id}::text) and ${contactEvidenceReviews.decision} = 'yes')`,
     or(isNull(leads.outreachQueuedAt), lt(leads.outreachQueuedAt, claimCutoff))
@@ -322,7 +328,7 @@ export async function processOutreachBatch(
     };
   }
 
-  if (!isInstantlyOutboundEnabled()) {
+  if (!isInstantlyOutboundEnabled() || isOutreachQuietHours(new Date())) {
     return {
       attempted: 0,
       queued: 0,
