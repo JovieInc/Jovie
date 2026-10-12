@@ -100,11 +100,7 @@ describe('visibility audit', () => {
     expect(markdown).toContain('MusicFetch is not called');
     expect(markdown).toContain('SerpAPI requests: 0');
     expect(markdown).toContain('Spotify Developer Policy III.13');
-    const committed = readFileSync(
-      path.resolve(HERE, '../../../../docs/examples/visibility-audit/tim.md'),
-      'utf8'
-    );
-    expect(committed).toBe(markdown);
+    expect(markdown).toMatchSnapshot();
   });
 
   it('resolves MBID to Wikidata QID to ISNI from stored identity links', () => {
