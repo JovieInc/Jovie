@@ -188,14 +188,21 @@ All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge
 | `docs/FEATURE_REGISTRY.md` | What feature flags exist? What are their current states? |
 | `docs/COST_MONITORING.md` | What stops a runaway code path from blowing up the bill? Provider spend caps + the cost-anomaly auto-rollback gate. |
 
-## macOS runners: self-hosted first, hosted fallback
+## macOS runners: self-hosted first, hosted fallback (org-wide)
 
-Hosted macOS is one small org-wide pool (Team plan) that LogYourBody often
-saturates. Jobs that something waits on (PR, merge-group, push and release
-gates) run on the self-hosted `jovie-mac` Macs when the heartbeat is fresh and
-fall back to hosted macOS when it is stale. A down Mac must never block
-shipping. Copy the `mac-runner-route` job from `ios-ci.yml`;
-`vars.JOVIE_MAC_RUNNER=off` sends everything to hosted.
+Applies to every JovieInc repo. Hosted macOS is one small org-wide pool (Team
+plan) that LogYourBody often saturates. Jobs that something waits on (PR,
+merge-group, push and release gates) run on the self-hosted `jovie-mac` Macs
+when the heartbeat is fresh and fall back to hosted macOS otherwise. Nothing is
+ever held on a Mac being asleep, busy or offline:
+
+- Copy the `mac-runner-route` job from `ios-ci.yml`. It picks the Macs only on
+  run attempt 1, so any rerun is hosted. `vars.JOVIE_MAC_RUNNER=off` sends
+  everything to hosted.
+- `.github/scripts/mac-runner-watch.sh` runs from the Gem lanes tick (the one
+  sanctioned scheduler; no new crons, JOV-INV-042). It dispatches each repo's
+  heartbeat and force-reruns any first-attempt run whose job has sat queued on
+  `jovie-mac` for 8 minutes, which lands it on hosted.
 
 Stay on hosted only when the Mac buys nothing or costs something, and record
 why in `HOSTED_MACOS_ALLOWED` in

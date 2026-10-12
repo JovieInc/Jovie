@@ -2043,7 +2043,7 @@ describe('iOS stage contract', () => {
       'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
     );
     expect(iosWorkflow).toContain(
-      "if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' }}"
+      "if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' && github.run_attempt == '1' }}"
     );
     expect(pathChanges).toContain(
       "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"

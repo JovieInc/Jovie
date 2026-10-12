@@ -624,7 +624,7 @@ jobs:
       # tims-macbook-air); stale, busy or unknown evidence keeps hosted macOS.
       - name: Query Mac runner heartbeat
         id: mac-heartbeat
-        if: ${{ vars.JOVIE_MAC_RUNNER != 'off' }}
+        if: ${{ vars.JOVIE_MAC_RUNNER != 'off' && github.run_attempt == '1' }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}

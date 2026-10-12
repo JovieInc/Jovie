@@ -54,7 +54,7 @@
       "apps/web/app/api/cron/**",
       "vercel.json"
     ],
-    "bodySha256": "3445c11bf18605ed70b71dc93eae6167ac6f6b1bfa33b828cfee5a5534330188"
+    "bodySha256": "f4530c557f3956e8e6e776563bd00f14c6d6a70ca92a350e3ec1be0ed8b46576"
   },
   {
     "file": ".claude/rules/ios.md",

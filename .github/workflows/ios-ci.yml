@@ -51,7 +51,7 @@ jobs:
       runner_class: ${{ steps.route.outputs.runner_class }}
     steps:
       - name: Checkout trusted runner routing policy
-        if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' }}
+        if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' && github.run_attempt == '1' }}
         continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,7 +65,7 @@ jobs:
 
       - name: Query Mac runner heartbeat
         id: heartbeat
-        if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' }}
+        if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' && github.run_attempt == '1' }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
