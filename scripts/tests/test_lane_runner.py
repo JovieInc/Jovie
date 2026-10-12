@@ -4041,6 +4041,48 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertEqual((self.path / "repair.txt").read_text(), "unpublished fix")
         self.assertTrue((self.path / lane.disk_guard.PRESERVED_REPAIR).exists())
 
+    def test_superseded_preserved_work_is_archived_and_the_repair_does_work(self):
+        # 2026-10-12 on Gem: #20840's preserved merge commit sat on an old head, so 694
+        # repairs in a day handed off and none ran.
+        self.cancelled_predecessor(commit=True)
+        (self.path / "draft.txt").write_text("uncommitted follow-up")
+        self.age_marker()
+        self.git(self.host.repo, "commit", "--allow-empty", "-qm", "writer push")
+        self.live["headRefOid"] = self.pr["headRefOid"] = self.git(self.host.repo, "rev-parse", "HEAD")
+        self.git(self.host.repo, "update-ref", "refs/remotes/origin/devin/jov-1", self.pr["headRefOid"])
+        ran = []
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            ran.append(cwd)
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=agent):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        ref = lane.PRESERVED_ARCHIVE_REF + self.path.name
+        self.assertEqual(receipt["archivedPreserved"], [ref])
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertEqual(len(ran), 1)
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.git(self.host.repo, "show", f"{ref}:repair.txt"), "unpublished fix")
+        self.assertEqual(self.git(self.host.repo, "show", f"{ref}:draft.txt"), "uncommitted follow-up")
+        self.assertNotIn(lane.disk_guard.PRESERVED_REPAIR,
+                         self.git(self.host.repo, "ls-tree", "--name-only", ref))
+
+    def age_marker(self, hours=7):
+        marker = self.path / lane.disk_guard.PRESERVED_REPAIR
+        data = json.loads(marker.read_text())
+        data["at"] = datetime.fromtimestamp(time.time() - hours * 3600, timezone.utc).isoformat()
+        marker.write_text(json.dumps(data))
+
+    def test_fresh_resumable_or_busy_preserved_work_is_never_archived(self):
+        self.cancelled_predecessor(commit=True)
+        self.assertIsNone(lane.archive_unresumable_preserved(self.host, self.path, "preserved-head-superseded"),
+                          "a fresh handoff waits for its owner")
+        self.age_marker()
+        self.assertIsNone(lane.archive_unresumable_preserved(self.host, self.path, "preserved-head-diverged"))
+        self.active = f"p123\nn{self.path}\n"
+        self.assertIsNone(lane.archive_unresumable_preserved(self.host, self.path, "preserved-head-superseded"))
+        self.assertTrue((self.path / lane.disk_guard.PRESERVED_REPAIR).exists())
+        self.assertEqual(self.git(self.host.repo, "for-each-ref", lane.PRESERVED_ARCHIVE_REF), "")
+
     def test_busy_published_checkout_is_never_retired(self):
         self.cancelled_predecessor()
         self.active = f"p123\nn{self.path}\n"
