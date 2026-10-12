@@ -333,6 +333,36 @@ describe('fleet gate receipt source order (JOV-8000 follow-up 33)', () => {
     );
   });
 
+  it('reads the lanes emitter key, live origin/main, and tick liveness locally', async () => {
+    const orchestrator = await import(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs')
+    );
+    const state = await mkdtemp(resolve(tmpdir(), 'lanes-state-'));
+    const readMain = repo => (repo === '/lanes/repo' ? 'a'.repeat(40) : null);
+    const env = { LANES_STATE: state, LANES_REPO: '/lanes/repo' };
+    try {
+      assert.equal(orchestrator.loadFleetGateEmitter(env, { readMain }), null);
+      await writeFile(
+        resolve(state, 'fleet-gate-emit.json'),
+        JSON.stringify({ key: 'gen-9', inputs: { main: 'b'.repeat(40) } })
+      );
+      await writeFile(
+        resolve(state, 'lanes-status.json'),
+        JSON.stringify({
+          schema: 'symphony-lanes-status/v1',
+          at: '2026-10-12T05:25:00Z',
+        })
+      );
+      assert.deepEqual(orchestrator.loadFleetGateEmitter(env, { readMain }), {
+        key: 'gen-9',
+        mainSha: 'a'.repeat(40),
+        tickAt: '2026-10-12T05:25:00Z',
+      });
+    } finally {
+      await rm(state, { recursive: true, force: true });
+    }
+  });
+
   it('falls back to the host receipt when the same-run file is missing, malformed, or stale (blocked stays blocked)', async () => {
     const now = new Date().toISOString();
     const stale = new Date(Date.now() - 11 * 60 * 1000).toISOString();
@@ -3578,6 +3608,66 @@ describe('deterministic Symphony admission boundary', () => {
       now: '2026-08-09T05:01:00.000Z',
     });
   }
+
+  describe('emitter-keyed receipt freshness (no fleet-gate clock)', () => {
+    const MAIN = 'a3eeefdd4dc681d1c9b5b4385720d661f5129137';
+    // 30 minutes after the receipt: past the 10-minute age window.
+    const NOW = '2026-08-09T05:30:00.000Z';
+    const liveEmitter = (overrides = {}) => ({
+      key: 'gen-1',
+      mainSha: MAIN,
+      tickAt: '2026-08-09T05:29:30.000Z',
+      ...overrides,
+    });
+    const codes = gate => gate.reasons.map(reason => reason.code);
+    const stale = [
+      admitter.FLEET_GATE_REASON.CONTROLLER_STALE,
+      admitter.FLEET_GATE_REASON.INDEPENDENT_REVIEW_STALE,
+    ];
+
+    it('keeps an old receipt current while the live emitter confirms its generation and main', () => {
+      const gate = admitter.evaluateFleetGate(
+        fleetEvidence({ inputGeneration: 'gen-1', emitter: liveEmitter() }),
+        { now: NOW }
+      );
+      for (const code of stale) assert.ok(!codes(gate).includes(code), code);
+      assert.equal(gate.state, greenFleetGate().state);
+    });
+
+    it('deliberate red: fails closed when live main moved past the receipt', () => {
+      const gate = admitter.evaluateFleetGate(
+        fleetEvidence({
+          inputGeneration: 'gen-1',
+          emitter: liveEmitter({
+            mainSha: 'b3eeefdd4dc681d1c9b5b4385720d661f5129138',
+          }),
+        }),
+        { now: NOW }
+      );
+      assert.ok(codes(gate).includes(stale[0]));
+    });
+
+    it('deliberate red: fails closed when the emitter is dead or has newer inputs', () => {
+      for (const emitter of [
+        liveEmitter({ tickAt: '2026-08-09T05:20:00.000Z' }),
+        liveEmitter({ key: 'gen-2' }),
+        null,
+      ]) {
+        const gate = admitter.evaluateFleetGate(
+          fleetEvidence({ inputGeneration: 'gen-1', emitter }),
+          { now: NOW }
+        );
+        assert.ok(codes(gate).includes(stale[0]), JSON.stringify(emitter));
+      }
+    });
+
+    it('still accepts a fresh receipt by age with no emitter (push and CI refresh)', () => {
+      const gate = admitter.evaluateFleetGate(fleetEvidence(), {
+        now: '2026-08-09T05:01:00.000Z',
+      });
+      for (const code of stale) assert.ok(!codes(gate).includes(code), code);
+    });
+  });
 
   it('maps a parked controller into hold-intake with production green (JOV-8000 follow-up 29)', () => {
     // The 38025443068 split-brain: the canonical python receipt said
