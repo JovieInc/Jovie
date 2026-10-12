@@ -6219,10 +6219,6 @@ jobs:
           export NODE_ENV=test
           export CI=true
           export SMOKE_ONLY=1
-          export SENTRY_E2E_REPORTING=1
-          export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
-          export SENTRY_ENVIRONMENT=ci-manual-e2e
-          export SENTRY_RELEASE="${{ github.sha }}"
           export E2E_USE_TEST_AUTH_BYPASS=1
           export VERCEL_ENV=development
           export E2E_TEST_AUTH_PERSONA=creator-ready
@@ -6876,10 +6872,6 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           E2E_SKIP_SEED: '1'
-          SENTRY_E2E_REPORTING: '1'
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          SENTRY_ENVIRONMENT: ci-main-e2e
-          SENTRY_RELEASE: ${{ github.sha }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -6932,10 +6924,6 @@ jobs:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           E2E_TEST_MODE: '1'
           CHAT_LLM_FAILURE_INJECTION: '1'
-          SENTRY_E2E_REPORTING: '1'
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          SENTRY_ENVIRONMENT: ci-main-e2e-quarantine
-          SENTRY_RELEASE: ${{ github.sha }}
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
         run: |
           RETRIES=$(jq -r '.retryBudget.quarantineE2eRetries // 2' apps/web/tests/quarantine.json)
