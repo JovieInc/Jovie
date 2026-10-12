@@ -4,7 +4,7 @@ paths: ["apps/web/**/*.tsx", "apps/web/**/*.css", "packages/ui/**", "DESIGN.md",
 
 # Motion
 
-Animation doctrine for Jovie UI. Sibling of `ui.md` — read that first for the component hierarchy and the No Decorative Hover Motion rule. Always reference `design-system.css` tokens; never hardcode durations, easings, or scale values (enforced by `@jovie/no-raw-motion-values`).
+Animation doctrine for Jovie UI. Sibling of `ui.md` — read that first for the component hierarchy and the No Decorative Hover Motion rule. Always reference `design-system.css` tokens; never hardcode durations, easings, or scale values (enforced in TSX/TS by `@jovie/no-raw-motion-values` and in `.css`/`.scss` stylesheets by `pnpm --filter @jovie/web run lint:motion-css`).
 
 > **Attribution:** Adapted from Emil Kowalski's `emil-design-eng` skill
 > (https://github.com/emilkowalski/skills), MIT License — copyright notice per

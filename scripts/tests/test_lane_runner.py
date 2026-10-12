@@ -2498,16 +2498,16 @@ class WorkerTest(unittest.TestCase):
         finally:
             contender.release()
 
-    def test_blocked_last_overlap_candidate_never_runs_or_claims_the_issue(self):
+    def test_an_overlapping_candidate_is_recorded_and_still_runs(self):
+        # Tim 2026-10-12: the overlap guard records, the merge queue serializes; it never blocks.
         self.linear.issues[0].description = "Edit `scripts/lanes/lane_runner.py`."
         existing = {"number": 1, "files": ["scripts/lanes/lane_runner.py"], "isDraft": False}
         with patch.object(lane, "overlap_inventory", return_value=([existing], [])), \
                 patch.object(lane, "open_hotspot_holds", return_value={}), \
-                patch.object(lane, "run_issue") as run, \
+                patch.object(lane, "run_issue", return_value={"verdict": "landing", "prUrl": "u"}) as run, \
                 patch.dict(os.environ, {"SYMPHONY_FILE_OVERLAP_GUARD": "1"}):
             lane.worker(self.host, "devin")
-        run.assert_not_called()
-        self.assertEqual(self.linear.moves, [])
+        run.assert_called_once()
 
     def test_event_cleanup_waits_until_all_productive_selections_decline(self):
         for chosen in ("event", "poll", "adopt", "issue", "idle"):
@@ -2788,8 +2788,14 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(self.execs, [])
         lane.run_issue = lambda *a: {"verdict": "provider-error", "reasons": [f"agent-exit:{lane.PROVIDER_LIMIT_EXIT}"]}
         self.assertEqual(lane.worker(self.host, "devin"), 1)
-        self.assertTrue(lane.cooling(self.host, "devin"))
+        self.assertFalse(lane.cooling(self.host, "devin"), "a raw CLI's 75 is not our limit contract")
         self.assertEqual(self.linear.moves[-1], ("id-JOV-3", "Todo"))
+        # codex_lane / claude_lane exit 75 only on a measured limit: that cools the lane.
+        self.assertTrue(lane.cool_down(self.host, "codex", lane.PROVIDER_LIMIT_EXIT))
+        self.assertTrue(lane.cooling(self.host, "codex"))
+        self.assertFalse(lane.cool_down(self.host, "claude", 1))
+        self.assertEqual(lane.provider_exit(["harness-error:x"]), -1)
+        self.assertFalse(lane.cool_down(self.host, "claude", lane.provider_exit([])))
 
     def test_red_prs_are_fixed_before_new_issues_are_claimed(self):
         fixed = []

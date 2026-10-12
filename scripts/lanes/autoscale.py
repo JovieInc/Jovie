@@ -285,9 +285,12 @@ def _budget_unknown(obs: dict) -> str | None:
     if _int(obs.get("githubRemaining")) is None:
         return "github-unknown"
     return None
-def _multi_reason(name: str, obs: dict, sample: dict, now: float) -> str | None:
+def _multi_reason(name: str, obs: dict, sample: dict, now: float, changed: float | None = None) -> str | None:
     bank, written = _num(_obj(obs.get("rateBankAt")).get(name)), _num(_obj(obs.get("cooldownAt")).get(name))
-    if (bank is not None and now - bank <= MULTIPLICATIVE_WINDOW_S) or (written is not None and now - written <= MULTIPLICATIVE_WINDOW_S):
+    # One halving per provider limit event (Gem 03:38Z: one devin cooldown halved 11 -> 1 over
+    # four ticks inside the window). The cooling itself already stops new spawns.
+    events = [at for at in (bank, written) if at is not None and now - at <= MULTIPLICATIVE_WINDOW_S]
+    if events and (changed is None or max(events) > changed):
         return "rate-limited"
     github = _int(obs.get("githubRemaining"))
     if github is not None and github < GITHUB_DECREASE_BELOW:
@@ -423,7 +426,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             # (Gem 21:11Z: devin 1 seat busy, census 6 at 21:06:57). A recent positive census
             # stands as the lower bound while the lane stays saturated.
             demand = _count(_obj(obs.get("recentPositiveDemandByProvider")).get(name)) or None
-        multi, additive = _multi_reason(name, obs, sample, now), _additive_reason(obs, sample)
+        multi, additive = _multi_reason(name, obs, sample, now, changed), _additive_reason(obs, sample)
         effective, reason, blockers, step_to = current, "hold:steady", [], None
         if multi:
             effective, reason, blockers = max(0 if current == 0 else MIN_SLOTS, math.ceil(current / 2)), multi, [multi]
