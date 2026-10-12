@@ -1019,9 +1019,7 @@ describe('merge_group workflow contract', () => {
     const macosCaller = getJobBlock(CI_WORKFLOW, 'ci-macos');
     const macosRoute = getJobBlock(MACOS_CI_WORKFLOW, 'mac');
     const macos = getJobBlock(MACOS_CI_WORKFLOW, 'build');
-    // An idle self-hosted Mac (child run via mac-lane-route.yml) first; hosted
-    // GA image otherwise (macos-26 pickup waited 8-68 min per merge group,
-    // 2026-10-10).
+    // An idle self-hosted Mac first (mac-lane-route.yml); hosted otherwise.
     expect(macosCaller).toContain('uses: ./.github/workflows/macos-ci.yml');
     expect(macosCaller).toContain('mac-first: true');
     expect(macosRoute).toContain(
