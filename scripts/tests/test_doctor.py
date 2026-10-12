@@ -243,7 +243,7 @@ class FakeTracker:
     def __init__(self):
         self.opened, self.reopened, self.closed, self.contradicted = [], [], [], []
 
-    def open(self, key, text):
+    def open(self, key, text, condition=None):
         self.opened.append((key, text))
         return f"id-{key}"
 
@@ -307,6 +307,14 @@ class ConditionReceiptTest(unittest.TestCase):
 
 
 class ReconcileTest(unittest.TestCase):
+    def test_dirty_checkout_cannot_be_claimed_as_exact_source_proof(self):
+        dirty = SimpleNamespace(returncode=0, stdout=" M scripts/lanes/doctor.py\n")
+        with mock.patch.dict(os.environ, {}, clear=False), \
+                mock.patch.object(doctor.subprocess, "run", return_value=dirty) as run:
+            os.environ.pop("JOVIE_SOURCE_SHA", None)
+            self.assertEqual(doctor._source_version(), "UNKNOWN")
+        run.assert_called_once()
+
     def test_mac_quota_unknown_retains_original_watchdog_until_observed_budget_recovery(self):
         first = obs(now=1791321038.0, githubRemaining=230)
         alerts = doctor.judge(first)
@@ -479,6 +487,47 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(doctor.Tracker(FakeLinear(), "gem").open("provider-idle:codex", "idle"), "urgent")
         self.assertEqual(captured[0]["priority"], 1)
         self.assertEqual(captured[0]["labelIds"], ["symphony", "idle"])
+
+    def test_new_alert_uses_exact_reviewed_report_once_and_persists_receipt(self):
+        created = []
+
+        class FakeLinear:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
+                        "id": "triage", "name": "Triage"}]}, "labels": {"nodes": [{
+                            "id": "symphony", "name": "symphony"}]}}]}}
+                if "issueCreate" in query:
+                    created.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-1", "identifier": "JOV-1"}}}
+                raise AssertionError(query)
+
+        reviewed = {
+            "message": "Exact reviewed Symphony report.",
+            "decision": "approved-template",
+            "review": {"schema": "jovie.agent-ops-report-delivery-review/v1",
+                       "reviewDigest": "digest"},
+        }
+        condition = {"schema": "jovie.control-plane-liveness-condition/v1",
+                     "idempotencyKey": "gem:disk-low:1", "generation": 1,
+                     "condition": "disk-low", "state": "active", "owner": "symphony-lanes-doctor",
+                     "source": {"producer": "scripts/lanes/doctor.py", "observedAt": "2026-10-12T08:00:00Z"},
+                     "nextAction": "wake-summer-via-linear-or-independent-status-feed"}
+        tracker = doctor.Tracker(FakeLinear(), "gem")
+        with (mock.patch.object(tracker, "_remediation_label_id", return_value=None),
+              mock.patch.object(tracker, "contradict_invariant"),
+              mock.patch.object(doctor, "prepare_ops_report", return_value=reviewed) as prepare):
+            state = doctor.reconcile({"disk-low": "4% free"}, {}, tracker, 1_000_000.0,
+                                     {"disk-low": condition})
+            state = doctor.reconcile({"disk-low": "4% free"}, state, tracker, 1_000_060.0,
+                                     {"disk-low": condition})
+        self.assertEqual(created[0]["description"], reviewed["message"])
+        self.assertEqual(len(created), 1)
+        prepare.assert_called_once()
+        self.assertEqual(state["conditions"]["disk-low"]["writingReview"], reviewed["review"])
+        self.assertEqual(state["conditions"]["disk-low"]["writingDecision"], "approved-template")
 
     def test_alert_label_is_created_on_open_reopen_and_close(self):
         created = []
