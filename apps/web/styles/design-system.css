@@ -98,10 +98,11 @@
   /* Shell V1 canonical app-shell tokens — app chrome should prefer these
      names when touching shared shell geometry. Values are centralized here
      (migrated from linear-tokens.css, JOV-5466). Dark-mode overrides below.
-     Founder lock 2026-09-25 (Linear-scale density): sidebar 244px, header
+     Founder lock 2026-09-25 (Linear-scale density): sidebar 224px
+     (left-sidebar-width-invariant-v1, JOV-8108 — hard ceiling 260px), header
      44px everywhere (single token — the former 36px "compact" variant is
      retired), 28px nav/history rows, 16px sidebar icons. */
-  --app-shell-sidebar-width: 244px;
+  --app-shell-sidebar-width: 224px;
   --app-shell-sidebar-icon-size: 1rem;
   --app-shell-sidebar-badge-font-size: 0.5rem;
   --app-shell-sidebar-history-font-size: 0.78125rem;
