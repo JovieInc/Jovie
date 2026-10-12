@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@/components/organisms/Dialog';
 import { APP_ROUTES } from '@/constants/routes';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import type {
   DistributionModel,
   Genre,
@@ -276,7 +276,7 @@ export function ReleasePlanWizard({
       <Dialog open={open} onClose={handleClose} size='md'>
         <DialogTitle>Release Plan</DialogTitle>
         <DialogDescription>
-          {`Release plans are an ${getPlanDisplayName('pro')} feature. Upgrade to generate a tailored task list for `}
+          {`Release plans are an ${PRO_PLAN_DISPLAY_NAME} feature. Upgrade to generate a tailored task list for `}
           <span className='font-medium'>{releaseTitle ?? 'this release'}</span>.
         </DialogDescription>
         <DialogActions>

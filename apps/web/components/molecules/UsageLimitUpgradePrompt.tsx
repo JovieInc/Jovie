@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 
 interface UsageLimitUpgradePromptProps {
   /** Current usage count */
@@ -35,7 +35,7 @@ export function UsageLimitUpgradePrompt({
   limit,
   featureName,
   upgradeCopy,
-  ctaLabel = `Upgrade to ${getPlanDisplayName('pro')}`,
+  ctaLabel = `Upgrade to ${PRO_PLAN_DISPLAY_NAME}`,
   className,
 }: UsageLimitUpgradePromptProps) {
   const hasTrackedRef = useRef(false);

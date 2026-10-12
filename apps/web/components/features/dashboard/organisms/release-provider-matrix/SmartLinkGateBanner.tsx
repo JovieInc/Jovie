@@ -5,7 +5,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { APP_ROUTES } from '@/constants/routes';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
 
@@ -43,26 +43,26 @@ function getUnreleasedCopy(
     case 'trial_last_day':
       return {
         headline: `${unreleasedCount} upcoming ${releaseLabel} after your trial`,
-        body: `Lock in ${getPlanDisplayName('pro')} to keep pre-release pages live past day 14.`,
-        cta: `Lock in ${getPlanDisplayName('pro')}`,
+        body: `Lock in ${PRO_PLAN_DISPLAY_NAME} to keep pre-release pages live past day 14.`,
+        cta: `Lock in ${PRO_PLAN_DISPLAY_NAME}`,
       };
     case 'recently_lapsed':
       return {
         headline: `${unreleasedCount} upcoming ${releaseLabel}`,
-        body: `Reclaim ${getPlanDisplayName('pro')} to bring pre-release pages and countdowns back.`,
-        cta: `Reclaim ${getPlanDisplayName('pro')}`,
+        body: `Reclaim ${PRO_PLAN_DISPLAY_NAME} to bring pre-release pages and countdowns back.`,
+        cta: `Reclaim ${PRO_PLAN_DISPLAY_NAME}`,
       };
     case 'stale_lapsed':
       return {
         headline: `${unreleasedCount} upcoming ${releaseLabel}`,
-        body: `Get ${getPlanDisplayName('pro')} to enable pre-release pages and countdowns.`,
-        cta: `Get ${getPlanDisplayName('pro')}`,
+        body: `Get ${PRO_PLAN_DISPLAY_NAME} to enable pre-release pages and countdowns.`,
+        cta: `Get ${PRO_PLAN_DISPLAY_NAME}`,
       };
     default:
       return {
         headline: `You have ${unreleasedCount} upcoming ${releaseLabel}`,
         body: 'Enable pre-release pages with countdowns and notify-me.',
-        cta: `Upgrade to ${getPlanDisplayName('pro')}`,
+        cta: `Upgrade to ${PRO_PLAN_DISPLAY_NAME}`,
       };
   }
 }

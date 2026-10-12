@@ -5,8 +5,8 @@ import { instantiateReleaseTasksFromCatalog } from '@/app/app/(shell)/dashboard/
 import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
 import { toast } from '@/components/feedback';
 import { buildReleaseTasksRoute } from '@/constants/routes';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import type { ReleaseViewModel } from '@/lib/discography/types';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import type { ReleaseContext } from '@/lib/release-tasks/applicability';
 
@@ -99,7 +99,7 @@ export function usePostCreateReleasePlan({
         if (isUpgradeRequiredError(error)) {
           // Expected entitlement gate — not a bug, do not report to Sentry.
           toast.error(
-            `Release plans require the ${getPlanDisplayName('pro')} plan. Upgrade to unlock this feature.`
+            `Release plans require the ${PRO_PLAN_DISPLAY_NAME} plan. Upgrade to unlock this feature.`
           );
         } else {
           captureError('Failed to generate release plan', error, {

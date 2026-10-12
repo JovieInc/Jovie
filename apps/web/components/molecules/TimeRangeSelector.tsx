@@ -13,7 +13,7 @@ import {
   getTimeRangeLabel,
   isRangeBeyondRetention,
 } from '@/lib/analytics/time-range';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { cn } from '@/lib/utils';
 
 /**
@@ -144,7 +144,7 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
             id: tabsBaseId ? `${tabsBaseId}-tab-${range}` : undefined,
             ariaControls: panelId,
             title: disabled
-              ? `Upgrade to ${getPlanDisplayName('pro')} for extended analytics`
+              ? `Upgrade to ${PRO_PLAN_DISPLAY_NAME} for extended analytics`
               : undefined,
           };
         })}

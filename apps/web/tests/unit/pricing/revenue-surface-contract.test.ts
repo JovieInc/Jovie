@@ -131,7 +131,9 @@ describe('revenue-surface contract (JOV-7809)', () => {
             `${contract.path} hardcodes a plan name matching ${pattern}; read it from getEntitlements()/ARTIST_VISIBILITY_OFFER instead`
           ).not.toMatch(pattern);
         }
-        expect(source).toMatch(/entitlements\/registry|billing\/offer-truth/);
+        expect(source).toMatch(
+          /entitlements\/registry|billing\/offer-truth|config\/plan-prices/
+        );
       });
 
       it('never renders placeholder or broken preview content', () => {

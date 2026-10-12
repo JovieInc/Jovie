@@ -15,7 +15,7 @@ import {
   type PersistedToolEvent,
 } from '@/lib/chat/tool-events';
 import { getToolUiConfig } from '@/lib/chat/tool-ui-registry';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { env } from '@/lib/env-client';
 import { opsCardFromToolOutput } from '@/lib/ovie/ops-card';
 import { addBreadcrumb } from '@/lib/sentry/client-lite';
@@ -141,7 +141,7 @@ function getLockedPlanRequired(event: PersistedToolEvent): string {
   const plan = event.output?.plan_required;
   return typeof plan === 'string' && plan.length > 0
     ? plan
-    : getPlanDisplayName('pro');
+    : PRO_PLAN_DISPLAY_NAME;
 }
 
 function getToolStatusTitle(event: PersistedToolEvent): string {

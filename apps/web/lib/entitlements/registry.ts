@@ -238,7 +238,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
     booleans: { ...PRO_BOOLEANS },
     limits: { ...PRO_LIMITS },
     marketing: {
-      displayName: 'Artist Presence',
+      displayName: ARTIST_VISIBILITY_OFFER.pro.displayName,
       tagline:
         'Continuous visibility monitoring, prioritized opportunities, and agentic fixes.',
       features: PRO_FEATURES,

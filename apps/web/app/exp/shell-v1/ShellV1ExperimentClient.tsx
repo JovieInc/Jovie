@@ -176,8 +176,8 @@ import { ThreadVideoCard } from '@/components/shell/ThreadVideoCard';
 import { ThreadView as ShellThreadView } from '@/components/shell/ThreadView';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { DSP_CONFIGS } from '@/lib/dsp-registry';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';
 // ---------------------------------------------------------------------------
@@ -4696,7 +4696,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
               type='button'
               className='inline-flex items-center h-7 px-3 rounded-md text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-primary-token hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
             >
-              {`Upgrade to ${getPlanDisplayName('pro')}`}
+              {`Upgrade to ${PRO_PLAN_DISPLAY_NAME}`}
             </button>
           ),
         },

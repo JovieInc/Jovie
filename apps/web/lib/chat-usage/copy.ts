@@ -1,4 +1,4 @@
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { getWeeklyUsageModel } from './metrics';
 
@@ -22,7 +22,7 @@ export interface ChatUsageCopy {
 const PLAN_LABELS: Record<ChatUsageData['plan'], string> = {
   free: 'Free',
   trial: 'Trial',
-  pro: getPlanDisplayName('pro'),
+  pro: PRO_PLAN_DISPLAY_NAME,
   max: 'Max',
 };
 
@@ -55,7 +55,7 @@ export function getChatUsageCopy(data: ChatUsageData): ChatUsageCopy {
   if (state === 'exhausted') {
     const summaryDescription =
       data.plan === 'free'
-        ? `You've used all ${data.weeklyLimit} weekly messages included in your plan. Upgrade to ${getPlanDisplayName('pro')} for more messages each week.`
+        ? `You've used all ${data.weeklyLimit} weekly messages included in your plan. Upgrade to ${PRO_PLAN_DISPLAY_NAME} for more messages each week.`
         : `You've used all ${data.weeklyLimit} weekly messages included in your plan. Your messages refresh when the current window ends.`;
 
     return {
@@ -69,7 +69,7 @@ export function getChatUsageCopy(data: ChatUsageData): ChatUsageCopy {
       summaryDescription,
       ctaLabel:
         data.plan === 'free'
-          ? `Upgrade to ${getPlanDisplayName('pro')}`
+          ? `Upgrade to ${PRO_PLAN_DISPLAY_NAME}`
           : 'View plans',
     };
   }
@@ -85,7 +85,7 @@ export function getChatUsageCopy(data: ChatUsageData): ChatUsageCopy {
       summaryDescription: `You've sent ${data.used} of ${data.weeklyLimit} weekly messages. ${data.remaining} remaining this week.`,
       ctaLabel:
         data.plan === 'free'
-          ? `Upgrade to ${getPlanDisplayName('pro')}`
+          ? `Upgrade to ${PRO_PLAN_DISPLAY_NAME}`
           : 'View plans',
     };
   }
@@ -100,7 +100,7 @@ export function getChatUsageCopy(data: ChatUsageData): ChatUsageCopy {
     summaryDescription: `${data.remaining} of ${data.weeklyLimit} weekly messages remaining this week.`,
     ctaLabel:
       data.plan === 'free'
-        ? `Upgrade to ${getPlanDisplayName('pro')}`
+        ? `Upgrade to ${PRO_PLAN_DISPLAY_NAME}`
         : 'View plans',
   };
 }
