@@ -8,10 +8,10 @@
  *    {value.toLocaleString()}, {Intl.NumberFormat…}, {n + 1}, {12}) renders
  *    changing numerals. Without `tabular-nums` the digits jitter as they
  *    update. Heuristic: every expression child must match a numeric cue
- *    (identifier containing Count|Total|Amount|Price|Score|Stat|Percent|
+ *    (identifier with a whole camelCase word Count|Total|Amount|Price|Score|Stat|Percent|
  *    Rate|Rank|Views|Plays|Fans|Followers|Duration|Balance|Quantity|
- *    Progress|Timer|Elapsed|Remaining|…, or contain a numeric literal /
- *    toLocaleString / toFixed / Intl.NumberFormat call) and no child may be
+ *    Progress|Timer|Elapsed|Remaining|…, BE a numeric literal or arithmetic
+ *    on one, or contain a toLocaleString / toFixed / Intl.NumberFormat call) and no child may be
  *    a JSX element. Generic names (`value`, `size`, `age`, `index`) are
  *    deliberately excluded — they often render non-numeric strings.
  *    Fix: add `tabular-nums`
@@ -147,10 +147,86 @@ const NUMERIC_LEAF_TAGS = new Set([
 // Identifier cues kept deliberately narrow: generic names like `value`,
 // `size`, `age`, or `index` frequently render non-numeric strings (copyable
 // IDs, dimensions labels) and produced false positives on existing markup.
-const NUMERIC_CUE_REGEX =
-  /(?:count|total|amount|price|score|stats?|percent|rate|rank|views?|plays?|fans|followers?|subscribers?|duration|balance|quantity|qty|progress|timer|elapsed|remaining|points|steps|reps|ratio|average|sum)\w*/i;
+// Matched against whole camelCase/snake_case words of each identifier, so
+// `followerCount` and `total_plays` match while `country` and `status` do
+// not (substring matching produced false positives on those).
+const NUMERIC_CUE_WORDS = new Set([
+  'count',
+  'total',
+  'amount',
+  'price',
+  'score',
+  'stat',
+  'stats',
+  'percent',
+  'percentage',
+  'rate',
+  'rank',
+  'view',
+  'views',
+  'play',
+  'plays',
+  'fans',
+  'follower',
+  'followers',
+  'subscriber',
+  'subscribers',
+  'duration',
+  'balance',
+  'quantity',
+  'qty',
+  'progress',
+  'timer',
+  'elapsed',
+  'remaining',
+  'points',
+  'steps',
+  'reps',
+  'ratio',
+  'average',
+  'sum',
+]);
 
-const NUMERIC_LITERAL_REGEX = /(?<![\w$])\d+(?:\.\d+)?/;
+const IDENTIFIER_REGEX = /[A-Za-z_$][\w$]*/g;
+
+function identifierWords(identifier) {
+  return identifier
+    .replaceAll(/([a-z\d])([A-Z])/g, '$1 $2')
+    .replaceAll(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .split(/[\s_$]+/)
+    .filter(Boolean)
+    .map(word => word.toLowerCase());
+}
+
+function hasNumericCue(text) {
+  for (const identifier of text.match(IDENTIFIER_REGEX) ?? []) {
+    if (identifierWords(identifier).some(word => NUMERIC_CUE_WORDS.has(word))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const ARITHMETIC_OPERATORS = new Set(['+', '-', '*', '/', '%', '**']);
+
+// A numeric literal only signals a numeral display when it IS the rendered
+// value (`{12}`, `{-1}`) or an arithmetic operand (`{n + 1}`). Literals used
+// as call arguments or indices (`name.charAt(0)`, `items[0]`) do not.
+function isNumericLiteralValue(expr) {
+  if (!expr) return false;
+  if (expr.type === 'Literal') return typeof expr.value === 'number';
+  if (expr.type === 'UnaryExpression') {
+    return isNumericLiteralValue(expr.argument);
+  }
+  if (expr.type === 'BinaryExpression') {
+    return (
+      ARITHMETIC_OPERATORS.has(expr.operator) &&
+      (isNumericLiteralValue(expr.left) || isNumericLiteralValue(expr.right))
+    );
+  }
+  return false;
+}
+
 const NUMERIC_FORMAT_REGEX =
   /toLocaleString|toFixed|Intl\.NumberFormat|formatNumber|formatCompact|formatCurrency|formatPercent|numeral\(/;
 
@@ -159,8 +235,8 @@ function looksNumericExpression(expr, sourceCode) {
   // Anything rendering markup is not a numeral.
   if (text.includes('<')) return false;
   return (
-    NUMERIC_CUE_REGEX.test(text) ||
-    NUMERIC_LITERAL_REGEX.test(text) ||
+    hasNumericCue(text) ||
+    isNumericLiteralValue(expr) ||
     NUMERIC_FORMAT_REGEX.test(text)
   );
 }
@@ -284,7 +360,8 @@ function checkHitArea(node, context) {
   const tokens = className.split(/\s+/).filter(Boolean);
 
   // Declared visual box: unprefixed h-*/w-*/size-* only (before:/after:
-  // pseudo utilities describe the hit container, not the visible box).
+  // pseudo utilities describe the hit container, not the visible box, and
+  // other variants are skipped below).
   let height = null;
   let width = null;
   // Rescues on each axis: unprefixed min-h-*/min-w-* ≥40px, or a
@@ -293,6 +370,10 @@ function checkHitArea(node, context) {
   let widthRescued = false;
   for (const token of tokens) {
     const hitContainer = /^(?:before|after):/.test(token);
+    // Responsive/state variants (md:, hover:, group-hover:) describe a
+    // different box than the base one; only base and hit-container tokens
+    // count, so `size-12 md:size-6` is judged by its base size.
+    if (!hitContainer && token.includes(':')) continue;
     const declaredH = utilityPx(token, ['h', 'size']);
     const declaredW = utilityPx(token, ['w', 'size']);
     if (!hitContainer) {
@@ -356,8 +437,14 @@ const RADIUS_CLASS_REGEX =
 function radiusRank(className) {
   // Returns { kind: 'none' | 'ranked' | 'round', rank, px } for the FIRST
   // whole-element radius token; null when absent.
+  // Only base (unprefixed) tokens: `md:rounded-2xl` or `hover:rounded-xl`
+  // describe a variant, not the element's resting radius.
+  const baseClasses = className
+    .split(/\s+/)
+    .filter(token => token && !token.includes(':'))
+    .join(' ');
   RADIUS_CLASS_REGEX.lastIndex = 0;
-  const match = RADIUS_CLASS_REGEX.exec(className);
+  const match = RADIUS_CLASS_REGEX.exec(baseClasses);
   if (!match) return null;
   const token = match[1] ?? '';
   if (token === 'pill' || token === 'full') return { kind: 'round' };

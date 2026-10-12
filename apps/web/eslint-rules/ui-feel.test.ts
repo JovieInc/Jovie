@@ -66,6 +66,38 @@ ruleTester.run('ui-feel', rule, {
       filename,
       code: `const el = <div>{items.map(i => <span key={i}>{i}</span>)}</div>;`,
     },
+    // Cue words must be whole identifier words, not substrings.
+    {
+      filename,
+      code: `const el = <span>{country}</span>;`,
+    },
+    {
+      filename,
+      code: `const el = <span>{status}</span>;`,
+    },
+    // Literals used as arguments or indices are not rendered numerals.
+    {
+      filename,
+      code: `const el = <span>{name.charAt(0)}</span>;`,
+    },
+    {
+      filename,
+      code: `const el = <span>{items[0]}</span>;`,
+    },
+    // Responsive/state variants don't override the base hit box.
+    {
+      filename,
+      code: `const el = <button className='size-12 md:size-6'>x</button>;`,
+    },
+    // Variant radius on the child is not its resting radius.
+    {
+      filename,
+      code: `const el = <div className='rounded-lg p-2'><div className='rounded-md md:rounded-2xl'>x</div></div>;`,
+    },
+    {
+      filename,
+      code: `const el = <div className='md:rounded-sm rounded-2xl p-2'><div className='rounded-xl'>x</div></div>;`,
+    },
     // Dynamic className is out of scope — can't reason statically.
     {
       filename,
@@ -161,6 +193,23 @@ ruleTester.run('ui-feel', rule, {
     },
   ],
   invalid: [
+    // Whole camelCase cue word and arithmetic on a literal.
+    {
+      filename,
+      code: `const el = <span>{followerCount}</span>;`,
+      errors: [{ messageId: 'missingTabularNums' }],
+    },
+    {
+      filename,
+      code: `const el = <span>{n + 1}</span>;`,
+      errors: [{ messageId: 'missingTabularNums' }],
+    },
+    // Variant tokens do not shrink the base box or radius.
+    {
+      filename,
+      code: `const el = <button className='h-8 w-8 md:h-12 md:w-12'>x</button>;`,
+      errors: [{ messageId: 'undersizedHitArea' }],
+    },
     // ── tabular-nums ───────────────────────────────────────────────────────
     {
       filename,
