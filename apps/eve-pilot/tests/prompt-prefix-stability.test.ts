@@ -1,7 +1,7 @@
 import type { ModelMessage } from 'ai';
 import { describe, expect, it } from 'vitest';
-// Eve's own harness compaction, as patched in patches/eve@0.70.0.patch.
-import { compactMessages } from '../node_modules/eve/dist/src/harness/compaction.js';
+// Eve's own harness compaction, as patched in patches/eve@0.72.1.patch.
+import { compactMessages } from '../node_modules/eve/dist/src/harness/compaction/engine.js';
 
 const big = (seed: number) => ({
   type: 'json' as const,

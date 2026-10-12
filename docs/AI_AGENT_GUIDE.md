@@ -286,6 +286,9 @@ no literal `fetch` call for their paths.
 | `/api/monitoring/performance` | GET | Admin | Performance metrics |
 | `/api/profile/view` | POST | Public | Track profile view |
 | `/api/px` | POST | Public | Tracking pixel |
+| `/api/referrals/apply` | POST | Better Auth | Apply referral code |
+| `/api/referrals/code` | GET/POST | Better Auth | Get/create referral code |
+| `/api/referrals/stats` | GET | Better Auth | Referral stats |
 | `/api/report` | POST | Public | Submit abuse/security report (rate-limited) |
 | `/api/revalidate/featured-creators` | POST | Internal | Revalidate featured cache |
 | `/api/suggestions` | GET | Better Auth | Profile suggestions |

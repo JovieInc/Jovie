@@ -47,6 +47,8 @@ function renderTitlebar(
       value={{
         state: 'open',
         open: true,
+        isPreview: false,
+        isFloating: false,
         setOpen: vi.fn(),
         openMobile: false,
         setOpenMobile: vi.fn(),
@@ -234,6 +236,8 @@ describe('DesktopTitlebar', () => {
         value={{
           state: 'open',
           open: true,
+          isPreview: false,
+          isFloating: false,
           setOpen: vi.fn(),
           openMobile: false,
           setOpenMobile: vi.fn(),
@@ -463,6 +467,8 @@ describe('DesktopTitlebar', () => {
         value={{
           state: 'open',
           open: true,
+          isPreview: false,
+          isFloating: false,
           setOpen: vi.fn(),
           openMobile: false,
           setOpenMobile: vi.fn(),
@@ -526,6 +532,8 @@ describe('DesktopTitlebar', () => {
         value={{
           state: 'open',
           open: true,
+          isPreview: false,
+          isFloating: false,
           setOpen: vi.fn(),
           openMobile: false,
           setOpenMobile: vi.fn(),
@@ -577,6 +585,8 @@ describe('DesktopTitlebar', () => {
         value={{
           state: 'open',
           open: true,
+          isPreview: false,
+          isFloating: false,
           setOpen: vi.fn(),
           openMobile: false,
           setOpenMobile: vi.fn(),

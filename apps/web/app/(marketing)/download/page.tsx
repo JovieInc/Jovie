@@ -71,7 +71,7 @@ const PLATFORM_ROWS = [
   {
     icon: Laptop,
     label: 'Mac',
-    title: 'Native desktop workspace',
+    title: 'Native desktop\u00a0workspace',
     body: 'Open Jovie from your Dock, keep your release workflow out of browser noise, and stay current with automatic updates.',
     action: 'Download for Mac',
     href: DOWNLOAD_URL,
@@ -285,7 +285,7 @@ export default function DownloadPage() {
                     </div>
                     <h2
                       data-wrap='editorial-title'
-                      className='mt-5 max-w-xs text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
+                      className='mt-5 text-pretty text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-4xl'
                     >
                       {platform.title}
                     </h2>
@@ -329,7 +329,7 @@ export default function DownloadPage() {
               <p className='homepage-section-eyebrow'>Release workflow</p>
               <h2
                 data-wrap='editorial-title'
-                className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
+                className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
               >
                 Everything In Jovie, Closer.
               </h2>
@@ -359,7 +359,7 @@ export default function DownloadPage() {
                 <p className='homepage-section-eyebrow'>Install details</p>
                 <h2
                   data-wrap='editorial-title'
-                  className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
+                  className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
                 >
                   Built To Stay Out Of The Way.
                 </h2>

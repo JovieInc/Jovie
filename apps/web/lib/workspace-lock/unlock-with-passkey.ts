@@ -1,6 +1,10 @@
+import { WebAuthnAbortService } from '@simplewebauthn/browser';
 import { authClient } from '@/lib/auth/client';
 import { isDesktopEnvironment } from '@/lib/desktop/electron-bridge';
-import { updateWorkspacePrivacyLock } from './workspace-lock';
+import {
+  updateWorkspacePrivacyLock,
+  WorkspacePrivacyLockError,
+} from './workspace-lock';
 
 /**
  * Passkey / Touch ID step-up shared by the workspace lock screen and the
@@ -105,17 +109,36 @@ function stepUpTimeoutMs(): number {
 
 function withTimeout<T>(
   pending: Promise<T>,
-  timeoutError = new PasskeyStepUpError('timeout', TIMEOUT_MESSAGE)
+  timeoutError = new PasskeyStepUpError('timeout', TIMEOUT_MESSAGE),
+  signal?: AbortSignal,
+  onTimeout?: () => void
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(timeoutError), stepUpTimeoutMs());
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(
+        signal?.reason ??
+          new PasskeyStepUpError('cancelled', SIGN_IN_CANCELLED_MESSAGE)
+      );
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(timeoutError);
+      onTimeout?.();
+    }, stepUpTimeoutMs());
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) onAbort();
     pending.then(
       value => {
-        clearTimeout(timer);
+        cleanup();
         resolve(value);
       },
       error => {
-        clearTimeout(timer);
+        cleanup();
         reject(error instanceof Error ? error : new Error(String(error)));
       }
     );
@@ -171,11 +194,12 @@ async function assertCeremonyCanRun(): Promise<void> {
  * to the lock. Confirm the receipt exists before reloading so that case
  * shows an actionable error instead (JOV-6892).
  */
-async function assertStepUpActive(): Promise<void> {
+async function assertStepUpActive(signal?: AbortSignal): Promise<void> {
   let body: { unlocked?: boolean } | null = null;
   try {
     const response = await withTimeout(
       fetch(STEP_UP_STATUS_PATH, {
+        signal,
         credentials: 'same-origin',
         cache: 'no-store',
       }),
@@ -196,9 +220,20 @@ async function assertStepUpActive(): Promise<void> {
   }
 }
 
-async function assertPrivacyLockUnlocked(): Promise<void> {
+async function assertPrivacyLockUnlocked(signal?: AbortSignal): Promise<void> {
   const state = await withTimeout(
-    updateWorkspacePrivacyLock('unlock'),
+    updateWorkspacePrivacyLock('unlock', signal).catch(error => {
+      if (
+        error instanceof WorkspacePrivacyLockError &&
+        error.code === 'PASSKEY_STEP_UP_REQUIRED'
+      ) {
+        throw new PasskeyStepUpError(
+          'admin-factor-missing',
+          ADMIN_FACTOR_MISSING_MESSAGE
+        );
+      }
+      throw error;
+    }),
     new PasskeyStepUpError('unconfirmed', UNCONFIRMED_MESSAGE)
   );
   const unlockedUntil = state.unlockedUntil
@@ -240,62 +275,96 @@ export interface UnlockWithPasskeyOptions {
   purpose?: 'admin' | 'privacy';
   /** Recovery flows can require an existing credential without enrolling one. */
   allowEnrollment?: boolean;
+  /** The initiating surface owns and cancels this attempt on unmount. */
+  signal?: AbortSignal;
 }
 
 export async function unlockWithPasskey({
   purpose = 'admin',
   allowEnrollment = true,
+  signal,
 }: UnlockWithPasskeyOptions = {}): Promise<void> {
-  await assertCeremonyCanRun();
-
-  const listed = await withTimeout(authClient.passkey.listUserPasskeys());
-  if (listed.error) throw new Error(listed.error.message);
-  if (
-    (listed.data ?? []).length === 0 &&
-    (purpose === 'privacy' || !allowEnrollment)
-  ) {
-    throw new PasskeyStepUpError(
-      'setup-required',
-      purpose === 'privacy'
-        ? PRIVACY_PASSKEY_REQUIRED_MESSAGE
-        : 'No passkey is registered for this account. Set one up in Jovie before reconnecting Ovie.'
+  const controller = new AbortController();
+  let ceremonyPending = false;
+  const cancel = () => {
+    controller.abort(
+      new PasskeyStepUpError('cancelled', SIGN_IN_CANCELLED_MESSAGE)
     );
-  }
-  if ((listed.data ?? []).length === 0) {
-    const added = await withTimeout(
-      authClient.passkey.addPasskey({ name: 'Ovie' })
+    if (ceremonyPending) WebAuthnAbortService.cancelCeremony();
+  };
+  signal?.addEventListener('abort', cancel, { once: true });
+  if (signal?.aborted) cancel();
+  const wait = <T>(pending: Promise<T>) =>
+    withTimeout(
+      pending,
+      new PasskeyStepUpError('timeout', TIMEOUT_MESSAGE),
+      controller.signal,
+      cancel
     );
-    // Better Auth writes the passkey row only after verified registration,
-    // so a canceled/aborted ceremony (e.g. dismissing the 1Password prompt)
-    // must never be projected as a saved credential (JOV-6892). Treat a
-    // data-less result — error or not — as an aborted enrollment.
-    if (added?.error || !added?.data) {
-      throw added?.error
-        ? toStepUpError(added.error, ENROLLMENT_CANCELLED_MESSAGE)
-        : new PasskeyStepUpError('cancelled', ENROLLMENT_CANCELLED_MESSAGE);
-    }
-  }
+  try {
+    await wait(assertCeremonyCanRun());
+    controller.signal.throwIfAborted();
 
-  const signedIn = await withTimeout(authClient.signIn.passkey());
-  if (signedIn?.error) {
-    const code = passkeyErrorCode(signedIn.error);
-    if (code && UNREGISTERED_CREDENTIAL_CODES.has(code)) {
-      // The authenticator offered a credential the server never registered
-      // (kept locally after a canceled enrollment). Reconcile against the
-      // authoritative server list before claiming a usable passkey.
-      const reconciled = await withTimeout(
-        authClient.passkey.listUserPasskeys()
+    const listed = await wait(authClient.passkey.listUserPasskeys());
+    if (listed.error) throw new Error(listed.error.message);
+    if (
+      (listed.data ?? []).length === 0 &&
+      (purpose === 'privacy' || !allowEnrollment)
+    ) {
+      throw new PasskeyStepUpError(
+        'setup-required',
+        purpose === 'privacy'
+          ? PRIVACY_PASSKEY_REQUIRED_MESSAGE
+          : 'No passkey is registered for this account. Set one up in Jovie before reconnecting Ovie.'
       );
-      if ((reconciled.data ?? []).length === 0) {
-        throw new PasskeyStepUpError('setup-required', SETUP_REQUIRED_MESSAGE);
+    }
+    if ((listed.data ?? []).length === 0) {
+      ceremonyPending = true;
+      const added = await wait(
+        authClient.passkey.addPasskey({
+          name: 'Ovie',
+          fetchOptions: { signal: controller.signal },
+        })
+      );
+      // Better Auth writes the passkey row only after verified registration,
+      // so a canceled/aborted ceremony (e.g. dismissing the 1Password prompt)
+      // must never be projected as a saved credential (JOV-6892). Treat a
+      // data-less result — error or not — as an aborted enrollment.
+      if (added?.error || !added?.data) {
+        throw added?.error
+          ? toStepUpError(added.error, ENROLLMENT_CANCELLED_MESSAGE)
+          : new PasskeyStepUpError('cancelled', ENROLLMENT_CANCELLED_MESSAGE);
       }
     }
-    throw toStepUpError(signedIn.error, SIGN_IN_CANCELLED_MESSAGE);
-  }
 
-  if (purpose === 'privacy') {
-    await assertPrivacyLockUnlocked();
-    return;
+    ceremonyPending = true;
+    const signedIn = await wait(
+      authClient.signIn.passkey({ fetchOptions: { signal: controller.signal } })
+    );
+    ceremonyPending = false;
+    if (signedIn?.error) {
+      const code = passkeyErrorCode(signedIn.error);
+      if (code && UNREGISTERED_CREDENTIAL_CODES.has(code)) {
+        // The authenticator offered a credential the server never registered
+        // (kept locally after a canceled enrollment). Reconcile against the
+        // authoritative server list before claiming a usable passkey.
+        const reconciled = await wait(authClient.passkey.listUserPasskeys());
+        if ((reconciled.data ?? []).length === 0) {
+          throw new PasskeyStepUpError(
+            'setup-required',
+            SETUP_REQUIRED_MESSAGE
+          );
+        }
+      }
+      throw toStepUpError(signedIn.error, SIGN_IN_CANCELLED_MESSAGE);
+    }
+
+    if (purpose === 'privacy') {
+      await wait(assertPrivacyLockUnlocked(controller.signal));
+      return;
+    }
+    await wait(assertStepUpActive(controller.signal));
+  } finally {
+    signal?.removeEventListener('abort', cancel);
   }
-  await assertStepUpActive();
 }

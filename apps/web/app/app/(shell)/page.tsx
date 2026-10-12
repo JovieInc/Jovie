@@ -35,7 +35,9 @@ export default async function AppRootPage({
 
   return (
     <HydrateClient state={getDehydratedState()}>
-      <OpportunityInboxRoute />
+      <OpportunityInboxRoute
+        initialView={readFirstParam(params.view) === 'done' ? 'done' : 'needs'}
+      />
       <OnboardingInterviewModal initialRequested={interviewRequested} />
     </HydrateClient>
   );

@@ -8,6 +8,7 @@ import {
   getBaseServerConfig,
   isNonProductionServerNoise,
 } from '@/lib/sentry/config';
+import { LOW_VALUE_SPAN_FILTERS } from '@/lib/sentry/low-value-spans';
 import {
   DESTINATION_STREAM_CLOSED_IGNORE_ERRORS,
   isNonActionableDestinationStreamEvent,
@@ -38,6 +39,10 @@ type SamplingContext = Parameters<
 
 Sentry.init({
   ...baseConfig,
+
+  // JOV-6109: drop framework-bookkeeping and unauthenticated-noise spans.
+  // The SDK appends its own Next.js filters (_next/static, /404, …).
+  ignoreSpans: [...LOW_VALUE_SPAN_FILTERS],
 
   // Drop performance traces for the health endpoint — Sentry's uptime monitor
   // pings it every minute, which would otherwise skew p50/p99 latency data.

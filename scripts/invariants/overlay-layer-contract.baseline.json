@@ -10,7 +10,7 @@
     "packages/ui"
   ],
   "localStackingMax": 30,
-  "totalFindings": 81,
+  "totalFindings": 79,
   "files": {
     "apps/web/app/exp/component-checker/ComponentCheckerClient.tsx": {
       "z-50": 1
@@ -106,9 +106,6 @@
     "apps/web/components/features/home/HeroSpotifySearch.tsx": {
       "z-50": 1
     },
-    "apps/web/components/features/home/HomePhoneFrame.tsx": {
-      "z-[18]": 1
-    },
     "apps/web/components/features/home/HomeTrustSection.tsx": {
       "z-[1]": 1
     },
@@ -139,9 +136,6 @@
     "apps/web/components/marketing/HomeComposerHero.tsx": {
       "z-[1]": 1,
       "z-[2]": 1
-    },
-    "apps/web/components/molecules/drawer/RightDrawer.tsx": {
-      "z-50": 1
     },
     "apps/web/components/molecules/MobileNav.tsx": {
       "z-[100]": 1,

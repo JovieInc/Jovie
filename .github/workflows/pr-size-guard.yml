@@ -186,7 +186,7 @@ jobs:
 
       - name: Upload repository health receipt
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: repo-health-receipt-${{ github.event.pull_request.number }}
           path: repo-health-receipt.json
@@ -232,6 +232,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+          PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}
           REPO: ${{ github.repository }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
@@ -248,28 +249,30 @@ jobs:
 
           # Exclude generated / lock / snapshot / vendored noise from the count.
           EXCLUDE='pnpm-lock\.yaml|package-lock\.json|yarn\.lock|\.lock$|/generated/|\.gen\.|__snapshots__/|\.snap$|\.svg$|\.po$|/dist/|/build/|\.min\.|drizzle/migrations/meta/'
-          # The GraphQL-backed `gh pr view --json files` shares an installation
-          # quota with the rest of the fleet and can fail before counting a
-          # two-file PR. Use the paginated REST endpoint and retry only
-          # transient quota/server failures; every other error fails closed.
-          api_error="$RUNNER_TEMP/pr-size-guard-api.err"
-          rows=''
-          for attempt in 1 2 3; do
-            if rows=$(gh api --paginate \
-              "repos/$REPO/pulls/$PR/files?per_page=100" \
-              --jq '.[] | "\(.additions+.deletions)\t\(.filename)"' \
-              2>"$api_error"); then
-              break
-            fi
-            if [[ "$attempt" -eq 3 ]] || ! grep -qiE \
-              "rate limit|HTTP 403|HTTP 429|HTTP 5[0-9][0-9]|invalid character '<'" "$api_error"; then
-              cat "$api_error" >&2
-              exit 1
-            fi
-            delay=$((attempt * 5))
-            echo "Transient GitHub REST failure (attempt $attempt/3); retrying in ${delay}s"
-            sleep "$delay"
-          done
+          # Count from the exact merge base this job already checked out: no
+          # GitHub API call, so the shared GITHUB_TOKEN quota (1,000 REST/h for
+          # every workflow in the repo) can never turn this required check red
+          # (2026-10-11 20:07Z). Same rows as `pulls/<n>/files`: renames count
+          # once under the new path, binary files count zero lines.
+          # shellcheck disable=SC2016 # JavaScript source, not shell expansion.
+          rows=$(node -e '
+            const out = require("node:child_process").execFileSync(
+              "git", ["diff", "--numstat", "-z", "-M", process.argv[1], "HEAD"],
+              { maxBuffer: 256 * 1024 * 1024 });
+            const parts = out.toString("utf8").split("\0");
+            const rows = [];
+            for (let i = 0; i < parts.length; ) {
+              const record = parts[i++];
+              if (!record) continue;
+              const [added, deleted, path] = record.split("\t");
+              let name = path;
+              if (path === "") { i += 1; name = parts[i++]; }
+              const lines = (added === "-" ? 0 : Number(added)) + (deleted === "-" ? 0 : Number(deleted));
+              if (!Number.isSafeInteger(lines) || !name) throw new Error(`unparseable numstat row: ${record}`);
+              rows.push(`${lines}\t${name}`);
+            }
+            process.stdout.write(rows.join("\n"));
+          ' "$PR_DIFF_BASE")
           counted=$(printf '%s\n' "$rows" | grep -vE "$EXCLUDE" || true)
           lines=$(printf '%s\n' "$counted" | awk -F'\t' '{s+=$1} END{print s+0}')
           files=$(printf '%s\n' "$counted" | grep -c . || true)

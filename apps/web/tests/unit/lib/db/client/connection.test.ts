@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  classifyDatabaseEndpoint,
   db,
+  evaluateFleetConnectionBudget,
   resolvePoolConfig,
+  resolvePoolMax,
   resolveStatementTimeoutMs,
   setInternalDb,
 } from '@/lib/db/client/connection';
@@ -14,6 +17,7 @@ const mutableEnv = process.env as Record<string, string | undefined>;
 const originalNodeEnv = mutableEnv.NODE_ENV;
 const originalVitest = mutableEnv.VITEST;
 const originalStatementTimeout = mutableEnv.DB_STATEMENT_TIMEOUT_MS;
+const originalPoolMax = mutableEnv.DB_POOL_MAX;
 
 describe('db proxy', () => {
   afterEach(() => {
@@ -34,6 +38,12 @@ describe('db proxy', () => {
       delete mutableEnv.DB_STATEMENT_TIMEOUT_MS;
     } else {
       mutableEnv.DB_STATEMENT_TIMEOUT_MS = originalStatementTimeout;
+    }
+
+    if (originalPoolMax === undefined) {
+      delete mutableEnv.DB_POOL_MAX;
+    } else {
+      mutableEnv.DB_POOL_MAX = originalPoolMax;
     }
   });
   it('binds function properties to underlying db instance', () => {
@@ -68,6 +78,79 @@ describe('db proxy', () => {
     const config = resolvePoolConfig('postgres://localhost:5432/dev');
 
     expect(config.max).toBe(20);
+  });
+
+  it('allows only a downward per-process pool override', () => {
+    mutableEnv.NODE_ENV = 'development';
+    delete mutableEnv.VITEST;
+    mutableEnv.DB_POOL_MAX = '6';
+    expect(resolvePoolMax()).toBe(6);
+
+    mutableEnv.DB_POOL_MAX = '200';
+    expect(resolvePoolMax()).toBe(20);
+    mutableEnv.DB_POOL_MAX = 'invalid';
+    expect(resolvePoolMax()).toBe(20);
+  });
+
+  it('classifies Neon transaction pooler URLs without exposing credentials', () => {
+    expect(
+      classifyDatabaseEndpoint(
+        'postgres://role:secret@ep-example-pooler.us-east-1.aws.neon.tech/db' // trufflehog:ignore
+      )
+    ).toBe('transaction-pooled');
+    expect(
+      classifyDatabaseEndpoint(
+        'postgres://role:secret@ep-example.us-east-1.aws.neon.tech/db' // trufflehog:ignore
+      )
+    ).toBe('direct');
+    expect(classifyDatabaseEndpoint('postgres://localhost/db')).toBe('other');
+  });
+
+  it('budgets overlapping pooled clients against backend rather than client ceiling', () => {
+    expect(
+      evaluateFleetConnectionBudget({
+        adminConnections: 2,
+        directWorkerConnections: 5,
+        effectiveBackendLimit: 50,
+        endpointMode: 'transaction-pooled',
+        interactiveReserve: 10,
+        overlappingDeployInstances: 2,
+        peakInstances: 8,
+        poolMax: 20,
+        poolerBackendLimit: 30,
+        testConnections: 0,
+      })
+    ).toEqual({
+      applicationBackendCeiling: 30,
+      applicationClientCeiling: 200,
+      headroom: 13,
+      missing: [],
+      status: 'accepted',
+      totalBackendCeiling: 37,
+    });
+  });
+
+  it('rejects direct fleet pressure and keeps incomplete budgets unknown', () => {
+    const direct = evaluateFleetConnectionBudget({
+      adminConnections: 2,
+      directWorkerConnections: 5,
+      effectiveBackendLimit: 50,
+      endpointMode: 'direct',
+      interactiveReserve: 10,
+      overlappingDeployInstances: 2,
+      peakInstances: 8,
+      poolMax: 20,
+      testConnections: 0,
+    });
+    expect(direct.status).toBe('rejected');
+    expect(direct.totalBackendCeiling).toBe(207);
+
+    const unknown = evaluateFleetConnectionBudget({
+      endpointMode: 'transaction-pooled',
+      poolMax: 20,
+    });
+    expect(unknown.status).toBe('unknown');
+    expect(unknown.missing).toContain('poolerBackendLimit');
   });
 
   it('omits statement_timeout when DB_STATEMENT_TIMEOUT_MS is unset', () => {

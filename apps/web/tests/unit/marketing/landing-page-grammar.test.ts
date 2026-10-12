@@ -160,9 +160,14 @@ describe('certified landing-page grammar', () => {
     );
   });
 
-  it('keeps the homepage at the locked nine-section budget and Find me action', () => {
+  it('projects the selected homepage jobs while preserving the separate grammar budget and action lock', () => {
     expect(LANDING_PAGE_HOMEPAGE_LOCK.maxSections).toBe(9);
-    expect(LANDING_PAGE_HOMEPAGE_LOCK.sectionJobs).toHaveLength(9);
+    expect(LANDING_PAGE_HOMEPAGE_LOCK.sectionJobs).toEqual([
+      'hero',
+      'feature-split',
+      'feature-split',
+      'cta',
+    ]);
     expect(LANDING_PAGE_HOMEPAGE_LOCK.primaryAction).toBe('Find me');
     expect(LANDING_PAGE_HOMEPAGE_LOCK.tasteOwner).toBe('Tim');
   });
@@ -203,7 +208,7 @@ describe('certified landing-page grammar', () => {
   });
 
   it('exposes canonical route and content-slot lookups', () => {
-    expect(getLandingPageRouteType('homepage').sectionJobs).toHaveLength(9);
+    expect(getLandingPageRouteType('homepage').sectionJobs).toHaveLength(4);
     expect(getLandingPageSlots('hero')).toEqual(
       expect.arrayContaining(['headline', 'primaryCta'])
     );

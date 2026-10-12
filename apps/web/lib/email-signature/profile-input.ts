@@ -22,6 +22,8 @@ interface ProfileLikeForSignature {
 interface SocialLinkLike {
   readonly label: string;
   readonly url: string;
+  /** Canonical platform id, when known (e.g. `instagram`). */
+  readonly platform?: string | null;
 }
 
 function buildTagline(profile: ProfileLikeForSignature): string | undefined {
@@ -46,7 +48,12 @@ function dedupeSocials(
     const url = social.url.trim();
     if (!url || seen.has(url)) continue;
     seen.add(url);
-    result.push({ label: social.label.trim() || url, url });
+    const platform = social.platform?.trim();
+    result.push({
+      label: social.label.trim() || url,
+      url,
+      ...(platform ? { platform } : {}),
+    });
   }
   return result;
 }

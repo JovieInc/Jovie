@@ -1,16 +1,19 @@
-import { execSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { Linter } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const tsParser = require('@typescript-eslint/parser');
 const canonicalUiLabelCasingRule = require('../../../eslint-rules/canonical-ui-label-casing.js');
 
 const webRoot = path.resolve(__dirname, '../../..');
-const repoRoot = path.resolve(webRoot, '..');
+const repoRoot = path.resolve(webRoot, '../..');
+const biomeCli = require.resolve('@biomejs/biome/bin/biome');
+const execFileAsync = promisify(execFile);
 
 const EXP_DRIFT_TARGETS = [
   'apps/web/app/exp/library-v1/page.tsx',
@@ -41,13 +44,34 @@ const LABEL_CASING_TARGETS = [
   'components/features/dev/DevToolbar.tsx',
 ] as const;
 
-function run(command: string) {
-  return execSync(command, {
+// JOV-4892: launch each Biome check once, in parallel, from a shared beforeAll
+// so a loaded affected-suite shard pays the cold process startup once instead
+// of sequentially inside two test bodies — sequential cold spawns are what
+// exhausted the 5s default vitest budget in shard 4/8. The 30s child timeout is
+// ~30-150x the observed 0.2-1s runtime and turns a hung spawn into an ordinary
+// assertion failure rather than a test timeout; the 45s test timeout bounds the
+// await of the already-running check.
+const BIOME_CHILD_TIMEOUT_MS = 30_000;
+const BIOME_TEST_TIMEOUT_MS = 45_000;
+
+function checkBiome(targets: readonly string[]) {
+  // Resolve the installed CLI directly: shell/pnpm startup can exhaust the
+  // unit-test budget on a loaded pre-push runner. Keep the subprocess bounded.
+  return execFileAsync(process.execPath, [biomeCli, 'check', ...targets], {
     cwd: repoRoot,
     encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: BIOME_CHILD_TIMEOUT_MS,
   });
 }
+
+const biomeChecks: Partial<
+  Record<'exp' | 'components', ReturnType<typeof checkBiome>>
+> = {};
+
+beforeAll(() => {
+  biomeChecks.exp = checkBiome(EXP_DRIFT_TARGETS);
+  biomeChecks.components = checkBiome(COMPONENT_DRIFT_TARGETS);
+});
 
 function canonicalLabelErrors(targets: readonly string[]) {
   const linter = new Linter({ configType: 'flat' });
@@ -86,10 +110,14 @@ function canonicalLabelErrors(targets: readonly string[]) {
 }
 
 describe('exp drift lint guard (#11224 follow-up)', () => {
-  it('keeps the exp route sources Biome-clean so pre-push hooks do not fail on unrelated work', () => {
-    const files = EXP_DRIFT_TARGETS.join(' ');
-    expect(() => run(`pnpm biome check ${files}`)).not.toThrow();
-  });
+  it(
+    'keeps the exp route sources Biome-clean so pre-push hooks do not fail on unrelated work',
+    async () => {
+      expect(biomeChecks.exp).toBeDefined();
+      await expect(biomeChecks.exp).resolves.toBeDefined();
+    },
+    BIOME_TEST_TIMEOUT_MS
+  );
 
   it('keeps canonical UI label casing clean on the exp route sources', () => {
     expect(canonicalLabelErrors(EXP_DRIFT_TARGETS)).toEqual([]);
@@ -97,10 +125,14 @@ describe('exp drift lint guard (#11224 follow-up)', () => {
 });
 
 describe('component drift lint guard (#11274)', () => {
-  it('keeps the 8 component files Biome-clean so pre-push hooks do not fail on unrelated work', () => {
-    const files = COMPONENT_DRIFT_TARGETS.join(' ');
-    expect(() => run(`pnpm biome check ${files}`)).not.toThrow();
-  });
+  it(
+    'keeps the 8 component files Biome-clean so pre-push hooks do not fail on unrelated work',
+    async () => {
+      expect(biomeChecks.components).toBeDefined();
+      await expect(biomeChecks.components).resolves.toBeDefined();
+    },
+    BIOME_TEST_TIMEOUT_MS
+  );
 
   it('keeps canonical UI label casing clean on the two previously-violated component files', () => {
     expect(canonicalLabelErrors(LABEL_CASING_TARGETS)).toEqual([]);

@@ -44,8 +44,9 @@ describe('TableActionMenu interactions', () => {
     expect(screen.getByRole('menuitem', { name: 'Share' })).toBeInTheDocument();
   });
 
-  it('preserves nested submenu trees', async () => {
+  it('keeps deeply nested actions reachable through the searchable chooser', async () => {
     const user = userEvent.setup({ delay: null });
+    const copyWithUtm = vi.fn();
 
     render(
       <TableActionMenu
@@ -61,7 +62,7 @@ describe('TableActionMenu interactions', () => {
                   {
                     id: 'instagram-story',
                     label: 'Instagram Story',
-                    onClick: vi.fn(),
+                    onClick: copyWithUtm,
                   },
                 ],
               },
@@ -72,11 +73,17 @@ describe('TableActionMenu interactions', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'More actions' }));
-    await user.hover(screen.getByRole('menuitem', { name: 'Share' }));
-
-    expect(
-      await screen.findByRole('menuitem', { name: 'Copy with UTM' })
-    ).toBeInTheDocument();
+    const search = screen.getByRole('textbox', { name: 'Search...' });
+    expect(search).toHaveFocus();
+    await user.type(search, 'instagram');
+    const action = screen.getByRole('menuitem', {
+      name: 'Share › Copy with UTM › Instagram Story',
+    });
+    expect(action).not.toHaveAttribute('aria-haspopup');
+    await user.click(action);
+    expect(copyWithUtm).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More actions' })).toHaveFocus();
   });
 
   it('focuses and recursively filters the action search when opened', async () => {

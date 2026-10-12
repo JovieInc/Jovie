@@ -9,6 +9,7 @@ import {
   getBaseServerConfig,
   isNonProductionServerNoise,
 } from '@/lib/sentry/config';
+import { LOW_VALUE_SPAN_FILTERS } from '@/lib/sentry/low-value-spans';
 import {
   DESTINATION_STREAM_CLOSED_IGNORE_ERRORS,
   isNonActionableDestinationStreamEvent,
@@ -27,6 +28,9 @@ const baseConfig = getBaseServerConfig();
 
 Sentry.init({
   ...baseConfig,
+
+  // JOV-6109: drop framework-bookkeeping and unauthenticated-noise spans.
+  ignoreSpans: [...LOW_VALUE_SPAN_FILTERS],
 
   tracesSampler: samplingContext => {
     const name = samplingContext.name ?? '';

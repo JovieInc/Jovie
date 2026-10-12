@@ -39,6 +39,9 @@ const hoisted = vi.hoisted(() => {
     insertOnConflictDoNothingMock,
     insertReturningMock,
     updateMock,
+    updateSetMock,
+    generateTextMock: vi.fn(),
+    titleTasks: [] as Array<() => Promise<void>>,
     captureErrorMock: vi.fn(),
     loggerWarnMock: vi.fn(),
     loggerErrorMock: vi.fn(),
@@ -55,6 +58,17 @@ vi.mock('@/lib/db', () => ({
     insert: hoisted.insertMock,
     update: hoisted.updateMock,
   },
+}));
+
+vi.mock('@/lib/ai/sdk', () => ({
+  generateText: hoisted.generateTextMock,
+  gateway: vi.fn(),
+}));
+vi.mock('@/lib/next/schedule-after', () => ({
+  scheduleAfter: vi.fn((task: () => Promise<void>) => {
+    hoisted.titleTasks.push(task);
+    return true;
+  }),
 }));
 
 vi.mock('@/lib/db/schema/chat', () => ({
@@ -128,12 +142,77 @@ describe('chat conversation message routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    hoisted.titleTasks.length = 0;
     hoisted.selectLimitMock.mockReset();
     hoisted.selectLimitMock.mockResolvedValue([]);
     hoisted.insertReturningMock.mockReset();
     hoisted.insertReturningMock.mockResolvedValue([]);
     hoisted.getSessionContextMock.mockResolvedValue({
       profile: { id: 'profile-1' },
+    });
+  });
+
+  it('persists an owner-bound deterministic task title without invoking a model or changing the body', async () => {
+    const content = `Help me with this work.\n${JSON.stringify({ workId: '808c9f4d-505c-4000-8000-000000000001', workTitle: 'Midnight Drive', revision: '2026-10-06' })}`;
+    hoisted.selectLimitMock.mockResolvedValueOnce([
+      { id: 'conv-1', title: null },
+    ]);
+    const { POST } = await import(
+      '@/app/api/chat/conversations/[id]/messages/route'
+    );
+    const response = await POST(
+      new Request('http://localhost/api/chat/conversations/conv-1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content }] }),
+      }),
+      { params: Promise.resolve({ id: 'conv-1' }) }
+    );
+    expect(response.status).toBe(201);
+    await hoisted.titleTasks[0]();
+    expect(hoisted.generateTextMock).not.toHaveBeenCalled();
+    expect(hoisted.updateSetMock).toHaveBeenCalledWith({
+      title: 'Midnight Drive',
+    });
+    expect(hoisted.insertValuesMock).toHaveBeenCalledWith([
+      expect.objectContaining({ content }),
+    ]);
+    const { eq, isNull } = await import('drizzle-orm');
+    expect(eq).toHaveBeenCalledWith('creatorProfileId', 'profile-1');
+    expect(isNull).toHaveBeenCalledWith('title');
+  });
+
+  it('removes transport metadata from title-model context while retaining stored messages', async () => {
+    const content = `Help me with this work.\n${JSON.stringify({ workId: '808c9f4d-505c-4000-8000-000000000001', workTitle: 'Midnight Drive', revision: '2026-10-06' })}`;
+    hoisted.selectLimitMock.mockResolvedValueOnce([
+      { id: 'conv-1', title: null },
+    ]);
+    hoisted.generateTextMock.mockResolvedValueOnce({
+      text: 'Release planning',
+    });
+    const { POST } = await import(
+      '@/app/api/chat/conversations/[id]/messages/route'
+    );
+    await POST(
+      new Request('http://localhost/api/chat/conversations/conv-1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'user', content: 'Help me plan a release' },
+            { role: 'assistant', content },
+          ],
+        }),
+      }),
+      { params: Promise.resolve({ id: 'conv-1' }) }
+    );
+    await hoisted.titleTasks[0]();
+    const prompt = hoisted.generateTextMock.mock.calls[0][0].prompt;
+    expect(prompt).toContain('Midnight Drive');
+    expect(prompt).not.toContain('workId');
+    expect(prompt).not.toContain('revision');
+    expect(hoisted.updateSetMock).toHaveBeenCalledWith({
+      title: 'Release planning',
     });
   });
 

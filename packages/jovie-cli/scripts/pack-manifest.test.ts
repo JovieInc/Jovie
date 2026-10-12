@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { createReleaseManifest, resolveReleaseVersion } from './pack-manifest';
+import {
+  createReleaseManifest,
+  nextReleaseVersion,
+  resolveReleaseVersion,
+} from './pack-manifest';
 
 describe('release pack manifest', () => {
   it('adds the release version without changing the source manifest', () => {
@@ -87,5 +91,22 @@ describe('CLI release version selection', () => {
     expect(resolveReleaseVersion('26.12.9007199254740991')).toBe(
       '26.12.9007199254740991'
     );
+  });
+});
+
+describe('automatic release version', () => {
+  it.each([
+    ['26.10.1\n', [], '26.10.1'],
+    ['26.10.1', ['26.9.16', '26.10.0'], '26.10.1'],
+    ['26.10.1', ['26.10.0', '26.10.1'], '26.10.2'],
+    // A manual release above VERSION must not be reused or undercut.
+    ['26.10.1', ['26.10.1', '26.10.4', '26.9.30'], '26.10.5'],
+    ['26.10.1', ['26.10.1', '26.11.0', '26.11.0-rc.9'], '26.11.1'],
+  ])('VERSION %j with %j publishes %s', (canonical, published, expected) => {
+    expect(nextReleaseVersion(canonical, published)).toBe(expected);
+  });
+
+  it('rejects a malformed canonical VERSION', () => {
+    expect(() => nextReleaseVersion('26.10', [])).toThrow('YY.M.PATCH');
   });
 });

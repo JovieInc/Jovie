@@ -48,7 +48,7 @@ describe('production continuity Sentry check-in', () => {
         failure_issue_threshold: 1,
         max_runtime: 3,
         recovery_threshold: 1,
-        schedule: { type: 'interval', unit: 'hour', value: 4 },
+        schedule: { type: 'interval', unit: 'hour', value: 12 },
         timezone: 'UTC',
       },
       status: 'in_progress',

@@ -1,27 +1,19 @@
+'use client';
+
+// @coverage-via apps/web/components/shell/__tests__/AppShellRightRail.test.tsx
+
 import type { ReactNode } from 'react';
 import { SHELL_RAIL_ALLOCATION } from '@/components/shell/rail-motion';
 import { cn } from '@/lib/utils';
 
 export interface AppShellRightRailProps {
-  /** Right-rail content — typically a RightDrawer or EntitySidebarShell tree. */
   readonly children: ReactNode;
   readonly className?: string;
 }
 
-/**
- * Shared AppShell right-rail frame slot.
- *
- * Owns the sticky structural container inset inside the main workspace.
- * On desktop it is an in-flow sibling of the route column, so a drawer width
- * narrows the route surface rather than overlaying it. The inset belongs here;
- * entity elevation belongs to EntitySidebarShell so every rail shares it.
- * Mobile continues to be owned by RightDrawer's fixed sheet adapter.
- *
- * Usage (normally composed by AppShellFrame):
- *   <AppShellRightRail>
- *     <EntitySidebarShell ...>{content}</EntitySidebarShell>
- *   </AppShellRightRail>
- */
+/** Shared desktop inspector overlay, contained by the route's main surface.
+ * It never owns a flex column or narrows the route. Mobile sheets retain the
+ * RightDrawer viewport adapter; pointer and focus ownership stay with the drawer. */
 export function AppShellRightRail({
   children,
   className,
@@ -30,21 +22,17 @@ export function AppShellRightRail({
     <aside
       data-testid='app-shell-right-rail'
       data-shell-rail-motion='right'
+      data-rail-preview-region='right'
       aria-label='Context Panel'
       className={cn(
-        // The mobile RightDrawer is viewport-fixed. Keep this mount neutral
-        // below lg so it cannot clip the sheet; desktop alone owns the
-        // self-stretch in-flow slot and clipping beside route content.
-        'relative z-30 h-0 w-0 shrink-0 overflow-visible lg:sticky lg:top-0 lg:z-10 lg:flex lg:h-full lg:min-h-0 lg:w-fit lg:flex-col lg:self-stretch lg:overflow-hidden lg:p-1.5',
-        // Shared rail-motion contract (JOV-4522): the same allocation class
-        // the left sidebar mount uses, so both rails reclaim/yield canvas on
-        // identical timing.
+        'pointer-events-none z-30 shell-inspector-overlay',
         SHELL_RAIL_ALLOCATION,
-        'lg:rounded-(--app-shell-radius)',
         className
       )}
     >
-      {children}
+      <div className='pointer-events-auto h-full min-w-0 max-w-full'>
+        {children}
+      </div>
     </aside>
   );
 }

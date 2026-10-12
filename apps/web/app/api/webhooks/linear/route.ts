@@ -5,7 +5,12 @@
  *
  * Bridges signed Linear changes to bounded GitHub repository_dispatch events:
  * CodeRabbit plan comments become `linear_plan_ready`; JOV Issue changes in
- * Triage become `linear_triage_assess` for a trusted exact-issue reread.
+ * Triage become `linear_triage_assess` for a trusted exact-issue reread;
+ * validation receipt comments on JOV issues become `linear_validation_receipt`
+ * (Linear Sync on Merge re-evaluates the lifecycle); a JOV issue that gains
+ * a Quality Gap Finder input label (post-mortem action or escaped defect), or
+ * closes while carrying one, becomes `quality-gap-scan`. These are the events
+ * those workflows used to catch on a clock.
  *
  * Issue pickup is owned by upstream OpenAI Symphony. The Triage event is
  * an assessment wake-up, not an admission or worker dispatch.
@@ -42,6 +47,31 @@ const DISPATCH_TIMEOUT_MS = 4500;
 const MAX_PROVIDER_EVENT_AGE_MS = 6 * 60 * 60 * 1000;
 const JOV_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 const JOV_TRIAGE_STATE_ID = '9844cfe6-6cf4-4347-842c-893a68f349b8';
+const JOV_IDENTIFIER = /^JOV-\d+$/;
+const VALIDATION_RECEIPT_MARKER = /<!--\s*validation-receipt:v1\b/;
+// Mirrors DEFECT_LABELS plus `postmortem-action` in scripts/quality-gap-finder.mjs.
+const QUALITY_GAP_INPUT_LABELS = new Set([
+  'postmortem-action',
+  'bug',
+  'dogfood',
+  'sentry',
+  'intake',
+  'escaped-defect',
+]);
+const CLOSED_STATE_TYPES = new Set(['completed', 'canceled']);
+
+type LinearEventKind =
+  | 'plan'
+  | 'triage-assess'
+  | 'validation-receipt'
+  | 'quality-gap-input';
+
+const DISPATCH_EVENT_TYPE: Record<LinearEventKind, string> = {
+  plan: 'linear_plan_ready',
+  'triage-assess': 'linear_triage_assess',
+  'validation-receipt': 'linear_validation_receipt',
+  'quality-gap-input': 'quality-gap-scan',
+};
 
 interface LinearIssueState {
   id?: string;
@@ -62,6 +92,7 @@ interface LinearIssueData {
   };
   state?: LinearIssueState;
   stateId?: string;
+  labels?: Array<{ id?: string; name?: string }>;
 }
 
 interface LinearCommentUser {
@@ -83,6 +114,7 @@ interface LinearWebhookPayload {
   data?: LinearIssueData | LinearCommentData;
   updatedFrom?: {
     stateId?: string;
+    labelIds?: string[];
   };
   webhookId?: string;
   webhookTimestamp?: string | number;
@@ -131,6 +163,14 @@ function isCodeRabbitPlanComment(payload: LinearWebhookPayload): boolean {
   return isCodeRabbitAuthor && hasPlanMarker;
 }
 
+function isJovIssue(issue: LinearIssueData | undefined): boolean {
+  return Boolean(
+    issue?.id &&
+      JOV_IDENTIFIER.test(issue.identifier ?? '') &&
+      (issue.teamId === JOV_TEAM_ID || issue.team?.key === 'JOV')
+  );
+}
+
 function isJovTriageIssueChange(payload: LinearWebhookPayload): boolean {
   if (
     payload.type !== 'Issue' ||
@@ -139,14 +179,50 @@ function isJovTriageIssueChange(payload: LinearWebhookPayload): boolean {
     return false;
   }
   const issue = payload.data as LinearIssueData | undefined;
-  return Boolean(
-    issue?.id &&
-      /^JOV-\d+$/.test(issue.identifier ?? '') &&
-      (issue.teamId === JOV_TEAM_ID || issue.team?.key === 'JOV') &&
-      (issue.stateId === JOV_TRIAGE_STATE_ID ||
-        issue.state?.id === JOV_TRIAGE_STATE_ID ||
-        issue.state?.name === 'Triage')
+  return (
+    isJovIssue(issue) &&
+    (issue?.stateId === JOV_TRIAGE_STATE_ID ||
+      issue?.state?.id === JOV_TRIAGE_STATE_ID ||
+      issue?.state?.name === 'Triage')
   );
+}
+
+function isValidationReceiptComment(payload: LinearWebhookPayload): boolean {
+  if (payload.type !== 'Comment' || payload.action !== 'create') return false;
+  const comment = payload.data as LinearCommentData | undefined;
+  return (
+    VALIDATION_RECEIPT_MARKER.test(comment?.body ?? '') &&
+    Boolean(comment?.issue?.id) &&
+    JOV_IDENTIFIER.test(comment?.issue?.identifier ?? '')
+  );
+}
+
+function isQualityGapInputChange(payload: LinearWebhookPayload): boolean {
+  if (payload.type !== 'Issue' || payload.action !== 'update') return false;
+  const issue = payload.data as LinearIssueData | undefined;
+  if (!isJovIssue(issue)) return false;
+  const inputLabels = (issue?.labels ?? []).filter(label =>
+    QUALITY_GAP_INPUT_LABELS.has(label.name ?? '')
+  );
+  if (inputLabels.length === 0) return false;
+  const closed =
+    Boolean(payload.updatedFrom?.stateId) &&
+    CLOSED_STATE_TYPES.has(issue?.state?.type ?? '');
+  const previousLabelIds = payload.updatedFrom?.labelIds;
+  const gainedLabel =
+    Array.isArray(previousLabelIds) &&
+    inputLabels.some(label => !previousLabelIds.includes(label.id ?? ''));
+  return closed || gainedLabel;
+}
+
+function classifyLinearEvent(
+  payload: LinearWebhookPayload
+): LinearEventKind | null {
+  if (isCodeRabbitPlanComment(payload)) return 'plan';
+  if (isValidationReceiptComment(payload)) return 'validation-receipt';
+  if (isJovTriageIssueChange(payload)) return 'triage-assess';
+  if (isQualityGapInputChange(payload)) return 'quality-gap-input';
+  return null;
 }
 
 function getIssueData(
@@ -235,10 +311,11 @@ export async function POST(request: NextRequest) {
 
     const payload = JSON.parse(body) as LinearWebhookPayload;
 
-    const isPlanReadyEvent = isCodeRabbitPlanComment(payload);
-    const isTriageEvent = isJovTriageIssueChange(payload);
+    const eventKind = classifyLinearEvent(payload);
+    const isPlanReadyEvent = eventKind === 'plan';
+    const isTriageEvent = eventKind === 'triage-assess';
 
-    if (!isPlanReadyEvent && !isTriageEvent) {
+    if (!eventKind) {
       return NextResponse.json(
         { received: true, ignored: true },
         { headers: NO_STORE_HEADERS }
@@ -271,7 +348,6 @@ export async function POST(request: NextRequest) {
     // The signature authenticates the body, not Linear-Delivery. A replay with
     // a changed header must remain the same event; distinct signed revisions
     // get independent keys. The keyed digest does not expose issue content.
-    const eventKind = isTriageEvent ? 'triage-assess' : 'plan';
     const authenticatedDeliveryId = createHmac('sha256', webhookSecret)
       .update(body)
       .digest('hex');
@@ -319,9 +395,7 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          event_type: isTriageEvent
-            ? 'linear_triage_assess'
-            : 'linear_plan_ready',
+          event_type: DISPATCH_EVENT_TYPE[eventKind],
           client_payload: {
             delivery_id: authenticatedDeliveryId,
             provider_timestamp: observedAt ?? payload.createdAt ?? null,

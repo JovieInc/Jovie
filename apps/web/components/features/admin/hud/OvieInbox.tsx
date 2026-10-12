@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
+import { FounderReviewRecorder } from '@/components/features/opportunity-inbox/FounderReviewRecorder';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import {
@@ -10,7 +11,16 @@ import {
 } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 
+const FOUNDER_NOTE_TARGET = {
+  type: 'founder-note',
+  id: 'founder-brain-dump',
+  title: 'Inbox Brain Dump',
+  sourceKind: 'founder.brain_dump',
+  category: 'note',
+} as const;
+
 export function OvieInbox() {
+  const [captureOpen, setCaptureOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -221,6 +231,19 @@ export function OvieInbox() {
             </p>
           ) : null}
         </div>
+        <details
+          className='mt-4 border-t border-subtle pt-3'
+          onToggle={event => setCaptureOpen(event.currentTarget.open)}
+        >
+          <summary className='cursor-pointer text-xs text-secondary-token'>
+            Capture A Note
+          </summary>
+          <div className='mt-3'>
+            {captureOpen ? (
+              <FounderReviewRecorder target={FOUNDER_NOTE_TARGET} />
+            ) : null}
+          </div>
+        </details>
       </div>
     </ContentSurfaceCard>
   );

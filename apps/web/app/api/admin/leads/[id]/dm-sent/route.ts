@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
-import { evaluateOutboundSend } from '@/lib/outbound/approval';
+import { evaluateOutboundHistoryRecord } from '@/lib/outbound/approval';
 import {
   outboundTargetFromLead,
   readOutboundLedger,
@@ -61,14 +61,15 @@ export async function PATCH(
       );
     }
 
-    // A DM may only be recorded as sent for the exact copy Tim approved.
+    // This records operator-reported history; it does not deliver a DM.
+    // Preserve the existing exact-copy review requirement for this local action.
     const ledger = await readOutboundLedger([existingLead.id]);
-    const permission = evaluateOutboundSend({
+    const permission = evaluateOutboundHistoryRecord({
       target: outboundTargetFromLead(existingLead),
       channel: 'dm',
       rows: ledger.get(existingLead.id) ?? [],
     });
-    if (!permission.allowed) {
+    if (!permission.historyRecordAllowed) {
       return NextResponse.json(
         { error: 'Outreach not approved', reason: permission.reason },
         { status: 409, headers: NO_STORE_HEADERS }
@@ -93,7 +94,11 @@ export async function PATCH(
         eventType: 'dm_sent',
         channel: 'dm',
         campaignKey: 'claim_invite',
-        metadata: { approvedCopyRevision: permission.copy.revision },
+        metadata: {
+          approvedCopyRevision: permission.copy.revision,
+          recordingSource: 'operator_reported',
+          deliveryVerified: false,
+        },
       },
       { idempotent: true }
     );
