@@ -595,23 +595,20 @@ test('a blocking label on a queued PR dequeues only that PR', () => {
   );
 });
 
-test('wakes on completed Source Validation and on the bounded reconciliation sweep', () => {
+test('wakes on completed Source Validation and on the push-to-main reconciliation sweep', () => {
   assert.ok(workflow.on.workflow_run.workflows.includes('Source Validation'));
   assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
   assert.deepEqual(workflow.on.pull_request_target.types, [
     'labeled',
     'unlabeled',
     'reopened',
+    'synchronize',
   ]);
   // A label is never an enroll wake; only a blocking one dequeues its PR.
   assert.match(workflow.jobs.enroll.if, /github\.event\.action != 'labeled'/);
   // JOV-7589: a dequeue while checks are already green emits no completion
-  // event, so a periodic full-roster sweep re-arms within the cadence.
-  const [sweep] = workflow.on.schedule;
-  const cadenceMinutes = Number(
-    /^\*\/([1-9][0-9]*) \* \* \* \*$/.exec(sweep.cron)?.[1]
-  );
-  assert.ok(cadenceMinutes > 0 && cadenceMinutes <= 15);
+  // event, so every landing on main runs the full-roster sweep.
+  assert.deepEqual(workflow.on.push, { branches: ['main'] });
   assert.match(workflow.jobs.enroll.if, /conclusion == 'success'/);
   const ready = load(
     readFileSync('.github/workflows/auto-ready-agent-drafts.yml', 'utf8')
@@ -1371,4 +1368,30 @@ test('a deferred current-state read cannot dequeue a repaired head after its hol
     releaseRead();
     await Promise.allSettled([pending]);
   }
+});
+
+test('a landing on main reconciles the full roster and the hold contract without a timer', async () => {
+  // Tim 2026-10-12: no time-based loops. The push wake replaces the */15 sweep.
+  assert.deepEqual(workflow.on.push, { branches: ['main'] });
+  assert.ok(workflow.on.pull_request_target.types.includes('synchronize'));
+  assert.match(workflow.concurrency.group, /'push'/);
+  assert.equal(
+    concurrencyGroup({ event_name: 'push', event: {}, run_id: 1 }),
+    concurrencyGroup({ event_name: 'push', event: {}, run_id: 2 })
+  );
+  const effects = await fixture({ eventName: 'push', roster: [candidate(1)] });
+  // One paginated pulls.list inventory, as for the schedule and dispatch.
+  assert.equal(effects.inventories.length, 1);
+  assert.deepEqual(effects.reads, [1]);
+  assert.equal(effects.mutations.length, 1);
+  const contract = workflow.jobs['enforce-hold-contract'].if;
+  for (const event of [
+    'push',
+    'pull_request_target',
+    'schedule',
+    'workflow_dispatch',
+  ]) {
+    assert.match(contract, new RegExp(`"${event}"`));
+  }
+  assert.match(contract, /workflow_run\.event == 'merge_group'/);
 });
