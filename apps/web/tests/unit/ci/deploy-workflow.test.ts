@@ -808,7 +808,7 @@ describe('deploy workflow Vercel env resolution', () => {
     }
   });
 
-  it('blocks production promotion on the exact-build canonical six-route browser budget', () => {
+  it('keeps exact-build performance proof deployable without optional auth credentials', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promotionJob = getJobBlock(workflow, 'promote-production');
     const setupStep = getStepBlock(
@@ -873,8 +873,24 @@ describe('deploy workflow Vercel env resolution', () => {
     ]) {
       expect(performanceStep).toContain(`--route-id ${routeId}`);
     }
+    expect(performanceStep).toContain('auth_performance_configured=false');
     expect(performanceStep).toContain(
-      'Authenticated performance credentials are required'
+      'authenticated_performance_status=skipped_unconfigured'
+    );
+    expect(performanceStep).toContain(
+      'authenticated route budgets are explicitly skipped and are not release proof'
+    );
+    expect(performanceStep).toContain(
+      'if [ "$auth_performance_configured" = "true" ]; then'
+    );
+    expect(performanceStep).not.toContain(
+      'fail_performance_gate "Authenticated performance credentials are required'
+    );
+    expect(performanceStep).toContain(
+      'fail_performance_gate "Unable to establish authenticated exact-build browser state."'
+    );
+    expect(performanceStep).toContain(
+      'fail_performance_gate "Authenticated exact-build browser state was not persisted."'
     );
     expect(performanceStep).toContain(
       'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}'
