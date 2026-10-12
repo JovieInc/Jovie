@@ -29,7 +29,7 @@ import {
   AUTH_SIGNUP_ONBOARDING_CANARY_REDIS_KEY,
   AUTH_SIGNUP_ONBOARDING_ROUTES,
   bodyContainsAuthShellReady,
-  bodyContainsInitializedInterview,
+  bodyContainsOnboardingSessionBoundary,
   buildReport,
   type CanaryReport,
   checkAuthSurfaceGet,
@@ -105,9 +105,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         checkAuthSurfaceGet(
           'start-200',
           `${base}${AUTH_SIGNUP_ONBOARDING_ROUTES.start}`,
-          // Robust primary signal: the interview must initialize (starter
-          // intro / composer present), not merely render the chat container.
-          bodyContainsInitializedInterview
+          // Robust signal at the HTTP level: /start must SSR the onboarding
+          // session boundary. The interview itself mounts client-side after
+          // the session restore fetch, so init markers are asserted by the
+          // browser Playwright spec, not here.
+          bodyContainsOnboardingSessionBoundary
         ),
         checkOnboardingChatProbe(
           'onboarding-chat-gate',

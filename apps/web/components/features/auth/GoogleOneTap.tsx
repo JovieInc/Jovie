@@ -48,6 +48,20 @@ function isNativeWebview(): boolean {
   );
 }
 
+function isAutomatedBrowser(): boolean {
+  if (
+    typeof globalThis.navigator === 'undefined' ||
+    typeof globalThis.document === 'undefined'
+  ) {
+    return false;
+  }
+
+  return (
+    globalThis.navigator.webdriver ||
+    globalThis.document.documentElement.dataset.e2eMode === '1'
+  );
+}
+
 export function GoogleOneTap({
   mode,
   suppress,
@@ -56,6 +70,11 @@ export function GoogleOneTap({
   useEffect(() => {
     if (suppress) return;
     if (isNativeWebview()) return;
+    // FedCM reports account-less automation as browser console errors before
+    // Better Auth's promise settles. The root layout marks managed no-auth QA
+    // as e2e mode because Lighthouse masks navigator.webdriver. Skip the
+    // zero-DOM enhancer there while preserving the visible Google OAuth button.
+    if (isAutomatedBrowser()) return;
     if (!isGoogleOneTapConfigured()) return;
 
     // Better Auth's proxy client can expose a callable unknown property even
