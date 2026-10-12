@@ -2587,18 +2587,17 @@ ${selectedGateScript}`,
     expect(coalesce).toContain(
       "needs.release-source.outputs.eligible == 'true'"
     );
-    // No universal fixed delay: the bounded window derives from merge-queue
-    // depth and is capped inside the 5-minute job budget.
-    expect(coalesce).not.toContain('COALESCE_DELAY_SECONDS');
+    // No wait of any kind: a current SHA proceeds at once, and a newer
+    // generation supersedes this one through the FIFO and lineage gate.
+    expect(coalesce).not.toContain('COALESCE_');
+    expect(coalesce).not.toContain('sleep "$wait_seconds"');
     expect(coalesce).not.toContain('sleep 60');
-    expect(coalesce).toContain("COALESCE_PER_GENERATION_SECONDS: '30'");
-    expect(coalesce).toContain("COALESCE_MAX_SECONDS: '150'");
-    expect(coalesce).toContain('sleep "$wait_seconds"');
-    // Event sources: exact main and the merge queue only; no polling loop.
+    // Event source: exact main only; the merge queue is not read.
     expect(coalesce).toContain('commits/main');
-    expect(coalesce).toContain('mergeQueue(branch: "main")');
-    // Empty queue + current SHA proceeds without any wait.
-    expect(coalesce).toContain('if [ "$queue_depth" -eq 0 ]; then');
+    expect(coalesce).not.toContain('mergeQueue(branch: "main")');
+    expect(coalesce).toContain(
+      'record_receipt "proceed" "exact SHA is current"'
+    );
     // Every decision emits a lineage receipt with reason, replacement SHA,
     // time saved, and next state; any wait names benefit and deadline.
     expect(coalesce).toContain('record_receipt');

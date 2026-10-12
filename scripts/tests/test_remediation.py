@@ -197,7 +197,8 @@ class RouterLadderTest(unittest.TestCase):
         self.assertTrue(remediation.escalation_enabled())
         self.assertFalse(remediation.notify_tim())
         self.assertFalse(remediation.lift_human_holds())
-        self.assertFalse(remediation.stuck_pr_escalation_enabled())
+        os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
+        self.assertTrue(remediation.stuck_pr_escalation_enabled(), "every exhausted head gets the ladder by default")
         os.environ["LANES_ESCALATION"] = "0"
         try:
             plan = remediation.plan_ladder({"cls": "fixable-by-model", "subtype": "check", "next_action": "escalate"},
@@ -548,9 +549,14 @@ class LabeledEventTest(unittest.TestCase):
         self.assertEqual(recur["events"]["e2e-login-timeout"]["identifier"], "JOV-1")
         self.assertEqual(recur["reopens"], [{"id": "id-JOV-1", "stateId": "todo-JOV"}])
 
-    def test_stuck_pr_ladder_is_off_and_sweep_labels_are_ordinary_events(self):
+    def test_stuck_pr_ladder_is_on_and_sweep_labels_are_ordinary_events(self):
         os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
-        self.assertFalse(remediation.stuck_pr_escalation_enabled())
+        self.assertTrue(remediation.stuck_pr_escalation_enabled())
+        os.environ["LANES_ESCALATION_STUCK_PRS"] = "0"
+        try:
+            self.assertFalse(remediation.stuck_pr_escalation_enabled())
+        finally:
+            os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
         os.environ["LANES_ESCALATION"] = "0"
         os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
         try:

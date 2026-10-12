@@ -17,8 +17,9 @@ export const QUERY = `query($owner:String!,$name:String!,$number:Int!){
  repository(owner:$owner,name:$name){pullRequest(number:$number){
  headRefOid baseRefName state isDraft mergeable reviewDecision
  isMergeQueueEnabled isInMergeQueue mergeQueueEntry{position} autoMergeRequest{enabledAt}
+ commits(last:1){nodes{commit{committedDate}}}
  timelineItems(last:1,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{
- ... on RemovedFromMergeQueueEvent{id beforeCommit{oid} reason}
+ ... on RemovedFromMergeQueueEvent{id createdAt beforeCommit{oid} reason}
  }}
  }}}`;
 
@@ -57,6 +58,22 @@ export function parseArgs(args) {
     options[key] = args[i + 1];
   }
   return options;
+}
+
+// A removal is revision-scoped, as in merge-queue-green-enroll.yml: a commit
+// after it is a new head that the failure-hold statuses and required checks
+// judge afresh. Only an unchanged head still needs owner reconciliation.
+// Missing timestamps fail closed.
+export function headChangedSinceRemoval(state, removal) {
+  const removedAt = Date.parse(removal?.createdAt);
+  const committedAt = Date.parse(
+    state.commits?.nodes?.[0]?.commit?.committedDate
+  );
+  return (
+    Number.isFinite(removedAt) &&
+    Number.isFinite(committedAt) &&
+    committedAt > removedAt
+  );
 }
 
 /**
@@ -197,7 +214,7 @@ export async function submitMergeIntent(
         state.viewerLogin.toLowerCase() !== reconciliation.owner.toLowerCase()
       )
         return result('blocked', 'reconciliation-owner-mismatch');
-    } else if (removal) {
+    } else if (removal && !headChangedSinceRemoval(state, removal)) {
       return result('blocked', 'queue-ejected-requires-owner-reconciliation', {
         removalEventId: typeof removal.id === 'string' ? removal.id : undefined,
       });

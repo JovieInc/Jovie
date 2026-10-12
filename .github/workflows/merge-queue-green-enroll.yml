@@ -534,6 +534,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-victim-rearm.mjs
+            scripts/lib/admission-hold-labels.mjs
           sparse-checkout-cone-mode: false
 
       - name: Set up pinned Node.js

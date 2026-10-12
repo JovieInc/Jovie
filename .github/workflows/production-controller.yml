@@ -2,10 +2,10 @@ name: Production Controller
 # Invariant consumer: JOV-INV-010. JOV-INV-029: merge is not activation.
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Symphony
-# capability-gap: Event-driven supersession must read live merge-queue depth,
-#   which exists only behind the GitHub GraphQL API; no static in-repo
-#   evidence can prove whether a newer eligible generation is queued.
-# revisit-trigger: Revisit when merge-queue state is carried on the
+# capability-gap: Event-driven supersession must read live main and the
+#   production FIFO, which exist only behind the GitHub API; no static in-repo
+#   evidence can prove whether a newer generation is already queued.
+# revisit-trigger: Revisit when main and FIFO state are carried on the
 #   workflow_run event payload or the controller moves to webhook dispatch.
 run-name: Production Controller ${{ github.event.workflow_run.display_title }}
 
@@ -51,13 +51,14 @@ jobs:
       - id: source
         env: {GH_TOKEN: "${{ github.token }}"}
         run: node .github/scripts/staging-release-source.mjs
-  # Event-driven supersession, not a fixed release-wave sleep: main itself is
-  # the release-lineage event log and the merge queue is the only place a
-  # newer eligible generation can already be validating or queued. This
-  # generation proceeds as soon as its exact SHA is current with an empty
-  # queue, and waits only a bounded queue-derived window when a newer
-  # generation is already approaching, so no staging deploy, migration,
-  # canary, promotion, or rollback mutation can start for a stale SHA.
+  # Event-driven supersession, with no wait: main itself is the
+  # release-lineage event log. This generation proceeds the moment its exact
+  # SHA is current. A newer generation still validating in the merge queue
+  # is not waited for (2026-10-12: no timers that slow shipping); when it
+  # lands, its own run queues behind this one in the FIFO and the lineage
+  # gate at each later boundary yields this generation to it, so no staging
+  # deploy, migration, canary, promotion, or rollback mutation can start for
+  # a stale SHA.
   # A stale-but-ancestor SHA yields to a generation already queued behind it,
   # even past the starvation bound, so a stale backlog drains to the newest
   # queued generation instead of every generation running the full pipeline
@@ -94,15 +95,10 @@ jobs:
           # queued behind it. Still-queued ancestors yield regardless, so a
           # stale backlog drains to the newest queued generation.
           PRODUCTION_STARVATION_SECONDS: '5400'
-          # The bounded window derives from queue state, never a universal
-          # constant: one increment per newer generation already validating in
-          # the merge queue, capped well inside the 5-minute job budget.
-          COALESCE_PER_GENERATION_SECONDS: '30'
-          COALESCE_MAX_SECONDS: '150'
           # A transient GitHub API failure (rate limit, 5xx) must not kill a
           # release wave: each API read retries a bounded number of times
-          # before failing closed. Sized well inside the 5-minute job budget.
-          GH_API_RETRY_ATTEMPTS: '3'
+          # (three attempts) before failing closed, well inside the 5-minute
+          # job budget.
           GH_API_RETRY_SECONDS: '15'
           # Retired fixed release-wave window; receipts record time saved
           # against it.
@@ -110,7 +106,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          queue_depth=0
           {
             echo "is_current=false"
             echo "decision=superseded"
@@ -121,8 +116,8 @@ jobs:
 
           # Emit the release-lineage receipt: every decision records its
           # reason, the replacement SHA, the time saved against the retired
-          # fixed window, and the next state. Any wait carries an explicit
-          # expected benefit and deadline.
+          # fixed window, and the next state. Supersession never waits, so
+          # every receipt records zero wait.
           record_receipt() {
             local decision="$1" reason="$2" replacement_sha="$3" wait_seconds="$4" next_state="$5"
             local time_saved_seconds=$(( FIXED_WINDOW_SECONDS_REPLACED - wait_seconds ))
@@ -136,13 +131,7 @@ jobs:
               echo "time_saved_seconds=$time_saved_seconds"
             } >> "$GITHUB_OUTPUT"
             local deadline="none"
-            if [ "$wait_seconds" -gt 0 ]; then
-              deadline="$(date -u -d "+${wait_seconds} seconds" +%Y-%m-%dT%H:%M:%SZ)"
-            fi
-            local expected_benefit="none: no newer eligible generation is validating or queued"
-            if [ "$wait_seconds" -gt 0 ]; then
-              expected_benefit="allow $queue_depth queued merge-group generation(s) to supersede before exact CI authorization"
-            fi
+            local expected_benefit="none: supersession never waits"
             jq -n \
               --arg generation "$EXPECTED_SHA" \
               --arg decision "$decision" \
@@ -169,12 +158,12 @@ jobs:
           # fails closed so supersession evidence is never guessed.
           gh_api() {
             local attempt
-            for attempt in $(seq "$GH_API_RETRY_ATTEMPTS"); do
+            for attempt in 1 2 3; do
               if gh api "$@" > "$RUNNER_TEMP/gh-api-out.json" 2> "$RUNNER_TEMP/gh-api-err.log"; then
                 cat "$RUNNER_TEMP/gh-api-out.json"
                 return 0
               fi
-              if [ "$attempt" -lt "$GH_API_RETRY_ATTEMPTS" ]; then
+              if [ "$attempt" -lt 3 ]; then
                 echo "::warning::gh api attempt $attempt failed ($(head -n 1 "$RUNNER_TEMP/gh-api-err.log")); retrying in ${GH_API_RETRY_SECONDS}s." >&2
                 sleep "$GH_API_RETRY_SECONDS"
               fi
@@ -213,63 +202,8 @@ jobs:
             exit 0
           fi
 
-          # Event 2: the merge queue is the only signal of a newer eligible
-          # generation already validating or queued. An empty queue means no
-          # wait can avoid redundant work, so proceed immediately.
-          queue_json="$(gh_api graphql \
-            -F owner="${REPOSITORY%%/*}" \
-            -F name="${REPOSITORY##*/}" \
-            -f query='query($owner: String!, $name: String!) {
-              repository(owner: $owner, name: $name) {
-                mergeQueue(branch: "main") {
-                  entries(first: 25) { nodes { position } }
-                }
-              }
-            }')" || {
-            echo "::error::Could not read the main merge queue during release supersession."
-            exit 1
-          }
-          queue_depth="$(jq -r '[(.data.repository.mergeQueue.entries.nodes // [])[] | select(.position | type == "number" and . >= 1)] | length' <<<"$queue_json")"
-          [[ "$queue_depth" =~ ^[0-9]+$ ]] || {
-            echo "::error::Merge queue evidence was malformed during release supersession."
-            exit 1
-          }
-
-          if [ "$queue_depth" -eq 0 ]; then
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-            record_receipt "proceed" "exact SHA is current and the merge queue is empty" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
-            exit 0
-          fi
-
-          # Bounded coalescing: wait only because a newer generation is
-          # already validating. The window derives from queue depth and is
-          # capped; one bounded recheck at the deadline, no polling loop.
-          wait_seconds=$(( queue_depth * COALESCE_PER_GENERATION_SECONDS ))
-          if [ "$wait_seconds" -gt "$COALESCE_MAX_SECONDS" ]; then
-            wait_seconds="$COALESCE_MAX_SECONDS"
-          fi
-          echo "::notice::Release lineage $EXPECTED_SHA waits ${wait_seconds}s (queue_depth=$queue_depth, expected benefit: allow queued merge-group generations to supersede before exact CI authorization, deadline $(date -u -d "+${wait_seconds} seconds" +%Y-%m-%dT%H:%M:%SZ))."
-          sleep "$wait_seconds"
-
-          current_main_sha="$(gh_api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
-          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Could not resolve exact current main at the coalescing deadline."
-            exit 1
-          }
-          if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            gate_decision="$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="at the coalescing deadline" \
-              bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
-            if [ "$gate_decision" != "decision=proceed" ]; then
-              record_receipt "superseded" "newer main landed during the bounded coalescing window" "$current_main_sha" "$wait_seconds" "yield the production lease to controller generation $current_main_sha"
-              exit 0
-            fi
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
-            record_receipt "proceed" "main advanced to $current_main_sha during the window but no newer generation is queued; this ancestor generation keeps the lease" "$EXPECTED_SHA" "$wait_seconds" "authorize exact CI evidence"
-            exit 0
-          fi
-
           echo "is_current=true" >> "$GITHUB_OUTPUT"
-          record_receipt "proceed" "exact SHA stayed current through the bounded coalescing window" "$EXPECTED_SHA" "$wait_seconds" "authorize exact CI evidence"
+          record_receipt "proceed" "exact SHA is current" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
 
   fleet-promotion:
     name: Authorize fleet deployment state

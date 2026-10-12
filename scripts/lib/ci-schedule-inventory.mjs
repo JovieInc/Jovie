@@ -108,7 +108,6 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/cost-anomaly-gate.yml',
   '.github/workflows/deepsec-native.yml',
   '.github/workflows/deprecation-intake.yml',
-  '.github/workflows/design-governance.yml',
   '.github/workflows/desktop-release.yml',
   '.github/workflows/doc-gardening-agent.yml',
   '.github/workflows/fleet-gate-refresh.yml',
@@ -135,11 +134,10 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/shipping-slo.yml',
   '.github/workflows/summer-eve-pin.yml',
   '.github/workflows/synthetic-monitoring.yml',
-  '.github/workflows/visual-a11y.yml',
   '.github/workflows/visual-regression.yml',
   '.github/workflows/voc-mine.yml',
 ]);
-export const CRON_ALLOWLIST_CEILING = 40;
+export const CRON_ALLOWLIST_CEILING = 38;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
@@ -189,10 +187,8 @@ export const POLLING_DEBT = Object.freeze({
     'dispatches ci.yml then waits up to 80 min for that run to complete',
   '.github/workflows/pr-conflict-handler.yml#record_cohort':
     'polls candidate CI runs until a deadline to record cohort outcomes',
-  '.github/workflows/production-controller.yml#coalesce-production':
-    'sleeps up to the coalescing cap scaled by merge-queue depth before rereading main',
 });
-export const POLLING_DEBT_CEILING = 5;
+export const POLLING_DEBT_CEILING = 4;
 
 /**
  * Mutations that change PR, merge-queue, issue, or label state. A workflow is
@@ -269,7 +265,7 @@ export function shellLoops(script = '') {
   const lines = String(script).split('\n').map(stripShellComment);
   const loops = [];
   for (let start = 0; start < lines.length; start += 1) {
-    const header = lines[start].match(/(?:^|[|;&]\s*)(while|until|for)\s/);
+    const header = lines[start].match(/(?:^\s*|[|;&]\s*)(while|until|for)\s/);
     if (!header) continue;
     let depth = 0;
     let end = start;

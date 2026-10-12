@@ -200,8 +200,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
                    for name, seats in capacity_by_provider.items()}
         qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
                                  for name, issues in qualified_by_provider.items()}
-        pool_by_provider = {name: (None if budgets[name]["used"] is None else len(issues))
-                            for name, issues in qualified_by_provider.items()}
+        pool_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
         qualified_jobs = {name: [issue.identifier for issue in issues]
                           for name, issues in qualified_by_provider.items()}
         pool = (None if any(value is None for value in pool_by_provider.values()) else
@@ -1216,7 +1215,17 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "slo": obs.get("slo"),
             "escalation": obs.get("escalation") or remediation.empty_escalation(),
             "remediation": obs.get("remediation") or remediation.empty_remediation(),
-            "autoscale": _autoscale_block(host)}
+            "autoscale": _autoscale_block(host),
+            # Real-limit record (jovie.capacity-limit): which measured limit holds lanes back.
+            "capacityLimit": _capacity_limit_block(host)}
+
+
+def _capacity_limit_block(host) -> dict | None:
+    try:
+        import capacity_limit
+        return capacity_limit.read_record(host.state)
+    except Exception:  # the feed never fails on an optional record
+        return None
 
 
 def _autoscale_block(host) -> dict:

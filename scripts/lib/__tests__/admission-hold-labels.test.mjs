@@ -76,6 +76,14 @@ test('every enroll, dequeue, and auto-merge copy matches the canonical set', () 
     /scripts\/lib\/admission-hold-labels\.mjs/
   );
 
+  const rearm = enroll.jobs['rearm-green-victims'].steps.find(s =>
+    s.uses?.includes('checkout')
+  );
+  assert.match(
+    rearm.with['sparse-checkout'],
+    /scripts\/lib\/admission-hold-labels\.mjs/
+  );
+
   const enable = readWorkflow('auto-merge-default.yml').jobs.enable.steps.find(
     s => s.name === 'Enable auto-merge'
   ).run;
