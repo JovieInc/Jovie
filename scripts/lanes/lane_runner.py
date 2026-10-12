@@ -51,6 +51,7 @@ import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
+import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
@@ -118,7 +119,8 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
-              "scripts/tests/test_epics.py"]
+              "scripts/tests/test_epics.py",
+              "scripts/tests/test_linear_sync.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
@@ -152,11 +154,6 @@ OPEN_PRS_PER_SLOT = 2
 # (codex may not adopt/gate). They are bounded separately so they cannot pin the
 # active budget at its cap forever (JOV-7514: codex idle with 7 terminal PRs).
 TERMINAL_PRS_PER_SLOT = 4
-LANE_ISSUE_PAGES = 5  # <=500 rows per bounded label/state read
-# The claim pool is every JOV Todo issue: one shared snapshot per TTL, <=1000 issues (316 on
-# 2026-10-11). A larger pool fails closed as lane-inventory-page-limit; raise this bound.
-TODO_POOL = "*"
-TODO_POOL_PAGES = 10
 STALE_DRAFT_S = 24 * 3600
 SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
@@ -1839,69 +1836,6 @@ class Linear:
         finally:
             record_linear_usage(self.key, family, outcome, headers)
 
-    def _bounded_lane_nodes(self, query: str, variables: dict) -> list[dict]:
-        """Retain the request cap, but never treat a truncated inventory as complete."""
-        nodes, ids, cursors, after = [], set(), set(), None
-        for _ in range(LANE_ISSUE_PAGES):
-            data = self.gql(query, {**variables, "after": after})
-            edge = data.get("issues") if isinstance(data, dict) else None
-            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list):
-                raise LaneInventoryUnknown("lane-inventory-unreadable")
-            for row in edge["nodes"]:
-                if not isinstance(row, dict) or not isinstance(row.get("id"), str) or not row["id"]:
-                    raise LaneInventoryUnknown("lane-inventory-malformed")
-                if row["id"] not in ids:
-                    nodes.append(row)
-                    ids.add(row["id"])
-            page = edge.get("pageInfo")
-            if not isinstance(page, dict) or not isinstance(page.get("hasNextPage"), bool):
-                raise LaneInventoryUnknown("lane-inventory-coverage-unknown")
-            if not page["hasNextPage"]:
-                return nodes
-            after = page.get("endCursor")
-            if not isinstance(after, str) or not after or after in cursors:
-                raise LaneInventoryUnknown("lane-inventory-cursor-invalid")
-            cursors.add(after)
-        raise LaneInventoryUnknown("lane-inventory-page-limit")
-
-    def _todo_scope(self) -> str:
-        return _linear_scope_id(self.key)
-
-    def _todo_envelope_valid(self, value, labels: list[str]) -> bool:
-        if not isinstance(value, dict) or value.get("schema") != "jovie-linear-todo-snapshot/v1" or (
-                value.get("scope") != self._todo_scope() or value.get("catalog") != labels):
-            raise LaneInventoryUnknown("lane-snapshot-binding-invalid")
-        started, completed, now = value.get("sourceStartedAt"), value.get("completedAt"), time.time()
-        if any(type(stamp) not in (int, float) or not math.isfinite(stamp) for stamp in (started, completed, now)):
-            raise LaneInventoryUnknown("lane-snapshot-clock-invalid")
-        if started > completed or completed > now:
-            raise LaneInventoryUnknown("lane-snapshot-clock-reversed")
-        if now - started >= CLAIM_SCAN_TTL_S:
-            return False
-        if value.get("overflow") is True:
-            if value.get("complete") is not False or "rows" in value:
-                raise LaneInventoryUnknown("lane-snapshot-overflow-invalid")
-            return True
-        rows = value.get("rows")
-        if value.get("complete") is not True or not isinstance(rows, list):
-            raise LaneInventoryUnknown("lane-snapshot-coverage-unknown")
-        ids = set()
-        for row in rows:
-            if not isinstance(row, dict) or any(not isinstance(row.get(key), str) or not row[key]
-                    for key in ("id", "identifier", "title", "created_at")) or (
-                    type(row.get("priority")) is not int or not 0 <= row["priority"] <= 4
-                    or not isinstance(row.get("description"), str)
-                    or not isinstance(row.get("labels"), list)
-                    or any(not isinstance(name, str) or not name for name in row["labels"])):
-                raise LaneInventoryUnknown("lane-snapshot-row-invalid")
-            if row["id"] in ids or (labels != [TODO_POOL] and not set(row["labels"]).intersection(labels)):
-                raise LaneInventoryUnknown("lane-snapshot-membership-invalid")
-            ids.add(row["id"])
-        revision = hashlib.sha256(json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        if value.get("revision") != revision:
-            raise LaneInventoryUnknown("lane-snapshot-revision-invalid")
-        return True
-
     def _snapshot_budget_admitted(self, pages: int, max_age_s: float | None = None) -> bool:
         max_age_s = CLAIM_SCAN_TTL_S if max_age_s is None else max_age_s
         state = lane_state_dir()
@@ -1947,103 +1881,34 @@ class Linear:
             return False
         return self._snapshot_budget_admitted(pages)
 
-    def _todo_snapshot(self, labels: list[str], pages: int, *, overflow=False) -> dict:
-        started, rows, cursors, after = time.time(), {}, set(), None
-        for page_index in range(pages):
-            if not 0 <= time.time() - started < CLAIM_SCAN_TTL_S:
-                raise LaneInventoryUnknown("lane-inventory-scan-expired")
-            if not self._snapshot_budget_admitted(pages - page_index) \
-                    and not self._refresh_budget_evidence(pages - page_index):
-                raise LaneInventoryUnknown("linear-refresh-reserve-held")
-            everything = labels == [TODO_POOL]
-            data = self.gql(
-                ('query($after:String)' if everything else 'query($labels:[String!]!,$after:String)')
-                + '{issues(first:100,after:$after,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}}'
-                + ('' if everything else ',labels:{name:{in:$labels}}')
-                + '}){pageInfo{hasNextPage endCursor} '
-                'nodes{id identifier title description priority createdAt '
-                'labels(first:50){pageInfo{hasNextPage} nodes{name}}}}}',
-                {"after": after} if everything else {"labels": labels, "after": after})
-            if not 0 <= time.time() - started < CLAIM_SCAN_TTL_S:
-                raise LaneInventoryUnknown("lane-inventory-scan-expired")
-            edge = data.get("issues") if isinstance(data, dict) else None
-            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list) or len(edge["nodes"]) > 100:
-                raise LaneInventoryUnknown("lane-inventory-unreadable")
-            for node in edge["nodes"]:
-                if not isinstance(node, dict):
-                    raise LaneInventoryUnknown("lane-inventory-malformed")
-                label_edge = node.get("labels")
-                if not isinstance(label_edge, dict) or not isinstance(label_edge.get("nodes"), list) or (
-                        len(label_edge["nodes"]) > 50 or not isinstance(label_edge.get("pageInfo"), dict)
-                        or label_edge["pageInfo"].get("hasNextPage") is not False):
-                    raise LaneInventoryUnknown("lane-label-coverage-unknown")
-                names = label_edge["nodes"]
-                if any(not isinstance(item, dict) or not isinstance(item.get("name"), str) or not item["name"] for item in names):
-                    raise LaneInventoryUnknown("lane-label-malformed")
-                row = {"id": node.get("id"), "identifier": node.get("identifier"), "title": node.get("title"),
-                       "description": node.get("description") or "", "priority": node.get("priority") or 0,
-                       "created_at": node.get("createdAt"), "labels": sorted({item["name"] for item in names})}
-                ident = row["id"]
-                if not isinstance(ident, str) or not ident:
-                    raise LaneInventoryUnknown("lane-inventory-malformed")
-                if ident in rows and rows[ident] != row:
-                    raise LaneInventoryUnknown("lane-inventory-conflicting-revision")
-                rows[ident] = row
-            page = edge.get("pageInfo")
-            if not isinstance(page, dict) or type(page.get("hasNextPage")) is not bool:
-                raise LaneInventoryUnknown("lane-inventory-coverage-unknown")
-            if not page["hasNextPage"]:
-                ordered = sorted(rows.values(), key=lambda row: row["id"])
-                result = {"schema": "jovie-linear-todo-snapshot/v1", "scope": self._todo_scope(),
-                          "catalog": labels, "sourceStartedAt": started, "completedAt": time.time(),
-                          "complete": True, "rows": ordered,
-                          "revision": hashlib.sha256(json.dumps(ordered, sort_keys=True, separators=(",", ":")).encode()).hexdigest()}
-                if not self._todo_envelope_valid(result, labels):
-                    raise LaneInventoryUnknown("lane-inventory-scan-expired")
-                return result
-            after = page.get("endCursor")
-            if not isinstance(after, str) or not after or after in cursors:
-                raise LaneInventoryUnknown("lane-inventory-cursor-invalid")
-            cursors.add(after)
-        if overflow:
-            return {"schema": "jovie-linear-todo-snapshot/v1", "scope": self._todo_scope(), "catalog": labels,
-                    "sourceStartedAt": started, "completedAt": time.time(), "complete": False, "overflow": True}
-        raise LaneInventoryUnknown("lane-inventory-page-limit")
-
     def lane_issues(self, label: str | None = None) -> list[Issue]:
-        """Every JOV Todo issue, from one complete, credential-bound snapshot per host per TTL.
+        """Every dispatchable JOV Todo issue, from the host's local mirror (Tim 2026-10-11:
+        "linear being down should not stop shipping"). No Linear request: the dispatch tick
+        keeps the mirror fresh when the budget allows and a stale mirror is reported, not
+        refused. `label` (the caller's lane) does not narrow the pool; the router decides.
+        This host's claim ledger and pending outbox moves are already applied."""
+        state = lane_state_dir()
+        return [Issue(row["id"], row["identifier"], row["title"], row["description"], row["priority"],
+                      row["createdAt"], list(row["labels"]))
+                for row in (linear_sync.todo(state, "JOV") if state else [])]
 
-        Tim 2026-10-11: any issue is eligible, so every lane reads the same snapshot and
-        `label` (the caller's lane) no longer narrows it; admission_rejection and the router
-        decide. A truncated scan fails closed. This is candidate observation only:
-        consequential state, mutation readbacks, holds and ownership remain freshly checked
-        at the ordinary claim boundary."""
-        catalog = [TODO_POOL]
-        binding = hashlib.sha256(json.dumps([self._todo_scope(), catalog], separators=(",", ":")).encode()).hexdigest()
-        value = shared(f"claim-todo-all-v2-{binding}", CLAIM_SCAN_TTL_S,
-                       lambda: self._todo_snapshot(catalog, TODO_POOL_PAGES),
-                       validate=lambda envelope: self._todo_envelope_valid(envelope, catalog))
-        if value is None:
-            raise LaneInventoryUnknown("lane-snapshot-unavailable")
-        rows = value.get("rows")
-        if value.get("overflow") is True or not isinstance(rows, list) or len(rows) > 100 * TODO_POOL_PAGES:
-            raise LaneInventoryUnknown("lane-inventory-page-limit")
-        return [Issue(row["id"], row["identifier"], row["title"], row["description"],
-                      row["priority"], row["created_at"], list(row["labels"])) for row in rows]
-
-    def active_lane_issues(self, labels: list[str] | None = None) -> list[Issue]:
-        """In Progress work, for cross-host overlap admission. Every JOV issue is claimable,
-        so no labels (the default) means all In Progress JOV work."""
-        nodes = self._bounded_lane_nodes(
-                ('query($after:String)' if not labels else 'query($labels:[String!]!,$after:String)')
-                + '{issues(first:100,after:$after,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"In Progress"}}'
-                + ('' if not labels else ',labels:{name:{in:$labels}}')
-                + '}){pageInfo{hasNextPage endCursor} '
-                'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}',
-                {"labels": labels} if labels else {})
-        return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
-                      n["createdAt"], [label["name"] for label in n["labels"]["nodes"]])
-                for n in nodes]
+    def admit(self, requests: int) -> bool:
+        """The protected budget gate (both quota dimensions, fresh evidence) for mirror sync
+        and outbox flushes; reserves are unchanged. Evidence older than the autoscaler's
+        window (a quiet host) is re-observed by one probe, at most once per window."""
+        if self._snapshot_budget_admitted(requests) or self._refresh_budget_evidence(requests):
+            return True
+        state = lane_state_dir()
+        budget = maintenance_json(state / "api-budget.json", limit=65536, missing={}) if state else {}
+        seen = autoscale._epoch(((budget.get("dimensions") or {}).get("requests") or {}).get("observedAt")) \
+            if isinstance(budget, dict) else None
+        if state is None or (seen is not None and 0 <= time.time() - seen <= autoscale.STALE_S):
+            return False
+        try:
+            self.gql("query{viewer{id}}", {})
+        except Exception:
+            return False
+        return self._snapshot_budget_admitted(requests)
 
     def create_triage(self, title: str, description: str, dedupe: str | None = None) -> str | None:
         """`dedupe`: a title fragment; an open issue already carrying it is returned instead of a new one."""
@@ -2076,6 +1941,15 @@ class Linear:
         result = self.gql('mutation($id:String!,$b:String!){commentCreate(input:{issueId:$id,body:$b}){success}}',
                           {"id": issue_id, "b": body})
         if not isinstance(result, dict) or not isinstance(result.get("commentCreate"), dict) or result["commentCreate"].get("success") is not True: raise RuntimeError("linear: comment not delivered")
+
+
+def linear_optional(step, *args):
+    """A Linear-dependent side task (escalation, labeled events, sweep). A rate limit skips
+    it for this pass; issue intake continues from the local mirror."""
+    try:
+        return step(*args)
+    except LinearRateLimited:
+        return None
 
 
 def notify_issue_claim(linear: Linear, issue: Issue, name: str, spec: dict) -> None:
@@ -4694,6 +4568,36 @@ def fix_request_source(pr: dict) -> dict:
     }
 
 
+# Cancellation stages before the agent ran or any source mutation landed. A repair
+# stopped at one of them consumed none of the work the fix budget pays for.
+UNWORKED_PRE_AGENT_STAGES = frozenset(
+    {"before-execution-claim", "before-checkout", "after-fetch", "before-install", "before-agent"})
+
+
+def unworked_fix_attempt(receipt: dict) -> str | None:
+    """The no-work reason when a charged attempt ended before any agent work, else None.
+
+    The attempt is charged at claim time, before the run learns the target or its
+    checkout are unusable. Infrastructure stops (an unreadable target, a failed
+    checkout, a preserved-run handoff) then spent the head's bounded fix budget on
+    no work — 19 repairs in 24h on 2026-10-11 (JOV-8191). Stops after the agent ran
+    or source changed keep their charge."""
+    verdict = receipt.get("verdict")
+    if verdict == "recovery-handoff":
+        return str((receipt.get("reasons") or ["recovery-handoff"])[0])
+    if verdict == "skipped":
+        reason = str((receipt.get("reasons") or [""])[0])
+        return reason if reason.startswith("worktree-unavailable") else None
+    # `cancelled` keeps its charge: a queued, merged or superseded target is a repair
+    # outcome, not host infrastructure spending the budget (the doctor never counts it).
+    if verdict == "reconcile-unavailable":
+        stage = (receipt.get("cancellation") or {}).get("stage")
+        if stage is None or stage in UNWORKED_PRE_AGENT_STAGES:
+            return str((receipt.get("cancellation") or {}).get("reason")
+                       or (receipt.get("reasons") or [verdict])[0])
+    return None
+
+
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
     """Release the host-local claim without fabricating an attempt when called directly."""
     def finish(attempts: dict) -> None:
@@ -4705,6 +4609,12 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
                        repairHeadBefore=receipt.get("headBefore"), repairVerdict=receipt.get("verdict"))
         if receipt.get("verdict") == "fix-pushed" and receipt.get("headAfter"):
             attempt["pushedHead"] = receipt["headAfter"]
+        if (refund := unworked_fix_attempt(receipt)) \
+                and type(attempt.get("count")) is int and attempt["count"] > 0:
+            attempt["count"] -= 1
+            attempt["noWorkRefund"] = {"reason": refund[:120], "runId": receipt.get("runId"),
+                                       "at": time.time()}
+            receipt["attemptRefunded"] = refund[:120]
     update_json(host.state / "fix-attempts.json", finish)
 
 
@@ -5020,13 +4930,39 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
 
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
+    opened: dict = {}
     try:
-        return _fix_red_pr(host, name, spec, pr, branch_held=lock.held)
+        return _fix_red_pr(host, name, spec, pr, branch_held=lock.held, opened=opened)
+    except BaseException as error:
+        end_abandoned_attempt(host, opened, error)
+        raise
     finally:
         lock.release()
 
 
-def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True) -> dict:
+def end_abandoned_attempt(host: Host, opened: dict, error: BaseException) -> dict | None:
+    """A repair that crashes after its claim still ends its fenced attempt.
+
+    Without this, its jovie-execution/* status on the PR head stayed pending until the
+    lease expired and a later claim of the same identity reconciled it, which may never
+    happen. Best effort: a failed write leaves the lease-expiry sweep as the backstop.
+    """
+    if not opened:
+        return None
+    try:
+        return execution_attempt.finish(
+            host.state / "runs" / "execution-attempts.jsonl", opened["ident"], opened["fence"], "failed_unknown",
+            {"failureClass": "harness_crash", "failureFingerprint": execution_attempt.digest([type(error).__name__]),
+             "evidenceDigest": execution_attempt.digest(f"{type(error).__name__}:{error}"[:300]),
+             "costs": {}, "dependencies": []}, coordination=opened["coordination"])
+    except Exception:
+        return None
+    finally:
+        opened.clear()
+
+
+def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True, opened: dict | None = None) -> dict:
+    opened = {} if opened is None else opened
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -5051,6 +4987,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             cancellation={
                 "schema": "jovie-fix-cancellation/v1",
                 "reason": reason,
+                "stage": error.stage,
                 "observedState": state or "UNKNOWN",
                 "mergedAt": (live or {}).get("mergedAt"),
                 "observedHead": (live or {}).get("headRefOid"),
@@ -5103,6 +5040,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         receipt.update(verdict="failed", reasons=[f"claim-error:{type(error).__name__}:{error}"[:300]])
     else:
         receipt["execution"] = claimed
+        if claimed["admitted"]:
+            opened.update(ident=ident, fence=claimed["fencingToken"], coordination=coordination)
     if not receipt.get("verdict") and not claimed["admitted"]:
         receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
                        reasons=[claimed["reason"]])
@@ -5274,6 +5213,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
          "costs": {"apiCalls": 1}, "mutationsPerformed": ["source_push"] if pushed else [],
          "confidence": "unknown" if target_unavailable else "high",
          "dependencies": [name, "github-target-state"] if target_unavailable else [name]}, coordination=coordination)
+    opened.clear()
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
@@ -5487,18 +5427,11 @@ def overlap_inventory(host: Host, linear: Linear) -> tuple[list[dict], list[dict
     prs = overlap_prs_summary()
     if prs is None:
         return None
-    def fetch_active():
-        return [{"id": issue.id, "identifier": issue.identifier, "title": issue.title,
-                 "description": issue.description, "priority": issue.priority,
-                 "createdAt": issue.created_at, "labels": issue.labels}
-                for issue in linear.active_lane_issues()]
+    # Owned work without a PR comes from the local mirror and claim ledger, never a live
+    # Linear read, so a Linear outage cannot hold file-overlap admission.
     try:
-        active = shared("file-overlap-tasks-v3", SUMMARY_TTL_S, fetch_active)
-    except LinearRateLimited:
-        raise
+        active = linear_sync.active(host.state, "JOV")
     except Exception:
-        return None
-    if active is None:
         return None
     pr_text = "\n".join(f"{pr.get('headRefName', '')}\n{pr.get('body', '')}" for pr in prs).lower()
     tasks = []
@@ -5739,6 +5672,54 @@ def ended_repair_head(pr: dict, record: dict, pending: dict, now: float) -> bool
                 record.get("repairHeadBefore") == before and all(type(t) in (int, float) and math.isfinite(t) for t in stamps) and
                 0 < stamps[0] <= stamps[1] <= now and not pr.get("isCrossRepository") and
                 str(pr.get("state", "OPEN")).upper() == "OPEN")
+
+
+EXECUTION_STATUS_SWEEP_S = 900  # host-wide cadence of the stale jovie-execution/* sweep
+EXECUTION_STATUS_RECHECK_S = 3600  # one head is re-read at most hourly
+EXECUTION_STATUS_HEADS = 8  # bounded status reads per sweep (bot token, one paginated GET each)
+
+
+def sweep_execution_statuses(host: Host, prs: list[dict] | None = None, now: float | None = None) -> list[dict]:
+    """End stale jovie-execution/* statuses on open PR heads so they stop reading UNSTABLE.
+
+    Candidates come from the cached open-PR inventory (no new listing): heads whose rollup is
+    not green, pending first, each re-read at most hourly. execution_attempt decides staleness
+    from the receipts themselves; a live lease is never touched."""
+    now = time.time() if now is None else now
+    if execution_coordination("0" * 40).get("kind") != "github-status":
+        return []  # Self-test and local-test backends publish no commit statuses.
+    marker = host.state / "execution-status-sweep.json"
+    try:
+        seen = json.loads(marker.read_text())
+    except (OSError, ValueError):
+        seen = {}
+    if not isinstance(seen, dict) or not isinstance(seen.get("heads"), dict):
+        seen = {"heads": {}}
+    if now - (seen.get("at") or 0) < EXECUTION_STATUS_SWEEP_S:
+        return []
+    prs = open_prs_summary() if prs is None else prs
+    open_heads = {pr.get("headRefOid") for pr in prs}
+    heads = {sha: at for sha, at in seen["heads"].items() if sha in open_heads}
+    candidates = sorted(
+        (pr for pr in prs if re.fullmatch(r"[0-9a-f]{40}", pr.get("headRefOid") or "")
+         and pr.get("rollup") not in (None, "SUCCESS") and not pr.get("isCrossRepository")
+         and now - heads.get(pr["headRefOid"], 0) >= EXECUTION_STATUS_RECHECK_S),
+        key=lambda pr: (pr.get("rollup") not in ("PENDING", "EXPECTED"), heads.get(pr["headRefOid"], 0), pr["number"]))
+    results = []
+    for pr in candidates[:EXECUTION_STATUS_HEADS]:
+        coordination = execution_coordination(pr["headRefOid"])
+        heads[pr["headRefOid"]] = now
+        try:
+            outcomes = execution_attempt.finalize_stale_statuses(
+                host.state / "runs" / "execution-attempts.jsonl", coordination, now=now)
+        except Exception as error:  # One unreadable head never blocks the others or the worker.
+            outcomes = [{"outcome": f"error:{type(error).__name__}:{error}"[:200]}]
+        results += [{"pr": pr["number"], "sha": pr["headRefOid"], **item} for item in outcomes]
+    host.state.mkdir(parents=True, exist_ok=True)
+    tmp = marker.with_suffix(f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps({"at": now, "heads": heads, "last": results[-50:]}))
+    os.replace(tmp, marker)
+    return results
 
 
 def publish_exhausted_repairs(host: Host, name: str, prs: list[dict], now: float | None = None) -> int:
@@ -6259,13 +6240,19 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         if not (red or adopt) and not maintenance_only:
             linear = Linear(host.linear_env)
             if local:
-                escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
-        labeled = None if red or adopt or not local or maintenance_only else claim_labeled_event(host, name, linear)
+                linear_optional(escalate_exhausted, host,
+                                list({pr["number"]: pr for pr in candidates + events}.values()), linear)
+        labeled = None if red or adopt or not local or maintenance_only \
+            else linear_optional(claim_labeled_event, host, name, linear)
         issue = labeled
         if local and linear is not None:
-            sweep_lane_prs(host, name, linear)
+            linear_optional(sweep_lane_prs, host, name, linear)
         if local and not (red or adopt or labeled):
             publish_exhausted_repairs(host, name, candidates)
+            try:
+                sweep_execution_statuses(host)
+            except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+                pass  # Retried on the next idle pass; it never blocks new work.
             try:
                 revisit_terminal_prs(host, candidates)
             except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
@@ -6305,10 +6292,12 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                     continue
                 overlap_prediction = admission
                 route_decision = router.decisions.get(issue.identifier) if router else None
-                if linear.state_of(issue.id) != "Todo":
-                    issue = None  # another host claimed it between our read and now
+                # One Symphony host: the local ledger is the claim. Linear's In Progress is
+                # its projection, delivered by the outbox when the budget allows.
+                if not linear_sync.claim(host.state, issue.id, issue.identifier, name):
+                    issue = None
                     break
-                linear.move(issue.id, "In Progress")
+                linear_sync.enqueue(host.state, "move", issue.id, target="In Progress")
                 file_overlap.reserve_task(host.state, issue, overlap_prediction)
                 break
         if red is None and adopt is None and issue is None:
@@ -6347,6 +6336,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     if route_decision and route_decision.get("chosen"):
         log_route(host, name, route_decision)
         spec = {**spec, "model": route_decision["chosen"]["model"], "route": route_decision}
+    linear = linear_sync.Outboxed(host.state, linear)  # every disposition write waits in the outbox
     notify_issue_claim(linear, issue, name, spec)
     try:
         receipt = (epics.run_epic(THIS, host, name, spec, linear, issue, host.repo) if epics.is_epic(issue)
@@ -6486,12 +6476,23 @@ def dispatch(host: Host) -> int:
         ensure_full_history(host)
         try:
             tick["remediationEvents"] = claim_remediation_events(host, Linear(host.linear_env))
-        except Exception as error:  # the label scan never takes worker spawn down
+        except (Exception, SystemExit) as error:  # the label scan (or a missing key) never takes spawn down
             tick["remediationEventsError"] = f"{type(error).__name__}: {error}"[:200]
             try:
                 tick["remediationEvents"] = _event_delivery_snapshot(host, time.time())
             except Exception as status_error:
                 tick["remediationDeliveryStatusError"] = f"{type(status_error).__name__}: {status_error}"[:200]
+        if not os.environ.get("LANES_SELFTEST"):  # a release self-test never calls Linear
+            try:
+                teams = ["JOV", *(binding.key for binding in bindings.extra_bindings(THIS))]
+                client = Linear(host.linear_env)
+                tick["linearSync"] = linear_sync.tick(host.state, client, client.admit, (LinearRateLimited,), teams)
+            except (Exception, SystemExit) as error:  # dispatch reads the mirror at any age
+                tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
+        try:
+            tick["linear"] = linear_sync.status(host.state)
+        except Exception as error:
+            tick["linear"] = {"error": type(error).__name__}
         for name, spec in load_providers().items():
             try:
                 slots = host.slots(name, spec.get("slots", 1))
@@ -6523,17 +6524,17 @@ def dispatch(host: Host) -> int:
         return finish_dispatch(host, tick)
     try:
         tick["events"] = pr_events.tick(host, THIS, lambda: Linear(host.linear_env))
-    except Exception as error:  # the ready/orphan queue never takes dispatch down
+    except (Exception, SystemExit) as error:  # the ready/orphan queue never takes dispatch down
         tick["eventsError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         tick["reason"] = reason_lane.tick(host, THIS, lambda: Linear(host.linear_env))
-    except Exception as error:  # Summer's reasoning jobs never take dispatch down
+    except (Exception, SystemExit) as error:  # Summer's reasoning jobs never take dispatch down
         tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         if not os.environ.get("LANES_SELFTEST"):  # a release self-test never writes to Linear
             teams = ["JOV", *(binding.key for binding in bindings.extra_bindings(THIS))]
             tick["issueReconcile"] = epics.reconcile(THIS, host, lambda: Linear(host.linear_env), teams)
-    except Exception as error:  # epic closure and hold expiry never take dispatch down
+    except (Exception, SystemExit) as error:  # epic closure and hold expiry never take dispatch down
         tick["issueReconcileError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         corpus_owner = os.environ.get("YC_CORPUS_OWNER", "gem").split(".")[0]

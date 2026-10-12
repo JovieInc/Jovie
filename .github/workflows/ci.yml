@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: GitHub merge queue keys no concurrency by PR, so a rebuilt group's run keeps its predecessor's runs busy; the Jovie Bot token lists runs off the shared GITHUB_TOKEN quota.
+# removal-trigger: Remove ci-merge-group-supersede when GitHub cancels superseded merge_group runs natively or merge_group concurrency can key on the queued PR number.
 name: CI
 
 on:
@@ -1133,7 +1137,9 @@ jobs:
           ref: main
           fetch-depth: 1
           persist-credentials: false
-          sparse-checkout: scripts/lib/merge-group-admission.mjs
+          sparse-checkout: |
+            scripts/lib/merge-group-admission.mjs
+            scripts/lib/github-rate-limit.mjs
           sparse-checkout-cone-mode: false
       - name: Require live queue membership and external admission checks
         id: admission
@@ -1171,69 +1177,98 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   # A rebuilt group gets a new queue ref for the same PR, but CI keys
-  # merge_group concurrency by head SHA, so the superseded run kept every lane
+  # merge_group concurrency by head SHA, so a superseded run kept every lane
   # busy: 2,312 of 3,468 group runs on 2026-10-03 were still running after
-  # their PR had a newer group (~11.5k wall-min). This watchdog lists the PR's
-  # queue refs over git (no REST quota) and cancels this run only after two
-  # consecutive reads show its own ref gone AND a successor ref for the same
-  # PR present. A merged or failed-and-removed group leaves no successor, so
-  # its run keeps its real conclusion; an unreadable listing is not evidence.
-  ci-merge-group-watchdog:
-    name: Merge Group Supersession Watchdog
+  # their PR had a newer group (~11.5k wall-min). The newest group's run
+  # cancels its predecessors once, at start: it lists this workflow's live
+  # merge_group runs with the Jovie Bot token (its own quota; the repo
+  # GITHUB_TOKEN budget is the binding one), keeps only older runs of the same
+  # PR on a different queue SHA, and cancels each one whose queue ref git no
+  # longer lists. Only the cancel itself spends GITHUB_TOKEN quota (the App
+  # has actions:read). Any failed read logs and exits 0; it gates nothing.
+  ci-merge-group-supersede:
+    name: Merge Group Supersede Older Runs
     if: ${{ github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
-    # Outlives check_response_timeout_minutes (60); exits as soon as the
-    # group leaves the queue.
-    timeout-minutes: 70
+    timeout-minutes: 3
     permissions:
       actions: write
     steps:
-      - name: Cancel this run once a newer group supersedes it
+      - name: Generate Jovie Bot read token
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
+
+      - name: Cancel older runs of the same queued PR
         env:
-          GH_TOKEN: ${{ github.token }}
+          READ_TOKEN: ${{ steps.app-token.outputs.token }}
+          CANCEL_TOKEN: ${{ github.token }}
           QUEUE_REF: ${{ github.ref }}
+          HEAD_SHA: ${{ github.sha }}
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
-          POLL_SECONDS: '30'
-          MAX_SECONDS: '3900'
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          GIT_SERVER: ${{ github.server_url }}
         run: |
           set -uo pipefail
           if [[ ! "$QUEUE_REF" =~ ^refs/heads/gh-readonly-queue/main/pr-([1-9][0-9]*)-[0-9a-f]{40}$ ]]; then
-            echo "::notice::$QUEUE_REF is not a main queue ref; watchdog idle."
+            echo "::notice::$QUEUE_REF is not a main queue ref; nothing to supersede."
             exit 0
           fi
-          prefix="refs/heads/gh-readonly-queue/main/pr-${BASH_REMATCH[1]}-"
-          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          list_refs() {
-            GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+          pr="${BASH_REMATCH[1]}"
+          if [[ -z "${READ_TOKEN:-}" ]]; then
+            echo "::warning::No Jovie Bot read token; skipping supersession."
+            exit 0
+          fi
+          workflow="${WORKFLOW_REF%%@*}"
+          workflow="${workflow##*/}"
+          # One read: this workflow's newest 100 merge_group runs (~2h of
+          # groups, beyond the 60-min queue check timeout), unfinished only.
+          if ! page="$(GH_TOKEN="$READ_TOKEN" gh api \
+            "repos/$REPOSITORY/actions/workflows/$workflow/runs?event=merge_group&per_page=100")"; then
+            echo "::warning::Could not list merge_group runs; skipping supersession."
+            exit 0
+          fi
+          if ! older="$(jq -r --argjson own "$RUN_ID" --arg sha "$HEAD_SHA" \
+            --arg branch "^gh-readonly-queue/main/pr-${pr}-[0-9a-f]{40}$" '
+              .workflow_runs[]
+              | select(.status != "completed" and .id < $own and .head_sha != $sha)
+              | select((.head_branch // "") | test($branch))
+              | "\(.id) \(.head_branch)"' <<<"$page")"; then
+            echo "::warning::Unreadable run listing; skipping supersession."
+            exit 0
+          fi
+          if [[ -z "$older" ]]; then
+            echo "::notice::No older run for PR #$pr to supersede."
+            exit 0
+          fi
+          # A ref git still lists is a live group: never cancel its run.
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$READ_TOKEN" | base64 | tr -d '\n')"
+          if ! live="$(GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.$GIT_SERVER/.extraheader" \
             GIT_CONFIG_VALUE_0="$auth" \
             GIT_TERMINAL_PROMPT=0 \
-              git ls-remote "https://github.com/$REPOSITORY" "${prefix}*"
-          }
-          misses=0
-          while (( SECONDS < MAX_SECONDS )); do
-            if refs="$(list_refs)"; then
-              names="$(awk '{print $2}' <<<"$refs")"
-              if grep -qxF "$QUEUE_REF" <<<"$names"; then
-                misses=0
-              elif grep -q . <<<"$names"; then
-                misses=$((misses + 1))
-                if (( misses >= 2 )); then
-                  echo "::notice::$QUEUE_REF was superseded by $(head -n1 <<<"$names"); cancelling run $RUN_ID."
-                  gh run cancel "$RUN_ID" --repo "$REPOSITORY" || echo "::warning::cancel request failed"
-                  exit 0
-                fi
-              else
-                echo "::notice::$QUEUE_REF left the queue without a successor; keeping this run's conclusion."
-                exit 0
-              fi
-            else
-              misses=0
+            git ls-remote "$GIT_SERVER/$REPOSITORY" \
+              "refs/heads/gh-readonly-queue/main/pr-${pr}-*")"; then
+            echo "::warning::Could not list queue refs for PR #$pr; skipping supersession."
+            exit 0
+          fi
+          live="$(awk '{print $2}' <<<"$live")"
+          while read -r id branch; do
+            if grep -qxF "refs/heads/$branch" <<<"$live"; then
+              echo "::notice::Run $id keeps running: $branch is still a live queue ref."
+              continue
             fi
-            sleep "$POLL_SECONDS"
-          done
-          echo "::notice::watchdog budget elapsed with $QUEUE_REF still queued."
+            echo "::notice::Cancelling run $id ($branch), superseded by $QUEUE_REF."
+            GH_TOKEN="$CANCEL_TOKEN" gh api -X POST \
+              "repos/$REPOSITORY/actions/runs/$id/cancel" >/dev/null \
+              || echo "::warning::Cancel request for run $id failed."
+          done <<<"$older"
 
   ci-risk-classifier:
     # Dependency-free so fork PRs classify without waiting on a trusted job or

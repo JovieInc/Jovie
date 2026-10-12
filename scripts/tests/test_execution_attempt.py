@@ -221,12 +221,16 @@ class GithubCoordinationBoundaryTest(unittest.TestCase):
             self.assertIn("/git/refs", transport.call_args.args[2])
 
     def test_append_maps_terminal_states_and_preserves_predecessor(self):
-        for terminal, expected in [(None, "pending"), ("succeeded", "success"),
-                                   ("no_op_stale", "success"), ("superseded", "success"),
-                                   ("failed_known", "failure")]:
-            with self.subTest(terminal=terminal), patch.object(attempt, "_gh", return_value={} ) as transport:
-                event = attempt._github_append(self.coord, self.ident, self.row(terminalState=terminal), 7)
-                self.assertEqual(transport.call_count, 2)
+        # An ended retryable attempt is no longer running: only a live attempt or seal is pending.
+        for event_name, terminal, expected in [("attempt_started", None, "pending"), ("boundary_admitted", None, "pending"),
+                                               ("completion_fenced", None, "pending"), ("attempt_finished", None, "success"),
+                                               ("attempt_finished", "succeeded", "success"),
+                                               ("attempt_finished", "no_op_stale", "success"), ("disposition_reconciled", "no_op_stale", "success"),
+                                               ("attempt_finished", "superseded", "success"),
+                                               ("attempt_finished", "failed_known", "failure"), ("decision", "budget_exhausted", "failure")]:
+            with self.subTest(event=event_name, terminal=terminal), patch.object(attempt, "_gh", return_value={} ) as transport:
+                event = attempt._github_append(self.coord, self.ident, self.row(event=event_name, terminalState=terminal), 7)
+                self.assertEqual(transport.call_count, 3 if event_name == "attempt_started" else 2)
                 body = transport.call_args.args[3]
                 self.assertEqual(body["state"], expected)
                 packed = body["target_url"].split("#jovie-execution=", 1)[1]
@@ -532,5 +536,102 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
             return real(coord, method, endpoint, body)
         with patch.object(attempt, "_gh", side_effect=raced), self.assertRaisesRegex(RuntimeError, "unsupported-history"): self.reconcile()
         self.assertEqual([body["state"] for body in self.posts], ["failure"])
+    def test_finalized_legacy_pending_statuses_keep_reconciliation_and_its_strict_history(self):
+        outcomes = attempt.finalize_stale_statuses(self.state / "sweep.jsonl", self.coord, now=self.now)
+        self.assertEqual([item["outcome"] for item in outcomes], ["finalized", "finalized"])
+        self.assertEqual([body["state"] for body in self.posts], ["success", "success"])
+        self.assertEqual(attempt.finalize_stale_statuses(self.state / "sweep.jsonl", self.coord, now=self.now), [])
+        self.posts.clear()
+        self.assertTrue(self.reconcile()["reconciled"])
+        self.assertEqual([body["state"] for body in self.posts], ["pending", "success"])
+
+
+class StaleStatusSweepTest(unittest.TestCase):
+    """Every jovie-execution/* status on a PR head ends unless a live lease still owns it."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        self.sha = "b" * 40
+        self.coord = {"kind": "github-status", "repository": "JovieInc/Jovie", "sha": self.sha}
+        self.creator = {"login": "jovie-bot[bot]", "type": "Bot", "id": 12}
+        self.ident = attempt.identity("pr-remediation", {"repository": "JovieInc/Jovie", "pr": 9, "failure": 0}, {"headSha": self.sha})
+        self.statuses, self.posts, self.refs = [], [], set()
+        self.transport = patch.object(attempt, "_gh", side_effect=self.gh); self.transport.start(); self.addCleanup(self.transport.stop)
+    def gh(self, coord, method, endpoint, body=None):
+        if method == "POST":
+            if endpoint.endswith("/git/refs"):
+                if body["ref"] in self.refs: return None
+                self.refs.add(body["ref"]); return {}
+            self.posts.append(body)
+            self.statuses.append({**body, "id": len(self.statuses) + 1, "creator": dict(self.creator)}); return {}
+        if "/statuses?" in endpoint: return [copy.deepcopy(self.statuses)]
+        self.fail(f"unexpected endpoint: {endpoint}")
+    def publish(self, rows, *, legacy=True, creator=None):
+        """Mirror the ledger to statuses as the pre-fix writer did (every non-terminal row pending)."""
+        previous = None
+        for row in rows:
+            number = len(self.statuses) + 1
+            packed = {**row, "_remote": {"prevStatusId": previous, "eventId": f"fixture-{number}"}}
+            state = "pending" if legacy and not row.get("terminalState") else attempt.status_state(row)
+            self.statuses.append({"id": number, "context": f"jovie-execution/{self.ident['identityDigest']}", "state": state,
+                                  "creator": creator or dict(self.creator),
+                                  "target_url": f"https://github.com/JovieInc/Jovie/commit/{self.sha}#jovie-execution={attempt._pack(packed)}"})
+            previous = number
+    def local(self, *, finish=None, now=100):
+        path = self.dir / f"worker-{len(list(self.dir.glob('worker-*.jsonl')))}.jsonl"
+        start = attempt.claim(path, self.ident, owner(), policy(leaseSeconds=50, wallSeconds=1000), {"triggerId": "run-1"}, now, LOCAL)
+        attempt.boundary(path, self.ident, start["fencingToken"], {"spend": 1, "mutations": 1}, now + 1, LOCAL)
+        if finish:
+            attempt.finish(path, self.ident, start["fencingToken"], "failed_known", {"failureClass": finish, "failureFingerprint": "f"}, now + 2, LOCAL)
+        return attempt._rows(path)
+    def sweep(self, now):
+        return [item["outcome"] for item in attempt.finalize_stale_statuses(self.dir / "sweep.jsonl", self.coord, now=now)]
+    def test_ended_retryable_attempt_is_finalized_without_consuming_its_retry(self):
+        self.publish(self.local(finish="repair_incomplete"))
+        self.assertEqual(self.sweep(200), ["finalized"])
+        self.assertEqual([body["state"] for body in self.posts], ["success"])
+        marker = attempt._unpack(self.posts[0]["target_url"].split("#jovie-execution=", 1)[1])
+        self.assertEqual((marker["event"], marker["finalizes"], marker["_remote"]["prevStatusId"]), (attempt.FINALIZED, "attempt_finished", 3))
+        chain, head = attempt._status_rows(self.statuses, self.ident, strict=True)
+        self.assertEqual(([row["event"] for row in chain], head), (["attempt_started", "boundary_admitted", "attempt_finished"], 4))
+        self.assertEqual(self.sweep(300), [], "a terminal latest status is never rewritten")
+        retried = attempt.claim(self.dir / "next.jsonl", self.ident, owner(), policy(leaseSeconds=50, wallSeconds=1000), {"triggerId": "run-2"}, 400, self.coord)
+        self.assertTrue(retried["admitted"]); self.assertEqual(retried["attempt"], 2)
+        self.assertEqual(self.posts[-1]["state"], "pending")
+    def test_live_lease_is_left_pending(self):
+        self.publish(self.local())
+        self.assertEqual(self.sweep(140), ["live"])
+        self.assertEqual(self.posts, [])
+    def test_expired_lease_records_the_lost_worker_failure_a_claim_would(self):
+        self.publish(self.local())
+        self.assertEqual(self.sweep(151), ["expired"])
+        self.assertEqual([body["state"] for body in self.posts], ["failure"])
+        row = attempt._unpack(self.posts[0]["target_url"].split("#jovie-execution=", 1)[1])
+        self.assertEqual((row["terminalState"], row["failureClass"]), ("failed_unknown", "lost_worker"))
+        self.assertEqual(attempt._rows(self.dir / "sweep.jsonl")[-1]["failureClass"], "lost_worker")
+        self.assertEqual(attempt.claim(self.dir / "next.jsonl", self.ident, owner(), policy(), {}, 400, self.coord)["reason"], "generation_terminal")
+        self.assertEqual(self.sweep(500), [])
+    def test_untrusted_sealed_or_malformed_pending_statuses_are_not_touched(self):
+        self.publish(self.local(finish="repair_incomplete"), creator={"login": "someone", "type": "User"})
+        self.assertEqual(self.sweep(200), [])
+        self.statuses.clear()
+        rows = self.local(finish="repair_incomplete")
+        self.publish([*rows, {**rows[-1], "event": "completion_fenced", "sealedAttempt": 2}])
+        self.assertEqual(self.sweep(200), ["skipped-sealed"])
+        self.statuses.clear()
+        self.statuses.append({"id": 1, "context": "jovie-execution/" + "0" * 64, "state": "pending", "creator": dict(self.creator),
+                              "target_url": "https://github.com/x#jovie-execution=not-a-receipt"})
+        self.statuses.append({"id": 2, "context": "Fork PR Gate", "state": "pending", "creator": dict(self.creator)})
+        self.assertEqual(self.sweep(200), ["skipped-malformed"])
+        self.assertEqual(self.posts, [])
+    def test_new_writer_posts_terminal_for_ended_attempts_so_nothing_needs_sweeping(self):
+        self.publish(self.local(finish="repair_incomplete"), legacy=False)
+        self.assertEqual([status["state"] for status in self.statuses], ["pending", "pending", "success"])
+        self.assertEqual(self.sweep(200), [])
+    def test_sweep_requires_live_github_coordination(self):
+        with self.assertRaisesRegex(ValueError, "coordination-required"):
+            attempt.finalize_stale_statuses(self.dir / "x.jsonl", LOCAL)
+        with self.assertRaisesRegex(ValueError, "coordinator-malformed"):
+            attempt.finalize_stale_statuses(self.dir / "x.jsonl", {**self.coord, "sha": "nope"})
 
 if __name__ == "__main__": unittest.main()
