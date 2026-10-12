@@ -94,7 +94,14 @@ export const AvatarCell = React.memo(function AvatarCell({
       className={className ? `group ${className}` : 'group'}
       trailing={
         isFeatured || usernameActions ? (
-          <span className='flex items-center gap-1.5'>
+          // pr-1 keeps the last action's 4px focus ring inside the clipped cell.
+          <span
+            className={
+              usernameActions
+                ? 'flex items-center gap-1.5 pr-1'
+                : 'flex items-center gap-1.5'
+            }
+          >
             {isFeatured ? (
               <Star
                 aria-label='Featured'

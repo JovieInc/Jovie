@@ -66,7 +66,12 @@ describe('PersonCell', () => {
     ).toHaveAttribute('data-size', 'sm');
     // Initials stand in when there is no photo, so every person row has a face.
     expect(container).toHaveTextContent('AL');
-    expect(container.querySelector('.truncate')).not.toBeNull();
+    // One clamped line that can still shrink: nowrap (`truncate`) text sets the
+    // auto-layout table's min-content width and pushes the table off-screen.
+    expect(
+      container.querySelector('.line-clamp-1.whitespace-normal.break-all')
+    ).not.toBeNull();
+    expect(container.querySelector('.truncate')).toBeNull();
   });
 
   it('omits the secondary slot and trailing slot when empty', () => {

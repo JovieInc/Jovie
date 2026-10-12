@@ -49,7 +49,10 @@ export const PersonCell = React.memo(function PersonCell({
         size='sm'
         verified={verified}
       />
-      <span className='min-w-0 truncate'>
+      {/* Clamp, never nowrap (cells inherit nowrap): auto-layout tables size
+          columns from min-content, and nowrap text widens the table past its
+          scroller so focusing a trailing action scrolls the face away. */}
+      <span className='min-w-0 line-clamp-1 whitespace-normal break-all'>
         <span className='font-medium text-primary-token'>
           {nameHref ? (
             <Link href={nameHref} onClick={event => event.stopPropagation()}>
