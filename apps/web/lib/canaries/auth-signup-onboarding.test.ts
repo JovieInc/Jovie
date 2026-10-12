@@ -5,6 +5,7 @@ import {
   bodyContainsAuthShellReady,
   bodyContainsInitializedInterview,
   bodyContainsOnboardingChat,
+  bodyContainsOnboardingSessionBoundary,
   buildOnboardingChatProbePayload,
   buildReport,
   evaluateOnboardingChatProbe,
@@ -98,6 +99,27 @@ describe('bodyContainsInitializedInterview', () => {
     expect(
       bodyContainsInitializedInterview(
         '<div data-testid="onboarding-empty-intro"></div>'
+      )
+    ).toBe(false);
+  });
+});
+
+describe('bodyContainsOnboardingSessionBoundary', () => {
+  it('matches the SSR session-boundary restore shell', () => {
+    // What /start actually emits over HTTP since JOV-7689: the interview
+    // mounts client-side after the restore fetch, so the body contains the
+    // boundary shell, not the init markers.
+    expect(
+      bodyContainsOnboardingSessionBoundary(
+        '<div data-testid="onboarding-session-boundary" data-restore-state="restoring"><p>Restoring your conversation…</p></div>'
+      )
+    ).toBe(true);
+  });
+
+  it('fails when the boundary shell is absent', () => {
+    expect(
+      bodyContainsOnboardingSessionBoundary(
+        '<div data-testid="onboarding-chat"><div data-testid="onboarding-empty-intro"></div></div>'
       )
     ).toBe(false);
   });

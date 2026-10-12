@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { sendPendingNotifications } from '@/app/api/cron/send-release-notifications/route';
+import {
+  GET,
+  sendPendingNotifications,
+} from '@/app/api/cron/send-release-notifications/route';
 
 const {
   mockDbSelect,
@@ -11,7 +14,11 @@ const {
   mockLoggerWarn,
   mockGetReleaseDayNotificationEmail,
   mockSendNotification,
+  audiencePolicy,
 } = vi.hoisted(() => ({
+  // Production always denies; the retained dispatch path stays covered by
+  // forcing the policy open in the legacy suites below.
+  audiencePolicy: { open: false },
   mockDbSelect: vi.fn(),
   mockDbUpdate: vi.fn(),
   mockDbUpdateSet: vi.fn(),
@@ -133,6 +140,22 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
+vi.mock('@/lib/outbound/audience-effect-policy', async importOriginal => {
+  const actual =
+    await importOriginal<
+      typeof import('@/lib/outbound/audience-effect-policy')
+    >();
+  return {
+    ...actual,
+    denyAudienceEffect: (operation: unknown) => {
+      const receipt = actual.denyAudienceEffect(operation);
+      return audiencePolicy.open
+        ? ({ ...receipt, dispatchAllowed: true } as unknown as typeof receipt)
+        : receipt;
+    },
+  };
+});
+
 function createPendingNotificationsChain(result: unknown) {
   return {
     from: vi.fn().mockReturnValue({
@@ -157,8 +180,9 @@ function createWhereResolvedChain(result: unknown) {
   };
 }
 
-describe('sendPendingNotifications', () => {
+describe('sendPendingNotifications (dispatch path behind the policy)', () => {
   beforeEach(() => {
+    audiencePolicy.open = true;
     vi.clearAllMocks();
 
     mockDbUpdate.mockReturnValue({
@@ -679,4 +703,84 @@ describe('sendPendingNotifications', () => {
       })
     );
   });
+});
+
+describe('fan release audience dispatch denial', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    audiencePolicy.open = false;
+    mockDbSelect.mockImplementation(() => {
+      throw new Error('must not read audiences');
+    });
+    mockDbUpdate.mockImplementation(() => {
+      throw new Error('must not recover or claim jobs');
+    });
+    mockSendNotification.mockResolvedValue({
+      delivered: ['email', 'sms'],
+      errors: [],
+    });
+  });
+
+  it('blocks queued, due, trial and retry work before all database/provider effects', async () => {
+    const result = await sendPendingNotifications();
+    expect(result).toMatchObject({
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      processed: 0,
+      policyBlocked: {
+        reason: 'audience_delivery_disabled',
+        dispatchAllowed: false,
+        retryable: false,
+        queueDisposition: 'do_not_enqueue_or_retry',
+      },
+    });
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(mockGetBatchCreatorEntitlements).not.toHaveBeenCalled();
+    expect(mockGetReleaseDayNotificationEmail).not.toHaveBeenCalled();
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('repeated triggers never recover or retry stored delivery work', async () => {
+    await sendPendingNotifications();
+    await sendPendingNotifications();
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('reports policy refusal through the authenticated cron endpoint', async () => {
+    const response = await GET(
+      new Request('https://jov.ie/api/cron/send-release-notifications', {
+        headers: { authorization: 'Bearer test-secret' },
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const data = await response.json();
+    expect(data).toMatchObject({
+      sent: 0,
+      processed: 0,
+      policyBlocked: { reason: 'audience_delivery_disabled', retryable: false },
+    });
+    expect(data.message).not.toBe('No pending notifications to send');
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, 'Bearer incorrect'])(
+    'retains cron authentication with %s',
+    async authorization => {
+      const response = await GET(
+        new Request('https://jov.ie/api/cron/send-release-notifications', {
+          headers: authorization ? { authorization } : {},
+        })
+      );
+      expect(response.status).toBe(401);
+      expect(mockDbSelect).not.toHaveBeenCalled();
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect(mockSendNotification).not.toHaveBeenCalled();
+    }
+  );
 });
