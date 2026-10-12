@@ -1107,6 +1107,14 @@ class AccountAttributionTest(unittest.TestCase):
         self.assertNotIn("codex-all-banked", alerts)
         self.assertNotIn("provider-down:codex", alerts)
 
+    def test_free_login_slots_count_as_unleased_capacity(self):
+        # One current login with three run slots, one busy: two runs of capacity remain.
+        report = self.report(**{"current-login": {"available": True, "leased": False, "freeSlots": 2}})
+        self.assertEqual(doctor.codex_attribution(report, self.NOW)["unleasedAvailable"], 2)
+        report = self.report(**{"current-login": {"available": False, "leased": False, "freeSlots": 2,
+                                                   "exhaustedUntil": doctor.epoch_iso(self.NOW + 60), "lastKind": "limit"}})
+        self.assertEqual(doctor.codex_attribution(report, self.NOW)["unleasedAvailable"], 0, "a banked login has no capacity")
+
     def test_lease_occupancy_and_hold_kinds_remain_independent(self):
         rows = {kind: {"available": False, "leased": True, "lastKind": kind,
                        "exhaustedUntil": doctor.epoch_iso(self.NOW + 120)} for kind in ["auth", "rate", "limit", "ok"]}

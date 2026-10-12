@@ -122,6 +122,27 @@ class CurrentLoginTest(Isolated):
         return codex.run(SimpleNamespace(prompt_file=str(prompt), receipt_file=str(self.root / "receipt.jsonl"),
                                         cwd=str(self.root), model=None, reasoning_effort="high"))
 
+    def test_one_login_holds_configured_concurrent_slots_and_reports_free_ones(self):
+        # Tim 2026-10-11: more runs on the one current login, no account rotation.
+        self.fake_cli()
+        handles = []
+        with patch.dict(os.environ, {"CODEX_LANE_LOGIN_SLOTS": "3"}):
+            self.assertEqual(codex.status()["accounts"][codex.CURRENT_LOGIN]["freeSlots"], 3)
+            for expected_free in (2, 1, 0):
+                name, handle = codex.pick({}, 1.0)
+                self.assertEqual(name, codex.CURRENT_LOGIN)
+                handles.append(handle)
+                row = codex.status()["accounts"][codex.CURRENT_LOGIN]
+                self.assertEqual((row["freeSlots"], row["leased"]), (expected_free, expected_free == 0))
+            self.assertEqual(codex.pick({}, 1.0), (None, None), "never more runs than slots")
+            handles.pop().close()
+            self.assertEqual(codex.status()["accounts"][codex.CURRENT_LOGIN]["freeSlots"], 1)
+        for handle in handles:
+            handle.close()
+        name, handle = codex.pick({}, 1.0)
+        self.assertEqual(codex.pick({}, 1.0), (None, None), "default stays one exclusive run")
+        handle.close()
+
     def test_existing_cli_login_without_opening_credentials_or_scanning_profiles(self):
         self.fake_cli()
         with patch.object(Path, "glob", side_effect=AssertionError("profile discovery")):
