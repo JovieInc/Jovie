@@ -119,8 +119,6 @@ export const CRON_KEEP_REASONS = Object.freeze({
     'external: real auth plus Stripe test mode drift without a repository event, and acquisition eligibility needs Golden Path proof under 48 h old',
   '.github/workflows/m2-revenue-path-canary.yml':
     'external: production money-path probe (claim, $199 checkout, activation) that can break with no deploy',
-  '.github/workflows/mac-runner-heartbeat.yml':
-    'external (mac-routing): an offline self-hosted Mac emits no event; the heartbeat is the only liveness signal',
   '.github/workflows/merge-queue-ruleset-verify.yml':
     'external: a GitHub UI edit to the merge-queue ruleset emits no Actions event',
   '.github/workflows/node-runtime-compatibility.yml':
@@ -159,7 +157,7 @@ export const CRON_KEEP_REASONS = Object.freeze({
 
 /** @type {readonly string[]} */
 export const CRON_ALLOWLIST = Object.freeze(Object.keys(CRON_KEEP_REASONS));
-export const CRON_ALLOWLIST_CEILING = 27;
+export const CRON_ALLOWLIST_CEILING = 26;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.

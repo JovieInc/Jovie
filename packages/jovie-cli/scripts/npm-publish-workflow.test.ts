@@ -17,6 +17,11 @@ const workflow = readFileSync(
   resolve(import.meta.dirname, '../../../.github/workflows/npm-publish.yml'),
   'utf8'
 );
+// Every chaos cell (and its Mac child) runs this reusable workflow.
+const chaosCell = readFileSync(
+  resolve(import.meta.dirname, '../../../.github/workflows/cli-chaos.yml'),
+  'utf8'
+);
 
 function assertPublishWorkflowContract(source: string): void {
   // Automatic publication is main-only; pull requests never gain authority.
@@ -124,14 +129,16 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
   expect(source).toMatch(/node: \[[^\]]*'24\.21\.0'[^\]]*'26'\]/);
   expect(source).toContain('fail-fast: false');
-  // Self-hosted Macs first, hosted macOS as the fallback.
-  expect(source).toContain('needs: [chaos-tarball, mac-runner-route]');
-  expect(source).toContain(
-    'runs-on: ${{ matrix.os == \'macos-latest\' && needs.mac-runner-route.outputs.runner_class == \'mac\' && fromJSON(\'["self-hosted","macOS","ARM64","jovie-mac"]\') || matrix.os }}'
-  );
-  expect(source).toContain('node "$PACK_DIR/chaos-blackbox.mjs"');
-  expect(source).toContain('--profile release');
-  expect(source).toContain('npm install --prefix "$CLEAN_DIR"');
+  // macOS cells try an idle self-hosted Mac first, hosted otherwise.
+  expect(source).toContain('uses: ./.github/workflows/cli-chaos.yml');
+  expect(source).toContain("mac-first: ${{ matrix.os == 'macos-latest' }}");
+  expect(source).toContain('artifact-run-id: ${{ github.run_id }}');
+  expect(chaosCell).toContain('node "$PACK_DIR/chaos-blackbox.mjs"');
+  expect(chaosCell).toContain('--profile release');
+  expect(chaosCell).toContain('npm install --prefix "$CLEAN_DIR"');
+  expect(chaosCell).toContain('run-id: ${{ inputs.artifact-run-id }}');
+  // On the owner's laptop the CLI never sees the real home directory.
+  expect(chaosCell).toContain('export HOME="$RUNNER_TEMP/jovie-cli-home"');
   expect(source).toContain(
     'if (!process.env.TESTED_INTEGRITY || pack.integrity !== process.env.TESTED_INTEGRITY) {'
   );

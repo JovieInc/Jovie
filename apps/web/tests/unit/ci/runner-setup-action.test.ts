@@ -348,18 +348,31 @@ describe('self-hosted runner setup action', () => {
     const ci = parseYaml(
       readFileSync(resolve(repoRoot, '.github/workflows/ci.yml'), 'utf8')
     ) as {
-      jobs: Record<string, { needs?: string[]; steps?: ActionStep[] }>;
+      jobs: Record<
+        string,
+        { needs?: string[]; uses?: string; steps?: ActionStep[] }
+      >;
     };
-    const disabled = Object.entries(ci.jobs).flatMap(([id, job]) =>
-      (job.steps ?? [])
-        .filter(
-          step =>
-            step.uses === './.github/actions/setup-node-pnpm' &&
-            String(step.with?.package_cache) === 'false'
-        )
-        .map(() => id)
-    );
-    expect(disabled).toEqual(['ci-macos']);
+    const macosLane = parseYaml(
+      readFileSync(resolve(repoRoot, '.github/workflows/macos-ci.yml'), 'utf8')
+    ) as {
+      jobs: Record<string, { steps?: ActionStep[] }>;
+    };
+    const disabledIn = (jobs: Record<string, { steps?: ActionStep[] }>) =>
+      Object.entries(jobs).flatMap(([id, job]) =>
+        (job.steps ?? [])
+          .filter(
+            step =>
+              step.uses === './.github/actions/setup-node-pnpm' &&
+              String(step.with?.package_cache) === 'false'
+          )
+          .map(() => id)
+      );
+    // The Mac product lane runs inside the macos-ci.yml child workflow, so
+    // ci.yml itself must never disable the cache teardown.
+    expect(ci.jobs['ci-macos']?.uses).toBe('./.github/workflows/macos-ci.yml');
+    expect(disabledIn(ci.jobs)).toEqual([]);
+    expect(disabledIn(macosLane.jobs)).toEqual(['build']);
     expect(ci.jobs['ci-cross-product-integration']?.needs).toContain(
       'ci-macos'
     );
