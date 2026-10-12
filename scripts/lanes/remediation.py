@@ -1327,6 +1327,11 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                 if row.get("status") in {"done", "human", "exhausted"}:
                     row["status"] = "open"
                     row["asked"] = False
+                # A recurrence is new evidence: its ladder starts fresh. Kept attempts made the
+                # reopened event `exhausted` again at once, forever (Tim 2026-10-12: every
+                # exhausted state needs an automatic exit).
+                row["priorAttempts"] = [*(row.get("priorAttempts") or []), *prior_attempts][-20:]
+                row["attempts"] = []  # attemptCount keeps the history count
         else:
             by_id = {issue.get("id"): issue for issue in group}
             canonical = by_id.get(recorded_id) or group[0]
