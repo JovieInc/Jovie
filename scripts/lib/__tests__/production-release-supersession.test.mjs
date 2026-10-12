@@ -1202,25 +1202,29 @@ if (args[0] === 'api') {
   });
 });
 
-describe('controller merge-queue read resilience', () => {
-  function runCoalesce(queueFailures) {
+describe('controller main read resilience', () => {
+  function runCoalesce(mainFailures) {
     const fixture = makeFixture('coalesce-');
-    const attempts = join(fixture.root, 'queue-attempts');
+    const attempts = join(fixture.root, 'main-attempts');
     stubCommand(
       fixture.bin,
       'gh',
       `#!/bin/sh
 case "$*" in
   *graphql*)
+    echo "unexpected merge-queue read" >&2
+    exit 2
+    ;;
+  *commits/main*)
     n=0
-    [ -f "$STUB_QUEUE_ATTEMPTS" ] && n="$(cat "$STUB_QUEUE_ATTEMPTS")"
+    [ -f "$STUB_MAIN_ATTEMPTS" ] && n="$(cat "$STUB_MAIN_ATTEMPTS")"
     n=$((n + 1))
-    printf '%s' "$n" > "$STUB_QUEUE_ATTEMPTS"
-    if [ "$n" -le "$STUB_QUEUE_FAILURES" ]; then
+    printf '%s' "$n" > "$STUB_MAIN_ATTEMPTS"
+    if [ "$n" -le "$STUB_MAIN_FAILURES" ]; then
       echo "gh: API rate limit already exceeded for site ID installation." >&2
       exit 1
     fi
-    printf '{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[]}}}}}\\n'
+    printf '%s\\n' "$STUB_MAIN_SHA"
     ;;
   *) printf '%s\\n' "$STUB_MAIN_SHA" ;;
 esac
@@ -1231,18 +1235,15 @@ esac
       'Evaluate event-driven supersession'
     );
     const result = runScript(script, fixture, {
-      COALESCE_MAX_SECONDS: '150',
-      COALESCE_PER_GENERATION_SECONDS: '30',
       EXPECTED_SHA,
       FIXED_WINDOW_SECONDS_REPLACED: '60',
-      GH_API_RETRY_ATTEMPTS: '3',
       GH_API_RETRY_SECONDS: '0',
       GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
       PRODUCTION_STARVATION_SECONDS: '5400',
       REPOSITORY: 'JovieInc/Jovie',
       STUB_MAIN_SHA: EXPECTED_SHA,
-      STUB_QUEUE_ATTEMPTS: attempts,
-      STUB_QUEUE_FAILURES: String(queueFailures),
+      STUB_MAIN_ATTEMPTS: attempts,
+      STUB_MAIN_FAILURES: String(mainFailures),
     });
     return {
       attempts: existsSync(attempts)
@@ -1253,19 +1254,22 @@ esac
     };
   }
 
-  it('recovers from a transient API failure and proceeds on an empty queue', () => {
+  it('recovers from a transient API failure and proceeds at once on a current SHA', () => {
     const run = runCoalesce(1);
     expect(run.result.status, run.result.stderr).toBe(0);
     expect(run.attempts).toBe(2);
     expect(run.outputs.is_current).toBe('true');
     expect(run.outputs.decision).toBe('proceed');
+    expect(run.outputs.wait_seconds).toBe('0');
+    expect(run.result.stderr).not.toContain('unexpected merge-queue read');
   });
 
-  it('still fails closed when the merge queue stays unreadable', () => {
+  it('still fails closed when main stays unreadable', () => {
     const run = runCoalesce(9);
     expect(run.result.status).toBe(1);
     expect(run.attempts).toBe(3);
-    expect(run.result.stdout).toContain('Could not read the main merge queue');
+    expect(run.outputs.is_current).toBe('false');
+    expect(run.result.stderr).toContain('API rate limit already exceeded');
   });
 });
 
@@ -1279,7 +1283,7 @@ describe('controller starvation bound', () => {
     );
     expect(
       coalesce.match(/release-lineage-gate\.sh/g)?.length ?? 0
-    ).toBeGreaterThanOrEqual(3);
+    ).toBeGreaterThanOrEqual(2);
     expect(authorize.match(/release-lineage-gate\.sh/g)?.length ?? 0).toBe(2);
     expect(coalesce).not.toContain(
       'if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then\n            record_receipt "superseded"'

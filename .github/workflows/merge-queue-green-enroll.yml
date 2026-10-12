@@ -170,9 +170,10 @@ jobs:
             const failurePolicy = await import(pathToFileURL(
               `${process.env.GITHUB_WORKSPACE}/scripts/merge-group-failure-hold.mjs`
             ));
+            // ADMISSION_BLOCKING_LABELS (scripts/lib/admission-hold-labels.mjs).
             // queue-poison: ejected twice in 24 h (scripts/lanes/pr_events.py, JOV-6904);
             // the lanes remove it with their fix.
-            const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
+            const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-poison']);
             // Required checks green and no conflicts. UNSTABLE only adds a
             // non-required pending/red context (e.g. lane execution receipts).
             const ADMISSIBLE = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
@@ -394,8 +395,9 @@ jobs:
             }
             core.info(`enqueued=${enqueued}`);
 
-  # Hold contract (scripts/hold-contract.mjs, jovie-hold/v1): a `hold` needs a
-  # receipt comment naming an owner plus an expiry or a head-change release.
+  # Hold contract (scripts/hold-contract.mjs, jovie-hold/v1): every stop label
+  # (hold, gated, incident, do-not-merge, tim-hold variants) needs a receipt
+  # comment naming an owner plus an expiry or a head-change release.
   # Ownerless holds past their grace period and expired or released receipts
   # are removed with one comment. The Jovie Bot unlabel event then wakes the
   # enroll job above; required checks still gate admission.
@@ -415,6 +417,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/hold-contract.mjs
+            scripts/lib/admission-hold-labels.mjs
           sparse-checkout-cone-mode: false
 
       - name: Set up pinned Node.js
@@ -447,7 +450,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request_target' &&
       github.event.action == 'labeled' &&
-      contains(fromJSON('["hold","gated","incident","do-not-merge","queue-poison"]'), github.event.label.name)
+      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-poison"]'), github.event.label.name)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions: {}
@@ -471,7 +474,7 @@ jobs:
             const sourceHead = context.payload.pull_request?.head?.sha;
             const rawLabel = context.payload.label?.name;
             const label = typeof rawLabel === 'string' ? rawLabel.toLowerCase() : null;
-            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'queue-poison']);
+            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-poison']);
             if (!Number.isSafeInteger(number) || number <= 0 ||
                 typeof sourceHead !== 'string' || !/^[a-f0-9]{40}$/.test(sourceHead) || !blocking.has(label)) {
               core.info('Ignoring an incomplete blocking-label event');
@@ -531,6 +534,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-victim-rearm.mjs
+            scripts/lib/admission-hold-labels.mjs
           sparse-checkout-cone-mode: false
 
       - name: Set up pinned Node.js

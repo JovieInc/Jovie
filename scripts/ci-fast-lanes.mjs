@@ -441,7 +441,9 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/inbound-loop/inbound-loop.test.mjs',
   'scripts/merge-queue-green-enroll.test.mjs',
   'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
+  'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
   'scripts/hold-contract.test.mjs',
+  'scripts/lib/__tests__/admission-hold-labels.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
   'scripts/publish-coverage-report.test.mjs',
   'scripts/lib/__tests__/canonical-json.test.mjs',
@@ -514,6 +516,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/doc-freshness.test.mjs',
   'scripts/lib/__tests__/flaky-test-filing.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',
+  'scripts/lib/__tests__/github-rate-limit.test.mjs',
   'scripts/lib/__tests__/help-center-recertification-workflow.test.mjs',
   'scripts/lib/__tests__/isolated-ui-docs-policy.test.mjs',
   'scripts/lib/__tests__/lighthouse-production-collect.test.mjs',
@@ -525,6 +528,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/m2-revenue-path-canary-intake.test.mjs',
   'scripts/lib/__tests__/synthetic-monitoring-plan.test.mjs',
   'scripts/lib/__tests__/remediation-detector-plans.test.mjs',
+  'scripts/lib/__tests__/mac-runner-route-contract.test.mjs',
   'scripts/lib/__tests__/main-release-readiness.test.mjs',
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
   'scripts/lib/__tests__/pr-liveness.test.mjs',
@@ -855,6 +859,27 @@ function shell(command, opts = {}) {
   };
 }
 
+/**
+ * Literal-argv twin of shell(). Changed filenames are attacker-adjacent input:
+ * routing them through /bin/sh lets names like `$(cmd).ts` execute. Every
+ * argument here reaches the child verbatim.
+ */
+function argv(command, args, opts = {}) {
+  const result = spawnSync(command, args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    env: process.env,
+    maxBuffer: 20 * 1024 * 1024,
+    ...opts,
+  });
+  const stdout = result.stdout ?? '';
+  const stderr = result.stderr ?? '';
+  return {
+    code: result.status ?? 1,
+    output: `${stdout}${stderr}`,
+  };
+}
+
 /** @param {readonly string[]} patterns */
 export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   const event = process.env.GITHUB_EVENT_NAME || '';
@@ -862,7 +887,9 @@ export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   if (event === 'pull_request') {
     const base = process.env.GITHUB_BASE_REF || 'main';
     // Prefer origin/<base> when available (fetch done by workflow).
-    const probe = shell(`git rev-parse --verify origin/${base}`, { cwd });
+    const probe = argv('git', ['rev-parse', '--verify', `origin/${base}`], {
+      cwd,
+    });
     diffBase =
       probe.code === 0
         ? `origin/${base}`
@@ -875,19 +902,24 @@ export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   // Combined-head and push checks retain their exact two-tree comparison.
   const range =
     event === 'pull_request' ? `${diffBase}...HEAD` : `${diffBase} HEAD`;
-  const pathspecs = patterns.map(p => `'${p}'`).join(' ');
-  const result = shell(
-    `git diff --diff-filter=ACDMRT --name-only ${range} -- ${pathspecs}`,
+  const result = argv(
+    'git',
+    [
+      'diff',
+      '--diff-filter=ACDMRT',
+      '--name-only',
+      '-z',
+      ...range.split(' '),
+      '--',
+      ...patterns,
+    ],
     { cwd }
   );
   if (result.code !== 0) {
     // Fall back to full set (caller decides).
     return null;
   }
-  return result.output
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean);
+  return result.output.split('\0').filter(Boolean);
 }
 
 export const BILLING_PROVENANCE_COVERAGE_PATHS = Object.freeze([
@@ -1006,8 +1038,8 @@ function runNodeRuntimeContracts() {
  * stays advisory while new slop, harm, legal, or ToS violations cannot land.
  * An unreadable diff fails closed.
  */
-export function runCopyGate() {
-  const files = changedFiles(COPY_GATE_PATHS);
+export function runCopyGate(cwd = REPO_ROOT) {
+  const files = changedFiles(COPY_GATE_PATHS, cwd);
   if (files === null) {
     return {
       code: 1,
@@ -1023,11 +1055,21 @@ export function runCopyGate() {
   }
   const base = process.env.GITHUB_BASE_REF || 'main';
   const diffBase =
-    shell(`git rev-parse --verify origin/${base}`).code === 0
+    argv('git', ['rev-parse', '--verify', `origin/${base}`], { cwd }).code === 0
       ? `origin/${base}`
       : process.env.TURBO_SCM_BASE || 'HEAD^1';
-  return shell(
-    `pnpm exec tsx packages/copy/cli.ts check --diff-base ${diffBase} ${files.map(file => `'${file}'`).join(' ')}`
+  return argv(
+    'pnpm',
+    [
+      'exec',
+      'tsx',
+      'packages/copy/cli.ts',
+      'check',
+      '--diff-base',
+      diffBase,
+      ...files,
+    ],
+    { cwd }
   );
 }
 
@@ -1383,29 +1425,40 @@ export function biomeNeedsFullTree(changed) {
   return changed.some(file => BIOME_TOOLCHAIN_FILES.includes(file));
 }
 
-function runBiome() {
+export function runBiome(cwd = REPO_ROOT) {
   const event = process.env.GITHUB_EVENT_NAME || '';
-  const toolchain = changedFiles([...BIOME_TOOLCHAIN_FILES]);
+  const toolchain = changedFiles([...BIOME_TOOLCHAIN_FILES], cwd);
   if (event !== 'workflow_dispatch' && !biomeNeedsFullTree(toolchain ?? [])) {
-    const files = changedFiles([
-      '*.ts',
-      '*.tsx',
-      '*.js',
-      '*.jsx',
-      '*.json',
-      '*.mts',
-      '*.mjs',
-      ':(exclude)**/package-lock.json',
-      ':(exclude).claude/settings.json',
-      ':(exclude).claude/skills/**',
-    ]);
+    const files = changedFiles(
+      [
+        '*.ts',
+        '*.tsx',
+        '*.js',
+        '*.jsx',
+        '*.json',
+        '*.mts',
+        '*.mjs',
+        ':(exclude)**/package-lock.json',
+        ':(exclude).claude/settings.json',
+        ':(exclude).claude/skills/**',
+      ],
+      cwd
+    );
     if (files && files.length === 0) {
       return { code: 0, output: 'No lintable files changed\n', skipped: false };
     }
     if (files && files.length > 0) {
-      const quoted = files.map(f => JSON.stringify(f)).join(' ');
-      return shell(
-        `pnpm biome ci --reporter=github --no-errors-on-unmatched ${quoted}`
+      return argv(
+        'pnpm',
+        [
+          'biome',
+          'ci',
+          '--reporter=github',
+          '--no-errors-on-unmatched',
+          '--',
+          ...files.map(f => (f.startsWith('-') ? `./${f}` : f)),
+        ],
+        { cwd }
       );
     }
   }
@@ -1416,15 +1469,18 @@ function runShadcnLintContracts() {
   return shell('pnpm --filter=@jovie/web run lint:shadcn-contracts');
 }
 
-function runEslintServerBoundaries() {
+export function runEslintServerBoundaries(cwd = REPO_ROOT) {
   const event = process.env.GITHUB_EVENT_NAME || '';
   if (event !== 'workflow_dispatch') {
-    const files = changedFiles([
-      'apps/web/*.ts',
-      'apps/web/*.tsx',
-      'apps/web/**/*.ts',
-      'apps/web/**/*.tsx',
-    ]);
+    const files = changedFiles(
+      [
+        'apps/web/*.ts',
+        'apps/web/*.tsx',
+        'apps/web/**/*.ts',
+        'apps/web/**/*.tsx',
+      ],
+      cwd
+    );
     if (files && files.length === 0) {
       return {
         code: 0,
@@ -1433,9 +1489,16 @@ function runEslintServerBoundaries() {
       };
     }
     if (files && files.length > 0) {
-      const quoted = files.map(f => JSON.stringify(f)).join(' ');
-      return shell(
-        `pnpm --filter=@jovie/web run lint:server-boundaries -- ${quoted}`
+      return argv(
+        'pnpm',
+        [
+          '--filter=@jovie/web',
+          'run',
+          'lint:server-boundaries',
+          '--',
+          ...files,
+        ],
+        { cwd }
       );
     }
   }

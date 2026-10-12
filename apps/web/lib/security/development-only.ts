@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { NextResponse } from 'next/server';
+import { isProductScreenshotCapturePath } from './production-blocked-routes';
 
 export const DEVELOPMENT_ONLY_ERROR = 'Not available outside development';
 
@@ -89,6 +90,39 @@ function isLoopbackE2eAutomationHost(
   );
 }
 
+/** Synthetic shell fixtures require the local server and request authorities. */
+function screenshotAuthorityHostname(value: string | null): string | null {
+  if (!value || /[\s,@/\\?#]/.test(value)) return null;
+  const authority = value.match(/^(\[[^\]]+\]|[^:]+)(?::([0-9]+))?$/);
+  if (!authority || (authority[2] && Number(authority[2]) > 65535)) return null;
+  const hostname = authority[1].toLowerCase();
+  return isLocalDevelopmentAutomationHostname(hostname) ? hostname : null;
+}
+
+function isLocalScreenshotFixtureRequest(
+  hostname: string | null,
+  headerReader: HeaderReader
+): boolean {
+  if (
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' ||
+    process.env.VERCEL === '1' ||
+    Boolean(process.env.VERCEL_ENV) ||
+    !isLocalDevelopmentAutomationHostname(process.env.HOSTNAME ?? null) ||
+    !isLocalDevelopmentAutomationHostname(hostname)
+  ) {
+    return false;
+  }
+
+  // Do not derive authority from client-controlled forwarding, origin or referer.
+  const host = screenshotAuthorityHostname(headerReader.get('host'));
+  if (!host) return false;
+  const forwardedHost = headerReader.get('x-forwarded-host');
+  return (
+    forwardedHost === null ||
+    screenshotAuthorityHostname(forwardedHost) === host
+  );
+}
+
 /**
  * Loopback-only escape hatch for production-built CI servers (mobile overflow,
  * screenshot capture). Keeps debug routes blocked on public hosts.
@@ -98,6 +132,13 @@ export function shouldBypassProductionBlockedDebugPath(
   hostname: string | null,
   headerReader: HeaderReader
 ): boolean {
+  if (
+    pathname.startsWith('/demo') &&
+    isProductScreenshotCapturePath(pathname)
+  ) {
+    return isLocalScreenshotFixtureRequest(hostname, headerReader);
+  }
+
   if (!isLoopbackE2eAutomationHost(hostname, headerReader)) {
     return false;
   }
