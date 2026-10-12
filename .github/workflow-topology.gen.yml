@@ -106,7 +106,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:report
     jobCount: 1
@@ -793,7 +792,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:scheduled-cleanup
     jobCount: 1

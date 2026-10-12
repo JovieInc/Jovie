@@ -7,6 +7,7 @@ import {
   admissionSignals,
   CRON_ALLOWLIST,
   CRON_ALLOWLIST_CEILING,
+  CRON_KEEP_REASONS,
   checkEventDrivenContract,
   EVENT_DRIVEN_INVARIANT_ID,
   EVIDENCE_DRIVEN_WORKFLOWS,
@@ -125,6 +126,22 @@ describe('event-driven admission contract (JOV-INV-042)', () => {
       expect(CRON_ALLOWLIST, path).toContain(path);
       expect(entry.reason, path).toBeTruthy();
       expect(entry.replacement, path).toBeTruthy();
+    }
+  });
+
+  it('names the real limit behind every kept clock', () => {
+    // Tim 2026-10-12: a clock stays only for a time-bound external fact, a
+    // calendar window, a real resource limit, or an owner-tracked
+    // replacement still in flight.
+    const kinds =
+      /^(?:external(?: and calendar)?(?: \([\w-]+\))?|calendar window|AI credits|compute|owner-tracked(?: \([\w -]+\))?): \S/;
+    expect(Object.keys(CRON_KEEP_REASONS)).toEqual([...CRON_ALLOWLIST]);
+    for (const [path, reason] of Object.entries(CRON_KEEP_REASONS)) {
+      expect(reason, path).toMatch(kinds);
+      if (reason.startsWith('owner-tracked')) {
+        expect(reason, path).toContain('see ADMISSION_CRON_DEBT');
+        expect(ADMISSION_CRON_DEBT, path).toHaveProperty([path]);
+      }
     }
   });
 
