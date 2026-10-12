@@ -444,6 +444,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
   'scripts/hold-contract.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
+  'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
   'scripts/publish-coverage-report.test.mjs',
   'scripts/lib/__tests__/canonical-json.test.mjs',

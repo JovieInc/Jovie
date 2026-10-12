@@ -74,17 +74,11 @@ available worker capacity. Slot occupancy, account leases and PR work remain
 separate facts. Empty-demand alerts require known zero eligibility and no open
 PR maintenance; unknown evidence and backpressure reset the empty timer.
 
-The file-overlap guard flags by default (Tim 2026-10-12): classification, ledger, doctor
-and HUD visibility, no holds; the merge queue's own conflict detection serializes PRs and a
-hold left by the old default is released. `SYMPHONY_FILE_OVERLAP_GUARD=enforce` (or `1`)
-turns holds on; `=0` disables it and releases automation-owned holds. With enforcement on, Existing non-draft PR overlaps are ordered by
-an explicit stack/dependency first, then foundational/shared work, smaller diffs,
-creation time, and PR number. The later PR receives `hold`; after the earlier PR
-lands, Symphony removes only the hold it applied and queues `lane-fix-dequeued` for
-the existing rebase lane. A stacked child is retargeted to `main`, never merged into
-its parent branch. Generated workflow topology and migration journals are regenerated
-after rebasing rather than hand-merged. `doctor.json.fileOverlap` publishes active
-pairs, files, actions, and the prevention/flag/rebase counters.
+The file-overlap guard never holds a PR (Tim 2026-10-12; hold contract #21275). It records
+overlapping open PRs and new issues for the ledger, doctor and HUD, and the merge queue's own
+conflict detection serializes PRs. A `hold` the retired enforce mode applied is released on
+the next reconcile; `SYMPHONY_FILE_OVERLAP_GUARD=0` turns the recording off and `1`/`enforce`
+read as flag. `doctor.json.fileOverlap` publishes active pairs, files and the flag counters.
 
 Account attribution uses the existing status rows without changing account
 admission. Lease occupancy and cooldown are independent; an account can be both

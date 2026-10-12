@@ -82,7 +82,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
+      - push
       - workflow_dispatch
     terminalReceipt: job:gc
     jobCount: 1
@@ -95,7 +95,6 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - push
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:prune
     jobCount: 1
@@ -226,6 +225,7 @@ nodes:
       - iOS CI
       - Mac CI
       - Lane Fix Relay
+      - Main CI health monitor
       - Merge Queue Green Enroll
       - PR Conflict Handler
       - Quarantine Recovery
@@ -756,8 +756,8 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:auto-rerun
     jobCount: 2
   - name: Marketing Certification Producer

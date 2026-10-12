@@ -50,15 +50,12 @@ def now_iso() -> str:
 
 
 def guard_mode(value: str | None = None) -> str:
-    """Default `flag` (Tim 2026-10-12): an overlap is recorded, never a plain `hold` plus
-    --disable-auto on a PR; the merge queue's own conflict detection serializes PRs. A hold
-    left by the old enforce default is released on the next reconcile. Enforcement must be
-    asked for explicitly (`1`/`enforce`)."""
+    """`flag` or `off`. The overlap guard never holds a PR (Tim 2026-10-12, hold contract
+    #21275): it records overlaps for the ledger, doctor and HUD, and the merge queue's own
+    conflict detection serializes PRs. A legacy `hold` it applied is released on the next
+    reconcile. Old `enforce`/`1` values read as `flag`."""
     value = os.environ.get("SYMPHONY_FILE_OVERLAP_GUARD", "flag") if value is None else value
-    lowered = str(value).strip().lower()
-    if lowered in {"0", "false", "off", "no"}:
-        return "off"
-    return "enforce" if lowered in {"1", "true", "on", "yes", "enforce"} else "flag"
+    return "off" if str(value).strip().lower() in {"0", "false", "off", "no"} else "flag"
 
 
 def _issue_labels(issue) -> list[str]:
@@ -382,15 +379,6 @@ def _pr_labels(pr: dict) -> set[str]:
     return {str(label.get("name") if isinstance(label, dict) else label) for label in pr.get("labels") or []}
 
 
-def _hold(lane, number: int, *, add_label: bool) -> None:
-    if add_label:
-        result = lane.sh(["gh", "api", "-X", "POST", f"repos/{lane.REPO_SLUG}/issues/{number}/labels",
-                          "-f", "labels[]=hold"])
-        if result.returncode != 0:
-            raise RuntimeError(f"file overlap hold failed for PR #{number}")
-    lane.sh(["gh", "pr", "merge", str(number), "--repo", lane.REPO_SLUG, "--disable-auto"])
-
-
 def _retarget_main(lane, pr: dict) -> None:
     if pr.get("baseRefName") != "main":
         result = lane.sh(["gh", "pr", "edit", str(pr["number"]), "--repo", lane.REPO_SLUG, "--base", "main"])
@@ -465,11 +453,6 @@ def reconcile_open_prs(host, lane, prs: list[dict]) -> dict:
                 did_release = release_once(later, old)
                 action = "rebase-queued" if did_release and later["number"] in rebase_later else "released"
                 released.append({**old, "actionTaken": action, "releasedAt": now_iso()})
-            elif later and is_enforced and not was_enforced:
-                _retarget_main(lane, later)
-                decision["holdApplied"] = "hold" not in {label.lower() for label in _pr_labels(later)}
-                _hold(lane, later["number"], add_label=decision["holdApplied"])
-                created.append(decision)
             else:
                 decision.update({name: old[name] for name in ("holdApplied", "observedAt") if name in old})
             continue
@@ -477,11 +460,7 @@ def reconcile_open_prs(host, lane, prs: list[dict]) -> dict:
         if not later:
             continue
         decision["observedAt"] = now_iso()
-        if decision["actionTaken"] in {"sequence", "stack", "block"}:
-            _retarget_main(lane, later)
-            decision["holdApplied"] = "hold" not in {label.lower() for label in _pr_labels(later)}
-            _hold(lane, later["number"], add_label=decision["holdApplied"])
-        created.append(decision)
+        created.append(decision)  # flag only: no hold, no disabled auto-merge
 
     # Transfer ownership after per-pair metadata is copied, so an older false
     # holdApplied value cannot overwrite the surviving owner's inherited lease.

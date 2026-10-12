@@ -141,6 +141,7 @@ jobs:
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
+            scripts/lib/admission-hold-labels.json
           sparse-checkout-cone-mode: false
 
       - name: Generate Jovie Bot token
@@ -170,10 +171,13 @@ jobs:
             const failurePolicy = await import(pathToFileURL(
               `${process.env.GITHUB_WORKSPACE}/scripts/merge-group-failure-hold.mjs`
             ));
-            // ADMISSION_BLOCKING_LABELS (scripts/lib/admission-hold-labels.mjs).
-            // queue-poison: ejected twice in 24 h (scripts/lanes/pr_events.py, JOV-6904);
-            // the lanes remove it with their fix.
-            const BLOCKING = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-poison']);
+            // Single source: scripts/lib/admission-hold-labels.json (stop labels plus
+            // queue-poison, which the lanes add after two ejections and remove with their fix).
+            const holdLabels = JSON.parse(require('node:fs').readFileSync(
+              `${process.env.GITHUB_WORKSPACE}/scripts/lib/admission-hold-labels.json`, 'utf8'
+            ));
+            const BLOCKING = new Set([...holdLabels.stopHoldLabels, holdLabels.queuePoisonLabel]);
+            if (BLOCKING.size < 2) throw new Error('admission hold labels are unreadable');
             // Required checks green and no conflicts. UNSTABLE only adds a
             // non-required pending/red context (e.g. lane execution receipts).
             const ADMISSIBLE = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
@@ -417,6 +421,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/hold-contract.mjs
+            scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
           sparse-checkout-cone-mode: false
 
@@ -534,6 +539,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-victim-rearm.mjs
+            scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
           sparse-checkout-cone-mode: false
 

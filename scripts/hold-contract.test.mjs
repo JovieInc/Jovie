@@ -227,7 +227,7 @@ test('the enroll workflow runs the trusted hold contract with a Jovie Bot token'
   assert.match(checkout.with['sparse-checkout'], /scripts\/hold-contract\.mjs/);
   assert.match(
     checkout.with['sparse-checkout'],
-    /scripts\/lib\/admission-hold-labels\.mjs/
+    /scripts\/lib\/admission-hold-labels\.json\n\s*scripts\/lib\/admission-hold-labels\.mjs/
   );
   const token = job.steps.find(step => step.id === 'app-token');
   assert.equal(token.with['permission-pull-requests'], 'write');
