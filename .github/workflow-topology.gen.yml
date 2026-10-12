@@ -615,7 +615,7 @@ nodes:
       - workflow_call
       - workflow_dispatch
     terminalReceipt: job:graphics
-    jobCount: 1
+    jobCount: 2
   - name: iOS CI
     path: .github/workflows/ios-ci.yml
     active: true
@@ -693,7 +693,6 @@ nodes:
     triggeringStateTransition:
       - issues
       - pull_request_target
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:sweep
     jobCount: 2
