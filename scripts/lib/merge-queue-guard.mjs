@@ -41,7 +41,7 @@ export const NATIVE_QUEUE_COHORT_POLICY = Object.freeze({
   // The live queue already uses immediate 1/0 formation. Marking the cutover
   // applied makes future drift fail closed instead of preserving the retired
   // five-entry cohort exception.
-  liveRulesetCutover: 'applied',
+  liveRulesetCutover: /** @type {'applied' | 'pending'} */ ('applied'),
 });
 
 const COHORT_LIVE_CUTOVER_FIELDS = Object.freeze([
