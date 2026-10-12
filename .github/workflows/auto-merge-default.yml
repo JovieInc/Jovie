@@ -135,6 +135,15 @@ jobs:
             echo "::notice::Fork PR — GITHUB_TOKEN is read-only on pull_request events from forks; skipping auto-merge enable."
             exit 0
           fi
+          # On a merge-queue repo, auto-merge on a CLEAN PR enqueues it at once,
+          # and a held member fails every merge group it joins. Same set as
+          # ADMISSION_BLOCKING_LABELS (scripts/lib/admission-hold-labels.mjs).
+          if gh pr view "$PR_NUMBER" --repo "$BASE_REPO" --json labels \
+            --jq '[.labels[].name | ascii_downcase] | any(. == "hold" or . == "gated" or . == "incident" or . == "do-not-merge" or . == "tim-hold" or . == "tim:hold" or . == "hold:tim" or . == "queue-poison")' \
+            | grep -qx true; then
+            echo "PR #$PR_NUMBER carries an admission-blocking label; auto-merge stays off until it is removed (Merge Queue Green Enroll then admits it)."
+            exit 0
+          fi
           PR_HEAD=$(gh pr view "$PR_NUMBER" --repo "$BASE_REPO" --json headRefOid --jq '.headRefOid')
           STATUS_PAGES=$(gh api --paginate --slurp "repos/$BASE_REPO/commits/$PR_HEAD/statuses?per_page=100")
           if jq -e --arg context "jovie-queue-failure-hold/v1" \
