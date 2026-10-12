@@ -198,13 +198,7 @@ When evidence is incomplete, keep remediation running until the relevant machine
 
 ## Conventional Commits Required
 
-```bash
-# Format: type(scope): description
-feat(auth): add password reset flow
-fix(dashboard): resolve chart rendering issue
-refactor(api): simplify user endpoint logic
-docs(readme): update setup instructions
-```
+Use `type(scope): description` with a header of at most 100 characters (commitlint enforces it); the org-wide rule lives in `~/.claude/CLAUDE.md` §5.
 
 ## Ship Validation (CodeRabbit Issue Planner Instruction)
 
