@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/app/ov/hud',
   useRouter: () => ({ push: mocks.push }),
 }));
 vi.mock('@/lib/queries/useOvieListsQuery', () => ({
