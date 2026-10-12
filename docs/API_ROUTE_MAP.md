@@ -9,7 +9,7 @@
 | Code | Meaning |
 |------|---------|
 | `public` | No authentication required |
-| `auth` | Clerk `auth()` — requires authenticated user |
+| `auth` | Better Auth session — requires authenticated user |
 | `admin` | Requires admin role via `getCurrentUserEntitlements()` |
 | `cron` | `CRON_SECRET` bearer token |
 | `webhook` | Provider-specific signature verification |
@@ -433,6 +433,14 @@ sibling deployments, machine publishers, or source-repository automation.
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/profile/view` | POST | `public` | Increment profile view count (bot-filtered) |
+
+### Referrals
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/referrals/apply` | POST | `auth` | Apply a referral code |
+| `/api/referrals/code` | GET, POST | `auth` | Get or generate referral code |
+| `/api/referrals/stats` | GET | `auth` | Get referral statistics and earnings |
 
 ### Revalidate
 

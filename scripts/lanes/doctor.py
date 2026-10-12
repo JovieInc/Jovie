@@ -11,6 +11,7 @@ color `#E5484D`). `doctor.json` is what the HUD renders.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -19,6 +20,7 @@ import statistics
 import subprocess
 import sys
 import time
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -31,6 +33,7 @@ import design_gate  # noqa: E402  (design-brief admission census)
 import gh_app_token  # noqa: E402  (canonical GitHub read-budget floor)
 import merge_evidence  # noqa: E402  (shared complete merge-window reader)
 import file_overlap  # noqa: E402
+import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
 import remediation  # noqa: E402
 
 COOL_OFF_S = 6 * 3600
@@ -46,6 +49,10 @@ POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
 GATE_TIMEOUT_ALERT = 5
 FAILED_RUN_ALERT = 10
+# Repairs that ended before any agent work: each still spends one of the PR's bounded fix
+# attempts (no refunds, by design), so a run of them exhausts PRs on infrastructure alone.
+NO_WORK_REPAIR_VERDICTS = frozenset({"recovery-handoff", "reconcile-unavailable", "skipped"})
+NO_WORK_REPAIR_ALERT = 6
 DISK_MIN_PCT = 10
 DISK_CRIT_PCT = 5
 GITHUB_MIN_REMAINING = gh_app_token.FLOOR
@@ -55,6 +62,8 @@ AGED_PR_S = 7 * 24 * 3600
 MERGE_THROUGHPUT_REFRESH_S = 5 * 60
 MERGE_THROUGHPUT_CACHE_S = 10 * 60
 PROMOTION_SCRIPT = Path(__file__).resolve().parents[1] / "promotion-loss-metrics.mjs"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+OPS_REPORT_SCRIPT = Path(__file__).resolve().with_name("ops-report.mjs")
 
 
 def now_iso() -> str:
@@ -116,6 +125,7 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
     candidates = {name: linear.lane_issues(specs[name]["label"])
                   for name, seats in capacity.items() if seats["slots"] > 0}
     qualified, rejected = {}, {}
+    rejected_issues = {}
     for name in capacity:
         qualified[name], rejected[name] = [], {}
         # Work the router sends to another lane is not this lane's idle capacity (JOV-7706).
@@ -129,8 +139,17 @@ def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, d
                 qualified[name].append(issue)
             else:
                 rejected[name][reason] = rejected[name].get(reason, 0) + 1
+                # Per-issue view (bounded): the remediator surfaces
+                # route-held/over-budget per selected issue without host access.
+                rejected_issues[issue.identifier] = reason
     counts = {name: len(candidates.get(name, [])) for name in capacity}
-    return qualified, len({issue.identifier for issues in candidates.values() for issue in issues}), counts, rejected
+    return (
+        qualified,
+        len({issue.identifier for issues in candidates.values() for issue in issues}),
+        counts,
+        rejected,
+        rejected_issues,
+    )
 
 
 def observe(host, lane, codex, now: float | None = None) -> dict:
@@ -171,34 +190,30 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             linear_skipped = "cooldown"
     except (Exception, SystemExit):
         linear_skipped = None
-    if linear_skipped:
-        pool, candidate_pool, pool_by_provider, qualified_jobs = None, None, {}, {}
-        candidate_counts, rejected = {}, {}
-        eligible_pool, eligible_by_provider, budgets = None, {}, {}
+    # The runnable pool comes from the local Linear mirror, so a Linear cooldown no longer
+    # hides it; the cooldown still skips the doctor's own Linear writes below.
+    try:
+        (qualified_by_provider, candidate_pool, candidate_counts,
+         rejected, rejected_issues) = qualified_pool(host, lane, capacity_by_provider, now)
+        design_census = design_gate.apply_to_pool(
+            qualified_by_provider, read_text=design_gate.repo_reader(host.repo))
+        eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
+        eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
+        budgets = {name: lane.read_new_issue_budget(name, seats.get("base", seats["slots"]))
+                   for name, seats in capacity_by_provider.items()}
+        qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
+                                 for name, issues in qualified_by_provider.items()}
+        pool_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
+        qualified_jobs = {name: [issue.identifier for issue in issues]
+                          for name, issues in qualified_by_provider.items()}
+        pool = (None if any(value is None for value in pool_by_provider.values()) else
+                len({issue.identifier for issues in qualified_by_provider.values() for issue in issues}))
         linear_error = None
-    else:
-        try:
-            qualified_by_provider, candidate_pool, candidate_counts, rejected = qualified_pool(host, lane, capacity_by_provider, now)
-            design_census = design_gate.apply_to_pool(
-                qualified_by_provider, rejected, read_text=design_gate.repo_reader(host.repo), now=now)
-            eligible_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
-            eligible_pool = len({issue.identifier for issues in qualified_by_provider.values() for issue in issues})
-            budgets = {name: lane.read_new_issue_budget(name, seats.get("base", seats["slots"]))
-                       for name, seats in capacity_by_provider.items()}
-            qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
-                                     for name, issues in qualified_by_provider.items()}
-            pool_by_provider = {name: (None if budgets[name]["used"] is None else len(issues))
-                                for name, issues in qualified_by_provider.items()}
-            qualified_jobs = {name: [issue.identifier for issue in issues]
-                              for name, issues in qualified_by_provider.items()}
-            pool = (None if any(value is None for value in pool_by_provider.values()) else
-                    len({issue.identifier for issues in qualified_by_provider.values() for issue in issues}))
-            linear_error = None
-        except (Exception, SystemExit) as error:
-            design_census = None
-            pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
-            candidate_counts, rejected = {}, {}
-            eligible_pool, eligible_by_provider, budgets = None, {}, {}
+    except (Exception, SystemExit) as error:
+        design_census = None
+        pool, candidate_pool, pool_by_provider, qualified_jobs, linear_error = None, None, {}, {}, f"{type(error).__name__}: {error}"[:100]
+        candidate_counts, rejected, rejected_issues = {}, {}, {}
+        eligible_pool, eligible_by_provider, budgets = None, {}, {}
     github = None
     merged, merged_error, merged_window, merge_throughput, merge_throughput_error = [], None, None, None, None
     try:
@@ -237,6 +252,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "gateWaitMedianS24h": int(statistics.median(gate_waits)) if gate_waits else None,
         "gateWaitMaxS24h": int(max(gate_waits)) if gate_waits else None,
         "failed24h": sum(1 for r in receipts if r.get("verdict") == "failed"),
+        "noWorkRepairs24h": dict(Counter(
+            (r.get("reasons") or ["?"])[0].split(":", 1)[0] for r in receipts
+            if r.get("kind") == "fix-red" and r.get("verdict") in NO_WORK_REPAIR_VERDICTS)),
         "lastLandingAge": min(landings) if landings else None, "runs24h": len(receipts),
         "lastWorkAge": min((age_s(r.get("endedAt"), now) for r in receipts if r.get("kind") != "sync-main"), default=None),
         # Per-provider age of the last clean claim-scan exit: proves spawned workers reach the
@@ -254,9 +272,14 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "codexAttribution": codex_attribution(accounts, account_observed_at),
         "qualifiedJobsByProvider": qualified_jobs,
         "candidatePoolByProvider": candidate_counts, "rejectedByProvider": rejected,
+        # Per-issue rejection reasons (bounded to 20, deterministic order) so
+        # route-held:frontier / over-budget on a specific bridged/agent-ready
+        # issue is visible without host access (read by the remediator).
+        "rejectedIssues": dict(sorted(rejected_issues.items())[:20]),
         "designGate": design_census,
         "fileOverlap": file_overlap.doctor_view(state),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
+        "linearSync": linear_sync.status(state, now),
         "merged24h": merged, "mergedAttributionError": merged_error,
         "mergeThroughput": merge_throughput, "mergeThroughputError": merge_throughput_error,
         "autoscale": _autoscale_block(host),
@@ -455,13 +478,15 @@ def _active_lease(path: Path, now: float) -> dict | None:
 
 
 def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
-    """The tick attempted recovery, but no worker owns any configured slot."""
+    """The tick attempted recovery, but at least one configured slot remains vacant."""
     capacity = (obs.get("capacityByProvider") or {}).get(provider) or {}
     pool = (obs.get("poolByProvider") or {}).get(provider)
     tick = obs.get("tick") or {}
     account_state = obs.get("codexAttribution") or codex_attribution(obs.get("codex") or {}, obs["now"])
     account_ready = provider != "codex" or bool(account_state.get("unleasedAvailable"))
-    return bool(pool and account_ready and capacity.get("slots") and not capacity.get("running")
+    slots, running = capacity.get("slots"), capacity.get("running")
+    vacant = (type(slots) is int and type(running) is int and 0 <= running < slots)
+    return bool(pool and account_ready and vacant
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
 
 
@@ -497,7 +522,9 @@ def codex_attribution(report: dict, now: float) -> dict:
             return unknown
         counts["leased"] += int(row["leased"])
         counts["eligibleByCooldown"] += int(row["available"])
-        counts["unleasedAvailable"] += int(row["available"] and not row["leased"])
+        free = row.get("freeSlots", 0 if row["leased"] else 1)
+        counts["unleasedAvailable"] += (free if type(free) is int and free >= 0 else int(not row["leased"])) \
+            if row["available"] else 0
         if not row["available"]:
             until = age_s(row.get("exhaustedUntil"), now)
             if until is None or until >= 0:
@@ -618,6 +645,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                 continue
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
+    alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
     if obs.get("linearError"):
         alerts["linear-down"] = f"Linear unreadable: {obs['linearError']}"
     elif obs.get("linearSkipped") or obs.get("pool") is None:
@@ -677,21 +705,19 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         pool_for_provider = (obs.get("poolByProvider") or {}).get(provider)
         accounts = f", {account_state['unleasedAvailable']} available account(s)" if provider == "codex" else ""
         alerts[f"provider-idle:{provider}"] = (f"{provider} has {pool_for_provider} compatible issue(s){accounts}, "
-                                               f"but 0/{capacity['slots']} workers after dispatch retried for "
+                                               f"but {capacity['running']}/{capacity['slots']} workers after dispatch retried for "
                                                f"{PROVIDER_IDLE_S // 60}m")
     if obs.get("gateTimeouts24h", 0) >= GATE_TIMEOUT_ALERT:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
         alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
-    stale_briefs = (obs.get("designGate") or {}).get("stale") or []
-    if stale_briefs:
-        alerts["design-brief-stale"] = (f"{len(stale_briefs)} needs-design-brief issue(s) held past 24h "
-                                        f"without a build claim ({', '.join(stale_briefs[:5])})")
-    elif obs.get("designGate") is None:
-        # A failed/cooldown census cannot prove recovery of a previously observed alarm.
-        prior_alarm = ((previous or {}).get("alerts") or {}).get("design-brief-stale")
-        if prior_alarm:
-            alerts["design-brief-stale"] = prior_alarm
+    no_work = obs.get("noWorkRepairs24h") or {}
+    if sum(no_work.values()) >= NO_WORK_REPAIR_ALERT:
+        causes = ", ".join(f"{reason} {count}" for reason, count in sorted(no_work.items(), key=lambda kv: -kv[1])[:3])
+        alerts["repairs-without-work"] = (f"{sum(no_work.values())} PR repairs in 24h spent a fix attempt before any "
+                                          f"agent work ({causes}); infrastructure, not the PRs, is exhausting them")
+    # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
+    # claiming run writes it), so a held brief is no longer a condition to watch.
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
@@ -781,8 +807,6 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         source_status = "unknown" if key == "linear-down" else "stale" if key == "hud-stale" else "degraded"
         if key == "delivery-stalled" and (obs.get("delivery") or {}).get("state") in ("unknown", "controller-held"):
             source_status = "unknown"
-        if key == "design-brief-stale" and obs.get("designGate") is None:
-            source_status = "unknown"
         if key == "admission-repair-needed" and (obs.get("eligiblePool") is None or obs.get("pool") is None
                 or any(row.get("reason") == "pr-inventory-unavailable"
                        for row in (obs.get("newIssueBudgetByProvider") or {}).values())):
@@ -847,11 +871,121 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
 
 # ---------------------------------------------------------------- Linear actions
 
+def _source_version() -> str:
+    explicit = os.environ.get("JOVIE_SOURCE_SHA", "").strip().lower()
+    if re.fullmatch(r"[a-f0-9]{40}", explicit):
+        return explicit
+    try:
+        status = subprocess.run(
+            ["git", "status", "--porcelain=v1", "--untracked-files=all"], cwd=REPO_ROOT,
+            capture_output=True, text=True, timeout=5, check=False)
+        if status.returncode != 0 or status.stdout.strip():
+            return "UNKNOWN"
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True,
+            text=True, timeout=5, check=False)
+        resolved = result.stdout.strip().lower()
+        return resolved if result.returncode == 0 and re.fullmatch(r"[a-f0-9]{40}", resolved) else "UNKNOWN"
+    except (OSError, subprocess.SubprocessError):
+        return "UNKNOWN"
+
+
+def _emergency_ops_report(key: str, text: str, condition: dict, host_name: str, target: str) -> dict:
+    """Preapproved deterministic notice when the observation-only reviewer is unavailable."""
+    source = condition.get("source") or {}
+    observed_at = source.get("observedAt") or "UNKNOWN"
+    owner = condition.get("owner") or "UNKNOWN"
+    next_action = condition.get("nextAction") or "inspect the existing Symphony doctor receipt"
+    message = "\n".join([
+        "Symphony emergency notice: report review is unavailable.",
+        "Domain: company (JovieInc/Jovie)",
+        f"Evidence observed: {observed_at}",
+        f"Evidence source: {source.get('producer') or 'UNKNOWN'}",
+        "Surface owner: Summer",
+        f"Current owner: {owner}",
+        f"Blocker: {text or 'UNKNOWN'}",
+        "Root cause: UNKNOWN",
+        f"Next action: {next_action}",
+    ])
+    message_digest = hashlib.sha256(message.encode()).hexdigest()
+    evidence_digest = hashlib.sha256(json.dumps(condition, sort_keys=True, default=str).encode()).hexdigest()
+    bindings = {
+        "messageSha256": message_digest,
+        "audience": "Founder and operators reading agent output",
+        "destination": {"adapter": "linear-issue", "target": target},
+        "evidenceFingerprint": evidence_digest,
+        "policyVersion": "canon/VOICE.md action-only agent communication; FLEET admission policy",
+        "resolvedModel": "NOT_APPLICABLE",
+    }
+    review_digest = hashlib.sha256(json.dumps(bindings, sort_keys=True).encode()).hexdigest()
+    return {
+        "message": message,
+        "decision": "approved-template",
+        "idempotencyKey": f"{host_name}:{key}:{condition.get('generation', 1)}",
+        "review": {
+            "schema": "jovie.agent-ops-report-delivery-review/v1",
+            "mode": "observation",
+            "outcome": "approved-template",
+            "reviewStatus": "emergency-reviewer-unavailable",
+            "revisionCount": 0,
+            "requestFingerprint": None,
+            "reviewedAt": now_iso(),
+            "bindings": bindings,
+            "reviewDigest": review_digest,
+        },
+    }
+
+
+def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, target: str) -> dict:
+    """Prepare, but never send, one company-scoped report through the Jev observation seam."""
+    source = condition.get("source") or {}
+    observed_at = source.get("observedAt") or "UNKNOWN"
+    source_version = _source_version()
+    proof = {
+        name: {"status": "UNKNOWN", "observedAt": observed_at,
+               "source": source.get("producer") or "UNKNOWN", "receipt": "UNKNOWN"}
+        for name in ("source", "tests", "ciQueue", "merge", "deployment",
+                     "authenticatedRuntime", "recurrence")
+    }
+    if source_version != "UNKNOWN":
+        proof["source"].update(status="PROVEN", receipt=source_version)
+    if int(condition.get("generation") or 1) > 1:
+        proof["recurrence"].update(status="PROVEN", receipt=condition.get("idempotencyKey") or "UNKNOWN")
+    else:
+        proof["recurrence"].update(status="NOT_APPLICABLE", receipt="NOT_APPLICABLE")
+    payload = {
+        "domain": "company",
+        "producer": "Symphony",
+        "currentOwner": condition.get("owner"),
+        "observedState": f"{condition.get('condition') or key} is {condition.get('state') or 'UNKNOWN'}",
+        "blocker": text,
+        "rootCause": None,
+        "nextAction": condition.get("nextAction"),
+        "evidence": {"observedAt": observed_at, "source": source.get("producer")},
+        "sourceSha": source_version,
+        "proofTiers": proof,
+        "destination": {"adapter": "linear-issue", "target": target},
+    }
+    try:
+        result = subprocess.run(
+            ["node", str(OPS_REPORT_SCRIPT)], cwd=REPO_ROOT, input=json.dumps(payload),
+            capture_output=True, text=True, timeout=20, check=False,
+            env={**os.environ, "JOVIE_AGENT_PROFILE": "no_agent"})
+        prepared = json.loads(result.stdout) if result.returncode == 0 else None
+        if (not isinstance(prepared, dict) or not isinstance(prepared.get("review"), dict)
+                or not isinstance(prepared.get("message"), str)
+                or prepared.get("destination", {}).get("target") != target):
+            raise ValueError("invalid ops report result")
+        return prepared
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return _emergency_ops_report(key, text, condition, host_name, target)
+
 class Tracker:
     """Linear Triage issues, one per alert key, reused within the cool-off."""
     def __init__(self, linear, host_name: str):
         self.linear, self.host = linear, host_name
         self._team_node = None
+        self.last_writing_report = None
 
     def title(self, key: str) -> str:
         if key == "bottleneck:merge-queue":
@@ -927,7 +1061,8 @@ class Tracker:
         except Exception:
             return None
 
-    def open(self, key: str, text: str) -> str | None:
+    def open(self, key: str, text: str, condition: dict | None = None) -> str | None:
+        self.last_writing_report = None
         found = self.existing(key)
         if found:
             self.apply_alert_label(found, key)
@@ -941,14 +1076,19 @@ class Tracker:
             remediation_label = self._remediation_label_id(key)
             if remediation_label:
                 labels.append(remediation_label)
+            description = (f"**{text}**\n\nHost `{self.host}`, {now_iso()}. Raised by `scripts/lanes/doctor.py`; "
+                           "it will move this issue to Done when the condition clears.\n\n"
+                           "Runbook: `scripts/lanes/README.md`; state under `~/.local/state/jovie-lanes` "
+                           "(`tick.json`, `runs/ledger.jsonl`, `doctor.json`).")
+            if condition:
+                prepared = prepare_ops_report(key, text, condition, self.host, self.title(key))
+                description = prepared["message"]
+                self.last_writing_report = prepared
             data = self.linear.gql(
                 'mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id identifier}}}',
                 {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": priority,
                        "title": self.title(key),
-                       "description": f"**{text}**\n\nHost `{self.host}`, {now_iso()}. Raised by `scripts/lanes/doctor.py`; "
-                                      "it will move this issue to Done when the condition clears.\n\n"
-                                      "Runbook: `scripts/lanes/README.md`; state under `~/.local/state/jovie-lanes` "
-                                      "(`tick.json`, `runs/ledger.jsonl`, `doctor.json`)."}})
+                       "description": description}})
             return data["issueCreate"]["issue"]["id"]
         except Exception:
             return None
@@ -1032,7 +1172,14 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
             else:
                 entry["pendingAction"] = "reopen"
             continue
-        issue_id = tracker.open(key, text) if tracker else None
+        issue_id = tracker.open(key, text, (conditions or {}).get(key)) if tracker else None
+        writing_report = getattr(tracker, "last_writing_report", None) if tracker else None
+        if issue_id and writing_report and conditions and key in conditions:
+            conditions[key] = {
+                **conditions[key],
+                "writingReview": writing_report["review"],
+                "writingDecision": writing_report["decision"],
+            }
         issues[key] = {"id": issue_id, "closedAt": None}  # retry a failed open
         if tracker and issue_id and conditions and key in conditions:
             contradict = getattr(tracker, "contradict_invariant", None)
@@ -1047,6 +1194,11 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
                 entry["pendingAction"] = "close"
     receipts = {}
     for key, event in (conditions or {}).items():
+        prior_event = (previous.get("conditions") or {}).get(key) or {}
+        if (not event.get("writingReview") and prior_event.get("writingReview")
+                and prior_event.get("idempotencyKey") == event.get("idempotencyKey")):
+            event = {**event, "writingReview": prior_event["writingReview"],
+                     "writingDecision": prior_event.get("writingDecision")}
         entry = issues.get(key) or {}
         acknowledged = bool(entry) and not entry.get("pendingAction")
         if event.get("state") == "resolved":
@@ -1160,7 +1312,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
         overlap = (file_overlap.doctor_view(host.state) if getattr(host, "state", None) else
                    {"mode": file_overlap.guard_mode(), "pairs": [], "metrics": {}})
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
-            "fileOverlap": overlap,
+            "fileOverlap": overlap, "linear": obs.get("linearSync") or tick.get("linear"),
             "lanes": counts, "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),
@@ -1196,7 +1348,17 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "slo": obs.get("slo"),
             "escalation": obs.get("escalation") or remediation.empty_escalation(),
             "remediation": obs.get("remediation") or remediation.empty_remediation(),
-            "autoscale": _autoscale_block(host)}
+            "autoscale": _autoscale_block(host),
+            # Real-limit record (jovie.capacity-limit): which measured limit holds lanes back.
+            "capacityLimit": _capacity_limit_block(host)}
+
+
+def _capacity_limit_block(host) -> dict | None:
+    try:
+        import capacity_limit
+        return capacity_limit.read_record(host.state)
+    except Exception:  # the feed never fails on an optional record
+        return None
 
 
 def _autoscale_block(host) -> dict:

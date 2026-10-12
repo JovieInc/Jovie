@@ -198,6 +198,8 @@ test('concurrent completion events issue at most one mutation', async () => {
 });
 
 test('every removal blocks ordinary callers even when beforeCommit is a synthetic group SHA', async () => {
+  // JOV-INV-011 evidence name. Every removal of the *unchanged* head blocks;
+  // a later commit is a new head (see the next test).
   for (const oid of [head, null, 'b'.repeat(40)]) {
     const f = fixture({
       states: [
@@ -219,6 +221,39 @@ test('every removal blocks ordinary callers even when beforeCommit is a syntheti
     assert.equal(result.reason, 'queue-ejected-requires-owner-reconciliation');
     assert.equal(result.removalEventId, 'MQR_latest-removal');
   }
+});
+
+test('a commit after the removal is a new head and records intent without reconciliation', async () => {
+  const ejected = committedDate => ({
+    commits: { nodes: [{ commit: { committedDate } }] },
+    timelineItems: {
+      nodes: [
+        {
+          id: 'MQR_old-removal',
+          createdAt: '2026-10-10T12:00:00Z',
+          beforeCommit: { oid: 'b'.repeat(40) },
+          reason: 'failed_checks',
+        },
+      ],
+    },
+  });
+  const rebased = ejected('2026-10-11T08:00:00Z');
+  const f = fixture({
+    states: [rebased, rebased, { autoMergeRequest: { enabledAt: 'now' } }],
+    checks: [{ name: 'PR Ready', bucket: 'pending' }],
+  });
+  const result = await submitMergeIntent(f.options, f);
+  assert.equal(f.mutations().length, 1);
+  assert.notEqual(result.reason, 'queue-ejected-requires-owner-reconciliation');
+  for (const committedDate of ['2026-10-10T11:00:00Z', 'not a date']) {
+    const same = fixture({ states: [ejected(committedDate)] });
+    assert.equal(
+      (await submitMergeIntent(same.options, same)).reason,
+      'queue-ejected-requires-owner-reconciliation'
+    );
+    assert.equal(same.mutations().length, 0);
+  }
+  assert.ok(QUERY.includes('commits(last:1){nodes{commit{committedDate}}}'));
 });
 
 const removalId = 'MQR_latest-removal';
@@ -277,7 +312,9 @@ test('owner-bound exact removal permits one request and retains immutable event 
   assert.equal(receipt.head, head);
   assert.equal(receipt.reconciliation.owner, 'test-owner');
   assert.ok(f.calls[0].includes(`query=${QUERY}`));
-  assert.ok(QUERY.includes('RemovedFromMergeQueueEvent{id beforeCommit'));
+  assert.ok(
+    QUERY.includes('RemovedFromMergeQueueEvent{id createdAt beforeCommit')
+  );
   assert.ok(QUERY.includes('viewer{login}'));
 });
 

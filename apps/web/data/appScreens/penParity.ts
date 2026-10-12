@@ -335,9 +335,9 @@ export const APP_SCREEN_PEN_PENDING_DECISIONS: readonly PenPendingDecision[] = [
     checkId: 'app-shell.sidebar-width',
     recordedOn: '2026-09-27',
     penValue: 256,
-    sourceValue: 244,
+    sourceValue: 224,
     summary:
-      'JwsdW sidebar slot is 256; code and VgcZb follow the 2026-09-25 244px lock.',
+      'JwsdW sidebar slot is 256; code follows the 224px left-sidebar-width-invariant-v1 lock (JOV-8108).',
   },
   {
     decisionId: 'D1',
@@ -354,6 +354,15 @@ export const APP_SCREEN_PEN_PENDING_DECISIONS: readonly PenPendingDecision[] = [
     penValue: 48,
     sourceValue: 44,
     summary: 'xLyVs App Header is 48; code header is 44.',
+  },
+  {
+    decisionId: 'D1',
+    checkId: 'app-sidebar.width',
+    recordedOn: '2026-10-12',
+    penValue: 244,
+    sourceValue: 224,
+    summary:
+      'VgcZb App Sidebar master is 244; code moved to the 224px left-sidebar-width-invariant-v1 lock (JOV-8108). Update the Pen master.',
   },
   {
     decisionId: 'D2',

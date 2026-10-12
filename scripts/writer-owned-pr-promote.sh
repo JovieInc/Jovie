@@ -31,9 +31,9 @@ upsert_status_comment() {
 }
 read_state() {
   gh_retry api graphql \
-    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id number state isDraft headRefOid body labels(first:100){nodes{name}} autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id state position}}}}' \
+    -f query='query($owner:String!,$name:String!,$number:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$number){id number state isDraft headRefOid body labels(first:100){nodes{name}} autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id state position}}}}' \
     -f owner="${REPO%%/*}" -f name="${REPO#*/}" -F number="$PR_NUMBER" \
-    --jq '.data.repository.pullRequest | {id, number, state, draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), body: (.body // ""), labels: [.labels.nodes[].name], autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true and .mergeQueueEntry != null), mergeQueueEntry}'
+    --jq 'if type != "object" or (has("errors") and .errors != []) or (.data.repository.pullRequest | type) != "object" then error("promotion state response incomplete") else . as $response | .data.repository.pullRequest | {id, number, state, draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), body: (.body // ""), labels: [.labels.nodes[].name], autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true and .mergeQueueEntry != null), mergeQueueEntry, viewerLogin: $response.data.viewer.login} end'
 }
 blocker_body() {
   jq -nc \
@@ -120,7 +120,9 @@ decision_for() {
 before="$(read_state)" || emit_blocker_and_exit "precondition" "state-read-failed" 0
 live_head="$(jq -r '.head // ""' <<<"$before")"
 [[ "$live_head" == "$EXPECTED_HEAD" ]] || emit_blocker_and_exit "precondition" "head-mismatch:${live_head:-missing}" 0
-viewer_login="$(gh_retry api user --jq '.login' 2>/dev/null)" || emit_blocker_and_exit "precondition" "writer-identity-unreadable" 0
+# Bind the writer to the authenticated principal in this same fresh state read.
+# Installation actors support GraphQL viewer; /user is a different token contract.
+viewer_login="$(jq -er '.viewerLogin | select(type == "string") | select(test("^[A-Za-z0-9][A-Za-z0-9-]*(\\[bot\\])?$")) | select(contains("\n") | not)' <<<"$before")" || emit_blocker_and_exit "precondition" "writer-identity-unreadable" 0
 if [[ "$(normalize_login "$viewer_login")" != "$(normalize_login "$WRITER_LOGIN")" ]]; then
   emit_blocker_and_exit "precondition" "writer-token-mismatch:${viewer_login:-unknown}" 0
 fi

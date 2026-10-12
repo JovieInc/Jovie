@@ -732,7 +732,7 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     assert '.[0].head_sha == $head_sha' in query
     assert 'index($runner_label) != null' in query
     assert 'HEARTBEAT_RUNNER_LABEL="jovie-runner"' in query
-    assert 'HEARTBEAT_RUNNER_LABEL="jovie-mac"' in query
+    assert 'HEARTBEAT_RUNNER_LABEL="jovie-mac"' not in query
     assert 'jobs_endpoint="repos/$GH_REPO/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100"' in query
     assert '.[0].run_attempt == $run_attempt' in query
     assert "HEARTBEAT_JOB_POLL_ATTEMPTS" in query
@@ -814,7 +814,9 @@ _MAC_JOB = {
 }
 
 
-def test_mac_heartbeat_identity_is_healthy(tmp_path: Path) -> None:
+def test_mac_pool_has_no_heartbeat_identity(tmp_path: Path) -> None:
+    # Mac lanes route from live runner state (mac-lane.sh); a Mac heartbeat
+    # must never authorize anything.
     runs_json, jobs_json = _exact_evidence(run_updates=_MAC_RUN, job_updates=_MAC_JOB)
     result, outputs = _run_query(
         tmp_path,
@@ -823,16 +825,11 @@ def test_mac_heartbeat_identity_is_healthy(tmp_path: Path) -> None:
         workflow="mac-runner-heartbeat.yml",
     )
     assert result.returncode == 0, result.stderr
-    assert outputs["health"] == "up"
-    assert outputs["probe_state"] == "healthy"
+    assert outputs["health"] == "down"
+    assert outputs["evidence"] == "heartbeat workflow identity is not authorized"
 
 
 def test_pool_heartbeats_cannot_attest_for_each_other(tmp_path: Path) -> None:
-    # Linux heartbeat evidence must never route work to the Mac pool.
-    result, outputs = _run_query(tmp_path / "linux-as-mac", workflow="mac-runner-heartbeat.yml")
-    assert result.returncode == 0, result.stderr
-    assert outputs["health"] == "down"
-
     # A Mac runner reusing the Linux job identity still lacks the Linux label.
     runs_json, jobs_json = _exact_evidence(
         job_updates={**_MAC_JOB, "name": "Self-hosted runner heartbeat"}

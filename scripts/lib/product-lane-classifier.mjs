@@ -105,9 +105,14 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^pnpm-lock\.yaml$/,
   ],
   [
+    // JS workspace config reaches the pnpm install, TypeScript, Biome, Turbo
+    // and Vitest graph. The iOS lane installs none of it: ios-ci.yml runs
+    // xcodebuild plus `node --test` on apps/ios/scripts with the runner's
+    // system Node. Root package.json is classified per changed script in
+    // classifyPackageJsonChange, which still selects iOS for iOS scripts.
     'shared-js-workspace',
     'shared-contract',
-    PRODUCT_LANES,
+    ['mac', 'web'],
     /^(package\.json|pnpm-workspace\.yaml|turbo\.json|tsconfig\.json|vitest\.config\.mts|biome\.json|\.node-version|\.npmrc|\.nvmrc|patches\/)/,
   ],
   [

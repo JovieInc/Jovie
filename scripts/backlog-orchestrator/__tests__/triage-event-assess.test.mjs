@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 import {
   assessTriageEvent as assessWithRealClient,
   escalationBlockOf,
   parseTriageEvent,
+  runCli,
   assessTriageSweep as sweepWithRealClient,
+  triageSweepThrottle,
 } from '../triage-event-assess.mjs';
 
 /** Partial clients are deliberate test doubles; production uses the full Linear module.
@@ -525,6 +529,71 @@ test('does not mutate an issue that left Triage before the job ran', async () =>
   assert.equal(receipt.disposition, 'stale-event');
   assert.equal(receipt.wakeSymphony, false);
   assert.equal(writes, 0);
+});
+
+test('triageSweepThrottle skips only a fresh successful sweep and fails open', () => {
+  const nowMs = Date.parse('2026-10-10T17:00:00.000Z');
+  // a successful sweep 45 minutes ago -> run again
+  assert.deepEqual(
+    triageSweepThrottle({ lastOkAt: '2026-10-10T16:15:00.000Z', nowMs }),
+    { skip: false, reason: 'interval-elapsed' }
+  );
+  // a successful sweep 10 minutes ago -> skip
+  const skipped = triageSweepThrottle({
+    lastOkAt: '2026-10-10T16:50:00.000Z',
+    nowMs,
+  });
+  assert.equal(skipped.skip, true);
+  assert.match(skipped.reason, /^swept-10m-ago$/);
+  // exactly at the 30-minute floor -> run (not < the floor)
+  assert.equal(
+    triageSweepThrottle({ lastOkAt: '2026-10-10T16:30:00.000Z', nowMs }).skip,
+    false
+  );
+  // missing / unparseable / future timestamps never skip (fail open)
+  assert.deepEqual(triageSweepThrottle({ lastOkAt: undefined, nowMs }), {
+    skip: false,
+    reason: 'no-prior-ok',
+  });
+  assert.deepEqual(triageSweepThrottle({ lastOkAt: 'garbage', nowMs }), {
+    skip: false,
+    reason: 'no-prior-ok',
+  });
+  assert.deepEqual(
+    triageSweepThrottle({ lastOkAt: '2026-10-10T18:00:00.000Z', nowMs }),
+    { skip: false, reason: 'clock-skew' }
+  );
+});
+
+test('the sweep CLI skips a fresh successful sweep without Linear access', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'triage-sweep-throttle-'));
+  const cacheFile = join(directory, 'cache.json');
+  const previousArgv = process.argv;
+  const previousCacheFile = process.env.JOVIE_ORCHESTRATOR_CACHE;
+  const previousExitCode = process.exitCode;
+  const logs = [];
+  t.mock.method(console, 'log', message => logs.push(String(message)));
+  try {
+    writeFileSync(
+      cacheFile,
+      JSON.stringify({ lastTriageSweepOkAt: new Date().toISOString() })
+    );
+    process.argv = [process.execPath, 'triage-event-assess.mjs', '--sweep'];
+    process.env.JOVIE_ORCHESTRATOR_CACHE = cacheFile;
+
+    await runCli();
+
+    assert.equal(process.exitCode, 0);
+    assert.equal(logs.length, 1);
+    assert.match(logs[0], /^triage-sweep skipped reason=swept-0m-ago$/);
+  } finally {
+    process.argv = previousArgv;
+    process.exitCode = previousExitCode;
+    if (previousCacheFile === undefined)
+      delete process.env.JOVIE_ORCHESTRATOR_CACHE;
+    else process.env.JOVIE_ORCHESTRATOR_CACHE = previousCacheFile;
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('records an urgent unowned assessment without waking Symphony', async () => {

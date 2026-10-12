@@ -122,6 +122,40 @@ class CurrentLoginTest(Isolated):
         return codex.run(SimpleNamespace(prompt_file=str(prompt), receipt_file=str(self.root / "receipt.jsonl"),
                                         cwd=str(self.root), model=None, reasoning_effort="high"))
 
+    def test_one_login_holds_configured_concurrent_slots_and_reports_free_ones(self):
+        # Tim 2026-10-11: more runs on the one current login, no account rotation.
+        self.fake_cli()
+        handles = []
+        with patch.dict(os.environ, {"CODEX_LANE_LOGIN_SLOTS": "3"}):
+            self.assertEqual(codex.status()["accounts"][codex.CURRENT_LOGIN]["freeSlots"], 3)
+            for expected_free in (2, 1, 0):
+                name, handle = codex.pick({}, 1.0)
+                self.assertEqual(name, codex.CURRENT_LOGIN)
+                handles.append(handle)
+                row = codex.status()["accounts"][codex.CURRENT_LOGIN]
+                self.assertEqual((row["freeSlots"], row["leased"]), (expected_free, expected_free == 0))
+            self.assertEqual(codex.pick({}, 1.0), (None, None), "never more runs than slots")
+            handles.pop().close()
+            self.assertEqual(codex.status()["accounts"][codex.CURRENT_LOGIN]["freeSlots"], 1)
+        for handle in handles:
+            handle.close()
+        name, handle = codex.pick({}, 1.0)
+        self.assertEqual(codex.pick({}, 1.0), (None, None), "default stays one exclusive run")
+        handle.close()
+
+    def test_logged_in_cli_clears_an_auth_bank_before_picking(self):
+        self.fake_cli()
+        codex.write_state({codex.CURRENT_LOGIN: {"lastKind": "auth", "lastError": "429", "exhaustedUntil": 10_000.0}})
+        name, handle = codex.pick(codex.read_state(), 1.0)
+        self.assertEqual(name, codex.CURRENT_LOGIN)
+        handle.close()
+        row = codex.read_state()[codex.CURRENT_LOGIN]
+        self.assertNotIn("exhaustedUntil", row)
+        self.assertEqual(row["lastKind"], "auth-reverified")
+        self.fake_cli(auth="Not logged in", auth_code=1)
+        codex.write_state({codex.CURRENT_LOGIN: {"lastKind": "auth", "exhaustedUntil": 10_000.0}})
+        self.assertEqual(codex.pick(codex.read_state(), 1.0), (None, None), "a real logout stays benched")
+
     def test_existing_cli_login_without_opening_credentials_or_scanning_profiles(self):
         self.fake_cli()
         with patch.object(Path, "glob", side_effect=AssertionError("profile discovery")):
@@ -157,16 +191,53 @@ class CurrentLoginTest(Isolated):
         name, handle = codex.pick({}, time.time())
         self.assertEqual(name, "current-login")
         try:
-            self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
+            with patch.object(codex, "LEASE_WAIT_S", 0):
+                self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
             self.assertFalse((self.root / "launch.json").exists())
         finally:
             handle.close()
         self.assertEqual(self.invoke(), 0)
 
+    def test_a_busy_lease_is_waited_for_not_reported_as_exhaustion(self):
+        # Gem 2026-10-11 18:38-18:43: concurrent runs lost the one lease, exited 75, were charged
+        # a fix attempt or cooled the whole provider while the account was healthy.
+        self.fake_cli()
+        name, handle = codex.pick({}, time.time())
+        self.assertEqual(name, "current-login")
+        waits = []
+        real_sleep = time.sleep
+        def release(seconds):
+            # time.sleep is global: subprocess's own wait loop (codex login status) also calls it
+            # on a loaded host (Gem, load ~16, 2026-10-12). Only the lane's lease wait releases.
+            if seconds < codex.LEASE_POLL_S:
+                return real_sleep(seconds)
+            waits.append(seconds)
+            handle.close()
+        with patch.object(codex.time, "sleep", side_effect=release):
+            self.assertEqual(self.invoke(), 0)
+        self.assertEqual(waits, [codex.LEASE_POLL_S])
+        self.assertTrue((self.root / "launch.json").exists())
+        self.assertEqual(codex.read_state()["current-login"]["runs"], 1, "the wait itself is not a run")
+
+    def test_successful_run_clears_a_stale_last_error(self):
+        self.fake_cli()
+        codex.write_state({"current-login": {"lastKind": "auth", "lastError": "401", "runs": 2}})
+        self.assertEqual(self.invoke(), 0)
+        entry = codex.read_state()["current-login"]
+        self.assertEqual(entry["lastKind"], "ok")
+        self.assertNotIn("lastError", entry)
+
     def test_limit_banks_single_login_without_rotation_or_credit_redemption(self):
         self.fake_cli("You've hit your usage limit. Try again in 2 hours.", 1)
+        real_sleep = time.sleep
+        def no_rotation_pause(seconds):
+            # subprocess's own wait loop also calls the global time.sleep on a loaded host;
+            # only the lane's rotate/lease pauses mean rotation.
+            if seconds >= min(codex.ROTATE_PAUSE_S, codex.LEASE_POLL_S):
+                raise AssertionError("rotation")
+            return real_sleep(seconds)
         with patch.object(codex, "maybe_redeem", side_effect=AssertionError("credit redemption")), \
-                patch.object(codex.time, "sleep", side_effect=AssertionError("rotation")):
+                patch.object(codex.time, "sleep", side_effect=no_rotation_pause):
             self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
         state = codex.read_state()
         self.assertEqual(list(state), ["current-login"])
@@ -476,6 +547,14 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual((kind, until), ("auth", 86400.0))
         self.assertEqual(codex.classify("codex\nOK\ntokens used\n12", 0, 0.0), ("ok", None))
         self.assertEqual(codex.classify("boom", 3, 0.0), ("error", None))
+
+    def test_auth_words_inside_the_agents_work_do_not_bench_the_login(self):
+        # 2026-10-12 on Gem: a run ending on a 429 whose work mentioned 401/unauthorized was
+        # classified auth and benched the only login for 24h with 96% capacity left.
+        transcript = "editing auth-guard.ts\nexpect(res.status).toBe(401) // unauthorized\n" + "work\n" * 40 \
+            + "error: 429 Too Many Requests"
+        self.assertEqual(codex.classify(transcript, 1, 0.0)[0], "rate")
+        self.assertEqual(codex.classify("work\n" * 40 + "error: not logged in", 1, 0.0), ("auth", 86400.0))
 
     def test_successful_run_that_mentions_rate_limits_is_not_exhausted(self):
         transcript = "reading rate-limiter.test.ts\nexpect 429 Too Many Requests\nquota fallback\n" + "work\n" * 40 + "Done."

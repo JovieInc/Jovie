@@ -1,13 +1,21 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: GitHub evicts Actions caches only by 7-day LRU, and over the 10 GB budget that LRU drops live main caches; this hop holds only actions:write to evict closed-ref, duplicate, and surplus caches first.
+# removal-trigger: Remove when each cache writer deletes its predecessor after saving and closed PRs drop their own caches.
 name: Actions Cache GC
-# clock-class: temporal-resource
 
 # Ongoing eviction for stale/duplicate Actions caches. Does not smash live
 # pnpm/node/playwright caches on main or open PR refs unless they are unused
 # and the repo is over the cache budget.
+#
+# No clock: the cache only grows when workflows save, and main pushes are
+# where the large caches are written, so each main push re-plans eviction.
+# Caches of PRs closed since the last push go on the next one. One run goes
+# at a time and the newest push waits behind it.
 
 on:
-  schedule:
-    - cron: '19 4 * * *'
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       apply:

@@ -43,6 +43,59 @@ const SERVICE_CENSUS_SELECTOR_TESTS = [
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
 ];
 
+describe('Sentry deployment contract selection', () => {
+  const inputs = [
+    '.github/actions/sentry-error-gate/action.yml',
+    '.github/scripts/sentry-read-json.sh',
+    'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
+    'scripts/run-affected-tests.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+    'docs/runbooks/production-sentry-uncertainty-recovery.md',
+  ];
+  const deploymentContract = 'apps/web/tests/unit/ci/deploy-workflow.test.ts';
+
+  it('retains the existing deployment contract for transport-only and contract repair changes', () => {
+    for (const files of [inputs, [...inputs, deploymentContract]]) {
+      const plan = buildAffectedTestPlan(files);
+      expect(plan.mode).toBe('selected');
+      expect(plan.selectedTests).toEqual([deploymentContract]);
+      expect(plan.scriptVitestTests).toContain(
+        'scripts/lib/__tests__/sentry-error-gate-request.test.mjs'
+      );
+      expect(plan.scriptVitestTests).toContain(
+        'scripts/lib/__tests__/automation-verify.test.mjs'
+      );
+    }
+  });
+
+  it('requires a Sentry-specific input before narrowing a deployment-only repair', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        deploymentContract,
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the existing deployment contract is unavailable', () => {
+    const plan = buildAffectedTestPlan(inputs, {
+      isFileAvailable: file => file !== deploymentContract,
+    });
+    expect(plan.mode).toBe('full');
+    expect(plan.fallbackReason).toBe(
+      'Sentry deployment workflow contract is unavailable'
+    );
+  });
+
+  it('does not shrink unrelated product changes into the Sentry closure', () => {
+    expect(
+      buildAffectedTestPlan([...inputs, 'apps/web/lib/unknown-release-peer.ts'])
+        .mode
+    ).toBe('full');
+  });
+});
+
 describe('lane Python qualification coverage', () => {
   it.each([
     ['lane source', ['scripts/lanes/hyperagent_lane.py']],
@@ -1394,6 +1447,14 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const PLAYWRIGHT_SENTRY_ISOLATION_DIFF = [
+  '.github/workflows/ci.yml',
+  'apps/web/playwright.config.ts',
+  'apps/web/tests/e2e/reporters/sentry-ci-reporter.ts',
+  'apps/web/tests/e2e/sentry.spec.ts',
+  'apps/web/tests/unit/ci/sentry-ci-reporter.test.ts',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const SENTRY_AUTOFIX_RECURRENCE_LANE = [
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
@@ -2712,6 +2773,37 @@ describe('automation-verify affected scope', () => {
         ],
       ],
     ]);
+  });
+
+  it('keeps Playwright Sentry isolation on its focused unit and selector proofs', () => {
+    const plan = buildAffectedTestPlan(PLAYWRIGHT_SENTRY_ISOLATION_DIFF);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/ci/sentry-ci-reporter.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(
+      buildAffectedTestPlan([
+        ...PLAYWRIGHT_SENTRY_ISOLATION_DIFF,
+        'apps/web/tests/e2e/reporters/unknown-reporter.ts',
+      ]).mode
+    ).toBe('full');
+    expect(
+      buildAffectedTestPlan(
+        PLAYWRIGHT_SENTRY_ISOLATION_DIFF.filter(
+          file => file !== 'apps/web/tests/e2e/sentry.spec.ts'
+        )
+      ).mode
+    ).toBe('full');
+    expect(
+      buildAffectedTestPlan(PLAYWRIGHT_SENTRY_ISOLATION_DIFF, {
+        isFileAvailable: file =>
+          file !== 'apps/web/tests/unit/ci/sentry-ci-reporter.test.ts',
+      }).fallbackReason
+    ).toBe('Playwright Sentry isolation proof is unavailable');
   });
 
   it('keeps the golden-path smoke contract repair on focused coverage', () => {

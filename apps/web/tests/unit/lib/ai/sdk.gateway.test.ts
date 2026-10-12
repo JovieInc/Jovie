@@ -50,6 +50,39 @@ describe('lib/ai/sdk gateway routing', () => {
     expect(mockGatewayModel).not.toHaveBeenCalled();
   });
 
+  it('fails closed on non-allowlisted model ids (JOV-8109)', async () => {
+    process.env.AI_GATEWAY_API_KEY = 'gateway-key';
+    const { gateway } = await import('@/lib/ai/sdk');
+
+    for (const denied of [
+      'google/gemini-2.5-flash-image',
+      'deepseek/deepseek-v4',
+      'zai/glm-5.2',
+    ]) {
+      expect(() => gateway(denied)).toThrow(/not on the allowlist/);
+    }
+    expect(mockGatewayModel).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on non-allowlisted image model ids (JOV-8109)', async () => {
+    process.env.AI_GATEWAY_API_KEY = 'gateway-key';
+    const image = vi.fn((modelId: string) => ({ __image: modelId }));
+    const provider = Object.assign(
+      vi.fn((modelId: string) => ({ __model: modelId })),
+      { image }
+    );
+    mockCreateGateway.mockReturnValue(provider);
+
+    const { gateway } = await import('@/lib/ai/sdk');
+    for (const denied of [
+      'google/imagen-4.0-ultra-generate-001',
+      'bfl/flux-2-pro',
+    ]) {
+      expect(() => gateway.image(denied)).toThrow(/not on the image allowlist/);
+    }
+    expect(image).not.toHaveBeenCalled();
+  });
+
   it('fails fast on banned image model ids (JOV-7119)', async () => {
     process.env.AI_GATEWAY_API_KEY = 'gateway-key';
     const image = vi.fn((modelId: string) => ({ __image: modelId }));

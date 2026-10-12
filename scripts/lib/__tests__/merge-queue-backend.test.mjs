@@ -61,7 +61,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":10,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":10,"max_entries_to_merge":1,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -86,10 +86,10 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
   checkResponseTimeout: 3600,
   maximumEntriesToBuild: 10,
-  maximumEntriesToMerge: 5,
+  maximumEntriesToMerge: 1,
   mergeMethod: 'SQUASH',
-  minimumEntriesToMerge: 5,
-  minimumEntriesToMergeWaitTime: 10,
+  minimumEntriesToMerge: 1,
+  minimumEntriesToMergeWaitTime: 0,
 });
 function prState(overrides = {}) {
   return {
@@ -738,8 +738,8 @@ describe('native live preflight', () => {
             { type: 'MERGE_QUEUE', parameters: {
               __typename: 'MergeQueueParameters',
               checkResponseTimeoutMinutes: 60, groupingStrategy: 'ALLGREEN',
-              maxEntriesToBuild: 10, maxEntriesToMerge: 5, mergeMethod: 'SQUASH',
-              minEntriesToMerge: 5, minEntriesToMergeWaitMinutes: 10,
+              maxEntriesToBuild: 10, maxEntriesToMerge: 1, mergeMethod: 'SQUASH',
+              minEntriesToMerge: 1, minEntriesToMergeWaitMinutes: 0,
             } },
           ] },
           bypassActors: { totalCount: 0, pageInfo: {
@@ -848,8 +848,8 @@ describe('native live preflight', () => {
     ['different build concurrency', live => { live.rules.nodes[1].parameters.maxEntriesToBuild = 3; }],
     ['different max group', live => { live.rules.nodes[1].parameters.maxEntriesToMerge = 2; }],
     ['different method', live => { live.rules.nodes[1].parameters.mergeMethod = 'MERGE'; }],
-    ['different minimum group', live => { live.rules.nodes[1].parameters.minEntriesToMerge = 1; }],
-    ['different minimum wait', live => { live.rules.nodes[1].parameters.minEntriesToMergeWaitMinutes = 0; }],
+    ['different minimum group', live => { live.rules.nodes[1].parameters.minEntriesToMerge = 5; }],
+    ['different minimum wait', live => { live.rules.nodes[1].parameters.minEntriesToMergeWaitMinutes = 10; }],
   ])('rejects incomplete or disagreeing same-response policy before mutation: %s', async (_, change) => {
     const input = aggregateInput();
     input.ruleset.updated_at = '2026-10-04T13:22:46.241Z';
@@ -1033,8 +1033,8 @@ describe('native live preflight', () => {
     });
   });
 
-  it('records pending cohort cutover drift without failing live 1/0 preflight', () => {
-    const liveUntilCutover = {
+  it('fails closed on the retired five-entry cohort policy', () => {
+    const retiredCohort = {
       ...VALID_RULESET,
       rules: VALID_RULESET.rules.map(rule =>
         rule.type === 'merge_queue'
@@ -1042,24 +1042,30 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                min_entries_to_merge: 1,
-                min_entries_to_merge_wait_minutes: 0,
+                max_entries_to_merge: 5,
+                min_entries_to_merge: 5,
+                min_entries_to_merge_wait_minutes: 10,
               },
             }
           : rule
       ),
     };
     const result = validateNativePreflightEvidence({
-      ruleset: liveUntilCutover,
+      ruleset: retiredCohort,
       repository: VALID_REPOSITORY,
       workflowYaml: VALID_WORKFLOW,
       branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
     });
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
     expect(result.policyReadback).toMatchObject({
       matched: false,
-      drift: ['min_entries_to_merge', 'min_entries_to_merge_wait_minutes'],
+      drift: [
+        'max_entries_to_merge',
+        'min_entries_to_merge',
+        'min_entries_to_merge_wait_minutes',
+      ],
     });
+    expect(result.errors.join('\n')).toContain('max_entries_to_merge');
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceCount');
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceActors');
   });
@@ -1244,8 +1250,6 @@ describe('native live preflight', () => {
     ).toBe(20);
     expect(falseDrift.policyReadback.drift).toEqual([
       'check_response_timeout_minutes',
-      'min_entries_to_merge',
-      'min_entries_to_merge_wait_minutes',
     ]);
     expect(
       falseDrift.errors.some(error =>

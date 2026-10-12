@@ -1,6 +1,7 @@
-import { neon, Pool } from '@neondatabase/serverless';
+import { neon, Pool, type PoolClient } from '@neondatabase/serverless';
 /* eslint-disable @jovie/no-manual-db-pooling -- Distinct pooled clients for identity-bleed proof */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { classifyDatabaseEndpoint } from '@/lib/db/client/connection';
 import { setupDatabase } from '../setup-db';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -12,6 +13,9 @@ describeRlsPin('RLS identity pin on real Postgres (JOV-6267)', () => {
   beforeAll(async () => {
     await setupDatabase();
     pool = new Pool({ connectionString: databaseUrl, max: 3 });
+    if (process.env.DB_CERTIFICATION === 'true') {
+      expect(classifyDatabaseEndpoint(databaseUrl!)).toBe('transaction-pooled');
+    }
   }, 60_000);
 
   afterAll(async () => {
@@ -27,14 +31,26 @@ describeRlsPin('RLS identity pin on real Postgres (JOV-6267)', () => {
     return result.rows[0]?.clerk_user_id ?? '';
   }
 
-  it('records runtime owner/BYPASSRLS/FORCE without claiming production enforcement', async () => {
-    const client = await pool.connect();
+  it('records scoped limits, peak clients, acquisition latency, and headroom', async () => {
+    const clients: PoolClient[] = [];
+    const acquisitionMs: number[] = [];
     try {
-      const role = await client.query(`
+      for (let index = 0; index < 3; index += 1) {
+        const startedAt = performance.now();
+        clients.push(await pool.connect());
+        acquisitionMs.push(Number((performance.now() - startedAt).toFixed(1)));
+      }
+      const role = await clients[0].query(`
         SELECT current_user, r.rolbypassrls, r.rolsuper
         FROM pg_roles r WHERE r.rolname = current_user
       `);
-      const tables = await client.query(`
+      const limits = await clients[0].query(`
+        SELECT current_setting('max_connections')::int AS server_limit,
+          r.rolconnlimit AS role_limit,
+          (SELECT count(*)::int FROM pg_stat_activity) AS observed_connections
+        FROM pg_roles r WHERE r.rolname = current_user
+      `);
+      const tables = await clients[0].query(`
         SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -43,23 +59,35 @@ describeRlsPin('RLS identity pin on real Postgres (JOV-6267)', () => {
       `);
       expect(typeof role.rows[0]?.rolbypassrls).toBe('boolean');
       expect(tables.rows.length).toBeGreaterThan(0);
+      expect(pool.totalCount).toBeLessThanOrEqual(3);
+      const snapshot = limits.rows[0];
+      console.info(
+        JSON.stringify({
+          scope: 'isolated-neon-certification',
+          endpointMode: classifyDatabaseEndpoint(databaseUrl!),
+          serverLimit: snapshot?.server_limit ?? 'unknown',
+          roleLimit: snapshot?.role_limit ?? 'unknown',
+          poolerBackendLimit: 'unknown',
+          observedConnections: snapshot?.observed_connections ?? 'unknown',
+          observedPeakClients: pool.totalCount,
+          acquisitionMs,
+          serverHeadroom:
+            snapshot?.server_limit != null &&
+            snapshot?.observed_connections != null
+              ? snapshot.server_limit - snapshot.observed_connections
+              : 'unknown',
+          runtime: process.version,
+        })
+      );
     } finally {
-      client.release();
+      for (const client of clients) client.release();
     }
   });
 
-  it('unpinned identity survives COMMIT; pinned identity does not leak across users', async () => {
+  it('keeps RLS identity on each handle and clears it on commit or rollback', async () => {
     const clientA = await pool.connect();
     const clientB = await pool.connect();
     try {
-      await clientA.query('BEGIN');
-      await clientA.query("SELECT set_config('app.clerk_user_id', $1, false)", [
-        'user-unpinned-a',
-      ]);
-      await clientA.query('COMMIT');
-      expect(await readIdentity(clientA)).toBe('user-unpinned-a');
-      await clientA.query("SELECT set_config('app.clerk_user_id', '', false)");
-
       await clientA.query('BEGIN');
       await clientB.query('BEGIN');
       await clientA.query("SELECT set_config('app.clerk_user_id', $1, true)", [
@@ -70,7 +98,7 @@ describeRlsPin('RLS identity pin on real Postgres (JOV-6267)', () => {
       ]);
       expect(await readIdentity(clientA)).toBe('user-pinned-a');
       expect(await readIdentity(clientB)).toBe('user-pinned-b');
-      await clientA.query('ROLLBACK');
+      await clientA.query('COMMIT');
       await clientB.query('ROLLBACK');
       expect(await readIdentity(clientA)).not.toBe('user-pinned-a');
       expect(await readIdentity(clientB)).not.toBe('user-pinned-b');
@@ -80,18 +108,60 @@ describeRlsPin('RLS identity pin on real Postgres (JOV-6267)', () => {
     }
   });
 
-  it('cancels bounded SQL and leaves the pooled connection usable', async () => {
+  it('uses only transaction-local timeouts and leaves the handle reusable', async () => {
     const client = await pool.connect();
     try {
-      await client.query("SET statement_timeout = '50ms'");
+      const original = await client.query(
+        "SELECT current_setting('statement_timeout') AS value"
+      );
+      await client.query('BEGIN');
+      await client.query("SET LOCAL statement_timeout = '50ms'");
       await expect(client.query('SELECT pg_sleep(0.2)')).rejects.toThrow(
         /canceling statement/i
       );
-      await client.query('RESET statement_timeout');
+      await client.query('ROLLBACK');
+      expect(
+        (
+          await client.query(
+            "SELECT current_setting('statement_timeout') AS value"
+          )
+        ).rows[0]?.value
+      ).toBe(original.rows[0]?.value);
       expect((await client.query('SELECT 1 AS ok')).rows[0]?.ok).toBe(1);
     } finally {
-      await client.query('RESET statement_timeout').catch(() => undefined);
+      await client.query('ROLLBACK').catch(() => undefined);
       client.release();
+    }
+  });
+
+  it('reaps idle clients and reconnects after a forced pool lifecycle', async () => {
+    const lifecyclePool = new Pool({
+      connectionString: databaseUrl,
+      max: 1,
+      idleTimeoutMillis: 50,
+      allowExitOnIdle: true,
+    });
+    const first = await lifecyclePool.connect();
+    expect((await first.query('SELECT 1 AS ok')).rows[0]?.ok).toBe(1);
+    first.release();
+
+    const deadline = Date.now() + 2_000;
+    while (lifecyclePool.totalCount !== 0 && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    expect(lifecyclePool.totalCount).toBe(0);
+
+    const reconnected = await lifecyclePool.connect();
+    expect((await reconnected.query('SELECT 1 AS ok')).rows[0]?.ok).toBe(1);
+    reconnected.release();
+    await lifecyclePool.end();
+    expect(lifecyclePool.totalCount).toBe(0);
+
+    const replacement = new Pool({ connectionString: databaseUrl, max: 1 });
+    try {
+      expect((await replacement.query('SELECT 1 AS ok')).rows[0]?.ok).toBe(1);
+    } finally {
+      await replacement.end();
     }
   });
 
