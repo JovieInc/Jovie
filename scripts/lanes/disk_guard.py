@@ -27,9 +27,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import autoscale  # noqa: E402  (sibling module of the release)
 import worktree_pool  # noqa: E402  (sibling module of the release)
 
-LOW_PCT = 15.0
+# One threshold (Gem 2026-10-12 04:12Z): autoscale stops growth at or below this free %, so the
+# sweep must already run there. At exactly 15% growth was blocked and nothing was reclaimed
+# while ~178 GB of retired workspaces sat on disk.
+LOW_PCT = float(autoscale.DISK_INCREASE_MIN)
 CRITICAL_PCT = 5.0
 DERIVED_DATA_IDLE_S = 5 * 3600
 WORKTREE_IDLE_S = 12 * 3600
@@ -232,6 +236,17 @@ def retired_workspace_roots() -> list[Path]:
     return [*(Path.home() / name for name in RETIRED_WORKSPACE_DIRS), *map(Path, RETIRED_WORKSPACE_ABSOLUTE)]
 
 
+def reclaimable(host, roots=None) -> bool:
+    """Cheap: a retired Symphony workspace root still holds a directory the sweep can remove."""
+    for root in retired_workspace_roots() if roots is None else roots:
+        try:
+            if root.is_dir() and not root.is_symlink() and any(child.is_dir() for child in root.iterdir()):
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def log_dirs(host) -> list[Path]:
     return [host.state / "runs", *([] if selftest() else [Path.home() / "symphony-ui-pilot-logs"])]
 
@@ -308,7 +323,7 @@ def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
                 report["actions"].append("retired workspaces: budget spent, continuing next sweep")
                 return
             pct = free_pct(path)
-            if path.is_symlink() or not path.is_dir() or pct is None or pct >= LOW_PCT:
+            if path.is_symlink() or not path.is_dir() or pct is None or pct > LOW_PCT:
                 continue
             resolved = path.resolve()
             if any(mount == resolved or resolved in mount.parents for mount in mounts):
@@ -369,8 +384,8 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
     now = time.time() if now is None else now
     pct = free_pct(host.state)
     report = {"at": now_iso(), "freePct": pct, "low": False, "critical": False, "actions": [], "errors": []}
-    report["low"] = pct is not None and pct < LOW_PCT
-    if sweep and pct is not None and CRITICAL_PCT < pct < LOW_PCT:
+    report["low"] = pct is not None and pct <= LOW_PCT
+    if sweep and pct is not None and CRITICAL_PCT < pct <= LOW_PCT:
         try:
             with open(host.state / "disk-cleanup.lock", "a") as lock:
                 try:
@@ -398,6 +413,8 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
             report["errors"].append(f"cleanup-lock:{error}"[:200])
         pct = free_pct(host.state)
     report["freePctAfter"] = pct
+    # Disk is a capacity limit only once nothing reclaimable is left (capacity_limit reads this).
+    report["reclaimable"] = reclaimable(host)
     report["critical"] = pct is not None and pct <= CRITICAL_PCT
     report["admitted"] = pct is not None and pct > CRITICAL_PCT
     report["reason"] = "disk-unobservable" if pct is None else "disk-critical" if report["critical"] else "disk-available"

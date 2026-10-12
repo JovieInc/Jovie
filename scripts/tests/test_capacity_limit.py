@@ -79,11 +79,12 @@ class CapacityLimitTest(unittest.TestCase):
         self.assertEqual(body["unblock"]["action"], C.UNBLOCK["host-cpu"][0])
         body.update(sentAt=A._iso(NOW), deliveryId="gem:host-cpu:limited:1800000000", signatureKeyId="key-1", signature="ed25519=x")
         self.assertTrue(C.valid_body(body))
-        # Load wobbles under the material threshold: nothing new. A 25% move re-emits needs.
-        tracker, out = run([(state(CPU["lanes"], load1=17.5), OBS)], tracker)
-        self.assertEqual(out[0][0], [])
-        tracker, out = run([(state(CPU["lanes"], load1=24.0), OBS)], tracker)
-        self.assertEqual(out[0][0][0]["observed"], 24.0)
+        # Load moving is jitter, never a re-POST (Gem 03:59-04:05Z churn); a new limit is material.
+        for load in (17.5, 24.0, 9.0):
+            tracker, out = run([(state(CPU["lanes"], load1=load), OBS)], tracker)
+            self.assertEqual(out[0][0], [])
+        tracker, out = run([(state(CPU["lanes"], cpu=32, load1=40.0), OBS)], tracker)
+        self.assertEqual(out[0][0][0]["limit"], 32)
         # Lanes changing is a change.
         one = state({"devin": row(["host-pressure"]), "grok": row([], demand=0, reason="sustained-demand")})
         tracker, out = run([(one, OBS)], tracker)
@@ -116,7 +117,7 @@ class CapacityLimitTest(unittest.TestCase):
              {**OBS, "codexAttribution": {"quotaBanked": 1, "earliestCooldownS": 3600}}, "codex-credits"),
             ({"codex": row(["rate-limited"])}, {**OBS, "rateBankAt": {"codex": NOW - 30}}, "codex-credits"),
             ({"hyperagent": row(["rate-bank"])}, {**OBS, "rateBankAt": {"hyperagent": NOW - 30}}, "claude-credits"),
-            ({"devin": row(["disk-low"])}, {**OBS, "disk": {"admitted": True, "freePct": 12}}, "host-disk"),
+            ({"devin": row(["disk-low"])}, {**OBS, "disk": {"admitted": True, "freePct": 12}, "diskReclaimable": False}, "host-disk"),
             ({"devin": row(["low-mem"])}, OBS, "host-memory"),
             ({"devin": row(["github-budget"])}, {**OBS, "githubRemaining": 900}, "github-api-quota"),
             ({"devin": row(["lane-ceiling"])}, OBS, "host-cpu"),
@@ -131,6 +132,14 @@ class CapacityLimitTest(unittest.TestCase):
                 self.assertTrue(C.valid_body(body), body)
         _, out = run([(state({"codex": row(["codex-unleased"], running=0)}), {**OBS, "codexAttribution": {"quotaBanked": 1, "earliestCooldownS": 3600}})] * 3)
         self.assertIn("until", out[2][0][0])
+
+    def test_disk_is_no_limit_while_the_sweep_has_targets(self):
+        # Gem 04:12Z: host-disk was POSTed at 15% free with ~178 GB of retired workspaces left.
+        lanes = state({"devin": row(["disk-low"])})
+        for reclaimable in (True, None):
+            tracker, out = run([(lanes, {**OBS, "disk": {"admitted": True, "freePct": 15}, "diskReclaimable": reclaimable})] * 4)
+            self.assertTrue(all(emit == [] for emit, _ in out))
+            self.assertTrue(tracker["bottleneckFound"], "a pending sweep is a software step, not a purchase")
 
     def test_software_and_no_demand_holds_are_never_sent(self):
         for blockers, demand, found in ((["gate-pressure"], 6, True), (["stale-doctor"], 6, True), (["unknown-running"], 6, True),
