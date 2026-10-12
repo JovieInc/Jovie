@@ -29,6 +29,10 @@ export const STORYBOOK_VITEST_RUN_TIMEOUT_MS = 12 * 60 * 1000;
 export const STORYBOOK_BUILD_RSS_LIMIT_BYTES = 8 * 1024 ** 3;
 const STORYBOOK_BUILD_OWNERS = new WeakMap();
 const STORYBOOK_BUILD_REPLACED = new WeakSet();
+// A leader that has exited but whose exit Node has not yet dispatched is
+// absent (or a zombie) in `ps`. Allow a short grace for the exit event before
+// treating the missing leader as an identity failure.
+const STORYBOOK_BUILD_LEADER_ABSENT_GRACE_CHECKS = 8;
 
 /** Limit the owned build, not the story inventory or certification assertions. */
 export function storybookBuildEnvironment(env = process.env) {
@@ -171,6 +175,7 @@ export function watchStorybookBuildResources(
         ?.startedAt,
     intervalMs = 250,
     signal = killProcessGroup,
+    leaderAbsentGraceChecks = STORYBOOK_BUILD_LEADER_ABSENT_GRACE_CHECKS,
   } = {}
 ) {
   // Bind launch identity independently of RSS measurement: a failed memory
@@ -180,6 +185,7 @@ export function watchStorybookBuildResources(
   STORYBOOK_BUILD_OWNERS.set(child, owner);
   let stopped = false;
   let peakRssBytes = 0;
+  let leaderAbsentChecks = 0;
   const stop = () => {
     stopped = true;
     clearInterval(timer);
@@ -201,8 +207,14 @@ export function watchStorybookBuildResources(
         );
         return;
       }
-      if (!observation.leaderStartedAt)
+      if (!observation.leaderStartedAt) {
+        // The leader exited (or is a zombie awaiting reap) before Node
+        // dispatched its exit event; give that event a bounded chance to land.
+        leaderAbsentChecks += 1;
+        if (leaderAbsentChecks <= leaderAbsentGraceChecks) return;
         throw new Error('owned build identity unavailable');
+      }
+      leaderAbsentChecks = 0;
       for (const member of observation.members ?? [])
         owner.members.set(member.pid, member.startedAt);
       peakRssBytes = Math.max(peakRssBytes, observation.rssBytes);
