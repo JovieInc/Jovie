@@ -92,53 +92,76 @@ export const EVENT_DRIVEN_INVARIANT_ID = 'JOV-INV-042';
 const EVENT_DRIVEN_FIX = `use pull_request/pull_request_target/merge_group/workflow_run/check_suite/repository_dispatch triggers or extend the Gem lanes tick (scripts/lanes/); see canon invariant ${EVENT_DRIVEN_INVARIANT_ID}`;
 
 /**
- * Every workflow that still runs from a GitHub cron on 2026-10-11. Frozen:
- * a cron in any other workflow fails, and an entry whose workflow no longer
- * has a cron fails until it is deleted. The ceiling below only goes down.
+ * Every workflow that still runs from a GitHub cron, with the one fact that
+ * justifies a clock. Tim's 2026-10-12 directive: a clock is kept only for a
+ * time-bound external fact (no event can report it), a real resource limit,
+ * or an owner-tracked replacement still in flight. Frozen: a cron in any
+ * other workflow fails, an entry whose workflow lost its cron fails until it
+ * is deleted, and the ceiling below only goes down.
  */
+/** @type {Readonly<Record<string, string>>} */
+export const CRON_KEEP_REASONS = Object.freeze({
+  '.github/workflows/auto-merge-default.yml':
+    'owner-tracked (admissions): hourly missed-enable backstop until the ready_for_review path is proven; see ADMISSION_CRON_DEBT',
+  '.github/workflows/ci-duration-ratchet.yml':
+    'calendar window: daily rollup of rolling p95 CI wall time; a per-run trigger would re-alert on every completion',
+  '.github/workflows/cli-chaos-nightly.yml':
+    'external: the npm-published @jovie/cli bytes, their unpinned installs, and read-only production probes drift with no repository event',
+  '.github/workflows/cost-anomaly-gate.yml':
+    'external: production event volume in Sentry can run away with no deploy or repository event',
+  '.github/workflows/deepsec-native.yml':
+    'AI credits: one subscription-bounded native security scan of main per day; per push would multiply native scanner spend',
+  '.github/workflows/desktop-release.yml':
+    'owner-tracked: daily signed staging desktop build until staging rides the Production Controller event without the 2026-09 supersession livelock; see ADMISSION_CRON_DEBT',
+  '.github/workflows/fleet-gate-refresh.yml':
+    'owner-tracked (Gem lanes): keeps the fleet receipt inside its wall-clock stale window until the lanes tick writes it; see ADMISSION_CRON_DEBT',
+  '.github/workflows/golden-path-nightly.yml':
+    'external: real auth plus Stripe test mode drift without a repository event, and acquisition eligibility needs Golden Path proof under 48 h old',
+  '.github/workflows/m2-revenue-path-canary.yml':
+    'external: production money-path probe (claim, $199 checkout, activation) that can break with no deploy',
+  '.github/workflows/mac-runner-heartbeat.yml':
+    'external (mac-routing): an offline self-hosted Mac emits no event; the heartbeat is the only liveness signal',
+  '.github/workflows/merge-queue-green-enroll.yml':
+    'owner-tracked (admissions): */15 reconcile until the Gem lanes enroll backstop (#21291) replaces it; see ADMISSION_CRON_DEBT',
+  '.github/workflows/merge-queue-ruleset-verify.yml':
+    'external: a GitHub UI edit to the merge-queue ruleset emits no Actions event',
+  '.github/workflows/node-runtime-compatibility.yml':
+    'external: new official Node release lines plus the soak-day promotion policy are calendar facts',
+  '.github/workflows/node-runtime-freshness.yml':
+    'external: Node.js publishes releases and security advisories on its own schedule',
+  '.github/workflows/pr-review-learn.yml':
+    'AI credits: weekly Gateway-budgeted replay of the review kernel; disabled until PR_REVIEW_LEARN_ENABLED',
+  '.github/workflows/production-continuity.yml':
+    'external: Vercel spend pauses and outages on Jovie and Summer have no event Jovie receives reliably',
+  '.github/workflows/production-controller-health.yml':
+    'external: GitHub can drop a workflow_run delivery, and a dropped event cannot announce itself',
+  '.github/workflows/public-benchmark.yml':
+    'external: third-party profile pages change with no event Jovie can subscribe to',
+  '.github/workflows/remediation-sweep.yml':
+    'external and calendar: domain expiry (RDAP), Vercel production ERROR, and age deadlines on drafts and holds',
+  '.github/workflows/runner-health-monitor.yml':
+    'external: offline self-hosted runners emit no event; hosted observer of the heartbeat',
+  '.github/workflows/runner-heartbeat.yml':
+    'external: an offline self-hosted runner emits no event; the queued heartbeat is the only liveness signal',
+  '.github/workflows/security.yml':
+    'external: dependency and SAST advisories publish on their own clock (JOV-7565); pushes already scan new code',
+  '.github/workflows/sentry-autofix-recurrence.yml':
+    'calendar window: resolving a quiet incident needs its post-deploy soak to elapse with no new events',
+  '.github/workflows/shipping-slo.yml':
+    'calendar window: daily throughput and 7-day p50/p95 rollups with week-over-week growth',
+  '.github/workflows/summer-eve-pin.yml':
+    'external: summer.jov.ie deploys from JovieInc/summer-config, which sends this repository no event',
+  '.github/workflows/synthetic-monitoring.yml':
+    'external: production surfaces and the AI Gateway can fail with no deploy or repository event',
+  '.github/workflows/visual-regression.yml':
+    'compute: one 35-minute Neon plus build baseline refresh per day; the merge-group snapshot compare in ci.yml is the event gate and never waits on it',
+  '.github/workflows/voc-mine.yml':
+    'external: public review sites publish complaints with no event Jovie can subscribe to',
+});
+
 /** @type {readonly string[]} */
-export const CRON_ALLOWLIST = Object.freeze([
-  '.github/workflows/actions-cache-gc.yml',
-  '.github/workflows/actions-cache-supersede.yml',
-  '.github/workflows/agent-harness-health-report.yml',
-  '.github/workflows/auto-merge-default.yml',
-  '.github/workflows/brand-scrub.yml',
-  '.github/workflows/ci-duration-ratchet.yml',
-  '.github/workflows/cli-chaos-nightly.yml',
-  '.github/workflows/cost-anomaly-gate.yml',
-  '.github/workflows/deepsec-native.yml',
-  '.github/workflows/deprecation-intake.yml',
-  '.github/workflows/desktop-release.yml',
-  '.github/workflows/doc-gardening-agent.yml',
-  '.github/workflows/fleet-gate-refresh.yml',
-  '.github/workflows/golden-path-nightly.yml',
-  '.github/workflows/m2-revenue-path-canary.yml',
-  '.github/workflows/mac-runner-heartbeat.yml',
-  '.github/workflows/main-ci-health-monitor.yml',
-  '.github/workflows/marketing-certification-producer.yml',
-  '.github/workflows/merge-queue-green-enroll.yml',
-  '.github/workflows/merge-queue-ruleset-verify.yml',
-  '.github/workflows/neon-scheduled-cleanup.yml',
-  '.github/workflows/node-runtime-compatibility.yml',
-  '.github/workflows/node-runtime-freshness.yml',
-  '.github/workflows/pr-review-learn.yml',
-  '.github/workflows/production-continuity.yml',
-  '.github/workflows/production-controller-health.yml',
-  '.github/workflows/public-benchmark.yml',
-  '.github/workflows/quarantine-recovery.yml',
-  '.github/workflows/remediation-sweep.yml',
-  '.github/workflows/runner-health-monitor.yml',
-  '.github/workflows/runner-heartbeat.yml',
-  '.github/workflows/security-suppression-audit.yml',
-  '.github/workflows/security.yml',
-  '.github/workflows/sentry-autofix-recurrence.yml',
-  '.github/workflows/shipping-slo.yml',
-  '.github/workflows/summer-eve-pin.yml',
-  '.github/workflows/synthetic-monitoring.yml',
-  '.github/workflows/visual-regression.yml',
-  '.github/workflows/voc-mine.yml',
-]);
-export const CRON_ALLOWLIST_CEILING = 39;
+export const CRON_ALLOWLIST = Object.freeze(Object.keys(CRON_KEEP_REASONS));
+export const CRON_ALLOWLIST_CEILING = 28;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.

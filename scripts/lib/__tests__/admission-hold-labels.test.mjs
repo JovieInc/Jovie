@@ -14,6 +14,8 @@ import { test } from 'node:test';
 import { CONTRACT_LABELS } from '../../hold-contract.mjs';
 import {
   ADMISSION_BLOCKING_LABELS,
+  HOLD_LABELS_SCHEMA,
+  parseHoldLabels,
   QUEUE_POISON_LABEL,
   STOP_HOLD_LABELS,
 } from '../admission-hold-labels.mjs';
@@ -40,25 +42,47 @@ test('stop labels plus queue-poison make up the admission-blocking set', () => {
   assert.deepEqual(sorted(CONTRACT_LABELS), sorted(STOP_HOLD_LABELS));
 });
 
-test('the merge-group member policy and the lanes hold the same stop labels', () => {
+test('the JSON source has the shape every consumer, lanes included, reads', () => {
+  const raw = JSON.parse(
+    readFileSync('scripts/lib/admission-hold-labels.json', 'utf8')
+  );
+  assert.deepEqual(Object.keys(raw).sort(), [
+    'queuePoisonLabel',
+    'schema',
+    'stopHoldLabels',
+  ]);
+  assert.equal(raw.schema, HOLD_LABELS_SCHEMA);
+  assert.deepEqual(raw.stopHoldLabels, [...STOP_HOLD_LABELS]);
+  assert.equal(raw.queuePoisonLabel, QUEUE_POISON_LABEL);
+  const valid = { ...raw };
+  for (const broken of [
+    'not json',
+    JSON.stringify({ ...valid, schema: 'v0' }),
+    JSON.stringify({ ...valid, stopHoldLabels: [] }),
+    JSON.stringify({ ...valid, stopHoldLabels: ['hold', 'hold'] }),
+    JSON.stringify({ ...valid, stopHoldLabels: ['Hold'] }),
+    JSON.stringify({ ...valid, stopHoldLabels: ['hold', ''] }),
+    JSON.stringify({ ...valid, queuePoisonLabel: 'hold' }),
+    JSON.stringify({ ...valid, queuePoisonLabel: null }),
+  ]) {
+    assert.throws(() => parseHoldLabels(broken));
+  }
+});
+
+test('the merge-group member policy holds the same stop labels', () => {
   assert.deepEqual(sorted(MEMBER_POLICY_HOLD_LABELS), sorted(STOP_HOLD_LABELS));
-  const lanes = readFileSync('scripts/lanes/pr_events.py', 'utf8').match(
-    /^HOLD_LABELS = frozenset\(\{([^}]*)\}\)/m
-  );
-  assert.ok(lanes, 'pr_events.py HOLD_LABELS literal not found');
-  assert.deepEqual(
-    sorted([...lanes[1].matchAll(/"([^"]+)"/g)].map(m => m[1])),
-    sorted(STOP_HOLD_LABELS)
-  );
 });
 
 test('every enroll, dequeue, and auto-merge copy matches the canonical set', () => {
   const enroll = readWorkflow('merge-queue-green-enroll.yml');
   const enrollScript = enroll.jobs.enroll.steps.find(s => s.with?.script).with
     .script;
-  assert.deepEqual(
-    sorted(quotedSet(enrollScript, 'BLOCKING')),
-    sorted(ADMISSION_BLOCKING_LABELS)
+  assert.match(enrollScript, /scripts\/lib\/admission-hold-labels\.json/);
+  assert.match(
+    enroll.jobs.enroll.steps.find(s => s.uses?.includes('checkout')).with[
+      'sparse-checkout'
+    ],
+    /scripts\/lib\/admission-hold-labels\.json/
   );
   const dequeue = enroll.jobs['dequeue-held'];
   const ifList = JSON.parse(dequeue.if.match(/fromJSON\('(\[[^\]]*\])'\)/)[1]);
@@ -73,7 +97,7 @@ test('every enroll, dequeue, and auto-merge copy matches the canonical set', () 
   );
   assert.match(
     contract.with['sparse-checkout'],
-    /scripts\/lib\/admission-hold-labels\.mjs/
+    /scripts\/lib\/admission-hold-labels\.json\n\s*scripts\/lib\/admission-hold-labels\.mjs/
   );
 
   const rearm = enroll.jobs['rearm-green-victims'].steps.find(s =>
@@ -81,7 +105,7 @@ test('every enroll, dequeue, and auto-merge copy matches the canonical set', () 
   );
   assert.match(
     rearm.with['sparse-checkout'],
-    /scripts\/lib\/admission-hold-labels\.mjs/
+    /scripts\/lib\/admission-hold-labels\.json\n\s*scripts\/lib\/admission-hold-labels\.mjs/
   );
 
   const enable = readWorkflow('auto-merge-default.yml').jobs.enable.steps.find(
@@ -100,7 +124,7 @@ test('every enroll, dequeue, and auto-merge copy matches the canonical set', () 
 
 // Runs the real enable step against a fake gh: a held PR must never be armed,
 // because arming a CLEAN PR enqueues it and a held member fails every group.
-function runEnable(labels) {
+function runEnable(labels, { isDraft = false, env: extraEnv = {} } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'auto-merge-enable-'));
   try {
     const log = join(dir, 'calls.log');
@@ -119,6 +143,7 @@ while [ $# -gt 0 ]; do
 done
 case "$json" in
   labels) printf '%s' '{"labels":${JSON.stringify(labels.map(name => ({ name })))}}' | jq -r "$jq_expr" ;;
+  state,isDraft) printf '%s' '{"state":"OPEN","isDraft":${isDraft}}' | jq -r "$jq_expr" ;;
   headRefOid) echo ${'a'.repeat(40)} ;;
   autoMergeRequest) echo "" ;;
   "") echo '[[]]' ;;
@@ -138,6 +163,7 @@ esac
         PR_NUMBER: '7',
         HEAD_REPO: 'JovieInc/Jovie',
         BASE_REPO: 'JovieInc/Jovie',
+        ...extraEnv,
       },
     });
     assert.equal(result.status, 0, result.stderr);
@@ -159,4 +185,23 @@ test('the auto-merge enable step skips held PRs and arms unheld ones', () => {
     assert.match(held.stdout, /admission-blocking label/);
   }
   assert.equal(runEnable(['ui']).merged, true);
+});
+
+test('a Source Validation completion re-arms a missed same-repo enable but never a draft', () => {
+  const enable = readWorkflow('auto-merge-default.yml');
+  assert.deepEqual(enable.on.workflow_run, {
+    workflows: ['Source Validation'],
+    types: ['completed'],
+  });
+  assert.ok(enable.on.pull_request.types.includes('synchronize'));
+  assert.match(
+    enable.jobs.enable.if,
+    /workflow_run\.pull_requests\[0\]\.number != null/
+  );
+  assert.match(
+    enable.jobs.enable.if,
+    /head_repository\.full_name == github\.repository/
+  );
+  assert.equal(runEnable([], { isDraft: true }).merged, false);
+  assert.equal(runEnable([]).merged, true);
 });

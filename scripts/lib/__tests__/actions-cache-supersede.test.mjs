@@ -41,6 +41,11 @@ it('runs main-only with only actions: write', () => {
   );
   expect(wf).toContain("github.ref == 'refs/heads/main'");
   expect(wf).toMatch(/^permissions:\n {2}actions: write\n\n/m);
+  // Each main push saves the new generation and applies the prune; no clock.
+  expect(wf).not.toMatch(/^ {2}schedule:/m);
+  expect(wf).toContain(
+    "APPLY: ${{ github.event_name == 'push' || inputs.apply }}"
+  );
 });
 
 it('keeps only the newest evidence cache of each quota-saving family', () => {

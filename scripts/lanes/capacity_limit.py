@@ -33,7 +33,6 @@ ROUTE = "/summer/v1/symphony/capacity-limits"
 # Anti-flap: a resource must bind (or be clear) for this many consecutive ticks before it is
 # published (or cleared). Ticks are the existing dispatch minute; nothing else schedules this.
 HYSTERESIS_TICKS = 3
-MATERIAL_CHANGE = 0.25  # an observed value moving this much (relative) re-emits `needs`
 POST_TIMEOUT_S = 10
 DELIVERY_ID = re.compile(r"^[A-Za-z0-9:_-]{16,128}$")
 KEY_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$")
@@ -241,7 +240,11 @@ def lane_limit(name: str, row: dict, state: dict, obs: dict) -> tuple[str | None
         return "github-api-quota", {"githubRemaining": autoscale._int(obs.get("githubRemaining"))}, False
     if first in HOST_TOKENS:
         evidence = _host_evidence(state, obs)
-        return _host_resource(tokens, evidence), evidence, False
+        resource = _host_resource(tokens, evidence)
+        if resource == "host-disk" and obs.get("diskReclaimable") is not False:
+            # Not a real limit while the sweep still has targets (or that is unknown).
+            return None, {"lane": name, "blockers": tokens, "disk": "reclaimable"}, True
+        return resource, evidence, False
     return None, {"lane": name, "blockers": tokens}, True
 
 
@@ -298,12 +301,9 @@ def evaluate(state: dict, obs: dict) -> tuple[dict, list]:
 
 
 def _material(previous: dict, current: dict) -> bool:
-    before, after = previous.get("observed"), current.get("observed")
-    if previous.get("limit") != current.get("limit"):
-        return True
-    if not isinstance(before, (int, float)) or not isinstance(after, (int, float)):
-        return before != after
-    return abs(after - before) >= MATERIAL_CHANGE * max(1.0, abs(before))
+    """A changed limit (e.g. login slots) is material; the observed value moving (load jitter,
+    busy runs 1 -> 3) is not: re-POSTing on it was churn (Gem 03:59-04:05Z)."""
+    return previous.get("limit") != current.get("limit")
 
 
 def step(tracker: dict | None, state: dict, obs: dict, now: float, *, host: str, release_at: float | None) -> tuple[dict, list, bool]:
@@ -418,6 +418,8 @@ def tick(state_dir, tick_row: dict | None = None, now: float | None = None, *, c
     if not autoscale._valid_state(state) or state.get("mode") != "apply":
         return None
     obs = autoscale.collect(root, tick_row or {}, now)
+    pressure = autoscale._read_json(root / "disk-pressure.json", max_bytes=1048576)
+    obs["diskReclaimable"] = pressure.get("reclaimable") if isinstance(pressure, dict) else None
     tracker = autoscale._read_json(root / TRACKER_FILE)
     host = socket.gethostname().split(".")[0] or "gem"
     nxt, emit, changed = step(tracker, state, obs, now, host=host, release_at=autoscale.release_installed_at(root))

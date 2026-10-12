@@ -1,10 +1,8 @@
 name: Agent Harness Health Report
-# clock-class: skip-if-unchanged
 
+# On-demand snapshot of open agent PRs and recent CI runs; no clock. The weekly
+# run wrote only a step summary that nothing consumed, so it runs on dispatch.
 on:
-  schedule:
-    # Weekly report every Tuesday at 09:00 UTC.
-    - cron: '0 9 * * 2'
   workflow_dispatch:
 
 permissions:

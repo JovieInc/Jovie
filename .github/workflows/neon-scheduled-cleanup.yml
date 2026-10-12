@@ -1,10 +1,11 @@
 name: Neon Scheduled Branch Cleanup
-# clock-class: temporal-resource
 
+# Manual reconciliation only; no clock. The shared create-with-retry action
+# gives every ephemeral Neon branch a TTL (expires_in_hours 2-4) that Neon
+# enforces itself, PR close deletes its branch (neon-ephemeral-branch-cleanup),
+# and branch creation cleans up and retries when the project hits its branch
+# limit. A daily sweep re-did work those three events already own.
 on:
-  schedule:
-    # Daily hygiene sweep, offset from the nightly CI lanes.
-    - cron: '43 3 * * *'
   workflow_dispatch:
     inputs:
       cleanup_threshold:
@@ -52,7 +53,7 @@ jobs:
             --kind neon-branch \
             --environment "ephemeral Neon branches past TTL or provably orphaned" \
             --cleanup-trigger heartbeat-reconciliation \
-            --proof "Daily heartbeat reconciliation pass completed; see Neon Branch Cleanup step log for deletions" \
+            --proof "Manual reconciliation pass completed; see Neon Branch Cleanup step log for deletions" \
             --cleaned-by "neon-scheduled-cleanup.yml" \
             --out "$RUNNER_TEMP/preview-env-cleanup-neon-scheduled.json"
 
@@ -61,7 +62,7 @@ jobs:
         run: |
           echo "## Neon Branch Cleanup Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Scheduled cleanup completed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Manual cleanup completed" >> "$GITHUB_STEP_SUMMARY"
           echo "- Threshold: ${{ github.event.inputs.cleanup_threshold || '5' }} branches" >> "$GITHUB_STEP_SUMMARY"
           echo "- Minimum branch age: ${{ github.event.inputs.minimum_branch_age_minutes || '45' }} minutes" >> "$GITHUB_STEP_SUMMARY"
           echo "- Run at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_STEP_SUMMARY"
