@@ -32,10 +32,12 @@ test('the commissioned recovery writer cannot slow or supersede the hot report',
   assert.equal(recovery.concurrency['cancel-in-progress'], false);
   assert.deepEqual(recovery.permissions, { contents: 'read', actions: 'read' });
   const job = recovery.jobs['recover-quarantine'];
-  assert.equal(
-    job.if,
-    "${{ vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true' && github.event_name != 'workflow_run' }}"
+  assert.ok(!recovery.on.schedule);
+  assert.ok(
+    job.if.startsWith("${{ vars.QUARANTINE_AUTO_HEAL_ENABLED == 'true' &&")
   );
+  assert.ok(job.if.includes("github.event.workflow_run.event == 'push'"));
+  assert.ok(job.if.includes("github.event.workflow_run.head_branch == 'main'"));
   const checkout = job.steps.find(step =>
     step.uses?.startsWith('actions/checkout@')
   );

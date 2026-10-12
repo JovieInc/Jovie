@@ -151,6 +151,33 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts/design-frontend-skill-check.mjs | tar -x -C "$guard_root"
           node "$guard_root/scripts/design-frontend-skill-check.mjs" --diff-base "$trusted_ref"
+      # The merge group's Path Changes job runs this trusted classifier and
+      # fails PR Ready on any path no lane rule maps, ejecting the whole group.
+      # Run the same classifier here so the PR fails before enqueue instead.
+      - name: Classify product lanes with the trusted base classifier
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "$BASE_BRANCH"
+          trusted_ref="$(git rev-parse --verify "refs/remotes/origin/$BASE_BRANCH^{commit}")"
+          base_sha="$(git merge-base "$trusted_ref" HEAD)"
+          lane_dir="$(mktemp -d "$RUNNER_TEMP/product-lane-classification.XXXXXX")"
+          trap 'rm -rf "$lane_dir"' EXIT
+          git diff --name-only "$base_sha" HEAD > "$lane_dir/changed-paths.txt"
+          git show "$trusted_ref:scripts/lib/product-lane-classifier.mjs" \
+            > "$lane_dir/product-lane-classifier.mjs"
+          node "$lane_dir/product-lane-classifier.mjs" \
+            --files-from "$lane_dir/changed-paths.txt" \
+            --base-ref "$base_sha" \
+            --head-ref HEAD \
+            --json-out "$lane_dir/receipt.json"
+          # The classifier only runs when invoked as its own entry point; a
+          # missing receipt means it never ran, which must not read as a pass.
+          test -s "$lane_dir/receipt.json"
       - name: Run deterministic source contract
         if: steps.reuse.outputs.reuse != 'true'
         env:

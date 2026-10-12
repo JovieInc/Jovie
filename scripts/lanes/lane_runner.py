@@ -1768,6 +1768,25 @@ def _body_is_rate_limited(status: int, raw: bytes) -> bool:
     return _data_is_rate_limited(data)
 
 
+class LinearRequestError(RuntimeError):
+    """Only fixed classification/status metadata survives a GraphQL rejection."""
+    def __init__(self, error):
+        error = error if isinstance(error, dict) else {}
+        extensions = error.get("extensions")
+        extensions = extensions if isinstance(extensions, dict) else {}
+        code = extensions.get("code")
+        allowed = {"FORBIDDEN", "UNAUTHENTICATED", "AUTHENTICATION_ERROR", "BAD_USER_INPUT",
+                   "GRAPHQL_VALIDATION_FAILED", "NOT_FOUND", "INTERNAL_SERVER_ERROR"}
+        self.diagnostic = {"class": "linear-graphql", "code": code if isinstance(code, str) and code in allowed else "UNKNOWN"}
+        status = extensions.get("statusCode")
+        if type(status) is int and 100 <= status <= 599:
+            self.diagnostic["httpStatus"] = status
+        # Retain ONLY this exact known missing-comment preimage contract. Other
+        # provider messages can contain input, credentials or response bodies.
+        missing = error.get("message") == "Entity not found: Comment"
+        super().__init__("linear: Entity not found: Comment" if missing else "linear: request rejected")
+
+
 class Linear:
     def __init__(self, env_file: Path, app_env: Path | None = None):
         # The Jovie Lanes app (own quota) when its credentials are installed; Tim's personal
@@ -1839,7 +1858,7 @@ class Linear:
             record_linear_budget(headers, rate_limited=False)
             if payload.get("errors"):
                 outcome = "graphql-error"
-                raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
+                raise LinearRequestError(payload["errors"][0])
             data = payload["data"]
             outcome = "success"
             return data
@@ -2578,7 +2597,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         except Exception as error:  # a broken run must still leave a receipt and free its issue
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            if receipt.get("verdict") == "disk-held":
+            if receipt.get("verdict") in {"disk-held", "pr-readback-pending"}:
                 preserve_repair(worktree, receipt)
             else:
                 remove_worktree(host, worktree)
@@ -2602,6 +2621,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     verdict = receipt.get("verdict")
     receipt["result"] = {"verdict": verdict, "commit": receipt.get("headSha"), "pr": receipt.get("pr"),
                          "prUrl": receipt.get("prUrl")}
+    if "prReadback" in receipt:
+        receipt["result"]["prReadback"] = receipt["prReadback"]
     result = "succeeded" if verdict in ("landing", "verified-not-queued", "held", "gate-timeout",
                                         "gate-in-progress", "gate-deferred", "gate-already-completed") \
         else "no_op_stale" if verdict in ("no-change", "not-shippable") else "failed_unknown"
@@ -2621,27 +2642,60 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
 def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, started: float,
                     opened: bool = False, sensitive: bool = False) -> dict:
     """Independent of the agent's own claim: find its PR, re-derive the diff, run checks, then land."""
-    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"{issue.identifier} in:title",
-                 "--json", "number,headRefName,headRefOid,createdAt,url,isDraft"], log=log)
-    prs = [pr for pr in json.loads(listed.stdout or "[]")
-           if datetime.fromisoformat(pr["createdAt"].replace("Z", "+00:00")).timestamp() >= started - 60]
+    def pending(reason):
+        return {"verdict": "pr-readback-pending", "reasons": [reason],
+                "prReadback": {"state": "unknown", "branch": branch},
+                "next_action": "reconcile-existing-branch-pr-through-maintained-reader"}
+
+    try:
+        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--head", branch,
+                     "--json", "number,headRefName,headRefOid,createdAt,url,isDraft"], log=log)
+    except (subprocess.TimeoutExpired, OSError):
+        return pending("pr-inventory-unavailable")
+    if listed.returncode:
+        return pending("pr-inventory-unavailable")
+    try:
+        prs = json.loads(listed.stdout)
+        if not isinstance(prs, list) or len(prs) > 1:
+            raise ValueError("inventory shape")
+        for pr in prs:
+            if (not isinstance(pr, dict) or type(pr.get("number")) is not int or pr["number"] <= 0
+                    or pr.get("headRefName") != branch or type(pr.get("isDraft")) is not bool
+                    or any(not isinstance(pr.get(key), str) or not pr[key]
+                           for key in ("headRefOid", "url", "createdAt"))):
+                raise ValueError("PR identity")
+            created = datetime.fromisoformat(pr["createdAt"].replace("Z", "+00:00"))
+            if created.tzinfo is None or created.timestamp() < started - 60:
+                raise ValueError("PR generation")
+    except (ValueError, TypeError, OverflowError):
+        return pending("pr-inventory-invalid")
     if not prs and opened:
-        return {"verdict": "failed", "reasons": ["pr-create-failed"]}
+        # A create response (including 'already exists') is not readback.
+        # Visibility/transport uncertainty must never start another PR attempt.
+        return pending("pr-create-readback-unconfirmed")
     if not prs:
         ahead = sh(["git", "rev-list", "--count", "origin/main..HEAD"], cwd=worktree).stdout.strip()
         if ahead in ("", "0"):
             return {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
         require_publishable(host, branch, "before-push")
-        sh(["git", "push", "-q", "-u", "origin", branch], cwd=worktree, log=log)
+        try:
+            pushed = sh(["git", "push", "-q", "-u", "origin", branch], cwd=worktree, log=log)
+        except (subprocess.TimeoutExpired, OSError):
+            return pending("pr-publication-unconfirmed")
+        if pushed.returncode:
+            return pending("pr-publication-unconfirmed")
         # The push's own hooks can take minutes; a stop during them still bars the PR open.
         require_publishable(host, branch, "before-pr-create")
-        sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
-            "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
-            "--body", f"Refs {issue.identifier}.\n\n"
-            f"<!-- linear-issue-id:{issue.id} -->\n"
-            f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
-            "Lane implementation; verification by the lane gate. "
-            "Runtime and commissioning acceptance remain with the issue owner."], cwd=worktree, log=log)
+        try:
+            sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
+                "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
+                "--body", f"Refs {issue.identifier}.\n\n"
+                f"<!-- linear-issue-id:{issue.id} -->\n"
+                f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+                "Lane implementation; verification by the lane gate. "
+                "Runtime and commissioning acceptance remain with the issue owner."], cwd=worktree, log=log)
+        except (subprocess.TimeoutExpired, OSError):
+            pass  # A create may have landed remotely; reconcile once, never resend.
         return verify_and_land(host, issue, branch, worktree, log, started, opened=True, sensitive=sensitive)
     pr = max(prs, key=lambda item: item["createdAt"])
     if sensitive:
@@ -3837,6 +3891,23 @@ def _event_delivery_snapshot(host: Host, now: float) -> dict:
     return report
 
 
+def _event_delivery_diagnostic(error, phase: str, operation: str) -> dict:
+    diagnostic = {"phase": phase, "operation": operation}
+    if isinstance(error, LinearRequestError):
+        diagnostic.update(error.diagnostic)
+    elif isinstance(error, urllib.error.HTTPError):
+        diagnostic.update({"class": "linear-http", "httpStatus": error.code})
+    elif isinstance(error, LinearRateLimited):
+        diagnostic["class"] = "linear-rate-limited"
+    elif isinstance(error, (TimeoutError, subprocess.TimeoutExpired)):
+        diagnostic["class"] = "transport-timeout"
+    elif isinstance(error, (urllib.error.URLError, OSError)):
+        diagnostic["class"] = "transport-unavailable"
+    else:
+        diagnostic["class"] = "controller-error"
+    return diagnostic
+
+
 def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) -> dict:
     """Drain one durable intent per tick under the existing delivery/claim locks.
 
@@ -3848,6 +3919,7 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
             row["createdAt"], ("reopens", "comments", "labels").index(row["kind"]), row["key"])):
         if row["status"] in {"acknowledged", "superseded"} or now < row["nextAt"]:
             continue
+        phase = "readback"
         try:
             acknowledged, receipt = _event_delivery_readback(linear, row)
             if not acknowledged and row["attempts"] < EVENT_DELIVERY_ATTEMPTS and now < row["deadline"]:
@@ -3864,6 +3936,7 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
                     # The remote preimage is refreshed INSIDE the mutation fence.
                     # A state changed since the earlier read is never downgraded.
                     if row["kind"] == "reopens":
+                        phase = "fenced-readback"
                         acknowledged, receipt = _event_delivery_readback(linear, row)
                         if acknowledged:
                             row.update(status="acknowledged", acknowledgedAt=now, receipt=receipt)
@@ -3875,6 +3948,7 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
                     row["history"].append({"at": now, "outcome": "intent-persisted", "attempt": row["attempts"]})
                     _save_event_delivery(host, data)
                     payload = row["payload"]
+                    phase = "send"
                     if row["kind"] == "comments":
                         result = linear.gql('mutation($i:CommentCreateInput!){commentCreate(input:$i){success}}',
                             {"i": {"id": row["commentId"], "issueId": payload["id"], "body": payload["body"]}})
@@ -3891,6 +3965,7 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
                         raise RuntimeError("event-mutation-rejected")
                 finally:
                     lock.release()
+                phase = "post-send-readback"
                 acknowledged, receipt = _event_delivery_readback(linear, row)
             if acknowledged:
                 row.update(status="acknowledged", acknowledgedAt=now, receipt=receipt)
@@ -3899,9 +3974,15 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
                 raise RuntimeError("event-delivery-unacknowledged")
         except Exception as error:
             # No provider response/credential content in controller health output.
-            row["error"] = str(error) if isinstance(error, RuntimeError) and str(error).startswith("event-") else type(error).__name__
+            safe_events = {"event-comment-readback-unreadable", "event-comment-readback-mismatch",
+                           "event-issue-readback-unreadable", "event-state-preimage-changed",
+                           "event-label-readback-unreadable", "event-owner-preimage-changed",
+                           "event-mutation-rejected", "event-delivery-unacknowledged"}
+            row["error"] = str(error) if isinstance(error, RuntimeError) and str(error) in safe_events else type(error).__name__
+            row["diagnostic"] = _event_delivery_diagnostic(error, phase, row["kind"])
             row["status"] = "exhausted" if row["attempts"] >= EVENT_DELIVERY_ATTEMPTS or now >= row["deadline"] else "failed"
-            row["history"].append({"at": now, "outcome": row["status"], "error": row["error"]})
+            row["history"].append({"at": now, "outcome": row["status"], "error": row["error"],
+                                   "diagnostic": row["diagnostic"]})
         row["nextAt"] = now + (60 if row["attempts"] < 2 else 300)
         _save_event_delivery(host, data)
         break  # Bounded work; a transport outage must not monopolize dispatch.
@@ -6381,6 +6462,11 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                                  + (", lane cooling on the provider's limit." if cooled else "."))
         slot.release()
         return 1
+    if verdict == "pr-readback-pending":
+        # Keep the original issue/worktree/attempt. Inventory is unknown, so no
+        # new provider run, retry refund, issue downgrade or success is justified.
+        slot.release()
+        return 1
     if verdict == "remote-held":
         # Leave remote ownership In Progress. Retrying a local worktree or
         # another model would duplicate a live/unknown paid remote attempt.
@@ -6687,6 +6773,53 @@ def object_mirror(repo: Path) -> Path | None:
     return None
 
 
+# A borrowing clone's refs are invisible to the mirror's gc. With these, pruned mirror refs
+# never take objects with them (2026-10-12: one auto-gc after a minutely fetch dropped the
+# objects of three lanes rebase branches and every origin fetch on Gem died "bad object").
+MIRROR_KEEP_OBJECTS = (("gc.auto", "0"), ("gc.pruneExpire", "never"), ("gc.reflogExpireUnreachable", "never"))
+
+
+def ensure_mirror_keeps_objects(mirror: Path) -> None:
+    config = mirror / "config"
+    for key, value in MIRROR_KEEP_OBJECTS:
+        current = subprocess.run(["git", "config", "--file", str(config), "--get", key],
+                                 capture_output=True, text=True, timeout=10).stdout.strip()
+        if current != value:
+            subprocess.run(["git", "config", "--file", str(config), key, value],
+                           check=True, capture_output=True, timeout=10)
+
+
+def missing_object_refs(repo: Path) -> list[str]:
+    """Local refs whose objects this clone (alternates included) no longer has."""
+    listing = subprocess.run(["git", "for-each-ref", "--format=%(objectname) %(refname)"], cwd=repo,
+                             capture_output=True, text=True, timeout=60)
+    refs = [line.split(" ", 1) for line in listing.stdout.splitlines() if " " in line]
+    if listing.returncode or not refs:
+        return []
+    checked = subprocess.run(["git", "cat-file", "--batch-check=%(objectname)"], cwd=repo,
+                             input="".join(f"{sha}\n" for sha, _ in refs), capture_output=True, text=True, timeout=120)
+    missing = {line.split()[0] for line in checked.stdout.splitlines() if line.endswith(" missing")}
+    return [ref for sha, ref in refs if sha in missing]
+
+
+def fetch_release_source(host: Host) -> subprocess.CompletedProcess:
+    """update's own origin fetch. A ref whose objects are gone cannot be repaired by any later
+    fetch and blocks every one of them, so only such refs are deleted, then the fetch is retried
+    once. Refs with present objects are never touched."""
+    fetched = sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo)
+    if fetched.returncode == 0 or not re.search(r"bad object|did not send all necessary objects",
+                                                f"{fetched.stdout}{fetched.stderr}"):
+        return fetched
+    broken = missing_object_refs(host.repo)
+    if not broken:
+        return fetched
+    for ref in broken:
+        subprocess.run(["git", "update-ref", "-d", ref], cwd=host.repo, capture_output=True, timeout=30)
+    print(f"lane update: deleted {len(broken)} ref(s) with missing objects: {', '.join(broken)[:300]}",
+          file=sys.stderr)
+    return sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo)
+
+
 def refresh_object_mirror(host: Host) -> dict:
     """Refresh the shared object mirror right before update's own origin fetch, under the lock
     every mirror writer takes (/srv/git/locks/<name>-mirror.lock). Replaces Gem's retired
@@ -6702,11 +6835,13 @@ def refresh_object_mirror(host: Host) -> dict:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 return {"status": "busy", "mirror": str(mirror)}
-            fetched = lifecycle.run(["git", "-C", str(mirror), "fetch", "--quiet", "--prune", "origin", "+refs/*:refs/*"],
+            ensure_mirror_keeps_objects(mirror)
+            fetched = lifecycle.run(["git", "-c", "gc.auto=0", "-c", "maintenance.auto=false", "-C", str(mirror),
+                                     "fetch", "--quiet", "--prune", "origin", "+refs/*:refs/*"],
                                     capture_output=True, text=True, timeout=MIRROR_FETCH_TIMEOUT_S)
     except subprocess.TimeoutExpired:
         return {"status": "timeout", "mirror": str(mirror)}
-    except OSError as error:
+    except (OSError, subprocess.CalledProcessError) as error:
         return {"status": "error", "mirror": str(mirror), "error": f"{type(error).__name__}: {error}"[:200]}
     if fetched.returncode:
         return {"status": "failed", "mirror": str(mirror), "error": (fetched.stderr or "").strip()[-200:]}
@@ -7078,7 +7213,7 @@ def install_release(host: Host, *, operator=None) -> int:
         if not isinstance(operator, lifecycle.OperatorGuard) or operator.state != host.state.resolve():
             raise lifecycle.AdmissionHeld("operator installation owner differs")
         operator.validate()
-    if sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo).returncode:
+    if fetch_release_source(host).returncode:
         raise RuntimeError("release-source-fetch-failed")
     bundle = release_identity(host)
     if operator is not None and bundle != operator.manifest:

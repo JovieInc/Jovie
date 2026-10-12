@@ -180,18 +180,6 @@ nodes:
       - workflow_run
     terminalReceipt: job:green-source
     jobCount: 2
-  - name: Brand Scrub
-    path: .github/workflows/brand-scrub.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - schedule
-      - workflow_dispatch
-    terminalReceipt: job:brand-scrub-unit-tests
-    jobCount: 2
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
@@ -363,7 +351,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
+      - push
       - workflow_dispatch
     terminalReceipt: job:intake
     jobCount: 1
@@ -413,7 +401,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
+      - push
       - workflow_dispatch
     terminalReceipt: job:garden
     jobCount: 1
@@ -756,7 +744,6 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - push
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:produce
     jobCount: 1
@@ -1102,7 +1089,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:publish-queue-results
@@ -1234,9 +1220,8 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request_review
-      - schedule
       - workflow_dispatch
-    terminalReceipt: job:nightly-audit
+    terminalReceipt: job:roster-audit
     jobCount: 2
   - name: Security Scanning
     path: .github/workflows/security.yml

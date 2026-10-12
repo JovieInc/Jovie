@@ -89,6 +89,15 @@ Read DESIGN.md once, then only the linked detail section needed for the task.
 Instruction-only refactors preserve design policy; they do not need a visual
 proposal or screenshot gate unless rendered UI also changes.
 
+For visual or art-directed work, pull the surface's references and active
+art direction first (canon/design-refs, JOV-7081), move toward that direction
+in Jovie tokens, and run the anti-copy guard on screenshots before review:
+
+```bash
+pnpm --filter web design-refs pull --surface <homepage|golden-path|marketing|...>
+pnpm --filter web design-refs guard <screenshot.png>
+```
+
 For UI work, also inspect the target component, existing neighboring components,
 states, fixtures/tests, and screenshots if present. For skill/doc work, inspect
 the generated source template and any generated output rule before editing.
