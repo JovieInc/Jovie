@@ -69,4 +69,9 @@ describe('DemoShell', () => {
     expect(source).toContain("@/components/organisms/sidebar'");
     expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
+
+  it('inherits --sidebar-width from the design-system token, not a px override', () => {
+    const source = readWebSource('components/features/demo/DemoShell.tsx');
+    expect(source).not.toMatch(/--sidebar-width['"]?\s*:\s*['"]?\d+px/);
+  });
 });

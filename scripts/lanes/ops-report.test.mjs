@@ -1,0 +1,347 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { JEV_ROUTE } from '../invariants/jev-gateway.mjs';
+import {
+  buildOpsReport,
+  deliverOpsReport,
+  NOT_APPLICABLE,
+  OPS_REPORT_REVIEW_SCHEMA,
+  OPS_REPORT_SCHEMA,
+  PROOF_TIERS,
+  prepareOpsReportDelivery,
+  UNKNOWN,
+  verifyOpsReportDelivery,
+} from './ops-report.mjs';
+
+const NOW = Date.parse('2026-10-12T08:00:00.000Z');
+const OBSERVED_AT = '2026-10-12T07:59:30.000Z';
+
+const tier = (status = UNKNOWN, receipt = UNKNOWN) => ({
+  status,
+  observedAt: OBSERVED_AT,
+  source: 'synthetic doctor fixture',
+  receipt,
+});
+
+const baseInput = (overrides = {}) => ({
+  domain: 'company',
+  producer: 'Symphony',
+  currentOwner: 'symphony-lanes-doctor',
+  observedState: 'provider capacity is idle while qualified work exists',
+  blocker: '0 of 3 workers are active',
+  rootCause: null,
+  nextAction: 'dispatch provider workers and verify a fenced receipt',
+  evidence: {
+    observedAt: OBSERVED_AT,
+    source: 'scripts/lanes/doctor.py',
+  },
+  sourceSha: 'a'.repeat(40),
+  proofTiers: {
+    source: tier('PROVEN', 'a'.repeat(40)),
+    tests: tier(),
+    ciQueue: tier(),
+    merge: tier(),
+    deployment: tier(),
+    authenticatedRuntime: tier(),
+    recurrence: tier(NOT_APPLICABLE, NOT_APPLICABLE),
+  },
+  destination: {
+    adapter: 'linear-issue',
+    target: 'Symphony doctor: provider-idle:codex (gem)',
+  },
+  ...overrides,
+});
+
+const cleanReceipt = (input, extra = {}) => ({
+  status: 'evaluated',
+  requestFingerprint: `request:${input.artifactSha256}`,
+  findings: [],
+  unreviewed: [],
+  resolvedModel: JEV_ROUTE.model,
+  completedAt: NOW + 100,
+  ...extra,
+});
+
+test('inventory-owned company report keeps all proof tiers distinct', () => {
+  const report = buildOpsReport(baseInput(), { now: () => NOW });
+  assert.equal(report.schema, OPS_REPORT_SCHEMA);
+  assert.equal(report.domain, 'company');
+  assert.equal(report.repository, 'JovieInc/Jovie');
+  assert.equal(report.surfaceOwner, 'Summer');
+  assert.equal(report.currentOwner, 'symphony-lanes-doctor');
+  assert.deepEqual(Object.keys(report.proofTiers), PROOF_TIERS);
+  assert.equal(report.proofTiers.tests.status, UNKNOWN);
+  assert.equal(report.proofTiers.ciQueue.status, UNKNOWN);
+  assert.equal(report.proofTiers.merge.status, UNKNOWN);
+  assert.equal(report.proofTiers.deployment.status, UNKNOWN);
+  assert.equal(report.proofTiers.authenticatedRuntime.status, UNKNOWN);
+});
+
+test('consumer-domain or alternate notifier input is rejected', () => {
+  assert.throws(
+    () => buildOpsReport(baseInput({ domain: 'consumer' })),
+    /company domain/
+  );
+  assert.throws(
+    () =>
+      buildOpsReport(
+        baseInput({ destination: { adapter: 'new-webhook', target: 'x' } })
+      ),
+    /existing Linear issue adapter/
+  );
+});
+
+test('clean semantic review binds exact message and existing destination', async () => {
+  const prepared = await prepareOpsReportDelivery(baseInput(), {
+    now: () => NOW,
+    review: async input => cleanReceipt(input),
+  });
+  assert.equal(prepared.decision, 'observed');
+  assert.equal(prepared.review.schema, OPS_REPORT_REVIEW_SCHEMA);
+  assert.equal(prepared.review.bindings.resolvedModel, JEV_ROUTE.model);
+  assert.equal(
+    prepared.review.bindings.destination.target,
+    baseInput().destination.target
+  );
+  assert.equal(prepared.review.revisionCount, 0);
+  assert.equal(
+    verifyOpsReportDelivery(prepared, baseInput(), { now: () => NOW }),
+    true
+  );
+});
+
+test('stale evidence routes to review without asking Jev', async () => {
+  let reviewed = false;
+  const input = baseInput({
+    evidence: {
+      observedAt: '2026-10-12T07:00:00.000Z',
+      source: 'scripts/lanes/doctor.py',
+    },
+  });
+  const prepared = await prepareOpsReportDelivery(input, {
+    now: () => NOW,
+    review: async () => {
+      reviewed = true;
+      return {};
+    },
+  });
+  assert.equal(reviewed, false);
+  assert.equal(prepared.decision, 'review-queue');
+  assert.match(prepared.message, /stale-evidence/);
+});
+
+test('fake production claim cannot pass without deployment proof', async () => {
+  const prepared = await prepareOpsReportDelivery(
+    baseInput({ observedState: 'production is live and healthy' }),
+    { now: () => NOW, review: async input => cleanReceipt(input) }
+  );
+  assert.equal(prepared.decision, 'review-queue');
+  assert.match(prepared.message, /unsupported-production-claim/);
+  assert.doesNotMatch(prepared.message, /production is live/);
+});
+
+test('contradictory proof tiers cannot become a success report', async () => {
+  const input = baseInput({
+    proofTiers: {
+      ...baseInput().proofTiers,
+      merge: tier('FAILED', 'merge-failed'),
+      deployment: tier('PROVEN', 'deploy-claimed'),
+    },
+  });
+  const prepared = await prepareOpsReportDelivery(input, {
+    now: () => NOW,
+    review: async semanticInput => cleanReceipt(semanticInput),
+  });
+  assert.equal(prepared.decision, 'review-queue');
+  assert.match(prepared.message, /deployment-without-merge-proof/);
+});
+
+test('missing evidence stays UNKNOWN and never counts as semantic pass', async () => {
+  let reviewed = false;
+  const input = baseInput({ evidence: { observedAt: null, source: null } });
+  const prepared = await prepareOpsReportDelivery(input, {
+    now: () => NOW,
+    review: async () => {
+      reviewed = true;
+      return {};
+    },
+  });
+  assert.equal(reviewed, false);
+  assert.equal(prepared.decision, 'review-queue');
+  assert.match(prepared.message, /Evidence observed: UNKNOWN/);
+  assert.match(prepared.message, /Evidence source: UNKNOWN/);
+});
+
+test('unknown owner survives semantic review and final message editing', async () => {
+  const input = baseInput({ currentOwner: null });
+  const prepared = await prepareOpsReportDelivery(input, {
+    now: () => NOW,
+    review: async semanticInput => cleanReceipt(semanticInput),
+  });
+  assert.equal(prepared.decision, 'observed');
+  assert.match(prepared.message, /Current owner: UNKNOWN/);
+});
+
+test('one targeted revision is re-reviewed and cannot alter UNKNOWN facts', async () => {
+  let reviewCount = 0;
+  let revisionCount = 0;
+  const input = baseInput({ currentOwner: null });
+  const prepared = await prepareOpsReportDelivery(input, {
+    now: () => NOW,
+    review: async semanticInput => {
+      reviewCount += 1;
+      return reviewCount === 1
+        ? cleanReceipt(semanticInput, {
+            findings: [{ axis: 'voice-fit', passageId: 'p1' }],
+          })
+        : cleanReceipt(semanticInput);
+    },
+    revise: async ({ candidate }) => {
+      revisionCount += 1;
+      return `Root cause is disk pressure.\n\n${candidate}`;
+    },
+  });
+  assert.equal(revisionCount, 1);
+  assert.equal(
+    reviewCount,
+    1,
+    'factual drift is rejected before a second model call'
+  );
+  assert.equal(prepared.decision, 'approved-template');
+  assert.equal(prepared.review.reviewStatus, 'revision-fidelity-failed');
+  assert.match(prepared.message, /Current owner: UNKNOWN/);
+});
+
+test('a faithful revision gets exactly one revision and one final recheck', async () => {
+  let reviewCount = 0;
+  let revisionCount = 0;
+  const prepared = await prepareOpsReportDelivery(baseInput(), {
+    now: () => NOW,
+    review: async semanticInput => {
+      reviewCount += 1;
+      return reviewCount === 1
+        ? cleanReceipt(semanticInput, {
+            findings: [{ axis: 'voice-fit', passageId: 'p1' }],
+          })
+        : cleanReceipt(semanticInput);
+    },
+    revise: async ({ candidate }) => {
+      revisionCount += 1;
+      return `Action required.\n\n${candidate}`;
+    },
+  });
+  assert.equal(revisionCount, 1);
+  assert.equal(reviewCount, 2);
+  assert.equal(prepared.review.revisionCount, 1);
+  assert.equal(prepared.decision, 'observed');
+});
+
+test('timeout and late stale result use the approved factual template', async () => {
+  for (const status of ['timeout', 'stale']) {
+    const prepared = await prepareOpsReportDelivery(baseInput(), {
+      now: () => NOW,
+      review: async () => ({ status }),
+    });
+    assert.equal(prepared.decision, 'approved-template');
+    assert.equal(prepared.review.reviewStatus, status);
+    assert.equal(prepared.review.bindings.resolvedModel, NOT_APPLICABLE);
+    assert.match(prepared.message, /Root cause: UNKNOWN/);
+  }
+});
+
+test('missing resolved model and partial semantic answers fall back', async () => {
+  for (const receipt of [
+    {
+      status: 'evaluated',
+      findings: [],
+      unreviewed: [],
+      completedAt: NOW,
+    },
+    {
+      status: 'evaluated',
+      findings: [],
+      unreviewed: [{ reason: 'missing-answer' }],
+      resolvedModel: JEV_ROUTE.model,
+      completedAt: NOW,
+    },
+  ]) {
+    const prepared = await prepareOpsReportDelivery(baseInput(), {
+      now: () => NOW,
+      review: async () => receipt,
+    });
+    assert.equal(prepared.decision, 'approved-template');
+  }
+});
+
+test('changed evidence, destination, or exact text invalidates the review', async () => {
+  const prepared = await prepareOpsReportDelivery(baseInput(), {
+    now: () => NOW,
+    review: async input => cleanReceipt(input),
+  });
+  assert.throws(
+    () =>
+      verifyOpsReportDelivery(
+        prepared,
+        baseInput({
+          evidence: {
+            observedAt: '2026-10-12T07:59:31.000Z',
+            source: 'scripts/lanes/doctor.py',
+          },
+        }),
+        { now: () => NOW }
+      ),
+    /invalidated/
+  );
+  assert.throws(
+    () =>
+      verifyOpsReportDelivery(
+        prepared,
+        baseInput({
+          destination: { adapter: 'linear-issue', target: 'different issue' },
+        }),
+        { now: () => NOW }
+      ),
+    /invalidated/
+  );
+  assert.throws(
+    () =>
+      verifyOpsReportDelivery(
+        { ...prepared, message: `${prepared.message}\nlate edit` },
+        baseInput(),
+        { now: () => NOW }
+      ),
+    /invalidated/
+  );
+});
+
+test('existing send seam suppresses duplicate notification', async () => {
+  const prepared = await prepareOpsReportDelivery(baseInput(), {
+    now: () => NOW,
+    review: async input => cleanReceipt(input),
+  });
+  const sent = [];
+  const dedupe = new Set();
+  const send = async (message, destination) =>
+    sent.push({ message, destination });
+  assert.equal(
+    (
+      await deliverOpsReport(prepared, baseInput(), {
+        send,
+        dedupe,
+        now: () => NOW,
+      })
+    ).outcome,
+    'sent-to-existing-adapter'
+  );
+  assert.equal(
+    (
+      await deliverOpsReport(prepared, baseInput(), {
+        send,
+        dedupe,
+        now: () => NOW,
+      })
+    ).outcome,
+    'suppressed-duplicate'
+  );
+  assert.equal(sent.length, 1);
+});

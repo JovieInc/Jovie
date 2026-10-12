@@ -426,6 +426,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/funnel-judge/rubric.test.mjs',
   'scripts/funnel-judge/coherence-screen.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
+  'scripts/gem-producer-drift/check-attestation.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
@@ -439,6 +440,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',
   'scripts/inbound-loop/inbound-loop.test.mjs',
+  'scripts/lanes/ops-report.test.mjs',
   'scripts/merge-queue-green-enroll.test.mjs',
   'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
   'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
@@ -461,6 +463,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/postmortem-linkage-check.test.mjs',
   'scripts/public-benchmark/public-benchmark.test.mjs',
   'scripts/quality-gap-finder.test.mjs',
+  'scripts/screenshot-loop/screenshot-bug-loop.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
   'scripts/security/findings.test.mjs',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
@@ -530,6 +533,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/synthetic-monitoring-plan.test.mjs',
   'scripts/lib/__tests__/remediation-detector-plans.test.mjs',
   'scripts/lib/__tests__/mac-runner-route-contract.test.mjs',
+  'scripts/lib/__tests__/mac-lane-script.test.mjs',
   'scripts/lib/__tests__/main-release-readiness.test.mjs',
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
   'scripts/lib/__tests__/pr-liveness.test.mjs',
@@ -667,7 +671,7 @@ const LANES = [
     id: 'design-governance-enforcement',
     name: 'Design governance enforcement',
     nextLocalCommand:
-      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
+      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel',
     run: runDesignGovernanceEnforcement,
   },
   {
@@ -2309,6 +2313,7 @@ export async function runStructural(opts = {}) {
           STRUCTURAL_RUNNER_COVERAGE_COMMAND,
           'pnpm --filter @jovie/web exec node scripts/test-truth-guard.mjs',
           'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts',
+          'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/provider-incident-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/provider-incident.ts" --coverage.thresholds.lines=95 --coverage.thresholds.statements=95 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-provider-incident-contract-coverage"',
           'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
           // Run the deploy contract by name for operations-only changes too:
           // .github/scripts and workflow diffs select only the operations lane,

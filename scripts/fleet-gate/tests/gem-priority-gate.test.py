@@ -4771,7 +4771,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("pull_request_target:", content)
         self.assertNotIn("check_run:", content)
         self.assertNotIn("check_suite:", content)
-        self.assertNotIn("workflow_run:", content)
+        self.assertIn("workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]", content)
         self.assertNotIn("Production Marker Recovery]", content)
         self.assertIn("push:", content)
         self.assertIn("branches: [main]", content)

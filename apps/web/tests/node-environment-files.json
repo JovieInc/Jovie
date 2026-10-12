@@ -286,6 +286,7 @@
   "scripts/lighthouse-exact-target-guard.test.ts",
   "scripts/linear-compare/owned-output-directory.test.ts",
   "scripts/lint-motion-css.test.mjs",
+  "scripts/lint-ui-feel.test.mjs",
   "scripts/marketing-factory/",
   "scripts/mobile-overflow-guard.test.ts",
   "scripts/owned-output-path.test.ts",

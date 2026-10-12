@@ -2026,17 +2026,19 @@ describe('iOS stage contract', () => {
     );
     expect(iosWorkflow).not.toMatch(/^  pull_request:/m);
     expect(iosWorkflow).not.toMatch(/^  push:/m);
-    // Hosted macOS stays the fallback; the self-hosted Mac is heartbeat-gated
-    // and never probed for release regressions.
+    // Hosted macOS stays the fallback; an idle self-hosted Mac runs the fast
+    // gate in a cancellable child run, never for release regressions.
     expect(iosWorkflow).toContain(
-      `runs-on: \${{ needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-26' }}`
+      `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-26' }}`
     );
     expect(iosWorkflow).toContain(
-      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
+      'uses: ./.github/workflows/mac-lane-route.yml'
     );
     expect(iosWorkflow).toContain(
-      "if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' }}"
+      'if: ${{ inputs.mac-first && !inputs.mac-child && !inputs.full-regression }}'
     );
+    expect(iosWorkflow).not.toContain('mac-runner-heartbeat.yml');
+    expect(ios).toContain('mac-first: true');
     expect(pathChanges).toContain(
       "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
     );
@@ -5247,7 +5249,11 @@ describe('production marker recovery workflow (JOV-4965)', () => {
       'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );
     const fleetRefresh = readFileSync(fleetGateRefreshWorkflowPath, 'utf8');
-    expect(fleetRefresh).not.toContain('workflow_run:');
+    // Only main CI completion wakes the refresh; release workflows never do.
+    expect(fleetRefresh).toContain(
+      'workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]'
+    );
+    expect(fleetRefresh.match(/workflow_run:/g)).toHaveLength(1);
     expect(fleetRefresh).not.toContain('Production Marker Recovery]');
   });
 
