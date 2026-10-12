@@ -1471,7 +1471,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
       'design-exception-registry': 'pnpm design:exception-registry:check',
       'design-governance-enforcement':
-        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target',
+        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel',
       'ios-fast': 'pnpm run ios:lint && pnpm run ios:app-store:test',
       'merge-group-guards':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
@@ -2574,6 +2574,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/scripts/check-reliability-detectors.ts',
       'apps/web/scripts/lint-contrast-ratchet.mjs',
       'apps/web/scripts/lint-no-native-dialogs.mjs',
+      'apps/web/scripts/lint-ui-feel.mjs',
       'apps/web/scripts/next-proxy-guard.mjs',
       'apps/web/scripts/seo-ratchet-guard.mjs',
       'apps/web/scripts/tailwind-guard.mjs',
@@ -2647,6 +2648,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(uiRe.test('apps/web/scripts/lint-contrast-ratchet.mjs')).toBe(true);
     expect(uiRe.test('apps/web/scripts/lint-no-native-dialogs.mjs')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/lint-ui-feel.mjs')).toBe(true);
     expect(uiRe.test('apps/web/scripts/next-proxy-guard.mjs')).toBe(true);
     expect(uiRe.test('apps/web/scripts/seo-ratchet-guard.mjs')).toBe(true);
     expect(uiRe.test('apps/web/scripts/tailwind-guard.mjs')).toBe(true);
