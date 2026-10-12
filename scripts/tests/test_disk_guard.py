@@ -263,6 +263,21 @@ class CheckTest(unittest.TestCase):
                 self.assertEqual(report["reason"], "disk-unobservable" if pct is None else
                                  "disk-available" if pct == 10.0 else "disk-critical")
 
+    def test_sweep_runs_where_autoscale_stops_growth_and_reports_reclaimable(self):
+        # Gem 04:12Z: autoscale blocked growth at <= 15% free, the sweep ran only below 15%.
+        self.assertEqual(guard.LOW_PCT, float(guard.autoscale.DISK_INCREASE_MIN))
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                patch.object(guard, "sweep_derived_data") as sweep:
+            report = guard.check(self.host(tmp), sweep=True)
+        sweep.assert_called_once()
+        self.assertTrue(report["low"])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "symphony-elixir-workspaces"
+            self.assertFalse(guard.reclaimable(None, roots=[root]))
+            (root / "JOV-1").mkdir(parents=True)
+            self.assertTrue(guard.reclaimable(None, roots=[root]))
+
     def test_cleanup_lock_serializes_workers_and_recovers_after_release(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(guard, "free_pct", return_value=10.0), \
                 patch.object(guard, "sweep_derived_data") as sweep, \

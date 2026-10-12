@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from disk_guard import ensure_sbin_on_path  # noqa: E402  (sibling module of the release)
+from disk_guard import LOW_PCT as DISK_LOW_PCT, ensure_sbin_on_path  # noqa: E402  (sibling module of the release)
 import lifecycle  # noqa: E402
 
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
@@ -325,7 +325,7 @@ def maybe_spawn(state: Path, repo: Path, free_pct: float | None, *, now: float |
         last = json.loads(stamp.read_text()).get("startedAt", 0)
     except (OSError, ValueError, AttributeError):
         last = 0
-    interval = LOW_INTERVAL_S if free_pct is not None and free_pct < 15 else INTERVAL_S
+    interval = LOW_INTERVAL_S if free_pct is not None and free_pct <= DISK_LOW_PCT else INTERVAL_S
     if now - last < interval:
         return "not-due"
     state.mkdir(parents=True, exist_ok=True)
