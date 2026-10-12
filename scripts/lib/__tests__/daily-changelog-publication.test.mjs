@@ -551,7 +551,7 @@ describe('publication transport', () => {
       'repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100'
     );
     expect(workflow.jobs['coalesce-production'].steps.at(-1).run).toContain(
-      'exact SHA stayed current through the bounded coalescing window'
+      'record_receipt "proceed" "exact SHA is current"'
     );
     expect(workflow.jobs['production-verified'].needs).not.toContain(
       'publish-customer-changelog'

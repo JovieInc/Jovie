@@ -85,6 +85,7 @@ type CliValues = {
   readonly flags: Readonly<Record<string, string | undefined>>;
   readonly meshFlags: Readonly<Record<string, string | undefined>>;
   readonly dir?: string;
+  readonly fleet?: boolean;
   readonly full?: boolean;
   readonly help?: boolean;
   readonly json?: boolean;
@@ -111,7 +112,7 @@ class UsageError extends Error {
   readonly code = 'USAGE_ERROR' as const;
 }
 
-function usage(): string {
+function usage(showFleet: boolean): string {
   const width = 28;
   const line = (name: string, summary: string) =>
     name.length < width
@@ -129,7 +130,13 @@ function usage(): string {
       command.summary
     );
   const lines = COMMANDS.filter(command => !command.internal).map(row);
-  const internal = COMMANDS.filter(command => command.internal).map(row);
+  const internal = showFleet
+    ? `\nInternal fleet (operators only; needs a scoped JOVIE_WORKER_TOKEN):\n${COMMANDS.filter(
+        command => command.internal
+      )
+        .map(row)
+        .join('\n')}\n`
+    : '';
   return `Usage: jovie <command> [options]
 
 Jovie for agents: extract public creator data, create artist profiles from
@@ -142,16 +149,14 @@ ${line('mcp', 'Run as an MCP server over stdio (same tools as above)')}
 ${line('init', 'Install the Jovie skill into Claude, Codex, OpenClaw, Hermes')}
 ${line('skill', 'Print the Jovie SKILL.md')}
 ${line('help', 'Show this help')}
-
-Internal fleet (operators only; needs a scoped JOVIE_WORKER_TOKEN):
-${internal.join('\n')}
-
+${internal}
 ${MESH_USAGE}
 
 Options:
   --base-url <url>       Compatible Jovie deployment origin (default: ${DEFAULT_BASE_URL})
   --json                 Emit compact JSON; text resources use {"content":"..."}
   --full                 Fetch /llms-full.txt (only with docs llms)
+  --fleet                With --help, also list internal operator commands
   --dir <path>           Skills directory for init (default: every installed agent)
   --debug                Print error details (stack and cause) to stderr
   -h, --help             Show this help
@@ -264,6 +269,7 @@ function parseCliArgs(argv: readonly string[]): {
       'base-url': { type: 'string' },
       debug: { type: 'boolean' },
       dir: { type: 'string' },
+      fleet: { type: 'boolean' },
       full: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       json: { type: 'boolean' },
@@ -283,6 +289,7 @@ function parseCliArgs(argv: readonly string[]): {
     readonly 'base-url'?: string;
     readonly debug?: boolean;
     readonly dir?: string;
+    readonly fleet?: boolean;
     readonly full?: boolean;
     readonly help?: boolean;
     readonly json?: boolean;
@@ -305,6 +312,7 @@ function parseCliArgs(argv: readonly string[]): {
         ])
       ),
       dir: values.dir,
+      fleet: values.fleet,
       full: values.full,
       help: values.help,
       json: values.json,
@@ -452,8 +460,12 @@ export async function runCli(
     positionals.length === 0 ||
     (positionals.length === 1 && positionals[0] === 'help')
   ) {
-    if (values.json) writeLine(stdout, JSON.stringify({ content: usage() }));
-    else writeText(stdout, usage());
+    const showFleet = Boolean(
+      values.fleet ?? dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN
+    );
+    if (values.json)
+      writeLine(stdout, JSON.stringify({ content: usage(showFleet) }));
+    else writeText(stdout, usage(showFleet));
     return 0;
   }
 

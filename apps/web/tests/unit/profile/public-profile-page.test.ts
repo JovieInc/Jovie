@@ -40,6 +40,15 @@ const PUBLIC_PROFILE_PAGE_SOURCE = readFileSync(
   path.join(WEB_ROOT, 'app/[username]/page.tsx'),
   'utf8'
 );
+// Stryker rewrites the page with stryMutAct ternaries and a stryNS preamble.
+// Source-text contracts cannot evaluate those runtime mutations, and copied
+// sandboxes cannot resolve the repo-root file imported by next.config.js. Keep
+// those contracts in normal Vitest and skip them only under instrumentation.
+const IS_STRYKER_INSTRUMENTED_SOURCE = /stryNS_\w+\(\)|__stryker__/.test(
+  PUBLIC_PROFILE_PAGE_SOURCE
+);
+const sourceDescribe = describe.skipIf(IS_STRYKER_INSTRUMENTED_SOURCE);
+const sourceTest = it.skipIf(IS_STRYKER_INSTRUMENTED_SOURCE);
 const PUBLIC_PROFILE_LAYOUT_SOURCE = readFileSync(
   path.join(WEB_ROOT, 'app/[username]/layout.tsx'),
   'utf8'
@@ -146,40 +155,26 @@ const mockLinks = [
 const mockGenres = ['rock', 'indie', 'alternative'];
 
 describe('Public Profile Page Logic', () => {
-  // Stryker copies this suite into its sandbox with the page instrumented
-  // (stryS calls, if(stryNS().activeMutant) cover blocks, a stryNS preamble),
-  // which hides the plain source shapes several assertions match against.
-  // Strip the instrumentation so those assertions check the same structural
-  // contract in both environments instead of failing the mutation dry run on
-  // rewritten source. Non-vacuous: nothing else is removed, so every regex
-  // below still fails if the asserted code shape is deleted or mutated.
-  function stripStrykerInstrumentation(source: string): string {
-    return (
-      source
-        .replace(
-          /\bstryS(?:Thin)?\(\s*\d+\s*,\s*(?:\[[^\]]*\]\s*,\s*)?\d+\s*\)\s*,?\s*/g,
-          ''
-        )
-        // Drop the cover blocks (bounded to their closing brace) BEFORE the
-        // preamble strip so the spanning preamble match cannot eat unrelated
-        // source.
-        .replace(/if\s*\(\s*stryNS_\w+\(\)\.[\s\S]*?\n?\}\s*;?\s*/g, '')
-        .replace(/\bstryNS_\w+\(\)\s*\{[^}]*\}\s*;?/g, '')
-    );
-  }
+  sourceTest(
+    'uses only structured Spotify links to resolve the profile owner identity',
+    () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toMatch(
+        /\.filter\(link\s*=>\s*(?:\{[^}]*?return\s+)?link\.platform === 'spotify'\s*;?\s*\}?\)[\s\S]{0,200}\.map\(link\s*=>\s*(?:\{[^}]*?return\s+)?link\.url\s*;?\s*\}?\)/
+      );
+    }
+  );
 
-  it('uses only structured Spotify links to resolve the profile owner identity', () => {
-    expect(stripStrykerInstrumentation(PUBLIC_PROFILE_PAGE_SOURCE)).toMatch(
-      /\.filter\(link\s*=>\s*(?:\{[^}]*?return\s+)?link\.platform === 'spotify'\s*;?\s*\}?\)[\s\S]{0,200}\.map\(link\s*=>\s*(?:\{[^}]*?return\s+)?link\.url\s*;?\s*\}?\)/
-    );
-  });
-
-  it('disables fan capture until the profile has a verified owner', () => {
-    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('allowFanCapture={isClaimed}');
-  });
+  sourceTest(
+    'disables fan capture until the profile has a verified owner',
+    () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'allowFanCapture={isClaimed}'
+      );
+    }
+  );
 
   describe('public profile ISR boundary', () => {
-    it('scopes streamed loading to the base profile page', () => {
+    sourceTest('scopes streamed loading to the base profile page', () => {
       expect(
         existsSync(path.join(WEB_ROOT, 'app/[username]/loading.tsx'))
       ).toBe(false);
@@ -188,44 +183,53 @@ describe('Public Profile Page Logic', () => {
       );
     });
 
-    it('resolves missing profiles before the streamed page boundary', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        "import { notFound, permanentRedirect } from 'next/navigation'"
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'const profileResult = await getProfileAndLinks(username)'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        "profileResult.status === 'not_found'"
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('notFound()');
-      expect(
-        PUBLIC_PROFILE_PAGE_SOURCE.indexOf("status === 'not_found'")
-      ).toBeLessThan(
-        PUBLIC_PROFILE_PAGE_SOURCE.indexOf(
-          '<Suspense fallback={<ProfileLoading />}>'
-        )
-      );
-      expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toContain('notFound()');
-    });
+    sourceTest(
+      'resolves missing profiles before the streamed page boundary',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          "import { notFound, permanentRedirect } from 'next/navigation'"
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'const profileResult = await getProfileAndLinks(username)'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          "profileResult.status === 'not_found'"
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('notFound()');
+        expect(
+          PUBLIC_PROFILE_PAGE_SOURCE.indexOf("status === 'not_found'")
+        ).toBeLessThan(
+          PUBLIC_PROFILE_PAGE_SOURCE.indexOf(
+            '<Suspense fallback={<ProfileLoading />}>'
+          )
+        );
+        expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toContain('notFound()');
+      }
+    );
 
-    it('redirects or 404s opaque internal-ID profile URLs before rendering junk', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'resolveOpaqueInternalProfileUsername'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'not_found'");
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'redirect'");
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('permanentRedirect');
-    });
+    sourceTest(
+      'redirects or 404s opaque internal-ID profile URLs before rendering junk',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'resolveOpaqueInternalProfileUsername'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'not_found'");
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'redirect'");
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('permanentRedirect');
+      }
+    );
 
-    it('keeps the transient profile error state out of the client graph', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
-        '@/features/feedback/ErrorBanner'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        '<PublicProfileErrorState retryHref={`/${username.toLowerCase()}`} />'
-      );
-    });
+    sourceTest(
+      'keeps the transient profile error state out of the client graph',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+          '@/features/feedback/ErrorBanner'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          '<PublicProfileErrorState retryHref={`/${username.toLowerCase()}`} />'
+        );
+      }
+    );
 
     it('renders a full-size accessible recovery surface for transient errors', () => {
       render(createElement(PublicProfileErrorState, { retryHref: '/dualipa' }));
@@ -250,77 +254,94 @@ describe('Public Profile Page Logic', () => {
       );
     });
 
-    it('keeps request-aware APIs out of the public profile server render', () => {
-      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
-        "from 'next/headers'"
-      );
-      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
-        'await headers'
-      );
-      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
-        'await cookies'
-      );
-      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
-        '@/lib/error-tracking'
-      );
-      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
-        'captureError('
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        '@/lib/profile/featured-playlist-fallback-data'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
-        "from '@/lib/profile/featured-playlist-fallback';"
-      );
-    });
+    sourceTest(
+      'keeps request-aware APIs out of the public profile server render',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+          "from 'next/headers'"
+        );
+        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+          'await headers'
+        );
+        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+          'await cookies'
+        );
+        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+          '@/lib/error-tracking'
+        );
+        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
+          'captureError('
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          '@/lib/profile/featured-playlist-fallback-data'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+          "from '@/lib/profile/featured-playlist-fallback';"
+        );
+      }
+    );
   });
 
   describe('public tour data loading', () => {
-    it('uses the public-safe upcoming tour query helper', () => {
+    sourceTest('uses the public-safe upcoming tour query helper', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'getUpcomingTourDatesForProfile'
       );
     });
 
-    it('does not import the dashboard noStore loader into the public page', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('loadUpcomingTourDates');
-    });
+    sourceTest(
+      'does not import the dashboard noStore loader into the public page',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+          'loadUpcomingTourDates'
+        );
+      }
+    );
 
-    it('falls back to an empty tour list when public tour loading fails', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'Error fetching public profile tour dates'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'const tourDatesPromise = getPublicTourDates(profile.id)'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'tourDatesPromise.catch(() => [] as TourDateViewModel[])'
-      );
-    });
+    sourceTest(
+      'falls back to an empty tour list when public tour loading fails',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'Error fetching public profile tour dates'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'const tourDatesPromise = getPublicTourDates(profile.id)'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'tourDatesPromise.catch(() => [] as TourDateViewModel[])'
+        );
+      }
+    );
 
-    it('marks a failed catalog load instead of treating it as an empty catalog', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'Error fetching public profile releases'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('failed: true');
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'catalogLoadFailed={catalogLoadFailed}'
-      );
-    });
+    sourceTest(
+      'marks a failed catalog load instead of treating it as an empty catalog',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'Error fetching public profile releases'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('failed: true');
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'catalogLoadFailed={catalogLoadFailed}'
+        );
+      }
+    );
 
-    it('reads a confirmed playlist fallback from profile settings without live search', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'getConfirmedFeaturedPlaylistFallback(profileSettings)'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('searchWeb');
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
-        'discoverThisIsPlaylistCandidate'
-      );
-    });
+    sourceTest(
+      'reads a confirmed playlist fallback from profile settings without live search',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'getConfirmedFeaturedPlaylistFallback(profileSettings)'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('searchWeb');
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+          'discoverThisIsPlaylistCandidate'
+        );
+      }
+    );
   });
 
   describe('public claim banner handling', () => {
-    it('keeps mode query handling out of the ISR server render', () => {
+    sourceTest('keeps mode query handling out of the ISR server render', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('await searchParams');
       expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('readonly searchParams');
       expect(PUBLIC_PROFILE_TEMPLATE_SOURCE).toContain(
@@ -358,35 +379,46 @@ describe('Public Profile Page Logic', () => {
       expect(getProfileModeSubtitle('tip')).toBe(getProfileModeSubtitle('pay'));
     });
 
-    it('delegates claim banner query handling to the client wrapper', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('PublicClaimBanner');
-    });
+    sourceTest(
+      'delegates claim banner query handling to the client wrapper',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('PublicClaimBanner');
+      }
+    );
 
-    it('offers the editorial AEO claim card for unclaimed direct-claim or proof profiles', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        '!isProofProfile && !isClaimed && directClaimSupported'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('isProofProfile');
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('resolveProofClaimCta');
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('/claim?next=auth');
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('ProfileAeoProofClaimCard');
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'claimFooterLabel={isProofProfile ? proofClaim.label : undefined}'
-      );
-    });
+    sourceTest(
+      'offers the editorial AEO claim card for unclaimed direct-claim or proof profiles',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          '!isProofProfile && !isClaimed && directClaimSupported'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('isProofProfile');
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('resolveProofClaimCta');
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('/claim?next=auth');
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'ProfileAeoProofClaimCard'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'claimFooterLabel={isProofProfile ? proofClaim.label : undefined}'
+        );
+      }
+    );
   });
 
   describe('profile accent handling', () => {
-    it('does not derive remote avatar accents during public profile ISR render', () => {
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('mergeProfileTheme');
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain(
-        'ensureThemeHasProfileAccent'
-      );
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain('accentSourceUrl');
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain(
-        'persistDerivedProfileAccent'
-      );
-    });
+    sourceTest(
+      'does not derive remote avatar accents during public profile ISR render',
+      () => {
+        expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('mergeProfileTheme');
+        expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain(
+          'ensureThemeHasProfileAccent'
+        );
+        expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain('accentSourceUrl');
+        expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain(
+          'persistDerivedProfileAccent'
+        );
+      }
+    );
   });
 
   describe('generateProfileStructuredData', () => {
@@ -692,10 +724,12 @@ describe('Public Profile Page Logic', () => {
       // The profile page source must conditionally emit a FAQPage script tag
       // when aeoContent.faqs.length > 0. This feeds AI citation engines and
       // Google FAQ rich results.
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'buildProfileAeoFaqStructuredData'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('aeoContent.faqs');
+      if (!IS_STRYKER_INSTRUMENTED_SOURCE) {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'buildProfileAeoFaqStructuredData'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('aeoContent.faqs');
+      }
 
       const structured = buildProfileAeoFaqStructuredData({
         faqs: [
@@ -722,12 +756,15 @@ describe('Public Profile Page Logic', () => {
       });
     });
 
-    it('guards the FAQPage script tag behind a faqs.length > 0 check', () => {
-      // Prevents an empty FAQPage from being emitted for profiles with no data
-      expect(stripStrykerInstrumentation(PUBLIC_PROFILE_PAGE_SOURCE)).toMatch(
-        /aeoContent\.faqs\.length\s*>\s*0/
-      );
-    });
+    sourceTest(
+      'guards the FAQPage script tag behind a faqs.length > 0 check',
+      () => {
+        // Prevents an empty FAQPage from being emitted for profiles with no data
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toMatch(
+          /aeoContent\.faqs\.length\s*>\s*0/
+        );
+      }
+    );
   });
 
   describe('Profile page mode logic', () => {
@@ -744,12 +781,15 @@ describe('Public Profile Page Logic', () => {
       expect(getProfileModeSubtitle('unknown')).toBe('Artist');
     });
 
-    it('passes social links and pay button flag through to StaticArtistPage', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('socialLinks={links}');
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'showPayButton={showPayButton}'
-      );
-    });
+    sourceTest(
+      'passes social links and pay button flag through to StaticArtistPage',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('socialLinks={links}');
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'showPayButton={showPayButton}'
+        );
+      }
+    );
 
     it('shows back button only for non-profile modes', () => {
       const modes = profileModes.filter(mode => mode !== 'contact');
@@ -880,45 +920,57 @@ describe('Public Profile Page Logic', () => {
   });
 
   describe('reserved handle short-circuit (JOV-3054)', () => {
-    it('rejects reserved usernames before the profile loader runs', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'isReservedUsername(username)'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('notFound()');
-    });
+    sourceTest(
+      'rejects reserved usernames before the profile loader runs',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+          'isReservedUsername(username)'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('notFound()');
+      }
+    );
 
-    it('fast-fails reserved handles inside the shared profile loader', () => {
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
-        'isReservedUsername(username)'
-      );
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
-        'return RESERVED_PROFILE_NOT_FOUND'
-      );
-    });
+    sourceTest(
+      'fast-fails reserved handles inside the shared profile loader',
+      () => {
+        expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
+          'isReservedUsername(username)'
+        );
+        expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
+          'return RESERVED_PROFILE_NOT_FOUND'
+        );
+      }
+    );
 
-    it('passes public-release presence into profile metadata (JOV-6611)', () => {
-      const metadataSource = PUBLIC_PROFILE_PAGE_SOURCE.slice(
-        PUBLIC_PROFILE_PAGE_SOURCE.indexOf(
+    sourceTest(
+      'passes public-release presence into profile metadata (JOV-6611)',
+      () => {
+        const metadataSource = PUBLIC_PROFILE_PAGE_SOURCE.slice(
+          PUBLIC_PROFILE_PAGE_SOURCE.indexOf(
+            'export async function generateMetadata'
+          )
+        );
+        expect(metadataSource).toContain('latestRelease');
+        expect(metadataSource).toContain(
+          'hasPublicRelease: latestRelease !== null'
+        );
+      }
+    );
+
+    sourceTest(
+      'uses notFound() in generateMetadata for missing profiles',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
           'export async function generateMetadata'
-        )
-      );
-      expect(metadataSource).toContain('latestRelease');
-      expect(metadataSource).toContain(
-        'hasPublicRelease: latestRelease !== null'
-      );
-    });
-
-    it('uses notFound() in generateMetadata for missing profiles', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'export async function generateMetadata'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
-        'return PROFILE_NOT_FOUND_METADATA'
-      );
-      expect(stripStrykerInstrumentation(PUBLIC_PROFILE_PAGE_SOURCE)).toMatch(
-        /if \(\s*(?:[^()]*?)?\s*!\s*profile\s*\)\s*\{[^{}]*?notFound\(\);\s*\}/
-      );
-    });
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+          'return PROFILE_NOT_FOUND_METADATA'
+        );
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).toMatch(
+          /if \(\s*(?:[^()]*?)?\s*!\s*profile\s*\)\s*\{[^{}]*?notFound\(\);\s*\}/
+        );
+      }
+    );
   });
 
   describe('cache strategy', () => {
@@ -932,24 +984,27 @@ describe('Public Profile Page Logic', () => {
       expect(shouldCache('error')).toBe(false);
     });
 
-    it('carries the first non-ok payload through the unstable_cache throw path', () => {
-      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-        'NonCacheableProfileResultError'
-      );
-      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-        'throw new NonCacheableProfileResultError(data)'
-      );
-      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-        'if (error instanceof NonCacheableProfileResultError)'
-      );
-      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-        'return error.result'
-      );
-    });
+    sourceTest(
+      'carries the first non-ok payload through the unstable_cache throw path',
+      () => {
+        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
+          'NonCacheableProfileResultError'
+        );
+        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
+          'throw new NonCacheableProfileResultError(data)'
+        );
+        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
+          'if (error instanceof NonCacheableProfileResultError)'
+        );
+        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
+          'return error.result'
+        );
+      }
+    );
   });
 });
 
-describe('profile mode route redirects', () => {
+sourceDescribe('profile mode route redirects', () => {
   it('keeps the canonical profile admission URL source-backed and database-independent', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;

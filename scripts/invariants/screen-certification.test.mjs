@@ -213,6 +213,17 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(admin.entry?.id, 'web.settings-admin-redirect');
     assert.deepEqual(admin.entry?.viewports, ['desktop', 'mobile']);
   });
+  it('registers the referral settings page and its copy interaction', () => {
+    for (const path of [
+      'apps/web/app/app/(shell)/settings/referral/page.tsx',
+      'apps/web/app/app/(shell)/settings/referral/ReferralCodeCopyClient.tsx',
+    ]) {
+      const classified = classifyScreenPath(path);
+      assert.equal(classified.kind, 'registered');
+      assert.equal(classified.entry?.id, 'web.settings-referral');
+      assert.deepEqual(classified.entry?.viewports, ['desktop', 'mobile']);
+    }
+  });
   it('registers the money route and layout for both viewports', () => {
     for (const path of [
       'apps/web/app/app/money/page.tsx',
@@ -3596,23 +3607,17 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
-  it('retains scheduled whole-system sweeps', () => {
+  it('retains event-driven whole-system sweeps', () => {
     assert.deepEqual(validateRetainedSweeps(), []);
     for (const workflow of RETAINED_SWEEP_WORKFLOWS) {
       const text = readFileSync(resolve(ROOT, workflow.path), 'utf8');
-      assert.match(text, /\n  schedule:\n/);
-      const cron = workflow.cron.replace(/\*/g, '\\*');
-      assert.match(text, new RegExp(cron));
+      assert.match(text, /\n {2}push:\n {4}branches: \[main\]\n/);
+      assert.doesNotMatch(text, /\n {2}schedule:\n/);
     }
     const dropped = validateRetainedSweeps({
-      workflows: [
-        {
-          path: 'scripts/invariants/screen-certification.test.mjs',
-          cron: '0 9 * * *',
-        },
-      ],
+      workflows: [{ path: 'scripts/invariants/screen-certification.test.mjs' }],
     });
-    assert.match(dropped.join('\n'), /dropped its schedule/);
+    assert.match(dropped.join('\n'), /dropped its main-push trigger/);
   });
 
   it('does not require proof for excluded Ovie, auth, MenuMonitor, or iOS shell changes', () => {

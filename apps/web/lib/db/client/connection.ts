@@ -33,9 +33,124 @@ declare global {
 // Lazy initialization of database connection
 let _db: DbType | undefined;
 let _pool: Pool | undefined;
+let _poolConnectionErrors = 0;
+let _poolPeak = 0;
+let _poolEndpointMode: PoolMetrics['endpointMode'] = 'other';
+let _poolMax = 0;
 
 const DEFAULT_POOL_MAX = 20;
+const MAX_POOL_MAX = 20;
 const TEST_POOL_MAX = 1;
+
+export interface FleetConnectionBudgetInput {
+  adminConnections?: number;
+  directWorkerConnections?: number;
+  effectiveBackendLimit?: number;
+  endpointMode: PoolMetrics['endpointMode'];
+  interactiveReserve?: number;
+  overlappingDeployInstances?: number;
+  peakInstances?: number;
+  poolMax: number;
+  poolerBackendLimit?: number;
+  testConnections?: number;
+}
+
+export interface FleetConnectionBudget {
+  applicationBackendCeiling: number | null;
+  applicationClientCeiling: number | null;
+  headroom: number | null;
+  missing: string[];
+  status: 'accepted' | 'rejected' | 'unknown';
+  totalBackendCeiling: number | null;
+}
+
+/** Fail-closed fleet budget calculation; absent measurements stay unknown. */
+export function evaluateFleetConnectionBudget(
+  input: FleetConnectionBudgetInput
+): FleetConnectionBudget {
+  const required = {
+    adminConnections: input.adminConnections,
+    directWorkerConnections: input.directWorkerConnections,
+    effectiveBackendLimit: input.effectiveBackendLimit,
+    interactiveReserve: input.interactiveReserve,
+    overlappingDeployInstances: input.overlappingDeployInstances,
+    peakInstances: input.peakInstances,
+    testConnections: input.testConnections,
+  };
+  const missing = Object.entries(required)
+    .filter(([, value]) => !Number.isInteger(value) || Number(value) < 0)
+    .map(([key]) => key);
+  if (input.endpointMode === 'other') missing.push('endpointMode');
+  if (
+    input.endpointMode === 'transaction-pooled' &&
+    (!Number.isInteger(input.poolerBackendLimit) ||
+      Number(input.poolerBackendLimit) < 0)
+  ) {
+    missing.push('poolerBackendLimit');
+  }
+  if (!Number.isInteger(input.poolMax) || input.poolMax <= 0) {
+    missing.push('poolMax');
+  }
+
+  if (missing.length > 0) {
+    return {
+      applicationBackendCeiling: null,
+      applicationClientCeiling: null,
+      headroom: null,
+      missing,
+      status: 'unknown',
+      totalBackendCeiling: null,
+    };
+  }
+
+  const applicationClientCeiling =
+    input.poolMax * (input.peakInstances! + input.overlappingDeployInstances!);
+  const applicationBackendCeiling =
+    input.endpointMode === 'transaction-pooled'
+      ? input.poolerBackendLimit!
+      : applicationClientCeiling;
+  const totalBackendCeiling =
+    applicationBackendCeiling +
+    input.directWorkerConnections! +
+    input.testConnections! +
+    input.adminConnections!;
+  const headroom = input.effectiveBackendLimit! - totalBackendCeiling;
+
+  return {
+    applicationBackendCeiling,
+    applicationClientCeiling,
+    headroom,
+    missing,
+    status: headroom >= input.interactiveReserve! ? 'accepted' : 'rejected',
+    totalBackendCeiling,
+  };
+}
+
+export function classifyDatabaseEndpoint(
+  connectionString: string
+): PoolMetrics['endpointMode'] {
+  try {
+    const hostname = new URL(connectionString).hostname;
+    if (/^ep-[a-z0-9-]+-pooler\..*\.neon\.tech$/i.test(hostname)) {
+      return 'transaction-pooled';
+    }
+    if (/^ep-[a-z0-9-]+\..*\.neon\.tech$/i.test(hostname)) return 'direct';
+  } catch {
+    // Environment validation owns malformed URL errors.
+  }
+  return 'other';
+}
+
+/**
+ * Per-process client admission. Production may only lower the audited default;
+ * a larger fleet budget needs a new source change and review.
+ */
+export function resolvePoolMax(): number {
+  if (isTestEnv()) return TEST_POOL_MAX;
+  const parsed = Number(process.env.DB_POOL_MAX);
+  if (!Number.isInteger(parsed) || parsed <= 0) return DEFAULT_POOL_MAX;
+  return Math.min(parsed, MAX_POOL_MAX);
+}
 
 /**
  * Opt-in pool-level PostgreSQL statement_timeout (milliseconds).
@@ -56,12 +171,11 @@ export function resolveStatementTimeoutMs(): number | undefined {
 }
 
 export function resolvePoolConfig(connectionString: string) {
-  const runningInTest = isTestEnv();
   const statementTimeoutMs = resolveStatementTimeoutMs();
 
   return {
     connectionString,
-    max: runningInTest ? TEST_POOL_MAX : DEFAULT_POOL_MAX,
+    max: resolvePoolMax(),
     idleTimeoutMillis: 20_000,
     connectionTimeoutMillis: 15_000,
     allowExitOnIdle: true,
@@ -107,10 +221,9 @@ export function initializeDb(): DbType {
   //
   // Pool settings tuned for Neon serverless to prevent
   // "Connection terminated unexpectedly" errors:
-  //   - max: 20 — tuned for launch burst traffic; each Vercel container gets
-  //     its own pool, so this handles 20 concurrent queries per container.
-  //     Note: Neon enforces a project-wide connection ceiling (~100 on launch
-  //     tier), so revisit if container concurrency grows beyond 5.
+  //   - max: 20 — audited source default. DB_POOL_MAX may lower it after the
+  //     fleet budget is measured. This lazy, process-local client ceiling is
+  //     not a fleet-wide backend connection count.
   //   - idleTimeoutMillis: 20s — close idle connections before Neon's server-side
   //     timeout (typically 30-60s) can terminate them unexpectedly
   //   - connectionTimeoutMillis: 15s — allow time for Neon cold starts (up to ~10s)
@@ -119,8 +232,13 @@ export function initializeDb(): DbType {
   //     remain (important for serverless/edge runtimes)
   const poolConfig = resolvePoolConfig(databaseUrl);
   const pool = new Pool(poolConfig);
+  _poolConnectionErrors = 0;
+  _poolEndpointMode = classifyDatabaseEndpoint(databaseUrl);
+  _poolMax = poolConfig.max;
+  _poolPeak = 0;
 
   logDbInfo('pool_config', 'Initialized Neon pool configuration', {
+    endpointMode: _poolEndpointMode,
     environment: env.NODE_ENV,
     maxConnections: poolConfig.max,
     statementTimeoutMs: poolConfig.statement_timeout ?? null,
@@ -131,6 +249,7 @@ export function initializeDb(): DbType {
   // Handle pool-level errors so unexpected connection terminations
   // are logged and do not crash the process with an unhandled 'error' event.
   pool.on('error', (err: Error) => {
+    _poolConnectionErrors += 1;
     logDbError(
       'pool_error',
       err,
@@ -138,6 +257,11 @@ export function initializeDb(): DbType {
       { asBreadcrumb: true }
     );
   });
+  const recordPoolPeak = () => {
+    _poolPeak = Math.max(_poolPeak, pool.totalCount);
+  };
+  pool.on('connect', recordPoolPeak);
+  pool.on('acquire', recordPoolPeak);
 
   _pool = pool;
 
@@ -240,8 +364,12 @@ export function getPoolMetrics(): PoolMetrics | null {
   const waiting = _pool.waitingCount;
 
   return {
+    connectionErrors: _poolConnectionErrors,
+    endpointMode: _poolEndpointMode,
     total,
     idle,
+    max: _poolMax,
+    peak: Math.max(_poolPeak, total),
     waiting,
     utilization: total > 0 ? (total - idle) / total : 0,
   };

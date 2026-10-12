@@ -87,7 +87,7 @@ function assertPositiveTimeoutMs(timeoutMs: number): number {
 }
 
 /**
- * Sets the PostgreSQL statement timeout for the current session.
+ * Sets the PostgreSQL statement timeout for the current transaction.
  *
  * Uses parameterized `set_config` instead of `SET statement_timeout = $1`.
  * PostgreSQL rejects bind parameters on SET, which surfaced in production as
@@ -100,7 +100,7 @@ export async function setStatementTimeout(
   const safeMs = assertPositiveTimeoutMs(timeoutMs);
 
   await db.execute(
-    drizzleSql`SELECT set_config('statement_timeout', ${String(safeMs)}, false)`
+    drizzleSql`SELECT set_config('statement_timeout', ${String(safeMs)}, true)`
   );
 }
 

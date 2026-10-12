@@ -2,13 +2,14 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   read: vi.fn(),
-  exists: vi.fn(),
+  access: vi.fn(),
   parse: vi.fn(),
   parseDocument: vi.fn(),
   cachedSources: new Map<string, Promise<string>>(),
 }));
-vi.mock('node:fs', () => ({
-  default: { readFileSync: mocks.read, existsSync: mocks.exists },
+vi.mock('node:fs/promises', () => ({
+  readFile: mocks.read,
+  access: mocks.access,
 }));
 vi.mock('next/cache', () => ({
   unstable_cache: (load: () => Promise<string>, keys: string[]) => {
@@ -37,12 +38,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.unstubAllEnvs();
   mocks.cachedSources.clear();
-  mocks.exists.mockReturnValue(true);
+  mocks.access.mockResolvedValue(undefined);
 });
 
 it('reads new release bytes after deployment even when the data cache survives', async () => {
   vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'a'.repeat(40));
-  mocks.read.mockReturnValue('August source');
+  mocks.read.mockResolvedValue('August source');
   mocks.parse.mockImplementation(source => [{ version: source }]);
   const first = await import('../changelog-source');
   expect(await first.getChangelogReleases()).toEqual([
@@ -51,7 +52,7 @@ it('reads new release bytes after deployment even when the data cache survives',
 
   vi.resetModules();
   vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'b'.repeat(40));
-  mocks.read.mockReturnValue('October source');
+  mocks.read.mockResolvedValue('October source');
   const second = await import('../changelog-source');
   expect(await second.getChangelogReleases()).toEqual([
     { version: 'October source' },
@@ -60,7 +61,7 @@ it('reads new release bytes after deployment even when the data cache survives',
 });
 
 it('caches markdown but reapplies current filtering policy for every read', async () => {
-  mocks.read.mockReturnValue('release source');
+  mocks.read.mockResolvedValue('release source');
   mocks.parse
     .mockReturnValueOnce([{ version: 'first policy' }])
     .mockReturnValueOnce([]);
@@ -73,7 +74,7 @@ it('caches markdown but reapplies current filtering policy for every read', asyn
 });
 
 it('fails closed to empty source when the source file is missing', async () => {
-  mocks.exists.mockReturnValue(false);
+  mocks.access.mockRejectedValue(new Error('ENOENT'));
   mocks.parse.mockReturnValue([]);
   const { getChangelogReleases } = await import('../changelog-source');
   expect(await getChangelogReleases()).toEqual([]);
@@ -82,7 +83,7 @@ it('fails closed to empty source when the source file is missing', async () => {
 });
 
 it('returns source headings and public releases together for freshness UI', async () => {
-  mocks.read.mockReturnValue('release source');
+  mocks.read.mockResolvedValue('release source');
   const parsed = {
     releases: [{ version: '26.8.2' }],
     sourceReleases: [{ version: '26.9.0' }, { version: '26.8.2' }],

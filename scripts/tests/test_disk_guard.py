@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -262,6 +263,21 @@ class CheckTest(unittest.TestCase):
                 self.assertEqual(report["reason"], "disk-unobservable" if pct is None else
                                  "disk-available" if pct == 10.0 else "disk-critical")
 
+    def test_sweep_runs_where_autoscale_stops_growth_and_reports_reclaimable(self):
+        # Gem 04:12Z: autoscale blocked growth at <= 15% free, the sweep ran only below 15%.
+        self.assertEqual(guard.LOW_PCT, float(guard.autoscale.DISK_INCREASE_MIN))
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                patch.object(guard, "sweep_derived_data") as sweep:
+            report = guard.check(self.host(tmp), sweep=True)
+        sweep.assert_called_once()
+        self.assertTrue(report["low"])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "symphony-elixir-workspaces"
+            self.assertFalse(guard.reclaimable(None, roots=[root]))
+            (root / "JOV-1").mkdir(parents=True)
+            self.assertTrue(guard.reclaimable(None, roots=[root]))
+
     def test_cleanup_lock_serializes_workers_and_recovers_after_release(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(guard, "free_pct", return_value=10.0), \
                 patch.object(guard, "sweep_derived_data") as sweep, \
@@ -286,6 +302,159 @@ class CheckTest(unittest.TestCase):
             second.assert_not_called()
             self.assertFalse(report["admitted"])
 
+
+
+class RetiredHostLoopTest(unittest.TestCase):
+    """Runner _work, retired Symphony workspaces and old logs: the gem-disk-reclaim duties."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
+        self.env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        self.env.update(GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.com",
+                        GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.com")
+
+    def report(self):
+        return {"actions": [], "errors": []}
+
+    def runner(self, name, transient=("_temp", "_tool"), job="Jovie"):
+        root = self.root / name
+        for child in (*transient, job):
+            (root / "_work" / child).mkdir(parents=True)
+            (root / "_work" / child / "f").write_text("x")
+        (root / ".runner").write_text("{}")
+        (root / "run.sh").write_text("")
+        return root
+
+    def test_selftest_sees_no_host_roots(self):
+        with patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
+            self.assertEqual((guard.runner_roots(), guard.retired_workspace_roots()), ([], []))
+            self.assertEqual(guard.log_dirs(SimpleNamespace(state=self.root)), [self.root / "runs"])
+
+    def test_idle_runner_loses_transient_work_busy_runner_keeps_it(self):
+        idle, busy, unknown = self.runner("r1"), self.runner("r2"), self.root / "r3"
+        (unknown / "_work/_temp").mkdir(parents=True)
+        ps = SimpleNamespace(returncode=0, stderr="",
+                             stdout=f"{busy}/bin/Runner.Listener run\n{busy}/bin/Runner.Worker spawnclient 1 2\n")
+        report = self.report()
+        guard.sweep_runner_work(lambda *a, **k: ps, report, roots=[idle, busy, unknown])
+        self.assertEqual(sorted(p.name for p in (idle / "_work").iterdir()), ["Jovie"], "job checkout stays warm")
+        self.assertTrue((busy / "_work/_temp/f").exists())
+        self.assertTrue((unknown / "_work/_temp").exists(), "not a runner install")
+        self.assertIn(f"preserved busy runner {busy}", report["actions"])
+
+    def test_unattributable_or_unobservable_worker_holds_every_runner(self):
+        idle = self.runner("r1")
+        for ps in (SimpleNamespace(returncode=0, stdout="Runner.Worker spawnclient 1 2\n", stderr=""),
+                   SimpleNamespace(returncode=1, stdout="", stderr="ps: denied")):
+            report = self.report()
+            guard.sweep_runner_work(lambda *a, **k: ps, report, roots=[idle])
+            self.assertTrue((idle / "_work/_temp/f").exists())
+            self.assertEqual(report["errors"], ["runner-state-unavailable"])
+
+    def git(self, *args, cwd):
+        subprocess.run(["git", *args], cwd=cwd, env=self.env, check=True, capture_output=True)
+
+    def checkout(self, root, name, origin):
+        path = root / name
+        self.git("clone", "-q", str(origin), str(path), cwd=self.root)
+        (path / "a.txt").write_text(name)
+        self.git("add", "a.txt", cwd=path)
+        self.git("commit", "-q", "-m", name, cwd=path)
+        self.git("push", "-q", "origin", f"HEAD:refs/heads/{name}", cwd=path)
+        self.git("fetch", "-q", "origin", cwd=path)
+        return path
+
+    def age(self, *paths):
+        for path in paths:
+            for entry in [path, *path.rglob("*")]:
+                os.utime(entry, (NOW - 48 * 3600, NOW - 48 * 3600), follow_symlinks=False)
+
+    def run_cmd(self, args, **kwargs):
+        if args[0] in ("ps", "lsof"):
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return subprocess.run(args, env=kwargs.pop("env", None) or self.env, **kwargs)
+
+    def test_retired_workspaces_back_up_work_then_go_never_through_mounts(self):
+        origin = self.root / "origin.git"
+        self.git("init", "-q", "--bare", str(origin), cwd=self.root)
+        root = self.root / "symphony-workspaces"; root.mkdir()
+        clean = self.checkout(root, "JOV-1", origin)
+        dirty = self.checkout(root, "JOV-2", origin)
+        (dirty / "wip.txt").write_text("unsaved")
+        orphan = self.checkout(root, "JOV-3", origin)
+        self.git("remote", "remove", "origin", cwd=orphan)
+        (orphan / "wip.txt").write_text("unsaved")
+        (orphan / "node_modules/x").mkdir(parents=True)
+        plain = root / "JOV-4"; (plain / "node_modules/x").mkdir(parents=True); (plain / "notes.md").write_text("n")
+        mounted = self.checkout(root, "JOV-5", origin)
+        fresh = self.checkout(root, "JOV-6", origin)
+        self.age(clean, dirty, orphan, plain, mounted)
+        os.utime(fresh / "a.txt", (NOW, NOW))
+        report = self.report()
+        with patch.dict(os.environ, self.env, clear=True), patch.object(guard, "free_pct", return_value=10.0), \
+                patch.object(guard, "mount_points", return_value={mounted}):
+            guard.sweep_retired_workspaces(SimpleNamespace(state=self.root), self.run_cmd, NOW, report, roots=[root])
+        self.assertFalse(clean.exists())
+        self.assertFalse(dirty.exists())
+        backups = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/heads/backup"],
+                                 cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
+        self.assertEqual(len(backups), 1, report)
+        self.assertTrue(backups[0].endswith("/JOV-2-" + guard.datetime.fromtimestamp(NOW, guard.timezone.utc).strftime("%Y%m%d")))
+        shown = subprocess.run(["git", "show", f"{backups[0]}:wip.txt"], cwd=origin, env=self.env,
+                               capture_output=True, text=True).stdout
+        self.assertEqual(shown, "unsaved")
+        self.assertTrue((orphan / "wip.txt").exists(), "unsaved work without a backup stays")
+        self.assertFalse((orphan / "node_modules").exists())
+        self.assertTrue((plain / "notes.md").exists(), "a non-git dir cannot prove it holds no work")
+        self.assertFalse((plain / "node_modules").exists())
+        self.assertTrue((mounted / "a.txt").exists())
+        self.assertIn(f"preserved mounted workspace {mounted}", report["actions"])
+        self.assertTrue(fresh.exists(), "recently used workspaces stay")
+        self.assertEqual(report["errors"], [])
+
+    def test_retired_workspaces_need_a_low_filesystem_and_a_mount_table(self):
+        root = self.root / "ws"; (root / "JOV-1").mkdir(parents=True)
+        self.age(root / "JOV-1")
+        for pct, mounts, error in ((50.0, set(), []), (10.0, None, ["retired-workspaces:mounts-unavailable"])):
+            report = self.report()
+            with patch.object(guard, "free_pct", return_value=pct), patch.object(guard, "mount_points", return_value=mounts):
+                guard.sweep_retired_workspaces(SimpleNamespace(state=self.root), self.run_cmd, NOW, report, roots=[root])
+            self.assertTrue((root / "JOV-1").exists())
+            self.assertEqual(report["errors"], error)
+
+    def test_mount_table_decodes_escaped_paths(self):
+        table = self.root / "mountinfo"
+        table.write_text("36 35 8:1 / / rw - ext4 /dev/sda1 rw\n"
+                         "40 36 8:17 /shard /srv/worktrees/jovie/JOV\\0401 rw - ext4 /dev/sdb1 rw\n")
+        with patch.object(guard, "MOUNTINFO", table):
+            self.assertEqual(guard.mount_points(), {Path("/"), Path("/srv/worktrees/jovie/JOV 1")})
+        with patch.object(guard, "MOUNTINFO", self.root / "absent"):
+            self.assertIsNone(guard.mount_points())
+
+    def test_old_logs_go_ledgers_and_fresh_logs_stay(self):
+        runs = self.root / "runs"; runs.mkdir()
+        names = ("old.log", "old.prompt.md", "ledger.jsonl", "fresh.log")
+        for name in names:
+            (runs / name).write_text("x")
+        for name in names[:3]:
+            os.utime(runs / name, (NOW - guard.LOG_IDLE_S - 1,) * 2)
+        os.utime(runs / "fresh.log", (NOW,) * 2)
+        report = self.report()
+        guard.sweep_old_logs(None, NOW, report, dirs=[runs])
+        self.assertEqual(sorted(p.name for p in runs.iterdir()), ["fresh.log", "ledger.jsonl"])
+        self.assertEqual(report["actions"], [f"removed 2 old log(s) from {runs}"])
+
+    def test_low_disk_sweep_runs_the_host_loop_steps(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(guard, "free_pct", return_value=10.0), \
+                patch.object(guard, "sweep_runner_work") as runners, \
+                patch.object(guard, "sweep_retired_workspaces") as workspaces, \
+                patch.object(guard, "sweep_old_logs") as logs, \
+                patch.object(guard, "sweep_worktrees"), patch.object(guard, "sweep_host_tools"), \
+                patch.object(guard, "sweep_derived_data"), patch.object(guard, "sweep_worktree_pool"):
+            guard.check(SimpleNamespace(state=Path(tmp), repo=Path(tmp)), run=ok, now=NOW, sweep=True)
+        runners.assert_called_once(); workspaces.assert_called_once(); logs.assert_called_once()
 
 
 class HarnessArtifactTest(unittest.TestCase):

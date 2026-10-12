@@ -3,9 +3,19 @@ import {
   getConnectionRetryDelayMs,
   getMigrationLockRetryLimit,
   isRetryableConnectionError,
+  resolveMigrationDatabaseUrl,
 } from '../../../scripts/drizzle-migrate';
 
 describe('drizzle-migrate connection retry policy', () => {
+  it('uses a direct endpoint for session-sensitive migration locks', () => {
+    const direct = resolveMigrationDatabaseUrl(
+      'postgres://migration:secret@ep-example-pooler.us-east-1.aws.neon.tech/db?sslmode=require' // trufflehog:ignore
+    );
+
+    expect(new URL(direct).hostname).toBe('ep-example.us-east-1.aws.neon.tech');
+    expect(new URL(direct).searchParams.get('sslmode')).toBe('require');
+  });
+
   it('retries Neon endpoint-limit failures with exponential backoff', () => {
     const error = new Error(
       'You have exceeded the limit of concurrently active endpoints. Please suspend some endpoints and try again.'

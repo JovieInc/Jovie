@@ -28,6 +28,7 @@ import {
 import { MERGE_GROUP_ADMISSION_WAIT_MS } from '../merge-group-admission.mjs';
 import { MERGE_GROUP_POLICY_DEADLINE_MS } from '../merge-group-member-policy.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
+import { resolveRealGh, runWithRealGh } from '../real-gh-harness.mjs';
 import {
   createGitRunner,
   formatMetaEnv,
@@ -46,6 +47,10 @@ const SETUP_NODE_PNPM_ACTION = readFileSync(
 );
 const IOS_CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ios-ci.yml'),
+  'utf8'
+);
+const MACOS_CI_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/macos-ci.yml'),
   'utf8'
 );
 const IOS_TESTFLIGHT_WORKFLOW = readFileSync(
@@ -387,7 +392,7 @@ describe('merge_group workflow contract', () => {
       workflowDeclaresReadyForReviewType(AUTO_MERGE_DEFAULT_WORKFLOW)
     ).toBe(true);
     expect(AUTO_MERGE_DEFAULT_WORKFLOW).toContain(
-      'types: [opened, reopened, ready_for_review]'
+      'types: [opened, reopened, ready_for_review, synchronize]'
     );
     expect(getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable')).toContain(
       'github.event.pull_request.draft == false'
@@ -916,7 +921,7 @@ describe('merge_group workflow contract', () => {
       'unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}'
     );
     expect(unitTests).toContain(
-      'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1'
+      'uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2'
     );
     expect(unitTests).toContain('path: apps/web/test-report.*.junit.xml');
     expect(unitTests).toContain('if-no-files-found: warn');
@@ -1011,33 +1016,34 @@ describe('merge_group workflow contract', () => {
       `shard: [${Array.from({ length: 14 }, (_, i) => `'${i + 1}/14'`).join(', ')}, 'packages/ui']`
     );
 
-    const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
-    // Self-hosted jovie-mac when the heartbeat is fresh; hosted GA image
-    // otherwise (macos-26 pickup waited 8-68 min per merge group, 2026-10-10).
-    expect(macos).toContain(
-      `runs-on: \${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+    const macosCaller = getJobBlock(CI_WORKFLOW, 'ci-macos');
+    const macosRoute = getJobBlock(MACOS_CI_WORKFLOW, 'mac');
+    const macos = getJobBlock(MACOS_CI_WORKFLOW, 'build');
+    // An idle self-hosted Mac first (mac-lane-route.yml); hosted otherwise.
+    expect(macosCaller).toContain('uses: ./.github/workflows/macos-ci.yml');
+    expect(macosCaller).toContain('mac-first: true');
+    expect(macosRoute).toContain(
+      'uses: ./.github/workflows/mac-lane-route.yml'
     );
+    expect(macos).toContain(
+      `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+    );
+    expect(macos).toContain("needs.mac.outputs.run_hosted == 'true'");
     expect(macos).not.toContain('runs-on: macos-26');
-    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
-    expect(pathChanges).toContain(
-      "mac_runner_class: ${{ steps.mac-route.outputs.runner_class || 'hosted' }}"
-    );
-    expect(pathChanges).toContain(
-      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
-    );
-    expect(macos).toContain(
+    expect(CI_WORKFLOW).not.toContain('mac_runner_class');
+    expect(CI_WORKFLOW).not.toContain('mac-runner-heartbeat.yml');
+    expect(macosCaller).toContain(
       "format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number)"
     );
-    expect(macos).toContain(
+    expect(macosCaller).toContain(
       "format('ci-macos-{0}-{1}', github.run_id, github.run_attempt)"
     );
-    expect(macos).toContain(
+    expect(macosCaller).toContain(
       "cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}"
     );
     expect(CI_WORKFLOW).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
-    expect(CI_WORKFLOW).not.toContain('.github/workflows/macos-ci.yml');
-    expect(macos).toContain("github.event_name == 'merge_group'");
-    expect(macos).not.toContain("github.event_name == 'pull_request'");
+    expect(macosCaller).toContain("github.event_name == 'merge_group'");
+    expect(macosCaller).not.toContain("github.event_name == 'pull_request'");
     expect(macos).toContain(
       'swift test --package-path apps/macos/MenuMonitor --enable-code-coverage'
     );
@@ -1052,7 +1058,10 @@ describe('merge_group workflow contract', () => {
     expect(macos).toContain(
       'DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}"'
     );
-    expect(macos).toContain('JOVIE_DESKTOP_SOURCE_REVISION="$GITHUB_SHA"');
+    expect(macos).toContain('JOVIE_DESKTOP_SOURCE_REVISION="$SOURCE_SHA"');
+    expect(macos).toContain(
+      'SOURCE_SHA: ${{ inputs.checkout-ref || github.sha }}'
+    );
     expect(macos).toContain(
       'version="${{ steps.desktop-staging-identity.outputs.version }}"'
     );
@@ -1583,6 +1592,14 @@ describe('merge_group workflow contract', () => {
     );
     expect(noopBranch).toContain('mkdir -p "$PRODUCT_LANE_DIR"');
     expect(noopBranch).toContain(': > "$PRODUCT_LANE_DIR/changed-paths.txt"');
+    // The classified branch runs the classifier from a physical path and
+    // fails closed when it wrote no receipt.
+    expect(detectStep).toContain(
+      'PRODUCT_LANE_DIR="$(cd "$RUNNER_TEMP" && pwd -P)/product-lane-classification"'
+    );
+    expect(detectStep).toMatch(
+      /--github-output "\$GITHUB_OUTPUT"\n\s*# [^\n]*\n\s*test -s "\$PRODUCT_LANE_DIR\/receipt\.json"/
+    );
 
     const homepageVisualScript = getStepRunScript(
       pathChanges,
@@ -2576,18 +2593,17 @@ ${selectedGateScript}`,
     expect(coalesce).toContain(
       "needs.release-source.outputs.eligible == 'true'"
     );
-    // No universal fixed delay: the bounded window derives from merge-queue
-    // depth and is capped inside the 5-minute job budget.
-    expect(coalesce).not.toContain('COALESCE_DELAY_SECONDS');
+    // No wait of any kind: a current SHA proceeds at once, and a newer
+    // generation supersedes this one through the FIFO and lineage gate.
+    expect(coalesce).not.toContain('COALESCE_');
+    expect(coalesce).not.toContain('sleep "$wait_seconds"');
     expect(coalesce).not.toContain('sleep 60');
-    expect(coalesce).toContain("COALESCE_PER_GENERATION_SECONDS: '30'");
-    expect(coalesce).toContain("COALESCE_MAX_SECONDS: '150'");
-    expect(coalesce).toContain('sleep "$wait_seconds"');
-    // Event sources: exact main and the merge queue only; no polling loop.
+    // Event source: exact main only; the merge queue is not read.
     expect(coalesce).toContain('commits/main');
-    expect(coalesce).toContain('mergeQueue(branch: "main")');
-    // Empty queue + current SHA proceeds without any wait.
-    expect(coalesce).toContain('if [ "$queue_depth" -eq 0 ]; then');
+    expect(coalesce).not.toContain('mergeQueue(branch: "main")');
+    expect(coalesce).toContain(
+      'record_receipt "proceed" "exact SHA is current"'
+    );
     // Every decision emits a lineage receipt with reason, replacement SHA,
     // time saved, and next state; any wait names benefit and deadline.
     expect(coalesce).toContain('record_receipt');
@@ -2882,10 +2898,21 @@ ${selectedGateScript}`,
     // Dependabot pull_request runs receive an empty secrets context, so the
     // step also bails when JOVIE_BOT_PRIVATE_KEY is unavailable; the hourly
     // triage sweep enables auto-merge with full secrets.
-    expect(tokenStep).toContain(`        if: >-
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          github.event.pull_request.user.login != 'dependabot[bot]' &&
-          env.JOVIE_BOT_PRIVATE_KEY != ''
+    // The job if: admits only same-repo, non-Dependabot PRs for both the
+    // pull_request and the Source Validation workflow_run wake.
+    expect(enable).toContain(
+      'github.event.pull_request.head.repo.full_name == github.repository &&'
+    );
+    expect(enable).toContain(
+      "github.event.pull_request.user.login != 'dependabot[bot]')"
+    );
+    expect(enable).toContain(
+      'github.event.workflow_run.head_repository.full_name == github.repository &&'
+    );
+    expect(enable).toContain(
+      "github.event.workflow_run.actor.login != 'dependabot[bot]' &&"
+    );
+    expect(tokenStep).toContain(`        if: env.JOVIE_BOT_PRIVATE_KEY != ''
         id: app-token`);
     expect(enable).toContain(
       '      JOVIE_BOT_PRIVATE_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
@@ -3302,117 +3329,168 @@ ${selectedGateScript}`,
   });
 });
 
-describe('merge-group supersession watchdog', () => {
-  const OWN = 'refs/heads/gh-readonly-queue/main/pr-20546-' + '1'.repeat(40);
-  const NEXT = 'refs/heads/gh-readonly-queue/main/pr-20546-' + '2'.repeat(40);
-  const line = ref => `${'f'.repeat(40)}\t${ref}`;
+describe('merge-group supersede one-shot', () => {
+  const PR = '20546';
+  const sha = digit => digit.repeat(40);
+  const branch = (pr, digit) => `gh-readonly-queue/main/pr-${pr}-${sha(digit)}`;
+  const OWN_ID = 900;
+  const OWN = branch(PR, '9');
+  const realGh = resolveRealGh();
+  const job =
+    /** @type {{ jobs: Record<string, { if: string, 'timeout-minutes': number, permissions: Record<string, string>, steps: { id?: string, uses?: string, 'continue-on-error'?: boolean, run?: string, with?: Record<string, string> }[] }> }} */ (
+      load(CI_WORKFLOW)
+    ).jobs['ci-merge-group-supersede'];
+  const run = (id, headBranch, status = 'in_progress') => ({
+    id,
+    status,
+    head_branch: headBranch,
+    head_sha: headBranch.slice(-40),
+  });
+  const RUNS = [
+    run(OWN_ID, OWN),
+    run(950, branch(PR, '8')), // newer than this run: never ours to cancel
+    run(800, branch(PR, '1')), // superseded, ref gone: cancel
+    run(801, branch(PR, '2'), 'queued'), // superseded, ref gone: cancel
+    run(802, branch(PR, '3')), // older but its ref is still live: keep
+    run(803, branch(PR, '4'), 'completed'), // already finished: keep
+    run(804, OWN), // same queue SHA as this run: keep
+    run(805, branch('20547', '5')), // a different PR: keep
+    run(806, branch(`${PR}1`, '6')), // PR number prefix collision: keep
+  ];
 
-  function runWatchdog(listings, { queueRef = OWN, maxSeconds = '60' } = {}) {
-    const job =
-      /** @type {{ jobs: Record<string, { permissions: Record<string, string>, steps: { run: string, env: Record<string, string> }[] }> }} */ (
-        load(CI_WORKFLOW)
-      ).jobs['ci-merge-group-watchdog'];
-    const root = mkdtempSync(join(tmpdir(), 'mg-watchdog-'));
+  /**
+   * @param {{ queueRef?: string, readToken?: string, list?: { status?: number, body: unknown }, liveRefs?: string[] | null }} [opts]
+   */
+  async function runSupersede({
+    queueRef = `refs/heads/${OWN}`,
+    readToken = 'app-read-token',
+    list = { body: { workflow_runs: RUNS } },
+    liveRefs = [OWN, branch(PR, '3')],
+  } = {}) {
+    const root = mkdtempSync(join(tmpdir(), 'mg-supersede-'));
     try {
       const bin = join(root, 'bin');
       mkdirSync(bin);
-      listings.forEach((listing, index) =>
-        writeFileSync(join(root, `listing-${index}`), listing ?? '')
-      );
-      // Each git call consumes the next listing; null = unreadable listing.
-      // The token must reach git only as config env, never in argv.
+      // The read token must reach git only as config env, never in argv.
       writeFileSync(
         join(bin, 'git'),
         `#!/bin/bash
-n=$(cat "${root}/count" 2>/dev/null || echo 0); echo $((n + 1)) > "${root}/count"
 printf '%s\\n' "$*" >> "${root}/git.log"
 [[ "$GIT_CONFIG_VALUE_0" == "AUTHORIZATION: basic "* ]] || exit 9
-f="${root}/listing-$n"; [[ -f "$f" ]] || exit 1
-${listings.map((l, i) => (l === null ? `[[ $n == ${i} ]] && exit 128` : '')).join('\n')}
-cat "$f"
+${
+  liveRefs === null
+    ? 'exit 128'
+    : `printf '%s' '${liveRefs.map(ref => `${sha('f')}\trefs/heads/${ref}\n`).join('')}'`
+}
 `,
         { mode: 0o755 }
       );
-      writeFileSync(
-        join(bin, 'gh'),
-        `#!/bin/bash\nprintf '%s\\n' "$*" >> "${root}/gh.log"\n`,
-        { mode: 0o755 }
-      );
-      writeFileSync(join(bin, 'sleep'), '#!/bin/bash\n/bin/sleep 0.05\n', {
-        mode: 0o755,
-      });
-      const result = spawnSync('bash', ['-c', job.steps[0].run], {
-        encoding: 'utf8',
-        timeout: 90_000,
+      const proof = await runWithRealGh({
+        script: /** @type {string} */ (job.steps[1].run),
         env: {
-          PATH: `${bin}${delimiter}/usr/bin${delimiter}/bin`,
-          GH_TOKEN: 'synthetic-test-token',
+          PATH: `${bin}${delimiter}${process.env.PATH}`,
+          READ_TOKEN: readToken,
+          CANCEL_TOKEN: 'github-token',
           QUEUE_REF: queueRef,
+          HEAD_SHA: OWN.slice(-40),
           REPOSITORY: 'JovieInc/Jovie',
-          RUN_ID: '37193704778',
-          POLL_SECONDS: '0',
-          MAX_SECONDS: maxSeconds,
+          RUN_ID: String(OWN_ID),
+          WORKFLOW_REF: `JovieInc/Jovie/.github/workflows/ci.yml@${queueRef}`,
+          GIT_SERVER: 'https://github.com',
+        },
+        route: path => {
+          if (path.startsWith('repos/JovieInc/Jovie/actions/workflows/')) {
+            return list;
+          }
+          if (
+            /^repos\/JovieInc\/Jovie\/actions\/runs\/\d+\/cancel$/.test(path)
+          ) {
+            return { status: 202, body: {} };
+          }
+          return null;
         },
       });
-      const read = name => {
-        try {
-          return readFileSync(join(root, name), 'utf8');
-        } catch {
-          return '';
-        }
-      };
-      return {
-        job,
-        status: result.status,
-        stdout: result.stdout,
-        gh: read('gh.log'),
-        git: read('git.log'),
-      };
+      let git = '';
+      try {
+        git = readFileSync(join(root, 'git.log'), 'utf8');
+      } catch {}
+      return { ...proof, git };
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   }
 
-  it('cancels only after two consecutive reads show a successor group', () => {
-    const r = runWatchdog([line(OWN), `${line(NEXT)}\n`, line(NEXT)]);
-    expect(r.status).toBe(0);
-    expect(r.gh).toBe('run cancel 37193704778 --repo JovieInc/Jovie\n');
-    expect(r.stdout).toContain(`superseded by ${NEXT}`);
-    expect(r.git.trim().split('\n')).toHaveLength(3);
-    expect(r.git).toContain(
-      'ls-remote https://github.com/JovieInc/Jovie refs/heads/gh-readonly-queue/main/pr-20546-*'
+  const LIST =
+    'GET repos/JovieInc/Jovie/actions/workflows/ci.yml/runs?event=merge_group&per_page=100';
+
+  it('is a seconds-long one-shot that gates nothing and never polls', () => {
+    expect(job.if).toContain("github.event_name == 'merge_group'");
+    expect(job['timeout-minutes']).toBeLessThanOrEqual(3);
+    expect(job.permissions).toEqual({ actions: 'write' });
+    const [mint, cancel] = job.steps;
+    expect(mint.uses).toMatch(
+      /^actions\/create-github-app-token@[0-9a-f]{40}$/
     );
-    expect(r.git).not.toContain('synthetic-test-token');
-    expect(r.job.permissions).toEqual({ actions: 'write' });
+    expect(mint['continue-on-error']).toBe(true);
+    expect(mint.with?.['permission-actions']).toBe('read');
+    expect(cancel.run).not.toMatch(/\bsleep\b|\bwhile\s+(true|\(\()|\buntil\b/);
+    const { jobs } =
+      /** @type {{ jobs: Record<string, { needs?: string | string[] }> }} */ (
+        load(CI_WORKFLOW)
+      );
+    expect(jobs['ci-merge-group-watchdog']).toBeUndefined();
+    for (const [id, other] of Object.entries(jobs)) {
+      const needs = [other.needs ?? []].flat();
+      expect(needs, id).not.toContain('ci-merge-group-supersede');
+    }
   });
 
-  it('never cancels on a flap, an unreadable listing, or a group that left without a successor', () => {
-    // Successor once, own ref back, unreadable read between two misses, then
-    // the group leaves the queue (merged or removed for its own failure).
-    const r = runWatchdog([
-      line(NEXT),
-      line(OWN),
-      line(NEXT),
-      null,
-      line(NEXT),
-      '',
-    ]);
-    expect(r.status).toBe(0);
-    expect(r.gh).toBe('');
-    expect(r.stdout).toContain('left the queue without a successor');
-  });
+  it.skipIf(!realGh)(
+    'cancels only older unfinished runs of the same PR whose queue ref is gone',
+    async () => {
+      const r = await runSupersede();
+      expect(r.code, r.stderr).toBe(0);
+      expect(r.requests).toEqual([
+        LIST,
+        'POST repos/JovieInc/Jovie/actions/runs/800/cancel',
+        'POST repos/JovieInc/Jovie/actions/runs/801/cancel',
+      ]);
+      expect(r.stdout).toContain('Run 802 keeps running');
+      expect(r.git).toBe(
+        `ls-remote https://github.com/JovieInc/Jovie refs/heads/gh-readonly-queue/main/pr-${PR}-*\n`
+      );
+      expect(r.git).not.toContain('app-read-token');
+    },
+    30_000
+  );
 
-  it('stays idle outside a main queue ref and within its time budget', () => {
-    const idle = runWatchdog([line(NEXT), line(NEXT)], {
-      queueRef: 'refs/heads/main',
-    });
-    expect(idle.gh).toBe('');
-    expect(idle.git).toBe('');
-    const queued = runWatchdog([], { maxSeconds: '1' });
-    expect(queued.status).toBe(0);
-    expect(queued.gh).toBe('');
-    expect(queued.stdout).toContain('watchdog budget elapsed');
-  });
+  it.skipIf(!realGh)(
+    'never cancels and exits 0 when a read fails or no read token exists',
+    async () => {
+      const listFails = await runSupersede({
+        list: { status: 500, body: { message: 'boom' } },
+      });
+      expect(listFails.code).toBe(0);
+      expect(listFails.requests).toEqual([LIST]);
+      expect(listFails.stdout).toContain('Could not list merge_group runs');
+      expect(listFails.git).toBe('');
+
+      const refsFail = await runSupersede({ liveRefs: null });
+      expect(refsFail.code).toBe(0);
+      expect(refsFail.requests).toEqual([LIST]);
+      expect(refsFail.stdout).toContain('Could not list queue refs');
+
+      const noToken = await runSupersede({ readToken: '' });
+      expect(noToken.code).toBe(0);
+      expect(noToken.requests).toEqual([]);
+
+      const notQueue = await runSupersede({ queueRef: 'refs/heads/main' });
+      expect(notQueue.code).toBe(0);
+      expect(notQueue.requests).toEqual([]);
+      expect(notQueue.git).toBe('');
+    },
+    60_000
+  );
 });
 
 describe('PR Size Guard merge-base comparison', () => {

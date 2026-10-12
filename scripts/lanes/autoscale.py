@@ -2,23 +2,29 @@
 """Adaptive per-lane slots on the minute dispatch tick. Default mode is apply. Kill switch: SYMPHONY_AUTOSCALE=0. decide() is pure and does no I/O at import."""
 from __future__ import annotations
 import json; import math; import os; import stat; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"
-MIN_SLOTS, STALE_S, RATE_QUIET_S = 1, 600, 900; MULTIPLICATIVE_WINDOW_S, HOST_COOLDOWN_S = 300, 120; DEFAULT_INTERVAL_S = LANE_COOLDOWN_S = 1800
-UP_STREAK_REQUIRED = IDLE_STREAK_REQUIRED = DEFAULT_INTERVAL_S // 60; HISTORY_CAP, GIB = 50, 1024 ** 3
+# Tim 2026-10-12: no arbitrary timers. Seats follow proven demand every tick; only measured limits
+# (host load/memory/PSI/disk, provider credits and leases, GitHub quota, current failure rate on
+# this release) hold or shrink them. HOST_SETTLE_S is the measurement lag of the signal itself:
+# load1 is a one-minute average and PSI avg10 trails new workers, so a host step waits for the
+# previous step to show up in the sample before taking the next one.
+MIN_SLOTS, STALE_S, RATE_QUIET_S = 1, 600, 900; MULTIPLICATIVE_WINDOW_S, HOST_SETTLE_S = 300, 120; HOST_COOLDOWN_S = HOST_SETTLE_S
+HISTORY_CAP, GIB = 50, 1024 ** 3
 MEM_HEADROOM_BYTES, MEM_EMERGENCY_BYTES = 8 * GIB, 4 * GIB; GITHUB_INCREASE_MIN, GITHUB_DECREASE_BELOW = 1500, 600
 LINEAR_INCREASE_RATIO, LINEAR_DECREASE_RATIO = 0.25, 0.10; LOAD_INCREASE_MAX, LOAD_DECREASE_MIN = 0.75, 1.0
 PSI_CPU_OK, PSI_MEM_OK, PSI_IO_OK, PSI_CPU_SEVERE, PSI_MEM_SEVERE, PSI_IO_SEVERE = 20, 2, 10, 40, 5, 20
-GATE_WAIT_INCREASE_MAX, GATE_WAIT_DECREASE, PRODUCTIVE_MIN, PRODUCTIVE_MIN_STARTS = 600, 1200, 0.5, 5; DISK_INCREASE_MIN, DISK_SOFT, DISK_HARD = 15, 10, 5
+DISK_INCREASE_MIN, DISK_SOFT, DISK_HARD = 15, 10, 5
 MERGE_QUEUE_WAIT_BRAKE_MIN = 30
-RAMP_INTERVAL_S = 300  # surge ramp: proven demand > 2x seats doubles toward demand every 5 min
 # A census is stamped with its source rows' age (up to 3 x 60 s cache TTLs), read on the next minute tick.
 MAINTENANCE_DEMAND_STALE_S = 240
+# A saturated lane keeps its last positive census this long (one lane agent timeout, 5400 s).
+BUSY_DEMAND_STALE_S = 5400
+# Run failures pressure capacity only while current (Tim 2026-10-11). The doctor's failed-runs
+# alert is a 24 h trailing diagnostic: failures from bugs fixed hours earlier froze every lane.
+# Only runs on the installed release count, as a rate over the latest completed runs, so a fix
+# (new release) or successful runs clear it at once and real current failures still back off.
+FAILURE_RATE_RUNS, FAILURE_RATE_MIN, FAILURE_RATE_MIN_COUNT, LEDGER_TAIL_BYTES = 8, 0.5, 2, 1024 * 1024
 _OFF, _OBSERVE, _APPLY = frozenset({"0", "off", "false"}), frozenset({"observe", "shadow"}), frozenset({"1", "on", "true", "apply"})
 _AVG10, _PSI = re.compile(r"avg10=([0-9.]+)"), ("cpuSomeAvg10", "memoryFullAvg10", "ioFullAvg10")
-_HARD_REASONS = ("over-budget", "terminal-pr-backlog", "provider-disabled", "pr-inventory-unavailable")
-_LINEAR_COLLAPSE_REASONS = ("linear-ratelimited", "hold:linear-ratelimited", "hold:linear-budget", "hold:linear-unknown")
-def streak_ticks(interval_s: int) -> int:
-    """Minute ticks in one cadence interval. 1800 s → 30 ticks."""
-    return max(1, int(interval_s) // 60)
 def idle_floor(base: int) -> int:
     return 0 if base <= 0 else max(MIN_SLOTS, math.ceil(base / 2))
 def _pint(value) -> int | None:
@@ -89,8 +95,7 @@ def load_config(env=None, config=None) -> dict:
         provider, parsed = str(key)[len(prefix):].strip().lower(), _from_env_or_file(env, file_vals, key)
         if provider and parsed is not None:
             maxima[provider] = parsed
-    return {"mode": mode(env, config), "max": maxima, "hostMax": _from_env_or_file(env, file_vals, "SYMPHONY_AUTOSCALE_HOST_MAX"),
-            "intervalS": _from_env_or_file(env, file_vals, "SYMPHONY_AUTOSCALE_INTERVAL_S") or DEFAULT_INTERVAL_S}
+    return {"mode": mode(env, config), "max": maxima, "hostMax": _from_env_or_file(env, file_vals, "SYMPHONY_AUTOSCALE_HOST_MAX")}
 def _pressure_avg(path: Path, label: str) -> float | None:
     try:
         for line in path.read_text().splitlines():
@@ -158,13 +163,47 @@ def _linear_budget_observation(api: dict, now: float) -> dict:
             "linearBudgetFresh": observed is not None and 0 <= now - observed <= STALE_S}
 
 
+def release_installed_at(state_dir: Path) -> float | None:
+    """When the running release generation was activated: the `current` symlink's own mtime."""
+    try:
+        return os.lstat(Path(state_dir) / "current").st_mtime
+    except OSError:
+        return None
+def current_run_failures(state_dir: Path) -> dict | None:
+    """Failed / completed among the latest runs that started on the installed release; None when
+    the ledger is unreadable."""
+    since = release_installed_at(state_dir) or 0.0
+    try:
+        with open(Path(state_dir) / "runs" / "ledger.jsonl", "rb") as handle:
+            handle.seek(0, os.SEEK_END); size = handle.tell(); handle.seek(max(0, size - LEDGER_TAIL_BYTES))
+            lines = handle.read().decode(errors="replace").splitlines()[1 if size > LEDGER_TAIL_BYTES else 0:]
+    except FileNotFoundError:
+        lines = []
+    except OSError:
+        return None
+    runs = []
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict) or not isinstance(row.get("verdict"), str):
+            continue
+        began = _epoch(row.get("startedAt")) or _epoch(row.get("endedAt"))
+        if began is not None and began >= since:
+            # A provider-error no longer cools a lane unless the provider measured a limit, so a
+            # crashing provider shows up here, in the current failure rate, instead.
+            runs.append((_epoch(row.get("endedAt")) or began, row["verdict"] in ("failed", "provider-error")))
+    latest = [failed for _, failed in sorted(runs)[-FAILURE_RATE_RUNS:]]
+    return {"failed": sum(latest), "runs": len(latest), "releaseInstalledAt": since or None}
+def _failures_current(obs: dict) -> bool:
+    row = _obj(obs.get("currentRunFailures"))
+    failed, runs = _count(row.get("failed")), _count(row.get("runs"))
+    return bool(runs) and failed is not None and failed >= FAILURE_RATE_MIN_COUNT and failed / runs >= FAILURE_RATE_MIN
 def collect(state_dir: Path, tick: dict, now: float) -> dict:
     """Local files only: no GitHub or Linear calls."""
-    root, doctor = Path(state_dir), _obj(_read_json(Path(state_dir) / "doctor.json")); observed, stamp, feed = _obj(doctor.get("observed")), None, None
-    stamp, feed = _num(observed.get("now")), doctor.get("statusFeed")
-    throughput = _obj(_obj(feed).get("throughput")).get("providers") if isinstance(feed, dict) else None
-    if not isinstance(throughput, dict):
-        throughput = _obj(_obj(_obj(_read_json(root / "lanes-status.json")).get("throughput")).get("providers"))
+    root, doctor = Path(state_dir), _obj(_read_json(Path(state_dir) / "doctor.json")); observed = _obj(doctor.get("observed"))
+    stamp = _num(observed.get("now"))
     api, cooling, cooldown_at, latest = _obj(_read_json(root / "api-budget.json")), [], {}, None; cool_dir = root / "cooldown"
     if cool_dir.is_dir():
         for path in sorted(cool_dir.iterdir()):
@@ -179,18 +218,19 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
             banked = _num(entry.get("lastRunAt"))
             if banked is not None and (latest is None or banked > latest):
                 latest = banked
-    running, productive, starts = {}, {}, {}
+    running = {}
     for name, row in _obj(observed.get("capacityByProvider")).items():
         seats = _int(_obj(row).get("running"))
         if seats is not None:
             running[name] = seats
-    for name, metric in throughput.items():
-        if isinstance(metric, dict):
-            productive[name], starts[name] = metric.get("productiveRunRate"), metric.get("workerStarts")
     disk, attribution = _obj(_obj(tick).get("disk")), _obj(observed.get("codexAttribution")); maintenance = observed.get("maintenanceQueueByProvider")
     # Workers publish from their existing claim scan; collecting adds no API reads.
     census = _obj(_read_json(root / "maintenance-demand.json", max_bytes=65536))
+    recent = {}
     if census.get("schema") == "symphony-lanes-maintenance-demand/v1":
+        recent = {name: pending for name, row in _obj(census.get("lanes")).items()
+                  if (pending := _count(_obj(row).get("pending"))) and (at := _num(_obj(row).get("observedAt"))) is not None
+                  and 0 <= now - at <= BUSY_DEMAND_STALE_S}
         maintenance = {name: _count(_obj(row).get("pending")) for name, row in _obj(census.get("lanes")).items()
                        if (at := _num(_obj(row).get("observedAt"))) is not None and 0 <= now - at <= MAINTENANCE_DEMAND_STALE_S}
     merge = _obj(observed.get("mergeThroughput")); merge_at = _num(merge.get("observedAt"))
@@ -198,14 +238,16 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
             "eligiblePoolByProvider": _obj(observed.get("eligiblePoolByProvider")),
             "newIssueBudgetByProvider": _obj(observed.get("newIssueBudgetByProvider")),
             "maintenanceQueueByProvider": maintenance if isinstance(maintenance, dict) else {},
+            "recentPositiveDemandByProvider": recent,
             "runningByProvider": running,
             "unhealthy": [item for item in (_obj(observed.get("tick")).get("unhealthy") or []) if isinstance(item, str)],
             "cooling": cooling, "cooldownAt": cooldown_at,
             "rateBankAt": {"codex": latest} if latest is not None else {},
             "codexUnleasedAvailable": _int(attribution.get("unleasedAvailable")),
-            "productiveRunRate": productive, "starts": starts,
-            "alerts": [key for key in _obj(doctor.get("alerts")) if isinstance(key, str)],
-            "gateWaitMedianS24h": observed.get("gateWaitMedianS24h"),
+            "codexAttribution": {key: attribution.get(key) for key in ("state", "leased", "unleasedAvailable", "quotaBanked",
+                                                                       "rateCooldown", "authCooldown", "earliestCooldownS", "loginSlots")
+                                 if key in attribution},
+            "currentRunFailures": current_run_failures(root),
             "githubRemaining": _int(observed.get("githubRemaining")),
             **_linear_budget_observation(api, now),
             "mergeThroughputFresh": merge_at is not None and 0 <= now - merge_at <= STALE_S,
@@ -225,50 +267,30 @@ def _lane_ceiling(name: str, base: int, running, obs: dict, config: dict, host_c
         unleased = _count(obs.get("codexUnleasedAvailable"))
         cap = min(cap, base) if unleased is None or running is None else min(cap, max(0, running) + max(0, unleased))
     return max(0, cap)
-def _linear_intake_reason(obs: dict, now: float) -> str | None:
-    """Linear constrains issue/event intake, never existing PR resource capacity."""
-    if obs.get("linearBudgetFresh") is not True:
-        return "linear-unknown"
-    if "linearBudgetObservedAt" in obs:
-        observed = _num(obs.get("linearBudgetObservedAt"))
-        if observed is None or not 0 <= now - observed <= STALE_S:
-            return "linear-unknown"
-    raw_limited = obs.get("linearRateLimitedAt")
-    limited = _num(raw_limited)
-    if raw_limited is not None and (limited is None or limited <= 0 or limited > now):
-        return "linear-unknown"
-    if limited is not None and now - limited <= RATE_QUIET_S:
-        return "linear-ratelimited"
-    dimensions = _obj(obs.get("linearDimensions"))
-    for name in ("requests", "complexity"):
-        row = _obj(dimensions.get(name))
-        remaining, limit, observed = _count(row.get("remaining")), _count(row.get("limit")), _num(row.get("observedAt"))
-        if remaining is None or limit is None or limit <= 0 or remaining > limit or observed is None or not 0 <= now - observed <= STALE_S:
-            return "linear-" + name + "-unknown"
-        if remaining / limit < LINEAR_INCREASE_RATIO:
-            return "linear-" + name + "-budget"
-    return None
 def _demand(name: str, obs: dict, now: float | None = None) -> int | None:
+    """Pending work this lane could start now: routable Todo issues plus repair demand.
+
+    Intake reads the local Linear mirror (#21304) and claims through the local ledger, so
+    Linear quota is not an intake limit, and open-PR counts are not a ceiling on new work."""
     budget = _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name))
     maint = _count(_obj(obs.get("maintenanceQueueByProvider")).get(name))
-    if budget.get("reason") == "within-budget":
-        if _linear_intake_reason(obs, time.time() if now is None else now) is not None:
-            return maint
-        eligible = _count(_obj(obs.get("eligiblePoolByProvider")).get(name))
-        if eligible is not None and maint is not None:
-            return eligible + maint
-        # Positive observed demand is useful even when the other pool is unknown.
-        return eligible if eligible else maint if maint else None
-    if budget.get("reason") in _HARD_REASONS:
+    if budget.get("reason") == "provider-disabled":
         return maint
-    return maint if maint else None
+    eligible = _count(_obj(obs.get("eligiblePoolByProvider")).get(name))
+    if eligible is not None and maint is not None:
+        return eligible + maint
+    # Positive observed demand is useful even when the other pool is unknown.
+    return eligible if eligible else maint if maint else None
 def _budget_unknown(obs: dict) -> str | None:
     if _int(obs.get("githubRemaining")) is None:
         return "github-unknown"
     return None
-def _multi_reason(name: str, obs: dict, sample: dict, now: float) -> str | None:
+def _multi_reason(name: str, obs: dict, sample: dict, now: float, changed: float | None = None) -> str | None:
     bank, written = _num(_obj(obs.get("rateBankAt")).get(name)), _num(_obj(obs.get("cooldownAt")).get(name))
-    if (bank is not None and now - bank <= MULTIPLICATIVE_WINDOW_S) or (written is not None and now - written <= MULTIPLICATIVE_WINDOW_S):
+    # One halving per provider limit event (Gem 03:38Z: one devin cooldown halved 11 -> 1 over
+    # four ticks inside the window). The cooling itself already stops new spawns.
+    events = [at for at in (bank, written) if at is not None and now - at <= MULTIPLICATIVE_WINDOW_S]
+    if events and (changed is None or max(events) > changed):
         return "rate-limited"
     github = _int(obs.get("githubRemaining"))
     if github is not None and github < GITHUB_DECREASE_BELOW:
@@ -279,14 +301,15 @@ def _multi_reason(name: str, obs: dict, sample: dict, now: float) -> str | None:
         return "host-pressure"
     return None
 def _additive_reason(obs: dict, sample: dict) -> str | None:
+    """Measured host pressure, or failures on the installed release (a trailing 24 h alert or
+    gate-wait median is history, not a current limit: Tim 2026-10-11)."""
     load, mem, free = _load_ratio(sample), _num(sample.get("memAvailableBytes")), _num(_obj(obs.get("disk")).get("freePct"))
     if (load is not None and load >= LOAD_DECREASE_MIN) or (mem is not None and mem < MEM_HEADROOM_BYTES) or (free is not None and free < DISK_SOFT):
         return "host-pressure"
-    alerts, gate = set(obs.get("alerts") or []), _num(obs.get("gateWaitMedianS24h"))
-    if "failed-runs" in alerts or "gate-timeouts" in alerts or (gate is not None and gate > GATE_WAIT_DECREASE):
+    if _failures_current(obs):
         return "gate-pressure"
     return None
-def _throughput_brake(previous: dict, obs: dict, now: float, interval: int) -> dict:
+def _throughput_brake(previous: dict, obs: dict, now: float) -> dict:
     """Legacy doctor receipt: observe queue trouble; never use it for slot admission."""
     signal = _obj(obs.get("mergeThroughput")); depth = _count(signal.get("queueDepth")); wait = _num(signal.get("queueWaitP50Minutes"))
     merged, opened, ejections = _num(signal.get("mergedPerHour")), _num(signal.get("openedPerHour")), _num(signal.get("ejectionRate"))
@@ -298,21 +321,19 @@ def _throughput_brake(previous: dict, obs: dict, now: float, interval: int) -> d
         reasons.append("queue-wait")
     prior = _obj(previous.get("throughputBrake")); active = bool(reasons); prior_since = _num(prior.get("since"))
     since = (prior_since if active and prior.get("active") and prior_since is not None else now if active else None)
-    held = max(0, now - since) if since is not None else 0
-    return {"known": known, "active": active, "reasons": reasons, "since": since, "heldForS": held,
-            "intervalS": interval, "sustained": active and held >= interval,
+    return {"known": known, "active": active, "reasons": reasons, "since": since,
+            "heldForS": max(0, now - since) if since is not None else 0,
             "signal": {"queueDepth": depth, "queueWaitP50Minutes": wait, "mergedPerHour": merged,
                        "openedPerHour": opened, "ejectionRate": ejections}}
 def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
+    """Only measured limits and unknown measurements. No streaks, budgets or trailing averages."""
     reason = _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name)).get("reason")
-    github, gate = _int(obs.get("githubRemaining")), obs.get("gateWaitMedianS24h")
+    github = _int(obs.get("githubRemaining"))
     load, mem, psi = _load_ratio(sample), sample.get("memAvailableBytes"), sample.get("psi")
-    alerts, bank = set(obs.get("alerts") or []), _num(_obj(obs.get("rateBankAt")).get(name))
+    bank = _num(_obj(obs.get("rateBankAt")).get(name))
     disk, free = _obj(obs.get("disk")), _num(_obj(obs.get("disk")).get("freePct"))
-    starts, rate = _int(_obj(obs.get("starts")).get(name)), _obj(obs.get("productiveRunRate")).get(name)
     unleased = _count(obs.get("codexUnleasedAvailable"))
     pairs = (
-        (reason in ("over-budget", "terminal-pr-backlog") and not (_count(_obj(obs.get("maintenanceQueueByProvider")).get(name)) or 0), reason),
         (reason == "provider-disabled", reason),
         (demand is None or demand <= 0, "unknown-demand" if demand is None else "zero-demand"),
         (name in set(obs.get("unhealthy") or []), "unhealthy"),
@@ -320,9 +341,7 @@ def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
         (bank is not None and now - bank <= RATE_QUIET_S, "rate-bank"),
         (name == "codex" and (unleased is None or unleased < 1), "codex-unleased"),
         (running is None or running < 0, "unknown-running"),
-        (starts is not None and starts >= PRODUCTIVE_MIN_STARTS and (_num(rate) is None or rate < PRODUCTIVE_MIN), "low-productive-rate"),
-        ("failed-runs" in alerts or "gate-timeouts" in alerts, "gate-pressure"),
-        (gate is not None and (_num(gate) is None or gate >= GATE_WAIT_INCREASE_MAX), "gate-wait"),
+        (_failures_current(obs), "gate-pressure"),
         (load is None or load >= LOAD_INCREASE_MAX, "high-load"),
         (mem is None or _num(mem) is None or mem < MEM_HEADROOM_BYTES, "low-mem"),
         (psi is not None and (not _psi_known(psi) or any(psi[key] > limit for key, limit in zip(_PSI, (PSI_CPU_OK, PSI_MEM_OK, PSI_IO_OK)))), "psi-high"),
@@ -332,11 +351,11 @@ def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
     return [token for cond, token in pairs if cond]
 _CEILING_HOLDS = ("hold:lane-ceiling", "hold:host-ceiling")
 def _aimd_level(prev: dict, base: int) -> int:
-    """The AIMD level a lane evolves from. Credit and host ceilings clamp only the published
+    """The level a lane evolves from. Credit and host ceilings clamp only the published
     ``effective``: on 2026-10-11 one codex lease dip set its ceiling to 0 for a tick and the
-    clamp became the next tick's level, so codex sat at 0 seats (no repairs, no demand census
-    to prove recovery) after its credits returned. Receipts before ``target`` existed fall back
-    to the configured base when their last value was only a ceiling clamp."""
+    clamp became the next tick's level, so codex sat at 0 seats after its credits returned.
+    Receipts before ``target`` existed fall back to the configured base when their last value
+    was only a ceiling clamp."""
     target = _int(prev.get("target"))
     if target is None or target < 0:
         target = _int(prev.get("effective"))
@@ -344,12 +363,12 @@ def _aimd_level(prev: dict, base: int) -> int:
             return base
         if prev.get("lastReason") in _CEILING_HOLDS:
             target = max(target, base)
-    # No AIMD step goes below the floor; only a ceiling publishes 0. A lane whose level reads 0
-    # (an older clamped receipt) could never run the worker whose scan proves its demand.
+    # No step goes below the floor; only a ceiling publishes 0. A lane whose level reads 0
+    # could never run the worker whose scan proves its demand.
     return max(MIN_SLOTS, target) if base > 0 else target
-def _row(base, effective, running, changed, reason, blockers, ceiling, up=0, idle=0, floor=None) -> dict:
+def _row(base, effective, running, changed, reason, blockers, ceiling, floor=None, demand=None) -> dict:
     return {"base": base, "effective": effective, "floor": (MIN_SLOTS if base > 0 else 0) if floor is None else floor,
-            "ceiling": ceiling, "running": running, "upStreak": up, "idleStreak": idle,
+            "ceiling": ceiling, "running": running, "demand": demand,
             "lastChangeAt": changed, "lastReason": reason, "blockers": blockers}
 def _limit_host(all_rows: dict, cap: int, exclude: set | frozenset = frozenset()) -> None:
     """Proportional bounded allocation; a real host ceiling may require zero seats.
@@ -366,24 +385,29 @@ def _limit_host(all_rows: dict, cap: int, exclude: set | frozenset = frozenset()
     for name, row in rows.items():
         if row["effective"] != shares[name]:
             row.update(effective=shares[name], floor=0, lastReason="hold:host-ceiling",
-                       blockers=list(dict.fromkeys([*row["blockers"], "host-ceiling"])), upStreak=0)
+                       blockers=list(dict.fromkeys([*row["blockers"], "host-ceiling"])))
 
 
 def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, config: dict, now: float) -> dict:
-    """Pure AIMD step. Returns the next ``symphony-lanes-autoscale/v1`` receipt."""
+    """Pure step. Returns the next ``symphony-lanes-autoscale/v1`` receipt.
+
+    Every tick a saturated lane with pending demand grows toward running + pending (at most
+    doubling per host settle), bounded by its credit ceiling and the host's compute; a lane
+    with no demand releases its unused seats at once so it holds no host share. Measured
+    pressure halves (severe) or steps down (soft)."""
     previous, config, sample = _obj(previous), config or {}, host_sample or {}; prev_lanes, prev_host = _obj(previous.get("lanes")), _obj(previous.get("host"))
     if config.get("mode") == "apply" and previous.get("mode") != "apply":
         # Only an apply receipt records live capacity. Start other modes at the
         # configured base, then evaluate the same real safety limits below.
         prev_lanes, prev_host = {}, {}
     history = [row for row in (previous.get("history") or []) if isinstance(row, dict)]
-    interval, need = _pint(config.get("intervalS")) or DEFAULT_INTERVAL_S, 0; need, host_last = streak_ticks(interval), _num(prev_host.get("lastChangeAt"))
-    cpu = _int(sample.get("cpuCount")) or 0; cpu = max(0, cpu); enabled = [base for base in bases.values() if _int(base) is not None and base > 0]
-    base_sum, host_max = sum(enabled), config.get("hostMax")
-    host_max = _int(host_max)
+    host_last = _num(prev_host.get("lastChangeAt"))
+    cpu = max(0, _int(sample.get("cpuCount")) or 0)
+    host_max = _int(config.get("hostMax"))
     host_cap = min(host_max if host_max is not None and host_max > 0 else cpu, cpu); fresh = obs.get("doctorFresh") is True
-    unknown = _budget_unknown(obs) if fresh else None; brake = _throughput_brake(previous, obs, now, interval)
-    obs = {**obs, "throughputBrake": brake}; rows, pending = {}, []
+    unknown = _budget_unknown(obs) if fresh else None; brake = _throughput_brake(previous, obs, now)
+    host_ready = host_last is None or now - host_last >= HOST_SETTLE_S
+    rows, pending = {}, []
     for order, (name, raw_base) in enumerate(bases.items()):
         base, prev = _int(raw_base) or 0, _obj(prev_lanes.get(name)); changed = _num(prev.get("lastChangeAt"))
         running = _int(_obj(obs.get("runningByProvider")).get(name))
@@ -395,106 +419,79 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             fallback = min(base, current, ceiling)
             rows[name] = _row(base, fallback, running, changed, "hold:stale-doctor", ["stale-doctor"], ceiling, floor=0 if fallback == 0 else MIN_SLOTS)
             rows[name]["target"] = current; continue
-        recovery = current < base and (prev.get("recoveryPending") is True or prev.get("lastReason") in _LINEAR_COLLAPSE_REASONS)
-        up, idle, demand = _int(prev.get("upStreak")) or 0, _int(prev.get("idleStreak")) or 0, _demand(name, obs, now)
-        multi, additive = _multi_reason(name, obs, sample, now), _additive_reason(obs, sample)
-        effective, reason, blockers, want, step_to = current, "hold:steady", [], False, current + 1; lane_ready = changed is None or now - changed >= interval
-        host_ready = host_last is None or now - host_last >= HOST_COOLDOWN_S
+        demand = _demand(name, obs, now)
+        if demand is None and running is not None and running >= current:
+            # Only a worker's claim scan publishes demand. A lane whose every seat is in a long
+            # run never rescans, so its fresh demand reads unknown exactly when it should grow
+            # (Gem 21:11Z: devin 1 seat busy, census 6 at 21:06:57). A recent positive census
+            # stands as the lower bound while the lane stays saturated.
+            demand = _count(_obj(obs.get("recentPositiveDemandByProvider")).get(name)) or None
+        multi, additive = _multi_reason(name, obs, sample, now, changed), _additive_reason(obs, sample)
+        effective, reason, blockers, step_to = current, "hold:steady", [], None
         if multi:
-            effective, reason, blockers, up, idle = max(0 if current == 0 else MIN_SLOTS, math.ceil(current / 2)), multi, [multi], 0, 0
+            effective, reason, blockers = max(0 if current == 0 else MIN_SLOTS, math.ceil(current / 2)), multi, [multi]
         elif additive:
-            up = idle = 0
             if host_ready and current > MIN_SLOTS:
                 effective, reason, blockers = current - 1, additive, [additive]
             else:
-                reason, blockers = "hold:host-cooldown", [additive, "host-cooldown"]
-        else:
-            floor = idle_floor(base); idle_signal = demand == 0 and running is not None and running <= current - 2
-            idle = min(need, idle + 1) if idle_signal else 0
-            if idle_signal and current <= floor:
-                up, reason, blockers = 0, "hold:idle-floor", ["idle-floor"]
-            elif idle_signal and idle >= need and current > floor:
-                up = 0
-                if lane_ready:
-                    effective, reason, blockers, idle = current - 1, "idle-decay", [], 0
-                else:
-                    reason, blockers = "hold:lane-cooldown", ["lane-cooldown"]
-            elif idle_signal:
-                up, reason, blockers = 0, "hold:zero-demand", ["zero-demand"]
+                reason, blockers = "hold:" + additive, [additive] + (["host-settle"] if current > MIN_SLOTS else [])
+        elif demand == 0 and running is not None:
+            # Known idle: release unused seats now so this lane holds no host share another
+            # lane with demand could use. Never below the running count or the floor.
+            keep = max(idle_floor(base), running)
+            if current > keep:
+                effective, reason, blockers = keep, "idle-release", []
             else:
-                blockers = _increase_blockers(name, obs, sample, now, running, demand)
-                maintenance = _count(_obj(obs.get("maintenanceQueueByProvider")).get(name))
-                memory = _num(sample.get("memAvailableBytes"))
-                # Correct only a proven legacy Linear collapse. Every genuine
-                # increase safety gate and positive fresh maintenance still apply.
-                recoverable = recovery and maintenance is not None and maintenance > 0 and not blockers \
-                    and memory is not None and memory >= MEM_HEADROOM_BYTES \
-                    and (host_ready or prev.get("lastReason") in _LINEAR_COLLAPSE_REASONS)
-                if recoverable:
-                    effective, reason, up, idle = min(base, ceiling), "maintenance-recovery", 0, 0
-                    recovery = effective < base
-                elif running is not None and running < current and "unknown-running" not in blockers:
-                    blockers = ["not-saturated", *blockers]
-                if recoverable:
-                    pass
-                elif blockers:
-                    up, reason = 0, "hold:" + blockers[0]
-                else:
-                    # Tim 2026-10-11: capped by compute and credits only. Proven demand more than
-                    # twice the current seats ramps multiplicatively on a short interval instead
-                    # of one seat per 30 min (1 -> 16 took ~7.5 h with ~300 eligible issues).
-                    surge = demand is not None and demand > 2 * max(1, current)
-                    ramp_need = min(need, streak_ticks(RAMP_INTERVAL_S)) if surge else need
-                    ramp_ready = lane_ready or (surge and (changed is None or now - changed >= min(interval, RAMP_INTERVAL_S)))
-                    up = min(ramp_need, up + 1)
-                    hold = ("lane-cooldown" if not ramp_ready else "host-cooldown" if not host_ready
-                            else "lane-ceiling" if current + 1 > ceiling else "up-streak" if up < ramp_need else None)
-                    if hold:
-                        reason, blockers = "hold:" + hold, [hold]
-                    else:
-                        want, reason, blockers = True, "hold:one-lane", ["one-lane"]
-                        step_to = min(ceiling, demand, 2 * max(1, current)) if surge else current + 1
+                reason, blockers = "hold:zero-demand", ["zero-demand"]
+        else:
+            blockers = _increase_blockers(name, obs, sample, now, running, demand)
+            if running is not None and running < current and "unknown-running" not in blockers:
+                blockers = ["not-saturated", *blockers]
+            wanted = None if demand is None or running is None else max(0, running) + demand
+            want = None if wanted is None else min(ceiling, wanted)
+            if not blockers and wanted is not None and wanted <= current:
+                reason = "hold:steady"
+            elif not blockers and current + 1 > ceiling:
+                blockers = ["lane-ceiling"]
+            elif not blockers and not host_ready:
+                blockers = ["host-settle"]
+            elif not blockers:
+                step_to = min(want, max(current + 1, 2 * current))
+                reason, blockers = "hold:host-ceiling", ["host-ceiling"]
+            if blockers:
+                reason = "hold:" + blockers[0]
         target = effective
         if effective > ceiling:
             effective, reason, blockers = ceiling, "hold:lane-ceiling", ["lane-ceiling"]
-        rows[name] = _row(base, effective, running, changed, reason, blockers, ceiling, up, idle, 0 if effective == 0 else MIN_SLOTS)
+        rows[name] = _row(base, effective, running, changed, reason, blockers, ceiling, 0 if effective == 0 else MIN_SLOTS, demand)
         rows[name]["target"] = target
-        rows[name]["recoveryPending"] = recovery
-        if want:
-            pending.append((demand or 0, order, name, current, max(current + 1, step_to)))
-    _limit_host(rows, host_cap, exclude=set(obs.get("unhealthy") or []))
+        if step_to is not None:
+            pending.append((demand or 0, order, name, current, step_to))
+    unhealthy = set(obs.get("unhealthy") or [])
+    _limit_host(rows, host_cap, exclude=unhealthy)
     if pending:
-        used = sum(row["effective"] for name, row in rows.items() if name not in set(obs.get("unhealthy") or []))
-        # Every lane with sustained demand may grow in the same tick while host headroom lasts.
+        used = sum(row["effective"] for name, row in rows.items() if name not in unhealthy)
+        # Every lane with demand may grow in the same tick while host headroom lasts.
         for _demand_value, _order, chosen, current, step_to in sorted(pending, key=lambda item: (item[0] / max(1, item[3]), -item[1]), reverse=True):
             row = rows[chosen]
-            grow = min(step_to, row["ceiling"]) - current
-            grow = min(grow, host_cap - used)
+            grow = min(step_to - current, host_cap - used)
             if row["effective"] == current and grow >= 1:
-                row.update(effective=current + grow, target=current + grow, lastReason="sustained-demand", blockers=[], upStreak=0)
+                row.update(effective=current + grow, target=current + grow, lastReason="sustained-demand", blockers=[])
                 used += grow
-                continue
-            row.update(lastReason="hold:host-ceiling", blockers=["host-ceiling"])
-    intake_reason = _linear_intake_reason(obs, now) if fresh else "stale-doctor"
     for name, row in rows.items():
         base = row["base"]
         if base > 0 and row["effective"] > base and unknown:
             # API-budget uncertainty stays fail-safe; queue metrics are only diagnostic.
-            row.update(effective=base, target=min(base, row.get("target", base)), lastReason="hold:" + unknown, blockers=[unknown], upStreak=0)
-        prior = _obj(prev_lanes.get(name))
-        if prior.get("recoveryPending") is True or prior.get("lastReason") in _LINEAR_COLLAPSE_REASONS:
-            row["recoveryPending"] = row["effective"] < base
-        else:
-            row.setdefault("recoveryPending", False)
-        intake_blockers = [intake_reason] if intake_reason else []
+            row.update(effective=base, target=min(base, row.get("target", base)), lastReason="hold:" + unknown, blockers=[unknown])
+        intake_blockers = []
         if base <= 0 or _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name)).get("reason") == "provider-disabled":
             intake_blockers.append("disabled")
-        if name in set(obs.get("unhealthy") or []):
+        if name in unhealthy:
             intake_blockers.append("unhealthy")
         if name in set(obs.get("cooling") or []):
             intake_blockers.append("cooling")
         row.update(intakeEffective=0 if intake_blockers else row["effective"], intakeBlockers=intake_blockers)
-        before = _int(prior.get("effective")); before = base if before is None else before
+        before = _int(_obj(prev_lanes.get(name)).get("effective")); before = base if before is None else before
         if row["effective"] != before:
             row["lastChangeAt"], host_last = now, now
             history.append({"at": now, "lane": name, "from": before, "to": row["effective"], "reason": row["lastReason"]})
@@ -535,21 +532,16 @@ def _fresh_apply_state(state_dir: Path, now: float):
 
 
 def intake_slots(state_dir: Path, name: str, base: int, now: float | None = None) -> int:
-    """Linear-authorized seats within the same total slot ledger; unknown is zero."""
+    """Seats that may claim new issues within the same slot ledger. Intake reads the local
+    Linear mirror and claims through the local ledger, so Linear quota does not gate it; only
+    a disabled, unhealthy or cooling provider does. Fail-safe matches ``effective_slots``."""
     if base <= 0:
-        return 0
-    now = time.time() if now is None else now
-    # Configured-base modes use real native budget evidence, never hypothetical
-    # observed target counts. Re-reading also fences pressure newer than the tick.
-    native = _linear_budget_observation(_obj(_read_json(Path(state_dir) / "api-budget.json", max_bytes=65536)), now)
-    if _linear_intake_reason(native, now) is not None:
         return 0
     if mode() != "apply":
         return base
-    state = _fresh_apply_state(state_dir, now)
-    budget = _obj(_obj(state).get("apiBudget"))
-    if "linearBudgetObservedAt" not in budget or _linear_intake_reason(budget, now) is not None:
-        return 0
+    state = _fresh_apply_state(state_dir, time.time() if now is None else now)
+    if state is None:
+        return base
     row = _obj(_obj(state).get("lanes")).get(name)
     intake, effective, ceiling = (_count(_obj(row).get(key)) for key in ("intakeEffective", "effective", "ceiling"))
     if intake is None or effective is None or ceiling is None:
@@ -576,7 +568,8 @@ def public_block(state_dir) -> dict:
         return {"mode": mode(), "lanes": {}, "history": []}
     lanes = {name: {"base": row.get("base"), "effective": row.get("effective"), "reason": row.get("lastReason"),
                     "blockers": list(row.get("blockers") or []), "intakeEffective": row.get("intakeEffective"),
-                    "intakeBlockers": list(row.get("intakeBlockers") or []), "recoveryPending": row.get("recoveryPending") is True} for name, row in state["lanes"].items() if isinstance(row, dict)}
+                    "intakeBlockers": list(row.get("intakeBlockers") or []), "demand": row.get("demand")}
+             for name, row in state["lanes"].items() if isinstance(row, dict)}
     history = state.get("history") if isinstance(state.get("history"), list) else []
     return {"mode": state.get("mode") or mode(), "lanes": lanes, "history": history[-10:],
             "throughputBrake": _obj(state.get("throughputBrake"))}

@@ -197,7 +197,8 @@ class RouterLadderTest(unittest.TestCase):
         self.assertTrue(remediation.escalation_enabled())
         self.assertFalse(remediation.notify_tim())
         self.assertFalse(remediation.lift_human_holds())
-        self.assertFalse(remediation.stuck_pr_escalation_enabled())
+        os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
+        self.assertTrue(remediation.stuck_pr_escalation_enabled(), "every exhausted head gets the ladder by default")
         os.environ["LANES_ESCALATION"] = "0"
         try:
             plan = remediation.plan_ladder({"cls": "fixable-by-model", "subtype": "check", "next_action": "escalate"},
@@ -267,7 +268,7 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertIs(hyperagent["repairs"], False)
         self.assertEqual(hyperagent["agentId"], "cmtj3n2q901i407adklzzq01t")
         self.assertEqual(hyperagent["agentName"], "GLM 5.3 Developer")
-        self.assertFalse(catalog["grok"]["enabled"])
+        self.assertTrue(catalog["grok"].get("enabled", True))  # Tim 2026-10-11: grok lane on
         self.assertFalse(catalog["kimi"]["enabled"])
         for skip in ([], ["devin"], ["devin", "codex"], ["devin", "codex", "claude"]):
             chosen = remediation.route_lane(catalog, exclude=set(skip), healthy=lambda name, spec: True)
@@ -379,6 +380,15 @@ class LabeledEventTest(unittest.TestCase):
         self.assertEqual(recur["reopens"], [])
         self.assertFalse(any(row.get("id") == "id-JOV-8" and "not a second event" in row["body"]
                              for row in recur["comments"]))
+        # An exhausted fingerprint that recurs gets a fresh ladder (Tim 2026-10-12: no sticky exhaustion).
+        spent = [{"kind": "model", "lane": lane_name, "head": "e2e-login-timeout", "at": NOW - 100000 + i}
+                 for i, lane_name in enumerate(("codex", "devin", "codex", "devin"))]
+        again = remediation.plan_labeled_events(
+            [opened, closed], {"e2e-login-timeout": {"issueId": "id-JOV-1", "status": "exhausted", "attempts": spent}},
+            providers(), NOW, healthy=lambda *_: True)
+        row = again["events"]["e2e-login-timeout"]
+        self.assertEqual(row["status"], "claimed")
+        self.assertEqual(len(row["priorAttempts"]), 4)
 
     def test_human_and_exhausted_ping_is_behind_the_flag(self):
         human = linear_issue("JOV-3", "asc-agreements", title="ASC agreements blocked")
@@ -548,9 +558,14 @@ class LabeledEventTest(unittest.TestCase):
         self.assertEqual(recur["events"]["e2e-login-timeout"]["identifier"], "JOV-1")
         self.assertEqual(recur["reopens"], [{"id": "id-JOV-1", "stateId": "todo-JOV"}])
 
-    def test_stuck_pr_ladder_is_off_and_sweep_labels_are_ordinary_events(self):
+    def test_stuck_pr_ladder_is_on_and_sweep_labels_are_ordinary_events(self):
         os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
-        self.assertFalse(remediation.stuck_pr_escalation_enabled())
+        self.assertTrue(remediation.stuck_pr_escalation_enabled())
+        os.environ["LANES_ESCALATION_STUCK_PRS"] = "0"
+        try:
+            self.assertFalse(remediation.stuck_pr_escalation_enabled())
+        finally:
+            os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
         os.environ["LANES_ESCALATION"] = "0"
         os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
         try:

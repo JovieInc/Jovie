@@ -103,6 +103,7 @@ describe('MarketingFooter', () => {
     render(<MarketingFooter />);
 
     const footer = screen.getByTestId('marketing-footer');
+    expect(footer).toHaveAttribute('data-footer-variant', 'expanded');
     expect(footer).toHaveAttribute(
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.shell.footer
@@ -185,6 +186,10 @@ describe('MarketingFooter', () => {
 
     render(<MarketingFooter />);
 
+    expect(screen.getByTestId('marketing-footer')).toHaveAttribute(
+      'data-footer-variant',
+      'minimal'
+    );
     expect(screen.getByTestId('marketing-footer')).toHaveClass(
       'system-b-mounted-home-footer'
     );
