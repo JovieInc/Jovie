@@ -180,6 +180,10 @@ export function watchStorybookBuildResources(
   STORYBOOK_BUILD_OWNERS.set(child, owner);
   let stopped = false;
   let peakRssBytes = 0;
+  // Timers run before child-exit I/O. A build that has just exited is already
+  // missing from ps while exitCode is still null. Require a second miss before
+  // treating that as a lost group, so the exit status stays authoritative.
+  let absentOwnerSamples = 0;
   const stop = () => {
     stopped = true;
     clearInterval(timer);
@@ -201,8 +205,15 @@ export function watchStorybookBuildResources(
         );
         return;
       }
-      if (!observation.leaderStartedAt)
-        throw new Error('owned build identity unavailable');
+      if (!observation.leaderStartedAt) {
+        const survivingMembers = observation.members ?? [];
+        if (survivingMembers.length === 0) {
+          absentOwnerSamples += 1;
+          if (absentOwnerSamples < LOST_OWNER_CONFIRMATIONS) return;
+          throw new Error('owned build identity unavailable');
+        }
+      }
+      absentOwnerSamples = 0;
       for (const member of observation.members ?? [])
         owner.members.set(member.pid, member.startedAt);
       peakRssBytes = Math.max(peakRssBytes, observation.rssBytes);

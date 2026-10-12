@@ -522,6 +522,90 @@ describe('live Storybook owned build resource bounds', () => {
     }
   });
 
+  it('lets a finished build exit before a reaped leader becomes a lost identity', () => {
+    const instance = child();
+    const failure = vi.fn();
+    const watch = watchStorybookBuildResources(instance, failure, {
+      intervalMs: 60_000,
+      sample: () => ({
+        ...healthy,
+        leaderStartedAt: null,
+        members: [],
+        rssBytes: 0,
+      }),
+    });
+    try {
+      watch.check();
+      expect(failure).not.toHaveBeenCalled();
+      instance.exitCode = 0;
+      instance.emit('exit', 0);
+      watch.check();
+      expect(failure).not.toHaveBeenCalled();
+    } finally {
+      watch.stop();
+    }
+  });
+
+  it('keeps the resource limit after the leader wrapper exits and members remain', () => {
+    const instance = child();
+    const failure = vi.fn();
+    const signal = vi.fn();
+    const watch = watchStorybookBuildResources(instance, failure, {
+      intervalMs: 60_000,
+      signal,
+      sample: () => ({
+        ...healthy,
+        leaderStartedAt: null,
+        members: [{ pid: 1235, startedAt: 'Wed Oct 7 22:00:01 2026' }],
+        rssBytes: 60 * GiB,
+      }),
+    });
+    try {
+      watch.check();
+      expect(signal).toHaveBeenCalledExactlyOnceWith(instance, 'SIGKILL');
+      expect(failure.mock.calls[0][0].message).toContain(
+        'owned-build-rss-limit'
+      );
+    } finally {
+      watch.stop();
+    }
+  });
+
+  it('fails closed only after the owned build stays invisible', () => {
+    const instance = child();
+    const failure = vi.fn();
+    const signal = vi.fn();
+    let leaderVisible = false;
+    const watch = watchStorybookBuildResources(instance, failure, {
+      intervalMs: 60_000,
+      signal,
+      sample: () => ({
+        ...healthy,
+        leaderStartedAt: leaderVisible ? healthy.leaderStartedAt : null,
+        members: leaderVisible
+          ? [{ pid: 1234, startedAt: healthy.leaderStartedAt }]
+          : [],
+        rssBytes: GiB,
+      }),
+    });
+    try {
+      watch.check();
+      leaderVisible = true;
+      watch.check();
+      leaderVisible = false;
+      watch.check();
+      expect(failure).not.toHaveBeenCalled();
+      watch.check();
+      expect(signal).not.toHaveBeenCalled();
+      expect(failure).toHaveBeenCalledOnce();
+      expect(failure.mock.calls[0][0].message).toBe(
+        'owned build identity unavailable'
+      );
+    } finally {
+      watch.stop();
+    }
+  });
+
   it('refuses a reused leader identity and never signals that replacement', () => {
     const instance = child();
     const signal = vi.fn();
