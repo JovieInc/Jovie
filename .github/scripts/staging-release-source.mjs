@@ -15,6 +15,10 @@ const STAGING_PATH = '.github/workflows/staging-controller.yml';
 const CI_PATH = '.github/workflows/ci.yml';
 const SHA = /^[a-f0-9]{40}$/;
 const ID = /^[1-9][0-9]*$/;
+const GH_MAX_ATTEMPTS = 3;
+const GH_RETRY_DELAY_MS = 5_000;
+const TRANSIENT_GH_ERROR =
+  /HTTP 5\d\d|rate limit|error connecting|connection (?:reset|refused|timed? ?out)|i\/o timeout|TLS handshake timeout|temporarily unavailable|EOF|Bad Gateway/i;
 function requireEvidence(condition, reason) {
   if (!condition) throw new Error(reason);
 }
@@ -242,13 +246,46 @@ export function resolveStagingReleaseSource({
   };
 }
 
-function command(args, options = {}) {
-  const result = spawnSync(args[0], args.slice(1), {
-    ...options,
-    encoding: options.encoding ?? 'utf8',
-  });
-  requireEvidence(result.status === 0, `evidence transport failed: ${args[0]}`);
-  return result.stdout;
+function defaultSleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function transportError(result) {
+  return `${result.stderr ?? ''}\n${result.stdout ?? ''}\n${result.error?.message ?? ''}`;
+}
+
+export function command(
+  args,
+  options = {},
+  {
+    retryDelayMs = GH_RETRY_DELAY_MS,
+    spawn = spawnSync,
+    sleep = defaultSleep,
+  } = {}
+) {
+  const attempts = args[0] === 'gh' ? GH_MAX_ATTEMPTS : 1;
+  let result;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    result = spawn(args[0], args.slice(1), {
+      ...options,
+      encoding: options.encoding ?? 'utf8',
+    });
+    if (result.status === 0) return result.stdout;
+    if (
+      attempt === attempts ||
+      args[0] !== 'gh' ||
+      !TRANSIENT_GH_ERROR.test(transportError(result))
+    ) {
+      break;
+    }
+    const delayMs = retryDelayMs * 2 ** (attempt - 1);
+    const detail = transportError(result).trim().split(/\r?\n/, 1)[0];
+    console.warn(
+      `::warning::gh transport attempt ${attempt}/${attempts} failed transiently${detail ? ` (${detail})` : ''}; retrying in ${delayMs / 1000}s.`
+    );
+    sleep(delayMs);
+  }
+  requireEvidence(false, `evidence transport failed: ${args[0]}`);
 }
 
 export function runStagingReleaseSource(env = process.env) {

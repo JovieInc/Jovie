@@ -908,6 +908,91 @@ test('desktop authorizer accepts an exact successful recovered production marker
   ]);
 });
 
+test('scheduled staging defers while exact push CI is still running', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jovie-staging-ci-defer-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const repository = 'JovieInc/Jovie';
+  const releaseSha = 'a'.repeat(40);
+  const workflowId = 707;
+
+  const mockBin = join(root, 'bin');
+  await mkdir(mockBin);
+  const mockGh = join(mockBin, 'gh');
+  await writeFile(
+    mockGh,
+    `#!/usr/bin/env bash
+set -euo pipefail
+endpoint="\${!#}"
+case "$endpoint" in
+  *"actions/workflows/ci.yml") printf '%s' "$MOCK_CI_WORKFLOW_JSON" ;;
+  *"actions/workflows/"*"/runs"*) printf '%s' "$MOCK_CI_RUNS_JSON" ;;
+  *) printf 'unexpected gh endpoint: %s\\n' "$endpoint" >&2; exit 64 ;;
+esac
+`
+  );
+  await chmod(mockGh, 0o755);
+
+  const proof = shellStepBody(
+    desktopWorkflow,
+    'Cross-prove exact production evidence'
+  );
+  const stagingStart = proof.indexOf('if [ "$environment" = "staging" ]; then');
+  const stagingEnd = proof.indexOf('prove_existing_production_marker() {');
+  assert.ok(
+    stagingStart >= 0 && stagingEnd > stagingStart,
+    'missing staging exact-CI gate block'
+  );
+  const stagingGate = `set -euo pipefail\n${proof.slice(stagingStart, stagingEnd)}\necho fell-through\n`;
+
+  const ciRun = overrides => ({
+    head_sha: releaseSha,
+    head_branch: 'main',
+    head_repository: { full_name: repository },
+    event: 'push',
+    path: '.github/workflows/ci.yml',
+    ...overrides,
+  });
+  const run = runsJson =>
+    spawnSync('bash', ['-c', stagingGate], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: join(root, 'output.txt'),
+        MOCK_CI_RUNS_JSON: JSON.stringify({ workflow_runs: runsJson }),
+        MOCK_CI_WORKFLOW_JSON: JSON.stringify({
+          id: workflowId,
+          name: 'CI',
+          path: '.github/workflows/ci.yml',
+        }),
+        PATH: `${mockBin}:${process.env.PATH}`,
+        REPOSITORY: repository,
+        environment: 'staging',
+        release_sha: releaseSha,
+      },
+    });
+
+  const inFlight = run([ciRun({ status: 'in_progress' })]);
+  assert.equal(inFlight.status, 0, inFlight.stderr);
+  assert.match(inFlight.stdout, /still running; deferring staging publication/);
+  assert.doesNotMatch(inFlight.stdout, /fell-through/);
+
+  const queued = run([ciRun({ status: 'queued' })]);
+  assert.equal(queued.status, 0, queued.stderr);
+  assert.match(queued.stdout, /still running; deferring staging publication/);
+
+  const green = run([ciRun({ status: 'completed', conclusion: 'success' })]);
+  assert.equal(green.status, 0, green.stderr);
+  const authorized = await readFile(join(root, 'output.txt'), 'utf8');
+  assert.match(authorized, /^authorized=true$/m);
+
+  const failed = run([ciRun({ status: 'completed', conclusion: 'failure' })]);
+  assert.equal(failed.status, 1);
+  assert.match(
+    failed.stdout,
+    /lacks an exact successful CI run for staging publication/
+  );
+});
+
 test('desktop dedup cross-proves an actual-publish-only marker', () => {
   const authorize = job(desktopWorkflow, 'authorize-release');
   const proof = step(authorize, 'Cross-prove exact production evidence');

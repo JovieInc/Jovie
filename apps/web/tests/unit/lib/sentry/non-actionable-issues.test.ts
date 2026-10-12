@@ -128,6 +128,27 @@ describe('non-actionable Sentry issues', () => {
         })
       ).toBe(true);
     });
+
+    it('matches the name-only bag title (JOV-3993)', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title: 'Error: {"name":"UpstashError"}',
+        })
+      ).toBe(true);
+      expect(
+        isNonActionableUpstashErrorBag({
+          title: '{"name":"UpstashError"}',
+        })
+      ).toBe(true);
+    });
+
+    it('does not match a bag carrying an enumerable message', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title: 'Error: {"name":"UpstashError","message":"socket hang up"}',
+        })
+      ).toBe(false);
+    });
   });
 
   describe('isNonActionableUpstashErrorBagEvent', () => {

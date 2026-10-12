@@ -1,0 +1,23 @@
+{
+  "schema": "jovie.design-refs-scout-seeds/v1",
+  "seeds": [
+    {"url":"https://linear.app/","surfaces":["homepage"],"weight":0.9,"mood":["precise","calm","premium"],"technique":["dark-ui","product-shot","gradient-light"],"why":"Dark product-first hero; one light source grazing the product UI; Linear-density type."},
+    {"url":"https://vercel.com/","surfaces":["homepage"],"weight":0.7,"mood":["technical","confident"],"technique":["grid","monochrome","product-shot"],"why":"Monochrome grid system; one bold claim with a single CTA pair."},
+    {"url":"https://stripe.com/","surfaces":["homepage"],"weight":0.8,"mood":["optimistic","premium"],"technique":["gradient-mesh","layered-cards"],"why":"Flowing single-hue gradient field behind a sharp claim; layered product cards."},
+    {"url":"https://raycast.com/","surfaces":["homepage","golden-path"],"weight":0.9,"mood":["cinematic","premium"],"technique":["dark-glass","3d-object","glow"],"why":"Dark glass and rim light around one focal object; cinematic depth."},
+    {"url":"https://www.apple.com/","surfaces":["homepage"],"weight":0.8,"mood":["editorial","restrained"],"technique":["full-bleed-photo","product-hero"],"why":"Editorial full-bleed tiles, one product per frame, generous pacing."},
+    {"url":"https://cursor.com/","surfaces":["homepage"],"weight":0.7,"mood":["technical","warm"],"technique":["product-shot","dark-ui"],"why":"Product UI as the hero image, framed in atmosphere."},
+    {"url":"https://www.perplexity.ai/","surfaces":["golden-path"],"weight":0.9,"mood":["focused","calm"],"technique":["single-input","centered"],"why":"One input as the whole page: the search-your-name golden path in its purest form."},
+    {"url":"https://www.framer.com/","surfaces":["homepage"],"weight":0.6,"mood":["bold","playful"],"technique":["kinetic-type","dark-ui"],"why":"Big kinetic type over dark canvas; motion as the hero."},
+    {"url":"https://granola.ai/","surfaces":["homepage"],"weight":0.6,"mood":["warm","human"],"technique":["editorial-type","light"],"why":"Editorial serif warmth, calm light canvas, human tone."},
+    {"url":"https://mercury.com/","surfaces":["homepage"],"weight":0.7,"mood":["premium","trustworthy"],"technique":["full-bleed-photo","atmospheric"],"why":"Atmospheric photographic hero with a single claim; premium finance restraint."},
+    {"url":"https://lumalabs.ai/","surfaces":["homepage"],"weight":0.8,"mood":["cinematic","ai-lab"],"technique":["full-bleed-video","atmospheric"],"why":"AI-lab cinematic: full-bleed generated imagery, minimal chrome."},
+    {"url":"https://runwayml.com/","surfaces":["homepage"],"weight":0.7,"mood":["cinematic","ai-lab"],"technique":["full-bleed-video","editorial-type"],"why":"Film-first AI lab homepage; the work is the hero."},
+    {"url":"https://linktr.ee/","surfaces":["golden-path"],"weight":0.8,"mood":["playful","direct"],"technique":["claim-field","bold-color"],"why":"Claim-your-link field in the hero: the direct competitor golden path."},
+    {"url":"https://cal.com/","surfaces":["golden-path"],"weight":0.6,"mood":["clean","direct"],"technique":["claim-field","light"],"why":"Claim-username input inline with the headline."},
+    {"url":"https://attio.com/","surfaces":["homepage"],"weight":0.6,"mood":["precise","premium"],"technique":["product-shot","light"],"why":"Light, precise product-first hero; dense but calm."},
+    {"url":"https://superhuman.com/","surfaces":["homepage"],"weight":0.7,"mood":["premium","fast"],"technique":["dark-ui","glow","product-shot"],"why":"Dark premium hero, product shot lit from one direction."},
+    {"url":"https://x.ai/","surfaces":["homepage"],"weight":0.6,"mood":["stark","ai-lab"],"technique":["monochrome","atmospheric"],"why":"Stark AI-lab minimalism; one word, one light."},
+    {"url":"https://www.anthropic.com/","surfaces":["homepage"],"weight":0.5,"mood":["editorial","human"],"technique":["editorial-type","illustration"],"why":"Editorial AI lab tone; restrained palette, illustration over spectacle."}
+  ]
+}

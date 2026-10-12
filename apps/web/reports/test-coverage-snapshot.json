@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-08T01:36:48.339Z",
+  "generated_at": "2026-10-12T17:40:22.768Z",
   "surfaces": {
     "rls-access-control": {
       "coverage_pct": 77.6,
@@ -44,19 +44,19 @@
       "status": "YELLOW"
     },
     "webhook-signatures": {
-      "coverage_pct": 81.8,
-      "branch_pct": 72,
-      "risk_score": 26.3,
+      "coverage_pct": 82.6,
+      "branch_pct": 73.7,
+      "risk_score": 26.2,
       "status": "YELLOW"
     },
     "api-routes-contract": {
-      "coverage_pct": 73.8,
-      "branch_pct": 63,
-      "risk_score": 25.2,
+      "coverage_pct": 74,
+      "branch_pct": 63.4,
+      "risk_score": 25.1,
       "status": "YELLOW"
     },
     "marketing-static": {
-      "coverage_pct": 80.9,
+      "coverage_pct": 81,
       "branch_pct": 71.4,
       "risk_score": 10.4,
       "status": "GREEN"

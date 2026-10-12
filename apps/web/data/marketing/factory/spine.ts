@@ -278,6 +278,23 @@ export const FACTORY_MEDIA_KINDS = [
   'none',
 ] as const;
 
+/** Shared authoring intent; not evidence that a rendered placement passed. */
+export const EditorialMediaIntentSchema = z.object({
+  benefit: z.string().trim().min(1),
+  focalDetail: z.string().trim().min(1),
+  rationale: z.string().trim().min(1),
+  fallback: z.string().trim().min(1),
+  alternatives: z
+    .array(
+      z.object({
+        medium: z.enum(FACTORY_MEDIA_KINDS),
+        reason: z.string().trim().min(1),
+      })
+    )
+    .min(1),
+});
+export type EditorialMediaIntent = z.infer<typeof EditorialMediaIntentSchema>;
+
 export const FactoryMediaPlanSchema = z.object({
   pageId: Id,
   sections: z
@@ -286,6 +303,8 @@ export const FactoryMediaPlanSchema = z.object({
         sectionInstanceId: SectionInstanceId,
         medium: z.enum(FACTORY_MEDIA_KINDS),
         decision: z.enum(['deterministic', 'ambiguous']),
+        editorialStatus: z.enum(['authored', 'legacy-unqualified']).optional(),
+        editorial: EditorialMediaIntentSchema.optional(),
         reason: z.string().min(1),
       })
     )

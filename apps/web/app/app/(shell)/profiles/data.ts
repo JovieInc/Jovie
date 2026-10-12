@@ -38,6 +38,7 @@ import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation'
 import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
 
 export type {
+  PresenceSignal,
   ProfilesWorkspaceData,
   ProfilesWorkspaceFilter,
   ProfileWorkspaceConnectorRow,

@@ -4,15 +4,28 @@
 # removal-trigger: Remove when Summer or the build pipeline emits deprecation findings into Linear intake natively.
 name: Deprecation Intake (Linear devin lane)
 
-# clock-class: skip-if-unchanged
-# Daily: read the latest successful merge-queue build log (main push runs
-# skip the Build jobs; the queue exercises the exact head that lands), file
-# one deduped Linear issue per distinct deprecation warning (Todo + label
-# devin) so the autonomous lane fixes deprecations without a human.
+# When a dependency or toolchain change lands: read the latest successful
+# merge-queue build log (main push runs skip the Build jobs; the queue
+# exercises the exact head that lands), file one deduped Linear issue per
+# distinct deprecation warning (Todo + label devin) so the autonomous lane
+# fixes deprecations without a human, and clear the ones that went away.
+# Deprecation warnings come from the versions and config below, so a landed
+# change to one of them is the trigger; there is no clock.
 
 on:
-  schedule:
-    - cron: '17 13 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'pnpm-lock.yaml'
+      - '**/package.json'
+      - '.nvmrc'
+      - '.node-version'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - '**/next.config.*'
+      - '**/tsconfig*.json'
+      - 'scripts/deprecation-*.mjs'
+      - '.github/workflows/deprecation-intake.yml'
   workflow_dispatch:
 
 permissions: {}
@@ -33,7 +46,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4.4.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         with:
           node-version-file: .nvmrc
 
@@ -93,7 +106,7 @@ jobs:
 
       - name: Preserve warning observation receipt
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deprecation-observations-${{ github.run_id }}-${{ github.run_attempt }}
           path: |

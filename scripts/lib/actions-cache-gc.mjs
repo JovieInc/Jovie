@@ -264,16 +264,26 @@ async function main() {
   const deleted = [];
   if (apply) {
     for (const cache of plan.evict) {
-      await execFileAsync(
-        'gh',
-        [
-          'api',
-          '-X',
-          'DELETE',
-          `repos/${repository}/actions/caches/${cache.id}`,
-        ],
-        { env: process.env }
-      );
+      try {
+        await execFileAsync(
+          'gh',
+          [
+            'api',
+            '-X',
+            'DELETE',
+            `repos/${repository}/actions/caches/${cache.id}`,
+          ],
+          { env: process.env }
+        );
+      } catch (error) {
+        // Actions Cache Supersede runs on the same main push; a cache it
+        // already deleted is the outcome this run wanted.
+        if (!/HTTP 404|Not Found/.test(`${error?.stderr ?? ''}${error}`)) {
+          throw error;
+        }
+        console.log(`cache ${cache.id} already deleted`);
+        continue;
+      }
       deleted.push(cache.id);
     }
   }

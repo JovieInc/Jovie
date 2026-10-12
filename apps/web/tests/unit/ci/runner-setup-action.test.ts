@@ -329,12 +329,18 @@ describe('self-hosted runner setup action', () => {
       expect(kept(dir, file), dir).toBe(true);
   });
 
-  it('skips non-bundled onnxruntime downloads in both install phases', () => {
+  it('skips non-bundled onnxruntime downloads in every install phase', () => {
+    // The merge-group consumer reinstalls from the frozen lockfile when its
+    // prepared workspace was evicted from the Actions cache, so it skips too.
     expect(
       actionSteps
         .filter(step => step.env?.ONNXRUNTIME_NODE_INSTALL === 'skip')
         .map(step => step.name)
-    ).toEqual(['Warm pnpm store', 'Install dependencies']);
+    ).toEqual([
+      'Warm pnpm store',
+      'Install dependencies',
+      'Require prepared merge-group workspace',
+    ]);
   });
 
   it('disables package cache teardown only for the exact Mac product lane', () => {
@@ -342,18 +348,31 @@ describe('self-hosted runner setup action', () => {
     const ci = parseYaml(
       readFileSync(resolve(repoRoot, '.github/workflows/ci.yml'), 'utf8')
     ) as {
-      jobs: Record<string, { needs?: string[]; steps?: ActionStep[] }>;
+      jobs: Record<
+        string,
+        { needs?: string[]; uses?: string; steps?: ActionStep[] }
+      >;
     };
-    const disabled = Object.entries(ci.jobs).flatMap(([id, job]) =>
-      (job.steps ?? [])
-        .filter(
-          step =>
-            step.uses === './.github/actions/setup-node-pnpm' &&
-            String(step.with?.package_cache) === 'false'
-        )
-        .map(() => id)
-    );
-    expect(disabled).toEqual(['ci-macos']);
+    const macosLane = parseYaml(
+      readFileSync(resolve(repoRoot, '.github/workflows/macos-ci.yml'), 'utf8')
+    ) as {
+      jobs: Record<string, { steps?: ActionStep[] }>;
+    };
+    const disabledIn = (jobs: Record<string, { steps?: ActionStep[] }>) =>
+      Object.entries(jobs).flatMap(([id, job]) =>
+        (job.steps ?? [])
+          .filter(
+            step =>
+              step.uses === './.github/actions/setup-node-pnpm' &&
+              String(step.with?.package_cache) === 'false'
+          )
+          .map(() => id)
+      );
+    // The Mac product lane runs inside the macos-ci.yml child workflow, so
+    // ci.yml itself must never disable the cache teardown.
+    expect(ci.jobs['ci-macos']?.uses).toBe('./.github/workflows/macos-ci.yml');
+    expect(disabledIn(ci.jobs)).toEqual([]);
+    expect(disabledIn(macosLane.jobs)).toEqual(['build']);
     expect(ci.jobs['ci-cross-product-integration']?.needs).toContain(
       'ci-macos'
     );
@@ -373,7 +392,10 @@ describe('full browser matrix setup routing', () => {
     jobs: Record<
       string,
       {
-        strategy?: { 'max-parallel'?: number; matrix?: { browser?: string[] } };
+        strategy?: {
+          'max-parallel'?: number;
+          matrix?: { browser?: string[]; shard?: number[] };
+        };
         env?: Record<string, string>;
         steps: ActionStep[];
       }
@@ -408,12 +430,16 @@ describe('full browser matrix setup routing', () => {
     );
   });
 
-  it('serializes the matrix and never skips browser host validation', () => {
+  it('serializes browsers per shard and never skips browser host validation', () => {
     expect(matrixJob?.strategy?.matrix?.browser).toEqual([
       'chromium',
       'firefox',
     ]);
-    expect(matrixJob?.strategy?.['max-parallel']).toBe(1);
+    // Sharded four ways per browser (JOV-8001): the standalone production
+    // server removed the OOM kill (exit 143) and sharding fits the suite in
+    // the 60m job budget.
+    expect(matrixJob?.strategy?.['max-parallel']).toBe(8);
+    expect(matrixJob?.strategy?.matrix?.shard).toEqual([1, 2, 3, 4]);
     // Four workers starve the hosted runner ("lost communication", JOV-7677).
     expect(matrixJob?.env?.PLAYWRIGHT_WORKERS).toBe('2');
     const playwrightAction = parseYaml(
@@ -432,6 +458,15 @@ describe('full browser matrix setup routing', () => {
     expect(JSON.stringify([matrixWorkflow, playwrightAction])).not.toContain(
       'PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS'
     );
+  });
+
+  it('provides the standalone server the secrets its claim routes require', () => {
+    const start = (matrixJob?.steps ?? []).find(step =>
+      /Start standalone E2E server/.test(step.name ?? '')
+    );
+    // Pending-claim and lead-attribution cookies throw without this key,
+    // which 500s the token-backed claim surface (JOV-8070).
+    expect(start?.env?.URL_ENCRYPTION_KEY).toBeTruthy();
   });
 });
 
@@ -1304,8 +1339,9 @@ describe('baked runner prerequisite contract', () => {
     expect(playwrightAction).toContain(
       'node .github/runner-image/verify-prerequisites.mjs --component playwright'
     );
+    // Version resolve, cache restore and browser download all skip on a warm image.
     expect(playwrightAction.match(/playwright_warm != 'true'/g)).toHaveLength(
-      2
+      3
     );
     expect(playwrightAction).toContain('PLAYWRIGHT_BROWSERS_PATH=');
   });
