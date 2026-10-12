@@ -18,7 +18,12 @@ name: Gem Producer Drift
 
 on:
   schedule:
-    - cron: '43 * * * *'
+    # Every 6 h, not hourly: drift only appears when symphony-control main
+    # advances or the Gem host install changes, neither of which sends this
+    # repository an event, and reinstall is a manual host action that an hour
+    # of extra latency does not change. Each tick also holds a jovie-fixed
+    # slot that admission work needs.
+    - cron: '43 */6 * * *'
   workflow_dispatch:
 
 permissions:

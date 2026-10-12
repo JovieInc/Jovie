@@ -141,3 +141,56 @@ describe('CLI', () => {
     assert.equal(code, 1);
   });
 });
+
+describe('gem-producer-drift workflow', async () => {
+  const { load } = await import('js-yaml');
+  const { mkdirSync, readFileSync } = await import('node:fs');
+  const workflowPath = fileURLToPath(
+    new URL('../../.github/workflows/gem-producer-drift.yml', import.meta.url)
+  );
+  const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
+  const doc = load(readFileSync(workflowPath, 'utf8'));
+  const job = doc.jobs.drift;
+  const verify = job.steps.find(step =>
+    step.run?.includes('check-attestation.mjs')
+  );
+
+  it('alarms every 6 h on the Gem host, never hourly', () => {
+    assert.deepEqual(doc.on.schedule, [{ cron: '43 */6 * * *' }]);
+    assert.ok('workflow_dispatch' in doc.on);
+    assert.deepEqual(job['runs-on'], [
+      'self-hosted',
+      'Linux',
+      'X64',
+      'jovie-fixed',
+    ]);
+  });
+
+  it('runs the checker step red on a missing attestation and green on a match', () => {
+    // Pin the upstream head so the real step body runs without a GitHub read.
+    const script = verify.run.replace(
+      'check-attestation.mjs --json',
+      `check-attestation.mjs --json --expected-sha=${HEAD}`
+    );
+    const step = workspace => {
+      try {
+        execFileSync('bash', ['-c', script], {
+          cwd: repoRoot,
+          env: { ...process.env, GEM_WORKSPACE: workspace },
+          encoding: 'utf8',
+        });
+        return 0;
+      } catch (error) {
+        return error.status;
+      }
+    };
+    const workspace = join(dir, 'gem-workspace');
+    mkdirSync(join(workspace, 'state'), { recursive: true });
+    assert.notEqual(step(workspace), 0);
+    writeFileSync(
+      join(workspace, 'state', 'gem-pr-rehabilitation-attestation.json'),
+      JSON.stringify({ sourceRevision: HEAD })
+    );
+    assert.equal(step(workspace), 0);
+  });
+});
