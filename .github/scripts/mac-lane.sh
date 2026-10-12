@@ -1,19 +1,8 @@
 #!/usr/bin/env bash
-# Mac-first lanes: run a macOS job on an idle self-hosted jovie-mac runner when
-# one is free right now, and on hosted macOS otherwise. Policy:
-# .claude/rules/infra.md "macOS runners".
-#
-#   dispatch  start the Mac child run (mac-lane.yml) and wait a bounded window
-#             for a Mac to pick it up; otherwise cancel the child -> fallback.
-#             Pickup is the live runner-state check: GITHUB_TOKEN cannot list
-#             org runners, and merge-group jobs get no app secrets.
-#   result    read the finished child run -> success, genuine failure (exit 1),
-#             or infra (asleep/offline/timeout) so the caller runs hosted
-#
-# The Mac work lives in a separate child run so a stuck Mac job is cancelled
-# there; the parent run never carries a cancelled job (a cancelled job makes
-# the whole run conclude "cancelled", which staging/production gates reject).
-# Every uncertainty resolves to hosted; nothing waits on a Mac.
+# Mac-first lanes (see mac-lane-route.yml; policy .claude/rules/infra.md
+# "macOS runners"). dispatch: start the mac-lane.yml child and wait for a Mac
+# to pick it up, else cancel it (fallback). result: read the finished child:
+# success, real failure (exit 1), or infra (lost Mac -> the caller runs hosted).
 set -uo pipefail
 
 MAC_LABEL="${MAC_LABEL:-jovie-mac}"

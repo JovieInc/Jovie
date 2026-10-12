@@ -1,10 +1,7 @@
 name: CLI Chaos
-# One cell of the @jovie/cli black-box chaos gate: install the release
-# candidate tarball from the publishing run and run chaos-blackbox.mjs on one
-# OS and Node version. npm-publish.yml calls it per matrix cell; the macOS
-# cells opt in to an idle self-hosted Mac first (mac-lane.yml child run) so a
-# saturated hosted macOS pool never holds a CLI release. Policy:
-# .claude/rules/infra.md "macOS runners".
+# One @jovie/cli chaos-gate cell (OS x Node) on the candidate tarball from the
+# publishing run. macOS cells try an idle self-hosted Mac first so a saturated
+# hosted macOS pool never holds a CLI release (.claude/rules/infra.md).
 
 on:
   workflow_call:

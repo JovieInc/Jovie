@@ -1,8 +1,6 @@
 name: Mac CI
-# Mac product evidence for one exact SHA: the MenuMonitor Swift package and the
-# packaged Electron desktop application. ci.yml calls it with mac-first so an
-# idle self-hosted Mac runs it (mac-lane.yml child run); otherwise hosted
-# macOS does. Policy: .claude/rules/infra.md "macOS runners".
+# Mac product evidence (MenuMonitor + packaged Electron app) for one exact SHA;
+# an idle self-hosted Mac first, hosted otherwise (.claude/rules/infra.md).
 
 on:
   workflow_call:
@@ -48,13 +46,9 @@ jobs:
     name: Build + Test
     needs: [mac]
     if: ${{ !cancelled() && (inputs.mac-child || needs.mac.result == 'skipped' || needs.mac.outputs.run_hosted == 'true') }}
-    # Hosted macos-15, not macos-26: MenuMonitor targets macOS 14 /
-    # swift-tools 5.10 and the Electron package needs no Xcode 26. Hosted
-    # macOS pickup waited 8-68 min per merge group on 2026-10-10 because the
-    # org-wide pool was full, which is why an idle Mac goes first.
+    # macos-15, not 26: MenuMonitor targets macOS 14 / swift-tools 5.10.
     runs-on: ${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
-    # A self-hosted run finishes in ~5 min; a laptop that sleeps mid-job must
-    # hand the lane back to hosted macOS quickly.
+    # ~5 min on a Mac; a sleeping laptop hands the lane to hosted quickly.
     timeout-minutes: ${{ inputs.mac-child && 25 || 45 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

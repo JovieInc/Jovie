@@ -1,9 +1,7 @@
 name: Mac Lane
 run-name: Mac lane ${{ inputs.lane }} @ ${{ inputs.sha }} for ${{ inputs.parent }}
-# Child run of mac-lane-route.yml: one macOS lane on the self-hosted jovie-mac
-# runners. The parent cancels this run when no Mac picks it up within MAC_PICKUP_SECONDS (45s) and
-# then runs the lane on hosted macOS, so the parent never holds on a Mac.
-# Policy: .claude/rules/infra.md "macOS runners". The child gets no
+# Child run of mac-lane-route.yml: one lane on the jovie-mac runners, cancelled
+# by the parent when no Mac picks it up (.claude/rules/infra.md). It gets no
 # repository secrets, only GITHUB_TOKEN, as the same jobs get when hosted.
 
 on:
