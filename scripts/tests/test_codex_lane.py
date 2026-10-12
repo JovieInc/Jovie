@@ -205,7 +205,12 @@ class CurrentLoginTest(Isolated):
         name, handle = codex.pick({}, time.time())
         self.assertEqual(name, "current-login")
         waits = []
+        real_sleep = time.sleep
         def release(seconds):
+            # time.sleep is global: subprocess's own wait loop (codex login status) also calls it
+            # on a loaded host (Gem, load ~16, 2026-10-12). Only the lane's lease wait releases.
+            if seconds < codex.LEASE_POLL_S:
+                return real_sleep(seconds)
             waits.append(seconds)
             handle.close()
         with patch.object(codex.time, "sleep", side_effect=release):
@@ -224,8 +229,15 @@ class CurrentLoginTest(Isolated):
 
     def test_limit_banks_single_login_without_rotation_or_credit_redemption(self):
         self.fake_cli("You've hit your usage limit. Try again in 2 hours.", 1)
+        real_sleep = time.sleep
+        def no_rotation_pause(seconds):
+            # subprocess's own wait loop also calls the global time.sleep on a loaded host;
+            # only the lane's rotate/lease pauses mean rotation.
+            if seconds >= min(codex.ROTATE_PAUSE_S, codex.LEASE_POLL_S):
+                raise AssertionError("rotation")
+            return real_sleep(seconds)
         with patch.object(codex, "maybe_redeem", side_effect=AssertionError("credit redemption")), \
-                patch.object(codex.time, "sleep", side_effect=AssertionError("rotation")):
+                patch.object(codex.time, "sleep", side_effect=no_rotation_pause):
             self.assertEqual(self.invoke(), codex.NO_ACCOUNT_EXIT)
         state = codex.read_state()
         self.assertEqual(list(state), ["current-login"])
