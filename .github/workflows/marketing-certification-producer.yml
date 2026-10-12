@@ -1,18 +1,20 @@
 name: Marketing Certification Producer
-# clock-class: temporal-resource
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: A hosted clock and main pushes run read-only evidence checks and post machine certification evidence to the production ledger with CRON_SECRET only; it never records founder decisions, merges, deploys or writes to GitHub.
-# removal-trigger: Remove the schedule when Production Controller emits the marketing evidence packets after each deploy, making the daily missed-event heartbeat redundant.
+# necessary-trust-boundary: Main pushes run read-only evidence checks and post machine certification evidence to the production ledger with CRON_SECRET only; it never records founder decisions, merges, deploys or writes to GitHub.
+# removal-trigger: Remove when Production Controller emits the marketing evidence packets after each deploy.
 # JOV-6928 Canary A: event-driven machine evidence for the marketing
 # certification ledger. A push to main that changes a registry entry's
 # canonical source re-evaluates exactly those entries and posts one
 # jovie.certification/v1 packet each to /api/internal/ovie/certification-evidence.
 # Evidence only: founder decisions never pass through this workflow.
 # workflow_dispatch with all=true reconciles every source-backed entry
-# (discovery of entries the ledger has never evaluated). The daily schedule is
-# the missed-event heartbeat: it re-evaluates everything once, so a dropped push
-# event cannot leave a certificate stale for more than a day.
+# (discovery of entries the ledger has never evaluated).
+#
+# No clock: each run evaluates everything since the last successful run, not
+# just its own push. The single concurrency slot replaces a waiting run when a
+# newer push arrives, so the newer run's range also covers the pushes whose
+# runs were replaced, and a failed run's range is retried by the next one.
 
 on:
   push:
@@ -50,8 +52,6 @@ on:
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - '.github/workflows/marketing-certification-producer.yml'
-  schedule:
-    - cron: '41 4 * * *'
   workflow_dispatch:
     inputs:
       all:
@@ -62,6 +62,8 @@ on:
 
 permissions:
   contents: read
+  # Reads this workflow's own run history to find the last successful range.
+  actions: read
 
 concurrency:
   group: marketing-certification-producer
@@ -80,22 +82,31 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      # The whole push range, from the compare API: merge-queue pushes batch
-      # several PRs, and a shallow checkout cannot diff back to `before`, so
-      # the old git fallback saw only the last commit and silently dropped
-      # the rest (2026-09-28: #19204's tests were never evaluated).
-      - name: Changed files in this push
+      # The whole range since the last successful run, from the compare API:
+      # merge-queue pushes batch several PRs, a shallow checkout cannot diff
+      # back that far (2026-09-28: #19204's tests were never evaluated), and
+      # replaced or failed runs leave their pushes to this one.
+      - name: Changed files since the last successful run
         id: changed
         env:
-          BEFORE: ${{ github.event.before }}
+          PUSH_BEFORE: ${{ github.event.before }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
         run: |
           set -euo pipefail
           out="${RUNNER_TEMP}/changed.txt"
           all=false
           : > "$out"
-          if [[ "${BEFORE:-}" =~ ^[0-9a-f]{40}$ && "$BEFORE" != "0000000000000000000000000000000000000000" ]]; then
+          workflow_file="${WORKFLOW_REF%@*}"
+          workflow_file="${workflow_file##*/}"
+          # GitHub's server-side status filter can return stale runs; filter
+          # completed main push runs locally instead.
+          BEFORE="$(gh api "repos/$REPO/actions/workflows/$workflow_file/runs?branch=main&event=push&status=completed&per_page=20" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success")][0].head_sha // empty' || true)"
+          BEFORE="${BEFORE:-$PUSH_BEFORE}"
+          echo "Evaluating changes from ${BEFORE:-<none>} to $GITHUB_SHA"
+          if [[ "${BEFORE:-}" =~ ^[0-9a-f]{40}$ && "$BEFORE" != "0000000000000000000000000000000000000000" && "$BEFORE" != "$GITHUB_SHA" ]]; then
             if ! gh api "repos/$REPO/compare/$BEFORE...$GITHUB_SHA" --jq '.files[] | .filename, .previous_filename // empty' > "$out"; then
               all=true
               : > "$out"
@@ -128,7 +139,7 @@ jobs:
           # Real defects (failed evidence) upsert one fingerprinted Linear issue.
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           CHANGED: ${{ steps.changed.outputs.path }}
-          ALL: ${{ (github.event_name == 'schedule' || inputs.all || steps.changed.outputs.all == 'true') && '--all' || '' }}
+          ALL: ${{ (inputs.all || steps.changed.outputs.all == 'true') && '--all' || '' }}
           RUN_REF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
