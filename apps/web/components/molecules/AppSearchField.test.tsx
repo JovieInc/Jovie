@@ -17,8 +17,12 @@ describe('AppSearchField', () => {
       'focus-within:border-(--linear-border-focus)',
       'focus-within:bg-surface-0',
       'has-[:focus-visible]:ring-2',
-      'has-[:focus-visible]:ring-ring/14'
+      'has-[:focus-visible]:ring-ring/14',
+      '[&_input]:focus-visible:ring-offset-0'
     );
+    expect(
+      screen.getByRole('searchbox', { name: 'Search library' }).className
+    ).not.toContain('ring-offset-0');
     expect(container.firstElementChild?.className).not.toContain(
       'focus-within:ring-'
     );
