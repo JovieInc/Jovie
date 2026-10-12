@@ -6687,6 +6687,53 @@ def object_mirror(repo: Path) -> Path | None:
     return None
 
 
+# A borrowing clone's refs are invisible to the mirror's gc. With these, pruned mirror refs
+# never take objects with them (2026-10-12: one auto-gc after a minutely fetch dropped the
+# objects of three lanes rebase branches and every origin fetch on Gem died "bad object").
+MIRROR_KEEP_OBJECTS = (("gc.auto", "0"), ("gc.pruneExpire", "never"), ("gc.reflogExpireUnreachable", "never"))
+
+
+def ensure_mirror_keeps_objects(mirror: Path) -> None:
+    config = mirror / "config"
+    for key, value in MIRROR_KEEP_OBJECTS:
+        current = subprocess.run(["git", "config", "--file", str(config), "--get", key],
+                                 capture_output=True, text=True, timeout=10).stdout.strip()
+        if current != value:
+            subprocess.run(["git", "config", "--file", str(config), key, value],
+                           check=True, capture_output=True, timeout=10)
+
+
+def missing_object_refs(repo: Path) -> list[str]:
+    """Local refs whose objects this clone (alternates included) no longer has."""
+    listing = subprocess.run(["git", "for-each-ref", "--format=%(objectname) %(refname)"], cwd=repo,
+                             capture_output=True, text=True, timeout=60)
+    refs = [line.split(" ", 1) for line in listing.stdout.splitlines() if " " in line]
+    if listing.returncode or not refs:
+        return []
+    checked = subprocess.run(["git", "cat-file", "--batch-check=%(objectname)"], cwd=repo,
+                             input="".join(f"{sha}\n" for sha, _ in refs), capture_output=True, text=True, timeout=120)
+    missing = {line.split()[0] for line in checked.stdout.splitlines() if line.endswith(" missing")}
+    return [ref for sha, ref in refs if sha in missing]
+
+
+def fetch_release_source(host: Host) -> subprocess.CompletedProcess:
+    """update's own origin fetch. A ref whose objects are gone cannot be repaired by any later
+    fetch and blocks every one of them, so only such refs are deleted, then the fetch is retried
+    once. Refs with present objects are never touched."""
+    fetched = sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo)
+    if fetched.returncode == 0 or not re.search(r"bad object|did not send all necessary objects",
+                                                f"{fetched.stdout}{fetched.stderr}"):
+        return fetched
+    broken = missing_object_refs(host.repo)
+    if not broken:
+        return fetched
+    for ref in broken:
+        subprocess.run(["git", "update-ref", "-d", ref], cwd=host.repo, capture_output=True, timeout=30)
+    print(f"lane update: deleted {len(broken)} ref(s) with missing objects: {', '.join(broken)[:300]}",
+          file=sys.stderr)
+    return sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo)
+
+
 def refresh_object_mirror(host: Host) -> dict:
     """Refresh the shared object mirror right before update's own origin fetch, under the lock
     every mirror writer takes (/srv/git/locks/<name>-mirror.lock). Replaces Gem's retired
@@ -6702,11 +6749,13 @@ def refresh_object_mirror(host: Host) -> dict:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 return {"status": "busy", "mirror": str(mirror)}
-            fetched = lifecycle.run(["git", "-C", str(mirror), "fetch", "--quiet", "--prune", "origin", "+refs/*:refs/*"],
+            ensure_mirror_keeps_objects(mirror)
+            fetched = lifecycle.run(["git", "-c", "gc.auto=0", "-c", "maintenance.auto=false", "-C", str(mirror),
+                                     "fetch", "--quiet", "--prune", "origin", "+refs/*:refs/*"],
                                     capture_output=True, text=True, timeout=MIRROR_FETCH_TIMEOUT_S)
     except subprocess.TimeoutExpired:
         return {"status": "timeout", "mirror": str(mirror)}
-    except OSError as error:
+    except (OSError, subprocess.CalledProcessError) as error:
         return {"status": "error", "mirror": str(mirror), "error": f"{type(error).__name__}: {error}"[:200]}
     if fetched.returncode:
         return {"status": "failed", "mirror": str(mirror), "error": (fetched.stderr or "").strip()[-200:]}
@@ -7078,7 +7127,7 @@ def install_release(host: Host, *, operator=None) -> int:
         if not isinstance(operator, lifecycle.OperatorGuard) or operator.state != host.state.resolve():
             raise lifecycle.AdmissionHeld("operator installation owner differs")
         operator.validate()
-    if sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo).returncode:
+    if fetch_release_source(host).returncode:
         raise RuntimeError("release-source-fetch-failed")
     bundle = release_identity(host)
     if operator is not None and bundle != operator.manifest:

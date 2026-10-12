@@ -5290,6 +5290,64 @@ class UpdateTest(unittest.TestCase):
                     patch.object(lane, "refresh_codex_skills", return_value={"status": "current"}):
                 self.assertEqual(lane.update(host), 0, "a failed mirror fetch never fails the update")
 
+    def test_mirror_prune_and_gc_never_break_the_borrowing_clone(self):
+        # 2026-10-12 on Gem: a mirror fetch --prune plus the mirror's auto-gc dropped the objects
+        # of three lanes rebase branches and every later origin fetch died "bad object".
+        with tempfile.TemporaryDirectory() as tmp, self.clean_env():
+            tmp = Path(tmp).resolve()
+            origin, work = tmp / "origin.git", tmp / "work"
+            self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
+            self.git("clone", "-q", str(origin), str(work), cwd=tmp)
+            self.commit(work, "a")
+            self.git("checkout", "-q", "-b", "rebase/1", cwd=work)
+            (work / "only-on-branch").write_text("x")
+            self.git("add", "-A", cwd=work); self.git("commit", "-qm", "branch", cwd=work)
+            self.git("push", "-q", "origin", "rebase/1", cwd=work)
+            mirror = tmp / "git/mirrors/Jovie.git"
+            self.git("clone", "-q", "--mirror", str(origin), str(mirror), cwd=tmp)
+            clone = tmp / "lanes"
+            self.git("clone", "-q", "--reference", str(mirror), str(origin), str(clone), cwd=tmp)
+            self.git("branch", "-q", "rebase/1", "origin/rebase/1", cwd=clone)
+            kept = subprocess.run(["git", "rev-parse", "rebase/1"], cwd=clone, capture_output=True, text=True).stdout.strip()
+            self.git("push", "-q", "origin", "--delete", "rebase/1", cwd=work)
+            self.git("-C", str(origin), "reflog", "expire", "--expire=now", "--all", cwd=tmp)
+            self.git("-C", str(origin), "gc", "-q", "--prune=now", cwd=tmp)
+            host = lane.Host(state=tmp / "state", repo=clone)
+            self.assertEqual(lane.refresh_object_mirror(host)["status"], "fetched")
+            for key, value in lane.MIRROR_KEEP_OBJECTS:
+                self.assertEqual(subprocess.run(["git", "config", "--file", str(mirror / "config"), key],
+                                                capture_output=True, text=True).stdout.strip(), value)
+            self.git("-C", str(mirror), "gc", "-q", cwd=tmp)  # what auto-gc would run
+            self.git("cat-file", "-e", kept, cwd=clone)
+            self.assertEqual(lane.missing_object_refs(clone), [])
+            self.commit(work, "b")
+            self.assertEqual(lane.fetch_release_source(host).returncode, 0)
+
+    def test_update_fetch_deletes_only_refs_whose_objects_are_gone_then_retries(self):
+        with tempfile.TemporaryDirectory() as tmp, self.clean_env():
+            tmp = Path(tmp).resolve()
+            origin, clone = tmp / "origin.git", tmp / "lanes"
+            self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
+            self.git("clone", "-q", str(origin), str(clone), cwd=tmp)
+            self.commit(clone, "a")
+            self.git("branch", "-q", "keep", cwd=clone)
+            (clone / ".git/refs/heads/rebase").mkdir(parents=True)
+            (clone / ".git/refs/heads/rebase/2").write_text("c9a2a2e2b695c6b75eb52d204fc3fe8d29c5f1cc\n")
+            host = lane.Host(state=tmp / "state", repo=clone)
+            self.assertEqual(lane.missing_object_refs(clone), ["refs/heads/rebase/2"])
+            with contextlib.redirect_stderr(io.StringIO()) as console:
+                fetched = lane.fetch_release_source(host)
+            self.assertEqual(fetched.returncode, 0, fetched.stderr)
+            refs = subprocess.run(["git", "for-each-ref", "--format=%(refname)"], cwd=clone,
+                                  capture_output=True, text=True).stdout.split()
+            self.assertIn("refs/heads/keep", refs)
+            self.assertNotIn("refs/heads/rebase/2", refs)
+            self.assertIn("deleted 1 ref(s) with missing objects", console.getvalue())
+            with patch.object(lane, "sh", return_value=subprocess.CompletedProcess([], 1, "", "fatal: unable to access")) as shell, \
+                    patch.object(lane, "missing_object_refs") as scan:
+                self.assertEqual(lane.fetch_release_source(host).returncode, 1)
+                scan.assert_not_called(); self.assertEqual(shell.call_count, 1, "an unrelated failure is not retried")
+
     def test_only_a_bare_alternate_is_a_mirror(self):
         with tempfile.TemporaryDirectory() as tmp, self.clean_env():
             tmp = Path(tmp).resolve()
