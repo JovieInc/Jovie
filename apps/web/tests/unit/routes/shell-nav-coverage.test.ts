@@ -55,6 +55,10 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Internal admin wiki article reached from the /hud/wiki/:path* rewrite into the OV app shell',
   '/app/ov/lists':
     'Founder lists index reached from the Lists block in the OV sidebar, which links each list directly',
+  '/app/ov/lists/[id]':
+    'One founder list, linked from the OV sidebar Lists block and the lists index',
+  '/app/ov/lists/views/[viewId]':
+    'One smart view across lists, linked from the OV sidebar Smart Views group and the lists index',
   '/app/ov/screenshots':
     'Internal screenshot QA utility retained for direct admin access outside founder navigation',
   '/app/ov/system':
