@@ -478,13 +478,15 @@ def _active_lease(path: Path, now: float) -> dict | None:
 
 
 def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
-    """The tick attempted recovery, but no worker owns any configured slot."""
+    """The tick attempted recovery, but at least one configured slot remains vacant."""
     capacity = (obs.get("capacityByProvider") or {}).get(provider) or {}
     pool = (obs.get("poolByProvider") or {}).get(provider)
     tick = obs.get("tick") or {}
     account_state = obs.get("codexAttribution") or codex_attribution(obs.get("codex") or {}, obs["now"])
     account_ready = provider != "codex" or bool(account_state.get("unleasedAvailable"))
-    return bool(pool and account_ready and capacity.get("slots") and not capacity.get("running")
+    slots, running = capacity.get("slots"), capacity.get("running")
+    vacant = (type(slots) is int and type(running) is int and 0 <= running < slots)
+    return bool(pool and account_ready and vacant
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
 
 
@@ -703,7 +705,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         pool_for_provider = (obs.get("poolByProvider") or {}).get(provider)
         accounts = f", {account_state['unleasedAvailable']} available account(s)" if provider == "codex" else ""
         alerts[f"provider-idle:{provider}"] = (f"{provider} has {pool_for_provider} compatible issue(s){accounts}, "
-                                               f"but 0/{capacity['slots']} workers after dispatch retried for "
+                                               f"but {capacity['running']}/{capacity['slots']} workers after dispatch retried for "
                                                f"{PROVIDER_IDLE_S // 60}m")
     if obs.get("gateTimeouts24h", 0) >= GATE_TIMEOUT_ALERT:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
