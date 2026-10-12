@@ -68,6 +68,7 @@ function run(command, { env = {}, fixtures = {} } = {}) {
   return { status: result.status, outputs, calls, stdout: result.stdout };
 }
 
+/** @param {string | null} [conclusion] @param {string | false} [failedStep] name of the failed step */
 const macJob = (status, conclusion = null, failedStep = false) => ({
   status,
   conclusion,
