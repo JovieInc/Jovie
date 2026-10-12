@@ -200,8 +200,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
                    for name, seats in capacity_by_provider.items()}
         qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
                                  for name, issues in qualified_by_provider.items()}
-        pool_by_provider = {name: (None if budgets[name]["used"] is None else len(issues))
-                            for name, issues in qualified_by_provider.items()}
+        pool_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
         qualified_jobs = {name: [issue.identifier for issue in issues]
                           for name, issues in qualified_by_provider.items()}
         pool = (None if any(value is None for value in pool_by_provider.values()) else

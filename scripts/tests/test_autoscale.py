@@ -362,7 +362,7 @@ class AutoscaleTest(unittest.TestCase):
             history.assert_not_called(); spawn.assert_not_called(); saved = json.loads((root / "autoscale.json").read_text()); self.assertEqual((saved["lanes"]["devin"]["effective"], saved["lanes"]["devin"]["lastReason"]), (2, "host-pressure"))
         recorded = {}
         def budget(name, slots):
-            recorded["slots"] = slots; result = lane.new_issue_budget(name, slots, []); recorded["cap"], recorded["terminalCap"] = result["cap"], result["terminalCap"]; return {"allowed": False, "reason": "over-budget", "used": 9, "cap": result["cap"], "terminal": 0, "terminalCap": result["terminalCap"]}
+            recorded["slots"] = slots; result = lane.new_issue_budget(name, slots, []); recorded["cap"], recorded["terminalCap"] = result["cap"], result["terminalCap"]; return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": None, "terminal": 0, "terminalCap": None}
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
             root = Path(tmp); (root / "linear.env").write_text("LINEAR_API_KEY=test\n"); host = lane.Host(state=root / "state", repo=root, linear_env=root / "linear.env")
             with patch.object(lane.autoscale, "effective_slots", return_value=9), \
@@ -374,7 +374,7 @@ class AutoscaleTest(unittest.TestCase):
                     patch.object(lane, "requeue_verified"), patch.object(lane, "escalate_exhausted"), patch.object(lane, "sweep_lane_prs"), \
                     patch.object(lane, "read_new_issue_budget", side_effect=budget):
                 self.assertEqual(lane.worker(host, "codex"), 0)
-        self.assertEqual((recorded["slots"], recorded["cap"], recorded["terminalCap"]), (3, 6, 12))
+        self.assertEqual((recorded["slots"], recorded["cap"], recorded["terminalCap"]), (3, None, None), "no PR ceiling")
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
             state, now = Path(tmp), time.time(); history = [{"at": now, "lane": "devin", "from": 4, "to": 6, "reason": "sustained-demand"} for _ in range(12)]
             (state / "autoscale.json").write_text(json.dumps({

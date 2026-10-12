@@ -10,8 +10,8 @@ Extra bindings share the host's provider seats, state dir and autoscale ceiling:
 run happens inside a seat a provider worker already holds, so the host's autoscaled seats
 (compute and credits) are the only concurrency limit unless a binding sets `concurrency`.
 Jovie-only holds (new-intake budget, hotspots, file overlap, routing) do not apply, and no
-binding state holds Jovie. A binding's own open-PR budget (`maxOpenPrs`) limits only new
-issue intake, never repair of its existing PRs; a per-PR lease keeps two seats off one PR. Linear and GitHub reads go through lane_runner.shared(), on the
+binding state holds Jovie. No open-PR ceiling limits a binding's intake (Tim 2026-10-12: only
+real limits); a per-PR lease keeps two seats off one PR. Linear and GitHub reads go through lane_runner.shared(), on the
 same TTLs as the Jovie claim scan. The binding's own CI is the gate: the harness opens a
 ready PR and moves the issue to In Review; the repo's required checks and native merge queue
 land it. It never runs Jovie's gate against another repo.
@@ -78,7 +78,6 @@ class Binding:
     gate: str                     # "lane-gate" (Jovie) | "github-required-checks"
     excluded: tuple[str, ...] = ()
     concurrency: int | None = None  # None: only the host's provider seats limit it
-    max_open_prs: int = 3
     providers: tuple[str, ...] = ()
     install: tuple[str, ...] = ()
     review_state: str = "In Review"
@@ -124,7 +123,7 @@ def extra_bindings(lane, policy: dict | None = None, env=None, hostname: str | N
             key, repo, slug, tuple(label.lower() for label in labels), str(row.get("gate") or "github-required-checks"),
             tuple(str(x).lower() for x in row.get("excludedLabels") or ()),
             None if row.get("concurrency") is None else max(1, int(row["concurrency"])),
-            max(1, int(row.get("maxOpenPrs", 3))), tuple(row.get("providers") or ()),
+            tuple(row.get("providers") or ()),
             tuple(row.get("install") or ()), str(row.get("reviewState") or "In Review")))
     return active
 
@@ -320,37 +319,11 @@ def refusal(lane, binding: Binding, issue, failures: dict, now: float, flying: f
     if lane.issue_is_sensitive(issue) and provider != lane.SENSITIVE_PROVIDER:
         return f"{binding.key}:sensitive-provider"
     record = lane.failure_record(failures.get(issue.identifier))
-    if record["count"] >= lane.MAX_FAILURES:
-        return f"{binding.key}:retry-exhausted"
-    if now - record["at"] < lane.RETRY_BACKOFF_S:
-        return f"{binding.key}:retry-backoff"
+    if rejected := lane.failure_rejection(record):
+        return f"{binding.key}:{rejected}"
     if issue.identifier.upper() in flying:
         return f"{binding.key}:in-flight-pr"
     return None
-
-
-def intake_refusal(binding: Binding, prs: list[dict], running: int = 0) -> str | None:
-    """The binding's own new-intake budget: open lane PRs, whatever their check state, plus
-    issue runs still working toward a PR. It never limits repair of existing PRs."""
-    count = len(lane_owned(binding, prs)) + running
-    return f"{binding.key}:intake-budget:{count}/{binding.max_open_prs}" if count >= binding.max_open_prs else None
-
-
-def running_issue_runs(lane, host, binding: Binding) -> int:
-    """Issue runs of this binding still in progress on this host (their lease is held)."""
-    count = 0
-    for path in sorted((host.state / "bindings" / binding.key).glob("issue.*.lock")):
-        probe = lane.Locked(path, blocking=False)
-        free = probe.held
-        probe.release()
-        if free:
-            try:
-                path.unlink()
-            except OSError:
-                pass
-        else:
-            count += 1
-    return count
 
 
 def repair_candidate(lane, binding: Binding, prs: list[dict], attempts: dict, busy=lambda pr: False,
@@ -558,7 +531,6 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
             record_status(lane, host, binding, worker=name, outcome="repair", pr=pr["number"],
                           reasons=pr.get("repairReasons") or [], maintained=maintained)
         elif not maintenance_only:
-            budget = intake_refusal(binding, prs, running_issue_runs(lane, host, binding))
             linear = lane.linear_sync.Outboxed(host.state, lane.Linear(host.linear_env))
             pool = todo_issues(lane, host, binding)
             failures = lane.read_json(lane.failures_path(host))
@@ -567,13 +539,13 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
             eligible = sorted((item for item in pool if refused[item.identifier] is None),
                               key=lambda item: lane.admission_order(item, now))
             # The local ledger is the claim; In Progress reaches Linear through the outbox.
-            if eligible and budget is None and lane.linear_sync.claim(
+            if eligible and lane.linear_sync.claim(
                     host.state, eligible[0].id, eligible[0].identifier, name):
                 issue = eligible[0]
                 lease = lane.Locked(host.state / "bindings" / binding.key / f"issue.{issue.identifier}.lock",
                                     blocking=False)
                 linear.move(issue.id, "In Progress")
-            outcome = budget or ("claimed" if issue else "claim-raced" if eligible else "none-eligible")
+            outcome = "claimed" if issue else "claim-raced" if eligible else "none-eligible"
             record_status(lane, host, binding, worker=name, outcome=outcome, pool=len(pool),
                           eligible=len(eligible), claimed=issue.identifier if issue else None,
                           refusals={key: value for key, value in refused.items() if value},
@@ -803,19 +775,20 @@ def finish_issue(lane, host, binding: Binding, name: str, linear, issue, receipt
         linear.comment(issue.id, f"🤖 lane `{name}` judged this not code-shippable: {receipt['reasons'][0]}")
         return
     if verdict == "provider-error":
-        lane.cool_down(host, name)
+        lane.cool_down(host, name, lane.provider_exit(receipt.get("reasons")))
         linear.move(issue.id, "Todo")
         return
     claim = lane.Locked(host.state / "claim.lock", blocking=True)  # the lock the Jovie path writes under
     try:
         failures = lane.read_json(lane.failures_path(host))
         count = lane.failure_record(failures.get(issue.identifier))["count"] + 1
-        failures[issue.identifier] = {"count": count, "at": time.time(),
+        failures[issue.identifier] = {"count": count, "at": time.time(), "release": lane.release_generation(),
                                       **lane.pr_events.failure_reason(receipt, count >= lane.MAX_FAILURES)}
         lane.failures_path(host).write_text(json.dumps(failures))
     finally:
         claim.release()
     exhausted = count >= lane.MAX_FAILURES
-    linear.move(issue.id, "Backlog" if exhausted else "Todo")
+    linear.move(issue.id, "Todo")  # exhausted: parked until the next lanes release, no human
     linear.comment(issue.id, f"🤖 lane `{name}`: {verdict} ({', '.join(receipt.get('reasons', []))}). "
-                             + ("Terminal after 3 attempts; needs a human decision." if exhausted else "Back to Todo."))
+                             + (f"{lane.MAX_FAILURES} attempts on this release; parked until the next lanes release."
+                                if exhausted else "Back to Todo."))

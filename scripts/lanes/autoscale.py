@@ -191,7 +191,9 @@ def current_run_failures(state_dir: Path) -> dict | None:
             continue
         began = _epoch(row.get("startedAt")) or _epoch(row.get("endedAt"))
         if began is not None and began >= since:
-            runs.append((_epoch(row.get("endedAt")) or began, row["verdict"] == "failed"))
+            # A provider-error no longer cools a lane unless the provider measured a limit, so a
+            # crashing provider shows up here, in the current failure rate, instead.
+            runs.append((_epoch(row.get("endedAt")) or began, row["verdict"] in ("failed", "provider-error")))
     latest = [failed for _, failed in sorted(runs)[-FAILURE_RATE_RUNS:]]
     return {"failed": sum(latest), "runs": len(latest), "releaseInstalledAt": since or None}
 def _failures_current(obs: dict) -> bool:

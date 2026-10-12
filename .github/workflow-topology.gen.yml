@@ -389,7 +389,6 @@ nodes:
       - pull_request
       - push
       - repository_dispatch
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:invariant-stewardship
     jobCount: 2
@@ -1489,7 +1488,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
+      - push
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
     jobCount: 3

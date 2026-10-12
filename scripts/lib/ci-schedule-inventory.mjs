@@ -108,7 +108,6 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/cost-anomaly-gate.yml',
   '.github/workflows/deepsec-native.yml',
   '.github/workflows/deprecation-intake.yml',
-  '.github/workflows/design-governance.yml',
   '.github/workflows/desktop-release.yml',
   '.github/workflows/doc-gardening-agent.yml',
   '.github/workflows/fleet-gate-refresh.yml',
@@ -136,11 +135,10 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/shipping-slo.yml',
   '.github/workflows/summer-eve-pin.yml',
   '.github/workflows/synthetic-monitoring.yml',
-  '.github/workflows/visual-a11y.yml',
   '.github/workflows/visual-regression.yml',
   '.github/workflows/voc-mine.yml',
 ]);
-export const CRON_ALLOWLIST_CEILING = 41;
+export const CRON_ALLOWLIST_CEILING = 39;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
