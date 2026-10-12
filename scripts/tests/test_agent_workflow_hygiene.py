@@ -1675,7 +1675,8 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
 
     assert "schedule:" in trigger
     assert "cron: '*/5 * * * *'" in trigger
-    assert "workflow_run:" not in trigger
+    assert "workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]" in trigger
+    assert trigger.count("workflow_run:") == 1
     assert "pull_request:" not in trigger
     assert "pull_request_target:" not in trigger
     assert "check_run:" not in trigger
@@ -1697,6 +1698,8 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "steps.refresh.outputs.receipt_path" in block
     assert "state/gem-priority-gate/latest.json" not in block
     assert "steps.stack-actions.outcome == 'success'" in block
+    assert "LANES_STATE: /home/timwhite/.local/state/jovie-lanes" in block
+    assert "LANES_REPO: /home/timwhite/devin-sweep/Jovie" in block
     assert "push:" in trigger and "branches: [main]" in trigger
 
 

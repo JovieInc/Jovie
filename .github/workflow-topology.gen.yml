@@ -223,6 +223,7 @@ nodes:
     allowedConsumers:
       - Agent Pipeline
       - iOS CI
+      - Fleet Gate Refresh
       - Lane Fix Relay
       - Main CI health monitor
       - Merge Queue Green Enroll
@@ -489,6 +490,7 @@ nodes:
       - repository_dispatch
       - schedule
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:assess
     jobCount: 2
   - name: Fork PR Gate
@@ -1514,6 +1516,9 @@ edges:
     type: workflow_run
   - from: Production Controller
     to: desktop-release
+    type: workflow_run
+  - from: CI
+    to: Fleet Gate Refresh
     type: workflow_run
   - from: Production Controller
     to: iOS TestFlight
