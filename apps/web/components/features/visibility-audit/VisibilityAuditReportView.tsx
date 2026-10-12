@@ -30,7 +30,7 @@ export function VisibilityAuditReportView({
       data-testid='visibility-audit-report'
     >
       <header className='flex flex-col gap-2'>
-        <h2 className='text-xl font-semibold text-primary-token'>
+        <h2 className='text-xl font-semibold text-primary-token text-balance'>
           {report.title}
         </h2>
         <p className='text-sm text-secondary-token'>
@@ -43,7 +43,9 @@ export function VisibilityAuditReportView({
       </header>
 
       <section className='flex flex-col gap-2'>
-        <h3 className='text-sm font-semibold text-primary-token'>Identity</h3>
+        <h3 className='text-sm font-semibold text-primary-token text-balance'>
+          Identity
+        </h3>
         <ul className='flex flex-col gap-1 text-sm text-secondary-token'>
           {report.identity.steps.map(step => (
             <li key={step.id}>
@@ -55,7 +57,7 @@ export function VisibilityAuditReportView({
       </section>
 
       <section className='flex flex-col gap-2'>
-        <h3 className='text-sm font-semibold text-primary-token'>
+        <h3 className='text-sm font-semibold text-primary-token text-balance'>
           DSP Presence ({report.dspPresence.presentCount} Of{' '}
           {report.dspPresence.registryCount})
         </h3>
@@ -69,7 +71,7 @@ export function VisibilityAuditReportView({
       </section>
 
       <section className='flex flex-col gap-2'>
-        <h3 className='text-sm font-semibold text-primary-token'>
+        <h3 className='text-sm font-semibold text-primary-token text-balance'>
           Link-in-bio Graph
         </h3>
         {report.linkGraph.conflicts.length === 0 ? (
@@ -84,7 +86,7 @@ export function VisibilityAuditReportView({
       </section>
 
       <section className='flex flex-col gap-2'>
-        <h3 className='text-sm font-semibold text-primary-token'>
+        <h3 className='text-sm font-semibold text-primary-token text-balance'>
           Google Page-1 Ownership
         </h3>
         <p className='text-sm text-secondary-token'>
@@ -96,7 +98,7 @@ export function VisibilityAuditReportView({
       </section>
 
       <section className='flex flex-col gap-2'>
-        <h3 className='text-sm font-semibold text-primary-token'>
+        <h3 className='text-sm font-semibold text-primary-token text-balance'>
           Answer-engine Citations
         </h3>
         <p className='text-sm text-secondary-token'>
@@ -115,7 +117,7 @@ export function VisibilityAuditReportView({
       </section>
 
       <section className='flex flex-col gap-2'>
-        <h3 className='text-sm font-semibold text-primary-token'>
+        <h3 className='text-sm font-semibold text-primary-token text-balance'>
           Catalog Mismatches
         </h3>
         <p className='text-sm text-secondary-token'>{report.catalog.policy}</p>
@@ -126,7 +128,9 @@ export function VisibilityAuditReportView({
       </section>
 
       <section className='flex flex-col gap-2'>
-        <h3 className='text-sm font-semibold text-primary-token'>Ad Pixels</h3>
+        <h3 className='text-sm font-semibold text-primary-token text-balance'>
+          Ad Pixels
+        </h3>
         <ul className='flex flex-col gap-1 text-sm text-secondary-token'>
           {report.pixels.rows.map(row => (
             <li key={row.platform}>
@@ -137,7 +141,7 @@ export function VisibilityAuditReportView({
       </section>
 
       <section className='flex flex-col gap-2'>
-        <h3 className='text-sm font-semibold text-primary-token'>
+        <h3 className='text-sm font-semibold text-primary-token text-balance'>
           Prioritized Fixes
         </h3>
         <ol className='flex flex-col gap-2 text-sm text-secondary-token'>
