@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { resolveSentryCiDestination } from '../../e2e/reporters/sentry-ci-reporter';
 
@@ -27,8 +28,11 @@ describe('Playwright Sentry isolation', () => {
   });
 
   it('keeps the default CI workflow on Playwright-native failure reporting', () => {
+    const repoRoot = process.cwd().endsWith('/apps/web')
+      ? resolve(process.cwd(), '../..')
+      : process.cwd();
     const workflow = readFileSync(
-      new URL('../../../../../.github/workflows/ci.yml', import.meta.url),
+      resolve(repoRoot, '.github/workflows/ci.yml'),
       'utf8'
     );
 
