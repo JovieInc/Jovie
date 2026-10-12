@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "label": "",
+  "flaky": [],
+  "run": {
+    "repository": null,
+    "headSha": null,
+    "runId": null,
+    "runAttempt": null,
+    "event": null,
+    "job": null
+  },
+  "generatedAt": "2026-10-12T11:40:42.114Z",
+  "complete": true,
+  "executions": [
+    {
+      "file": "tests/unit/profile/profile-liquid-glass-nav-regression.test.ts",
+      "fileHash": "3be4420209b139e75e117fac7b547b18c091c68e87b3c4416738f98f1a7d8acc",
+      "executedCount": 5,
+      "skippedCount": 0,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": true,
+      "failures": []
+    },
+    {
+      "file": "components/features/profile/templates/ProfileCompactSurface.test.tsx",
+      "fileHash": "ece5b6b66e482db56ef6b2c0fbbec597df872501a5c2847256ed90b855923600",
+      "executedCount": 28,
+      "skippedCount": 0,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": true,
+      "failures": []
+    }
+  ]
+}
