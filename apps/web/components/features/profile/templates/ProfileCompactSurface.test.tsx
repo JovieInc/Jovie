@@ -113,7 +113,6 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
     creditSegments,
     contacts,
     modeCardAccents,
-    paymentsVenmoLink,
   }: {
     readonly mode: string;
     readonly catalogLoadFailed?: boolean;
@@ -121,7 +120,6 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
     readonly creditSegments?: readonly { readonly type: string }[];
     readonly contacts?: readonly { readonly id: string }[];
     readonly modeCardAccents?: Record<string, { accent: string }>;
-    readonly paymentsVenmoLink?: string | null;
   }) => (
     <div
       data-testid={`mock-primary-tab-panel-${mode}`}
@@ -140,7 +138,6 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
               .join(',')
           : undefined
       }
-      data-payments-link={paymentsVenmoLink ?? ''}
     />
   ),
 }));
@@ -558,6 +555,59 @@ describe('ProfileCompactSurface', () => {
     );
   });
 
+  it('reserves dock clearance from the content column on every compact mode', () => {
+    const modes = ['profile', 'listen', 'tour', 'about', 'subscribe'] as const;
+
+    for (const activeMode of modes) {
+      const view = renderSurface({ activeMode });
+      const surface = screen.getByTestId('profile-compact-surface');
+      const column = screen.getByTestId('profile-content-scroll').parentElement;
+      const tabBar = screen.getByTestId('profile-tab-bar');
+
+      if (!(column instanceof HTMLElement)) {
+        throw new Error('content scroll has no column parent');
+      }
+
+      expect(surface).toHaveAttribute('data-presentation', 'standalone');
+      expect(column.parentElement).toBe(surface);
+      expect(column).toHaveClass('profile-content-column');
+      // The dock is a direct sibling, so the compact reservation selector
+      // (`:has(> .profile-floating-tab-bar) > .profile-content-column`)
+      // applies on every mode. BottomTabBar owns the floating class.
+      expect(tabBar.parentElement).toBe(surface);
+      expect(screen.getByTestId('profile-content-scroll')).toHaveClass(
+        'profile-content-scroll-region'
+      );
+      if (activeMode === 'profile') {
+        expect(column).toHaveClass('profile-home-content-column');
+      } else {
+        expect(column).not.toHaveClass('profile-home-content-column');
+      }
+
+      view.unmount();
+    }
+  });
+
+  it('keeps the content column when an embedded preview renders no dock', () => {
+    renderSurface({
+      activeMode: 'listen',
+      renderMode: 'preview',
+      presentation: 'embedded',
+    });
+
+    const surface = screen.getByTestId('profile-compact-surface');
+    const column = screen.getByTestId('profile-content-scroll').parentElement;
+
+    if (!(column instanceof HTMLElement)) {
+      throw new Error('content scroll has no column parent');
+    }
+
+    expect(surface).toHaveAttribute('data-presentation', 'embedded');
+    expect(column).toHaveClass('profile-content-column');
+    expect(column).not.toHaveClass('profile-home-content-column');
+    expect(screen.queryByTestId('profile-tab-bar')).toBeNull();
+  });
+
   it('anchors the mode-card accents on the featured artwork, matching the Pen', () => {
     renderSurface({
       latestRelease: {
@@ -574,38 +624,26 @@ describe('ProfileCompactSurface', () => {
     expect(rail).toHaveAttribute('data-featured-strength', 'art');
   });
 
-  it('rotates positionally and passes the payments link only when tips are on', () => {
-    const venmo = {
-      id: 'venmo-1',
-      artist_id: artist.id,
-      platform: 'venmo',
-      url: 'https://venmo.com/u/timwhite',
-      clicks: 0,
-      created_at: '2026-01-01T00:00:00.000Z',
-    };
-    const { unmount } = renderSurface({
+  it('rotates positionally and mounts the About panel without a payments card', () => {
+    // JOV-7810: the pay surface lives on the pay intent URL, not the About tab.
+    renderSurface({
       activeMode: 'about',
-      socialLinks: [venmo],
+      socialLinks: [
+        {
+          id: 'venmo-1',
+          artist_id: artist.id,
+          platform: 'venmo',
+          url: 'https://venmo.com/u/timwhite',
+          clicks: 0,
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+      ],
     });
 
     const panel = screen.getByTestId('mock-primary-tab-panel-about');
     // No release art and no photo: no image anchor, plain visual order.
     expect(panel).toHaveAttribute('data-accents', 'ion,ultra,pulse,orange');
-    expect(panel).toHaveAttribute(
-      'data-payments-link',
-      'https://venmo.com/u/timwhite'
-    );
-    unmount();
-
-    renderSurface({
-      activeMode: 'about',
-      socialLinks: [venmo],
-      showPayButton: false,
-    });
-    expect(screen.getByTestId('mock-primary-tab-panel-about')).toHaveAttribute(
-      'data-payments-link',
-      ''
-    );
+    expect(screen.queryByTestId('profile-payments-card')).toBeNull();
   });
 
   it('forwards the release credits opener to the overflow menu drawer', () => {

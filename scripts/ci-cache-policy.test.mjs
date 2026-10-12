@@ -14,7 +14,6 @@ test('Python workflows cache the pinned pytest dependency set', () => {
   for (const file of [
     '.github/workflows/ci.yml',
     '.github/workflows/actionlint.yml',
-    '.github/workflows/brand-scrub.yml',
   ]) {
     const workflow = read(file);
     assert.match(workflow, /cache: pip/, `${file} must restore pip downloads`);
@@ -34,7 +33,7 @@ test('desktop packaging restores the immutable pnpm store', () => {
 
 test('Mac packaging lanes cache only Electron download artifacts', () => {
   for (const file of [
-    '.github/workflows/ci.yml',
+    '.github/workflows/macos-ci.yml',
     '.github/workflows/desktop-release.yml',
   ]) {
     const workflow = read(file);

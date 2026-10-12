@@ -126,6 +126,22 @@ describe('synthetic monitoring workflow parser', () => {
     expect(parseStep).not.toContain('failed.length > 0 || skipped.length > 0');
   });
 
+  it('lets the artifact guard scan retry error-context.md instead of poisoning the producer', () => {
+    for (const path of [workflowPath, agentTickWorkflowPath]) {
+      const workflow = readFileSync(path, 'utf8');
+      const producerEnv = workflow
+        .split('\n')
+        .find(line =>
+          line.includes('PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE')
+        );
+
+      expect(producerEnv, `${path} sets the producer stage env`).toBeDefined();
+      expect(producerEnv).toContain(
+        "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
+      );
+    }
+  });
+
   it('uploads public-profile screenshots only through the bounded test-results artifact', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const uploadStep = getStepBlock(workflow, 'Upload test results');

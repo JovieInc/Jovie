@@ -113,6 +113,11 @@ export const ServerEnvSchema = z.object({
 
   // Database configuration (required at runtime, but optional during build)
   DATABASE_URL: databaseUrlValidator,
+  /** Downward-only per-process client admission limit; maximum 20. */
+  DB_POOL_MAX: z
+    .string()
+    .regex(/^(?:[1-9]|1\d|20)$/)
+    .optional(),
   /** Opt-in pool-level PostgreSQL statement_timeout in milliseconds. */
   DB_STATEMENT_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
 
@@ -547,6 +552,7 @@ export const ENV_KEYS = [
   'RESEND_INBOUND_WEBHOOK_SECRET',
   'SLACK_WEBHOOK_URL',
   'DATABASE_URL',
+  'DB_POOL_MAX',
   'DB_STATEMENT_TIMEOUT_MS',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',

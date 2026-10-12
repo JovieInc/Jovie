@@ -16,7 +16,6 @@ import type {
   ProfileRenderMode,
 } from '@/features/profile/contracts';
 import { ProfileEventsCard } from '@/features/profile/ProfileEventsCard';
-import { ProfilePaymentsCard } from '@/features/profile/ProfilePaymentsCard';
 import { ProfileStayCloseCard } from '@/features/profile/ProfileStayCloseCard';
 import {
   PUBLIC_MUSIC_EMPTY_DESCRIPTION,
@@ -90,8 +89,6 @@ interface ProfilePrimaryTabPanelProps {
   readonly modeCardAccents?: Readonly<
     Record<ProfileModeCardKind, ProfileCardAccentAssignment>
   >;
-  /** Venmo link for the Payments card; null hides the card. */
-  readonly paymentsVenmoLink?: string | null;
 }
 
 const DEFAULT_MODE_CARD_ACCENTS = resolveProfileModeCardAccents();
@@ -401,7 +398,6 @@ export function ProfilePrimaryTabPanel({
   onFlowClosed,
   onSubscriptionActivated,
   modeCardAccents = DEFAULT_MODE_CARD_ACCENTS,
-  paymentsVenmoLink = null,
 }: Readonly<ProfilePrimaryTabPanelProps>) {
   const [keepSubscribeFlowMounted, setKeepSubscribeFlowMounted] =
     useState(false);
@@ -569,12 +565,6 @@ export function ProfilePrimaryTabPanel({
 
   return (
     <div className='flex flex-col gap-4'>
-      <ProfilePaymentsCard
-        artistName={artist.name}
-        venmoLink={paymentsVenmoLink}
-        accent={modeCardAccents.payments}
-        renderMode={renderMode}
-      />
       <div className={PANEL_CLASS_NAME} data-testid='profile-primary-tab-about'>
         <SectionIntro title='About' />
         <div

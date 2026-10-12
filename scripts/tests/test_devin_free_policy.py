@@ -176,6 +176,24 @@ class FreePolicyTest(unittest.TestCase):
             self.assertEqual(calls[:2], ['ownership', 'free'])
             self.assertIn('revoked', calls)
 
+    def test_free_proof_cadence_does_not_speed_up_the_ownership_guard(self):
+        # 2026-10-11: the 1s free-proof tick also ran the repair target guard, so one Devin
+        # repair read its multi-page GraphQL target up to 787 times.
+        os.environ['LANES_EXECUTION_BACKEND'] = 'local-test'
+        import lane_runner as lane
+        with tempfile.TemporaryDirectory() as tmp:
+            cli = Path(tmp)/'devin'
+            cli.write_text('#!/usr/bin/env python3\nimport time\ntime.sleep(3.5)\n')
+            cli.chmod(0o700)
+            calls = []
+            with tempfile.TemporaryFile(mode='w+') as log, \
+                    patch.object(free, 'command_guard', return_value=lambda: calls.append('free')), \
+                    patch.object(lane.lifecycle, 'active', return_value=False):
+                lane.run_agent([str(cli),'-p','--model','swe-2-medium'], Path(tmp), log, 10,
+                               guard=lambda: calls.append('ownership'), guard_interval=30)
+            self.assertEqual(calls.count('ownership'), 1, calls)
+            self.assertGreaterEqual(calls.count('free'), 3, calls)
+
 
 if __name__ == '__main__':
     unittest.main()

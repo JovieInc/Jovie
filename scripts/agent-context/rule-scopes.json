@@ -7,12 +7,12 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "b538ae4a2b72eb4f2db4c330ec18b51a25d2bbb886039ce0b120183033180914"
+    "bodySha256": "66d966ab9feb4df050a3fc10c034c966ab5938defff365eacced22ce2a5d93ca"
   },
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "25164713a8fc910f61d565914dab8132b9fb0b8de38f55876df58ebd672e3364"
+    "bodySha256": "6ed5a855a64aafc54cd5175371584b1028ef160f6c606d81d0ad053802d3fc11"
   },
   {
     "file": ".claude/rules/db.md",
@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "7f3b0dba3ee3214064fe9d7d78c2374d1de1193497df38338aba883fece617b2"
+    "bodySha256": "b0c5be920c0f2f5b75be43e8325735d313b0167fd9148cdb49aa1af176ec59b1"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -44,7 +44,7 @@
   {
     "file": ".claude/rules/hermes-air.md",
     "paths": ["docs/HERMES_AIR.md"],
-    "bodySha256": "96281ca1e3039407a003dff93b13642902ae4368fa8a9157ee4f8fed4cca27c1"
+    "bodySha256": "d495fddaadb7e03ab601b6076351bc0aa0e507c61fc4065a096146ab345bd89c"
   },
   {
     "file": ".claude/rules/infra.md",
@@ -54,7 +54,7 @@
       "apps/web/app/api/cron/**",
       "vercel.json"
     ],
-    "bodySha256": "fe43d1631f0d7110578dddcd570f4504623ec5b23c883b036f008d6d647a7801"
+    "bodySha256": "6d35e726878f810fea9671ebadc6eb90094787ddcf74723e44c47bab71d86513"
   },
   {
     "file": ".claude/rules/ios.md",
@@ -91,7 +91,7 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "c88601f1ff765b3d671ee02523fe6d2124a50f8b39b9275061604bc2a7c75346"
+    "bodySha256": "d923a03cbc44bea8b7104790889662c61a0f0da0117d1398630b02a6b8b361e7"
   },
   {
     "file": ".claude/rules/pen.md",
@@ -112,7 +112,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "7cd69dc11cfe4f4f784611444631ca17a2394514791a66c844de301a5545e2b7"
+    "bodySha256": "ceb43bd5254511d31a6499da86ef99028579eed93ca359baf9fd71fbddc15b03"
   },
   {
     "file": ".claude/rules/security.md",
@@ -132,7 +132,7 @@
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
-    "bodySha256": "a157147142eb239b02e83595ee04895dcae9bf6767612fa02b64651d87236c3e"
+    "bodySha256": "e26c5b3a138b93444c1497c7d5007d6b4627f8bbd95a1af7cd0849ba68d7df17"
   },
   {
     "file": ".claude/rules/testing.md",
@@ -154,6 +154,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "bd51a598658a675f387b87581a44f6c06a32223396b9a75cef86ea21a727447a"
+    "bodySha256": "b4917647952118f17104236747a29588fbdc07dfee9bc8632653f04c08636723"
   }
 ]

@@ -207,6 +207,19 @@ export function validateUrl(url: string, platform: PlatformInfo): boolean {
         return /linktr\.ee\/[a-zA-Z0-9._]+\/?$/.test(url);
       case 'bandcamp':
         return /[a-zA-Z0-9_-]+\.bandcamp\.com\/?$/.test(url);
+      case 'beatport': {
+        const parsed = new URL(url);
+        return (
+          parsed.protocol === 'https:' &&
+          !parsed.username &&
+          !parsed.password &&
+          !parsed.port &&
+          /^(?:www\.)?beatport\.com$/i.test(parsed.hostname) &&
+          /^\/(artist|release|track)\/(?:[^/]+\/)?[1-9]\d*\/?$/.test(
+            parsed.pathname
+          )
+        );
+      }
       default:
         return true; // Basic URL validation passed for unknown platforms
     }

@@ -8,11 +8,13 @@ name: Linear Sync on Merge
 # Projects merged pull requests onto the Linear validation lifecycle
 # (JOV-7694): Merging -> Validating -> Done, with Rework on a required
 # failure. A merge event evaluates its linked issue; a completed Production
-# Controller run, the schedule, or a manual dispatch re-evaluates every issue
-# in Merging, Validating, or Rework. Both paths run the same evaluation, so
-# replayed and out-of-order events converge. Receipts recorded as Linear
-# comments do not emit GitHub events, so the schedule is their backstop.
-# clock-class: temporal-resource
+# Controller run, a validation receipt, or a manual dispatch re-evaluates
+# every issue in Merging, Validating, or Rework. Both paths run the same
+# evaluation, so replayed and out-of-order events converge. Receipts are
+# Linear comments; /api/webhooks/linear bridges each one to the
+# linear_validation_receipt dispatch, so there is no clock. The lifecycle has
+# no time-based transition, and every Production Controller completion
+# re-evaluates all open issues if a bridged dispatch is ever lost.
 
 on:
   pull_request:
@@ -20,8 +22,8 @@ on:
   workflow_run:
     workflows: [Production Controller]
     types: [completed]
-  schedule:
-    - cron: '23,53 * * * *'
+  repository_dispatch:
+    types: [linear_validation_receipt]
   workflow_dispatch:
 
 permissions:
@@ -76,8 +78,20 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # Merged pull requests, their files and exact-commit compares never
+      # change; each sweep re-reads ~280 issues' worth of them from the
+      # repo's shared 1,000/h GITHUB_TOKEN quota otherwise (2026-10-11).
+      - name: Restore immutable GitHub reads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .linear-sync-github-cache
+          key: linear-sync-github-v1-${{ github.run_id }}
+          restore-keys: linear-sync-github-v1-
+
       - name: Evaluate the validation lifecycle
+        id: evaluate
         env:
+          LINEAR_SYNC_GITHUB_CACHE_DIR: .linear-sync-github-cache
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -86,3 +100,11 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: node scripts/lib/linear-sync-on-merge.mjs
+
+      # Main-scoped only: a pull_request (merge) run restores but never saves.
+      - name: Save immutable GitHub reads
+        if: ${{ !cancelled() && github.event_name != 'pull_request' && steps.evaluate.outputs.github_cache_key != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .linear-sync-github-cache
+          key: ${{ steps.evaluate.outputs.github_cache_key }}

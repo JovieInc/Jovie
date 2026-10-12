@@ -10,7 +10,9 @@ import { and, asc, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
+  classifyGatewayAlert,
   isGatewayBudgetExceededError,
+  isGatewayInsufficientFundsError,
   resolveChatStreamErrorMessage,
 } from '@/lib/ai/gateway-errors';
 import { getAppUserByBetterAuthId } from '@/lib/auth/app-user';
@@ -25,7 +27,10 @@ import {
   buildScriptedFallbackResponse,
   type FallbackReason,
 } from '@/lib/chat/onboarding-script/respond';
-import { STREAM_ERROR_LINE } from '@/lib/chat/onboarding-script/script';
+import {
+  OWNERSHIP_CONFLICT_LINE,
+  STREAM_ERROR_LINE,
+} from '@/lib/chat/onboarding-script/script';
 import {
   type PersistedOnboardingMessage,
   resumeOnboardingTranscript,
@@ -57,6 +62,7 @@ import {
   ONBOARDING_SESSION_COOKIE_NAME,
   verifySessionCookie,
 } from '@/lib/onboarding/session';
+import { hasSpotifyProfileIdentityConflict } from '@/lib/profile/spotify-profile-identity';
 import {
   checkAnonymousChatRateLimit,
   checkAuthenticatedOnboardingChatRateLimit,
@@ -331,6 +337,7 @@ export async function tryHandleAnonymousOnboardingChat(
   const cookieSessionId = verifySessionCookie(
     cookieMap.get(ONBOARDING_SESSION_COOKIE_NAME)
   );
+  let verifiedAppUserId: string | null = null;
   let ownedConversation: Awaited<
     ReturnType<typeof findOnboardingConversation>
   > = null;
@@ -351,6 +358,7 @@ export async function tryHandleAnonymousOnboardingChat(
         );
       }
       if (appUser) {
+        verifiedAppUserId = appUser.id;
         const conversation = await findOnboardingConversation({
           userId: appUser.id,
           sessionId: null,
@@ -736,6 +744,86 @@ export async function tryHandleAnonymousOnboardingChat(
       ? 'injected'
       : null;
 
+  // Check the canonical Spotify identity on every turn, including a new
+  // picker/URL confirmation. Neither client history nor a matching artist
+  // can authorize a claim, handle change, or checkout suggestion.
+  if (onboardingState.spotifyArtistId) {
+    let identityConflict: boolean;
+    try {
+      identityConflict = await hasSpotifyProfileIdentityConflict(
+        db,
+        onboardingState.spotifyArtistId,
+        verifiedAppUserId
+      );
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { context: 'onboarding_identity_lookup', requestId },
+      });
+      return NextResponse.json(
+        {
+          error: 'Profile ownership could not be verified. Try again.',
+          errorCode: 'SPOTIFY_IDENTITY_LOOKUP_FAILED',
+          requestId,
+        },
+        { status: 503, headers: responseHeaders }
+      );
+    }
+    if (identityConflict) {
+      const confirmationPart = serverArtistConfirmation?.historyMessage
+        .parts[0] as
+        | { input: Record<string, unknown>; output: Record<string, unknown> }
+        | undefined;
+      const recovery: FallbackTurn = {
+        line: OWNERSHIP_CONFLICT_LINE,
+        text: OWNERSHIP_CONFLICT_LINE.text,
+        // Persist enrichment only, so a reload still knows which artist
+        // is blocked. No claim, handle, or checkout tool is emitted.
+        toolEvents: confirmationPart
+          ? [
+              {
+                toolName: 'confirmSpotifyArtist',
+                input: confirmationPart.input,
+                output: confirmationPart.output,
+              },
+            ]
+          : [],
+      };
+      const built = buildScriptedFallbackResponse({
+        turn: recovery,
+        reason: 'ownership_conflict',
+        headers: {
+          ...responseHeaders,
+          'x-onboarding-error-code': 'SPOTIFY_IDENTITY_CONFLICT',
+        },
+      });
+      try {
+        await persistAnonymousAssistantRecord({
+          conversationId,
+          latestUserClientMessageId: latestUserMessage.clientMessageId,
+          content: recovery.text,
+          toolCalls: built.persistedToolEvents,
+          assistantSource: 'script',
+          scriptLineKey: recovery.line.key,
+        });
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: {
+            context: 'onboarding_identity_recovery_persistence',
+            requestId,
+          },
+        });
+        return NextResponse.json(
+          {
+            error: 'Your conversation could not be saved. Try again.',
+            errorCode: 'ONBOARDING_CHAT_PERSISTENCE_FAILED',
+            requestId,
+          },
+          { status: 503, headers: responseHeaders }
+        );
+      }
+      return built.response;
+    }
+  }
   try {
     if (forcedFallbackReason) {
       return await serveScriptedFallback(forcedFallbackReason);
@@ -797,6 +885,7 @@ export async function tryHandleAnonymousOnboardingChat(
     // Mid-stream failures cannot swap the Response for the scripted
     // fallback; the lint-clean script line is the recovery copy instead.
     const streamErrorText = (error: unknown) =>
+      isGatewayInsufficientFundsError(error) ||
       isGatewayBudgetExceededError(error)
         ? resolveChatStreamErrorMessage(error)
         : STREAM_ERROR_LINE.text;
@@ -839,34 +928,23 @@ export async function tryHandleAnonymousOnboardingChat(
     // The LLM failure still pages — the fallback masks the user impact, not
     // the incident. The logger line keeps the failure visible in local dev,
     // where Sentry is a no-op and the fallback would otherwise hide it.
-    const budgetExceeded = isGatewayBudgetExceededError(error);
+    const gatewayAlert = classifyGatewayAlert(error);
     logger.error(
-      budgetExceeded
-        ? '[onboarding-chat] AI Gateway budget exceeded; serving scripted fallback'
+      gatewayAlert
+        ? `[onboarding-chat] ${gatewayAlert.title}; serving scripted fallback`
         : '[onboarding-chat] LLM turn failed; serving scripted fallback',
       { error, requestId, turnCount }
     );
-    Sentry.captureException(
-      budgetExceeded
-        ? Object.assign(new Error('AI Gateway API key budget exceeded'), {
-            name: 'GatewayBudgetExceededError',
-            cause: error,
-          })
-        : error,
-      {
-        tags: {
-          feature: 'ai-chat',
-          chat_mode: 'onboarding',
-          ...(budgetExceeded
-            ? {
-                errorType: 'gateway_budget_exceeded',
-                alert: 'ai_gateway_budget',
-              }
-            : {}),
-        },
-        extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
-      }
-    );
+    Sentry.captureException(gatewayAlert?.error ?? error, {
+      tags: {
+        feature: 'ai-chat',
+        chat_mode: 'onboarding',
+        ...(gatewayAlert
+          ? { errorType: gatewayAlert.errorType, alert: gatewayAlert.alert }
+          : {}),
+      },
+      extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
+    });
     try {
       return await serveScriptedFallback('llm_error');
     } catch (fallbackError) {

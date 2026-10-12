@@ -12,8 +12,8 @@ describe('getBreadcrumbLabel', () => {
   });
 
   it('returns "Presence" for the internal profiles route', () => {
-    expect(getBreadcrumbLabel('profiles')).toBe('Identity');
-    expect(getBreadcrumbLabel('presence')).toBe('Identity');
+    expect(getBreadcrumbLabel('profiles')).toBe('Profiles');
+    expect(getBreadcrumbLabel('presence')).toBe('Profiles');
     expect(getBreadcrumbLabel('library')).toBe('Work');
   });
 

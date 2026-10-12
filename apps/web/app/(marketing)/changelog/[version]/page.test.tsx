@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ChangelogRelease } from '@/lib/changelog-parser';
+import { parseWhatsNewFeed, projectWhatsNew } from '@/lib/whats-new';
 
 const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
@@ -201,4 +202,32 @@ describe('ChangelogReleasePage', () => {
       generateMetadata({ params: Promise.resolve({ version: '0.0.0' }) })
     ).resolves.toEqual({});
   });
+});
+
+it('uses the same published hero descriptor as the validated update feed', async () => {
+  const release = RELEASES[0]!;
+  const reviewed = {
+    ...release,
+    customerOutcomes: Object.fromEntries(
+      Object.values(release.sections)
+        .flat()
+        .map(text => [
+          text,
+          { availability: 'unverified' as const, prerequisites: [] },
+        ])
+    ),
+  };
+  const update = parseWhatsNewFeed(
+    projectWhatsNew([reviewed], 'https://jov.ie')
+  )?.entries[0];
+  await renderVersion(release.version);
+  const hero = screen.getByTestId('changelog-version-hero-photo');
+  const image = hero.querySelector('img');
+  expect(update?.hero?.postId).toBe(release.version);
+  expect(decodeURIComponent(image?.getAttribute('src') ?? '')).toContain(
+    update?.hero?.src
+  );
+  expect(image).toHaveAttribute('alt', update?.hero?.alt);
+  expect(hero).toHaveAttribute('aria-hidden', 'true');
+  expect(update?.url).toBe('https://jov.ie/changelog/26.9.0');
 });

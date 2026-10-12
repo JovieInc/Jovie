@@ -17,16 +17,32 @@ const workflow = readFileSync(
   resolve(import.meta.dirname, '../../../.github/workflows/npm-publish.yml'),
   'utf8'
 );
+// Every chaos cell (and its Mac child) runs this reusable workflow.
+const chaosCell = readFileSync(
+  resolve(import.meta.dirname, '../../../.github/workflows/cli-chaos.yml'),
+  'utf8'
+);
 
 function assertPublishWorkflowContract(source: string): void {
-  expect(source).toMatch(/^on:\n  workflow_dispatch:\s*$/m);
-  expect(source).not.toMatch(
-    /^\s+(push|pull_request|schedule|workflow_run|repository_dispatch):/m
+  // Automatic publication is main-only; pull requests never gain authority.
+  expect(source).toContain(
+    'on:\n  push:\n    branches: [main]\n    paths:\n      - packages/jovie-cli/src/**\n'
   );
+  expect(source).toMatch(/^  workflow_dispatch:\s*$/m);
+  expect(source.match(/^  push:$/gm)).toHaveLength(1);
+  expect(source).not.toMatch(
+    /^\s+(pull_request|pull_request_target|schedule|workflow_run|repository_dispatch):/m
+  );
+  // Publish exactly the chaos-tested commit and its resolved version.
+  expect(source).toContain('ref: ${{ needs.chaos-tarball.outputs.sha }}');
+  expect(source).toContain(
+    'CLI_RELEASE_VERSION: ${{ needs.chaos-tarball.outputs.version }}'
+  );
+  expect(source).toContain(': nextReleaseVersion(canonical, published));');
   expect(source).toMatch(/permissions:\n  contents: read/);
   expect(source).toMatch(/id-token: write/);
   expect(source).toMatch(/runs-on: ubuntu-latest/);
-  expect(source).toContain('timeout-minutes: 25');
+  expect(source).toContain('timeout-minutes: 30');
   expect(source).toContain(
     'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
   );
@@ -47,10 +63,12 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain('test "$GITHUB_REF" = refs/heads/main');
   expect(source).toContain('git rev-parse origin/main');
   expect(
-    source.match(/test "\$checked_out_sha" = "\$current_main_sha"/g)
-  ).toHaveLength(2);
+    source.match(
+      /git merge-base --is-ancestor "\$checked_out_sha" "\$current_main_sha"/g
+    )
+  ).toHaveLength(3);
   expect(source).toContain(
-    'Checkout drifted from current origin/main immediately before publication.'
+    'Checkout left origin/main immediately before publication.'
   );
   expect(source).toContain(
     "readFileSync('VERSION', 'utf8'), process.env.CLI_RELEASE_VERSION"
@@ -89,7 +107,13 @@ function assertPublishWorkflowContract(source: string): void {
     'npm publish --provenance --access public "$PACKAGE_DIR"'
   );
   expect(source).toContain('- name: Prove public registry release');
-  expect(source).toContain('for attempt in {1..60}');
+  expect(source).toContain('deadline=$((SECONDS + 1200))');
+  expect(source).toContain('while (( SECONDS < deadline )); do');
+  expect(source).toContain('until npm install \\');
+  expect(source).toContain('(( SECONDS < deadline )) || {');
+  expect(source).toContain(
+    'Published version was not installable from the public registry.'
+  );
   expect(source).toContain('metadata.dist?.attestations?.url');
   expect(source).toContain('metadata.dist?.attestations?.provenance');
   expect(source).toContain('Array.isArray(metadata.maintainers)');
@@ -105,25 +129,43 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
   expect(source).toMatch(/node: \[[^\]]*'24\.21\.0'[^\]]*'26'\]/);
   expect(source).toContain('fail-fast: false');
-  expect(source).toContain('node "$PACK_DIR/chaos-blackbox.mjs"');
-  expect(source).toContain('--profile release');
-  expect(source).toContain('npm install --prefix "$CLEAN_DIR"');
+  // macOS cells try an idle self-hosted Mac first, hosted otherwise.
+  expect(source).toContain('uses: ./.github/workflows/cli-chaos.yml');
+  expect(source).toContain("mac-first: ${{ matrix.os == 'macos-latest' }}");
+  expect(source).toContain('artifact-run-id: ${{ github.run_id }}');
+  expect(chaosCell).toContain('node "$PACK_DIR/chaos-blackbox.mjs"');
+  expect(chaosCell).toContain('--profile release');
+  expect(chaosCell).toContain('npm install --prefix "$CLEAN_DIR"');
+  expect(chaosCell).toContain('run-id: ${{ inputs.artifact-run-id }}');
+  // On the owner's laptop the CLI never sees the real home directory.
+  expect(chaosCell).toContain('export HOME="$RUNNER_TEMP/jovie-cli-home"');
   expect(source).toContain(
     'if (!process.env.TESTED_INTEGRITY || pack.integrity !== process.env.TESTED_INTEGRITY) {'
   );
 }
 
-describe('manual npm provenance workflow', () => {
+describe('npm provenance workflow', () => {
   it('locks the release workflow to the exact, tested, unpublished main package', () => {
     assertPublishWorkflowContract(workflow);
   });
 
   it.each([
     [
-      'automatic trigger',
+      'pull request trigger',
       workflow.replace(
         '  workflow_dispatch:\n',
-        '  workflow_dispatch:\n  push:\n'
+        '  pull_request:\n  workflow_dispatch:\n'
+      ),
+    ],
+    [
+      'push trigger beyond main',
+      workflow.replace('    branches: [main]\n', ''),
+    ],
+    [
+      'publishing an untested commit',
+      workflow.replace(
+        'ref: ${{ needs.chaos-tarball.outputs.sha }}',
+        'ref: main'
       ),
     ],
     [
@@ -141,7 +183,7 @@ describe('manual npm provenance workflow', () => {
     [
       'final current-main publication recheck',
       workflow.replace(
-        '          test "$checked_out_sha" = "$current_main_sha" || {\n            echo "::error::Checkout drifted from current origin/main immediately before publication."\n            exit 1\n          }\n          npm publish',
+        '          git merge-base --is-ancestor "$checked_out_sha" "$current_main_sha" || {\n            echo "::error::Checkout left origin/main immediately before publication."\n            exit 1\n          }\n          npm publish',
         '          npm publish'
       ),
     ],
@@ -185,6 +227,10 @@ describe('manual npm provenance workflow', () => {
       ),
     ],
     [
+      'public install replication retry',
+      workflow.replace('until npm install \\', 'npm install \\'),
+    ],
+    [
       'fresh install runtime receipt',
       workflow.replace('"$installed_cli" api openapi', 'echo api openapi'),
     ],
@@ -223,7 +269,7 @@ describe('MCP-only publication resumes an already published artifact', () => {
 });
 
 describe('bounded MCP publication authority', () => {
-  it('keeps both npm and registry side effects behind explicit manual mode', () => {
+  it('keeps npm side effects behind manual mode while chaining the MCP listing', () => {
     expect(workflow).toContain('publish_mcp_only:');
     expect(workflow).toContain('default: false');
     for (const name of [
@@ -234,14 +280,32 @@ describe('bounded MCP publication authority', () => {
         `- name: ${name}` + '\n        if: ${{ !inputs.publish_mcp_only }}'
       );
     }
+    // JOV-8088: the exact-bytes listing is chained after the public readback
+    // on every run; publish_mcp_only only resumes a stranded release. Gating
+    // it on the manual input is what let the registry drift silently.
     for (const name of [
       'Verify exact staged bytes and prepare MCP manifest',
       'Publish exact MCP listing using GitHub OIDC',
     ]) {
-      expect(workflow).toContain(
+      expect(workflow).toContain(`- name: ${name}` + '\n        shell: bash');
+      expect(workflow).not.toContain(
         `- name: ${name}` + '\n        if: ${{ inputs.publish_mcp_only }}'
       );
     }
+    expect(
+      workflow.indexOf('- name: Prove public registry release')
+    ).toBeLessThan(
+      workflow.indexOf(
+        '- name: Verify exact staged bytes and prepare MCP manifest'
+      )
+    );
+    expect(
+      workflow.indexOf(
+        '- name: Verify exact staged bytes and prepare MCP manifest'
+      )
+    ).toBeLessThan(
+      workflow.indexOf('- name: Publish exact MCP listing using GitHub OIDC')
+    );
     expect(workflow).toContain(
       'node packages/jovie-cli/scripts/verify-published-package.mjs'
     );
@@ -250,8 +314,41 @@ describe('bounded MCP publication authority', () => {
     expect(workflow).toContain(
       'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc'
     );
-    expect(workflow).toContain('Main advanced before MCP publication.');
+    expect(workflow).toContain(
+      'Checkout left origin/main before MCP publication.'
+    );
     expect(workflow).toContain('verifyRegistryReadback(actual, expected)');
+  });
+});
+
+describe('MCP registry drift alarm', () => {
+  const nightly = readFileSync(
+    resolve(
+      import.meta.dirname,
+      '../../../.github/workflows/cli-chaos-nightly.yml'
+    ),
+    'utf8'
+  );
+  it('fails the nightly when the listing trails npm latest for over 24h', () => {
+    // JOV-8088: a read-only scheduled check files one deduped Linear issue so
+    // silent registry drift is caught even when no release is running.
+    expect(nightly).toContain('mcp-drift:');
+    expect(nightly).toContain('DRIFT_GRACE_MS');
+    expect(nightly).toContain('86400000');
+    expect(nightly).toContain('https://registry.npmjs.org/@jovie%2Fcli');
+    expect(nightly).toContain(
+      'https://registry.modelcontextprotocol.io/v0.1/servers/io.github.JovieInc%2Fjovie/versions/latest'
+    );
+    expect(nightly).toContain("packument['dist-tags']?.latest");
+    expect(nightly).toContain('listing.server?.version');
+    expect(nightly).toContain('driftMs <= graceMs');
+    expect(nightly).toContain('mcp-drift-remediation:');
+    expect(nightly).toContain('needs: [mcp-drift]');
+    expect(nightly).toContain('REMEDIATION_FINGERPRINT: mcp-registry-drift');
+    expect(nightly).toContain(
+      'REMEDIATION_CONCLUSION: ${{ needs.mcp-drift.result }}'
+    );
+    expect(nightly).toContain('node scripts/remediation-signal-intake.mjs');
   });
 });
 

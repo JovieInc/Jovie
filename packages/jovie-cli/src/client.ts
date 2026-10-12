@@ -486,14 +486,10 @@ async function request(
 async function requestJson(
   pathname: string,
   options: ResourceOptions,
-  jsonBody?: unknown
+  jsonBody?: unknown,
+  accept = 'application/json'
 ): Promise<unknown> {
-  const { body, url } = await request(
-    pathname,
-    'application/json',
-    options,
-    jsonBody
-  );
+  const { body, url } = await request(pathname, accept, options, jsonBody);
   try {
     return JSON.parse(body) as unknown;
   } catch {
@@ -504,6 +500,106 @@ async function requestJson(
       body.slice(0, 1_000)
     );
   }
+}
+
+/** Read through the existing public music MCP transport, without credentials. */
+export async function resolveMusic(
+  input: string,
+  flags: {
+    readonly kind?: string;
+    readonly artist?: string;
+    readonly territory?: string;
+  } = {},
+  options: ResourceOptions = {}
+): Promise<unknown> {
+  const value = input.trim();
+  const kind = flags.kind ?? 'artist';
+  if (
+    !value ||
+    value.length > 500 ||
+    !['artist', 'track', 'album'].includes(kind)
+  ) {
+    throw new JovieInputError(
+      'Provide an artist, track, or album input of 1–500 characters.'
+    );
+  }
+  if (
+    (flags.artist !== undefined &&
+      (!flags.artist.trim() || flags.artist.length > 200)) ||
+    (flags.territory !== undefined && !/^[A-Za-z]{2}$/.test(flags.territory))
+  ) {
+    throw new JovieInputError(
+      'Artist must be 1–200 characters; territory must be a two-letter country code.'
+    );
+  }
+  const id = 'jovie-music-resolve';
+  const response = (await requestJson(
+    '/api/music/mcp',
+    options,
+    {
+      jsonrpc: '2.0',
+      id,
+      method: 'tools/call',
+      params: {
+        name: 'resolve',
+        arguments: {
+          input: value,
+          kind,
+          ...(flags.artist === undefined
+            ? {}
+            : { artist: flags.artist.trim() }),
+          ...(flags.territory === undefined
+            ? {}
+            : { territory: flags.territory.toUpperCase() }),
+        },
+      },
+    },
+    'application/json, text/event-stream'
+  )) as {
+    jsonrpc?: string;
+    id?: string;
+    error?: unknown;
+    result?: {
+      isError?: boolean;
+      structuredContent?: { error?: { code?: unknown; retryable?: unknown } };
+    };
+  } | null;
+  const result = response?.result;
+  if (
+    response?.jsonrpc !== '2.0' ||
+    response.id !== id ||
+    response.error ||
+    !result?.structuredContent ||
+    typeof result.structuredContent !== 'object' ||
+    Array.isArray(result.structuredContent)
+  ) {
+    throw new JovieRequestError(
+      'Music resolver returned an invalid MCP response.',
+      `${normalizeBaseUrl(options.baseUrl)}/api/music/mcp`,
+      undefined,
+      undefined,
+      undefined,
+      'INVALID_RESPONSE',
+      false
+    );
+  }
+  if (result.isError || result.structuredContent.error) {
+    const error = result.structuredContent.error;
+    const code =
+      typeof error?.code === 'string' && /^[A-Z_]{1,64}$/.test(error.code)
+        ? error.code
+        : 'RESOLUTION_FAILED';
+    throw new JovieRequestError(
+      `Music resolution failed: ${code}`,
+      `${normalizeBaseUrl(options.baseUrl)}/api/music/mcp`,
+      undefined,
+      undefined,
+      undefined,
+      code,
+      error?.retryable === true
+    );
+  }
+  return result.structuredContent;
 }
 
 async function requestText(
