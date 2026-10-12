@@ -105,7 +105,7 @@ class ReasonTest(unittest.TestCase):
         self.assertEqual(events.held_reason(["check-failed:bash scripts/hooks", "error: x"]), ("gate-check-failed", "fix-loop"))
         self.assertEqual(events.held_reason(["gate-timeout:x3"]), ("gate-timeout", "regate"))
         self.assertEqual(events.held_reason(["code-change-without-test"]), ("missing-test", "fix-loop"))
-        self.assertEqual(events.held_reason(["diff-too-large:2000"]), ("diff-too-large", "bug-intake"))
+        self.assertEqual(events.held_reason(["diff-too-large:2000"]), ("diff-too-large", "fix-loop"))
         self.assertEqual(events.held_reason([]), ("unclassified", "fix-loop"))
 
     def test_the_most_severe_reason_names_the_record(self):
@@ -558,6 +558,27 @@ class RelayTest(unittest.TestCase):
         legacy = page([{"__typename": "PullRequestCommit", "commit": {"oid": "sync2"}}, removal])  # no parents: a plain boundary
         self.assertEqual(events.queue_ejections(7, NOW, Shell({("gh", "api", "graphql"): legacy}), head="sync2"), 1)
 
+    def test_lifting_queue_poison_is_the_ejection_boundary(self):
+        # Tim 2026-10-12: a main-moved revisit (or a fix push, or a person) lifts the label; the
+        # ejections before it are spent, so the synced head is not re-poisoned at once, and a
+        # defect that still fails re-poisons after two fresh ejections.
+        removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
+        lifted = {"__typename": "UnlabeledEvent", "label": {"name": "queue-poison"}}
+        other = {"__typename": "UnlabeledEvent", "label": {"name": "hold"}}
+        def commit(oid, parents):
+            return {"__typename": "PullRequestCommit", "commit": {"oid": oid, "parents": {"totalCount": parents}}}
+        def page(nodes):
+            return {"data": {"repository": {"pullRequest": {"headRefOid": "sync2", "state": "OPEN", "timelineItems": {
+                "nodes": nodes, "pageInfo": {"hasPreviousPage": False, "startCursor": None}}}}}}
+        cases = ((page([commit("fix", 1), removal, removal, commit("sync2", 2), lifted]), 0),
+                 (page([commit("fix", 1), removal, removal, lifted, commit("sync2", 2), removal]), 1),
+                 (page([commit("fix", 1), removal, removal, commit("sync2", 2), lifted, removal, removal]), 2),
+                 (page([commit("fix", 1), removal, removal, commit("sync2", 2), other]), 2))
+        for response, expected in cases:
+            shell = Shell({("gh", "api", "graphql"): response})
+            self.assertEqual(events.queue_ejections(7, NOW, shell, head="sync2"), expected)
+        self.assertIn("UNLABELED_EVENT", shell.calls[0][-1])
+
     def test_poison_mutation_rechecks_live_head_and_hold_after_history_reads(self):
         removal = {"__typename": "RemovedFromMergeQueueEvent", "createdAt": "2033-05-18T03:32:20Z", "reason": "failed_checks"}
         page = {"data": {"repository": {"pullRequest": {"headRefOid": "h7", "state": "OPEN", "timelineItems": {
@@ -839,10 +860,10 @@ class ClaimTest(unittest.TestCase):
 
     def test_an_unfixable_hold_retains_the_label_without_an_attempt(self):
         shell = Shell()
-        runner.record_held(self.host, 5, "h1", ["diff-too-large:2000"])
+        runner.record_held(self.host, 5, "h1", ["secret-like-file-changed"])
         claimed = events.claim_event_pr(self.host, fake_lane(shell), "devin",
                                         [pr(kinds=["red"], checks=[RED_CHECK])], NOW)
-        self.assertIsNone(claimed, "a hold no push clears (diff-too-large) never reaches the fix loop")
+        self.assertIsNone(claimed, "a hold no push clears (a secret-like file) never reaches the fix loop")
         self.assertEqual(self.attempts(), {})
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [])
 
@@ -1403,6 +1424,17 @@ class GapTest(unittest.TestCase):
         self.assertIsNone(events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
                                           Shell({("gh", "api", "graphql"): ctx})))
 
+    def test_a_bot_hold_whose_head_moved_is_stale_at_once(self):
+        # Tim 2026-10-12: no 24 h wait for an automation hold the head already moved past.
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        ctx = self.hold_ctx([("2033-05-18T02:00:00Z", "hold", "jovie-lanes[bot]")])
+        ctx["data"]["repository"]["pullRequest"]["commits"]["nodes"][0]["commit"]["committedDate"] = "2033-05-18T02:30:00Z"
+        row = events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now, Shell({("gh", "api", "graphql"): ctx}))
+        self.assertTrue(row and row["auto"])
+        ctx["data"]["repository"]["pullRequest"]["commits"]["nodes"][0]["commit"]["committedDate"] = "2033-05-18T01:00:00Z"
+        self.assertIsNone(events.stale_hold(5, pr(merge="CLEAN", labels=["hold"]), now,
+                                            Shell({("gh", "api", "graphql"): ctx})), "an unmoved head still waits")
+
     def test_truncated_or_unproven_hold_history_never_authorizes_unhold_advice(self):
         now = events.iso_ts("2033-05-18T03:00:00Z")
         for connection in ("timelineItems", "comments"):
@@ -1414,6 +1446,9 @@ class GapTest(unittest.TestCase):
                                                       Shell({("gh", "api", "graphql"): ctx})))
 
     def test_reconcile_alerts_once_per_stale_hold_episode(self):
+        # Lifting is the default (Tim 2026-10-12); alert-only is the explicit opt-out.
+        os.environ["LANES_STALE_HOLD_UNHOLD"] = "0"
+        self.addCleanup(os.environ.pop, "LANES_STALE_HOLD_UNHOLD", None)
         now = events.iso_ts("2033-05-18T03:00:00Z")
         held_node = {**self.node(5, mergeStateStatus="CLEAN", labels=[{"name": "hold"},
                                                                    {"name": events.POISON_LABEL}]),
@@ -1528,9 +1563,9 @@ class RunnerHookTest(unittest.TestCase):
     def test_record_held_and_failures_are_structured(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = runner.Host(state=Path(tmp))
-            runner.record_held(host, 9, "h9", ["diff-too-large:3000"])
+            runner.record_held(host, 9, "h9", ["secret-like-file-changed"])
             record = json.loads((host.state / "held.json").read_text())["9"]
-            self.assertEqual((record["reason"], record["next_action"]), ("diff-too-large", "bug-intake"))
+            self.assertEqual((record["reason"], record["next_action"]), ("secret-file", "bug-intake"))
 
     def test_exhausted_disabled_lane_preserves_pr_and_terminal_backlog_disposition(self):
         stuck = pr(number=7, branch="claude/jov-9-20260926t0100", sha="h1", merge="DIRTY")
@@ -1579,7 +1614,7 @@ class RunnerHookTest(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp))
-                runner.record_held(host, 7, "h1", ["diff-too-large:2000"])
+                runner.record_held(host, 7, "h1", ["secret-like-file-changed"])
                 os.environ["LANES_ESCALATION_STUCK_PRS"] = "1"
                 runner.escalate_exhausted(host, [stuck], linear)
                 runner.escalate_exhausted(host, [stuck], linear)  # intake once, not every pass
@@ -1589,7 +1624,7 @@ class RunnerHookTest(unittest.TestCase):
             runner.sh, runner.load_providers, events.return_to_pool = saved
             os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)
         self.assertEqual(triaged, [], "an unfixable hold gets a terminal disposition, not Triage inventory")
-        self.assertEqual((held["reason"], held["sha"]), ("diff-too-large", "h1"),
+        self.assertEqual((held["reason"], held["sha"]), ("secret-file", "h1"),
                          "a zero-attempt hold keeps its real reason instead of fix-exhausted")
         self.assertTrue(attempts["escalated"])
         self.assertNotIn("count", attempts, "no fix attempt was charged")
@@ -1686,7 +1721,7 @@ class NativeQueueClaimTest(unittest.TestCase):
                     elif change == "branch":live["headRefName"] = "external/branch"
                     elif change == "fork":live["isCrossRepository"] = True
                     elif change == "remote-hold":live["labels"] = [{"name": "tim-hold"}]
-                    else:(host.state / "held.json").write_text(json.dumps({"5": events.held_record("h1", ["diff-too-large:100"])}))
+                    else:(host.state / "held.json").write_text(json.dumps({"5": events.held_record("h1", ["secret-like-file-changed"])}))
                     return "failed merge group"
                 with patch.object(events, "queue_failure", side_effect=failure):
                     self.assertIsNone(events.claim_event_pr(host, module, "devin", [target], NOW))
@@ -1820,7 +1855,7 @@ class NativeQueueClaimTest(unittest.TestCase):
                     elif change == "new-head":live["headRefOid"] = "h2"
                     elif change == "now-red":live["statusCheckRollup"] = [RED_CHECK]
                     elif change == "exhaustion-label":live["labels"] += [{"name": "lane-fix-exhausted"}]
-                    elif change == "held":(host.state / "held.json").write_text(json.dumps({"5": events.held_record("h1", ["diff-too-large:100"])}))
+                    elif change == "held":(host.state / "held.json").write_text(json.dumps({"5": events.held_record("h1", ["secret-like-file-changed"])}))
                     else:(host.state / "fix-attempts.json").write_text(json.dumps({"5": {"sha": "h1", "count": 2 if change == "spent" else 1, "at": NOW}}))
                     return False
                 module.claimed_elsewhere = owner;module.reconcile_fix_target = lambda _: live
@@ -2042,11 +2077,11 @@ class TerminalPreservationTest(unittest.TestCase):
         ordinary=pr(number=1,merge='BLOCKED',updatedAt='2020-01-01T00:00:00Z')
         target=pr(number=5,draft=True,updatedAt='2020-01-01T00:00:00Z')
         newer=pr(number=6,merge='CLEAN')
-        held={'5':events.held_record('h1',['diff-too-large:2001'],at=NOW-500)}
+        held={'5':events.held_record('h1',['secret-like-file-changed'],at=NOW-500)}
         plan=events.reconcile_plan([ordinary,target,newer],{},set(),2,NOW,held=held)
         self.assertEqual(plan['close'],[])
         row=next(x for x in plan['dispositions'] if x['pr']==5)
-        self.assertEqual(row['state'],'hold:diff-too-large')
+        self.assertEqual(row['state'],'hold:secret-file')
 
     def test_stale_unhold_preserves_changed_head_local_owner_and_foreign_owner(self):
         for record, foreign in [({'sha':'h0','count':1,'at':NOW-1},False), ({},True)]:

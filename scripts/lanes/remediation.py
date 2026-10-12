@@ -64,7 +64,9 @@ GENERATED_RESOLVERS = {
     ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
     "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
 }
-DIFF_POLICY = frozenset({"secret-file", "diff-too-large", "lockfile-without-manifest"})
+# Only a secret-like file is a human call; an oversize diff is split by a repair lane and a
+# lockfile without its manifest is fixed by one (Tim 2026-10-12: no dead-end holds).
+DIFF_POLICY = frozenset({"secret-file"})
 STALE_LABELS = frozenset({"lane-fix-exhausted", "queue-poison", "lane-fix-escalating"})
 FLAKY_CONCLUSIONS = frozenset({"CANCELLED", "TIMED_OUT", "STARTUP_FAILURE", "CANCELED"})
 # Summary checks that only restate their underlying jobs. Their own FAILURE carries no cause
@@ -1034,14 +1036,10 @@ HISTORY_STATE_NAMES = frozenset({"done", "canceled", "cancelled", "closed"})
 
 
 def stuck_pr_escalation_enabled() -> bool:
-    """In-process stuck-PR ladder. Default off, and only while the router flag is on.
-
-    Detection belongs to remediation-sweep. It files ordinary labeled issues:
-    ``remediation:pr-<n>-hold`` and ``remediation:pr-<n>-conflict`` (the
-    lane-fix-exhausted case). ``LANES_ESCALATION_STUCK_PRS=1`` restores the
-    in-process ladder.
-    """
-    return escalation_enabled() and _flag("LANES_ESCALATION_STUCK_PRS", False)
+    """In-process stuck-PR ladder, on by default while the router flag is on (Tim 2026-10-12:
+    every exhausted head needs an automatic exit; the daily remediation sweep was the only
+    other one). ``LANES_ESCALATION_STUCK_PRS=0`` turns it off."""
+    return escalation_enabled() and _flag("LANES_ESCALATION_STUCK_PRS", True)
 
 
 def alert_key_slug(key: str) -> str | None:

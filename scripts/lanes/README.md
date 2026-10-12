@@ -25,7 +25,7 @@ The harness, not the model, owns:
 |---|---|
 | Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
-| Open-PR budget: a lane holding `slots × 2` open advanceable non-green PRs only fixes/adopts until it drains; held/`lane-fix-exhausted` PRs are bounded separately at `slots × 4` (`terminal-pr-backlog`) so parked work cannot pin a lane idle | `new_issue_budget()`, `pr_is_terminal()` |
+| No open-PR ceiling (Tim 2026-10-12): new-issue intake is bounded only by real limits in autoscale (compute, credits, quotas); `new_issue_budget()` reports counts, never refuses | `new_issue_budget()` |
 | Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit dispatch-next in the admitted pool → tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
 | File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
 | Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
@@ -40,7 +40,7 @@ The harness, not the model, owns:
 | Gate timeouts are transient: re-gated by adopt, held only after 3 on one head | `gate_timeouts()` |
 | Landing: only a gate-passing PR is marked ready and auto-merged; CI and the queue decide | `gate_pr()`, `requeue_verified()` |
 | Receipts (`runs/ledger.jsonl`) bind Linear issue, provider/account class and lease, worktree/branch, PR/head or terminal failure; per-run log and prompt, Linear handoff comments | `run_issue()`, `codex_lane.record_lease()`, `worker()` |
-| Retry to Todo, Triage after 3 failures; not-shippable goes to Triage once | `worker()` |
+| Retry to Todo with no backoff; 3 failures park the issue on this host until the next lanes release (no Backlog sink); a provider error returns the issue to Todo and cools the lane only on a measured limit (exit 75); not-shippable goes to Backlog once | `worker()`, `failure_rejection()`, `cool_down()` |
 | Fix loop owns every open non-draft PR in the repo (red checks, conflicts, changes requested), reconciles live state before checkout/install/push, 2 attempts per head, then the escalation ladder | `fix_candidates()`, `reconcile_fix_target()`, `red_pr()`, `escalate_exhausted()`, `remediation.py` |
 | Event queue: GitHub signals become `lane-fix-<kind>` labels; a worker takes a labeled PR first | `pr_events.py`, `lane-fix-relay.yml` |
 | Cheapest lane first: attempt n belongs to the n-th enabled lane in `providers.json` order | `pr_events.may_take()` |
@@ -55,7 +55,7 @@ The harness, not the model, owns:
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
 | Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash, HTTP 404, unhealthy) hands the same worktree to the next enabled, healthy, uncooled lane in `providers.json` tier order, up to 2 handoffs; the receipt records `handoffs` (with `reason`) and `finishedBy`. Disabled entries and remote-only lanes (`repairs: false`, Hyperagent) are never chosen | `run_issue()`, `next_provider()`, `remediation.route_lane()` |
-| Repository bindings: the one service also routes LogYourBody (Linear `LYB` -> `JovieInc/LogYourBody`, `~/LogYourBody` on Gem, `LANES_REPO_LYB` overrides, `LANES_BINDING_LYB=0` disables). A worker spends its held seat on one LYB repair (red or behind lane PR, 2 tries per head, a per-PR lease so two seats never repair one PR) or one claim (any Todo issue without `hold` or a hard-excluded label; sensitive labels only on the Codex lane; no LYB-specific concurrency cap, only the host's seats; `maxOpenPrs` counts open lane PRs plus running issue runs and limits new intake only, never repair) before Jovie intake. Jovie-only holds never block LYB and a binding fault never blocks Jovie. The harness pushes, opens a ready PR (never draft: LYB's native merge queue skips drafts; a repair readies a draft lane PR) and moves the issue to In Review; LYB required checks and its native queue land it. Refusal reasons land in `bindings.json`. LYB remediation events never run in the Jovie repo | `bindings.py`, `routing.json` `bindings`, `worker_with_slot()` |
+| Repository bindings: the one service also routes LogYourBody (Linear `LYB` -> `JovieInc/LogYourBody`, `~/LogYourBody` on Gem, `LANES_REPO_LYB` overrides, `LANES_BINDING_LYB=0` disables). A worker spends its held seat on one LYB repair (red or behind lane PR, 2 tries per head, a per-PR lease so two seats never repair one PR) or one claim (any Todo issue without `hold` or a hard-excluded label; sensitive labels only on the Codex lane; no LYB-specific concurrency cap or open-PR ceiling, only the host's seats) before Jovie intake. Jovie-only holds never block LYB and a binding fault never blocks Jovie. The harness pushes, opens a ready PR (never draft: LYB's native merge queue skips drafts; a repair readies a draft lane PR) and moves the issue to In Review; LYB required checks and its native queue land it. Refusal reasons land in `bindings.json`. LYB remediation events never run in the Jovie repo | `bindings.py`, `routing.json` `bindings`, `worker_with_slot()` |
 | Cost-aware routing: one capability floor per issue (`routing.json`), then the cheapest available `(lane, model)` route that clears it by effective cost; every claim is logged with its rationale | `remediation.route_issue()`, `issue_router()`, `runs/routing.jsonl` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
@@ -65,22 +65,18 @@ issue. The minute timer only restarts idle lanes and applies updates; it never s
 running worker. Production deploys are a separate track: only a red main stops shipping.
 
 New-issue admission reports three separate counts: raw Todo candidates, candidates
-passing the issue predicate, and new issues after the owning lane's PR budget.
-Worker and doctor share the same budget decision: each dated lane branch counts
-once toward the active cap while non-green and advanceable, with a cap of
-configured base slots × 2. Held, repair-exhausted, and escalating PRs count
-separately toward the terminal cap of configured base slots × 4. Manual branches
-and disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
-malformed or truncation-ambiguous inventory stays unknown and cannot admit new
-issues. Maintenance claims still run first and do not depend on that budget read.
+passing the issue predicate, and new issues a lane may claim. There is no open-PR
+ceiling (Tim 2026-10-12): the JOV-6833 `slots × 2` and JOV-7514 `slots × 4` caps
+are gone, and the claim path makes no PR-count read. Maintenance claims still run first.
 HUD labels this count as new issues; it is not total company demand or a claim of
 available worker capacity. Slot occupancy, account leases and PR work remain
 separate facts. Empty-demand alerts require known zero eligibility and no open
 PR maintenance; unknown evidence and backpressure reset the empty timer.
 
-The file-overlap guard is on by default. `SYMPHONY_FILE_OVERLAP_GUARD=flag` keeps
-classification, ledger, doctor, and HUD visibility without holds; `=0` disables it
-and releases automation-owned holds. Existing non-draft PR overlaps are ordered by
+The file-overlap guard flags by default (Tim 2026-10-12): classification, ledger, doctor
+and HUD visibility, no holds; the merge queue's own conflict detection serializes PRs and a
+hold left by the old default is released. `SYMPHONY_FILE_OVERLAP_GUARD=enforce` (or `1`)
+turns holds on; `=0` disables it and releases automation-owned holds. With enforcement on, Existing non-draft PR overlaps are ordered by
 an explicit stack/dependency first, then foundational/shared work, smaller diffs,
 creation time, and PR number. The later PR receives `hold`; after the earlier PR
 lands, Symphony removes only the hold it applied and queues `lane-fix-dequeued` for
@@ -561,12 +557,15 @@ is created on the JOV team when it is missing, color `#E5484D`.
 
 ### Stuck PRs stay on the sweep
 
-Stuck-PR detection lives in remediation-sweep. It files ordinary labeled
-issues: `remediation:pr-<n>-hold` and `remediation:pr-<n>-conflict` for a PR
-whose `lane-fix-exhausted` label has aged out. The router consumes those as
-normal remediation events. It does not run its own stuck-PR escalation unless
-`LANES_ESCALATION_STUCK_PRS=1` (and `LANES_ESCALATION` is on). That flag
-defaults off.
+Remediation-sweep also files ordinary labeled issues (`remediation:pr-<n>-hold`,
+`remediation:pr-<n>-conflict`) that the router consumes as normal events. The in-process
+stuck-PR ladder runs by default (Tim 2026-10-12: every exhausted head needs an automatic exit)
+while `LANES_ESCALATION` is on; `LANES_ESCALATION_STUCK_PRS=0` turns it off. Terminal heads
+(exhausted, escalated, `queue-poison`) also get a no-model main sync each time main moves, with
+no clock; the sync lifts `queue-poison`, and that removal is the boundary the poison count
+restarts from. A bot hold whose head moved past it is lifted at once
+(`LANES_STALE_HOLD_UNHOLD=0` keeps alert-only). An oversize diff goes to a repair lane that
+splits it into a stack instead of bug intake.
 
 On the next dispatch tick the router:
 
