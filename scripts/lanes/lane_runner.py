@@ -2251,23 +2251,27 @@ HANDOFF_NOTE = ("A previous agent (lane `{prev}`) stopped before finishing (exit
 
 
 # EX_TEMPFAIL: the provider wrapper measured a limit, an auth failure or no capacity
-# (codex_lane NO_ACCOUNT_EXIT, claude_lane NO_CAPACITY_EXIT).
+# (codex_lane NO_ACCOUNT_EXIT, claude_lane NO_CAPACITY_EXIT). Only those wrappers define it:
+# a raw CLI's 75 (devin on LYB runs, Gem 03:38Z) is an unexplained failure, not a limit.
 PROVIDER_LIMIT_EXIT = 75
+LIMIT_EXIT_PROVIDERS = frozenset({"codex", "claude"})
 
 
-def provider_exit(reasons) -> int | None:
+def provider_exit(reasons) -> int:
+    """The agent exit code a provider-error recorded; -1 when none was (never a limit)."""
     for reason in reasons or []:
         found = re.fullmatch(r"agent-exit:(-?\d+)", str(reason))
         if found:
             return int(found.group(1))
-    return None
+    return -1
 
 
-def cool_down(host: Host, name: str, code: int | None = PROVIDER_LIMIT_EXIT) -> bool:
+def cool_down(host: Host, name: str, code: int | None = None) -> bool:
     """Cool a provider only on a measured provider limit (Tim 2026-10-12): a crash or any other
     non-zero exit is a failure, which the current failure rate already backs off on. Returns
     whether a cooldown was written."""
-    if code != PROVIDER_LIMIT_EXIT:
+    # `code` None: the caller measured the limit itself. An exit code must be a wrapper's 75.
+    if code is not None and (code != PROVIDER_LIMIT_EXIT or name not in LIMIT_EXIT_PROVIDERS):
         return False
     path = host.state / "cooldown" / name
     path.parent.mkdir(parents=True, exist_ok=True)
