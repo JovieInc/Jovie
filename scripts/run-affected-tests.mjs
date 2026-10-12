@@ -214,6 +214,19 @@ const AUDIENCE_RELEASE_DENIAL_LANE = new Set([
   'apps/web/tests/unit/api/cron/schedule-release-notifications.test.ts',
   'apps/web/tests/unit/api/cron/send-release-notifications.test.ts',
 ]);
+const PLAYWRIGHT_SENTRY_ISOLATION_PROOF =
+  'apps/web/tests/unit/ci/sentry-ci-reporter.test.ts';
+const PLAYWRIGHT_SENTRY_ISOLATION_INPUTS = new Set([
+  '.github/workflows/ci.yml',
+  'apps/web/playwright.config.ts',
+  'apps/web/tests/e2e/reporters/sentry-ci-reporter.ts',
+  'apps/web/tests/e2e/sentry.spec.ts',
+  PLAYWRIGHT_SENTRY_ISOLATION_PROOF,
+]);
+const PLAYWRIGHT_SENTRY_ISOLATION_LANE = new Set([
+  ...PLAYWRIGHT_SENTRY_ISOLATION_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
 const SUMMER_COMMISSIONING_PRIMARY_INPUTS = new Set([
   'scripts/summer-commissioning/architecture-freshness-registry.json',
   'scripts/summer-commissioning/capability-access-registry.json',
@@ -382,7 +395,6 @@ const CI_CONTROL_SCRIPT_TESTS = [
   OWNERLESS_RECOVERY_POLICY_TEST,
   'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
   'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
-  'scripts/lib/__tests__/eval-main-health-action.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
   'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
   'scripts/lib/__tests__/pr-conflict-event.test.mjs',
@@ -1296,6 +1308,44 @@ function planAffectedTests(
         'scripts/lib/__tests__/ci-harness.test.mjs',
         'scripts/lib/__tests__/production-release-supersession.test.mjs',
       ],
+    };
+  }
+  const hasPlaywrightSentryIsolationSource = files.includes(
+    'apps/web/tests/e2e/reporters/sentry-ci-reporter.ts'
+  );
+  if (hasPlaywrightSentryIsolationSource) {
+    const sentryIsolationInputCount = files.filter(file =>
+      PLAYWRIGHT_SENTRY_ISOLATION_INPUTS.has(file)
+    ).length;
+    const selectorInputCount = files.filter(file =>
+      AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+    ).length;
+    const isBoundedPlaywrightSentryIsolationChange =
+      sentryIsolationInputCount === PLAYWRIGHT_SENTRY_ISOLATION_INPUTS.size &&
+      files.every(file => PLAYWRIGHT_SENTRY_ISOLATION_LANE.has(file)) &&
+      (selectorInputCount === 0 ||
+        selectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+    if (!isBoundedPlaywrightSentryIsolationChange) {
+      return fullSuitePlan(
+        'Playwright Sentry isolation change exceeds its focused lane'
+      );
+    }
+    if (!isFileAvailable(PLAYWRIGHT_SENTRY_ISOLATION_PROOF)) {
+      return fullSuitePlan('Playwright Sentry isolation proof is unavailable');
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [PLAYWRIGHT_SENTRY_ISOLATION_PROOF],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      nodeTests: [],
+      scriptVitestTests:
+        selectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size
+          ? AFFECTED_TEST_SELECTOR_TESTS
+          : [],
     };
   }
   if (

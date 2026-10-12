@@ -11,6 +11,7 @@ color `#E5484D`). `doctor.json` is what the HUD renders.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -61,6 +62,8 @@ AGED_PR_S = 7 * 24 * 3600
 MERGE_THROUGHPUT_REFRESH_S = 5 * 60
 MERGE_THROUGHPUT_CACHE_S = 10 * 60
 PROMOTION_SCRIPT = Path(__file__).resolve().parents[1] / "promotion-loss-metrics.mjs"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+OPS_REPORT_SCRIPT = Path(__file__).resolve().with_name("ops-report.mjs")
 
 
 def now_iso() -> str:
@@ -200,8 +203,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
                    for name, seats in capacity_by_provider.items()}
         qualified_by_provider = {name: issues if budgets[name]["allowed"] else []
                                  for name, issues in qualified_by_provider.items()}
-        pool_by_provider = {name: (None if budgets[name]["used"] is None else len(issues))
-                            for name, issues in qualified_by_provider.items()}
+        pool_by_provider = {name: len(issues) for name, issues in qualified_by_provider.items()}
         qualified_jobs = {name: [issue.identifier for issue in issues]
                           for name, issues in qualified_by_provider.items()}
         pool = (None if any(value is None for value in pool_by_provider.values()) else
@@ -476,13 +478,15 @@ def _active_lease(path: Path, now: float) -> dict | None:
 
 
 def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
-    """The tick attempted recovery, but no worker owns any configured slot."""
+    """The tick attempted recovery, but at least one configured slot remains vacant."""
     capacity = (obs.get("capacityByProvider") or {}).get(provider) or {}
     pool = (obs.get("poolByProvider") or {}).get(provider)
     tick = obs.get("tick") or {}
     account_state = obs.get("codexAttribution") or codex_attribution(obs.get("codex") or {}, obs["now"])
     account_ready = provider != "codex" or bool(account_state.get("unleasedAvailable"))
-    return bool(pool and account_ready and capacity.get("slots") and not capacity.get("running")
+    slots, running = capacity.get("slots"), capacity.get("running")
+    vacant = (type(slots) is int and type(running) is int and 0 <= running < slots)
+    return bool(pool and account_ready and vacant
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
 
 
@@ -518,7 +522,9 @@ def codex_attribution(report: dict, now: float) -> dict:
             return unknown
         counts["leased"] += int(row["leased"])
         counts["eligibleByCooldown"] += int(row["available"])
-        counts["unleasedAvailable"] += int(row["available"] and not row["leased"])
+        free = row.get("freeSlots", 0 if row["leased"] else 1)
+        counts["unleasedAvailable"] += (free if type(free) is int and free >= 0 else int(not row["leased"])) \
+            if row["available"] else 0
         if not row["available"]:
             until = age_s(row.get("exhaustedUntil"), now)
             if until is None or until >= 0:
@@ -699,7 +705,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         pool_for_provider = (obs.get("poolByProvider") or {}).get(provider)
         accounts = f", {account_state['unleasedAvailable']} available account(s)" if provider == "codex" else ""
         alerts[f"provider-idle:{provider}"] = (f"{provider} has {pool_for_provider} compatible issue(s){accounts}, "
-                                               f"but 0/{capacity['slots']} workers after dispatch retried for "
+                                               f"but {capacity['running']}/{capacity['slots']} workers after dispatch retried for "
                                                f"{PROVIDER_IDLE_S // 60}m")
     if obs.get("gateTimeouts24h", 0) >= GATE_TIMEOUT_ALERT:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
@@ -865,11 +871,121 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
 
 # ---------------------------------------------------------------- Linear actions
 
+def _source_version() -> str:
+    explicit = os.environ.get("JOVIE_SOURCE_SHA", "").strip().lower()
+    if re.fullmatch(r"[a-f0-9]{40}", explicit):
+        return explicit
+    try:
+        status = subprocess.run(
+            ["git", "status", "--porcelain=v1", "--untracked-files=all"], cwd=REPO_ROOT,
+            capture_output=True, text=True, timeout=5, check=False)
+        if status.returncode != 0 or status.stdout.strip():
+            return "UNKNOWN"
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True,
+            text=True, timeout=5, check=False)
+        resolved = result.stdout.strip().lower()
+        return resolved if result.returncode == 0 and re.fullmatch(r"[a-f0-9]{40}", resolved) else "UNKNOWN"
+    except (OSError, subprocess.SubprocessError):
+        return "UNKNOWN"
+
+
+def _emergency_ops_report(key: str, text: str, condition: dict, host_name: str, target: str) -> dict:
+    """Preapproved deterministic notice when the observation-only reviewer is unavailable."""
+    source = condition.get("source") or {}
+    observed_at = source.get("observedAt") or "UNKNOWN"
+    owner = condition.get("owner") or "UNKNOWN"
+    next_action = condition.get("nextAction") or "inspect the existing Symphony doctor receipt"
+    message = "\n".join([
+        "Symphony emergency notice: report review is unavailable.",
+        "Domain: company (JovieInc/Jovie)",
+        f"Evidence observed: {observed_at}",
+        f"Evidence source: {source.get('producer') or 'UNKNOWN'}",
+        "Surface owner: Summer",
+        f"Current owner: {owner}",
+        f"Blocker: {text or 'UNKNOWN'}",
+        "Root cause: UNKNOWN",
+        f"Next action: {next_action}",
+    ])
+    message_digest = hashlib.sha256(message.encode()).hexdigest()
+    evidence_digest = hashlib.sha256(json.dumps(condition, sort_keys=True, default=str).encode()).hexdigest()
+    bindings = {
+        "messageSha256": message_digest,
+        "audience": "Founder and operators reading agent output",
+        "destination": {"adapter": "linear-issue", "target": target},
+        "evidenceFingerprint": evidence_digest,
+        "policyVersion": "canon/VOICE.md action-only agent communication; FLEET admission policy",
+        "resolvedModel": "NOT_APPLICABLE",
+    }
+    review_digest = hashlib.sha256(json.dumps(bindings, sort_keys=True).encode()).hexdigest()
+    return {
+        "message": message,
+        "decision": "approved-template",
+        "idempotencyKey": f"{host_name}:{key}:{condition.get('generation', 1)}",
+        "review": {
+            "schema": "jovie.agent-ops-report-delivery-review/v1",
+            "mode": "observation",
+            "outcome": "approved-template",
+            "reviewStatus": "emergency-reviewer-unavailable",
+            "revisionCount": 0,
+            "requestFingerprint": None,
+            "reviewedAt": now_iso(),
+            "bindings": bindings,
+            "reviewDigest": review_digest,
+        },
+    }
+
+
+def prepare_ops_report(key: str, text: str, condition: dict, host_name: str, target: str) -> dict:
+    """Prepare, but never send, one company-scoped report through the Jev observation seam."""
+    source = condition.get("source") or {}
+    observed_at = source.get("observedAt") or "UNKNOWN"
+    source_version = _source_version()
+    proof = {
+        name: {"status": "UNKNOWN", "observedAt": observed_at,
+               "source": source.get("producer") or "UNKNOWN", "receipt": "UNKNOWN"}
+        for name in ("source", "tests", "ciQueue", "merge", "deployment",
+                     "authenticatedRuntime", "recurrence")
+    }
+    if source_version != "UNKNOWN":
+        proof["source"].update(status="PROVEN", receipt=source_version)
+    if int(condition.get("generation") or 1) > 1:
+        proof["recurrence"].update(status="PROVEN", receipt=condition.get("idempotencyKey") or "UNKNOWN")
+    else:
+        proof["recurrence"].update(status="NOT_APPLICABLE", receipt="NOT_APPLICABLE")
+    payload = {
+        "domain": "company",
+        "producer": "Symphony",
+        "currentOwner": condition.get("owner"),
+        "observedState": f"{condition.get('condition') or key} is {condition.get('state') or 'UNKNOWN'}",
+        "blocker": text,
+        "rootCause": None,
+        "nextAction": condition.get("nextAction"),
+        "evidence": {"observedAt": observed_at, "source": source.get("producer")},
+        "sourceSha": source_version,
+        "proofTiers": proof,
+        "destination": {"adapter": "linear-issue", "target": target},
+    }
+    try:
+        result = subprocess.run(
+            ["node", str(OPS_REPORT_SCRIPT)], cwd=REPO_ROOT, input=json.dumps(payload),
+            capture_output=True, text=True, timeout=20, check=False,
+            env={**os.environ, "JOVIE_AGENT_PROFILE": "no_agent"})
+        prepared = json.loads(result.stdout) if result.returncode == 0 else None
+        if (not isinstance(prepared, dict) or not isinstance(prepared.get("review"), dict)
+                or not isinstance(prepared.get("message"), str)
+                or prepared.get("destination", {}).get("target") != target):
+            raise ValueError("invalid ops report result")
+        return prepared
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return _emergency_ops_report(key, text, condition, host_name, target)
+
 class Tracker:
     """Linear Triage issues, one per alert key, reused within the cool-off."""
     def __init__(self, linear, host_name: str):
         self.linear, self.host = linear, host_name
         self._team_node = None
+        self.last_writing_report = None
 
     def title(self, key: str) -> str:
         if key == "bottleneck:merge-queue":
@@ -945,7 +1061,8 @@ class Tracker:
         except Exception:
             return None
 
-    def open(self, key: str, text: str) -> str | None:
+    def open(self, key: str, text: str, condition: dict | None = None) -> str | None:
+        self.last_writing_report = None
         found = self.existing(key)
         if found:
             self.apply_alert_label(found, key)
@@ -959,14 +1076,19 @@ class Tracker:
             remediation_label = self._remediation_label_id(key)
             if remediation_label:
                 labels.append(remediation_label)
+            description = (f"**{text}**\n\nHost `{self.host}`, {now_iso()}. Raised by `scripts/lanes/doctor.py`; "
+                           "it will move this issue to Done when the condition clears.\n\n"
+                           "Runbook: `scripts/lanes/README.md`; state under `~/.local/state/jovie-lanes` "
+                           "(`tick.json`, `runs/ledger.jsonl`, `doctor.json`).")
+            if condition:
+                prepared = prepare_ops_report(key, text, condition, self.host, self.title(key))
+                description = prepared["message"]
+                self.last_writing_report = prepared
             data = self.linear.gql(
                 'mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id identifier}}}',
                 {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": priority,
                        "title": self.title(key),
-                       "description": f"**{text}**\n\nHost `{self.host}`, {now_iso()}. Raised by `scripts/lanes/doctor.py`; "
-                                      "it will move this issue to Done when the condition clears.\n\n"
-                                      "Runbook: `scripts/lanes/README.md`; state under `~/.local/state/jovie-lanes` "
-                                      "(`tick.json`, `runs/ledger.jsonl`, `doctor.json`)."}})
+                       "description": description}})
             return data["issueCreate"]["issue"]["id"]
         except Exception:
             return None
@@ -1050,7 +1172,14 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
             else:
                 entry["pendingAction"] = "reopen"
             continue
-        issue_id = tracker.open(key, text) if tracker else None
+        issue_id = tracker.open(key, text, (conditions or {}).get(key)) if tracker else None
+        writing_report = getattr(tracker, "last_writing_report", None) if tracker else None
+        if issue_id and writing_report and conditions and key in conditions:
+            conditions[key] = {
+                **conditions[key],
+                "writingReview": writing_report["review"],
+                "writingDecision": writing_report["decision"],
+            }
         issues[key] = {"id": issue_id, "closedAt": None}  # retry a failed open
         if tracker and issue_id and conditions and key in conditions:
             contradict = getattr(tracker, "contradict_invariant", None)
@@ -1065,6 +1194,11 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
                 entry["pendingAction"] = "close"
     receipts = {}
     for key, event in (conditions or {}).items():
+        prior_event = (previous.get("conditions") or {}).get(key) or {}
+        if (not event.get("writingReview") and prior_event.get("writingReview")
+                and prior_event.get("idempotencyKey") == event.get("idempotencyKey")):
+            event = {**event, "writingReview": prior_event["writingReview"],
+                     "writingDecision": prior_event.get("writingDecision")}
         entry = issues.get(key) or {}
         acknowledged = bool(entry) and not entry.get("pendingAction")
         if event.get("state") == "resolved":
@@ -1214,7 +1348,17 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "slo": obs.get("slo"),
             "escalation": obs.get("escalation") or remediation.empty_escalation(),
             "remediation": obs.get("remediation") or remediation.empty_remediation(),
-            "autoscale": _autoscale_block(host)}
+            "autoscale": _autoscale_block(host),
+            # Real-limit record (jovie.capacity-limit): which measured limit holds lanes back.
+            "capacityLimit": _capacity_limit_block(host)}
+
+
+def _capacity_limit_block(host) -> dict | None:
+    try:
+        import capacity_limit
+        return capacity_limit.read_record(host.state)
+    except Exception:  # the feed never fails on an optional record
+        return None
 
 
 def _autoscale_block(host) -> dict:

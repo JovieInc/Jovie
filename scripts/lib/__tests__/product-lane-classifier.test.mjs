@@ -485,6 +485,30 @@ describe('product lane classifier', () => {
     ).toThrow(ProductLaneClassificationError);
   });
 
+  it('keeps JS workspace config off the native iOS lane', () => {
+    for (const path of [
+      'tsconfig.json',
+      'turbo.json',
+      'biome.json',
+      'vitest.config.mts',
+      'pnpm-workspace.yaml',
+      '.nvmrc',
+      '.node-version',
+      '.npmrc',
+      'patches/next@16.0.0.patch',
+    ]) {
+      expect(classifyProductLanes([path]).selectedLanes, path).toEqual([
+        'mac',
+        'web',
+        'cross-product',
+      ]);
+    }
+    expect(
+      classifyProductLanes(['tsconfig.json', 'apps/ios/Jovie/App.swift'])
+        .selectedLanes
+    ).toEqual(ALL);
+  });
+
   it('maps isolated, shared, and operations-only paths', () => {
     for (const [path, lanes] of /** @type {Array<[string, string[]]>} */ ([
       ['apps/ios/Jovie/App.swift', ['ios']],

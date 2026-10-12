@@ -1447,6 +1447,14 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const PLAYWRIGHT_SENTRY_ISOLATION_DIFF = [
+  '.github/workflows/ci.yml',
+  'apps/web/playwright.config.ts',
+  'apps/web/tests/e2e/reporters/sentry-ci-reporter.ts',
+  'apps/web/tests/e2e/sentry.spec.ts',
+  'apps/web/tests/unit/ci/sentry-ci-reporter.test.ts',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const SENTRY_AUTOFIX_RECURRENCE_LANE = [
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
@@ -2765,6 +2773,37 @@ describe('automation-verify affected scope', () => {
         ],
       ],
     ]);
+  });
+
+  it('keeps Playwright Sentry isolation on its focused unit and selector proofs', () => {
+    const plan = buildAffectedTestPlan(PLAYWRIGHT_SENTRY_ISOLATION_DIFF);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/ci/sentry-ci-reporter.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(
+      buildAffectedTestPlan([
+        ...PLAYWRIGHT_SENTRY_ISOLATION_DIFF,
+        'apps/web/tests/e2e/reporters/unknown-reporter.ts',
+      ]).mode
+    ).toBe('full');
+    expect(
+      buildAffectedTestPlan(
+        PLAYWRIGHT_SENTRY_ISOLATION_DIFF.filter(
+          file => file !== 'apps/web/tests/e2e/sentry.spec.ts'
+        )
+      ).mode
+    ).toBe('full');
+    expect(
+      buildAffectedTestPlan(PLAYWRIGHT_SENTRY_ISOLATION_DIFF, {
+        isFileAvailable: file =>
+          file !== 'apps/web/tests/unit/ci/sentry-ci-reporter.test.ts',
+      }).fallbackReason
+    ).toBe('Playwright Sentry isolation proof is unavailable');
   });
 
   it('keeps the golden-path smoke contract repair on focused coverage', () => {

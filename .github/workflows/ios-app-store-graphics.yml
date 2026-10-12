@@ -40,70 +40,11 @@ concurrency:
   cancel-in-progress: ${{ inputs.checkout-ref == '' }}
 
 jobs:
-  # Self-hosted Macs first (no hosted-pool queue, warm simulator); hosted
-  # macos-26 when the heartbeat is stale. See .claude/rules/infra.md.
-  mac-runner-route:
-    name: Mac Runner Route
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    permissions:
-      actions: read
-      contents: read
-    outputs:
-      runner_class: ${{ steps.route.outputs.runner_class }}
-    steps:
-      - name: Checkout trusted runner routing policy
-        if: ${{ vars.JOVIE_MAC_RUNNER != 'off' }}
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: main
-          fetch-depth: 1
-          sparse-checkout: |
-            .github/scripts/await-runner-heartbeat.sh
-            .github/scripts/query-runner-heartbeat.sh
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
-
-      - name: Query Mac runner heartbeat
-        id: heartbeat
-        if: ${{ vars.JOVIE_MAC_RUNNER != 'off' }}
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml
-          HEARTBEAT_MAX_AGE_SECONDS: '1500'
-          HEARTBEAT_API_TIMEOUT_SECONDS: '5'
-          HEARTBEAT_POLL_ATTEMPTS: '1'
-          HEARTBEAT_POLL_INTERVAL_SECONDS: '1'
-        run: |
-          set -uo pipefail
-          helper='.github/scripts/await-runner-heartbeat.sh'
-          if [ -x "$helper" ]; then
-            timeout 60s "$helper" || true
-          fi
-          exit 0
-
-      - name: Select Mac runner route
-        id: route
-        env:
-          HEARTBEAT_HEALTH: ${{ steps.heartbeat.outputs.health }}
-          HEARTBEAT_EVIDENCE: ${{ steps.heartbeat.outputs.evidence }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          runner_class='hosted'
-          if [ "$HEARTBEAT_HEALTH" = 'up' ]; then
-            runner_class='mac'
-          fi
-          echo "runner_class=$runner_class" >> "$GITHUB_OUTPUT"
-          echo "::notice::App Store graphics Mac route: $runner_class — ${HEARTBEAT_EVIDENCE:-not probed}"
-
+  # Hosted macOS: path-filtered, advisory, and also a release call; nothing in
+  # the merge queue waits on it (HOSTED_MACOS_ALLOWED).
   graphics:
     name: Render App Store Graphics
-    needs: [mac-runner-route]
-    runs-on: ${{ needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-26' }}
+    runs-on: macos-26
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -145,7 +86,7 @@ jobs:
         run: node apps/ios/scripts/app-store-graphics.mjs verify
 
       - name: Upload App Store graphics
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ios-app-store-graphics-${{ inputs.checkout-ref || github.sha }}
           path: |
@@ -157,7 +98,7 @@ jobs:
 
       - name: Upload captures for diagnosis
         if: ${{ failure() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ios-app-store-graphics-failed-${{ inputs.checkout-ref || github.sha }}-${{ github.run_attempt }}
           path: artifacts/app-store-graphics/

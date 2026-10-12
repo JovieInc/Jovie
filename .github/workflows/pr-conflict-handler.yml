@@ -350,7 +350,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload exact plan receipt
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pr-conflict-plan-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -866,7 +866,7 @@ jobs:
 
       - name: Upload immutable conflict artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: conflict-fx-candidate-${{ github.run_id }}-${{ github.run_attempt }}-pr-${{ matrix.prNumber }}-attempt-${{ matrix.attempt }}
           path: ${{ runner.temp }}/conflict-fx-artifact
@@ -1045,7 +1045,7 @@ jobs:
 
       - name: Upload isolated verification binding only
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: conflict-fx-verification-${{ github.run_id }}-${{ github.run_attempt }}-pr-${{ matrix.prNumber }}-attempt-${{ matrix.attempt }}
           path: ${{ runner.temp }}/conflict-fx-verification
@@ -1840,7 +1840,7 @@ jobs:
 
       - name: Upload durable cohort evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: conflict-fx-cohort-${{ github.run_id }}-${{ github.run_attempt }}
           path: |

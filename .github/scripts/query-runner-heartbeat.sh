@@ -59,11 +59,6 @@ case "$HEARTBEAT_WORKFLOW" in
     HEARTBEAT_JOB_NAME="Self-hosted runner heartbeat"
     HEARTBEAT_RUNNER_LABEL="jovie-runner"
     ;;
-  mac-runner-heartbeat.yml)
-    HEARTBEAT_WORKFLOW_NAME="Mac Runner Heartbeat"
-    HEARTBEAT_JOB_NAME="Self-hosted Mac runner heartbeat"
-    HEARTBEAT_RUNNER_LABEL="jovie-mac"
-    ;;
   *) degrade uncertain "heartbeat workflow identity is not authorized" ;;
 esac
 HEARTBEAT_WORKFLOW_PATH=".github/workflows/$HEARTBEAT_WORKFLOW"

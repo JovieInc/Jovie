@@ -534,7 +534,7 @@ export function classifyRequiredCheckPage(page, { checkName, headSha }) {
     }
     return run.conclusion === 'success'
       ? { state: 'success', detail: 'success' }
-      : { state: 'terminal-failure', detail: run.conclusion };
+      : { state: 'terminal-failure', detail: run.conclusion, runId: run.id };
   }
 
   if (!NONTERMINAL_CHECK_STATUSES.has(run.status) || run.conclusion !== null) {
@@ -573,6 +573,10 @@ const TRANSIENT_ADMISSION_MESSAGES = [
   // 2026-10-11 20:10Z (run 38171069689): unmatched, it was classed
   // "unclassified" and spent #21264's one source retry on a quota outage.
   /^GitHub rate-limit recovery does not fit within the admission budget$/,
+  // A producer whose only errors were GitHub quota/5xx (2026-10-11 20:21Z:
+  // 34 PR Size Guard and Fork PR Gate groups failed on the repo's exhausted
+  // GITHUB_TOKEN). Its red is infrastructure, not the source revision.
+  /^(?:Fork PR Gate|PR Size Guard) failed on GitHub (?:primary-rate-limit|secondary-rate-limit|transient-server), not on the combined head$/,
 ];
 const TRANSIENT_ADMISSION_HTTP_MESSAGE =
   /^GitHub API (?:(?:403|429) for \S+: .*\b(?:secondary )?rate limit\b|(?:502|503|504) for \S+: )/i;
@@ -593,8 +597,50 @@ function defaultSleep(delayMs) {
   return new Promise(resolve => setTimeout(resolve, delayMs));
 }
 
+const RUNNER_EXIT_ANNOTATION = /^Process completed with exit code \d+\.$/;
+
+/**
+ * The GitHub failure kind when every error a failed producer reported was a
+ * quota/5xx answer from GitHub, else null. One annotations read, spent only on
+ * a failed producer; any doubt (unreadable, mixed or empty) stays a real red.
+ */
+async function producerInfrastructureFailure({
+  classifyFailureText,
+  deadlineMs,
+  loadCheckRunAnnotations,
+  state,
+}) {
+  if (
+    state.detail !== 'failure' ||
+    typeof classifyFailureText !== 'function' ||
+    typeof loadCheckRunAnnotations !== 'function'
+  ) {
+    return null;
+  }
+  let annotations;
+  try {
+    annotations = await loadCheckRunAnnotations({
+      checkRunId: state.runId,
+      deadlineMs,
+    });
+  } catch (error) {
+    // The read itself hit the exhausted quota: the producer did too.
+    return isTransientApiError(error) ? 'primary-rate-limit' : null;
+  }
+  const messages = (Array.isArray(annotations) ? annotations : [])
+    .filter(row => row?.annotation_level === 'failure')
+    .map(row => String(row.message ?? '').trim())
+    .filter(message => message && !RUNNER_EXIT_ANNOTATION.test(message));
+  if (messages.length === 0) return null;
+  const kinds = new Set(messages.map(message => classifyFailureText(message)));
+  if (kinds.has('none') || kinds.size !== 1) return null;
+  return [...kinds][0];
+}
+
 export async function waitForMergeGroupAdmission({
   event,
+  classifyFailureText = undefined,
+  loadCheckRunAnnotations = undefined,
   loadCheckRuns,
   loadLiveQueueEntries,
   loadQueueRef,
@@ -732,6 +778,20 @@ export async function waitForMergeGroupAdmission({
       state => state.state === 'terminal-failure'
     );
     if (terminalFailure >= 0) {
+      const infrastructure = await producerInfrastructureFailure({
+        classifyFailureText,
+        deadlineMs,
+        loadCheckRunAnnotations,
+        state: states[terminalFailure],
+      });
+      if (infrastructure) {
+        // Terminal for this run (the producer will not re-run), yet the failure
+        // hold reads the message as infrastructure and spends no source retry.
+        throw new MergeGroupAdmissionError(
+          `${REQUIRED_CHECKS[terminalFailure]} failed on GitHub ${infrastructure}, not on the combined head`,
+          { rateLimit: false }
+        );
+      }
       fail(
         `${REQUIRED_CHECKS[terminalFailure]} completed with ${
           states[terminalFailure].detail
@@ -962,6 +1022,16 @@ function createGitHubAdmissionApi({
         throw error;
       }
     },
+    async loadCheckRunAnnotations({ checkRunId, deadlineMs }) {
+      if (!Number.isSafeInteger(checkRunId) || checkRunId < 1) {
+        fail('check-run annotations need an exact check-run id');
+      }
+      const result = await githubRequest(
+        `/repos/${encodedRepository}/check-runs/${checkRunId}/annotations?per_page=50`,
+        { deadlineMs, env, fetchImpl, now, token }
+      );
+      return result.data;
+    },
     loadCheckRuns({ checkName, deadlineMs, headSha }) {
       const query = new URLSearchParams({
         check_name: checkName,
@@ -1037,6 +1107,17 @@ async function writeAdmissionOutputs(receipt, env = process.env) {
   }
 }
 
+// ci.yml sparse-checks out this file from main; the shared classifier arrives
+// with the same change, so a checkout without it keeps the previous behavior.
+async function loadSharedFailureClassifier() {
+  try {
+    const { classifyGitHubFailure } = await import('./github-rate-limit.mjs');
+    return message => classifyGitHubFailure({ message }).kind;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * @param {Record<string, string | undefined>} [env]
  * @param {{
@@ -1073,6 +1154,7 @@ export async function runAdmissionFromEnv(
   const result = await waitForMergeGroupAdmission({
     event,
     ...api,
+    classifyFailureText: await loadSharedFailureClassifier(),
     now,
     sleep,
     onStatus,

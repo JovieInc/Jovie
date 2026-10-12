@@ -1,0 +1,13 @@
+{
+  "schema": "jovie-admission-hold-labels/v1",
+  "stopHoldLabels": [
+    "hold",
+    "gated",
+    "incident",
+    "do-not-merge",
+    "tim-hold",
+    "tim:hold",
+    "hold:tim"
+  ],
+  "queuePoisonLabel": "queue-poison"
+}

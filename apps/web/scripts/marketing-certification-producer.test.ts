@@ -269,7 +269,7 @@ describe('marketing certification producer', () => {
       'utf8'
     );
     const paths =
-      workflow.split('    paths:\n')[1]?.split('  schedule:')[0] ?? '';
+      workflow.split('    paths:\n')[1]?.split('  workflow_dispatch:')[0] ?? '';
     const actual = [...paths.matchAll(/^      - '([^']+)'$/gmu)].map(
       match => match[1]
     );
@@ -278,6 +278,9 @@ describe('marketing certification producer', () => {
       "--jq '.files[] | .filename, .previous_filename // empty'"
     );
     expect(workflow).toContain('cancel-in-progress: false');
+    // A replaced or failed run's pushes are covered by the next run's range.
+    expect(workflow).not.toMatch(/^  schedule:/mu);
+    expect(workflow).toContain('select(.conclusion == "success")');
   });
 
   it('selects entries whose source, declared tests or story changed', () => {

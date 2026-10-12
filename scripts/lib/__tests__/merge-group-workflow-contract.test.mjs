@@ -49,6 +49,10 @@ const IOS_CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ios-ci.yml'),
   'utf8'
 );
+const MACOS_CI_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/macos-ci.yml'),
+  'utf8'
+);
 const IOS_TESTFLIGHT_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ios-testflight.yml'),
   'utf8'
@@ -388,7 +392,7 @@ describe('merge_group workflow contract', () => {
       workflowDeclaresReadyForReviewType(AUTO_MERGE_DEFAULT_WORKFLOW)
     ).toBe(true);
     expect(AUTO_MERGE_DEFAULT_WORKFLOW).toContain(
-      'types: [opened, reopened, ready_for_review]'
+      'types: [opened, reopened, ready_for_review, synchronize]'
     );
     expect(getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable')).toContain(
       'github.event.pull_request.draft == false'
@@ -917,7 +921,7 @@ describe('merge_group workflow contract', () => {
       'unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}'
     );
     expect(unitTests).toContain(
-      'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1'
+      'uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2'
     );
     expect(unitTests).toContain('path: apps/web/test-report.*.junit.xml');
     expect(unitTests).toContain('if-no-files-found: warn');
@@ -1012,33 +1016,34 @@ describe('merge_group workflow contract', () => {
       `shard: [${Array.from({ length: 14 }, (_, i) => `'${i + 1}/14'`).join(', ')}, 'packages/ui']`
     );
 
-    const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
-    // Self-hosted jovie-mac when the heartbeat is fresh; hosted GA image
-    // otherwise (macos-26 pickup waited 8-68 min per merge group, 2026-10-10).
-    expect(macos).toContain(
-      `runs-on: \${{ needs.ci-path-changes.outputs.mac_runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+    const macosCaller = getJobBlock(CI_WORKFLOW, 'ci-macos');
+    const macosRoute = getJobBlock(MACOS_CI_WORKFLOW, 'mac');
+    const macos = getJobBlock(MACOS_CI_WORKFLOW, 'build');
+    // An idle self-hosted Mac first (mac-lane-route.yml); hosted otherwise.
+    expect(macosCaller).toContain('uses: ./.github/workflows/macos-ci.yml');
+    expect(macosCaller).toContain('mac-first: true');
+    expect(macosRoute).toContain(
+      'uses: ./.github/workflows/mac-lane-route.yml'
     );
+    expect(macos).toContain(
+      `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+    );
+    expect(macos).toContain("needs.mac.outputs.run_hosted == 'true'");
     expect(macos).not.toContain('runs-on: macos-26');
-    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
-    expect(pathChanges).toContain(
-      "mac_runner_class: ${{ steps.mac-route.outputs.runner_class || 'hosted' }}"
-    );
-    expect(pathChanges).toContain(
-      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
-    );
-    expect(macos).toContain(
+    expect(CI_WORKFLOW).not.toContain('mac_runner_class');
+    expect(CI_WORKFLOW).not.toContain('mac-runner-heartbeat.yml');
+    expect(macosCaller).toContain(
       "format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number)"
     );
-    expect(macos).toContain(
+    expect(macosCaller).toContain(
       "format('ci-macos-{0}-{1}', github.run_id, github.run_attempt)"
     );
-    expect(macos).toContain(
+    expect(macosCaller).toContain(
       "cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}"
     );
     expect(CI_WORKFLOW).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
-    expect(CI_WORKFLOW).not.toContain('.github/workflows/macos-ci.yml');
-    expect(macos).toContain("github.event_name == 'merge_group'");
-    expect(macos).not.toContain("github.event_name == 'pull_request'");
+    expect(macosCaller).toContain("github.event_name == 'merge_group'");
+    expect(macosCaller).not.toContain("github.event_name == 'pull_request'");
     expect(macos).toContain(
       'swift test --package-path apps/macos/MenuMonitor --enable-code-coverage'
     );
@@ -1053,7 +1058,10 @@ describe('merge_group workflow contract', () => {
     expect(macos).toContain(
       'DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}"'
     );
-    expect(macos).toContain('JOVIE_DESKTOP_SOURCE_REVISION="$GITHUB_SHA"');
+    expect(macos).toContain('JOVIE_DESKTOP_SOURCE_REVISION="$SOURCE_SHA"');
+    expect(macos).toContain(
+      'SOURCE_SHA: ${{ inputs.checkout-ref || github.sha }}'
+    );
     expect(macos).toContain(
       'version="${{ steps.desktop-staging-identity.outputs.version }}"'
     );
@@ -1584,6 +1592,14 @@ describe('merge_group workflow contract', () => {
     );
     expect(noopBranch).toContain('mkdir -p "$PRODUCT_LANE_DIR"');
     expect(noopBranch).toContain(': > "$PRODUCT_LANE_DIR/changed-paths.txt"');
+    // The classified branch runs the classifier from a physical path and
+    // fails closed when it wrote no receipt.
+    expect(detectStep).toContain(
+      'PRODUCT_LANE_DIR="$(cd "$RUNNER_TEMP" && pwd -P)/product-lane-classification"'
+    );
+    expect(detectStep).toMatch(
+      /--github-output "\$GITHUB_OUTPUT"\n\s*# [^\n]*\n\s*test -s "\$PRODUCT_LANE_DIR\/receipt\.json"/
+    );
 
     const homepageVisualScript = getStepRunScript(
       pathChanges,
@@ -2577,18 +2593,17 @@ ${selectedGateScript}`,
     expect(coalesce).toContain(
       "needs.release-source.outputs.eligible == 'true'"
     );
-    // No universal fixed delay: the bounded window derives from merge-queue
-    // depth and is capped inside the 5-minute job budget.
-    expect(coalesce).not.toContain('COALESCE_DELAY_SECONDS');
+    // No wait of any kind: a current SHA proceeds at once, and a newer
+    // generation supersedes this one through the FIFO and lineage gate.
+    expect(coalesce).not.toContain('COALESCE_');
+    expect(coalesce).not.toContain('sleep "$wait_seconds"');
     expect(coalesce).not.toContain('sleep 60');
-    expect(coalesce).toContain("COALESCE_PER_GENERATION_SECONDS: '30'");
-    expect(coalesce).toContain("COALESCE_MAX_SECONDS: '150'");
-    expect(coalesce).toContain('sleep "$wait_seconds"');
-    // Event sources: exact main and the merge queue only; no polling loop.
+    // Event source: exact main only; the merge queue is not read.
     expect(coalesce).toContain('commits/main');
-    expect(coalesce).toContain('mergeQueue(branch: "main")');
-    // Empty queue + current SHA proceeds without any wait.
-    expect(coalesce).toContain('if [ "$queue_depth" -eq 0 ]; then');
+    expect(coalesce).not.toContain('mergeQueue(branch: "main")');
+    expect(coalesce).toContain(
+      'record_receipt "proceed" "exact SHA is current"'
+    );
     // Every decision emits a lineage receipt with reason, replacement SHA,
     // time saved, and next state; any wait names benefit and deadline.
     expect(coalesce).toContain('record_receipt');
@@ -2883,10 +2898,21 @@ ${selectedGateScript}`,
     // Dependabot pull_request runs receive an empty secrets context, so the
     // step also bails when JOVIE_BOT_PRIVATE_KEY is unavailable; the hourly
     // triage sweep enables auto-merge with full secrets.
-    expect(tokenStep).toContain(`        if: >-
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          github.event.pull_request.user.login != 'dependabot[bot]' &&
-          env.JOVIE_BOT_PRIVATE_KEY != ''
+    // The job if: admits only same-repo, non-Dependabot PRs for both the
+    // pull_request and the Source Validation workflow_run wake.
+    expect(enable).toContain(
+      'github.event.pull_request.head.repo.full_name == github.repository &&'
+    );
+    expect(enable).toContain(
+      "github.event.pull_request.user.login != 'dependabot[bot]')"
+    );
+    expect(enable).toContain(
+      'github.event.workflow_run.head_repository.full_name == github.repository &&'
+    );
+    expect(enable).toContain(
+      "github.event.workflow_run.actor.login != 'dependabot[bot]' &&"
+    );
+    expect(tokenStep).toContain(`        if: env.JOVIE_BOT_PRIVATE_KEY != ''
         id: app-token`);
     expect(enable).toContain(
       '      JOVIE_BOT_PRIVATE_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'

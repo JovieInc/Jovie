@@ -42,11 +42,17 @@ describe('public profile Liquid Glass navigation', () => {
     expect(desktopHomeLayoutStart).toBeGreaterThan(0);
     const compactHomeBaseLayout = CSS.slice(0, desktopHomeLayoutStart);
     expect(compactHomeBaseLayout).toMatch(
-      /\.profile-home-content-column\s*\n\s*\) \{\s*margin-bottom:\s*var\(--profile-bottom-nav-height\)/
+      /\.profile-content-column\s*\n\s*\) \{\s*margin-bottom:\s*var\(--profile-bottom-nav-height\)/
     );
     expect(compactHomeBaseLayout).toMatch(
-      /\.profile-home-content-scroll \{\s*padding-bottom:\s*0;/
+      /\.profile-content-scroll-region \{\s*padding-bottom:\s*0;/
     );
+    // JOV-6617: the reservation covers every mode (listen/tour/about/subscribe
+    // included), not only data-mode="profile" home content.
+    expect(compactHomeBaseLayout).not.toMatch(
+      /data-mode="profile"[^}]*\.profile-content-column[^}]*margin-bottom/
+    );
+    expect(SURFACE).toContain('profile-content-column');
     expect(CSS).toMatch(
       /\.profile-floating-tab-bar\)[\s\S]{0,180}position:\s*absolute[\s\S]{0,120}pointer-events:\s*none/
     );
