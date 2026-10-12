@@ -61,4 +61,20 @@ describe('ActivityTableUnified', () => {
     expect(source).toContain("'@/lib/tanstack-table'");
     expect(source).not.toContain("'@tanstack/react-table'");
   });
+
+  it('scopes the noExplicitAny suppression to the TanStack column memo', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/admin/ActivityTableUnified.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      '// biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays'
+    );
+    expect(source).not.toContain('biome-ignore-all');
+    expect(source).not.toContain('biome-ignore-start');
+  });
 });
