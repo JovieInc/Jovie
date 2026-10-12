@@ -6,7 +6,10 @@ import type { ChatErrorType, MessagePart } from '@/components/jovie/types';
 import {
   GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
   GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
+  GATEWAY_INSUFFICIENT_FUNDS_ERROR_CODE,
+  GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE,
   isGatewayBudgetExceededError,
+  isGatewayInsufficientFundsError,
 } from '@/lib/ai/gateway-errors';
 import {
   type OnboardingWidgetEventType,
@@ -204,6 +207,8 @@ export function getOnboardingErrorMessage(
     case 'ONBOARDING_CHAT_PERSISTENCE_FAILED':
     case 'INTERNAL_ERROR':
       return 'Chat is temporarily unavailable. Try again in a moment.';
+    case GATEWAY_INSUFFICIENT_FUNDS_ERROR_CODE:
+      return GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE;
     case GATEWAY_BUDGET_EXCEEDED_ERROR_CODE:
       return GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE;
     default:
@@ -221,6 +226,9 @@ export function getOnboardingErrorMessage(
   }
   if (/unauthorized|authentication required|auth_required/i.test(message)) {
     return 'Sign in to continue this chat.';
+  }
+  if (isGatewayInsufficientFundsError(message)) {
+    return GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE;
   }
   if (isGatewayBudgetExceededError(message)) {
     return GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE;

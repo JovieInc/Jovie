@@ -1,0 +1,56 @@
+{
+  "schema": "jovie.art-direction/v1",
+  "id": "field-and-claim",
+  "title": "Field and Claim",
+  "status": "proposed",
+  "surfaces": ["homepage"],
+  "thesis": "The hero is a place: one cinematic, shallow-depth frame with a quiet zone where the claim and the name field live.",
+  "referenceIds": ["mercury-com", "runwayml-com", "cursor-com", "lumalabs-ai"],
+  "principles": {
+    "light": [
+      "Natural single-direction light (low sun or overcast wrap); UI glass and borders take the same direction.",
+      "Atmospheric haze separates planes so depth reads before detail."
+    ],
+    "composition": [
+      "Composed for the layout: the image reserves a calm zone for headline, sub and field before anything is generated.",
+      "85mm at f/1.4-2.4: one subject in focus, the rest falls into bokeh."
+    ],
+    "type": [
+      "Claim centred or left on the quiet zone, white on scene with a scrim only where contrast needs it.",
+      "Field and CTA share one line under the claim."
+    ],
+    "motion": [
+      "Very slow parallax or light change on the scene; the field never moves.",
+      "Scene stills first, then motion between certified key frames."
+    ],
+    "color": [
+      "The camera finds the palette: the scene is graded toward one Jovie hue before capture or generation.",
+      "No people under UI; no text over faces."
+    ]
+  },
+  "tokenMap": [
+    {
+      "principle": "scene graded to one hue",
+      "jovie": "Scene Palette v1 / imageColorPolicy.ts; one accent per page hero"
+    },
+    {
+      "principle": "claim + field on one line",
+      "jovie": "homepage name search -> Find me (JOV-5085 lock); 28px pill CTA"
+    },
+    {
+      "principle": "shallow depth",
+      "jovie": "art canon: single-shot 85mm bokeh focal rule"
+    },
+    {
+      "principle": "background image use",
+      "jovie": "single-use hero background, abstract or place, never repeated across pages"
+    }
+  ],
+  "antiGoals": [
+    "Stock-photo landscapes with a desk prop.",
+    "Placing the field or any UI over a person.",
+    "Reusing a reference's scene, location or subject."
+  ],
+  "decidedBy": "refs agent, provisional (taste feedback rides post-ship review, JOV-7081)",
+  "updatedAt": "2026-10-04T00:00:00.000Z"
+}

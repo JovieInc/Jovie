@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
+import type { UIMessage } from 'ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
@@ -15,6 +16,7 @@ const chatMocks = vi.hoisted(() => ({
   stop: vi.fn(),
   onError: undefined as undefined | ((error: Error) => void),
   errorMetadata: {} as Record<string, unknown>,
+  options: null as null | { id?: string; messages?: UIMessage[] },
 }));
 
 vi.mock('ai', () => ({
@@ -24,10 +26,17 @@ vi.mock('ai', () => ({
 }));
 
 vi.mock('@ai-sdk/react', () => ({
-  useChat: (options: { onError?: (error: Error) => void }) => {
+  useChat: (options: {
+    onError?: (error: Error) => void;
+    id?: string;
+    messages?: UIMessage[];
+  }) => {
+    chatMocks.options = options;
     chatMocks.onError = options.onError;
     return {
-      messages: chatMocks.messages,
+      messages: options.messages?.length
+        ? options.messages
+        : chatMocks.messages,
       sendMessage: chatMocks.sendMessage,
       setMessages: chatMocks.setMessages,
       status: chatMocks.status,
@@ -106,6 +115,40 @@ vi.mock('@/components/jovie/components', () => ({
 }));
 
 describe('OnboardingChat empty intro', () => {
+  it('renders persisted progress without auto-submitting a starter or re-triggering claim activity', async () => {
+    const initialMessages: UIMessage[] = [
+      {
+        id: 'saved-user',
+        role: 'user',
+        parts: [{ type: 'text', text: 'I already selected my artist' }],
+      },
+      {
+        id: 'saved-assistant',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Your artist is saved' }],
+      },
+    ];
+    const activity = vi.fn();
+    render(
+      <OnboardingChat
+        conversationId='saved-conversation'
+        initialMessages={initialMessages}
+        starterHandoff={{ kind: 'prompt', prompt: 'Old starter' }}
+        onConversationActivity={activity}
+        turnstileToken={null}
+      />
+    );
+    await waitFor(() =>
+      expect(screen.getByText('Your artist is saved')).toBeTruthy()
+    );
+    expect(chatMocks.options).toMatchObject({
+      id: 'saved-conversation',
+      messages: initialMessages,
+    });
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    expect(activity).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     chatMocks.messages = [];

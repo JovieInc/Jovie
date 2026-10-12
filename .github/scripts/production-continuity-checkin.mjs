@@ -56,12 +56,15 @@ export async function sendCheckIn({
     status,
   };
   if (status === 'in_progress') {
+    // GitHub scheduled workflows are best-effort: observed gaps on this repo
+    // reach ~7.5h, so the expected cadence must exceed that or the deadman
+    // reports missed check-ins while the workflow is merely delayed.
     payload.monitor_config = {
       checkin_margin: 60,
       failure_issue_threshold: 1,
       max_runtime: 3,
       recovery_threshold: 1,
-      schedule: { type: 'interval', unit: 'hour', value: 4 },
+      schedule: { type: 'interval', unit: 'hour', value: 12 },
       timezone: 'UTC',
     };
   }

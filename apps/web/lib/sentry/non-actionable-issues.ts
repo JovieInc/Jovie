@@ -201,6 +201,7 @@ function isUpstashErrorJsonBagText(value: string | null | undefined): boolean {
     normalized === normalize(UPSTASH_ERROR_JSON_BAG) ||
     normalized === normalize(UPSTASH_ERROR_JSON_BAG_TITLE) ||
     UPSTASH_ERROR_JSON_BAG_PATTERN.test(value) ||
+    UPSTASH_ERROR_NAME_ONLY_PATTERN.test(value) ||
     UPSTASH_ERROR_CLERK_USER_JSON_BAG_PATTERN.test(value)
   );
 }

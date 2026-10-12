@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+import { access, readFile } from 'node:fs/promises';
 import { unstable_cache } from 'next/cache';
 import {
   type ChangelogParseResult,
@@ -8,25 +8,29 @@ import {
 } from './changelog-parser';
 import { resolveAppPath, resolveMonorepoPath } from './filesystem-paths';
 
-function resolveChangelogPath(): string | null {
+async function resolveChangelogPath(): Promise<string | null> {
   // Deployed functions read the build-time copy in runtime-data/.
   const candidates = [
     resolveAppPath('runtime-data', 'CHANGELOG.md'),
     resolveMonorepoPath('CHANGELOG.md'),
   ];
-  return (
-    candidates.find(candidate =>
-      fs.existsSync(/* turbopackIgnore: true */ candidate)
-    ) ?? null
-  );
+  for (const candidate of candidates) {
+    try {
+      await access(/* turbopackIgnore: true */ candidate);
+      return candidate;
+    } catch {
+      // Candidate absent; try the next root.
+    }
+  }
+  return null;
 }
 
 const getChangelogMarkdown = unstable_cache(
   async (): Promise<string> => {
-    const changelogPath = resolveChangelogPath();
+    const changelogPath = await resolveChangelogPath();
     if (!changelogPath) return '';
     try {
-      return fs.readFileSync(/* turbopackIgnore: true */ changelogPath, 'utf8');
+      return await readFile(/* turbopackIgnore: true */ changelogPath, 'utf8');
     } catch {
       return '';
     }

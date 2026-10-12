@@ -134,12 +134,26 @@ describe('JOV-INV-026 performance invariant factory', () => {
     );
   });
 
+  it('runs on main pushes of every budget source', () => {
+    const source = readFileSync(GOVERNANCE_WORKFLOW, 'utf8');
+    assert.equal(overlay(source), '');
+    assert.match(
+      overlay(
+        source.replace("      - 'docs/performance/route-budgets.json'\n", '')
+      ),
+      /main push of docs\/performance\/route-budgets\.json/
+    );
+  });
+
   it('rejects a 15-minute beat', () => {
     const source = readFileSync(GOVERNANCE_WORKFLOW, 'utf8');
-    assert.match(
-      overlay(source.replace("cron: '17 8 * * 1'", "cron: '*/15 * * * *'")),
-      /15-minute/
+    const clocked = source.replace(
+      '  workflow_dispatch:',
+      "  schedule:\n    - cron: '*/15 * * * *'\n  workflow_dispatch:"
     );
+    assert.match(overlay(clocked), /15-minute/);
+    // Any clock is rejected; the pack runs on pushes of its sources.
+    assert.match(overlay(clocked), /not a clock/);
     assert.equal(FORBIDDEN_INTERVAL_MINUTES, 15);
     assert.equal(
       existsSync('.github/workflows/performance-invariants.yml'),

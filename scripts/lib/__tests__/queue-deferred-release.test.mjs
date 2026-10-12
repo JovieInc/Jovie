@@ -14,6 +14,8 @@ const STACK_EVENT_GUARD =
 
 function assertTrustedStackHealthContract(value) {
   expect(value).toContain(STACK_LIVENESS_CRON);
+  expect(value).toContain('group: fleet-gate-receipt');
+  expect(value).toContain('cancel-in-progress: false');
   expect(value).toContain('branches: [main]');
   expect(value).not.toContain('pull_request_target:');
   expect(value).not.toContain('check_run:');
@@ -48,15 +50,22 @@ describe('retired queue release and retained fleet refresh', () => {
   });
 
   it('keeps Fleet Gate Refresh as the one-way workflow_run bridge', () => {
-    // CI and Production Controller are direct upstream semantic inputs.
-    // Marker Recovery dispatches the gate after durable bytes so it remains
-    // within GitHub's workflow_run chain cap.
-    expect(fleetGateRefreshWorkflow).not.toContain('workflow_run:');
+    // Main CI completion is the one direct workflow_run input (pending ->
+    // green has no local signal on Gem). Marker Recovery still dispatches the
+    // gate after durable bytes so it stays within GitHub's workflow_run chain
+    // cap; no release workflow wakes it through workflow_run.
+    expect(fleetGateRefreshWorkflow).toContain(
+      'workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]'
+    );
+    expect(fleetGateRefreshWorkflow.match(/workflow_run:/g)).toHaveLength(1);
+    expect(fleetGateRefreshWorkflow).not.toContain(
+      'Production Marker Recovery]'
+    );
     expect(fleetGateRefreshWorkflow).not.toContain('pull_request_target:');
     assertTrustedStackHealthContract(fleetGateRefreshWorkflow);
     expect(fleetGateRefreshWorkflow).toContain('push:\n    branches: [main]');
     expect(fleetGateRefreshWorkflow).toContain('schedule:');
-    expect(fleetGateRefreshWorkflow).toContain('cancel-in-progress: true');
+    expect(fleetGateRefreshWorkflow).toContain('cancel-in-progress: false');
     const markerRecovery = readFileSync(
       resolve(repoRoot, '.github/workflows/production-marker-recovery.yml'),
       'utf8'
@@ -68,6 +77,14 @@ describe('retired queue release and retained fleet refresh', () => {
 
   it('keeps stack repair consumption fail-closed under trigger, checkout, and guard regressions', () => {
     const regressions = [
+      fleetGateRefreshWorkflow.replace(
+        'cancel-in-progress: false',
+        'cancel-in-progress: true'
+      ),
+      fleetGateRefreshWorkflow.replace(
+        'group: fleet-gate-receipt',
+        'group: fleet-gate-${{ github.run_id }}'
+      ),
       fleetGateRefreshWorkflow.replace(
         STACK_LIVENESS_CRON,
         "cron: '0 0 * * *'"

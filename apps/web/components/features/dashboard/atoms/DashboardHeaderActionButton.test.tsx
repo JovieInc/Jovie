@@ -11,19 +11,12 @@ const icon = <svg data-testid='action-icon' />;
 describe('DashboardHeaderActionButton', () => {
   it('locks the text button to the 32px desktop density contract', () => {
     expect(DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS).toContain('h-8');
-    expect(DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS).toContain(
-      'sm:before:min-h-8'
-    );
+    expect(DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS).not.toContain('h-7');
   });
 
-  it('locks the icon button to 32px with a desktop-collapsed hit target', () => {
-    expect(DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS).toContain('h-8');
-    expect(DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS).toContain('w-8');
-    expect(DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS).toContain(
-      'sm:before:h-8'
-    );
-    expect(DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS).toContain(
-      'sm:before:w-8'
+  it('keeps the canonical hit target instead of restyling icon height', () => {
+    expect(DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS).not.toMatch(
+      /(^|\s)(sm:before:)?[hw]-\d/
     );
   });
 
@@ -58,7 +51,9 @@ describe('DashboardHeaderActionButton', () => {
 
     const button = screen.getByTestId('copy-action');
     expect(button).toHaveAttribute('aria-label', 'Copy');
+    // md IconButton size = 32px face; the 44px pseudo hit target stays.
     expect(button.className).toContain('h-8');
     expect(button.className).toContain('w-8');
+    expect(button.className).toContain('before:h-11');
   });
 });

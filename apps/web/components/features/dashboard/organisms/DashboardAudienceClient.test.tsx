@@ -2,9 +2,13 @@ import { render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockDestinationReady } = vi.hoisted(() => ({
-  mockDestinationReady: vi.fn(),
-}));
+const { mockDestinationReady, mockPanelOpen, mockPanelClose } = vi.hoisted(
+  () => ({
+    mockDestinationReady: vi.fn(),
+    mockPanelOpen: vi.fn(),
+    mockPanelClose: vi.fn(),
+  })
+);
 
 vi.mock('nuqs', () => {
   const createParser = () => {
@@ -39,10 +43,17 @@ vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
 }));
 
-vi.mock('@/lib/nuqs', () => ({
-  audienceSortFields: ['lastSeen'],
-  audienceViews: ['all'],
-}));
+vi.mock('@/lib/nuqs', () => {
+  const parser = {
+    withOptions: () => parser,
+    withDefault: () => parser,
+  };
+  return {
+    audiencePanelParser: parser,
+    audienceSortFields: ['lastSeen'],
+    audienceViews: ['all'],
+  };
+});
 
 vi.mock('@/lib/queries', () => ({
   QueryErrorBoundary: ({ children }: { children: ReactNode }) => children,
@@ -56,10 +67,13 @@ vi.mock('@/lib/queries', () => ({
 
 vi.mock('./AudiencePanelContext', () => ({
   AudiencePanelProvider: ({ children }: { children: ReactNode }) => children,
+  ControlledAudiencePanelProvider: ({ children }: { children: ReactNode }) =>
+    children,
   useAudiencePanel: () => ({
     mode: null,
-    open: vi.fn(),
-    close: vi.fn(),
+    open: mockPanelOpen,
+    close: mockPanelClose,
+    toggle: vi.fn(),
   }),
 }));
 
@@ -72,6 +86,31 @@ import { DashboardAudienceClient } from './DashboardAudienceClient';
 describe('DashboardAudienceClient', () => {
   beforeEach(() => {
     mockDestinationReady.mockReset();
+    mockPanelOpen.mockReset();
+    mockPanelClose.mockReset();
+  });
+
+  it('never opens a secondary panel implicitly on mount', () => {
+    render(
+      <DashboardAudienceClient
+        mode='members'
+        view='all'
+        initialRows={[]}
+        total={0}
+        page={1}
+        pageSize={25}
+        sort='lastSeen'
+        direction='desc'
+        subscriberCount={0}
+        totalAudienceCount={0}
+        filters={{ segments: [] }}
+      />
+    );
+
+    // JOV-5836: panel state must come from the explicit `panel` URL param or
+    // a user action — never from navigation alone.
+    expect(mockPanelOpen).not.toHaveBeenCalled();
+    expect(mockPanelClose).not.toHaveBeenCalled();
   });
 
   it('marks the query-backed Audience destination ready after it renders', () => {

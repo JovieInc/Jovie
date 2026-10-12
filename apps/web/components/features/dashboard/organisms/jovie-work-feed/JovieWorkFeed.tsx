@@ -205,6 +205,7 @@ export function JovieWorkFeed({
   profileId,
   range = '7d',
   showHeader = true,
+  completedOnly = false,
 }: JovieWorkFeedProps) {
   const {
     data: items = [],
@@ -215,6 +216,7 @@ export function JovieWorkFeed({
   } = useJovieWorkFeedQuery({
     profileId,
     range,
+    completedOnly,
   });
 
   const isRefreshing = isFetching && !isLoading;

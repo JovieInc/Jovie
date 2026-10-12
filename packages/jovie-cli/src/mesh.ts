@@ -247,6 +247,18 @@ async function meshRequest(
   try {
     payload = JSON.parse(await readResponseBody(response, signal));
   } catch {
+    // Headers do not prove delivery: the shared deadline can expire while
+    // reading the receipt after Summer has already stored the message.
+    if (signal.aborted)
+      throw new JovieRequestError(
+        'Mesh transport unavailable. Retry with the same --correlation-id.',
+        origin,
+        response.status,
+        undefined,
+        undefined,
+        'TEMPORARILY_UNAVAILABLE',
+        true
+      );
     throw new JovieRequestError(
       'Invalid mesh response.',
       origin,

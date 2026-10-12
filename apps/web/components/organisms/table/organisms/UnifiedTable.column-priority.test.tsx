@@ -1,4 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -48,25 +54,35 @@ const rows: DemoRow[] = [
 ];
 
 function installObserver() {
-  let callback: ResizeObserverCallback | null = null;
-  vi.stubGlobal(
-    'ResizeObserver',
-    class MockResizeObserver {
-      constructor(next: ResizeObserverCallback) {
-        callback = next;
-      }
-
-      observe = vi.fn();
-      unobserve = vi.fn();
-      disconnect = vi.fn();
+  const observers: MockResizeObserver[] = [];
+  class MockResizeObserver {
+    readonly targets = new Set<Element>();
+    constructor(readonly callback: ResizeObserverCallback) {
+      observers.push(this);
     }
-  );
+    observe = vi.fn((target: Element) => this.targets.add(target));
+    unobserve = vi.fn((target: Element) => this.targets.delete(target));
+    disconnect = vi.fn(() => this.targets.clear());
+  }
+  vi.stubGlobal('ResizeObserver', MockResizeObserver);
   return (width: number) => {
     act(() => {
-      callback?.(
-        [{ contentRect: { width } } as ResizeObserverEntry],
-        {} as ResizeObserver
-      );
+      for (const observer of observers) {
+        const targets = [...observer.targets].filter(
+          target => target instanceof HTMLDivElement
+        );
+        if (targets.length === 0) continue;
+        observer.callback(
+          targets.map(target => ({
+            target,
+            contentRect: new DOMRect(0, 0, width, 0),
+            borderBoxSize: [],
+            contentBoxSize: [],
+            devicePixelContentBoxSize: [],
+          })),
+          observer as unknown as ResizeObserver
+        );
+      }
     });
   };
 }
@@ -165,6 +181,17 @@ describe('UnifiedTable column priority', () => {
       'SMS'
     );
 
+    resize(800);
+    expect(
+      screen.getByRole('columnheader', { name: 'State' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Alerts' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('table-column-compacts')
+    ).not.toBeInTheDocument();
+
     vi.unstubAllGlobals();
   });
 
@@ -251,5 +278,30 @@ describe('UnifiedTable column priority', () => {
     expect(document.querySelector('[data-column-snap="on"]')).toBeNull();
     reduced.unmount();
     vi.unstubAllGlobals();
+  });
+
+  it('plays on Space and opens on Enter when a row toggle is given', () => {
+    const onRowClick = vi.fn();
+    const onRowToggle = vi.fn();
+    render(
+      <UnifiedTable
+        data={rows}
+        columns={columns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        getRowTestId={row => `demo-row-${row.id}`}
+        onRowClick={onRowClick}
+        onRowToggle={onRowToggle}
+        minWidth='0'
+      />
+    );
+    const row = screen.getByTestId('demo-row-1');
+
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(onRowToggle).toHaveBeenCalledWith(rows[0]);
+    expect(onRowClick).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(onRowClick).toHaveBeenCalledWith(rows[0]);
   });
 });

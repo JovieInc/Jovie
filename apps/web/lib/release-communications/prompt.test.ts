@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolveCustomerChangelogHero } from '../customer-changelog';
 import { InMemoryReleaseCommunicationsAdapter } from './index';
 import {
   parseDailyWhatsNewPrompt,
@@ -143,5 +144,51 @@ describe('parseDailyWhatsNewPrompt', () => {
       },
     });
     expect(prompt).toMatchObject({ postId: 'p1', materialCount: 2 });
+  });
+});
+
+describe('daily prompt published hero binding', () => {
+  it('inherits only the matching published story and retains legacy text on mismatch', async () => {
+    const adapter = new InMemoryReleaseCommunicationsAdapter('UTC');
+    const post = await adapter.ingest(event());
+    const published = {
+      id: post.localDate,
+      title: post.entries[0]!.title,
+      date: post.localDate,
+      summary: 'Published copy',
+      url: `https://jov.ie/changelog/${post.localDate}`,
+      highlights: [],
+      dogfood: [],
+      hero: resolveCustomerChangelogHero(post.localDate),
+    };
+    const input = {
+      post,
+      dismissed: false,
+      changelogUrl: CHANGELOG_URL,
+      publishedUpdate: published,
+    };
+    const prompt = resolveDailyWhatsNewPrompt(input);
+    expect(prompt?.hero).toEqual(published.hero);
+    expect(prompt?.changelogUrl).toBe(published.url);
+    expect(parseDailyWhatsNewPrompt({ prompt })?.hero).toEqual(published.hero);
+    for (const update of [
+      null,
+      { ...published, id: 'old' },
+      { ...published, title: 'Other story' },
+      { ...published, url: CHANGELOG_URL },
+    ]) {
+      const fallback = resolveDailyWhatsNewPrompt({
+        ...input,
+        publishedUpdate: update,
+      });
+      expect(fallback?.hero).toBeNull();
+      expect(fallback?.title).toBe(post.entries[0]!.title);
+      expect(fallback?.changelogUrl).toBe(CHANGELOG_URL);
+    }
+    expect(
+      parseDailyWhatsNewPrompt({
+        prompt: { ...prompt, hero: { ...published.hero, postId: 'old' } },
+      })?.hero
+    ).toBeNull();
   });
 });

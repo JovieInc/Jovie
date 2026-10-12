@@ -292,7 +292,7 @@ export function NavMenuItem({
     active: isActive || pending,
     tone: item.tone,
     className:
-      'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0',
+      'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0',
   });
   const shellInnerContent = (
     <>

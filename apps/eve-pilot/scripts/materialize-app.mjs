@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const pilot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const common = [
   'scripts/check-built-app.mjs',
-  'patches/eve@0.70.0.patch',
+  'patches/eve@0.72.1.patch',
   'tests/prompt-prefix-stability.test.ts',
   'package.json',
   'pnpm-lock.yaml',
@@ -298,6 +298,7 @@ The source export is preparatory; deployment and commissioning require separate 
       'index.ts',
       'prediction-outcome.ts',
       'prediction-receipt.ts',
+      'provider-incident.ts',
       'symphony-outage.ts',
       'package.json',
     ]) {
@@ -316,6 +317,12 @@ The source export is preparatory; deployment and commissioning require separate 
         // Workspace index stays bundler-safe for Next typecheck/Turbopack.
         // Isolated NodeNext copies re-export the health module with .js.
         contents = `${contents.trimEnd()}\n\nexport * from './symphony-outage.js';\n`;
+      }
+      if (
+        path === 'index.ts' &&
+        !contents.includes("from './provider-incident.js'")
+      ) {
+        contents = `${contents.trimEnd()}\n\nexport * from './provider-incident.js';\n`;
       }
       put(`vendor/agent-transport-contracts/${path}`, contents);
     }
@@ -336,6 +343,7 @@ The source export is preparatory; deployment and commissioning require separate 
     '../../packages/agent-transport-contracts/index.ts',
     '../../packages/agent-transport-contracts/prediction-outcome.ts',
     '../../packages/agent-transport-contracts/prediction-receipt.ts',
+    '../../packages/agent-transport-contracts/provider-incident.ts',
     '../../packages/agent-transport-contracts/symphony-outage.ts',
     '../../packages/agent-transport-contracts/package.json',
   ];

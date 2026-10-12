@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { Browser } from '@playwright/test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FactoryRenderCaptureSchema } from '../../data/marketing/factory/spine';
+import { capturePng } from './capture-integrity.fixtures';
 import {
   evaluateRenderCaptures,
   fixtureCaptures,
@@ -103,18 +104,22 @@ describe('evaluateRenderCaptures', () => {
 });
 
 function fakeBrowser(vitals: { cls: number; lcp: number | null }) {
+  let viewport = { width: 390, height: 844 };
   const closed = vi.fn(async () => undefined);
   const page = {
     goto: vi.fn(async () => ({ status: () => 200 })),
     evaluate: vi.fn(async () => vitals),
-    screenshot: vi.fn(async () => Buffer.from('png-bytes')),
+    screenshot: vi.fn(async () => capturePng(viewport.width, viewport.height)),
   };
   const browser = {
-    newContext: vi.fn(async () => ({
-      addInitScript: vi.fn(async () => undefined),
-      newPage: async () => page,
-      close: vi.fn(async () => undefined),
-    })),
+    newContext: vi.fn(async options => {
+      viewport = options.viewport;
+      return {
+        addInitScript: vi.fn(async () => undefined),
+        newPage: async () => page,
+        close: vi.fn(async () => undefined),
+      };
+    }),
     close: closed,
   } as unknown as Browser;
   return { browser, page, closed };
@@ -159,12 +164,12 @@ describe('liveRenderMeasurer', () => {
       httpStatus: 200,
       screenshot: {
         path: join(outDir, 'mobile-390.png'),
-        digest: sha256Digest('png-bytes'),
+        digest: sha256Digest(capturePng(390, 844)),
       },
       domFindings: [{ kind: 'stranded-text' }],
     });
-    expect(readFileSync(join(outDir, 'desktop-1440.png'), 'utf8')).toBe(
-      'png-bytes'
+    expect(readFileSync(join(outDir, 'desktop-1440.png'))).toEqual(
+      capturePng(1440, 900)
     );
     expect(failedIds(measured.captures)).toContain('render-dom:mobile');
   });

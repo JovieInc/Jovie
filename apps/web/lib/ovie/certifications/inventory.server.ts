@@ -6,6 +6,8 @@ import {
   describeAcquisitionBlock,
 } from '@/lib/acquisition/eligibility';
 import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
+import { readFeatureRegistrySource } from '@/lib/admin/feature-registry-source';
+import type { FounderReviewItem } from '@/lib/admin/founder-review-registry';
 import {
   evaluateCertificationAdmission,
   type FounderCertificationDecisionKind,
@@ -34,13 +36,13 @@ import {
   type CertificationPacketFile,
   type CertificationPacketFileRead,
   PACKET_FILE_DOMAINS,
-  type PacketFileDomain,
   readCertificationPacketFiles,
 } from './packet-files.server';
 import {
   OVIE_CERTIFICATION_DOMAIN_LABELS,
   OVIE_CERTIFICATION_INVENTORY_CONTRACT,
   type OvieCertificationDecisionRequest,
+  type OvieCertificationDomainId,
   type OvieCertificationDomainSummary,
   type OvieCertificationInventory,
   type OvieCertificationInventoryIssue,
@@ -93,10 +95,24 @@ export interface CustomerCertificationSource {
   store(): Pick<AcquisitionCertificationStore, 'project' | 'decide'>;
 }
 
+/**
+ * Feature Registry packets are derived from the committed
+ * `docs/FEATURE_REGISTRY.md` source at read time — the same projection the
+ * admin page renders. `sourceUpdatedAt` is the registry file's mtime and
+ * stands in for `packetUpdatedAt` in the shared decision ledger.
+ */
+export interface FeatureRegistryCertificationSource {
+  list(): Promise<{
+    readonly items: readonly FounderReviewItem[];
+    readonly sourceUpdatedAt: string;
+  }>;
+}
+
 export interface OvieCertificationInventoryDeps {
   readonly marketingStore: () => MarketingCertificationStore;
   readonly backend: () => CertificationRecordBackend;
   readonly readPacketFiles: () => Promise<CertificationPacketFileRead>;
+  readonly featureRegistry: FeatureRegistryCertificationSource;
   readonly customers?: CustomerCertificationSource;
   /**
    * ACQUISITION_ELIGIBLE (JOV-7696). Prospect outreach is acquisition, so a
@@ -113,6 +129,7 @@ export const defaultOvieCertificationInventoryDeps: OvieCertificationInventoryDe
     marketingStore: getMarketingCertificationStore,
     backend: postgresRecordBackend,
     readPacketFiles: () => readCertificationPacketFiles(),
+    featureRegistry: { list: readFeatureRegistrySource },
     acquisitionEligibility: () => getAcquisitionEligibility(),
   };
 
@@ -274,7 +291,7 @@ async function marketingDomain(
 }
 
 async function packetDomain(
-  domain: PacketFileDomain,
+  domain: OvieCertificationDomainId,
   files: readonly CertificationPacketFile[],
   deps: OvieCertificationInventoryDeps,
   evaluatedAt: string
@@ -337,6 +354,69 @@ async function packetDomain(
       ],
     };
   }
+}
+
+const FEATURE_REGISTRY_SURFACE_LABELS = {
+  behavior: 'Atomic Behavior',
+  capability: 'Feature Capability',
+  component: 'Registry Component',
+} as const;
+
+function featureRegistryPacketFile(
+  item: FounderReviewItem,
+  sourceUpdatedAt: string
+): CertificationPacketFile {
+  return {
+    domain: 'feature_registry',
+    surface: FEATURE_REGISTRY_SURFACE_LABELS[item.scope],
+    packetUpdatedAt: sourceUpdatedAt,
+    links: [],
+    packet: item.certificationPacket,
+    file: item.source,
+  };
+}
+
+/**
+ * The Feature Registry projects the same kernel admission and decision ledger
+ * as packet-file domains; only the packet source differs (the committed
+ * FEATURE_REGISTRY.md instead of worker packet files).
+ */
+async function featureRegistryDomain(
+  deps: OvieCertificationInventoryDeps,
+  evaluatedAt: string
+): Promise<CertificationDomainProjection> {
+  const domain = 'feature_registry' as const;
+  let source: Awaited<ReturnType<FeatureRegistryCertificationSource['list']>>;
+  try {
+    source = await deps.featureRegistry.list();
+  } catch {
+    return {
+      rows: [],
+      deliveries: [],
+      summary: {
+        domain,
+        label: OVIE_CERTIFICATION_DOMAIN_LABELS[domain],
+        status: 'error',
+        rowCount: 0,
+        note: 'The feature registry source could not be read.',
+      },
+      issues: [
+        {
+          domain,
+          source: 'feature_registry',
+          message: 'Feature registry read failed.',
+        },
+      ],
+    };
+  }
+  return packetDomain(
+    domain,
+    source.items.map(item =>
+      featureRegistryPacketFile(item, source.sourceUpdatedAt)
+    ),
+    deps,
+    evaluatedAt
+  );
 }
 
 /**
@@ -501,6 +581,7 @@ export async function readOvieCertificationInventory(
   const results = await Promise.all([
     marketingDomain(deps, generatedAt),
     customersDomain(deps, generatedAt),
+    featureRegistryDomain(deps, generatedAt),
     ...PACKET_FILE_DOMAINS.map(domain =>
       packetDomain(
         domain,
@@ -675,6 +756,69 @@ const DECISION_FAILURE_MESSAGES: Record<string, string> = {
 };
 
 /**
+ * Feature Registry decisions land in the same shared packet-decision ledger
+ * path as packet-file domains; the packet is re-derived from the committed
+ * registry source, so a stale client digest or item fails closed.
+ */
+async function recordFeatureRegistryDecision(
+  request: OvieCertificationDecisionRequest,
+  subjectId: string,
+  deps: OvieCertificationInventoryDeps,
+  decidedAt: string,
+  reviewer: string
+): Promise<OvieCertificationDecisionOutcome> {
+  let source: Awaited<ReturnType<FeatureRegistryCertificationSource['list']>>;
+  try {
+    source = await deps.featureRegistry.list();
+  } catch {
+    return {
+      ok: false,
+      status: 409,
+      error: 'feature_registry_unavailable',
+      message: 'The feature registry could not be read.',
+    };
+  }
+  const item = source.items.find(candidate => candidate.id === subjectId);
+  if (!item) {
+    return {
+      ok: false,
+      status: 404,
+      error: 'unknown_certification',
+      message: 'This certification item is not in the feature registry.',
+    };
+  }
+  const target = featureRegistryPacketFile(item, source.sourceUpdatedAt);
+  const backend = deps.backend();
+  const result = await recordPacketFounderDecision({
+    backend,
+    target,
+    decidedAt,
+    decision: {
+      id: request.actionId,
+      decision: request.decision,
+      evidenceDigest: request.evidenceDigest,
+      notes: request.notes,
+      reviewer,
+    },
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      status: 409,
+      error: result.reason,
+      message:
+        DECISION_FAILURE_MESSAGES[result.reason] ??
+        'The decision could not be recorded.',
+    };
+  }
+  const ledger = await readPacketDecisionLedger(backend, target.domain);
+  return {
+    ok: true,
+    row: packetRow(target, ledger.records[subjectId], decidedAt),
+  };
+}
+
+/**
  * Dispatch one founder decision to the kernel owner of the row's domain.
  * The reviewer is resolved by the caller from the server session only.
  */
@@ -698,6 +842,15 @@ export async function recordOvieCertificationDecision(
   }
   if (domain === 'customers') {
     return recordCustomerDecision(request, subjectId, deps, decidedAt);
+  }
+  if (domain === 'feature_registry') {
+    return recordFeatureRegistryDecision(
+      request,
+      subjectId,
+      deps,
+      decidedAt,
+      reviewer
+    );
   }
   if (!(PACKET_FILE_DOMAINS as readonly string[]).includes(domain)) {
     return {
@@ -724,7 +877,7 @@ export async function recordOvieCertificationDecision(
   const backend = deps.backend();
   const result = await recordPacketFounderDecision({
     backend,
-    file,
+    target: file,
     decidedAt,
     decision: {
       id: request.actionId,

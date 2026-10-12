@@ -29,6 +29,22 @@ function listPageSources(directory: string): string[] {
 }
 
 describe('authenticated app screen registry', () => {
+  it('registers the restored Referral page as a canonical Settings body without retired Retargeting', () => {
+    expect(
+      APP_SCREEN_REGISTRY.find(
+        screen => screen.route === '/app/settings/referral'
+      )
+    ).toMatchObject({
+      kind: 'canonical',
+      designReference: true,
+      archetypeId: 'settings',
+    });
+    expect(
+      APP_SCREEN_REGISTRY.some(
+        screen => screen.route === '/app/settings/retargeting-ads'
+      )
+    ).toBe(false);
+  });
   it('registers every authenticated shell page exactly once', () => {
     expect(APP_SCREEN_REGISTRY.map(entry => entry.source).sort()).toEqual(
       listPageSources(shellRoot)
@@ -228,6 +244,25 @@ describe('authenticated app screen registry', () => {
       );
       expect(entry.story?.componentIds).toEqual(recipe?.componentIds);
     }
+  });
+
+  it('keeps retired Work as an Inbox Done alias with no design body or nested canvas', () => {
+    const work = APP_SCREEN_REGISTRY.find(
+      entry => entry.route === '/app/jovie-work'
+    );
+    expect(work).toMatchObject({
+      kind: 'alias',
+      conceptId: '/app',
+      redirectTo: '/app?view=done',
+      designReference: false,
+      story: null,
+      archetypeId: null,
+      canvas: {
+        canvasOwner: 'shell',
+        nestedSurfaceRoles: [],
+        nestedCanvasAllowances: [],
+      },
+    });
   });
 
   it('resolves every alias/legacy route without a duplicate design body', () => {

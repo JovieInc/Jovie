@@ -303,6 +303,15 @@ function preventionEvidence(classification, valueUnit) {
 }
 
 function queueEconomicRecord(candidate) {
+  // Read the current Linear issue, not a cached classification override.
+  // Linear uses 0 for No priority; absent/malformed values get the same last tier.
+  const rawPriority = candidate.issue
+    ? candidate.issue.priority
+    : candidate.priority;
+  const priority =
+    Number.isInteger(rawPriority) && rawPriority >= 1 && rawPriority <= 4
+      ? rawPriority
+      : 0;
   const expectedValue = valueEvidence(candidate, candidate.score);
   const fullyLoadedCost = costEvidence(candidate);
   const preventionLeverage = preventionEvidence(candidate, expectedValue.unit);
@@ -314,6 +323,7 @@ function queueEconomicRecord(candidate) {
     fullyLoadedCost.missingSourceContracts.length === 0;
   return {
     candidate,
+    priority,
     expectedValue,
     fullyLoadedCost,
     preventionLeverage,
@@ -327,7 +337,9 @@ function queueEconomicRecord(candidate) {
 }
 
 /**
- * Rank the existing admission candidates. Economic ordering is used only when
+ * Rank existing eligible admission candidates by explicit Linear priority,
+ * then value within each priority tier. This does not confer admission authority.
+ * Economic ordering is used only when
  * every candidate has a comparable complete receipt; otherwise the current
  * deterministic score remains the provisional order and the missing contracts
  * are explicit. This avoids turning an unknown cost into a fabricated zero.
@@ -347,13 +359,18 @@ export function rankQueueCandidates(
       right.candidate.score - left.candidate.score ||
       left.candidate.identifier.localeCompare(right.candidate.identifier)
   );
-  const ranked = economic
+  const valueRanked = economic
     ? records.toSorted(
         (left, right) =>
           right.expectedNetValue - left.expectedNetValue ||
           left.candidate.identifier.localeCompare(right.candidate.identifier)
       )
     : legacy;
+  const priorityRank = record => record.priority || 5;
+  // Stable sorting retains the existing economic/score order inside a tier.
+  const ranked = valueRanked.toSorted(
+    (left, right) => priorityRank(left) - priorityRank(right)
+  );
   const selected = ranked[0] ?? null;
   const displaced = ranked[1] ?? null;
   const missingSourceContracts = [
@@ -373,7 +390,7 @@ export function rankQueueCandidates(
   // Order the queue would have had with zero prevention leverage. Compared
   // against the actual winner this explains whether prevention leverage
   // changed the admission order.
-  const withoutPrevention = economic
+  const withoutPreventionByValue = economic
     ? records.toSorted(
         (left, right) =>
           right.expectedValue.amount -
@@ -389,7 +406,13 @@ export function rankQueueCandidates(
               preventionScoreAdjustment(left.candidate.prevention)) ||
           left.candidate.identifier.localeCompare(right.candidate.identifier)
       );
+  const withoutPrevention = withoutPreventionByValue.toSorted(
+    (left, right) => priorityRank(left) - priorityRank(right)
+  );
   const orderingReasons = [];
+  if (selected && valueRanked[0] && selected !== valueRanked[0]) {
+    orderingReasons.push('linear-priority');
+  }
   if (
     selected &&
     withoutPrevention[0] &&
@@ -411,6 +434,7 @@ export function rankQueueCandidates(
     selectedAt,
     mode: economic ? 'fully-loaded-economic' : 'provisional-missing-cost',
     selectedCandidate: selected?.candidate.identifier ?? null,
+    selectedPriority: selected?.priority ?? null,
     displacedCandidate: displaced?.candidate.identifier ?? null,
     estimatedOpportunityCost: {
       amount: displacedOpportunity,
@@ -441,6 +465,7 @@ export function rankQueueCandidates(
     rankings: ranked.map((record, index) => ({
       rank: index + 1,
       candidate: record.candidate.identifier,
+      priority: record.priority,
       expectedValue: record.expectedValue,
       fullyLoadedCost: record.fullyLoadedCost,
       preventionLeverage: record.preventionLeverage,

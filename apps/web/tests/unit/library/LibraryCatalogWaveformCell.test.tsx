@@ -39,14 +39,14 @@ function buildRelease(
 }
 
 describe('LibraryCatalogWaveformCell', () => {
-  it('keeps table artwork in the single caller-owned row frame', () => {
+  it('keeps 24px table artwork in the single caller-owned row frame', () => {
     const [asset] = buildLibraryReleaseAssets([buildRelease('verified')]);
 
     render(<LibraryCatalogArtworkCell asset={asset!} />);
 
     const thumbnail = screen.getByTestId('library-media-thumbnail-release-1');
     expect(thumbnail).toHaveAttribute('data-artwork-frame', 'thumbnail');
-    expect(thumbnail).toHaveClass('h-9', 'w-9');
+    expect(thumbnail).toHaveClass('h-6', 'w-6');
     expect(thumbnail.querySelector('img')).toHaveClass(
       'h-full',
       'w-full',

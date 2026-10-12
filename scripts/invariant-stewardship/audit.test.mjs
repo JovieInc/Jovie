@@ -424,7 +424,7 @@ test('scope-separated stewardship and coding admission policies are compatible',
   assert.ok(capacity.relations.scopeSeparated.includes(wip.id));
 });
 
-test('cadence composes the existing workflow and does not create another scheduler', () => {
+test('stewardship composes the existing event-driven workflow and adds no scheduler', () => {
   const workflow = fs.readFileSync(
     '.github/workflows/design-governance.yml',
     'utf8'
@@ -439,7 +439,7 @@ test('cadence composes the existing workflow and does not create another schedul
     false
   );
   assert.match(workflow, /group: governance-/);
-  assert.match(workflow, /cron: '17 8 \* \* 1'/);
+  assert.doesNotMatch(workflow, /^\s+schedule:/m);
 });
 
 test('generated audit artifact remains evidence-only beside executable authority', () => {

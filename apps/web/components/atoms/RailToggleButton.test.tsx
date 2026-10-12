@@ -2,24 +2,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@jovie/ui', () => ({
-  IconButton: ({
-    children,
-    variant,
-    size,
-    ...props
-  }: React.ComponentProps<'button'> & {
-    readonly variant?: string;
-    readonly size?: string;
-  }) => (
-    <button
-      data-icon-button-variant={variant}
-      data-icon-button-size={size}
-      {...props}
-    >
-      {children}
-    </button>
-  ),
+vi.mock('@jovie/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@jovie/ui')>()),
   TooltipShortcut: ({ children }: { readonly children: React.ReactNode }) =>
     children,
 }));
@@ -27,7 +11,6 @@ vi.mock('@jovie/ui', () => ({
 import { RailToggleButton } from './RailToggleButton';
 
 describe('RailToggleButton', () => {
-  // ship-gate touch: keep colocated test in PR when component chrome changes
   it('uses one static chrome contract for a left rail', async () => {
     const onToggle = vi.fn();
     const user = userEvent.setup();
@@ -46,11 +29,21 @@ describe('RailToggleButton', () => {
 
     const button = screen.getByTestId('left-toggle');
     expect(button).toHaveAttribute('data-rail-toggle', 'left');
-    expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
-    expect(button).toHaveAttribute('data-icon-button-size', 'sm');
+    expect(button).toHaveClass(
+      'h-7',
+      'w-7',
+      'rounded-full',
+      'before:h-11',
+      'before:w-11'
+    );
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(button).toHaveAttribute('aria-pressed', 'true');
-    expect(button.className).toContain('aria-pressed:bg-interactive-active');
+    expect(button.className).not.toContain('aria-pressed:bg-');
+    expect(button).toHaveClass('bg-transparent');
+    expect(button).not.toHaveClass(
+      'focus-visible:bg-interactive-hover',
+      'focus-visible:bg-surface-1'
+    );
     expect(button.className).not.toContain('active:scale');
     expect(screen.getByTestId('left-icon')).toHaveAttribute(
       'aria-hidden',
@@ -59,6 +52,24 @@ describe('RailToggleButton', () => {
 
     await user.click(button);
     expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes preview visibility separately from saved pin state', () => {
+    render(
+      <RailToggleButton
+        side='right'
+        open
+        pinned={false}
+        controlsId='profile-rail'
+        openLabel='Pin profile'
+        closedLabel='Show profile'
+        onToggle={vi.fn()}
+      />
+    );
+    const button = screen.getByRole('button', { name: 'Pin profile' });
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(button).toHaveAttribute('aria-controls', 'profile-rail');
   });
 
   it('mirrors the same contract for a closed right rail', () => {
@@ -78,8 +89,13 @@ describe('RailToggleButton', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false');
     expect(button).toHaveAttribute('aria-pressed', 'false');
     expect(button).toHaveAttribute('aria-label', 'Show profile');
-    expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
-    expect(button).toHaveAttribute('data-icon-button-size', 'sm');
+    expect(button).toHaveClass(
+      'h-7',
+      'w-7',
+      'rounded-full',
+      'before:h-11',
+      'before:w-11'
+    );
   });
 
   it.each([

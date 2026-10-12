@@ -17,6 +17,7 @@ import argparse
 import fcntl
 import hashlib
 import json
+import math
 import os
 import re
 import select
@@ -36,6 +37,12 @@ LIMIT = re.compile(r"usage limit|rate limit|too many requests|\b429\b|quota", re
 USAGE = re.compile(r"usage limit|quota|insufficient", re.I)
 RATE_BACKOFF_S = int(os.environ.get("CODEX_RATE_BACKOFF_S", 120))
 ROTATE_PAUSE_S = float(os.environ.get("CODEX_ROTATE_PAUSE_S", 20))
+# An account leased by another run is busy, not spent. On Gem (one current-login lease) three
+# runs started within two minutes on 2026-10-11; the losers exited NO_ACCOUNT_EXIT, which the
+# lane reads as provider failure: a fix attempt was charged and codex cooled down. A run now
+# waits (bounded) for a busy lease; only exhausted accounts end it early.
+LEASE_WAIT_S = int(os.environ.get("CODEX_LEASE_WAIT_S", 1800))
+LEASE_POLL_S = float(os.environ.get("CODEX_LEASE_POLL_S", 15))
 LEDGER_SCHEMA = "jovie.capacity-lease/v1"
 LEDGER_CADENCE_S = 3600
 EVIDENCE_MAX_AGE_S = 2 * 3600
@@ -51,10 +58,45 @@ NEGATED = re.compile(r"\b(?:no|not|never|won't|will not|didn't|did not)\b", re.I
 NO_ACCOUNT_EXIT = 75  # EX_TEMPFAIL: the lane treats it as provider-error and cools down
 PROVIDER_EVIDENCE_SCHEMA = "jovie-provider-lease/v1"
 ACCOUNT_CLASS = "chatgpt-oauth"
+CURRENT_LOGIN = "current-login"
+
+
+def current_login_mode() -> bool:
+    """Opt-in to the existing CLI login; never discover or rotate other profiles."""
+    return os.environ.get("CODEX_LANE_AUTH_MODE") == CURRENT_LOGIN
+
+
+def cli() -> str:
+    return os.environ.get("CODEX_LANE_CLI", "codex")
+
+
+def account_home(name: str) -> Path:
+    if current_login_mode() and name == CURRENT_LOGIN:
+        return Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+    return ACCOUNTS_ROOT / name
+
+
+def subscription_env(name: str) -> dict:
+    # Environment API credentials must never override a subscription login.
+    excluded = {"OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_BASE_URL", "AZURE_OPENAI_API_KEY"}
+    return {**{key: value for key, value in os.environ.items() if key not in excluded},
+            "CODEX_HOME": str(account_home(name))}
+
+
+def current_login_available() -> bool:
+    """Ask the supported CLI for auth mode; do not open/copy credentials or infer quota."""
+    try:
+        result = subprocess.run([cli(), "login", "status"], env=subscription_env(CURRENT_LOGIN),
+                                capture_output=True, text=True, timeout=10)
+        return result.returncode == 0 and "Logged in using ChatGPT" in (result.stdout + result.stderr).splitlines()
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 def accounts() -> list[str]:
     """ChatGPT-authenticated profiles only; adapters and API-key profiles never lease."""
+    if current_login_mode():
+        return [CURRENT_LOGIN] if current_login_available() else []
     found = []
     for auth in sorted(ACCOUNTS_ROOT.glob("*/auth.json")):
         try:
@@ -68,8 +110,16 @@ def accounts() -> list[str]:
 
 def read_state() -> dict:
     try:
-        return json.loads(STATE.read_text())
+        value = json.loads(STATE.read_text())
+        if current_login_mode() and (not isinstance(value, dict)
+                                    or any(not isinstance(row, dict) for row in value.values())):
+            raise ValueError("subscription banking state malformed")
+        return value
+    except FileNotFoundError:
+        return {}
     except (OSError, ValueError):
+        if current_login_mode():
+            raise
         return {}
 
 
@@ -409,10 +459,20 @@ def reset_readback_verified(before: dict, after: dict) -> bool:
             return False
     return bool(comparisons) and any(comparisons)
 
-def app_server_calls(name: str, calls: list[tuple[str, dict | None]], timeout: float = 15) -> list[dict]:
-    proc = subprocess.Popen(["codex", "app-server", "--stdio"], stdin=subprocess.PIPE,
+def app_server_calls(name: str, calls: list[tuple[str, dict | None]], timeout: float = 15,
+                     *, lease_handle=None) -> list[dict]:
+    current = current_login_mode()
+    if current and (name != CURRENT_LOGIN or calls != CURRENT_METADATA_CALLS):
+        raise ValueError("current-login permits only public subscription metadata reads")
+    if current and (lease_handle is None or lease_handle.closed):
+        raise ValueError("current-login metadata requires its execution account lease")
+    command = ([cli(), "app-server", "--stdio", "-c", 'forced_login_method="chatgpt"']
+               if current else ["codex", "app-server", "--stdio"])
+    proc = subprocess.Popen(command, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
-                            env={**os.environ, "CODEX_HOME": str(ACCOUNTS_ROOT / name)})
+                            env=(subscription_env(name) if current else
+                                 {**os.environ, "CODEX_HOME": str(ACCOUNTS_ROOT / name)}),
+                            **({"pass_fds": (lease_handle.fileno(),)} if current else {}))
     deadline = time.monotonic() + timeout
 
     def request(request_id: int, method: str, params=None) -> dict:
@@ -437,24 +497,160 @@ def app_server_calls(name: str, calls: list[tuple[str, dict | None]], timeout: f
 
     try:
         request(1, "initialize", {"clientInfo": {"name": "jovie-quota-ledger", "version": "1"},
-                                   "capabilities": {"experimentalApi": True}})
+                                   "capabilities": {"experimentalApi": not current}})
         proc.stdin.write(json.dumps({"method": "initialized"}) + "\n")
         proc.stdin.flush()
         return [request(index + 2, method, params) for index, (method, params) in enumerate(calls)]
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(timeout=2)
+        if current:
+            reap_current_metadata(proc)
+        else:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=2)
         for stream in (proc.stdin, proc.stdout): stream.close()
+
+
+def reap_current_metadata(proc):
+    """Never release the account lease while metadata cleanup is unproved.
+
+    The child inherits the same locked descriptor, so parent death also cannot
+    admit another account user while that child retains ownership.
+    """
+    interrupted = None
+    first = True
+    while True:
+        try:
+            if proc.poll() is not None:
+                break
+            if first:
+                proc.terminate()
+                first = False
+            else:
+                proc.kill()
+            proc.wait(timeout=2)
+            break
+        except subprocess.TimeoutExpired:
+            first = False
+        except BaseException as error:
+            first = False
+            if not isinstance(error, Exception):
+                interrupted = interrupted or error
+            # Follow the maintained cleanup-unproved rule: keep ownership.
+            # Retry observation; a signal/error alone does not prove reap.
+            try:
+                time.sleep(.1)
+            except BaseException as pause_error:
+                interrupted = interrupted or pause_error
+    if interrupted is not None:
+        raise interrupted
 
 def account_snapshot(name: str) -> dict:
     account, rates, messages = app_server_calls(name, [
         ("account/read", {"refreshToken": False}), ("account/rateLimits/read", None),
         ("account/workspaceMessages/read", None)])
     return {"account": account, "rateLimits": rates, "messages": messages}
+
+
+CURRENT_METADATA_CALLS = [("account/read", {"refreshToken": False}),
+                          ("account/rateLimits/read", None),
+                          ("model/list", {"limit": 100, "includeHidden": False})]
+
+
+def current_subscription_snapshot(name: str, *, lease_handle=None) -> dict:
+    account, rates, models = app_server_calls(name, CURRENT_METADATA_CALLS, lease_handle=lease_handle)
+    return {"account": account, "rateLimits": rates, "models": models}
+
+
+def reconcile_current_subscription(now, if_due, fetch) -> dict:
+    """Observe one existing login; never redeem credits, rotate or clear banks.
+
+    Use the execution account's lock, and the maintained hourly cadence. Failure
+    leaves the previous observation to become stale; it cannot certify capacity.
+    """
+    def due():
+        ledger = read_state().get("_ledger") or {}
+        last = ledger.get("reconciledAt")
+        return not (ledger.get("authMode") == CURRENT_LOGIN and if_due
+                    and type(last) in (int, float) and 0 <= now - last < if_due)
+    try:
+        if not due():
+            return {"reconciled": False, "reason": "cadence"}
+    except (OSError, ValueError):
+        return {"reconciled": False, "reason": "banking-state-unreadable"}
+    handle = lease(CURRENT_LOGIN)
+    if handle is None:
+        return {"reconciled": False, "reason": "account-lease-busy"}
+    errors = {}
+    try:
+        try:
+            if not due():
+                return {"reconciled": False, "reason": "cadence"}
+        except (OSError, ValueError):
+            return {"reconciled": False, "reason": "banking-state-unreadable"}
+        # Persist the attempt before provider access. If storage is unavailable,
+        # make no request; a failed observation or event write must not hot-loop.
+        try:
+            update_state(lambda state: state.__setitem__("_ledger",
+                         {"schema": LEDGER_SCHEMA, "authMode": CURRENT_LOGIN,
+                          "reconciledAt": now, "errors": {CURRENT_LOGIN: "observation-in-progress"}}))
+        except Exception as error:
+            return {"reconciled": False, "accounts": [],
+                    "errors": {"_reconcile": type(error).__name__ + ": observation storage unavailable"}}
+        value = None
+        try:
+            snapshot = (fetch(CURRENT_LOGIN, lease_handle=handle)
+                        if fetch is current_subscription_snapshot else fetch(CURRENT_LOGIN))
+            account = snapshot["account"]["account"]
+            if account.get("type") != "chatgpt":
+                raise ValueError("subscription account not established")
+            windows = _windows(snapshot["rateLimits"])
+            if not windows or any(type(row.get("usedPercent")) not in (int, float)
+                                  or not math.isfinite(row["usedPercent"])
+                                  or not 0 <= row["usedPercent"] <= 100
+                                  or type(row.get("resetsAt")) is not int
+                                  or row["resetsAt"] <= now for row in windows.values()):
+                raise ValueError("included capacity metadata incomplete")
+            catalog = snapshot["models"]
+            if not isinstance(catalog.get("data"), list) or catalog.get("nextCursor"):
+                raise ValueError("model catalog incomplete")
+            ids = [row["id"] for row in catalog["data"] if isinstance(row, dict)
+                   and isinstance(row.get("id"), str) and row.get("hidden") is not True]
+            if len(ids) != len(catalog["data"]):
+                raise ValueError("model catalog ambiguous")
+            value = build_capacity_lease(CURRENT_LOGIN, snapshot, {"models": ids}, now)
+            value["sources"]["announcements"] = {"source": None, "reconciliation": "not-requested"}
+            value["compatibility"].update(cli=cli(), authMode=CURRENT_LOGIN,
+                                           restrictions=["subscription-only", "one-account-lease"])
+        except Exception as error:
+            errors[CURRENT_LOGIN] = type(error).__name__ + ": public subscription metadata unavailable"
+
+        def apply(state):
+            if value is not None:
+                # Merge only observation fields into the current locked row.
+                # Quota/auth banks and run/attempt ownership remain untouched.
+                entry = state.setdefault(CURRENT_LOGIN, {})
+                previous = entry.get("capacityLease") or {}
+                entry["capacityLease"] = value
+                if _lease_digest(previous) != _lease_digest(value):
+                    path = STATE.parent / "capacity-events.jsonl"
+                    with path.open("a") as stream:
+                        stream.write(json.dumps({"schema": "jovie.capacity-lease-change/v1", "at": iso(now),
+                                                 "leaseId": value["leaseId"], "previousDigest": _lease_digest(previous) if previous else None,
+                                                 "currentDigest": _lease_digest(value), "lease": value}) + "\n")
+            state["_ledger"] = {"schema": LEDGER_SCHEMA, "authMode": CURRENT_LOGIN,
+                                "reconciledAt": now, "errors": errors}
+        try:
+            update_state(apply)
+        except Exception as error:
+            errors["_reconcile"] = type(error).__name__ + ": observation storage unavailable"
+            return {"reconciled": False, "accounts": [], "errors": errors}
+        return {"reconciled": value is not None, "accounts": [CURRENT_LOGIN] if value else [], "errors": errors}
+    finally:
+        handle.close()
 
 def _lease_digest(value: dict) -> str:
     stable = json.loads(json.dumps(value))
@@ -466,6 +662,9 @@ def _lease_digest(value: dict) -> str:
     return hashlib.sha256(json.dumps(stable, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 def reconcile(now: float | None = None, if_due: int = LEDGER_CADENCE_S, fetch=account_snapshot) -> dict:
+    if current_login_mode():
+        return reconcile_current_subscription(time.time() if now is None else now, if_due,
+                                              current_subscription_snapshot if fetch is account_snapshot else fetch)
     now = time.time() if now is None else now
     current = read_state()
     last = float(current.get("_ledger", {}).get("reconciledAt") or 0)
@@ -591,26 +790,64 @@ def classify(output: str, code: int, now: float) -> tuple[str, float | None]:
         if not USAGE.search(closing):
             return "rate", parse_reset(closing, now) or now + RATE_BACKOFF_S
         return "limit", parse_reset(closing, now) or now + DEFAULT_COOLDOWN_S
-    if code != 0 and AUTH.search(tail):
+    # Same rule as limits: only codex's closing lines can say the login failed. An agent
+    # working on auth code prints "401"/"unauthorized" all run long; scanning the whole tail
+    # benched Gem's only login for 24h on a plain 429 (2026-10-12, 96% capacity left).
+    if code != 0 and AUTH.search(closing):
         return "auth", now + 24 * 3600
     return ("ok" if code == 0 else "error"), None
 
 
-def lease(name: str):
-    """Exclusive per-account flock; released by the kernel if the run dies."""
-    locks = STATE.parent / "codex-locks"
-    locks.mkdir(parents=True, exist_ok=True)
-    handle = open(locks / f"{name}.lock", "w")
+def login_slots(name: str) -> int:
+    """Concurrent runs one account may hold. Only the single current-login account can be
+    widened (CODEX_LANE_LOGIN_SLOTS, Tim 2026-10-11: more runs on one login, no account
+    rotation); every other account keeps one exclusive run."""
+    if not (current_login_mode() and name == CURRENT_LOGIN):
+        return 1
     try:
-        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        handle.close()
-        return None
-    return handle
+        return max(1, int(os.environ.get("CODEX_LANE_LOGIN_SLOTS", "1")))
+    except ValueError:
+        return 1
+
+
+def _slot_paths(name: str) -> list[Path]:
+    locks = STATE.parent / "codex-locks"
+    return [locks / (f"{name}.lock" if slot == 0 else f"{name}.{slot}.lock") for slot in range(login_slots(name))]
+
+
+def lease(name: str):
+    """One flock per concurrent run slot; released by the kernel if the run dies."""
+    (STATE.parent / "codex-locks").mkdir(parents=True, exist_ok=True)
+    for path in _slot_paths(name):
+        handle = open(path, "w")
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            handle.close()
+            continue
+        return handle
+    return None
+
+
+def reverify_auth_bank(state: dict, now: float) -> dict:
+    """An auth bank on the current login is only as good as the login: `codex login status`
+    (local, no quota) is the authority. A logged-in CLI clears the bank instead of idling
+    the lane for a day on a misread transcript."""
+    entry = state.get(CURRENT_LOGIN) or {}
+    if not (current_login_mode() and entry.get("lastKind") == "auth"
+            and float(entry.get("exhaustedUntil") or 0) > now and current_login_available()):
+        return state
+    def clear(st: dict) -> None:
+        row = st.setdefault(CURRENT_LOGIN, {})
+        row.pop("exhaustedUntil", None)
+        row.update(lastKind="auth-reverified", authReverifiedAt=now)
+    update_state(clear)
+    return read_state()
 
 
 def pick(state: dict, now: float, names: list[str] | None = None):
     """Least-recently-used available account that nobody else has leased right now."""
+    state = reverify_auth_bank(state, now)
     names = accounts() if names is None else names
     order = sorted((n for n in names if available(n, state, now)),
                    key=lambda n: float(state.get(n, {}).get("lastUsed") or 0))
@@ -628,8 +865,15 @@ def run(args) -> int:
     provider."""
     prompt = Path(args.prompt_file).read_text()
     last = Path(args.cwd or ".") / ".codex-last-message.txt"
-    base = ["codex", "exec", "--ignore-user-config", "--skip-git-repo-check", "--ephemeral",
+    base = [cli(), "exec", "--ignore-user-config", "--skip-git-repo-check", "--ephemeral",
             "--dangerously-bypass-approvals-and-sandbox", "--color", "never", "-o", str(last)]
+    if current_login_mode():
+        base.remove("--dangerously-bypass-approvals-and-sandbox")
+        # The installed CLI supports these configuration keys but not the TUI's
+        # --approve-for-me shortcut. Keep the sandbox and reviewer explicit.
+        base += ["--sandbox", "workspace-write", "-c", 'approval_policy="on-request"',
+                 "-c", 'approvals_reviewer="auto_review"', "-c", 'model_provider="openai"',
+                 "-c", 'forced_login_method="chatgpt"']
     if args.model:
         base += ["-m", args.model]
     if args.reasoning_effort:
@@ -639,11 +883,23 @@ def run(args) -> int:
     base.append("-")
     tried: list[str] = []
     attempted = False
+    wait_until, waiting = time.time() + LEASE_WAIT_S, False
     while True:
         now = time.time()
-        name, handle = pick(read_state(), now, [n for n in accounts() if n not in tried])
+        candidates = [n for n in accounts() if n not in tried]
+        state = read_state()
+        name, handle = pick(state, now, candidates)
         if name is None:
-            print("codex-lane: no available account (all exhausted or leased)", file=sys.stderr)
+            busy = [n for n in candidates if available(n, state, now)]
+            if busy and now < wait_until:
+                if not waiting:
+                    print(f"codex-lane: account lease busy ({', '.join(busy)}); waiting up to {LEASE_WAIT_S}s",
+                          file=sys.stderr, flush=True)
+                    waiting = True
+                time.sleep(LEASE_POLL_S)
+                continue
+            why = "leased by other runs past the wait" if busy else "all exhausted"
+            print(f"codex-lane: no available account ({why})", file=sys.stderr)
             return NO_ACCOUNT_EXIT
         tried.append(name)
         text = prompt if not attempted else (
@@ -652,6 +908,10 @@ def run(args) -> int:
         attempted = True
         code, kind, until = run_account(name, handle, base, text, args.cwd, now,
                                         getattr(args, "receipt_file", None))
+        if current_login_mode():
+            # Preserve the worktree for the harness's existing retry/handoff policy;
+            # never rotate accounts or consume reset credits after an exhausted run.
+            return NO_ACCOUNT_EXIT if kind in ("rate", "limit", "auth") else code
         if kind == "reset-credit":
             tried.remove(name)
             continue
@@ -663,8 +923,8 @@ def run(args) -> int:
 
 def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
                 receipt_file: str | None = None):
-    home = ACCOUNTS_ROOT / name
-    env = {**os.environ, "CODEX_HOME": str(home)}
+    home = account_home(name)
+    env = subscription_env(name) if current_login_mode() else {**os.environ, "CODEX_HOME": str(home)}
     from collections import deque
     tail = deque(maxlen=400)  # classification only needs the end of the output
     launch = None
@@ -697,8 +957,10 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
                 entry.update(exhaustedUntil=until, lastError=(LIMIT.search(output) or AUTH.search(output)).group(0)[:80])
             else:
                 entry.pop("exhaustedUntil", None)
+            if kind == "ok":
+                entry.pop("lastError", None)  # a working run disproves the last failure
         update_state(record)
-        if kind == "limit" and maybe_redeem(name, handle, time.time()):
+        if kind == "limit" and not current_login_mode() and maybe_redeem(name, handle, time.time()):
             return 0, "reset-credit", None
         return code, kind, until
     finally:
@@ -721,7 +983,8 @@ def status(now: float | None = None, names: list[str] | None = None, state: dict
         credit_count = (capacity_lease.get("credits") or {}).get("availableCount")
         rows[name] = {
             "available": until <= now,
-            "leased": (STATE.parent / "codex-locks" / f"{name}.lock").exists() and not _lockable(name),
+            "leased": (free := _free_slots(name)) == 0,
+            "freeSlots": free,
             "exhaustedUntil": iso(until) if until > now else None,
             "resetsInS": max(0, int(until - now)) if until > now else 0,
             "lastKind": entry.get("lastKind"), "lastError": entry.get("lastError"),
@@ -738,12 +1001,22 @@ def status(now: float | None = None, names: list[str] | None = None, state: dict
             "accounts": rows, "available": banked, "count": len(rows), "ledger": state.get("_ledger")}
 
 
-def _lockable(name: str) -> bool:
-    handle = lease(name)
-    if handle is None:
-        return False
-    handle.close()
-    return True
+def _free_slots(name: str) -> int:
+    """Slots nobody holds right now; probe each with a non-blocking flock and release it."""
+    free = 0
+    for path in _slot_paths(name):
+        if not path.exists():
+            free += 1
+            continue
+        handle = open(path, "a")
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            free += 1
+        except BlockingIOError:
+            pass
+        finally:
+            handle.close()
+    return free
 
 
 def main(argv=None) -> int:

@@ -15,6 +15,9 @@ const ANSI = /\u001b\[[0-9;]*m/g;
 // GitHub log lines are `<job>\t<step>\t<ISO time> <text>`; keep only the text.
 const LOG_PREFIX = /^.*?\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*/;
 const DEPRECATION = /\bdeprecat(ed|ion)\b|\[DEP\d{4}\]/i;
+// Ref names may contain "deprecated" without reporting a deprecation warning.
+const GIT_REF_UPDATE =
+  /^(?:[+*!=t-]\s+)?(?:\[(?:new branch|new tag|new ref|deleted|up to date|rejected|tag update)\]|[0-9a-f]+\.\.\.?[0-9a-f]+)\s+\S+\s+->\s+\S+(?:\s+\(.*\))?$/i;
 // ponytail: 10 per run caps Linear spam if a toolchain bump floods warnings.
 export const MAX_ISSUES_PER_RUN = 10;
 
@@ -34,7 +37,12 @@ export function extractDeprecations(log) {
   for (const raw of log.split('\n')) {
     if (!DEPRECATION.test(raw)) continue;
     const text = normalizeWarning(raw);
-    if (text.length < 12 || /^(\+|echo\b)/.test(text)) continue;
+    if (
+      text.length < 12 ||
+      /^(\+|echo\b)/.test(text) ||
+      GIT_REF_UPDATE.test(text)
+    )
+      continue;
     const fingerprint = `deprecation-${createHash('sha256').update(text).digest('hex').slice(0, 12)}`;
     if (!seen.has(fingerprint)) seen.set(fingerprint, text.slice(0, 500));
   }

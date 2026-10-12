@@ -2,12 +2,17 @@ import { OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH } from './oauth-contract';
 import { parseJsonRpc, rpcError, rpcOk } from './protocol';
 import type { OperatingStore } from './store';
 import { getDefaultOperatingStore } from './store';
-import { callOvieMcpTool, listOvieMcpTools } from './tools';
+import {
+  authorizeOvieMcpAccess,
+  callOvieMcpTool,
+  listOvieMcpTools,
+} from './tools';
 import {
   type JsonRpcRequest,
   OVIE_MCP_IDENTITY,
   OVIE_MCP_PROTOCOL_VERSION,
   OVIE_MCP_SERVER_NAME,
+  OvieMcpInputError,
   type OvieMcpPrincipal,
 } from './types';
 
@@ -24,25 +29,33 @@ export async function handleOvieMcpRequest(input: {
   readonly principal: OvieMcpPrincipal;
   readonly store?: OperatingStore;
 }): Promise<OvieMcpHandleResult> {
-  const store = input.store ?? getDefaultOperatingStore();
   const parsed = parseJsonRpc(input.body);
   if (!parsed?.method) {
     return { status: 200, body: rpcError(null, -32700, 'Parse error') };
   }
 
-  if (!input.principal.authenticated) {
+  const access = authorizeOvieMcpAccess(input.principal);
+  if (!access.ok) {
     return {
-      status: 401,
-      body: rpcError(parsed.id, -32001, 'authentication required'),
-      headers: { 'www-authenticate': UNAUTHENTICATED_WWW_AUTHENTICATE },
+      status: access.status,
+      body: rpcError(parsed.id, -32001, access.message),
+      ...(access.status === 401
+        ? { headers: { 'www-authenticate': UNAUTHENTICATED_WWW_AUTHENTICATE } }
+        : {}),
     };
   }
 
   try {
+    const store = input.store ?? getDefaultOperatingStore();
     return await dispatchAuthenticated(parsed, input.principal, store);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'internal error';
-    return { status: 200, body: rpcError(parsed.id, -32602, message) };
+    if (error instanceof OvieMcpInputError) {
+      return {
+        status: 200,
+        body: rpcError(parsed.id, -32602, error.publicMessage),
+      };
+    }
+    return { status: 200, body: rpcError(parsed.id, -32603, 'internal error') };
   }
 }
 
@@ -101,7 +114,7 @@ async function dispatchAuthenticated(
     default:
       return {
         status: 200,
-        body: rpcError(id, -32601, `Method not found: ${request.method}`),
+        body: rpcError(id, -32601, 'Method not found'),
       };
   }
 }
