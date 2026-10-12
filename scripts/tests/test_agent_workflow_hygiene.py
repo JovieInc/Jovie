@@ -1270,7 +1270,8 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
     )[0]
     assert "push:" in screenshot_triggers
     assert "schedule:" not in screenshot_triggers
-    assert "'0 9 * * 2'" in harness
+    assert "schedule:" not in harness
+    assert "workflow_dispatch:" in harness
 
 
 def test_full_matrix_supersedes_stale_runs_cleanly() -> None:

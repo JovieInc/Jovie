@@ -268,8 +268,28 @@ jobs:
               exit 1
             }
             ci_workflow_id="$(jq -r '.id' <<<"$ci_workflow")"
+            # The scheduled reconciliation can fire while the tip's exact push CI
+            # is still running. That is a defer, not a failure: exit 0 so the
+            # neutral skip lands and tomorrow's reconciliation (or a
+            # workflow_run hop) owns the generation. A completed failed run
+            # still fails closed.
             ci_runs="$(gh api \
-              "repos/$REPOSITORY/actions/workflows/$ci_workflow_id/runs?branch=main&head_sha=$release_sha&status=completed&per_page=100")"
+              "repos/$REPOSITORY/actions/workflows/$ci_workflow_id/runs?branch=main&head_sha=$release_sha&per_page=100")"
+            if jq -e --arg repo "$REPOSITORY" --arg sha "$release_sha" '
+              type == "object" and
+              (.workflow_runs | type == "array") and
+              ([.workflow_runs[]? | select(
+                .head_sha == $sha and
+                .head_branch == "main" and
+                .head_repository.full_name == $repo and
+                .event == "push" and
+                .path == ".github/workflows/ci.yml" and
+                .status != "completed"
+              )] | length) >= 1
+            ' >/dev/null <<<"$ci_runs"; then
+              echo "::notice::Exact push CI for staging generation $release_sha is still running; deferring staging publication to the next reconciliation."
+              exit 0
+            fi
             jq -e --arg repo "$REPOSITORY" --arg sha "$release_sha" '
               type == "object" and
               (.workflow_runs | type == "array") and

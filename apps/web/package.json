@@ -36,6 +36,7 @@
     "lint:no-native-dialogs": "node scripts/lint-no-native-dialogs.mjs",
     "lint:contrast-ratchet": "node scripts/lint-contrast-ratchet.mjs && tsx scripts/lint-contrast-computed.ts",
     "lint:contrast-computed": "tsx scripts/lint-contrast-computed.ts",
+    "lint:motion-css": "node scripts/lint-motion-css.mjs",
     "lint:touch-target": "tsx scripts/lint-touch-target.ts",
     "tokens:build": "node scripts/build-design-tokens.mjs",
     "tokens:check": "node scripts/build-design-tokens.mjs --check",

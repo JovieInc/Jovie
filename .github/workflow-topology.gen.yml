@@ -106,7 +106,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:report
     jobCount: 1
@@ -154,6 +153,7 @@ nodes:
       - pull_request
       - schedule
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:self-test
     jobCount: 3
   - name: Auto-PR on Agent Push
@@ -781,6 +781,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request_target
+      - push
       - schedule
       - workflow_dispatch
       - workflow_run
@@ -818,7 +819,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:scheduled-cleanup
     jobCount: 1
@@ -1338,6 +1338,7 @@ nodes:
     authoritativeFor:
       - source-validation
     allowedConsumers:
+      - Auto-Merge Default
       - Auto-Ready Agent Drafts
       - Lane Fix Relay
       - Merge Queue Green Enroll
@@ -1527,6 +1528,9 @@ nodes:
     terminalReceipt: job:mine
     jobCount: 1
 edges:
+  - from: Source Validation
+    to: Auto-Merge Default
+    type: workflow_run
   - from: CI
     to: iOS CI
     type: workflow_call

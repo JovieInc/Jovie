@@ -912,7 +912,7 @@ jobs:
       - name: Build and stage production deployment
         id: stage-production
         if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
-        timeout-minutes: 30
+        timeout-minutes: 45
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           EXPECTED_SHA: ${{ inputs.expected_sha }}
@@ -1114,7 +1114,7 @@ jobs:
 
           inspect_wait_status=0
           ./node_modules/.bin/vercel inspect "$production_deploy_id" \
-            --wait --timeout 15m "${scope_args[@]}" ||
+            --wait --timeout 30m "${scope_args[@]}" ||
             inspect_wait_status=$?
           # inspect --format=json omits meta in Vercel 56.3.2. Read the full
           # authenticated deployment record for the unchanged provenance checks.

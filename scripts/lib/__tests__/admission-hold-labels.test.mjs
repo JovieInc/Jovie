@@ -124,7 +124,7 @@ test('every enroll, dequeue, and auto-merge copy matches the canonical set', () 
 
 // Runs the real enable step against a fake gh: a held PR must never be armed,
 // because arming a CLEAN PR enqueues it and a held member fails every group.
-function runEnable(labels) {
+function runEnable(labels, { isDraft = false, env: extraEnv = {} } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'auto-merge-enable-'));
   try {
     const log = join(dir, 'calls.log');
@@ -143,6 +143,7 @@ while [ $# -gt 0 ]; do
 done
 case "$json" in
   labels) printf '%s' '{"labels":${JSON.stringify(labels.map(name => ({ name })))}}' | jq -r "$jq_expr" ;;
+  state,isDraft) printf '%s' '{"state":"OPEN","isDraft":${isDraft}}' | jq -r "$jq_expr" ;;
   headRefOid) echo ${'a'.repeat(40)} ;;
   autoMergeRequest) echo "" ;;
   "") echo '[[]]' ;;
@@ -162,6 +163,7 @@ esac
         PR_NUMBER: '7',
         HEAD_REPO: 'JovieInc/Jovie',
         BASE_REPO: 'JovieInc/Jovie',
+        ...extraEnv,
       },
     });
     assert.equal(result.status, 0, result.stderr);
@@ -183,4 +185,23 @@ test('the auto-merge enable step skips held PRs and arms unheld ones', () => {
     assert.match(held.stdout, /admission-blocking label/);
   }
   assert.equal(runEnable(['ui']).merged, true);
+});
+
+test('a Source Validation completion re-arms a missed same-repo enable but never a draft', () => {
+  const enable = readWorkflow('auto-merge-default.yml');
+  assert.deepEqual(enable.on.workflow_run, {
+    workflows: ['Source Validation'],
+    types: ['completed'],
+  });
+  assert.ok(enable.on.pull_request.types.includes('synchronize'));
+  assert.match(
+    enable.jobs.enable.if,
+    /workflow_run\.pull_requests\[0\]\.number != null/
+  );
+  assert.match(
+    enable.jobs.enable.if,
+    /head_repository\.full_name == github\.repository/
+  );
+  assert.equal(runEnable([], { isDraft: true }).merged, false);
+  assert.equal(runEnable([]).merged, true);
 });
