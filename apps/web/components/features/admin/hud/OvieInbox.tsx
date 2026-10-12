@@ -105,7 +105,9 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
     <ContentSurfaceCard data-testid='ovie-inbox'>
       <div className='min-h-64 p-4'>
         <div className='flex items-center justify-between gap-3'>
-          <h2 className='text-sm font-semibold text-primary-token'>Inbox</h2>
+          <h2 className='whitespace-nowrap text-sm font-semibold text-primary-token'>
+            Inbox
+          </h2>
           <DrawerButton
             type='button'
             tone='secondary'
@@ -134,7 +136,7 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
             </div>
           ) : item ? (
             <article data-testid='ovie-inbox-decision' key={item.id}>
-              <h3 className='text-app font-medium text-primary-token'>
+              <h3 className='text-balance text-app font-medium text-primary-token'>
                 {item.title}
               </h3>
               <p className='mt-2 whitespace-pre-wrap text-app text-secondary-token'>
