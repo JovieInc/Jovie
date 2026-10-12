@@ -44,13 +44,16 @@ import continuity_clock  # noqa: E402
 import lifecycle  # noqa: E402
 import devin_free_policy  # noqa: E402
 import autoscale  # noqa: E402
+import capacity_limit  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
+import fleet_gate_emitter  # noqa: E402
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
+import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
@@ -117,11 +120,16 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
+              "scripts/tests/test_capacity_limit.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
-              "scripts/tests/test_epics.py"]
+              "scripts/tests/test_epics.py",
+              "scripts/tests/test_linear_sync.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
+RELEASE_EXTRAS = ["scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
+                  "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
+                  "scripts/fleet-gate/symphony_proof_context.py",
+                  "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
@@ -137,7 +145,6 @@ LANE_BRANCH = re.compile(
     r"(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-(?:\d{8}|[a-f0-9]{15}\Z)"
 )
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE"})
-RETRY_BACKOFF_S = 1800
 # JOV-7690: a recovery-handoff run does no work, so the issue backs off exponentially
 # (5 min doubling to 6 h) instead of being re-claimed on the next reexec. Linear hears
 # about the first handoff and once more at HANDOFF_COMMENT_AT, never once per loop.
@@ -145,18 +152,6 @@ HANDOFF_BACKOFF_S = 300
 HANDOFF_BACKOFF_CAP_S = 6 * 3600
 HANDOFF_COMMENT_AT = 3
 PRESERVED_RUN_NAME = re.compile(r"^\d{8}T\d{6}Z-(?P<issue>[A-Z]+-\d+)-")
-# JOV-6833: a lane may hold this many open non-green PRs per slot before it stops claiming
-# new issues and only fixes/adopts what it already opened.
-OPEN_PRS_PER_SLOT = 2
-# Held/exhausted lane PRs wait for a human and cannot be advanced by the owning lane
-# (codex may not adopt/gate). They are bounded separately so they cannot pin the
-# active budget at its cap forever (JOV-7514: codex idle with 7 terminal PRs).
-TERMINAL_PRS_PER_SLOT = 4
-LANE_ISSUE_PAGES = 5  # <=500 rows per bounded label/state read
-# The claim pool is every JOV Todo issue: one shared snapshot per TTL, <=1000 issues (316 on
-# 2026-10-11). A larger pool fails closed as lane-inventory-page-limit; raise this bound.
-TODO_POOL = "*"
-TODO_POOL_PAGES = 10
 STALE_DRAFT_S = 24 * 3600
 SWEEP_EVERY_S = 1800
 PROVIDER_COOLDOWN_S = 900
@@ -531,6 +526,24 @@ def failure_record(value) -> dict:
     return value if isinstance(value, dict) else {"count": int(value or 0), "at": 0}
 
 
+def release_generation() -> str | None:
+    """The installed release tree; a new one is new evidence for an exhausted issue."""
+    state = lane_state_dir()
+    try:
+        return (state / "current" / ".tree").read_text().strip() or None if state else None
+    except OSError:
+        return None
+
+
+def failure_rejection(record: dict) -> str | None:
+    """MAX_FAILURES identical runs on one release park the issue on this host; the next
+    release (a harness fix) is its automatic exit. No fixed backoff between runs (Tim
+    2026-10-12): the count bounds identical retries, the release generation reopens them."""
+    if record["count"] >= MAX_FAILURES and record.get("release") == release_generation():
+        return "retry-exhausted"
+    return None
+
+
 def created_at_epoch(value: str) -> float | None:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -599,10 +612,8 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
         return "sensitive-provider"
     record = failure_record(failures.get(issue.identifier))
-    if record["count"] >= MAX_FAILURES:
-        return "retry-exhausted"
-    if now - record["at"] < RETRY_BACKOFF_S:
-        return "retry-backoff"
+    if rejected := failure_rejection(record):
+        return rejected
     if issue.identifier.lower() in in_flight:
         return "in-flight-pr"
     if route is not None:
@@ -1761,6 +1772,25 @@ def _body_is_rate_limited(status: int, raw: bytes) -> bool:
     return _data_is_rate_limited(data)
 
 
+class LinearRequestError(RuntimeError):
+    """Only fixed classification/status metadata survives a GraphQL rejection."""
+    def __init__(self, error):
+        error = error if isinstance(error, dict) else {}
+        extensions = error.get("extensions")
+        extensions = extensions if isinstance(extensions, dict) else {}
+        code = extensions.get("code")
+        allowed = {"FORBIDDEN", "UNAUTHENTICATED", "AUTHENTICATION_ERROR", "BAD_USER_INPUT",
+                   "GRAPHQL_VALIDATION_FAILED", "NOT_FOUND", "INTERNAL_SERVER_ERROR"}
+        self.diagnostic = {"class": "linear-graphql", "code": code if isinstance(code, str) and code in allowed else "UNKNOWN"}
+        status = extensions.get("statusCode")
+        if type(status) is int and 100 <= status <= 599:
+            self.diagnostic["httpStatus"] = status
+        # Retain ONLY this exact known missing-comment preimage contract. Other
+        # provider messages can contain input, credentials or response bodies.
+        missing = error.get("message") == "Entity not found: Comment"
+        super().__init__("linear: Entity not found: Comment" if missing else "linear: request rejected")
+
+
 class Linear:
     def __init__(self, env_file: Path, app_env: Path | None = None):
         # The Jovie Lanes app (own quota) when its credentials are installed; Tim's personal
@@ -1832,75 +1862,12 @@ class Linear:
             record_linear_budget(headers, rate_limited=False)
             if payload.get("errors"):
                 outcome = "graphql-error"
-                raise RuntimeError(f"linear: {payload['errors'][0].get('message')}")
+                raise LinearRequestError(payload["errors"][0])
             data = payload["data"]
             outcome = "success"
             return data
         finally:
             record_linear_usage(self.key, family, outcome, headers)
-
-    def _bounded_lane_nodes(self, query: str, variables: dict) -> list[dict]:
-        """Retain the request cap, but never treat a truncated inventory as complete."""
-        nodes, ids, cursors, after = [], set(), set(), None
-        for _ in range(LANE_ISSUE_PAGES):
-            data = self.gql(query, {**variables, "after": after})
-            edge = data.get("issues") if isinstance(data, dict) else None
-            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list):
-                raise LaneInventoryUnknown("lane-inventory-unreadable")
-            for row in edge["nodes"]:
-                if not isinstance(row, dict) or not isinstance(row.get("id"), str) or not row["id"]:
-                    raise LaneInventoryUnknown("lane-inventory-malformed")
-                if row["id"] not in ids:
-                    nodes.append(row)
-                    ids.add(row["id"])
-            page = edge.get("pageInfo")
-            if not isinstance(page, dict) or not isinstance(page.get("hasNextPage"), bool):
-                raise LaneInventoryUnknown("lane-inventory-coverage-unknown")
-            if not page["hasNextPage"]:
-                return nodes
-            after = page.get("endCursor")
-            if not isinstance(after, str) or not after or after in cursors:
-                raise LaneInventoryUnknown("lane-inventory-cursor-invalid")
-            cursors.add(after)
-        raise LaneInventoryUnknown("lane-inventory-page-limit")
-
-    def _todo_scope(self) -> str:
-        return _linear_scope_id(self.key)
-
-    def _todo_envelope_valid(self, value, labels: list[str]) -> bool:
-        if not isinstance(value, dict) or value.get("schema") != "jovie-linear-todo-snapshot/v1" or (
-                value.get("scope") != self._todo_scope() or value.get("catalog") != labels):
-            raise LaneInventoryUnknown("lane-snapshot-binding-invalid")
-        started, completed, now = value.get("sourceStartedAt"), value.get("completedAt"), time.time()
-        if any(type(stamp) not in (int, float) or not math.isfinite(stamp) for stamp in (started, completed, now)):
-            raise LaneInventoryUnknown("lane-snapshot-clock-invalid")
-        if started > completed or completed > now:
-            raise LaneInventoryUnknown("lane-snapshot-clock-reversed")
-        if now - started >= CLAIM_SCAN_TTL_S:
-            return False
-        if value.get("overflow") is True:
-            if value.get("complete") is not False or "rows" in value:
-                raise LaneInventoryUnknown("lane-snapshot-overflow-invalid")
-            return True
-        rows = value.get("rows")
-        if value.get("complete") is not True or not isinstance(rows, list):
-            raise LaneInventoryUnknown("lane-snapshot-coverage-unknown")
-        ids = set()
-        for row in rows:
-            if not isinstance(row, dict) or any(not isinstance(row.get(key), str) or not row[key]
-                    for key in ("id", "identifier", "title", "created_at")) or (
-                    type(row.get("priority")) is not int or not 0 <= row["priority"] <= 4
-                    or not isinstance(row.get("description"), str)
-                    or not isinstance(row.get("labels"), list)
-                    or any(not isinstance(name, str) or not name for name in row["labels"])):
-                raise LaneInventoryUnknown("lane-snapshot-row-invalid")
-            if row["id"] in ids or (labels != [TODO_POOL] and not set(row["labels"]).intersection(labels)):
-                raise LaneInventoryUnknown("lane-snapshot-membership-invalid")
-            ids.add(row["id"])
-        revision = hashlib.sha256(json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        if value.get("revision") != revision:
-            raise LaneInventoryUnknown("lane-snapshot-revision-invalid")
-        return True
 
     def _snapshot_budget_admitted(self, pages: int, max_age_s: float | None = None) -> bool:
         max_age_s = CLAIM_SCAN_TTL_S if max_age_s is None else max_age_s
@@ -1947,103 +1914,34 @@ class Linear:
             return False
         return self._snapshot_budget_admitted(pages)
 
-    def _todo_snapshot(self, labels: list[str], pages: int, *, overflow=False) -> dict:
-        started, rows, cursors, after = time.time(), {}, set(), None
-        for page_index in range(pages):
-            if not 0 <= time.time() - started < CLAIM_SCAN_TTL_S:
-                raise LaneInventoryUnknown("lane-inventory-scan-expired")
-            if not self._snapshot_budget_admitted(pages - page_index) \
-                    and not self._refresh_budget_evidence(pages - page_index):
-                raise LaneInventoryUnknown("linear-refresh-reserve-held")
-            everything = labels == [TODO_POOL]
-            data = self.gql(
-                ('query($after:String)' if everything else 'query($labels:[String!]!,$after:String)')
-                + '{issues(first:100,after:$after,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Todo"}}'
-                + ('' if everything else ',labels:{name:{in:$labels}}')
-                + '}){pageInfo{hasNextPage endCursor} '
-                'nodes{id identifier title description priority createdAt '
-                'labels(first:50){pageInfo{hasNextPage} nodes{name}}}}}',
-                {"after": after} if everything else {"labels": labels, "after": after})
-            if not 0 <= time.time() - started < CLAIM_SCAN_TTL_S:
-                raise LaneInventoryUnknown("lane-inventory-scan-expired")
-            edge = data.get("issues") if isinstance(data, dict) else None
-            if not isinstance(edge, dict) or not isinstance(edge.get("nodes"), list) or len(edge["nodes"]) > 100:
-                raise LaneInventoryUnknown("lane-inventory-unreadable")
-            for node in edge["nodes"]:
-                if not isinstance(node, dict):
-                    raise LaneInventoryUnknown("lane-inventory-malformed")
-                label_edge = node.get("labels")
-                if not isinstance(label_edge, dict) or not isinstance(label_edge.get("nodes"), list) or (
-                        len(label_edge["nodes"]) > 50 or not isinstance(label_edge.get("pageInfo"), dict)
-                        or label_edge["pageInfo"].get("hasNextPage") is not False):
-                    raise LaneInventoryUnknown("lane-label-coverage-unknown")
-                names = label_edge["nodes"]
-                if any(not isinstance(item, dict) or not isinstance(item.get("name"), str) or not item["name"] for item in names):
-                    raise LaneInventoryUnknown("lane-label-malformed")
-                row = {"id": node.get("id"), "identifier": node.get("identifier"), "title": node.get("title"),
-                       "description": node.get("description") or "", "priority": node.get("priority") or 0,
-                       "created_at": node.get("createdAt"), "labels": sorted({item["name"] for item in names})}
-                ident = row["id"]
-                if not isinstance(ident, str) or not ident:
-                    raise LaneInventoryUnknown("lane-inventory-malformed")
-                if ident in rows and rows[ident] != row:
-                    raise LaneInventoryUnknown("lane-inventory-conflicting-revision")
-                rows[ident] = row
-            page = edge.get("pageInfo")
-            if not isinstance(page, dict) or type(page.get("hasNextPage")) is not bool:
-                raise LaneInventoryUnknown("lane-inventory-coverage-unknown")
-            if not page["hasNextPage"]:
-                ordered = sorted(rows.values(), key=lambda row: row["id"])
-                result = {"schema": "jovie-linear-todo-snapshot/v1", "scope": self._todo_scope(),
-                          "catalog": labels, "sourceStartedAt": started, "completedAt": time.time(),
-                          "complete": True, "rows": ordered,
-                          "revision": hashlib.sha256(json.dumps(ordered, sort_keys=True, separators=(",", ":")).encode()).hexdigest()}
-                if not self._todo_envelope_valid(result, labels):
-                    raise LaneInventoryUnknown("lane-inventory-scan-expired")
-                return result
-            after = page.get("endCursor")
-            if not isinstance(after, str) or not after or after in cursors:
-                raise LaneInventoryUnknown("lane-inventory-cursor-invalid")
-            cursors.add(after)
-        if overflow:
-            return {"schema": "jovie-linear-todo-snapshot/v1", "scope": self._todo_scope(), "catalog": labels,
-                    "sourceStartedAt": started, "completedAt": time.time(), "complete": False, "overflow": True}
-        raise LaneInventoryUnknown("lane-inventory-page-limit")
-
     def lane_issues(self, label: str | None = None) -> list[Issue]:
-        """Every JOV Todo issue, from one complete, credential-bound snapshot per host per TTL.
+        """Every dispatchable JOV Todo issue, from the host's local mirror (Tim 2026-10-11:
+        "linear being down should not stop shipping"). No Linear request: the dispatch tick
+        keeps the mirror fresh when the budget allows and a stale mirror is reported, not
+        refused. `label` (the caller's lane) does not narrow the pool; the router decides.
+        This host's claim ledger and pending outbox moves are already applied."""
+        state = lane_state_dir()
+        return [Issue(row["id"], row["identifier"], row["title"], row["description"], row["priority"],
+                      row["createdAt"], list(row["labels"]))
+                for row in (linear_sync.todo(state, "JOV") if state else [])]
 
-        Tim 2026-10-11: any issue is eligible, so every lane reads the same snapshot and
-        `label` (the caller's lane) no longer narrows it; admission_rejection and the router
-        decide. A truncated scan fails closed. This is candidate observation only:
-        consequential state, mutation readbacks, holds and ownership remain freshly checked
-        at the ordinary claim boundary."""
-        catalog = [TODO_POOL]
-        binding = hashlib.sha256(json.dumps([self._todo_scope(), catalog], separators=(",", ":")).encode()).hexdigest()
-        value = shared(f"claim-todo-all-v2-{binding}", CLAIM_SCAN_TTL_S,
-                       lambda: self._todo_snapshot(catalog, TODO_POOL_PAGES),
-                       validate=lambda envelope: self._todo_envelope_valid(envelope, catalog))
-        if value is None:
-            raise LaneInventoryUnknown("lane-snapshot-unavailable")
-        rows = value.get("rows")
-        if value.get("overflow") is True or not isinstance(rows, list) or len(rows) > 100 * TODO_POOL_PAGES:
-            raise LaneInventoryUnknown("lane-inventory-page-limit")
-        return [Issue(row["id"], row["identifier"], row["title"], row["description"],
-                      row["priority"], row["created_at"], list(row["labels"])) for row in rows]
-
-    def active_lane_issues(self, labels: list[str] | None = None) -> list[Issue]:
-        """In Progress work, for cross-host overlap admission. Every JOV issue is claimable,
-        so no labels (the default) means all In Progress JOV work."""
-        nodes = self._bounded_lane_nodes(
-                ('query($after:String)' if not labels else 'query($labels:[String!]!,$after:String)')
-                + '{issues(first:100,after:$after,filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"In Progress"}}'
-                + ('' if not labels else ',labels:{name:{in:$labels}}')
-                + '}){pageInfo{hasNextPage endCursor} '
-                'nodes{id identifier title description priority createdAt labels{nodes{name}}}}}',
-                {"labels": labels} if labels else {})
-        return [Issue(n["id"], n["identifier"], n["title"], n.get("description") or "", n.get("priority") or 0,
-                      n["createdAt"], [label["name"] for label in n["labels"]["nodes"]])
-                for n in nodes]
+    def admit(self, requests: int) -> bool:
+        """The protected budget gate (both quota dimensions, fresh evidence) for mirror sync
+        and outbox flushes; reserves are unchanged. Evidence older than the autoscaler's
+        window (a quiet host) is re-observed by one probe, at most once per window."""
+        if self._snapshot_budget_admitted(requests) or self._refresh_budget_evidence(requests):
+            return True
+        state = lane_state_dir()
+        budget = maintenance_json(state / "api-budget.json", limit=65536, missing={}) if state else {}
+        seen = autoscale._epoch(((budget.get("dimensions") or {}).get("requests") or {}).get("observedAt")) \
+            if isinstance(budget, dict) else None
+        if state is None or (seen is not None and 0 <= time.time() - seen <= autoscale.STALE_S):
+            return False
+        try:
+            self.gql("query{viewer{id}}", {})
+        except Exception:
+            return False
+        return self._snapshot_budget_admitted(requests)
 
     def create_triage(self, title: str, description: str, dedupe: str | None = None) -> str | None:
         """`dedupe`: a title fragment; an open issue already carrying it is returned instead of a new one."""
@@ -2076,6 +1974,15 @@ class Linear:
         result = self.gql('mutation($id:String!,$b:String!){commentCreate(input:{issueId:$id,body:$b}){success}}',
                           {"id": issue_id, "b": body})
         if not isinstance(result, dict) or not isinstance(result.get("commentCreate"), dict) or result["commentCreate"].get("success") is not True: raise RuntimeError("linear: comment not delivered")
+
+
+def linear_optional(step, *args):
+    """A Linear-dependent side task (escalation, labeled events, sweep). A rate limit skips
+    it for this pass; issue intake continues from the local mirror."""
+    try:
+        return step(*args)
+    except LinearRateLimited:
+        return None
 
 
 def notify_issue_claim(linear: Linear, issue: Issue, name: str, spec: dict) -> None:
@@ -2347,10 +2254,33 @@ HANDOFF_NOTE = ("A previous agent (lane `{prev}`) stopped before finishing (exit
                 "start over.\n\n")
 
 
-def cool_down(host: Host, name: str) -> None:
+# EX_TEMPFAIL: the provider wrapper measured a limit, an auth failure or no capacity
+# (codex_lane NO_ACCOUNT_EXIT, claude_lane NO_CAPACITY_EXIT). Only those wrappers define it:
+# a raw CLI's 75 (devin on LYB runs, Gem 03:38Z) is an unexplained failure, not a limit.
+PROVIDER_LIMIT_EXIT = 75
+LIMIT_EXIT_PROVIDERS = frozenset({"codex", "claude"})
+
+
+def provider_exit(reasons) -> int:
+    """The agent exit code a provider-error recorded; -1 when none was (never a limit)."""
+    for reason in reasons or []:
+        found = re.fullmatch(r"agent-exit:(-?\d+)", str(reason))
+        if found:
+            return int(found.group(1))
+    return -1
+
+
+def cool_down(host: Host, name: str, code: int | None = None) -> bool:
+    """Cool a provider only on a measured provider limit (Tim 2026-10-12): a crash or any other
+    non-zero exit is a failure, which the current failure rate already backs off on. Returns
+    whether a cooldown was written."""
+    # `code` None: the caller measured the limit itself. An exit code must be a wrapper's 75.
+    if code is not None and (code != PROVIDER_LIMIT_EXIT or name not in LIMIT_EXIT_PROVIDERS):
+        return False
     path = host.state / "cooldown" / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
+    return True
 
 
 def next_provider(host: Host, exclude: set[str], providers: dict | None = None):
@@ -2631,7 +2561,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                 nxt = next_provider(host, {name, *(h["to"] for h in handoffs)})
                 if nxt is None:
                     break
-                cool_down(host, current)
+                cool_down(host, current, agent.returncode)
                 nxt_name, nxt_spec = nxt
                 handoff_note = HANDOFF_NOTE.format(prev=current, code=agent.returncode)
                 handoff_prompt = handoff_note + prompt
@@ -2675,7 +2605,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
         except Exception as error:  # a broken run must still leave a receipt and free its issue
             receipt.update(verdict="failed", reasons=[f"harness-error:{type(error).__name__}:{error}"[:300]])
         finally:
-            if receipt.get("verdict") == "disk-held":
+            if receipt.get("verdict") in {"disk-held", "pr-readback-pending"}:
                 preserve_repair(worktree, receipt)
             else:
                 remove_worktree(host, worktree)
@@ -2699,6 +2629,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     verdict = receipt.get("verdict")
     receipt["result"] = {"verdict": verdict, "commit": receipt.get("headSha"), "pr": receipt.get("pr"),
                          "prUrl": receipt.get("prUrl")}
+    if "prReadback" in receipt:
+        receipt["result"]["prReadback"] = receipt["prReadback"]
     result = "succeeded" if verdict in ("landing", "verified-not-queued", "held", "gate-timeout",
                                         "gate-in-progress", "gate-deferred", "gate-already-completed") \
         else "no_op_stale" if verdict in ("no-change", "not-shippable") else "failed_unknown"
@@ -2718,27 +2650,60 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
 def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, started: float,
                     opened: bool = False, sensitive: bool = False) -> dict:
     """Independent of the agent's own claim: find its PR, re-derive the diff, run checks, then land."""
-    listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--search", f"{issue.identifier} in:title",
-                 "--json", "number,headRefName,headRefOid,createdAt,url,isDraft"], log=log)
-    prs = [pr for pr in json.loads(listed.stdout or "[]")
-           if datetime.fromisoformat(pr["createdAt"].replace("Z", "+00:00")).timestamp() >= started - 60]
+    def pending(reason):
+        return {"verdict": "pr-readback-pending", "reasons": [reason],
+                "prReadback": {"state": "unknown", "branch": branch},
+                "next_action": "reconcile-existing-branch-pr-through-maintained-reader"}
+
+    try:
+        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open", "--head", branch,
+                     "--json", "number,headRefName,headRefOid,createdAt,url,isDraft"], log=log)
+    except (subprocess.TimeoutExpired, OSError):
+        return pending("pr-inventory-unavailable")
+    if listed.returncode:
+        return pending("pr-inventory-unavailable")
+    try:
+        prs = json.loads(listed.stdout)
+        if not isinstance(prs, list) or len(prs) > 1:
+            raise ValueError("inventory shape")
+        for pr in prs:
+            if (not isinstance(pr, dict) or type(pr.get("number")) is not int or pr["number"] <= 0
+                    or pr.get("headRefName") != branch or type(pr.get("isDraft")) is not bool
+                    or any(not isinstance(pr.get(key), str) or not pr[key]
+                           for key in ("headRefOid", "url", "createdAt"))):
+                raise ValueError("PR identity")
+            created = datetime.fromisoformat(pr["createdAt"].replace("Z", "+00:00"))
+            if created.tzinfo is None or created.timestamp() < started - 60:
+                raise ValueError("PR generation")
+    except (ValueError, TypeError, OverflowError):
+        return pending("pr-inventory-invalid")
     if not prs and opened:
-        return {"verdict": "failed", "reasons": ["pr-create-failed"]}
+        # A create response (including 'already exists') is not readback.
+        # Visibility/transport uncertainty must never start another PR attempt.
+        return pending("pr-create-readback-unconfirmed")
     if not prs:
         ahead = sh(["git", "rev-list", "--count", "origin/main..HEAD"], cwd=worktree).stdout.strip()
         if ahead in ("", "0"):
             return {"verdict": "no-change", "reasons": ["no-pr-and-no-commits"]}
         require_publishable(host, branch, "before-push")
-        sh(["git", "push", "-q", "-u", "origin", branch], cwd=worktree, log=log)
+        try:
+            pushed = sh(["git", "push", "-q", "-u", "origin", branch], cwd=worktree, log=log)
+        except (subprocess.TimeoutExpired, OSError):
+            return pending("pr-publication-unconfirmed")
+        if pushed.returncode:
+            return pending("pr-publication-unconfirmed")
         # The push's own hooks can take minutes; a stop during them still bars the PR open.
         require_publishable(host, branch, "before-pr-create")
-        sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
-            "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
-            "--body", f"Refs {issue.identifier}.\n\n"
-            f"<!-- linear-issue-id:{issue.id} -->\n"
-            f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
-            "Lane implementation; verification by the lane gate. "
-            "Runtime and commissioning acceptance remain with the issue owner."], cwd=worktree, log=log)
+        try:
+            sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
+                "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
+                "--body", f"Refs {issue.identifier}.\n\n"
+                f"<!-- linear-issue-id:{issue.id} -->\n"
+                f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+                "Lane implementation; verification by the lane gate. "
+                "Runtime and commissioning acceptance remain with the issue owner."], cwd=worktree, log=log)
+        except (subprocess.TimeoutExpired, OSError):
+            pass  # A create may have landed remotely; reconcile once, never resend.
         return verify_and_land(host, issue, branch, worktree, log, started, opened=True, sensitive=sensitive)
     pr = max(prs, key=lambda item: item["createdAt"])
     if sensitive:
@@ -3592,7 +3557,7 @@ def _legacy_terminal(host: Host, pr: dict, record: dict, held: dict, linear, att
         pass
 
 
-TERMINAL_REVISIT_S = 24 * 3600
+# GitHub writes per idle pass; the rest go on the next pass (main moving is the trigger).
 TERMINAL_REVISITS_PER_PASS = 3
 TERMINAL_LABELS = frozenset({pr_events.PREFIX + pr_events.EXHAUSTED, pr_events.POISON_LABEL})
 
@@ -3620,11 +3585,14 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
     """The material-change exit for terminal generations, fired without a human (2026-10-11).
 
     A terminal head waits for "a new PR head", which nothing produced: 26 PRs sat exhausted,
-    poisoned or escalated for days. Main moving is new evidence, so at most once per PR per
-    TERMINAL_REVISIT_S, and only when main moved since the last revisit, the PR gets a
-    deterministic no-model sync: GitHub merges main into it (exact expected head), or a
-    Dependabot bump asks Dependabot to recreate itself on main. The new head is ordinary
-    re-entry: a new bounded generation with its own attempts and the queue's failure log.
+    poisoned or escalated for days. Main moving is new evidence, so each time main moved since
+    the PR's last revisit (no clock: Tim 2026-10-12) the PR gets a deterministic no-model sync:
+    GitHub merges main into it (exact expected head), or a Dependabot bump asks Dependabot to
+    recreate itself on main. The new head is ordinary re-entry: a new bounded generation with
+    its own attempts and the queue's failure log. A `queue-poison` label is lifted with it:
+    main moved past the base that failed, and the label's removal is the boundary
+    `queue_ejections` counts from, so a defect that still fails re-poisons after two more
+    ejections, whoever authored the PR (bots and Dependabot included).
     Conflicted (DIRTY) non-Dependabot heads cannot merge main without a model and stay with
     the escalation ladder. No attempt or rung is refunded or reset.
     """
@@ -3638,8 +3606,6 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
         last = visits.get(str(pr["number"])) if isinstance(visits.get(str(pr["number"])), dict) else {}
         dependabot = (pr.get("headRefName") or "").startswith("dependabot/")
         if pr.get("mergeStateStatus") == "DIRTY" and not dependabot:
-            continue
-        if type(last.get("at")) in (int, float) and now - last["at"] < TERMINAL_REVISIT_S:
             continue
         due.append((pr, last, dependabot))
     if not due:
@@ -3663,6 +3629,8 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
         else:
             action = "update-branch"
             ok = pr_events.sync_main(host, THIS, pr, now, terminal_ok=True) == "synced"
+        if ok and pr_events.POISON_LABEL in pr_events.label_names(pr):
+            sh(["gh", "api", "-X", "DELETE", f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{pr_events.POISON_LABEL}"])
         visit = {"at": now, "head": pr["headRefOid"], "main": main, "action": action, "ok": ok}
         update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
         pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "terminal-revisit", "origin": AUTONOMOUS_ORIGIN,
@@ -3931,6 +3899,23 @@ def _event_delivery_snapshot(host: Host, now: float) -> dict:
     return report
 
 
+def _event_delivery_diagnostic(error, phase: str, operation: str) -> dict:
+    diagnostic = {"phase": phase, "operation": operation}
+    if isinstance(error, LinearRequestError):
+        diagnostic.update(error.diagnostic)
+    elif isinstance(error, urllib.error.HTTPError):
+        diagnostic.update({"class": "linear-http", "httpStatus": error.code})
+    elif isinstance(error, LinearRateLimited):
+        diagnostic["class"] = "linear-rate-limited"
+    elif isinstance(error, (TimeoutError, subprocess.TimeoutExpired)):
+        diagnostic["class"] = "transport-timeout"
+    elif isinstance(error, (urllib.error.URLError, OSError)):
+        diagnostic["class"] = "transport-unavailable"
+    else:
+        diagnostic["class"] = "controller-error"
+    return diagnostic
+
+
 def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) -> dict:
     """Drain one durable intent per tick under the existing delivery/claim locks.
 
@@ -3942,6 +3927,7 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
             row["createdAt"], ("reopens", "comments", "labels").index(row["kind"]), row["key"])):
         if row["status"] in {"acknowledged", "superseded"} or now < row["nextAt"]:
             continue
+        phase = "readback"
         try:
             acknowledged, receipt = _event_delivery_readback(linear, row)
             if not acknowledged and row["attempts"] < EVENT_DELIVERY_ATTEMPTS and now < row["deadline"]:
@@ -3958,6 +3944,7 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
                     # The remote preimage is refreshed INSIDE the mutation fence.
                     # A state changed since the earlier read is never downgraded.
                     if row["kind"] == "reopens":
+                        phase = "fenced-readback"
                         acknowledged, receipt = _event_delivery_readback(linear, row)
                         if acknowledged:
                             row.update(status="acknowledged", acknowledgedAt=now, receipt=receipt)
@@ -3969,6 +3956,7 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
                     row["history"].append({"at": now, "outcome": "intent-persisted", "attempt": row["attempts"]})
                     _save_event_delivery(host, data)
                     payload = row["payload"]
+                    phase = "send"
                     if row["kind"] == "comments":
                         result = linear.gql('mutation($i:CommentCreateInput!){commentCreate(input:$i){success}}',
                             {"i": {"id": row["commentId"], "issueId": payload["id"], "body": payload["body"]}})
@@ -3985,6 +3973,7 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
                         raise RuntimeError("event-mutation-rejected")
                 finally:
                     lock.release()
+                phase = "post-send-readback"
                 acknowledged, receipt = _event_delivery_readback(linear, row)
             if acknowledged:
                 row.update(status="acknowledged", acknowledgedAt=now, receipt=receipt)
@@ -3993,9 +3982,15 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
                 raise RuntimeError("event-delivery-unacknowledged")
         except Exception as error:
             # No provider response/credential content in controller health output.
-            row["error"] = str(error) if isinstance(error, RuntimeError) and str(error).startswith("event-") else type(error).__name__
+            safe_events = {"event-comment-readback-unreadable", "event-comment-readback-mismatch",
+                           "event-issue-readback-unreadable", "event-state-preimage-changed",
+                           "event-label-readback-unreadable", "event-owner-preimage-changed",
+                           "event-mutation-rejected", "event-delivery-unacknowledged"}
+            row["error"] = str(error) if isinstance(error, RuntimeError) and str(error) in safe_events else type(error).__name__
+            row["diagnostic"] = _event_delivery_diagnostic(error, phase, row["kind"])
             row["status"] = "exhausted" if row["attempts"] >= EVENT_DELIVERY_ATTEMPTS or now >= row["deadline"] else "failed"
-            row["history"].append({"at": now, "outcome": row["status"], "error": row["error"]})
+            row["history"].append({"at": now, "outcome": row["status"], "error": row["error"],
+                                   "diagnostic": row["diagnostic"]})
         row["nextAt"] = now + (60 if row["attempts"] < 2 else 300)
         _save_event_delivery(host, data)
         break  # Bounded work; a transport outage must not monopolize dispatch.
@@ -4319,6 +4314,11 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     if pr.get("gateEvidence"):
         excerpt = "Lane gate (the repo's pre-push-gate) held this PR:\n" + "\n".join(pr["gateEvidence"]) + \
             ("\n\n" + excerpt if excerpt else "")
+        if any(str(line).startswith("diff-too-large") for line in pr["gateEvidence"]):
+            excerpt = (f"Split this PR: keep at most {MAX_REVIEWABLE_LINES} reviewable changed lines (tests "
+                       "included, generated files excluded) on this branch, and move the rest to a new branch "
+                       "based on this one, opened as a follow-up PR whose body says it stacks on this one. "
+                       "Each part must build and pass its own tests.\n\n") + excerpt
     if pr.get("mergeStateStatus") == "DIRTY":
         problem = ["This PR conflicts with main. Merge origin/main into the branch and resolve every",
                    "conflict keeping both sides' intent. If both sides added a migration with the same",
@@ -4694,6 +4694,36 @@ def fix_request_source(pr: dict) -> dict:
     }
 
 
+# Cancellation stages before the agent ran or any source mutation landed. A repair
+# stopped at one of them consumed none of the work the fix budget pays for.
+UNWORKED_PRE_AGENT_STAGES = frozenset(
+    {"before-execution-claim", "before-checkout", "after-fetch", "before-install", "before-agent"})
+
+
+def unworked_fix_attempt(receipt: dict) -> str | None:
+    """The no-work reason when a charged attempt ended before any agent work, else None.
+
+    The attempt is charged at claim time, before the run learns the target or its
+    checkout are unusable. Infrastructure stops (an unreadable target, a failed
+    checkout, a preserved-run handoff) then spent the head's bounded fix budget on
+    no work — 19 repairs in 24h on 2026-10-11 (JOV-8191). Stops after the agent ran
+    or source changed keep their charge."""
+    verdict = receipt.get("verdict")
+    if verdict == "recovery-handoff":
+        return str((receipt.get("reasons") or ["recovery-handoff"])[0])
+    if verdict == "skipped":
+        reason = str((receipt.get("reasons") or [""])[0])
+        return reason if reason.startswith("worktree-unavailable") else None
+    # `cancelled` keeps its charge: a queued, merged or superseded target is a repair
+    # outcome, not host infrastructure spending the budget (the doctor never counts it).
+    if verdict == "reconcile-unavailable":
+        stage = (receipt.get("cancellation") or {}).get("stage")
+        if stage is None or stage in UNWORKED_PRE_AGENT_STAGES:
+            return str((receipt.get("cancellation") or {}).get("reason")
+                       or (receipt.get("reasons") or [verdict])[0])
+    return None
+
+
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
     """Release the host-local claim without fabricating an attempt when called directly."""
     def finish(attempts: dict) -> None:
@@ -4705,6 +4735,12 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
                        repairHeadBefore=receipt.get("headBefore"), repairVerdict=receipt.get("verdict"))
         if receipt.get("verdict") == "fix-pushed" and receipt.get("headAfter"):
             attempt["pushedHead"] = receipt["headAfter"]
+        if (refund := unworked_fix_attempt(receipt)) \
+                and type(attempt.get("count")) is int and attempt["count"] > 0:
+            attempt["count"] -= 1
+            attempt["noWorkRefund"] = {"reason": refund[:120], "runId": receipt.get("runId"),
+                                       "at": time.time()}
+            receipt["attemptRefunded"] = refund[:120]
     update_json(host.state / "fix-attempts.json", finish)
 
 
@@ -5020,13 +5056,39 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
 
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
+    opened: dict = {}
     try:
-        return _fix_red_pr(host, name, spec, pr, branch_held=lock.held)
+        return _fix_red_pr(host, name, spec, pr, branch_held=lock.held, opened=opened)
+    except BaseException as error:
+        end_abandoned_attempt(host, opened, error)
+        raise
     finally:
         lock.release()
 
 
-def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True) -> dict:
+def end_abandoned_attempt(host: Host, opened: dict, error: BaseException) -> dict | None:
+    """A repair that crashes after its claim still ends its fenced attempt.
+
+    Without this, its jovie-execution/* status on the PR head stayed pending until the
+    lease expired and a later claim of the same identity reconciled it, which may never
+    happen. Best effort: a failed write leaves the lease-expiry sweep as the backstop.
+    """
+    if not opened:
+        return None
+    try:
+        return execution_attempt.finish(
+            host.state / "runs" / "execution-attempts.jsonl", opened["ident"], opened["fence"], "failed_unknown",
+            {"failureClass": "harness_crash", "failureFingerprint": execution_attempt.digest([type(error).__name__]),
+             "evidenceDigest": execution_attempt.digest(f"{type(error).__name__}:{error}"[:300]),
+             "costs": {}, "dependencies": []}, coordination=opened["coordination"])
+    except Exception:
+        return None
+    finally:
+        opened.clear()
+
+
+def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True, opened: dict | None = None) -> dict:
+    opened = {} if opened is None else opened
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-PR{pr['number']}-{name}-fix-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -5051,6 +5113,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             cancellation={
                 "schema": "jovie-fix-cancellation/v1",
                 "reason": reason,
+                "stage": error.stage,
                 "observedState": state or "UNKNOWN",
                 "mergedAt": (live or {}).get("mergedAt"),
                 "observedHead": (live or {}).get("headRefOid"),
@@ -5103,6 +5166,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         receipt.update(verdict="failed", reasons=[f"claim-error:{type(error).__name__}:{error}"[:300]])
     else:
         receipt["execution"] = claimed
+        if claimed["admitted"]:
+            opened.update(ident=ident, fence=claimed["fencingToken"], coordination=coordination)
     if not receipt.get("verdict") and not claimed["admitted"]:
         receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
                        reasons=[claimed["reason"]])
@@ -5274,6 +5339,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
          "costs": {"apiCalls": 1}, "mutationsPerformed": ["source_push"] if pushed else [],
          "confidence": "unknown" if target_unavailable else "high",
          "dependencies": [name, "github-target-state"] if target_unavailable else [name]}, coordination=coordination)
+    opened.clear()
     with open(runs / "ledger.jsonl", "a") as ledger:
         ledger.write(json.dumps(receipt) + "\n")
     return receipt
@@ -5388,7 +5454,8 @@ def repo_prs() -> list[dict]:
     """Every open, non-draft PR whose branch lives in this repo (forks cannot be pushed to).
     Tim: no open PR should ever need his action; the fix loop owns them all."""
     ready = [pr for pr in open_prs_summary() if not pr.get("isDraft") and not pr.get("isCrossRepository")]
-    return sorted(ready, key=lambda pr: pr.get("updatedAt") or "", reverse=True)[:60]
+    # No top-N window: an old red PR outside the 60 most recently updated was never repaired.
+    return sorted(ready, key=lambda pr: pr.get("updatedAt") or "", reverse=True)
 
 
 _SUMMARY: dict = {"at": 0.0, "prs": [], "readable": False}
@@ -5487,18 +5554,11 @@ def overlap_inventory(host: Host, linear: Linear) -> tuple[list[dict], list[dict
     prs = overlap_prs_summary()
     if prs is None:
         return None
-    def fetch_active():
-        return [{"id": issue.id, "identifier": issue.identifier, "title": issue.title,
-                 "description": issue.description, "priority": issue.priority,
-                 "createdAt": issue.created_at, "labels": issue.labels}
-                for issue in linear.active_lane_issues()]
+    # Owned work without a PR comes from the local mirror and claim ledger, never a live
+    # Linear read, so a Linear outage cannot hold file-overlap admission.
     try:
-        active = shared("file-overlap-tasks-v3", SUMMARY_TTL_S, fetch_active)
-    except LinearRateLimited:
-        raise
+        active = linear_sync.active(host.state, "JOV")
     except Exception:
-        return None
-    if active is None:
         return None
     pr_text = "\n".join(f"{pr.get('headRefName', '')}\n{pr.get('body', '')}" for pr in prs).lower()
     tasks = []
@@ -5587,13 +5647,6 @@ def is_green(pr: dict) -> bool:
     return not pr.get("isDraft") and pr.get("mergeStateStatus") in ("CLEAN", "HAS_HOOKS")
 
 
-def over_budget(name: str, prs: list[dict], slots: int) -> bool:
-    """Slots bound worktrees, not open PRs; without this a lane keeps opening while its earlier
-    PRs rot (84 devin PRs, 0 green drafts on 2026-09-27). Over budget = fix/adopt only."""
-    own = [pr for pr in prs if (pr.get("headRefName") or "").startswith(f"{name}/")]
-    return sum(not is_green(pr) for pr in own) >= slots * OPEN_PRS_PER_SLOT
-
-
 def pr_is_terminal(pr: dict) -> bool:
     """Held or repair-exhausted: only a human (or another lane's adopt) can move it."""
     labels = {label.lower() for label in pr_events.label_names(pr)}
@@ -5601,59 +5654,23 @@ def pr_is_terminal(pr: dict) -> bool:
                                                    pr_events.PREFIX + "escalating"}))
 
 
-def new_issue_budget(name: str, slots: int, inventory: list[dict] | None) -> dict:
-    """One owning lane's new-issue budget; maintenance/orphan work is separate.
-
-    Active (advanceable) non-green PRs are capped at slots x OPEN_PRS_PER_SLOT.
-    Terminal PRs (hold / lane-fix-exhausted / lane-fix-escalating) are capped separately at
-    slots x TERMINAL_PRS_PER_SLOT so a lane cannot accumulate unbounded parked work,
-    but parked work alone can no longer pin a lane idle (JOV-7514)."""
-    cap = max(0, slots) * OPEN_PRS_PER_SLOT
-    terminal_cap = max(0, slots) * TERMINAL_PRS_PER_SLOT
+def new_issue_budget(name: str, slots: int, inventory: list[dict] | None = None) -> dict:
+    """A lane's new-issue admission. Tim 2026-10-12: no PR-count ceilings (the JOV-6833
+    `slots x 2` active and JOV-7514 `slots x 4` terminal caps are gone); only real limits
+    (compute, credits, quotas) bound a lane, and those live in autoscale. Repair of existing
+    PRs never consulted this. `inventory` is reported for visibility only."""
     if slots <= 0:
-        return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": cap,
-                "terminal": 0, "terminalCap": terminal_cap}
-    if inventory is None:
-        return {"allowed": False, "reason": "pr-inventory-unavailable", "used": None, "cap": cap,
-                "terminal": None, "terminalCap": terminal_cap}
+        return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": None, "terminal": 0, "terminalCap": None}
     dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
-    own = {pr["number"]: pr for pr in inventory if dated.match(pr["headRefName"])}
-    terminal = sum(pr_is_terminal(pr) for pr in own.values())
-    used = sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own.values())
-    reason = ("over-budget" if used >= cap else
-              "terminal-pr-backlog" if terminal >= terminal_cap else "within-budget")
-    return {"allowed": reason == "within-budget", "reason": reason, "used": used, "cap": cap,
-            "terminal": terminal, "terminalCap": terminal_cap}
+    own = [pr for pr in inventory or [] if dated.match(pr.get("headRefName") or "")]
+    return {"allowed": True, "reason": "within-budget",
+            "used": None if inventory is None else sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own),
+            "cap": None, "terminal": None if inventory is None else sum(pr_is_terminal(pr) for pr in own), "terminalCap": None}
 
 
 def read_new_issue_budget(name: str, slots: int) -> dict:
-    """Fail closed on incomplete budget reads without disrupting maintenance reads."""
-    inventory, error = None, None
-    if slots <= 0:
-        return new_issue_budget(name, slots, [])
-    try:
-        listed = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--state", "open",
-                     "--search", f"head:{name}/", "--limit", "200", "--json", LIGHT_PR_FIELDS],
-                    timeout=60)
-        if listed.returncode:
-            raise ValueError("pr-read-failed")
-        rows = json.loads(listed.stdout)
-        # Validate before filtering: 200 manual rows can hide dated lane PRs.
-        if not isinstance(rows, list) or len(rows) >= 200:
-            raise ValueError("pr-inventory-incomplete")
-        for row in rows:
-            if (not isinstance(row, dict) or type(row.get("number")) is not int or row["number"] <= 0
-                    or not isinstance(row.get("headRefName"), str) or not row["headRefName"].strip()
-                    or type(row.get("isDraft")) is not bool
-                    or not isinstance(row.get("mergeStateStatus"), str) or not row["mergeStateStatus"].strip()):
-                raise ValueError("pr-inventory-malformed")
-        if len({row["number"] for row in rows}) != len(rows):
-            raise ValueError("pr-inventory-duplicate")
-        inventory = rows
-    except (OSError, ValueError, subprocess.SubprocessError) as failure:
-        error = str(failure) if isinstance(failure, ValueError) else type(failure).__name__
-    result = new_issue_budget(name, slots, inventory)
-    return {**result, "observedAt": now_iso(), "error": error}
+    """No GitHub read: with no PR ceiling there is nothing to count before claiming."""
+    return {**new_issue_budget(name, slots), "observedAt": now_iso(), "error": None}
 
 
 def last_pushes() -> dict[int, float]:
@@ -5739,6 +5756,54 @@ def ended_repair_head(pr: dict, record: dict, pending: dict, now: float) -> bool
                 record.get("repairHeadBefore") == before and all(type(t) in (int, float) and math.isfinite(t) for t in stamps) and
                 0 < stamps[0] <= stamps[1] <= now and not pr.get("isCrossRepository") and
                 str(pr.get("state", "OPEN")).upper() == "OPEN")
+
+
+EXECUTION_STATUS_SWEEP_S = 900  # host-wide cadence of the stale jovie-execution/* sweep
+EXECUTION_STATUS_RECHECK_S = 3600  # one head is re-read at most hourly
+EXECUTION_STATUS_HEADS = 8  # bounded status reads per sweep (bot token, one paginated GET each)
+
+
+def sweep_execution_statuses(host: Host, prs: list[dict] | None = None, now: float | None = None) -> list[dict]:
+    """End stale jovie-execution/* statuses on open PR heads so they stop reading UNSTABLE.
+
+    Candidates come from the cached open-PR inventory (no new listing): heads whose rollup is
+    not green, pending first, each re-read at most hourly. execution_attempt decides staleness
+    from the receipts themselves; a live lease is never touched."""
+    now = time.time() if now is None else now
+    if execution_coordination("0" * 40).get("kind") != "github-status":
+        return []  # Self-test and local-test backends publish no commit statuses.
+    marker = host.state / "execution-status-sweep.json"
+    try:
+        seen = json.loads(marker.read_text())
+    except (OSError, ValueError):
+        seen = {}
+    if not isinstance(seen, dict) or not isinstance(seen.get("heads"), dict):
+        seen = {"heads": {}}
+    if now - (seen.get("at") or 0) < EXECUTION_STATUS_SWEEP_S:
+        return []
+    prs = open_prs_summary() if prs is None else prs
+    open_heads = {pr.get("headRefOid") for pr in prs}
+    heads = {sha: at for sha, at in seen["heads"].items() if sha in open_heads}
+    candidates = sorted(
+        (pr for pr in prs if re.fullmatch(r"[0-9a-f]{40}", pr.get("headRefOid") or "")
+         and pr.get("rollup") not in (None, "SUCCESS") and not pr.get("isCrossRepository")
+         and now - heads.get(pr["headRefOid"], 0) >= EXECUTION_STATUS_RECHECK_S),
+        key=lambda pr: (pr.get("rollup") not in ("PENDING", "EXPECTED"), heads.get(pr["headRefOid"], 0), pr["number"]))
+    results = []
+    for pr in candidates[:EXECUTION_STATUS_HEADS]:
+        coordination = execution_coordination(pr["headRefOid"])
+        heads[pr["headRefOid"]] = now
+        try:
+            outcomes = execution_attempt.finalize_stale_statuses(
+                host.state / "runs" / "execution-attempts.jsonl", coordination, now=now)
+        except Exception as error:  # One unreadable head never blocks the others or the worker.
+            outcomes = [{"outcome": f"error:{type(error).__name__}:{error}"[:200]}]
+        results += [{"pr": pr["number"], "sha": pr["headRefOid"], **item} for item in outcomes]
+    host.state.mkdir(parents=True, exist_ok=True)
+    tmp = marker.with_suffix(f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps({"at": now, "heads": heads, "last": results[-50:]}))
+    os.replace(tmp, marker)
+    return results
 
 
 def publish_exhausted_repairs(host: Host, name: str, prs: list[dict], now: float | None = None) -> int:
@@ -6259,19 +6324,23 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         if not (red or adopt) and not maintenance_only:
             linear = Linear(host.linear_env)
             if local:
-                escalate_exhausted(host, list({pr["number"]: pr for pr in candidates + events}.values()), linear)
-        labeled = None if red or adopt or not local or maintenance_only else claim_labeled_event(host, name, linear)
+                linear_optional(escalate_exhausted, host,
+                                list({pr["number"]: pr for pr in candidates + events}.values()), linear)
+        labeled = None if red or adopt or not local or maintenance_only \
+            else linear_optional(claim_labeled_event, host, name, linear)
         issue = labeled
         if local and linear is not None:
-            sweep_lane_prs(host, name, linear)
+            linear_optional(sweep_lane_prs, host, name, linear)
         if local and not (red or adopt or labeled):
             publish_exhausted_repairs(host, name, candidates)
+            try:
+                sweep_execution_statuses(host)
+            except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+                pass  # Retried on the next idle pass; it never blocks new work.
             try:
                 revisit_terminal_prs(host, candidates)
             except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
                 pass  # The exit is retried next idle pass; it never blocks new work.
-        # JOV-7514 budgets stay on configured base slots. Scaling the cap with the
-        # autoscaled count would admit more parked PRs as capacity rises.
         budget = None if red or adopt or labeled or maintenance_only else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked or labeled or maintenance_only else in_flight_issues()
@@ -6305,10 +6374,12 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                     continue
                 overlap_prediction = admission
                 route_decision = router.decisions.get(issue.identifier) if router else None
-                if linear.state_of(issue.id) != "Todo":
-                    issue = None  # another host claimed it between our read and now
+                # One Symphony host: the local ledger is the claim. Linear's In Progress is
+                # its projection, delivered by the outbox when the budget allows.
+                if not linear_sync.claim(host.state, issue.id, issue.identifier, name):
+                    issue = None
                     break
-                linear.move(issue.id, "In Progress")
+                linear_sync.enqueue(host.state, "move", issue.id, target="In Progress")
                 file_overlap.reserve_task(host.state, issue, overlap_prediction)
                 break
         if red is None and adopt is None and issue is None:
@@ -6347,6 +6418,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     if route_decision and route_decision.get("chosen"):
         log_route(host, name, route_decision)
         spec = {**spec, "model": route_decision["chosen"]["model"], "route": route_decision}
+    linear = linear_sync.Outboxed(host.state, linear)  # every disposition write waits in the outbox
     notify_issue_claim(linear, issue, name, spec)
     try:
         receipt = (epics.run_epic(THIS, host, name, spec, linear, issue, host.repo) if epics.is_epic(issue)
@@ -6389,14 +6461,18 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         slot.release()
         return reexec(host, name)
     if verdict == "provider-error":
-        cooldown = host.state / "cooldown" / name
-        cooldown.parent.mkdir(parents=True, exist_ok=True)
-        cooldown.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
-        linear.move(issue.id, "Backlog")
+        cooled = cool_down(host, name, provider_exit(receipt.get("reasons")))
+        # Back to Todo, not Backlog: a provider fault says nothing about the issue, and Backlog
+        # needed a human to come back (Tim 2026-10-12: every hold needs an automatic exit).
+        linear.move(issue.id, "Todo")
         linear.comment(issue.id, f"🤖 lane `{name}` provider failed before working the issue "
-                                 f"({', '.join(receipt.get('reasons', []))}); unknown outcome quarantined, lane "
-                                 "cooling down. Disposition: blocked on the provider dependency; re-entry "
-                                 "once a healthy lane or a human clears it.")
+                                 f"({', '.join(receipt.get('reasons', []))}); back to Todo"
+                                 + (", lane cooling on the provider's limit." if cooled else "."))
+        slot.release()
+        return 1
+    if verdict == "pr-readback-pending":
+        # Keep the original issue/worktree/attempt. Inventory is unknown, so no
+        # new provider run, retry refund, issue downgrade or success is justified.
         slot.release()
         return 1
     if verdict == "remote-held":
@@ -6429,19 +6505,18 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         try:
             failures = json.loads(failures_path(host).read_text()) if failures_path(host).exists() else {}
             count = failure_record(failures.get(issue.identifier))["count"] + 1
-            failures[issue.identifier] = {"count": count, "at": time.time(),
+            failures[issue.identifier] = {"count": count, "at": time.time(), "release": release_generation(),
                                           **pr_events.failure_reason(receipt, count >= MAX_FAILURES)}
             failures_path(host).write_text(json.dumps(failures))
         finally:
             claim.release()
         exhausted = failures[issue.identifier]["count"] >= MAX_FAILURES
-        # A run that exhausted its bounded retries is terminal: Backlog under an explicit
-        # disposition, not generic Triage admission (JOV-7089).
-        linear.move(issue.id, "Backlog" if exhausted else "Todo")
+        # Exhausted runs stay in Todo, parked on this host until the next lanes release
+        # (failure_rejection): Backlog needed a human to come back (Tim 2026-10-12).
+        linear.move(issue.id, "Todo")
         linear.comment(issue.id, f"🤖 lane `{name}`: {verdict} ({', '.join(receipt.get('reasons', []))}). "
-                                 + ("Terminal after 3 attempts — disposition: needs human decision; "
-                                    "re-entry requires new authoritative evidence or a certified policy "
-                                    "override (JOV-7089)." if exhausted else "Back to Todo."))
+                                 + (f"{MAX_FAILURES} attempts on this release; parked until the next lanes "
+                                    "release, then retried automatically." if exhausted else "Back to Todo."))
     slot.release()
     return reexec(host, name)
 
@@ -6486,12 +6561,23 @@ def dispatch(host: Host) -> int:
         ensure_full_history(host)
         try:
             tick["remediationEvents"] = claim_remediation_events(host, Linear(host.linear_env))
-        except Exception as error:  # the label scan never takes worker spawn down
+        except (Exception, SystemExit) as error:  # the label scan (or a missing key) never takes spawn down
             tick["remediationEventsError"] = f"{type(error).__name__}: {error}"[:200]
             try:
                 tick["remediationEvents"] = _event_delivery_snapshot(host, time.time())
             except Exception as status_error:
                 tick["remediationDeliveryStatusError"] = f"{type(status_error).__name__}: {status_error}"[:200]
+        if not os.environ.get("LANES_SELFTEST"):  # a release self-test never calls Linear
+            try:
+                teams = ["JOV", *(binding.key for binding in bindings.extra_bindings(THIS))]
+                client = Linear(host.linear_env)
+                tick["linearSync"] = linear_sync.tick(host.state, client, client.admit, (LinearRateLimited,), teams)
+            except (Exception, SystemExit) as error:  # dispatch reads the mirror at any age
+                tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
+        try:
+            tick["linear"] = linear_sync.status(host.state)
+        except Exception as error:
+            tick["linear"] = {"error": type(error).__name__}
         for name, spec in load_providers().items():
             try:
                 slots = host.slots(name, spec.get("slots", 1))
@@ -6523,17 +6609,17 @@ def dispatch(host: Host) -> int:
         return finish_dispatch(host, tick)
     try:
         tick["events"] = pr_events.tick(host, THIS, lambda: Linear(host.linear_env))
-    except Exception as error:  # the ready/orphan queue never takes dispatch down
+    except (Exception, SystemExit) as error:  # the ready/orphan queue never takes dispatch down
         tick["eventsError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         tick["reason"] = reason_lane.tick(host, THIS, lambda: Linear(host.linear_env))
-    except Exception as error:  # Summer's reasoning jobs never take dispatch down
+    except (Exception, SystemExit) as error:  # Summer's reasoning jobs never take dispatch down
         tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         if not os.environ.get("LANES_SELFTEST"):  # a release self-test never writes to Linear
             teams = ["JOV", *(binding.key for binding in bindings.extra_bindings(THIS))]
             tick["issueReconcile"] = epics.reconcile(THIS, host, lambda: Linear(host.linear_env), teams)
-    except Exception as error:  # epic closure and hold expiry never take dispatch down
+    except (Exception, SystemExit) as error:  # epic closure and hold expiry never take dispatch down
         tick["issueReconcileError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         corpus_owner = os.environ.get("YC_CORPUS_OWNER", "gem").split(".")[0]
@@ -6550,6 +6636,22 @@ def finish_dispatch(host: Host, tick: dict) -> int:
         tick["continuity"] = continuity_clock.tick(host.state, HOST)
     except Exception as error:  # liveness must not suppress the existing doctor
         tick["continuity"] = {"status": "failed", "error": type(error).__name__}
+    if autoscale.mode() == "apply":
+        try:
+            # After the spawn loop: a slow or failed Summer POST never delays or blocks a worker.
+            record = capacity_limit.tick(host.state, tick)
+            if record is not None:
+                tick["capacityLimit"] = {"changed": True, "bottleneckFound": record["bottleneckFound"],
+                                         "limited": [row["resource"] for row in record["limited"]]}
+        except Exception as error:  # the record is observability, never dispatch
+            tick["capacityLimitError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        # The canonical Gem fleet-gate receipt, emitted when its local inputs change (replaces
+        # fleet-gate-refresh.yml's */5 cron). Detached: never delays dispatch.
+        tree = (host.state / "current" / ".tree").read_text().strip() if (host.state / "current" / ".tree").exists() else None
+        tick["fleetGate"] = fleet_gate_emitter.tick(host.state, host.repo, tree)
+    except Exception as error:  # observability and admission evidence, never dispatch
+        tick["fleetGate"] = {"status": "error", "error": f"{type(error).__name__}: {error}"[:200]}
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())
@@ -6661,17 +6763,166 @@ def read_marker(host: Host) -> str | None:
         return None
 
 
+MIRROR_FETCH_TIMEOUT_S = 300
+SKILLS_TIMEOUT_S = 120
+CODEX_LANE_SKILLS = ("autoreview", "behavior-validator")
+
+
+def object_mirror(repo: Path) -> Path | None:
+    """The bare mirror this clone borrows objects from (objects/info/alternates). Only a bare
+    repository qualifies: on the Mac the alternate is Tim's own checkout, whose branches a
+    mirror fetch would overwrite."""
+    try:
+        lines = (repo / ".git/objects/info/alternates").read_text().splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        objects = Path(line.strip())
+        mirror = objects.parent
+        if objects.name != "objects" or mirror.name == ".git" or not mirror.name.endswith(".git"):
+            continue
+        bare = subprocess.run(["git", "config", "--file", str(mirror / "config"), "--bool", "core.bare"],
+                              capture_output=True, text=True, timeout=10)
+        if bare.returncode == 0 and bare.stdout.strip() == "true":
+            return mirror
+    return None
+
+
+# A borrowing clone's refs are invisible to the mirror's gc. With these, pruned mirror refs
+# never take objects with them (2026-10-12: one auto-gc after a minutely fetch dropped the
+# objects of three lanes rebase branches and every origin fetch on Gem died "bad object").
+MIRROR_KEEP_OBJECTS = (("gc.auto", "0"), ("gc.pruneExpire", "never"), ("gc.reflogExpireUnreachable", "never"))
+
+
+def ensure_mirror_keeps_objects(mirror: Path) -> None:
+    config = mirror / "config"
+    for key, value in MIRROR_KEEP_OBJECTS:
+        current = subprocess.run(["git", "config", "--file", str(config), "--get", key],
+                                 capture_output=True, text=True, timeout=10).stdout.strip()
+        if current != value:
+            subprocess.run(["git", "config", "--file", str(config), key, value],
+                           check=True, capture_output=True, timeout=10)
+
+
+def missing_object_refs(repo: Path) -> list[str]:
+    """Local refs whose objects this clone (alternates included) no longer has."""
+    listing = subprocess.run(["git", "for-each-ref", "--format=%(objectname) %(refname)"], cwd=repo,
+                             capture_output=True, text=True, timeout=60)
+    refs = [line.split(" ", 1) for line in listing.stdout.splitlines() if " " in line]
+    if listing.returncode or not refs:
+        return []
+    checked = subprocess.run(["git", "cat-file", "--batch-check=%(objectname)"], cwd=repo,
+                             input="".join(f"{sha}\n" for sha, _ in refs), capture_output=True, text=True, timeout=120)
+    missing = {line.split()[0] for line in checked.stdout.splitlines() if line.endswith(" missing")}
+    return [ref for sha, ref in refs if sha in missing]
+
+
+def fetch_release_source(host: Host) -> subprocess.CompletedProcess:
+    """update's own origin fetch. A ref whose objects are gone cannot be repaired by any later
+    fetch and blocks every one of them, so only such refs are deleted, then the fetch is retried
+    once. Refs with present objects are never touched."""
+    fetched = sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo)
+    if fetched.returncode == 0 or not re.search(r"bad object|did not send all necessary objects",
+                                                f"{fetched.stdout}{fetched.stderr}"):
+        return fetched
+    broken = missing_object_refs(host.repo)
+    if not broken:
+        return fetched
+    for ref in broken:
+        subprocess.run(["git", "update-ref", "-d", ref], cwd=host.repo, capture_output=True, timeout=30)
+    print(f"lane update: deleted {len(broken)} ref(s) with missing objects: {', '.join(broken)[:300]}",
+          file=sys.stderr)
+    return sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo)
+
+
+def refresh_object_mirror(host: Host) -> dict:
+    """Refresh the shared object mirror right before update's own origin fetch, under the lock
+    every mirror writer takes (/srv/git/locks/<name>-mirror.lock). Replaces Gem's retired
+    jovie-git-mirror-refresh timer: the mirror moves on the same event the clone does."""
+    mirror = object_mirror(host.repo)
+    if mirror is None:
+        return {"status": "no-mirror"}
+    lock_path = mirror.parent.parent / "locks" / f"{mirror.name.removesuffix('.git').lower()}-mirror.lock"
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(lock_path, "a") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return {"status": "busy", "mirror": str(mirror)}
+            ensure_mirror_keeps_objects(mirror)
+            fetched = lifecycle.run(["git", "-c", "gc.auto=0", "-c", "maintenance.auto=false", "-C", str(mirror),
+                                     "fetch", "--quiet", "--prune", "origin", "+refs/*:refs/*"],
+                                    capture_output=True, text=True, timeout=MIRROR_FETCH_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return {"status": "timeout", "mirror": str(mirror)}
+    except (OSError, subprocess.CalledProcessError) as error:
+        return {"status": "error", "mirror": str(mirror), "error": f"{type(error).__name__}: {error}"[:200]}
+    if fetched.returncode:
+        return {"status": "failed", "mirror": str(mirror), "error": (fetched.stderr or "").strip()[-200:]}
+    return {"status": "fetched", "mirror": str(mirror), "at": now_iso()}
+
+
+def refresh_codex_skills(host: Host, home: Path | None = None) -> dict:
+    """Keep the codex lanes' skills current from ~/agent-skills (retired update-agent-skills.sh
+    cron). One ls-remote per update; fetch, fast-forward and reinstall only when main moved or
+    the last install did not finish."""
+    home = Path.home() if home is None else home
+    source, receipt = home / "agent-skills", host.state / "codex-skills.json"
+    if not (source / ".git").exists():
+        return {"status": "no-source"}
+    def git(*args):
+        return lifecycle.run(["git", "-C", str(source), *args], capture_output=True, text=True, timeout=SKILLS_TIMEOUT_S)
+    try:
+        remote = git("ls-remote", "origin", "refs/heads/main")
+        head = git("rev-parse", "HEAD").stdout.strip()
+        wanted = remote.stdout.split()[0] if remote.returncode == 0 and remote.stdout.split() else None
+        if not wanted:
+            return {"status": "remote-unavailable"}
+        installed = read_json(receipt).get("installed")
+        if wanted == head and installed == head:
+            return {"status": "current", "head": head[:12]}
+        if wanted != head:
+            for step in (("fetch", "-q", "origin", "main"), ("merge", "--ff-only", "-q", "FETCH_HEAD")):
+                result = git(*step)
+                if result.returncode:
+                    return {"status": "failed", "step": step[0], "error": (result.stderr or "").strip()[-200:]}
+        install = lifecycle.run([sys.executable, "scripts/install-skills", "--target", str(home / ".codex/skills"),
+                                 *CODEX_LANE_SKILLS, "--force"], cwd=source, capture_output=True, text=True,
+                                timeout=SKILLS_TIMEOUT_S)
+        if install.returncode:
+            return {"status": "failed", "step": "install", "error": (install.stderr or "").strip()[-200:]}
+    except subprocess.TimeoutExpired:
+        return {"status": "timeout"}
+    except OSError as error:
+        return {"status": "error", "error": f"{type(error).__name__}: {error}"[:200]}
+    receipt.write_text(json.dumps({"installed": wanted, "at": now_iso()}))
+    return {"status": "updated", "from": head[:12], "to": wanted[:12]}
+
+
+def host_maintenance(host: Host, step) -> dict:
+    """Host upkeep riding the update event; never fatal, never inside a release self-test."""
+    if os.environ.get("LANES_SELFTEST"):
+        return {"status": "selftest-skipped"}
+    try:
+        return step(host)
+    except Exception as error:
+        return {"status": "error", "error": f"{type(error).__name__}: {error}"[:200]}
+
+
 def update(host: Host) -> int:
     """Install origin/main's scripts/lanes as a new release after its own tests pass.
     Only the `current` symlink moves; running workers finish on their release. The outcome is
     written to update.json so a refused release is an alert, not a traceback in a journal."""
+    mirror = host_maintenance(host, refresh_object_mirror)  # before install_release's origin fetch
     try:
         code = install_release(host)
         error = None if code == 0 else "release tests failed"
     except Exception as failure:
         code, error = 1, f"{type(failure).__name__}: {failure}"[:300]
+    skills = host_maintenance(host, refresh_codex_skills)
     update_json(host.state / "update.json", lambda data: (data.clear(), data.update(
-        at=now_iso(), ok=code == 0, error=error, current=read_marker(host))))
+        at=now_iso(), ok=code == 0, error=error, current=read_marker(host), mirror=mirror, skills=skills)))
     return code
 
 
@@ -6704,6 +6955,12 @@ HOST_KNOB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_LANE_")
 HOST_CREDENTIAL_PREFIXES = ("GH_", "GITHUB_", "LINEAR_", "JOVIE_BOT_", "JOVIE_GITHUB_", "CODEX_HOME", "XDG_")
 
 
+# Every process a release self-test starts inherits this per-run marker. A detached child
+# (start_new_session) leaves the helper's process group and can outlive it, but it cannot shed
+# its environment, so the marker finds it. Not under LANES_: nested selftest_env calls keep it.
+SELFTEST_RUN_ENV = "JOVIE_SELFTEST_RUN"
+
+
 def selftest_env(scratch: Path) -> dict:
     env = {key: value for key, value in os.environ.items()
            if not key.startswith(HOST_KNOB_PREFIXES + HOST_CREDENTIAL_PREFIXES)}
@@ -6711,7 +6968,61 @@ def selftest_env(scratch: Path) -> dict:
     shim = str(Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "bin")
     if "PATH" in env:
         env["PATH"] = os.pathsep.join(entry for entry in env["PATH"].split(os.pathsep) if entry.rstrip("/") != shim)
-    return {**env, "HOME": str(Path(scratch) / "home"), "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
+    return {SELFTEST_RUN_ENV: uuid.uuid4().hex, **env, "HOME": str(Path(scratch) / "home"),
+            "LANES_SELFTEST": "1", "LANES_STATE": str(scratch)}
+
+
+def marked_processes(marker: str) -> list[int]:
+    """Live processes (other than this one) whose environment carries this self-test's marker."""
+    token = f"{SELFTEST_RUN_ENV}={marker}"
+    found = []
+    proc = Path("/proc")
+    if proc.is_dir():
+        for entry in proc.iterdir():
+            if not entry.name.isdigit() or int(entry.name) == os.getpid():
+                continue
+            try:
+                environ = (entry / "environ").read_bytes()
+            except OSError:
+                continue
+            if token.encode() in environ.split(b"\0"):
+                found.append(int(entry.name))
+        return found
+    # Darwin: `ps -E` appends the environment of this user's processes to the command.
+    listing = subprocess.run(["ps", "-E", "-ww", "-axo", "pid=,stat=,command="],
+                             capture_output=True, text=True, errors="replace", timeout=30)
+    for line in listing.stdout.splitlines():
+        fields = line.split()
+        if (len(fields) > 2 and fields[0].isdigit() and int(fields[0]) != os.getpid()
+                and not fields[1].startswith("Z") and token in fields[2:]):
+            found.append(int(fields[0]))
+    return found
+
+
+def reap_selftest_processes(marker: str) -> int:
+    """Stop everything the self-test left running (orphaned yc refresh/gbrain pairs lived 4-5
+    days on Gem, 2026-10-11). Returns how many processes were still alive when it ended."""
+    import signal
+    try:
+        leftovers = marked_processes(marker)
+    except (OSError, subprocess.SubprocessError):
+        return 0
+    for sig, grace in ((signal.SIGTERM, 3), (signal.SIGKILL, 2)):
+        try:
+            alive = marked_processes(marker)
+        except (OSError, subprocess.SubprocessError):
+            break
+        if not alive:
+            break
+        for pid in alive:
+            try:
+                os.kill(pid, sig)
+            except (ProcessLookupError, PermissionError):
+                pass
+        deadline = time.monotonic() + grace
+        while time.monotonic() < deadline and marked_processes(marker):
+            time.sleep(.05)
+    return len(leftovers)
 
 
 # The installed packages mesh-runtime-bundle.mjs compiles against (exact pins checked there).
@@ -6736,10 +7047,10 @@ def mesh_dependency_root(host: Host) -> Path | None:
     return next((slot for slot in slots if installed(slot)), None)
 
 
-def retain_selftest_diagnostic(staging: Path, stderr, returncode, *, timed_out=False) -> None:
+def retain_selftest_diagnostic(staging: Path, stderr, returncode, *, timed_out=False, leftovers=0) -> None:
     raw = stderr if isinstance(stderr, bytes) else (stderr or "").encode()
     diagnostic = {"schema": "jovie-lane-selftest-diagnostic/v1", "returncode": returncode,
-                  "timedOut": timed_out, "observedAt": now_iso(),
+                  "timedOut": timed_out, "observedAt": now_iso(), "leftoverProcesses": leftovers,
                   "failedSelectors": re.findall(r"^(?:FAIL|ERROR): ([A-Za-z0-9_.]+ \([A-Za-z0-9_.]+\))",
                                                 raw.decode(errors="replace"), re.MULTILINE),
                   "stderrSha256": hashlib.sha256(raw).hexdigest(), "stderrBytes": len(raw)}
@@ -6805,16 +7116,23 @@ def prove_staging(host: Host, staging: Path) -> str | None:
         return "mesh runtime dependency closure failed"
     # ~60 s on an idle host; simulator/xcodebuild load from other sessions (load avg ~600 on
     # 2026-09-28) pushed it past 300 s, so every release was refused and fixes never landed.
+    env = selftest_env(scratch)
+    leftovers = 0
     try:
-        test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
-                              cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
-                              env=selftest_env(scratch))
+        try:
+            test = lifecycle.run([sys.executable, "-m", "unittest", "-q", *LANE_TESTS],
+                                  cwd=staging, capture_output=True, text=True, timeout=UPDATE_TEST_TIMEOUT_S,
+                                  env=env)
+        finally:
+            leftovers = reap_selftest_processes(env[SELFTEST_RUN_ENV])
+            if leftovers:
+                print(f"release self-test left {leftovers} process(es) running; stopped", file=sys.stderr)
     except subprocess.TimeoutExpired as error:
-        retain_selftest_diagnostic(staging, error.stderr, None, timed_out=True)
+        retain_selftest_diagnostic(staging, error.stderr, None, timed_out=True, leftovers=leftovers)
         return f"self-test timeout {UPDATE_TEST_TIMEOUT_S}s"
     # Retain the original proof diagnostic privately; console truncation must not
     # lose a failing selector or force repeated release attempts to diagnose it.
-    retain_selftest_diagnostic(staging, test.stderr, test.returncode)
+    retain_selftest_diagnostic(staging, test.stderr, test.returncode, leftovers=leftovers)
     if test.returncode != 0:
         print(test.stderr[-2000:], file=sys.stderr)
         if not retry_failed_selectors(staging, test.stderr):
@@ -6854,12 +7172,15 @@ def retry_failed_selectors(staging: Path, stderr) -> bool:
         return False
     scratch = staging / ".selftest-retry-state"
     (scratch / "home").mkdir(parents=True, exist_ok=True)
+    env = selftest_env(scratch)
     try:
         rerun = lifecycle.run([sys.executable, "-m", "unittest", "-q", *ids], cwd=staging, capture_output=True,
-                              text=True, timeout=SELFTEST_RETRY_TIMEOUT_S, env=selftest_env(scratch))
+                              text=True, timeout=SELFTEST_RETRY_TIMEOUT_S, env=env)
         passed = rerun.returncode == 0
     except subprocess.TimeoutExpired:
         passed = False
+    finally:
+        reap_selftest_processes(env[SELFTEST_RUN_ENV])
     receipt = {"schema": "jovie-lane-selftest-retry/v1", "selectors": ids, "passedOnRetry": passed,
                "observedAt": now_iso()}
     fd = os.open(staging / ".selftest-retry.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
@@ -6907,7 +7228,7 @@ def install_release(host: Host, *, operator=None) -> int:
         if not isinstance(operator, lifecycle.OperatorGuard) or operator.state != host.state.resolve():
             raise lifecycle.AdmissionHeld("operator installation owner differs")
         operator.validate()
-    if sh(["git", "fetch", "-q", "origin", "main"], cwd=host.repo).returncode:
+    if fetch_release_source(host).returncode:
         raise RuntimeError("release-source-fetch-failed")
     bundle = release_identity(host)
     if operator is not None and bundle != operator.manifest:

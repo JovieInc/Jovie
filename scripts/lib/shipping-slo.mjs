@@ -57,6 +57,9 @@ export const METRIC_DEFS = Object.freeze([
     key: 'remediation.production_promote_hold.p95',
     unit: 'seconds',
     direction: 'lower',
+    // No collector feeds promote-hold intervals yet (JOV-8082); the evaluator
+    // skips unsupported metrics and validateBaseline rejects baselining them.
+    unsupported: true,
   },
   {
     key: 'production_lag.merged_to_verified.p95',
@@ -179,7 +182,8 @@ export function leadTimeByLane(prs, sinceMs, nowMs) {
  *  - pr_red_to_green: per head branch, earliest failure → next success (seconds).
  *  - main_red_to_green: on the default-branch run sequence, failure → next success.
  *  - production_promote_hold: caller-supplied [{startedAt, clearedAt}] records;
- *    null when no data source exists yet.
+ *    null while no data source exists; the metric is marked `unsupported` in
+ *    METRIC_DEFS and excluded from baseline evaluation until one does.
  */
 export function remediationStats({
   prRuns,
@@ -241,9 +245,10 @@ export function remediationStats({
 }
 
 /**
- * Production lag: mergedAt → first successful production deployment at/after
- * the merge. deployments: [{status:'success', createdAt, sha?}] — sha matching
- * used when available, otherwise first success after mergedAt wins.
+ * Production lag: mergedAt → first successful production verification at/after
+ * the merge. deployments: [{status:'success', createdAt, sha?}] — a sha match
+ * wins when present, otherwise the first success after mergedAt covers the PR
+ * because a verified generation ships every merge that is its ancestor.
  */
 export function productionLag(prs, deployments, sinceMs, nowMs) {
   const successes = (deployments ?? [])
@@ -258,11 +263,12 @@ export function productionLag(prs, deployments, sinceMs, nowMs) {
     if (mergedAt < sinceMs || mergedAt > nowMs) continue;
     merged += 1;
     const sha = pr.mergeCommitSha ?? pr.merge_commit_sha;
-    const match = sha
-      ? successes.find(
-          d => d.sha === sha && Date.parse(d.createdAt) >= mergedAt
-        )
-      : successes.find(d => Date.parse(d.createdAt) >= mergedAt);
+    const match =
+      (sha
+        ? successes.find(
+            d => d.sha === sha && Date.parse(d.createdAt) >= mergedAt
+          )
+        : null) ?? successes.find(d => Date.parse(d.createdAt) >= mergedAt);
     if (!match) continue;
     const lag = secondsBetween(pr.mergedAt, match.createdAt);
     if (lag) {
@@ -445,6 +451,7 @@ export function evaluateShippingSlo(flat, baseline, { today = null } = {}) {
   const regressions = [];
   const tightenCandidates = [];
   for (const def of METRIC_DEFS) {
+    if (def.unsupported) continue;
     const observed = flat[def.key];
     const baseValue = Number(base[def.key]?.value ?? base[def.key]);
     if (observed === null || observed === undefined) continue;
@@ -599,6 +606,8 @@ export function validateBaseline(baseline) {
     for (const [key, entry] of Object.entries(baseline.metrics)) {
       const def = defFor(key);
       if (!def) errors.push(`unknown metric key: ${key}`);
+      else if (def.unsupported)
+        errors.push(`${key}: metric is unsupported and must not be baselined`);
       const value = Number(entry?.value ?? entry);
       if (!Number.isFinite(value) || value < 0)
         errors.push(`${key}: value must be a non-negative number`);

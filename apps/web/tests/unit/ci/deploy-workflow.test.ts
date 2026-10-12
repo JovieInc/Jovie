@@ -98,14 +98,6 @@ const costAnomalyWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/cost-anomaly-gate.yml'
 );
-const mainHealthWorkflowPath = resolve(
-  repoRoot,
-  '.github/workflows/main-ci-health-monitor.yml'
-);
-const mainHealthActionPath = resolve(
-  repoRoot,
-  '.github/actions/eval-main-health/action.yml'
-);
 const productionControllerHealthPath = resolve(
   repoRoot,
   '.github/workflows/production-controller-health.yml'
@@ -463,7 +455,7 @@ describe('CI test-performance path gate', () => {
 });
 
 describe('CI Storybook accessibility path gate', () => {
-  it('classifies relevant paths; the scheduled visual-a11y lane owns execution', () => {
+  it('classifies relevant paths; the main-push visual-a11y lane owns execution', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const pathJob = getJobBlock(workflow, 'ci-path-changes');
     const detectStep = getStepBlock(
@@ -475,7 +467,7 @@ describe('CI Storybook accessibility path gate', () => {
       "run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || 'false' }}"
     );
     // The duplicate manual ci-storybook-a11y job was removed (JOV-4326); the
-    // scheduled visual-a11y.yml storybook-a11y lane is the single owner.
+    // main-push visual-a11y.yml storybook-a11y lane is the single owner.
     expect(workflow).not.toContain('ci-storybook-a11y:');
     expect(detectStep).not.toContain('DEEP_CI_LABEL');
 
@@ -506,8 +498,8 @@ describe('CI Storybook accessibility path gate', () => {
     ).toBe(1);
 
     const visualWorkflow = readFileSync(visualA11yWorkflowPath, 'utf8');
-    expect(visualWorkflow).toMatch(/^  schedule:/m);
-    expect(visualWorkflow).not.toMatch(/^  push:/m);
+    expect(visualWorkflow).not.toMatch(/^  schedule:/m);
+    expect(visualWorkflow).toMatch(/^  push:\n    branches: \[main\]/m);
     expect(visualWorkflow).not.toMatch(/^  pull_request:/m);
     expect(visualWorkflow).not.toContain('vars.CI_FAST_RUNNER');
     const visualPathJob = getJobBlock(visualWorkflow, 'ci-visual-path-changes');
@@ -516,7 +508,7 @@ describe('CI Storybook accessibility path gate', () => {
       'Detect visual-relevant changes'
     );
     expect(visualDetectStep).toContain(
-      '[ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "schedule" ]'
+      '[ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "push" ]'
     );
     expect(visualDetectStep).toContain(
       'echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"'
@@ -816,7 +808,7 @@ describe('deploy workflow Vercel env resolution', () => {
     }
   });
 
-  it('blocks production promotion on the exact-build canonical six-route browser budget', () => {
+  it('keeps exact-build performance proof deployable without optional auth credentials', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promotionJob = getJobBlock(workflow, 'promote-production');
     const setupStep = getStepBlock(
@@ -881,8 +873,24 @@ describe('deploy workflow Vercel env resolution', () => {
     ]) {
       expect(performanceStep).toContain(`--route-id ${routeId}`);
     }
+    expect(performanceStep).toContain('auth_performance_configured=false');
     expect(performanceStep).toContain(
-      'Authenticated performance credentials are required'
+      'authenticated_performance_status=skipped_unconfigured'
+    );
+    expect(performanceStep).toContain(
+      'authenticated route budgets are explicitly skipped and are not release proof'
+    );
+    expect(performanceStep).toContain(
+      'if [ "$auth_performance_configured" = "true" ]; then'
+    );
+    expect(performanceStep).not.toContain(
+      'fail_performance_gate "Authenticated performance credentials are required'
+    );
+    expect(performanceStep).toContain(
+      'fail_performance_gate "Unable to establish authenticated exact-build browser state."'
+    );
+    expect(performanceStep).toContain(
+      'fail_performance_gate "Authenticated exact-build browser state was not persisted."'
     );
     expect(performanceStep).toContain(
       'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}'
@@ -2034,17 +2042,19 @@ describe('iOS stage contract', () => {
     );
     expect(iosWorkflow).not.toMatch(/^  pull_request:/m);
     expect(iosWorkflow).not.toMatch(/^  push:/m);
-    // Hosted macOS stays the fallback; the self-hosted Mac is heartbeat-gated
-    // and never probed for release regressions.
+    // Hosted macOS stays the fallback; an idle self-hosted Mac runs the fast
+    // gate in a cancellable child run, never for release regressions.
     expect(iosWorkflow).toContain(
-      `runs-on: \${{ needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-26' }}`
+      `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-26' }}`
     );
     expect(iosWorkflow).toContain(
-      'HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml'
+      'uses: ./.github/workflows/mac-lane-route.yml'
     );
     expect(iosWorkflow).toContain(
-      "if: ${{ !inputs.full-regression && vars.JOVIE_MAC_RUNNER != 'off' }}"
+      'if: ${{ inputs.mac-first && !inputs.mac-child && !inputs.full-regression }}'
     );
+    expect(iosWorkflow).not.toContain('mac-runner-heartbeat.yml');
+    expect(ios).toContain('mac-first: true');
     expect(pathChanges).toContain(
       "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
     );
@@ -4075,6 +4085,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(stageStep).toContain('VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"');
     expect(stageStep).toContain('NEXT_PUBLIC_BUILD_SHA="$expected"');
     expect(stageStep).toContain('--meta "githubCommitSha=${EXPECTED_SHA}"');
+    expect(stageStep).toContain('timeout-minutes: 45');
+    expect(stageStep).toContain('--timeout 30m');
     expect(stageStep).toContain('[ "$production_deploy_state" != "READY" ]');
     expect(stageStep).toContain(
       '[ "$production_deploy_target" != "production" ]'
@@ -4707,10 +4719,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryAction).toContain('echo "gate_status=failed"');
   });
 
-  it('keeps cost and main-health observers strict and bounded without GitHub Issue intake', () => {
+  it('keeps the cost observer strict and bounded without GitHub Issue intake', () => {
     const cost = readFileSync(costAnomalyWorkflowPath, 'utf8');
-    const monitor = readFileSync(mainHealthWorkflowPath, 'utf8');
-    const evaluator = readFileSync(mainHealthActionPath, 'utf8');
 
     expect(cost).toContain("cron: '*/15 * * * *'");
     expect(cost).toContain('name: Production – jovie');
@@ -4726,14 +4736,6 @@ describe('production promotion exact-artifact contract', () => {
     expect(cost).not.toContain('INCIDENT_TITLE=');
     expect(cost).not.toContain('issues: write');
     expect(cost).not.toContain('DRY_RUN');
-    expect(monitor).toContain('group: main-ci-health-monitor');
-    expect(monitor).toContain('main-ci-health-alert-$ALERT_KEY');
-    expect(monitor).toContain('main-ci-rerun-request-${FAILED_RUN_ID}');
-    expect(monitor).toContain('gh run rerun "$FAILED_RUN_ID" --failed');
-    expect(evaluator).toContain("default: '5'");
-    expect(evaluator).toContain('failingRunAttempt === 1');
-    expect(evaluator).toContain('attemptEvidenceTrusted');
-    expect(evaluator).toContain('evidence_known');
   });
 
   it('recovers one payload-bound interrupted marker with a full leased rerun', () => {
@@ -5263,7 +5265,11 @@ describe('production marker recovery workflow (JOV-4965)', () => {
       'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );
     const fleetRefresh = readFileSync(fleetGateRefreshWorkflowPath, 'utf8');
-    expect(fleetRefresh).not.toContain('workflow_run:');
+    // Only main CI completion wakes the refresh; release workflows never do.
+    expect(fleetRefresh).toContain(
+      'workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]'
+    );
+    expect(fleetRefresh.match(/workflow_run:/g)).toHaveLength(1);
     expect(fleetRefresh).not.toContain('Production Marker Recovery]');
   });
 

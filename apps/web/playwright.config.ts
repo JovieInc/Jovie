@@ -38,7 +38,8 @@ if (!managedWebServerUrl.port) {
 }
 const managedWebServerPort = managedWebServerUrl.port;
 const sentryE2eEnabled =
-  process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN);
+  process.env.SENTRY_E2E_REPORTING === '1' &&
+  Boolean(process.env.SENTRY_DSN_DEV);
 const shouldSerializeLocalBypassRuns = !isCI && useTestAuthBypass;
 
 const videoMode: 'off' | 'retain-on-failure' = isCI

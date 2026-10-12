@@ -110,20 +110,13 @@ function sizedPr(labels) {
 }
 
 describe('merge-group member discovery', () => {
-  it('resolves every member from the exact synthetic first-parent chain', () => {
+  it('resolves the singleton member from the exact synthetic first-parent chain', () => {
     const members = resolveMergeGroupMembers({
       event: event(),
-      comparison: comparison([
-        commit(FIRST, BASE, 101),
-        commit(HEAD, FIRST, 102),
-      ]),
+      comparison: comparison([commit(HEAD, BASE, 102)]),
     });
 
     expect(members).toEqual([
-      {
-        number: 101,
-        syntheticHeadSha: FIRST,
-      },
       {
         number: 102,
         syntheticHeadSha: HEAD,
@@ -185,7 +178,7 @@ describe('merge-group member discovery', () => {
           commit(HEAD, FIRST, 101),
         ]),
       })
-    ).toThrow(/repeats PR #101/);
+    ).toThrow(/exceeds trusted 1-member bound/);
   });
 
   it('rejects commits without canonical GitHub generation evidence', () => {
@@ -241,10 +234,10 @@ describe('merge-group member discovery', () => {
       resolveMergeGroupMembers({
         event: event(),
         comparison: comparison(
-          Array.from({ length: 11 }, () => commit(HEAD, BASE, 102))
+          Array.from({ length: 2 }, () => commit(HEAD, BASE, 102))
         ),
       })
-    ).toThrow(/exceeds trusted 5-member bound/);
+    ).toThrow(/exceeds trusted 1-member bound/);
   });
 
   it('requires current open main-bound PR metadata after discovery', () => {

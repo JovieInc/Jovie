@@ -271,7 +271,7 @@ test('a proven admission-quota ejection authorizes one unchanged-head retry with
   const recovered = await fixture({
     statuses,
     overrides,
-    eventName: 'schedule',
+    eventName: 'push',
   });
   assert.deepEqual(recovered.mutations, [{ id: 'PR_1', oid: sha }]);
   assert.equal(
@@ -414,7 +414,7 @@ test('admits every required-green merge state and refuses blocked or conflicting
   const overrides = Object.fromEntries(
     states.map((mergeStateStatus, i) => [i + 1, { mergeStateStatus }])
   );
-  const result = await fixture({ roster, overrides, eventName: 'schedule' });
+  const result = await fixture({ roster, overrides, eventName: 'push' });
   assert.deepEqual(
     result.mutations.map(mutation => mutation.id),
     ['PR_1', 'PR_2', 'PR_3']
@@ -455,8 +455,8 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
     releases: { nodes: [{ createdAt, label: { name } }] },
   });
   const enqueued = async override =>
-    (await fixture({ overrides: { 1: override }, eventName: 'schedule' }))
-      .mutations.length;
+    (await fixture({ overrides: { 1: override }, eventName: 'push' })).mutations
+      .length;
   assert.equal(await enqueued({ ...removal('MANUAL'), ...release('hold') }), 1);
   assert.equal(
     await enqueued({ ...removal('manual'), ...release('Queue-Poison') }),
@@ -595,23 +595,20 @@ test('a blocking label on a queued PR dequeues only that PR', () => {
   );
 });
 
-test('wakes on completed Source Validation and on the bounded reconciliation sweep', () => {
+test('wakes on completed Source Validation and on the push-to-main reconciliation sweep', () => {
   assert.ok(workflow.on.workflow_run.workflows.includes('Source Validation'));
   assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
   assert.deepEqual(workflow.on.pull_request_target.types, [
     'labeled',
     'unlabeled',
     'reopened',
+    'synchronize',
   ]);
   // A label is never an enroll wake; only a blocking one dequeues its PR.
   assert.match(workflow.jobs.enroll.if, /github\.event\.action != 'labeled'/);
   // JOV-7589: a dequeue while checks are already green emits no completion
-  // event, so a periodic full-roster sweep re-arms within the cadence.
-  const [sweep] = workflow.on.schedule;
-  const cadenceMinutes = Number(
-    /^\*\/([1-9][0-9]*) \* \* \* \*$/.exec(sweep.cron)?.[1]
-  );
-  assert.ok(cadenceMinutes > 0 && cadenceMinutes <= 15);
+  // event, so every landing on main runs the full-roster sweep.
+  assert.deepEqual(workflow.on.push, { branches: ['main'] });
   assert.match(workflow.jobs.enroll.if, /conclusion == 'success'/);
   const ready = load(
     readFileSync('.github/workflows/auto-ready-agent-drafts.yml', 'utf8')
@@ -782,7 +779,7 @@ test('a PR wake reads only its current candidate instead of rescanning the whole
   }
 });
 
-test('a scheduled sweep re-enqueues a dequeued PR whose repaired head turned green', async () => {
+test('a push-to-main sweep re-enqueues a dequeued PR whose repaired head turned green', async () => {
   // JOV-7589 regression: after a merge-queue ejection the lane pushes a newer
   // head and the checks go green without a wake. The sweep must find and
   // re-enroll it; a still-removed head stays blocked without a bounded retry.
@@ -795,7 +792,7 @@ test('a scheduled sweep re-enqueues a dequeued PR whose repaired head turned gre
   const result = await fixture({
     roster: [candidate(1), candidate(2)],
     overrides,
-    eventName: 'schedule',
+    eventName: 'push',
   });
   assert.equal(result.inventories.length, 1);
   assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
@@ -1040,7 +1037,7 @@ async function exerciseRecoveryBoundary(boundary, change) {
     await released.promise;
   }
   const pending = fixture({
-    eventName: 'schedule',
+    eventName: 'push',
     statuses: [recovery],
     effectSink: effects,
     beforeStatusResponse: () => pause('statuses'),
@@ -1371,4 +1368,26 @@ test('a deferred current-state read cannot dequeue a repaired head after its hol
     releaseRead();
     await Promise.allSettled([pending]);
   }
+});
+
+test('a landing on main reconciles the full roster and the hold contract without a timer', async () => {
+  // Tim 2026-10-12: no time-based loops. The push wake replaces the */15 sweep.
+  assert.deepEqual(workflow.on.push, { branches: ['main'] });
+  assert.ok(workflow.on.pull_request_target.types.includes('synchronize'));
+  assert.match(workflow.concurrency.group, /'push'/);
+  assert.equal(
+    concurrencyGroup({ event_name: 'push', event: {}, run_id: 1 }),
+    concurrencyGroup({ event_name: 'push', event: {}, run_id: 2 })
+  );
+  const effects = await fixture({ eventName: 'push', roster: [candidate(1)] });
+  // One paginated pulls.list inventory, as for a manual dispatch.
+  assert.equal(effects.inventories.length, 1);
+  assert.deepEqual(effects.reads, [1]);
+  assert.equal(effects.mutations.length, 1);
+  const contract = workflow.jobs['enforce-hold-contract'].if;
+  assert.equal(workflow.on.schedule, undefined);
+  for (const event of ['push', 'pull_request_target', 'workflow_dispatch']) {
+    assert.match(contract, new RegExp(`"${event}"`));
+  }
+  assert.match(contract, /workflow_run\.event == 'merge_group'/);
 });

@@ -363,7 +363,7 @@ jobs:
             fi
           done < <(jq -er '.allowedPaths[]' "$PLAN_PATH")
       - name: Upload prelaunch receipt before model execution
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hosted-ci-prelaunch-${{ needs.plan.outputs.pr_number }}-${{ needs.plan.outputs.expected_head }}
           path: ${{ runner.temp }}/hosted-repair/prelaunch.json
@@ -505,7 +505,7 @@ jobs:
           }' > "$RUNNER_TEMP/hosted-repair/staged/executor.json"
       - name: Upload immutable patch artifact
         id: upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hosted-ci-patch-${{ needs.plan.outputs.pr_number }}-${{ needs.plan.outputs.expected_head }}
           path: ${{ runner.temp }}/hosted-repair/staged
@@ -660,7 +660,7 @@ jobs:
           test -z "$(git -C candidate status --porcelain=v1 --untracked-files=all)"
       - name: Upload raw test report and coverage
         id: upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hosted-ci-test-proof-${{ needs.plan.outputs.pr_number }}-${{ needs.plan.outputs.expected_head }}
           path: ${{ runner.temp }}/hosted-repair/test-proof/*.json
@@ -780,7 +780,7 @@ jobs:
           echo "terminal_b64=$TERMINAL_B64" >> "$GITHUB_OUTPUT"
       - name: Upload acceptance and terminal receipts
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hosted-ci-write-receipts-${{ needs.plan.outputs.pr_number }}-${{ needs.plan.outputs.expected_head }}
           path: |
@@ -978,7 +978,7 @@ jobs:
               --output "$RUNNER_TEMP/hosted-terminal/terminal.json"
           fi
       - name: Upload terminal receipt
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hosted-ci-terminal-${{ needs.plan.outputs.pr_number }}-${{ needs.plan.outputs.expected_head }}
           path: ${{ runner.temp }}/hosted-terminal/terminal.json
