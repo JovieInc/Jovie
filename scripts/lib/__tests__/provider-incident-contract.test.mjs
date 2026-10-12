@@ -9,12 +9,29 @@ import {
   verifyProviderIncidentHandoff,
 } from '../../../packages/agent-transport-contracts/provider-incident.ts';
 
+/**
+ * @typedef {import('../../../packages/agent-transport-contracts/provider-incident.ts').ProviderFailureObservationInput} ProviderFailureObservationInput
+ * @typedef {import('../../../packages/agent-transport-contracts/provider-incident.ts').ProviderIncidentPath} ProviderIncidentPath
+ */
+
+/**
+ * Untyped returns widen `state: 'healthy'` to string and fail scripts checkJs.
+ * @param {ProviderIncidentPath} path
+ * @param {string} [observedAt]
+ * @returns {ProviderFailureObservationInput['baseline']}
+ */
 const baseline = (path, observedAt = '2026-08-04T16:55:00.000Z') => ({
   state: 'healthy',
   observedAt,
   evidenceRef: `record://provider-health/${path}`,
 });
 
+/**
+ * @param {ProviderIncidentPath} path
+ * @param {unknown} error
+ * @param {string} observedAt
+ * @returns {ProviderFailureObservationInput}
+ */
 const failure = (path, error, observedAt) => ({
   path,
   error,
@@ -242,6 +259,7 @@ describe('shared Summer/Zoe provider incident contract', () => {
     ).toThrow('does not match');
     expect(() =>
       recordProviderIncidentAction(receipt, {
+        // @ts-expect-error classified is an intake action excluded from remediation
         kind: 'classified',
         completedAt: '2026-08-04T17:04:00.000Z',
         evidenceRef: 'record://provider-action/classified',
