@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { bodyContainsOnboardingSessionBoundary } from '@/lib/canaries/auth-signup-onboarding';
 
@@ -69,7 +69,7 @@ describe('GET /api/cron/auth-signup-onboarding-canary', () => {
     );
 
     const response = await GET(
-      new Request('https://jov.ie/api/cron/auth-signup-onboarding-canary')
+      new NextRequest('https://jov.ie/api/cron/auth-signup-onboarding-canary')
     );
 
     expect(response.status).toBe(401);
@@ -82,7 +82,7 @@ describe('GET /api/cron/auth-signup-onboarding-canary', () => {
     );
 
     const response = await GET(
-      new Request('https://jov.ie/api/cron/auth-signup-onboarding-canary')
+      new NextRequest('https://jov.ie/api/cron/auth-signup-onboarding-canary')
     );
 
     const startCall = checkAuthSurfaceGetMock.mock.calls.find(
@@ -108,7 +108,7 @@ describe('GET /api/cron/auth-signup-onboarding-canary', () => {
     );
 
     const response = await GET(
-      new Request('https://jov.ie/api/cron/auth-signup-onboarding-canary')
+      new NextRequest('https://jov.ie/api/cron/auth-signup-onboarding-canary')
     );
 
     expect(response.status).toBe(207);
