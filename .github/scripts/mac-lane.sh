@@ -41,14 +41,15 @@ fallback() {
 }
 
 dispatch() {
-  local pickup="${PICKUP_SECONDS:-45}" poll="${POLL_SECONDS:-10}"
-  local response run_id jobs state deadline
+  local pickup="${MAC_PICKUP_SECONDS:-45}" poll="${POLL_SECONDS:-10}"
+  local response run_id jobs state deadline lane_args="${LANE_ARGS:-}"
+  [ -n "$lane_args" ] || lane_args='{}'
   emit join_group "$JOIN_GROUP"
   if ! response="$(api -X POST "repos/$GH_REPO/actions/workflows/mac-lane.yml/dispatches" \
     -f ref="$DISPATCH_REF" -F return_run_details=true \
     -f "inputs[lane]=$LANE" -f "inputs[sha]=$CHECKOUT_SHA" \
     -f "inputs[join-group]=$JOIN_GROUP" -f "inputs[supersede-group]=$SUPERSEDE_GROUP" \
-    -f "inputs[parent]=$PARENT_RUN")" \
+    -f "inputs[parent]=$PARENT_RUN" -f "inputs[args]=$lane_args")" \
     || ! run_id="$(jq -er '.workflow_run_id' <<<"$response")"; then
     fallback "child dispatch failed"
   fi
@@ -75,23 +76,36 @@ dispatch() {
   done
 }
 
+summary() {
+  [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+  return 0
+}
+
 result() {
-  local jobs verdict
-  if ! jobs="$(mac_jobs "$CHILD_RUN_ID")"; then
+  local jobs verdict title
+  local url="$GITHUB_SERVER_URL/$GH_REPO/actions/runs/$CHILD_RUN_ID"
+  summary "Mac lane ${LANE:-?}: child run $url"
+  # The child names the exact SHA it checked out; anything else is not
+  # evidence for this commit, so the hosted job runs instead.
+  if ! title="$(api "repos/$GH_REPO/actions/runs/$CHILD_RUN_ID" --jq .display_title)" \
+    || [[ "$title" != *"@ $CHECKOUT_SHA "* ]] \
+    || ! jobs="$(mac_jobs "$CHILD_RUN_ID")"; then
     emit infra true
-    echo "::warning::Mac child run $CHILD_RUN_ID unreadable; running hosted."
+    echo "::warning::Mac child run $url unreadable or not for $CHECKOUT_SHA; running hosted."
+    summary "Unreadable or wrong SHA: running hosted."
     exit 0
   fi
   # success: every Mac job passed. failure: a step failed (a real test or build
-  # failure). Anything else (cancelled, timed out, runner lost) is the Mac's
-  # fault, not the change's, so the hosted job runs instead.
+  # failure) and the lane fails. Anything else (cancelled, timed out, runner
+  # lost) is the Mac's fault, not the change's, so the hosted job runs and its
+  # result decides the lane.
   verdict="$(jq -r '
     if length == 0 then "infra"
     elif all(.[]; .conclusion == "success" or .conclusion == "skipped") then "success"
     elif any(.[]; .conclusion == "failure" and any(.steps[]?; .conclusion == "failure")) then "failure"
     else "infra" end' <<<"$jobs")"
   emit infra "$([ "$verdict" = infra ] && echo true || echo false)"
-  local url="$GITHUB_SERVER_URL/$GH_REPO/actions/runs/$CHILD_RUN_ID"
+  summary "Result: $verdict"
   case "$verdict" in
     success) echo "::notice::Mac lane ${LANE:-?} passed on a Mac: $url" ;;
     failure) echo "::error::Mac lane ${LANE:-?} failed on a Mac: $url"; exit 1 ;;

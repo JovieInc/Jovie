@@ -272,6 +272,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:remediation
     jobCount: 2
+  - name: CLI Chaos
+    path: .github/workflows/cli-chaos.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Mac Lane Route
+    triggeringStateTransition:
+      - workflow_call
+    terminalReceipt: job:chaos
+    jobCount: 2
   - name: CODEOWNERS Path Drift
     path: .github/workflows/codeowners-drift.yml
     active: true
@@ -732,10 +744,11 @@ nodes:
     allowedConsumers:
       - iOS CI
       - Mac CI
+      - CLI Chaos
     triggeringStateTransition:
       - workflow_dispatch
-    terminalReceipt: job:macos
-    jobCount: 2
+    terminalReceipt: job:cli-chaos
+    jobCount: 3
   - name: Mac CI
     path: .github/workflows/macos-ci.yml
     active: true
@@ -890,7 +903,8 @@ nodes:
     category: release-orchestration
     authoritativeProducer: Production Controller
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - CLI Chaos
     triggeringStateTransition:
       - push
       - workflow_dispatch
@@ -1537,6 +1551,9 @@ edges:
   - from: CI
     to: Mac CI
     type: workflow_call
+  - from: CLI Chaos
+    to: Mac Lane Route
+    type: workflow_call
   - from: Production Controller
     to: Delivery Control Receipts
     type: workflow_run
@@ -1588,6 +1605,9 @@ edges:
   - from: Mac Lane
     to: Mac CI
     type: workflow_call
+  - from: Mac Lane
+    to: CLI Chaos
+    type: workflow_call
   - from: Mac CI
     to: Mac Lane Route
     type: workflow_call
@@ -1603,6 +1623,9 @@ edges:
   - from: PR Size Guard
     to: Merge Queue Green Enroll
     type: workflow_run
+  - from: Publish @jovie/cli to npm
+    to: CLI Chaos
+    type: workflow_call
   - from: Source Validation
     to: PR Review (shadow)
     type: workflow_run

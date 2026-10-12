@@ -22,6 +22,9 @@ elif [[ "$args" == *"/cancel"* ]]; then
 elif [[ "$args" == *"/jobs"* ]]; then
   [ -f "$FAKE_DIR/jobs.json" ] || exit 1
   jq "$(sed -n 's/.*--jq //p' <<<"$args")" "$FAKE_DIR/jobs.json"
+elif [[ "$args" == *"/actions/runs/"* ]]; then
+  [ -f "$FAKE_DIR/run.json" ] || exit 1
+  jq -r "$(sed -n 's/.*--jq //p' <<<"$args")" "$FAKE_DIR/run.json"
 else
   exit 1
 fi
@@ -101,7 +104,7 @@ describe('mac-lane.sh dispatch', () => {
 
   it('cancels the child and falls back when no Mac picks it up in time', () => {
     const result = run('dispatch', {
-      env: { ...dispatchEnv, PICKUP_SECONDS: '0' },
+      env: { ...dispatchEnv, MAC_PICKUP_SECONDS: '0' },
       fixtures: {
         'dispatch.json': { workflow_run_id: 42 },
         'jobs.json': { jobs: [macJob('queued')] },
@@ -121,10 +124,15 @@ describe('mac-lane.sh dispatch', () => {
 });
 
 describe('mac-lane.sh result', () => {
-  const result = jobs =>
-    run('result', {
-      env: { GH_TOKEN: 't', CHILD_RUN_ID: '42' },
-      fixtures: jobs ? { 'jobs.json': { jobs } } : {},
+  const RUN = { display_title: 'Mac lane ios @ abc for parent' };
+  const result = (jobs, run = RUN) => run_('result', jobs, run);
+  const run_ = (command, jobs, runFixture) =>
+    run(command, {
+      env: { GH_TOKEN: 't', CHILD_RUN_ID: '42', CHECKOUT_SHA: 'abc' },
+      fixtures: {
+        ...(jobs ? { 'jobs.json': { jobs } } : {}),
+        ...(runFixture ? { 'run.json': runFixture } : {}),
+      },
     });
 
   it('passes a Mac success through', () => {
@@ -150,6 +158,17 @@ describe('mac-lane.sh result', () => {
       const lost = result(jobs);
       expect(lost.status).toBe(0);
       expect(lost.outputs.infra).toBe('true');
+    }
+  });
+
+  it('never treats a child for another SHA, or an unreadable one, as evidence', () => {
+    for (const runFixture of [
+      { display_title: 'Mac lane ios @ other for parent' },
+      null,
+    ]) {
+      const untrusted = result([macJob('completed', 'success')], runFixture);
+      expect(untrusted.status).toBe(0);
+      expect(untrusted.outputs.infra).toBe('true');
     }
   });
 });

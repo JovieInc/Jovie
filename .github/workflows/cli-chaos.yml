@@ -1,0 +1,97 @@
+name: CLI Chaos
+# One cell of the @jovie/cli black-box chaos gate: install the release
+# candidate tarball from the publishing run and run chaos-blackbox.mjs on one
+# OS and Node version. npm-publish.yml calls it per matrix cell; the macOS
+# cells opt in to an idle self-hosted Mac first (mac-lane.yml child run) so a
+# saturated hosted macOS pool never holds a CLI release. Policy:
+# .claude/rules/infra.md "macOS runners".
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: Hosted runner label for this cell.
+        required: true
+        type: string
+      node:
+        description: Node.js version for this cell.
+        required: true
+        type: string
+      artifact-run-id:
+        description: Run that uploaded jovie-cli-chaos-candidate.
+        required: true
+        type: string
+      mac-first:
+        description: Prefer an idle self-hosted Mac (mac-lane-route.yml); hosted otherwise.
+        required: false
+        default: false
+        type: boolean
+      mac-child:
+        description: Set only by mac-lane.yml; runs the cell on the self-hosted Macs.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    name: Mac Route
+    if: ${{ inputs.mac-first && !inputs.mac-child }}
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/mac-lane-route.yml
+    with:
+      lane: cli-chaos
+      instance: node-${{ inputs.node }}
+      checkout-sha: ${{ github.sha }}
+      args: ${{ format('{{"node":"{0}","artifact-run-id":"{1}"}}', inputs.node, inputs.artifact-run-id) }}
+
+  chaos:
+    name: Chaos
+    needs: [mac]
+    if: ${{ !cancelled() && (inputs.mac-child || needs.mac.result == 'skipped' || needs.mac.outputs.run_hosted == 'true') }}
+    runs-on: ${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || inputs.os }}
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ inputs.node }}
+
+      - name: Download the release candidate
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: jovie-cli-chaos-candidate
+          path: ${{ runner.temp }}/jovie-cli-chaos
+          run-id: ${{ inputs.artifact-run-id }}
+          github-token: ${{ github.token }}
+
+      - name: Install the tarball into a clean directory and run the chaos gate
+        shell: bash
+        env:
+          PACK_DIR: ${{ runner.temp }}/jovie-cli-chaos
+          CLEAN_DIR: ${{ runner.temp }}/jovie-cli-clean
+        run: |
+          set -euo pipefail
+          # A self-hosted Mac is the owner's laptop: keep the CLI away from
+          # the real home directory, its config and credentials.
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then
+            export HOME="$RUNNER_TEMP/jovie-cli-home"
+            export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share"
+            mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
+          fi
+          mkdir -p "$CLEAN_DIR"
+          tarball="$(ls "$PACK_DIR"/jovie-cli-*.tgz)"
+          npm install --prefix "$CLEAN_DIR" --ignore-scripts --no-audit --no-fund --package-lock=false "$tarball"
+          shim="$CLEAN_DIR/node_modules/.bin/jovie"
+          if [ "$RUNNER_OS" = Windows ]; then shim="$shim.cmd"; fi
+          node "$PACK_DIR/chaos-blackbox.mjs" \
+            --bin "$CLEAN_DIR/node_modules/@jovie/cli/dist/cli.js" \
+            --shim "$shim" \
+            --profile release

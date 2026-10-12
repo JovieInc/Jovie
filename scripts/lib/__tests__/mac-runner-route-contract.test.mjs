@@ -21,12 +21,14 @@ const HOSTED_MACOS_ALLOWED = {
     'path-filtered and advisory; also a release call; nothing in the queue waits on it',
   'ios-signing-bootstrap.yml': 'rare manual keychain/match bootstrap',
   'ios-testflight.yml': 'signs and uploads to App Store Connect',
-  'npm-publish.yml':
-    'post-merge publish nothing in the queue waits on; its legs need this run’s tarball',
 };
 
 // Mac-first lanes: workflow -> mac-lane.yml lane that runs it on a Mac.
-const MAC_LANES = { 'ios-ci.yml': 'ios', 'macos-ci.yml': 'macos' };
+const MAC_LANES = {
+  'cli-chaos.yml': 'cli-chaos',
+  'ios-ci.yml': 'ios',
+  'macos-ci.yml': 'macos',
+};
 
 const workflows = readdirSync(WORKFLOWS_DIR)
   .filter(file => /\.ya?ml$/.test(file))
@@ -48,6 +50,15 @@ describe('macOS jobs use the self-hosted Macs first', () => {
     '%s routes macOS through mac-lane-route.yml or documents why not',
     (file, workflow) => {
       if (!usesMacos(workflow) || HOSTED_MACOS_ALLOWED[file]) return;
+      // A matrix that hands its macOS cells to a Mac-first lane workflow.
+      const viaLane = Object.keys(MAC_LANES).some(
+        lane =>
+          workflow.source.includes(`uses: ./.github/workflows/${lane}`) &&
+          /mac-first: \$\{\{ matrix\.os == 'macos-latest' \}\}/.test(
+            workflow.source
+          )
+      );
+      if (viaLane) return;
       expect(
         MAC_LANES[file],
         `${file} needs a mac-lane.yml lane`
@@ -92,9 +103,16 @@ describe('macOS jobs use the self-hosted Macs first', () => {
 
   it('routes only first attempts of trusted events and never holds', () => {
     const route = read('mac-lane-route.yml');
+    // Public repos, owner's laptops: only same-repo pull_request,
+    // merge_group, push and workflow_dispatch reach a Mac; never forks or
+    // pull_request_target.
     expect(route).toContain(
-      "      vars.JOVIE_MAC_RUNNER != 'off' &&\n      github.run_attempt == '1' &&\n      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)"
+      "      vars.JOVIE_MAC_RUNNER != 'off' &&\n      github.run_attempt == '1' &&\n      (contains(fromJSON('[\"merge_group\",\"push\",\"workflow_dispatch\"]'), github.event_name) ||\n      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))"
     );
+    // The one wait in Mac routing, with no retry after it.
+    expect(route).toContain("MAC_PICKUP_SECONDS: '45'");
+    // The child gets no secrets beyond what the hosted job gets (none).
+    expect(read('mac-lane.yml')).not.toMatch(/secrets[.:]/);
     expect(route).toContain(
       "if: ${{ needs.dispatch.outputs.fallback == 'false' && github.run_attempt == '1' }}"
     );

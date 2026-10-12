@@ -191,24 +191,29 @@ All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge
 ## macOS runners: self-hosted first, hosted fallback (org-wide)
 
 Applies to every JovieInc repo. Hosted macOS is one small org-wide pool (Team
-plan) that LogYourBody often saturates, so jobs that something waits on
-(merge-group and push gates) try an idle self-hosted `jovie-mac` Mac first.
-Nothing is ever held on a Mac being asleep, busy or offline:
+plan) that LogYourBody often saturates, so macOS jobs that something waits on
+(merge-group, push and release gates, CLI publish chaos) try an idle
+self-hosted `jovie-mac` Mac first. Nothing is held on a Mac being asleep, busy
+or offline:
 
 - Never queue a job straight on `jovie-mac`: GitHub has no queue timeout for
-  self-hosted jobs, so a sleeping Mac holds it for 24h. Mac work runs only in a
-  `mac-lane.yml` child run started by `mac-lane-route.yml` (copy the `mac` job
-  from `ios-ci.yml` or `macos-ci.yml`). No Mac pickup within 45s cancels the
-  child and the caller's hosted job runs. A Mac that dies mid-run (lost runner,
-  timeout, cancel) also hands the lane to hosted; a real test failure fails.
+  self-hosted jobs. Mac work runs only in a `mac-lane.yml` child run started by
+  the shared `mac-lane-route.yml` (copy the `mac` job from `ios-ci.yml`,
+  `macos-ci.yml` or `cli-chaos.yml`). If no Mac picks it up within
+  `MAC_PICKUP_SECONDS` (45s, the only wait; no retry), the child is cancelled
+  and the caller's hosted job runs. A Mac lost mid-run (runner lost, timeout,
+  cancel) also hands the lane to hosted; a real failure fails the lane. The
+  join checks the child ran the exact SHA and links it in the step summary.
 - The parent never carries the cancelled job: one cancelled job makes the whole
   run conclude `cancelled`, which the staging and production gates reject.
-- Only run attempt 1 of a trusted event may use a Mac, so every rerun is
-  hosted and fork PRs never reach the owner's laptops (Jovie and LogYourBody
-  are public). `vars.JOVIE_MAC_RUNNER=off` sends everything to hosted.
+- Jovie and LogYourBody are public and the Macs are the owner's laptops: only
+  same-repo `pull_request`, `merge_group`, `push` and `workflow_dispatch` on
+  run attempt 1 reach a Mac (never forks or `pull_request_target`; every rerun
+  is hosted). The child gets no secrets. `vars.JOVIE_MAC_RUNNER=off` forces
+  hosted.
+- Keep caches and artifact uploads hosted-only: the home uplink runs ~0.3 MB/s.
 - Event-driven only (JOV-INV-042): no heartbeat crons, keep-warm dispatchers or
-  rescue pollers. The only wait is the run-scoped 45s pickup check; the join
-  waits on a concurrency group, not on the API.
+  rescue pollers. The join waits on a concurrency group, not on the API.
 
 Stay on hosted only when the Mac buys nothing or costs something, and record
 why in `HOSTED_MACOS_ALLOWED` in

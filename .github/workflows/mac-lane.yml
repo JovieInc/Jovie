@@ -1,9 +1,10 @@
 name: Mac Lane
-run-name: Mac lane ${{ inputs.lane }} for ${{ inputs.parent }}
+run-name: Mac lane ${{ inputs.lane }} @ ${{ inputs.sha }} for ${{ inputs.parent }}
 # Child run of mac-lane-route.yml: one macOS lane on the self-hosted jovie-mac
-# runners. The parent cancels this run when no Mac picks it up within 60s and
+# runners. The parent cancels this run when no Mac picks it up within MAC_PICKUP_SECONDS (45s) and
 # then runs the lane on hosted macOS, so the parent never holds on a Mac.
-# Policy: .claude/rules/infra.md "macOS runners".
+# Policy: .claude/rules/infra.md "macOS runners". The child gets no
+# repository secrets, only GITHUB_TOKEN, as the same jobs get when hosted.
 
 on:
   workflow_dispatch:
@@ -12,7 +13,7 @@ on:
         description: Lane to run on a Mac.
         required: true
         type: choice
-        options: [ios, macos]
+        options: [ios, macos, cli-chaos]
       sha:
         description: Exact SHA to check out.
         required: true
@@ -28,6 +29,11 @@ on:
       parent:
         description: Parent run URL.
         required: true
+        type: string
+      args:
+        description: JSON object of lane-specific inputs.
+        required: false
+        default: '{}'
         type: string
 
 permissions:
@@ -67,4 +73,20 @@ jobs:
     uses: ./.github/workflows/macos-ci.yml
     with:
       checkout-ref: ${{ inputs.sha }}
+      mac-child: true
+
+  cli-chaos:
+    name: CLI chaos
+    if: ${{ inputs.lane == 'cli-chaos' }}
+    concurrency:
+      group: ${{ inputs.join-group }}
+      cancel-in-progress: false
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/cli-chaos.yml
+    with:
+      os: macos-latest
+      node: ${{ fromJSON(inputs.args).node }}
+      artifact-run-id: ${{ fromJSON(inputs.args).artifact-run-id }}
       mac-child: true

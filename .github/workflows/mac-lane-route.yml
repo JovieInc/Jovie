@@ -6,7 +6,7 @@ name: Mac Lane Route
 # Mac-first routing for one macOS lane (policy: .claude/rules/infra.md
 # "macOS runners"). The caller runs its hosted macOS job when run_hosted is
 # true and skips it otherwise:
-#   dispatch  starts mac-lane.yml on the jovie-mac Macs and waits up to 45s for
+#   dispatch  starts mac-lane.yml on the jovie-mac Macs and waits MAC_PICKUP_SECONDS (45s) for
 #             one to pick it up (the pickup IS the live runner check). No
 #             pickup -> the child run is cancelled and the caller runs hosted.
 #   join      waits on the child through a shared concurrency group (no
@@ -20,7 +20,7 @@ on:
   workflow_call:
     inputs:
       lane:
-        description: mac-lane.yml lane to run on a Mac (ios or macos).
+        description: mac-lane.yml lane to run on a Mac.
         required: true
         type: string
       checkout-sha:
@@ -31,6 +31,16 @@ on:
         description: Stable identity whose newer child run supersedes an older one; empty is run-scoped.
         required: false
         default: ''
+        type: string
+      instance:
+        description: Distinguishes several calls for one lane in a run (matrix cells).
+        required: false
+        default: ''
+        type: string
+      args:
+        description: JSON object passed to the lane in mac-lane.yml.
+        required: false
+        default: '{}'
         type: string
     outputs:
       run_hosted:
@@ -43,12 +53,15 @@ permissions:
 jobs:
   dispatch:
     name: Start on a Mac
-    # Reruns are hosted; fork PRs never reach the owner's laptops (public
-    # repo); vars.JOVIE_MAC_RUNNER=off sends everything hosted.
+    # Public repo, owner's laptops: only same-repo pull_request, merge_group,
+    # push and workflow_dispatch reach a Mac (never forks or
+    # pull_request_target). Reruns are hosted; vars.JOVIE_MAC_RUNNER=off sends
+    # everything hosted.
     if: >-
       vars.JOVIE_MAC_RUNNER != 'off' &&
       github.run_attempt == '1' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      (contains(fromJSON('["merge_group","push","workflow_dispatch"]'), github.event_name) ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -75,12 +88,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           LANE: ${{ inputs.lane }}
+          LANE_ARGS: ${{ inputs.args }}
           CHECKOUT_SHA: ${{ inputs.checkout-sha }}
+          # The only wait in Mac routing: how long a Mac gets to pick up the
+          # child before the lane runs hosted. No retry after it expires.
+          MAC_PICKUP_SECONDS: '45'
           # The child reads mac-lane.yml from this branch: a same-repo PR's
           # head branch, the merge-group branch, or main.
           DISPATCH_REF: ${{ github.head_ref || github.ref_name }}
-          JOIN_GROUP: mac-lane-join-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.lane }}
-          SUPERSEDE_GROUP: mac-lane-${{ inputs.lane }}-${{ inputs.supersede-key || format('run-{0}-{1}', github.run_id, github.run_attempt) }}
+          JOIN_GROUP: mac-lane-join-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.lane }}${{ inputs.instance && format('-{0}', inputs.instance) || '' }}
+          SUPERSEDE_GROUP: mac-lane-${{ inputs.lane }}${{ inputs.instance && format('-{0}', inputs.instance) || '' }}-${{ inputs.supersede-key || format('run-{0}-{1}', github.run_id, github.run_attempt) }}
           PARENT_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: bash .github/scripts/mac-lane.sh dispatch
 
@@ -116,5 +133,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           LANE: ${{ inputs.lane }}
+          CHECKOUT_SHA: ${{ inputs.checkout-sha }}
           CHILD_RUN_ID: ${{ needs.dispatch.outputs.child_run_id }}
         run: bash .github/scripts/mac-lane.sh result
