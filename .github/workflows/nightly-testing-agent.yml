@@ -90,6 +90,9 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
+      # playwright-artifact-secrets.test.ts launches Chromium (JOV-5101).
+      - uses: ./.github/actions/setup-playwright
+
       - name: Run unit suite
         id: unit
         continue-on-error: true

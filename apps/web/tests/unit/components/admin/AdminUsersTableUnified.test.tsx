@@ -16,6 +16,7 @@ const mockUseBreakpointDown = vi.fn<
 >(() => false);
 const mockUseAdminUsersInfiniteQuery = vi.fn();
 const mockUseRowSelection = vi.fn();
+let capturedDesktopColumnIds: string[] = [];
 
 vi.mock('next/navigation', async importOriginal => {
   const actual = await importOriginal<typeof import('next/navigation')>();
@@ -96,19 +97,22 @@ vi.mock('@/components/organisms/table', () => ({
     columns,
   }: {
     columns: Array<{ id: string; meta?: { cellContentClassName?: string } }>;
-  }) => (
-    <div
-      data-testid='desktop-table'
-      data-multiline-columns={columns
-        .filter(column =>
-          column.meta?.cellContentClassName?.includes('whitespace-normal')
-        )
-        .map(column => column.id)
-        .join(',')}
-    >
-      Desktop table
-    </div>
-  ),
+  }) => {
+    capturedDesktopColumnIds = columns.map(column => column.id);
+    return (
+      <div
+        data-testid='desktop-table'
+        data-multiline-columns={columns
+          .filter(column =>
+            column.meta?.cellContentClassName?.includes('whitespace-normal')
+          )
+          .map(column => column.id)
+          .join(',')}
+      >
+        Desktop table
+      </div>
+    );
+  },
   useRowSelection: (rowIds: string[]) => mockUseRowSelection(rowIds),
 }));
 
@@ -224,4 +228,37 @@ describe('AdminUsersTableUnified', () => {
       );
     }
   );
+
+  it('builds the memoized column contract handed to the desktop table', () => {
+    mockUseBreakpointDown.mockReturnValue(false);
+    mockUseAdminUsersInfiniteQuery.mockReturnValue({
+      data: { pages: [{ rows: [userRow], total: 1 }] },
+      fetchNextPage: vi.fn().mockResolvedValue(undefined),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    });
+    mockUseRowSelection.mockReturnValue({
+      selectedIds: new Set<string>(),
+      selectedCount: 0,
+      headerCheckboxState: false,
+      toggleSelect: vi.fn(),
+      toggleSelectAll: vi.fn(),
+      clearSelection: vi.fn(),
+    });
+
+    renderUsersTable();
+
+    expect(capturedDesktopColumnIds).toEqual([
+      'select',
+      'name',
+      'username',
+      'created',
+      'profile',
+      'plan',
+      'status',
+      'suppression',
+      'welcome',
+      'actions',
+    ]);
+  });
 });
