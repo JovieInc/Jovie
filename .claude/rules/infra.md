@@ -211,9 +211,8 @@ or offline:
   run attempt 1 reach a Mac (never forks or `pull_request_target`; every rerun
   is hosted). The child gets no secrets. `vars.JOVIE_MAC_RUNNER=off` forces
   hosted.
-- Keep caches and artifact uploads hosted-only: the home uplink runs ~0.3 MB/s.
-- Event-driven only (JOV-INV-042): no heartbeat crons, keep-warm dispatchers or
-  rescue pollers. The join waits on a concurrency group, not on the API.
+- Caches and artifact uploads stay hosted-only (home uplink ~0.3 MB/s). No
+  heartbeat crons or rescue pollers (JOV-INV-042).
 
 Stay on hosted only when the Mac buys nothing or costs something, and record
 why in `HOSTED_MACOS_ALLOWED` in
