@@ -1,26 +1,40 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# capability-gap: A failed scheduled run has no PR or reviewer to surface it, so one job with only issues:write opens or updates a single standing issue per lane (GOVERNANCE.md: nothing fails silently).
-# removal-trigger: Remove the report-scheduled-failure job when a shared scheduled-failure reporter covers every scheduled workflow.
+# capability-gap: A failed main run has no PR or reviewer to surface it, so one job with only issues:write opens or updates a single standing issue per lane (GOVERNANCE.md: nothing fails silently).
+# removal-trigger: Remove the report-scheduled-failure job when a shared main-failure reporter covers every evidence workflow.
 name: Visual & A11y Tests
-# clock-class: skip-if-unchanged
 
 # Storybook axe lane (JOV-4042). Playwright page-level visual compare lives in
 # visual-regression.yml (self-healing baselines + admin surfaces). This workflow
 # stays Storybook-only to avoid double Neon/build cost. It is deep evidence, so
 # source PRs and main releases never wait on it.
 on:
-  schedule:
-    - cron: '37 7 * * *'
+  # Runs once the inputs it audits land on main. These paths mirror
+  # VISUAL_PATTERNS below; nothing else can change a Storybook a11y result.
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/components/**'
+      - 'apps/web/.storybook/**'
+      - 'apps/web/app/globals.css'
+      - 'apps/web/styles/**'
+      - 'apps/web/tailwind.config.*'
+      - 'apps/web/postcss.config.*'
+      - 'apps/web/vitest.config.storybook.mts'
+      - 'apps/web/package.json'
+      - 'packages/ui/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/visual-a11y.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Keep at most one deep Storybook audit per ref.
+# One audit runs at a time and the newest main push waits behind it, so a
+# busy main still finishes an audit instead of cancelling each one.
 concurrency:
-  group: visual-a11y-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  group: visual-a11y-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   ci-visual-path-changes:
@@ -37,7 +51,7 @@ jobs:
         id: detect
         run: |
           VISUAL_PATTERNS='^(apps/web/components/|apps/web/\.storybook/|apps/web/app/globals\.css|apps/web/styles/|apps/web/(tailwind|postcss)\.config\.|apps/web/vitest\.config\.storybook\.mts|apps/web/package\.json|packages/ui/|pnpm-lock\.yaml|\.github/workflows/visual-a11y\.yml)'
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "schedule" ]; then
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "push" ]; then
             echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_visual_changes=false" >> "$GITHUB_OUTPUT"
@@ -93,11 +107,11 @@ jobs:
           fi
 
   report-scheduled-failure:
-    # Nothing fails silently (docs/design-system/GOVERNANCE.md): a red scheduled
+    # Nothing fails silently (docs/design-system/GOVERNANCE.md): a red main
     # run opens or updates one standing issue, deduped by title. Not required.
-    name: Report scheduled failure
+    name: Report main failure
     needs: [ci-visual-path-changes, storybook-a11y]
-    if: ${{ always() && github.event_name == 'schedule' && contains(needs.*.result, 'failure') }}
+    if: ${{ always() && github.event_name == 'push' && contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -112,7 +126,7 @@ jobs:
           set -euo pipefail
           TITLE="Visual a11y lane red"
           BODY=$(cat <<EOF
-          The scheduled $GITHUB_WORKFLOW run failed on ${GITHUB_SHA::8}.
+          The main $GITHUB_WORKFLOW run failed on ${GITHUB_SHA::8}.
 
           Run: $RUN_URL
 

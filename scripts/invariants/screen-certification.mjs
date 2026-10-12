@@ -159,8 +159,9 @@ export const EXCLUDED_OWNERS = Object.freeze([
 ]);
 export const RETAINED_SWEEP_WORKFLOWS = Object.freeze([
   // JOV-5852: screenshots.yml is path-complete on push to main + manual
-  // dispatch (its daily cron was retired); live external drift keeps a sweep.
-  { path: '.github/workflows/visual-a11y.yml', cron: '37 7 * * *' },
+  // dispatch. The Storybook axe sweep stays whole-system but has no clock
+  // (2026-10-12): it runs on every main push of the inputs it renders.
+  { path: '.github/workflows/visual-a11y.yml' },
 ]);
 
 /**
@@ -882,21 +883,23 @@ export function validateRetainedSweeps({
 } = {}) {
   const issues = [];
   if (!Array.isArray(workflows) || workflows.length === 0) {
-    return ['scheduled whole-system sweeps are missing'];
+    return ['whole-system sweeps are missing'];
   }
   for (const workflow of workflows) {
     const abs = resolve(repoRoot, workflow.path);
     if (!existsSync(abs)) {
-      issues.push(`scheduled sweep ${workflow.path} is missing`);
+      issues.push(`whole-system sweep ${workflow.path} is missing`);
       continue;
     }
     const text = readFileSync(abs, 'utf8');
-    if (!/\n  schedule:\n/.test(`\n${text}`) || !/cron:/.test(text)) {
-      issues.push(`scheduled sweep ${workflow.path} dropped its schedule`);
-    }
-    if (workflow.cron && !text.includes(workflow.cron)) {
+    if (!/\n {2}push:\n {4}branches: \[main\]\n/.test(`\n${text}`)) {
       issues.push(
-        `scheduled sweep ${workflow.path} dropped cron ${workflow.cron}`
+        `whole-system sweep ${workflow.path} dropped its main-push trigger`
+      );
+    }
+    if (/\n {2}schedule:\n/.test(`\n${text}`)) {
+      issues.push(
+        `whole-system sweep ${workflow.path} runs on a clock; run it on main pushes of its inputs`
       );
     }
   }
