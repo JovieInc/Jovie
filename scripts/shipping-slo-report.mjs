@@ -22,7 +22,8 @@
  *   { collectedAt, runs: {pull_request:[], merge_group:[], main:[]},
  *     mergedPrs: [{number,title,headRefName,createdAt,mergedAt,mergeCommitSha}],
  *     timelines: { <prNumber>: [{type, at}] },
- *     deployments: [{status, createdAt, sha}] }
+ *     deployments: [{status, createdAt, sha}],
+ *     productionVerifications: [{sha, verifiedAt}] }
  */
 
 import { execFileSync } from 'node:child_process';
@@ -278,6 +279,53 @@ export function collectRaw({ workflows, days }) {
     );
   }
 
+  // Vercel promotes never create GitHub Deployments, so the authoritative
+  // "verified" signal is the Production Controller's `Production Verified`
+  // job (JOV-8082). Each successful job completion verifies one generation
+  // (run head_sha) and every merge that is its ancestor.
+  const productionVerifications = [];
+  try {
+    const list = gh([
+      'api',
+      `repos/${ghRepo}/actions/workflows/production-controller.yml/runs?created=>=${encodeURIComponent(sinceIso)}&status=completed&per_page=50`,
+      '--jq',
+      '.workflow_runs[] | select(.conclusion == "success") | {id, head_sha}',
+    ]);
+    const controllerRuns = (Array.isArray(list) ? list : [list]).filter(
+      Boolean
+    );
+    for (const controllerRun of controllerRuns) {
+      try {
+        const jobs = gh([
+          'api',
+          `repos/${ghRepo}/actions/runs/${controllerRun.id}/jobs?per_page=100`,
+          '--paginate',
+          '--slurp',
+          '--jq',
+          '[.[].jobs[] | select(.name == "Production Verified" and .conclusion == "success") | {completedAt: .completed_at}]',
+        ]);
+        const first = jobs
+          .map(j => j?.completedAt)
+          .filter(Boolean)
+          .sort()[0];
+        if (first)
+          productionVerifications.push({
+            sha: controllerRun.head_sha ?? null,
+            verifiedAt: first,
+          });
+      } catch {
+        // Unreadable job list skips that run; other runs still count.
+      }
+    }
+    productionVerifications.sort(
+      (a, b) => Date.parse(a.verifiedAt) - Date.parse(b.verifiedAt)
+    );
+  } catch (error) {
+    console.error(
+      `[shipping-slo] warn: production-controller fetch failed: ${error.message}`
+    );
+  }
+
   return {
     collectedAt: new Date().toISOString(),
     workflows,
@@ -286,6 +334,7 @@ export function collectRaw({ workflows, days }) {
     mergedPrs,
     timelines,
     deployments,
+    productionVerifications,
   };
 }
 
@@ -302,11 +351,24 @@ export function buildReport(raw, baseline, { now = Date.now() } = {}) {
     nowMs
   );
   const merged = raw.mergedPrs ?? [];
-  const verifiedSha = new Set(
-    (raw.deployments ?? [])
-      .filter(d => d.status === 'success' && d.sha)
-      .map(d => d.sha)
-  );
+  // Unified "production verified" event stream: GitHub Deployments (when a
+  // provider emits them), Production Controller `Production Verified` job
+  // completions, and per-PR check-run evidence collected on merge commits.
+  const verifiedEvents = [
+    ...(raw.deployments ?? []),
+    ...(raw.productionVerifications ?? []).map(v => ({
+      status: 'success',
+      createdAt: v.verifiedAt,
+      sha: v.sha,
+    })),
+    ...merged
+      .filter(p => p?.productionVerifiedAt)
+      .map(p => ({
+        status: 'success',
+        createdAt: p.productionVerifiedAt,
+        sha: p.mergeCommitSha ?? null,
+      })),
+  ].filter(e => e && e.status === 'success' && e.createdAt);
   const metrics = {
     ci,
     mergeQueue: mergeQueueStats(
@@ -322,10 +384,15 @@ export function buildReport(raw, baseline, { now = Date.now() } = {}) {
       sinceMs,
       nowMs,
     }),
-    productionLag: productionLag(merged, raw.deployments ?? [], sinceMs, nowMs),
+    productionLag: productionLag(merged, verifiedEvents, sinceMs, nowMs),
     throughput: throughputTrend(merged, nowMs, {
       verifiedPredicate: p =>
-        Boolean(p.mergeCommitSha && verifiedSha.has(p.mergeCommitSha)),
+        Boolean(
+          p?.mergedAt &&
+            verifiedEvents.some(
+              e => Date.parse(e.createdAt) >= Date.parse(p.mergedAt)
+            )
+        ),
     }),
   };
   const blogPublishLatency = buildBlogPublishLatency(raw);
@@ -357,6 +424,13 @@ export function buildReport(raw, baseline, { now = Date.now() } = {}) {
     .slice(0, 5);
 
   const flat = flattenMetrics(metrics);
+  // When no verification evidence was collected at all, a 0 is a collector
+  // gap, not a throughput signal — null the derived keys so the evaluator
+  // skips them instead of filing a phantom >20% regression (JOV-8082).
+  if (verifiedEvents.length === 0) {
+    flat['production_lag.merged_to_verified.p95'] = null;
+    flat['throughput.verified_per_day'] = null;
+  }
   flat.throughput_wow_growth = metrics.throughput.wowGrowth;
   flat.throughput_growth_trend = metrics.throughput.growthTrend;
 
@@ -384,6 +458,7 @@ export function buildReport(raw, baseline, { now = Date.now() } = {}) {
       mergedPrs: merged.length,
       timelines: Object.keys(raw.timelines ?? {}).length,
       deployments: (raw.deployments ?? []).length,
+      productionVerifications: (raw.productionVerifications ?? []).length,
       blogContentPrs: blogPublishLatency.sampleCount,
     },
     offenders: { slowestPrs: leadTimeRows, slowestCiRuns: slowRuns },
