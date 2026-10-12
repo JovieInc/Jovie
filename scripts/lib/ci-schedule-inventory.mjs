@@ -141,7 +141,7 @@ export const CRON_ALLOWLIST = Object.freeze([
   '.github/workflows/visual-regression.yml',
   '.github/workflows/voc-mine.yml',
 ]);
-export const CRON_ALLOWLIST_CEILING = 43;
+export const CRON_ALLOWLIST_CEILING = 42;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
