@@ -46,6 +46,7 @@ import devin_free_policy  # noqa: E402
 import autoscale  # noqa: E402
 import capacity_limit  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
+import fleet_gate_emitter  # noqa: E402
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
@@ -119,13 +120,16 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
-              "scripts/tests/test_capacity_limit.py",
+              "scripts/tests/test_capacity_limit.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
               "scripts/tests/test_linear_sync.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
+RELEASE_EXTRAS = ["scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
+                  "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
+                  "scripts/fleet-gate/symphony_proof_context.py",
+                  "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
@@ -6637,6 +6641,13 @@ def finish_dispatch(host: Host, tick: dict) -> int:
                                          "limited": [row["resource"] for row in record["limited"]]}
         except Exception as error:  # the record is observability, never dispatch
             tick["capacityLimitError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        # The canonical Gem fleet-gate receipt, emitted when its local inputs change (replaces
+        # fleet-gate-refresh.yml's */5 cron). Detached: never delays dispatch.
+        tree = (host.state / "current" / ".tree").read_text().strip() if (host.state / "current" / ".tree").exists() else None
+        tick["fleetGate"] = fleet_gate_emitter.tick(host.state, host.repo, tree)
+    except Exception as error:  # observability and admission evidence, never dispatch
+        tick["fleetGate"] = {"status": "error", "error": f"{type(error).__name__}: {error}"[:200]}
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())
