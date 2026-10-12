@@ -157,8 +157,12 @@ finish a PR.
 
 ### Hold contract (jovie-hold/v1)
 
-A `hold` label must come with a receipt comment on the PR that names an owner
-and a machine-checkable release:
+Every stop label (`hold`, `gated`, `incident`, `do-not-merge`, and the
+`tim-hold` / `tim:hold` / `hold:tim` variants) must come with a receipt comment
+on the PR that names an owner and a machine-checkable release. The canonical
+list is `scripts/lib/admission-hold-labels.mjs`; enroll, dequeue, auto-merge
+enable and the merge-group member policy all block on the same set plus the
+lanes-owned `queue-poison`, and a parity test fails when a copy drifts:
 
 ```
 <!-- jovie-hold/v1 {"owner":"agent:<task>","until":"2026-10-12T18:00:00Z","reason":"..."} -->
@@ -167,9 +171,10 @@ and a machine-checkable release:
 
 `until` is an expiry. `head` releases the hold once the PR head moves off that
 SHA. No receipt lasts more than 7 days from its own creation, and a receipt
-posted more than an hour before the latest `hold` event does not count. The
+posted more than an hour before the label's latest labeled event does not
+count. Each label is evaluated on its own labeled time. The
 `enforce-hold-contract` job in `merge-queue-green-enroll.yml`
-(`scripts/hold-contract.mjs`) runs on every reconcile. It removes holds that
+(`scripts/hold-contract.mjs`) runs on every reconcile. It removes stop labels that
 are ownerless (no valid receipt after 24 h), expired, or released by a head
 change, and leaves one comment each time. Prose conditions such as "until
 qualification" are not release conditions. The unlabel is done with the
