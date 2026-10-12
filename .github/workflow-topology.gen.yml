@@ -151,11 +151,22 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:self-test
     jobCount: 3
+  - name: Auto-Merge Stuck Report
+    path: .github/workflows/auto-merge-stuck-report.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:report
+    jobCount: 1
   - name: Auto-Ready Agent Drafts
     path: .github/workflows/auto-ready-agent-drafts.yml
     active: false
@@ -500,6 +511,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Auto-Merge Default
       - Auto-Ready Agent Drafts
       - Lane Fix Relay
       - Merge Queue Green Enroll
@@ -986,6 +998,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Auto-Merge Default
       - Auto-Ready Agent Drafts
       - Lane Fix Relay
       - Merge Queue Green Enroll
@@ -1519,6 +1532,12 @@ nodes:
     jobCount: 1
 edges:
   - from: Source Validation
+    to: Auto-Merge Default
+    type: workflow_run
+  - from: PR Size Guard
+    to: Auto-Merge Default
+    type: workflow_run
+  - from: Fork PR Gate
     to: Auto-Merge Default
     type: workflow_run
   - from: CI

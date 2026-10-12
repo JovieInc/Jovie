@@ -101,8 +101,8 @@ const EVENT_DRIVEN_FIX = `use pull_request/pull_request_target/merge_group/workf
  */
 /** @type {Readonly<Record<string, string>>} */
 export const CRON_KEEP_REASONS = Object.freeze({
-  '.github/workflows/auto-merge-default.yml':
-    'owner-tracked (admissions): stuck-PR reporting + fork enable backstop; see ADMISSION_CRON_DEBT',
+  '.github/workflows/auto-merge-stuck-report.yml':
+    'calendar window: a PR stuck 6 h after auto-merge enable emits no event; report-only (comments + one tracking issue), never admission',
   '.github/workflows/ci-duration-ratchet.yml':
     'calendar window: daily rollup of rolling p95 CI wall time; a per-run trigger would re-alert on every completion',
   '.github/workflows/cli-chaos-nightly.yml':
@@ -169,12 +169,6 @@ export const CRON_ALLOWLIST_CEILING = 27;
  */
 /** @type {Readonly<Record<string, {reason: string, replacement: string}>>} */
 export const ADMISSION_CRON_DEBT = Object.freeze({
-  '.github/workflows/auto-merge-default.yml': Object.freeze({
-    reason:
-      'hourly triage: auto-merge enable for fork PRs (workflow_run lists no fork pull_requests) and stuck-PR reporting; same-repo enable is event-driven (synchronize + Source Validation workflow_run)',
-    replacement:
-      'fork enable via a pull_request_target enable path; stuck-PR reporting moves to the Gem lanes tick',
-  }),
   '.github/workflows/desktop-release.yml': Object.freeze({
     reason:
       'daily staging desktop build in the same workflow that opens and labels the release stamp PR',
@@ -188,7 +182,7 @@ export const ADMISSION_CRON_DEBT = Object.freeze({
       'Gem lanes tick emits the receipt natively (its removal-trigger); push and repository_dispatch stay',
   }),
 });
-export const ADMISSION_CRON_DEBT_CEILING = 3;
+export const ADMISSION_CRON_DEBT_CEILING = 2;
 
 /**
  * Workflow steps that hold a runner polling GitHub, git, or queue state. Keyed

@@ -429,7 +429,7 @@ test('isTransientGhError only matches transient shapes', () => {
   );
 });
 
-for (const jobName of ['triage', 'self-test']) {
+for (const jobName of ['self-test']) {
   test(`${jobName} installs workflow-test dependencies before running tests`, () => {
     const workflow = load(
       readFileSync('.github/workflows/auto-merge-default.yml', 'utf8')

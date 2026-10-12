@@ -1,0 +1,79 @@
+# Auto-Merge Stuck Report
+#
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Ovie
+# necessary-trust-boundary: Report-only half of the former hourly auto-merge-default sweep: it upserts one diagnostic comment per stuck PR and the one aggregate tracking issue as Jovie Bot (the existing comments' author). It never enables auto-merge, readies, labels, queues, or closes a PR; enable and customer-notes handoff are event-driven in auto-merge-default.yml (JOV-INV-042).
+# removal-trigger: Remove when the Gem lanes tick reports stuck auto-merge PRs itself, or GitHub exposes a first-party stuck auto-merge triage surface.
+#
+# A PR is stuck when auto-merge has been enabled for STUCK_THRESHOLD_HOURS
+# (default 6) without merging. Nothing happens on a stuck PR, so no event can
+# report it: age is the signal.
+
+name: Auto-Merge Stuck Report
+# clock-class: temporal-resource
+
+on:
+  schedule:
+    # Every 6 h, matching the 6 h stuck threshold: an hourly clock re-read the
+    # same few stuck PRs and only rewrote "already current" comments. GitHub
+    # delivered the old hourly cron only ~5x/day anyway.
+    - cron: '29 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Log stuck PRs without commenting or editing the tracking issue'
+        required: false
+        default: 'false'
+      threshold_hours:
+        description: 'Hours after auto-merge enable before a PR counts as stuck'
+        required: false
+        default: '6'
+
+permissions: {}
+
+concurrency:
+  group: auto-merge-stuck-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Report stuck auto-merge PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout trusted report script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts
+            scripts/lib/admission-hold-labels.json
+          sparse-checkout-cone-mode: false
+
+      - name: Generate Jovie Bot token
+        # Comments are upserted by marker; updating an existing Jovie Bot
+        # comment needs the same author.
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-checks: read
+          permission-contents: read
+          permission-issues: write
+          permission-pull-requests: write
+          permission-statuses: read
+
+      - name: Report stuck PRs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          THRESHOLD_HOURS: ${{ inputs.threshold_hours || '6' }}
+        run: |
+          set -euo pipefail
+          ARGS=(--repo "$GH_REPO" --threshold-hours "$THRESHOLD_HOURS")
+          case "$DRY_RUN" in [Tt][Rr][Uu][Ee]) ARGS+=(--dry-run) ;; esac
+          node .github/scripts/auto-merge-stuck-triage.js "${ARGS[@]}"

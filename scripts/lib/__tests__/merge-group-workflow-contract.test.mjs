@@ -392,7 +392,7 @@ describe('merge_group workflow contract', () => {
       workflowDeclaresReadyForReviewType(AUTO_MERGE_DEFAULT_WORKFLOW)
     ).toBe(true);
     expect(AUTO_MERGE_DEFAULT_WORKFLOW).toContain(
-      'types: [opened, reopened, ready_for_review, synchronize]'
+      'types: [opened, reopened, ready_for_review, synchronize, unlabeled]'
     );
     expect(getJobBlock(AUTO_MERGE_DEFAULT_WORKFLOW, 'enable')).toContain(
       'github.event.pull_request.draft == false'
@@ -2896,15 +2896,15 @@ ${selectedGateScript}`,
     const enableScript = getStepRunScript(enable, 'Enable auto-merge');
 
     // Dependabot pull_request runs receive an empty secrets context, so the
-    // step also bails when JOVIE_BOT_PRIVATE_KEY is unavailable; the hourly
-    // triage sweep enables auto-merge with full secrets.
+    // step also bails when JOVIE_BOT_PRIVATE_KEY is unavailable;
+    // dependabot-auto-merge.yml owns that lane with full secrets.
     // The job if: admits only same-repo, non-Dependabot PRs for both the
     // pull_request and the Source Validation workflow_run wake.
     expect(enable).toContain(
       'github.event.pull_request.head.repo.full_name == github.repository &&'
     );
     expect(enable).toContain(
-      "github.event.pull_request.user.login != 'dependabot[bot]')"
+      "github.event.pull_request.user.login != 'dependabot[bot]' &&"
     );
     expect(enable).toContain(
       'github.event.workflow_run.head_repository.full_name == github.repository &&'

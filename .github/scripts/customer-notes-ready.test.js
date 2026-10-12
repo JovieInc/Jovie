@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { finishCustomerNotes } = require('./customer-notes-ready');
+const { finishCustomerNotes, main } = require('./customer-notes-ready');
 const checks = [
   'PR Ready',
   'Migration Guard',
@@ -88,4 +88,62 @@ test('one failed view or ready action leaves the next note and normal triage ava
     assert.equal(second.customerNotesReadyHead, 'abc');
     assert.ok(calls.some(args => args[1] === 'ready' && args[2] === '43'));
   }
+});
+
+// The event path (auto-merge-default.yml customer-notes job) passes one
+// branch; gh pr list returns plain arrays, which are reshaped for the gate.
+function listed(overrides = {}) {
+  const { files, labels, ...pr } = { ...source(), ...overrides };
+  return {
+    ...pr,
+    files: files?.nodes ?? [{ path: 'CHANGELOG.md' }],
+    labels: labels?.nodes ?? [],
+  };
+}
+function runMain(argv, prs) {
+  const calls = [];
+  const ready = main(argv, args => {
+    calls.push(args);
+    if (args[1] === 'list') return JSON.stringify(prs);
+    if (args[1] === 'checks') return JSON.stringify(checks);
+    return JSON.stringify({ headRefOid: 'abc' });
+  });
+  return { calls, ready };
+}
+const branchArgs = [
+  '--repo',
+  'o/r',
+  '--branch',
+  'release/daily-changelog-2026-10-02-12-1',
+];
+test('the branch CLI readies only the open changelog draft on that head', () => {
+  const { calls, ready } = runMain(branchArgs, [listed()]);
+  assert.deepEqual(ready, [42]);
+  assert.deepEqual(calls[0].slice(0, 6), [
+    'pr',
+    'list',
+    '--repo',
+    'o/r',
+    '--head',
+    'release/daily-changelog-2026-10-02-12-1',
+  ]);
+  assert.deepEqual(calls.at(-1), ['pr', 'ready', '42', '--repo', 'o/r']);
+  assert.deepEqual(
+    runMain(branchArgs, [listed({ labels: { nodes: [{ name: 'hold' }] } })])
+      .ready,
+    []
+  );
+  assert.deepEqual(runMain(branchArgs, []).ready, []);
+  const dry = runMain([...branchArgs, '--dry-run'], [listed()]);
+  assert.deepEqual(dry.ready, []);
+  assert.ok(dry.calls.every(args => args[1] !== 'ready'));
+});
+test('the branch CLI refuses a malformed repo or a non-release branch', () => {
+  for (const argv of [
+    ['--branch', 'release/daily-changelog-2026-10-02'],
+    ['--repo', 'o/r'],
+    ['--repo', 'o/r', '--branch', 'codex/notes'],
+    ['--repo', 'bad repo', '--branch', 'release/daily-changelog-2026-10-02'],
+  ])
+    assert.throws(() => runMain(argv, [listed()]), /usage/);
 });

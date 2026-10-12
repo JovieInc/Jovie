@@ -1,4 +1,6 @@
-// Narrow draft handoff inside the existing auto-merge owner. No new scheduler.
+// Narrow draft handoff inside the existing auto-merge owner. No scheduler: the
+// auto-merge-default.yml customer-notes job runs it when a required-check
+// workflow completes on the release/daily-changelog-* branch.
 const REQUIRED = [
   'PR Ready',
   'Migration Guard',
@@ -77,4 +79,61 @@ function finishCustomerNotes(repo, prs, dryRun, command) {
     pr.customerNotesReadyHead = pr.headRefOid;
   }
 }
-module.exports = { finishCustomerNotes, BLOCKING_LABELS };
+// One open PR per head branch, in the shape finishCustomerNotes reads.
+function customerNotesForBranch(repo, branch, dryRun, command) {
+  const prs = JSON.parse(
+    command([
+      'pr',
+      'list',
+      '--repo',
+      repo,
+      '--head',
+      branch,
+      '--state',
+      'open',
+      '--json',
+      'number,isDraft,isCrossRepository,baseRefName,headRefName,headRefOid,files,labels',
+    ])
+  ).map(pr => ({
+    ...pr,
+    files: { totalCount: pr.files.length, nodes: pr.files },
+    labels: { nodes: pr.labels },
+  }));
+  finishCustomerNotes(repo, prs, dryRun, command);
+  return prs.filter(pr => pr.customerNotesReadyHead).map(pr => pr.number);
+}
+function main(argv, command) {
+  const value = flag => argv[argv.indexOf(flag) + 1];
+  const repo = value('--repo');
+  const branch = value('--branch');
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? '') || !branch?.startsWith('release/'))
+    throw new Error(
+      'usage: --repo owner/name --branch release/... [--dry-run]'
+    );
+  const ready = customerNotesForBranch(
+    repo,
+    branch,
+    argv.includes('--dry-run'),
+    command
+  );
+  console.log(
+    `Customer-notes handoff for ${branch}: ready=[${ready.join(',')}]`
+  );
+  return ready;
+}
+/* node:coverage ignore next 9 */
+if (require.main === module) {
+  const { execFileSync } = require('node:child_process');
+  main(process.argv.slice(2), args =>
+    execFileSync('gh', args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'inherit'],
+    })
+  );
+}
+module.exports = {
+  finishCustomerNotes,
+  customerNotesForBranch,
+  main,
+  BLOCKING_LABELS,
+};
