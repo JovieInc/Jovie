@@ -822,7 +822,9 @@ jobs:
             exit 1
           fi
 
-          PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
+          # Physical path: the classifier runs only when argv[1] matches its own
+          # URL, which a symlinked temp dir (macOS /var) silently breaks.
+          PRODUCT_LANE_DIR="$(cd "$RUNNER_TEMP" && pwd -P)/product-lane-classification"
           mkdir -p "$PRODUCT_LANE_DIR"
           printf '%s\n' "$CHANGED_FILES" > "$PRODUCT_LANE_DIR/changed-paths.txt"
           CLASSIFICATION_BASE_SHA=$(git rev-parse --verify "${CLASSIFICATION_BASE_REF}^{commit}")
@@ -839,6 +841,8 @@ jobs:
             --json-out "$PRODUCT_LANE_DIR/receipt.json" \
             --summary-out "$PRODUCT_LANE_DIR/summary.md" \
             --github-output "$GITHUB_OUTPUT"
+          # A classifier that never ran must not read as zero selected lanes.
+          test -s "$PRODUCT_LANE_DIR/receipt.json"
           TEST_PERFORMANCE_PATTERN='^apps/web/scripts/test-performance-(guard\.ts|profiler(\.test)?\.ts)$'
           if echo "$CHANGED_FILES" | grep -q -E "$TEST_PERFORMANCE_PATTERN"; then
             echo "run_test_performance=true" >> "$GITHUB_OUTPUT"
