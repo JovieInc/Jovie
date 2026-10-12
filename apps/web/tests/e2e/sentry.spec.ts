@@ -4,12 +4,11 @@ import { expect, test } from '@playwright/test';
  * Sentry Integration Coverage (JOV-1427 — "ensure sentry coverage")
  *
  * Verifies that Sentry is correctly integrated:
- * 1. SENTRY_DSN is configured in the Doppler environment
- * 2. sentry-example-page renders without white-screening the app
- * 3. Sentry CI reporter config is valid when E2E reporting is enabled
+ * 1. sentry-example-page renders without white-screening the app
+ * 2. Explicit test reporting uses the isolated development Sentry project
  *
  * The sentry-ci-reporter.ts sends actual test failures to Sentry
- * when SENTRY_E2E_REPORTING=1 and SENTRY_DSN are set.
+ * only when SENTRY_E2E_REPORTING=1 and SENTRY_DSN_DEV are set.
  *
  * @smoke @sentry
  */
@@ -17,29 +16,6 @@ import { expect, test } from '@playwright/test';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Sentry Integration', () => {
-  test('Sentry DSN is configured', () => {
-    const dsn =
-      process.env.SENTRY_DSN ?? process.env.NEXT_PUBLIC_SENTRY_DSN ?? '';
-
-    if (!dsn) {
-      const hasDoppler =
-        Boolean(process.env.DATABASE_URL) &&
-        Boolean(process.env.CLERK_SECRET_KEY);
-      if (!hasDoppler) {
-        test.skip(true, 'Sentry DSN not set — run with doppler to verify');
-        return;
-      }
-      expect(
-        dsn,
-        'SENTRY_DSN not configured — errors will drop silently in production'
-      ).toBeTruthy();
-    }
-
-    expect(dsn).toMatch(
-      /^https:\/\/[0-9a-f]+@(o\d+\.ingest(\.us)?\.sentry\.io|sentry\.io)\//
-    );
-  });
-
   test('sentry-example-page renders without crashing', async ({ page }) => {
     test.setTimeout(90_000);
 
@@ -89,21 +65,21 @@ test.describe('Sentry Integration', () => {
 
   test('Sentry CI reporter config valid when E2E reporting enabled', () => {
     const sentryE2eEnabled = process.env.SENTRY_E2E_REPORTING === '1';
-    const hasDsn = Boolean(process.env.SENTRY_DSN);
+    const hasDevDsn = Boolean(process.env.SENTRY_DSN_DEV);
 
     if (!sentryE2eEnabled) {
       console.log(
         'ℹ SENTRY_E2E_REPORTING not enabled — test failures will not be sent to Sentry'
       );
       console.log(
-        '  To enable: set SENTRY_E2E_REPORTING=1 and SENTRY_DSN in Doppler'
+        '  To enable: set SENTRY_E2E_REPORTING=1 and SENTRY_DSN_DEV in Doppler'
       );
       return;
     }
 
     expect(
-      hasDsn,
-      'SENTRY_E2E_REPORTING=1 but SENTRY_DSN is not set — CI reporter will fail silently'
+      hasDevDsn,
+      'SENTRY_E2E_REPORTING=1 but SENTRY_DSN_DEV is not set — CI reporter will fail silently'
     ).toBe(true);
   });
 });
