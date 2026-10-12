@@ -149,7 +149,7 @@ describe('gem-producer-drift workflow', async () => {
     new URL('../../.github/workflows/gem-producer-drift.yml', import.meta.url)
   );
   const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
-  const doc = load(readFileSync(workflowPath, 'utf8'));
+  const doc = /** @type {any} */ (load(readFileSync(workflowPath, 'utf8')));
   const job = doc.jobs.drift;
   const verify = job.steps.find(step =>
     step.run?.includes('check-attestation.mjs')
