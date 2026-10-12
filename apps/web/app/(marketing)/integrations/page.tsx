@@ -1,15 +1,21 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingContainer } from '@/components/marketing';
+import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getConnectorAvailability } from '@/lib/connectors/availability.server';
 import { getAdvertisedConnectorIntegrations } from '@/lib/connectors/capabilities';
+import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 
+const PAGE_URL = `${BASE_URL}${APP_ROUTES.INTEGRATIONS}`;
 export const metadata: Metadata = {
   title: 'Integrations | Jovie',
   description:
     'See the account integrations and specific capabilities available in Jovie.',
+  alternates: { canonical: PAGE_URL },
 };
+const SCHEMA = buildBreadcrumbSchema([{ name: 'Integrations', url: PAGE_URL }]);
+const RELATED = [APP_ROUTES.DEVELOPERS, APP_ROUTES.CLI, APP_ROUTES.PRICING];
 
 // Public capabilities reflect deployment configuration. Rebuild this static
 // reference when provider configuration changes; Settings checks live availability.
@@ -21,7 +27,8 @@ export default function IntegrationsDirectoryPage() {
   );
   return (
     <MarketingContainer width='page' className='py-12 sm:py-16'>
-      <header className='mb-8 max-w-prose-canonical space-y-3'>
+      <script type='application/ld+json'>{SCHEMA}</script>
+      <div className='mb-8 max-w-prose-canonical space-y-3'>
         <h1 className='truncate text-3xl font-semibold tracking-tight text-primary'>
           Integrations
         </h1>
@@ -36,7 +43,7 @@ export default function IntegrationsDirectoryPage() {
         >
           Manage integrations
         </Link>
-      </header>
+      </div>
       <div className='divide-y divide-subtle'>
         {integrations.map(integration => (
           <section
@@ -67,6 +74,14 @@ export default function IntegrationsDirectoryPage() {
           </p>
         )}
       </div>
+      <p className='pt-6 text-sm text-secondary'>
+        Related pages:{' '}
+        {RELATED.map(href => (
+          <Link key={href} href={href} className='mr-3 underline'>
+            {href}
+          </Link>
+        ))}
+      </p>
     </MarketingContainer>
   );
 }

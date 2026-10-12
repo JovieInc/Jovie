@@ -404,8 +404,8 @@ export async function inspectImageContrast(
   });
   // Under runner CPU contention headless Chromium intermittently rejects a
   // capture with "Protocol error (Page.captureScreenshot): Unable to
-  // capture screenshot". Recover this transient at most twice; persistent
-  // failures and unrelated errors still fail the certification.
+  // capture screenshot". Retry only that transient, at most twice; any
+  // other error, or a third failure, fails.
   const captureScreenshot = async (): Promise<Buffer> => {
     for (let attempt = 1; ; attempt++) {
       try {

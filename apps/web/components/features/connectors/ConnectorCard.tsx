@@ -105,11 +105,7 @@ export function ConnectorCard({
     label: statusLabel,
     variant: statusVariant,
     icon: StatusIcon,
-  } = STATUS_BADGE[
-    (status === 'not_connected' || status === 'disabled') && !available
-      ? 'unavailable'
-      : status
-  ];
+  } = STATUS_BADGE[available ? status : 'unavailable'];
   const isConnected = status === 'connected' || status === 'syncing';
   const needsAttention =
     status === 'error' || status === 'needs_reauth' || status === 'unavailable';
@@ -213,7 +209,7 @@ export function ConnectorCard({
           <p
             className={cn(
               'min-h-4 text-xs',
-              needsAttention ? 'text-error' : 'text-tertiary'
+              needsAttention || !available ? 'text-error' : 'text-tertiary'
             )}
             data-testid={`connector-detail-${provider}`}
           >

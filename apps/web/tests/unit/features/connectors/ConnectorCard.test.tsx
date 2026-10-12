@@ -90,6 +90,7 @@ describe('ConnectorCard', () => {
         onDisconnect={onDisconnect}
       />
     );
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect Gmail' }));
     expect(onDisconnect).toHaveBeenCalledOnce();
   });
