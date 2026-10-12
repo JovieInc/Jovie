@@ -282,6 +282,7 @@
   "scripts/ensure-sharp-runtime-traces.test.mjs",
   "scripts/eval-lanes.test.mjs",
   "scripts/fetch-sonar-issues.test.mjs",
+  "scripts/fix-standalone-loopback-hostname.test.mjs",
   "scripts/lighthouse-exact-target-guard.test.ts",
   "scripts/linear-compare/owned-output-directory.test.ts",
   "scripts/marketing-factory/",

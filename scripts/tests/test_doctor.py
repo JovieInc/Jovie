@@ -10,8 +10,10 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
+from datetime import datetime
 from types import SimpleNamespace
 from unittest import mock
 
@@ -97,10 +99,10 @@ class JudgeTest(unittest.TestCase):
         self.assertNotIn('remediation-delivery', alerts)
         self.assertEqual(doctor.condition_receipts(alerts, prior, good, 'gem')['remediation-delivery']['state'], 'resolved')
 
-    def test_design_brief_held_past_24h_alerts(self):
-        alerts = doctor.judge(obs(designGate={"stale": ["JOV-3"]}))
-        self.assertIn("JOV-3", alerts["design-brief-stale"])
-        self.assertEqual(doctor.judge(obs(designGate={"stale": []})), {})
+    def test_design_brief_stale_alert_is_retired(self):
+        # 2026-10-11: no issue is held for a brief, so even a legacy census never alerts.
+        self.assertEqual(doctor.judge(obs(designGate={"stale": ["JOV-3"]})), {})
+        self.assertEqual(doctor.judge(obs(designGate={"gated": 1, "autoAdmitted": 1})), {})
 
     def test_escalation_alert_names_the_pr_and_class(self):
         alerts = doctor.judge(obs(escalation={"surfaced": [{"pr": 7, "cls": "needs-human-decision"}]}))
@@ -120,6 +122,14 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("earliest reset in 10m", alerts["codex-all-banked"])
         self.assertIn("8h ago", alerts["no-landing"])
         self.assertIn("Boom", alerts["tick-error"])
+
+    def test_repairs_spent_without_work_name_their_infrastructure_causes(self):
+        quiet = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": doctor.NO_WORK_REPAIR_ALERT - 1}))
+        self.assertNotIn("repairs-without-work", quiet)
+        alerts = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": 23,
+                                                    "preserved-target-needs-reconciliation": 17}))
+        self.assertIn("40 PR repairs", alerts["repairs-without-work"])
+        self.assertIn("target-state-unavailable 23", alerts["repairs-without-work"])
 
     def test_disk_tiers_page_summer_only_below_critical(self):
         self.assertEqual(set(doctor.judge(obs(diskFreePct=7.0))), {"disk-low"})
@@ -384,26 +394,17 @@ class ReconcileTest(unittest.TestCase):
         self.assertNotIn("workers-without-completions", doctor.judge(obs(lastWorkAge=60), prior))
         self.assertNotIn("workers-without-completions", doctor.judge(obs(lastWorkAge=None)))
 
-    def test_unknown_design_census_preserves_alarm_until_observed_recovery(self):
-        for reason in ({"linearError": "pool read failed"}, {"linearSkipped": "cooldown"}):
+    def test_open_design_brief_alarm_resolves_after_the_retirement(self):
+        for reason in ({"linearError": "pool read failed"}, {"linearSkipped": "cooldown"}, {}):
             with self.subTest(reason=reason):
                 tracker = FakeTracker()
-                observed = obs(designGate={"stale": ["JOV-3"]})
-                alerts = doctor.judge(observed)
+                observed = obs()
+                alerts = {"design-brief-stale": "1 needs-design-brief issue(s) held past 24h (JOV-3)"}
                 state = doctor.reconcile(alerts, {}, tracker, observed["now"],
                                          doctor.condition_receipts(alerts, {}, observed, "gem"))
                 observed = obs(designGate=None, **reason)
                 alerts = doctor.judge(observed, state)
-                state = doctor.reconcile(alerts, state, tracker, observed["now"],
-                                         doctor.condition_receipts(alerts, state, observed, "gem"))
-                self.assertEqual(tracker.closed, [])
-                self.assertIsNone(state["issues"]["design-brief-stale"]["closedAt"])
-                condition = state["conditions"]["design-brief-stale"]
-                self.assertEqual(condition["state"], "active")
-                self.assertEqual(condition["source"]["status"], "unknown")
-                self.assertEqual(condition["generation"], 1)
-                observed = obs(designGate={"stale": []})
-                alerts = doctor.judge(observed, state)
+                self.assertNotIn("design-brief-stale", alerts)
                 state = doctor.reconcile(alerts, state, tracker, observed["now"],
                                          doctor.condition_receipts(alerts, state, observed, "gem"))
                 self.assertEqual(tracker.closed.count("id-design-brief-stale"), 1)
@@ -883,6 +884,11 @@ class StatusFeedTest(unittest.TestCase):
             rows = [{"endedAt": doctor.epoch_iso(now - 60), "verdict": "landing", "gateWaitS": 120},
                     {"endedAt": doctor.epoch_iso(now - 120), "verdict": "held", "gateWaitS": 300},
                     {"endedAt": doctor.epoch_iso(now - 30), "verdict": "no-change"},
+                    {"endedAt": doctor.epoch_iso(now - 40), "kind": "fix-red", "verdict": "recovery-handoff",
+                     "reasons": ["preserved-head-superseded"]},
+                    {"endedAt": doctor.epoch_iso(now - 50), "kind": "fix-red", "verdict": "skipped",
+                     "reasons": ["worktree-unavailable:fatal: already used by worktree"]},
+                    {"endedAt": doctor.epoch_iso(now - 55), "kind": "fix-red", "verdict": "fix-no-change"},
                     {"endedAt": doctor.epoch_iso(now - 90000), "verdict": "landing", "gateWaitS": 9999}]
             (state / "runs" / "ledger.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
             host = type("Host", (), {"state": state, "linear_env": state / "missing.env"})()
@@ -898,6 +904,7 @@ class StatusFeedTest(unittest.TestCase):
             finally:
                 os.environ.pop("LANES_SELFTEST", None)
         self.assertEqual(observed["gateWaits24h"], 2)
+        self.assertEqual(observed["noWorkRepairs24h"], {"preserved-head-superseded": 1, "worktree-unavailable": 1})
         self.assertEqual(observed["gateWaitMedianS24h"], 210)
         self.assertEqual(observed["gateWaitMaxS24h"], 300)
         self.assertEqual(feed["gateWaitMedianS24h"], 210)
@@ -939,9 +946,9 @@ class RunnablePoolTest(unittest.TestCase):
         lane = load("lane_runner")
         def issue(key, labels=(), description=""):
             return lane.Issue(key, key, "Task", description, 1, "2026-09-01T00:00:00Z", list(labels))
-        candidates = [issue("JOV-GOOD"), issue("JOV-EPIC", ["type:epic"]),
+        candidates = [issue("JOV-GOOD"), issue("JOV-EPIC", ["hold"]),
                       issue("JOV-SENSITIVE", ["auth"]), issue("JOV-PRICE", description="Change live pricing"),
-                      issue("JOV-OWNED"), issue("JOV-EXHAUSTED"), issue("JOV-BACKOFF")]
+                      issue("JOV-OWNED"), issue("JOV-EXHAUSTED")]
         providers = {"devin": {"label": "devin", "slots": 4},
                      "codex": {"label": "codex", "slots": 3},
                      "claude": {"label": "claude", "slots": 2, "enabled": False}}
@@ -949,7 +956,7 @@ class RunnablePoolTest(unittest.TestCase):
             state = Path(tmp)
             host = lane.Host(state=state, linear_env=state / "test.env")
             (state / "failures.json").write_text(json.dumps({
-                "JOV-EXHAUSTED": 3, "JOV-BACKOFF": {"count": 1, "at": 9990}}))
+                "JOV-EXHAUSTED": 3}))
             tracker = mock.Mock()
             tracker.lane_issues.return_value = candidates
             # Host slot overrides must not replace this fixture's provider capacities.
@@ -965,27 +972,37 @@ class RunnablePoolTest(unittest.TestCase):
                     mock.patch.object(lane, "graphql_budget", return_value=None):
                 observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
                 self.assertEqual(observed["pool"], 2)
-                self.assertEqual(observed["candidatePool"], 7)
+                self.assertEqual(observed["candidatePool"], 6)
                 self.assertEqual(observed["qualifiedJobsByProvider"], {
                     "devin": ["JOV-GOOD"], "codex": ["JOV-GOOD", "JOV-SENSITIVE"], "claude": []})
                 self.assertEqual(observed["poolByProvider"], {"devin": 1, "codex": 2, "claude": 0})
-                self.assertEqual(observed["candidatePoolByProvider"], {"devin": 7, "codex": 7, "claude": 0})
-                reasons = {"excluded-label:type:epic": 1, "sensitive-text": 1,
-                           "in-flight-pr": 1, "retry-exhausted": 1, "retry-backoff": 1}
+                self.assertEqual(observed["candidatePoolByProvider"], {"devin": 6, "codex": 6, "claude": 0})
+                reasons = {"excluded-label:hold": 1, "sensitive-text": 1,
+                           "in-flight-pr": 1, "retry-exhausted": 1}
                 self.assertEqual(observed["rejectedByProvider"], {
                     "devin": {**reasons, "sensitive-provider": 1}, "codex": reasons, "claude": {}})
+                # Per-issue rejection view (JOV-8000 follow-up 39): bounded
+                # {issueId: reason} so route-held / over-budget is visible
+                # without host access; every rejected candidate is named.
+                rejected_issues = observed["rejectedIssues"]
+                self.assertEqual(rejected_issues.get("JOV-EPIC"), "excluded-label:hold")
+                self.assertEqual(rejected_issues.get("JOV-PRICE"), "sensitive-text")
+                self.assertEqual(rejected_issues.get("JOV-OWNED"), "in-flight-pr")
+                self.assertEqual(rejected_issues.get("JOV-EXHAUSTED"), "retry-exhausted")
+                self.assertNotIn("JOV-GOOD", rejected_issues)
+                self.assertLessEqual(len(rejected_issues), 20)
                 feed = doctor.status_feed(host, lane, observed, {}, {})
                 self.assertEqual(feed["admission"]["rejectedByProvider"], observed["rejectedByProvider"])
                 self.assertEqual(feed["admission"]["poolByProvider"], observed["poolByProvider"])
                 self.assertEqual(tracker.lane_issues.call_args_list, [mock.call("devin"), mock.call("codex")])
                 # Reproduce the reported eight nominal candidates, none runnable.
-                tracker.lane_issues.return_value = [issue(f"JOV-EPIC-{n}", ["type:epic"]) for n in range(5)] + [
+                tracker.lane_issues.return_value = [issue(f"JOV-EPIC-{n}", ["hold"]) for n in range(5)] + [
                     issue(f"JOV-PRICE-{n}", description="Change live pricing") for n in range(3)]
                 blocked = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
                 self.assertEqual(blocked["candidatePool"], 8)
                 self.assertEqual(blocked["pool"], 0)
                 self.assertEqual(blocked["rejectedByProvider"]["devin"], {
-                    "excluded-label:type:epic": 5, "sensitive-text": 3})
+                    "excluded-label:hold": 5, "sensitive-text": 3})
                 tracker.lane_issues.return_value = candidates
                 with mock.patch.dict(os.environ, {"LANES_SLOTS_CODEX": "0"}):
                     tracker.lane_issues.reset_mock()
@@ -1091,6 +1108,14 @@ class AccountAttributionTest(unittest.TestCase):
         self.assertNotIn("codex-all-banked", alerts)
         self.assertNotIn("provider-down:codex", alerts)
 
+    def test_free_login_slots_count_as_unleased_capacity(self):
+        # One current login with three run slots, one busy: two runs of capacity remain.
+        report = self.report(**{"current-login": {"available": True, "leased": False, "freeSlots": 2}})
+        self.assertEqual(doctor.codex_attribution(report, self.NOW)["unleasedAvailable"], 2)
+        report = self.report(**{"current-login": {"available": False, "leased": False, "freeSlots": 2,
+                                                   "exhaustedUntil": doctor.epoch_iso(self.NOW + 60), "lastKind": "limit"}})
+        self.assertEqual(doctor.codex_attribution(report, self.NOW)["unleasedAvailable"], 0, "a banked login has no capacity")
+
     def test_lease_occupancy_and_hold_kinds_remain_independent(self):
         rows = {kind: {"available": False, "leased": True, "lastKind": kind,
                        "exhaustedUntil": doctor.epoch_iso(self.NOW + 120)} for kind in ["auth", "rate", "limit", "ok"]}
@@ -1185,18 +1210,14 @@ class AdmissionBackpressureTest(unittest.TestCase):
                 observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
                 self.assertEqual(observed["eligiblePool"], 1)
                 self.assertEqual(observed["eligiblePoolByProvider"], {"devin": 1, "codex": 1})
-                self.assertEqual(observed["poolByProvider"], {"devin": 1, "codex": 0})
+                # Six open codex PRs never shrink codex's pool (no PR ceiling, Tim 2026-10-12).
+                self.assertEqual(observed["poolByProvider"], {"devin": 1, "codex": 1})
                 self.assertEqual(observed["pool"], 1, "provider union must not sum duplicate issues")
                 self.assertEqual(observed["newIssueBudgetByProvider"]["codex"], lane.new_issue_budget("codex", 3, inventory))
                 with mock.patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: lane.new_issue_budget(name, slots, None if name == "codex" else [])):
                     unknown = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
-                self.assertEqual(unknown["eligiblePool"], 1)
-                self.assertEqual(unknown["poolByProvider"], {"devin": 1, "codex": None})
-                self.assertIsNone(unknown["pool"])
+                self.assertEqual((unknown["eligiblePool"], unknown["pool"]), (1, 1), "an uncounted inventory is not unknown demand")
                 self.assertIsNone(unknown["linearError"])
-                feed = doctor.status_feed(host, lane, unknown, {}, {})
-                self.assertIsNone(feed["admission"]["newIssuePool"])
-                self.assertEqual(feed["throughput"]["providers"]["codex"]["idleReason"], "pr-inventory-unavailable")
 
     def test_empty_timer_cannot_survive_unknown_backpressure_or_maintenance(self):
         for changes in [
@@ -1452,7 +1473,7 @@ class RunTest(unittest.TestCase):
             written = json.loads((state / "doctor.json").read_text())
             self.assertEqual(set(written["alerts"]) >= {"provider-down:devin", "linear-down"}, True)
             self.assertEqual(written["conditions"]["linear-down"]["source"]["status"], "unknown")
-            self.assertEqual(written["fileOverlap"]["mode"], "enforce")
+            self.assertEqual(written["fileOverlap"]["mode"], "flag")
             self.assertEqual(written["fileOverlap"]["pairs"], [])
             self.assertEqual(sorted(k for k, _ in tracker.opened), sorted(result["alerts"]))
 
@@ -1633,6 +1654,27 @@ class MergeWindowTest(unittest.TestCase):
         with mock.patch.object(doctor.merge_evidence, "collect", return_value={"complete": True, "prs": rows}) as collect:
             self.assertEqual(doctor.merged_prs_24h(lane, self.NOW), rows)
             collect.assert_called_once_with(lane.REPO_SLUG, self.NOW - 86400, self.NOW)
+
+
+
+class StatusFeedContractTest(unittest.TestCase):
+    def test_published_feed_keeps_schema_and_a_fresh_at_every_tick(self):
+        # Summer reads the raw gist as a liveness guard: stale `at` after 10 min = producer down.
+        lane = load("lane_runner")
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            fake = SimpleNamespace(HOST="gem", provider_throughput=lambda *a, **k: {"providers": {}})
+            feed = doctor.status_feed(host, fake, {"now": time.time(), "codexAttribution": {"state": "available"}}, {}, {})
+            self.assertEqual(feed["schema"], "symphony-lanes-status/v1")
+            stamp = datetime.fromisoformat(feed["at"].replace("Z", "+00:00"))
+            self.assertLess(abs(time.time() - stamp.timestamp()), 60)
+            with mock.patch.object(doctor, "PRIMARY_FLAG", Path(tmp) / "primary"), \
+                    mock.patch.object(doctor.lifecycle, "run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")):
+                (Path(tmp) / "primary").write_text("")
+                (Path(tmp) / "status-gist.json").write_text(json.dumps({"url": "https://gist.example/x", "id": "x"}))
+                doctor.publish_status(host, SimpleNamespace(load_github_env=lambda: None), feed)
+            published = json.loads((Path(tmp) / "lanes-status.json").read_text())
+            self.assertEqual((published["schema"], published["at"]), ("symphony-lanes-status/v1", feed["at"]))
 
 
 if __name__ == "__main__":

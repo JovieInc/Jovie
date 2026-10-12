@@ -530,7 +530,8 @@ def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
     assert "pull_request_target:" in trigger
     assert "issues:" in trigger
     assert "types: [labeled]" in trigger
-    assert "schedule:" in trigger
+    # Event-driven only (JOV-INV-042): the labeled event deletes the label.
+    assert "schedule:" not in trigger
     assert "workflow_dispatch:" in trigger
     assert "actions/checkout" not in scrub
     assert 'gh api --method DELETE "repos/$GH_REPO/labels/$LABEL"' in scrub
@@ -1246,7 +1247,7 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
         encoding="utf-8"
     )
 
-    assert "max-parallel: 1" in full_matrix
+    assert "max-parallel: 8" in full_matrix
     assert "needs: [context, deterministic]" in nightly_agent
     assert "schedule:" not in nightly_agent
     assert "push:" in nightly_agent
@@ -1381,6 +1382,15 @@ def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     ):
         assert result in all_success
     assert "env.SLACK_WEBHOOK_URL != ''" in all_success
+
+
+def test_product_screenshot_servers_bind_to_loopback() -> None:
+    """Both production server forms must enforce the fixture trust boundary."""
+    start = _step_block("screenshots.yml", "Start production server")
+    assert "HOSTNAME: localhost" in start
+    assert "SERVER_COMMAND=(node .next/standalone/apps/web/server.js)" in start
+    assert "SERVER_COMMAND=(pnpm run start --hostname localhost)" in start
+    assert 'setsid "${SERVER_COMMAND[@]}"' in start
 
 
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:

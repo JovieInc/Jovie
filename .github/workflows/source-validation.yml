@@ -72,7 +72,7 @@ jobs:
           DEPENDENCY_PARITY_RECEIPT_DIR: ${{ runner.temp }}/jovie-dependency-parity
         run: node .github/scripts/dependency-parity-evidence.mjs write
       - name: Preserve exact source dependency evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dependency-digest-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}
           path: ${{ runner.temp }}/jovie-dependency-parity/dep-digest.json
@@ -223,12 +223,17 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
       - name: Scan the exact source diff
         if: steps.reuse.outputs.reuse != 'true'
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
         run: |
           git fetch --no-tags origin "${{ github.base_ref }}"
           base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
           ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
           ./scripts/security/verify-gitleaks-coverage.sh
           node scripts/golden-path-lock.mjs merge-gate
+          git diff --name-only "$base_sha" HEAD > "$RUNNER_TEMP/security-gate-files.txt"
+          node scripts/security/security-gate.mjs --changed-files "$RUNNER_TEMP/security-gate-files.txt"
   migration:
     name: Migration Guard
     runs-on: ubuntu-latest

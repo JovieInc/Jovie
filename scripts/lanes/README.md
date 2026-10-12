@@ -5,10 +5,19 @@ Devin, Codex, Claude Code and Hyperagent are the lanes that ship (Claude and Hyp
 JOV-7706); grok and kimi stay `enabled: false`. Symphony Elixir on Gem is retired (its units are stopped and masked by
 `gem-retire-elixir.sh`); nothing else claims JOV work.
 
-A lane is a Linear label plus a provider command in `providers.json`. Every enabled lane
-reads the shared `agent-ready` pool as well as its own label; the cost-aware router (below)
-decides which lane takes each issue. Issues carrying
-`no-symphony`, billing, auth, infra or epic labels are never taken.
+A lane is a provider command in `providers.json` plus a Linear label that expresses a routing
+preference. Every JOV Todo issue is eligible (Tim 2026-10-11: no `agent-ready`, plan or
+approval label is required): every lane reads one shared all-Todo snapshot per TTL (at most
+`TODO_POOL_PAGES` x 100 issues; a larger pool fails closed) and the cost-aware router (below)
+decides which lane takes each issue. `hold` is the one stop signal, and it expires: the
+reconcile pass removes a `hold` with no issue activity for 72h (with a comment on how to
+re-hold). `codex-blocked` only keeps the issue off the codex lane; `no-symphony` no longer
+excludes (the claiming agent decides what the issue needs, closing an obsolete one with
+`NOT-SHIPPABLE` included); a `reasoning-job` issue belongs to the reason lane only when it
+carries Summer's job block; `type:epic` is a decomposition unit (see Epics). Auth, billing and
+infra labels route only to the guarded Codex lane. Issue runs get a goal and a definition of done (the issue's own
+acceptance section when it has one) instead of a pre-approved plan, may run gstack
+`/autoplan` themselves for non-trivial work, and never wait for an approval label.
 
 The harness, not the model, owns:
 
@@ -16,7 +25,7 @@ The harness, not the model, owns:
 |---|---|
 | Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
-| Open-PR budget: a lane holding `slots × 2` open advanceable non-green PRs only fixes/adopts until it drains; held/`lane-fix-exhausted` PRs are bounded separately at `slots × 4` (`terminal-pr-backlog`) so parked work cannot pin a lane idle | `new_issue_budget()`, `pr_is_terminal()` |
+| No open-PR ceiling (Tim 2026-10-12): new-issue intake is bounded only by real limits in autoscale (compute, credits, quotas); `new_issue_budget()` reports counts, never refuses | `new_issue_budget()` |
 | Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit dispatch-next in the admitted pool → tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
 | File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
 | Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
@@ -31,7 +40,7 @@ The harness, not the model, owns:
 | Gate timeouts are transient: re-gated by adopt, held only after 3 on one head | `gate_timeouts()` |
 | Landing: only a gate-passing PR is marked ready and auto-merged; CI and the queue decide | `gate_pr()`, `requeue_verified()` |
 | Receipts (`runs/ledger.jsonl`) bind Linear issue, provider/account class and lease, worktree/branch, PR/head or terminal failure; per-run log and prompt, Linear handoff comments | `run_issue()`, `codex_lane.record_lease()`, `worker()` |
-| Retry to Todo, Triage after 3 failures; not-shippable goes to Triage once | `worker()` |
+| Retry to Todo with no backoff; 3 failures park the issue on this host until the next lanes release (no Backlog sink); a provider error returns the issue to Todo and cools the lane only on a measured limit (exit 75); not-shippable goes to Backlog once | `worker()`, `failure_rejection()`, `cool_down()` |
 | Fix loop owns every open non-draft PR in the repo (red checks, conflicts, changes requested), reconciles live state before checkout/install/push, 2 attempts per head, then the escalation ladder | `fix_candidates()`, `reconcile_fix_target()`, `red_pr()`, `escalate_exhausted()`, `remediation.py` |
 | Event queue: GitHub signals become `lane-fix-<kind>` labels; a worker takes a labeled PR first | `pr_events.py`, `lane-fix-relay.yml` |
 | Cheapest lane first: attempt n belongs to the n-th enabled lane in `providers.json` order | `pr_events.may_take()` |
@@ -40,12 +49,14 @@ The harness, not the model, owns:
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
 | Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `backup/<host>/<name>-<date>` first, else only build output is stripped. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
-| Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source | `disk_guard.py`, `dispatch()`, `worker()` |
-| Adaptive slots (default on, 30-minute cadence; kill switch `SYMPHONY_AUTOSCALE=0`) | `autoscale.decide()`, `dispatch()` |
+| Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source. The same sweep also removes transient `_work` output of runners with no `Runner.Worker` running, retires idle Symphony workspaces on a low filesystem (never through a mount; dirty or unpushed work is pushed to a backup branch first, else only build output goes) and lane logs idle 14 days | `disk_guard.py`, `dispatch()`, `worker()` |
+| Adaptive slots (default on, every tick, measured limits only; kill switch `SYMPHONY_AUTOSCALE=0`) | `autoscale.decide()`, `dispatch()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
+| Host upkeep on the same update event (no timers): fetch the bare object mirror the lanes clone borrows from (`objects/info/alternates`, under `<root>/locks/<name>-mirror.lock`) right before update's own fetch, and refresh the codex lanes' `autoreview`/`behavior-validator` skills from `~/agent-skills` only when its `main` moved. Both are bounded, non-fatal, and recorded in `update.json` | `update()` |
 | Codex accounts: lease one per run; a burst 429 backs off 2 min and rotates, a spent plan (usage limit / quota) banks until its reset, and only a failed run's closing lines can bank an account | `codex_lane.py` |
 | Provider throughput: matched-work offers, accepts, starts, productive/PR/first-pass rates, remediation, issue→PR→merge time, landed output, idle qualified capacity and failure reasons; landed attribution comes from receipts, never a branch prefix | `provider_throughput()`, `doctor.status_feed()`, `hud.py` |
 | Provider failover: a lane that exits non-zero mid-issue (every account spent, auth, crash, HTTP 404, unhealthy) hands the same worktree to the next enabled, healthy, uncooled lane in `providers.json` tier order, up to 2 handoffs; the receipt records `handoffs` (with `reason`) and `finishedBy`. Disabled entries and remote-only lanes (`repairs: false`, Hyperagent) are never chosen | `run_issue()`, `next_provider()`, `remediation.route_lane()` |
+| Repository bindings: the one service also routes LogYourBody (Linear `LYB` -> `JovieInc/LogYourBody`, `~/LogYourBody` on Gem, `LANES_REPO_LYB` overrides, `LANES_BINDING_LYB=0` disables). A worker spends its held seat on one LYB repair (red or behind lane PR, 2 tries per head, a per-PR lease so two seats never repair one PR) or one claim (any Todo issue without `hold` or a hard-excluded label; sensitive labels only on the Codex lane; no LYB-specific concurrency cap or open-PR ceiling, only the host's seats) before Jovie intake. Jovie-only holds never block LYB and a binding fault never blocks Jovie. The harness pushes, opens a ready PR (never draft: LYB's native merge queue skips drafts; a repair readies a draft lane PR) and moves the issue to In Review; LYB required checks and its native queue land it. Refusal reasons land in `bindings.json`. LYB remediation events never run in the Jovie repo | `bindings.py`, `routing.json` `bindings`, `worker_with_slot()` |
 | Cost-aware routing: one capability floor per issue (`routing.json`), then the cheapest available `(lane, model)` route that clears it by effective cost; every claim is logged with its rationale | `remediation.route_issue()`, `issue_router()`, `runs/routing.jsonl` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
@@ -55,20 +66,18 @@ issue. The minute timer only restarts idle lanes and applies updates; it never s
 running worker. Production deploys are a separate track: only a red main stops shipping.
 
 New-issue admission reports three separate counts: raw Todo candidates, candidates
-passing the issue predicate, and new issues after the owning lane's PR budget.
-Worker and doctor share the same budget decision: each dated lane branch counts
-once while non-green, with a cap of configured base slots × 2. Manual branches and
-disabled-lane orphan maintenance do not inflate that lane's budget. A failed,
-malformed or truncation-ambiguous inventory stays unknown and cannot admit new
-issues. Maintenance claims still run first and do not depend on that budget read.
+passing the issue predicate, and new issues a lane may claim. There is no open-PR
+ceiling (Tim 2026-10-12): the JOV-6833 `slots × 2` and JOV-7514 `slots × 4` caps
+are gone, and the claim path makes no PR-count read. Maintenance claims still run first.
 HUD labels this count as new issues; it is not total company demand or a claim of
 available worker capacity. Slot occupancy, account leases and PR work remain
 separate facts. Empty-demand alerts require known zero eligibility and no open
 PR maintenance; unknown evidence and backpressure reset the empty timer.
 
-The file-overlap guard is on by default. `SYMPHONY_FILE_OVERLAP_GUARD=flag` keeps
-classification, ledger, doctor, and HUD visibility without holds; `=0` disables it
-and releases automation-owned holds. Existing non-draft PR overlaps are ordered by
+The file-overlap guard flags by default (Tim 2026-10-12): classification, ledger, doctor
+and HUD visibility, no holds; the merge queue's own conflict detection serializes PRs and a
+hold left by the old default is released. `SYMPHONY_FILE_OVERLAP_GUARD=enforce` (or `1`)
+turns holds on; `=0` disables it and releases automation-owned holds. With enforcement on, Existing non-draft PR overlaps are ordered by
 an explicit stack/dependency first, then foundational/shared work, smaller diffs,
 creation time, and PR number. The later PR receives `hold`; after the earlier PR
 lands, Symphony removes only the hold it applied and queues `lane-fix-dequeued` for
@@ -196,9 +205,13 @@ Gaps closed after the first week (no PR may sit unowned):
   a repair attempt or new authority.
 - Age SLOs are per class (JOV-7079): queued/ready PRs live on the merge queue's clock, lane
   drafts on the 48h idle `stale` SLO, and non-lane agent drafts (`codex/…`, `tim/…`, `devin/…`,
-  etc.) on a 7-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
-  drafts receive `repair`, or `hold:dependency` while a named dependency is open.
-  A landed dependency releases repair; it never grants authority to discard the branch.
+  etc.) on a 3-day age SLO once stalled (idle 48h, conflicting, or red). Stalled agent
+  drafts are reclaimed (Tim, 2026-10-10): the sweep labels them `lane-fix-stale` (plus
+  `conflict`/`red` as applicable), workers finish them with the stale-draft prompt, the
+  gate adopts them like lane drafts, and `ready_green` marks a CLEAN one ready with native
+  merge intent. `hold:dependency` applies while a named dependency is open; a landed
+  dependency releases the draft to the lanes. `hold` and human branches are never reclaimed,
+  and nothing here grants authority to discard the branch.
   JOV-INV-011 requires an explicit `duplicate` label before automatic retirement; age and
   exhaustion never close a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
   carrying `lane-fix-exhausted` or `queue-poison` for more than 48h (measured from the label's
@@ -225,11 +238,27 @@ Held reason codes (`held.json`): `secret-file`, `fix-exhausted`, `empty-diff`, `
 Green CI overrides only `gate-check-failed` and `gate-timeout`, which are verdicts from the local
 gate. The other codes are diff policy or unknown, and the PR stays a draft.
 
+## Epics (`type:epic`)
+
+An epic is a unit of work, not an exclusion (`epics.py`). A lane that claims an epic with no
+open child issues runs a planning pass in a detached origin/main checkout: the agent reads the
+epic and the repo and ends with a `jovie.epic-plan/v1` JSON block; the harness (never the agent)
+files up to 12 children in the epic's team (Todo, parent = the epic, a Goal and a Definition of
+done each, no labels), skipping titles that already exist under the epic, verifies each
+`issueCreate` readback, comments a summary and leaves the epic In Progress. An epic with open
+children is not decomposed: the children carry the work. Remote lanes (hyperagent) never take
+epics. The dispatch reconcile pass (`epics.reconcile`, every 15 minutes on
+`LANES_RECONCILE_OWNER`, default `gem`) moves an epic to Done with a comment once every child is
+terminal and at least one is Done, moves a Todo epic with open children to In Progress, and
+expires stale `hold` labels (one filtered read per kind, no per-issue reads, at most 10 writes
+per kind per pass).
+
 ## Reason lane (Summer's tier-3 decisions)
 
 Ranking, prioritization and strategy decisions are not made on Summer's flash model. Summer
 files a JOV issue labeled `reasoning-job` in Todo, carrying a `summer.reasoning-job/v1` JSON block
-(question, decision type, context refs, deadline). The label is excluded from the shipping lanes.
+(question, decision type, context refs, deadline). Only issues with that block are reason-lane
+jobs; a `reasoning-job` issue without one is ordinary work for the build lanes.
 Each dispatch tick checks for queued jobs and starts one detached `reason_lane.py drain` per host
 (flock `reason.lock`), so a job starts within a minute. Per job:
 
@@ -260,6 +289,9 @@ The same minute tick schedules `yc_corpus.py refresh` at most daily. Each run ro
 40 public YC Library/blog/YouTube records, respects robots, writes metadata plus bounded excerpts into
 the existing GBrain store, and content-hash skips unchanged source and derived-playbook pages. Refresh
 health is recorded under `ycCorpus` in `tick.json`; it never silently converts an outage into a miss.
+A release self-test (`LANES_SELFTEST`) never schedules the refresh, and its default fetch and `gbrain`
+helpers refuse to run there; every self-test process carries a per-run `JOVIE_SELFTEST_RUN` marker and
+`prove_staging` stops any still running when the tests end (`leftoverProcesses` in the diagnostic).
 
 ## Nothing fails silently
 
@@ -329,8 +361,8 @@ or release hold.
 Auth, billing, payment, infrastructure, and Vercel labels are admitted only by this lane.
 Those runs use maximum reasoning effort, carry the `sensitive-surface` PR label across
 hosts, and stay draft until the normal Migration Guard/security/boundary checks plus a
-separate max-effort Codex review pass. `no-symphony`, secret/credential rotation, and
-live billing pricing remain excluded. Other providers retain their sensitive-label
+separate max-effort Codex review pass. Secret/credential rotation and live billing pricing
+remain excluded; a `codex-blocked` sensitive issue has no lane and waits for its label to change. Other providers retain their sensitive-label
 exclusions.
 
 ## Routing (JOV-7706)
@@ -368,29 +400,32 @@ State and receipts live under `~/.local/state/jovie-lanes`. Every gated run reco
 `gateWaitMedianS24h`/`gateWaitMaxS24h` into the status feed so a seat raise or a
 second host is decided on measured queue time, not on timeouts alone.
 
-`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. The
-doctor samples one-hour merge throughput every five minutes: queue depth,
-current queue-wait p50, merged/hour, opened/hour, and queue-entry ejection rate.
-Scale-up stops immediately while merged/hour is below opened/hour or queue-wait
-p50 is at least 30 minutes. After that brake stays active for one full autoscale
-interval, each enabled lane steps down by one per interval to `ceil(base/2)`.
-After more than one interval, the doctor files or reopens the single Linear
-remediation `remediation:symphony-bottleneck-merge-queue`. Missing or stale
-throughput evidence blocks growth but does not trigger a blind scale-down.
-Idle scale-down uses the same floor.
-`SYMPHONY_AUTOSCALE_INTERVAL_S` (default 1800) is the per-lane cooldown and,
-divided by 60, both streaks. Rate limits, a low GitHub or Linear budget, and
-disk or memory emergencies cut immediately and ignore that cooldown. Tim set
-this on 2026-10-02 with no observe-only period. `observe` or `shadow` records
-the decision and leaves `Host.slots()` on the configured base. The kill switch
-is `SYMPHONY_AUTOSCALE=0` (`off` or `false`), in the environment or
-`~/.config/jovie-lanes/autoscale.env` (the environment wins). Ceilings are
-`SYMPHONY_AUTOSCALE_MAX_<PROVIDER>` (default twice the base) and
-`SYMPHONY_AUTOSCALE_HOST_MAX` (default twice the base sum, never below today's
-base sum). New-issue budgets stay on base slots (`×2` active, `×4` terminal).
-Missing, stale, or corrupt input fails safe to base; an unknown API budget
-never exceeds base; a disabled lane stays at 0. `install.sh` does not pass
-the flag. Scale-down does not signal workers.
+**Ship now:** the gate timeout defaults to 3,600 seconds on macOS and remains 2,400 seconds
+elsewhere; `LANES_GATE_TIMEOUT_S` still overrides either default. **Re-evaluate when:** the mac
+records five gate timeouts in a 24-hour window after a full day on this release. **Then:** use the
+recorded gate waits and receipts to decide whether to reduce `LANES_GATE_SLOTS` before extending
+the timeout again.
+
+`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick. There are no
+cadence timers or streaks (Tim 2026-10-12). A saturated lane with pending work (routable Todo
+issues from the local Linear mirror plus repair demand) grows toward running + pending, at most
+doubling per host step. Lanes wait only `HOST_SETTLE_S` (120 s) between host steps, which is the
+lag of the load and PSI samples themselves. A lane with no demand releases its unused seats at
+once, down to `ceil(base/2)` and never below its running count, so it holds no host share.
+Growth stops only on measured limits:
+- host load, memory, PSI or disk
+- provider credits: banks, leases and cooldowns
+- the GitHub API budget
+- failures on the installed release
+
+Severe pressure halves a lane and soft pressure removes one seat per host step. Linear quota,
+open-PR counts, 24-hour gate-wait medians, trailing alerts and productive-rate history do not
+hold a lane. Merge throughput is diagnostic only. Ceilings are the host's CPU count and each
+provider's credits: codex is capped at running plus unleased login runs.
+`SYMPHONY_AUTOSCALE_HOST_MAX` and `SYMPHONY_AUTOSCALE_MAX_<PROVIDER>` still override them.
+`observe` or `shadow` records the decision and leaves `Host.slots()` on the configured base.
+The kill switch is `SYMPHONY_AUTOSCALE=0`. Missing, stale or corrupt input fails safe to base;
+an unknown GitHub budget never exceeds base; a disabled lane stays at 0.
 
 ## Worktree pool and shared caches (JOV-7705)
 
@@ -411,22 +446,6 @@ its idle, clean and published checks, then `worktree_pool.recycle()` detaches HE
 `origin/main`, runs `git clean -ffdx` except `node_modules` and `.cache`, and moves the
 checkout into the pool while there is room and disk. Deleting one installed worktree
 took 3 to 32 minutes under load; recycling takes seconds.
-
-`SYMPHONY_AUTOSCALE` applies by default on the minute `dispatch()` tick.
-Scale-down drops one slot after 30 idle ticks, floor `ceil(base/2)`.
-`SYMPHONY_AUTOSCALE_INTERVAL_S` (default 1800) is the per-lane cooldown and,
-divided by 60, both streaks. Rate limits, a low GitHub or Linear budget, and
-disk or memory emergencies cut immediately and ignore that cooldown. Tim set
-this on 2026-10-02 with no observe-only period. `observe` or `shadow` records
-the decision and leaves `Host.slots()` on the configured base. The kill switch
-is `SYMPHONY_AUTOSCALE=0` (`off` or `false`), in the environment or
-`~/.config/jovie-lanes/autoscale.env` (the environment wins). Ceilings are
-`SYMPHONY_AUTOSCALE_MAX_<PROVIDER>` (default twice the base) and
-`SYMPHONY_AUTOSCALE_HOST_MAX` (default twice the base sum, never below today's
-base sum). New-issue budgets stay on base slots (`×2` active, `×4` terminal).
-Missing, stale, or corrupt input fails safe to base; an unknown API budget
-never exceeds base; a disabled lane stays at 0. `install.sh` does not pass
-the flag. Scale-down does not signal workers.
 
 ## Preserved repairs (JOV-7347)
 
@@ -518,15 +537,6 @@ Examples: `remediation:asc-agreements`, `remediation:billing-health-public`,
 
 The bare label `remediation` (no colon) is the relay intake label, not an event.
 
-### Precedence over `no-symphony`
-
-An issue that carries any `remediation:*` label is never skipped because it also
-carries `no-symphony`. JOV-7540 and JOV-7551 carry `no-symphony`. The bare
-`remediation` label does not override that exclusion. `type:epic`,
-`codex-blocked`, and `reasoning-job` still exclude the issue. The exception
-follows `LANES_ESCALATION` (default on). When that flag is off, `no-symphony`
-excludes the issue again.
-
 ### Dedupe is the label, and closed issues are history
 
 Events dedupe by the `remediation:<fingerprint>` label across JOV and LYB.
@@ -551,12 +561,15 @@ is created on the JOV team when it is missing, color `#E5484D`.
 
 ### Stuck PRs stay on the sweep
 
-Stuck-PR detection lives in remediation-sweep. It files ordinary labeled
-issues: `remediation:pr-<n>-hold` and `remediation:pr-<n>-conflict` for a PR
-whose `lane-fix-exhausted` label has aged out. The router consumes those as
-normal remediation events. It does not run its own stuck-PR escalation unless
-`LANES_ESCALATION_STUCK_PRS=1` (and `LANES_ESCALATION` is on). That flag
-defaults off.
+Remediation-sweep also files ordinary labeled issues (`remediation:pr-<n>-hold`,
+`remediation:pr-<n>-conflict`) that the router consumes as normal events. The in-process
+stuck-PR ladder runs by default (Tim 2026-10-12: every exhausted head needs an automatic exit)
+while `LANES_ESCALATION` is on; `LANES_ESCALATION_STUCK_PRS=0` turns it off. Terminal heads
+(exhausted, escalated, `queue-poison`) also get a no-model main sync each time main moves, with
+no clock; the sync lifts `queue-poison`, and that removal is the boundary the poison count
+restarts from. A bot hold whose head moved past it is lifted at once
+(`LANES_STALE_HOLD_UNHOLD=0` keeps alert-only). An oversize diff goes to a repair lane that
+splits it into a stack instead of bug intake.
 
 On the next dispatch tick the router:
 
@@ -670,39 +683,21 @@ checked against `app-ui-primitives.gen.json`, a projection of
 `DESIGN_SYSTEM_COMPONENT_IDS` and `AppScreenComponentId` that a test keeps
 in sync with those registries.
 
-**What happens to a held issue (JOV-7717: a brief must never block forever).**
-`worker()` calls `design_gate.pick_build_issue(...)` with the existing
-`pick_issue`. That call does five things:
+**No issue waits for a brief (Tim 2026-10-11).** `worker()` calls
+`design_gate.pick_build_issue(...)` with the existing `pick_issue`; ordinary
+order and eligibility choose the issue. A gated issue whose brief is missing or
+incomplete (inline or linked) is claimed as `brief-auto`: the gate labels it,
+clears any legacy `needs-design-brief` label, comments once, and appends one
+founder `jovie.work-order/v1` block for the taste call, which Summer's founder
+path (JOV-7739) posts to Ovie after the fact. The claiming build run writes the
+brief itself from the template and canon (`DESIGN_LOOP_CONTRACT`), puts it in
+the PR body, and builds in the same run. There is no separate brief run, no
+`held-at` marker and no frontier retry.
 
-1. **First claim.** A held issue goes ahead of build work: among issues whose
-   brief run is due, `pick_issue` order and eligibility choose one. The gate
-   adds `needs-design-brief` and a `held-at` marker once.
-2. **Brief run.** `run_brief` runs the same provider with a brief-only prompt.
-   The prompt says to write `.design-brief.md` and not to invent artifacts.
-   The runner appends the result inline under
-   `<!-- design-gate:brief-lane -->`, even if the run produced nothing, and
-   opens no PR. The issue returns to Todo.
-3. **Frontier retry.** If steps are still missing, the next claim runs one
-   retry on the `codex` lane (if healthy, otherwise the same lane). It fills
-   the steps from canon (DESIGN.md and the registries) and replaces the draft
-   under `<!-- design-gate:brief-retry -->`.
-4. **Auto-admission.** After the retry, or 24h after `held-at`, an incomplete
-   brief is admitted as `brief-auto`. The gate labels it, comments a warning,
-   and appends one founder `jovie.work-order/v1` block for the taste call. An
-   auto-admitted issue keeps brief-lane priority until its build claim, so the
-   24h escape cannot fall back into ordinary pool ordering. Summer's founder
-   path (JOV-7739) posts that block to Ovie with no model turn.
-5. **Linked briefs.** A linked `Design brief:` doc is never overwritten. It
-   gets no brief run and follows the 24h rule.
-
-`doctor.py` adds `designGate` to the admission census, deduped:
-
-- `gated`, `admitted`, `autoAdmitted`, `needsBrief` and `missingSteps`;
-- `ageHistogram`: time since `held-at` for issues still held or labeled;
-- `stale`: issues held past 25h. Any entry raises the `design-brief-stale`
-  alert.
-
-Incomplete briefs also increment `rejectedByProvider["needs-design-brief"]`.
+`doctor.py` adds `designGate` to the admission census, deduped: `gated`,
+`admitted`, `autoAdmitted` and `missingSteps` (steps the claiming runs will
+write). Nothing is rejected for a brief and there is no `design-brief-stale`
+alert.
 
 Design loop (JOV-7759): a gated issue's build prompt carries
 `DESIGN_LOOP_CONTRACT`. The lane plans from the brief, builds, and iterates

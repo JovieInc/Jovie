@@ -62,6 +62,10 @@ describe('Shared fenced-attempt coverage contract', () => {
       '*/scripts/lanes/worktree_sweep.py" --fail-under=85'
     );
     expect(command).toContain('scripts/tests/test_continuity_clock.py');
+    expect(command).toContain('scripts/tests/test_epics.py');
+    expect(command).toContain(
+      '--include="*/scripts/lanes/epics.py" --fail-under=90'
+    );
     expect(command).toContain('scripts/tests/test_worktree_pool.py');
     expect(command).toContain(
       '*/scripts/lanes/worktree_pool.py" --fail-under=85'

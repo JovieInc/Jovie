@@ -186,6 +186,7 @@ function runScript(script, fixture, env = {}) {
       ...process.env,
       ...env,
       GITHUB_OUTPUT: fixture.output,
+      GITHUB_WORKSPACE: REPO_ROOT,
       PATH: `${fixture.bin}${delimiter}${process.env.PATH || ''}`,
       RUNNER_TEMP: fixture.root,
     },
@@ -357,6 +358,10 @@ function runFinalize(overrides = {}, boundarySha = NEWER_SHA) {
   writeFileSync(
     join(fixture.root, 'release-lineage/fleet-admission.json'),
     JSON.stringify({ scopedAdmission: { revision: EXPECTED_SHA } })
+  );
+  writeFileSync(
+    join(fixture.root, 'release-lineage/release-risk-receipt.json'),
+    '{"latency":{"mergeAt":"2026-10-03T00:00:00Z","targetP95Seconds":1800},"ovie":{},"certificationPacket":null}'
   );
   stubCommand(
     fixture.bin,

@@ -473,13 +473,13 @@ describe('aggregate required checks', () => {
       parseRequiredStatusChecksFromYaml(branchProtectionYaml)
     ).not.toContain('Storybook A11y');
     // The duplicate manual ci-storybook-a11y job was removed (JOV-4326); the
-    // scheduled visual-a11y.yml storybook-a11y lane is the single owner.
+    // main-push visual-a11y.yml storybook-a11y lane is the single owner.
     expect(ciWorkflowYaml).not.toContain('ci-storybook-a11y:');
     expect(storybookBlock).toMatch(/pnpm --filter @jovie\/web test:a11y/);
     expect(prReadyBlock).not.toMatch(/ci-storybook-a11y|STORYBOOK_A11Y_RESULT/);
     expect(visualWorkflowYaml).not.toMatch(/^\s+pull_request:/m);
-    expect(visualWorkflowYaml).not.toMatch(/^\s+push:/m);
-    expect(visualWorkflowYaml).toMatch(/^\s+schedule:/m);
+    expect(visualWorkflowYaml).toMatch(/^\s+push:\n\s+branches: \[main\]/m);
+    expect(visualWorkflowYaml).not.toMatch(/^\s+schedule:/m);
     expect(visualWorkflowYaml).not.toContain('vars.CI_FAST_RUNNER');
   });
 

@@ -276,6 +276,15 @@ describe('story receipt SHA ancestry', () => {
 
     expect(issues, issues.join('\n')).toEqual([]);
     expect(receipts.length).toBeGreaterThan(0);
-    expect(gitCommandCount - commandsBefore).toBe(3 + receiptShas.length);
+    // In a shallow checkout cat-file cannot resolve the receipt commits, so
+    // the per-sha ls-tree calls never run and the count is 3 + 0 regardless
+    // of the library. Pin the batched-call count only where it is
+    // deterministic (full history); the shallow case still asserts zero
+    // receipt issues above.
+    if (!shallow) {
+      expect(gitCommandCount - commandsBefore).toBe(3 + receiptShas.length);
+    } else {
+      expect(gitCommandCount - commandsBefore).toBe(3);
+    }
   });
 });

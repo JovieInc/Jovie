@@ -176,7 +176,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - check_suite
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:green-source
@@ -236,7 +235,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers:
       - Agent Pipeline
-      - Auto-Ready Agent Drafts
       - iOS CI
       - Lane Fix Relay
       - Merge Queue Green Enroll
@@ -250,7 +248,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 62
+    jobCount: 63
   - name: Claude Review (gbrain-aware)
     path: .github/workflows/claude-review.yml
     active: true
@@ -391,7 +389,6 @@ nodes:
       - pull_request
       - push
       - repository_dispatch
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:invariant-stewardship
     jobCount: 2
@@ -432,7 +429,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:notify
-    jobCount: 2
+    jobCount: 3
   - name: Real-Model Eval Lane
     path: .github/workflows/eval-real-model.yml
     active: false
@@ -617,7 +614,7 @@ nodes:
       - workflow_call
       - workflow_dispatch
     terminalReceipt: job:graphics
-    jobCount: 1
+    jobCount: 2
   - name: iOS CI
     path: .github/workflows/ios-ci.yml
     active: true
@@ -684,7 +681,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:relay
-    jobCount: 1
+    jobCount: 2
   - name: Legacy Human Hold Scrub
     path: .github/workflows/legacy-human-hold-scrub.yml
     active: true
@@ -695,7 +692,6 @@ nodes:
     triggeringStateTransition:
       - issues
       - pull_request_target
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:sweep
     jobCount: 2
@@ -708,7 +704,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - pull_request
-      - schedule
+      - repository_dispatch
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:sync_done
@@ -777,7 +773,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:rearm-green-victims
-    jobCount: 4
+    jobCount: 5
   - name: Merge Queue Ruleset Verify
     path: .github/workflows/merge-queue-ruleset-verify.yml
     active: true
@@ -884,9 +880,10 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - push
       - workflow_dispatch
     terminalReceipt: job:publish
-    jobCount: 3
+    jobCount: 4
   - name: Observability Report (Linear)
     path: .github/workflows/observability-issue.yml
     active: true
@@ -1094,7 +1091,6 @@ nodes:
     triggeringStateTransition:
       - push
       - repository_dispatch
-      - schedule
       - workflow_dispatch
     terminalReceipt: job:find
     jobCount: 1
@@ -1251,9 +1247,10 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - push
+      - schedule
       - workflow_dispatch
     terminalReceipt: job:workflow-execution-posture
-    jobCount: 6
+    jobCount: 8
   - name: Sentry Autofix Recurrence
     path: .github/workflows/sentry-autofix-recurrence.yml
     active: true
@@ -1460,6 +1457,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:audit
     jobCount: 1
+  - name: Unstack Merged Parent
+    path: .github/workflows/unstack-merged-parent.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_dispatch
+    terminalReceipt: job:unstack
+    jobCount: 1
   - name: Vercel Preview Cleanup
     path: .github/workflows/vercel-preview-cleanup.yml
     active: true
@@ -1479,7 +1488,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
+      - push
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
     jobCount: 3

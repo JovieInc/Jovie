@@ -84,3 +84,83 @@ export function useFullAudioPlayerExpandRequests(): number {
     getFullPlayerExpandRequests
   );
 }
+
+/**
+ * Media-canvas transport channel (JOV-7240). While MediaCanvasViewer is open
+ * it registers a controller and publishes playback state, so the shell audio
+ * dock becomes the transport for canvas video (play/pause, scrub, time) and
+ * its next/previous buttons step through photo and video items alike. Only
+ * one registration is live at a time — the canvas is the playback owner, and
+ * starting a canvas video pauses the audio track.
+ */
+export interface MediaCanvasTransportSnapshot {
+  readonly title: string;
+  readonly index: number;
+  readonly count: number;
+  readonly isVideo: boolean;
+  readonly isPlaying: boolean;
+  readonly currentTime: number;
+  readonly duration: number;
+  readonly hasNext: boolean;
+  readonly hasPrevious: boolean;
+}
+
+export interface MediaCanvasTransportController {
+  readonly toggle: () => void;
+  readonly seek: (time: number) => void;
+  readonly next: () => void;
+  readonly previous: () => void;
+}
+
+let mediaCanvasSnapshot: MediaCanvasTransportSnapshot | null = null;
+let mediaCanvasController: MediaCanvasTransportController | null = null;
+
+export function getMediaCanvasTransportSnapshot(): MediaCanvasTransportSnapshot | null {
+  return mediaCanvasSnapshot;
+}
+
+export function registerMediaCanvasTransport(
+  controller: MediaCanvasTransportController
+): () => void {
+  mediaCanvasController = controller;
+  mediaCanvasSnapshot = null;
+  emitAudioChromeChange();
+  return () => {
+    if (mediaCanvasController !== controller) return;
+    mediaCanvasController = null;
+    mediaCanvasSnapshot = null;
+    emitAudioChromeChange();
+  };
+}
+
+export function publishMediaCanvasTransport(
+  next: MediaCanvasTransportSnapshot
+): void {
+  if (!mediaCanvasController) return;
+  mediaCanvasSnapshot = next;
+  emitAudioChromeChange();
+}
+
+export function useMediaCanvasTransport(): MediaCanvasTransportSnapshot | null {
+  return useSyncExternalStore(
+    subscribeAudioChrome,
+    getMediaCanvasTransportSnapshot,
+    getMediaCanvasTransportSnapshot
+  );
+}
+
+/** Dock-side commands — no-ops when no canvas session is registered. */
+export const mediaCanvasTransport = {
+  toggle(): void {
+    mediaCanvasController?.toggle();
+  },
+  seek(time: number): void {
+    mediaCanvasController?.seek(time);
+  },
+  next(): void {
+    mediaCanvasController?.next();
+  },
+  previous(): void {
+    mediaCanvasController?.previous();
+  },
+} as const;

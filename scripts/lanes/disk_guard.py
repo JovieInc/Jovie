@@ -5,8 +5,10 @@ Runs inside the existing event paths — the dispatch tick and each worker spawn
 never on its own timer. Below LOW_PCT free on the state filesystem the guard sweeps,
 in order: DerivedData idle > 5h, clean worktrees idle > 12h (branches kept),
 .next/test-results inside idle worktrees that stay, idle worktree-pool slots once
-free space is under the pool's floor (`worktree_pool.shed`), `xcrun simctl delete
-unavailable`. The shared pnpm store stays intact: pruning it while active worktrees
+free space is under the pool's floor (`worktree_pool.shed`), transient `_work` output of
+idle self-hosted runners, retired Symphony workspaces (backed up to a branch first when they
+hold work), lane logs older than LOG_IDLE_S, `xcrun simctl delete unavailable`. The runner,
+workspace and log steps took over from Gem's retired gem-disk-reclaim timer (2026-10-11). The shared pnpm store stays intact: pruning it while active worktrees
 install with copy imports amplifies disk use. Free space at or below CRITICAL_PCT
 after the sweep is `critical` in the receipt; the doctor turns that reading into a
 Linear Triage signal for Summer. Every step fails soft: one bad path never stops the rest.
@@ -16,6 +18,7 @@ from __future__ import annotations
 import json
 import fcntl
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -36,6 +39,20 @@ DERIVED_DATA_ROOT = Path(os.environ.get("LANES_DERIVED_DATA",
 PRUNE_DIRS = frozenset({".next", "test-results"})
 SKIP_DIRS = PRUNE_DIRS | {".git", "node_modules"}
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
+# Files the harness itself writes into a checkout. They are never source: counting them as
+# uncommitted work preserved clean checkouts, locked their PR branches and burned every
+# repair attempt on "already used by worktree" (2026-10-11, 25 PRs fix-exhausted).
+HARNESS_ARTIFACTS = (PRESERVED_REPAIR, ".codex-last-message.txt")
+SOURCE_PATHSPEC = ("--", ".", *(f":(exclude){name}" for name in HARNESS_ARTIFACTS))
+# What gem-disk-reclaim removed from an idle runner's _work: the job checkouts stay warm.
+RUNNER_TRANSIENT = ("_actions", "_temp", "_tool", "_update")
+# Elixir Symphony is retired; its workspaces only shrink. Linux mount table for mount safety.
+RETIRED_WORKSPACE_DIRS = ("symphony-elixir-workspaces", "symphony-workspaces")
+RETIRED_WORKSPACE_ABSOLUTE = ("/srv/worktrees/jovie",)
+MOUNTINFO = Path("/proc/self/mountinfo")
+LOG_IDLE_S = 14 * 86400
+LOG_NAME = re.compile(r".*\.(log|log\.\d+(\.gz)?|log\.gz|prompt\.md)$")
+RETIRED_SWEEP_BUDGET_S = 300
 
 
 def now_iso() -> str:
@@ -80,7 +97,7 @@ def worktree_paths(repo: Path, run) -> list[Path]:
 
 def is_clean(path: Path, run) -> bool:
     """Clean = no tracked modifications and no untracked (non-ignored) files."""
-    result = run(["git", "-C", str(path), "status", "--porcelain"], capture_output=True, text=True, timeout=120)
+    result = run(["git", "-C", str(path), "status", "--porcelain", *SOURCE_PATHSPEC], capture_output=True, text=True, timeout=120)
     return result.returncode == 0 and not result.stdout.strip()
 
 
@@ -195,6 +212,144 @@ def sweep_worktree_pool(host, report: dict) -> None:
     report["actions"].extend(f"drained pool slot {name}" for name in worktree_pool.shed(host.repo))
 
 
+def selftest() -> bool:
+    return bool(os.environ.get("LANES_SELFTEST"))
+
+
+def runner_roots() -> list[Path]:
+    """Self-hosted runner installs on this host. A release self-test sees none: these are
+    absolute host paths a fixture must never reach."""
+    if selftest():
+        return []
+    home = Path.home()
+    return [home / "actions-runner", *(home / f"actions-runner-{n}" for n in range(1, 6)),
+            *sorted(Path("/srv/git").glob("actions-runner-*"))]
+
+
+def retired_workspace_roots() -> list[Path]:
+    if selftest():
+        return []
+    return [*(Path.home() / name for name in RETIRED_WORKSPACE_DIRS), *map(Path, RETIRED_WORKSPACE_ABSOLUTE)]
+
+
+def log_dirs(host) -> list[Path]:
+    return [host.state / "runs", *([] if selftest() else [Path.home() / "symphony-ui-pilot-logs"])]
+
+
+def runner_workers(run) -> list[str] | None:
+    """Command lines of running Runner.Worker processes; None when that cannot be observed."""
+    try:
+        ps = run(["ps", "-axo", "args="], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if getattr(ps, "returncode", 1) != 0:
+        return None
+    return [line.strip() for line in ps.stdout.splitlines() if "Runner.Worker" in line]
+
+
+def sweep_runner_work(run, report: dict, roots=None) -> None:
+    """Transient _work output of runners with no job running. A worker whose install cannot
+    be attributed holds every runner: an unknown job is never swept from under itself."""
+    roots = runner_roots() if roots is None else roots
+    if not any(root.is_dir() for root in roots):
+        return
+    workers = runner_workers(run)
+    if workers is None or any(not re.search(r"(^|\s)/\S*Runner\.Worker", line) for line in workers):
+        report["errors"].append("runner-state-unavailable")
+        return
+    for root in roots:
+        if root.is_symlink() or not (root / ".runner").is_file() or not (root / "run.sh").exists():
+            continue
+        if any(f"{root.resolve()}/" in line for line in workers):
+            report["actions"].append(f"preserved busy runner {root}")
+            continue
+        for name in RUNNER_TRANSIENT:
+            child = root / "_work" / name
+            if child.is_symlink() or not child.is_dir():
+                continue
+            shutil.rmtree(child, ignore_errors=True)
+            (report["errors"] if child.exists() else report["actions"]).append(f"removed runner {child}")
+
+
+def mount_points() -> set[Path] | None:
+    """Every mount point on this host, or None when the table is unreadable (fail closed)."""
+    try:
+        lines = MOUNTINFO.read_text().splitlines()
+    except OSError:
+        return None
+    decode = lambda text: re.sub(r"\\([0-7]{3})", lambda match: chr(int(match.group(1), 8)), text)
+    return {Path(decode(line.split()[4])) for line in lines if len(line.split()) > 4}
+
+
+def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
+                             budget_s: float = RETIRED_SWEEP_BUDGET_S) -> None:
+    """Idle retired Symphony workspaces go, only from a filesystem that is itself under
+    LOW_PCT. Never through a mount (a bind-mounted workspace is skipped whole), never a busy
+    one, and never unsaved work: a git checkout with dirty or unpushed state is first pushed to
+    `backup/<host>/...` exactly as worktree_sweep does; if that fails, or the directory is not
+    a readable checkout, it only loses regenerable build output."""
+    import worktree_sweep  # late: worktree_sweep imports this module
+    roots = retired_workspace_roots() if roots is None else roots
+    candidates = [root for root in roots if root.is_dir() and not root.is_symlink()]
+    if not candidates:
+        return
+    mounts = mount_points()
+    live = worktree_sweep.live_paths(run)
+    if mounts is None or live is None:
+        report["errors"].append("retired-workspaces:" + ("mounts-unavailable" if mounts is None
+                                                        else "process-state-unavailable"))
+        return
+    prefix = "backup/mac" if sys.platform == "darwin" else f"backup/{os.uname().nodename.split('.')[0]}"
+    date = datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
+    deadline = time.monotonic() + budget_s
+    for root in candidates:
+        for path in sorted(root.iterdir()):
+            if time.monotonic() > deadline:
+                report["actions"].append("retired workspaces: budget spent, continuing next sweep")
+                return
+            pct = free_pct(path)
+            if path.is_symlink() or not path.is_dir() or pct is None or pct >= LOW_PCT:
+                continue
+            resolved = path.resolve()
+            if any(mount == resolved or resolved in mount.parents for mount in mounts):
+                report["actions"].append(f"preserved mounted workspace {path}")
+                continue
+            if worktree_sweep.busy(resolved, live) or recently_touched(path, WORKTREE_IDLE_S, now):
+                continue
+            info = worktree_sweep.inspect(path, run) if (path / ".git").exists() else None
+            if info is None:
+                worktree_sweep.strip_build_dirs(path)
+                report["actions"].append(f"stripped unverifiable workspace {path}")
+                continue
+            if info["dirty"] or info["unpushed"] != "0":
+                saved = worktree_sweep.backup(path, info, run, prefix, date)
+                if not saved:
+                    worktree_sweep.strip_build_dirs(path)
+                    report["actions"].append(f"stripped workspace {path}: backup failed")
+                    continue
+                report["actions"].append(f"backed up {path} to {saved}")
+            shutil.rmtree(path, ignore_errors=True)
+            (report["errors"] if path.exists() else report["actions"]).append(f"removed retired workspace {path}")
+
+
+def sweep_old_logs(host, now: float, report: dict, dirs=None) -> None:
+    """Lane run logs and prompts (never the jsonl ledgers) untouched for LOG_IDLE_S."""
+    for directory in log_dirs(host) if dirs is None else dirs:
+        if not directory.is_dir() or directory.is_symlink():
+            continue
+        removed = 0
+        for path in directory.iterdir():
+            try:
+                if (LOG_NAME.match(path.name) and path.is_file() and not path.is_symlink()
+                        and path.stat().st_mtime < now - LOG_IDLE_S):
+                    path.unlink()
+                    removed += 1
+            except OSError:
+                continue
+        if removed:
+            report["actions"].append(f"removed {removed} old log(s) from {directory}")
+
+
 def sweep_host_tools(run, report: dict) -> None:
     for cmd in (["xcrun", "simctl", "delete", "unavailable"],):
         if shutil.which(cmd[0]) is None:
@@ -227,6 +382,9 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
                     for step in (lambda: sweep_derived_data(now, report),
                                  lambda: sweep_worktrees(host, run, now, report),
                                  lambda: sweep_worktree_pool(host, report),
+                                 lambda: sweep_runner_work(run, report),
+                                 lambda: sweep_retired_workspaces(host, run, now, report),
+                                 lambda: sweep_old_logs(host, now, report),
                                  lambda: sweep_host_tools(run, report)):
                         # Pressure can change between steps; never keep sweeping critically low disk.
                         current = free_pct(host.state)

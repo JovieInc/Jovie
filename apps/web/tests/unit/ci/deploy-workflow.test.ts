@@ -90,6 +90,10 @@ const sentryGateActionPath = resolve(
   repoRoot,
   '.github/actions/sentry-error-gate/action.yml'
 );
+const sentryReadHelperPath = resolve(
+  repoRoot,
+  '.github/scripts/sentry-read-json.sh'
+);
 const costAnomalyWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/cost-anomaly-gate.yml'
@@ -153,7 +157,7 @@ function getStepBlock(workflow: string, stepName: string): string {
 function getSentryStatsRequests(action: string): string[] {
   return (
     action.match(
-      /STATS_RESPONSE=\$\(curl[\s\S]*?"https:\/\/sentry\.io\/api\/0\/organizations\/\$SENTRY_ORG\/events-stats\/"\)/g
+      /STATS_RESPONSE=\$\(sentry_read_json[\s\S]*?"https:\/\/sentry\.io\/api\/0\/organizations\/\$SENTRY_ORG\/events-stats\/"\)/g
     ) ?? []
   );
 }
@@ -459,7 +463,7 @@ describe('CI test-performance path gate', () => {
 });
 
 describe('CI Storybook accessibility path gate', () => {
-  it('classifies relevant paths; the scheduled visual-a11y lane owns execution', () => {
+  it('classifies relevant paths; the main-push visual-a11y lane owns execution', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const pathJob = getJobBlock(workflow, 'ci-path-changes');
     const detectStep = getStepBlock(
@@ -471,7 +475,7 @@ describe('CI Storybook accessibility path gate', () => {
       "run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || 'false' }}"
     );
     // The duplicate manual ci-storybook-a11y job was removed (JOV-4326); the
-    // scheduled visual-a11y.yml storybook-a11y lane is the single owner.
+    // main-push visual-a11y.yml storybook-a11y lane is the single owner.
     expect(workflow).not.toContain('ci-storybook-a11y:');
     expect(detectStep).not.toContain('DEEP_CI_LABEL');
 
@@ -502,8 +506,8 @@ describe('CI Storybook accessibility path gate', () => {
     ).toBe(1);
 
     const visualWorkflow = readFileSync(visualA11yWorkflowPath, 'utf8');
-    expect(visualWorkflow).toMatch(/^  schedule:/m);
-    expect(visualWorkflow).not.toMatch(/^  push:/m);
+    expect(visualWorkflow).not.toMatch(/^  schedule:/m);
+    expect(visualWorkflow).toMatch(/^  push:\n    branches: \[main\]/m);
     expect(visualWorkflow).not.toMatch(/^  pull_request:/m);
     expect(visualWorkflow).not.toContain('vars.CI_FAST_RUNNER');
     const visualPathJob = getJobBlock(visualWorkflow, 'ci-visual-path-changes');
@@ -512,7 +516,7 @@ describe('CI Storybook accessibility path gate', () => {
       'Detect visual-relevant changes'
     );
     expect(visualDetectStep).toContain(
-      '[ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "schedule" ]'
+      '[ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "push" ]'
     );
     expect(visualDetectStep).toContain(
       'echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"'
@@ -619,7 +623,7 @@ describe('deploy workflow Vercel env resolution', () => {
 
     expect(classifierJob).toContain('timeout-minutes: 3');
     expect(classifierJob).toContain(
-      'uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
+      'uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'
     );
     expect(classifierJob).toContain("node-version: '24'");
     // biome-ignore format: exact-diff/fail-closed contract stays compact for the integration-train cap
@@ -4604,6 +4608,24 @@ describe('production promotion exact-artifact contract', () => {
     const sentryJob = getJobBlock(reusable, 'sentry-error-gate');
     const sentryAction = readFileSync(sentryGateActionPath, 'utf8');
 
+    // The action delegates transport to the shared helper. Keep the strict
+    // failure/deadline/retry contract as well as the production query checks.
+    const sentryReadHelper = readFileSync(sentryReadHelperPath, 'utf8');
+    expect(sentryAction).toContain(
+      'source .github/scripts/sentry-read-json.sh'
+    );
+    expect(sentryReadHelper).toContain('curl --fail --silent --show-error');
+    expect(sentryReadHelper).toContain('--connect-timeout 5 --max-time 15');
+    expect(sentryReadHelper).toContain(
+      '--retry 2 --retry-delay 1 --retry-max-time 40'
+    );
+    expect(sentryReadHelper).toContain(
+      'timeout --signal=TERM --kill-after=1s 55s'
+    );
+    expect(sentryReadHelper).not.toContain('--retry-all-errors');
+    expect(sentryAction).toContain('echo "gate_status=error"');
+    expect(sentryAction).toContain('refusing automatic rollback');
+
     expect(sentryJob).toContain('runs-on: ubuntu-latest');
     expect(sentryJob).toContain('name: Production – jovie');
     expect(sentryJob).toContain('ref: ${{ inputs.expected_sha }}');
@@ -4643,7 +4665,7 @@ describe('production promotion exact-artifact contract', () => {
     const exactProductionErrorQuery =
       '--data-urlencode "query=event.type:error environment:vercel-production"';
     for (const request of statsRequests.slice(0, 2)) {
-      expect(request).toContain('curl --fail --silent --show-error --get');
+      expect(request).toContain('sentry_read_json --get');
       expect(request.match(/--data-urlencode "query=[^"]+"/g)).toEqual([
         exactProductionErrorQuery,
       ]);

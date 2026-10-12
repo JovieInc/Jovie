@@ -211,3 +211,59 @@ test.describe('Marketing auth-entry prefetch boundary', () => {
     });
   }
 });
+
+test.describe('Public footer incremental content stability', () => {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+    { width: 1440, height: 1600 },
+  ]) {
+    test(`expanded footer keeps its origin at ${viewport.width}x${viewport.height}`, async ({
+      browser,
+    }) => {
+      test.setTimeout(30_000);
+      // Isolate the server-rendered shell from hydration. Removing and restoring
+      // the existing navigation models its arrival after the CTA HTML has painted.
+      const context = await browser.newContext({
+        viewport,
+        javaScriptEnabled: false,
+        reducedMotion: 'reduce',
+      });
+      try {
+        const page = await context.newPage();
+        await page.goto('/demo/video', { waitUntil: 'load' });
+        const footer = page.getByTestId('marketing-footer');
+        const originalTop = (await footer.boundingBox())?.y;
+        expect(originalTop).toBeDefined();
+        const navigation = await footer
+          .getByRole('navigation', { name: 'Footer', exact: true })
+          .elementHandle();
+        expect(navigation).not.toBeNull();
+        if (!navigation) throw new Error('Missing expanded footer navigation');
+        await navigation.evaluate(element => {
+          const marker = document.createComment(
+            'incremental-footer-navigation'
+          );
+          element.before(marker);
+          (element as HTMLElement & { restoreMarker?: Comment }).restoreMarker =
+            marker;
+          element.remove();
+        });
+        await page.waitForTimeout(250);
+        const partialTop = (await footer.boundingBox())?.y;
+        await navigation.evaluate(element => {
+          const marker = (element as HTMLElement & { restoreMarker?: Comment })
+            .restoreMarker;
+          if (!marker) throw new Error('Missing incremental footer marker');
+          marker.replaceWith(element);
+        });
+        await page.waitForTimeout(250);
+        const restoredTop = (await footer.boundingBox())?.y;
+        expect(partialTop, 'partial footer origin').toBe(originalTop);
+        expect(restoredTop, 'complete footer origin').toBe(originalTop);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+});

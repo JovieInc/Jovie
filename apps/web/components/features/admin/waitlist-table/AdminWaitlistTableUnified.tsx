@@ -119,6 +119,7 @@ export function AdminWaitlistTableUnified({
 
   // Define columns using TanStack Table
   // Note: selectedIds and headerCheckboxState use refs to prevent column recreation on selection change
+  // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
   const columns = useMemo<ColumnDef<WaitlistEntryRow, any>[]>(
     () => [
       // Checkbox column

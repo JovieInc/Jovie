@@ -17,18 +17,18 @@ then promotes). CI refuses `proven` without a reference route. (Charter's 11 +
 
 ## #recipe-homepage (proven)
 
-**Reference:** `/new` (richest shipped homepage composition; live `/` currently
-renders hero-only). **Audience:** general. **Sections (9):** hero → logo-cloud
-→ feature-split ×3 → spec-wall → social-proof → pricing → cta.
+**Reference:** `/` (selected company-level identity homepage; `/new` redirects
+here). **Audience:** general. **Sections (4):** hero → feature-split (presence)
+→ feature-split (structure) → cta. Permissioned logo proof is conditional and
+omitted by default; available FAQ copy is not a mounted FAQ section.
 
-**Arc:** promise → permission → comprehension → depth → capability → detail →
-belief → price → action (B2B C2 canonical homepage macro-order).
+**Arc:** promise → comprehension → depth → action, using the selected
+homepage's existing identity, presence, structure and claim content authority.
 
-**CTA cadence:** sparse, "Get started" + "See a live profile", hero-and-close.
+**CTA cadence:** sparse, "Claim", hero-and-close.
 
 **Decision tree:** `traffic=home OR (audience=general AND intent=category)`.
-Substitutions: `social-proof` → `stats` (if socialProof absent but stats
-verified); `pricing` → `monetization` (if audience=artist).
+The artist-specific capture/reactivation story belongs to its scoped recipe.
 
 **Never:** for audience=artist specifically (use artist-lp); as a feature page
 (use feature — narrower scope).
