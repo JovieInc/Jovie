@@ -19,6 +19,10 @@ import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { tryWithIdempotency } from '@/lib/idempotency';
+import {
+  type BlockedEffectReceipt,
+  denyAudienceEffect,
+} from '@/lib/outbound/audience-effect-policy';
 import { logger } from '@/lib/utils/logger';
 
 export type CampaignSegment =
@@ -106,12 +110,22 @@ async function insertCampaignBatch(
 }
 
 /**
- * Schedule fan notifications for a campaign + segment.
+ * Review-only scheduling entry point; audience admission is currently closed.
  * Idempotent at (campaign, segment, subscriber) level via dedupKey.
  */
 export async function scheduleCampaignFanNotifications(
   params: ScheduleCampaignNotificationsParams
-): Promise<{ scheduled: number; deduped: number }> {
+): Promise<{
+  scheduled: number;
+  deduped: number;
+  policyBlocked?: BlockedEffectReceipt;
+}> {
+  const policy = denyAudienceEffect('audience.delivery.schedule');
+  if (!policy.dispatchAllowed) {
+    // Direct/bulk invocations cannot read audiences, acquire a queue lock,
+    // enqueue jobs or revive scheduled work, regardless of draft approval.
+    return { scheduled: 0, deduped: 0, policyBlocked: policy };
+  }
   const {
     creatorProfileId,
     campaignId,
