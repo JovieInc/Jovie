@@ -296,6 +296,7 @@ test('source admission loads the actual changelog guard from trusted base when a
     for (const file of [
       'scripts/changelog-source-guard.mjs',
       'scripts/lib/gh-retry.sh',
+      'scripts/lib/github-rate-limit.mjs',
       'scripts/lib/daily-changelog-publication.mjs',
       'scripts/lib/daily-changelog.mjs',
       'scripts/lib/changelog-filter-rules.mjs',
@@ -351,6 +352,8 @@ test('source admission loads the actual changelog guard from trusted base when a
           EXPECTED_HEAD: head,
           GITHUB_EVENT_PATH: eventPath,
           GITHUB_REPOSITORY: 'JovieInc/Jovie',
+          // The re-read path: a first attempt judges the event body instead.
+          GITHUB_RUN_ATTEMPT: '2',
           CURRENT_PR_JSON: JSON.stringify({ head: { sha: currentHead }, body }),
         },
       });
