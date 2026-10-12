@@ -20,6 +20,7 @@ const repo = resolve(import.meta.dirname, '../../..');
 const ports = [
   'scripts/lanes/mesh-host-ack.mjs',
   'scripts/lanes/mesh-native-terminal.mjs',
+  'scripts/lanes/mesh-current-wire.mjs',
 ];
 const inputs = [
   ...ports,
@@ -77,6 +78,7 @@ describe('immutable managed mesh dependency closure', () => {
     expect(Object.keys(proof.outputs).sort()).toEqual([
       'receiver.mjs',
       'terminal.mjs',
+      'wire.mjs',
     ]);
     expect(statSync(portable()).mode & 0o777).toBe(0o700);
     for (const [name, output] of Object.entries(proof.outputs)) {
@@ -91,14 +93,17 @@ describe('immutable managed mesh dependency closure', () => {
         `
       const r = await import(${JSON.stringify(join(portable(), 'receiver.mjs'))});
       const t = await import(${JSON.stringify(join(portable(), 'terminal.mjs'))});
+      const w = await import(${JSON.stringify(join(portable(), 'wire.mjs'))});
       try { await r.createMeshHostAcknowledgments({}).readOwnedTaskAcknowledgment({}); } catch (e) { console.log(e.message); }
       try { t.readNativeJournal('/missing-original-journal'); } catch (e) { console.log(e.code); }
+      try { w.createCurrentHostReader(null); } catch (e) { console.log(e.message); }
     `,
       ],
       { cwd: root, encoding: 'utf8' }
     );
     expect(result).toContain('mesh-host-authority-unconfigured');
     expect(result).toContain('ENOENT');
+    expect(result).toContain('mesh-current-original-host-binding-unavailable');
     for (const file of inputs)
       expect(hash(readFileSync(join(archive, file)))).toBe(
         hash(readFileSync(join(repo, file)))

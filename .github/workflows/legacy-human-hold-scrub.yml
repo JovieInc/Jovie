@@ -1,5 +1,4 @@
 name: Legacy Human Hold Scrub
-# clock-class: temporal-resource
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # necessary-trust-boundary: Trusted base workflow removes retired PR control labels without checking out or executing candidate code.
@@ -8,15 +7,16 @@ name: Legacy Human Hold Scrub
 # JOV-INV-028: retired human-hold labels are removed at the PR boundary.
 # Human taste feedback is collected before a PR opens or after landing behind
 # a feature flag. These retired labels must never pause automated remediation,
-# admission, or landing. The event path removes a newly applied label; the
-# manual sweep reconciles any label applied while this workflow was unavailable.
+# admission, or landing. The event path deletes the repository label itself, so
+# it detaches from every PR and issue at once; the manual sweep reconciles any
+# label applied while this workflow was unavailable. No clock (JOV-INV-042):
+# the */5 sweep removed nothing in its last runs because the labels no longer
+# exist, and re-creating one fires the labeled event above.
 on:
   pull_request_target:
     types: [labeled]
   issues:
     types: [labeled]
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch: {}
 
 permissions: {}
@@ -56,7 +56,7 @@ jobs:
 
   sweep:
     name: Reconcile all open pull requests
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

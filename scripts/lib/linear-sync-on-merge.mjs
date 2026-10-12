@@ -12,7 +12,7 @@
  * need an outcome receipt (JOV-7300). Invariant consumer: JOV-INV-041.
  */
 
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { deprecationCheckGreen } from './deprecation-observation.mjs';
@@ -22,9 +22,11 @@ import {
   LIFECYCLE_STATES,
 } from './validation-lifecycle.mjs';
 import {
+  boundGithubCache,
   createProductionFacts,
   fetchWithRetry,
   githubClient,
+  immutableGithubCache,
   reconcileValidation,
 } from './validation-sync.mjs';
 
@@ -821,7 +823,10 @@ export async function syncLinearIssueOnMerge(options = {}) {
       'GITHUB_REPOSITORY and GITHUB_TOKEN are required before moving a Linear issue'
     );
   }
-  const github = githubClient(fetchImpl, token);
+  const github = immutableGithubCache(
+    githubClient(fetchImpl, token),
+    env.LINEAR_SYNC_GITHUB_CACHE_DIR
+  );
   const facts = createProductionFacts({
     fetchImpl,
     github,
@@ -1004,9 +1009,21 @@ if (isDirectRun) {
     command === 'receipt'
       ? recordValidationReceipt(rest).then(body => console.log(body))
       : syncLinearIssueOnMerge();
-  run.catch(error => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(message);
-    process.exitCode = 1;
-  });
+  run
+    .catch(error => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(message);
+      process.exitCode = 1;
+    })
+    .finally(() => {
+      // Save the immutable-read cache only when its content changed.
+      const dir = process.env.LINEAR_SYNC_GITHUB_CACHE_DIR;
+      const digest = dir ? boundGithubCache(dir) : '';
+      if (digest && process.env.GITHUB_OUTPUT) {
+        appendFileSync(
+          process.env.GITHUB_OUTPUT,
+          `github_cache_key=linear-sync-github-v1-${digest}\n`
+        );
+      }
+    });
 }

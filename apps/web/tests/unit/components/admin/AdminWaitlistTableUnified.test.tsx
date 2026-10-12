@@ -6,18 +6,24 @@ import { AdminWaitlistTableUnified } from '@/components/features/admin/waitlist-
 let capturedGetRowClassName:
   | ((row: unknown, index: number) => string)
   | undefined;
+let capturedColumnIds: string[] = [];
 
 vi.mock('@/features/admin/table/AdminDataTable', () => ({
   AdminDataTable: ({
     children,
+    columns,
     emptyState,
     getRowClassName,
   }: {
     readonly children?: ReactNode;
+    readonly columns?: Array<{ id?: string }>;
     readonly emptyState?: ReactNode;
     readonly getRowClassName?: (row: unknown, index: number) => string;
   }) => {
     capturedGetRowClassName = getRowClassName;
+    capturedColumnIds = (columns ?? [])
+      .map(column => column.id)
+      .filter((id): id is string => typeof id === 'string');
 
     return (
       <div data-testid='admin-data-table'>
@@ -91,5 +97,29 @@ describe('AdminWaitlistTableUnified', () => {
         .querySelector('svg')
         ?.getAttribute('class') ?? ''
     ).toContain('text-tertiary-token');
+  });
+
+  it('builds the memoized column contract handed to AdminDataTable', () => {
+    render(
+      <AdminWaitlistTableUnified
+        entries={[entry]}
+        page={1}
+        pageSize={20}
+        total={1}
+      />
+    );
+
+    expect(capturedColumnIds).toEqual([
+      'select',
+      'name',
+      'email',
+      'primaryGoal',
+      'primarySocial',
+      'spotify',
+      'heardAbout',
+      'status',
+      'created',
+      'actions',
+    ]);
   });
 });

@@ -167,6 +167,7 @@ export function MarketingFooter({
         className
       )}
       data-testid='marketing-footer'
+      data-footer-variant={resolvedVariant}
     >
       <div
         className={cn(

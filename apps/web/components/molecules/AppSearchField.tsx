@@ -2,7 +2,7 @@
 
 import { Input } from '@jovie/ui';
 import { Search, X } from 'lucide-react';
-import type * as React from 'react';
+import * as React from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
@@ -33,16 +33,19 @@ export function AppSearchField({
   className,
   inputClassName,
 }: AppSearchFieldProps) {
+  const internalInputRef = React.useRef<HTMLInputElement>(null);
+  React.useImperativeHandle(inputRef, () => internalInputRef.current!, []);
+
   return (
     <div
       className={cn(
-        'flex h-app-control-sm items-center gap-1.5 rounded-full border border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) px-2.5 text-primary-token transition-[border-color,box-shadow,background-color] duration-subtle hover:bg-surface-1 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/14',
+        'flex h-app-control-sm items-center gap-1.5 rounded-full border border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) px-2.5 text-primary-token transition-[border-color,box-shadow,background-color] duration-subtle hover:bg-surface-1 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/14 [&_input]:focus-visible:ring-offset-0',
         className
       )}
     >
       <Search className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
       <Input
-        ref={inputRef}
+        ref={internalInputRef}
         autoFocus={autoFocus}
         type='search'
         data-app-search-field='true'
@@ -54,7 +57,7 @@ export function AppSearchField({
         placeholder={placeholder}
         aria-label={ariaLabel}
         className={cn(
-          'h-full border-0 bg-transparent px-0 text-app tracking-tight text-secondary-token shadow-none ring-0 placeholder:text-tertiary-token focus-visible:border-0 focus-visible:ring-0',
+          'h-full appearance-none border-0 bg-transparent px-0 text-app tracking-tight text-secondary-token shadow-none ring-0 placeholder:text-tertiary-token focus-visible:border-0 focus-visible:ring-0 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden',
           inputClassName
         )}
       />
@@ -64,6 +67,7 @@ export function AppSearchField({
           ariaLabel='Clear search'
           className='border-transparent bg-transparent text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-secondary-token'
           onClick={() => {
+            internalInputRef.current?.focus({ preventScroll: true });
             onChange('');
             onClear?.();
           }}

@@ -16,7 +16,7 @@
         "owner": "ci-risk-classifier / release engineering",
         "surface": "ephemeral Neon branch ci-neon-run-<run_id>-<attempt> (isolated database only)",
         "ttlHours": 2,
-        "cleanupTrigger": "Neon branch TTL (expires_in_hours=2); neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupTrigger": "Neon branch TTL (expires_in_hours=2); PR-close cleanup and on-limit cleanup in neon-create-branch-with-retry",
         "cleanupProof": "Branch absent from the Neon project branch inventory",
         "costBudget": "One Neon branch with at most 2h of endpoint compute per selected run"
       }
@@ -34,7 +34,7 @@
         "owner": "ci-risk-classifier / release engineering",
         "surface": "ephemeral Neon branch dashboard-lighthouse-<run_id>-<attempt> (isolated database only)",
         "ttlHours": 2,
-        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupTrigger": "Neon branch TTL; PR-close cleanup and on-limit cleanup in neon-create-branch-with-retry",
         "cleanupProof": "Branch absent from the Neon project branch inventory",
         "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
       }
@@ -52,7 +52,7 @@
         "owner": "ci-risk-classifier / release engineering",
         "surface": "ephemeral Neon branch golden-path-<run_id>-<attempt> (isolated database only)",
         "ttlHours": 2,
-        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupTrigger": "Neon branch TTL; PR-close cleanup and on-limit cleanup in neon-create-branch-with-retry",
         "cleanupProof": "Branch absent from the Neon project branch inventory",
         "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
       }
@@ -70,7 +70,7 @@
         "owner": "ci-risk-classifier / release engineering",
         "surface": "ephemeral Neon branch admin-smoke-<run_id>-<attempt> (isolated database only)",
         "ttlHours": 2,
-        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupTrigger": "Neon branch TTL; PR-close cleanup and on-limit cleanup in neon-create-branch-with-retry",
         "cleanupProof": "Branch absent from the Neon project branch inventory",
         "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
       }
@@ -105,7 +105,7 @@
         "owner": "ci scheduled evidence lanes / release engineering",
         "surface": "ephemeral Neon branch e2e-full-<run_id>-* (isolated database only)",
         "ttlHours": 2,
-        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupTrigger": "Neon branch TTL; PR-close cleanup and on-limit cleanup in neon-create-branch-with-retry",
         "cleanupProof": "Branch absent from the Neon project branch inventory",
         "costBudget": "One Neon branch with at most 2h of endpoint compute per weekly run"
       }
@@ -122,7 +122,7 @@
         "owner": "ci scheduled evidence lanes / release engineering",
         "surface": "ephemeral Neon branch nightly-e2e-<run_id> (isolated database only)",
         "ttlHours": 2,
-        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupTrigger": "Neon branch TTL; PR-close cleanup and on-limit cleanup in neon-create-branch-with-retry",
         "cleanupProof": "Branch absent from the Neon project branch inventory",
         "costBudget": "One Neon branch with at most 2h of endpoint compute per nightly run"
       }
@@ -139,7 +139,7 @@
         "owner": "ci scheduled evidence lanes / release engineering",
         "surface": "ephemeral Neon branch visual-regression-<run_id> (isolated database only)",
         "ttlHours": 2,
-        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupTrigger": "Neon branch TTL; PR-close cleanup and on-limit cleanup in neon-create-branch-with-retry",
         "cleanupProof": "Branch absent from the Neon project branch inventory",
         "costBudget": "One Neon branch with at most 2h of endpoint compute per daily run"
       }

@@ -143,21 +143,11 @@ describe('ProfilePrimaryTabPanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the Payments card on About when the profile can take payments', () => {
-    renderPanel({
-      mode: 'about',
-      modeCardAccents: PEN_ACCENTS,
-      paymentsVenmoLink: 'https://venmo.com/u/timwhite',
-    });
+  it('keeps the Payments surface off the About tab even when the profile can take payments', () => {
+    // JOV-7810: pay content only renders on the pay intent surface.
+    renderPanel({ mode: 'about', modeCardAccents: PEN_ACCENTS });
 
-    const card = screen.getByTestId('profile-payments-card');
-    expect(card).toHaveAttribute('data-accent', 'ion');
     expect(screen.getByTestId('profile-primary-tab-about')).toBeInTheDocument();
-  });
-
-  it('hides the Payments card when there is no safe payment link', () => {
-    renderPanel({ mode: 'about', paymentsVenmoLink: 'https://evil.test/pay' });
-
     expect(screen.queryByTestId('profile-payments-card')).toBeNull();
   });
 

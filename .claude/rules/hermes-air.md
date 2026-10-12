@@ -12,7 +12,7 @@ Operating contract for the always-on Hermes gateway running on the dedicated 16 
 
 Hermes was retired as Summer's runtime on 2026-09-05 and its gateway is unloaded on the Air. The Air (`tims-macbook-air`) is now the fleet's **Mac lane**, doing Mac-only work that Gem (Linux) cannot:
 
-- **Self-hosted Actions runner** `tims-macbook-air` (labels `self-hosted, macOS, ARM64, jovie-mac`). It runs only jobs whose `runs-on` selects `jovie-mac` after a fresh `Mac Runner Heartbeat`. Today that is the iOS fast gate in `ios-ci.yml`. Any stale, busy or uncertain heartbeat falls back to hosted macOS, and the repo variable `JOVIE_MAC_RUNNER=off` forces hosted. Release regressions never run here.
+- **Self-hosted Actions runner** `tims-macbook-air` (labels `self-hosted, macOS, ARM64, jovie-mac, jovie-mac-tims-macbook-air`). It runs only `mac-lane.yml` child runs: the iOS fast gate and the Mac build that merge groups and main pushes try on an idle Mac first. A Mac that does not pick one up within 45s, or dies mid-run, hands the lane to hosted macOS; `JOVIE_MAC_RUNNER=off` forces hosted. Release regressions never run here. See `.claude/rules/infra.md` "macOS runners".
 - **Nightly Mac dogfood verifier:** a local launchd job running a headless Claude Code session on a clean `origin/main` worktree. It exercises the iOS simulator build, the macOS apps, and read-only production web. It files at most three `mac-dogfood` Linear issues per night and never edits, commits, pushes or merges.
 - **gbrain client only.** The Air uses the ops Mac server over Tailscale with its own bearer token. It runs no gbrain server against the shared database.
 

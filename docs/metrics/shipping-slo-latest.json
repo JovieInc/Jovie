@@ -1,34 +1,28 @@
 {
-  "at": "2026-10-09T14:21:01.282Z",
+  "at": "2026-10-12T16:42:18.429Z",
   "ciP95Seconds": {
     "pull_request": null,
-    "merge_group": 3488
+    "merge_group": 613
   },
   "queueWaitP95Seconds": null,
   "queueEjectionRate": null,
   "leadTimeP95Seconds": {
-    "devin": 35208,
-    "codex": 47126,
-    "other": 33060
+    "devin": 12201,
+    "codex": 201223,
+    "other": 22364
   },
   "remediationP95Seconds": {
     "prRedToGreen": null,
-    "mainRedToGreen": 2383,
+    "mainRedToGreen": 2872,
     "productionPromoteHold": null
   },
   "productionLagP95Seconds": null,
   "throughput": {
     "mergesPerDay": 42.857142857142854,
-    "verifiedPerDay": 0,
+    "verifiedPerDay": null,
     "wowGrowth": null,
     "growthTrend": "unknown"
   },
-  "regressions": [
-    "ci_walltime.merge_group.p95",
-    "lead_time.devin.p95",
-    "lead_time.codex.p95",
-    "remediation.main_red_to_green.p95",
-    "throughput.verified_per_day"
-  ],
+  "regressions": ["lead_time.codex.p95", "remediation.main_red_to_green.p95"],
   "flatStall": false
 }
