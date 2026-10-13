@@ -509,7 +509,6 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
   'scripts/lib/__tests__/linear-cooldown.test.mjs',
   'scripts/lib/__tests__/policy-gate-liveness.test.mjs',
-  'scripts/lib/__tests__/real-eval-workflow.test.mjs',
   'scripts/lib/observability-fingerprint.test.mjs',
   'scripts/logo-asset-normalization.test.mjs',
   'scripts/observability-issue-github.test.mjs',

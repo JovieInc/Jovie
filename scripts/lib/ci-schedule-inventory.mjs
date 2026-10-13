@@ -20,7 +20,6 @@ export const SCHEDULE_CLASSES = Object.freeze([
 export const EVIDENCE_DRIVEN_WORKFLOWS = Object.freeze([
   '.github/workflows/codeql.yml',
   '.github/workflows/e2e-full-matrix.yml',
-  '.github/workflows/eval-real-model.yml',
   '.github/workflows/nightly-testing-agent.yml',
   '.github/workflows/nightly-tests.yml',
   // security.yml intentionally keeps a weekly upstream-advisory baseline
