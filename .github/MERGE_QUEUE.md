@@ -193,8 +193,11 @@ qualification" are not release conditions. The unlabel is done with the
 Jovie Bot token, so it wakes enrollment, and required checks still gate the
 merge.
 
-`queue-deferred`, `needs-rebase`, and `needs-conflict-resolution` are historical
-machine annotations, not native admission authority. Actual conflicts, failed
+`queue-deferred` is a stop label like `hold` (2026-10-13): agents use it to
+keep a PR out of the queue, so green enroll and every other copy of the stop
+set skip it, and the hold contract governs it (receipt or 24 h release).
+`needs-rebase` and `needs-conflict-resolution` are historical machine
+annotations, not native admission authority. Actual conflicts, failed
 required checks, draft state, and explicit human `hold`, `gated`, or `incident`
 labels still block the finishing request. Shared receipt and fleet helpers
 remain for their other callers and historical records; their presence does

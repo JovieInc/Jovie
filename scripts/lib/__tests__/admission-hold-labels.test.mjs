@@ -133,3 +133,12 @@ test('green enroll wakes on ready_for_review but never runs enroll for a draft e
     /github\.event_name != 'pull_request_target' \|\| github\.event\.pull_request\.draft == false/
   );
 });
+
+// Agents defer PRs with `queue-deferred`; the sole queue writer must honor it
+// like any other stop label (queue writer consolidation, 2026-10-13).
+test('queue-deferred blocks admission and is governed by the hold contract', () => {
+  assert.ok(STOP_HOLD_LABELS.includes('queue-deferred'));
+  assert.ok(ADMISSION_BLOCKING_LABELS.includes('queue-deferred'));
+  assert.ok(CONTRACT_LABELS.includes('queue-deferred'));
+  assert.ok(MEMBER_POLICY_HOLD_LABELS.has('queue-deferred'));
+});

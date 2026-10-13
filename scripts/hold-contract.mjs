@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Hold contract (jovie-hold/v1).
 //
-// A stop label (`hold`, `gated`, `incident`, `do-not-merge`, or a `tim-hold`
-// variant; scripts/lib/admission-hold-labels.mjs) pauses admission. It may not
+// A stop label (`hold`, `gated`, `incident`, `do-not-merge`, `queue-deferred`,
+// or a `tim-hold` variant; scripts/lib/admission-hold-labels.mjs) pauses admission. It may not
 // pause it forever on prose alone. Whoever applies one posts a receipt comment
 // on the PR:
 //

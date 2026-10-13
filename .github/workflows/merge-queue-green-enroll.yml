@@ -537,7 +537,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request_target' &&
       github.event.action == 'labeled' &&
-      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-poison"]'), github.event.label.name)
+      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-deferred","queue-poison"]'), github.event.label.name)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions: {}
@@ -561,7 +561,7 @@ jobs:
             const sourceHead = context.payload.pull_request?.head?.sha;
             const rawLabel = context.payload.label?.name;
             const label = typeof rawLabel === 'string' ? rawLabel.toLowerCase() : null;
-            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-poison']);
+            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-deferred', 'queue-poison']);
             if (!Number.isSafeInteger(number) || number <= 0 ||
                 typeof sourceHead !== 'string' || !/^[a-f0-9]{40}$/.test(sourceHead) || !blocking.has(label)) {
               core.info('Ignoring an incomplete blocking-label event');
