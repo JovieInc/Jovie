@@ -198,19 +198,6 @@ jobs:
           timeout 90s node scripts/backlog-orchestrator/triage-event-assess.mjs \
             --sweep > "$RECEIPT_FILE"
 
-      - name: Wake existing picker after catch-up Todo transitions
-        if: always()
-        env:
-          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-catch-up.json
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -s "$RECEIPT_FILE" ]] && jq -e '.wakeSymphony == true' "$RECEIPT_FILE" >/dev/null; then
-            curl --fail --silent --show-error --max-time 5 \
-              -H 'content-type: application/json' -d '{}' \
-              http://127.0.0.1:4041/api/v1/refresh
-          fi
-
       - name: Preserve Triage catch-up receipt
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -266,17 +253,6 @@ jobs:
           timeout 60s node scripts/backlog-orchestrator/triage-event-assess.mjs \
             --event-file="$GITHUB_EVENT_PATH" > "$RECEIPT_FILE"
           jq -e '.schema == "linear-triage-assessment/v1"' "$RECEIPT_FILE"
-      - name: Wake the lanes picker after Todo transition
-        shell: bash
-        env:
-          RECEIPT_FILE: ${{ runner.temp }}/linear-triage-assessment.json
-        run: |
-          set -euo pipefail
-          if jq -e '.wakeSymphony == true' "$RECEIPT_FILE" >/dev/null; then
-            curl --fail --silent --show-error --max-time 5 \
-              -H 'content-type: application/json' -d '{}' \
-              http://127.0.0.1:4041/api/v1/refresh
-          fi
       - name: Preserve exact assessment receipt
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
