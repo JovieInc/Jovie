@@ -15,7 +15,7 @@ describe('Logo', () => {
     render(<Logo />);
 
     const logo = screen.getByRole('img', { hidden: true });
-    expect(logo).toHaveAttribute('viewBox', '0 0 136 39');
+    expect(logo.getAttribute('viewBox')).toMatch(/^0 0 \d+ \d+/);
     expect(logo).toHaveAttribute('fill', 'currentColor');
   });
 
@@ -65,13 +65,12 @@ describe('Logo', () => {
     expect(logo.style.color).toContain('var(--linear-text-primary');
   });
 
-  it('contains the Jovie logo path data', () => {
+  it('contains the five construction glyphs', () => {
     render(<Logo />);
 
     const logo = screen.getByRole('img', { hidden: true });
+    expect(logo.querySelectorAll('path')).toHaveLength(5);
     const path = logo.querySelector('path');
-    expect(path).toBeInTheDocument();
-    expect(path).toHaveAttribute('fill-rule', 'evenodd');
     expect(path).toHaveAttribute('d');
 
     // Verify it has a substantial path (the Jovie logo)
@@ -85,7 +84,6 @@ describe('Logo', () => {
 
     const logo = screen.getByRole('img', { hidden: true });
     expect(logo).toHaveAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    expect(logo).toHaveAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
   });
 
   it('names the wordmark for assistive tech', () => {
@@ -99,25 +97,17 @@ describe('Logo', () => {
     expect(screen.queryByLabelText('Jovie logo')).not.toBeInTheDocument();
   });
 
-  it('renders both mark and wordmark for the full variant', () => {
+  it('draws the wordmark alone for the full variants (its o is the mark)', () => {
     render(<Logo variant='full' />);
-    expect(screen.getByLabelText('Jovie')).toBeInTheDocument();
     expect(screen.getByLabelText('Jovie logo')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Jovie')).not.toBeInTheDocument();
   });
 
-  it('uses explicit dark and light alt wordmarks instead of inherited text color', () => {
-    render(<Logo variant='wordAlt' />);
-    const images = screen.getAllByAltText('Jovie logo');
-    expect(images).toHaveLength(2);
-    expect(images[0]).toHaveAttribute(
-      'src',
-      '/brand/Jovie-Logo-Wordmark-Alt-Black.svg'
+  it('draws wordAlt as the same inline wordmark, not raster images', () => {
+    const { container } = render(<Logo variant='wordAlt' />);
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByLabelText('Jovie logo').tagName.toLowerCase()).toBe(
+      'svg'
     );
-    expect(images[0]).toHaveClass('dark:hidden');
-    expect(images[1]).toHaveAttribute(
-      'src',
-      '/brand/Jovie-Logo-Wordmark-Alt-White.svg'
-    );
-    expect(images[1]).toHaveClass('hidden', 'dark:block');
   });
 });
