@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => {
   const backend = { kind: 'postgres' };
   const store = {
     ingestPacket: vi.fn(async () => 'ingested'),
+    inspectLedger: vi.fn(async () => ({ entryOutcomes: ['ledger-entry'] })),
     projectReviewReady: vi.fn(async () => 'projected'),
     recordFounderDecision: vi.fn(async () => 'recorded'),
   };
@@ -45,9 +46,12 @@ it('constructs one Postgres registry store and forwards runtime operations', asy
   const packet = { subject: { id: 'section.hero' } } as never;
   await expect(
     ingestMarketingCertificationPacket(packet, '2026-09-05T07:59:00.000Z')
-  ).resolves.toBe('ingested');
+  ).resolves.toEqual({ entries: ['ledger-entry'], row: 'ingested' });
   expect(mocks.store.ingestPacket).toHaveBeenCalledWith(
     packet,
+    '2026-09-05T07:59:00.000Z'
+  );
+  expect(mocks.store.inspectLedger).toHaveBeenCalledWith(
     '2026-09-05T07:59:00.000Z'
   );
 

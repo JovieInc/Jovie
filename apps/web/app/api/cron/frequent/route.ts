@@ -33,7 +33,7 @@ import {
 } from '@/lib/canaries/receipt-freshness';
 import { reconcileOrphanedAcceptedActions } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { verifyCronRequest } from '@/lib/cron/auth';
-import { db } from '@/lib/db';
+import { db, withRetry } from '@/lib/db';
 import {
   discoveryKeywords,
   leadPipelineSettings,
@@ -372,8 +372,12 @@ export async function GET(request: Request) {
       'ingestionFallback',
       async () => {
         const fallbackNow = new Date();
-        const claimed = await withSystemIngestionSession(tx =>
-          claimPendingJobs(tx, fallbackNow, 2)
+        const claimed = await withRetry(
+          () =>
+            withSystemIngestionSession(tx =>
+              claimPendingJobs(tx, fallbackNow, 2)
+            ),
+          'ingestion.claimPendingJobs'
         );
         let processed = 0;
         for (const job of claimed) {

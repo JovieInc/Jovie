@@ -89,18 +89,18 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
 - Minimum entries to merge: `1`.
 - Minimum entries wait: `0` minutes. A source-green PR forms a group
   immediately instead of waiting for a cohort.
-- Maximum entries per merge: `1`. A slow or starved PR can invalidate only its
-  own synthetic head; it cannot batch-block an unrelated fast PR.
-- Maximum entries building concurrently: checked-in ceiling `10`. Lower live
-  values from `1` through `10` remain supported as a reversible runner-capacity
-  brake.
+- Maximum entries per merge: `5`. Each entry still builds its own synthetic
+  head layered on the entry ahead (one member per group), so per-member lanes
+  and member policy are unchanged; up to five green entries land in one push.
+- Maximum entries building concurrently: checked-in ceiling `6`. Lower live
+  values remain supported as a reversible runner-capacity brake. Raise the
+  file and the live ruleset together.
 - Check response timeout: `60` minutes (source-first cutover and live readback
   verified 2026-09-24). Required checks and ALLGREEN remain unchanged.
 - Production health governs deployment and promotion through the existing
   production controls. Native source admission uses the required checks above;
   the retired Auto-Enroll fleet gate does not create a second admission gate.
-- Re-read live ruleset `10512119` before claiming the singleton-group settings
-  are active.
+- Re-read live ruleset `10512119` before claiming these settings are active.
 - Signed-commit and non-fast-forward rules: dormant/not applied. The checked-in
   payload intentionally matches live ruleset `10512119`; enabling either is a
   separate reviewed cutover, not an implicit source reapply.
@@ -128,16 +128,28 @@ mutations additionally require the dedicated controller authorization, so a
 bare local command cannot mutate queue state accidentally.
 
 The repository still has one native queue for `main`; lane separation happens
-inside each singleton synthetic head. The trusted changed-path classifier runs
+inside each per-member synthetic head. The trusted changed-path classifier runs
 only the selected Web, Mac, iOS, operations/tooling, and shared-contract lanes,
 so a fast-only change does not inherit an unrelated PR's slow product lane.
 
-**Ship now:** immediate singleton groups (`min=1`, `max=1`, `wait=0`) with up
-to ten entries building concurrently. **Re-evaluate when:** seven days of
-same-method evidence shows hosted-runner pickup above three minutes or lower
-merges/hour. **Then:** reduce `max_entries_to_build`; do not couple PRs into
-larger groups unless the data shows the throughput gain exceeds slow-sibling
-blocking.
+**Ship now:** immediate groups (`min=1`, `wait=0`), up to five green entries
+per merge push, six building concurrently, ALLGREEN. HEADGREEN is unsafe here:
+member policy validates only the newest member and lanes are path-selected per
+member, so an earlier member could land without its own lanes passing.
+**Re-evaluate when:** the group failure rate stays under 10% and the repo
+GITHUB_TOKEN bucket stays healthy for a day. **Then:** raise
+`max_entries_to_build` toward 8 in this file and the live ruleset together,
+watching hosted macOS pickup (the org shares five hosted macOS slots).
+
+### Tuning log
+
+| When (UTC) | Change | Why |
+| --- | --- | --- |
+| before 2026-10-12 23:25 | live `max_entries_to_merge` 1 → 5 | batch green entries per push |
+| 2026-10-12 23:25 | live `max_entries_to_build` 3 → 6 | queue 38 deep |
+| 2026-10-13 02:37 | live `max_entries_to_build` 6 → 8 | throughput |
+| 2026-10-13 03:47 | live `max_entries_to_build` 8 → 6 | GITHUB_TOKEN quota storm |
+| 2026-10-13 | source synced to live (build 6, merge 5) | keep the daily verify green |
 
 ## Reconciliation and loop prevention
 
@@ -305,9 +317,33 @@ JovieInc/Jovie`. After flipping the variable, also run
 and disarm every PR it prints. `scripts/merge-queue-green-enroll.test.mjs` fails if a job
 that can enqueue or arm lacks the guard.
 
-After a breaker dequeue, restore the snapshot directly, or release each PR
-with `hold` then unhold: green enroll does not re-admit a manually dequeued,
-unchanged head.
+Circuit-breaker dequeues: when a storm forces PRs out of the queue, mark each
+one so green enroll restores it after the lift instead of a hand restore:
+
+```sh
+gh api graphql -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
+  -f id="$(gh pr view N --json id --jq .id -R JovieInc/Jovie)" &&
+  gh pr edit N --add-label queue-breaker -R JovieInc/Jovie
+```
+
+Once `QUEUE_FREEZE` is back to 0, green enroll's next sweep (any landing on
+main) or a dispatch re-admits a `queue-breaker` PR whose manual removal left
+the head unchanged, while it is still green and carries no hold label or
+failure hold. Immediately before enqueue it revalidates that state and consumes
+the marker as a one-shot authorization. If the marker cannot be consumed, the
+state changes, or enqueue then fails, the PR stays out and must be marked again
+before another restore attempt. A manual dequeue without the marker, or a
+`failed_checks` removal, is never re-admitted this way.
+
+The marker must be added after a successful dequeue, as the `&&` sequence
+above enforces. Green enroll binds that label event to the latest removal, so
+a failed/interrupted dequeue or an older marker cannot authorize a later one.
+If the head changes after the marked removal, normal admission handles the new
+revision and clears the stale marker after enqueue.
+
+For breaker dequeues that were not marked first, restore the snapshot
+directly, or release each PR with `hold` then unhold. Green enroll does not
+otherwise re-admit a manually dequeued, unchanged head.
 
 To admit one PR without a roster sweep, dispatch green enroll with
 `gh workflow run merge-queue-green-enroll.yml -f pr_number=N -R JovieInc/Jovie`.

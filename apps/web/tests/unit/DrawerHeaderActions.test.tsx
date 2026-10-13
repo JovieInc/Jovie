@@ -111,6 +111,23 @@ describe('DrawerHeaderActions', () => {
     ]);
   });
 
+  it('shows a visible close control below lg, where every drawer is a full-screen sheet', () => {
+    const onClose = vi.fn();
+    render(<DrawerHeaderActions primaryActions={[]} onClose={onClose} />);
+
+    const close = screen.getByTestId('drawer-header-close');
+    expect(close).toHaveAttribute('aria-label', 'Close');
+    expect(close).toHaveAttribute('data-variant', 'ghost');
+    expect(close.className).toBe('lg:hidden');
+    close.click();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the visible close control when the drawer cannot close', () => {
+    render(<DrawerHeaderActions primaryActions={[]} />);
+    expect(screen.queryByTestId('drawer-header-close')).toBeNull();
+  });
+
   it('keeps the overflow trigger borderless', () => {
     render(
       <DrawerHeaderActions

@@ -31,6 +31,11 @@ describe('command registry navigation', () => {
       label: PRODUCT_ONTOLOGY.identity.label,
       href: APP_ROUTES.PRESENCE,
     });
+    // Home leads, and nav icons match the sidebar (resolvable in ICON_MAP).
+    const navIds = navCommands(COMMANDS).map(command => command.id);
+    expect(navIds[0]).toBe('go-home');
+    expect(byId.get('go-home')?.href).toBe(APP_ROUTES.DASHBOARD);
+    expect(byId.get('go-presence')?.iconName).toBe('User');
     expect(byId.has('go-youtube')).toBe(false);
     expect(byId.has('go-jovie-work')).toBe(false);
     expect(byId.has('go-calendar')).toBe(true);

@@ -9,7 +9,8 @@ const ROOT = resolve(import.meta.dirname, '../../..');
 const CI = /** @type {{ jobs: Record<string, any> }} */ (
   load(readFileSync(resolve(ROOT, '.github/workflows/ci.yml'), 'utf8'))
 );
-const STEP_NAME = 'Eject the merge group on this lane failure';
+const STEP_NAME = 'Post a failing PR Ready on the combined head';
+const ejectJob = lane => `${lane}-fail-fast`;
 const SHA = 'a'.repeat(40);
 
 // Lanes whose failure always fails the combined-head `PR Ready` aggregate and
@@ -50,8 +51,8 @@ function transitiveNeeds(job, seen = new Set()) {
   return seen;
 }
 
-function ejectStep(job) {
-  return CI.jobs[job].steps.find(step => step.name === STEP_NAME);
+function ejectStep(lane) {
+  return CI.jobs[ejectJob(lane)].steps.find(step => step.name === STEP_NAME);
 }
 
 let server;
@@ -90,7 +91,7 @@ async function runEject({ status }) {
         GITHUB_SERVER_URL: 'https://github.com',
         GITHUB_REPOSITORY: 'JovieInc/Jovie',
         GITHUB_SHA: SHA,
-        GITHUB_JOB: 'ci-fast-remaining',
+        LANE: 'ci-fast-remaining',
         GITHUB_RUN_ID: '42',
       },
     }
@@ -108,28 +109,53 @@ describe('merge-group fail-fast ejection', () => {
     const ready = transitiveNeeds('ci-merge-group-ready');
     for (const lane of FAIL_FAST_LANES)
       expect(ready.has(lane), lane).toBe(true);
-    const withStep = Object.keys(CI.jobs).filter(job =>
-      (CI.jobs[job].steps ?? []).some(step => step.name === STEP_NAME)
+    const ejectors = Object.keys(CI.jobs).filter(job =>
+      job.endsWith('-fail-fast')
     );
-    expect(withStep.sort()).toEqual([...FAIL_FAST_LANES].sort());
+    expect(ejectors.sort()).toEqual(FAIL_FAST_LANES.map(ejectJob).sort());
   });
 
-  it('runs last, only for a failed merge-group lane, with status scope', () => {
+  it('runs a step-only job per lane, only for its failed merge-group lane', () => {
     const run = ejectStep(FAIL_FAST_LANES[0]).run;
     for (const lane of FAIL_FAST_LANES) {
-      const { steps, permissions } = CI.jobs[lane];
-      const step = ejectStep(lane);
-      expect(steps.at(-1), lane).toBe(step);
-      expect(step.if, lane).toBe(
+      const job = CI.jobs[ejectJob(lane)];
+      expect(needsOf(ejectJob(lane)), lane).toEqual([lane]);
+      expect(job.if, lane).toBe(
         "${{ failure() && github.event_name == 'merge_group' }}"
       );
-      expect(step.run, lane).toBe(run);
-      expect(permissions.statuses, lane).toBe('write');
+      expect(job.permissions, lane).toEqual({ statuses: 'write' });
+      expect(job.steps, lane).toHaveLength(1);
+      expect(ejectStep(lane).run, lane).toBe(run);
+      expect(ejectStep(lane).env.LANE, lane).toBe(lane);
+      // The lane itself keeps no write scope.
+      const lanePermissions = Object.entries(CI.jobs[lane].permissions ?? {});
       expect(
-        Object.entries(permissions).filter(([, level]) => level === 'write'),
+        lanePermissions.filter(([, level]) => level === 'write'),
         lane
-      ).toEqual([['statuses', 'write']]);
+      ).toEqual([]);
     }
+  });
+
+  it('only posts failure, never a passing status', () => {
+    const run = ejectStep(FAIL_FAST_LANES[0]).run;
+    expect(run).toContain('\\"state\\":\\"failure\\"');
+    expect(run).not.toMatch(/success|pending/);
+  });
+
+  it('gives statuses: write only to jobs that run no action and no checked-out code', () => {
+    // 2026-10-13 review of #21539: a lane running third-party actions or the
+    // queued head's code with statuses: write could forge a SUCCESS PR Ready.
+    for (const [name, job] of Object.entries(CI.jobs)) {
+      if ((job.permissions ?? {}).statuses !== 'write') continue;
+      for (const step of job.steps ?? []) {
+        expect(step.uses, `${name}: ${step.name}`).toBeUndefined();
+      }
+    }
+    expect(
+      Object.values(CI.jobs).filter(
+        job => (job.permissions ?? {}).statuses === 'write'
+      )
+    ).toHaveLength(FAIL_FAST_LANES.length);
   });
 
   it('posts a failing PR Ready status on the exact combined head', async () => {

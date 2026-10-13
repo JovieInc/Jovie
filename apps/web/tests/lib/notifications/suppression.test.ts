@@ -35,11 +35,13 @@ vi.mock('@/lib/db', () => ({
       }),
     }),
   },
+  withRetry: vi.fn((operation: () => Promise<unknown>) => operation()),
 }));
 
-import { db } from '@/lib/db';
+import { db, withRetry } from '@/lib/db';
 import {
   addSuppression,
+  cleanupExpiredSuppressions,
   getSuppressionStats,
   hashEmail,
   isCategorySuppressed,
@@ -324,6 +326,30 @@ describe('Suppression Service', () => {
       expect(stats.user_request).toBe(0);
       expect(stats.abuse).toBe(0);
       expect(stats.legal).toBe(0);
+    });
+  });
+
+  describe('cleanupExpiredSuppressions', () => {
+    it('should return the number of deleted suppressions', async () => {
+      vi.mocked(db.delete).mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: 'a' }, { id: 'b' }]),
+        }),
+      } as never);
+
+      const result = await cleanupExpiredSuppressions();
+
+      expect(result).toBe(2);
+      expect(db.delete).toHaveBeenCalled();
+    });
+
+    it('should route the delete through withRetry for transient failures', async () => {
+      await cleanupExpiredSuppressions();
+
+      expect(withRetry).toHaveBeenCalledWith(
+        expect.any(Function),
+        'notifications.cleanupExpiredSuppressions'
+      );
     });
   });
 });

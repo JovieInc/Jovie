@@ -1092,7 +1092,6 @@ jobs:
       checks: read
       contents: read
       pull-requests: read
-      statuses: write
     steps:
       - name: Check out trusted admission policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1141,17 +1140,6 @@ jobs:
             echo "synthetic_head_sha=$GITHUB_SHA"
             echo 'current_queue_state=LEGACY_EXACT_REF_BOOTSTRAP'
           } >> "$GITHUB_OUTPUT"
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   # A rebuilt group gets a new queue ref for the same PR, but CI keys
   # merge_group concurrency by head SHA, so a superseded run kept every lane
@@ -1270,7 +1258,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 3
     outputs:
       risk_level: ${{ steps.classify.outputs.risk_level }}
@@ -1390,17 +1377,6 @@ jobs:
           name: ci-risk-classification-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-harness/ci-risk-classification.json
           retention-days: 7
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-env-example-guard:
     needs: [ci-path-changes]
@@ -1456,7 +1432,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1523,17 +1498,6 @@ jobs:
             ./scripts/security/scan-secrets.sh ci-pr "$BASE_SHA"
       - name: Verify backup-file fixture coverage
         run: ./scripts/security/verify-gitleaks-coverage.sh
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-golden-path-lock:
     name: Golden Path Lock
@@ -1548,7 +1512,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1570,17 +1533,6 @@ jobs:
             ${{ runner.temp }}/golden-path-lock-coverage/coverage-final.json
           if-no-files-found: ignore
           retention-days: 7
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-visual-snapshot-compare:
     name: Visual Snapshot Compare
@@ -1601,7 +1553,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 25
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
@@ -1792,17 +1743,6 @@ jobs:
           allow-images: 'true'
           public-images: 'true'
           allow-markdown: 'true'
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-fast-typecheck:
     name: ci-fast (typecheck)
@@ -1813,7 +1753,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 25
     if: >-
       !cancelled() &&
@@ -1918,17 +1857,6 @@ jobs:
           path: ${{ runner.temp }}/ci-fast-lanes.json
           retention-days: 7
           if-no-files-found: warn
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-fast-remaining:
     name: ci-fast (remaining)
@@ -1941,7 +1869,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 40
     if: &ci-fast-gate >-
       !cancelled() &&
@@ -2378,17 +2305,6 @@ jobs:
             ${{ runner.temp }}/ci-fast-lanes-structural.json
           retention-days: 7
           if-no-files-found: warn
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-profile-admission-browser:
     name: ci-fast (profile browser)
@@ -2400,7 +2316,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 15
     if: >-
       !cancelled() &&
@@ -2525,17 +2440,6 @@ jobs:
           name: profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           retention-days: 3
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-fast:
     name: ci-fast
@@ -2675,7 +2579,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 20
     if: *ci-fast-gate
     env:
@@ -2706,17 +2609,6 @@ jobs:
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         env: *structural-run-env
         run: node scripts/ci-fast-lanes.mjs
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-fast-structural-web:
     name: ci-fast (structural web)
@@ -2728,7 +2620,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 20
     if: *ci-fast-gate
     env:
@@ -2792,17 +2683,6 @@ jobs:
             ${{ runner.temp }}/ci-fast-lanes-structural.json
           retention-days: 7
           if-no-files-found: warn
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-knip:
     name: Knip (dead code)
@@ -3427,7 +3307,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3457,17 +3336,6 @@ jobs:
         env:
           NEXT_PUBLIC_APP_URL: http://localhost:3105
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3105
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-typecheck-ovie:
     name: Ovie Typecheck (combined)
@@ -3500,7 +3368,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3516,17 +3383,6 @@ jobs:
       - name: Typecheck independent Ovie app
         if: hashFiles('apps/ovie/package.json') != ''
         run: pnpm --filter @jovie/ovie typecheck
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-storybook-surfaces:
     name: Storybook Surface Matrix (combined)
@@ -3559,7 +3415,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 30
     # The 162 Storybook specs took 4.0m of a 6.6m job on two workers and set
     # the merge-group wall (end p50 7.3m over 18 web merge groups on
@@ -3680,17 +3535,6 @@ jobs:
           path: apps/web/test-results/storybook-input-evidence/
           allow-images: 'true'
           retention-days: 7
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   # The coverage-bearing iOS unit gate belongs on the synthetic combined head,
   # never the source PR. Full simulator UI/screenshot regression is preserved
@@ -4651,7 +4495,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 30
     concurrency:
       group: neon-endpoint-pool-ci-lighthouse-dashboard-pr-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
@@ -4812,17 +4655,6 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
             -H "Content-Type: application/json" \
             "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding gate)
@@ -4849,7 +4681,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -4979,17 +4810,6 @@ jobs:
           path: apps/web/.lighthouseci/onboarding-pr/
           if-no-files-found: ignore
           retention-days: 3
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-lighthouse-admin-pr:
     name: Lighthouse (admin manual)
@@ -5477,7 +5297,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
     timeout-minutes: 40
     strategy:
       # The first failing shard is sufficient to reject an exact combined head.
@@ -5707,17 +5526,6 @@ jobs:
           flags: unittests
           fail_ci_if_error: false
           verbose: true
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-exact-head-coverage-shard:
     name: Exact-head Coverage shard ${{ matrix.shard }}/4
@@ -5744,7 +5552,6 @@ jobs:
     timeout-minutes: 18
     permissions:
       contents: read
-      statuses: write
     strategy:
       fail-fast: true
       matrix:
@@ -5876,17 +5683,6 @@ jobs:
           if-no-files-found: error
           overwrite: true
           retention-days: 1
-      # Fail fast: the queue ejects on this failing required context now,
-      # not when the slowest lane finishes (.github/MERGE_QUEUE.md).
-      - name: Eject the merge group on this lane failure
-        if: ${{ failure() && github.event_name == 'merge_group' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${GITHUB_JOB} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
-          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
-            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
 
   ci-exact-head-coverage:
     name: Exact-head Coverage
@@ -8578,3 +8374,394 @@ jobs:
           path: ${{ runner.temp }}/product-lane-release/release.json
           if-no-files-found: error
           retention-days: 30
+
+  ci-merge-group-admission-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-merge-group-admission)
+    needs: [ci-merge-group-admission]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-merge-group-admission
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-risk-classifier-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-risk-classifier)
+    needs: [ci-risk-classifier]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-risk-classifier
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-secret-scan-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-secret-scan)
+    needs: [ci-secret-scan]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-secret-scan
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-golden-path-lock-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-golden-path-lock)
+    needs: [ci-golden-path-lock]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-golden-path-lock
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-visual-snapshot-compare-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-visual-snapshot-compare)
+    needs: [ci-visual-snapshot-compare]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-visual-snapshot-compare
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-fast-typecheck-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-fast-typecheck)
+    needs: [ci-fast-typecheck]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-fast-typecheck
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-fast-remaining-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-fast-remaining)
+    needs: [ci-fast-remaining]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-fast-remaining
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-profile-admission-browser-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-profile-admission-browser)
+    needs: [ci-profile-admission-browser]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-profile-admission-browser
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-fast-structural-python-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-fast-structural-python)
+    needs: [ci-fast-structural-python]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-fast-structural-python
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-fast-structural-web-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-fast-structural-web)
+    needs: [ci-fast-structural-web]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-fast-structural-web
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-build-ovie-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-build-ovie)
+    needs: [ci-build-ovie]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-build-ovie
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-typecheck-ovie-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-typecheck-ovie)
+    needs: [ci-typecheck-ovie]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-typecheck-ovie
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-storybook-surfaces-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-storybook-surfaces)
+    needs: [ci-storybook-surfaces]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-storybook-surfaces
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-lighthouse-dashboard-pr-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-lighthouse-dashboard-pr)
+    needs: [ci-lighthouse-dashboard-pr]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-lighthouse-dashboard-pr
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-lighthouse-onboarding-pr-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-lighthouse-onboarding-pr)
+    needs: [ci-lighthouse-onboarding-pr]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-lighthouse-onboarding-pr
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-unit-tests-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-unit-tests)
+    needs: [ci-unit-tests]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-unit-tests
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true
+
+  ci-exact-head-coverage-shard-fail-fast:
+    # Fail fast with no lane code: only this step-only job may write a status,
+    # and it can only post FAILURE (2026-10-13 review of #21539: a lane that
+    # runs third-party actions and the queued head's code must never hold
+    # statuses: write, or it could forge a SUCCESS PR Ready).
+    name: Eject merge group (ci-exact-head-coverage-shard)
+    needs: [ci-exact-head-coverage-shard]
+    if: ${{ failure() && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a failing PR Ready on the combined head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ci-exact-head-coverage-shard
+        run: |
+          body="{\"state\":\"failure\",\"context\":\"PR Ready\",\"description\":\"${LANE} failed; ejected before the slowest lane\",\"target_url\":\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
+          /usr/bin/curl -sS -o /dev/null -w 'status post: %{http_code}\n' -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$body" || true

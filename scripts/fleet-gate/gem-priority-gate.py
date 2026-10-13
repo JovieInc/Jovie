@@ -1766,6 +1766,86 @@ def resource_for_artifact(path: str) -> str | None:
     return f"github-actions:{name}" if name else None
 
 
+CAPACITY_WORKPAD_SCHEMA = "jovie-capacity-workpad/v1"
+CAPACITY_WORKPAD_RUNNER = (
+    ROOT_SCRIPTS_DIR / "backlog-orchestrator" / "backlog-orchestrator.mjs"
+) if (ROOT_SCRIPTS_DIR := Path(__file__).resolve().parents[2] / "scripts").exists() else (
+    Path(__file__).resolve().parents[1] / "backlog-orchestrator" / "backlog-orchestrator.mjs"
+)
+CAPACITY_WORKPAD_TIMEOUT_SECONDS = 90.0
+CAPACITY_WORKPAD_MAX_SELECTED = 50
+
+
+def observe_capacity_workpad(
+    runner: Path | None = None,
+    main_sha_value: object = None,
+    run=subprocess.run,
+    timeout_seconds: float = CAPACITY_WORKPAD_TIMEOUT_SECONDS,
+) -> dict[str, Any]:
+    """Linear backlog cohort for the Capacity Workpad, via the orchestrator's
+    own dry-run receipt (backlog-remediation.mjs computes the selected cohort).
+
+    Fail-closed: a missing runner, a non-zero exit, an unparsable receipt, or
+    a receipt without the exact observed main SHA yields an empty cohort with
+    a named reason — the gate never admits work on unattributed evidence.
+    The selected identifiers are the Linear backlog cohort, NOT green-ready
+    PRs; consumers treat mainSha != current main tip as STALE.
+    """
+    reason = "capacity-workpad-observed"
+    selected: list[str] = []
+    capacity_reason = "unknown"
+    runner_path = runner if runner is not None else CAPACITY_WORKPAD_RUNNER
+    if runner_path is None or not Path(runner_path).is_file():
+        reason = "capacity-workpad-runner-missing"
+    else:
+        try:
+            result = run(
+                ["node", str(runner_path), "remediate", "--dry-run"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                timeout=timeout_seconds,
+                text=True,
+            )
+        except (OSError, subprocess.SubprocessError):
+            reason = "capacity-workpad-runner-failed"
+            result = None
+        if result is None or result.returncode != 0:
+            if reason == "capacity-workpad-observed":
+                reason = "capacity-workpad-runner-nonzero"
+        else:
+            try:
+                receipt = json.loads(result.stdout)
+                if not isinstance(receipt, dict):
+                    raise ValueError("receipt is not an object")
+            except (ValueError, json.JSONDecodeError):
+                reason = "capacity-workpad-receipt-malformed"
+                receipt = None
+            if receipt is not None:
+                rows = receipt.get("cohort", {}).get("selected") if isinstance(receipt.get("cohort"), dict) else None
+                if not isinstance(rows, list):
+                    reason = "capacity-workpad-receipt-malformed"
+                else:
+                    identifiers = [
+                        str(row.get("identifier"))
+                        for row in rows
+                        if isinstance(row, dict) and row.get("identifier")
+                    ]
+                    selected = identifiers[:CAPACITY_WORKPAD_MAX_SELECTED]
+                    capacity_reason_field = receipt.get("capacity", {}).get("reason") if isinstance(receipt.get("capacity"), dict) else None
+                    capacity_reason = str(capacity_reason_field) if capacity_reason_field else "unknown"
+    return {
+        "schema": CAPACITY_WORKPAD_SCHEMA,
+        "selected": selected,
+        "reason": capacity_reason,
+        "mainSha": main_sha_value if valid_commit_sha(main_sha_value, exact=True) else None,
+        "source": "backlog-orchestrator-remediate-dry-run",
+        "status": "stale" if reason != "capacity-workpad-observed" or not valid_commit_sha(main_sha_value, exact=True) else "fresh",
+        "failureReason": None if reason == "capacity-workpad-observed" else reason,
+        "observedAt": isoformat(utc_now()),
+    }
+
+
 def build_lane_capacity_receipt(
     repo: str,
     green_ready: list[dict[str, Any]],
@@ -2082,6 +2162,12 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         else {"status": "unknown"}
     )
     closure_health = validate_closure_health(signals.get("closureHealth"))
+    capacity_workpad = (
+        signals.get("capacityWorkpad")
+        if isinstance(signals.get("capacityWorkpad"), dict)
+        and signals["capacityWorkpad"].get("schema") == CAPACITY_WORKPAD_SCHEMA
+        else observe_capacity_workpad(runner=None, main_sha_value=main.get("sha"))
+    )
     product_closures = build_product_closure_health(
         closure_health, signals.get("productClosureHealth")
     )
@@ -2606,6 +2692,14 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "review": INDEPENDENT_REVIEW_AUTHORITY,
             "directGemPickup": False,
             "reason": "single implementation owner prevents duplicate pickup",
+        },
+        "capacity": {
+            "schema": CAPACITY_WORKPAD_SCHEMA,
+            "selected": capacity_workpad.get("selected") or [],
+            "reason": capacity_workpad.get("reason") or "unknown",
+            "mainSha": capacity_workpad.get("mainSha"),
+            "observedAt": capacity_workpad.get("observedAt"),
+            "source": capacity_workpad.get("source"),
         },
         "concurrency": {
             "gem": {
@@ -3454,6 +3548,11 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
                 args.state_dir, args.repo, "queue-snapshot.json"
             ),
             now=now,
+        ),
+        "capacityWorkpad": observe_capacity_workpad(
+            runner=getattr(args, "capacity_workpad_runner", None)
+            or CAPACITY_WORKPAD_RUNNER,
+            main_sha_value=main.get("sha"),
         ),
         "closureHealth": closure,
         "ciAudit": observe_ci_audit(args.repo, main.get("sha"), gh_json,

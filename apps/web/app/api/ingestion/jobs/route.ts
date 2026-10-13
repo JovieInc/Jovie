@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { withRetry } from '@/lib/db';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -56,8 +57,9 @@ export async function POST(request: NextRequest) {
   let attempted = 0;
 
   try {
-    const claimed = await withSystemIngestionSession(tx =>
-      claimPendingJobs(tx, now, 5)
+    const claimed = await withRetry(
+      () => withSystemIngestionSession(tx => claimPendingJobs(tx, now, 5)),
+      'ingestion.claimPendingJobs'
     );
 
     attempted = claimed.length;

@@ -6,7 +6,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  IconButton,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -41,7 +40,6 @@ import {
   RefreshCw,
   Table2,
   Video,
-  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -1512,8 +1510,13 @@ function LibraryToolbar({
               hidden={filtersOpen}
             />
           </div>
+          {/* One count per breakpoint: the status bar owns it from sm up. */}
           <span
-            className={cn(PAGE_TOOLBAR_META_TEXT_CLASS, 'whitespace-nowrap')}
+            className={cn(
+              PAGE_TOOLBAR_META_TEXT_CLASS,
+              'whitespace-nowrap sm:hidden'
+            )}
+            data-testid='library-toolbar-count'
           >
             {visibleCount}
             {visibleCount === totalCount ? '' : ` of ${totalCount}`} visible
@@ -2215,6 +2218,19 @@ function ApprovalStatusEditor({
   );
 }
 
+/**
+ * Name the header link by where it goes. A release without its own target
+ * falls back to its public smart-link page, which "Open Full View" misnamed
+ * as an in-app view.
+ */
+export function workPrimaryActionLabel(
+  asset: Pick<LibraryReleaseAsset, 'primaryActionHref'>
+): string {
+  const href = asset.primaryActionHref;
+  if (!href) return 'View Public Page';
+  return href.startsWith('/app') ? 'Open Full View' : 'Open Original';
+}
+
 function AssetDrawer({
   asset,
   open,
@@ -2381,35 +2397,22 @@ function AssetDrawer({
     [onClose]
   );
   const drawerHeaderActions = current ? (
-    <div className='flex items-center gap-0.5'>
-      <DrawerHeaderActions
-        primaryActions={[
-          {
-            id: 'open-full-view',
-            label: 'Open Full View',
-            icon: ExternalLink,
-            href: current.primaryActionHref ?? current.smartLinkPath,
-          },
-        ]}
-        menuItems={convertToCommonDropdownItems(getContextMenuItems(current))}
-        onClose={onClose}
-        searchable
-        searchPlaceholder='Search actions'
-        searchMode='recursive'
-      />
-      {/* Below lg the inspector is a full-screen sheet with nothing outside
-          it to click, so close gets a visible control (desktop: Esc). */}
-      <IconButton
-        variant='ghost'
-        size='sm'
-        onClick={onClose}
-        aria-label='Close'
-        className='lg:hidden'
-        data-testid='library-inspector-close'
-      >
-        <X className='h-3.5 w-3.5' aria-hidden='true' />
-      </IconButton>
-    </div>
+    // The shared header shows the visible mobile Close for every drawer.
+    <DrawerHeaderActions
+      primaryActions={[
+        {
+          id: 'open-full-view',
+          label: workPrimaryActionLabel(current),
+          icon: ExternalLink,
+          href: current.primaryActionHref ?? current.smartLinkPath,
+        },
+      ]}
+      menuItems={convertToCommonDropdownItems(getContextMenuItems(current))}
+      onClose={onClose}
+      searchable
+      searchPlaceholder='Search actions'
+      searchMode='recursive'
+    />
   ) : null;
 
   return (

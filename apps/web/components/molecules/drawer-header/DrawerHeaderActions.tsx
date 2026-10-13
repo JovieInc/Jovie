@@ -4,7 +4,7 @@
 
 import { type CommonDropdownItem, IconButton } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, X } from 'lucide-react';
 import Link from 'next/link';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
@@ -162,6 +162,22 @@ export function DrawerHeaderActions({
           </IconButton>
         </TableActionMenu>
       )}
+
+      {/* Below lg every drawer is a full-screen sheet with nothing outside it
+          to tap, so a closable drawer shows a visible Close (desktop keeps
+          Esc and the menu item). */}
+      {onClose ? (
+        <IconButton
+          variant='ghost'
+          size='sm'
+          onClick={onClose}
+          ariaLabel='Close'
+          className='lg:hidden'
+          data-testid='drawer-header-close'
+        >
+          <X aria-hidden='true' />
+        </IconButton>
+      ) : null}
     </div>
   );
 }

@@ -23,7 +23,7 @@ const ROOT = resolve(import.meta.dirname, '../../..');
 const CI = /** @type {{ jobs: Record<string, any> }} */ (
   load(readFileSync(resolve(ROOT, '.github/workflows/ci.yml'), 'utf8'))
 );
-const FAIL_FAST_STEP = 'Eject the merge group on this lane failure';
+const FAIL_FAST_STEP = 'Post a failing PR Ready on the combined head';
 
 /**
  * kind:
@@ -154,9 +154,13 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
   });
 
   it('spends the ejection call only after a lane failure', () => {
-    for (const { key, step } of tokenSteps()) {
-      if (step.name !== FAIL_FAST_STEP) continue;
-      expect(step.if, key).toBe(
+    const ejectors = tokenSteps().filter(
+      ({ step }) => step.name === FAIL_FAST_STEP
+    );
+    expect(ejectors.length).toBeGreaterThan(0);
+    for (const { key, job } of ejectors) {
+      // The step-only <lane>-fail-fast job carries the failure gate (#21592).
+      expect(CI.jobs[job].if, key).toBe(
         "${{ failure() && github.event_name == 'merge_group' }}"
       );
     }

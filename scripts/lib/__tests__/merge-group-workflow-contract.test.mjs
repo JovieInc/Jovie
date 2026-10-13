@@ -772,7 +772,9 @@ describe('merge_group workflow contract', () => {
       match => match[1]
     );
     const consumers = jobIds.filter(jobId => {
-      if (jobId === 'ci-build-ovie') return false;
+      // A lane's fail-fast ejector only posts a failing PR Ready; it gates nothing.
+      if (jobId === 'ci-build-ovie' || jobId.endsWith('-fail-fast'))
+        return false;
       const job = getJobBlock(CI_WORKFLOW, jobId);
       return job
         .slice(0, job.indexOf('    runs-on:'))
@@ -3040,7 +3042,12 @@ ${selectedGateScript}`,
       /^\s*max_entries_to_merge:\s*(\d+)$/m
     )?.[1];
     expect(maxMembers).toBeTruthy();
-    expect(MEMBER_POLICY).toContain(`const MAX_GROUP_MEMBERS = ${maxMembers};`);
+    // ALLGREEN layers each entry's synthetic head on the entry ahead, so one
+    // group carries exactly one member even when up to max_entries_to_merge
+    // entries land in one push. The member bound stays at one (fail closed)
+    // and never exceeds the checked-in merge batch.
+    expect(MEMBER_POLICY).toContain('const MAX_GROUP_MEMBERS = 1;');
+    expect(Number(maxMembers)).toBeGreaterThanOrEqual(1);
   });
 
   it('keeps source and combined-head lanes deterministic and free of privileged secrets', () => {

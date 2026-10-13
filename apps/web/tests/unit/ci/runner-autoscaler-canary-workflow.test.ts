@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import {
+  triggerNames,
+  workflowTriggers,
+} from '../../../../../scripts/lib/workflow-triggers.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
 const workflow = readFileSync(
@@ -10,12 +14,9 @@ const workflow = readFileSync(
 
 describe('runner autoscaler canary workflow', () => {
   it('is manual-only and targets the production autoscaler label', () => {
-    const triggerBlock = workflow.match(/on:\n(?<block>[\s\S]*?)\npermissions:/)
-      ?.groups?.block;
-
-    expect(triggerBlock).toContain('workflow_dispatch:');
-    expect(triggerBlock).not.toContain('push:');
-    expect(triggerBlock).not.toContain('pull_request:');
+    expect(triggerNames(workflowTriggers(workflow))).toEqual([
+      'workflow_dispatch',
+    ]);
     expect(workflow).toContain(
       'runs-on: [self-hosted, Linux, X64, "${{ \'jovie-ephemeral\' }}"]'
     );

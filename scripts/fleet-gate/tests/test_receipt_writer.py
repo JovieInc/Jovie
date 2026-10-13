@@ -92,6 +92,106 @@ class ReceiptWriterTests(unittest.TestCase):
         self.assertEqual(out.getvalue().splitlines(), ["mode=emitter", f"state_dir={self.fence}", "age_seconds=10"])
 
 
+    def write_receipt_with_capacity(self, age_seconds: float, main_sha: str) -> None:
+        observed = (NOW - timedelta(seconds=age_seconds)).isoformat().replace("+00:00", "Z")
+        (self.canonical / "latest.json").write_text(
+            json.dumps(
+                {
+                    "schema": writer.SCHEMA,
+                    "observedAt": observed,
+                    "capacity": {
+                        "schema": "jovie-capacity-workpad/v1",
+                        "selected": ["JOV-1", "JOV-2"],
+                        "reason": "capacity-available",
+                        "mainSha": main_sha,
+                        "observedAt": observed,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def test_capacity_receipt_schema_carries_selected_and_main_sha(self) -> None:
+        """The emitter-written receipt must carry the Linear backlog cohort
+        (capacity.selected[], from backlog-remediation.mjs — NOT green-ready
+        PRs) plus the mainSha it was computed against."""
+        import importlib.util
+
+        gate_path = ROOT / "scripts/fleet-gate/gem-priority-gate.py"
+        spec = importlib.util.spec_from_file_location("gem_priority_gate", gate_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        def fake_run(command, **kwargs):
+            class Result:
+                returncode = 0
+                stdout = json.dumps(
+                    {
+                        "cohort": {
+                            "selected": [
+                                {"identifier": "JOV-8001"},
+                                {"identifier": "JOV-8002"},
+                            ]
+                        },
+                        "capacity": {"reason": "capacity-available"},
+                    }
+                )
+                stderr = ""
+
+            return Result()
+
+        observed = module.observe_capacity_workpad(
+            runner=gate_path,  # any existing file; run is faked
+            main_sha_value="a" * 40,
+            run=fake_run,
+        )
+        self.assertEqual(observed["schema"], "jovie-capacity-workpad/v1")
+        self.assertEqual(observed["selected"], ["JOV-8001", "JOV-8002"])
+        self.assertEqual(observed["reason"], "capacity-available")
+        self.assertEqual(observed["mainSha"], "a" * 40)
+        self.assertEqual(observed["status"], "fresh")
+        self.assertIsNone(observed["failureReason"])
+
+    def test_capacity_receipt_fails_closed_when_the_runner_fails(self) -> None:
+        import importlib.util
+
+        gate_path = ROOT / "scripts/fleet-gate/gem-priority-gate.py"
+        spec = importlib.util.spec_from_file_location("gem_priority_gate", gate_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        class Result:
+            returncode = 1
+            stdout = ""
+            stderr = "boom"
+
+        observed = module.observe_capacity_workpad(
+            runner=gate_path,
+            main_sha_value="a" * 40,
+            run=lambda command, **kwargs: Result(),
+        )
+        self.assertEqual(observed["selected"], [])
+        self.assertEqual(observed["status"], "stale")
+        self.assertEqual(observed["failureReason"], "capacity-workpad-runner-nonzero")
+
+    def test_capacity_receipt_is_stale_when_main_sha_differs_from_tip(self) -> None:
+        """The consumer marks the receipt STALE when mainSha != current tip."""
+        tip = "b" * 40
+        self.write_receipt_with_capacity(60, main_sha="a" * 40)
+        stale = writer.capacity_receipt_stale(self.canonical / "latest.json", tip, NOW)
+        self.assertIs(stale, True)
+
+        self.write_receipt_with_capacity(60, main_sha=tip)
+        fresh = writer.capacity_receipt_stale(self.canonical / "latest.json", tip, NOW)
+        self.assertIs(fresh, False)
+
+        # missing capacity block fails closed (None), never silently fresh
+        self.write_receipt(60)
+        self.assertIsNone(
+            writer.capacity_receipt_stale(self.canonical / "latest.json", tip, NOW)
+        )
+
+
 def refresh_steps(content: str) -> list[str]:
     job = content.split("\n  refresh:\n", 1)[1].split("\n  assess:\n", 1)[0]
     return job.split("\n      - name: ")[1:]

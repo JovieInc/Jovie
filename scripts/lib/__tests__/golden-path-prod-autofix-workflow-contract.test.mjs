@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildProdProbeReceipt } from '../golden-path-lock.mjs';
+import { triggerNames, workflowTriggers } from '../workflow-triggers.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const WORKFLOW = readFileSync(
@@ -25,10 +26,9 @@ const CI_WORKFLOW = readFileSync(
 
 describe('Golden Path prod autofix workflow contract', () => {
   it('is a bounded manual fallback, not a recursive observer', () => {
-    expect(WORKFLOW).toContain('workflow_dispatch:');
-    expect(WORKFLOW).not.toContain('workflow_run:');
-    expect(WORKFLOW).not.toMatch(/^\s*schedule:/m);
-    expect(WORKFLOW).not.toContain('cron:');
+    expect(triggerNames(workflowTriggers(WORKFLOW))).toEqual([
+      'workflow_dispatch',
+    ]);
   });
 
   it('probes live jov.ie without signup secrets and fails closed without Cursor', () => {
