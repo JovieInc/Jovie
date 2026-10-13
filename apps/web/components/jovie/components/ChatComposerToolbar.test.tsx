@@ -170,4 +170,22 @@ describe('ComposerSendButton', () => {
       expect(send.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
     }
   );
+
+  it('keeps the tooltip wrapper out of the tab order so focus lands on a named control', () => {
+    const { container } = render(
+      <TooltipProvider>
+        <ComposerSendButton
+          canSend={false}
+          isStreaming={false}
+          reducedMotion
+          onMouseDown={vi.fn()}
+          onSend={vi.fn()}
+        />
+      </TooltipProvider>
+    );
+
+    const focusable = container.querySelectorAll('[tabindex="0"]');
+    expect(focusable).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+  });
 });

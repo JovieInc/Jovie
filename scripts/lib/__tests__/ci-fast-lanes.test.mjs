@@ -1950,7 +1950,7 @@ describe('source-read guard selection', () => {
     selectSourceGuards(event, files).map(guard => guard.id);
 
   it.each([
-    ['pull_request', ['web-source-read-tests']],
+    ['pull_request', ['web-source-read-tests', 'script-contracts']],
     ['merge_group', []],
     ['push', []],
   ])(
@@ -2027,10 +2027,11 @@ describe('source-read guard selection', () => {
     ],
     ['packages/ui/src/button.tsx', ['merge-group-unit-guards']],
   ])('selects the guards that read %s on a PR', (path, guards) => {
-    // Any path can be read by a web test; the script narrows the tests.
+    // PR-wide guards narrow inside their scripts.
     expect(selected('pull_request', [path])).toEqual([
       ...guards,
       'web-source-read-tests',
+      'script-contracts',
     ]);
   });
 
@@ -2059,6 +2060,10 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'script-contracts') {
+        expect(guard.command).toContain('/lib/script-contract-affected.mjs');
+        continue;
+      }
       if (guard.id === 'web-source-read-tests') {
         expect(guard.command).toContain('/lib/web-source-read-tests.mjs');
         expect(
