@@ -18,6 +18,7 @@
 // checks remain the only merge gate.
 import { execFileSync } from 'node:child_process';
 import { STOP_HOLD_LABELS } from './lib/admission-hold-labels.mjs';
+import { extractReceiptFromComment } from './lib/queue-deferral-receipt.mjs';
 
 export const HOLD_LABEL = 'hold';
 export const CONTRACT_LABELS = STOP_HOLD_LABELS;
@@ -59,7 +60,18 @@ export function parseHoldReceipt(body) {
       reason: typeof raw.reason === 'string' ? raw.reason.slice(0, 200) : '',
     };
   }
-  return latest;
+  if (latest) return latest;
+  // A valid exact-head `jovie-queue-deferral/v1` receipt (drain and controller
+  // deferrals) names its source and releases when the head moves.
+  const deferral = extractReceiptFromComment(body);
+  return deferral && !deferral.invalid
+    ? {
+        owner: deferral.source,
+        until: null,
+        head: deferral.head,
+        reason: deferral.reason.slice(0, 200),
+      }
+    : null;
 }
 
 /**

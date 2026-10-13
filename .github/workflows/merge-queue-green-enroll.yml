@@ -505,6 +505,7 @@ jobs:
             scripts/hold-contract.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
+            scripts/lib/queue-deferral-receipt.mjs
           sparse-checkout-cone-mode: false
 
       - name: Set up pinned Node.js
