@@ -394,7 +394,7 @@ test('promote-production installs into a warm pnpm store before generating the S
   );
   assert.match(
     step('Warm pnpm store'),
-    /steps\.node-modules-cache\.outputs\.cache-hit != 'true'[\s\S]*pnpm fetch --frozen-lockfile/
+    /steps\.node-modules-cache\.outputs\.cache-matched-key == ''[\s\S]*pnpm fetch --frozen-lockfile/
   );
 });
 
