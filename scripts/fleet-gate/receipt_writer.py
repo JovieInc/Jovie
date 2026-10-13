@@ -50,6 +50,33 @@ def read_receipt(receipt: Path, now: datetime) -> tuple[float, str] | None:
     return (age, text) if age >= 0 else None
 
 
+def capacity_receipt_stale(
+    receipt: Path, main_tip: str, now: datetime | None = None
+) -> bool | None:
+    """Whether the receipt's Capacity Workpad block is STALE.
+
+    STALE when the capacity block's mainSha does not match the current main
+    tip (the cohort was computed against an older main). None when the
+    receipt or its capacity block is unusable (the caller fails closed).
+    Fresh requires a well-formed receipt with a capacity block whose mainSha
+    equals the live tip.
+    """
+    found = read_receipt(receipt, now or datetime.now(timezone.utc))
+    if found is None:
+        return None
+    try:
+        data = json.loads(found[1])
+        capacity = data["capacity"]
+    except (ValueError, TypeError, KeyError):
+        return None
+    if not isinstance(capacity, dict):
+        return None
+    main_sha = capacity.get("mainSha")
+    if not isinstance(main_sha, str) or not main_sha:
+        return None
+    return main_sha != main_tip
+
+
 def receipt_age_seconds(receipt: Path, now: datetime) -> float | None:
     found = read_receipt(receipt, now)
     return None if found is None else found[0]
