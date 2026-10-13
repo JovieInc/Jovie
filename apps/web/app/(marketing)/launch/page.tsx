@@ -417,7 +417,7 @@ function SectionIntro({
       <h2
         id={headingId}
         data-wrap='editorial-title'
-        className='system-b-launch-section-title'
+        className='system-b-launch-section-title text-balance'
       >
         {title}
       </h2>
@@ -466,7 +466,7 @@ export default function LaunchPage() {
                 <h1
                   id='hero-heading'
                   data-wrap='editorial-title'
-                  className='system-b-launch-hero-title'
+                  className='system-b-launch-hero-title text-balance'
                 >
                   {/* ui-casing-allow: marketing display headline */}
                   Your entire music career. One intelligent link.
@@ -528,7 +528,7 @@ export default function LaunchPage() {
               <h2
                 id='thesis-heading'
                 data-wrap='editorial-title'
-                className='system-b-launch-thesis-title'
+                className='system-b-launch-thesis-title text-balance'
               >
                 {/* ui-casing-allow: marketing display headline */}
                 Paste one Spotify link. Get smart links, fan notifications, and
@@ -539,7 +539,7 @@ export default function LaunchPage() {
               {PILLARS.map(item => (
                 <article key={item.label} className='system-b-launch-pillar'>
                   <span>{item.label}</span>
-                  <h3>{item.title}</h3>
+                  <h3 className='text-balance'>{item.title}</h3>
                   <p>{item.body}</p>
                 </article>
               ))}
@@ -624,7 +624,7 @@ export default function LaunchPage() {
                       <span>Links</span>
                       <span>Details</span>
                     </div>
-                    <h3>The Sound</h3>
+                    <h3 className='text-balance'>The Sound</h3>
                     <p>Single / March 22, 2018</p>
                     {RELEASE_FIELDS.map(field => (
                       <div key={field.label} className='system-b-launch-field'>
@@ -661,7 +661,7 @@ export default function LaunchPage() {
                     <span>
                       <Icon aria-hidden='true' />
                     </span>
-                    <h3>
+                    <h3 className='text-balance'>
                       <span>jov.ie/tim</span>
                       {item.route}
                     </h3>
@@ -695,7 +695,7 @@ export default function LaunchPage() {
                 return (
                   <article key={item.title} className='system-b-launch-feature'>
                     <Icon aria-hidden='true' />
-                    <h3>{item.title}</h3>
+                    <h3 className='text-balance'>{item.title}</h3>
                     <p>{item.body}</p>
                   </article>
                 );
@@ -741,7 +741,7 @@ export default function LaunchPage() {
                     tabIndex={0}
                   >
                     <div className='system-b-launch-toolbar'>
-                      <h3>Audience</h3>
+                      <h3 className='text-balance'>Audience</h3>
                       <div>
                         <span>Filter</span>
                         <span>Display</span>
@@ -816,11 +816,11 @@ export default function LaunchPage() {
               body='AI is creating more music and more competition for fan attention. Owned fan context is the edge.'
             />
             <div className='system-b-launch-stat-grid'>
-              {STATS.map(stat => (
-                <article key={stat.value}>
-                  <strong>{stat.value}</strong>
-                  <p>{stat.label}</p>
-                  <span>{stat.source}</span>
+              {STATS.map(({ value, label, source }) => (
+                <article key={value}>
+                  <strong className='tabular-nums'>{value}</strong>
+                  <p>{label}</p>
+                  <span>{source}</span>
                 </article>
               ))}
             </div>
@@ -843,7 +843,7 @@ export default function LaunchPage() {
                 const Icon = column.icon;
                 return (
                   <article key={column.label}>
-                    <h3>{column.label}</h3>
+                    <h3 className='text-balance'>{column.label}</h3>
                     <ul>
                       {column.items.map(item => (
                         <li key={item}>
@@ -864,7 +864,11 @@ export default function LaunchPage() {
           className='system-b-launch-final'
         >
           <MarketingContainer width='page'>
-            <h2 id='cta-heading' data-wrap='editorial-title'>
+            <h2
+              id='cta-heading'
+              data-wrap='editorial-title'
+              className='text-balance'
+            >
               {/* ui-casing-allow: marketing display headline */}
               Your music deserves better than a stack of links.
             </h2>
