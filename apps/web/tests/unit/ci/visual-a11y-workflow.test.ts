@@ -32,6 +32,7 @@ type Job = {
   if?: string;
   env?: Record<string, unknown>;
   'continue-on-error'?: unknown;
+  strategy?: unknown;
   steps: Step[];
 };
 type Workflow = { on: Record<string, unknown>; jobs: Record<string, Job> };
@@ -213,17 +214,22 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(buildLayout.if).not.toContain("github.event_name == 'pull_request'");
   });
 
-  it('runs the Storybook matrix on two workers of a hosted runner', () => {
+  it('runs the Storybook matrix on two workers of two hosted runners', () => {
     const storybook = job('ci-storybook-surfaces');
     expect(storybook['runs-on']).toBe('ubuntu-latest');
+    // Two disjoint Playwright shards cover the full spec list; one failing
+    // shard fails the job result the aggregates read.
+    expect(storybook.strategy).toEqual({
+      'fail-fast': true,
+      matrix: { shard: [1, 2] },
+    });
     const matrix = step(storybook, 'Run surface elevation matrix (Storybook)');
+    expect(matrix.step.env?.STORYBOOK_SHARD).toBe('${{ matrix.shard }}/2');
     const command = String(matrix.step.run).replace(/\s*\\\n\s*/g, ' ');
     expect(command).toMatch(
-      /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line --workers=2/
+      /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line --workers=2 --shard="\$STORYBOOK_SHARD"/
     );
-    expect(command).not.toMatch(
-      /--update-snapshots|--retries|--repeat-each|--shard/
-    );
+    expect(command).not.toMatch(/--update-snapshots|--retries|--repeat-each/);
     const config = readFileSync(
       resolve(repoRoot, 'apps/web/playwright.config.storybook.ts'),
       'utf8'
@@ -280,11 +286,15 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
       }
     );
     const pid = live.stdout.trim();
-    const ready = runStep(matrixRun, stubs, { STORYBOOK_PID: pid });
+    const ready = runStep(matrixRun, stubs, {
+      STORYBOOK_PID: pid,
+      STORYBOOK_SHARD: '2/2',
+    });
     expect(ready.status, ready.stderr).toBe(0);
     expect(ready.calls).toMatch(
       /node .*guard-playwright-artifacts\.mjs --run -- pnpm exec playwright test/
     );
+    expect(ready.calls).toContain('--shard=2/2');
     // The EXIT trap stops the server and prints its log.
     expect(spawnSync('kill', ['-0', pid]).status).not.toBe(0);
     expect(ready.stdout).toContain('Storybook dev server log');

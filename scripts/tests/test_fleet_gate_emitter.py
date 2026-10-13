@@ -68,6 +68,44 @@ class FleetGateEmitterTest(unittest.TestCase):
         record = json.loads((self.state / F.STATE_FILE).read_text())
         self.assertEqual((record["lastExit"], record["inputs"]["main"]), (0, NEXT))
 
+    def receipt(self, generation, age_s, now):
+        stamp = F.datetime.fromtimestamp(now - age_s, F.timezone.utc).isoformat()
+        (self.gem / "state" / "gem-priority-gate" / "latest.json").write_text(json.dumps(
+            {"state": "AMBER" if age_s % 2 else "GREEN", "reasons": [{"code": str(age_s)}],
+             "observedAt": stamp, "inputGeneration": generation}))
+
+    def test_its_own_receipt_and_restamped_evidence_never_re_trigger_it(self):
+        now = 2_000_000_000.0
+        tick = lambda at: F.tick(self.state, self.state, "tree-1", env=self.env, spawn=self.spawn, now=at)
+        self.assertEqual(tick(now)["status"], "emitting")
+        key = self.spawned[0][1]["FLEET_GATE_INPUT_GENERATION"]
+        self.finish()
+        # The gate's own write (any verdict) and a re-observed but unchanged integrity file.
+        self.receipt(key, 1, now + 60)
+        (self.gem / "state" / "integrity.json").write_text(json.dumps({"status": "clear", "observedAt": "t1"}))
+        self.assertEqual(tick(now + 60)["status"], "emitting", "new integrity content is input")
+        self.finish()
+        key = self.spawned[-1][1]["FLEET_GATE_INPUT_GENERATION"]
+        for at, stamp in ((now + 120, "t2"), (now + 3600, "t3")):
+            self.receipt(key, 7, at)
+            (self.gem / "state" / "integrity.json").write_text(json.dumps({"status": "clear", "observedAt": stamp}))
+            self.assertEqual(tick(at)["status"], "unchanged")
+        self.assertEqual(len(self.spawned), 2)
+
+    def test_a_foreign_receipt_is_restamped_once_before_it_ages_out(self):
+        now = 2_000_000_000.0
+        tick = lambda at: F.tick(self.state, self.state, "tree-1", env=self.env, spawn=self.spawn, now=at)
+        tick(now)
+        self.finish()
+        self.receipt("workflow", 10, now + 30)  # a push-triggered workflow run wrote a fresh receipt
+        self.assertEqual(tick(now + 30)["status"], "unchanged")
+        later = now + F.RESTAMP_AFTER_S + 30
+        self.receipt("workflow", F.RESTAMP_AFTER_S, later)
+        self.assertEqual(tick(later)["reason"], "restamp")
+        self.finish()
+        self.assertEqual(tick(later + 60)["status"], "unchanged", "at most one restamp per interval")
+        self.assertEqual(len(self.spawned), 2)
+
     def test_a_running_observation_is_not_restarted(self):
         with patch.object(F, "_alive", return_value=True):
             self.tick()
