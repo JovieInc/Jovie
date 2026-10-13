@@ -57,18 +57,16 @@ export function isPendingNativeCohortCutoverField(field) {
 }
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
-  // JOV-6107 measured peak 19 hosted jobs/group plus >=7 background jobs on
-  // Team's 60-job budget permits two groups (45), not three (64). JOV-6815:
-  // a ruleset admin raised live build concurrency to GitHub's 10-group
-  // ceiling on 2026-09-25 (production-freeze incident window); source syncs
-  // to the applied live value and every lower live count stays supported
-  // for rollback. Re-evaluate against measured runner saturation if deep
-  // queues starve required CI. Preserve ALLGREEN. The 60-minute response
-  // budget covers the 30/40-minute required CI paths.
+  // Synced to live ruleset 10512119 on 2026-10-13 (.github/MERGE_QUEUE.md
+  // tuning log): six groups build at once and up to five green entries land
+  // per push. Every lower live build count stays supported for rollback.
+  // Group CI spends repo GITHUB_TOKEN quota and the org's five hosted macOS
+  // slots, so raise this and the live ruleset together. Preserve ALLGREEN.
+  // The 60-minute response budget covers the 30/40-minute required CI paths.
   check_response_timeout_minutes: 60,
   grouping_strategy: 'ALLGREEN',
-  max_entries_to_build: 10,
-  max_entries_to_merge: 1,
+  max_entries_to_build: 6,
+  max_entries_to_merge: 5,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
   min_entries_to_merge_wait_minutes:

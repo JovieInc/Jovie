@@ -179,12 +179,13 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 ### Native build capacity (JOV-6107)
 
-**Ship now:** immediate singleton groups (`min_entries_to_merge=1`,
-`max_entries_to_merge=1`, wait zero) keep a fast PR independent from slow or
-starved siblings. The changed-path classifier selects the Web, Mac, iOS,
-operations/tooling, and shared-contract lanes inside that isolated synthetic
-head. The checked-in `max_entries_to_build=10` ceiling preserves concurrency;
-any lower live count remains a supported runner-capacity brake.
+**Ship now:** immediate groups (`min_entries_to_merge=1`, wait zero) with up
+to five green entries per merge push (`max_entries_to_merge=5`). Each entry
+still builds its own synthetic head on the entry ahead, and the changed-path
+classifier selects the Web, Mac, iOS, operations/tooling, and shared-contract
+lanes per member. The checked-in `max_entries_to_build=6` matches live (synced
+2026-10-13, see the tuning log in `.github/MERGE_QUEUE.md`); any lower live
+count remains a supported runner-capacity brake.
 
 On 2026-09-23 the 20-minute response deadline proved shorter than required
 CI paths configured for 30 and 40 minutes. The source-first repair landed and
@@ -209,8 +210,8 @@ hosted product lanes.
 On 2026-09-25 a ruleset admin raised live `max_entries_to_build` to GitHub's
 10-group ceiling (`updated_at` 2026-09-25T22:20Z, during the production-freeze
 incident window). Source-of-record synced to the applied live value under
-JOV-6815; the live-parity check keeps accepting any lower build count so a
-rollback to the JOV-6107 bound stays green. Re-evaluate against measured
+JOV-6815 (later lowered to 6 on 2026-10-13); the live-parity check keeps
+accepting any lower build count so a rollback to the JOV-6107 bound stays green. Re-evaluate against measured
 runner saturation — ten full groups (~190 hosted jobs) exceeds both capacity
 figures above — and return live to `2` if deep queues starve required CI.
 
