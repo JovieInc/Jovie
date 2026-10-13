@@ -78,6 +78,7 @@ vi.mock('@/lib/db', () => ({
     select: mockDbSelect,
     insert: mockDbInsert,
   },
+  withRetry: vi.fn((operation: () => Promise<unknown>) => operation()),
 }));
 
 vi.mock('@/lib/db/schema/leads', () => ({
