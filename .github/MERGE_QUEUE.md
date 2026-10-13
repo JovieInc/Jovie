@@ -38,6 +38,20 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 | `Fork PR Gate`    | Human approval policy for external forks                                                                                 | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
 | `PR Size Guard`   | Source-diff size policy                                                                                                  | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
 
+### Fail-fast ejection
+
+A merge-group `PR Ready` waits for its slowest lane, so a failed group used to
+report at about 7 minutes even when its first lane failed at about 3, and every
+group behind it kept building on a dead base. Each lane listed in
+`scripts/lib/__tests__/merge-group-fail-fast.test.mjs` ends with one
+`failure() && merge_group` step that posts a failing `PR Ready` commit status
+on the exact combined head. GitHub ejects the entry and rebuilds the groups
+behind it right away. That is one API call per failed lane and none per green
+group. The run itself still finishes, so the failure hold classifies the
+complete terminal run as before. The status only ever reports `failure`. It
+grants nothing a queued head could not already request, because
+`merge_group` workflow definitions come from the synthetic head.
+
 Preview, Neon, E2E, Lighthouse, a11y, Storybook, golden-path, and extended-smoke
 lanes are hosted manual, scheduled, repository-event, or post-merge work. They
 never start from the source-PR event and are not required source `PR Ready`
@@ -193,8 +207,11 @@ qualification" are not release conditions. The unlabel is done with the
 Jovie Bot token, so it wakes enrollment, and required checks still gate the
 merge.
 
-`queue-deferred`, `needs-rebase`, and `needs-conflict-resolution` are historical
-machine annotations, not native admission authority. Actual conflicts, failed
+`queue-deferred` is a stop label like `hold` (2026-10-13): agents use it to
+keep a PR out of the queue, so green enroll and every other copy of the stop
+set skip it, and the hold contract governs it (receipt or 24 h release).
+`needs-rebase` and `needs-conflict-resolution` are historical machine
+annotations, not native admission authority. Actual conflicts, failed
 required checks, draft state, and explicit human `hold`, `gated`, or `incident`
 labels still block the finishing request. Shared receipt and fleet helpers
 remain for their other callers and historical records; their presence does
@@ -253,6 +270,27 @@ runtime behavior, or Summer commissioning.
   merge-group attempts per merge plus deterministic same-head recurrence.
 - Emergency response: inspect the native ruleset and exact queue entry,
   repair the source or required check, and prove a fresh native canary.
+
+## Queue freeze (queue-watch runbook)
+
+Merge Queue Green Enroll is the sole queue writer, so one repository variable
+freezes admission:
+
+- Freeze: `gh variable set QUEUE_FREEZE --body 1 -R JovieInc/Jovie`
+- Lift: `gh variable set QUEUE_FREEZE --body 0 -R JovieInc/Jovie`
+
+While `QUEUE_FREEZE=1`, green enroll's `enroll` and `rearm-green-victims` jobs
+and the manual Auto-Ready Agent Drafts `auto-ready` job are skipped. Failure
+holds, the hold contract and held-PR dequeues keep running. PRs already in
+the queue keep landing, so dequeue any that must stop. The variable does not
+disarm native auto-merge: a PR armed before the flip (by an agent's
+`gh pr merge --auto` or any remaining writer) is still enqueued by GitHub
+when it turns green. Disarm those with `gh pr merge N --disable-auto -R
+JovieInc/Jovie`. `scripts/merge-queue-green-enroll.test.mjs` fails if a job
+that can enqueue or arm lacks the guard.
+
+To admit one PR without a roster sweep, dispatch green enroll with
+`gh workflow run merge-queue-green-enroll.yml -f pr_number=N -R JovieInc/Jovie`.
 
 ## Signed commits
 

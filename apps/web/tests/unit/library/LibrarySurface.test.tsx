@@ -1509,7 +1509,7 @@ describe('LibrarySurface', () => {
     expect(drawer.queryByText('a.zip')).not.toBeInTheDocument();
   });
 
-  it('opens the Files tab for the selected work from Share Privately', () => {
+  it('opens private file sharing in place from Share Privately (one share concept)', () => {
     renderLibrary([
       buildAsset({
         id: 'release-a',
@@ -1520,17 +1520,44 @@ describe('LibrarySurface', () => {
 
     fireEvent.click(screen.getByTestId('library-release-row-release-a'));
     const drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.queryByTestId('work-private-share')).toBeNull();
+
+    fireEvent.click(drawer.getByRole('button', { name: 'Share Privately' }));
+
     expect(drawer.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
       'aria-selected',
       'true'
     );
-
-    fireEvent.click(drawer.getByRole('button', { name: 'Share Privately' }));
-
-    expect(drawer.getByRole('tab', { name: 'Files' })).toHaveAttribute(
-      'aria-selected',
-      'true'
+    expect(drawer.getByTestId('work-private-share')).toHaveTextContent(
+      'Share files privately'
     );
+    fireEvent.click(drawer.getByTestId('library-share-create-cancel'));
+    expect(drawer.queryByTestId('work-private-share')).toBeNull();
+
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+    expect(drawer.queryByText('Share Files Privately')).toBeNull();
+    expect(drawer.queryByTestId('library-share-create-trigger')).toBeNull();
+  });
+
+  it('jumps to Files and opens the picker on Cmd+U from the Overview tab', () => {
+    const click = vi
+      .spyOn(HTMLInputElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+    try {
+      renderLibrary([buildAsset({ id: 'release-a', title: 'Release A' })]);
+      fireEvent.click(screen.getByTestId('library-release-row-release-a'));
+      const drawer = within(screen.getByTestId('library-asset-drawer'));
+
+      fireEvent.keyDown(document, { key: 'u', metaKey: true });
+
+      expect(drawer.getByRole('tab', { name: 'Files' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+      expect(click).toHaveBeenCalledTimes(1);
+    } finally {
+      click.mockRestore();
+    }
   });
 
   it('uses shell focus tokens for library cards and drawer actions', () => {
@@ -1790,10 +1817,17 @@ describe('LibrarySurface', () => {
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
     fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
 
-    // Missing audio is not a broken state — acquisition sits behind Add File.
+    // Missing audio is not a broken state — acquisition sits behind the one
+    // Attach File control, which opens from anywhere in the rail with Cmd+U.
     expect(screen.getByTestId('library-files-list')).toBeInTheDocument();
     expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
-    fireEvent.click(screen.getByTestId('library-add-audio-acquisition'));
+    expect(screen.getByTestId('library-attach-file')).toBeInTheDocument();
+    fireEvent.drop(screen.getByTestId('library-files-panel'), {
+      dataTransfer: {
+        files: [new File(['a'], 'take.mp3', { type: 'audio/mpeg' })],
+        types: ['Files'],
+      },
+    });
 
     expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
     expect(
@@ -1830,8 +1864,7 @@ describe('LibrarySurface', () => {
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
     fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
-    fireEvent.click(screen.getByTestId('library-add-audio-acquisition'));
-    fireEvent.change(screen.getByLabelText('Upload audio for Take Me Over'), {
+    fireEvent.change(screen.getByTestId('library-attach-file-input'), {
       target: {
         files: [
           new File(['audio'], 'take-me-over.mp3', { type: 'audio/mpeg' }),

@@ -94,7 +94,13 @@ jobs:
       always() && needs.rerun-unacquired.outputs.requested != 'true' && (
       (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'failure') ||
       (github.event_name == 'repository_dispatch' && github.event.action == 'sentry-issue') ||
-      (github.event_name != 'workflow_run' && github.event_name != 'deployment_status' && github.event_name != 'repository_dispatch') ||
+      (github.event_name == 'pull_request_target' &&
+       !contains(github.event.reason, 'merged') && !contains(github.event.reason, 'branch')) ||
+      (github.event_name == 'pull_request_review' &&
+       (github.event.review.state == 'changes_requested' ||
+        (github.event.review.state == 'commented' && github.event.review.user.type == 'User'))) ||
+      (github.event_name == 'pull_request_review_comment' && github.event.comment.user.type == 'User') ||
+      contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) ||
       (github.event.workflow_run.event == 'pull_request' &&
        contains(fromJSON('["failure","timed_out","startup_failure"]'), github.event.workflow_run.conclusion)) ||
       (github.event.workflow_run.event == 'pull_request' &&
@@ -125,8 +131,28 @@ jobs:
             scripts/lib/github-rate-limit.mjs
           sparse-checkout-cone-mode: false
 
+      # 2026-10-13: the relay was the shared GITHUB_TOKEN bucket's top caller
+      # (75 executed runs in 55 minutes) in three quota storms. Reads move to
+      # the Jovie Bot installation's own quota, read-only scopes; writes stay
+      # on GITHUB_TOKEN so labels start no label-triggered workflows. This
+      # workflow is never merge_group-reachable: workflow_run, push and the
+      # pull_request_target/review events run the default branch's file.
+      - name: Generate Jovie Bot read token
+        id: read-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
+          permission-issues: read
+          permission-pull-requests: read
+          permission-statuses: read
+
       - name: Label the PR for the lanes
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_READ_TOKEN: ${{ steps.read-token.outputs.token }}
           MODE: ${{ github.event_name == 'workflow_dispatch' && 'backfill' || 'relay' }}
         run: python3 scripts/lanes/pr_events.py "$MODE"

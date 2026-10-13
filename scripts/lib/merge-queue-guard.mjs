@@ -577,6 +577,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'E2E Smoke (manual)',
   'CI / Golden Path (manual)',
   'Golden Path (manual)',
+  'CI / Golden Path Report',
+  'Golden Path Report',
   'CI / Extended Smoke (manual)',
   'Extended Smoke (manual)',
   'CI / Preview Deploy (manual)',

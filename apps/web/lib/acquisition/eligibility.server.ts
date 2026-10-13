@@ -42,8 +42,12 @@ const CACHE_TTL_SECONDS = 10 * 60;
 export const CONE_WORKFLOWS = {
   /** Includes the canonical artist profile certificate (JOV-6920). */
   revenuePath: 'm2-revenue-path-canary.yml',
-  /** signup → claim → checkout → verified payment → entitlement → refund. */
-  goldenPath: 'golden-path-nightly.yml',
+  /**
+   * signup → claim → checkout → verified payment → entitlement → refund: the
+   * Golden Path job of the latest dispatched main ci.yml run. The nightly
+   * workflow only dispatches it, so its own run proves nothing.
+   */
+  goldenPath: 'ci.yml#Golden Path (manual)',
 } as const;
 
 const M2_STEP_REQUIREMENTS: Record<M2RevenuePathStepName, ConeRequirementId> = {
@@ -91,8 +95,24 @@ export interface AcquisitionEligibilityDeps {
   readonly readFunnel: () => Promise<FounderFunnelData>;
 }
 
+/**
+ * Conclusion of the named job in a run. A job that never ran, or was skipped
+ * because an upstream job failed, counts as the run failing.
+ */
+export function jobConclusion(
+  jobs: ReadonlyArray<Record<string, unknown>>,
+  jobName: string,
+  runConclusion: string | null
+): string | null {
+  const job = jobs.find(item => item.name === jobName);
+  const conclusion =
+    typeof job?.conclusion === 'string' ? job.conclusion : null;
+  if (conclusion && conclusion !== 'skipped') return conclusion;
+  return runConclusion === 'cancelled' ? 'cancelled' : 'failure';
+}
+
 async function readLatestMainWorkflowRun(
-  workflowFile: string
+  workflowSpec: string
 ): Promise<WorkflowRunRead> {
   const owner = env.HUD_GITHUB_OWNER;
   const repo = env.HUD_GITHUB_REPO;
@@ -100,34 +120,60 @@ async function readLatestMainWorkflowRun(
   if (!token || !owner || !repo) {
     return { status: 'unavailable', reason: 'GitHub read is not configured.' };
   }
-  const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?branch=main&status=completed&per_page=1`;
-  const response = await serverFetch(url, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-    cache: 'no-store',
-    context: 'Acquisition eligibility workflow run',
-    timeoutMs: 8000,
-  });
-  if (!response.ok) {
+  // `file#Job name` reads one job of the latest dispatched main run.
+  const [workflowFile, jobName] = workflowSpec.split('#', 2);
+  const repoUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+  const event = jobName ? '&event=workflow_dispatch' : '';
+  const readJson = async (url: string) => {
+    const response = await serverFetch(url, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      cache: 'no-store',
+      context: 'Acquisition eligibility workflow run',
+      timeoutMs: 8000,
+    });
+    return response.ok
+      ? { ok: true as const, payload: await response.json() }
+      : { ok: false as const, status: response.status };
+  };
+  const runs = await readJson(
+    `${repoUrl}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?branch=main&status=completed${event}&per_page=1`
+  );
+  if (!runs.ok) {
     return {
       status: 'unavailable',
-      reason: `GitHub API error (${response.status}).`,
+      reason: `GitHub API error (${runs.status}).`,
     };
   }
-  const payload = (await response.json()) as {
+  const payload = runs.payload as {
     workflow_runs?: Array<Record<string, unknown>>;
   };
   const run = payload.workflow_runs?.[0];
   if (!run || typeof run.created_at !== 'string') {
     return { status: 'observed', run: null };
   }
+  let conclusion = typeof run.conclusion === 'string' ? run.conclusion : null;
+  if (jobName) {
+    const jobs = await readJson(
+      `${repoUrl}/actions/runs/${encodeURIComponent(String(run.id))}/jobs?filter=latest&per_page=100`
+    );
+    if (!jobs.ok) {
+      return {
+        status: 'unavailable',
+        reason: `GitHub API error (${jobs.status}).`,
+      };
+    }
+    const list = (jobs.payload as { jobs?: Array<Record<string, unknown>> })
+      .jobs;
+    conclusion = jobConclusion(list ?? [], jobName, conclusion);
+  }
   return {
     status: 'observed',
     run: {
-      conclusion: typeof run.conclusion === 'string' ? run.conclusion : null,
+      conclusion,
       createdAt: run.created_at,
       headSha: typeof run.head_sha === 'string' ? run.head_sha : null,
       url: typeof run.html_url === 'string' ? run.html_url : null,
