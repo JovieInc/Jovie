@@ -1,5 +1,5 @@
 {
-  "$comment": "Initial client JS ratchet for /app routes (gzip -9 KB). Measured 2026-09-27 on main + shell skeleton split. Target from docs/performance/route-budgets.json is 250 KB; lower these as routes get lighter. Enforced by scripts/route-js-budget.mjs in the merge-queue build. 2026-10-02: /app/admin/hud 990 -> 992 after UnifiedTable took the shared column-priority layout; the merge-group build measured 991 KB. 2026-10-04: /app/admin/people 1055 -> 1057 and /app/admin/hud 992 -> 994 after the shared nav learned to hide Identity when the Profiles workspace is off (#20180); merge-group builds measured 1056 and 993 KB. 2026-10-05: restored /app/admin/people 1057 -> 1055 and /app/admin/hud 994 -> 992 after preserving the command palette lazy boundary (#20721); combined head 60a29588989b05173ceef98b577ed353f0013e59 measured 1047 and 973 KB. 2026-10-12: /app/admin/hud 992 -> 995 after main crept back to the ceiling; merge groups for unrelated PRs (#20203, #20970, #20958) measured 993 KB on main b70df22fe0. Lower again once the creep since #20741 is traced (follow-up). 2026-10-12: /app/admin/people 1055 -> 1056 for canonical Artist Presence plan copy (#20678, JOV-7809): client surfaces read PRO_PLAN_DISPLAY_NAME from plan-prices instead of the entitlement registry; local builds measured +220 B of longer plan-name copy (main 1055.70 vs PR 1055.91 KB).",
+  "$comment": "Initial client JS ratchet for /app routes (gzip -9 KB). Measured 2026-09-27 on main + shell skeleton split. Target from docs/performance/route-budgets.json is 250 KB; lower these as routes get lighter. Enforced by scripts/route-js-budget.mjs in the merge-queue build. 2026-10-02: /app/admin/hud 990 -> 992 after UnifiedTable took the shared column-priority layout; the merge-group build measured 991 KB. 2026-10-04: /app/admin/people 1055 -> 1057 and /app/admin/hud 992 -> 994 after the shared nav learned to hide Identity when the Profiles workspace is off (#20180); merge-group builds measured 1056 and 993 KB. 2026-10-05: restored /app/admin/people 1057 -> 1055 and /app/admin/hud 994 -> 992 after preserving the command palette lazy boundary (#20721); combined head 60a29588989b05173ceef98b577ed353f0013e59 measured 1047 and 973 KB. 2026-10-12: /app/admin/hud 992 -> 995 after main crept back to the ceiling; merge groups for unrelated PRs (#20203, #20970, #20958) measured 993 KB on main b70df22fe0. Lower again once the creep since #20741 is traced (follow-up). 2026-10-12: /app/admin/hud 995 -> 975 and /app/admin/people 1055 -> default 900 after lazy-loading the collapsed HUD noise sections and the non-default People views (#21464); dispatch build b93bd51 measured 965 and 888 KB.",
   "defaultMaxGzipKb": 900,
   "routes": {
     "/app/chat/[id]": 1385,
@@ -8,10 +8,9 @@
     "/app/tasks": 1245,
     "/app/library": 1215,
     "/app/dashboard/releases": 1080,
-    "/app/admin/people": 1056,
     "/app/settings/profile": 1035,
     "/app/admin/system": 1030,
-    "/app/admin/hud": 995,
+    "/app/admin/hud": 975,
     "/app/presence": 950,
     "/app": 935,
     "/app/contacts": 925,

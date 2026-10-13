@@ -36,7 +36,7 @@ test.describe('Artist Notifications Landing', () => {
   test('hero renders with the new promise and Pro CTA', async ({ page }) => {
     await expect(
       page.getByRole('heading', {
-        name: /reach every fan\.\s*automatically\./i,
+        name: /reach every fan\.\s*on autopilot\./i,
       })
     ).toBeVisible();
     await expect(
@@ -55,7 +55,7 @@ test.describe('Artist Notifications Landing', () => {
       page.getByRole('heading', { name: /capture every fan\./i })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: /notify them automatically\./i })
+      page.getByRole('heading', { name: /notify every fan automatically\./i })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: /bring fans back when it matters\./i })
@@ -87,7 +87,7 @@ test.describe('Artist Notifications Landing', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: /reach every fan\.\s*automatically\./i,
+        name: /reach every fan\.\s*on autopilot\./i,
       })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
