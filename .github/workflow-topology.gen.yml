@@ -260,6 +260,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - repository_dispatch
       - schedule
       - workflow_dispatch
     terminalReceipt: job:evaluate
@@ -937,6 +938,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - repository_dispatch
       - schedule
       - workflow_dispatch
     terminalReceipt: job:preserve-incident
@@ -1075,6 +1077,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - repository_dispatch
       - schedule
       - workflow_dispatch
     terminalReceipt: job:monitor
@@ -1088,6 +1091,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - push
+      - repository_dispatch
       - schedule
       - workflow_dispatch
     terminalReceipt: job:remediation-clock
@@ -1148,6 +1152,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - repository_dispatch
       - schedule
       - workflow_dispatch
     terminalReceipt: job:recurrence

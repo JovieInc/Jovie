@@ -6,6 +6,11 @@ name: Runner Heartbeat
 # revisit-trigger: Remove these dispatches when GitHub supports a durable delayed workflow retry at an upstream API reset timestamp.
 
 on:
+  # The Gem lanes tick fires this on the designed cadence
+  # (scripts/lanes/continuity_clock.py): GitHub delivered the cron below only
+  # about every 6 h, so the schedule is now the backstop.
+  repository_dispatch:
+    types: [clock_runner_heartbeat]
   # GitHub cron delivery is best-effort and can be delayed well past its nominal
   # interval. Scheduled, direct-main, and manual probes retain monitoring while
   # phase 0 prevents merge-group candidates from consuming the fixed pool.
