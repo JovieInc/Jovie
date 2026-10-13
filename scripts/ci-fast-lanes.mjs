@@ -105,7 +105,22 @@ export const COPY_GATE_COMMAND =
  * Each runs here when the diff touches a file it reads. `prOnly` guards
  * already run in every web merge group and push, so they run on PRs only.
  */
+/** Repo-wide web unit guards; see runMergeGroupGuards. */
+export const MERGE_GROUP_GUARDS_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts';
+
 export const SOURCE_GUARDS = Object.freeze([
+  Object.freeze({
+    // The repo-wide design-system, metrics-layer and locked Pen chrome
+    // guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
+    // (2026-10-13) was ejected because a PR added text-destructive to
+    // OutboundRail.tsx and tripped destructive-red-drift-ratchet. They read
+    // web source from disk, so any web change can trip them.
+    id: 'merge-group-unit-guards',
+    command: MERGE_GROUP_GUARDS_COMMAND,
+    inputs: /^(?:apps\/web\/(?!tests\/e2e\/)|packages\/ui\/)/u,
+    prOnly: true,
+  }),
   Object.freeze({
     id: 'ci-schedule-inventory',
     command:
@@ -697,8 +712,7 @@ const LANES = [
   {
     id: 'merge-group-guards',
     name: 'Merge-group unit guards',
-    nextLocalCommand:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
+    nextLocalCommand: MERGE_GROUP_GUARDS_COMMAND,
     run: runMergeGroupGuards,
   },
   {
