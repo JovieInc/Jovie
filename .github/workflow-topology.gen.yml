@@ -845,8 +845,8 @@ nodes:
       - push
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:record_cohort
-    jobCount: 6
+    terminalReceipt: job:deliver
+    jobCount: 5
   - name: PR Preparation Canary
     path: .github/workflows/pr-preparation-canary.yml
     active: true
