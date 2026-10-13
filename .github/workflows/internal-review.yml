@@ -2,9 +2,7 @@ name: Internal PR Review (advisory)
 
 # JOV-7400: internal, advisory-only AI reviewer — the CodeRabbit replacement.
 # Posts exactly one upserted comment per PR head covering correctness risks,
-# test gaps, and migration hazards on non-draft PR open, reopen and push.
-# ready_for_review is reserved for auto-merge-default.yml (merge-group workflow
-# contract), so an undrafted PR is reviewed on its next push.
+# test gaps, and migration hazards on non-draft PR open, reopen, ready and push.
 # The prompt carries the scoped .claude/rules conventions for changed paths,
 # read from the trusted base checkout.
 #
@@ -29,7 +27,7 @@ name: Internal PR Review (advisory)
 
 on:
   pull_request_target:
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, ready_for_review, synchronize]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
