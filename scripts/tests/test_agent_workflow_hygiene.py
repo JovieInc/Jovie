@@ -26,8 +26,6 @@ FLEET_CONTROLLER_JOBS = (
 MODEL_OR_ADVISORY_JOBS = (
     ("eval-real-model.yml", "real-model-eval"),
     ("sentry-autofix.yml", "autofix"),
-    ("taste-classifier.yml", "classify"),
-    ("taste-label-guard.yml", "guard"),
 )
 
 HOSTED_DEEP_EVIDENCE_JOBS = (
@@ -1372,22 +1370,11 @@ def test_cost_anomaly_alerts_on_ratio_or_absolute_floor(tmp_path: Path) -> None:
 
 
 
-def test_taste_policy_runs_trusted_base_code_with_write_authority() -> None:
-    """PR data may steer policy, but PR-controlled code must never execute."""
-    for workflow, job_name in (
-        ("taste-classifier.yml", "classify"),
-        ("taste-label-guard.yml", "guard"),
-    ):
-        source = (WORKFLOWS / workflow).read_text(encoding="utf-8")
-        block = _job_block(workflow, job_name)
-        assert "\n  pull_request_target:\n" in source
-        assert "\n  pull_request:\n" not in source
-        assert "ref: ${{ github.event.pull_request.base.sha }}" in block
-        assert "persist-credentials: false" in block
-        assert "ref: ${{ github.event.pull_request.head.sha }}" not in block
-        assert "pnpm install" not in block
-        assert "corepack enable" not in block
-        assert "runs-on: ubuntu-latest" in block
+def test_taste_workflows_stay_deleted() -> None:
+    """Pre-landing taste holds are retired; the disabled classifier and label
+    guard workflows were deleted on 2026-10-12 (the CLIs remain)."""
+    for name in ("taste-classifier.yml", "taste-label-guard.yml"):
+        assert not (WORKFLOWS / name).exists(), name
 
 
 def test_model_and_advisory_jobs_never_consume_fixed_ci_runners() -> None:
