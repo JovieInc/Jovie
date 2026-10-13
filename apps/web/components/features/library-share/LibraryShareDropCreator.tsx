@@ -50,7 +50,11 @@ export function LibraryShareDropCreator({
   const candidates = useMemo(() => {
     // Explicit empty `candidateAssets` must stay empty (no phantom fallback ids).
     if (candidateAssets) {
-      return candidateAssets;
+      // The work being shared leads the picker so its checked row is visible.
+      const preferred = new Set(releaseIds);
+      return [...candidateAssets].sort(
+        (a, b) => Number(preferred.has(b.id)) - Number(preferred.has(a.id))
+      );
     }
     return releaseIds.map(id => ({ id, title: defaultTitle }));
   }, [candidateAssets, defaultTitle, releaseIds]);
@@ -256,7 +260,8 @@ export function LibraryShareDropCreator({
       <div className='mt-4 space-y-3'>
         {showAssetPicker ? (
           <fieldset
-            className='space-y-2'
+            // Fieldsets default to min-content width; long titles overflowed.
+            className='min-w-0 space-y-2'
             data-testid='library-share-asset-picker'
           >
             <legend className='text-xs font-medium text-secondary-token'>
