@@ -9,9 +9,11 @@ const {
   mockProcessJob,
   mockSucceedJob,
   mockVerifyCronRequest,
+  mockWithRetry,
   mockWithSystemIngestionSession,
 } = vi.hoisted(() => ({
   mockCaptureError: vi.fn(),
+  mockWithRetry: vi.fn(),
   mockClaimPendingJobs: vi.fn(),
   mockHandleIngestionJobFailure: vi.fn(),
   mockLoggerError: vi.fn(),
@@ -23,6 +25,10 @@ const {
 
 vi.mock('@/lib/cron/auth', () => ({
   verifyCronRequest: mockVerifyCronRequest,
+}));
+
+vi.mock('@/lib/db', () => ({
+  withRetry: mockWithRetry,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -51,6 +57,9 @@ describe('GET /api/cron/process-ingestion-jobs', () => {
     vi.clearAllMocks();
     vi.resetModules();
     mockVerifyCronRequest.mockReturnValue(null);
+    mockWithRetry.mockImplementation(
+      async (operation: () => Promise<unknown>) => operation()
+    );
     mockWithSystemIngestionSession.mockImplementation(async callback =>
       callback({})
     );
@@ -78,6 +87,17 @@ describe('GET /api/cron/process-ingestion-jobs', () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+  });
+
+  it('claims pending jobs through withRetry for transient failures', async () => {
+    const { GET } = await import('@/app/api/cron/process-ingestion-jobs/route');
+    await GET(new Request('http://localhost/api/cron/process-ingestion-jobs'));
+
+    expect(mockWithRetry).toHaveBeenCalledWith(
+      expect.any(Function),
+      'ingestion.claimPendingJobs'
+    );
+    expect(mockClaimPendingJobs).toHaveBeenCalled();
   });
 
   it('processes claimed jobs and returns an empty errors array on success', async () => {
