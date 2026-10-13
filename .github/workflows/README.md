@@ -23,11 +23,11 @@ automatically; re-enabling it is a founder decision. Enable **Main CI Health
 Monitor** only after
 the queue and production topology have produced bounded proof. GitHub AI
 Orchestrator, GitHub AI Dispatcher, Agent Tick, Agent Landing Sweep, and Stuck
-Draft Auto-Close were deleted on 2026-10-12; Main Autofix and Auto-Fix Lint
+Draft Auto-Close were deleted on 2026-10-12; Taste Classifier and Taste Label
+Guard are deleted at source. Main Autofix and Auto-Fix Lint
 on Agent Drafts are retired at source — the lanes fix loop owns PR and red-main
 repair. Keep Agent Pipeline, PR
-Conflict Handler, Taste
-Classifier/Guard, Auto-PR on Agent Push, and the legacy Release Loop disabled
+Conflict Handler, Auto-PR on Agent Push, and the legacy Release Loop disabled
 throughout the drain. The newly added Production
 Controller, Production Controller Health, and Production Release workflows
 should register active on land; verify their live state before relying on

@@ -34,7 +34,8 @@ PREFIX = "lane-fix-"
 FIX_KINDS = ("red", "conflict", "dequeued", "review", "stale")
 TICK_KINDS = ("green", "orphan")
 RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
-HOLD_LABELS = frozenset({"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim"})
+HOLD_LABELS = frozenset({"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim",
+                         "queue-deferred"})
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 # Agent/automation-owned prefixes that are not lane branches (a codex run, a manual agent
 # session). Their drafts are still lane-owned work: the reconcile sweep owes them a
@@ -97,8 +98,38 @@ RUN_FAILURES = (
 )
 
 
+READ_TOKEN_ENV = "GH_READ_TOKEN"
+READ_VERBS = {("pr", "view"), ("pr", "list"), ("issue", "list"), ("run", "list"), ("run", "view")}
+
+
+def gh_read_only(args: list[str]) -> bool:
+    """A gh call that only reads: no write verb, no non-GET method, no GraphQL mutation."""
+    if len(args) < 3 or args[0] != "gh":
+        return False
+    if (args[1], args[2]) in READ_VERBS:
+        return True
+    if args[1] != "api":
+        return False
+    for flag, value in zip(args, args[1:]):
+        if flag in ("-X", "--method") and value.upper() != "GET":
+            return False
+    if args[2] == "graphql":
+        return not any("mutation" in arg for arg in args)
+    # A field (-f/-F) without an explicit GET turns gh api into a POST.
+    explicit_get = any(f in ("-X", "--method") for f in args)
+    return explicit_get or not any(f in ("-f", "-F", "--field", "--raw-field", "--input") for f in args)
+
+
 def run(args: list[str], timeout: int = 120):
-    return lifecycle.run(args, capture_output=True, text=True, timeout=timeout)
+    """Reads go on the Jovie Bot read token when the relay minted one: the repo's shared
+    GITHUB_TOKEN bucket (1,000 REST/h) ran dry three times on 2026-10-13 with the relay its
+    top caller. Writes (labels, comments, reruns) stay on GITHUB_TOKEN, whose events start
+    no workflows, so a relay label never fans out into label-triggered runs."""
+    env = None
+    read_token = os.environ.get(READ_TOKEN_ENV)
+    if read_token and gh_read_only(args):
+        env = {**os.environ, "GH_TOKEN": read_token}
+    return lifecycle.run(args, capture_output=True, text=True, timeout=timeout, env=env)
 
 
 # ---------------------------------------------------------------- reason codes

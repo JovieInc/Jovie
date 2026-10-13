@@ -5836,8 +5836,24 @@ class UpdateTest(unittest.TestCase):
                 self.git("add", str(policy), cwd=clone)
                 self.git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "policy", cwd=clone)
                 self.git("push", "-q", "origin", "HEAD:main", cwd=clone)
-                self.assertEqual(lane.update(host), 0)
+                # The staged self-test above already ran every lane test against this
+                # suite; repeating it (~70 s, half of this test and the floor of
+                # ci-fast remaining) proves nothing new about a policy-only change.
+                # The new bundle must still be staged and sent through its own
+                # prove-staging gate before it activates.
+                real_run, proofs = lane.lifecycle.run, []
+
+                def run(argv, *args, **kwargs):
+                    if "prove-staging" in argv:
+                        proofs.append(Path(argv[-1]))
+                        return subprocess.CompletedProcess(argv, 0, "", "")
+                    return real_run(argv, *args, **kwargs)
+
+                with patch.object(lane.lifecycle, "run", side_effect=run):
+                    self.assertEqual(lane.update(host), 0)
+                self.assertEqual(len(proofs), 1)
                 newer = (host.state / "current").resolve()
+                self.assertEqual(proofs[0].name, f".{newer.parents[1].name}.tmp")
                 self.assertNotEqual(newer, current, "policy-only change must activate a new bundle")
                 self.assertTrue(current.exists(), "existing workers retain their old immutable bundle")
                 self.assertEqual((newer.parent / "lib/source-admission-policy.mjs").read_text(), policy.read_text())
