@@ -259,6 +259,17 @@ nodes:
       - pull_request_target
     terminalReceipt: job:auto-merge
     jobCount: 1
+  - name: Dependabot Pin Sync
+    path: .github/workflows/dependabot-pin-sync.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:commit
+    jobCount: 2
   - name: Deprecation Intake (Linear devin lane)
     path: .github/workflows/deprecation-intake.yml
     active: true
@@ -1170,6 +1181,7 @@ nodes:
       - source-validation
     allowedConsumers:
       - Auto-Ready Agent Drafts
+      - Dependabot Pin Sync
       - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Review (shadow)
@@ -1336,6 +1348,9 @@ edges:
     type: workflow_call
   - from: Production Controller
     to: Delivery Control Receipts
+    type: workflow_run
+  - from: Source Validation
+    to: Dependabot Pin Sync
     type: workflow_run
   - from: Production Controller
     to: desktop-release
