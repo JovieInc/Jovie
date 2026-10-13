@@ -22,10 +22,11 @@ while **Auto-Ready Agent Drafts** has been `disabled_manually` since
 automatically; re-enabling it is a founder decision. Enable **Main CI Health
 Monitor** only after
 the queue and production topology have produced bounded proof. GitHub AI
-Orchestrator, GitHub AI Dispatcher, Main Autofix, and Auto-Fix Lint
-on Agent Drafts are retired at source (Agent Tick was deleted on 2026-10-12) — the lanes fix loop owns PR and red-main
+Orchestrator, GitHub AI Dispatcher, Agent Tick, Agent Landing Sweep, and Stuck
+Draft Auto-Close were deleted on 2026-10-12; Main Autofix and Auto-Fix Lint
+on Agent Drafts are retired at source — the lanes fix loop owns PR and red-main
 repair. Keep Agent Pipeline, PR
-Conflict Handler, Stuck Draft Auto-Close, Taste
+Conflict Handler, Taste
 Classifier/Guard, Auto-PR on Agent Push, and the legacy Release Loop disabled
 throughout the drain. The newly added Production
 Controller, Production Controller Health, and Production Release workflows
@@ -95,32 +96,11 @@ Ship now / Re-evaluate when / Then:
 - Re-evaluate when: manual live evals catch a release-blocking regression twice in 30 days or observed live eval cost stays below the agreed per-run budget for 10 consecutive runs.
 - Then: add a capped scheduled or PR-gated live subset with explicit case count, concurrency 1, and per-run cost reporting.
 
-## Agent Landing Sweep
-
-The `agent-landing-sweep.yml` workflow is manual-only. When explicitly dispatched, it sweeps open, non-draft agent PRs and enables auto-merge on any that pass all guardrails:
-
-- All required source contexts passed
-- No unknown non-advisory terminal-red check
-- No sensitive files changed (auth, billing, migrations, CI, etc.)
-- No active machine gate or terminal-red required check
-- Has `automerge`, `auto-approved`, or `ai:ready-to-merge` label
-- Queue pressure below the dynamic threshold (`MERGE_QUEUE_POLICY.maxQueueDepth` in `scripts/lib/merge-queue-guard.mjs`, currently 16 PRs already queued)
-
-Use it as an operator recovery tool when the event-driven pipeline missed delivery; it is not an active polling loop.
-
 ## Linear-only intake and retired GitHub Issue automation
 
 Linear-backed Symphony is the only canonical backlog selector. GitHub remains
 authoritative for PRs, Actions, and merge-queue evidence. The historical
-GitHub-Issue workflows remain visible for auditability but cannot run:
-
-- **`github-ai-orchestrator.yml`**
-  - Trigger: manual `workflow_dispatch` is retained only for visibility
-  - Behavior: all jobs are unconditionally skipped; a workflow-state flip cannot restore GitHub Issue selection
-
-- **`github-ai-dispatcher.yml`**
-  - Trigger: manual `workflow_dispatch` is retained only for visibility
-  - Behavior: its only job is unconditionally skipped; it never scans GitHub Issues
+GitHub-Issue dispatcher and orchestrator workflows were deleted on 2026-10-12.
 
 - **`linear-sync-on-merge.yml`**
   - Trigger: `pull_request.closed` (merged)

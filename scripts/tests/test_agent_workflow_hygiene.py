@@ -12,7 +12,6 @@ WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 
 HOT_PATH_WORKFLOWS = (
     "auto-ready-agent-drafts.yml",
-    "stuck-draft-autoclose.yml",
 )
 
 FULL_CHECKOUT_JOBS = (
@@ -29,7 +28,6 @@ MODEL_OR_ADVISORY_JOBS = (
     ("claude-review.yml", "review"),
     ("eval.yml", "eval"),
     ("eval-real-model.yml", "real-model-eval"),
-    ("github-ai-orchestrator.yml", "implement_and_open_pr"),
     ("sentry-autofix.yml", "autofix"),
     ("taste-classifier.yml", "classify"),
     ("taste-label-guard.yml", "guard"),
@@ -119,12 +117,7 @@ HOSTED_API_ONLY_PR_CONTROLLERS = (
 
 HOSTED_BACKGROUND_CONTROLLER_JOBS = (
     ("agent-harness-health-report.yml", "report"),
-    ("agent-landing-sweep.yml", "sweep"),
     ("doc-gardening-agent.yml", "garden"),
-    ("github-ai-dispatcher.yml", "dispatch"),
-    ("github-ai-orchestrator.yml", "guard"),
-    ("github-ai-orchestrator.yml", "claim_issue"),
-    ("github-ai-orchestrator.yml", "finalize_claim"),
     ("neon-scheduled-cleanup.yml", "scheduled-cleanup"),
     ("observability-issue.yml", "sync-issue"),
     ("sentry-autofix-recurrence.yml", "recurrence"),
@@ -321,24 +314,6 @@ def test_agent_hot_paths_do_not_run_repo_tests() -> None:
         assert "test_gh_retry.py" not in content, workflow_name
 
 
-def test_stuck_draft_autoclose_is_manual_and_hosted_only() -> None:
-    """The all-PR drain must never schedule an automatic draft closer."""
-    workflow = (WORKFLOWS / "stuck-draft-autoclose.yml").read_text(
-        encoding="utf-8"
-    )
-    trigger_block = workflow.split("\non:\n", 1)[1].split(
-        "\nconcurrency:", 1
-    )[0]
-
-    assert "workflow_dispatch:" in trigger_block
-    assert "schedule:" not in trigger_block
-    assert "runs-on: ubuntu-latest" in _job_block(
-        "stuck-draft-autoclose.yml", "autoclose"
-    )
-    assert "CI_FAST_RUNNER" not in _job_block(
-        "stuck-draft-autoclose.yml", "autoclose"
-    )
-
 
 def test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready() -> None:
     """Live ruleset parity must run; it must not become a source PR gate."""
@@ -374,9 +349,6 @@ def test_agent_pipeline_retires_dead_qc_wires() -> None:
     assert "needs-human-autoclose.mjs" not in workflow
     assert "scripts/lib/agent-branch-pattern.mjs" in workflow
     assert "scripts/lib/agent-branch-pattern.mjs --match" in workflow
-    landing = (WORKFLOWS / "agent-landing-sweep.yml").read_text(encoding="utf-8")
-    assert "scope-judge" not in landing
-    assert "Scope Judge" not in landing.split("\njobs:", 1)[1]
 
 
 def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
@@ -495,9 +467,7 @@ def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> N
     """Autonomous shipping uses machine gates and never creates a human hold."""
     for workflow_name in (
         "agent-pipeline.yml",
-        "agent-landing-sweep.yml",
         "sentry-autofix.yml",
-        "github-ai-orchestrator.yml",
     ):
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "blocksUnattendedAutoMerge == true" not in content, workflow_name
@@ -1168,22 +1138,6 @@ def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
     )
 
 
-def test_github_ai_orchestrator_is_manual_only_and_hard_disabled() -> None:
-    """A workflow-state flip must not restore GitHub Issue intake."""
-    workflow = (WORKFLOWS / "github-ai-orchestrator.yml").read_text(
-        encoding="utf-8"
-    )
-    triggers = workflow.split("\njobs:", 1)[0]
-
-    assert "workflow_dispatch:" in triggers
-    assert "issues:" not in triggers
-    for job in ("guard", "claim_issue", "implement_and_open_pr", "finalize_claim"):
-        job_block = _job_block("github-ai-orchestrator.yml", job)
-        assert (
-            "if: ${{ github.event_name == '__retired_linear_only__' }}"
-            in job_block
-        )
-
 
 def test_live_model_work_never_fans_out_from_pull_requests() -> None:
     """PR evals stay deterministic; live-model spend belongs off the PR path."""
@@ -1810,16 +1764,13 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
     assert "ci.head_sha === completion.sha" in source
 
 
-def test_github_ai_dispatcher_is_manual_only_and_hard_disabled() -> None:
-    """GitHub Issues cannot select work even if the workflow is re-enabled."""
-    workflow = (WORKFLOWS / "github-ai-dispatcher.yml").read_text(encoding="utf-8")
-    block = _job_block("github-ai-dispatcher.yml", "dispatch")
-    triggers = workflow.split("\njobs:", 1)[0]
-
-    assert "workflow_dispatch:" in triggers
-    assert "workflow_run:" not in triggers
-    assert "pull_request:" not in triggers
-    assert "issues:" not in triggers
-    assert (
-        "if: ${{ github.event_name == '__retired_linear_only__' }}" in block
-    )
+def test_retired_intake_and_landing_workflows_stay_deleted() -> None:
+    """GitHub-issue intake and the manual landing shells were deleted on
+    2026-10-12; Linear-backed lanes own intake and native auto-merge owns landing."""
+    for name in (
+        "agent-landing-sweep.yml",
+        "github-ai-dispatcher.yml",
+        "github-ai-orchestrator.yml",
+        "stuck-draft-autoclose.yml",
+    ):
+        assert not (WORKFLOWS / name).exists(), name
