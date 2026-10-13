@@ -13,6 +13,10 @@
   "exports": {
     ".": "./index.ts",
     "./atoms/*": "./atoms/*",
+    "./brand": "./brand/index.ts",
+    "./brand/geometry.gen": "./brand/geometry.gen.ts",
+    "./brand/jovie-o-geometry": "./brand/jovie-o-geometry.ts",
+    "./brand/*": "./brand/*",
     "./lib/*": "./lib/*",
     "./media/*": "./media/*",
     "./theme/*": "./theme/*"

@@ -4,6 +4,9 @@
 # removal-trigger: Remove when each cache writer deletes its predecessor after saving and closed PRs drop their own caches.
 name: Actions Cache GC
 
+# The one Actions cache eviction controller. It also prunes superseded main
+# generations (scripts/lib/actions-cache-supersede.mjs), which used to be a
+# second workflow listing the same caches on the same push.
 # Ongoing eviction for stale/duplicate Actions caches. Does not smash live
 # pnpm/node/playwright caches on main or open PR refs unless they are unused
 # and the repo is over the cache budget.
@@ -45,6 +48,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts/lib/actions-cache-gc.mjs
+            scripts/lib/actions-cache-supersede.mjs
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js

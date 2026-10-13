@@ -466,20 +466,18 @@ describe('Dependabot reconciliation workflow contract', () => {
     expect(WORKFLOW).not.toContain('gh pr merge --auto');
   });
 
-  it('records native auto-merge intent only after certification and classification', () => {
-    expect(WORKFLOW).toContain('scripts/native-merge-intent.mjs');
-    expect(
-      readFileSync(
-        resolve(REPO_ROOT, 'scripts/native-merge-intent.mjs'),
-        'utf8'
-      )
-    ).toContain('--match-head-commit');
-    expect(WORKFLOW).not.toContain('gh pr merge --auto');
+  it('never arms auto-merge: green enroll is the sole queue writer', () => {
+    expect(WORKFLOW).not.toContain('native-merge-intent');
+    expect(WORKFLOW).not.toMatch(/--auto\b/);
+    expect(WORKFLOW).not.toContain('enablePullRequestAutoMerge');
+    expect(WORKFLOW).not.toContain('enqueuePullRequest');
+    expect(WORKFLOW).not.toMatch(
+      /steps\.policy\.outputs\.decision == 'queue'$/m
+    );
     expect(WORKFLOW).toContain('permission-checks: read');
     expect(WORKFLOW).toContain('permission-contents: write');
     expect(WORKFLOW).toContain('permission-pull-requests: write');
     expect(WORKFLOW).toContain('permission-statuses: read');
-    expect(WORKFLOW).toMatch(/steps\.policy\.outputs\.decision == 'queue'$/m);
     expect(WORKFLOW).toContain(
       "steps.policy.outputs.decision == 'queue-recovered'"
     );
