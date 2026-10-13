@@ -206,10 +206,15 @@ export function getPresenceEntityName(
   const artist = artistName.trim();
   if (subject.kind === 'connector') return label || platformName;
   if (!label) return artist || platformName;
+  const normalized = normalizeLabel(label);
   if (
     artist &&
-    (normalizeLabel(label) === normalizeLabel(platformName) ||
-      normalizeLabel(label) === normalizeLabel(subject.platform))
+    (normalized === normalizeLabel(platformName) ||
+      normalized === normalizeLabel(subject.platform) ||
+      // Link titles auto-generated as "<artist> on <platform>" repeat the
+      // platform the row's subtitle already shows ("Tim on spotify").
+      normalized === normalizeLabel(`${artist} on ${platformName}`) ||
+      normalized === normalizeLabel(`${artist} on ${subject.platform}`))
   ) {
     return artist;
   }

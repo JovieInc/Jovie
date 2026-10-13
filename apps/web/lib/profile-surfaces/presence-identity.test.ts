@@ -150,6 +150,20 @@ describe('presence identity', () => {
     };
 
     expect(getPresenceEntityName(sevenDigital, 'Tim White')).toBe('Tim White');
+    // Generated "<artist> on <platform>" titles collapse to the entity name;
+    // the row subtitle already carries the platform.
+    expect(
+      getPresenceEntityName(
+        { kind: 'social', platform: 'spotify', label: 'Tim White on spotify' },
+        'Tim White'
+      )
+    ).toBe('Tim White');
+    expect(
+      getPresenceEntityName(
+        { kind: 'social', platform: 'venmo', label: 'Tip on Venmo' },
+        'Tim White'
+      )
+    ).toBe('Tip on Venmo');
     expect(getPresenceHandle(sevenDigital)).toBeNull();
     expect(
       getPresenceEntityName(
