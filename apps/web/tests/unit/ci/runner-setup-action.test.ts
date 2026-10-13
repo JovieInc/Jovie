@@ -384,7 +384,10 @@ describe('self-hosted runner setup action', () => {
         );
       const result = spawnSync('bash', ['-eo', 'pipefail', '-c', script], {
         encoding: 'utf8',
-        env: { PATH: `${bin}${delimiter}${process.env.PATH ?? ''}` },
+        env: {
+          ...process.env,
+          PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
+        },
       });
       expect(result.status, result.stderr).toBe(0);
       return readFileSync(resolve(root, 'calls.log'), 'utf8');
