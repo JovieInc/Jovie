@@ -2218,6 +2218,19 @@ function ApprovalStatusEditor({
   );
 }
 
+/**
+ * Name the header link by where it goes. A release without its own target
+ * falls back to its public smart-link page, which "Open Full View" misnamed
+ * as an in-app view.
+ */
+export function workPrimaryActionLabel(
+  asset: Pick<LibraryReleaseAsset, 'primaryActionHref'>
+): string {
+  const href = asset.primaryActionHref;
+  if (!href) return 'View Public Page';
+  return href.startsWith('/app') ? 'Open Full View' : 'Open Original';
+}
+
 function AssetDrawer({
   asset,
   open,
@@ -2389,7 +2402,7 @@ function AssetDrawer({
       primaryActions={[
         {
           id: 'open-full-view',
-          label: 'Open Full View',
+          label: workPrimaryActionLabel(current),
           icon: ExternalLink,
           href: current.primaryActionHref ?? current.smartLinkPath,
         },
