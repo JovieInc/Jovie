@@ -11,7 +11,7 @@ Coverage is not the goal — coverage on the right files is. The risk-based dash
 | [`TEST_RISK_REGISTER.md`](TEST_RISK_REGISTER.md) | Hand-curated taxonomy of high-risk surfaces with blast radius, reversibility, visibility, and target coverage. Source of truth. |
 | [`TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) | Auto-generated nightly. Joins the register with measured v8 coverage and Stryker mutation scores. Priority queue at the top is the action list. |
 | `scripts/audit-test-coverage.ts` | Generator. Regenerate locally with `pnpm exec tsx scripts/audit-test-coverage.ts`. |
-| `.context/test-coverage-snapshot.json` | Machine-readable snapshot (gitignored) used by the PR delta check. |
+| `apps/web/reports/test-coverage-snapshot.json` | Machine-readable snapshot committed by the nightly audit; the heatmap Δ7d baseline. |
 | `.github/workflows/test-coverage-audit.yml` | Nightly cron at 18:30 UTC, after the deterministic nightly lanes. Runs `test:coverage:diff` against the committed snapshot, then commits the heatmap when values change. Slack on failure. Merge-queue unit shards stay coverage-off. |
 
 **When you add or modify code in a critical surface,** check the heatmap's priority queue and aim for the surface's `target_coverage`. The register fields drive everything: change `blast_radius` / `reversibility` / `visibility` to recalibrate, change `target_coverage` to move the goal post.

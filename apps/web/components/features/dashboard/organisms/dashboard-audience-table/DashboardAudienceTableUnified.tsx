@@ -887,6 +887,7 @@ export const DashboardAudienceTableUnified = memo(
                           getRowId={row => row.id}
                           enableVirtualization={true}
                           enableKeyboardNavigation={true}
+                          rowMode='dense'
                           sorting={sorting}
                           onSortingChange={handleSortingChange}
                           columnVisibility={columnVisibility}

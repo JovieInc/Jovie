@@ -42,6 +42,7 @@ export const Anonymous: Story = {
   args: {
     name: 'Anonymous Fan',
     secondary: null,
+    anonymous: true,
   },
 };
 

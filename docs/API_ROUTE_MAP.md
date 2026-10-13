@@ -81,6 +81,7 @@ sibling deployments, machine publishers, or source-repository automation.
 | `/api/admin/ov-lists/[id]` | GET, PATCH, DELETE | `admin` | List detail, rate/favorite/swipe/suggestion decisions |
 | `/api/admin/ov-lists/[id]/suggest` | POST | `admin` | Propose explainable auto-fill suggestions (never auto-adds) |
 | `/api/admin/ov-lists/creators` | GET | `admin` | Search existing creator profiles to add to a list |
+| `/api/admin/ov-lists/views/[viewId]` | GET | `admin` | Smart view rows across every list |
 | `/api/admin/outreach` | GET, POST | `admin` | Outreach management |
 | `/api/admin/outreach/debug` | GET | `admin` | Debug outreach |
 | `/api/admin/outreach/settings` | GET | `admin` | Outreach settings |
