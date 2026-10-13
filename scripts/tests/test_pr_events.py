@@ -822,6 +822,13 @@ class ClaimCommentTest(unittest.TestCase):
         self.assertEqual(len(conditional), 2)
         self.assertFalse(shell.made("gh", "api", "--paginate"))
 
+    def test_consecutive_five_minute_ticks_read_the_same_claim_url(self):
+        shell = Shell()
+        with patch.object(events, "etag_cache_dir", return_value=None):
+            for offset in range(0, 3600, 300):
+                events.claim_active(7, "h1", shell, NOW - (NOW - events.CLAIM_TTL_S) % 3600 + offset)
+        self.assertEqual(len({call[3] for call in shell.made("gh", "api", "--paginate")}), 1)
+
     def test_conditional_page_falls_back_on_more_pages_errors_or_no_cache(self):
         paged = ("HTTP/2.0 200 OK\nEtag: \"e\"\nLink: <https://x?page=2>; rel=\"next\"\r\n\r\n[]")
         with tempfile.TemporaryDirectory() as tmp:
