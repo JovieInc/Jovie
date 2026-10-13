@@ -212,7 +212,7 @@ export const RetryRecovery: Story = {
       );
       await expect(retry).toHaveFocus();
       await expect(retry.getBoundingClientRect().toJSON()).toEqual(bounds);
-      await expect(canvas.getByText('Pro plan')).toBeVisible();
+      await expect(canvas.getByText('Artist Presence plan')).toBeVisible();
       await expect(requests).toBe(1);
     } finally {
       finishRetry();
