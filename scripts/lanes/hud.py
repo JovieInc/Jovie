@@ -51,6 +51,10 @@ PHASES = [
 ]
 LANE_LABELS = ("agent-ready", "devin", "codex")
 REFRESH_REMOTE_S = 90
+# The office display needs GitHub in minutes, not seconds: at 90 s the HUD alone spent ~245 gh
+# calls an hour (one PR listing per lane, the merge window, the queue) on the lanes host's
+# budget (2026-10-12 gh ledger). Linear reads the free local mirror and keeps the 90 s cadence.
+REFRESH_GITHUB_S = 300
 # JOV-6836: promotion-loss metrics take ~25 s of GitHub reads; refresh them far less often.
 PROMOTION_SCRIPT = HERE.parent / "promotion-loss-metrics.mjs"
 PROMOTION_EVERY_S = 900
@@ -292,7 +296,9 @@ def github_model() -> dict:
         model["errors"]["open"] = f"{type(error).__name__}: {error}"[:100]
     try:
         until = utcnow().timestamp()
-        evidence = merge_evidence.collect(lane.REPO_SLUG, until - 86400, until)
+        state = lane.lane_state_dir()
+        evidence = merge_evidence.collect_shared(lane.REPO_SLUG, until - 86400, until,
+                                                 state / "merge-window.json" if state else None)
         model["mergedWindow"] = {k: v for k, v in evidence.items() if k != "prs"}
         merged = merge_evidence.require_complete(evidence)
         model["merged24h"] = [{"number": m["number"], "title": m["title"], "mergedAt": m["mergedAt"],
@@ -501,7 +507,7 @@ def render(model: dict, width: int = 160, height: int = 45) -> list[str]:
     linear_note = (f"Linear mirror {age(linear['fetchedAt'], now)} · outbox {linear.get('outbox', 0)}" if linear.get("ok")
                    else "Linear " + rgb(RED, linear.get("error", "unread")))
     stale_flags = []
-    if github.get("fetchedAt") and (now - datetime.fromisoformat(github["fetchedAt"])).total_seconds() > 3 * REFRESH_REMOTE_S:
+    if github.get("fetchedAt") and (now - datetime.fromisoformat(github["fetchedAt"])).total_seconds() > 3 * REFRESH_GITHUB_S:
         stale_flags.append("github stale " + age(github["fetchedAt"], now))
     if linear.get("fetchedAt") and (now - datetime.fromisoformat(linear["fetchedAt"])).total_seconds() > 3 * REFRESH_REMOTE_S:
         stale_flags.append("linear stale " + age(linear["fetchedAt"], now))
@@ -774,10 +780,13 @@ class Remote(threading.Thread):
         self.host, self.linear, self.github = host, {"ok": False, "error": "not read yet"}, {"ok": False, "errors": {"open": "not read yet"}}
 
     def run(self):
+        github_at = None
         while True:
             targets = [w["run"]["target"] for w in running_workers(self.host.state) if w["run"]]
             self.linear = linear_model(self.host.linear_env, targets)
-            self.github = github_model()
+            if github_at is None or time.monotonic() - github_at >= REFRESH_GITHUB_S:
+                github_at = time.monotonic()
+                self.github = github_model()
             time.sleep(REFRESH_REMOTE_S)
 
 
