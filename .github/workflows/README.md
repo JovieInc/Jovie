@@ -22,8 +22,8 @@ while **Auto-Ready Agent Drafts** has been `disabled_manually` since
 automatically; re-enabling it is a founder decision. Enable **Main CI Health
 Monitor** only after
 the queue and production topology have produced bounded proof. GitHub AI
-Orchestrator, GitHub AI Dispatcher, Agent Tick, Main Autofix, and Auto-Fix Lint
-on Agent Drafts are retired at source — the lanes fix loop owns PR and red-main
+Orchestrator, GitHub AI Dispatcher, Main Autofix, and Auto-Fix Lint
+on Agent Drafts are retired at source (Agent Tick was deleted on 2026-10-12) — the lanes fix loop owns PR and red-main
 repair. Keep Agent Pipeline, PR
 Conflict Handler, Stuck Draft Auto-Close, Auto-PR on Agent Push, and the legacy Release Loop disabled
 throughout the drain. The newly added Production

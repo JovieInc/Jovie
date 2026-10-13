@@ -221,7 +221,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         budget = lane.graphql_budget()
         github = budget[0] if budget else None
         if not os.environ.get("LANES_SELFTEST"):
-            merged_window = merge_evidence.collect(lane.REPO_SLUG, now - 86400, now)
+            merged_window = merge_evidence.collect_shared(lane.REPO_SLUG, now - 86400, now,
+                                                          state / "merge-window.json")
             merged = merge_evidence.require_complete(merged_window)
     except merge_evidence.IncompleteMergeEvidence as error:
         merged_error = str(error)
@@ -314,7 +315,9 @@ def open_pr_numbers() -> set[int] | None:
 
 
 def merged_prs_24h(lane, now: float) -> list[dict]:
-    return merge_evidence.require_complete(merge_evidence.collect(lane.REPO_SLUG, now - 86400, now))
+    state = lane.lane_state_dir()
+    return merge_evidence.require_complete(merge_evidence.collect_shared(
+        lane.REPO_SLUG, now - 86400, now, state / "merge-window.json" if state else None))
 
 
 def sample_merge_throughput(state: Path, now: float, run=lifecycle.run) -> tuple[dict | None, str | None]:

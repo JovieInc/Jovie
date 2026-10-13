@@ -150,6 +150,15 @@ describe('routeLead', () => {
     expect(result.dmCopy).toContain('Test Artist');
   });
 
+  it('uses creator-generic DM copy with no music assumptions', async () => {
+    setupLead({ displayName: 'Sam', linktreeHandle: 'sam' });
+
+    const result = await routeLead('lead-1');
+
+    expect(result.dmCopy).toContain('creators');
+    expect(result.dmCopy).not.toMatch(/music|spotify|artist/i);
+  });
+
   it('routes "email" when email is valid but no Instagram', async () => {
     setupLead({ hasInstagram: false });
 
