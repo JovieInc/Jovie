@@ -1107,8 +1107,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:sweep
-    jobCount: 1
+    terminalReceipt: job:time-bombs-file
+    jobCount: 3
   - name: Repository documentation shadow
     path: .github/workflows/repository-docs-shadow.yml
     active: true
