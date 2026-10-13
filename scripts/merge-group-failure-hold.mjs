@@ -385,7 +385,10 @@ function parseTrustedAdmissionRecoveryStatus(status, repository) {
   };
 }
 
-/** A trusted hold-removal event restores only its exact current source intent. */
+/**
+ * A trusted hold-removal event restores only its exact current source intent.
+ * @param {{ eventName?: string, event?: object }} [input]
+ */
 export function ownerHoldReleaseIntent({ eventName, event } = {}) {
   const pr = event?.pull_request;
   const releasedAt = Date.parse(pr?.updated_at);
