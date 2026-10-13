@@ -6,19 +6,29 @@
  * before JOV-8196 lands on main the guard intentionally skips, matching the
  * script's own graceful skip.
  */
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  addedLines,
   BASELINE_KEYS,
+  checkChanged,
   collectViolations,
   countByCheck,
   loadUiFeelRule,
   main,
   readBaseline,
   regressions,
+  violationsOnAddedLines,
 } from './lint-ui-feel.mjs';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -74,6 +84,13 @@ describe('ui-feel ratchet baseline math', () => {
     expect(counts.someNewCheck).toBe(1);
     expect(counts.headingNeedsBalance).toBe(0);
     expect(counts.nonConcentricRadius).toBe(0);
+  });
+
+  it('leaves enforcement to the ratchet, not the shared eslint config', () => {
+    // As 'error', lint-staged and lint:eslint:changed failed on the baselined
+    // legacy violations in any touched file; the ratchet owns the gate.
+    const config = readFileSync(join(projectRoot, 'eslint.config.js'), 'utf8');
+    expect(config).toMatch(/'@jovie\/ui-feel':\s*'off'/);
   });
 
   it('committed baseline only uses known check keys', () => {
@@ -223,4 +240,119 @@ describe('ui-feel rule wiring', () => {
     // loadUiFeelRule returns null so the gate defers until JOV-8196 lands.
     expect(Boolean(loadUiFeelRule())).toBe(RULE_PRESENT);
   });
+});
+
+describe('ui-feel added-lines gate (PR time)', () => {
+  const DIFF = [
+    'diff --git a/apps/web/components/Card.tsx b/apps/web/components/Card.tsx',
+    '--- a/apps/web/components/Card.tsx',
+    '+++ b/apps/web/components/Card.tsx',
+    '@@ -3,0 +4,2 @@ export function Card() {',
+    '+  <h2>New</h2>',
+    '+  <p>x</p>',
+    '@@ -9 +11 @@',
+    '+  <h3>Edited</h3>',
+    '@@ -20,2 +22,0 @@',
+    'diff --git a/apps/web/lib/util.ts b/apps/web/lib/util.ts',
+    '+++ b/apps/web/lib/util.ts',
+    '@@ -1 +1 @@',
+    'diff --git a/apps/docs/Page.tsx b/apps/docs/Page.tsx',
+    '+++ b/apps/docs/Page.tsx',
+    '@@ -1 +1 @@',
+    '',
+  ].join('\n');
+
+  it('maps added lines per scanned web tsx file and skips pure deletions', () => {
+    const added = addedLines(DIFF);
+    expect([...added.keys()]).toEqual(['components/Card.tsx']);
+    expect([...(added.get('components/Card.tsx') ?? [])]).toEqual([4, 5, 11]);
+  });
+
+  it('keeps only violations on added lines', () => {
+    const added = addedLines(DIFF);
+    const violations = [
+      {
+        file: 'components/Card.tsx',
+        line: 4,
+        messageId: 'headingNeedsBalance',
+      },
+      {
+        file: 'components/Card.tsx',
+        line: 7,
+        messageId: 'headingNeedsBalance',
+      },
+      {
+        file: 'components/Other.tsx',
+        line: 4,
+        messageId: 'missingTabularNums',
+      },
+    ];
+    expect(violationsOnAddedLines(violations, added)).toEqual([violations[0]]);
+  });
+
+  it('fails closed when the base diff fails', async () => {
+    const error = vi.fn();
+    const code = await checkChanged({
+      baseRef: 'origin/main',
+      rule: {},
+      spawn: () => ({ status: 128, stdout: '' }),
+      error,
+      log: () => {},
+    });
+    expect(code).toBe(1);
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('could not diff')
+    );
+  });
+
+  it.skipIf(!RULE_PRESENT)(
+    'fails on a newly added violation but not on untouched legacy debt',
+    async () => {
+      const root = mkdtempSync(join(tmpdir(), 'ui-feel-gate-'));
+      const webRoot = join(root, 'apps', 'web');
+      mkdirSync(join(webRoot, 'components'), { recursive: true });
+      writeFileSync(
+        join(webRoot, 'components', 'Card.tsx'),
+        [
+          'export function Card() {',
+          '  return (',
+          '    <div>',
+          '      <h2>Legacy heading</h2>',
+          '      <h3>Added heading</h3>',
+          '    </div>',
+          '  );',
+          '}',
+          '',
+        ].join('\n')
+      );
+      const diffFor = lines =>
+        ['+++ b/apps/web/components/Card.tsx', `@@ -1,0 +${lines} @@`, ''].join(
+          '\n'
+        );
+      const run = async lines => {
+        const errors = [];
+        const code = await checkChanged({
+          baseRef: 'origin/main',
+          rule: loadUiFeelRule(),
+          webRoot,
+          spawn: () => ({ status: 0, stdout: diffFor(lines) }),
+          log: () => {},
+          error: message => errors.push(message),
+        });
+        return { code, errors: errors.join('\n') };
+      };
+      try {
+        const added = await run('5,1');
+        expect(added.code).toBe(1);
+        expect(added.errors).toContain(
+          'components/Card.tsx:5  headingNeedsBalance'
+        );
+        expect(added.errors).not.toContain('components/Card.tsx:4');
+
+        expect((await run('8,1')).code).toBe(0);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
 });

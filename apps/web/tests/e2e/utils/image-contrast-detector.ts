@@ -402,21 +402,42 @@ export async function inspectImageContrast(
   const styleTag = await page.addStyleTag({
     content: `[${HIDE_ATTRIBUTE}], [${HIDE_ATTRIBUTE}] * { color: transparent !important; text-shadow: none !important; -webkit-text-stroke: transparent !important; caret-color: transparent !important; }`,
   });
-  // Under runner CPU contention headless Chromium intermittently rejects a
-  // capture with "Protocol error (Page.captureScreenshot): Unable to
-  // capture screenshot". Retry only that transient, at most twice; any
-  // other error, or a third failure, fails.
+  // Headless Chromium rejects a capture with "Protocol error
+  // (Page.captureScreenshot): Unable to capture screenshot" when the view has
+  // no compositor frame to copy yet. Deliberate-red fixtures call
+  // page.setContent on a fresh page and capture within milliseconds, racing
+  // that first frame; on a contended Linux runner the frame can lag long
+  // enough that three back-to-back retries all lose (merge group, 10-12).
+  // Wait for a committed frame before every capture, and retry only that
+  // transient with backoff, at most three times; any other error, or a
+  // fourth failure, fails.
+  const waitForCommittedFrame = () =>
+    page.evaluate(
+      () =>
+        new Promise<void>(resolve => {
+          // A hidden page never runs rAF; the timer keeps this bounded.
+          const fallback = setTimeout(resolve, 1_000);
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              clearTimeout(fallback);
+              resolve();
+            })
+          );
+        })
+    );
   const captureScreenshot = async (): Promise<Buffer> => {
     for (let attempt = 1; ; attempt++) {
+      await waitForCommittedFrame();
       try {
         return await page.screenshot({ type: 'png' });
       } catch (error) {
         if (
-          attempt >= 3 ||
+          attempt >= 4 ||
           !String(error).includes('Unable to capture screenshot')
         ) {
           throw error;
         }
+        await page.waitForTimeout(250 * 2 ** (attempt - 1));
       }
     }
   };

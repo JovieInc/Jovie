@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Install the Jovie shipping lanes on this host (Gem: systemd user timer; macOS: launchd).
 # Idempotent. The timer runs `update` (drain-safe self-update from origin/main) then
-# `dispatch` every minute; workers pull the next issue themselves as slots free up.
+# `dispatch` every 5 minutes; workers pull the next issue (and lane-fix-labeled PRs) themselves
+# as slots free up, so the tick is only the idle fallback. 5 minutes, not more: the doctor's
+# status feed rides this tick and its consumers call it stale after 10 minutes. Each tick costs
+# ~6-14 GitHub reads; minutely ticks ran back to back (~19/h) for no new work.
 #   LANES_REPO=~/devin-sweep/Jovie scripts/lanes/install.sh
 set -euo pipefail
 state="${LANES_STATE:-$HOME/.local/state/jovie-lanes}"
@@ -44,7 +47,7 @@ if [ "$(uname)" = "Darwin" ]; then
     <key>CODEX_LEDGER_CADENCE_S</key><string>$ledger_cadence</string>
     <key>LANES_LINEAR_ENV</key><string>${LANES_LINEAR_ENV:-$HOME/.config/symphony/linear.env}</string>
   </dict>
-  <key>StartInterval</key><integer>60</integer>
+  <key>StartInterval</key><integer>300</integer>
   <key>RunAtLoad</key><true/>
   <key>StandardOutPath</key><string>$state/tick.log</string>
   <key>StandardErrorPath</key><string>$state/tick.log</string>
@@ -73,7 +76,7 @@ UNIT
 [Unit]
 Description=Idle fallback for Jovie shipping lanes (busy slots pull work themselves)
 [Timer]
-OnCalendar=minutely
+OnCalendar=*:0/5
 Persistent=true
 [Install]
 WantedBy=timers.target

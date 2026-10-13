@@ -65,6 +65,8 @@ const COVERED_PRODUCTION_SOURCES = [
   'packages/ui/lib/overlay-focus.ts',
   'packages/ui/atoms/founder-pen-atoms.ts',
   'packages/ui/atoms/status-glyph.tsx',
+  'packages/ui/brand/JovieO.tsx',
+  'packages/ui/brand/JovieWordmark.tsx',
 ];
 const EXCLUDED_NON_PRODUCTION_SOURCES = [
   'packages/ui/index.test.ts',
@@ -151,7 +153,7 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.equal(result.status, 'pass');
   assert.equal(result.totalFindings, 0);
   assert.deepEqual(result.findings, []);
-  assert.equal(result.scannedFiles.length, 62);
+  assert.equal(result.scannedFiles.length, 69);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
     assert.equal(
       result.scannedFiles.includes(relativePath),
