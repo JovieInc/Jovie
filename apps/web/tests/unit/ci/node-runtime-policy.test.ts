@@ -4,6 +4,11 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  cronGapMinutes,
+  triggerNames,
+  workflowTriggers,
+} from '../../../../../scripts/lib/workflow-triggers.mjs';
+import {
   engineAllowsMajor,
   evaluateOfficialReleases,
   getReleaseStatus,
@@ -161,10 +166,17 @@ describe('Node runtime lifecycle policy', () => {
       resolve(repoRoot, '.github/workflows/node-runtime-freshness.yml'),
       'utf8'
     );
-    expect(workflow).toContain('schedule:');
-    expect(workflow).toContain("cron: '47 16 * * 1'");
-    expect(freshness).toContain("cron: '17 16 * * *'");
-    expect(workflow).toContain('workflow_dispatch:');
+    // Both recur on a clock (at most daily within a firing day) and the
+    // compatibility matrix can also be dispatched by hand.
+    const compatibilityOn = workflowTriggers(workflow);
+    expect(triggerNames(compatibilityOn)).toEqual([
+      'schedule',
+      'workflow_dispatch',
+    ]);
+    expect(cronGapMinutes(compatibilityOn).max).toBeLessThanOrEqual(1440);
+    expect(cronGapMinutes(workflowTriggers(freshness)).max).toBeLessThanOrEqual(
+      1440
+    );
     expect(workflow).toContain(
       'matrix: ${{ fromJSON(needs.policy.outputs.matrix) }}'
     );

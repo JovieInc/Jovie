@@ -11,6 +11,7 @@ import {
   TRUSTED_FX_WORKFLOW_NAME,
   TRUSTED_FX_WORKFLOW_PATH,
 } from '../auto-ready-provenance.mjs';
+import { triggerNames, workflowTriggers } from '../workflow-triggers.mjs';
 import {
   buildWriterProofReceipt,
   evaluateWriterPromotion,
@@ -405,14 +406,15 @@ describe('Auto-Ready App-token workflow', () => {
   });
 
   it('keeps workflow recovery manual-only and never source-event driven', () => {
-    expect(workflow).toContain('workflow_dispatch:');
+    // Manual recovery plus completed source-check runs; no PR, schedule or
+    // ready_for_review wake can start a cascade.
+    expect(triggerNames(workflowTriggers(workflow))).toEqual([
+      'workflow_dispatch',
+      'workflow_run',
+    ]);
     expect(workflow).toContain(
       "github.event_name == 'workflow_dispatch' && inputs.pr_number == ''"
     );
-    expect(workflow).not.toContain('pull_request:');
-    expect(workflow).not.toContain('types: [opened, synchronize, reopened]');
-    expect(workflow).not.toContain('types: [ready_for_review');
     expect(workflow).not.toContain('ready_for_review/CI cascade');
-    expect(workflow).not.toContain('schedule:');
   });
 });
