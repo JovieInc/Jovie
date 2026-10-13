@@ -100,6 +100,8 @@ export interface GoldenPathClaim {
 }
 
 const HOMEPAGE_COPY = 'apps/web/data/homepageIdentityCopy.ts';
+const CHECKOUT_CLIENT =
+  'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx';
 const PRESENCE_STEPS = 'apps/web/lib/onboarding/presence-build/execute-step.ts';
 
 export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
@@ -177,19 +179,13 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     capabilityIds: ['public-profile', 'artist-notifications'],
   },
   {
-    id: 'start.metadata.one-conversation',
+    id: 'start.metadata.description',
     step: 'start',
     route: '/start',
     source: 'apps/web/app/(dynamic)/start/page.tsx',
-    copy: 'Start your artist profile in one conversation.',
-    nature: 'outcome',
-    capabilityIds: ['artist-profiles'],
-    evidence: {
-      class: 'none',
-      kind: 'metric',
-      generator: 'dogfood',
-      need: 'Median onboarding turns from first /start message to a live profile, measured from prod chat sessions.',
-    },
+    copy: 'Claim your name and start your Jovie profile.',
+    nature: 'capability',
+    capabilityIds: ['public-profile'],
   },
   {
     id: 'preview.research.verified-signals',
@@ -235,9 +231,28 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'upgrade',
     route: APP_ROUTES.SETTINGS_BILLING,
     source: 'apps/web/lib/entitlements/registry.ts',
-    copy: 'Continuous visibility monitoring, prioritized opportunities, and agentic fixes.',
+    copy: 'Take payments, launch releases and sell merch from your Jovie profile.',
     nature: 'capability',
-    capabilityIds: ['profile-monitoring'],
+    capabilityIds: ['pay', 'release-launch', 'instant-merch'],
+  },
+  {
+    id: 'upgrade.checkout.claim-time-proof',
+    step: 'upgrade',
+    route: APP_ROUTES.ONBOARDING_CHECKOUT,
+    source: CHECKOUT_CLIENT,
+    copy: 'Found From Your Profile',
+    nature: 'outcome',
+    capabilityIds: ['public-profile'],
+    evidence: { class: 'computed', slot: 'assembled-profile' },
+  },
+  {
+    id: 'upgrade.checkout.payments',
+    step: 'upgrade',
+    route: APP_ROUTES.ONBOARDING_CHECKOUT,
+    source: CHECKOUT_CLIENT,
+    copy: 'Take tips and payments on your profile',
+    nature: 'capability',
+    capabilityIds: ['pay'],
   },
   {
     id: 'pricing.pro.note',
@@ -259,6 +274,99 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
   },
 ];
 
+/**
+ * Claims the golden path wants to make but cannot render yet: buyer
+ * objections (VOC 2026-10-03) and findings the persona judge rewarded in
+ * the Pen frames. Each one stays an open ProofRequest naming its generator
+ * and owner until proof lands; copy may not state it before then.
+ */
+export interface WantedClaim {
+  readonly id: string;
+  readonly statement: string;
+  /** The buyer objection or judge finding this claim answers. */
+  readonly answers: string;
+  readonly unlocks: readonly GoldenPathStep[];
+  readonly kind: ProofKind;
+  readonly generator: ProofGeneratorId;
+  /** Linear issue that owns producing the proof. */
+  readonly owner: string;
+}
+
+export const WANTED_CLAIMS: readonly WantedClaim[] = [
+  {
+    id: 'outcome.creator-before-after',
+    statement:
+      'A before/after result on a creator’s own data: fans, streams or bookings.',
+    answers: 'VOC: "I made no sales", "no real results" (ends subscriptions)',
+    unlocks: ['upgrade', 'pricing'],
+    kind: 'metric',
+    generator: 'pilot',
+    owner: 'JOV-7793',
+  },
+  {
+    id: 'billing.renewal-reminder-and-refund',
+    statement:
+      'A renewal reminder at least 7 days before the charge, one-click cancel and a pro-rated refund.',
+    answers: 'VOC: billing honesty',
+    unlocks: ['upgrade', 'pricing'],
+    kind: 'product-proof',
+    generator: 'dogfood',
+    owner: 'JOV-7805',
+  },
+  {
+    id: 'ownership.page-and-export-survive-lapse',
+    statement:
+      'The public page stays live after a plan lapses, and the audience exports as CSV on any plan.',
+    answers: 'VOC: ownership and lock-in',
+    unlocks: ['signup', 'upgrade', 'pricing'],
+    kind: 'product-proof',
+    generator: 'dogfood',
+    owner: 'JOV-7806',
+  },
+  {
+    id: 'rights.no-training-on-creator-work',
+    statement:
+      'Jovie does not train on, or claim rights to, a creator’s work or likeness.',
+    answers: 'VOC: creator rights',
+    unlocks: ['signup', 'upgrade', 'pricing'],
+    kind: 'third-party',
+    generator: 'research',
+    owner: 'JOV-7807',
+  },
+  {
+    id: 'dogfood.launch-loop',
+    statement:
+      'Each Jovie launch grows the audience for the next one, measured send over send.',
+    answers: 'Tim: each launch grows the audience for the next',
+    unlocks: ['homepage', 'pricing'],
+    kind: 'metric',
+    generator: 'dogfood',
+    owner: 'JOV-7834',
+  },
+  {
+    id: 'dogfood.non-music-profile',
+    statement:
+      'A real public Jovie profile for a non-music creator: a founder, podcaster or author.',
+    answers:
+      'Studio 2026-10-04: non-music personas have no real page to judge; jov.ie/tim is an artist',
+    unlocks: ['homepage', 'claim', 'pricing'],
+    kind: 'product-proof',
+    generator: 'dogfood',
+    owner: 'JOV-7866',
+  },
+  {
+    id: 'computed.link-drift-finding',
+    statement:
+      'A drift finding about the visitor: a public link that points somewhere stale.',
+    answers:
+      'Persona judge: most-quoted line in studio round 3 preview (value 6.9)',
+    unlocks: ['preview', 'upgrade'],
+    kind: 'product-proof',
+    generator: 'computed',
+    owner: 'JOV-7794',
+  },
+];
+
 export const CLAIM_STATUSES = [
   'admissible',
   'proof-gap',
@@ -266,6 +374,7 @@ export const CLAIM_STATUSES = [
   'invented-number',
   'unbacked-offer',
   'checkable-positioning',
+  'weak-proof-rendered',
 ] as const;
 
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
@@ -295,6 +404,8 @@ export interface GoldenPathProofReport {
   /** Paywall steps that show no admissible outcome proof at all. */
   readonly prooflessPaywallSteps: readonly GoldenPathStep[];
   readonly proofRequests: readonly ProofRequest[];
+  /** Claims copy wants but may not make yet, each with its request. */
+  readonly wantedClaims: readonly WantedClaim[];
 }
 
 export interface GoldenPathAuditInput {
@@ -303,6 +414,7 @@ export interface GoldenPathAuditInput {
   readonly offerClaims: readonly Claim[];
   readonly registry?: readonly ProofCandidate[];
   readonly claims?: readonly GoldenPathClaim[];
+  readonly wantedClaims?: readonly WantedClaim[];
 }
 
 const HAS_DIGIT = /\d/u;
@@ -364,6 +476,16 @@ function auditOutcome(
       fresh(item)
   );
   if (valid.length > 0 && valid.length === evidence.proofIds.length) {
+    // Persona judges read weak receipts as anti-proof ("my free page beats
+    // that"): they may back a claim, never appear as its number.
+    const weak = valid.filter(item => item.strength === 'weak');
+    if (weak.length > 0 && HAS_DIGIT.test(claim.copy)) {
+      return {
+        evidenceClass: evidence.class,
+        status: 'weak-proof-rendered',
+        detail: `renders a number backed by weak proof: ${weak.map(item => item.id).join(', ')}`,
+      };
+    }
     return {
       evidenceClass: evidence.class,
       status: 'admissible',
@@ -509,6 +631,16 @@ export function auditGoldenPathClaims(
         generator: 'dogfood',
       })
     ),
+    ...(input.wantedClaims ?? WANTED_CLAIMS).map(wanted =>
+      createProofRequest({
+        kind: wanted.kind,
+        claimId: `wanted.${wanted.id}`,
+        pagesBlocked: wanted.unlocks.map(
+          step => inventory.find(claim => claim.step === step)?.route ?? step
+        ),
+        generator: wanted.generator,
+      })
+    ),
   ];
 
   return {
@@ -520,6 +652,7 @@ export function auditGoldenPathClaims(
     statusCounts,
     prooflessPaywallSteps,
     proofRequests,
+    wantedClaims: input.wantedClaims ?? WANTED_CLAIMS,
   };
 }
 
@@ -528,4 +661,5 @@ export const HARD_FAIL_STATUSES: readonly ClaimStatus[] = [
   'invented-number',
   'unbacked-offer',
   'checkable-positioning',
+  'weak-proof-rendered',
 ];

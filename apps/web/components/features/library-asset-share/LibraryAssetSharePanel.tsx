@@ -27,6 +27,7 @@ export function LibraryAssetSharePanel({
   disabled,
   initialShare,
   onShareChange,
+  onSharePrivately,
 }: {
   readonly asset: LibraryReleaseAsset;
   readonly profileId: string | null;
@@ -37,6 +38,8 @@ export function LibraryAssetSharePanel({
     assetId: string,
     share: LibraryAssetShareViewModel
   ) => void;
+  /** Private multi-file drop; lives on this link row, not as its own button. */
+  readonly onSharePrivately?: () => void;
 }) {
   const [share, setShare] = useState<LibraryAssetShareViewModel | null>(
     initialShare ?? null
@@ -142,7 +145,16 @@ export function LibraryAssetSharePanel({
   const overflowBusy = disabled || isEnsuring || isRevoking || !profileId;
 
   const overflowItems = useMemo<OverflowMenuItem[]>(() => {
-    const items: OverflowMenuItem[] = [
+    const items: OverflowMenuItem[] = [];
+    if (onSharePrivately) {
+      items.push({
+        id: 'share-privately',
+        label: 'Share Files Privately',
+        disabled,
+        onSelect: onSharePrivately,
+      });
+    }
+    items.push(
       {
         id: 'visibility',
         label: visibility === 'public' ? 'Make private' : 'Make public',
@@ -160,8 +172,8 @@ export function LibraryAssetSharePanel({
         onSelect: () => {
           globalThis.open(shareUrl, '_blank', 'noopener,noreferrer');
         },
-      },
-    ];
+      }
+    );
 
     if (visibility === 'private') {
       items.push({
@@ -178,9 +190,11 @@ export function LibraryAssetSharePanel({
 
     return items;
   }, [
+    disabled,
     handleRevoke,
     handleVisibilityToggle,
     isRevoking,
+    onSharePrivately,
     overflowBusy,
     profileId,
     shareUrl,

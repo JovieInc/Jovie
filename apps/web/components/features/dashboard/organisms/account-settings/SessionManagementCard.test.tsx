@@ -287,4 +287,56 @@ describe('SessionManagementCard', () => {
     });
     expect(screen.getByText('This device')).toBeVisible();
   });
+
+  it('reserves the same frame while loading as the loaded preview, so nothing shifts', async () => {
+    const pending = Promise.withResolvers<{
+      data: unknown;
+      error: null;
+    }>();
+    listSessions.mockReturnValue(pending.promise);
+
+    render(<SessionManagementCard activeSessionId='session-current' />);
+
+    expect(screen.getAllByTestId('session-row-skeleton')).toHaveLength(3);
+    const frame = screen.getByTestId('session-management-frame');
+    const listClass = frame.lastElementChild?.className;
+    expect(listClass).toContain('min-h-48');
+
+    await act(async () => {
+      pending.resolve({ data: [currentSession, otherSession], error: null });
+      await pending.promise;
+    });
+
+    expect(screen.getAllByTestId('session-row')).toHaveLength(2);
+    expect(
+      screen.getByTestId('session-management-frame').lastElementChild?.className
+    ).toBe(listClass);
+  });
+
+  it('previews the current device plus the most recent sessions behind Show All', async () => {
+    const user = userEvent.setup();
+    const others = Array.from({ length: 5 }, (_, index) => ({
+      ...otherSession,
+      id: `session-other-${index}`,
+      token: `token-other-${index}`,
+      updatedAt: new Date(Date.UTC(2026, 8, 20 + index)),
+    }));
+    listSessions.mockResolvedValue({
+      data: [...others, currentSession],
+      error: null,
+    });
+
+    render(<SessionManagementCard activeSessionId='session-current' />);
+
+    const rows = await screen.findAllByTestId('session-row');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent('This device');
+
+    await user.click(screen.getByTestId('session-show-all'));
+    expect(screen.getAllByTestId('session-row')).toHaveLength(6);
+    expect(screen.getByTestId('session-show-all')).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+  });
 });

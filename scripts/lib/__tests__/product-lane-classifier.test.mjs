@@ -1,5 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -557,6 +563,63 @@ describe('product lane classifier', () => {
     expect(
       classifyProductLanes(['ops/signals/example.request']).selectedLanes
     ).toEqual(['operations']);
+  });
+
+  it('runs the Mac and iOS builds when their workflows or routing change', () => {
+    for (const [path, lanes] of /** @type {Array<[string, string[]]>} */ ([
+      ['.github/workflows/mac-lane.yml', ['ios', 'mac', 'operations']],
+      ['.github/workflows/mac-lane-route.yml', ['ios', 'mac', 'operations']],
+      ['.github/scripts/mac-lane.sh', ['ios', 'mac', 'operations']],
+      ['.github/workflows/macos-ci.yml', ['mac', 'operations']],
+      ['.github/actions/setup-node-pnpm/action.yml', ['mac', 'operations']],
+      ['scripts/generate-brand-assets.ts', ['mac', 'operations']],
+    ]))
+      expect(classifyProductLanes([path]).selectedLanes, path).toEqual(lanes);
+  });
+
+  it('selects the Mac lane for every file outside apps/desktop the desktop build reads', async () => {
+    const { DESKTOP_DOGFOOD_INVENTORY } = await import(
+      '../../../apps/desktop/scripts/desktop-dogfood-inventory.mjs'
+    );
+    const inventorySources = DESKTOP_DOGFOOD_INVENTORY.flatMap(
+      surface => surface.sources
+    ).filter(source => !source.startsWith('apps/desktop/'));
+    expect(inventorySources.length).toBeGreaterThan(0);
+    const consumed = [
+      ...new Set([
+        ...inventorySources,
+        'apps/web/scripts/generate-brand-assets.ts',
+        'apps/web/lib/brand/tokens.ts',
+        'packages/ui/brand/geometry.gen.ts',
+        'packages/ui/brand/jovie-o-geometry.ts',
+        'apps/web/lib/design/generated/design-tokens.ts',
+        'apps/web/styles/design-system.css',
+        'apps/web/styles/system-b-app.css',
+        'apps/web/data/marketing/routeManifest.ts',
+        'apps/ios/Jovie/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json',
+      ]),
+    ];
+    for (const path of consumed) {
+      expect(existsSync(path), `${path} moved; update mac-consumed-*`).toBe(
+        true
+      );
+      expect(
+        classifyProductLanes([path]).selectedLanes,
+        `${path} must select the Mac lane`
+      ).toContain('mac');
+    }
+  });
+
+  it('keeps ordinary web changes off the native lanes', () => {
+    for (const path of [
+      'apps/web/app/page.tsx',
+      'apps/web/components/organisms/HeaderNav.tsx',
+      'apps/web/styles/globals.css',
+      'apps/web/lib/brand/primitives.tsx',
+      'apps/web/scripts/dev-fast.mjs',
+      'packages/ui/src/button.tsx',
+    ])
+      expect(classifyProductLanes([path]).selectedLanes, path).toEqual(['web']);
   });
 
   it('evaluates failures without admitting skipped products', () => {

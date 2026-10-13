@@ -1,5 +1,13 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
 
 export const SCHEDULE_CLASSES = Object.freeze([
@@ -101,8 +109,6 @@ const EVENT_DRIVEN_FIX = `use pull_request/pull_request_target/merge_group/workf
  */
 /** @type {Readonly<Record<string, string>>} */
 export const CRON_KEEP_REASONS = Object.freeze({
-  '.github/workflows/auto-merge-default.yml':
-    'owner-tracked (admissions): stuck-PR reporting + fork enable backstop; see ADMISSION_CRON_DEBT',
   '.github/workflows/ci-duration-ratchet.yml':
     'calendar window: daily rollup of rolling p95 CI wall time; a per-run trigger would re-alert on every completion',
   '.github/workflows/cli-chaos-nightly.yml':
@@ -115,8 +121,6 @@ export const CRON_KEEP_REASONS = Object.freeze({
     'owner-tracked: daily signed staging desktop build until staging rides the Production Controller event without the 2026-09 supersession livelock; see ADMISSION_CRON_DEBT',
   '.github/workflows/fleet-gate-refresh.yml':
     'owner-tracked (Gem lanes): keeps the fleet receipt inside its wall-clock stale window until the lanes tick writes it; see ADMISSION_CRON_DEBT',
-  '.github/workflows/gem-producer-drift.yml':
-    'external: Gem host attestation drift (JOV-7223) emits no repository event; the symphony-control install owner runs host installs manually',
   '.github/workflows/golden-path-nightly.yml':
     'external: real auth plus Stripe test mode drift without a repository event, and acquisition eligibility needs Golden Path proof under 48 h old',
   '.github/workflows/m2-revenue-path-canary.yml':
@@ -159,8 +163,10 @@ export const CRON_KEEP_REASONS = Object.freeze({
 
 /** @type {readonly string[]} */
 export const CRON_ALLOWLIST = Object.freeze(Object.keys(CRON_KEEP_REASONS));
-// 27 = main's 26 after mac-runner-heartbeat removal, plus gem-producer-drift.
-export const CRON_ALLOWLIST_CEILING = 27;
+// 25 = 27 minus auto-merge-default (retired: merge-queue-green-enroll admits,
+// the lanes stuck-PR ladder reports) and gem-producer-drift (its producer and
+// symphony-control's own drift check were removed in symphony-control#15).
+export const CRON_ALLOWLIST_CEILING = 25;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
@@ -169,12 +175,6 @@ export const CRON_ALLOWLIST_CEILING = 27;
  */
 /** @type {Readonly<Record<string, {reason: string, replacement: string}>>} */
 export const ADMISSION_CRON_DEBT = Object.freeze({
-  '.github/workflows/auto-merge-default.yml': Object.freeze({
-    reason:
-      'hourly triage: auto-merge enable for fork PRs (workflow_run lists no fork pull_requests) and stuck-PR reporting; same-repo enable is event-driven (synchronize + Source Validation workflow_run)',
-    replacement:
-      'fork enable via a pull_request_target enable path; stuck-PR reporting moves to the Gem lanes tick',
-  }),
   '.github/workflows/desktop-release.yml': Object.freeze({
     reason:
       'daily staging desktop build in the same workflow that opens and labels the release stamp PR',
@@ -188,22 +188,15 @@ export const ADMISSION_CRON_DEBT = Object.freeze({
       'Gem lanes tick emits the receipt natively (its removal-trigger); push and repository_dispatch stay',
   }),
 });
-export const ADMISSION_CRON_DEBT_CEILING = 3;
+export const ADMISSION_CRON_DEBT_CEILING = 2;
 
 /**
  * Workflow steps that hold a runner polling GitHub, git, or queue state. Keyed
  * `<workflow path>#<job id>`. No entry may be added; the ceiling only goes down.
  */
 /** @type {Readonly<Record<string, string>>} */
-export const POLLING_DEBT = Object.freeze({
-  '.github/workflows/auto-merge-default.yml#self-test':
-    'manual self-test rereads autoMergeRequest 12 times for 60 s',
-  '.github/workflows/golden-path-nightly.yml#golden-path':
-    'dispatches ci.yml then waits up to 80 min for that run to complete',
-  '.github/workflows/pr-conflict-handler.yml#record_cohort':
-    'polls candidate CI runs until a deadline to record cohort outcomes',
-});
-export const POLLING_DEBT_CEILING = 3;
+export const POLLING_DEBT = Object.freeze({});
+export const POLLING_DEBT_CEILING = 2;
 
 /**
  * Mutations that change PR, merge-queue, issue, or label state. A workflow is
@@ -380,6 +373,18 @@ export function inventoryPolling(files = []) {
 
 // --- Event-driven contract ------------------------------------------------------
 
+// A list may only shrink: it fails when it has more entries than its ceiling,
+// never when it has fewer. The ceiling is the lower of the hand cap and the
+// same list's size on the CI base (`baseCeilings`), so a cleanup needs no
+// ceiling edit. Two cleanups that each lowered a hand ceiling 3 -> 2 used to
+// merge cleanly into a list of 1 and fail "shrank" in the merge group
+// (#21432/#21429/#21454, 2026-10-12).
+function effectiveCeiling(ceiling, base) {
+  return Number.isSafeInteger(base) && base >= 0
+    ? Math.min(ceiling, base)
+    : ceiling;
+}
+
 function ratchet(errors, label, entries, detected, ceiling, fix) {
   const listed = new Set(entries);
   for (const key of detected) {
@@ -396,10 +401,6 @@ function ratchet(errors, label, entries, detected, ceiling, fix) {
     errors.push(
       `${label.name} has ${entries.length} entries but its ceiling is ${ceiling}; the list only shrinks. ${fix}`
     );
-  } else if (entries.length < ceiling) {
-    errors.push(
-      `${label.name} shrank to ${entries.length}; lower its ceiling from ${ceiling} to ${entries.length}`
-    );
   }
 }
 
@@ -413,6 +414,7 @@ function ratchet(errors, label, entries, detected, ceiling, fix) {
  *   admissionCeiling?: number,
  *   pollingDebt?: Readonly<Record<string, string>>,
  *   pollingCeiling?: number,
+ *   baseCeilings?: {cron?: number | null, admission?: number | null, polling?: number | null} | null,
  * }} [options]
  */
 export function checkEventDrivenContract(
@@ -425,6 +427,7 @@ export function checkEventDrivenContract(
     admissionCeiling = ADMISSION_CRON_DEBT_CEILING,
     pollingDebt = POLLING_DEBT,
     pollingCeiling = POLLING_DEBT_CEILING,
+    baseCeilings = null,
   } = {}
 ) {
   const errors = [];
@@ -441,7 +444,7 @@ export function checkEventDrivenContract(
     },
     cronAllowlist,
     scheduled,
-    cronCeiling,
+    effectiveCeiling(cronCeiling, baseCeilings?.cron),
     EVENT_DRIVEN_FIX
   );
 
@@ -468,7 +471,7 @@ export function checkEventDrivenContract(
     },
     Object.keys(admissionDebt),
     new Set(admission.keys()),
-    admissionCeiling,
+    effectiveCeiling(admissionCeiling, baseCeilings?.admission),
     EVENT_DRIVEN_FIX
   );
 
@@ -484,11 +487,47 @@ export function checkEventDrivenContract(
     },
     Object.keys(pollingDebt),
     new Set(polling.map(row => row.key)),
-    pollingCeiling,
+    effectiveCeiling(pollingCeiling, baseCeilings?.polling),
     'react to the completion event instead (workflow_run, check_suite, merge_group, deployment_status) or extend the Gem lanes tick; never hold a runner waiting. See canon invariant ' +
       EVENT_DRIVEN_INVARIANT_ID
   );
   return { errors, scheduled: [...scheduled].sort(), admission, polling };
+}
+
+/**
+ * The three debt-list sizes in this module's own source at `ref` (the CI base),
+ * or null when that revision cannot be read. The base copy is imported from a
+ * temporary sibling file so its own imports resolve.
+ * @param {string} ref
+ * @param {string} repoRoot
+ * @returns {Promise<{cron: number, admission: number, polling: number} | null>}
+ */
+export async function baseDebtCounts(ref, repoRoot) {
+  const relativePath = 'scripts/lib/ci-schedule-inventory.mjs';
+  const shown = spawnSync('git', ['show', `${ref}:${relativePath}`], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (shown.status !== 0 || !shown.stdout) return null;
+  const copy = join(
+    repoRoot,
+    'scripts/lib',
+    `.ci-schedule-inventory.base-${process.pid}-${Date.now()}.mjs`
+  );
+  try {
+    writeFileSync(copy, shown.stdout);
+    const base = await import(pathToFileURL(copy).href);
+    return {
+      cron: base.CRON_ALLOWLIST?.length ?? null,
+      admission: Object.keys(base.ADMISSION_CRON_DEBT ?? {}).length,
+      polling: Object.keys(base.POLLING_DEBT ?? {}).length,
+    };
+  } catch {
+    return null;
+  } finally {
+    rmSync(copy, { force: true });
+  }
 }
 
 export function repoScriptReader(repoRoot) {

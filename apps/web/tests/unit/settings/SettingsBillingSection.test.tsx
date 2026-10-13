@@ -126,7 +126,7 @@ describe('SettingsBillingSection', () => {
     const manage = screen.getByRole('button', { name: /manage in stripe/i });
     expect(manage).toBe(retry);
     expect(manage).toHaveFocus();
-    expect(screen.getByText('Pro plan')).toBeInTheDocument();
+    expect(screen.getByText('Artist Presence plan')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(mutateMock).not.toHaveBeenCalled();
   });
@@ -143,7 +143,7 @@ describe('SettingsBillingSection', () => {
 
     render(<SettingsBillingSection />);
 
-    expect(screen.getByText('Pro plan')).toBeInTheDocument();
+    expect(screen.getByText('Artist Presence plan')).toBeInTheDocument();
     const activeBadge = screen.getByText('Active');
     // Canonical Badge owns status color: no call-site palette restyle.
     expect(activeBadge).toHaveAttribute('data-variant', 'success');

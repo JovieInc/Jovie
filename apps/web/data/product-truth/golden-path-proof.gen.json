@@ -1,6 +1,6 @@
 {
   "schema": "jovie.golden-path-proof/v1",
-  "asOf": "2026-10-04T02:20:20.652Z",
+  "asOf": "2026-10-04T05:52:03.377Z",
   "funnelStepIds": {
     "homepage": [],
     "claim": ["outreach", "claim-landing"],
@@ -89,23 +89,15 @@
       "detail": "certified: public-profile, artist-notifications"
     },
     {
-      "id": "start.metadata.one-conversation",
+      "id": "start.metadata.description",
       "step": "start",
       "route": "/start",
       "source": "apps/web/app/(dynamic)/start/page.tsx",
-      "copy": "Start your artist profile in one conversation.",
-      "nature": "outcome",
-      "evidenceClass": "none",
-      "status": "proof-gap",
-      "detail": "Median onboarding turns from first /start message to a live profile, measured from prod chat sessions.",
-      "request": {
-        "recordType": "proof-request",
-        "kind": "metric",
-        "claimId": "golden-path.start.metadata.one-conversation",
-        "pagesBlocked": ["/start"],
-        "suggestedLane": "measurement",
-        "generator": "dogfood"
-      }
+      "copy": "Claim your name and start your Jovie profile.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: public-profile"
     },
     {
       "id": "preview.research.verified-signals",
@@ -156,11 +148,33 @@
       "step": "upgrade",
       "route": "/app/settings/billing",
       "source": "apps/web/lib/entitlements/registry.ts",
-      "copy": "Continuous visibility monitoring, prioritized opportunities, and agentic fixes.",
+      "copy": "Take payments, launch releases and sell merch from your Jovie profile.",
       "nature": "capability",
       "evidenceClass": null,
-      "status": "uncertified-capability",
-      "detail": "uncertified capability: profile-monitoring"
+      "status": "admissible",
+      "detail": "certified: pay, release-launch, instant-merch"
+    },
+    {
+      "id": "upgrade.checkout.claim-time-proof",
+      "step": "upgrade",
+      "route": "/onboarding/checkout",
+      "source": "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx",
+      "copy": "Found From Your Profile",
+      "nature": "outcome",
+      "evidenceClass": "computed",
+      "status": "admissible",
+      "detail": "computed slot assembled-profile: Jovie built a profile from the visitor’s own data."
+    },
+    {
+      "id": "upgrade.checkout.payments",
+      "step": "upgrade",
+      "route": "/onboarding/checkout",
+      "source": "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx",
+      "copy": "Take tips and payments on your profile",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: pay"
     },
     {
       "id": "pricing.pro.note",
@@ -186,37 +200,22 @@
     }
   ],
   "evidenceCounts": {
-    "computed": 4,
+    "computed": 5,
     "dogfood": 3,
     "pilot": 0,
-    "none": 1
+    "none": 0
   },
   "statusCounts": {
-    "admissible": 13,
-    "proof-gap": 1,
-    "uncertified-capability": 1,
+    "admissible": 17,
+    "proof-gap": 0,
+    "uncertified-capability": 0,
     "invented-number": 0,
     "unbacked-offer": 0,
-    "checkable-positioning": 0
+    "checkable-positioning": 0,
+    "weak-proof-rendered": 0
   },
-  "prooflessPaywallSteps": ["upgrade", "pricing"],
+  "prooflessPaywallSteps": ["pricing"],
   "proofRequests": [
-    {
-      "recordType": "proof-request",
-      "kind": "metric",
-      "claimId": "golden-path.start.metadata.one-conversation",
-      "pagesBlocked": ["/start"],
-      "suggestedLane": "measurement",
-      "generator": "dogfood"
-    },
-    {
-      "recordType": "proof-request",
-      "kind": "metric",
-      "claimId": "golden-path.upgrade.paid-outcome",
-      "pagesBlocked": ["/app/settings/billing"],
-      "suggestedLane": "measurement",
-      "generator": "dogfood"
-    },
     {
       "recordType": "proof-request",
       "kind": "metric",
@@ -224,6 +223,127 @@
       "pagesBlocked": ["/pricing"],
       "suggestedLane": "measurement",
       "generator": "dogfood"
+    },
+    {
+      "recordType": "proof-request",
+      "kind": "metric",
+      "claimId": "wanted.outcome.creator-before-after",
+      "pagesBlocked": ["/app/settings/billing", "/pricing"],
+      "suggestedLane": "measurement",
+      "generator": "pilot"
+    },
+    {
+      "recordType": "proof-request",
+      "kind": "product-proof",
+      "claimId": "wanted.billing.renewal-reminder-and-refund",
+      "pagesBlocked": ["/app/settings/billing", "/pricing"],
+      "suggestedLane": "product-capture",
+      "generator": "dogfood"
+    },
+    {
+      "recordType": "proof-request",
+      "kind": "product-proof",
+      "claimId": "wanted.ownership.page-and-export-survive-lapse",
+      "pagesBlocked": ["/app/settings/billing", "/pricing", "/signup"],
+      "suggestedLane": "product-capture",
+      "generator": "dogfood"
+    },
+    {
+      "recordType": "proof-request",
+      "kind": "third-party",
+      "claimId": "wanted.rights.no-training-on-creator-work",
+      "pagesBlocked": ["/app/settings/billing", "/pricing", "/signup"],
+      "suggestedLane": "third-party-research",
+      "generator": "research"
+    },
+    {
+      "recordType": "proof-request",
+      "kind": "metric",
+      "claimId": "wanted.dogfood.launch-loop",
+      "pagesBlocked": ["/", "/pricing"],
+      "suggestedLane": "measurement",
+      "generator": "dogfood"
+    },
+    {
+      "recordType": "proof-request",
+      "kind": "product-proof",
+      "claimId": "wanted.dogfood.non-music-profile",
+      "pagesBlocked": ["/", "/[handle]?claim=1", "/pricing"],
+      "suggestedLane": "product-capture",
+      "generator": "dogfood"
+    },
+    {
+      "recordType": "proof-request",
+      "kind": "product-proof",
+      "claimId": "wanted.computed.link-drift-finding",
+      "pagesBlocked": ["/app/settings/billing", "/start (profile reveal)"],
+      "suggestedLane": "product-capture",
+      "generator": "computed"
+    }
+  ],
+  "wantedClaims": [
+    {
+      "id": "outcome.creator-before-after",
+      "statement": "A before/after result on a creator’s own data: fans, streams or bookings.",
+      "answers": "VOC: \"I made no sales\", \"no real results\" (ends subscriptions)",
+      "unlocks": ["upgrade", "pricing"],
+      "kind": "metric",
+      "generator": "pilot",
+      "owner": "JOV-7793"
+    },
+    {
+      "id": "billing.renewal-reminder-and-refund",
+      "statement": "A renewal reminder at least 7 days before the charge, one-click cancel and a pro-rated refund.",
+      "answers": "VOC: billing honesty",
+      "unlocks": ["upgrade", "pricing"],
+      "kind": "product-proof",
+      "generator": "dogfood",
+      "owner": "JOV-7805"
+    },
+    {
+      "id": "ownership.page-and-export-survive-lapse",
+      "statement": "The public page stays live after a plan lapses, and the audience exports as CSV on any plan.",
+      "answers": "VOC: ownership and lock-in",
+      "unlocks": ["signup", "upgrade", "pricing"],
+      "kind": "product-proof",
+      "generator": "dogfood",
+      "owner": "JOV-7806"
+    },
+    {
+      "id": "rights.no-training-on-creator-work",
+      "statement": "Jovie does not train on, or claim rights to, a creator’s work or likeness.",
+      "answers": "VOC: creator rights",
+      "unlocks": ["signup", "upgrade", "pricing"],
+      "kind": "third-party",
+      "generator": "research",
+      "owner": "JOV-7807"
+    },
+    {
+      "id": "dogfood.launch-loop",
+      "statement": "Each Jovie launch grows the audience for the next one, measured send over send.",
+      "answers": "Tim: each launch grows the audience for the next",
+      "unlocks": ["homepage", "pricing"],
+      "kind": "metric",
+      "generator": "dogfood",
+      "owner": "JOV-7834"
+    },
+    {
+      "id": "dogfood.non-music-profile",
+      "statement": "A real public Jovie profile for a non-music creator: a founder, podcaster or author.",
+      "answers": "Studio 2026-10-04: non-music personas have no real page to judge; jov.ie/tim is an artist",
+      "unlocks": ["homepage", "claim", "pricing"],
+      "kind": "product-proof",
+      "generator": "dogfood",
+      "owner": "JOV-7866"
+    },
+    {
+      "id": "computed.link-drift-finding",
+      "statement": "A drift finding about the visitor: a public link that points somewhere stale.",
+      "answers": "Persona judge: most-quoted line in studio round 3 preview (value 6.9)",
+      "unlocks": ["preview", "upgrade"],
+      "kind": "product-proof",
+      "generator": "computed",
+      "owner": "JOV-7794"
     }
   ]
 }

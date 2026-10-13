@@ -48,9 +48,9 @@ export const ARTIST_NOTIFICATIONS_COPY = {
       'Turn new music and nearby shows into repeat visits without writing campaigns.',
   },
   hero: {
-    headline: 'Reach Every Fan Automatically.',
-    headlineLines: ['Reach Every Fan.', 'Automatically.'],
-    primaryCtaLabel: 'Start Pro Trial',
+    headline: 'Reach Every Fan. On Autopilot.',
+    headlineLines: ['Reach Every Fan.', 'On Autopilot.'],
+    primaryCtaLabel: 'Start Artist Presence Trial',
     primaryCtaHref: PRO_SIGNUP_HREF,
     floatingCards: [
       {
@@ -168,7 +168,7 @@ export const ARTIST_NOTIFICATIONS_COPY = {
     ],
   },
   reactivation: {
-    headline: 'Notify them automatically.',
+    headline: 'Notify every fan automatically.',
     subhead:
       'When new music drops or a nearby show is coming up, Jovie brings the right fans back.',
     workflow: {
@@ -261,17 +261,17 @@ export const ARTIST_NOTIFICATIONS_COPY = {
           'Clicks go to the destination that fits the moment: the latest release when new music is live, or the relevant ticket page when a nearby show is worth acting on.',
       },
       {
-        question: 'When does it make sense to turn on Pro?',
+        question: 'When does it make sense to turn on Artist Presence?',
         answer:
-          'Use free to capture demand first. Turn on Pro when you want Jovie to start bringing those fans back automatically when music or show moments happen.',
+          'Use free to capture demand first. Turn on Artist Presence when you want Jovie to start bringing those fans back automatically when music or show moments happen.',
       },
     ],
   },
   finalCta: {
     headline: 'Ready to Amplify?',
     subhead:
-      'Capture demand on free. Turn on automatic artist notifications with Pro.',
-    ctaLabel: 'Start Pro Trial',
+      'Capture demand on free. Turn on automatic artist notifications with Artist Presence.',
+    ctaLabel: 'Start Artist Presence Trial',
     signature: 'jov.ie/you',
     ctaHref: PRO_SIGNUP_HREF,
   },

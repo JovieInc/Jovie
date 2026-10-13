@@ -2292,6 +2292,38 @@ function AssetDrawer({
     },
     [currentId]
   );
+  // One share concept: the link row owns private file sharing too.
+  const [privateShareObjectId, setPrivateShareObjectId] = useState<
+    string | null
+  >(null);
+  const privateShareOpen =
+    currentId !== null && privateShareObjectId === currentId;
+  const openPrivateShare = useCallback(() => {
+    setPrivateShareObjectId(currentId);
+  }, [currentId]);
+  const handlePrivateShareOpenChange = useCallback(
+    (next: boolean) => setPrivateShareObjectId(next ? currentId : null),
+    [currentId]
+  );
+  // One attach concept: ⌘U from anywhere in the open inspector.
+  const [attachRequested, setAttachRequested] = useState(false);
+  const clearAttachRequest = useCallback(() => setAttachRequested(false), []);
+  const canAttachFiles = open && current !== null && !isMerch;
+  useEffect(() => {
+    if (!canAttachFiles) return;
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      if (event.shiftKey || event.key.toLowerCase() !== 'u') return;
+      // Rich-text editors keep ⌘U for underline.
+      if (event.target instanceof HTMLElement && event.target.isContentEditable)
+        return;
+      event.preventDefault();
+      handleTabChange('files');
+      setAttachRequested(true);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [canAttachFiles, handleTabChange]);
   const [findingState, setFindingState] = useState({
     source: postReleaseBundle.findings,
     findings: postReleaseBundle.findings,
@@ -2451,7 +2483,7 @@ function AssetDrawer({
                       launches={workLaunches}
                       canPublish={profileId !== null}
                       disabled={!open}
-                      onSharePrivately={() => handleTabChange('files')}
+                      onSharePrivately={openPrivateShare}
                     />
                   </InspectorSection>
                 ) : null}
@@ -2521,9 +2553,28 @@ function AssetDrawer({
                         disabled={!open}
                         initialShare={current.share}
                         onShareChange={onShareChange}
+                        onSharePrivately={
+                          isYouTubeVideo ? undefined : openPrivateShare
+                        }
                       />
                     ) : null}
                   </InspectorSection>
+                ) : null}
+
+                {privateShareOpen && !isMerch && !isYouTubeVideo ? (
+                  <div className='py-3' data-testid='work-private-share'>
+                    <LibraryShareDropCreator
+                      key={current.id}
+                      open
+                      onOpenChange={handlePrivateShareOpenChange}
+                      releaseIds={[current.id]}
+                      candidateAssets={shareCandidates.map(item => ({
+                        id: item.id,
+                        title: item.title,
+                      }))}
+                      defaultTitle={`${current.title} files`}
+                    />
+                  </div>
                 ) : null}
 
                 <InspectorSection
@@ -2733,40 +2784,27 @@ function AssetDrawer({
             ) : isMerch ? (
               <InspectorEmpty message='No files for this merch item.' />
             ) : (
-              <>
-                <LibraryFilesPanel
-                  asset={current}
-                  downloads={inspectorBundle.downloads}
-                  disabled={!open}
-                  disabledTabIndex={closedTabIndex}
-                  audioPreviewAction={
-                    hasVerifiedLibraryAudioPreview(current) ? (
-                      <PreviewActionButton
-                        asset={current}
-                        isPreviewPlaying={isPreviewPlaying}
-                        onTogglePreview={onTogglePreview}
-                        compact
-                        disabledTabIndex={closedTabIndex}
-                      />
-                    ) : null
-                  }
-                  onAudioUploaded={onAudioUploaded}
-                  onArtworkUploaded={onArtworkUploaded}
-                />
-
-                {!isYouTubeVideo ? (
-                  <InspectorSection title='Share Files Privately'>
-                    <LibraryShareDropCreator
-                      releaseIds={[current.id]}
-                      candidateAssets={shareCandidates.map(item => ({
-                        id: item.id,
-                        title: item.title,
-                      }))}
-                      defaultTitle={`${current.title} files`}
+              <LibraryFilesPanel
+                asset={current}
+                downloads={inspectorBundle.downloads}
+                disabled={!open}
+                disabledTabIndex={closedTabIndex}
+                audioPreviewAction={
+                  hasVerifiedLibraryAudioPreview(current) ? (
+                    <PreviewActionButton
+                      asset={current}
+                      isPreviewPlaying={isPreviewPlaying}
+                      onTogglePreview={onTogglePreview}
+                      compact
+                      disabledTabIndex={closedTabIndex}
                     />
-                  </InspectorSection>
-                ) : null}
-              </>
+                  ) : null
+                }
+                onAudioUploaded={onAudioUploaded}
+                onArtworkUploaded={onArtworkUploaded}
+                attachRequested={attachRequested}
+                onAttachRequestHandled={clearAttachRequest}
+              />
             )}
           </div>
         </TableContextMenu>

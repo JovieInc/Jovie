@@ -379,15 +379,27 @@ def _pr_labels(pr: dict) -> set[str]:
     return {str(label.get("name") if isinstance(label, dict) else label) for label in pr.get("labels") or []}
 
 
-def _retarget_main(lane, pr: dict) -> None:
-    if pr.get("baseRefName") != "main":
+def _parent_open(lane, base: str, open_heads: set[str]) -> bool:
+    """A stacked child's parent is open while some open PR still heads its base branch.
+    Unknown counts as open: retargeting early drags the parent's commits into the child."""
+    if base in open_heads:
+        return True
+    owner = lane.REPO_SLUG.split("/", 1)[0]
+    result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/pulls?state=open&head={owner}:{base}",
+                      "--jq", "length"])
+    return result.returncode != 0 or str(getattr(result, "stdout", "")).strip() != "0"
+
+
+def _retarget_main(lane, pr: dict, open_heads: set[str]) -> None:
+    base = pr.get("baseRefName")
+    if base and base != "main" and not _parent_open(lane, base, open_heads):
         result = lane.sh(["gh", "pr", "edit", str(pr["number"]), "--repo", lane.REPO_SLUG, "--base", "main"])
         if result.returncode != 0:
             raise RuntimeError(f"file overlap retarget failed for PR #{pr['number']}")
 
 
-def _release(lane, pr: dict, record: dict, *, rebase: bool) -> None:
-    _retarget_main(lane, pr)
+def _release(lane, pr: dict, record: dict, *, rebase: bool, open_heads: set[str]) -> None:
+    _retarget_main(lane, pr, open_heads)
     if record.get("holdApplied"):
         result = lane.sh(["gh", "api", "-X", "DELETE",
                           f"repos/{lane.REPO_SLUG}/issues/{pr['number']}/labels/hold"])
@@ -406,6 +418,7 @@ def reconcile_open_prs(host, lane, prs: list[dict]) -> dict:
     previous = read_state(host.state)
     previous_pr = {key: row for key, row in previous["active"].items() if row.get("laterPr")}
     by_number = {pr["number"]: pr for pr in prs}
+    open_heads = {pr["headRefName"] for pr in prs if pr.get("headRefName")}
     decisions = open_pr_decisions(prs, mode)
     desired = {_key(row): row for row in decisions}
     if mode == "enforce":
@@ -439,7 +452,7 @@ def reconcile_open_prs(host, lane, prs: list[dict]) -> dict:
         if number in remaining_later or number in released_later:
             return False
         _release(lane, later, {**record, "holdApplied": number in owned_holds},
-                 rebase=number in rebase_later)
+                 rebase=number in rebase_later, open_heads=open_heads)
         released_later.add(number)
         return True
 

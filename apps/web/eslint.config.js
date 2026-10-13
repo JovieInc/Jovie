@@ -243,8 +243,11 @@ const baseConfig = {
     // JOV-8196: deterministic UI-feel checks — tabular-nums on changing
     // numerals, text-wrap balance on headings, 40x40 hit-area floor, and
     // concentric border radii (System B tokens). Heuristics documented in
-    // eslint-rules/ui-feel.js.
-    '@jovie/ui-feel': 'error',
+    // eslint-rules/ui-feel.js. Off here: the lint:ui-feel baseline ratchet
+    // (ci-fast design governance) owns enforcement. As 'error' it failed
+    // lint-staged and Source Validation's lint:eslint:changed on the
+    // baselined legacy violations in any touched file.
+    '@jovie/ui-feel': 'off',
     // JOV-6280: call-site appearance is owned by @jovie/ui. Layout/placement is
     // allowed. Extra upstream rules stay off until a fixture proves incremental
     // protection (see docs/design-system/shadcn-lint-overlap.md).
@@ -353,6 +356,7 @@ module.exports = [
       'components/atoms/TableErrorFallback.tsx',
       'components/atoms/AvatarUploadOverlay.tsx',
       'components/atoms/ReleaseArtworkThumb.tsx',
+      'components/atoms/SettingsPlanGateLabel.tsx',
     ],
     rules: {
       'no-restricted-syntax': [

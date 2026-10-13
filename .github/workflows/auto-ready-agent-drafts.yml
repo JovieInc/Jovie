@@ -54,7 +54,8 @@ jobs:
   auto-ready:
     # Writer-proof recovery stays manual. CI/check_suite must not scan 200 PRs
     # looking for proof receipts — that path is author-owned.
-    if: github.event_name == 'workflow_dispatch' && inputs.pr_number == ''
+    # QUEUE_FREEZE=1 (repo variable): this job arms auto-merge, so it stays off.
+    if: github.event_name == 'workflow_dispatch' && inputs.pr_number == '' && vars.QUEUE_FREEZE != '1'
     concurrency:
       group: auto-ready-agent-drafts
       cancel-in-progress: false
@@ -99,7 +100,7 @@ jobs:
   green-source:
     # Event-driven undraft when required source checks succeed. Job-level
     # filters keep failed/cancelled/unrelated suites from provisioning a runner.
-    # No ready_for_review listener — auto-merge-default.yml owns that event.
+    # No ready_for_review listener — merge-queue-green-enroll.yml owns that event.
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.pr_number != '') ||
       (

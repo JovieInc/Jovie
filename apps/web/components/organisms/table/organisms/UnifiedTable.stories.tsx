@@ -2,7 +2,8 @@ import '@/styles/system-b-app.css';
 import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import type { ColumnDef } from '@/lib/tanstack-table';
+import type { ColumnDef, RowSelectionState } from '@/lib/tanstack-table';
+import { PersonCell } from '../atoms/PersonCell';
 import { UnifiedTable } from './UnifiedTable';
 
 type RowData = { id: string; title: string; artist: string };
@@ -105,4 +106,99 @@ function RowModeScrollFixture() {
 
 export const RowModeLoadingAndScroll: Story = {
   render: () => <RowModeScrollFixture />,
+};
+
+type PersonRow = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  city: string;
+  lastSeen: string;
+};
+
+const people: PersonRow[] = [
+  ['Maya Okafor', 'maya@example.com', 'Superfan', 'Lagos', '2m'],
+  ['Jonas Feld', 'jonas@example.com', 'Subscriber', 'Berlin', '14m'],
+  ['Priya Raman', 'priya@example.com', 'Buyer', 'Chennai', '1h'],
+  ['Luca Moretti', 'luca@example.com', 'Subscriber', 'Milan', '3h'],
+  ['Ana Souza', 'ana@example.com', 'Superfan', 'São Paulo', '5h'],
+  ['Kenji Arai', 'kenji@example.com', 'Tipper', 'Osaka', '1d'],
+  ['Zoë Laurent', 'zoe@example.com', 'Subscriber', 'Lyon', '2d'],
+  ['Sam Rivers', 'sam@example.com', 'Buyer', 'Austin', '3d'],
+].map(([name, email, role, city, lastSeen], index) => ({
+  id: `person-${index}`,
+  name,
+  email,
+  role,
+  city,
+  lastSeen,
+}));
+
+const peopleColumns: ColumnDef<PersonRow, unknown>[] = [
+  {
+    id: 'person',
+    header: 'Name',
+    cell: ({ row }) => (
+      <PersonCell name={row.original.name} secondary={row.original.email} />
+    ),
+    size: 320,
+  },
+  { accessorKey: 'role', header: 'Role', size: 140 },
+  { accessorKey: 'city', header: 'City', size: 140 },
+  {
+    accessorKey: 'lastSeen',
+    header: 'Last seen',
+    size: 96,
+    meta: { align: 'right' },
+  },
+];
+
+function DensePeopleExample() {
+  const [selected, setSelected] = useState<RowSelectionState>({
+    'person-1': true,
+  });
+  return (
+    <UnifiedTable
+      data={people}
+      columns={peopleColumns}
+      rowMode='dense'
+      enableVirtualization={false}
+      enableKeyboardNavigation
+      getRowId={row => row.id}
+      rowSelection={selected}
+      onToggleRowSelection={row =>
+        setSelected(previous => {
+          const next = { ...previous };
+          if (next[row.id]) delete next[row.id];
+          else next[row.id] = true;
+          return next;
+        })
+      }
+      onRowClick={() => undefined}
+    />
+  );
+}
+
+/** The one people row: 32px, 20px face, j/k, x selects, Shift+J/K extends. */
+export const DensePeople: Story = {
+  render: () => <DensePeopleExample />,
+};
+
+export const DensePeopleLoading: Story = {
+  render: () => (
+    <UnifiedTable
+      data={[]}
+      columns={peopleColumns}
+      rowMode='dense'
+      isLoading
+      skeletonRows={6}
+      skeletonColumnConfig={[
+        { width: '220px', variant: 'person' },
+        { width: '72px', variant: 'text' },
+        { width: '72px', variant: 'text' },
+        { width: '32px', variant: 'text' },
+      ]}
+    />
+  ),
 };
