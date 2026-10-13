@@ -719,12 +719,27 @@ export function supersededByLiveEntry(pr, sourceHeadSha, groupHeadSha) {
   );
 }
 
+// A group's base is main or, behind other entries, the head of the group ahead
+// of it. Until that group's CI passes, a failure here can be the ahead entry's:
+// on 2026-10-12 #21393 was held as deterministic-source for a DESIGN.md check
+// that #21384, ahead of it, broke, while the ahead group was still running.
+// GitHub removes the failing ahead entry and rebuilds this one, so the hold
+// waits. An unreadable base keeps the hold (`baseOnMain` defaults true).
+/** @typedef {{ baseOnMain?: boolean, aheadConclusion?: string | null }} AheadGroup */
+/** @param {AheadGroup} [group] */
+export function aheadEntryUnproven({
+  baseOnMain = true,
+  aheadConclusion,
+} = {}) {
+  return baseOnMain === false && aheadConclusion !== 'success';
+}
+
 // Persist the exact-source failure before removing native merge intent. A new
 // head keeps the old receipt and receives no dequeue/disable mutation.
 // Dequeue denial is non-fatal: this token cannot call dequeuePullRequest, and
 // GitHub already removes the PR when the merge_group run fails.
 /**
- * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string }} input
+ * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string, aheadGroup?: AheadGroup }} input
  * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function }} io
  */
 export async function applyMergeGroupFailure(
@@ -738,6 +753,7 @@ export async function applyMergeGroupFailure(
     changedFiles,
     mainSha,
     admissionText = '',
+    aheadGroup,
   },
   { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
 ) {
@@ -822,6 +838,26 @@ export async function applyMergeGroupFailure(
       workflowRunAttempt: run.run_attempt,
       classification,
       superseded: true,
+      statusWritten: false,
+      dequeued: false,
+      dequeueOutcome: 'not-attempted',
+      autoMergeDisabled: false,
+    };
+  }
+  if (aheadEntryUnproven(aheadGroup)) {
+    return {
+      schema: FAILURE_HOLD_SCHEMA,
+      repository,
+      prNumber: front.prNumber,
+      sourceHeadSha,
+      mergeGroupHeadSha: groupHeadSha,
+      mergeGroupBaseSha: front.baseSha,
+      aheadConclusion: aheadGroup.aheadConclusion ?? null,
+      workflowRunId: run.id,
+      workflowRunAttempt: run.run_attempt,
+      classification,
+      skipped: true,
+      aheadEntryUnproven: true,
       statusWritten: false,
       dequeued: false,
       dequeueOutcome: 'not-attempted',
@@ -1121,6 +1157,37 @@ function instructionContractEvidence(repository, run, jobs, baseSha) {
   }
 }
 
+// Is the group's base on main, and how did the CI run of the group ahead end?
+// Any unreadable answer returns {} (attributable), the pre-existing behavior.
+/** @returns {AheadGroup} */
+function readAheadGroup(repository, baseSha) {
+  try {
+    const compare = ghJson([
+      'api',
+      `repos/${repository}/compare/${baseSha}...main`,
+    ]);
+    if (
+      !['ahead', 'identical', 'behind', 'diverged'].includes(compare?.status)
+    ) {
+      return {};
+    }
+    if (compare.status === 'ahead' || compare.status === 'identical') {
+      return { baseOnMain: true };
+    }
+    const runs = ghJson([
+      'api',
+      `repos/${repository}/actions/runs?head_sha=${baseSha}&event=merge_group&per_page=20`,
+    ]).workflow_runs;
+    if (!Array.isArray(runs)) return {};
+    const ahead = runs
+      .filter(item => item?.workflow_id === CI_WORKFLOW_ID)
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+    return { baseOnMain: false, aheadConclusion: ahead?.conclusion ?? null };
+  } catch {
+    return {};
+  }
+}
+
 async function main(argv) {
   if (argv.length !== 2 || argv[0] !== '--event-path') {
     fail(
@@ -1190,6 +1257,7 @@ async function main(argv) {
       changedFiles: evidence.changedFiles,
       mainSha,
       admissionText,
+      aheadGroup: readAheadGroup(repository, front.baseSha),
     },
     {
       writeStatus: async receipt =>
