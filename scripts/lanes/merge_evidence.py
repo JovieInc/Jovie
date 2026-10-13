@@ -2,13 +2,17 @@
 
 Adapts JOV-5004's repository-connection/two-scan contract into the canonical
 lanes runtime after scripts/symphony retired (JOV-6637). No search-result cap,
-background collector, attribution policy, or new persisted authority.
+background collector, attribution policy, or new persisted authority. The doctor (every
+dispatch tick) and the HUD read the same 24 h window, so `collect_shared` lets them share
+one complete read for a few minutes instead of each re-reading it twice per refresh.
 """
 from __future__ import annotations
 
 from datetime import datetime
 import json
 import math
+import os
+from pathlib import Path
 import subprocess
 import time
 
@@ -135,6 +139,42 @@ def collect(repository: str, since: float, until: float, *, fetch_page=None,
             return incomplete('unstable_snapshot')
         previous = rows
     return {**result, 'complete': True, 'prs': previous}
+
+
+# Every collect() is two full scans; the doctor ran it each dispatch tick and the HUD every
+# refresh, about 140 GraphQL reads an hour on Gem for one 24 h stat (2026-10-12 gh ledger).
+SHARED_TTL_S = 300
+
+
+def collect_shared(repository: str, since: float, until: float, cache: Path | None, *,
+                   ttl_s: float = SHARED_TTL_S, collect_fn=None) -> dict:
+    """collect(), reused across a host's lanes processes for up to ttl_s.
+
+    Only complete evidence is shared. A reused read keeps its own `until`: rows merged
+    after it are simply not counted yet, never reported as read."""
+    collect_fn = collect_fn or collect
+    if cache is None:
+        return collect_fn(repository, since, until)
+    try:
+        shared = json.loads(Path(cache).read_text())
+        evidence = shared['evidence']
+        window = evidence['window']
+        if (shared['repository'] == repository and evidence['complete'] is True
+                and window['since'] <= since and 0 <= until - window['until'] < ttl_s):
+            rows = [row for row in evidence['prs'] if since <= _epoch(row['mergedAt'])]
+            return {**evidence, 'window': {'since': since, 'until': window['until']}, 'prs': rows}
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    evidence = collect_fn(repository, since, until)
+    if evidence.get('complete') is True:
+        try:
+            Path(cache).parent.mkdir(parents=True, exist_ok=True)
+            tmp = Path(cache).with_name(f'{Path(cache).name}.{os.getpid()}.tmp')
+            tmp.write_text(json.dumps({'repository': repository, 'evidence': evidence}))
+            os.replace(tmp, cache)
+        except OSError:
+            pass  # an unwritable cache only costs the next reader a fresh read
+    return evidence
 
 
 def require_complete(evidence: dict) -> list[dict]:
