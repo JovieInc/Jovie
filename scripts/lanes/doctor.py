@@ -42,6 +42,8 @@ NO_LANDING_S = 6 * 3600
 # (every worker exited on claim), which looked busy to every other rule.
 NO_WORK_S = 5 * 60
 PROVIDER_IDLE_S = 5 * 60
+# The idle-fallback tick runs every 5 min (install.sh); two cadences still prove a live tick.
+TICK_FRESH_S = 10 * 60
 ADMISSION_REPAIR_S = 5 * 60
 DELIVERY_STALE_S = 2 * 3600
 ESCALATION_S = 10 * 60
@@ -428,7 +430,7 @@ def delivery_evidence(obs: dict, previous: dict) -> dict:
     # Only post-budget qualified work grants demand. Held work is diagnosed by
     # its existing admission/ownership condition, never force-admitted here.
     known = (type(obs.get("pool")) is int and not obs.get("linearSkipped") and bool(capacity)
-             and isinstance(obs.get("tickAge"), (int, float)) and 0 <= obs["tickAge"] <= PROVIDER_IDLE_S)
+             and isinstance(obs.get("tickAge"), (int, float)) and 0 <= obs["tickAge"] <= TICK_FRESH_S)
     tick = obs.get("tick") or {}
     healthy = [name for name, seats in capacity.items() if seats.get("slots", 0) > 0
                and name in tick.get("spawned", []) and not tick.get("error")
@@ -1283,6 +1285,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "account-leases-occupied" if provider == "codex" and account_state["state"] == "leases-occupied" else
             "account-quota-banked" if provider == "codex" and account_state["state"] == "quota-banked" else
             "account-cooldown" if provider == "codex" and account_state["state"] == "cooldown" else
+            f"quota-blocked:{(tick.get('quotaBlocked') or {})[provider]}"
+            if provider in (tick.get("quotaBlocked") or {}) else
             "provider-unhealthy" if provider in (tick.get("unhealthy") or []) else
             "no-account-available" if provider == "codex" and account_available == 0 else
             "new-issue-admission-unknown" if qualified is None else

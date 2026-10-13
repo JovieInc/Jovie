@@ -276,6 +276,15 @@ class ConditionReceiptTest(unittest.TestCase):
         self.assertEqual(event["owner"], "symphony-lanes-doctor")
         self.assertEqual(event["owningInvariant"], "JOV-6004")
 
+    def test_a_five_minute_tick_still_counts_as_live_demand_evidence(self):
+        for tick_age, known in ((330, True), (doctor.TICK_FRESH_S + 1, False)):
+            observed = obs(now=1000.0, tickAge=tick_age, pool=20, poolByProvider={"devin": 20},
+                           tick={"at": "x", "unhealthy": [], "error": None, "spawned": ["devin"],
+                                 "disk": {"admitted": True}},
+                           capacityByProvider={"devin": {"running": 1, "slots": 2, "base": 2}})
+            runnable = doctor.delivery_evidence(observed, {})["admission"]["runnablePool"]
+            self.assertEqual(runnable is not None, known, tick_age)
+
     def test_failed_devin_restarts_emit_one_bounded_summer_escalation_generation(self):
         observed = obs(now=1000.0, tickAge=3,
                        tick={"at": "x", "unhealthy": [], "error": None, "spawned": ["devin"] * 4},
@@ -985,6 +994,16 @@ class StatusFeedTest(unittest.TestCase):
         self.assertEqual(metric["idleReason"], "capacity-idle-with-qualified-work")
         self.assertEqual(metric["accountIdleSecondsWhileQualifiedWorkExists"], 100)
         self.assertEqual(feed["_idleQualifiedSince"], {"codex": 900.0})
+
+    def test_feed_names_expected_quota_block_instead_of_unhealthy_capacity(self):
+        host = type("Host", (), {"state": Path("/tmp")})()
+        lane = type("Lane", (), {"HOST": "gem", "provider_throughput": staticmethod(throughput_stub)})
+        observed = obs(poolByProvider={"claude": 5},
+                       capacityByProvider={"claude": {"running": 0, "slots": 2}})
+        feed = doctor.status_feed(host, lane, observed, {},
+                                  {"quotaBlocked": {"claude": "banked:usage-limit"}})
+        self.assertEqual(feed["throughput"]["providers"]["claude"]["idleReason"],
+                         "quota-blocked:banked:usage-limit")
 
     def test_terminal_pr_backlog_is_its_own_idle_reason(self):
         """JOV-7514: parked hold/exhausted PRs must not be reported as the active open-PR cap."""

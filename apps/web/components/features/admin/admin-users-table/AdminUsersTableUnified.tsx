@@ -33,7 +33,6 @@ import {
   TableBulkActionsToolbar,
   useRowSelection,
 } from '@/components/organisms/table';
-import { TABLE_CELL_MULTILINE_CONTENT_CLASSNAME } from '@/components/organisms/table/atoms/TableCell';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useTableMeta } from '@/contexts/TableMetaContext';
@@ -93,6 +92,7 @@ function AdminUserMobileCard({
   contextMenuItems,
 }: Readonly<AdminUserMobileCardProps>) {
   const actionItems = convertContextMenuItems(contextMenuItems);
+  const displayName = user.name || 'Email Subscriber';
 
   return (
     <ContentSurfaceCard
@@ -110,7 +110,7 @@ function AdminUserMobileCard({
           />
           <div className='min-w-0'>
             <p className='truncate text-sm font-semibold tracking-tight text-primary-token'>
-              {user.name || 'Email Subscriber'}
+              {displayName}
             </p>
             <p className='truncate text-xs text-secondary-token'>
               {user.email ?? 'No email'}
@@ -474,7 +474,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       // Name column
       columnHelper.accessor('name', {
         id: 'name',
-        meta: { cellContentClassName: TABLE_CELL_MULTILINE_CONTENT_CLASSNAME },
         header: 'Name',
         cell: renderNameCell,
         size: 260,
@@ -652,7 +651,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
             </div>
           ) : (
             <AdminDataTable
-              rowMode='two-line'
+              rowMode='dense'
               data={users}
               columns={columns}
               rowSelection={rowSelection}

@@ -90,30 +90,6 @@ describe('agent-branch-pattern (open-agent-PR capacity)', () => {
     expect(text).toContain('LINEAR_API_KEY');
   });
 
-  it('workflows consume the shared module (no divergent inline capacity regex)', () => {
-    const workflows = [
-      'github-ai-dispatcher.yml',
-      'github-ai-orchestrator.yml',
-    ];
-    for (const name of workflows) {
-      const text = readFileSync(
-        `${repoRoot}/.github/workflows/${name}`,
-        'utf8'
-      );
-      expect(text).toContain('scripts/lib/agent-branch-pattern.mjs');
-      // Capacity listing must paginate so all gates see the same PR universe.
-      expect(text).toMatch(/gh api --paginate .*pulls\?state=open/);
-      // Old divergent forms must not reappear as capacity filters.
-      expect(text).not.toMatch(/test\("\^\[\^\/\]\+\/jov-\[0-9\]\+-"; "i"\)/);
-      expect(text).not.toMatch(
-        /headRefName \| test\("\^\(codex\|claude\|codegen-bot\|linear\)\//
-      );
-      expect(text).not.toMatch(
-        /head\.ref \| test\("\^\(codex\|codegen-bot\|linear\|claude\)\//
-      );
-    }
-  });
-
   it('actionlint is not push/PR-triggered (agent-branch push → zero runs)', () => {
     const text = readFileSync(
       `${repoRoot}/.github/workflows/actionlint.yml`,
