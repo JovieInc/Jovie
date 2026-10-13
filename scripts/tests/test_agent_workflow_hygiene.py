@@ -1429,8 +1429,9 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
         encoding="utf-8"
     )
     assert "Graphite" not in dependabot
-    assert "scripts/native-merge-intent.mjs" in dependabot
-    assert "--match-head-commit" in (REPO_ROOT / "scripts" / "native-merge-intent.mjs").read_text(encoding="utf-8")
+    # Green enroll is the sole queue writer; Dependabot reconciliation never arms.
+    assert "native-merge-intent" not in dependabot
+    assert "--auto" not in dependabot
     adapter = (REPO_ROOT / "scripts" / "dependabot-workflow-run-adapter.mjs").read_text(
         encoding="utf-8"
     )
@@ -1451,10 +1452,7 @@ def test_dependabot_workflow_materializes_trusted_policy_runtime() -> None:
     assert "\n  workflow_run:" not in workflow
     assert "actions/download-artifact" not in workflow
     assert "      actions: read" in workflow
-    for entrypoint in (
-        "scripts/dependabot-workflow-run-adapter.mjs",
-        "scripts/native-merge-intent.mjs",
-    ):
+    for entrypoint in ("scripts/dependabot-workflow-run-adapter.mjs",):
         assert entrypoint in materialized
         _assert_local_runtime_closure(materialized, entrypoint)
 
@@ -1591,7 +1589,7 @@ def test_triage_catch_up_uses_trusted_main_and_preserves_wake_receipts() -> None
     assert "persist-credentials: false" in checkout
     assert "if:" not in checkout
     catch_up = block.split("- name: Recover missed Linear Triage events", 1)[1].split(
-        "- name: Wake existing picker", 1
+        "- name: Preserve Triage catch-up receipt", 1
     )[0]
     assert "steps.debounce" not in catch_up
     assert (
@@ -1600,13 +1598,6 @@ def test_triage_catch_up_uses_trusted_main_and_preserves_wake_receipts() -> None
     )
     assert '--sweep > "$RECEIPT_FILE"' in catch_up
     assert "summer-bottleneck-signing.env" in catch_up
-    wake = block.split("- name: Wake existing picker", 1)[1].split(
-        "- name: Preserve Triage", 1
-    )[0]
-    assert "if: always()" in wake
-    assert '[[ -s "$RECEIPT_FILE" ]]' in wake
-    assert ".wakeSymphony == true" in wake
-    assert "--max-time 5" in wake
     receipt = block.split("- name: Preserve Triage catch-up receipt", 1)[1]
     assert "if: always()" in receipt
     assert (
@@ -1629,7 +1620,7 @@ def test_triage_catch_up_survives_failed_reconciliation_with_trusted_prerequisit
     assert "ref: main" in checkout
     assert "id: main-node" in node_setup
     catch_up = block.split("- name: Recover missed Linear Triage events", 1)[1].split(
-        "- name: Wake existing picker", 1
+        "- name: Preserve Triage catch-up receipt", 1
     )[0]
     condition = re.search(r"if: >-\n(.*?)\n        env:", catch_up, re.DOTALL)
     assert condition is not None, "Default success() skips recovery after upstream failure"
@@ -1641,16 +1632,16 @@ def test_triage_catch_up_survives_failed_reconciliation_with_trusted_prerequisit
     assert "continue-on-error:" not in block
 
 
-def test_symphony_wake_requires_verified_admitted_receipt() -> None:
-    """The assess job writes the exact-issue receipt before any Symphony wake,
-    and the wake is conditioned on the reconciler's mutated Todo transition."""
+def test_triage_receipts_never_wake_the_retired_symphony_endpoint() -> None:
+    """The Elixir Symphony at 127.0.0.1:4041 is retired (connection refused);
+    the Gem lanes dispatch tick picks Todo work from its Linear mirror. A wake
+    curl there only turned admitted Triage receipts into red runs."""
+    workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
+    assert "127.0.0.1:4041" not in workflow
+    assert ".wakeSymphony == true" not in workflow
     block = _job_block("fleet-gate-refresh.yml", "assess")
     assert "github.event_name == 'repository_dispatch'" in block
-    receipt_write = block.index('> "$RECEIPT_FILE"')
-    wake_gate = block.index(".wakeSymphony == true")
-    wake_call = block.index("http://127.0.0.1:4041/api/v1/refresh")
-    assert receipt_write < wake_gate < wake_call
-    assert "requiresImmediateInvestigation == true" in block
+    assert block.index('> "$RECEIPT_FILE"') < block.index("requiresImmediateInvestigation == true")
 
 
 def test_retired_admission_commands_stay_disabled() -> None:

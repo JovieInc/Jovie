@@ -73,6 +73,7 @@ function expectedCheckoutStep(exactBase) {
 function expectedNormalStep(otherBase) {
   return [
     '      - name: Enforce combined-tree payload and member size policy',
+    '        id: member-policy',
     `        if: ${otherBase}`,
     '        env:',
     '          # The synthetic head controls this workflow definition. Never expose',
@@ -80,7 +81,9 @@ function expectedNormalStep(otherBase) {
     '          GH_TOKEN: ${{ github.token }}',
     "          MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}",
     "          MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}",
-    '        run: node scripts/lib/merge-group-member-policy.mjs --policy=size',
+    '        # Publishes fork_verdict before any size failure, so the Fork PR Gate',
+    '        # job below judges the members it was asked about.',
+    '        run: node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork',
   ].join('\n');
 }
 

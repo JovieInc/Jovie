@@ -8,6 +8,7 @@ import {
   updateReleaseTask,
 } from '@/app/app/(shell)/dashboard/releases/task-actions';
 import { toast } from '@/components/feedback';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { captureError } from '@/lib/error-tracking';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import { queryKeys } from './keys';
@@ -128,7 +129,7 @@ export function useInstantiateTasksMutation(releaseId: string) {
       // Expected entitlement gate — not a bug, do not report to Sentry.
       if (isUpgradeRequiredError(error)) {
         toast.error(
-          'Release plans require a Pro plan. Upgrade to unlock this feature.'
+          `Release plans require the ${PRO_PLAN_DISPLAY_NAME} plan. Upgrade to unlock this feature.`
         );
         return;
       }
