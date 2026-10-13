@@ -77,7 +77,9 @@ async function runEject({ status }) {
     });
   });
   await new Promise(done => server.listen(0, '127.0.0.1', done));
-  const { port } = server.address();
+  const { port } = /** @type {import('node:net').AddressInfo} */ (
+    server.address()
+  );
   const child = spawn(
     'bash',
     ['-e', '-c', ejectStep('ci-fast-remaining').run],
