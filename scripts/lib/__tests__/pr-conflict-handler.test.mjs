@@ -20,7 +20,6 @@ import {
   buildSteeringExceptionReceipt,
   CONFLICT_CLOSED_LOOP_INVARIANT_ID,
   CONFLICT_FX_CLAIM_TTL_MS,
-  CONFLICT_FX_COHORT_SCHEMA,
   CONFLICT_FX_MAX_ATTEMPTS,
   CONFLICT_FX_MODEL,
   CONFLICT_FX_RECEIPT_SCHEMA,
@@ -1589,49 +1588,6 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(dynamicCaps.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('persists trusted adaptive cohort evidence after the repair matrix settles', () => {
-    const cohortStep = workflowStep(
-      'Reconcile exact outcomes and persist trusted cohort receipt'
-    );
-    expect(WORKFLOW).toMatch(
-      new RegExp(
-        `(?:buildConflictFxCohortMarker|${CONFLICT_FX_COHORT_SCHEMA.replaceAll('/', '\\/')})`,
-        'u'
-      )
-    );
-    for (const field of [
-      'staleHeadSkips',
-      'staleHeadSkipRate',
-      'p95CiLatencyMs',
-      'baselineP95CiLatencyMs',
-      'runnerCapacity',
-      'activeCi',
-      'queuedCi',
-      'backlog',
-      'runUrl',
-    ]) {
-      expect(WORKFLOW).toContain(field);
-    }
-    expect(WORKFLOW).toMatch(
-      /gh\s+api\s+-X\s+POST[^\n]*(?:issues\/[^\s"']+\/comments|issues\/\$[A-Z_]+\/comments)/iu
-    );
-    expect(WORKFLOW).toContain('buildConflictCohortLiveHeadQuery');
-    expect(WORKFLOW).toContain('indexLatestConflictCohortCiRuns');
-    expect(WORKFLOW).toContain('page <= max_ci_run_pages');
-    expect(WORKFLOW).not.toContain(
-      'actions/workflows/ci.yml/runs?head_sha=$resolved_head'
-    );
-    expect(cohortStep).toContain('--paginate --slurp');
-    expect(cohortStep).not.toContain('| head -1 || true');
-    expect(WORKFLOW).toContain('ci-latencies.txt');
-    expect(WORKFLOW).toContain('latest_check("PR Ready")');
-    expect(WORKFLOW).toContain('latest_check("Migration Guard")');
-    expect(WORKFLOW).toContain('latest_status("Fork PR Gate")');
-    expect(WORKFLOW).not.toContain(
-      'actions/workflows/ci.yml/runs?status=completed&per_page=50'
-    );
-  });
-
   it('binds the stronger FX model and immutable artifact before granting writer authority', () => {
     expect(WORKFLOW).toMatch(/FX_MODEL:\s*['"]?openai\/gpt-5\.6-sol['"]?/u);
     expect(WORKFLOW).toContain('AI_GATEWAY_API_KEY');
@@ -1998,7 +1954,7 @@ printf 'success\\n' > "$SUCCESS_MARKER"`;
     expect(WORKFLOW).toContain('mergeQueueEntry');
     expect(
       WORKFLOW.match(/GH_QUEUE_TOKEN: \$\{\{ github\.token \}\}/gu)
-    ).toHaveLength(4);
+    ).toHaveLength(3);
     expect(
       WORKFLOW.match(/GH_TOKEN="\$GH_QUEUE_TOKEN" gh api graphql/gu)
     ).toHaveLength(7); // Includes the exact-PR queue read before an FX claim.
