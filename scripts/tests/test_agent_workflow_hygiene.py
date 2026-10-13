@@ -24,9 +24,6 @@ FLEET_CONTROLLER_JOBS = (
 )
 
 MODEL_OR_ADVISORY_JOBS = (
-    ("claude.yml", "claude"),
-    ("claude-review.yml", "review"),
-    ("eval.yml", "eval"),
     ("eval-real-model.yml", "real-model-eval"),
     ("sentry-autofix.yml", "autofix"),
     ("taste-classifier.yml", "classify"),
@@ -56,7 +53,6 @@ HOSTED_DEEP_EVIDENCE_JOBS = (
     ("screenshots.yml", "generate"),
     ("test-flakiness-report.yml", "analyze-flakiness"),
     ("ci-duration-ratchet.yml", "measure"),
-    ("sentry-error-gate.yml", "sentry-gate"),
     ("cost-anomaly-gate.yml", "evaluate"),
     ("visual-a11y.yml", "ci-visual-path-changes"),
     ("visual-a11y.yml", "storybook-a11y"),
@@ -121,12 +117,6 @@ HOSTED_BACKGROUND_CONTROLLER_JOBS = (
     ("neon-scheduled-cleanup.yml", "scheduled-cleanup"),
     ("observability-issue.yml", "sync-issue"),
     ("sentry-autofix-recurrence.yml", "recurrence"),
-    ("reusable-ci-lint.yml", "lint"),
-    ("reusable-ci-lint.yml", "typecheck"),
-    ("reusable-ci-lint.yml", "knip"),
-    ("reusable-ci-lint.yml", "env-example-guard"),
-    ("reusable-ci-lint.yml", "promptfoo-evals"),
-    ("reusable-ci-lint.yml", "golden-eval-set"),
 )
 
 
@@ -507,18 +497,6 @@ def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
         assert f" {label}" in scrub
 
 
-def test_claude_mention_requires_write_capable_association() -> None:
-    """Public @claude mentions must not mint a write token for strangers."""
-    workflow = (WORKFLOWS / "claude.yml").read_text(encoding="utf-8")
-    job = _job_block("claude.yml", "claude")
-
-    assert "github.event.comment.author_association == 'OWNER'" in job
-    assert "github.event.comment.author_association == 'MEMBER'" in job
-    assert "github.event.comment.author_association == 'COLLABORATOR'" in job
-    assert "github.actor == 'coderabbitai[bot]'" in job
-    assert "allowed_bots: 'coderabbitai[bot]'" in workflow
-    assert "author_association == 'CONTRIBUTOR'" not in job
-    assert "author_association == 'NONE'" not in job
 
 
 def test_trigger_guard_materializes_systemic_detector_import_closure() -> None:
@@ -1142,11 +1120,9 @@ def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
 def test_live_model_work_never_fans_out_from_pull_requests() -> None:
     """PR evals stay deterministic; live-model spend belongs off the PR path."""
     real_model = (WORKFLOWS / "eval-real-model.yml").read_text(encoding="utf-8")
-    deterministic = (WORKFLOWS / "eval.yml").read_text(encoding="utf-8")
 
     assert "pull_request:" not in real_model
     assert "pnpm exec vitest run" in real_model
-    assert "github.event_name == 'pull_request' && '0'" in deterministic
 
 
 def test_deep_lanes_are_event_driven_and_bounded() -> None:
@@ -1440,12 +1416,6 @@ def test_cost_anomaly_alerts_on_ratio_or_absolute_floor(tmp_path: Path) -> None:
         assert reason in outputs
 
 
-def test_claude_review_uses_hosted_bun_prerequisites() -> None:
-    """setup-bun must not land on self-hosted images missing unzip."""
-    block = _job_block("claude-review.yml", "review")
-    assert "runs-on: ubuntu-latest" in block
-    assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block
-    assert "uses: oven-sh/setup-bun@" in block
 
 
 def test_taste_policy_runs_trusted_base_code_with_write_authority() -> None:

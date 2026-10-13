@@ -100,10 +100,6 @@ const SECURITY_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/security.yml'),
   'utf8'
 );
-const CLAUDE_REVIEW_WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/claude-review.yml'),
-  'utf8'
-);
 const NEXT_BUILD_CACHE_WARM_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/next-build-cache-warm.yml'),
   'utf8'
@@ -3193,87 +3189,6 @@ ${selectedGateScript}`,
     expect(SIZE_GUARD_WORKFLOW).toContain(
       'Active native-queue required-context producer'
     );
-  });
-
-  it('keeps secret-backed AI review manual and isolates PR head data', () => {
-    const workflowHeader = CLAUDE_REVIEW_WORKFLOW.slice(
-      0,
-      CLAUDE_REVIEW_WORKFLOW.indexOf('\njobs:')
-    );
-    expect(workflowHeader).toMatch(/^  workflow_dispatch:\s*$/m);
-    for (const automaticTrigger of [
-      'schedule',
-      'workflow_run',
-      'issues',
-      'issue_comment',
-      'pull_request',
-      'pull_request_target',
-      'pull_request_review',
-      'pull_request_review_comment',
-    ]) {
-      expect(workflowHeader).not.toMatch(
-        new RegExp(`^  ${automaticTrigger}:\\s*$`, 'm')
-      );
-    }
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain(
-      "if: github.ref == 'refs/heads/main'"
-    );
-    expect(workflowHeader).toMatch(/^  pull-requests: read$/m);
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain(
-      'ref: ${{ steps.pr.outputs.base_sha }}'
-    );
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain('persist-credentials: false');
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain(
-      'Fetch exact PR head as data only'
-    );
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain(
-      '+refs/pull/$PR_NUMBER/head:$head_ref'
-    );
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain('permission-contents: read');
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain('permission-pull-requests: read');
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain('permission-pull-requests: write');
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain(
-      '--allowedTools "Read,Glob,Grep,mcp__gbrain__query,mcp__gbrain__search"'
-    );
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain('--max-turns 8');
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain(
-      '--mcp-config "${{ runner.temp }}/gbrain-mcp.json"'
-    );
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain(
-      'BUNDLE_DIR="$GITHUB_WORKSPACE/.claude-review-input"'
-    );
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain(
-      'GBRAIN_CONNECTION:"${GBRAIN_CONNECTION}"'
-    );
-    expect(CLAUDE_REVIEW_WORKFLOW).not.toContain('--add-dir');
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain(
-      'chmod 600 "$RUNNER_TEMP/gbrain-mcp.json"'
-    );
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain('Remove trusted review inputs');
-    expect(CLAUDE_REVIEW_WORKFLOW).not.toMatch(/^\s+mcp_config:/m);
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain('--json-schema');
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain(
-      'STRUCTURED_OUTPUT: ${{ steps.claude.outputs.structured_output }}'
-    );
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain('pull.head.sha !== expectedHead');
-    expect(CLAUDE_REVIEW_WORKFLOW).toContain('github.rest.pulls.createReview');
-    expect(CLAUDE_REVIEW_WORKFLOW).not.toContain(
-      'github.rest.issues.createComment'
-    );
-    expect(CLAUDE_REVIEW_WORKFLOW).not.toContain('gh pr diff');
-    expect(CLAUDE_REVIEW_WORKFLOW).not.toContain('github.event.pull_request');
-
-    for (const workflowFile of readdirSync(
-      resolve(REPO_ROOT, '.github/workflows')
-    ).filter(file => file.endsWith('.yml') && file !== 'claude-review.yml')) {
-      expect(
-        readFileSync(
-          resolve(REPO_ROOT, '.github/workflows', workflowFile),
-          'utf8'
-        ),
-        workflowFile
-      ).not.toContain('claude-review.yml');
-    }
   });
 
   it('keeps workflow execution posture reporting post-merge and advisory', () => {

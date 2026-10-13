@@ -88,8 +88,6 @@ Promptfoo has explicit cost lanes:
 - **Live HTTP rate-limit evals** run only from `pnpm run evals:live:http:rate-limit`, require `JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS=1`, `JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED=1`, `JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1`, and a loopback `JOVIE_PROMPTFOO_BASE_URL`. Start the local server with `JOVIE_DISABLE_REDIS_FOR_EVALS=1` and `JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1`; this lane is manual-only and validates fail-closed 429 headers without touching shared Redis or model providers.
 - **Promptfoo eval-infrastructure-only PRs** stay on the deterministic fast source gate; generic `testing` metadata cannot fan out Neon, Lighthouse, mobile overflow, Playwright, eval, or preview deploy jobs. Path-selected deterministic evals run on the exact merge-group head (and direct-main fallback); exhaustive or live eval evidence remains explicit manual work.
 
-The legacy `evals-periodic.yml` workflow is also manual-only. It has no scheduled trigger, requires typing `RUN_LIVE_EVALS` into `confirm_live_llm_evals`, and runs at concurrency 1 if explicitly invoked.
-
 Ship now / Re-evaluate when / Then:
 
 - Ship now: path-selected deterministic evals stay model-key-free on combined heads, Promptfoo eval-infrastructure-only PRs do not fan out into heavyweight source-PR CI or preview deploys from generic `testing` metadata, every live LLM eval surface requires manual intent and concurrency 1, live HTTP route evals stay manual plus no-model, and live rate-limit evals require Redis/model-key-disabled local server mode.

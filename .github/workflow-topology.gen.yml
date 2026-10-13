@@ -204,28 +204,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
     jobCount: 63
-  - name: Claude Review (gbrain-aware)
-    path: .github/workflows/claude-review.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-    terminalReceipt: job:review
-    jobCount: 1
-  - name: Claude Code
-    path: .github/workflows/claude.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - issue_comment
-    terminalReceipt: job:claude
-    jobCount: 1
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true
@@ -409,28 +387,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:real-model-eval
     jobCount: 1
-  - name: Eval Gate
-    path: .github/workflows/eval.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-    terminalReceipt: job:eval
-    jobCount: 1
-  - name: Periodic Evals
-    path: .github/workflows/evals-periodic.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-    terminalReceipt: job:evals
-    jobCount: 2
   - name: Eve Pilot
     path: .github/workflows/eve-pilot.yml
     active: true
@@ -1089,17 +1045,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:parity
     jobCount: 1
-  - name: Lint & Static Checks (reusable)
-    path: .github/workflows/reusable-ci-lint.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_call
-    terminalReceipt: job:golden-eval-set
-    jobCount: 6
   - name: Rolling CI Dispatch
     path: .github/workflows/rolling-ci-dispatch.yml
     active: false
@@ -1147,18 +1092,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:remediation-clock
     jobCount: 2
-  - name: Runner Isolation Smoke
-    path: .github/workflows/runner-isolation-smoke.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - push
-      - workflow_dispatch
-    terminalReceipt: job:unit-shard
-    jobCount: 1
   - name: Safe PR Remediation
     path: .github/workflows/safe-pr-remediation.yml
     active: true
@@ -1229,17 +1162,6 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
     terminalReceipt: job:autofix
-    jobCount: 1
-  - name: Sentry Error Gate
-    path: .github/workflows/sentry-error-gate.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_call
-    terminalReceipt: job:sentry-gate
     jobCount: 1
   - name: Shipping SLO Ratchet
     path: .github/workflows/shipping-slo.yml
