@@ -197,7 +197,8 @@ jobs:
           # own singleflight lock; any failure still fails this step.
           web_types_log="$(mktemp)"
           (
-            export TYPECHECK_SINGLEFLIGHT_DIR="$(mktemp -d)"
+            TYPECHECK_SINGLEFLIGHT_DIR="$(mktemp -d)"
+            export TYPECHECK_SINGLEFLIGHT_DIR
             pnpm --filter @jovie/web run typecheck:tests
             pnpm --filter @jovie/web run typecheck:stories
           ) > "$web_types_log" 2>&1 &
