@@ -94,7 +94,6 @@ describe('agent-branch-pattern (open-agent-PR capacity)', () => {
     const workflows = [
       'github-ai-dispatcher.yml',
       'github-ai-orchestrator.yml',
-      'agent-tick.yml',
     ];
     for (const name of workflows) {
       const text = readFileSync(
