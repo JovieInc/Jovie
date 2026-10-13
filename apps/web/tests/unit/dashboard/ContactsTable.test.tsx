@@ -53,7 +53,9 @@ vi.mock('@/components/organisms/table', async importOriginal => {
       isRowSelected,
       isLoading,
       onRowClick,
+      rowMode,
     }: {
+      readonly rowMode?: string;
       readonly data: EditableContact[];
       readonly isRowSelected?: (row: EditableContact, index: number) => boolean;
       readonly isLoading?: boolean;
@@ -67,6 +69,7 @@ vi.mock('@/components/organisms/table', async importOriginal => {
         <div
           data-first-row-selected={firstRowSelected}
           data-loading={String(isLoading)}
+          data-row-mode={rowMode}
           data-testid='contacts-unified-table'
         >
           {data[0] ? (
@@ -206,6 +209,11 @@ describe('ContactsTable', () => {
       'Loading contacts'
     );
     expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
+    // Loading and loaded rows share the 32px dense people-row geometry.
+    expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
+      'data-row-mode',
+      'dense'
+    );
   });
 
   it('keeps the same Add Contact action in the toolbar and empty state', () => {

@@ -95,13 +95,16 @@ vi.mock('@/components/organisms/table', () => ({
   TableBulkActionsToolbar: () => null,
   UnifiedTable: ({
     columns,
+    rowMode,
   }: {
     columns: Array<{ id: string; meta?: { cellContentClassName?: string } }>;
+    rowMode?: string;
   }) => {
     capturedDesktopColumnIds = columns.map(column => column.id);
     return (
       <div
         data-testid='desktop-table'
+        data-row-mode={rowMode}
         data-multiline-columns={columns
           .filter(column =>
             column.meta?.cellContentClassName?.includes('whitespace-normal')
@@ -211,9 +214,14 @@ describe('AdminUsersTableUnified', () => {
 
       renderUsersTable();
 
+      // People rows are one line (face, name, email) at the 32px dense mode.
       expect(screen.getByTestId('desktop-table')).toHaveAttribute(
         'data-multiline-columns',
-        'name'
+        ''
+      );
+      expect(screen.getByTestId('desktop-table')).toHaveAttribute(
+        'data-row-mode',
+        'dense'
       );
       expect(screen.getByTestId('desktop-table')).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'Users' })).toBeNull();
