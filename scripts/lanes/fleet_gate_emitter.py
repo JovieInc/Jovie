@@ -6,8 +6,8 @@ replaces fleet-gate-refresh.yml's */5 cron, whose only job between pushes was ke
 
 Event-driven, no clock and no GitHub polling of its own: the input key hashes only state the
 tick already holds locally. That state is main's head from the update step's fetch, the shared
-open-PR cache, the gate's local integrity/concurrency evidence, the previous receipt's verdict,
-and the installed release (a new release replays the receipt once). An unchanged key does
+open-PR cache, the gate's local integrity/concurrency evidence (minus observation stamps) and
+the installed release (a new release replays the receipt once). An unchanged key does
 nothing. A changed key runs the exact-main gate code shipped with this release
 (scripts/fleet-gate/gem-priority-gate.py --consumer fleet) detached, under the gate's own
 writer lock, so a slow observation never delays a worker spawn. The receipt carries the key as
@@ -22,11 +22,18 @@ import signal
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 GATE = Path(__file__).resolve().parents[1] / "fleet-gate" / "gem-priority-gate.py"
 STATE_FILE = "fleet-gate-emit.json"
 OPEN_PRS_CACHE = "cache/open-prs-labels-v2.json"
+# The previous receipt's verdict used to be part of the key, so every emission that changed the
+# verdict (and every push-triggered workflow receipt) re-ran the gate on the next tick: the
+# emitter fed on its own output. Instead a receipt this emitter did not stamp (a workflow wrote
+# it, or the gate declined to persist) is re-stamped once it is this old, inside consumers'
+# 10-minute age window, and at most this often.
+RESTAMP_AFTER_S = 300
 # Fields of a cached open-PR row that move the gate's queue/closure verdict.
 PR_FIELDS = ("number", "headRefOid", "isDraft", "mergeStateStatus", "isInMergeQueue", "baseRefName")
 
@@ -82,11 +89,28 @@ def inputs(state_dir: Path, repo: Path, gem: Path) -> dict | None:
                    for row in cached if isinstance(row, dict)), key=lambda row: row.get("number") or 0) \
         if isinstance(cached, list) else None
     gate_state = gem / "state"
-    receipt = _obj(_read(gate_state / "gem-priority-gate" / "latest.json"))
     return {"main": sha, "openPrs": _digest(rows) if rows is not None else None,
-            "integrity": _digest(_read(gate_state / "integrity.json")),
-            "concurrency": _digest(_read(gate_state / "concurrency.json")),
-            "verdict": _digest({key: receipt.get(key) for key in ("state", "promotionMode", "reasons")})}
+            "integrity": _digest(_unstamped(_read(gate_state / "integrity.json"))),
+            "concurrency": _digest(_unstamped(_read(gate_state / "concurrency.json")))}
+
+
+def _unstamped(value):
+    """Evidence without its observation time: a re-observed, unchanged file is not new input."""
+    return {k: v for k, v in value.items() if k != "observedAt"} if isinstance(value, dict) else value
+
+
+def restamp_due(gem: Path, key: str, record: dict, now: float) -> bool:
+    """The live receipt is not ours and is getting old, and we have not just tried."""
+    receipt = _obj(_read(gem / "state" / "gem-priority-gate" / "latest.json"))
+    if receipt.get("inputGeneration") == key:
+        return False
+    try:
+        stamp = datetime.fromisoformat(str(receipt.get("observedAt")).replace("Z", "+00:00"))
+        age = now - (stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)).timestamp()
+    except ValueError:
+        age = float("inf")
+    started = record.get("startedAt")
+    return age >= RESTAMP_AFTER_S and not (isinstance(started, (int, float)) and now - started < RESTAMP_AFTER_S)
 
 
 def _obj(value) -> dict:
@@ -129,7 +153,8 @@ def tick(state_dir, repo, release: str | None, *, env=None, spawn=None, now: flo
         if seen is None:
             return {"status": "main-unknown"}
         key = _digest({**seen, "release": release})
-        if key == record.get("key"):
+        restamp = key == record.get("key") and restamp_due(workspace(env), key, record, now)
+        if key == record.get("key") and not restamp:
             path.write_text(json.dumps(record))
             return {"status": "unchanged", "key": key[:12]}
         child_env = {k: v for k, v in env.items() if k not in ("FLEET_GATE_ALLOW_LIVE_PERSIST", "FLEET_GATE_DRY_RUN")}
@@ -138,7 +163,7 @@ def tick(state_dir, repo, release: str | None, *, env=None, spawn=None, now: flo
         rc.unlink(missing_ok=True)
         command = [sys.executable, str(GATE), "--consumer", "fleet"]
         pid = (spawn or _spawn)(command, child_env, out, rc)
-        reason = "release" if release != record.get("release") else "inputs"
+        reason = "restamp" if restamp else "release" if release != record.get("release") else "inputs"
         record.update(key=key, release=release, inputs=seen, pid=pid, startedAt=now, reason=reason)
         path.write_text(json.dumps(record))
         return {"status": "emitting", "reason": reason, "key": key[:12]}

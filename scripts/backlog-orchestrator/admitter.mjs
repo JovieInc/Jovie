@@ -83,9 +83,11 @@ export const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
  * confirms it: the receipt's input generation is the emitter's current key,
  * its main SHA is live origin/main in the lanes repo, and lanes-status.json
  * `at` shows a tick within this window. Anything else (SHA mismatch, newer
- * inputs, or a dead emitter) is real staleness and fails closed.
+ * inputs, or a dead emitter) is real staleness and fails closed. The tick
+ * is a 5-minute timer (scripts/lanes/install.sh) that runs 2-3 minutes, so a
+ * live emitter's last `at` can be up to ~8 minutes old.
  */
-export const FLEET_EMITTER_TICK_MAX_AGE_MS = 3 * 60 * 1000;
+export const FLEET_EMITTER_TICK_MAX_AGE_MS = 9 * 60 * 1000;
 
 /**
  * @param {{ inputGeneration?: unknown, mainSha?: unknown }} receipt

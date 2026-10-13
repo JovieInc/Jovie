@@ -6,6 +6,11 @@ name: Production Continuity Guard
 # clock-class: production-liveness
 
 on:
+  # The Gem lanes tick fires this on the designed cadence
+  # (scripts/lanes/continuity_clock.py): GitHub delivered the cron below only
+  # about every 6 h, so the schedule is now the backstop.
+  repository_dispatch:
+    types: [clock_production_continuity]
   # Vercel's native notifications are the event-driven spend-risk signal.
   # This external five-minute probe catches a missed notification and projects
   # that remained individually paused after another project was resumed.

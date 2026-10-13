@@ -484,5 +484,5 @@ CodeRabbit is optional supplementary review. Do not wait for its availability,
 rate limits, credits, or billing, and do not purchase capacity to unblock work.
 If used, evaluate and resolve actionable findings just as for internal review;
 provider availability and an actual correctness finding are different evidence.
-The existing gbrain-aware Claude reviewer (`.github/workflows/claude-review.yml`)
-remains part of the PR review tooling where applicable.
+The manual gbrain-aware Claude reviewer (`claude-review.yml`) was deleted
+2026-10-12 after 30 days with no runs.
