@@ -82,9 +82,9 @@ GitHub enablement state. During the PR-drain rollout, enable only **Merge Queue
 Auto-Enroll** and **Auto-Ready Agent Drafts** first. Enable **Main CI Health
 Monitor** and **Main Autofix** only after the staged queue and production path
 have produced bounded proof. **GitHub AI Orchestrator**, **GitHub AI
-Dispatcher** are retired at source under the Linear-only intake contract;
-**Agent Tick** was deleted on 2026-10-12. Keep **Agent Pipeline**,
-**PR Conflict Handler**, **Stuck Draft Auto-Close**, **Auto-Fix
+Dispatcher**, **Agent Tick**, **Agent Landing Sweep**, and **Stuck Draft
+Auto-Close** were deleted on 2026-10-12 under the Linear-only intake contract. Keep **Agent Pipeline**,
+**PR Conflict Handler**, **Auto-Fix
 Lint on Agent Drafts**, **Taste Classifier**, **Taste Label Guard**, **Auto-PR on
 Agent Push**, and the legacy **Release Loop** disabled throughout the drain. The new **Production
 Controller**, **Production Controller Health**, and **Production Release**
@@ -100,8 +100,6 @@ until the observer-only definition lands and is proven.
 
 | Workflow | File | Trigger | What It Does | Usage Pattern | Recommendation |
 |----------|------|---------|--------------|--------------|----------------|
-| **GitHub AI Orchestrator** | `github-ai-orchestrator.yml` | Audit-only `workflow_dispatch` | All jobs are hard-skipped; GitHub Issues cannot select, claim, or dispatch work | Verified `disabled_manually` (workflow ID `306926687`) | **Retired** — Linear-backed Symphony is the sole backlog selector |
-| **GitHub AI Dispatcher** | `github-ai-dispatcher.yml` | Audit-only `workflow_dispatch` | Its only job is hard-skipped; no GitHub Issue scan or dispatch can run | Verified `disabled_manually` (workflow ID `306926686`) | **Retired** — a workflow-state flip cannot restore intake |
 | **Linear AI Dispatcher** | retired (workflow removed) | none | Legacy scheduled Linear polling loop | none | **Retired** — no active `linear-ai-dispatcher.yml` exists |
 | **Hermes CLI Worker** | `hermes-cli-worker.yml` | `repository_dispatch` (`hermes_cli_worker`) + `workflow_dispatch` | Runs a self-hosted CLI worker (codex-cli, claude-code, or ruflo) on Hermes tasks; supports kinds: investigation, bug_patch, code_review, qa, triage, support_draft | Recently shipped (PR #8092); triggered on-demand | **Keep — enable if self-hosted runner is ready** — requires `[self-hosted, hermes]` runner. Verify runner is operational before routing work here. |
 | **Merge Queue Auto-Enroll** | `merge-queue-autoenroll.yml` | PR/CI/main events + manual; no schedule | Revalidates the exact current head and enrolls eligible PRs into GitHub's native merge queue | First controller enabled during drain | **Keep enabled first** — canonical queue enrollment owner |

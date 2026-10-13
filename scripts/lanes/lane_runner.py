@@ -3593,8 +3593,11 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
     main moved past the base that failed, and the label's removal is the boundary
     `queue_ejections` counts from, so a defect that still fails re-poisons after two more
     ejections, whoever authored the PR (bots and Dependabot included).
-    Conflicted (DIRTY) non-Dependabot heads cannot merge main without a model and stay with
-    the escalation ladder. No attempt or rung is refunded or reset.
+    A conflicted (DIRTY) head cannot take all of main without a model, but it can take the
+    newest main commit that still merges cleanly (`partial_main_sync`): that moves it as far
+    as a deterministic merge can and gives the remaining conflict a fresh, smaller generation.
+    No attempt or rung is refunded or reset. The PR revisited longest ago goes first, so a
+    few PRs whose conflict main cannot move past never starve the rest.
     """
     now = time.time() if now is None else now
     attempts = read_json(host.state / "fix-attempts.json")
@@ -3602,14 +3605,13 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
     path = host.state / "terminal-revisits.json"
     visits = read_json(path)
     due = []
-    for pr in sorted(terminal_prs(prs, attempts, held), key=lambda item: item["number"]):
+    for pr in terminal_prs(prs, attempts, held):
         last = visits.get(str(pr["number"])) if isinstance(visits.get(str(pr["number"])), dict) else {}
         dependabot = (pr.get("headRefName") or "").startswith("dependabot/")
-        if pr.get("mergeStateStatus") == "DIRTY" and not dependabot:
-            continue
         due.append((pr, last, dependabot))
     if not due:
         return []
+    due.sort(key=lambda item: (float(item[1].get("at") or 0), item[0]["number"]))
     listed = sh(["git", "ls-remote", "origin", "refs/heads/main"], cwd=host.repo, timeout=60)
     main = (listed.stdout or "").split()[0] if listed.returncode == 0 and (listed.stdout or "").split() else None
     if not main:
@@ -3626,6 +3628,9 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
             result = sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG,
                          "--body", "@dependabot recreate"])
             ok = result.returncode == 0
+        elif pr.get("mergeStateStatus") == "DIRTY":
+            action = "partial-main-sync"
+            ok = partial_main_sync(host, pr) is not None
         else:
             action = "update-branch"
             ok = pr_events.sync_main(host, THIS, pr, now, terminal_ok=True) == "synced"
@@ -3640,6 +3645,49 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
                                 "endedAt": now_iso()})
         acted.append(pr["number"])
     return acted
+
+
+SYNC_REF = "refs/jovie-sync/"
+
+
+def newest_clean_main(host: Host, pr: dict) -> str | None:
+    """The newest first-parent main commit this exact head merges with cleanly, if it is past
+    what the head already contains. Bisects `git merge-tree` (no checkout, no hooks); a
+    conflict, once main introduces it, stays, so the clean prefix is contiguous."""
+    head, number = pr["headRefOid"], pr["number"]
+    main_ref, pr_ref = f"{SYNC_REF}main", f"{SYNC_REF}pr-{number}"
+    git = lambda *args, timeout=120: sh(["git", *args], cwd=host.repo, timeout=timeout)
+    if git("fetch", "-q", "--no-tags", "origin", f"+refs/heads/main:{main_ref}",
+           f"+refs/pull/{number}/head:{pr_ref}", timeout=600).returncode             or (git("rev-parse", pr_ref).stdout or "").strip() != head:
+        return None
+    base = git("merge-base", head, main_ref)
+    listed = git("rev-list", "--first-parent", "--reverse", f"{(base.stdout or '').strip()}..{main_ref}")
+    if base.returncode or listed.returncode:
+        return None
+    commits = (listed.stdout or "").split()
+    clean, conflicted = -1, len(commits)
+    while conflicted - clean > 1:
+        middle = (clean + conflicted) // 2
+        merged = git("merge-tree", "--write-tree", "--name-only", "--no-messages", head, commits[middle], timeout=300)
+        if merged.returncode == 0:
+            clean = middle
+        elif merged.returncode == 1:
+            conflicted = middle
+        else:
+            return None
+    return commits[clean] if clean >= 0 else None
+
+
+def partial_main_sync(host: Host, pr: dict) -> str | None:
+    """Merge the newest conflict-free main commit into a DIRTY branch on GitHub (the merges
+    API: server-side, no checkout, refuses with 409 on any conflict). Returns that commit."""
+    target = newest_clean_main(host, pr)
+    if not target:
+        return None
+    result = sh(["gh", "api", "-X", "POST", f"repos/{REPO_SLUG}/merges", "-f", f"base={pr['headRefName']}",
+                 "-f", f"head={target}", "-f",
+                 f"commit_message=Merge main@{target[:12]} into {pr['headRefName']} (newest conflict-free main)"])
+    return target if result.returncode == 0 else None
 
 
 RERUN_RUNS_LIMIT = 5
