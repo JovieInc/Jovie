@@ -34,9 +34,8 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: mutation-diff
-  cancel-in-progress: false
+# No concurrency group: a shared group drops queued runs during merge
+# bursts, and each run only diffs its own push. Runs are read-only.
 
 jobs:
   mutate:
