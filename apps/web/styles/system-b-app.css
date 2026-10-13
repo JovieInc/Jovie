@@ -6493,3 +6493,15 @@
   width: 100%;
   table-layout: fixed;
 }
+
+/* Settings > Profile keeps the profile rail open as a companion. The shell
+   rail is an overlay that never narrows the route, so the settings column
+   reserves its width (SIDEBAR_WIDTH 360 + overlay padding) from the first
+   server paint instead of being covered by it. */
+@media (min-width: 1024px) {
+  [data-settings-layout-column="true"]:has(
+    > [data-settings-companion-rail="true"]
+  ) {
+    margin-inline-end: calc(360px + 2 * var(--space-1-5));
+  }
+}
