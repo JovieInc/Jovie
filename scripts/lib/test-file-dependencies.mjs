@@ -54,8 +54,24 @@ export function directDependencies(file, root) {
   return found;
 }
 
-/** The test file plus everything it imports (transitively, through JS) or reads. */
+const dependencyCache = new Map();
+
+/**
+ * The test file plus everything it imports (transitively, through JS) or reads.
+ * Cached per (root, test) for the process: runStructural is called many times
+ * by its own contract suite, and rescanning ~100 tests per call timed that
+ * suite out at 30 s in a loaded merge group (#21471, 2026-10-13).
+ */
 export function testDependencies(testFile, root) {
+  const key = `${root}\0${testFile}`;
+  const cached = dependencyCache.get(key);
+  if (cached) return cached;
+  const result = scanTestDependencies(testFile, root);
+  dependencyCache.set(key, result);
+  return result;
+}
+
+function scanTestDependencies(testFile, root) {
   const seen = new Set([testFile]);
   const pending = [testFile];
   while (pending.length > 0) {
