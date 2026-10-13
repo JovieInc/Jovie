@@ -300,7 +300,7 @@ export function OvieListWorkspace({ listId }: { readonly listId: string }) {
               )}
               {suggestions.length > 0 ? (
                 <section aria-label='Suggested By Jovie'>
-                  <h2 className='px-4 pb-1 pt-4 text-xs font-medium text-secondary-token'>
+                  <h2 className='text-balance px-4 pb-1 pt-4 text-xs font-medium text-secondary-token'>
                     Suggested By Jovie
                   </h2>
                   <ul>
