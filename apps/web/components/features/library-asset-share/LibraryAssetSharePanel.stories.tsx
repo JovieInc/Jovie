@@ -18,3 +18,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const ShareLinkRow: Story = {};
+
+export const WithPrivateFileSharing: Story = {
+  args: { onSharePrivately: () => undefined },
+};

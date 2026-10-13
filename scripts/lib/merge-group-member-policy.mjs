@@ -22,6 +22,7 @@ export const HOLD_LABELS = new Set([
   'tim-hold',
   'tim:hold',
   'hold:tim',
+  'queue-deferred',
 ]);
 const COLLABORATOR_ASSOCIATIONS = new Set(['COLLABORATOR', 'MEMBER', 'OWNER']);
 const OPINIONATED_REVIEW_STATES = new Set([

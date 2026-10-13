@@ -18,14 +18,13 @@ describe('LogoLoader', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses the muted brand mark at the default size', () => {
+  it('draws the living O in its loading state at the default size', () => {
     const { container } = render(<LogoLoader />);
-    const mark = container.querySelector('[data-brand-variant="jovie"]');
-    const svg = mark?.querySelector('svg');
-    expect(mark?.getAttribute('class')).toContain('text-muted-foreground/50');
-    expect(mark?.getAttribute('class')).toContain('animate-pulse');
-    expect(mark).toHaveAttribute('aria-hidden', 'true');
+    const svg = container.querySelector('svg');
+    expect(svg).toHaveAttribute('data-jo-state', 'loading');
+    expect(svg).toHaveAttribute('aria-hidden', 'true');
     expect(svg).toHaveAttribute('width', '32');
+    expect(container.querySelector('.animate-pulse')).toBeNull();
   });
 
   it('applies a custom size to the brand mark', () => {
