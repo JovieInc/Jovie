@@ -472,16 +472,13 @@ describe('CmdKPalette', () => {
     const input = screen.getByRole('combobox', {
       name: 'Command Palette Search',
     });
-    const profile = screen.getByRole('option', {
-      name: segmentedAccessibleName(
-        'Profile',
-        'Open your profile in the chat workspace.',
-        '⌘1'
-      ),
+    // Go To follows the sidebar: Home leads (Identity is flag-gated off here).
+    const home = screen.getByRole('option', {
+      name: segmentedAccessibleName('Home', 'Open your Jovie home.', '⌘1'),
     });
 
-    expect(profile).toHaveAttribute('aria-selected', 'true');
-    expect(profile).toHaveClass('system-b-table-row-shell');
+    expect(home).toHaveAttribute('aria-selected', 'true');
+    expect(home).toHaveClass('system-b-table-row-shell');
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
 

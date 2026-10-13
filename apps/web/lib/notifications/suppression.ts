@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { and, count, eq, gt, isNotNull, isNull, lt, or } from 'drizzle-orm';
 
-import { db } from '@/lib/db';
+import { db, withRetry } from '@/lib/db';
 import { suppressionReasonEnum } from '@/lib/db/schema/enums';
 import {
   categorySubscriptions,
@@ -305,16 +305,20 @@ export async function getSuppressionStats(): Promise<
 export async function cleanupExpiredSuppressions(): Promise<number> {
   const now = new Date();
 
-  const result = await db
-    .delete(emailSuppressions)
-    .where(
-      and(
-        eq(emailSuppressions.reason, 'soft_bounce'),
-        isNotNull(emailSuppressions.expiresAt),
-        lt(emailSuppressions.expiresAt, now)
-      )
-    )
-    .returning({ id: emailSuppressions.id });
+  const result = await withRetry(
+    () =>
+      db
+        .delete(emailSuppressions)
+        .where(
+          and(
+            eq(emailSuppressions.reason, 'soft_bounce'),
+            isNotNull(emailSuppressions.expiresAt),
+            lt(emailSuppressions.expiresAt, now)
+          )
+        )
+        .returning({ id: emailSuppressions.id }),
+    'notifications.cleanupExpiredSuppressions'
+  );
 
   return result.length;
 }

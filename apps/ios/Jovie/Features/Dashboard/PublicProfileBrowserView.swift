@@ -240,6 +240,9 @@ final class PublicProfileBrowserModel: NSObject, ObservableObject, WKNavigationD
         "<html><body style='background:#0a0a0b;color:white;font:24px -apple-system;padding:32px'>Public Profile</body></html>",
         baseURL: initialURL
       )
+      // The ready fixture is fully local; mark load complete synchronously so
+      // the UI-test ready marker does not depend on WKWebView delegate timing.
+      isLoading = false
       return
     }
 
@@ -367,6 +370,26 @@ struct PublicProfileBrowserView: View {
       ZStack {
         PublicProfileWebView(webView: model.webView)
           .accessibilityIdentifier("public-profile-web-view")
+
+        // Hermetic UI-test marker (JOV-7763): under -ui-testing-ready the model
+        // loads a local HTML string (no network), but WKWebView's rendered body
+        // text is not reliably exposed to XCUITest as a staticText on device
+        // (the test timed out waiting on it). Expose a deterministic SwiftUI
+        // label so the harness asserts a real accessibility element, never the
+        // web view's accessibility tree. The marker appears once the ready
+        // fixture has finished (not loading, no error).
+        if ProcessInfo.processInfo.arguments.contains("-ui-testing-ready"),
+           !model.isLoading,
+           model.errorMessage == nil
+        {
+          Text("Public Profile")
+            .accessibilityIdentifier("public-profile-content-ready")
+            // Keep it off the visual surface: the marker exists for the
+            // accessibility tree, not the user-facing browser.
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .accessibilityHidden(false)
+        }
 
         if model.isLoading {
           ProgressView()

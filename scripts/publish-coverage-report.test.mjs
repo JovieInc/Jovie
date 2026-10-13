@@ -464,6 +464,28 @@ test('a report PR in flight absorbs a newer measurement instead of a new PR', t 
   );
 });
 
+test('a conflicted report PR is replaced instead of absorbing new measurements', () => {
+  const now = Date.parse('2026-10-13T09:30:00Z');
+  const rows = [
+    {
+      number: 21585,
+      headRefName: 'bot/nightly-evidence-38372905104-1',
+      createdAt: '2026-10-13T09:22:56Z',
+      mergeable: 'CONFLICTING',
+    },
+  ];
+  assert.equal(inFlightReport(rows, 'nightly-evidence', now), null);
+  assert.equal(
+    inFlightReport(
+      [{ ...rows[0], mergeable: 'UNKNOWN' }],
+      'nightly-evidence',
+      now
+    )?.number,
+    21585,
+    'unknown mergeability still coalesces'
+  );
+});
+
 test('only an open report PR of the same profile inside the window coalesces', () => {
   const now = Date.parse('2026-10-12T12:00:00Z');
   const at = ms => new Date(now - ms).toISOString();

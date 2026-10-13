@@ -22,7 +22,10 @@ export async function ingestMarketingCertificationPacket(
   packet: CertificationReviewPacket,
   evaluatedAt?: string
 ) {
-  return getMarketingCertificationStore().ingestPacket(packet, evaluatedAt);
+  const store = getMarketingCertificationStore();
+  const row = await store.ingestPacket(packet, evaluatedAt);
+  const projection = await store.inspectLedger(evaluatedAt);
+  return { entries: projection.entryOutcomes, row };
 }
 
 export async function projectMarketingReviewReady(input: {
