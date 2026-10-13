@@ -1019,12 +1019,12 @@ class TickTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_a_clean_lane_draft_is_readied_with_its_merge_intent(self):
+    def test_a_clean_lane_draft_is_readied_without_merge_intent(self):
         shell = Shell()
         outcome = events.ready_green(self.host, fake_lane(shell), pr(draft=True, merge="CLEAN"), {}, NOW)
         self.assertEqual(outcome, "landing")
         self.assertEqual([call[:3] for call in shell.calls if call[0] == "gh"],
-                         [["gh", "pr", "ready"], ["gh", "pr", "merge"]])
+                         [["gh", "pr", "ready"]])
         ledger = [json.loads(line) for line in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
         self.assertEqual((ledger[0]["kind"], ledger[0]["verdict"]), ("ready-green", "landing"))
 
@@ -1037,10 +1037,10 @@ class TickTest(unittest.TestCase):
                          "revoked:run-stopped")
         self.assertFalse(shell.calls, "a revoked branch takes no publication mutation")
 
-    def test_a_failed_enqueue_is_handed_to_the_requeue_retry(self):
-        shell = Shell({("gh", "pr", "merge"): (1, "")})
+    def test_a_failed_ready_is_handed_to_the_requeue_retry(self):
+        shell = Shell({("gh", "pr", "ready"): (1, "")})
         self.assertEqual(events.ready_green(self.host, fake_lane(shell), pr(draft=True, merge="CLEAN"), {}, NOW),
-                         "verified-not-queued")
+                         "held:ready-failed")
         self.assertEqual(json.loads((self.host.state / "requeue.json").read_text()), {"5": "h1"})
 
     def test_diff_policy_and_legacy_gate_holds_stand_despite_green_ci(self):
@@ -2186,7 +2186,7 @@ class TerminalPreservationTest(unittest.TestCase):
 
 
 class GreenPublicationProofTest(unittest.TestCase):
-    def test_spent_final_self_push_can_publish_then_requeue_without_another_repair(self):
+    def test_spent_final_self_push_can_publish_without_another_repair(self):
         with tempfile.TemporaryDirectory() as tmp:
             host = runner.Host(state=Path(tmp))
             target = pr(draft=True, merge="CLEAN", kinds=["green", "dequeued"], labels=["lane-fix-green"])
@@ -2195,21 +2195,15 @@ class GreenPublicationProofTest(unittest.TestCase):
             proof = {"schema": runner.GATE_RESULT_SCHEMA, "headSha": "h1", "verdict": "verified-not-queued",
                      "completedAt": runner.now_iso(), "policyDigest": runner.GATE_POLICY_DIGEST, "sensitive": False}
             (host.state / "verified.json").write_text(json.dumps({"5:h1": proof}))
-            shell = Shell({("gh", "pr", "merge"): (1, "temporary failure")})
+            shell = Shell()
             with patch.object(events, "reconcile", return_value=None), patch.object(events, "queued_prs", return_value=[target]):
                 outcome = events.tick(host, fake_lane(shell), lambda: self.fail("no retirement"), NOW)
-            self.assertEqual(outcome[5], "verified-not-queued")
-            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {"5": "h1"})
+            self.assertEqual(outcome[5], "landing")
+            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {})
             self.assertFalse(any("update-branch" in " ".join(call) for call in shell.calls))
             self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1, "consume only green")
-            shell = Shell()
-            with patch.object(runner, "sh", shell), patch.object(runner, "claimed_elsewhere", return_value=False), \
-                 patch.object(runner, "reconcile_fix_target", return_value={**target, "state": "OPEN", "isDraft": False}):
-                runner.requeue_verified(host, [target])
-            self.assertEqual(json.loads((host.state / "requeue.json").read_text()), {})
-            self.assertEqual(json.loads((host.state / "fix-attempts.json").read_text()), history)
-            self.assertEqual(shell.made("gh", "pr", "ready"), [])
-            self.assertEqual(shell.made("gh", "pr", "merge")[0][-2:], ["--match-head-commit", "h1"])
+            self.assertEqual(len(shell.made("gh", "pr", "ready")), 1)
+            self.assertEqual(shell.made("gh", "pr", "merge"), [])
 
     def test_actual_tick_retains_green_event_without_terminal_proof_or_with_active_gate(self):
         with tempfile.TemporaryDirectory() as tmp:
