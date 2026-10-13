@@ -47,6 +47,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Sub-tool reached from Investors workspace actions',
   '/app/ov/hud':
     'Operator HUD workspace reached from the default /hud rewrite into the OV app shell',
+  '/app/ov/inbox':
+    'Guarded founder Inbox reached by direct Ovie links that open a requested pending case (JOV-6795)',
   '/app/ov/chat-playground':
     'Internal chat visual QA workspace reached by direct product and design review links',
   '/app/ov/wiki':
