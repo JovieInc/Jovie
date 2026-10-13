@@ -287,18 +287,12 @@ function readyAtHead(state, expectedHeadSha) {
   };
 }
 
-export function hasNativePromotionIntent(state, expectedHeadSha) {
+// JOV-INV-022 (2026-10-13): the writer readies on exact-head proof and Merge
+// Queue Green Enroll is the sole admitter. Promotion is complete once the exact
+// head is ready and unheld; auto-merge and queue state belong to green enroll.
+export function isPromotedAtHead(state, expectedHeadSha) {
   const { normalized, ready } = readyAtHead(state, expectedHeadSha);
-  return (
-    ready &&
-    normalized.heldLabels.length === 0 &&
-    (normalized.autoMerge || normalized.queued)
-  );
-}
-
-export function isReadyUnenrolledState(state, expectedHeadSha) {
-  const { normalized, ready } = readyAtHead(state, expectedHeadSha);
-  return ready && !normalized.autoMerge && !normalized.queued;
+  return ready && normalized.heldLabels.length === 0;
 }
 
 export function evaluateWriterPromotion(input = {}) {
@@ -324,15 +318,12 @@ export function evaluateWriterPromotion(input = {}) {
     };
   }
   if (!proof.ok) return { ...proof, action: 'block' };
-  if (hasNativePromotionIntent(normalized, expected)) {
+  if (isPromotedAtHead(normalized, expected)) {
     return {
       ok: true,
       action: 'already-complete',
-      reason: 'native-intent-established',
+      reason: 'ready-at-exact-head',
     };
-  }
-  if (isReadyUnenrolledState(normalized, expected)) {
-    return { ok: false, action: 'compensate', reason: 'ready-unenrolled' };
   }
   if (normalized.state !== 'OPEN') {
     return { ok: false, action: 'block', reason: `state-${normalized.state}` };

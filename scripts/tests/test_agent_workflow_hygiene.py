@@ -814,8 +814,8 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
               printf '%s\\n' '[{{"n":42,"t":"race guard","draft":true,"head":"codex/race","oid":"{fx_child_head}","body":{proof_body},"author":"itstimwhite","L":[]}}]'
             elif [[ "$1 $2" == "pr view" ]]; then
               phase="$(cat {state_file})"
-              if [[ "$phase" == "promoted" ]]; then
-                printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
+              if [[ "$phase" == "ready" ]]; then
+                printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
               elif [[ "$phase" == "restored" ]]; then
                 printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
               else
@@ -834,14 +834,15 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
               if [[ " $* " == *" --disable-auto "* ]]; then
                 :
               else
-                printf '%s\\n' promoted > {state_file}
+                printf 'auto-ready must never arm or merge: %s\\n' "$*" >&2
+                exit 2
               fi
             elif [[ "$1" == "api" ]]; then
               case "$2" in
                 graphql)
                   phase="$(cat {state_file})"
-                  if [[ "$phase" == "promoted" ]]; then
-                    printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
+                  if [[ "$phase" == "ready" ]]; then
+                    printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
                   elif [[ "$phase" == "restored" ]]; then
                     printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
                   else
@@ -894,10 +895,7 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
     assert state_file.read_text(encoding="utf-8").strip() == "restored"
     calls = call_log.read_text(encoding="utf-8")
     assert "pr ready 42 -R JovieInc/Jovie" in calls
-    assert (
-        f"pr merge 42 -R JovieInc/Jovie --auto --squash "
-        f"--match-head-commit {fx_child_head}"
-    ) in calls
+    assert " --auto " not in f"{calls} "
     assert "pr merge 42 -R JovieInc/Jovie --disable-auto" in calls
     assert "pr ready 42 -R JovieInc/Jovie --undo" in calls
     assert "pr checks" not in calls
@@ -970,14 +968,12 @@ def test_auto_ready_leaves_human_head_without_fx_provenance_draft(
     assert "pr ready" not in call_log.read_text(encoding="utf-8")
 
 
-def test_auto_ready_recovers_interrupted_ready_without_auto_merge(
+def test_auto_ready_leaves_a_proofed_ready_pr_to_green_enroll(
     tmp_path: Path,
 ) -> None:
-    """A later pass closes the interruption gap between ready and auto-merge."""
+    """A ready, proofed PR is promoted already; green enroll admits it (JOV-INV-022)."""
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
-    state_file = tmp_path / "state"
-    state_file.write_text("orphan-ready", encoding="utf-8")
     call_log = tmp_path / "calls.log"
     head = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
     proof_body = json.dumps(_writer_proof_body(head, 88, "jovie-bot[bot]"))
@@ -989,23 +985,12 @@ def test_auto_ready_recovers_interrupted_ready_without_auto_merge(
             set -euo pipefail
             printf '%s\n' "$*" >> {call_log}
             if [[ "$1 $2" == "pr list" ]]; then
-              printf '%s\n' '[{{"n":88,"t":"interrupted pair","draft":false,"head":"codex/interrupted","oid":"{head}","body":{proof_body},"author":"jovie-bot[bot]","L":[]}}]'
-            elif [[ "$1 $2" == "pr ready" ]]; then
-              printf 'recovery must not repeat the ready mutation\n' >&2
+              printf '%s\n' '[{{"n":88,"t":"ready pr","draft":false,"head":"codex/ready","oid":"{head}","body":{proof_body},"author":"jovie-bot[bot]","L":[]}}]'
+            elif [[ "$1 $2" == "pr ready" || "$1 $2" == "pr merge" ]]; then
+              printf 'auto-ready must not mutate a ready PR: %s\n' "$*" >&2
               exit 2
-            elif [[ "$1 $2" == "pr merge" ]]; then
-              if [[ " $* " == *" --auto "* ]]; then
-                printf '%s\n' auto-enabled > {state_file}
-              else
-                printf 'unexpected merge mutation: %s\n' "$*" >&2
-                exit 2
-              fi
             elif [[ "$1" == "api" && "$2" == "graphql" ]]; then
-              if [[ "$(cat {state_file})" == "auto-enabled" ]]; then
-                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","body":{proof_body},"labels":[],"state":"OPEN","autoMerge":true,"queued":false}}'
-              else
-                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","body":{proof_body},"labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
-              fi
+              printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/ready","body":{proof_body},"labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
             else
               printf 'unexpected fake gh invocation: %s\n' "$*" >&2
               exit 2
@@ -1036,14 +1021,10 @@ def test_auto_ready_recovers_interrupted_ready_without_auto_merge(
     )
 
     assert result.returncode == 0, result.stderr
-    assert "recovered ready #88 by enabling native auto-merge" in result.stdout
-    assert state_file.read_text(encoding="utf-8").strip() == "auto-enabled"
+    assert "leaving PR unchanged" in result.stdout
     calls = call_log.read_text(encoding="utf-8")
     assert "pr ready" not in calls
-    assert (
-        f"pr merge 88 -R JovieInc/Jovie --auto --squash "
-        f"--match-head-commit {head}"
-    ) in calls
+    assert "pr merge" not in calls
 
 
 def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
