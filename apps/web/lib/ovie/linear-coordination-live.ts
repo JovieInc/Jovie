@@ -8,7 +8,7 @@ import type {
 
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 
-async function linearGraphql<T>(
+export async function linearGraphql<T>(
   query: string,
   variables: Record<string, unknown>
 ): Promise<T> {
