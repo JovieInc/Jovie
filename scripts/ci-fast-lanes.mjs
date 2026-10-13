@@ -360,6 +360,28 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
   'pnpm --dir apps/web exec ',
 ]);
 
+/** Files of the lanes coverage suite (one coverage map, sharded below). */
+const LANES_PYTEST_FILES =
+  'scripts/tests/test_lane_runner.py scripts/tests/test_design_gate.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_hud.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_continuity_clock.py scripts/tests/test_execution_attempt.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_worktree_sweep.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_worktree_pool.py scripts/tests/test_gh_app_token.py scripts/tests/test_service_census.py scripts/tests/test_epics.py';
+
+/**
+ * The lanes coverage pytest was ci-fast (remaining)'s long pole (174.5s and
+ * 211.0s in merge groups 38247843089 and 38317277564), one process on a
+ * 4 vCPU runner. Two concurrent shards select `-k EXPR` and `-k "not (EXPR)"`
+ * over the identical file list, so every collected test runs exactly once;
+ * EXPR names test_lane_runner.py's slowest class (~half the suite time). A
+ * rename that empties the first shard fails it (pytest exit 5). `coverage
+ * combine` merges both branch-coverage maps before the unchanged per-module
+ * thresholds read them.
+ */
+export const LANES_PYTEST_SHARD_EXPRESSION = 'UpdateTest';
+
+/** @param {string} shard @param {string} expression */
+const lanesCoverageShard = (shard, expression) =>
+  `COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard}.coverage" python3 -m coverage run --branch -m pytest ${LANES_PYTEST_FILES} -q -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-${shard}" -k "${expression}"`;
+
+const LANES_COVERAGE_RUN = `{ ${lanesCoverageShard('a', LANES_PYTEST_SHARD_EXPRESSION)} & lanes_a=$!; ${lanesCoverageShard('b', `not (${LANES_PYTEST_SHARD_EXPRESSION})`)}; lanes_b=$?; wait "$lanes_a" && test "$lanes_b" -eq 0; } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage combine "\${RUNNER_TEMP:-/tmp}/jovie-lanes-a.coverage" "\${RUNNER_TEMP:-/tmp}/jovie-lanes-b.coverage"`;
+
 /**
  * Structural Python regressions, split so the pool can overlap them. Each
  * command keeps its original `&&` dependencies (coverage run → report).
@@ -367,7 +389,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_design_gate.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_hud.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_continuity_clock.py scripts/tests/test_execution_attempt.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_worktree_sweep.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_worktree_pool.py scripts/tests/test_gh_app_token.py scripts/tests/test_service_census.py scripts/tests/test_epics.py -q',
+      LANES_COVERAGE_RUN,
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hyperagent_lane.py" --fail-under=95',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/devin_free_policy.py" --fail-under=85',
