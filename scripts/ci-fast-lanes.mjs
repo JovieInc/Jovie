@@ -134,6 +134,21 @@ export const SOURCE_GUARDS = Object.freeze([
       /^apps\/web\/(?:tests\/unit\/marketing\/static-revalidate-policy\.test\.ts|(?!tests\/)(?!.*\.(?:test|spec)\.[cm]?[jt]sx?$).+)$/u,
     prOnly: true,
   }),
+  Object.freeze({
+    // Script contracts run only in the structural lane (merge groups); about
+    // 37 group runs failed on them in the 7 days to 2026-10-12. Full lists
+    // for script/workflow/toolchain diffs, derived ones otherwise
+    // (scripts/lib/script-contract-affected.mjs). Resolved beside this module
+    // because Source Validation loads guards from the trusted base archive.
+    id: 'script-contracts',
+    command: `node ${JSON.stringify(
+      fileURLToPath(
+        new URL('./lib/script-contract-affected.mjs', import.meta.url)
+      )
+    )}`,
+    inputs: /./u,
+    prOnly: true,
+  }),
 ]);
 
 /**
@@ -388,6 +403,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/lib/__tests__/script-contract-affected.test.mjs',
   '.github/scripts/customer-notes-ready.test.js',
   '.github/scripts/auto-merge-stuck-triage.test.js',
   '.claude/hooks/post-task-validate.test.mjs',
