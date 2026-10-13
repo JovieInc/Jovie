@@ -76,6 +76,13 @@ describe('ui-feel ratchet baseline math', () => {
     expect(counts.nonConcentricRadius).toBe(0);
   });
 
+  it('leaves enforcement to the ratchet, not the shared eslint config', () => {
+    // As 'error', lint-staged and lint:eslint:changed failed on the baselined
+    // legacy violations in any touched file; the ratchet owns the gate.
+    const config = readFileSync(join(projectRoot, 'eslint.config.js'), 'utf8');
+    expect(config).toMatch(/'@jovie\/ui-feel':\s*'off'/);
+  });
+
   it('committed baseline only uses known check keys', () => {
     const baseline = readBaseline();
     for (const key of BASELINE_KEYS) {

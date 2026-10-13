@@ -246,16 +246,8 @@ jobs:
 
           echo "✅ HTTP canary passed: shared semantic surfaces and route-specific controls are healthy"
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Verify public auth controls are interactive
         run: |
