@@ -1,14 +1,23 @@
 name: Sentry Autofix Recurrence
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Ops
+# necessary-trust-boundary: A main-only job resolves or reopens autofixed Sentry incidents after the post-deploy soak, with a scoped Jovie Bot comment token; source PRs never reach it.
+# revisit-trigger: Remove the clock dispatch and schedule when Sentry emits a regression-resolved webhook Jovie can consume.
 # clock-class: production-liveness
 
 # Closes the sentry-autofix loop after a fix has landed on current main.
-# Scheduled / manual only — never a source-PR or merge-queue gate, and never
+# Scheduled (Gem clock + cron backstop) / manual only — never a source-PR or merge-queue gate, and never
 # a member of the production-mutation FIFO. Resolves quiet production
 # incidents and reopens ones that are still firing after the post-deploy soak.
 # Missing lastSeen, environment, or current-main ancestry is skip/fail-closed,
 # not a green resolve.
 
 on:
+  # The Gem lanes tick fires this on the designed cadence
+  # (scripts/lanes/continuity_clock.py): GitHub delivered the cron below only
+  # about every 6 h, so the schedule is now the backstop.
+  repository_dispatch:
+    types: [clock_sentry_autofix_recurrence]
   schedule:
     - cron: '41 * * * *'
   workflow_dispatch:
@@ -22,7 +31,7 @@ concurrency:
 jobs:
   recurrence:
     name: Resolve or reopen from post-deploy evidence
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:

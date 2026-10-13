@@ -1,9 +1,6 @@
 {
   "description": "Shrink-only baseline of golden-path claims without admissible proof or certification (JOV-7750). Fill the gap with the named generator (computed, dogfood, pilot), then rerun golden-path-claims.test.ts with UPDATE_GOLDEN_PATH_PROOF=1. Never add entries by hand.",
   "open": {
-    "pricing.paid-outcome": "proofless-paywall",
-    "start.metadata.one-conversation": "proof-gap",
-    "upgrade.paid-outcome": "proofless-paywall",
-    "upgrade.pro.tagline": "uncertified-capability"
+    "pricing.paid-outcome": "proofless-paywall"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@jovie/ui",
-  "version": "26.10.2",
+  "version": "26.10.3",
   "private": true,
   "sideEffects": [
     "*.css"
@@ -13,6 +13,10 @@
   "exports": {
     ".": "./index.ts",
     "./atoms/*": "./atoms/*",
+    "./brand": "./brand/index.ts",
+    "./brand/geometry.gen": "./brand/geometry.gen.ts",
+    "./brand/jovie-o-geometry": "./brand/jovie-o-geometry.ts",
+    "./brand/*": "./brand/*",
     "./lib/*": "./lib/*",
     "./media/*": "./media/*",
     "./theme/*": "./theme/*"
@@ -54,11 +58,11 @@
     "@testing-library/user-event": "^14.6.7",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
-    "@vitejs/plugin-react": "^6.1.1",
+    "@vitejs/plugin-react": "^6.1.2",
     "@vitest/coverage-v8": "5.0.3",
-    "jsdom": "30.1.1",
+    "jsdom": "30.1.2",
     "typescript": "^6.0.3",
-    "vite": "8.3.1",
+    "vite": "8.3.4",
     "vitest": "5.0.3"
   }
 }

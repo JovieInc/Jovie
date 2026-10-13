@@ -821,6 +821,7 @@ jobs:
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/lib/test-file-dependencies.mjs
             scripts/invariants/scanned-paths.mjs
             LESSONS.guards.json
             scripts/invariants/overlay-layer-contract.mjs

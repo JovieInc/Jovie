@@ -504,6 +504,20 @@ const VERIFIED_PRODUCT_PROOF = [
       route: '/tim',
     },
   },
+  {
+    // Launch kit (offer agent): #20283 merged as 15018865b7, live in prod
+    // build 974bf78; jov.ie/api/v1/tim and /openapi.json verified 2026-10-04.
+    // Capability proof only: it shows the feature shipped, not an outcome.
+    recordType: 'proof',
+    id: 'product-agent-profile-api-launch',
+    kind: 'product-proof',
+    claimId:
+      'capability.agent-readable-profile-summary.machine-readable-public-profile-summary',
+    artifact: {
+      kind: 'changelog-entry',
+      entry: 'https://github.com/JovieInc/Jovie/pull/20283',
+    },
+  },
 ] as const satisfies readonly ProductProof[];
 
 for (const proof of VERIFIED_PRODUCT_PROOF) {

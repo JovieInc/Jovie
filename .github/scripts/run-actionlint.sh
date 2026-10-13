@@ -38,10 +38,13 @@ fi
 tool_dir="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/actionlint-toolchain.XXXXXX")"
 trap 'rm -rf "$tool_dir"' EXIT
 
+# GitHub release downloads 504 in bursts longer than curl's default 3-retry
+# window (1+2+4s); one burst failed a merge group on 10-12. Six exponential
+# retries ride out about a minute of 5xx before failing closed.
 download() {
   local url="$1" out="$2" sha="$3"
   curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
-    --retry 3 --retry-all-errors --max-time 120 --output "$out" "$url" ||
+    --retry 6 --retry-all-errors --max-time 120 --output "$out" "$url" ||
     fail "download failed: $url"
   printf '%s  %s\n' "$sha" "$out" | sha256sum --check --status ||
     fail "sha256 mismatch: $url"

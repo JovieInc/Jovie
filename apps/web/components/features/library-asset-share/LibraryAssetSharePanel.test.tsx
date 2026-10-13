@@ -56,4 +56,38 @@ describe('LibraryAssetSharePanel', () => {
       screen.getByRole('menuitem', { name: 'Revoke private link' })
     ).toBeInTheDocument();
   });
+
+  it('folds private file sharing into the link row overflow', async () => {
+    const user = userEvent.setup();
+    const onSharePrivately = vi.fn();
+
+    render(
+      <LibraryAssetSharePanel
+        asset={asset}
+        profileId='profile-1'
+        artistHandle='tim'
+        disabled={false}
+        initialShare={{
+          assetId: 'release-1',
+          visibility: 'public',
+          shareSlug: 'take-me-over',
+          accessToken: 'token-1',
+          shareUrl: 'https://jov.ie/p/token-1',
+          tokenRevokedAt: null,
+        }}
+        onShareChange={vi.fn()}
+        onSharePrivately={onSharePrivately}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Share link actions for Take Me Over',
+      })
+    );
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Share Files Privately' })
+    );
+    expect(onSharePrivately).toHaveBeenCalledTimes(1);
+  });
 });

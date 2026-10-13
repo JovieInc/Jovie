@@ -398,7 +398,7 @@ describe('proof evidence classes and the ProofRequest loop (JOV-7750)', () => {
       PROOF_REGISTRY.filter(item => item.kind === 'product-proof').map(
         proofEvidenceClass
       )
-    ).toEqual(['dogfood', 'dogfood']);
+    ).toEqual(['dogfood', 'dogfood', 'none']);
     expect(
       proofEvidenceClass({
         recordType: 'proof',

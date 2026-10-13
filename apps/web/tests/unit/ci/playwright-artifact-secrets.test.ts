@@ -116,7 +116,6 @@ const producerStageExempt = new Set([
 ]);
 // Jobs that must keep the receipt even if their uploads move elsewhere.
 const producerStageRequired = [
-  'agent-tick.yml:synthetic-monitoring',
   ...'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
     .split(' ')
     .map(job => `ci.yml:${job}`),
@@ -140,7 +139,6 @@ const allowanceEnabled = (value: unknown) =>
   value !== false &&
   !['', 'false'].includes(String(value));
 const imageAllowedJobs = new Set([
-  'agent-tick.yml:synthetic-monitoring',
   'ci.yml:ci-fast-remaining',
   'ci.yml:ci-golden-path',
   'ci.yml:ci-lighthouse-pr',

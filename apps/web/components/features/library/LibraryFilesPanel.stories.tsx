@@ -26,3 +26,6 @@ export const PopulatedArtwork: Story = {};
 export const EmptyFiles: Story = {
   args: { asset: { ...asset, artworkUrl: null, hasArtwork: false } },
 };
+export const AttachRequested: Story = {
+  args: { attachRequested: true, onAttachRequestHandled: () => undefined },
+};

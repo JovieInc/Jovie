@@ -151,7 +151,7 @@ describe('auditRobotsTxt', () => {
 // ---------------------------------------------------------------------------
 
 const PAGE_META = `<title>Pricing | Jovie</title>
-<meta name="description" content="Jovie profiles are free forever. Artist Visibility Pro is $199/month with limited access."/>`;
+<meta name="description" content="Jovie profiles are free forever. Artist Presence is $199/month with limited access."/>`;
 
 function headWithLd(documents: unknown[]): ReturnType<typeof extractSeoHead> {
   const scripts = documents
@@ -172,7 +172,7 @@ describe('auditJsonLdSemantics', () => {
     '@type': 'WebPage',
     name: 'Pricing | Jovie',
     description:
-      'Jovie profiles are free forever. Artist Visibility Pro is $199/month with limited access.',
+      'Jovie profiles are free forever. Artist Presence is $199/month with limited access.',
     url: 'https://jov.ie/pricing',
     mainEntity: {
       '@type': 'ItemList',
