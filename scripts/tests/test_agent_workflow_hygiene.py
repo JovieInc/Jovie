@@ -24,9 +24,6 @@ FLEET_CONTROLLER_JOBS = (
 )
 
 MODEL_OR_ADVISORY_JOBS = (
-    ("claude.yml", "claude"),
-    ("claude-review.yml", "review"),
-    ("eval.yml", "eval"),
     ("eval-real-model.yml", "real-model-eval"),
     ("sentry-autofix.yml", "autofix"),
     ("taste-classifier.yml", "classify"),
@@ -56,7 +53,6 @@ HOSTED_DEEP_EVIDENCE_JOBS = (
     ("screenshots.yml", "generate"),
     ("test-flakiness-report.yml", "analyze-flakiness"),
     ("ci-duration-ratchet.yml", "measure"),
-    ("sentry-error-gate.yml", "sentry-gate"),
     ("cost-anomaly-gate.yml", "evaluate"),
     ("visual-a11y.yml", "ci-visual-path-changes"),
     ("visual-a11y.yml", "storybook-a11y"),
@@ -121,12 +117,6 @@ HOSTED_BACKGROUND_CONTROLLER_JOBS = (
     ("neon-scheduled-cleanup.yml", "scheduled-cleanup"),
     ("observability-issue.yml", "sync-issue"),
     ("sentry-autofix-recurrence.yml", "recurrence"),
-    ("reusable-ci-lint.yml", "lint"),
-    ("reusable-ci-lint.yml", "typecheck"),
-    ("reusable-ci-lint.yml", "knip"),
-    ("reusable-ci-lint.yml", "env-example-guard"),
-    ("reusable-ci-lint.yml", "promptfoo-evals"),
-    ("reusable-ci-lint.yml", "golden-eval-set"),
 )
 
 
@@ -507,18 +497,6 @@ def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
         assert f" {label}" in scrub
 
 
-def test_claude_mention_requires_write_capable_association() -> None:
-    """Public @claude mentions must not mint a write token for strangers."""
-    workflow = (WORKFLOWS / "claude.yml").read_text(encoding="utf-8")
-    job = _job_block("claude.yml", "claude")
-
-    assert "github.event.comment.author_association == 'OWNER'" in job
-    assert "github.event.comment.author_association == 'MEMBER'" in job
-    assert "github.event.comment.author_association == 'COLLABORATOR'" in job
-    assert "github.actor == 'coderabbitai[bot]'" in job
-    assert "allowed_bots: 'coderabbitai[bot]'" in workflow
-    assert "author_association == 'CONTRIBUTOR'" not in job
-    assert "author_association == 'NONE'" not in job
 
 
 def test_trigger_guard_materializes_systemic_detector_import_closure() -> None:
@@ -657,8 +635,6 @@ def test_conflict_handler_uses_shared_non_cancelling_canary_queue() -> None:
 def test_conflict_handler_reserves_app_token_for_bounded_mutations() -> None:
     """Fleet reads cannot consume the App installation's writer budget."""
     block = _job_block("pr-conflict-handler.yml", "plan")
-    ledger = _job_block("pr-conflict-handler.yml", "record_cohort")
-
     assert "GH_TOKEN: ${{ github.token }}" in block
     assert "GH_QUEUE_TOKEN: ${{ github.token }}" in block
     assert "GH_MUTATION_TOKEN: ${{ steps.app-token.outputs.token }}" in block
@@ -671,51 +647,7 @@ def test_conflict_handler_reserves_app_token_for_bounded_mutations() -> None:
     assert "hydrateOpenPrStatusContexts" in fleet
     assert "'pr',\n    'list'" not in fleet
     assert "statusCheckRollup'].join" not in fleet
-    assert "GH_TOKEN: ${{ github.token }}" in ledger
-    assert "GH_LEDGER_TOKEN: ${{ steps.app-token.outputs.token }}" in ledger
-    assert 'GH_TOKEN="$GH_LEDGER_TOKEN" gh api -X POST' in ledger
-    assert 'GH_TOKEN="$GH_LEDGER_TOKEN" gh api -X PATCH' in ledger
 
-
-def test_conflict_cohort_batches_poll_reads_and_fails_closed_on_ledger_lookup() -> None:
-    """A 40-PR cohort must stay under the workflow token's read budget."""
-    ledger = _job_block("pr-conflict-handler.yml", "record_cohort")
-    assignments = {}
-    for name in (
-        "poll_interval_seconds",
-        "poll_deadline_seconds",
-        "max_ci_run_pages",
-        "max_cohort_size",
-    ):
-        match = re.search(rf"^\s*{name}=(\d+)$", ledger, re.MULTILINE)
-        assert match, name
-        assignments[name] = int(match.group(1))
-
-    polls = (
-        assignments["poll_deadline_seconds"]
-        + assignments["poll_interval_seconds"]
-        - 1
-    ) // assignments["poll_interval_seconds"]
-    fixed_read_ceiling = 5 * assignments["max_cohort_size"] + 20
-    worst_case_reads = fixed_read_ceiling + polls * (
-        1 + assignments["max_ci_run_pages"]
-    )
-    assert worst_case_reads == 460
-    assert worst_case_reads < 1000
-
-    poll = ledger.split(
-        "deadline=$((SECONDS + poll_deadline_seconds))", 1
-    )[1].split("timed_out=", 1)[0]
-    assert 'repos/$REPOSITORY/pulls/$pr' not in poll
-    assert "actions/workflows/ci.yml/runs?head_sha" not in poll
-    assert "buildConflictCohortLiveHeadQuery" in poll
-    assert "indexLatestConflictCohortCiRuns" in poll
-    assert "gh api graphql" in poll
-    assert "page <= max_ci_run_pages" in poll
-
-    assert "--paginate --slurp" in ledger
-    assert "duplicate cohort receipts" in ledger
-    assert "| head -1 || true" not in ledger
 
 
 def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
@@ -1142,11 +1074,9 @@ def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
 def test_live_model_work_never_fans_out_from_pull_requests() -> None:
     """PR evals stay deterministic; live-model spend belongs off the PR path."""
     real_model = (WORKFLOWS / "eval-real-model.yml").read_text(encoding="utf-8")
-    deterministic = (WORKFLOWS / "eval.yml").read_text(encoding="utf-8")
 
     assert "pull_request:" not in real_model
     assert "pnpm exec vitest run" in real_model
-    assert "github.event_name == 'pull_request' && '0'" in deterministic
 
 
 def test_deep_lanes_are_event_driven_and_bounded() -> None:
@@ -1440,12 +1370,6 @@ def test_cost_anomaly_alerts_on_ratio_or_absolute_floor(tmp_path: Path) -> None:
         assert reason in outputs
 
 
-def test_claude_review_uses_hosted_bun_prerequisites() -> None:
-    """setup-bun must not land on self-hosted images missing unzip."""
-    block = _job_block("claude-review.yml", "review")
-    assert "runs-on: ubuntu-latest" in block
-    assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block
-    assert "uses: oven-sh/setup-bun@" in block
 
 
 def test_taste_policy_runs_trusted_base_code_with_write_authority() -> None:

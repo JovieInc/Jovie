@@ -4,8 +4,14 @@ updates:
   - package-ecosystem: 'npm'
     directories:
       - '/'
+    # 2026-10-12: a daily run opened 11 single-package dev bumps, each costing a
+    # ~20 min merge group. Version updates now run weekly, so every group below
+    # opens at most one PR per week; security updates are unaffected. Re-evaluate
+    # when a grouped PR fails more than one merge group in three. Then split the
+    # failing group by family instead of returning to daily single-package PRs.
     schedule:
-      interval: 'daily'
+      interval: 'weekly'
+      day: 'monday'
       time: '09:00'
       timezone: 'Etc/UTC'
     # JOV-6837: the JOV-5465 re-evaluate trigger fired (12 open npm PRs, 5
@@ -41,14 +47,17 @@ updates:
         update-types:
           - 'minor'
           - 'patch'
-      dev-patch:
+      # Dev patch AND minor bumps land as one PR; dev majors (e.g. @sentry/node
+      # 10 -> 11) stay one PR per package for their own review.
+      dev-non-major:
         dependency-type: 'development'
         update-types:
+          - 'minor'
           - 'patch'
       # 2026-10-10: one daily batch opened 15 single-package runtime bumps. Each
       # needs the full merge group (Mac build included) under ALLGREEN with
       # max_entries_to_build 3, and the queue sat 18 deep for 90 min with no
-      # merge. Non-major runtime bumps land as one PR per day; majors stay one
+      # merge. Non-major runtime bumps land as one grouped PR; majors stay one
       # PR per package. Re-evaluate when the grouped PR fails more than one run
       # in three (then split by family instead of by package).
       runtime-non-major:
@@ -182,6 +191,14 @@ updates:
         patterns:
           # Sub-actions (analyze, upload-sarif, init) are distinct names.
           - 'github/codeql-action*'
+      # Every other non-major action bump lands as one weekly PR (a single
+      # merge group); majors stay one PR per action.
+      actions-non-major:
+        patterns:
+          - '*'
+        update-types:
+          - 'minor'
+          - 'patch'
 
   # Enable version updates for Docker (if needed)
   - package-ecosystem: 'docker'

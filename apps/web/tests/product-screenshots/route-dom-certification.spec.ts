@@ -526,6 +526,57 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
   });
 });
 
+// page.evaluate and page.close carry no Playwright timeout, so a wedged
+// renderer parks this 30-minute test until the job timeout instead of
+// failing: merge group 38322151758 (2026-10-12) sat silent for 20 minutes
+// inside one receipt. Bound every receipt and name the phase it stalled in.
+// goto (90s) and the visibility wait (20s) keep their own, clearer errors.
+const RECEIPT_DEADLINE_MS = 180_000;
+const PAGE_CLOSE_DEADLINE_MS = 30_000;
+
+async function withDeadline<T>(
+  label: string,
+  deadlineMs: number,
+  phase: () => string,
+  work: Promise<T>
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `${label} did not finish within ${deadlineMs / 1000}s (stalled in ${phase()})`
+          )
+        ),
+      deadlineMs
+    );
+  });
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+test('deliberate-red: a wedged receipt fails with its stalled phase instead of hanging', async ({
+  page,
+}) => {
+  await page.setContent('<main><h1>Wedged</h1></main>');
+  const started = Date.now();
+  await expect(
+    withDeadline(
+      '/wedged desktop',
+      1_000,
+      () => 'route DOM inspection',
+      page.evaluate(() => new Promise<never>(() => undefined))
+    )
+  ).rejects.toThrow(
+    '/wedged desktop did not finish within 1s (stalled in route DOM inspection)'
+  );
+  expect(Date.now() - started).toBeLessThan(10_000);
+});
+
 test('certifies every marketing route and public-profile open state', async ({
   context,
   page,
@@ -555,77 +606,101 @@ test('certifies every marketing route and public-profile open state', async ({
     for (const viewport of target.viewports) {
       // Release requests and renderer state after every viewport receipt.
       const page = await context.newPage();
+      const label = `${target.url} ${viewport}`;
+      let phase = 'setup';
       try {
-        await page.emulateMedia({ reducedMotion: 'reduce' });
-        await installLayoutShiftObserver(page);
-        await page.setViewportSize(SCREENSHOT_VIEWPORTS[viewport]);
-        const response = await page.goto(target.fixturePath, {
-          waitUntil: 'domcontentloaded',
-          timeout: 90_000,
-        });
-        expect.soft(response?.status(), target.url).toBeLessThan(400);
-        await expect(
-          page.locator(target.expectedRuntimeSelector).first()
-        ).toBeVisible({ timeout: 20_000 });
-        await page.waitForTimeout(250);
+        await withDeadline(
+          label,
+          RECEIPT_DEADLINE_MS,
+          () => phase,
+          (async () => {
+            await page.emulateMedia({ reducedMotion: 'reduce' });
+            await installLayoutShiftObserver(page);
+            await page.setViewportSize(SCREENSHOT_VIEWPORTS[viewport]);
+            phase = 'goto';
+            const response = await page.goto(target.fixturePath, {
+              waitUntil: 'domcontentloaded',
+              timeout: 90_000,
+            });
+            expect.soft(response?.status(), target.url).toBeLessThan(400);
+            phase = 'runtime selector';
+            await expect(
+              page.locator(target.expectedRuntimeSelector).first()
+            ).toBeVisible({ timeout: 20_000 });
+            await page.waitForTimeout(250);
 
-        const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
-        const imageContrast = await inspectImageContrast(page);
-        const layoutShift = await measureLayoutShift(page);
-        const findings = [
-          ...snapshot.findings,
-          ...imageContrast.findings,
-          ...(layoutShift ? [layoutShift] : []),
-        ];
-        const snapshotPath = path.join(
-          'marketing',
-          `${safeName(target.url)}-${viewport}.json`
+            phase = 'route DOM inspection';
+            const snapshot = await inspectRouteDom(page, {
+              surface: 'marketing',
+            });
+            phase = 'image contrast';
+            const imageContrast = await inspectImageContrast(page);
+            phase = 'layout shift';
+            const layoutShift = await measureLayoutShift(page);
+            phase = 'receipt';
+            const findings = [
+              ...snapshot.findings,
+              ...imageContrast.findings,
+              ...(layoutShift ? [layoutShift] : []),
+            ];
+            const snapshotPath = path.join(
+              'marketing',
+              `${safeName(target.url)}-${viewport}.json`
+            );
+            await writeSnapshot(snapshotPath, {
+              schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
+              sourceGitSha,
+              deploymentId,
+              deploymentUrl: baseUrl,
+              route: target.url,
+              fixturePath: target.fixturePath,
+              viewport,
+              state: 'default',
+              ...snapshot,
+              findings,
+              imageContrast,
+            });
+            receipts.push({
+              route: target.url,
+              viewport,
+              state: 'default',
+              snapshotPath,
+              findingCount: findings.length,
+            });
+            const tasteCounts = new Map<string, number>();
+            for (const finding of findings) {
+              if (!isTasteKind(finding.kind)) continue;
+              const key = `${target.url}|${viewport}|${finding.kind}`;
+              tasteCounts.set(key, (tasteCounts.get(key) ?? 0) + 1);
+            }
+            for (const [key, count] of tasteCounts)
+              nextTasteBaseline[key] = count;
+            const overBaseline = [...tasteCounts]
+              .filter(([key, count]) => count > (tasteBaseline[key] ?? 0))
+              .map(
+                ([key, count]) =>
+                  `${key}: ${count} > ${tasteBaseline[key] ?? 0}`
+              );
+            expect
+              .soft(
+                findings.filter(finding => !isTasteKind(finding.kind)),
+                `${target.url} ${viewport}`
+              )
+              .toEqual([]);
+            if (!updateTasteBaseline) {
+              expect
+                .soft(overBaseline, `${target.url} ${viewport} taste ratchet`)
+                .toEqual([]);
+            }
+          })()
         );
-        await writeSnapshot(snapshotPath, {
-          schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
-          sourceGitSha,
-          deploymentId,
-          deploymentUrl: baseUrl,
-          route: target.url,
-          fixturePath: target.fixturePath,
-          viewport,
-          state: 'default',
-          ...snapshot,
-          findings,
-          imageContrast,
-        });
-        receipts.push({
-          route: target.url,
-          viewport,
-          state: 'default',
-          snapshotPath,
-          findingCount: findings.length,
-        });
-        const tasteCounts = new Map<string, number>();
-        for (const finding of findings) {
-          if (!isTasteKind(finding.kind)) continue;
-          const key = `${target.url}|${viewport}|${finding.kind}`;
-          tasteCounts.set(key, (tasteCounts.get(key) ?? 0) + 1);
-        }
-        for (const [key, count] of tasteCounts) nextTasteBaseline[key] = count;
-        const overBaseline = [...tasteCounts]
-          .filter(([key, count]) => count > (tasteBaseline[key] ?? 0))
-          .map(
-            ([key, count]) => `${key}: ${count} > ${tasteBaseline[key] ?? 0}`
-          );
-        expect
-          .soft(
-            findings.filter(finding => !isTasteKind(finding.kind)),
-            `${target.url} ${viewport}`
-          )
-          .toEqual([]);
-        if (!updateTasteBaseline) {
-          expect
-            .soft(overBaseline, `${target.url} ${viewport} taste ratchet`)
-            .toEqual([]);
-        }
       } finally {
-        await page.close();
+        await withDeadline(
+          label,
+          PAGE_CLOSE_DEADLINE_MS,
+          () => 'page.close',
+          page.close()
+        );
       }
     }
   }
@@ -648,62 +723,76 @@ test('certifies every marketing route and public-profile open state', async ({
     ? []
     : profileViewports) {
     for (const state of profileStates) {
-      await page.setViewportSize(viewport);
-      await installPublicRouteMocks(page);
-      const response = await page.goto(profileRoute, {
-        waitUntil: 'domcontentloaded',
-        timeout: 90_000,
-      });
-      expect.soft(response?.status(), `${profileRoute} ${state.id}`).toBe(200);
-      await waitForHydration(page);
-      await expect(
-        page.getByTestId('public-profile-layout-shell')
-      ).toBeVisible();
-      await prepareProfileState(page, state);
-      // ProfileUnifiedDrawer.tsx cross-fades drawer views via Framer Motion
-      // AnimatePresence (mode="wait": the outgoing view exits over 120ms,
-      // then the incoming one enters over another 120ms) — a JS-driven
-      // opacity animation the library runs unconditionally, not a CSS
-      // transition/animation, so page.emulateMedia({reducedMotion: 'reduce'})
-      // above has no effect on it. 150ms could still land mid cross-fade,
-      // which for a state with brand-accent-colored content (e.g. the
-      // selected-amount pill on Pay) blends its real background toward the
-      // drawer's own dark surface and reads as a false low-contrast finding.
-      // Clear both phases with margin.
-      await page.waitForTimeout(400);
+      let phase = 'setup';
+      await withDeadline(
+        `${profileRoute} ${viewport.width}x${viewport.height} ${state.id}`,
+        RECEIPT_DEADLINE_MS,
+        () => phase,
+        (async () => {
+          await page.setViewportSize(viewport);
+          await installPublicRouteMocks(page);
+          const response = await page.goto(profileRoute, {
+            waitUntil: 'domcontentloaded',
+            timeout: 90_000,
+          });
+          expect
+            .soft(response?.status(), `${profileRoute} ${state.id}`)
+            .toBe(200);
+          phase = 'hydration';
+          await waitForHydration(page);
+          await expect(
+            page.getByTestId('public-profile-layout-shell')
+          ).toBeVisible();
+          await prepareProfileState(page, state);
+          // ProfileUnifiedDrawer.tsx cross-fades drawer views via Framer Motion
+          // AnimatePresence (mode="wait": the outgoing view exits over 120ms,
+          // then the incoming one enters over another 120ms) — a JS-driven
+          // opacity animation the library runs unconditionally, not a CSS
+          // transition/animation, so page.emulateMedia({reducedMotion: 'reduce'})
+          // above has no effect on it. 150ms could still land mid cross-fade,
+          // which for a state with brand-accent-colored content (e.g. the
+          // selected-amount pill on Pay) blends its real background toward the
+          // drawer's own dark surface and reads as a false low-contrast finding.
+          // Clear both phases with margin.
+          await page.waitForTimeout(400);
 
-      const snapshot = await inspectRouteDom(page, {
-        surface: 'public-profile',
-      });
-      const imageContrast = await inspectImageContrast(page);
-      const findings = [...snapshot.findings, ...imageContrast.findings];
-      const viewportId = `${viewport.width}x${viewport.height}`;
-      const snapshotPath = path.join(
-        'public-profile',
-        `${viewportId}-${state.id}.json`
+          phase = 'route DOM inspection';
+          const snapshot = await inspectRouteDom(page, {
+            surface: 'public-profile',
+          });
+          phase = 'image contrast';
+          const imageContrast = await inspectImageContrast(page);
+          phase = 'receipt';
+          const findings = [...snapshot.findings, ...imageContrast.findings];
+          const viewportId = `${viewport.width}x${viewport.height}`;
+          const snapshotPath = path.join(
+            'public-profile',
+            `${viewportId}-${state.id}.json`
+          );
+          await writeSnapshot(snapshotPath, {
+            schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
+            sourceGitSha,
+            deploymentId,
+            deploymentUrl: baseUrl,
+            route: profileRoute,
+            viewport: viewportId,
+            state: state.id,
+            ...snapshot,
+            findings,
+            imageContrast,
+          });
+          receipts.push({
+            route: profileRoute,
+            viewport: viewportId,
+            state: state.id,
+            snapshotPath,
+            findingCount: findings.length,
+          });
+          expect
+            .soft(findings, `${profileRoute} ${viewportId} ${state.id}`)
+            .toEqual([]);
+        })()
       );
-      await writeSnapshot(snapshotPath, {
-        schemaVersion: ROUTE_DOM_CERTIFICATION_SCHEMA,
-        sourceGitSha,
-        deploymentId,
-        deploymentUrl: baseUrl,
-        route: profileRoute,
-        viewport: viewportId,
-        state: state.id,
-        ...snapshot,
-        findings,
-        imageContrast,
-      });
-      receipts.push({
-        route: profileRoute,
-        viewport: viewportId,
-        state: state.id,
-        snapshotPath,
-        findingCount: findings.length,
-      });
-      expect
-        .soft(findings, `${profileRoute} ${viewportId} ${state.id}`)
-        .toEqual([]);
     }
   }
 

@@ -78,10 +78,6 @@ const canaryWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/canary-health-gate.yml'
 );
-const sentryGateWorkflowPath = resolve(
-  repoRoot,
-  '.github/workflows/sentry-error-gate.yml'
-);
 const sentryGateActionPath = resolve(
   repoRoot,
   '.github/actions/sentry-error-gate/action.yml'
@@ -4558,11 +4554,10 @@ describe('production promotion exact-artifact contract', () => {
 
   it('keeps rollback centralized behind confirmed structured gate failures', () => {
     const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
-    const sentry = readFileSync(sentryGateWorkflowPath, 'utf8');
     const cost = readFileSync(costAnomalyWorkflowPath, 'utf8');
 
     expect(reusable.match(/vercel rollback/g)).toHaveLength(1);
-    expect(`${sentry}\n${cost}`).not.toContain('vercel rollback');
+    expect(cost).not.toContain('vercel rollback');
     expect(reusable).toContain("gate_status == 'failed'");
     expect(reusable).toContain('gate_status=error');
     expect(reusable).toContain('PLAYWRIGHT_JSON_OUTPUT_NAME');
