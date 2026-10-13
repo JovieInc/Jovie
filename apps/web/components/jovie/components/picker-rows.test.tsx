@@ -84,6 +84,7 @@ describe('NavArt icon mapping', () => {
   });
 
   it.each([
+    ['Home', 'lucide-house'],
     ['User', 'lucide-user'],
     ['Layers', 'lucide-layers'],
     ['Megaphone', 'lucide-megaphone'],
