@@ -1,0 +1,207 @@
+diff --git a/src/v4/classic/external.ts b/src/v4/classic/external.ts
+index ae61fc0547495a2c06993d4a9b96b78e5f563d40..e9cdf799b1e30b493852d53dca26a4221580b1e4 100644
+--- a/src/v4/classic/external.ts
++++ b/src/v4/classic/external.ts
+@@ -40,7 +40,6 @@ export { deepPartial } from "./deep-partial.js";
+ // Types and values both, from one module — re-exporting the types from core would collide.
+ export { input, output } from "./in-out.js";
+ 
+-export * as locales from "../locales/index.js";
+ 
+ // iso must be exported from top-level https://github.com/colinhacks/zod/issues/4491
+ export { ZodISODateTime, ZodISODate, ZodISOTime, ZodISODuration } from "./iso.js";
+diff --git a/src/v4/core/index.ts b/src/v4/core/index.ts
+index f5bc49efd057a69b43ee57658cf1ad2a53d457ac..110a254fbca654cb3919ddb1260a733d8c97735c 100644
+--- a/src/v4/core/index.ts
++++ b/src/v4/core/index.ts
+@@ -8,7 +8,6 @@ export * from "./versions.js";
+ export * as util from "./util.js";
+ export { toZod } from "./util.js";
+ export * as regexes from "./regexes.js";
+-export * as locales from "../locales/index.js";
+ export * from "./registries.js";
+ export * from "./doc.js";
+ export * from "./compile.js";
+diff --git a/src/v4/mini/external.ts b/src/v4/mini/external.ts
+index 11b02233a8a69e935271a02869a2b16953703f8b..b176efee5295beea8fd5407907cb7d33794ece09 100644
+--- a/src/v4/mini/external.ts
++++ b/src/v4/mini/external.ts
+@@ -35,7 +35,6 @@ export {
+ } from "../core/index.js";
+ export { toJSONSchema } from "../core/json-schema-processors.js";
+ 
+-export * as locales from "../locales/index.js";
+ /** A special constant with type `never` */
+ // export const NEVER = {} as never;
+ 
+diff --git a/v4/classic/external.cjs b/v4/classic/external.cjs
+index 15a0faa24a5c93733b21ae9553f5d11271ef7cb6..f480139d2471b615bf1f3bcda6352ffd5215cdf4 100644
+--- a/v4/classic/external.cjs
++++ b/v4/classic/external.cjs
+@@ -26,7 +26,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
+     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+ };
+ Object.defineProperty(exports, "__esModule", { value: true });
+-exports.coerce = exports.iso = exports.ZodISODuration = exports.ZodISOTime = exports.ZodISODate = exports.ZodISODateTime = exports.locales = exports.output = exports.input = exports.deepPartial = exports.fromJSONSchema = exports.toJSONSchema = exports.getDiscriminatedOption = exports.ZodCompileUnsupportedError = exports.ZodCompileAsyncError = exports.withParser = exports.compile = exports.toZod = exports.INVALID = exports.NEVER = exports.util = exports.TimePrecision = exports.flattenError = exports.formatError = exports.prettifyError = exports.treeifyError = exports.regexes = exports.clone = exports.$brand = exports.$input = exports.$output = exports.memoizer = exports.config = exports.registry = exports.globalRegistry = exports.core = void 0;
++exports.coerce = exports.iso = exports.ZodISODuration = exports.ZodISOTime = exports.ZodISODate = exports.ZodISODateTime = exports.output = exports.input = exports.deepPartial = exports.fromJSONSchema = exports.toJSONSchema = exports.getDiscriminatedOption = exports.ZodCompileUnsupportedError = exports.ZodCompileAsyncError = exports.withParser = exports.compile = exports.toZod = exports.INVALID = exports.NEVER = exports.util = exports.TimePrecision = exports.flattenError = exports.formatError = exports.prettifyError = exports.treeifyError = exports.regexes = exports.clone = exports.$brand = exports.$input = exports.$output = exports.memoizer = exports.config = exports.registry = exports.globalRegistry = exports.core = void 0;
+ exports.core = __importStar(require("../core/index.cjs"));
+ __exportStar(require("./schemas.cjs"), exports);
+ __exportStar(require("./checks.cjs"), exports);
+@@ -67,7 +67,6 @@ Object.defineProperty(exports, "deepPartial", { enumerable: true, get: function
+ var in_out_js_1 = require("./in-out.cjs");
+ Object.defineProperty(exports, "input", { enumerable: true, get: function () { return in_out_js_1.input; } });
+ Object.defineProperty(exports, "output", { enumerable: true, get: function () { return in_out_js_1.output; } });
+-exports.locales = __importStar(require("../locales/index.cjs"));
+ // iso must be exported from top-level https://github.com/colinhacks/zod/issues/4491
+ var iso_js_1 = require("./iso.cjs");
+ Object.defineProperty(exports, "ZodISODateTime", { enumerable: true, get: function () { return iso_js_1.ZodISODateTime; } });
+diff --git a/v4/classic/external.d.cts b/v4/classic/external.d.cts
+index 7e9ce5e74a26696ebda836a0ac8c0fa0f5815936..f844c520a398909a03566308e5b7e64fbe1b2b33 100644
+--- a/v4/classic/external.d.cts
++++ b/v4/classic/external.d.cts
+@@ -12,7 +12,6 @@ export { toJSONSchema } from "../core/json-schema-processors.cjs";
+ export { fromJSONSchema } from "./from-json-schema.cjs";
+ export { deepPartial } from "./deep-partial.cjs";
+ export { input, output } from "./in-out.cjs";
+-export * as locales from "../locales/index.cjs";
+ export { ZodISODateTime, ZodISODate, ZodISOTime, ZodISODuration } from "./iso.cjs";
+ export * as iso from "./iso.cjs";
+ export type { ZodCoercedString, ZodCoercedNumber, ZodCoercedBigInt, ZodCoercedBoolean, ZodCoercedDate, } from "./coerce.cjs";
+diff --git a/v4/classic/external.d.ts b/v4/classic/external.d.ts
+index 8b5af4497534fc5b876333725ace4dedeb485622..e335dc4b146c5fc48d3955c261e97527a6730b50 100644
+--- a/v4/classic/external.d.ts
++++ b/v4/classic/external.d.ts
+@@ -12,7 +12,6 @@ export { toJSONSchema } from "../core/json-schema-processors.js";
+ export { fromJSONSchema } from "./from-json-schema.js";
+ export { deepPartial } from "./deep-partial.js";
+ export { input, output } from "./in-out.js";
+-export * as locales from "../locales/index.js";
+ export { ZodISODateTime, ZodISODate, ZodISOTime, ZodISODuration } from "./iso.js";
+ export * as iso from "./iso.js";
+ export type { ZodCoercedString, ZodCoercedNumber, ZodCoercedBigInt, ZodCoercedBoolean, ZodCoercedDate, } from "./coerce.js";
+diff --git a/v4/classic/external.js b/v4/classic/external.js
+index 435be167fc6c2c2276f9c0236526b22b2eed3f05..af256c99086a5633acb0879dfcc48e430138683c 100644
+--- a/v4/classic/external.js
++++ b/v4/classic/external.js
+@@ -10,7 +10,6 @@ export { fromJSONSchema } from "./from-json-schema.js";
+ export { deepPartial } from "./deep-partial.js";
+ // Types and values both, from one module — re-exporting the types from core would collide.
+ export { input, output } from "./in-out.js";
+-export * as locales from "../locales/index.js";
+ // iso must be exported from top-level https://github.com/colinhacks/zod/issues/4491
+ export { ZodISODateTime, ZodISODate, ZodISOTime, ZodISODuration } from "./iso.js";
+ export * as iso from "./iso.js";
+diff --git a/v4/core/index.cjs b/v4/core/index.cjs
+index 26253eec2ab0680c6a8f72782e935b7638cd97e3..ffbb4428a222971db33c74108b7b57f66930dd08 100644
+--- a/v4/core/index.cjs
++++ b/v4/core/index.cjs
+@@ -26,7 +26,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
+     return result;
+ };
+ Object.defineProperty(exports, "__esModule", { value: true });
+-exports.JSONSchema = exports.JSONSchemaGenerator = exports.toJSONSchema = exports.locales = exports.regexes = exports.toZod = exports.util = void 0;
++exports.JSONSchema = exports.JSONSchemaGenerator = exports.toJSONSchema = exports.regexes = exports.toZod = exports.util = void 0;
+ __exportStar(require("./core.cjs"), exports);
+ __exportStar(require("./parse.cjs"), exports);
+ __exportStar(require("./errors.cjs"), exports);
+@@ -38,7 +38,6 @@ exports.util = __importStar(require("./util.cjs"));
+ var util_js_1 = require("./util.cjs");
+ Object.defineProperty(exports, "toZod", { enumerable: true, get: function () { return util_js_1.toZod; } });
+ exports.regexes = __importStar(require("./regexes.cjs"));
+-exports.locales = __importStar(require("../locales/index.cjs"));
+ __exportStar(require("./registries.cjs"), exports);
+ __exportStar(require("./doc.cjs"), exports);
+ __exportStar(require("./compile.cjs"), exports);
+diff --git a/v4/core/index.d.cts b/v4/core/index.d.cts
+index 890121b016a9e529c2f4be6a81382dcbc639e0bd..a9a076f0f58ef3db5c2f3e10fe0be2340b656612 100644
+--- a/v4/core/index.d.cts
++++ b/v4/core/index.d.cts
+@@ -8,7 +8,6 @@ export * from "./versions.cjs";
+ export * as util from "./util.cjs";
+ export { toZod } from "./util.cjs";
+ export * as regexes from "./regexes.cjs";
+-export * as locales from "../locales/index.cjs";
+ export * from "./registries.cjs";
+ export * from "./doc.cjs";
+ export * from "./compile.cjs";
+diff --git a/v4/core/index.d.ts b/v4/core/index.d.ts
+index f5bc49efd057a69b43ee57658cf1ad2a53d457ac..110a254fbca654cb3919ddb1260a733d8c97735c 100644
+--- a/v4/core/index.d.ts
++++ b/v4/core/index.d.ts
+@@ -8,7 +8,6 @@ export * from "./versions.js";
+ export * as util from "./util.js";
+ export { toZod } from "./util.js";
+ export * as regexes from "./regexes.js";
+-export * as locales from "../locales/index.js";
+ export * from "./registries.js";
+ export * from "./doc.js";
+ export * from "./compile.js";
+diff --git a/v4/core/index.js b/v4/core/index.js
+index f5bc49efd057a69b43ee57658cf1ad2a53d457ac..110a254fbca654cb3919ddb1260a733d8c97735c 100644
+--- a/v4/core/index.js
++++ b/v4/core/index.js
+@@ -8,7 +8,6 @@ export * from "./versions.js";
+ export * as util from "./util.js";
+ export { toZod } from "./util.js";
+ export * as regexes from "./regexes.js";
+-export * as locales from "../locales/index.js";
+ export * from "./registries.js";
+ export * from "./doc.js";
+ export * from "./compile.js";
+diff --git a/v4/mini/external.cjs b/v4/mini/external.cjs
+index 935d793565c46def1af0f700cf9fb8f585f4fcf9..7a1413d8bca0b518c4631174371462148d04756e 100644
+--- a/v4/mini/external.cjs
++++ b/v4/mini/external.cjs
+@@ -26,7 +26,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
+     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+ };
+ Object.defineProperty(exports, "__esModule", { value: true });
+-exports.coerce = exports.ZodMiniISODuration = exports.ZodMiniISOTime = exports.ZodMiniISODate = exports.ZodMiniISODateTime = exports.iso = exports.locales = exports.toJSONSchema = exports.getDiscriminatedOption = exports.ZodCompileUnsupportedError = exports.ZodCompileAsyncError = exports.withParser = exports.compile = exports.toZod = exports.INVALID = exports.NEVER = exports.util = exports.TimePrecision = exports.flattenError = exports.formatError = exports.prettifyError = exports.treeifyError = exports.regexes = exports.clone = exports.$brand = exports.$input = exports.$output = exports.memoizer = exports.config = exports.registry = exports.globalRegistry = exports.output = exports.input = exports.deepPartial = exports.core = void 0;
++exports.coerce = exports.ZodMiniISODuration = exports.ZodMiniISOTime = exports.ZodMiniISODate = exports.ZodMiniISODateTime = exports.iso = exports.toJSONSchema = exports.getDiscriminatedOption = exports.ZodCompileUnsupportedError = exports.ZodCompileAsyncError = exports.withParser = exports.compile = exports.toZod = exports.INVALID = exports.NEVER = exports.util = exports.TimePrecision = exports.flattenError = exports.formatError = exports.prettifyError = exports.treeifyError = exports.regexes = exports.clone = exports.$brand = exports.$input = exports.$output = exports.memoizer = exports.config = exports.registry = exports.globalRegistry = exports.output = exports.input = exports.deepPartial = exports.core = void 0;
+ exports.core = __importStar(require("../core/index.cjs"));
+ __exportStar(require("./parse.cjs"), exports);
+ __exportStar(require("./schemas.cjs"), exports);
+@@ -62,7 +62,6 @@ Object.defineProperty(exports, "ZodCompileUnsupportedError", { enumerable: true,
+ Object.defineProperty(exports, "getDiscriminatedOption", { enumerable: true, get: function () { return index_js_1.getDiscriminatedOption; } });
+ var json_schema_processors_js_1 = require("../core/json-schema-processors.cjs");
+ Object.defineProperty(exports, "toJSONSchema", { enumerable: true, get: function () { return json_schema_processors_js_1.toJSONSchema; } });
+-exports.locales = __importStar(require("../locales/index.cjs"));
+ /** A special constant with type `never` */
+ // export const NEVER = {} as never;
+ // iso
+diff --git a/v4/mini/external.d.cts b/v4/mini/external.d.cts
+index ccae014365aa3d6c99fdf42b8c791273485ec734..0e9f4e4b53681678b038982843fd79498a8313be 100644
+--- a/v4/mini/external.d.cts
++++ b/v4/mini/external.d.cts
+@@ -9,7 +9,6 @@ export type { JSONType } from "../core/util.cjs";
+ export type { CompileOptions } from "../core/index.cjs";
+ export { globalRegistry, registry, config, memoizer, $output, $input, $brand, clone, regexes, treeifyError, prettifyError, formatError, flattenError, TimePrecision, util, NEVER, INVALID, toZod, compile, withParser, ZodCompileAsyncError, ZodCompileUnsupportedError, getDiscriminatedOption, } from "../core/index.cjs";
+ export { toJSONSchema } from "../core/json-schema-processors.cjs";
+-export * as locales from "../locales/index.cjs";
+ /** A special constant with type `never` */
+ export * as iso from "./iso.cjs";
+ export { ZodMiniISODateTime, ZodMiniISODate, ZodMiniISOTime, ZodMiniISODuration, } from "./iso.cjs";
+diff --git a/v4/mini/external.d.ts b/v4/mini/external.d.ts
+index 4ee77179806a5fd9784c57f1448f45546d101bc9..84c3e5f6ca0a661b79437fb3a1dbbfece1639ff3 100644
+--- a/v4/mini/external.d.ts
++++ b/v4/mini/external.d.ts
+@@ -9,7 +9,6 @@ export type { JSONType } from "../core/util.js";
+ export type { CompileOptions } from "../core/index.js";
+ export { globalRegistry, registry, config, memoizer, $output, $input, $brand, clone, regexes, treeifyError, prettifyError, formatError, flattenError, TimePrecision, util, NEVER, INVALID, toZod, compile, withParser, ZodCompileAsyncError, ZodCompileUnsupportedError, getDiscriminatedOption, } from "../core/index.js";
+ export { toJSONSchema } from "../core/json-schema-processors.js";
+-export * as locales from "../locales/index.js";
+ /** A special constant with type `never` */
+ export * as iso from "./iso.js";
+ export { ZodMiniISODateTime, ZodMiniISODate, ZodMiniISOTime, ZodMiniISODuration, } from "./iso.js";
+diff --git a/v4/mini/external.js b/v4/mini/external.js
+index 9a3f8ea998f2aeb539a3aabbe0bc90352f939641..5161b5b889bd4b7029dd54dad69b1cc0aa5992dc 100644
+--- a/v4/mini/external.js
++++ b/v4/mini/external.js
+@@ -6,7 +6,6 @@ export { deepPartial } from "./deep-partial.js";
+ export { input, output } from "./in-out.js";
+ export { globalRegistry, registry, config, memoizer, $output, $input, $brand, clone, regexes, treeifyError, prettifyError, formatError, flattenError, TimePrecision, util, NEVER, INVALID, toZod, compile, withParser, ZodCompileAsyncError, ZodCompileUnsupportedError, getDiscriminatedOption, } from "../core/index.js";
+ export { toJSONSchema } from "../core/json-schema-processors.js";
+-export * as locales from "../locales/index.js";
+ /** A special constant with type `never` */
+ // export const NEVER = {} as never;
+ // iso

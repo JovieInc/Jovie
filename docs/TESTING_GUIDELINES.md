@@ -76,6 +76,30 @@ Coverage is not the goal — coverage on the right files is. The risk-based dash
 - Keep **test utilities DRY** but approachable—prefer readable fixtures over deep helper stacks.
 - Treat **lint/typecheck warnings in tests as bugs**; fix them before merging.
 
+## Mutation testing
+
+Coverage shows which lines ran. Mutation testing shows whether a test would
+notice those lines changing. The `Mutation Diff` workflow runs Stryker after
+merge on changed high-risk `apps/web` source: billing, entitlements, auth,
+Stripe, webhooks, and claim. It posts per-file scores and surviving mutants to
+the job summary. It is advisory and fails only when Stryker itself breaks.
+
+Before landing a change to one of those files, run it locally:
+
+```bash
+CI=true node scripts/mutation-diff.mjs --files apps/web/lib/cron/auth.ts
+```
+
+A survivor that changes behavior (for example, a dropped production check)
+means a test is missing. Add the assertion that kills it. Survivors in log
+messages, and mutants that can't change behavior, can stay. Aim for 80% or
+higher on these surfaces. Scores under 60% are flagged `(low)`.
+
+`apps/web/stryker.diff.config.mjs` uses Stryker's command runner. Don't switch
+it to `@stryker-mutator/vitest-runner`: version 10.0.0 with vitest 5 drops the
+results of tests inside `describe` blocks, so killed mutants get reported as
+Survived.
+
 
 ## Local worktree identity (JOV-7353)
 

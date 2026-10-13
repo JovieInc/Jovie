@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { dirname, join, normalize } from 'node:path';
 import { test } from 'node:test';
 import { CONTRACT_LABELS } from '../../hold-contract.mjs';
 import {
@@ -104,24 +114,93 @@ test('every enroll, dequeue, and auto-merge copy matches the canonical set', () 
 // only active workflow that arms or enqueues, so a held head has one admission
 // path to guard. agent-pipeline.yml is disabled_manually in GitHub and is
 // deleted with the other dormant agent landing controllers.
+// A queue writer enqueues, or arms native auto-merge (GitHub enqueues an armed
+// PR when it turns green, even after the arming workflow is disabled).
+const QUEUE_WRITE =
+  /\benqueuePullRequest\b|\benablePullRequestAutoMerge\b|\bpr merge\b[^\n]*\s--auto\b|['"]--auto['"]/;
+// Interpreter-invoked scripts only: a path in a string map or a test is not a call.
+const RUN = String.raw`(?:node|bash|sh|python3?|tsx)\s+(?:-[\w=.-]+\s+)*["']?`;
+const SCRIPT = String.raw`[\w./-]+\.(?:mjs|cjs|js|sh|py)`;
+const uncommented = text =>
+  text
+    .split('\n')
+    .filter(line => !/^\s*(#|\/\/|\*)/.test(line))
+    .join('\n');
+const invokedScripts = (path, source, root) =>
+  [
+    ...[
+      ...source.matchAll(
+        new RegExp(`${RUN}((?:\\.github\\/)?scripts\\/${SCRIPT})`, 'g')
+      ),
+    ].map(m => join(root, m[1])),
+    ...[
+      ...source.matchAll(
+        new RegExp(`${RUN}\\$\\{?(?:SCRIPT_DIR|HERE)\\}?\\/(${SCRIPT})`, 'g')
+      ),
+    ].map(m => normalize(join(dirname(path), m[1]))),
+  ].filter(ref => !/__tests__|\/tests\/|\.test\./.test(ref));
+/** @returns {string[] | null} the call chain that reaches a queue write */
+const queueWriteChain = (path, root = '.', seen = new Set(), chain = []) => {
+  if (seen.has(path) || chain.length > 4 || !existsSync(path)) return null;
+  seen.add(path);
+  const source = uncommented(readFileSync(path, 'utf8'));
+  if (QUEUE_WRITE.test(source)) return [...chain, path];
+  for (const ref of invokedScripts(path, source, root)) {
+    const hit = queueWriteChain(ref, root, seen, [...chain, path]);
+    if (hit) return hit;
+  }
+  return null;
+};
+
+// Auto-Merge Default was retired as a second queue writer; green enroll is the
+// only active workflow that arms or enqueues, so a held head has one admission
+// path to guard. The scan follows invoked scripts, so a writer cannot hide
+// behind `run: node scripts/...`.
 test('merge-queue-green-enroll is the only workflow that arms or enqueues PRs', () => {
   const writers = readdirSync('.github/workflows')
     .filter(name => /\.ya?ml$/.test(name))
-    .filter(name => {
-      const source = readFileSync(`.github/workflows/${name}`, 'utf8')
-        .split('\n')
-        .filter(line => !/^\s*#/.test(line))
-        .join('\n');
-      return /\benqueuePullRequest\b|\bgh pr merge [^\n]*--auto\b|\benablePullRequestAutoMerge\b/.test(
-        source
-      );
-    });
-  // agent-pipeline.yml is tolerated only while it exists; deleting it must
-  // not turn this red, and no other workflow may join it.
+    .map(name => queueWriteChain(`.github/workflows/${name}`))
+    .filter(Boolean)
+    .map(chain => chain.join(' -> '));
+  // Tolerated only while they exist; deleting them must not turn this red, and
+  // no other workflow may join them. agent-pipeline and rolling-ci-dispatch are
+  // disabled_manually in GitHub. auto-ready-agent-drafts arms only from a manual
+  // workflow_dispatch, as JOV-INV-022 still pairs ready with native intent.
+  const dormant = [
+    '.github/workflows/agent-pipeline.yml',
+    '.github/workflows/auto-ready-agent-drafts.yml',
+    '.github/workflows/rolling-ci-dispatch.yml',
+  ];
   assert.deepEqual(
-    writers.filter(name => name !== 'agent-pipeline.yml'),
-    ['merge-queue-green-enroll.yml']
+    writers.filter(chain => !dormant.some(name => chain.startsWith(name))),
+    ['.github/workflows/merge-queue-green-enroll.yml']
   );
+});
+
+test('the queue-writer scan follows invoked scripts but not mentions', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'queue-writer-scan-'));
+  try {
+    mkdirSync(join(dir, 'scripts'));
+    const at = name => join(dir, name);
+    writeFileSync(at('scripts/arm.sh'), 'gh pr merge "$n" -R "$R" --auto\n');
+    writeFileSync(at('scripts/hop.sh'), 'bash "$SCRIPT_DIR/arm.sh"\n');
+    writeFileSync(at('scripts/off.sh'), 'gh pr merge "$n" --disable-auto\n');
+    writeFileSync(at('run.yml'), 'run: bash scripts/hop.sh\n');
+    writeFileSync(
+      at('note.yml'),
+      '# bash scripts/arm.sh\nrun: echo scripts/arm.sh\n'
+    );
+    writeFileSync(at('off.yml'), 'run: bash scripts/off.sh\n');
+    assert.deepEqual(queueWriteChain(at('run.yml'), dir), [
+      at('run.yml'),
+      at('scripts/hop.sh'),
+      at('scripts/arm.sh'),
+    ]);
+    assert.equal(queueWriteChain(at('note.yml'), dir), null);
+    assert.equal(queueWriteChain(at('off.yml'), dir), null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('green enroll wakes on ready_for_review but never runs enroll for a draft event', () => {
@@ -132,4 +211,13 @@ test('green enroll wakes on ready_for_review but never runs enroll for a draft e
     enroll.jobs.enroll.if,
     /github\.event_name != 'pull_request_target' \|\| github\.event\.pull_request\.draft == false/
   );
+});
+
+// Agents defer PRs with `queue-deferred`; the sole queue writer must honor it
+// like any other stop label (queue writer consolidation, 2026-10-13).
+test('queue-deferred blocks admission and is governed by the hold contract', () => {
+  assert.ok(STOP_HOLD_LABELS.includes('queue-deferred'));
+  assert.ok(ADMISSION_BLOCKING_LABELS.includes('queue-deferred'));
+  assert.ok(CONTRACT_LABELS.includes('queue-deferred'));
+  assert.ok(MEMBER_POLICY_HOLD_LABELS.has('queue-deferred'));
 });

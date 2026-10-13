@@ -253,6 +253,12 @@ describe('keyboard-shortcuts definitions', () => {
       expect(helpShortcut).toBeDefined();
     });
 
+    it('advertises one Attach file chord (Cmd+U) for the inspector', () => {
+      const attach = KEYBOARD_SHORTCUTS.find(s => s.id === 'attach-file');
+      expect(attach?.shortcutKey).toBe('Meta+u');
+      expect(attach?.category).toBe('actions');
+    });
+
     it('every shortcut has an icon', () => {
       for (const shortcut of KEYBOARD_SHORTCUTS) {
         expect(shortcut.icon).toBeDefined();

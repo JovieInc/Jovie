@@ -407,6 +407,38 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(events.relay_targets("workflow_run", {"workflow_run": {**run, "conclusion": "cancelled"}}), [])
         self.assertEqual(events.relay_targets("workflow_run", {"workflow_run": {**run, "event": "merge_group"}}), [])
 
+    def test_relay_reads_use_the_read_token_and_writes_stay_on_github_token(self):
+        # 2026-10-13: the relay was the shared GITHUB_TOKEN bucket's top caller in three storms.
+        reads = [["gh", "pr", "view", "7", "--repo", "r", "--json", "labels"],
+                 ["gh", "pr", "list", "--repo", "r"],
+                 ["gh", "api", "repos/r/commits/h/statuses?per_page=100", "--jq", "."],
+                 ["gh", "api", "--paginate", "repos/r/issues/7/comments?since=x"],
+                 ["gh", "api", "repos/r/pulls", "--method", "GET", "-f", "state=open"],
+                 ["gh", "api", "graphql", "-f", "query=query { viewer { login } }"],
+                 ["gh", "run", "view", "1", "--log-failed"]]
+        writes = [["gh", "api", "-X", "POST", "repos/r/issues/7/labels", "-f", "labels[]=lane-fix-red"],
+                  ["gh", "api", "-X", "DELETE", "repos/r/issues/7/labels/x"],
+                  ["gh", "api", "repos/r/statuses/h", "-f", "state=success"],
+                  ["gh", "api", "graphql", "-f", "query=mutation { x }"],
+                  ["gh", "pr", "comment", "7", "--body", "b"],
+                  ["gh", "issue", "create", "--title", "t"],
+                  ["git", "status"]]
+        for args in reads:
+            self.assertTrue(events.gh_read_only(args), args)
+        for args in writes:
+            self.assertFalse(events.gh_read_only(args), args)
+        seen = []
+        with patch.object(events.lifecycle, "run", side_effect=lambda args, **kw: seen.append(kw.get("env"))), \
+                patch.dict(events.os.environ, {"GH_READ_TOKEN": "read", "GH_TOKEN": "write"}):
+            events.run(reads[0])
+            events.run(writes[0])
+        self.assertEqual(seen[0]["GH_TOKEN"], "read")
+        self.assertIsNone(seen[1], "writes inherit GITHUB_TOKEN")
+        with patch.object(events.lifecycle, "run", side_effect=lambda args, **kw: seen.append(kw.get("env"))), \
+                patch.dict(events.os.environ, {"GH_READ_TOKEN": ""}):
+            events.run(reads[0])
+        self.assertIsNone(seen[2], "no minted token: everything stays on GITHUB_TOKEN")
+
     def test_queue_removal_and_review_feedback_are_relayed(self):
         base = {"pull_request": {"number": 7, "head": {"sha": "h7"}}}
         self.assertEqual(events.relay_targets("pull_request_target", {**base, "action": "dequeued"}), [(7, "dequeued", "h7")])
