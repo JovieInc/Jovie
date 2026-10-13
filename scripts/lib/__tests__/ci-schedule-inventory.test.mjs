@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -5,6 +6,7 @@ import {
   ADMISSION_CRON_DEBT,
   ADMISSION_CRON_DEBT_CEILING,
   admissionSignals,
+  baseDebtCounts,
   CRON_ALLOWLIST,
   CRON_ALLOWLIST_CEILING,
   CRON_KEEP_REASONS,
@@ -23,6 +25,17 @@ import {
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const workflowsDir = resolve(repoRoot, '.github/workflows');
+
+// The CI base this diff is measured against: ci-fast's TURBO_SCM_BASE, else
+// the merge-base with origin/main. Null when neither resolves (bare checkout).
+function ciBase() {
+  if (process.env.TURBO_SCM_BASE) return process.env.TURBO_SCM_BASE;
+  const merged = spawnSync('git', ['merge-base', 'HEAD', 'origin/main'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  return merged.status === 0 ? merged.stdout.trim() : null;
+}
 
 describe('ci schedule inventory', () => {
   it('requires every cron workflow to declare an allowed clock-class', () => {
@@ -111,17 +124,23 @@ const empty = {
 };
 
 describe('event-driven admission contract (JOV-INV-042)', () => {
-  it('holds every live workflow to the frozen cron, admission, and polling debt', () => {
+  it('holds every live workflow to the frozen cron, admission, and polling debt', async () => {
+    const base = ciBase();
+    const baseCeilings = base ? await baseDebtCounts(base, repoRoot) : null;
     const result = checkEventDrivenContract(loadWorkflowFiles(workflowsDir), {
       readScript: repoScriptReader(repoRoot),
+      baseCeilings,
     });
     expect(result.errors).toEqual([]);
     expect(result.scheduled).toEqual([...CRON_ALLOWLIST].sort());
-    expect(CRON_ALLOWLIST).toHaveLength(CRON_ALLOWLIST_CEILING);
-    expect(Object.keys(ADMISSION_CRON_DEBT)).toHaveLength(
+    // Ceilings are caps: a shorter list passes without a ceiling edit.
+    expect(CRON_ALLOWLIST.length).toBeLessThanOrEqual(CRON_ALLOWLIST_CEILING);
+    expect(Object.keys(ADMISSION_CRON_DEBT).length).toBeLessThanOrEqual(
       ADMISSION_CRON_DEBT_CEILING
     );
-    expect(Object.keys(POLLING_DEBT)).toHaveLength(POLLING_DEBT_CEILING);
+    expect(Object.keys(POLLING_DEBT).length).toBeLessThanOrEqual(
+      POLLING_DEBT_CEILING
+    );
     for (const [path, entry] of Object.entries(ADMISSION_CRON_DEBT)) {
       expect(CRON_ALLOWLIST, path).toContain(path);
       expect(entry.reason, path).toBeTruthy();
@@ -159,7 +178,7 @@ describe('event-driven admission contract (JOV-INV-042)', () => {
     expect(errors[0]).toContain(EVENT_DRIVEN_INVARIANT_ID);
   });
 
-  it('requires a removed cron to delete its entry and lower the ceiling', () => {
+  it('requires a removed cron to delete its entry, with no ceiling edit', () => {
     const stale = checkEventDrivenContract([], {
       ...empty,
       cronAllowlist: ['.github/workflows/gone.yml'],
@@ -168,8 +187,46 @@ describe('event-driven admission contract (JOV-INV-042)', () => {
     expect(stale.errors).toEqual([
       '.github/workflows/gone.yml: no longer has a cron schedule; delete its entry so the debt list shrinks',
     ]);
-    const shrunk = checkEventDrivenContract([], { ...empty, cronCeiling: 1 });
-    expect(shrunk.errors[0]).toContain('lower its ceiling from 1 to 0');
+    // Two cleanups that each lowered a ceiling 3 -> 2 merge into a list of 1:
+    // fewer entries than the ceiling is never an error.
+    const shrunk = checkEventDrivenContract([], {
+      ...empty,
+      cronCeiling: 1,
+      pollingCeiling: 3,
+      admissionCeiling: 2,
+    });
+    expect(shrunk.errors).toEqual([]);
+  });
+
+  it('deliberate red: rejects growing a list back past its size on the CI base', () => {
+    const path = '.github/workflows/regrown-clock.yml';
+    const { errors } = checkEventDrivenContract([{ path, source: CRON }], {
+      ...empty,
+      cronAllowlist: [path],
+      cronCeiling: 5,
+      baseCeilings: { cron: 0 },
+    });
+    expect(errors.join('\n')).toContain(
+      'CRON_ALLOWLIST has 1 entries but its ceiling is 0; the list only shrinks'
+    );
+    const unreadableBase = checkEventDrivenContract([{ path, source: CRON }], {
+      ...empty,
+      cronAllowlist: [path],
+      cronCeiling: 1,
+      baseCeilings: { cron: null },
+    });
+    expect(unreadableBase.errors).toEqual([]);
+  });
+
+  it('reads the debt-list sizes at a git revision', async () => {
+    expect(await baseDebtCounts('HEAD', repoRoot)).toEqual({
+      cron: expect.any(Number),
+      admission: expect.any(Number),
+      polling: expect.any(Number),
+    });
+    expect(
+      await baseDebtCounts('0000000000000000000000000000000000000000', repoRoot)
+    ).toBeNull();
   });
 
   it('deliberate red: rejects growing a debt list past its ceiling', () => {

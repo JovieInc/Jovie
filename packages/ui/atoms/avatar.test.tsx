@@ -81,6 +81,12 @@ describe('Avatar', () => {
     expect(getInitials('Tim van White')).toBe('TW');
   });
 
+  it('keeps emoji, CJK, and combining-mark initials whole', () => {
+    expect(getInitials('🎵 Tim White')).toBe('🎵W');
+    expect(getInitials('田中太郎')).toBe('田');
+    expect(getInitials('e\u0301mile zola')).toBe('E\u0301Z');
+  });
+
   it('uses a neutral accessible fallback when no identity is available', () => {
     render(<UserAvatar status='offline' />);
 

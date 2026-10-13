@@ -1,32 +1,8 @@
-/**
- * Grapheme-safe initial extraction. Replaces packages/ui's `getInitials`,
- * which uses `charAt(0)` and breaks on emoji-prefixed names, CJK, and
- * combining marks. Falls back to charAt-based slicing if Intl.Segmenter is
- * unavailable in the runtime.
- */
+import { getInitials } from '@jovie/ui';
+
+/** Grapheme-safe initials; delegates to the canonical Avatar contract. */
 export function getMonogramInitials(name: string | null | undefined): string {
-  const trimmed = (name ?? '').trim();
-  if (!trimmed) return '?';
-
-  const Segmenter = (
-    globalThis as { Intl?: { Segmenter?: typeof Intl.Segmenter } }
-  ).Intl?.Segmenter;
-
-  const firstGrapheme = (input: string): string => {
-    if (Segmenter) {
-      const seg = new Segmenter(undefined, { granularity: 'grapheme' });
-      const it = seg.segment(input)[Symbol.iterator]();
-      const next = it.next();
-      return next.done ? '' : next.value.segment;
-    }
-    return input.charAt(0);
-  };
-
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return firstGrapheme(parts[0]).toUpperCase();
-  const last = parts.at(-1) ?? '';
-  return (firstGrapheme(parts[0]) + firstGrapheme(last)).toUpperCase();
+  return getInitials(name ?? '');
 }
 
 /**
