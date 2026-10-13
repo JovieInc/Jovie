@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   LibrarySurface,
   resolveLibraryReviewStep,
+  workPrimaryActionLabel,
 } from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { LIBRARY_VIEW_MODE_STORAGE_KEY } from '@/app/app/(shell)/library/library-grid-preferences';
@@ -1375,7 +1376,7 @@ describe('LibrarySurface', () => {
     const about = within(drawer.getByTestId('work-inspector-about'));
 
     expect(
-      drawer.getByRole('link', { name: 'Open Full View' })
+      drawer.getByRole('link', { name: 'View Public Page' })
     ).toHaveAttribute('href', '/tim/take-me-over');
     expect(presentation.getByText('Released')).toBeInTheDocument();
     expect(presentation.getByText('Not public')).toBeInTheDocument();
@@ -1573,14 +1574,25 @@ describe('LibrarySurface', () => {
     }
   });
 
+  it.each([
+    [null, 'View Public Page'],
+    ['/app/library?view=merch', 'Open Full View'],
+    ['https://www.youtube.com/watch?v=1', 'Open Original'],
+  ] as const)(
+    'names the work header link by its destination (%s)',
+    (href, label) => {
+      expect(workPrimaryActionLabel({ primaryActionHref: href })).toBe(label);
+    }
+  );
+
   it('gives the full-screen mobile inspector a visible close control', () => {
     renderLibrary([buildAsset({ id: 'release-a', title: 'Release A' })]);
     fireEvent.click(screen.getByTestId('library-release-row-release-a'));
 
-    const close = screen.getByTestId('library-inspector-close');
+    const close = screen.getByTestId('drawer-header-close');
     expect(close).toHaveAttribute('aria-label', 'Close');
     // Desktop keeps Esc and the overflow menu; the X is for the sheet.
-    expect(close.className).toContain('lg:hidden');
+    expect(close.className).toContain('lg:hidden'); // via the shared header
     fireEvent.click(close);
     expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
       'aria-hidden',
