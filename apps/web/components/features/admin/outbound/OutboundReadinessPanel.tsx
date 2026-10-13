@@ -42,7 +42,7 @@ function Row({
           item.status === 'green'
             ? 'text-success'
             : item.status === 'red'
-              ? 'text-destructive'
+              ? 'text-error'
               : 'text-tertiary-token'
         )}
         aria-label={STATUS_LABEL[item.status]}
