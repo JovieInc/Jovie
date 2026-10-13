@@ -143,11 +143,9 @@ Agent({
 })
 ```
 
-## Why Pre-Created Worktrees, Not `isolation: "worktree"`
+## Pre-Created Worktrees, Not `isolation: "worktree"`
 
-Do not use `isolation: "worktree"` when spawning swarm agents.
-
-`isolation: "worktree"` sandboxes the spawned agent in a way that strips Bash tool permissions and MCP tool access, including `mcp__ruflo__*`. This was verified as a failure mode on 2026-05-07: agents spawned with this mode could not run shell commands or reach ruflo coordination tools, making them unable to follow the ship recipe.
+Never spawn swarm agents with `isolation: "worktree"`; why, and the other org-wide git/worktree rules, live in `~/.claude/CLAUDE.md` §5.
 
 The correct pattern is for the lead to pre-create worktrees sequentially before spawning agents, then pass the worktree path explicitly in the agent prompt:
 
