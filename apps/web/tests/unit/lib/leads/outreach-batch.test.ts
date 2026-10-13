@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -187,5 +189,14 @@ describe('processOutreachBatch', () => {
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockDbUpdate).not.toHaveBeenCalled();
     expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+  });
+
+  it('gates the pending-email query on recorded outreach consent', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../../../../lib/leads/outreach-batch.ts'),
+      'utf8'
+    );
+    expect(source).toMatch(/isNotNull\(leads\.outreachConsentAt\)/);
+    expect(source).toMatch(/isOutreachQuietHours\(new Date\(\)\)/);
   });
 });

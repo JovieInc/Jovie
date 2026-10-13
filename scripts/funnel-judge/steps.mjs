@@ -3,7 +3,7 @@
 
 /** Outreach DM copy, kept in sync with apps/web/lib/leads/constants.ts. */
 export const OUTREACH_DM_TEMPLATE =
-  "Hey {displayName}! I found your Linktree and love your music on Spotify. I built Jovie to help artists like you create a better link-in-bio. Here's your free page: {claimLink}";
+  "Hey {displayName}! I found your Linktree and built Jovie to give creators a better link-in-bio. Here's your free page: {claimLink}";
 
 export function renderOutreachDm({ displayName, claimLink }) {
   return OUTREACH_DM_TEMPLATE.replaceAll(
