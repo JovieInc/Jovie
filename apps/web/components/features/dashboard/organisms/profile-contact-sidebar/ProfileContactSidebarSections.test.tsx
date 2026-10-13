@@ -7,6 +7,8 @@ import { ProfileBentoView } from './ProfileContactSidebarSections';
 vi.mock('./ProfileSmartLinkAnalytics', () => ({
   ProfileSmartLinkAnalytics: () => null,
 }));
+const flags = vi.hoisted(() => ({ identity: true }));
+vi.mock('@/lib/flags/client', () => ({ useAppFlag: () => flags.identity }));
 
 const previewData: PreviewPanelData = {
   username: 'alex',
@@ -40,7 +42,8 @@ describe('ProfileBentoView', () => {
     expect(header).toHaveTextContent('@alex');
   });
 
-  it('routes Manage In Presence to the Presence surface', () => {
+  it('routes the current Identity label to its canonical destination', () => {
+    flags.identity = true;
     render(
       <ProfileBentoView
         previewData={previewData}
@@ -49,11 +52,12 @@ describe('ProfileBentoView', () => {
     );
 
     expect(
-      screen.getByRole('link', { name: 'Manage In Presence' })
+      screen.getByRole('link', { name: 'Manage In Identity' })
     ).toHaveAttribute('href', APP_ROUTES.PRESENCE);
   });
 
-  it('keeps Manage In Presence as a callback when the host overrides it', async () => {
+  it('passes the projected destination to the host callback', async () => {
+    flags.identity = true;
     const onManageConnections = vi.fn();
     render(
       <ProfileBentoView
@@ -63,8 +67,23 @@ describe('ProfileBentoView', () => {
       />
     );
 
-    const button = screen.getByRole('button', { name: 'Manage In Presence' });
+    const button = screen.getByRole('button', { name: 'Manage In Identity' });
     button.click();
-    expect(onManageConnections).toHaveBeenCalledTimes(1);
+    expect(onManageConnections).toHaveBeenCalledExactlyOnceWith(
+      APP_ROUTES.PRESENCE
+    );
+  });
+  it('shows the settings fallback without claiming the disabled workspace', () => {
+    flags.identity = false;
+    render(
+      <ProfileBentoView
+        previewData={previewData}
+        profileUrl='https://jov.ie/alex'
+      />
+    );
+    expect(
+      screen.getByRole('link', { name: 'Manage Profile' })
+    ).toHaveAttribute('href', `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`);
+    expect(screen.queryByText('Manage In Identity')).not.toBeInTheDocument();
   });
 });

@@ -96,7 +96,7 @@ export function ThemeToggle({
     );
 
     return renderTooltipContent ? (
-      <TooltipProvider delayDuration={0}>{segmentedContent}</TooltipProvider>
+      <TooltipProvider>{segmentedContent}</TooltipProvider>
     ) : (
       segmentedContent
     );
@@ -140,7 +140,7 @@ export function ThemeToggle({
   const buttonWithTooltip = withShortcutTooltip(toggleButton);
 
   return shortcutDescription ? (
-    <TooltipProvider delayDuration={0}>{buttonWithTooltip}</TooltipProvider>
+    <TooltipProvider>{buttonWithTooltip}</TooltipProvider>
   ) : (
     buttonWithTooltip
   );

@@ -19,7 +19,7 @@ test.skip(
 
 // Identity stays off the rail while PROFILES_WORKSPACE defaults off. The
 // creator-ready persona does not receive the admin default-on exception.
-const CANONICAL_LABELS = ['Home', 'Work', 'Audience'] as const;
+const CANONICAL_LABELS = ['Inbox', 'Work', 'Audience'] as const;
 
 const CANONICAL_HREFS = [
   APP_ROUTES.DASHBOARD,

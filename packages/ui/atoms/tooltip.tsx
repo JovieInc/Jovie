@@ -17,17 +17,34 @@ import { cn } from '../lib/utils';
  * TooltipProvider with sensible defaults for delays and pointer safety.
  * Should be rendered at app-level to provide tooltip context.
  */
+const TooltipProviderScope = React.createContext(false);
+
 const TooltipProvider = ({
-  delayDuration = 700,
-  skipDelayDuration = 300,
+  delayDuration,
+  skipDelayDuration,
   ...props
-}: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Provider>) => (
-  <TooltipPrimitive.Provider
-    delayDuration={delayDuration}
-    skipDelayDuration={skipDelayDuration}
-    {...props}
-  />
-);
+}: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Provider>) => {
+  const inherited = React.useContext(TooltipProviderScope);
+  // Default wrappers share the app's warm-up window. Explicit timing or
+  // hoverability remains available for isolated fixtures and forced notices.
+  if (
+    inherited &&
+    delayDuration === undefined &&
+    skipDelayDuration === undefined &&
+    props.disableHoverableContent === undefined
+  ) {
+    return <>{props.children}</>;
+  }
+  return (
+    <TooltipProviderScope.Provider value>
+      <TooltipPrimitive.Provider
+        delayDuration={delayDuration ?? 300}
+        skipDelayDuration={skipDelayDuration ?? 300}
+        {...props}
+      />
+    </TooltipProviderScope.Provider>
+  );
+};
 TooltipProvider.displayName = TooltipPrimitive.Provider.displayName;
 
 /**
@@ -56,8 +73,9 @@ TooltipTrigger.displayName = TooltipPrimitive.Trigger.displayName;
 interface TooltipContentProps
   extends React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content> {
   /**
-   * `compact` is reserved for an author-confirmed, single-line label. It keeps
-   * the tooltip on one line. Both variants use the shared rounded-rectangle
+   * `compact` is reserved for an author-confirmed, single-line label. It fits
+   * on one line when space allows and wraps at narrow viewport edges. Both
+   * variants use the shared rounded-rectangle
    * surface; `rich` is the default for content that may wrap or contain
    * structured children.
    */
@@ -105,6 +123,7 @@ const TooltipContent = React.forwardRef<
       tone = 'default',
       children,
       testId = 'tooltip-content',
+      style,
       ...props
     },
     ref
@@ -115,16 +134,19 @@ const TooltipContent = React.forwardRef<
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         data-testid={testId}
+        data-tooltip-content-variant={contentVariant}
+        style={{
+          maxWidth:
+            'min(14rem, var(--radix-tooltip-content-available-width, 14rem))',
+          ...style,
+        }}
         className={cn(
           // Every overlay shares the same tokenized rounded rectangle. The
-          // content contract only controls wrapping; compact labels are
-          // provably one line while rich content may wrap without clipping.
-          'z-tooltip px-2 py-1 text-xs font-normal tracking-tight',
+          // content contract describes intent; short labels stay on one line
+          // when space allows, and long labels wrap without clipping.
+          'z-tooltip flex items-center gap-2 max-w-56 break-words whitespace-normal px-2 py-1 text-xs font-normal leading-normal tracking-tight',
           tone === 'danger' ? TOOLTIP_SURFACE_DANGER : TOOLTIP_SURFACE_BASE,
           OVERLAY_CONTENT_RADIUS,
-          contentVariant === 'compact'
-            ? 'whitespace-nowrap'
-            : 'max-w-56 break-words',
           // Pure opacity reveal (fade only) — subtract decorative zoom + slide-ins.
           // Matches parallel support work on shell Tooltip / Dsp for visual parity.
           // No layout shift; cursor-near friendly.
