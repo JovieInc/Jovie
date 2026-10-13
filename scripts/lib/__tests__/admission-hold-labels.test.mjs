@@ -162,13 +162,10 @@ test('merge-queue-green-enroll is the only workflow that arms or enqueues PRs', 
     .map(name => queueWriteChain(`.github/workflows/${name}`))
     .filter(Boolean)
     .map(chain => chain.join(' -> '));
-  // Tolerated only while they exist; deleting them must not turn this red, and
-  // no other workflow may join them. agent-pipeline and rolling-ci-dispatch are
-  // disabled_manually in GitHub. auto-ready-agent-drafts arms only from a manual
-  // workflow_dispatch, as JOV-INV-022 still pairs ready with native intent.
+  // Tolerated only while they exist (both disabled_manually in GitHub); deleting
+  // them must not turn this red, and no other workflow may join them.
   const dormant = [
     '.github/workflows/agent-pipeline.yml',
-    '.github/workflows/auto-ready-agent-drafts.yml',
     '.github/workflows/rolling-ci-dispatch.yml',
   ];
   assert.deepEqual(
