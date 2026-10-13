@@ -221,6 +221,31 @@ export function getPresenceEntityName(
   return label;
 }
 
+/**
+ * Inventory-row title. Rows name the platform, not the artist (the photo
+ * carries identity), so a link title auto-generated as "<artist> on
+ * <platform>" becomes the platform's display name ("Spotify"); custom
+ * titles stay as written.
+ */
+export function getPresenceRowTitle(
+  subject: Pick<PresenceIdentitySubject, 'platform' | 'label'>,
+  artistName: string
+): string {
+  const label = subject.label.trim();
+  const platformName = platformDisplayName(subject.platform);
+  const artist = artistName.trim();
+  if (!label) return platformName;
+  const normalized = normalizeLabel(label);
+  if (
+    artist &&
+    (normalized === normalizeLabel(`${artist} on ${platformName}`) ||
+      normalized === normalizeLabel(`${artist} on ${subject.platform}`))
+  ) {
+    return platformName;
+  }
+  return label;
+}
+
 export function getPresenceHandle(
   subject: Pick<PresenceIdentitySubject, 'kind' | 'handle' | 'url'>
 ): string | null {
