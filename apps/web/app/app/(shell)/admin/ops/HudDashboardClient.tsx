@@ -20,27 +20,18 @@ import {
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
-import { FounderFunnelBand } from '@/components/features/admin/hud/FounderFunnelBand';
-import { FounderMorningWalkCard } from '@/components/features/admin/hud/FounderMorningWalkCard';
 import { HudCashMrrBand } from '@/components/features/admin/hud/HudCashMrrBand';
-import { HudDrilldownSearch } from '@/components/features/admin/hud/HudDrilldownSearch';
-import { HudEnvExceptionsPanel } from '@/components/features/admin/hud/HudEnvExceptionsPanel';
 import { HudExceptionsStrip } from '@/components/features/admin/hud/HudExceptionsStrip';
-import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
 import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
-import { HudGithubBudgetPanel } from '@/components/features/admin/hud/HudShipperPanels';
 import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { OvieInbox } from '@/components/features/admin/hud/OvieInbox';
 import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
-import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
 import { toast } from '@/components/feedback';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { QRCode } from '@/components/molecules/QRCode';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import type { FounderFunnelData } from '@/lib/admin/types';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
@@ -58,6 +49,17 @@ import type {
 } from '@/types/hud';
 import { HudClockClient } from './HudClockClient';
 import { HudMetricSourceTrust } from './HudMetricSourceTrust';
+import {
+  AgentOsRunsPanel,
+  FounderFunnelBand,
+  FounderMorningWalkCard,
+  HudDrilldownSearch,
+  HudEnvExceptionsPanel,
+  HudGithubBudgetPanel,
+  HudKpiSubgrid,
+  QRCode,
+  ShippingVelocityChart,
+} from './HudNoiseSections';
 import { HudStatusPill } from './HudStatusPill';
 import { useHudMetricsQuery } from './useHudMetricsQuery';
 
