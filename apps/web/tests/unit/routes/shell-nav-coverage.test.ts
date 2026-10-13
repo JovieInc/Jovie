@@ -61,6 +61,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'One smart view across lists, linked from the OV sidebar Smart Views group and the lists index',
   '/app/ov/screenshots':
     'Internal screenshot QA utility retained for direct admin access outside founder navigation',
+  [APP_ROUTES.ADMIN_VISIBILITY_AUDIT]:
+    'Internal visibility-audit sample retained for direct admin access outside founder navigation',
   '/app/ov/system':
     'Internal system diagnostics retained for direct admin access outside founder navigation',
   '/app/ov/agent-runs/[id]':
