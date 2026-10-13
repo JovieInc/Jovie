@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import * as zodMini from 'zod/mini';
 
-// patches/zod@4.6.5.patch drops the `locales` namespace re-exports. Turbopack
+// patches/zod@4.6.7.patch drops the `locales` namespace re-exports. Turbopack
 // cannot shake the `z` namespace, so they shipped ~39 KB gzip of translated
 // error strings in every client route that imports zod. Locales stay
 // importable from `zod/locales` when a caller needs one.

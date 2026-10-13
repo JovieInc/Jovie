@@ -150,7 +150,7 @@ describe('immutable managed mesh dependency closure', () => {
     const proof = buildMeshRuntime(archive, dependencies(Buffer.from(lock)));
     expect(Object.keys(proof.dependencyPins)).toEqual([
       'esbuild@0.28.2',
-      'zod@4.6.5',
+      'zod@4.6.7',
       `@esbuild/${process.platform}-${process.arch}@0.28.2`,
     ]);
     expect(proof.isolatedImportPassed).toBe(true);
@@ -187,7 +187,7 @@ describe('immutable managed mesh dependency closure', () => {
   });
   it('refuses unpinned versions even when both lockfiles agree', () => {
     const lock = readFileSync(join(repo, 'pnpm-lock.yaml'), 'utf8').replaceAll(
-      '  zod@4.6.5:',
+      '  zod@4.6.7:',
       '  zod@0.0.0:'
     );
     writeFileSync(join(archive, 'pnpm-lock.yaml'), lock);

@@ -5,19 +5,19 @@
  * kind has either a canonical detail surface or none yet — when none, we
  * return null so the palette can decline to commit (or fall back to chat).
  *
- * Releases don't have a top-level detail page today; the closest canonical
- * surface is the per-release tasks workspace, so we route there. Artists
+ * Releases open in Work with the inspector on that release, the same view a
+ * click in the Work table gives (one detail surface per entity). Artists
  * and tracks have no per-id detail pages at all yet — those surfaces ship
  * later. Returning null for those kinds keeps cmd+k honest instead of
  * silently dropping the user on an unrelated screen.
  */
 
-import { buildReleaseTasksRoute } from '@/constants/routes';
+import { buildLibraryWorkRoute } from '@/constants/routes';
 import type { EntityRef } from '@/lib/commands/entities';
 
 export function resolveEntityHref(entity: EntityRef): string | null {
   if (entity.kind === 'release') {
-    return buildReleaseTasksRoute(entity.id);
+    return buildLibraryWorkRoute(entity.id);
   }
   // Artists and tracks don't have per-entity detail pages yet.
   return null;

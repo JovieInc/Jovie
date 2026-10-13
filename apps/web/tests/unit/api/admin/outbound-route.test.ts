@@ -152,4 +152,19 @@ describe('/api/admin/outbound', () => {
     });
     expect(response.status).toBe(400);
   });
+
+  it('serves counts only for the sidebar badge', async () => {
+    mocks.queue.mockResolvedValue({
+      generatedAt: '2026-10-04T12:00:00Z',
+      rows: [{ leadId: 'private' }],
+      counts: { ready: 44 },
+    });
+    const response = await GET(
+      new Request('https://jov.ie/api/admin/outbound?summary=1')
+    );
+    await expect(response.json()).resolves.toEqual({
+      generatedAt: '2026-10-04T12:00:00Z',
+      counts: { ready: 44 },
+    });
+  });
 });

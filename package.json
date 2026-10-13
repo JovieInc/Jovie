@@ -31,8 +31,8 @@
       "@lhci/cli>lighthouse": "13.4.1",
       "drizzle-orm": "0.45.4",
       "jsdom": "30.1.2",
-      "react": "19.2.8",
-      "react-dom": "19.2.8",
+      "react": "19.3.0",
+      "react-dom": "19.3.0",
       "@modelcontextprotocol/sdk": ">=1.26.0",
       "hono": ">=4.12.31",
       "diff": ">=8.0.3",
@@ -90,7 +90,7 @@
       "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch",
       "@parse/node-apn@8.1.0": "patches/@parse__node-apn@8.1.0.patch",
       "@better-auth/oauth-provider@1.7.6": "patches/@better-auth__oauth-provider@1.7.6.patch",
-      "zod@4.6.5": "patches/zod@4.6.5.patch"
+      "zod@4.6.7": "patches/zod@4.6.7.patch"
     }
   },
   "scripts": {

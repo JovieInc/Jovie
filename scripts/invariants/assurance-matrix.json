@@ -3,7 +3,7 @@
   "contract": "jovie.certification/v1",
   "issue": "JOV-6064",
   "extends": "JOV-5853",
-  "matrixRevision": "2026-10-04.1",
+  "matrixRevision": "2026-10-13.1",
   "asOf": "2026-10-03T00:00:00Z",
   "evidenceMaxAgeMs": 2592000000,
   "scope": {
@@ -66,7 +66,7 @@
       "issue": "JOV-6048",
       "ref": "docs/engineering/DEPENDENCY_DEGRADATION_CONTRACTS.md"
     },
-    { "issue": "JOV-6050", "ref": "apps/web/stryker.config.mjs" },
+    { "issue": "JOV-6050", "ref": "apps/web/stryker.diff.config.mjs" },
     { "issue": "JOV-6051", "ref": "scripts/invariants/run-outcome.mjs" },
     {
       "issue": "JOV-6052",
@@ -713,7 +713,8 @@
       "owner": "engineering",
       "sources": ["JOV-6050"],
       "invalidatesOn": [
-        "apps/web/stryker.config.mjs",
+        "apps/web/stryker.diff.config.mjs",
+        "scripts/mutation-diff.mjs",
         "apps/web/tests",
         "scripts/invariants"
       ],
@@ -724,8 +725,8 @@
           "evidence": [
             {
               "kind": "source",
-              "ref": "apps/web/stryker.config.mjs",
-              "summary": "Mutation testing configured; not yet a blocking lane."
+              "ref": ".github/workflows/mutation-diff.yml",
+              "summary": "Advisory diff-scoped mutation lane on high-risk source pushes to main."
             },
             {
               "kind": "source",

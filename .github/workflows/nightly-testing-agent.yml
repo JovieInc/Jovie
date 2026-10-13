@@ -13,17 +13,12 @@ on:
       - 'apps/web/**/*.test.*'
       - 'apps/web/**/*.spec.*'
       - 'apps/web/scripts/nightly-test-agent.ts'
-      - 'apps/web/stryker.config.mjs'
       - 'apps/web/package.json'
       - 'pnpm-lock.yaml'
   workflow_dispatch:
     inputs:
       run_unit:
         description: Run the deterministic Vitest telemetry lane
-        type: boolean
-        default: true
-      run_mutation:
-        description: Run the Stryker mutation hotspot lane
         type: boolean
         default: true
       validate_candidates:
@@ -125,50 +120,6 @@ jobs:
         if: steps.unit.outcome == 'failure'
         run: exit 1
 
-  mutation-hotspots:
-    name: Mutation Hotspots
-    needs: [context, deterministic]
-    if: >-
-      always() &&
-      needs.context.result == 'success' &&
-      (github.event_name == 'push' || inputs.run_mutation)
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 20
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-node-pnpm
-
-      - name: Run Stryker hotspot mutation lane
-        id: mutation
-        continue-on-error: true
-        run: pnpm --filter=@jovie/web run test:mutation:hotspots
-        env:
-          CI: 'true'
-
-      - name: Normalize mutation telemetry
-        if: always()
-        run: >-
-          pnpm --filter=@jovie/web run test:nightly-agent:normalize --
-          --mutation apps/web/reports/mutation/mutation.json
-          --out apps/web/test-results/nightly-agent/mutation
-          --name normalized-results.json
-
-      - name: Upload mutation telemetry
-        if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/mutation/normalized-results.json') != '' }}
-        uses: ./.github/actions/upload-safe-playwright-artifact
-        with:
-          name: nightly-agent-mutation-${{ github.run_id }}
-          path: apps/web/test-results/nightly-agent/mutation/
-          retention-days: 30
-
-      - name: Preserve mutation setup failure signal
-        if: steps.mutation.outcome == 'failure'
-        run: exit 1
-
   candidate-validation:
     name: Candidate Test Validation
     needs: [context]
@@ -198,7 +149,7 @@ jobs:
 
   report:
     name: Emit Agent Report
-    needs: [context, deterministic, mutation-hotspots, candidate-validation]
+    needs: [context, deterministic, candidate-validation]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -225,7 +176,7 @@ jobs:
       - name: Resolve workflow conclusion
         id: conclusion
         run: |
-          results=("${{ needs.context.result }}" "${{ needs.deterministic.result }}" "${{ needs.mutation-hotspots.result }}" "${{ needs.candidate-validation.result }}")
+          results=("${{ needs.context.result }}" "${{ needs.deterministic.result }}" "${{ needs.candidate-validation.result }}")
           for result in "${results[@]}"; do
             if [ "$result" = "failure" ]; then
               echo "value=failure" >> "$GITHUB_OUTPUT"
