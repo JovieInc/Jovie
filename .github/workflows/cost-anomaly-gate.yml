@@ -36,9 +36,18 @@
 #   history. Linear is the sole canonical tracker.
 
 name: Cost Anomaly Gate
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Ops
+# necessary-trust-boundary: A hosted read of Sentry event volume runs outside production so a runaway in production cannot suppress its own alarm; it alerts and never mutates production.
+# revisit-trigger: Remove the Gem clock dispatch and this schedule when Sentry spend alerts deliver to the founder natively with a delivery receipt.
 # clock-class: production-liveness
 
 on:
+  # The Gem lanes tick fires this on the designed cadence
+  # (scripts/lanes/continuity_clock.py): GitHub delivered the cron below only
+  # about every 6 h, so the schedule is now the backstop.
+  repository_dispatch:
+    types: [clock_cost_anomaly_gate]
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:

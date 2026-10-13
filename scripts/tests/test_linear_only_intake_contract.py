@@ -26,22 +26,9 @@ def step(text: str, name: str) -> str:
     tail = text.split(marker, 1)[1]
     return tail.split("\n      - name:", 1)[0]
 
-def test_dispatchers_and_claude_cannot_select_github_issues() -> None:
-    dispatcher = read(WF / "github-ai-dispatcher.yml")
-    orchestrator = read(WF / "github-ai-orchestrator.yml")
-    tick = read(WF / "agent-tick.yml")
-    for workflow in (dispatcher, orchestrator):
-        triggers = block(workflow, 0, "on")
-        assert "workflow_dispatch:" in triggers and "issues:" not in triggers
-        assert "issues: read" not in workflow and "issues: write" not in workflow
-    assert RETIRED in block(dispatcher, 2, "dispatch")
-    for job in ("guard", "claim_issue", "implement_and_open_pr", "finalize_claim"):
-        assert RETIRED in block(orchestrator, 2, job)
-    for job in ("dispatch", "cost-anomaly"):
-        assert RETIRED in block(tick, 2, job)
-    claude = read(WF / "claude.yml")
-    assert "issues:" not in block(claude, 0, "on")
-    assert "github.event.issue.pull_request" in block(claude, 2, "claude")
+def test_retired_github_issue_dispatchers_stay_deleted() -> None:
+    for name in ("github-ai-dispatcher.yml", "github-ai-orchestrator.yml", "agent-tick.yml"):
+        assert not (WF / name).exists(), name
 
 def test_workflow_issue_writers_are_removed_or_hard_retired() -> None:
     retired_steps = {

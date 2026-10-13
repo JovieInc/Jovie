@@ -2,9 +2,9 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
-import { Button, Skeleton } from '@jovie/ui';
+import { Button, Link as JovieLink, Skeleton } from '@jovie/ui';
 import type { UIMessage } from 'ai';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import {
   type ReactNode,
   useCallback,
@@ -279,12 +279,14 @@ export function OnboardingShell({
                     </Button>
                   ) : null}
                   {!isSignedIn ? (
-                    <Link
-                      className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
-                      href={APP_ROUTES.SIGNIN}
+                    <JovieLink
+                      asChild
+                      variant='compact'
+                      touchTarget
+                      className='shrink-0 whitespace-nowrap'
                     >
-                      Sign in
-                    </Link>
+                      <NextLink href={APP_ROUTES.SIGNIN}>Sign in</NextLink>
+                    </JovieLink>
                   ) : null}
                 </OnboardingIdentityConflict>
               ) : null}
@@ -404,12 +406,11 @@ export function OnboardingIdentityConflict({
               Switch Account
             </Button>
           ) : !isSignedIn ? (
-            <Link
-              href={APP_ROUTES.SIGNIN}
-              className='btn-linear-login focus-ring-themed'
-            >
-              Sign in with original account
-            </Link>
+            <JovieLink asChild variant='compact' touchTarget>
+              <NextLink href={APP_ROUTES.SIGNIN}>
+                Sign in with original account
+              </NextLink>
+            </JovieLink>
           ) : null}
         </div>
       ) : null}

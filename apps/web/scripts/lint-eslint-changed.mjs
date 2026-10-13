@@ -5,7 +5,10 @@
 // violations (e.g. /card label casing, #18036).
 //
 // Whole files are linted, matching lint-staged: touching a file means
-// leaving it clean.
+// leaving it clean. The exception is @jovie/ui-feel, which carries ratcheted
+// legacy debt: it is off in the shared config and checked here on added
+// lines only (scripts/lint-ui-feel.mjs --changed), because the repo-wide
+// ratchet runs only in the merge group.
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
@@ -55,7 +58,12 @@ export function run({
     ['exec', 'eslint', '--max-warnings=0', '--no-warn-ignored', ...files],
     { cwd: webRoot, stdio: 'inherit' }
   );
-  return result.status ?? 1;
+  const uiFeel = spawn(
+    'node',
+    ['scripts/lint-ui-feel.mjs', '--changed', baseRef],
+    { cwd: webRoot, stdio: 'inherit' }
+  );
+  return (result.status ?? 1) || (uiFeel.status ?? 1);
 }
 
 const isMain =
