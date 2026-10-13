@@ -111,6 +111,10 @@ describe('CompanyPresenceWorkspace', () => {
     );
     expect(screen.getByText('Unconfigured')).toBeVisible();
     expect(screen.queryByText('Healthy')).not.toBeInTheDocument();
+    // JOV-5063: the shared badge holds the 32px Presence density on both pages.
+    expect(screen.getByText('Unconfigured').parentElement).toHaveClass(
+      'min-h-8'
+    );
   });
 
   it('states how many sources are connected', () => {

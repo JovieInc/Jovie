@@ -42,3 +42,9 @@ export const Disabled: Story = {
     disabled: true,
   },
 };
+
+export const Medium: Story = {
+  args: {
+    size: 'md',
+  },
+};

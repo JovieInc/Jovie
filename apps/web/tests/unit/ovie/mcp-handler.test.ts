@@ -962,13 +962,16 @@ describe('Ovie MCP handler', () => {
   });
 
   it('prepares the latest certified investor proof brief for the founder', async () => {
+    // The fixture brief expires 2026-10-13; pin the clock inside its window.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-01T00:00:00.000Z'));
     const result = await handleOvieMcpRequest({
       principal: founder,
       body: rpc('tools/call', {
         name: 'get_proof_brief',
         arguments: {},
       }),
-    });
+    }).finally(() => vi.useRealTimers());
     expect(result.status).toBe(200);
     const body = toolResult<{
       schema: string;
