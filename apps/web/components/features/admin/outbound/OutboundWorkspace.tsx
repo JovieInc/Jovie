@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Checkbox } from '@jovie/ui';
 import { AlertTriangle, RefreshCw, Send } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -115,13 +115,11 @@ function buildColumns(
       id: 'select',
       header: 'Select',
       cell: ({ row }) => (
-        <input
-          type='checkbox'
+        <Checkbox
           aria-label={`Select ${row.original.name}`}
           checked={selected.has(row.original.leadId)}
           onClick={event => event.stopPropagation()}
-          onChange={() => toggle(row.original.leadId)}
-          className='h-3.5 w-3.5'
+          onCheckedChange={() => toggle(row.original.leadId)}
         />
       ),
       size: 32,
