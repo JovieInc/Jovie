@@ -71,6 +71,7 @@ async function fixture(
     payload = {},
     associatedPages,
     beforeStatusResponse,
+    labelRemovalError,
     afterStatusWrite,
     readCurrentSnapshot,
     effectSink,
@@ -127,6 +128,7 @@ async function fixture(
       issues: {
         removeLabel: async params => {
           labelRemovals.push(params);
+          if (labelRemovalError) throw labelRemovalError;
           return {};
         },
       },
@@ -542,13 +544,38 @@ test('a sweep goes longest-waiting first and stops at its budget', async () => {
 test('a queue-breaker dequeue is re-admitted after the freeze and its marker removed', async () => {
   // 2026-10-13: four quota storms each ended with queue-watch restoring every
   // circuit-breaker dequeue by hand (manual removal, unchanged head).
-  const breaker = (reason, labels = ['queue-breaker']) => ({
-    timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
-    labels: {
-      pageInfo: { hasNextPage: false },
-      nodes: labels.map(name => ({ name })),
-    },
-  });
+  const breaker = (
+    reason,
+    labels = ['queue-breaker'],
+    markedAt = '2026-10-02T13:01:00Z'
+  ) => {
+    const removal = {
+      __typename: 'RemovedFromMergeQueueEvent',
+      createdAt: '2026-10-02T13:00:00Z',
+      reason,
+    };
+    const marker = markedAt
+      ? {
+          __typename: 'LabeledEvent',
+          createdAt: markedAt,
+          label: { name: 'queue-breaker' },
+        }
+      : null;
+    return {
+      timelineItems: { nodes: [removal] },
+      breakerEvents: {
+        nodes: marker
+          ? markedAt < removal.createdAt
+            ? [marker, removal]
+            : [removal, marker]
+          : [removal],
+      },
+      labels: {
+        pageInfo: { hasNextPage: false },
+        nodes: labels.map(name => ({ name })),
+      },
+    };
+  };
   const marked = await fixture({
     overrides: { 1: breaker('MANUAL') },
     eventName: 'push',
@@ -562,6 +589,32 @@ test('a queue-breaker dequeue is re-admitted after the freeze and its marker rem
       name: 'queue-breaker',
     },
   ]);
+  const equalTimestamps = await fixture({
+    overrides: {
+      1: breaker('MANUAL', ['queue-breaker'], '2026-10-02T13:00:00Z'),
+    },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    equalTimestamps.mutations,
+    [{ id: 'PR_1', oid: sha }],
+    'combined timeline order proves a marker added in the same timestamp tick'
+  );
+  const staleSameTickState = breaker(
+    'MANUAL',
+    ['queue-breaker'],
+    '2026-10-02T13:00:00Z'
+  );
+  staleSameTickState.breakerEvents.nodes.reverse();
+  const staleSameTick = await fixture({
+    overrides: { 1: staleSameTickState },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    staleSameTick.mutations,
+    [],
+    'a same-timestamp marker before the removal cannot authorize restoration'
+  );
   const plain = await fixture({
     overrides: { 1: breaker('MANUAL', []) },
     eventName: 'push',
@@ -590,6 +643,115 @@ test('a queue-breaker dequeue is re-admitted after the freeze and its marker rem
     [],
     'the marker stays until the head is green'
   );
+  const cleanupDenied = await fixture({
+    overrides: { 1: breaker('MANUAL') },
+    eventName: 'push',
+    labelRemovalError: new Error('secondary rate limit'),
+  });
+  assert.deepEqual(
+    cleanupDenied.mutations,
+    [],
+    'a marker that cannot be consumed never authorizes enqueue'
+  );
+  assert.ok(
+    cleanupDenied.warnings.some(message =>
+      message.includes('queue-breaker not consumed: secondary rate limit')
+    )
+  );
+  const enqueueDenied = await fixture({
+    overrides: { 1: breaker('MANUAL') },
+    eventName: 'push',
+    failMutation: true,
+  });
+  assert.deepEqual(
+    enqueueDenied.labelRemovals,
+    marked.labelRemovals,
+    'the one-shot marker is consumed before an enqueue attempt'
+  );
+  const staleMarker = await fixture({
+    overrides: {
+      1: breaker('MANUAL', ['queue-breaker'], '2026-10-02T12:59:00Z'),
+    },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    staleMarker.mutations,
+    [],
+    'a marker created before the latest dequeue cannot authorize restoration'
+  );
+  assert.deepEqual(staleMarker.labelRemovals, []);
+  const repairedHead = await fixture({
+    overrides: {
+      1: {
+        ...breaker('MANUAL'),
+        commits: {
+          nodes: [{ commit: { committedDate: '2026-10-02T13:02:00Z' } }],
+        },
+      },
+    },
+    eventName: 'push',
+  });
+  assert.deepEqual(
+    repairedHead.mutations,
+    [{ id: 'PR_1', oid: sha }],
+    'head movement uses normal admission instead of stale breaker restore'
+  );
+  assert.deepEqual(
+    repairedHead.labelRemovals,
+    marked.labelRemovals,
+    'normal admission clears the stale breaker marker after enqueue'
+  );
+});
+
+test('a queue-breaker restore is fenced against revocation and a new hold', async () => {
+  const runRace = async labels => {
+    const live = {
+      ...current(1),
+      timelineItems: {
+        nodes: [
+          {
+            __typename: 'RemovedFromMergeQueueEvent',
+            createdAt: '2026-10-02T13:00:00Z',
+            reason: 'MANUAL',
+          },
+        ],
+      },
+      breakerEvents: {
+        nodes: [
+          {
+            __typename: 'RemovedFromMergeQueueEvent',
+            createdAt: '2026-10-02T13:00:00Z',
+            reason: 'MANUAL',
+          },
+          {
+            __typename: 'LabeledEvent',
+            createdAt: '2026-10-02T13:01:00Z',
+            label: { name: 'queue-breaker' },
+          },
+        ],
+      },
+      labels: {
+        pageInfo: { hasNextPage: false },
+        nodes: [{ name: 'queue-breaker' }],
+      },
+    };
+    let changed = false;
+    return fixture({
+      eventName: 'push',
+      readCurrentSnapshot: () => live,
+      beforeStatusResponse: () => {
+        if (changed) return;
+        changed = true;
+        live.labels.nodes = labels.map(name => ({ name }));
+      },
+    });
+  };
+  const revoked = await runRace([]);
+  assert.deepEqual(revoked.mutations, []);
+  assert.deepEqual(revoked.labelRemovals, []);
+  const held = await runRace(['queue-breaker', 'hold']);
+  assert.deepEqual(held.mutations, []);
+  assert.deepEqual(held.labelRemovals, []);
 });
 
 test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
