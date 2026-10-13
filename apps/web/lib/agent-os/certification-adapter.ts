@@ -176,10 +176,22 @@ export type MarketingRecordFounderDecisionResult =
       readonly assurance: MarketingAssuranceEvaluation;
     };
 
+/**
+ * One registry identity inside a ledger read or evidence post.
+ * `failed` means this record could not be evaluated. It is not certified.
+ */
+export interface MarketingCertificationEntryOutcome {
+  readonly identityId: string;
+  readonly evaluation: 'evaluated' | 'failed';
+  readonly message: string | null;
+  readonly row: MarketingCertificationProjectionRow;
+}
+
 export interface MarketingCertificationLedgerProjection {
   readonly contract: typeof JOVIE_CERTIFICATION_CONTRACT;
   readonly registryIds: readonly string[];
   readonly rows: readonly MarketingCertificationProjectionRow[];
+  readonly entryOutcomes: readonly MarketingCertificationEntryOutcome[];
 }
 
 export type MarketingReviewReadyWithheldReason =
@@ -965,35 +977,96 @@ function assertDenominator(
   }
 }
 
-function assertPacketMatchesEntry(
+type PacketBinding =
+  | { readonly kind: 'match' }
+  | { readonly kind: 'source_drift' }
+  | { readonly kind: 'unevaluable'; readonly message: string };
+
+/**
+ * Sentinel commit for a rebound packet. It is not a real source revision.
+ * The failed canonical receipt keeps the record out of every certified state
+ * until a producer posts evidence for the current source.
+ */
+const DRIFTED_SOURCE_SHA = '0'.repeat(40);
+
+function classifyPacketBinding(
   packet: CertificationReviewPacket,
   entry: MarketingRegistryEntry
-): void {
+): PacketBinding {
   if (!isCertificationReviewPacket(packet)) {
-    throw new MarketingCertificationPersistenceError(
-      `Certification packet ${entry.id} has an invalid runtime shape.`
-    );
+    return {
+      kind: 'unevaluable',
+      message: `Certification packet ${entry.id} has an invalid runtime shape.`,
+    };
   }
   if (
     packet.subject.id !== entry.id ||
     packet.subject.kind !== `marketing-${entry.kind}` ||
     packet.subject.title !== entry.storybookTitle
   ) {
-    throw new MarketingCertificationPersistenceError(
-      `Certification packet ${entry.id} does not match its canonical registry identity.`
-    );
+    return {
+      kind: 'unevaluable',
+      message: `Certification packet ${entry.id} does not match its canonical registry identity.`,
+    };
   }
-  if (!packet.source) return;
+  if (!packet.source) return { kind: 'match' };
   if (!entry.sourceBacked || !entry.resolvedSource) {
+    return {
+      kind: 'unevaluable',
+      message: `Registry identity ${entry.id} has no resolved canonical source.`,
+    };
+  }
+  if (!packet.source.paths.includes(entry.resolvedSource)) {
+    return { kind: 'source_drift' };
+  }
+  return { kind: 'match' };
+}
+
+function assertPacketMatchesEntry(
+  packet: CertificationReviewPacket,
+  entry: MarketingRegistryEntry
+): void {
+  const binding = classifyPacketBinding(packet, entry);
+  if (binding.kind === 'match') return;
+  throw new MarketingCertificationPersistenceError(
+    binding.kind === 'source_drift'
+      ? `Certification packet ${entry.id} does not bind canonical source ${entry.resolvedSource}.`
+      : binding.message
+  );
+}
+
+function driftedSourcePacket(
+  entry: MarketingRegistryEntry,
+  previousPaths: readonly string[]
+): CertificationReviewPacket {
+  const resolvedSource = entry.resolvedSource;
+  if (!resolvedSource) {
     throw new MarketingCertificationPersistenceError(
       `Registry identity ${entry.id} has no resolved canonical source.`
     );
   }
-  if (!packet.source.paths.includes(entry.resolvedSource)) {
-    throw new MarketingCertificationPersistenceError(
-      `Certification packet ${entry.id} does not bind canonical source ${entry.resolvedSource}.`
-    );
-  }
+  const previous = previousPaths.join(', ') || '(none)';
+  return {
+    ...missingPacketForEntry(entry),
+    canonicalReferences: [
+      {
+        digest: null,
+        id: `${entry.id}:canonical-source-drift`,
+        ref: resolvedSource,
+        sourceSha: DRIFTED_SOURCE_SHA,
+        status: 'failed',
+        summary: `Canonical source moved from ${previous} to ${resolvedSource}. Stored evidence does not certify the current source.`,
+        tier: 'canonical_references',
+      },
+    ],
+    source: {
+      digest: null,
+      paths: [resolvedSource],
+      ref: 'main',
+      repository: 'JovieInc/Jovie',
+      sha: DRIFTED_SOURCE_SHA,
+    },
+  };
 }
 
 function serializeLedger(ledger: MarketingCertificationLedger): string {
@@ -1015,28 +1088,15 @@ function laterTimestamp(left: string, right: string): string {
 function projectionRow(
   entry: MarketingRegistryEntry,
   record: MarketingCertificationRecord,
-  evaluatedAt: string
+  packet: CertificationReviewPacket,
+  admission: CertificationAdmission
 ): MarketingCertificationProjectionRow {
-  let admission: CertificationAdmission;
-  try {
-    assertPacketMatchesEntry(record.packet, entry);
-    admission = evaluateCertificationAdmission({
-      decisions: record.decisions,
-      evaluatedAt,
-      packet: record.packet,
-    });
-  } catch {
-    throw new MarketingCertificationPersistenceError(
-      `Certification ledger record ${entry.id} cannot be evaluated.`
-    );
-  }
-
   return {
     admission,
     auditHistory: record.auditHistory,
     decisions: record.decisions,
     identityId: entry.id,
-    packet: record.packet,
+    packet,
     packetUpdatedAt: record.packetUpdatedAt,
     registryKind: entry.kind,
     resolvedSource: entry.resolvedSource,
@@ -1045,15 +1105,132 @@ function projectionRow(
   };
 }
 
+/**
+ * Evaluate one stored record. A record that cannot be evaluated fails closed
+ * for that identity and does not reject the rest of the ledger.
+ */
+function projectEntry(
+  entry: MarketingRegistryEntry,
+  record: MarketingCertificationRecord,
+  evaluatedAt: string
+): MarketingCertificationEntryOutcome {
+  const failClosed = (message: string): MarketingCertificationEntryOutcome => {
+    const packet = missingPacketForEntry(entry);
+    const admission = evaluateCertificationAdmission({
+      decisions: record.decisions,
+      evaluatedAt,
+      packet,
+    });
+    return {
+      evaluation: 'failed',
+      identityId: entry.id,
+      message,
+      row: projectionRow(entry, record, packet, admission),
+    };
+  };
+
+  try {
+    assertPacketMatchesEntry(record.packet, entry);
+    const admission = evaluateCertificationAdmission({
+      decisions: record.decisions,
+      evaluatedAt,
+      packet: record.packet,
+    });
+    return {
+      evaluation: 'evaluated',
+      identityId: entry.id,
+      message: null,
+      row: projectionRow(entry, record, record.packet, admission),
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : `Certification ledger record ${entry.id} cannot be evaluated.`;
+    try {
+      return failClosed(message);
+    } catch {
+      throw new MarketingCertificationPersistenceError(message);
+    }
+  }
+}
+
+function evaluateLedgerEntries(
+  ledger: MarketingCertificationLedger,
+  entries: readonly MarketingRegistryEntry[],
+  evaluatedAt: string
+): MarketingCertificationEntryOutcome[] {
+  assertDenominator(ledger, entries);
+  return entries.map(entry => {
+    const record = ledger.records[entry.id];
+    if (!record) {
+      throw new MarketingCertificationPersistenceError(
+        `Certification ledger record ${entry.id} is missing.`
+      );
+    }
+    return projectEntry(entry, record, evaluatedAt);
+  });
+}
+
 function assertLedgerMatchesRegistry(
   ledger: MarketingCertificationLedger,
   entries: readonly MarketingRegistryEntry[],
   evaluatedAt: string
 ): void {
-  assertDenominator(ledger, entries);
+  evaluateLedgerEntries(ledger, entries, evaluatedAt);
+}
+
+function ledgerProjection(
+  ledger: MarketingCertificationLedger,
+  entries: readonly MarketingRegistryEntry[],
+  evaluatedAt: string
+): MarketingCertificationLedgerProjection {
+  const entryOutcomes = evaluateLedgerEntries(ledger, entries, evaluatedAt);
+  return {
+    contract: JOVIE_CERTIFICATION_CONTRACT,
+    entryOutcomes,
+    registryIds: [...ledger.registryIds],
+    rows: entryOutcomes.map(outcome => outcome.row),
+  };
+}
+
+/**
+ * A registry source move (recipe.homepage left HomepageV2Route for the
+ * selected / page) leaves a stored packet that names the previous path.
+ * Rebind that record onto the current source with failed evidence. Prior
+ * receipts and founder locks stay in history and do not certify the new
+ * source. packetUpdatedAt is unchanged so a newer producer post can replace it.
+ */
+function rebindDriftedSourcePackets(
+  ledger: MarketingCertificationLedger,
+  entries: readonly MarketingRegistryEntry[],
+  evaluatedAt: string
+): MarketingCertificationLedger {
+  const replacements: Record<string, MarketingCertificationRecord> = {};
   for (const entry of entries) {
-    projectionRow(entry, ledger.records[entry.id], evaluatedAt);
+    const record = ledger.records[entry.id];
+    if (!record) continue;
+    if (classifyPacketBinding(record.packet, entry).kind !== 'source_drift') {
+      continue;
+    }
+    replacements[entry.id] = {
+      ...record,
+      auditHistory: [
+        ...record.auditHistory,
+        {
+          at: evaluatedAt,
+          evidenceDigest: null,
+          subjectId: entry.id,
+          summary: `Rebound ${entry.id} after canonical source drift. Prior evidence does not certify ${entry.resolvedSource}.`,
+          type: 'review_packet_incomplete',
+        },
+      ],
+      packet: driftedSourcePacket(entry, record.packet.source?.paths ?? []),
+      updatedAt: laterTimestamp(record.updatedAt, evaluatedAt),
+    };
   }
+  if (Object.keys(replacements).length === 0) return ledger;
+  return { ...ledger, records: { ...ledger.records, ...replacements } };
 }
 
 /** Grow the denominator without certifying new identities or discarding history. */
@@ -1062,17 +1239,19 @@ function extendLedgerRegistry(
   entries: readonly MarketingRegistryEntry[],
   initializedAt: string
 ): MarketingCertificationLedger {
-  const storedIds = new Set(ledger.registryIds);
+  const rebound = rebindDriftedSourcePackets(ledger, entries, initializedAt);
+  const storedIds = new Set(rebound.registryIds);
   const existingEntries = entries.filter(entry => storedIds.has(entry.id));
-  // Reject removals, duplicate ids, orphan records, and invalid existing packets.
-  assertLedgerMatchesRegistry(ledger, existingEntries, initializedAt);
+  // Reject removals, duplicate ids, and orphan records. One unevaluable
+  // existing packet fails that entry alone.
+  assertLedgerMatchesRegistry(rebound, existingEntries, initializedAt);
   const addedEntries = entries.filter(entry => !storedIds.has(entry.id));
-  if (addedEntries.length === 0) return ledger;
+  if (addedEntries.length === 0) return rebound;
   const additions = initialLedger(addedEntries, initializedAt);
   return {
-    ...ledger,
+    ...rebound,
     registryIds: registryIds(entries),
-    records: { ...ledger.records, ...additions.records },
+    records: { ...rebound.records, ...additions.records },
   };
 }
 
@@ -1133,9 +1312,16 @@ export class MarketingCertificationStore {
         ...ledger,
         records: { ...ledger.records, [entry.id]: nextRecord },
       };
+      const outcome = projectEntry(entry, nextRecord, evaluatedAt);
+      if (outcome.evaluation === 'failed') {
+        throw new MarketingCertificationPersistenceError(
+          outcome.message ??
+            `Certification ledger record ${entry.id} cannot be evaluated.`
+        );
+      }
       return {
         ledger: nextLedger,
-        result: projectionRow(entry, nextRecord, evaluatedAt),
+        result: outcome.row,
       };
     });
   }
@@ -1268,14 +1454,7 @@ export class MarketingCertificationStore {
   ): Promise<MarketingCertificationLedgerProjection> {
     assertValidTimestamp(evaluatedAt, 'Ledger projection time');
     const ledger = await this.ensureLedger(evaluatedAt);
-    assertLedgerMatchesRegistry(ledger, this.entries, evaluatedAt);
-    return {
-      contract: JOVIE_CERTIFICATION_CONTRACT,
-      registryIds: [...ledger.registryIds],
-      rows: this.entries.map(entry =>
-        projectionRow(entry, ledger.records[entry.id], evaluatedAt)
-      ),
-    };
+    return ledgerProjection(ledger, this.entries, evaluatedAt);
   }
 
   /** Read current certification state without creating a persisted ledger. */
@@ -1288,14 +1467,7 @@ export class MarketingCertificationStore {
       raw === null || raw === undefined
         ? initialLedger(this.entries, evaluatedAt)
         : extendLedgerRegistry(parseLedger(raw), this.entries, evaluatedAt);
-    assertLedgerMatchesRegistry(ledger, this.entries, evaluatedAt);
-    return {
-      contract: JOVIE_CERTIFICATION_CONTRACT,
-      registryIds: [...ledger.registryIds],
-      rows: this.entries.map(entry =>
-        projectionRow(entry, ledger.records[entry.id], evaluatedAt)
-      ),
-    };
+    return ledgerProjection(ledger, this.entries, evaluatedAt);
   }
 
   async projectReviewReady(input: {
