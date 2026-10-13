@@ -772,7 +772,9 @@ describe('merge_group workflow contract', () => {
       match => match[1]
     );
     const consumers = jobIds.filter(jobId => {
-      if (jobId === 'ci-build-ovie') return false;
+      // A lane's fail-fast ejector only posts a failing PR Ready; it gates nothing.
+      if (jobId === 'ci-build-ovie' || jobId.endsWith('-fail-fast'))
+        return false;
       const job = getJobBlock(CI_WORKFLOW, jobId);
       return job
         .slice(0, job.indexOf('    runs-on:'))
