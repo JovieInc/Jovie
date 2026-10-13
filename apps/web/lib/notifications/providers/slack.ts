@@ -7,6 +7,7 @@
  * @see https://api.slack.com/messaging/webhooks
  */
 
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
@@ -136,7 +137,7 @@ export async function notifySlackProfileClaimed(
  */
 export async function notifySlackUpgrade(
   name: string,
-  plan = 'Pro'
+  plan = getPlanDisplayName('pro')
 ): Promise<SlackNotificationResult> {
   const text = `⬆️ ${name} just upgraded to ${plan}!`;
   const result = await sendSlackMessage({ text });

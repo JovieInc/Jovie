@@ -174,7 +174,7 @@ describe('AiCrawlerIntelligenceCard', () => {
       )
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /upgrade to pro/i })
+      screen.getByRole('button', { name: /upgrade to artist presence/i })
     ).toBeInTheDocument();
     expect(onOpenDetail).not.toHaveBeenCalled();
   });

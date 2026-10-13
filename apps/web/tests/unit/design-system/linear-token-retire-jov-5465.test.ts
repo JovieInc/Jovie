@@ -92,5 +92,10 @@ describe('JOV-5465 duration/ease/shadow/blur retire', () => {
       expect(source).toContain(`proClaim.${claimKey}`);
     }
     expect(source).toContain('formatMonthlyPrice');
+
+    // Canonical plan naming (JOV-7809): the section must say Artist Presence,
+    // never the retired Artist Visibility Pro label.
+    expect(source).toContain('Artist Presence');
+    expect(source).not.toContain('Artist Visibility Pro');
   });
 });
