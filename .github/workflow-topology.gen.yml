@@ -744,7 +744,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:report
-    jobCount: 5
+    jobCount: 4
   - name: Changed-Evidence Test Suites
     path: .github/workflows/nightly-tests.yml
     active: true

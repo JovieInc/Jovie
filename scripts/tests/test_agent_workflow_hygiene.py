@@ -35,7 +35,6 @@ HOSTED_DEEP_EVIDENCE_JOBS = (
     ("e2e-full-matrix.yml", "notify"),
     ("nightly-testing-agent.yml", "context"),
     ("nightly-testing-agent.yml", "deterministic"),
-    ("nightly-testing-agent.yml", "mutation-hotspots"),
     ("nightly-testing-agent.yml", "candidate-validation"),
     ("nightly-testing-agent.yml", "report"),
     ("nightly-tests.yml", "knip"),
@@ -1087,7 +1086,7 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
     )
 
     assert "max-parallel: 8" in full_matrix
-    assert "needs: [context, deterministic]" in nightly_agent
+    assert "needs: [context, deterministic, candidate-validation]" in nightly_agent
     assert "schedule:" not in nightly_agent
     assert "push:" in nightly_agent
 
