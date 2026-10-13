@@ -244,12 +244,23 @@ jobs:
               }
             }
             core.info(`scanned=${prs.length}`);
-            let enqueued = 0;
-            for (const candidate of prs) {
-              if (candidate.draft || candidate.head.repo?.full_name !== `${owner}/${repo}`) continue;
-              if (candidate.labels.some(l => BLOCKING.has(l.name.toLowerCase()))) continue;
-              // Read one current PR at a time. The roster never authorizes enqueue.
-              const readCurrent = async () => (await github.graphql(`
+            // A reconciliation sweep reads every open PR. Each read takes ~3 s
+            // and UNKNOWN re-reads slept 3 s + 6 s more, so a 45-70 PR roster
+            // hit the 5-minute timeout on every push to main from 2026-10-12
+            // 22:31Z and re-armed nothing. Sweeps now prefetch reads in
+            // parallel (which also starts GitHub's mergeability recompute),
+            // give an UNKNOWN PR one fresh read with no sleep, go
+            // longest-waiting first, and stop at a time budget; the PRs left
+            // over are re-read on their own events and on the next sweep.
+            const sweep = ['workflow_dispatch', 'push'].includes(context.eventName);
+            const startedAt = Date.now();
+            const budgetMs = Math.max(1000, Number(process.env.SWEEP_BUDGET_MS ?? 200000) || 200000);
+            const overBudget = () => sweep && Date.now() - startedAt > budgetMs;
+            const ownCandidate = candidate =>
+              !candidate.draft && candidate.head.repo?.full_name === `${owner}/${repo}` &&
+              !candidate.labels.some(l => BLOCKING.has(l.name.toLowerCase()));
+            // Read one current PR. The roster never authorizes enqueue.
+            const readPr = async number => (await github.graphql(`
                 query($owner: String!, $repo: String!, $number: Int!) {
                   repository(owner: $owner, name: $repo) {
                     pullRequest(number: $number) {
@@ -266,7 +277,37 @@ jobs:
                       }
                     }
                   }
-                }`, { owner, repo, number: candidate.number })).repository.pullRequest;
+                }`, { owner, repo, number })).repository.pullRequest;
+            if (sweep) {
+              prs = prs.filter(ownCandidate).sort((a, b) =>
+                String(a.updated_at ?? '').localeCompare(String(b.updated_at ?? '')) || a.number - b.number);
+            }
+            const prefetched = new Map();
+            if (sweep && prs.length > 1) {
+              let next = 0;
+              // Prefetch spends at most half the budget so the loop keeps time to enqueue.
+              const take = () =>
+                next < prs.length && Date.now() - startedAt < budgetMs / 2 ? prs[next++].number : null;
+              const worker = async () => {
+                for (let number = take(); number !== null; number = take()) {
+                  try {
+                    prefetched.set(number, await readPr(number));
+                  } catch (error) {
+                    core.warning(`#${number} prefetch failed: ${error.message}`);
+                  }
+                }
+              };
+              const width = Math.max(1, Math.min(6, Number(process.env.SWEEP_READ_CONCURRENCY ?? 6) || 6));
+              await Promise.all(Array.from({ length: Math.min(width, prs.length) }, worker));
+            }
+            let enqueued = 0;
+            for (const [index, candidate] of prs.entries()) {
+              if (overBudget()) {
+                core.warning(`sweep budget spent after ${index}/${prs.length} PRs; the rest wait for their own events or the next sweep`);
+                break;
+              }
+              if (!ownCandidate(candidate)) continue;
+              const readCurrent = () => readPr(candidate.number);
               const eligible = pr => {
                 if (!pr || pr.state !== 'OPEN' || pr.baseRefName !== 'main') return false;
                 if (pr.isDraft || pr.isInMergeQueue || pr.isCrossRepository) return false;
@@ -276,8 +317,9 @@ jobs:
               };
               // UNKNOWN means GitHub has not recomputed mergeability since main
               // moved; the read itself starts that, so two short re-reads settle it.
-              let pr = await readCurrent();
-              for (let attempt = 1; pr?.mergeStateStatus === 'UNKNOWN' && attempt <= 2; attempt += 1) {
+              let pr = prefetched.get(candidate.number);
+              if (!pr || pr.mergeStateStatus === 'UNKNOWN') pr = await readCurrent();
+              for (let attempt = 1; !sweep && pr?.mergeStateStatus === 'UNKNOWN' && attempt <= 2; attempt += 1) {
                 await sleep(retryMs * attempt);
                 pr = await readCurrent();
               }
@@ -333,14 +375,20 @@ jobs:
                 (pr.releases?.nodes || []).some(event =>
                   typeof event?.createdAt === 'string' && event.createdAt > lastRemoval &&
                   BLOCKING.has(String(event.label?.name || '').toLowerCase()));
+              const ownerHoldRelease = failurePolicy.ownerHoldReleaseIntent({
+                eventName: context.eventName, event: context.payload,
+              });
               if (!releasedAfterManualRemoval) {
                 failure = failurePolicy.reenrollmentDisposition({
                   failure, statuses, repository: `${owner}/${repo}`, prNumber: pr.number, lastRemoval, headCommittedAt,
                   autoMergeEnabled: Number.isFinite(Date.parse(pr.autoMergeRequest?.enabledAt)),
+                  headSha: pr.headRefOid, lastRemovalReason: pr.timelineItems.nodes[0]?.reason,
+                  ownerHoldRelease,
                 });
               }
               if (failure.action === 'block' ||
-                  (removedUnchangedHead && failure.action !== 'retry-once' && !releasedAfterManualRemoval)) {
+                  (removedUnchangedHead && failure.action !== 'retry-once' &&
+                   failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval)) {
                 core.info(`skip #${pr.number}: head unchanged since queue removal (${removalReason}; ${failure.reason})`);
                 continue;
               }
@@ -349,6 +397,27 @@ jobs:
                 continue;
               }
               const admissionRecovery = failure.reason === 'bounded-admission-recovery';
+              const ownerReleaseStillCurrent = async () => {
+                const observed = await readCurrent();
+                if (!eligible(observed) || observed.id !== pr.id) return false;
+                const freshStatuses = await github.paginate(github.rest.repos.listCommitStatusesForRef,
+                  { owner, repo, ref: observed.headRefOid, per_page: 100 });
+                // Fence mutations during status pagination before expected-head enqueue.
+                const fresh = await readCurrent();
+                if (!eligible(fresh) || fresh.id !== pr.id || fresh.number !== pr.number ||
+                    fresh.headRefOid !== observed.headRefOid) return false;
+                const disposition = failurePolicy.reenrollmentDisposition({
+                  failure: failurePolicy.revisionFailureDisposition({ statuses: freshStatuses,
+                    repository: `${owner}/${repo}`, currentMainSha }),
+                  statuses: freshStatuses, repository: `${owner}/${repo}`, prNumber: fresh.number,
+                  lastRemoval: fresh.timelineItems.nodes[0]?.createdAt,
+                  headCommittedAt: fresh.commits.nodes[0]?.commit.committedDate,
+                  autoMergeEnabled: Number.isFinite(Date.parse(fresh.autoMergeRequest?.enabledAt)),
+                  headSha: fresh.headRefOid, lastRemovalReason: fresh.timelineItems.nodes[0]?.reason,
+                  ownerHoldRelease,
+                });
+                return disposition.reason === 'owner-hold-release' && disposition.removalAt === failure.removalAt;
+              };
               const recoveryStillCurrent = async () => {
                 const fresh = await readCurrent();
                 if (!eligible(fresh) || fresh.id !== pr.id || fresh.number !== pr.number) return false;
@@ -381,6 +450,7 @@ jobs:
                 // The reservation write is another await. A stale recovery keeps
                 // that reservation spent and never reaches enqueue or a refund.
                 if (admissionRecovery && !await recoveryStillCurrent()) continue;
+                if (failure.reason === 'owner-hold-release' && !await ownerReleaseStillCurrent()) continue;
                 enqueueAttempted = true;
                 const r = await github.graphql(`
                   mutation($id: ID!, $oid: GitObjectID!) {

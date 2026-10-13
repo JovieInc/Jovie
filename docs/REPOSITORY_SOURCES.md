@@ -19,7 +19,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a44a810c60e53213e6d3720322c545cb93c523a5ed8b68e27bdf031c66fc87b9`)
 - `canon/OPERATING_SYSTEM.md` — Company canon; review portable repository contract after changes (SHA-256 `405911b953ba432a2ef6d41efc69633ed330ba80a5d577865fe7027e9baf08f5`)
 - `canon/ENGINEERING.md` — Company engineering canon; review portable repository contract after changes (SHA-256 `ef3b80900618e178419090a8ee322d646d81e8f952ceb14a9372b1ac79e9c120`)
-- `canon/FLEET.md` — Company fleet canon; review portable repository contract after changes (SHA-256 `48ca3bca6148df9f8464757dfec689f42678ea6a31aa9082cccf38362ab5ca61`)
+- `canon/FLEET.md` — Company fleet canon; review portable repository contract after changes (SHA-256 `367120e3b49f643034f7a721d71927fadadb9c44e0d4f156822d92060da89af6`)
 - `docs/company/REPOSITORY_SOURCE_CONTRACT.md` — Portable shared source; independently update pinned consumers after review (SHA-256 `f6bb8cdfdc317ed4ac3b99f8d2fc18a9647124c4fb807b1eef274892447b184f`)
 
 ## Pinned shared sources
