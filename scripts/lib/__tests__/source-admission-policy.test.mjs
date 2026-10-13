@@ -159,7 +159,11 @@ exit 0
     const rejected = invoke();
     assert.notEqual(rejected.status, 0, rejected.stdout + rejected.stderr);
     assert.match(rejected.stdout + rejected.stderr, /TS2353/);
-    assert.match(readFileSync(calls, 'utf8'), /typecheck:stories\n$/);
+    // Story types check alongside the workspace typecheck; a rejection still
+    // stops the contract before any later gate runs.
+    const rejectedCalls = readFileSync(calls, 'utf8');
+    assert.match(rejectedCalls, /typecheck:stories\n/);
+    assert.doesNotMatch(rejectedCalls, /biome:check/);
     writeStory(false);
     git('add', '.');
     git('commit', '--quiet', '-m', 'use supported story props');
@@ -406,6 +410,7 @@ test('source validation rejects type errors and locked UI contract failures befo
       'typecheck',
       'run typecheck:scripts',
       '--filter @jovie/web run typecheck:tests',
+      '--filter @jovie/web run typecheck:stories',
       'screen-registration-gate',
       '--filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts',
     ]) {
@@ -1131,8 +1136,14 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     const [first, ...rest] = workflow.jobs[job].steps;
     assert.equal(first.id, 'reuse', job);
     assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
+    // Coverage's route-budget build narrows further to build-affecting diffs.
     for (const step of rest)
-      assert.equal(step.if, gate, `${job}: ${step.name ?? step.uses}`);
+      assert.ok(
+        step.if === gate ||
+          (job === 'coverage' &&
+            step.if === `${gate} && steps.scope.outputs.build == 'true'`),
+        `${job}: ${step.name ?? step.uses}`
+      );
   }
   const always = [
     'Validate customer changelog decision from trusted base',
@@ -1159,4 +1170,84 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     workflow.jobs.ready.steps[0].run,
     'test "$RESULTS" = \'success,success,success,success\''
   );
+});
+
+test('route budgets build only when the diff can change build output', () => {
+  const workflow = sourceValidationWorkflow();
+  // Exact-head Coverage carries the build so PR Ready requires it.
+  const job = workflow.jobs.coverage;
+  assert.ok(workflow.jobs.ready.needs.includes('coverage'));
+  const names = job.steps.map(step => step.name);
+  for (const name of [
+    'Build exact PR head',
+    'Enforce authed route initial JS budgets',
+    'Certify marketing SEO against prerendered HTML',
+  ])
+    assert.ok(names.includes(name), name);
+  assert.equal(
+    job.steps.find(
+      step => step.name === 'Enforce authed route initial JS budgets'
+    ).run,
+    'node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next'
+  );
+  const script = job.steps
+    .find(step => step.id === 'scope')
+    .run.replace(/\$\{\{\s*github.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-route-budgets-'));
+  const repo = join(root, 'repo');
+  mkdirSync(repo, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  const write = path => {
+    mkdirSync(join(repo, path, '..'), { recursive: true });
+    writeFileSync(join(repo, path), `${path}\n`);
+  };
+  try {
+    git('init', '--quiet', '--initial-branch=main');
+    git('config', 'user.name', 'Route budget test');
+    git('config', 'user.email', 'route-budget@example.invalid');
+    write('README.md');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'base');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    const scope = paths => {
+      git('checkout', '--quiet', '-B', 'head', 'origin/main');
+      for (const path of paths) write(path);
+      git('add', '.');
+      git('commit', '--quiet', '--allow-empty', '-m', 'head');
+      const output = join(root, `output-${Math.random()}`);
+      const result = spawnSync('/bin/bash', ['-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          GITHUB_OUTPUT: output,
+        },
+      });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      return readFileSync(output, 'utf8').trim();
+    };
+    for (const path of [
+      'apps/web/components/admin/Panel.tsx',
+      'apps/web/scripts/route-js-budgets.json',
+      'packages/ui/src/button.tsx',
+      'pnpm-lock.yaml',
+    ])
+      assert.equal(scope([path]), 'build=true', path);
+    assert.equal(
+      scope([
+        'apps/web/tests/unit/routes/shell-nav-coverage.test.ts',
+        'apps/web/components/admin/Panel.test.tsx',
+        'apps/web/components/admin/Panel.stories.tsx',
+        'apps/web/lib/__tests__/helper.ts',
+        'scripts/ci-fast-lanes.mjs',
+        'apps/ios/Jovie/App.swift',
+      ]),
+      'build=false'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

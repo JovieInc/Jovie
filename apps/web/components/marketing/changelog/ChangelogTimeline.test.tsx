@@ -22,6 +22,18 @@ const RELEASES: readonly ChangelogRelease[] = [
         '<img src=x onerror=alert(1)>',
       ],
     },
+    customerOutcomes: [
+      {
+        storyId: 'workspace',
+        entryId: 'customer-update:workspace',
+        slug: 'update-workspace',
+        aliases: ['published-workspace-fragment'],
+        summary: '**New workspace:** Review `release:status`.',
+        section: 'added',
+        availability: 'ga',
+        prerequisites: [],
+      },
+    ],
   },
 ];
 
@@ -43,6 +55,17 @@ describe('ChangelogTimeline', () => {
     expect(screen.getByText('/pitch').closest('strong')).toBeVisible();
     expect(screen.getByText('inline code', { selector: 'code' })).toBeVisible();
     expect(screen.getByText('New workspace')).toBeVisible();
+    expect(screen.getByText('New workspace').closest('li')).toHaveAttribute(
+      'id',
+      'update-workspace'
+    );
+    expect(
+      container.querySelector('#published-workspace-fragment')
+    ).toHaveAttribute('aria-hidden', 'true');
+    // The row is a flex container; an in-flow alias would add a gap.
+    expect(
+      container.querySelector('#published-workspace-fragment')
+    ).toHaveClass('absolute');
     expect(
       screen.getByText('release:status', { selector: 'code' })
     ).toBeVisible();

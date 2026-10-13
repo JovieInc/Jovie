@@ -13,8 +13,12 @@ import {
   preferenceExamples,
   suggestionPrecision,
 } from './model';
-import { BUILT_IN_SMART_VIEWS, visibleSidebarSmartViews } from './smart-views';
-import type { ListDetail, SidebarListsPayload } from './types';
+import {
+  BUILT_IN_SMART_VIEWS,
+  smartViewMatches,
+  visibleSidebarSmartViews,
+} from './smart-views';
+import type { ListDetail, SidebarListsPayload, SmartViewDetail } from './types';
 
 export const SUGGESTION_BATCH_SIZE = 10;
 
@@ -72,4 +76,23 @@ export async function suggestForList(id: string): Promise<ListUpdateResult> {
       })),
     },
   ]);
+}
+
+/** Rows for one smart view across every list, with the creators to render. */
+export async function getSmartViewDetail(
+  viewId: string
+): Promise<SmartViewDetail | null> {
+  const view = BUILT_IN_SMART_VIEWS.find(v => v.id === viewId);
+  if (!view) return null;
+  const lists = await readAllLists();
+  const names = new Map(lists.map(list => [list.id, list.name]));
+  const rows = smartViewMatches(view, lists).map(match => ({
+    listId: match.listId,
+    listName: names.get(match.listId) ?? '',
+    member: match.member,
+  }));
+  const creators = await getListCreatorsByIds([
+    ...new Set(rows.map(row => row.member.creatorId)),
+  ]);
+  return { view: { id: view.id, name: view.name }, rows, creators };
 }

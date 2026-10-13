@@ -46,7 +46,7 @@ export function validateStripeBillingConfig(): {
         : [];
   if (configuredPriceIds.length === 0) {
     issues.push(
-      'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Visibility Pro $199/month USD recurring price ID.'
+      'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Presence $199/month USD recurring price ID.'
     );
   }
 

@@ -65,9 +65,9 @@ describe('buildLockedToolResult', () => {
       ENTITLEMENT_REGISTRY.pro.marketing.displayName
     );
     expect(result.reason).toContain('canGenerateAlbumArt');
-    expect(result.reason).toContain('Pro');
-    expect(result.upgrade_cta).toContain('Pro');
-    expect(result.summary).toContain('Pro');
+    expect(result.reason).toContain('Artist Presence');
+    expect(result.upgrade_cta).toContain('Artist Presence');
+    expect(result.summary).toContain('Artist Presence');
   });
 });
 

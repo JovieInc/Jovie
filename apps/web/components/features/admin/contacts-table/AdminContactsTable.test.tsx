@@ -20,7 +20,11 @@ import type {
   AdminContactRow,
   AdminContactStageMetrics,
 } from './AdminContactsTable';
-import { AdminContactsTable } from './AdminContactsTable';
+import {
+  AdminContactsTable,
+  EvidenceItemCard,
+  humanize,
+} from './AdminContactsTable';
 
 const { mockRefresh, mockPush, mockToastError, mockToastSuccess } = vi.hoisted(
   () => ({
@@ -201,6 +205,15 @@ describe('AdminContactsTable', () => {
       .mockResolvedValueOnce(jsonResponse({ ok: true }));
 
     renderTable();
+    // Canonical dense people row with a face, not a hand-rolled 56px table.
+    expect(
+      document.querySelector('table[data-table-row-mode="dense"]')
+    ).not.toBeNull();
+    expect(
+      screen
+        .getByTestId('admin-contact-row')
+        .querySelector('[data-table-person-cell]')
+    ).not.toBeNull();
     fireEvent.click(screen.getByTestId('admin-contact-row'));
 
     expect(
@@ -262,5 +275,28 @@ describe('AdminContactsTable', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({ action: 'review_evidence', dedupeKey: contact.dedupeKey, evidenceKey: 'canonical:display-name', evidenceRevision: 'evidence-revision-1', decision: 'no' });
     expect(screen.getByText('Human reviewed')).toBeVisible();
     expect(screen.getByRole('button', { name: 'No' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('marks the keyboard-active evidence card for reuse in Ovie Outbound', () => {
+    const onDecision = vi.fn(async () => {});
+    const item = certification.items[0]!;
+    const { rerender } = render(
+      <EvidenceItemCard item={item} pending={false} onDecision={onDecision} />
+    );
+    const card = screen.getByText('Display name').closest('article');
+    expect(card).not.toHaveAttribute('aria-current');
+
+    rerender(
+      <EvidenceItemCard
+        item={item}
+        pending={false}
+        active
+        onDecision={onDecision}
+      />
+    );
+    expect(card).toHaveAttribute('aria-current', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' }));
+    expect(onDecision).toHaveBeenCalledWith(item, 'yes');
+    expect(humanize('dsp')).toBe('DSP artist identities');
   });
 });

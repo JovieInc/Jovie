@@ -19,7 +19,7 @@ describe('retouch capability resolution', () => {
 
     expect(capability).toEqual({
       availability: 'unavailable',
-      reason: 'Image retouching requires a Pro plan.',
+      reason: 'Image retouching requires the Artist Presence plan.',
       reasonCode: 'PLAN_UNAVAILABLE',
     });
   });

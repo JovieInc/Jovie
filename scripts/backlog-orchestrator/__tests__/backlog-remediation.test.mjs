@@ -934,7 +934,9 @@ describe('official Symphony backlog remediation', () => {
       ),
       'utf8'
     );
-    assert.match(workflow, /backlog-orchestrator\.mjs" remediate/);
+    // The FGR remediate hop fed the retired :4041 Symphony and timed out on
+    // every run; the lanes remediation ladder owns backlog remediation.
+    assert.doesNotMatch(workflow, /backlog-orchestrator\.mjs" remediate/);
     assert.doesNotMatch(workflow, /run-backlog\.sh/);
     assert.doesNotMatch(workflow, /JOV-5466/);
   });

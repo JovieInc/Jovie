@@ -36,12 +36,12 @@ function getOfferHeading(
   plan: PublicOfferPlan
 ): string {
   if (mode === 'sign-in') {
-    if (plan === 'pro') return 'Continue to Pro';
+    if (plan === 'pro') return 'Continue to Artist Presence';
     if (plan === 'max') return 'Continue to Max';
     return 'Continue with a free profile';
   }
   if (plan === 'pro')
-    return `Start your ${PRO_TRIAL_DURATION_DAYS}-day Pro trial`;
+    return `Start your ${PRO_TRIAL_DURATION_DAYS}-day Artist Presence trial`;
   if (plan === 'max') return 'Continue to Max';
   return 'Claim your free profile';
 }

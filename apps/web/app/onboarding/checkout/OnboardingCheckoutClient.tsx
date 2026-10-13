@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { BadgeCheck, BarChart3, Bell, Sparkles } from 'lucide-react';
+import { BadgeCheck, BarChart3, Sparkles, Wallet } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { recordOnboardingUpgradeOfferDecision } from '@/app/onboarding/actions/upgrade-offer';
@@ -18,9 +18,9 @@ import { PROOF_CLAIM_FUNNEL_EVENTS } from '@/lib/acquisition/proof-claim-funnel'
 import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
-import { ARTIST_VISIBILITY_OFFER } from '@/lib/billing/offer-truth';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
+import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
 import { cn } from '@/lib/utils';
 import { formatAmount } from '@/lib/utils/format-number';
 
@@ -36,6 +36,8 @@ interface OnboardingCheckoutClientProps {
   readonly avatarUrl: string | null;
   readonly spotifyFollowers: number | null;
   readonly isDefaultUpsell: boolean;
+  /** Computed claim-time proof; empty hides the card (JOV-7794). */
+  readonly proofFindings?: readonly ClaimTimeFinding[];
 }
 
 // formatPrice replaced by formatAmount per @jovie/no-ad-hoc-currency rule
@@ -48,11 +50,12 @@ function getAnnualSavingsPercent(
   return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
 }
 
-const PRO_HIGHLIGHTS = [
+const OFFER_HIGHLIGHTS = [
   {
-    icon: Bell,
-    label: 'Visibility Monitoring',
-    detail: ARTIST_VISIBILITY_OFFER.pro.outcomes[0],
+    // JOV-7794: a certified capability, not internal-only monitoring.
+    icon: Wallet,
+    label: 'Payments',
+    detail: 'Take tips and payments on your profile',
   },
   {
     icon: BarChart3,
@@ -70,6 +73,7 @@ const PRO_HIGHLIGHTS = [
 interface ProfilePreviewCardProps {
   readonly avatarUrl: string | null;
   readonly displayName: string;
+  readonly offerName: string;
   readonly spotifyFollowers: number | null;
   readonly username: string;
 }
@@ -77,25 +81,29 @@ interface ProfilePreviewCardProps {
 function ProfilePreviewCard({
   avatarUrl,
   displayName,
+  offerName,
   spotifyFollowers,
   username,
 }: ProfilePreviewCardProps) {
+  const artistName = displayName || username;
   return (
     <>
       <ContentSurfaceCard className='mb-6 p-5'>
         <div className='flex flex-col items-center gap-4'>
           <Avatar
             src={avatarUrl}
-            alt={displayName || username}
-            name={displayName || username}
+            alt={artistName || 'Your artist profile'}
+            name={artistName || 'Artist'}
             size='lg'
           />
 
           <div className='text-center'>
             <p className='text-mid font-semibold text-primary-token'>
-              {displayName || username}
+              {artistName || 'Your artist profile'}
             </p>
-            <p className='text-xs text-tertiary-token'>@{username}</p>
+            {username ? (
+              <p className='text-xs text-tertiary-token'>@{username}</p>
+            ) : null}
           </div>
 
           <div className='w-full'>
@@ -125,11 +133,50 @@ function ProfilePreviewCard({
               {spotifyFollowers.toLocaleString()} Spotify followers
             </span>
             {'. '}
-            Pro analytics shows exactly where they&apos;re listening from.
+            {offerName} analytics shows exactly where they&apos;re listening
+            from.
           </p>
         </ContentSurfaceCard>
       ) : null}
     </>
+  );
+}
+
+/** Max facts shown; the card proves real data, it is not a report. */
+const PROOF_FACT_LIMIT = 4;
+
+/**
+ * The visitor's own computed findings, shown before the price (JOV-7794).
+ * Renders nothing without a real finding: never a sample or stand-in.
+ */
+export function ClaimTimeProofCard({
+  findings,
+}: Readonly<{ findings: readonly ClaimTimeFinding[] }>) {
+  const facts = findings
+    .flatMap(finding => finding.facts)
+    .slice(0, PROOF_FACT_LIMIT);
+  if (facts.length === 0) return null;
+  return (
+    <ContentSurfaceCard className='mb-4' data-testid='claim-time-proof'>
+      <div className='p-4'>
+        <p className='text-xs font-medium text-tertiary-token'>
+          Found From Your Profile
+        </p>
+        <dl className='mt-2 space-y-1.5'>
+          {facts.map(fact => (
+            <div
+              key={`${fact.label}:${fact.value}`}
+              className='flex items-baseline justify-between gap-3'
+            >
+              <dt className='text-app text-secondary-token'>{fact.label}</dt>
+              <dd className='truncate text-app font-medium text-primary-token'>
+                {fact.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </ContentSurfaceCard>
   );
 }
 
@@ -200,6 +247,7 @@ export function OnboardingCheckoutClient({
   avatarUrl,
   spotifyFollowers,
   isDefaultUpsell,
+  proofFindings = [],
 }: OnboardingCheckoutClientProps) {
   const searchParams = useSearchParams();
   // Pre-compute savings to determine annual default
@@ -307,28 +355,29 @@ export function OnboardingCheckoutClient({
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>
-            {isDefaultUpsell
-              ? 'Upgrade To Artist Presence'
-              : `Upgrade To ${planMarketing.displayName}`}
+            {`Upgrade To ${planMarketing.displayName}`}
           </h1>
           <p className={FORM_LAYOUT.hint}>
             {isDefaultUpsell && username
-              ? `Congrats! Your profile, links, and fan capture are live at jov.ie/${username} — free forever. Here's what Artist Presence adds on top.`
-              : `Your profile is live. See what ${planMarketing.displayName} unlocks.`}
+              ? `Congrats! Your profile, links, and fan capture are live at jov.ie/${username} — free forever. Here's what ${planMarketing.displayName} adds on top.`
+              : `Your profile is live and stays free either way. Here's what ${planMarketing.displayName} adds on top.`}
           </p>
         </div>
 
         <ProfilePreviewCard
           avatarUrl={avatarUrl}
           displayName={displayName}
+          offerName={planMarketing.displayName}
           spotifyFollowers={spotifyFollowers}
           username={username}
         />
 
-        {/* Pro highlights */}
+        <ClaimTimeProofCard findings={proofFindings} />
+
+        {/* Certified plan highlights (JOV-7794) */}
         <ContentSurfaceCard className='mb-6 p-4'>
           <div className='space-y-2.5'>
-            {PRO_HIGHLIGHTS.map(item => (
+            {OFFER_HIGHLIGHTS.map(item => (
               <div key={item.label} className='flex items-start gap-3'>
                 <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-1'>
                   <item.icon className='h-4 w-4 text-(--linear-accent)' />
@@ -355,7 +404,7 @@ export function OnboardingCheckoutClient({
 
         {/* Price display */}
         <div className='mb-6 text-center'>
-          <span className='text-3xl font-semibold tracking-tight text-primary-token'>
+          <span className='text-3xl font-semibold tracking-tight tabular-nums text-primary-token'>
             {formatAmount(currentAmount)}
           </span>
           <span className='text-sm text-tertiary-token'>
@@ -384,22 +433,23 @@ export function OnboardingCheckoutClient({
         >
           {isLoading
             ? 'Redirecting to checkout...'
-            : isDefaultUpsell
-              ? 'Upgrade to Artist Presence'
-              : `Upgrade to ${planMarketing.displayName}`}
+            : `Upgrade to ${planMarketing.displayName}`}
         </Button>
 
-        {/* Skip */}
+        {/* Skip — the free profile is already live; never imply otherwise */}
         <button
           type='button'
           onClick={handleSkip}
           disabled={isLoading}
           className='mt-4 w-full text-center text-app text-tertiary-token hover:text-secondary-token transition-colors disabled:opacity-50'
         >
-          {isDefaultUpsell
-            ? 'Start free, upgrade anytime'
-            : 'Continue with Free'}
+          {isDefaultUpsell ? 'Keep My Free Profile' : 'Continue with Free'}
         </button>
+        {isDefaultUpsell ? (
+          <p className='mt-2 text-center text-xs text-tertiary-token'>
+            Your public profile stays live and free forever.
+          </p>
+        ) : null}
       </div>
     </div>
   );

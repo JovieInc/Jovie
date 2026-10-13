@@ -32,6 +32,9 @@ const meta: Meta<typeof Link> = {
     asChild: {
       control: { type: 'boolean' },
     },
+    touchTarget: {
+      control: { type: 'boolean' },
+    },
   },
 };
 
@@ -130,6 +133,15 @@ export const AsChild: Story = {
           'asChild composes the primitive onto a single child via Radix Slot. In apps, this is how the canonical Link keeps Next.js <Link> client-side navigation: <Link asChild><NextLink href="/x">…</NextLink></Link>.',
       },
     },
+  },
+};
+
+export const TouchTarget: Story = {
+  args: {
+    href: '#touch-target',
+    variant: 'compact',
+    touchTarget: true,
+    children: 'Compact link in a 44px hit target',
   },
 };
 

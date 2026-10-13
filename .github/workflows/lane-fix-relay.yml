@@ -112,6 +112,8 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
+      # A hand dequeue counts only with the failure hold's receipt on the head (pr_events.failure_held).
+      statuses: read
     steps:
       - name: Checkout trusted lane policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

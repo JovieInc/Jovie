@@ -14,6 +14,7 @@ search and takes the PR ahead of everything else; the dispatch tick handles `gre
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -366,6 +367,74 @@ def add_label(number: int, kind: str, sh=run) -> bool:
                "-f", f"labels[]={PREFIX}{kind}"]).returncode == 0
 
 
+# The dispatch tick re-read the same stuck PRs' claim comments every pass (~84 reads an hour on
+# Gem, 2026-10-12 gh ledger) though they rarely change. `since` is floored to this bucket, so the
+# URL stays stable long enough for a conditional request: a 304 costs no rate limit. A floored
+# `since` only widens the read; the age check below still bounds what counts as live. An hour,
+# not 10 min: with the 5-minute tick a 10-min bucket moved the URL every other pass, so half the
+# reads were fresh 200s (2026-10-13 ledger: 44 full reads/h vs 5 conditional).
+CLAIM_SINCE_BUCKET_S = 3600
+
+
+def etag_cache_dir() -> Path | None:
+    """Per-host conditional-request cache. No lanes state (Actions, tests) means no cache."""
+    state = os.environ.get("LANES_STATE")
+    return Path(state) / "cache" / "etag" if state else None
+
+
+def conditional_page(path: str, sh=run, timeout: float = 30, cache: Path | None = None):
+    """One REST page through If-None-Match. Returns the JSON body (fresh or the cached body a 304
+    confirmed), or None when the caller must read it the normal way: no cache, an error, a
+    malformed reply or more than one page (pagination never reuses a partial body)."""
+    if cache is None:
+        return None
+    entry_path = cache / (hashlib.sha256(path.encode()).hexdigest()[:32] + ".json")
+    try:
+        entry = json.loads(entry_path.read_text())
+        etag, body = entry["etag"], entry["body"]
+    except (OSError, ValueError, KeyError, TypeError):
+        etag, body = None, None
+    args = ["gh", "api", "-i", path]
+    if etag:
+        args[3:3] = ["-H", f"If-None-Match: {etag}"]
+    reply = sh(args, timeout=timeout)
+    text = reply.stdout or ""
+    status = text.split("\n", 1)[0].split()
+    head, sep, raw = text.partition("\r\n\r\n")
+    if not sep:
+        head, sep, raw = text.partition("\n\n")
+    headers = {}
+    for line in head.splitlines()[1:]:
+        key, _, value = line.partition(":")
+        headers[key.strip().lower()] = value.strip()
+    if len(status) >= 2 and status[1] == "304" and etag and body is not None:
+        return body  # gh exits 1 on a 304; the status line is the evidence
+    if reply.returncode != 0 or len(status) < 2 or status[1] != "200" or 'rel="next"' in headers.get("link", ""):
+        return None
+    try:
+        fresh = json.loads(raw)
+    except ValueError:
+        return None
+    if headers.get("etag"):
+        try:
+            cache.mkdir(parents=True, exist_ok=True)
+            tmp = entry_path.with_name(f"{entry_path.name}.{os.getpid()}.tmp")
+            tmp.write_text(json.dumps({"etag": headers["etag"], "body": fresh}))
+            os.replace(tmp, entry_path)
+        except OSError:
+            pass
+    return fresh
+
+
+def pr_files_cache(node: dict) -> Path | None:
+    """Where one exact head's complete file list is kept; None without lanes state or a head."""
+    cache, head = etag_cache_dir(), node.get("headRefOid")
+    if cache is None or type(node.get("number")) is not int or not isinstance(head, str) \
+            or not re.fullmatch(r"[0-9a-f]{40}", head):
+        return None
+    return cache.parent / "pr-files" / f"{node['number']}-{head}.json"
+
+
 def claim_active(number: int, sha: str | None, sh=run, now: float | None = None, *, kind: str | tuple = "fix",
                  exclude_host: str | None = None, timeout: float = 30) -> bool:
     """Whether an unexpired lane claim owns this exact head; unreadable evidence blocks.
@@ -380,12 +449,20 @@ def claim_active(number: int, sha: str | None, sh=run, now: float | None = None,
     # The per-issue comments endpoint ignores sort/direction: it pages oldest first, so a PR
     # past 100 comments hid every newer claim (2026-10-11: #20979 at 114). Only comments
     # inside the claim TTL can be live, so `since` bounds the read to exactly those.
-    since = datetime.fromtimestamp(now - CLAIM_TTL_S, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    listed = sh(["gh", "api", "--paginate", f"repos/{REPO}/issues/{number}/comments?per_page=100&since={since}",
-                 "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"], timeout=timeout)
-    if listed.returncode != 0:
-        return True
-    for line in (listed.stdout or "").splitlines():
+    floor = (now - CLAIM_TTL_S) // CLAIM_SINCE_BUCKET_S * CLAIM_SINCE_BUCKET_S
+    since = datetime.fromtimestamp(floor, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    path = f"repos/{REPO}/issues/{number}/comments?per_page=100&since={since}"
+    page = conditional_page(path, sh, timeout, etag_cache_dir())
+    if isinstance(page, list) and all(isinstance(row, dict) for row in page):
+        lines = [line for row in page if isinstance(row.get("body"), str)
+                 and row["body"].startswith("🤖 lane claim ") for line in row["body"].splitlines()]
+    else:
+        listed = sh(["gh", "api", "--paginate", path,
+                     "--jq", ".[] | select(.body | startswith(\"🤖 lane claim \")) | .body"], timeout=timeout)
+        if listed.returncode != 0:
+            return True
+        lines = (listed.stdout or "").splitlines()
+    for line in lines:
         fields = dict(part.split("=", 1) for part in line.split()[3:] if "=" in part)
         try:
             age = now - datetime.fromisoformat(fields.get("at", "").replace("Z", "+00:00")).timestamp()
@@ -1585,6 +1662,17 @@ def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
             total = files.get("totalCount")
             node["filesComplete"] = isinstance(total, int) and total == len(node["files"])
             if isinstance(total, int) and not node["filesComplete"]:
+                # A head's file list never changes; the sweep re-listed the same >100-file PR
+                # every tick (~19 reads an hour on Gem, 2026-10-12 gh ledger).
+                cached = pr_files_cache(node)
+                try:
+                    known = json.loads(cached.read_text()) if cached else None
+                except (OSError, ValueError):
+                    known = None
+                if isinstance(known, list) and len(known) == total:
+                    node["files"], node["filesComplete"] = known, True
+                    prs.append(node)
+                    continue
                 listed = lane.sh(["gh", "api", "--paginate", "--slurp",
                                   f"repos/{lane.REPO_SLUG}/pulls/{node['number']}/files?per_page=100"], timeout=120)
                 try:
@@ -1595,6 +1683,14 @@ def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
                     node["filesComplete"] = total == len(node["files"])
                 except (ValueError, KeyError, TypeError):
                     node["filesComplete"] = False
+                if node["filesComplete"] and cached:
+                    try:
+                        cached.parent.mkdir(parents=True, exist_ok=True)
+                        tmp = cached.with_name(f"{cached.name}.{os.getpid()}.tmp")
+                        tmp.write_text(json.dumps(node["files"]))
+                        os.replace(tmp, cached)
+                    except OSError:
+                        pass
             prs.append(node)
         if not page["pageInfo"]["hasNextPage"]:
             if report is not None:
