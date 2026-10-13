@@ -4765,9 +4765,11 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_refresh_is_event_driven_without_homemade_symphony_admission(self):
         content = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
-        self.assertIn("schedule:", content)
-        self.assertIn("cron: '*/5 * * * *'", content)
-        self.assertIn("# clock-class: production-liveness", content)
+        # JOV-INV-042: no clock; the Gem lanes emitter keeps the receipt fresh.
+        self.assertNotIn("\n  schedule:", content)
+        self.assertNotIn("cron:", content)
+        self.assertNotIn("# clock-class:", content)
+        self.assertNotIn("steps.debounce", content)
         self.assertNotIn("pull_request_target:", content)
         self.assertNotIn("check_run:", content)
         self.assertNotIn("check_suite:", content)
@@ -4790,7 +4792,6 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("group: fleet-gate-receipt", content)
         self.assertIn("--sweep", content)
         self.assertIn("fleet-gate-receipt", content)
-        self.assertIn("0 <= age < 120", content)
         self.assertNotIn("FLEET_GATE_ALLOW_LIVE_PERSIST", content)
         action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text(
             encoding="utf-8"

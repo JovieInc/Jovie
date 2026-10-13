@@ -2,8 +2,10 @@ name: Runner Heartbeat
 # clock-class: production-liveness
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: A hosted schedule can wake the canonical main-only recovery workflows without receiving Linear, Jovie Bot, or runner-host credentials.
-# revisit-trigger: Remove these dispatches when GitHub supports a durable delayed workflow retry at an upstream API reset timestamp.
+# necessary-trust-boundary: The schedule and the Gem clock event only queue a no-op job on the self-hosted pool; it holds contents:read and no Linear, Jovie Bot, or runner-host credentials.
+# revisit-trigger: Remove the schedule when the self-hosted runner host reports its own liveness to a hosted observer.
+# The fleet-gate receipt needs no clock (the Gem lanes emitter keeps it fresh), so
+# the former remediation-clock dispatch of fleet-gate-refresh.yml is gone.
 
 on:
   # The Gem lanes tick fires this on the designed cadence
@@ -38,20 +40,3 @@ jobs:
     steps:
       - name: Record heartbeat
         run: echo "Self-hosted heartbeat from $RUNNER_NAME"
-
-  remediation-clock:
-    name: Retry deferred backlog remediation
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    permissions:
-      actions: write
-      contents: read
-      pull-requests: read
-    steps:
-      - name: Dispatch canonical fleet refresh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          gh workflow run fleet-gate-refresh.yml --ref main
