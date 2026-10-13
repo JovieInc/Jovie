@@ -84,6 +84,12 @@ class ClockTest(unittest.TestCase):
             self.assertEqual(clock.observe(self.api, NOW)["status"], "active")
         self.assertEqual(len(self.calls), 5)
 
+    def test_ghost_run_stuck_active_for_days_does_not_block_the_clock(self):
+        # sentry-autofix-recurrence run 37655501164: "queued" since 2026-10-07, uncancellable.
+        self.rows = [run_row(), run_row(6 * 86400, status="queued")]
+        self.assertEqual(clock.observe(self.api, NOW)["status"], "overdue")
+        self.assertEqual(self.tick()["status"], "dispatch-requested")
+
     def test_empty_malformed_wrong_branch_or_unexpected_run_fails_closed(self):
         for rows in ([], None, {}, [None], [run_row(head_branch="other")],
                      [run_row(event="push")], [run_row(status="unknown")],
