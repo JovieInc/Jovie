@@ -53,7 +53,7 @@ read_state() {  # read_state <num>
   local name="${REPO#*/}"
   [[ -n "$owner" && -n "$name" && "$owner" != "$name" ]]
   gh_retry api graphql \
-    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title state mergeable mergeStateStatus labels(first:100){nodes{name}}}}}' \
+    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title state mergeable mergeStateStatus labels(first:100){nodes{name}} timelineItems(last:50,itemTypes:[CONVERT_TO_DRAFT_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on ConvertToDraftEvent{createdAt} ... on PullRequestCommit{commit{committedDate}} ... on HeadRefForcePushedEvent{createdAt}}}}}}' \
     -f owner="$owner" \
     -f name="$name" \
     -F number="$n" \
@@ -67,7 +67,13 @@ read_state() {  # read_state <num>
       labels: [.labels.nodes[].name],
       state: .state,
       mergeable: .mergeable,
-      mergeStateStatus: .mergeStateStatus
+      mergeStateStatus: .mergeStateStatus,
+      # Converted to draft after the last push: a deliberate park.
+      parkedDraft: (
+        ([.timelineItems.nodes[]? | select(.__typename == "ConvertToDraftEvent") | .createdAt] | max) as $parked
+        | ([.timelineItems.nodes[]? | (.commit.committedDate // (select(.__typename == "HeadRefForcePushedEvent") | .createdAt))] | max) as $pushed
+        | ($parked != null and ($pushed == null or $parked > $pushed))
+      )
     }'
 }
 
@@ -108,6 +114,7 @@ classify_live() {  # classify_live <num> <json> <checks-json> [expected-head]
       expectedHeadSha: $expectedHead,
       mergeable: $state.mergeable,
       mergeStateStatus: $state.mergeStateStatus,
+      parkedDraft: ($state.parkedDraft == true),
       labels: $state.labels,
       title: $state.title,
       branch: $state.branch,

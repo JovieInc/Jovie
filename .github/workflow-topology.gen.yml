@@ -57,8 +57,6 @@ inactiveWorkflows:
   - Real-Model Eval Lane
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
-  - Taste Classifier
-  - Taste Label Guard
 generatedAt: deterministic
 normalPrCheckRecords: 22
 nodes:
@@ -176,7 +174,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 63
+    jobCount: 64
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true
@@ -417,18 +415,6 @@ nodes:
       - pull_request_target
     terminalReceipt: job:fork-gate
     jobCount: 2
-  - name: Gem Producer Drift
-    path: .github/workflows/gem-producer-drift.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - schedule
-      - workflow_dispatch
-    terminalReceipt: job:drift
-    jobCount: 1
   - name: Golden Path Nightly
     path: .github/workflows/golden-path-nightly.yml
     active: true
@@ -1242,28 +1228,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:docs-deploy-jovie
     jobCount: 6
-  - name: Taste Classifier
-    path: .github/workflows/taste-classifier.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - pull_request_target
-    terminalReceipt: job:classify
-    jobCount: 1
-  - name: Taste Label Guard
-    path: .github/workflows/taste-label-guard.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - pull_request_target
-    terminalReceipt: job:guard
-    jobCount: 1
   - name: Test Coverage Audit
     path: .github/workflows/test-coverage-audit.yml
     active: true

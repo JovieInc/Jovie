@@ -289,6 +289,31 @@ describe('runStructural screenshot contract discovery', () => {
     vi.clearAllMocks();
   });
 
+  it.each([
+    ['web', ['apps/web/lib/leads/constants.ts'], true],
+    ['web,operations', ['apps/web/lib/leads/constants.ts'], false],
+    ['web', ['apps/web/app/page.tsx'], false],
+  ])(
+    'runs script contracts that read a changed file without operations (%s)',
+    async (lanes, changed, expected) => {
+      // #20922: a web-only change to DEFAULT_DM_TEMPLATE reddened main through
+      // scripts/funnel-judge/rubric.test.mjs, which only operations ran.
+      process.env.GITHUB_EVENT_NAME = 'merge_group';
+      process.env.CI_PRODUCT_LANES = lanes;
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
+      await runStructural({ execute, changedFileList: changed });
+      const commands = execute.mock.calls.map(([command]) => String(command));
+      const dependent = commands.filter(
+        command =>
+          command.startsWith('node --test ') &&
+          command.includes('scripts/funnel-judge/rubric.test.mjs') &&
+          !command.includes('scripts/agent-context/check.test.mjs')
+      );
+      expect(dependent).toHaveLength(expected ? 1 : 0);
+    }
+  );
+
   it('never runs a tests/unit/ci file in two structural commands', async () => {
     process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
     process.env.CI_PRODUCT_LANES = 'web,operations';
@@ -1925,7 +1950,7 @@ describe('source-read guard selection', () => {
     selectSourceGuards(event, files).map(guard => guard.id);
 
   it.each([
-    ['pull_request', ['web-source-read-tests']],
+    ['pull_request', ['web-source-read-tests', 'script-contracts']],
     ['merge_group', []],
     ['push', []],
   ])(
@@ -2002,10 +2027,11 @@ describe('source-read guard selection', () => {
     ],
     ['packages/ui/src/button.tsx', ['merge-group-unit-guards']],
   ])('selects the guards that read %s on a PR', (path, guards) => {
-    // Any path can be read by a web test; the script narrows the tests.
+    // PR-wide guards narrow inside their scripts.
     expect(selected('pull_request', [path])).toEqual([
       ...guards,
       'web-source-read-tests',
+      'script-contracts',
     ]);
   });
 
@@ -2034,6 +2060,10 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'script-contracts') {
+        expect(guard.command).toContain('/lib/script-contract-affected.mjs');
+        continue;
+      }
       if (guard.id === 'web-source-read-tests') {
         expect(guard.command).toContain('/lib/web-source-read-tests.mjs');
         expect(

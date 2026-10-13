@@ -5,6 +5,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   useLayoutEffect,
   useRef,
+  useState,
 } from 'react';
 
 interface CmdKMainPlaneSearchInputProps {
@@ -27,6 +28,28 @@ export function CmdKMainPlaneSearchInput({
   descriptionId,
 }: CmdKMainPlaneSearchInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  // The palette mounts this input in the shell header from an effect, so the
+  // `value` prop arrives a commit late. Driving the input from that prop
+  // dropped keys on fast typing ("settings" became "setns"). The input owns
+  // its draft; the prop only wins for external changes (reset on close).
+  const [draft, setDraft] = useState(value);
+  const draftRef = useRef(value);
+  const lastValueRef = useRef(value);
+  const pendingEchoesRef = useRef<Set<string>>(new Set());
+
+  useLayoutEffect(() => {
+    if (value === lastValueRef.current) return;
+    lastValueRef.current = value;
+    const pending = pendingEchoesRef.current;
+    if (pending.has(value)) {
+      // A late echo of something the user already typed.
+      if (value === draftRef.current) pending.clear();
+      return;
+    }
+    pending.clear();
+    draftRef.current = value;
+    setDraft(value);
+  }, [value]);
 
   useLayoutEffect(() => {
     if (open) inputRef.current?.focus();
@@ -42,9 +65,13 @@ export function CmdKMainPlaneSearchInput({
         ref={inputRef}
         id={`${listId}-input`}
         type='search'
-        value={value}
+        value={draft}
         onChange={event => {
-          onQueryChange(event.target.value);
+          const next = event.target.value;
+          pendingEchoesRef.current.add(next);
+          draftRef.current = next;
+          setDraft(next);
+          onQueryChange(next);
         }}
         onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => {
           event.stopPropagation();
