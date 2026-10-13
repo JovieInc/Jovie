@@ -70,6 +70,20 @@ class ReceiptWriterTests(unittest.TestCase):
             self.assertEqual(result["mode"], "emitter")
             self.assertNotEqual(pathlib.Path(result["state_dir"]).resolve(), self.canonical.resolve())
 
+    def test_fresh_receipt_snapshots_the_exact_bytes_for_stack_actions(self) -> None:
+        self.write_receipt(45)
+        snapshot_dir = pathlib.Path(self.workspace, "runner-temp")
+        result = writer.choose(self.workspace, self.fence, NOW, str(snapshot_dir))
+        self.assertEqual(result["mode"], "emitter")
+        snapshot = pathlib.Path(result["receipt_path"])
+        self.assertEqual(snapshot.parent, snapshot_dir)
+        self.assertEqual(snapshot.read_text(encoding="utf-8"), (self.canonical / "latest.json").read_text(encoding="utf-8"))
+
+    def test_stale_receipt_takes_no_snapshot(self) -> None:
+        self.write_receipt(writer.STALE_AFTER_SECONDS + 60)
+        result = writer.choose(self.workspace, self.fence, NOW, str(pathlib.Path(self.workspace, "runner-temp")))
+        self.assertNotIn("receipt_path", result)
+
     def test_main_prints_github_output_lines(self) -> None:
         self.write_receipt(10)
         out = io.StringIO()
@@ -78,7 +92,32 @@ class ReceiptWriterTests(unittest.TestCase):
         self.assertEqual(out.getvalue().splitlines(), ["mode=emitter", f"state_dir={self.fence}", "age_seconds=10"])
 
 
+def refresh_steps(content: str) -> list[str]:
+    job = content.split("\n  refresh:\n", 1)[1].split("\n  assess:\n", 1)[0]
+    return job.split("\n      - name: ")[1:]
+
+
 class WorkflowWiringTests(unittest.TestCase):
+    def test_fresh_receipt_makes_zero_gate_or_token_calls(self) -> None:
+        """Every step that mints the Jovie Bot token or runs the gate is gated
+        on the fallback choice, so a fresh emitter receipt spends no API calls."""
+        steps = refresh_steps(WORKFLOW.read_text(encoding="utf-8"))
+        callers = [
+            step for step in steps
+            if "evaluate-fleet-gate" in step or "create-github-app-token" in step
+        ]
+        self.assertEqual(len(callers), 2)
+        for step in callers:
+            condition = step.split("        if: ", 1)[1].split("\n", 1)[0]
+            self.assertIn("steps.writer.outputs.mode == 'fallback'", condition, step.splitlines()[0])
+        names = [step.splitlines()[0] for step in steps]
+        writer_index = next(i for i, name in enumerate(names) if name.startswith("Choose receipt writer"))
+        for step in callers:
+            self.assertGreater(steps.index(step), writer_index)
+        stack = next(step for step in steps if step.startswith("Persist stack policy repair actions"))
+        self.assertIn("steps.writer.outputs.mode == 'emitter' && steps.writer.outputs.receipt_path != ''", stack)
+        self.assertIn("steps.refresh.outputs.receipt_path || steps.writer.outputs.receipt_path", stack)
+
     def test_refresh_persists_where_the_writer_choice_says(self) -> None:
         content = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("python3 scripts/fleet-gate/receipt_writer.py", content)
