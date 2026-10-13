@@ -349,6 +349,11 @@ export function buildLibraryViewRoute(
   return `${APP_ROUTES.LIBRARY}?view=${encodeURIComponent(view)}`;
 }
 
+/** Work with its inspector open: the canonical in-app detail for a work. */
+export function buildLibraryWorkRoute(workId: string): string {
+  return `${APP_ROUTES.LIBRARY}?work=${encodeURIComponent(workId)}`;
+}
+
 export const buildWikiPageHref = (slug: string) =>
   `${APP_ROUTES.HUD_WIKI}/${encodeURIComponent(slug)}` as const;
 

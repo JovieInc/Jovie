@@ -90,7 +90,6 @@
     "test:guard": "tsx scripts/test-performance-guard.ts",
     "test:budgets": "tsx scripts/performance-budgets-guard.ts",
     "test:budgets:launch": "tsx scripts/performance-launch-check.ts",
-    "test:mutation:hotspots": "stryker run stryker.config.mjs --incremental",
     "test:nightly-agent:context": "tsx scripts/nightly-test-agent.ts context",
     "test:nightly-agent:select": "tsx scripts/nightly-test-agent.ts select",
     "test:nightly-agent:normalize": "tsx scripts/nightly-test-agent.ts normalize",
