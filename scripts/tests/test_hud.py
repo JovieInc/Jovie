@@ -151,6 +151,7 @@ class MergeEvidenceTest(unittest.TestCase):
         evidence = {"complete": False, "reason": "max_pages_reached", "prs": [],
                     "window": {"since": 1, "until": 2}, "pages": 20, "scans": 1}
         with mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud.lane, "lane_state_dir", return_value=None), \
                 mock.patch.object(hud.lane, "load_providers", return_value={}), \
                 mock.patch.object(hud, "promotion_model", return_value={"error": "fixture"}), \
                 mock.patch.object(hud, "gh_json", side_effect=RuntimeError("fixture")), \
@@ -160,6 +161,27 @@ class MergeEvidenceTest(unittest.TestCase):
         self.assertIn("max_pages_reached", result["errors"]["merged"])
         self.assertNotIn("merged24h", result)
         self.assertEqual(collect.call_count, 1)
+
+    def test_remote_reads_github_every_five_minutes_and_linear_every_tick(self):
+        class Stop(Exception):
+            pass
+        clock = iter([0, 90, 180, 300, 300])
+        sleeps = []
+        def sleep(seconds):
+            sleeps.append(seconds)
+            if len(sleeps) == 4:
+                raise Stop()
+        remote = hud.Remote(SimpleNamespace(state=Path("/nonexistent"), linear_env=None))
+        with mock.patch.object(hud, "running_workers", return_value=[]), \
+                mock.patch.object(hud, "linear_model", return_value={"ok": True}) as linear, \
+                mock.patch.object(hud, "github_model", return_value={"ok": True}) as github, \
+                mock.patch.object(hud.time, "monotonic", side_effect=lambda: next(clock)), \
+                mock.patch.object(hud.time, "sleep", side_effect=sleep), \
+                self.assertRaises(Stop):
+            remote.run()
+        self.assertEqual(linear.call_count, 4)
+        self.assertEqual(github.call_count, 2)
+        self.assertEqual(sleeps, [hud.REFRESH_REMOTE_S] * 4)
 
 
 class ParseTest(unittest.TestCase):

@@ -791,13 +791,50 @@ class ClaimCommentTest(unittest.TestCase):
         shell = Shell({("gh", "api", "--paginate"):
                        f"🤖 lane claim kind=fix sha=h1 host=mac at={stamp(60)}\n"
                        f"🤖 lane claim kind=gate sha=h1 host=gem at={stamp(30)}\n"})
-        self.assertTrue(events.claim_active(7, "h1", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
-        self.assertFalse(events.claim_active(7, "h1", shell, NOW, kind="gate", exclude_host="gem"),
-                         "a host never defers to its own claim")
-        self.assertFalse(events.claim_active(7, "h2", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
-        since = stamp(events.CLAIM_TTL_S)
+        with patch.object(events, "etag_cache_dir", return_value=None):
+            self.assertTrue(events.claim_active(7, "h1", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
+            self.assertFalse(events.claim_active(7, "h1", shell, NOW, kind="gate", exclude_host="gem"),
+                             "a host never defers to its own claim")
+            self.assertFalse(events.claim_active(7, "h2", shell, NOW, kind=("fix", "gate"), exclude_host="gem"))
+        # `since` is floored to a stable bucket (a superset of the TTL window) so it can be cached.
+        floor = (NOW - events.CLAIM_TTL_S) // events.CLAIM_SINCE_BUCKET_S * events.CLAIM_SINCE_BUCKET_S
+        self.assertLessEqual(floor, NOW - events.CLAIM_TTL_S)
+        since = stamp(NOW - floor)
         self.assertEqual(shell.calls[0][:4], ["gh", "api", "--paginate",
                                               f"repos/{events.REPO}/issues/7/comments?per_page=100&since={since}"])
+
+    def test_claim_read_reuses_a_304_and_still_ages_out_claims(self):
+        stamp = lambda age: datetime.fromtimestamp(NOW - age, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        body = [{"body": f"🤖 lane claim kind=fix sha=h1 host=mac at={stamp(events.CLAIM_TTL_S - 100)}"},
+                {"body": "ci report"}]
+        ok = "HTTP/2.0 200 OK\nEtag: W/\"e1\"\nContent-Type: application/json\r\n\r\n" + json.dumps(body)
+        not_modified = (1, "HTTP/2.0 304 Not Modified\nEtag: W/\"e1\"\r\n\r\n")
+        replies = iter([ok, not_modified, not_modified])
+        shell = Shell({("gh", "api", "-i"): lambda _: next(replies),
+                       ("gh", "api", "-H"): lambda _: next(replies)})
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(events, "etag_cache_dir", return_value=Path(tmp)):
+            self.assertTrue(events.claim_active(7, "h1", shell, NOW, exclude_host="gem"))
+            self.assertTrue(events.claim_active(7, "h1", shell, NOW + 30, exclude_host="gem"))
+            # The cached body still passes the live age check: an expired claim stops counting.
+            self.assertFalse(events.claim_active(7, "h1", shell, NOW + 150, exclude_host="gem"))
+        conditional = [call for call in shell.calls if "If-None-Match: W/\"e1\"" in call]
+        self.assertEqual(len(conditional), 2)
+        self.assertFalse(shell.made("gh", "api", "--paginate"))
+
+    def test_conditional_page_falls_back_on_more_pages_errors_or_no_cache(self):
+        paged = ("HTTP/2.0 200 OK\nEtag: \"e\"\nLink: <https://x?page=2>; rel=\"next\"\r\n\r\n[]")
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp)
+            self.assertIsNone(events.conditional_page("p", Shell({("gh",): paged}), cache=cache))
+            self.assertIsNone(events.conditional_page("p", Shell({("gh",): (1, "HTTP/2.0 502 Bad Gateway\r\n\r\n")}),
+                                                      cache=cache))
+            self.assertIsNone(events.conditional_page("p", Shell({("gh",): (1, "HTTP/2.0 304 Not Modified\r\n\r\n")}),
+                                                      cache=cache), "a 304 without our own cached body is unusable")
+            self.assertEqual(list(cache.iterdir()), [])
+        shell = Shell()
+        self.assertIsNone(events.conditional_page("p", shell, cache=None))
+        self.assertEqual(shell.calls, [])
 
 
 class ClaimTest(unittest.TestCase):
@@ -1545,6 +1582,26 @@ class GapTest(unittest.TestCase):
         partial = events.open_prs_state(fake_lane(shell), report)
         self.assertEqual(len(partial), 10)
         self.assertFalse(report['complete'])
+
+    def test_large_file_list_is_listed_once_per_head(self):
+        head = "a" * 40
+        def page(args):
+            return {"data": {"repository": {"pullRequests": {
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+                "nodes": [{"number": 1, "headRefOid": page.head, "files": {"totalCount": 101, "nodes": []}}]}}}}
+        page.head = head
+        rows = [[{"filename": f"f{i}", "status": "modified"} for i in range(100)], [{"filename": "f100"}]]
+        shell = Shell({("gh", "api", "graphql"): page, ("gh", "api", "--paginate"): json.dumps(rows)})
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(events, "etag_cache_dir", return_value=Path(tmp) / "etag"):
+            first = events.open_prs_state(fake_lane(shell))
+            again = events.open_prs_state(fake_lane(shell))
+            self.assertEqual(len(shell.made("gh", "api", "--paginate")), 1)
+            self.assertEqual(again[0]["files"], first[0]["files"])
+            self.assertTrue(again[0]["filesComplete"])
+            page.head = "b" * 40  # a new head is a new file list
+            events.open_prs_state(fake_lane(shell))
+            self.assertEqual(len(shell.made("gh", "api", "--paginate")), 2)
 
     def test_unreadable_large_file_list_preserves_metadata_without_certifying_overlap_inventory(self):
         page = {"data": {"repository": {"pullRequests": {
