@@ -6630,6 +6630,12 @@ def dispatch(host: Host) -> int:
             "spawned": [], "error": None, "admissionDenied": None}
     try:
         tick["disk"] = disk_guard.check(host)
+        try:
+            # The tick drives reclaim, not only worker spawns: a low reading
+            # spawns one detached sweep per interval (disk_guard.maybe_sweep).
+            tick["diskSweep"] = disk_guard.maybe_sweep(host, tick["disk"].get("freePct"))
+        except Exception as error:  # reclaim never takes dispatch down
+            tick["diskSweep"] = f"{type(error).__name__}: {error}"[:200]
         if autoscale.mode() != "off":
             try:
                 bases = {name: (host.base_slots(name, spec.get("slots", 1)) if spec.get("enabled", True) else 0)
