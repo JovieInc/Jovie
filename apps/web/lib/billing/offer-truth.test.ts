@@ -96,7 +96,7 @@ describe('Artist Visibility offer contract', () => {
   it('preserves legacy auth helpers while public claims use limited access', () => {
     expect(getPlanSignupHref('free')).toBe('/signup?plan=free');
     expect(getPlanCtaLabel('free')).toBe('Claim your profile');
-    expect(getPlanCtaLabel('pro')).toBe('Start 14-day Pro trial');
+    expect(getPlanCtaLabel('pro')).toBe('Start 14-day Artist Presence trial');
     expect(getPlanCtaLabel('enterprise')).toBe('Contact sales');
     expect(getPlanOfferNote('free')).toContain('free forever');
     expect(getPlanOfferNote('pro')).toContain('No credit card');

@@ -1,12 +1,13 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePanelContext';
+import type { AudienceMember } from '@/types';
 import { DashboardAudienceTableUnified } from './DashboardAudienceTableUnified';
 import { DEFAULT_AUDIENCE_FILTERS } from './types';
 
@@ -56,5 +57,64 @@ describe('DashboardAudienceTableUnified', () => {
     expect(
       screen.getByRole('link', { name: 'Open Profile Settings' })
     ).toHaveAttribute('href', '/app/settings/profile');
+  });
+
+  it('renders members on the 32px dense people row with a face', () => {
+    const member: AudienceMember = {
+      id: 'm1',
+      type: 'email',
+      displayName: 'Maya Okafor',
+      locationLabel: '',
+      geoCity: null,
+      geoCountry: null,
+      visits: 1,
+      engagementScore: 50,
+      intentLevel: 'medium',
+      latestActions: [],
+      referrerHistory: [],
+      utmParams: {},
+      email: 'maya@example.com',
+      emailVisibleToArtist: true,
+      phone: null,
+      spotifyConnected: false,
+      purchaseCount: 0,
+      tipAmountTotalCents: 0,
+      tipCount: 0,
+      tags: [],
+      deviceType: null,
+      lastSeenAt: null,
+    };
+    renderWithProviders(
+      <DashboardAudienceTableUnified
+        mode='members'
+        view='all'
+        rows={[member]}
+        total={1}
+        sort='lastSeen'
+        direction='desc'
+        onSortChange={() => undefined}
+        onViewChange={() => undefined}
+        onFiltersChange={() => undefined}
+        filters={DEFAULT_AUDIENCE_FILTERS}
+        subscriberCount={0}
+      />
+    );
+
+    expect(
+      document.querySelector('table[data-table-row-mode="dense"]')
+    ).not.toBeNull();
+    const person = document.querySelector('table [data-table-person-cell]');
+    expect(person).toHaveTextContent('Maya Okaformaya@example.com');
+    expect(
+      person?.querySelector('[data-slot="app-avatar-frame"]')
+    ).toHaveAttribute('data-size', 'sm');
+    // x selects the focused row and raises the bulk bar over the toolbar.
+    const bulkBar = () =>
+      document.querySelector('[data-state][aria-hidden]') as HTMLElement;
+    expect(bulkBar()).toHaveAttribute('data-state', 'hidden');
+    const row = person?.closest('tr') as HTMLElement;
+    fireEvent.keyDown(row, { key: 'x' });
+    expect(bulkBar()).toHaveAttribute('data-state', 'visible');
+    expect(row).toHaveAttribute('aria-selected', 'true');
   });
 });

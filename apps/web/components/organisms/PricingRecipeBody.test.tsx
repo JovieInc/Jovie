@@ -66,7 +66,7 @@ describe('PricingRecipeBody', () => {
     const items = schema.mainEntity?.itemListElement ?? [];
     expect(items.map(item => item.item?.name)).toEqual([
       'Jovie Free',
-      'Jovie Pro',
+      'Jovie Artist Presence',
       'Jovie Enterprise',
     ]);
     expect(items[1]?.item?.offers?.availability).toBe(
@@ -158,7 +158,7 @@ describe('PricingRecipeBody', () => {
 
     expect(proPlan).toBeDefined();
     expect(proCard).not.toBeNull();
-    expect(proCard?.textContent).toContain('Pro');
+    expect(proCard?.textContent).toContain('Artist Presence');
     expect(proPlan?.price).toBeDefined();
     expect(proCard?.textContent).toContain(proPlan?.price ?? '');
     expect(proCard?.textContent).toContain('/mo');

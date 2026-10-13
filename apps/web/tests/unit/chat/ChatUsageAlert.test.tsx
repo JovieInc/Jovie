@@ -74,7 +74,9 @@ describe('ChatUsageAlert', () => {
     expect(
       getByText("You're out of messages for this week")
     ).toBeInTheDocument();
-    expect(getByRole('button', { name: /Upgrade to Pro/ })).toBeInTheDocument();
+    expect(
+      getByRole('button', { name: /Upgrade to Artist Presence/ })
+    ).toBeInTheDocument();
   });
 
   it('does not offer Upgrade to Pro when a trial user is exhausted', () => {
@@ -95,7 +97,7 @@ describe('ChatUsageAlert', () => {
 
     expect(getByRole('link', { name: 'View plans' })).toBeInTheDocument();
     expect(
-      queryByRole('button', { name: /Upgrade to Pro/ })
+      queryByRole('button', { name: /Upgrade to Artist Presence/ })
     ).not.toBeInTheDocument();
   });
 

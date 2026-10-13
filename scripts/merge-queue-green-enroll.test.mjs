@@ -425,7 +425,12 @@ test('an UNKNOWN merge state after main moves is re-read instead of dropping the
   // Live 2026-10-11 18:57Z: every open PR read UNKNOWN right after main moved
   // and settled within seconds; a single read skipped the PR until the next
   // (throttled) sweep.
+  const wake = {
+    eventName: 'pull_request_target',
+    payload: { pull_request: { number: 1 } },
+  };
   const settles = await fixture({
+    ...wake,
     readCurrentSnapshot: (number, readCount) => ({
       ...current(number),
       mergeStateStatus: readCount < 3 ? 'UNKNOWN' : 'CLEAN',
@@ -434,6 +439,7 @@ test('an UNKNOWN merge state after main moves is re-read instead of dropping the
   assert.deepEqual(settles.reads, [1, 1, 1]);
   assert.deepEqual(settles.mutations, [{ id: 'PR_1', oid: sha }]);
   const never = await fixture({
+    ...wake,
     readCurrentSnapshot: number => ({
       ...current(number),
       mergeStateStatus: 'UNKNOWN',
@@ -442,9 +448,87 @@ test('an UNKNOWN merge state after main moves is re-read instead of dropping the
   assert.deepEqual(never.reads, [1, 1, 1]);
   assert.deepEqual(never.mutations, []);
   const settled = await fixture({
+    ...wake,
     overrides: { 1: { mergeStateStatus: 'BLOCKED' } },
   });
   assert.deepEqual(settled.reads, [1]);
+});
+
+test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and stays inside its budget', async () => {
+  // 2026-10-12 22:31Z onward: every push-to-main sweep (45-70 PRs, ~3 s per
+  // read, 3 s + 6 s UNKNOWN re-read sleeps) was cancelled at the 5-minute
+  // timeout and re-armed nothing.
+  const roster = Array.from({ length: 70 }, (_, i) => ({
+    ...candidate(i + 1),
+    updated_at: `2026-10-12T${String(10 + (i % 10)).padStart(2, '0')}:00:00Z`,
+  }));
+  let inFlight = 0;
+  let peak = 0;
+  const started = Date.now();
+  const result = await fixture({
+    roster,
+    eventName: 'push',
+    // A sleep would block the test far past its own timeout.
+    env: { MERGE_STATE_RETRY_MS: '600000' },
+    readCurrentSnapshot: async (number, readCount) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise(resolve => setTimeout(resolve, 20));
+      inFlight -= 1;
+      // Every PR reads UNKNOWN first (main just moved); a third stay BLOCKED,
+      // a third settle CLEAN on the second read, a third stay UNKNOWN.
+      const firstRead = readCount <= 70;
+      const state =
+        number % 3 === 0
+          ? 'BLOCKED'
+          : firstRead || number % 3 === 2
+            ? 'UNKNOWN'
+            : 'CLEAN';
+      return { ...current(number), mergeStateStatus: state };
+    },
+  });
+  assert.ok(
+    Date.now() - started < 20 * 70,
+    'reads overlap instead of running serially'
+  );
+  assert.ok(peak > 1 && peak <= 6, `prefetch concurrency ${peak}`);
+  // One prefetch per PR plus one fresh read per UNKNOWN; no retry loop.
+  assert.equal(result.reads.length, 70 + 70 - 23);
+  const cleanNumbers = roster.map(pr => pr.number).filter(n => n % 3 === 1);
+  assert.deepEqual(
+    result.mutations.map(m => m.id).sort(),
+    cleanNumbers.map(n => `PR_${n}`).sort()
+  );
+});
+
+test('a sweep goes longest-waiting first and stops at its budget', async () => {
+  const roster = [
+    { ...candidate(3), updated_at: '2026-10-12T12:00:00Z' },
+    { ...candidate(1), updated_at: '2026-10-12T10:00:00Z' },
+    { ...candidate(2), updated_at: '2026-10-12T11:00:00Z' },
+  ];
+  const ordered = await fixture({ roster, eventName: 'push' });
+  assert.deepEqual(
+    ordered.mutations.map(m => m.id),
+    ['PR_1', 'PR_2', 'PR_3']
+  );
+  const spent = await fixture({
+    roster,
+    eventName: 'push',
+    env: { SWEEP_BUDGET_MS: '1000', SWEEP_READ_CONCURRENCY: '1' },
+    readCurrentSnapshot: async number => {
+      await new Promise(resolve => setTimeout(resolve, 600));
+      return current(number);
+    },
+  });
+  // Prefetch stops at half the budget; the loop reads PR 2 itself, then stops.
+  assert.deepEqual(
+    spent.mutations.map(m => m.id),
+    ['PR_1', 'PR_2']
+  );
+  assert.ok(
+    spent.warnings.some(w => w.includes('sweep budget spent after 2/3'))
+  );
 });
 
 test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
@@ -602,10 +686,17 @@ test('wakes on completed Source Validation and on the push-to-main reconciliatio
     'labeled',
     'unlabeled',
     'reopened',
+    'ready_for_review',
     'synchronize',
   ]);
   // A label is never an enroll wake; only a blocking one dequeues its PR.
   assert.match(workflow.jobs.enroll.if, /github\.event\.action != 'labeled'/);
+  // Leaving draft is the only wake for an already-green head (JOV-INV-029);
+  // draft events never boot the enroll runner.
+  assert.match(
+    workflow.jobs.enroll.if,
+    /github\.event_name != 'pull_request_target' \|\| github\.event\.pull_request\.draft == false/
+  );
   // JOV-7589: a dequeue while checks are already green emits no completion
   // event, so every landing on main runs the full-roster sweep.
   assert.deepEqual(workflow.on.push, { branches: ['main'] });
@@ -943,7 +1034,10 @@ function concurrencyGroup(github) {
         'github.event.workflow_run.id',
         'github.event.workflow_run?.id'
       );
-    return new Function('github', `return (${js});`)(github);
+    return new Function('github', 'inputs', `return (${js});`)(
+      github,
+      github.inputs ?? {}
+    );
   });
 }
 
@@ -979,6 +1073,7 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
   const manual = id => ({
     event_name: 'workflow_dispatch',
     event: {},
+    inputs: { pr_number: '' },
     run_id: id,
   });
   assert.equal(concurrencyGroup(manual(1)), concurrencyGroup(manual(2)));
@@ -1390,4 +1485,68 @@ test('a landing on main reconciles the full roster and the hold contract without
     assert.match(contract, new RegExp(`"${event}"`));
   }
   assert.match(contract, /workflow_run\.event == 'merge_group'/);
+});
+
+test('a dispatch naming one PR takes the per-PR path and coalesces with its wakes', async () => {
+  const roster = Array.from({ length: 40 }, (_, i) => candidate(i + 1));
+  const one = await fixture({ roster, env: { DISPATCH_PR_NUMBER: '7' } });
+  assert.deepEqual(one.inventories, []);
+  assert.deepEqual(one.gets, [7]);
+  assert.deepEqual(one.reads, [7]);
+  assert.equal(one.mutations.length, 1);
+  for (const unnamed of ['', '0', 'abc']) {
+    const sweep = await fixture({
+      roster,
+      env: { DISPATCH_PR_NUMBER: unnamed },
+    });
+    assert.equal(sweep.inventories.length, 1, `unnamed ${unnamed} sweeps`);
+    assert.deepEqual(sweep.gets, []);
+  }
+  const dispatched = {
+    event_name: 'workflow_dispatch',
+    event: {},
+    inputs: { pr_number: '7' },
+    run_id: 1,
+  };
+  assert.equal(concurrencyGroup(dispatched), concurrencyGroup(wake(7, 101)));
+  assert.ok(workflow.on.workflow_dispatch.inputs.pr_number);
+});
+
+// QUEUE_FREEZE=1 (repo variable) is the one-flip queue freeze: every job that
+// can enqueue or arm admits nothing, while holds and dequeues keep running.
+const FREEZE_GUARD = "vars.QUEUE_FREEZE != '1'";
+const QUEUE_WRITE =
+  /\benqueuePullRequest\b|\benablePullRequestAutoMerge\b|merge-group-victim-rearm|auto-ready-agent-drafts\.sh|--auto\b/;
+test('QUEUE_FREEZE gates every job that can enqueue or arm, and nothing else', () => {
+  const writers = [];
+  for (const file of [
+    'merge-queue-green-enroll.yml',
+    'auto-ready-agent-drafts.yml',
+  ]) {
+    const jobs = load(readFileSync(`.github/workflows/${file}`, 'utf8')).jobs;
+    for (const [name, job] of Object.entries(jobs)) {
+      const steps = JSON.stringify(job.steps ?? []).replace(
+        /--disable-auto/g,
+        ''
+      );
+      const guarded = String(job.if ?? '').includes(FREEZE_GUARD);
+      if (QUEUE_WRITE.test(steps)) {
+        writers.push(`${file}#${name}`);
+        assert.ok(
+          guarded,
+          `${file}#${name} writes the queue without the freeze guard`
+        );
+      } else {
+        assert.ok(
+          !guarded,
+          `${file}#${name} must keep running during a freeze`
+        );
+      }
+    }
+  }
+  assert.deepEqual(writers.sort(), [
+    'auto-ready-agent-drafts.yml#auto-ready',
+    'merge-queue-green-enroll.yml#enroll',
+    'merge-queue-green-enroll.yml#rearm-green-victims',
+  ]);
 });

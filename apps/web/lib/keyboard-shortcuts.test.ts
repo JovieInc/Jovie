@@ -105,6 +105,14 @@ describe('keyboard-shortcuts definitions', () => {
       expect(ids).toContain('nav-settings');
     });
 
+    it('names and maps chords by the sidebar IA (Home, Work)', () => {
+      expect(NAV_SHORTCUTS.home.label).toBe('Go to home');
+      expect(NAV_SHORTCUTS.home.href).toBe(APP_ROUTES.DASHBOARD);
+      expect(NAV_SHORTCUTS.library.label).toBe('Go to work');
+      expect(sequential[0]?.id).toBe('nav-dashboard');
+      expect(sequential[1]?.id).toBe('nav-releases');
+    });
+
     it('uses the canonical library route for library navigation', () => {
       expect(NAV_SHORTCUTS.library.href).toBe(APP_ROUTES.LIBRARY);
       expect(NAV_SHORTCUTS.releases.href).toBe(APP_ROUTES.LIBRARY);
@@ -251,6 +259,12 @@ describe('keyboard-shortcuts definitions', () => {
         s => s.id === 'keyboard-shortcuts'
       );
       expect(helpShortcut).toBeDefined();
+    });
+
+    it('advertises one Attach file chord (Cmd+U) for the inspector', () => {
+      const attach = KEYBOARD_SHORTCUTS.find(s => s.id === 'attach-file');
+      expect(attach?.shortcutKey).toBe('Meta+u');
+      expect(attach?.category).toBe('actions');
     });
 
     it('every shortcut has an icon', () => {

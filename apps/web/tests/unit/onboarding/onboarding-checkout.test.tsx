@@ -92,7 +92,10 @@ vi.mock('@/app/onboarding/actions/upgrade-offer', () => ({
 
 vi.mock('@/lib/entitlements/registry', () => ({
   getEntitlements: () => ({
-    marketing: { displayName: 'Pro', tagline: 'For serious artists' },
+    marketing: {
+      displayName: 'Artist Presence',
+      tagline: 'For serious artists',
+    },
   }),
 }));
 
@@ -148,13 +151,13 @@ describe('OnboardingCheckoutClient', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
 
     expect(
-      screen.getByRole('heading', { name: 'Upgrade To Pro' })
+      screen.getByRole('heading', { name: 'Upgrade To Artist Presence' })
     ).toBeInTheDocument();
     expect(screen.getByText('Tim White')).toBeInTheDocument();
     expect(screen.getByText('@timwhite')).toBeInTheDocument();
     expect(screen.getByText('5,000 Spotify followers')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Upgrade to Pro' })
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     ).toBeInTheDocument();
     expect(screen.getByText('$39.00')).toBeInTheDocument();
     expect(screen.getByText('/mo')).toBeInTheDocument();
@@ -207,7 +210,9 @@ describe('OnboardingCheckoutClient', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
 
     await user.click(screen.getByRole('radio', { name: /annual/i }));
-    await user.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    );
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -245,7 +250,9 @@ describe('OnboardingCheckoutClient', () => {
 
     render(<OnboardingCheckoutClient {...defaultProps} />);
 
-    await user.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    );
 
     expect(
       await screen.findByRole('alert', {
@@ -253,7 +260,7 @@ describe('OnboardingCheckoutClient', () => {
       })
     ).toHaveTextContent('Checkout is temporarily unavailable.');
     expect(
-      screen.getByRole('button', { name: 'Upgrade to Pro' })
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     ).toBeEnabled();
     expect(hrefState.current).toBe('http://localhost/onboarding/checkout');
   });
@@ -308,13 +315,69 @@ describe('OnboardingCheckoutClient', () => {
     expect(
       screen.getByRole('heading', { name: 'Upgrade To Artist Presence' })
     ).toBeInTheDocument();
-    expect(screen.getByText(/free forever/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/free forever/i).length).toBeGreaterThan(0);
     expect(
       screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Start free, upgrade anytime' })
+      screen.getByRole('button', { name: 'Keep My Free Profile' })
     ).toBeInTheDocument();
+  });
+
+  it('leads with certified highlights and never contradicts the live profile', () => {
+    render(<OnboardingCheckoutClient {...defaultProps} isDefaultUpsell />);
+
+    // Hierarchy: heading → profile identity → highlights → price → CTA → free keep.
+    const heading = screen.getByRole('heading', {
+      name: 'Upgrade To Artist Presence',
+    });
+    const cta = screen.getByRole('button', {
+      name: 'Upgrade to Artist Presence',
+    });
+    const keepFree = screen.getByRole('button', {
+      name: 'Keep My Free Profile',
+    });
+    expect(heading.compareDocumentPosition(cta)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(cta.compareDocumentPosition(keepFree)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+
+    // Certified capabilities only (JOV-7794); monitoring is internal-only.
+    for (const highlight of [
+      'Payments',
+      '90-day Analytics',
+      'Verified Badge',
+    ]) {
+      expect(screen.getByText(highlight)).toBeInTheDocument();
+    }
+    expect(
+      screen.queryByText('Continuous visibility monitoring')
+    ).not.toBeInTheDocument();
+
+    // The profile is already live — "start free" copy must never appear.
+    expect(screen.queryByText(/start free/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/stays live and free forever/i)
+    ).toBeInTheDocument();
+  });
+
+  it('renders a deliberate empty state instead of placeholder chrome', () => {
+    render(
+      <OnboardingCheckoutClient
+        {...defaultProps}
+        displayName=''
+        username=''
+        avatarUrl={null}
+        spotifyFollowers={null}
+      />
+    );
+
+    expect(screen.getByText('Your artist profile')).toBeInTheDocument();
+    // No fake handle or placeholder glyph.
+    expect(screen.queryByText(/^@/)).not.toBeInTheDocument();
+    expect(screen.queryByText('?')).not.toBeInTheDocument();
   });
 
   it('records the offer as accepted server-side when upgrade starts', async () => {
@@ -324,7 +387,9 @@ describe('OnboardingCheckoutClient', () => {
       <OnboardingCheckoutClient {...defaultProps} profileId={profileId} />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    );
 
     expect(recordOfferDecisionMock).toHaveBeenCalledWith(
       profileId,
@@ -360,5 +425,55 @@ describe('OnboardingCheckoutClient', () => {
     );
 
     expect(recordOfferDecisionMock).not.toHaveBeenCalled();
+  });
+
+  it('shows computed claim-time proof before the price, capped at four facts', () => {
+    render(
+      <OnboardingCheckoutClient
+        {...defaultProps}
+        proofFindings={[
+          {
+            slot: 'assembled-profile',
+            title: 'Profile assembly',
+            facts: [
+              { label: 'Tracks', value: '12' },
+              { label: 'Releases', value: '3' },
+              { label: 'Active links', value: '5' },
+            ],
+          },
+          {
+            slot: 'live-profile-url',
+            title: 'Smart link',
+            facts: [
+              { label: 'Handle', value: '@timwhite' },
+              { label: 'URL', value: 'https://jov.ie/timwhite' },
+            ],
+          },
+        ]}
+      />
+    );
+
+    const card = screen.getByTestId('claim-time-proof');
+    expect(card).toHaveTextContent('Found From Your Profile');
+    expect(card).toHaveTextContent('Tracks12');
+    expect(card).toHaveTextContent('Handle@timwhite');
+    expect(card).not.toHaveTextContent('https://jov.ie/timwhite');
+    expect(
+      card.compareDocumentPosition(screen.getByText('$39.00')) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('hides the proof card when there is no real finding', () => {
+    render(<OnboardingCheckoutClient {...defaultProps} proofFindings={[]} />);
+    expect(screen.queryByTestId('claim-time-proof')).not.toBeInTheDocument();
+  });
+
+  it('sells certified capabilities, not internal-only monitoring', () => {
+    render(<OnboardingCheckoutClient {...defaultProps} />);
+    expect(screen.queryByText(/monitoring/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Take tips and payments on your profile')
+    ).toBeInTheDocument();
   });
 });

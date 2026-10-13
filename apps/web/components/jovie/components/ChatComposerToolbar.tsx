@@ -79,7 +79,11 @@ export function ComposerSendButton({
 
   return (
     <SimpleTooltip content={tooltipContent}>
+      {/* SimpleTooltip makes its trigger focusable by default. The wrapper is
+          only a pointer target for the disabled-state tooltip, so keep it out
+          of the tab order; the named button inside is the stop. */}
       <span
+        tabIndex={-1}
         className={cn(
           'inline-flex shrink-0',
           !isInteractive && 'cursor-not-allowed'
@@ -97,7 +101,10 @@ export function ComposerSendButton({
           }
           disabled={!showStop && !canSend && !canInterruptAndSend}
           className={cn(
-            'system-b-chat-composer-primary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+            // 36px face, 44px hit target (JOV-4411): enlarge the pointer area
+            // via a pseudo-element, never the visible control.
+            'system-b-chat-composer-primary-action relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+            'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2',
             !isInteractive && 'cursor-not-allowed'
           )}
           aria-label={actionLabel}

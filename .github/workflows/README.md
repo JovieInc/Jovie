@@ -22,11 +22,12 @@ while **Auto-Ready Agent Drafts** has been `disabled_manually` since
 automatically; re-enabling it is a founder decision. Enable **Main CI Health
 Monitor** only after
 the queue and production topology have produced bounded proof. GitHub AI
-Orchestrator, GitHub AI Dispatcher, Main Autofix, and Auto-Fix Lint
-on Agent Drafts are retired at source (Agent Tick was deleted on 2026-10-12) — the lanes fix loop owns PR and red-main
+Orchestrator, GitHub AI Dispatcher, Agent Tick, Agent Landing Sweep, and Stuck
+Draft Auto-Close were deleted on 2026-10-12; Taste Classifier and Taste Label
+Guard are deleted at source. Main Autofix and Auto-Fix Lint
+on Agent Drafts are retired at source — the lanes fix loop owns PR and red-main
 repair. Keep Agent Pipeline, PR
-Conflict Handler, Stuck Draft Auto-Close, Taste
-Classifier/Guard, Auto-PR on Agent Push, and the legacy Release Loop disabled
+Conflict Handler, Auto-PR on Agent Push, and the legacy Release Loop disabled
 throughout the drain. The newly added Production
 Controller, Production Controller Health, and Production Release workflows
 should register active on land; verify their live state before relying on
@@ -87,40 +88,17 @@ Promptfoo has explicit cost lanes:
 - **Live HTTP rate-limit evals** run only from `pnpm run evals:live:http:rate-limit`, require `JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS=1`, `JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED=1`, `JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED=1`, and a loopback `JOVIE_PROMPTFOO_BASE_URL`. Start the local server with `JOVIE_DISABLE_REDIS_FOR_EVALS=1` and `JOVIE_DISABLE_MODEL_KEYS_FOR_EVALS=1`; this lane is manual-only and validates fail-closed 429 headers without touching shared Redis or model providers.
 - **Promptfoo eval-infrastructure-only PRs** stay on the deterministic fast source gate; generic `testing` metadata cannot fan out Neon, Lighthouse, mobile overflow, Playwright, eval, or preview deploy jobs. Path-selected deterministic evals run on the exact merge-group head (and direct-main fallback); exhaustive or live eval evidence remains explicit manual work.
 
-The legacy `evals-periodic.yml` workflow is also manual-only. It has no scheduled trigger, requires typing `RUN_LIVE_EVALS` into `confirm_live_llm_evals`, and runs at concurrency 1 if explicitly invoked.
-
 Ship now / Re-evaluate when / Then:
 
 - Ship now: path-selected deterministic evals stay model-key-free on combined heads, Promptfoo eval-infrastructure-only PRs do not fan out into heavyweight source-PR CI or preview deploys from generic `testing` metadata, every live LLM eval surface requires manual intent and concurrency 1, live HTTP route evals stay manual plus no-model, and live rate-limit evals require Redis/model-key-disabled local server mode.
 - Re-evaluate when: manual live evals catch a release-blocking regression twice in 30 days or observed live eval cost stays below the agreed per-run budget for 10 consecutive runs.
 - Then: add a capped scheduled or PR-gated live subset with explicit case count, concurrency 1, and per-run cost reporting.
 
-## Agent Landing Sweep
-
-The `agent-landing-sweep.yml` workflow is manual-only. When explicitly dispatched, it sweeps open, non-draft agent PRs and enables auto-merge on any that pass all guardrails:
-
-- All required source contexts passed
-- No unknown non-advisory terminal-red check
-- No sensitive files changed (auth, billing, migrations, CI, etc.)
-- No active machine gate or terminal-red required check
-- Has `automerge`, `auto-approved`, or `ai:ready-to-merge` label
-- Queue pressure below the dynamic threshold (`MERGE_QUEUE_POLICY.maxQueueDepth` in `scripts/lib/merge-queue-guard.mjs`, currently 16 PRs already queued)
-
-Use it as an operator recovery tool when the event-driven pipeline missed delivery; it is not an active polling loop.
-
 ## Linear-only intake and retired GitHub Issue automation
 
 Linear-backed Symphony is the only canonical backlog selector. GitHub remains
 authoritative for PRs, Actions, and merge-queue evidence. The historical
-GitHub-Issue workflows remain visible for auditability but cannot run:
-
-- **`github-ai-orchestrator.yml`**
-  - Trigger: manual `workflow_dispatch` is retained only for visibility
-  - Behavior: all jobs are unconditionally skipped; a workflow-state flip cannot restore GitHub Issue selection
-
-- **`github-ai-dispatcher.yml`**
-  - Trigger: manual `workflow_dispatch` is retained only for visibility
-  - Behavior: its only job is unconditionally skipped; it never scans GitHub Issues
+GitHub-Issue dispatcher and orchestrator workflows were deleted on 2026-10-12.
 
 - **`linear-sync-on-merge.yml`**
   - Trigger: `pull_request.closed` (merged)
@@ -252,9 +230,12 @@ Sensitive changes are classified deterministically on source PRs. Smoke and prev
 ## Internal PR Review (advisory)
 
 `internal-review.yml` (JOV-7400) is the internal, advisory-only replacement for
-CodeRabbit. On every PR open/synchronize it posts one upserted comment covering
-correctness risks, test gaps, and migration hazards via the Vercel AI Gateway
-(`zai/glm-5.3-flash`, existing `AI_GATEWAY_API_KEY` secret — no new vendors).
+CodeRabbit. On each PR open, reopen and push it posts one upserted comment covering correctness risks, test gaps, migration
+hazards and violations of the scoped `.claude/rules` conventions for the
+changed paths, via the Vercel AI Gateway (`zai/glm-5.3-flash`, existing
+`AI_GATEWAY_API_KEY` secret — no new vendors). Dependabot, `bot/*`
+report branches and docs-only diffs are skipped; `gh workflow run
+internal-review.yml -f pr_number=<n>` reviews one PR on demand.
 
 Non-blocking by construction: it is not a required check, never requests
 changes, and the script always exits 0 — a missing key, rate limit, or

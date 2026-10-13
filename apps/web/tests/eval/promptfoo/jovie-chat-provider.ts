@@ -1160,7 +1160,7 @@ function evaluateChatConfirmRouteContract(vars: EvalVars) {
     }
     if (toBoolean(vars.albumArtEntitled, true) === false) {
       return response(403, {
-        error: 'Album art generation requires a Pro plan.',
+        error: 'Album art generation requires the Artist Presence plan.',
       });
     }
   }
@@ -1430,7 +1430,7 @@ function buildEvalAlbumArtCapability(vars: EvalVars): AlbumArtCapability {
   if (vars.albumArtCapability === 'plan-unavailable') {
     return {
       availability: 'unavailable',
-      reason: 'Album art generation requires a Pro plan.',
+      reason: 'Album art generation requires the Artist Presence plan.',
       reasonCode: 'PLAN_UNAVAILABLE',
     };
   }
@@ -3648,9 +3648,9 @@ function displayPlanForPrompt(
   billingVerification: EvalBillingVerification
 ): string {
   if (billingVerification === 'unavailable') return 'Unverified';
-  if (plan === 'trial') return 'Pro Trial';
+  if (plan === 'trial') return 'Artist Presence Trial';
   if (plan === 'max') return 'Max';
-  if (plan === 'pro') return 'Pro';
+  if (plan === 'pro') return 'Artist Presence';
   return 'Free';
 }
 

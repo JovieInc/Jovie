@@ -27,7 +27,7 @@ export function visibilityAuditPriceUsd(): number {
 
 export function visibilityAuditCreditNote(): string {
   const price = visibilityAuditPriceUsd();
-  return `This $${price} audit is credited toward the first month of Artist Visibility Pro ($${price}/mo).`;
+  return `This $${price} audit is credited toward the first month of Artist Presence ($${price}/mo).`;
 }
 
 /**

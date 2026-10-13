@@ -298,6 +298,9 @@ export const queryKeys = {
     all: ['admin'] as const,
     impersonation: () => [...queryKeys.admin.all, 'impersonation'] as const,
     certifications: () => [...queryKeys.admin.all, 'certifications'] as const,
+    outbound: () => [...queryKeys.admin.all, 'outbound'] as const,
+    outboundLead: (leadId: string) =>
+      [...queryKeys.admin.all, 'outbound', 'lead', leadId] as const,
     waitlistSettings: () =>
       [...queryKeys.admin.all, 'waitlist-settings'] as const,
     leads: {
@@ -310,6 +313,16 @@ export const queryKeys = {
       }) => [...queryKeys.admin.leads.all(), 'list', filters] as const,
       settings: () => [...queryKeys.admin.leads.all(), 'settings'] as const,
       keywords: () => [...queryKeys.admin.leads.all(), 'keywords'] as const,
+    },
+    lists: {
+      all: () => [...queryKeys.admin.all, 'ov-lists'] as const,
+      sidebar: () => [...queryKeys.admin.lists.all(), 'sidebar'] as const,
+      detail: (id: string) =>
+        [...queryKeys.admin.lists.all(), 'detail', id] as const,
+      view: (viewId: string) =>
+        [...queryKeys.admin.lists.all(), 'view', viewId] as const,
+      creatorSearch: (query: string) =>
+        [...queryKeys.admin.lists.all(), 'creator-search', query] as const,
     },
   },
 

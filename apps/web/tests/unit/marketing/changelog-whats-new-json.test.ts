@@ -26,10 +26,18 @@ const RELEASE_FIXTURE = {
 };
 
 Object.assign(RELEASE_FIXTURE, {
-  customerOutcomes: Object.fromEntries(
-    Object.values(RELEASE_FIXTURE.sections)
-      .flat()
-      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  customerOutcomes: Object.entries(RELEASE_FIXTURE.sections).flatMap(
+    ([section, entries]) =>
+      entries.map((summary, index) => ({
+        storyId: `${section}-${index}`,
+        entryId: `customer-update:${section}-${index}`,
+        slug: `update-${section}-${index}`,
+        aliases: [],
+        summary,
+        section,
+        availability: 'unverified',
+        prerequisites: [],
+      }))
   ),
 });
 
