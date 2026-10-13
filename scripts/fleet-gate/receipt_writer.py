@@ -10,8 +10,13 @@ STALE_AFTER_SECONDS (the emitter or Gem is down) does it write canonical, so a
 dead emitter can never freeze issue admission (2026-10-12: 19 h of
 `controller-stale`).
 
-Prints `mode=<emitter|fallback>`, `state_dir=<dir>` and `age_seconds=<n>` lines
-for $GITHUB_OUTPUT.
+A fresh receipt also means Fleet Gate Refresh does not run the gate at all
+(one gate run is ~44 Jovie Bot API calls whose output would only land in
+scratch). The emitter's receipt is snapshotted to `receipt_path` for the
+stack-actions consumer instead.
+
+Prints `mode=<emitter|fallback>`, `state_dir=<dir>`, `age_seconds=<n>` and, in
+emitter mode, `receipt_path=<file>` lines for $GITHUB_OUTPUT.
 """
 from __future__ import annotations
 
@@ -31,22 +36,29 @@ def canonical_dir(workspace: str) -> Path:
     return Path(workspace, "state", "gem-priority-gate")
 
 
-def receipt_age_seconds(receipt: Path, now: datetime) -> float | None:
-    """Seconds since a well-formed receipt's observedAt; None when unusable."""
+def read_receipt(receipt: Path, now: datetime) -> tuple[float, str] | None:
+    """(age seconds, exact bytes) of a well-formed receipt; None when unusable."""
     try:
-        data = json.loads(receipt.read_text(encoding="utf-8"))
+        text = receipt.read_text(encoding="utf-8")
+        data = json.loads(text)
         observed = datetime.fromisoformat(str(data["observedAt"]).replace("Z", "+00:00"))
     except (OSError, ValueError, TypeError, KeyError):
         return None
     if data.get("schema") != SCHEMA or observed.tzinfo is None:
         return None
     age = (now - observed).total_seconds()
-    return age if age >= 0 else None
+    return (age, text) if age >= 0 else None
 
 
-def choose(workspace: str, fence: str, now: datetime) -> dict[str, str]:
+def receipt_age_seconds(receipt: Path, now: datetime) -> float | None:
+    found = read_receipt(receipt, now)
+    return None if found is None else found[0]
+
+
+def choose(workspace: str, fence: str, now: datetime, snapshot_dir: str = "") -> dict[str, str]:
     canonical = canonical_dir(workspace)
-    age = receipt_age_seconds(canonical / "latest.json", now)
+    found = read_receipt(canonical / "latest.json", now)
+    age = None if found is None else found[0]
     if age is None or age > STALE_AFTER_SECONDS:
         return {
             "mode": "fallback",
@@ -58,7 +70,15 @@ def choose(workspace: str, fence: str, now: datetime) -> dict[str, str]:
     scratch = fence.strip() or str(Path(workspace, "state", SCRATCH_DIR_NAME))
     if Path(scratch).resolve() == canonical.resolve():
         scratch = str(Path(workspace, "state", SCRATCH_DIR_NAME))
-    return {"mode": "emitter", "state_dir": scratch, "age_seconds": str(int(age))}
+    result = {"mode": "emitter", "state_dir": scratch, "age_seconds": str(int(age))}
+    if snapshot_dir:
+        # Snapshot the exact bytes judged fresh, so the consumer never reads a
+        # receipt the emitter replaced after this decision.
+        snapshot = Path(snapshot_dir, "jovie-fleet-gate.json")
+        snapshot.parent.mkdir(parents=True, exist_ok=True)
+        snapshot.write_text(found[1], encoding="utf-8")
+        result["receipt_path"] = str(snapshot)
+    return result
 
 
 def main(env: dict[str, str] | None = None, now: datetime | None = None) -> int:
@@ -67,9 +87,11 @@ def main(env: dict[str, str] | None = None, now: datetime | None = None) -> int:
         env.get("GEM_WORKSPACE") or DEFAULT_WORKSPACE,
         env.get("GEM_PRIORITY_GATE_STATE_DIR", ""),
         now or datetime.now(timezone.utc),
+        env.get("RUNNER_TEMP", ""),
     )
-    for key in ("mode", "state_dir", "age_seconds"):
-        print(f"{key}={result[key]}")
+    for key in ("mode", "state_dir", "age_seconds", "receipt_path"):
+        if key in result:
+            print(f"{key}={result[key]}")
     return 0
 
 

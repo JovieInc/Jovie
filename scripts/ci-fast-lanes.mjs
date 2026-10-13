@@ -164,6 +164,21 @@ export const SOURCE_GUARDS = Object.freeze([
     inputs: /./u,
     prOnly: true,
   }),
+  Object.freeze({
+    // Script contracts run only in the structural lane (merge groups); about
+    // 37 group runs failed on them in the 7 days to 2026-10-12. Full lists
+    // for script/workflow/toolchain diffs, derived ones otherwise
+    // (scripts/lib/script-contract-affected.mjs). Resolved beside this module
+    // because Source Validation loads guards from the trusted base archive.
+    id: 'script-contracts',
+    command: `node ${JSON.stringify(
+      fileURLToPath(
+        new URL('./lib/script-contract-affected.mjs', import.meta.url)
+      )
+    )}`,
+    inputs: /./u,
+    prOnly: true,
+  }),
 ]);
 
 /**
@@ -440,6 +455,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.github/scripts/customer-notes-ready.test.js',
   '.claude/hooks/post-task-validate.test.mjs',
@@ -481,7 +497,6 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/funnel-judge/coherence-screen.test.mjs',
   'scripts/lib/__tests__/test-file-dependencies.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
-  'scripts/gem-producer-drift/check-attestation.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
@@ -616,6 +631,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/remediation-sweep-workflow-contract.test.mjs',
   'scripts/lib/__tests__/repository-docs-ratchet.test.mjs',
   'scripts/lib/__tests__/remediation-reopen.test.mjs',
+  'scripts/lib/__tests__/golden-path-nightly.test.mjs',
   'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-learning.test.mjs',
   'scripts/lib/__tests__/rolling-ci-pipeline.test.mjs',

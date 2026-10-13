@@ -1034,7 +1034,10 @@ function concurrencyGroup(github) {
         'github.event.workflow_run.id',
         'github.event.workflow_run?.id'
       );
-    return new Function('github', `return (${js});`)(github);
+    return new Function('github', 'inputs', `return (${js});`)(
+      github,
+      github.inputs ?? {}
+    );
   });
 }
 
@@ -1070,6 +1073,7 @@ test('same-PR wakes coalesce while unattributed receipts and manual reconciliati
   const manual = id => ({
     event_name: 'workflow_dispatch',
     event: {},
+    inputs: { pr_number: '' },
     run_id: id,
   });
   assert.equal(concurrencyGroup(manual(1)), concurrencyGroup(manual(2)));
@@ -1481,4 +1485,68 @@ test('a landing on main reconciles the full roster and the hold contract without
     assert.match(contract, new RegExp(`"${event}"`));
   }
   assert.match(contract, /workflow_run\.event == 'merge_group'/);
+});
+
+test('a dispatch naming one PR takes the per-PR path and coalesces with its wakes', async () => {
+  const roster = Array.from({ length: 40 }, (_, i) => candidate(i + 1));
+  const one = await fixture({ roster, env: { DISPATCH_PR_NUMBER: '7' } });
+  assert.deepEqual(one.inventories, []);
+  assert.deepEqual(one.gets, [7]);
+  assert.deepEqual(one.reads, [7]);
+  assert.equal(one.mutations.length, 1);
+  for (const unnamed of ['', '0', 'abc']) {
+    const sweep = await fixture({
+      roster,
+      env: { DISPATCH_PR_NUMBER: unnamed },
+    });
+    assert.equal(sweep.inventories.length, 1, `unnamed ${unnamed} sweeps`);
+    assert.deepEqual(sweep.gets, []);
+  }
+  const dispatched = {
+    event_name: 'workflow_dispatch',
+    event: {},
+    inputs: { pr_number: '7' },
+    run_id: 1,
+  };
+  assert.equal(concurrencyGroup(dispatched), concurrencyGroup(wake(7, 101)));
+  assert.ok(workflow.on.workflow_dispatch.inputs.pr_number);
+});
+
+// QUEUE_FREEZE=1 (repo variable) is the one-flip queue freeze: every job that
+// can enqueue or arm admits nothing, while holds and dequeues keep running.
+const FREEZE_GUARD = "vars.QUEUE_FREEZE != '1'";
+const QUEUE_WRITE =
+  /\benqueuePullRequest\b|\benablePullRequestAutoMerge\b|merge-group-victim-rearm|auto-ready-agent-drafts\.sh|--auto\b/;
+test('QUEUE_FREEZE gates every job that can enqueue or arm, and nothing else', () => {
+  const writers = [];
+  for (const file of [
+    'merge-queue-green-enroll.yml',
+    'auto-ready-agent-drafts.yml',
+  ]) {
+    const jobs = load(readFileSync(`.github/workflows/${file}`, 'utf8')).jobs;
+    for (const [name, job] of Object.entries(jobs)) {
+      const steps = JSON.stringify(job.steps ?? []).replace(
+        /--disable-auto/g,
+        ''
+      );
+      const guarded = String(job.if ?? '').includes(FREEZE_GUARD);
+      if (QUEUE_WRITE.test(steps)) {
+        writers.push(`${file}#${name}`);
+        assert.ok(
+          guarded,
+          `${file}#${name} writes the queue without the freeze guard`
+        );
+      } else {
+        assert.ok(
+          !guarded,
+          `${file}#${name} must keep running during a freeze`
+        );
+      }
+    }
+  }
+  assert.deepEqual(writers.sort(), [
+    'auto-ready-agent-drafts.yml#auto-ready',
+    'merge-queue-green-enroll.yml#enroll',
+    'merge-queue-green-enroll.yml#rearm-green-victims',
+  ]);
 });

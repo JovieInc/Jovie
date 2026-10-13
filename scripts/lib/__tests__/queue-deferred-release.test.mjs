@@ -10,7 +10,7 @@ const fleetGateRefreshWorkflow = readFileSync(
 
 const STACK_LIVENESS_CRON = "cron: '*/5 * * * *'";
 const STACK_EVENT_GUARD =
-  /schedule:[\s\S]*if: steps\.refresh\.outcome == 'success'[\s\S]*steps\.refresh\.outputs\.receipt_path/;
+  /schedule:[\s\S]*steps\.refresh\.outcome == 'success'[\s\S]*steps\.refresh\.outputs\.receipt_path/;
 
 function assertTrustedStackHealthContract(value) {
   expect(value).toContain(STACK_LIVENESS_CRON);
@@ -31,7 +31,7 @@ function assertTrustedStackHealthContract(value) {
     'node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs"'
   );
   expect(value).toContain(
-    '--closure-health-file="${{ steps.refresh.outputs.receipt_path }}"'
+    '--closure-health-file="${{ steps.refresh.outputs.receipt_path || steps.writer.outputs.receipt_path }}"'
   );
   expect(value).not.toContain('state/gem-priority-gate/latest.json');
   // The canonical receipt belongs to the lanes emitter; this workflow writes
@@ -98,7 +98,7 @@ describe('retired queue release and retained fleet refresh', () => {
         'ref: ${{ github.event.pull_request.head.sha }}'
       ),
       fleetGateRefreshWorkflow.replace(
-        '${{ steps.refresh.outputs.receipt_path }}',
+        '${{ steps.refresh.outputs.receipt_path || steps.writer.outputs.receipt_path }}',
         'state/gem-priority-gate/latest.json'
       ),
       fleetGateRefreshWorkflow.replace(
