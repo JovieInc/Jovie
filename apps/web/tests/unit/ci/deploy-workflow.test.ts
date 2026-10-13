@@ -78,10 +78,6 @@ const canaryWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/canary-health-gate.yml'
 );
-const agentTickWorkflowPath = resolve(
-  repoRoot,
-  '.github/workflows/agent-tick.yml'
-);
 const sentryGateWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/sentry-error-gate.yml'
@@ -3848,20 +3844,6 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
     expect(cleanupWorkflow).toContain('startswith($base + "-")');
   });
 
-  it('keeps consolidated agent tick manual-only while retaining cleanup controls', () => {
-    const agentTickWorkflow = readFileSync(agentTickWorkflowPath, 'utf8');
-    const cleanupJob = getJobBlock(agentTickWorkflow, 'neon-cleanup');
-
-    expect(agentTickWorkflow).toContain('workflow_dispatch:');
-    expect(agentTickWorkflow).not.toContain('schedule:');
-    expect(agentTickWorkflow).not.toContain('vercel rollback');
-    expect(cleanupJob).toContain('uses: ./.github/actions/neon-branch-cleanup');
-    expect(cleanupJob).toContain("minimum_branch_age_minutes: '45'");
-    expect(cleanupJob).toContain(
-      "protected_branches: 'main,development,preview,br-main,br-production'"
-    );
-  });
-
   it('recognizes only exact creator prefixes for ephemeral branches', () => {
     const cleanupAction = readFileSync(
       resolve(repoRoot, '.github/actions/neon-branch-cleanup/action.yml'),
@@ -4578,10 +4560,9 @@ describe('production promotion exact-artifact contract', () => {
     const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const sentry = readFileSync(sentryGateWorkflowPath, 'utf8');
     const cost = readFileSync(costAnomalyWorkflowPath, 'utf8');
-    const tick = readFileSync(agentTickWorkflowPath, 'utf8');
 
     expect(reusable.match(/vercel rollback/g)).toHaveLength(1);
-    expect(`${sentry}\n${cost}\n${tick}`).not.toContain('vercel rollback');
+    expect(`${sentry}\n${cost}`).not.toContain('vercel rollback');
     expect(reusable).toContain("gate_status == 'failed'");
     expect(reusable).toContain('gate_status=error');
     expect(reusable).toContain('PLAYWRIGHT_JSON_OUTPUT_NAME');
