@@ -18,10 +18,6 @@ const workflowPath = resolve(
   repoRoot,
   '.github/workflows/synthetic-monitoring.yml'
 );
-const agentTickWorkflowPath = resolve(
-  repoRoot,
-  '.github/workflows/agent-tick.yml'
-);
 const webAiHealthRunnerPath = resolve(
   repoRoot,
   '.github/scripts/run-web-ai-health.mjs'
@@ -51,8 +47,6 @@ describe('synthetic monitoring workflow parser', () => {
   it.each([
     [workflowPath, 0],
     [workflowPath, 1],
-    [agentTickWorkflowPath, 0],
-    [agentTickWorkflowPath, 1],
   ])(
     'keeps canary exit and token isolation for %s with probe exit %i',
     (path, probeExit) => {
@@ -127,7 +121,7 @@ describe('synthetic monitoring workflow parser', () => {
   });
 
   it('lets the artifact guard scan retry error-context.md instead of poisoning the producer', () => {
-    for (const path of [workflowPath, agentTickWorkflowPath]) {
+    for (const path of [workflowPath]) {
       const workflow = readFileSync(path, 'utf8');
       const producerEnv = workflow
         .split('\n')
@@ -153,7 +147,7 @@ describe('synthetic monitoring workflow parser', () => {
   });
 
   it('replaces the destructive account canary with the retained waitlist traversal', () => {
-    for (const path of [workflowPath, agentTickWorkflowPath]) {
+    for (const path of [workflowPath]) {
       const workflow = readFileSync(path, 'utf8');
       const canaryStep = getStepBlock(
         workflow,
@@ -185,7 +179,7 @@ describe('synthetic monitoring workflow parser', () => {
     const escapedExpression =
       "${{ toJSON(format('```{0}```', steps.test-results.outputs.failed_tests)) }}";
 
-    for (const path of [workflowPath, agentTickWorkflowPath]) {
+    for (const path of [workflowPath]) {
       const workflow = readFileSync(path, 'utf8');
       const alertStep = getStepBlock(workflow, 'Send Slack Alert on Failure');
 

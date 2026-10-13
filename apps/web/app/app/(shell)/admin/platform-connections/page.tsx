@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { AdminReadUnavailable } from '@/components/features/admin/AdminReadUnavailable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
@@ -57,6 +58,15 @@ export default async function AdminPlatformConnectionsPage({
       testId='admin-platform-connections'
       viewTestId={`admin-platform-connections-${currentTab}`}
     >
+      <p className='mb-4 text-sm text-secondary'>
+        <Link
+          href='/app/ov/integrations'
+          className='text-primary underline underline-offset-4'
+        >
+          Manage account integrations
+        </Link>{' '}
+        through the shared Settings connection flow.
+      </p>
       {data === null ? (
         <AdminReadUnavailable message='Publisher connection and playlist settings could not be read. Their status is unknown; changes are unavailable until the current settings can be verified.' />
       ) : (

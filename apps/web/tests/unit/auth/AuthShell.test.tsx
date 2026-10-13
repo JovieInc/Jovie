@@ -112,7 +112,9 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     searchParamsState.value =
       'plan=pro&interval=monthly&artist=Tim%20White&handle=timwhite';
     render(<AuthShell mode='sign-up' />);
-    expect(screen.getByText('Start 14-day Pro trial')).toBeInTheDocument();
+    expect(
+      screen.getByText('Start 14-day Artist Presence trial')
+    ).toBeInTheDocument();
     expect(screen.getByText(/199\/month/)).toBeInTheDocument();
     expect(screen.getByText(/No credit card/)).toBeInTheDocument();
     expect(
@@ -251,6 +253,21 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
         context: 'signup',
       });
     });
+  });
+
+  it('does not call One Tap in managed account-less browser audits', async () => {
+    document.documentElement.dataset.e2eMode = '1';
+
+    try {
+      oneTapConfiguredState.value = true;
+      render(<AuthShell mode='sign-up' />);
+
+      await waitFor(() => {
+        expect(oneTapMock).not.toHaveBeenCalled();
+      });
+    } finally {
+      delete document.documentElement.dataset.e2eMode;
+    }
   });
 
   it('suppresses One Tap on public auth landing surfaces', async () => {

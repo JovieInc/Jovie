@@ -58,11 +58,11 @@ describe('ArtistNotificationsPage', () => {
     );
     expect(
       heroSection.getByRole('heading', {
-        name: segmentedAccessibleName('Reach Every Fan.', 'Automatically.'),
+        name: segmentedAccessibleName('Reach Every Fan.', 'On Autopilot.'),
       })
     ).toBeInTheDocument();
     expect(
-      heroSection.getByRole('link', { name: 'Start Pro Trial' })
+      heroSection.getByRole('link', { name: 'Start Artist Presence Trial' })
     ).toHaveAttribute('href', '/signup?plan=pro');
     expect(heroSection.queryByText('Capture once')).not.toBeInTheDocument();
 
@@ -86,7 +86,7 @@ describe('ArtistNotificationsPage', () => {
     );
     expect(
       reactivationSection.getByRole('heading', {
-        name: 'Notify them automatically.',
+        name: 'Notify every fan automatically.',
       })
     ).toBeInTheDocument();
     expect(
@@ -155,7 +155,9 @@ describe('ArtistNotificationsPage', () => {
       faqSection.getByText('Where do fans land after they click?')
     ).toBeInTheDocument();
     expect(
-      faqSection.getByText('When does it make sense to turn on Pro?')
+      faqSection.getByText(
+        'When does it make sense to turn on Artist Presence?'
+      )
     ).toBeInTheDocument();
 
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(

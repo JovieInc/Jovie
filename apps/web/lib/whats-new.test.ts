@@ -29,10 +29,21 @@ function release(
     },
     ...overrides,
   };
-  value.customerOutcomes = Object.fromEntries(
-    Object.values(value.sections)
-      .flat()
-      .map(text => [text, { availability: 'unverified', prerequisites: [] }])
+  value.customerOutcomes = Object.entries(value.sections).flatMap(
+    ([section, entries]) =>
+      entries.map((summary: string, index: number) => {
+        const identity = `${version.replaceAll('.', '-')}-${section}-${index}`;
+        return {
+          storyId: identity,
+          entryId: `customer-update:${identity}`,
+          slug: `update-${identity}`,
+          aliases: [],
+          summary,
+          section: section as keyof ChangelogRelease['sections'],
+          availability: 'unverified',
+          prerequisites: [],
+        };
+      })
   );
   return value;
 }

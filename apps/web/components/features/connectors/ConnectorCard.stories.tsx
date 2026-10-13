@@ -23,6 +23,17 @@ const STATES = [
     errorMessage: 'Google access expired. Reconnect to continue.',
   },
   { status: 'disabled' },
+  {
+    status: 'unavailable',
+    available: false,
+    unavailableReason: 'Connections could not be read. Refresh to try again.',
+  },
+  {
+    status: 'connected',
+    accountLabel: 'artist@example.com',
+    pending: true,
+    pendingAction: 'disconnect',
+  },
 ] as const;
 
 export const StateMatrix: Story = {
@@ -30,7 +41,7 @@ export const StateMatrix: Story = {
     <div className='w-full max-w-2xl divide-y divide-subtle rounded-lg bg-surface-1 px-4'>
       {STATES.map(state => (
         <ConnectorCard
-          key={state.status}
+          key={'pending' in state ? 'disconnecting' : state.status}
           provider='gmail'
           {...state}
           onConnect={fn()}

@@ -289,6 +289,31 @@ describe('runStructural screenshot contract discovery', () => {
     vi.clearAllMocks();
   });
 
+  it.each([
+    ['web', ['apps/web/lib/leads/constants.ts'], true],
+    ['web,operations', ['apps/web/lib/leads/constants.ts'], false],
+    ['web', ['apps/web/app/page.tsx'], false],
+  ])(
+    'runs script contracts that read a changed file without operations (%s)',
+    async (lanes, changed, expected) => {
+      // #20922: a web-only change to DEFAULT_DM_TEMPLATE reddened main through
+      // scripts/funnel-judge/rubric.test.mjs, which only operations ran.
+      process.env.GITHUB_EVENT_NAME = 'merge_group';
+      process.env.CI_PRODUCT_LANES = lanes;
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
+      await runStructural({ execute, changedFileList: changed });
+      const commands = execute.mock.calls.map(([command]) => String(command));
+      const dependent = commands.filter(
+        command =>
+          command.startsWith('node --test ') &&
+          command.includes('scripts/funnel-judge/rubric.test.mjs') &&
+          !command.includes('scripts/agent-context/check.test.mjs')
+      );
+      expect(dependent).toHaveLength(expected ? 1 : 0);
+    }
+  );
+
   it('never runs a tests/unit/ci file in two structural commands', async () => {
     process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
     process.env.CI_PRODUCT_LANES = 'web,operations';
@@ -1148,18 +1173,40 @@ describe('structural command pool', () => {
       return started;
     };
     const parallel = await startOrder(3);
-    const head = parallel.slice(0, 3).join('\n');
+    const head = parallel.slice(0, 5).join('\n');
     expect(head).toContain('pnpm invariants:check');
-    expect(head).toContain('python3 -m pytest ');
+    expect(head).toContain('scripts/tests/test_lane_runner.py');
+    expect(head).toContain('lib/__tests__/merge-group-failure-hold.test.mjs');
     // Both complementary pytest shards are long poles.
     expect(
       parallel
-        .slice(0, 4)
+        .slice(0, 5)
         .filter(command => command.includes('python3 -m pytest '))
     ).toHaveLength(2);
     const serial = await startOrder(1);
     expect(serial[0]).toBe(WEB_CI_CONTRACT_TESTS_COMMAND);
     expect([...serial].sort()).toEqual([...parallel].sort());
+  });
+
+  it('starts the remaining job long poles first once the python job takes its parts', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', 'skip');
+    vi.stubEnv('CI_FAST_STRUCTURAL_WEB', 'skip');
+    const started = [];
+    await runStructural({
+      concurrency: 3,
+      execute: command => {
+        started.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    // Merge group 38247843089: the 174.5s lanes pytest started last and set
+    // the 260s remaining wall; it must hold a slot from the start.
+    const head = started.slice(0, 2).join('\n');
+    expect(head).toContain('scripts/tests/test_lane_runner.py');
+    expect(head).toContain('lib/__tests__/merge-group-failure-hold.test.mjs');
   });
 
   it('starts the slowest web commands first', async () => {
@@ -1902,12 +1949,16 @@ describe('source-read guard selection', () => {
   const selected = (event, files) =>
     selectSourceGuards(event, files).map(guard => guard.id);
 
-  it.each([['pull_request'], ['merge_group'], ['push']])(
+  it.each([
+    ['pull_request', ['web-source-read-tests']],
+    ['merge_group', []],
+    ['push', []],
+  ])(
     'runs ci-schedule-inventory on %s when a workflow changes',
-    event => {
+    (event, pr) => {
       expect(
         selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual(['ci-schedule-inventory']);
+      ).toEqual(['ci-schedule-inventory', ...pr]);
     }
   );
 
@@ -1921,30 +1972,66 @@ describe('source-read guard selection', () => {
     ['.github/scripts/run-actionlint.sh', []],
     [
       'apps/web/tests/unit/lib/auth/redis-command-budget.test.ts',
-      ['node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files'],
     ],
-    ['apps/web/app/api/cron/example/route.test.ts', ['node-environment-files']],
-    ['apps/web/eslint-rules/rule.test.js', ['node-environment-files']],
-    ['apps/web/scripts/tool.test.mjs', ['node-environment-files']],
-    ['apps/web/tests/node-environment-files.json', ['node-environment-files']],
-    ['apps/web/tests/setup-optimized.ts', ['node-environment-files']],
+    [
+      'apps/web/app/api/cron/example/route.test.ts',
+      ['merge-group-unit-guards', 'node-environment-files'],
+    ],
+    [
+      'apps/web/eslint-rules/rule.test.js',
+      ['merge-group-unit-guards', 'node-environment-files'],
+    ],
+    [
+      'apps/web/scripts/tool.test.mjs',
+      ['merge-group-unit-guards', 'node-environment-files'],
+    ],
+    [
+      'apps/web/tests/node-environment-files.json',
+      ['merge-group-unit-guards', 'node-environment-files'],
+    ],
+    [
+      'apps/web/tests/setup-optimized.ts',
+      ['merge-group-unit-guards', 'node-environment-files'],
+    ],
     [
       'apps/web/vitest.config.fast.mts',
-      ['node-environment-files', 'static-revalidate-policy'],
+      [
+        'merge-group-unit-guards',
+        'node-environment-files',
+        'static-revalidate-policy',
+      ],
     ],
-    ['apps/web/lib/queries/fetch.ts', ['static-revalidate-policy']],
+    [
+      'apps/web/lib/queries/fetch.ts',
+      ['merge-group-unit-guards', 'static-revalidate-policy'],
+    ],
     [
       'apps/web/app/(marketing)/download/page.tsx',
-      ['static-revalidate-policy'],
+      ['merge-group-unit-guards', 'static-revalidate-policy'],
     ],
     [
       'apps/web/tests/unit/marketing/static-revalidate-policy.test.ts',
-      ['node-environment-files', 'static-revalidate-policy'],
+      [
+        'merge-group-unit-guards',
+        'node-environment-files',
+        'static-revalidate-policy',
+      ],
     ],
     ['apps/web/tests/e2e/public-profile-smoke.spec.ts', []],
     ['apps/ios/Jovie/App.swift', []],
+    // OutboundRail.tsx text-destructive ejected group pr-21458 (10-13).
+    [
+      'apps/web/components/features/admin/outbound/OutboundRail.tsx',
+      ['merge-group-unit-guards', 'static-revalidate-policy'],
+    ],
+    ['packages/ui/src/button.tsx', ['merge-group-unit-guards']],
   ])('selects the guards that read %s on a PR', (path, guards) => {
-    expect(selected('pull_request', [path])).toEqual(guards);
+    // Any path can be read by a web test; the script narrows the tests.
+    expect(selected('pull_request', [path])).toEqual([
+      ...guards,
+      'web-source-read-tests',
+    ]);
   });
 
   it('keeps web-only guards to PRs; web merge groups already run them', () => {
@@ -1972,6 +2059,16 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'web-source-read-tests') {
+        expect(guard.command).toContain('/lib/web-source-read-tests.mjs');
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/lib/web-source-read-tests.mjs'),
+            'utf8'
+          )
+        ).toContain('export function selectSourceReadTests');
+        continue;
+      }
       const dir = guard.command.includes('@jovie/web') ? 'apps/web' : 'scripts';
       const file = guard.command.split(' ').at(-1);
       expect(

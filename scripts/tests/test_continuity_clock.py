@@ -1,6 +1,7 @@
 """Recover missing production workflow invocations without duplicate or false health receipts."""
 import fcntl
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -46,6 +47,7 @@ class ClockTest(unittest.TestCase):
         return SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": rows}), stderr="")
 
     def tick(self, **kwargs):
+        kwargs.setdefault("clocks", (clock.CONTINUITY,))
         return clock.tick(self.path, hostname="gem", run=self.api, now=NOW, **kwargs)
 
     def saved(self):
@@ -55,8 +57,9 @@ class ClockTest(unittest.TestCase):
         result = self.tick()
         self.assertEqual(result["status"], "dispatch-requested")
         self.assertEqual(len(self.calls), 3)
+        # repository_dispatch: the Jovie Bot token lacks actions:write (workflow_dispatch 403).
         self.assertEqual(self.calls[-1], ["gh", "api", "--method", "POST",
-            "repos/JovieInc/Jovie/actions/workflows/production-continuity.yml/dispatches", "-f", "ref=main"])
+            "repos/JovieInc/Jovie/dispatches", "-f", "event_type=clock_production_continuity"])
         self.assertEqual(self.saved()["lastResult"], result)
         self.assertNotIn("healthy", json.dumps(result))
         self.assertEqual(self.tick()["status"], "cooldown")
@@ -68,7 +71,7 @@ class ClockTest(unittest.TestCase):
         self.assertEqual(self.tick()["status"], "dispatch-requested")
 
     def test_recent_completed_run_needs_no_recovery_including_dispatch_event(self):
-        for event in ("schedule", "workflow_dispatch"):
+        for event in ("schedule", "workflow_dispatch", "repository_dispatch"):
             with self.subTest(event=event):
                 self.rows = [run_row(30, event=event)]
                 result = clock.observe(self.api, NOW)
@@ -80,6 +83,12 @@ class ClockTest(unittest.TestCase):
             self.rows = [run_row(), run_row(7200, status=status)]
             self.assertEqual(clock.observe(self.api, NOW)["status"], "active")
         self.assertEqual(len(self.calls), 5)
+
+    def test_ghost_run_stuck_active_for_days_does_not_block_the_clock(self):
+        # sentry-autofix-recurrence run 37655501164: "queued" since 2026-10-07, uncancellable.
+        self.rows = [run_row(), run_row(6 * 86400, status="queued")]
+        self.assertEqual(clock.observe(self.api, NOW)["status"], "overdue")
+        self.assertEqual(self.tick()["status"], "dispatch-requested")
 
     def test_empty_malformed_wrong_branch_or_unexpected_run_fails_closed(self):
         for rows in ([], None, {}, [None], [run_row(head_branch="other")],
@@ -118,7 +127,7 @@ class ClockTest(unittest.TestCase):
         self.post_error = subprocess.TimeoutExpired("gh", 10)
         self.assertEqual(self.tick()["status"], "dispatch-uncertain")
         self.assertEqual(self.saved()["nextAttemptAt"], NOW + 900)
-        self.assertEqual(clock.tick(self.path, "gem", self.api, NOW+600)["status"], "cooldown")
+        self.assertEqual(clock.tick(self.path, "gem", self.api, NOW+600, clocks=(clock.CONTINUITY,))["status"], "cooldown")
         self.assertEqual(len(self.calls), 3)
 
     def test_rejected_post_retains_uncertain_receipt_without_sensitive_output(self):
@@ -126,7 +135,7 @@ class ClockTest(unittest.TestCase):
             if "POST" in args:
                 return SimpleNamespace(returncode=1, stdout="secret", stderr="secret")
             return self.api(args, **kw)
-        result = clock.tick(self.path, "gem", reject, NOW)
+        result = clock.tick(self.path, "gem", reject, NOW, clocks=(clock.CONTINUITY,))
         self.assertEqual(result["status"], "dispatch-uncertain")
         self.assertNotIn("secret", json.dumps(result))
 
@@ -167,6 +176,80 @@ class ClockTest(unittest.TestCase):
             doctor.assert_called_once()
             receipt = json.loads((self.path / "tick.json").read_text())
             self.assertEqual(receipt["continuity"], {"status": "failed", "error": "OSError"})
+
+
+class CadenceClocksTest(unittest.TestCase):
+    """GitHub delivered sub-daily crons about every 6 h; the tick drives each cadence."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = Path(self.tmp.name)
+        self.calls = []
+        self.age = {}
+
+    def api(self, args, **kwargs):
+        self.calls.append(args)
+        if "POST" in args:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        if "status=in_progress" in args[-1]:
+            return SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": []}), stderr="")
+        workflow = args[-1].split("/workflows/", 1)[1].split("/", 1)[0]
+        event = "push" if workflow == "runner-heartbeat.yml" else "schedule"
+        rows = [run_row(self.age.get(workflow, 21600), event=event)]
+        return SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": rows}), stderr="")
+
+    def posts(self):
+        return [call[-1] for call in self.calls if "POST" in call]
+
+    @unittest.skipUnless((ROOT / ".github/workflows").is_dir(), "release trees carry no workflows")
+    def test_each_workflow_has_a_listening_trigger_and_a_kept_backstop_cron(self):
+        # Plain text, no PyYAML: the Gem release self-test runs this file too.
+        self.assertEqual(len({c.event_type for c in clock.CLOCKS}), len(clock.CLOCKS))
+        for c in clock.CLOCKS:
+            with self.subTest(workflow=c.workflow):
+                text = (ROOT / ".github/workflows" / c.workflow).read_text()
+                self.assertIn(f"  repository_dispatch:\n    types: [{c.event_type}]\n", text)
+                self.assertEqual(text.count("repository_dispatch:"), 1)
+                self.assertIn("  schedule:\n", text, "the GitHub cron stays as a backstop")
+                # A job gated to the schedule must also run on the clock event; only the
+                # heartbeat's own schedule-only dispatch job is exempt.
+                for condition in re.findall(r"^    if: (.*)$", text, re.MULTILINE):
+                    if "'schedule'" in condition and "github.event_name == 'schedule'" != condition:
+                        self.assertIn("'repository_dispatch'", condition)
+
+    def test_stale_workflows_are_dispatched_once_on_their_own_intervals(self):
+        result = clock.tick(self.path, "gem", self.api, NOW)
+        self.assertEqual(result["status"], "dispatch-requested")
+        self.assertEqual(set(result["clocks"]), {c.name for c in clock.CLOCKS[1:]})
+        self.assertEqual(sorted(self.posts()), sorted(f"event_type={c.event_type}" for c in clock.CLOCKS))
+        self.calls.clear()
+        # Five minutes later only the five-minute continuity clock is due again.
+        clock.tick(self.path, "gem", self.api, NOW + 290)
+        self.assertEqual(self.posts(), ["event_type=clock_production_continuity"])
+        self.calls.clear()
+        clock.tick(self.path, "gem", self.api, NOW + 600)
+        self.assertEqual(sorted(self.posts()), sorted([
+            "event_type=clock_production_continuity", "event_type=clock_runner_heartbeat",
+            "event_type=clock_runner_health_monitor"]))
+
+    def test_a_fresh_run_from_any_trigger_skips_its_dispatch(self):
+        self.age = {"runner-heartbeat.yml": 30, "cost-anomaly-gate.yml": 120}
+        result = clock.tick(self.path, "gem", self.api, NOW)
+        self.assertEqual(result["clocks"]["runnerHeartbeat"]["status"], "current")
+        self.assertEqual(result["clocks"]["costAnomaly"]["status"], "current")
+        self.assertNotIn("event_type=clock_runner_heartbeat", self.posts())
+
+    def test_one_broken_clock_state_leaves_the_others_running(self):
+        (self.path / "cost-anomaly-clock.json").write_text("broken")
+        result = clock.tick(self.path, "gem", self.api, NOW)
+        self.assertEqual(result["clocks"]["costAnomaly"]["status"], "state-unobservable")
+        self.assertEqual(result["clocks"]["sentryRecurrence"]["status"], "dispatch-requested")
+        self.assertNotIn("event_type=clock_cost_anomaly_gate", self.posts())
+
+    def test_other_hosts_dispatch_nothing(self):
+        self.assertEqual(clock.tick(self.path, "mac", self.api, NOW)["status"], "not-owner")
+        self.assertEqual(self.calls, [])
 
 
 if __name__ == "__main__":

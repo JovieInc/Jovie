@@ -168,3 +168,33 @@ describe('LibraryShareDropCreator', () => {
     expect(body.message).toBeNull();
   });
 });
+
+describe('LibraryShareDropCreator controlled by the link row', () => {
+  it('renders no standalone trigger and reports close to its owner', () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <LibraryShareDropCreator
+        releaseIds={['release-1']}
+        defaultTitle='Take Me Over files'
+        open={false}
+        onOpenChange={onOpenChange}
+      />
+    );
+    expect(screen.queryByTestId('library-share-create-trigger')).toBeNull();
+    expect(screen.queryByTestId('library-share-create-panel')).toBeNull();
+
+    rerender(
+      <LibraryShareDropCreator
+        releaseIds={['release-1']}
+        defaultTitle='Take Me Over files'
+        open
+        onOpenChange={onOpenChange}
+      />
+    );
+    expect(screen.getByTestId('library-share-create-panel')).toHaveTextContent(
+      'Share files privately'
+    );
+    fireEvent.click(screen.getByTestId('library-share-create-cancel'));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});

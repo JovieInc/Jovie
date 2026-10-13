@@ -109,7 +109,14 @@ class SentryCiReporter implements Reporter {
       environment: this.destination.environment,
       release: process.env.SENTRY_RELEASE,
       tracesSampleRate: 0,
-      sendDefaultPii: false,
+      // SDK 11 replaced sendDefaultPii with dataCollection; collect no PII.
+      dataCollection: {
+        userInfo: false,
+        cookies: false,
+        httpHeaders: false,
+        httpBodies: [],
+        urlQueryParams: false,
+      },
       maxBreadcrumbs: 100,
       initialScope: {
         tags: {

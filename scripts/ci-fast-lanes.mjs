@@ -47,6 +47,7 @@ import {
   affectsWebTestTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
+import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 
 export { affectsWebTestTypecheck };
 
@@ -105,7 +106,22 @@ export const COPY_GATE_COMMAND =
  * Each runs here when the diff touches a file it reads. `prOnly` guards
  * already run in every web merge group and push, so they run on PRs only.
  */
+/** Repo-wide web unit guards; see runMergeGroupGuards. */
+export const MERGE_GROUP_GUARDS_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts';
+
 export const SOURCE_GUARDS = Object.freeze([
+  Object.freeze({
+    // The repo-wide design-system, metrics-layer and locked Pen chrome
+    // guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
+    // (2026-10-13) was ejected because a PR added text-destructive to
+    // OutboundRail.tsx and tripped destructive-red-drift-ratchet. They read
+    // web source from disk, so any web change can trip them.
+    id: 'merge-group-unit-guards',
+    command: MERGE_GROUP_GUARDS_COMMAND,
+    inputs: /^(?:apps\/web\/(?!tests\/e2e\/)|packages\/ui\/)/u,
+    prOnly: true,
+  }),
   Object.freeze({
     id: 'ci-schedule-inventory',
     command:
@@ -131,6 +147,21 @@ export const SOURCE_GUARDS = Object.freeze([
     // `@/` and relative imports reach any non-test apps/web source.
     inputs:
       /^apps\/web\/(?:tests\/unit\/marketing\/static-revalidate-policy\.test\.ts|(?!tests\/)(?!.*\.(?:test|spec)\.[cm]?[jt]sx?$).+)$/u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    // Every disk-reading web unit test whose path literals name a changed
+    // file (scripts/lib/web-source-read-tests.mjs). Such tests ejected ~45
+    // merge groups in the 7 days to 2026-10-12 because the import-graph
+    // selection never picked them. Any path can be read, so any change
+    // selects the guard; the script narrows to the tests (p50 2, p90 15).
+    id: 'web-source-read-tests',
+    // Resolved beside this module: Source Validation loads guards from the
+    // trusted base archive, so heads older than the script still get it.
+    command: `node ${JSON.stringify(
+      fileURLToPath(new URL('./lib/web-source-read-tests.mjs', import.meta.url))
+    )}`,
+    inputs: /./u,
     prOnly: true,
   }),
 ]);
@@ -360,6 +391,28 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
   'pnpm --dir apps/web exec ',
 ]);
 
+/** Files of the lanes coverage suite (one coverage map, sharded below). */
+const LANES_PYTEST_FILES =
+  'scripts/tests/test_lane_runner.py scripts/tests/test_design_gate.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_hud.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_continuity_clock.py scripts/tests/test_execution_attempt.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_worktree_sweep.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_worktree_pool.py scripts/tests/test_gh_app_token.py scripts/tests/test_service_census.py scripts/tests/test_epics.py';
+
+/**
+ * The lanes coverage pytest was ci-fast (remaining)'s long pole (174.5s and
+ * 211.0s in merge groups 38247843089 and 38317277564), one process on a
+ * 4 vCPU runner. Two concurrent shards select `-k EXPR` and `-k "not (EXPR)"`
+ * over the identical file list, so every collected test runs exactly once;
+ * EXPR names test_lane_runner.py's slowest class (~half the suite time). A
+ * rename that empties the first shard fails it (pytest exit 5). `coverage
+ * combine` merges both branch-coverage maps before the unchanged per-module
+ * thresholds read them.
+ */
+export const LANES_PYTEST_SHARD_EXPRESSION = 'UpdateTest';
+
+/** @param {string} shard @param {string} expression */
+const lanesCoverageShard = (shard, expression) =>
+  `COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard}.coverage" python3 -m coverage run --branch -m pytest ${LANES_PYTEST_FILES} -q -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-${shard}" -k "${expression}"`;
+
+const LANES_COVERAGE_RUN = `{ ${lanesCoverageShard('a', LANES_PYTEST_SHARD_EXPRESSION)} & lanes_a=$!; ${lanesCoverageShard('b', `not (${LANES_PYTEST_SHARD_EXPRESSION})`)}; lanes_b=$?; wait "$lanes_a" && test "$lanes_b" -eq 0; } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage combine "\${RUNNER_TEMP:-/tmp}/jovie-lanes-a.coverage" "\${RUNNER_TEMP:-/tmp}/jovie-lanes-b.coverage"`;
+
 /**
  * Structural Python regressions, split so the pool can overlap them. Each
  * command keeps its original `&&` dependencies (coverage run → report).
@@ -367,7 +420,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage run --branch -m pytest scripts/tests/test_lane_runner.py scripts/tests/test_design_gate.py scripts/tests/test_pr_events.py scripts/tests/test_reason_lane.py scripts/tests/test_doctor.py scripts/tests/test_hud.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_continuity_clock.py scripts/tests/test_execution_attempt.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_worktree_sweep.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_worktree_pool.py scripts/tests/test_gh_app_token.py scripts/tests/test_service_census.py scripts/tests/test_epics.py -q',
+      LANES_COVERAGE_RUN,
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hyperagent_lane.py" --fail-under=95',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/devin_free_policy.py" --fail-under=85',
@@ -387,11 +440,12 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.github/scripts/customer-notes-ready.test.js',
-  '.github/scripts/auto-merge-stuck-triage.test.js',
   '.claude/hooks/post-task-validate.test.mjs',
   '.claude/hooks/prod-db-session-guard.test.mjs',
   'scripts/agent-context/check.test.mjs',
+  'scripts/agent/fix-claim.test.mjs',
   'scripts/agent/pen-native-semantic-manifest-contract.test.mjs',
   'scripts/agent/pen-registry-audit.test.mjs',
   'scripts/api-route-pruning.test.mjs',
@@ -425,12 +479,14 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/funnel-judge/proof-gate.test.mjs',
   'scripts/funnel-judge/rubric.test.mjs',
   'scripts/funnel-judge/coherence-screen.test.mjs',
+  'scripts/lib/__tests__/test-file-dependencies.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/gem-producer-drift/check-attestation.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
   'scripts/invariants/assurance-matrix.test.mjs',
+  'scripts/time-bomb/scan.test.mjs',
   'scripts/invariants/model-audit-contract.test.mjs',
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
   'scripts/invariants/quality-saturation.test.mjs',
@@ -498,6 +554,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/blog-publish-latency.test.mjs',
   'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
   'scripts/lib/__tests__/stryker-babel-compatibility.test.mjs',
+  'scripts/lib/__tests__/mutation-diff.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
@@ -580,6 +637,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
+  'scripts/lib/__tests__/merge-group-fail-fast.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
@@ -697,8 +755,7 @@ const LANES = [
   {
     id: 'merge-group-guards',
     name: 'Merge-group unit guards',
-    nextLocalCommand:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
+    nextLocalCommand: MERGE_GROUP_GUARDS_COMMAND,
     run: runMergeGroupGuards,
   },
   {
@@ -1941,6 +1998,11 @@ const STRUCTURAL_LONG_POLES = Object.freeze([
   // order started the 42s one 16th of 22, so it set the web-only wall.
   'lib/__tests__/component-live-storybook-certification.test.mjs',
   'YoutubeThumbnailsLanding.test.tsx',
+  // 2026-10-12 merge group 38247843089 (ci-fast remaining, wall 260s): the
+  // lanes coverage pytest (174.5s) and the script-contract Vitest run (74.6s)
+  // were the slowest commands, yet list order started the pytest last.
+  'scripts/tests/test_lane_runner.py',
+  'lib/__tests__/merge-group-failure-hold.test.mjs',
 ]);
 
 const PACKAGE_DIRS = Object.freeze({ '@jovie/web': 'apps/web' });
@@ -2265,6 +2327,7 @@ export async function runStructural(opts = {}) {
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/shipping-lead-gate.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/shipping-lead-gate.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/summer-shipping-lead-contract.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=95 scripts/backlog-orchestrator/__tests__/summer-shipping-lead-contract.test.mjs',
     'python3 scripts/fleet-gate/tests/test_evaluate_fleet_gate.py',
+    'python3 scripts/fleet-gate/tests/test_receipt_writer.py',
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
@@ -2307,6 +2370,13 @@ export async function runStructural(opts = {}) {
     // Merge-group-only unit guards run in their own web lane (merge-group-guards).
   ];
   const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
+  // Script contracts run with the operations lane, but they also read web and
+  // docs sources. Without operations, run the ones whose derived imports/reads
+  // the diff touches (#20922 reddened main through rubric.test.mjs).
+  const dependentScriptTests =
+    selected.has('operations') || !changed?.length
+      ? []
+      : testsAffectedBy(SCRIPT_CONTRACT_NODE_TESTS, changed, REPO_ROOT);
   const allParts = [
     ...(selected.has('operations') || selected.has('web')
       ? [
@@ -2331,6 +2401,9 @@ export async function runStructural(opts = {}) {
         ]
       : []),
     ...invariantParts,
+    ...(dependentScriptTests.length
+      ? [`node --test ${dependentScriptTests.join(' ')}`]
+      : []),
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),

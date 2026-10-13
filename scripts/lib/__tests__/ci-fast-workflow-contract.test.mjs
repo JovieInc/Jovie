@@ -26,6 +26,7 @@ import {
   formatLaneDuration,
   LANE_COMMANDS,
   LANE_GROUPS,
+  LANES_PYTEST_SHARD_EXPRESSION,
   listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
   NODE_RUNTIME_CONTRACT_COMMAND,
@@ -257,6 +258,76 @@ describe('ci-fast bounded parallel workflow', () => {
         expect.stringContaining(`then ${command}; elif`)
       )
     );
+  });
+
+  it('partitions the lanes coverage suite into complementary concurrent shards', () => {
+    // One coverage map used to come from one serial pytest (174.5s, the
+    // remaining job's long pole). Both shards must select the identical files
+    // with complementary -k expressions, both must pass, and their maps must
+    // be combined before any per-module threshold reads the data file.
+    const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
+    const shards = [
+      ...command.matchAll(
+        /COVERAGE_FILE="([^"]+)" python3 -m coverage run --branch -m pytest ((?:scripts\/tests\/\S+\.py ?)+) -q -p no:cacheprovider --basetemp="([^"]+)" -k "([^"]+)"/gu
+      ),
+    ].map(([, data, files, basetemp, keyword]) => ({
+      data,
+      files: files.trim().split(' '),
+      basetemp,
+      keyword,
+    }));
+    expect(shards.map(shard => shard.keyword)).toEqual([
+      LANES_PYTEST_SHARD_EXPRESSION,
+      `not (${LANES_PYTEST_SHARD_EXPRESSION})`,
+    ]);
+    expect(shards[1].files).toEqual(shards[0].files);
+    expect(shards[0].files).toContain('scripts/tests/test_lane_runner.py');
+    expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(2);
+    expect(command).toContain(
+      'lanes_b=$?; wait "$lanes_a" && test "$lanes_b" -eq 0; } && '
+    );
+    const combine = command.indexOf(
+      `python3 -m coverage combine "${shards[0].data}" "${shards[1].data}"`
+    );
+    expect(combine).toBeGreaterThan(-1);
+    expect(command.indexOf('python3 -m coverage report')).toBeGreaterThan(
+      combine
+    );
+  });
+
+  it('fails the lanes coverage command when either shard fails', () => {
+    const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
+    for (const failing of ['a', 'b', '']) {
+      const root = mkdtempSync(join(tmpdir(), 'lanes-shards-'));
+      try {
+        const bin = join(root, 'bin');
+        mkdirSync(bin);
+        writeFileSync(
+          join(bin, 'python3'),
+          `#!/bin/sh\necho "$COVERAGE_FILE $*" >> "${root}/calls.log"\ncase "$COVERAGE_FILE $*" in *jovie-lanes-${failing || 'none'}.coverage*" -m coverage run "*) exit 9 ;; esac\nexit 0\n`,
+          { mode: 0o755 }
+        );
+        const result = spawnSync('sh', ['-c', command], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            RUNNER_TEMP: root,
+          },
+        });
+        const calls = readFileSync(join(root, 'calls.log'), 'utf8');
+        if (failing) {
+          expect(result.status, failing).not.toBe(0);
+          expect(calls).not.toContain('-m coverage report');
+        } else {
+          expect(result.status, result.stderr).toBe(0);
+          expect(calls).toContain('-m coverage combine');
+          expect(calls).toContain('-m coverage report');
+        }
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
   });
 
   it('runs the scanner-heavy invariant suites outside the V8-coverage node --test batch', () => {
@@ -2169,6 +2240,8 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(script).toContain("readonly ACTIONLINT_VERSION='1.7.12'");
     expect(script).toContain("readonly SHELLCHECK_VERSION='0.11.0'");
     expect(script).toContain("readonly PYFLAKES_VERSION='3.4.0'");
+    // Release-download 5xx bursts outlast a 3-retry window (10-12 ejection).
+    expect(script).toMatch(/--retry 6 --retry-all-errors --max-time 120/);
     for (const name of [
       'ACTIONLINT_SHA256',
       'SHELLCHECK_TARBALL_SHA256',

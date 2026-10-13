@@ -128,6 +128,39 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^apps\/web\/tests\/unit\/ci\/deploy-workflow\.test\.ts$/,
   ],
   [
+    // The Mac lane's own workflows and routing (macos-ci.yml, mac-lane*.yml,
+    // .github/actions/setup-node-pnpm) run the Mac and iOS builds, so editing
+    // them must run those builds, not just the operations contract tests.
+    'mac-lane-routing',
+    'operations-tooling',
+    ['ios', 'mac'],
+    /^(\.github\/workflows\/mac-lane(-route)?\.yml|\.github\/scripts\/mac-lane\.sh)$/,
+  ],
+  [
+    'mac-ci-tooling',
+    'operations-tooling',
+    ['mac'],
+    /^(\.github\/workflows\/macos-ci\.yml|\.github\/actions\/setup-node-pnpm\/|scripts\/generate-brand-assets\.ts)/,
+  ],
+  [
+    // Files outside apps/desktop that `@jovie/desktop` test and
+    // package:staging read: prepare-icons runs apps/web's brand generator
+    // (which reads the iOS AppIcon set), system-b-tokens.test reads the web
+    // CSS, url-disposition.test reads the route manifest, and the dogfood
+    // inventory must resolve its web sources. A guard test derives the
+    // inventory list from desktop-dogfood-inventory.mjs.
+    'mac-consumed-ios-input',
+    'ios',
+    ['ios', 'mac'],
+    /^apps\/ios\/Jovie\/Resources\/Assets\.xcassets\/AppIcon\.appiconset\/Contents\.json$/,
+  ],
+  [
+    'mac-consumed-web-input',
+    'web',
+    ['mac', 'web'],
+    /^(?:packages\/ui\/brand\/(geometry\.gen|jovie-o-geometry)\.ts$|apps\/web\/(scripts\/generate-brand-assets\.ts|lib\/brand\/tokens\.ts|lib\/design\/generated\/design-tokens\.ts|styles\/(design-system|system-b-app)\.css|data\/marketing\/routeManifest\.ts|constants\/routes\.ts|app\/desktop-auth\/DesktopAuthClient\.tsx|components\/organisms\/(DesktopTitlebar|CmdKPalette|CommandPalette|user-button\/UserButton)\.tsx|components\/features\/(workspace-lock\/WorkspaceLockScreen\.tsx|dashboard\/dashboard-nav\/config\.ts))$)/,
+  ],
+  [
     'ios-product',
     'ios',
     ['ios'],

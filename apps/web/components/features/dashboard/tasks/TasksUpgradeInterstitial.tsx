@@ -7,6 +7,7 @@ import { NavigationDestinationReady } from '@/components/features/dashboard/Navi
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { PageShell } from '@/components/organisms/PageShell';
 import { APP_ROUTES } from '@/constants/routes';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { cn } from '@/lib/utils';
 
 interface TasksUpgradeContentProps {
@@ -52,7 +53,7 @@ function TasksUpgradeContent({
         {description}
       </p>
       <div className='mt-6 flex flex-wrap items-center justify-center gap-3'>
-        <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>
+        <UpgradeButton size='sm'>{`Upgrade to ${PRO_PLAN_DISPLAY_NAME}`}</UpgradeButton>
         {secondaryHref ? (
           <Button asChild variant='outline' size='sm'>
             <Link href={secondaryHref}>{secondaryLabel}</Link>

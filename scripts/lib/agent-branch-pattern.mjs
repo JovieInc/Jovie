@@ -3,9 +3,7 @@
  * Single source of truth for open-agent-PR capacity counting.
  *
  * Used by:
- * - .github/workflows/github-ai-dispatcher.yml
- * - .github/workflows/github-ai-orchestrator.yml
- * - .github/workflows/agent-tick.yml (dispatch job)
+ * - .github/workflows/agent-pipeline.yml (branch matching)
  *
  * Call sites must feed paginated open-PR JSON (`gh api --paginate … | jq -s`)
  * so every gate counts the same PR universe.

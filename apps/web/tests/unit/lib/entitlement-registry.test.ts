@@ -184,7 +184,9 @@ describe('Entitlement Registry Consistency', () => {
       if (planId === 'free') continue;
       const features = ENTITLEMENT_REGISTRY[planId].marketing.features;
       const referencesFreeTier = features.some(
-        f => f.includes('All Free features') || f.includes('All Pro features')
+        f =>
+          f.includes('All Free features') ||
+          f.includes('All Artist Presence features')
       );
       expect(referencesFreeTier).toBe(true);
     }
@@ -259,7 +261,7 @@ describe('Entitlement Registry Consistency', () => {
     expect(getLimit('max', 'aiRetouchDailyLimit')).toBe(50);
     expect(getLimit('unknown', 'aiRetouchDailyLimit')).toBeNull();
 
-    expect(getPlanDisplayName('founding')).toBe('Pro');
+    expect(getPlanDisplayName('founding')).toBe('Artist Presence');
     expect(getPlanDisplayName('growth')).toBe('Max');
     expect(getPlanDisplayName(null)).toBe('Free');
   });
