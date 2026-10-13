@@ -1,8 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useRouter } from 'next/navigation';
-import { useTransition } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useTransition } from 'react';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
 import { ConnectorCard } from '@/components/features/connectors/ConnectorCard';
 import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
@@ -23,34 +23,51 @@ interface ConnectorState {
   readonly accountLabel?: string;
   readonly scopes?: readonly string[];
   readonly errorMessage?: string;
+  readonly available?: boolean;
+  readonly unavailableReason?: string;
+  readonly lastSyncAt?: string;
 }
 
 interface ConnectorsClientProps {
   readonly connectors: Readonly<Record<ConnectorProviderId, ConnectorState>>;
   readonly creatorProfileId: string | null;
   readonly isDev: boolean;
+  readonly returnTo?: string;
 }
 
 export function ConnectorsClient({
   connectors,
   creatorProfileId,
   isDev,
+  returnTo = APP_ROUTES.SETTINGS_CONNECTORS,
 }: ConnectorsClientProps) {
   const router = useRouter();
+  const oauthFailed = Boolean(useSearchParams().get('error'));
   const [isPendingExtract, startExtract] = useTransition();
+  const [pendingBundle, setPendingBundle] = useState<string | null>(null);
+  const [disconnected, setDisconnected] = useState<readonly string[]>([]);
+  const [pendingAction, setPendingAction] = useState<'connect' | 'disconnect'>(
+    'connect'
+  );
+  const [actionErrors, setActionErrors] = useState<
+    Partial<Record<ConnectorProviderId, string>>
+  >({});
 
   const handleConnect = (provider: ConnectorProviderId) => {
     const definition = getConnectorDefinition(provider);
+    if (pendingBundle || connectors[provider].available === false) return;
     const params = new URLSearchParams({
-      returnTo: APP_ROUTES.SETTINGS_CONNECTORS,
+      returnTo,
     });
     if (provider === CONNECTOR_PROVIDERS.youtube) {
       if (!creatorProfileId) {
-        toast.error('Select an artist profile before connecting YouTube.');
+        toast.error('Select an identity before connecting YouTube.');
         return;
       }
       params.set('creatorProfileId', creatorProfileId);
     }
+    setPendingAction('connect');
+    setPendingBundle(definition.oauthBundle);
     router.push(
       `/api/connectors/${definition.oauthBundle}/authorize?${params.toString()}`
     );
@@ -58,13 +75,17 @@ export function ConnectorsClient({
 
   const handleDisconnect = async (provider: ConnectorProviderId) => {
     const definition = getConnectorDefinition(provider);
+    if (pendingBundle) return;
+    setPendingAction('disconnect');
+    setPendingBundle(definition.oauthBundle);
+    setActionErrors(errors => ({ ...errors, [provider]: undefined }));
     try {
       const requestInit: RequestInit = {
         method: 'POST',
       };
       if (provider === CONNECTOR_PROVIDERS.youtube) {
         if (!creatorProfileId) {
-          toast.error('Select an artist profile before disconnecting YouTube.');
+          toast.error('Select an identity before disconnecting YouTube.');
           return;
         }
         requestInit.headers = { 'Content-Type': 'application/json' };
@@ -78,10 +99,15 @@ export function ConnectorsClient({
         requestInit
       );
       if (!res.ok) throw new Error('Disconnect failed');
+      setDisconnected(bundles => [...bundles, definition.oauthBundle]);
       toast.success(`${definition.label} disconnected`);
       router.refresh();
     } catch {
-      toast.error('Failed to disconnect. Please try again.');
+      const message = 'Failed to disconnect. Try again.';
+      setActionErrors(errors => ({ ...errors, [provider]: message }));
+      toast.error(message);
+    } finally {
+      setPendingBundle(null);
     }
   };
 
@@ -117,11 +143,21 @@ export function ConnectorsClient({
   return (
     <SettingsSection
       id='connectors'
-      title='Connections'
+      title='Integrations'
       // ui-casing-allow: sentence-case description (Found === Expected)
       description='Connect the services Jovie uses to understand and manage your work.'
     >
-      <SettingsPanel title='Connected Apps' bodyClassName='px-4 sm:px-5'>
+      <SettingsPanel title='Connected Accounts' bodyClassName='px-4 sm:px-5'>
+        {oauthFailed && (
+          <p role='alert' className='py-3 text-xs text-error'>
+            The connection did not finish. Check the account status below, then
+            try connecting again.
+          </p>
+        )}
+        <p className='pb-3 text-xs text-tertiary'>
+          Gmail and Calendar share a Google connection. Disconnecting either
+          removes both.
+        </p>
         <div className='divide-y divide-subtle'>
           {CONNECTOR_DEFINITIONS.map(definition => {
             const connector = connectors[definition.id];
@@ -129,10 +165,33 @@ export function ConnectorsClient({
               <ConnectorCard
                 key={definition.id}
                 provider={definition.id}
-                status={connector.status}
+                status={
+                  disconnected.includes(definition.oauthBundle)
+                    ? 'disabled'
+                    : connector.status
+                }
                 accountLabel={connector.accountLabel}
                 scopes={connector.scopes}
                 errorMessage={connector.errorMessage}
+                actionError={actionErrors[definition.id]}
+                available={
+                  connector.available !== false &&
+                  (definition.accountScope !== 'identity' ||
+                    Boolean(creatorProfileId))
+                }
+                unavailableReason={
+                  connector.unavailableReason ??
+                  (definition.accountScope === 'identity' && !creatorProfileId
+                    ? 'Select an identity to connect this account.'
+                    : undefined)
+                }
+                lastSyncAt={connector.lastSyncAt}
+                pending={pendingBundle === definition.oauthBundle}
+                actionDisabled={
+                  Boolean(pendingBundle) &&
+                  pendingBundle !== definition.oauthBundle
+                }
+                pendingAction={pendingAction}
                 onConnect={() => handleConnect(definition.id)}
                 onDisconnect={() => handleDisconnect(definition.id)}
               />

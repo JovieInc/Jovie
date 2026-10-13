@@ -27,6 +27,12 @@ interface LibraryShareDropCreatorProps {
   readonly candidateAssets?: readonly LibraryShareDropCandidate[];
   readonly defaultTitle: string;
   readonly onCreated?: (shareUrl: string) => void;
+  /**
+   * Controlled mode: the parent share affordance (the link row) owns the
+   * entry point, so no standalone "Share drop" trigger renders.
+   */
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 function uniqueIds(ids: readonly string[]): string[] {
@@ -38,6 +44,8 @@ export function LibraryShareDropCreator({
   candidateAssets,
   defaultTitle,
   onCreated,
+  open: controlledOpen,
+  onOpenChange,
 }: LibraryShareDropCreatorProps) {
   const candidates = useMemo(() => {
     // Explicit empty `candidateAssets` must stay empty (no phantom fallback ids).
@@ -55,7 +63,13 @@ export function LibraryShareDropCreator({
     return candidates[0] ? [candidates[0].id] : [];
   }, [candidates, releaseIds]);
 
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const [title, setTitle] = useState(defaultTitle);
   const [includeComment, setIncludeComment] = useState(false);
   const [message, setMessage] = useState('');
@@ -146,7 +160,7 @@ export function LibraryShareDropCreator({
         data-testid='library-share-created-panel'
       >
         <p className='text-sm font-semibold text-primary-token'>
-          Share drop ready
+          Private link ready
         </p>
         <p className='mt-1 text-xs text-secondary-token'>
           Anyone with this link can view these files
@@ -210,6 +224,7 @@ export function LibraryShareDropCreator({
   }
 
   if (!open) {
+    if (isControlled) return null;
     return (
       <button
         type='button'
@@ -232,7 +247,7 @@ export function LibraryShareDropCreator({
       data-testid='library-share-create-panel'
     >
       <p className='text-sm font-semibold text-primary-token'>
-        Create share drop
+        Share files privately
       </p>
       <p className='mt-1 text-xs text-secondary-token'>
         Send a branded share page with {selectedCount} selected asset

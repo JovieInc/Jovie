@@ -71,12 +71,13 @@ describe('UsageMenuItem', () => {
       <UsageMenuItem
         usageStatsUrl={APP_ROUTES.SETTINGS_USAGE}
         onUpgrade={onUpgrade}
-        upgradeLabel='Upgrade to Pro'
       />
     );
 
     await user.click(screen.getByRole('button', { name: /usage remaining/i }));
-    await user.click(screen.getByRole('button', { name: /upgrade to pro/i }));
+    await user.click(
+      screen.getByRole('button', { name: /upgrade to artist presence/i })
+    );
     expect(onUpgrade).toHaveBeenCalledTimes(1);
   });
 

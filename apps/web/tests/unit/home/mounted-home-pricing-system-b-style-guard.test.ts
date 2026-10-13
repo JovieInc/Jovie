@@ -107,6 +107,11 @@ describe('mounted homepage pricing System B source contract', () => {
     // wording.
     expect(source).toContain('Jovie profiles are free forever');
     expect(source).not.toContain('Artist profiles are free forever');
+
+    // Canonical plan naming (JOV-7809): the mounted homepage names Artist
+    // Presence, never the retired Artist Visibility Pro label.
+    expect(source).toContain('Artist Presence');
+    expect(source).not.toContain('Artist Visibility Pro');
   });
 
   it('keeps mounted homepage CTA headings explicitly clamped', () => {

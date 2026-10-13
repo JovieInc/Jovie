@@ -152,6 +152,7 @@ export const APP_ROUTES = {
   /** Jovie's own pages: index, SEO/agentic cert, copy gate, Lighthouse (JOV-6770). */
   ADMIN_PRESENCE: '/app/ov/presence',
   ADMIN_CERTIFICATIONS: '/app/ov/certifications',
+  ADMIN_OUTBOUND: '/app/ov/outbound',
   /** Legacy feature-flags route. Redirect-only; use ADMIN_FEATURES. */
   LEGACY_FEATURE_FLAGS: '/app/feature-flags',
 
@@ -206,6 +207,7 @@ export const APP_ROUTES = {
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */
   SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',
+  INTEGRATIONS: '/integrations',
   YOUTUBE_THUMBNAILS: '/youtube-thumbnails',
   VOICE: '/voice',
   /** Internal render-fixture index; the page itself 404s unless fixtures are enabled. */

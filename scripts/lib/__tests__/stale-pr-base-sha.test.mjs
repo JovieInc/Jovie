@@ -319,19 +319,6 @@ describe('uses where a stale event base SHA is acceptable', () => {
       '# May be stale (not refreshed on synchronize); the range helper only'
     );
   });
-
-  it('taste policy stays pinned to an exact trusted base commit', () => {
-    for (const file of ['taste-classifier.yml', 'taste-label-guard.yml']) {
-      const checkout = step(file, 'Checkout exact trusted base policy');
-      expect(checkout).toContain(
-        'ref: ${{ github.event.pull_request.base.sha }}'
-      );
-      expect(checkout).not.toContain('head.sha');
-      expect(workflow(file)).toContain(
-        'base.sha can lag the base tip (not refreshed on synchronize).'
-      );
-    }
-  });
 });
 
 describe('base-branch fetch await (ci.yml &base-fetch-await)', () => {

@@ -128,6 +128,24 @@ describe('AiCrawlerDetailPanel', () => {
     expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
   });
 
+  it('gates the teaser behind the canonical Artist Presence upsell', () => {
+    hoisted.useAiCrawlerAnalyticsQueryMock.mockReturnValue({
+      data: { ...populatedAnalytics, isPro: false, isTeaser: true },
+      isLoading: false,
+    });
+
+    render(<AiCrawlerDetailPanel isOpen onClose={() => undefined} />);
+
+    expect(
+      screen.getByText(
+        'Upgrade to Artist Presence to see named AI crawlers and 30-day trends.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    ).toBeInTheDocument();
+  });
+
   it('keeps the drawer content in a loading state while telemetry resolves', () => {
     hoisted.useAiCrawlerAnalyticsQueryMock.mockReturnValue({
       data: undefined,

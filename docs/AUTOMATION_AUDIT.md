@@ -83,9 +83,10 @@ Auto-Enroll** and **Auto-Ready Agent Drafts** first. Enable **Main CI Health
 Monitor** and **Main Autofix** only after the staged queue and production path
 have produced bounded proof. **GitHub AI Orchestrator**, **GitHub AI
 Dispatcher**, **Agent Tick**, **Agent Landing Sweep**, and **Stuck Draft
-Auto-Close** were deleted on 2026-10-12 under the Linear-only intake contract. Keep **Agent Pipeline**,
+Auto-Close** were deleted on 2026-10-12 under the Linear-only intake contract.
+**Taste Classifier** and **Taste Label Guard** are deleted at source. Keep **Agent Pipeline**,
 **PR Conflict Handler**, **Auto-Fix
-Lint on Agent Drafts**, **Taste Classifier**, **Taste Label Guard**, **Auto-PR on
+Lint on Agent Drafts**, **Auto-PR on
 Agent Push**, and the legacy **Release Loop** disabled throughout the drain. The new **Production
 Controller**, **Production Controller Health**, and **Production Release**
 workflows are intended to register active on land; verify that state explicitly

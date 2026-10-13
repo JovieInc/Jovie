@@ -1,10 +1,9 @@
 import type { CSSProperties } from 'react';
 import {
-  BRAND_PATHS,
   BRAND_WORDMARKS,
   type BrandMarkSize,
   type BrandVariant,
-  JOVIE_VIEWBOX,
+  jovieMarkAtSize,
   resolveBrandMarkSize,
 } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
@@ -29,8 +28,6 @@ const TONE_CLASSES: Record<BrandLogoTone, string | undefined> = {
   muted: 'text-muted-foreground/50',
 };
 
-const BRAND_VIEW_BOX = `0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}`;
-
 export function BrandLogo({
   size = 'chrome',
   className,
@@ -43,6 +40,9 @@ export function BrandLogo({
 }: BrandLogoProps) {
   const resolvedAlt = alt ?? BRAND_WORDMARKS[variant];
   const markSize = resolveBrandMarkSize(size);
+  // Both variants draw the same O in a square slot; the pixel master for the
+  // size keeps the seam and counter crisp at 16-32 px.
+  const mark = jovieMarkAtSize(markSize);
   return (
     <span
       className={cn(
@@ -58,7 +58,7 @@ export function BrandLogo({
     >
       <svg
         xmlns='http://www.w3.org/2000/svg'
-        viewBox={BRAND_VIEW_BOX}
+        viewBox={mark.viewBox}
         width={markSize}
         height={markSize}
         fill='currentColor'
@@ -67,7 +67,7 @@ export function BrandLogo({
         aria-label={ariaHidden ? undefined : resolvedAlt}
       >
         {!ariaHidden && <title>{resolvedAlt}</title>}
-        <path d={BRAND_PATHS[variant]} />
+        <path d={mark.d} />
       </svg>
     </span>
   );

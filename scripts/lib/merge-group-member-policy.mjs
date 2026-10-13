@@ -22,6 +22,7 @@ export const HOLD_LABELS = new Set([
   'tim-hold',
   'tim:hold',
   'hold:tim',
+  'queue-deferred',
 ]);
 const COLLABORATOR_ASSOCIATIONS = new Set(['COLLABORATOR', 'MEMBER', 'OWNER']);
 const OPINIONATED_REVIEW_STATES = new Set([
@@ -391,6 +392,7 @@ export async function enforceCombinedTreePayload({
   repository,
   request = githubRequest,
   token,
+  treeSha: provenTreeSha = undefined,
 }) {
   requireSha(headSha, 'merge_group.head_sha');
   splitRepository(repository);
@@ -404,15 +406,17 @@ export async function enforceCombinedTreePayload({
     .split('/')
     .map(encodeURIComponent)
     .join('/');
-  const commit = await request(
-    `/repos/${encodedRepository}/git/commits/${headSha}`,
-    { deadlineMs, token }
-  );
-  const treeSha = commit.data?.tree?.sha;
-  if (
-    commit.data?.sha !== headSha ||
-    !SHA_PATTERN.test(String(treeSha ?? ''))
-  ) {
+  // The compare read already proved the head commit and names its tree.
+  let treeSha = provenTreeSha;
+  if (treeSha === undefined) {
+    const commit = await request(
+      `/repos/${encodedRepository}/git/commits/${headSha}`,
+      { deadlineMs, token }
+    );
+    treeSha = commit.data?.tree?.sha;
+    if (commit.data?.sha !== headSha) treeSha = undefined;
+  }
+  if (!SHA_PATTERN.test(String(treeSha ?? ''))) {
     fail('combined head commit evidence is missing or malformed');
   }
 
@@ -483,25 +487,124 @@ export async function readBoundedResponseText(
   return text + decoder.decode();
 }
 
-/**
- * @param {string} path
- * @param {{ token?: string, method?: string, body?: unknown, deadlineMs?: number,
- * env?: NodeJS.ProcessEnv, fetchImpl?: typeof fetch, now?: () => number,
- * timeoutSignal?: (milliseconds: number) => AbortSignal }} [options]
- * @returns {Promise<{data: any, link?: string | null}>}
- */
+// GitHub answers that say nothing about the merge group (secondary limits,
+// 5xx, a primary quota whose reset lands inside the deadline) are retried
+// instead of turning this required check red. On 2026-10-13 01:53-01:55Z 19
+// PR Size Guard merge groups failed on the repo's exhausted GITHUB_TOKEN.
+// Kept self-contained (same rules as scripts/lib/github-rate-limit.mjs): this
+// file runs from four sparse checkouts, including a pinned bootstrap base.
+export const MAX_API_ATTEMPTS = 3;
+const RETRY_MARGIN_MS = 2_000;
+const PRIMARY = 'primary-rate-limit';
+const NONE = 'none';
+
+function headerNumber(headers, name) {
+  const value = headers?.get?.(name);
+  return value != null && /^[0-9]+$/.test(String(value).trim())
+    ? Number(value)
+    : null;
+}
+
+function classifyGitHubFailure({ status, message, headers, now }) {
+  const remaining = headerNumber(headers, 'x-ratelimit-remaining');
+  const reset = headerNumber(headers, 'x-ratelimit-reset');
+  const retryAfter = headerNumber(headers, 'retry-after');
+  const bounds = [];
+  if (remaining === 0 && reset !== null) bounds.push(reset * 1000);
+  if (retryAfter !== null) bounds.push(now + retryAfter * 1000);
+  const retryAtMs = bounds.length ? Math.max(now, ...bounds) + 1000 : null;
+  const text = String(message ?? '');
+  if (
+    /\bAPI rate limit (?:already )?exceeded for\b/i.test(text) ||
+    ((status === 403 || status === 429) && remaining === 0)
+  ) {
+    return { kind: PRIMARY, retryAtMs };
+  }
+  if (
+    status === 429 ||
+    /\bsecondary rate limit\b|\babuse (?:detection|rate limit)\b/i.test(text) ||
+    (status === 403 && retryAfter !== null)
+  ) {
+    return { kind: 'secondary-rate-limit', retryAtMs };
+  }
+  if ([500, 502, 503, 504].includes(Number(status))) {
+    return { kind: 'transient-server', retryAtMs };
+  }
+  return { kind: NONE, retryAtMs: null };
+}
+
+/** Wait before the next attempt, or null when the answer is final or the wait misses the deadline. */
+export function apiRetryDelay({
+  status,
+  message,
+  headers,
+  attempt,
+  nowMs,
+  deadlineMs,
+}) {
+  if (attempt >= MAX_API_ATTEMPTS) return null;
+  const failure = classifyGitHubFailure({
+    status,
+    message,
+    headers,
+    now: nowMs,
+  });
+  if (failure.kind === NONE) return null;
+  const waitMs =
+    failure.retryAtMs !== null
+      ? failure.retryAtMs - nowMs
+      : failure.kind === PRIMARY
+        ? null
+        : 1_000 * 2 ** (attempt - 1);
+  if (waitMs === null || nowMs + waitMs > deadlineMs - RETRY_MARGIN_MS) {
+    return null;
+  }
+  return Math.max(0, waitMs);
+}
+
+/** @returns {Promise<{ data: any, link?: string | null }>} */
 export async function githubRequest(
   path,
   {
-    token,
+    token = undefined,
     method = 'GET',
-    body,
-    deadlineMs,
+    body = undefined,
+    deadlineMs = undefined,
     env = process.env,
     fetchImpl = fetch,
     now = Date.now,
     timeoutSignal = AbortSignal.timeout,
+    sleep = delayMs => new Promise(resolve => setTimeout(resolve, delayMs)),
   } = {}
+) {
+  for (let attempt = 1; ; attempt += 1) {
+    const answer = await requestOnce(path, {
+      token,
+      method,
+      body,
+      deadlineMs,
+      env,
+      fetchImpl,
+      now,
+      timeoutSignal,
+    });
+    if (answer.ok) return { data: answer.data, link: answer.link };
+    const delayMs = apiRetryDelay({
+      status: answer.status,
+      message: answer.message,
+      headers: answer.headers,
+      attempt,
+      nowMs: now(),
+      deadlineMs,
+    });
+    if (delayMs === null) fail(answer.message);
+    await sleep(delayMs);
+  }
+}
+
+async function requestOnce(
+  path,
+  { token, method, body, deadlineMs, env, fetchImpl, now, timeoutSignal }
 ) {
   requireDeadline(deadlineMs, now);
   const remainingMs = deadlineMs - now();
@@ -534,14 +637,19 @@ export async function githubRequest(
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
-    fail(`GitHub API returned non-JSON for ${path}`);
+    // A 5xx gateway page is HTML; it is still a retryable answer.
+    if (response.ok) fail(`GitHub API returned non-JSON for ${path}`);
+    data = null;
   }
   if (!response.ok) {
-    fail(
-      `GitHub API ${response.status} for ${path}: ${data?.message ?? 'unknown error'}`
-    );
+    return {
+      ok: false,
+      status: response.status,
+      headers: response.headers,
+      message: `GitHub API ${response.status} for ${path}: ${data?.message ?? 'unknown error'}`,
+    };
   }
-  return { data, link: response.headers.get('link') };
+  return { ok: true, data, link: response.headers.get('link') };
 }
 
 async function githubPages(
@@ -630,6 +738,7 @@ async function evaluateMembers({
   env,
   policy,
   pullRequests,
+  rangeFiles = null,
   repository,
   request,
   token,
@@ -660,13 +769,16 @@ async function evaluateMembers({
           pr.user?.login === 'dependabot[bot]' ||
           pr.head?.ref === 'screenshots/auto-update' ||
           labels.some(label => SIZE_BYPASS_LABELS.has(label));
-        return exempt
-          ? []
-          : githubPages(`/repos/${repository}/pulls/${pr.number}/files`, {
-              token,
-              deadlineMs,
-              request,
-            });
+        if (exempt) return [];
+        // A one-member group's compare diff is that PR's squash: its file
+        // list is already in hand, so the per-member files read is spent
+        // only for multi-member groups or a compare capped at 300 files.
+        if (rangeFiles) return rangeFiles;
+        return githubPages(`/repos/${repository}/pulls/${pr.number}/files`, {
+          token,
+          deadlineMs,
+          request,
+        });
       })
     );
     results = pullRequests.map((pr, index) =>
@@ -728,7 +840,29 @@ export async function runPolicy({
   pullRequests.forEach((pr, index) =>
     assertCurrentPullRequest(members[index], pr)
   );
-  const shared = { deadlineMs, env, pullRequests, repository, request, token };
+  // GitHub's compare returns at most 300 files; a full page may be truncated.
+  const COMPARE_FILE_CAP = 300;
+  const rangeFiles =
+    members.length === 1 &&
+    Array.isArray(comparison.files) &&
+    comparison.files.length < COMPARE_FILE_CAP
+      ? comparison.files
+      : null;
+  const headCommit = comparison.commits.at(-1);
+  const provenTreeSha =
+    headCommit?.sha === headSha &&
+    SHA_PATTERN.test(String(headCommit?.commit?.tree?.sha ?? ''))
+      ? headCommit.commit.tree.sha
+      : undefined;
+  const shared = {
+    deadlineMs,
+    env,
+    pullRequests,
+    rangeFiles,
+    repository,
+    request,
+    token,
+  };
 
   if (also) {
     // Publish the secondary verdict before any primary-only evidence (the
@@ -752,6 +886,7 @@ export async function runPolicy({
       repository,
       request,
       token,
+      treeSha: provenTreeSha,
     });
     const warning = trackedBytesBudgetWarning(payload.bytes);
     if (warning) log(`::warning::Combined tree: ${warning}`);
