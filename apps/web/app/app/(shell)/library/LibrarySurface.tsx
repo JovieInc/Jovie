@@ -6,6 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -40,6 +41,7 @@ import {
   RefreshCw,
   Table2,
   Video,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -2379,21 +2381,35 @@ function AssetDrawer({
     [onClose]
   );
   const drawerHeaderActions = current ? (
-    <DrawerHeaderActions
-      primaryActions={[
-        {
-          id: 'open-full-view',
-          label: 'Open Full View',
-          icon: ExternalLink,
-          href: current.primaryActionHref ?? current.smartLinkPath,
-        },
-      ]}
-      menuItems={convertToCommonDropdownItems(getContextMenuItems(current))}
-      onClose={onClose}
-      searchable
-      searchPlaceholder='Search actions'
-      searchMode='recursive'
-    />
+    <div className='flex items-center gap-0.5'>
+      <DrawerHeaderActions
+        primaryActions={[
+          {
+            id: 'open-full-view',
+            label: 'Open Full View',
+            icon: ExternalLink,
+            href: current.primaryActionHref ?? current.smartLinkPath,
+          },
+        ]}
+        menuItems={convertToCommonDropdownItems(getContextMenuItems(current))}
+        onClose={onClose}
+        searchable
+        searchPlaceholder='Search actions'
+        searchMode='recursive'
+      />
+      {/* Below lg the inspector is a full-screen sheet with nothing outside
+          it to click, so close gets a visible control (desktop: Esc). */}
+      <IconButton
+        variant='ghost'
+        size='sm'
+        onClick={onClose}
+        aria-label='Close'
+        className='lg:hidden'
+        data-testid='library-inspector-close'
+      >
+        <X className='h-3.5 w-3.5' aria-hidden='true' />
+      </IconButton>
+    </div>
   ) : null;
 
   return (
