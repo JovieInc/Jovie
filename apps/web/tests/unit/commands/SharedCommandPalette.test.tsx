@@ -504,7 +504,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(pushMock).toHaveBeenCalledWith('/app/chat?skill=submitFeedback');
   });
 
-  it('routes a release entity commit to its tasks page', () => {
+  it('routes a release entity commit to its Work inspector', () => {
     pushMock.mockClear();
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     const releaseRow = screen
@@ -512,7 +512,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       .find(el => el.textContent?.includes('Midnight Run'));
     expect(releaseRow).toBeDefined();
     fireEvent.mouseDown(releaseRow!);
-    expect(pushMock).toHaveBeenCalledWith('/app/releases/rel-1/tasks');
+    expect(pushMock).toHaveBeenCalledWith('/app/library?work=rel-1');
   });
 
   it('renders additional sections (e.g. recent chats) and routes via callback', () => {
