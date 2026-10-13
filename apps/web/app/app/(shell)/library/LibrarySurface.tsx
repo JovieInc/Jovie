@@ -1512,8 +1512,13 @@ function LibraryToolbar({
               hidden={filtersOpen}
             />
           </div>
+          {/* One count per breakpoint: the status bar owns it from sm up. */}
           <span
-            className={cn(PAGE_TOOLBAR_META_TEXT_CLASS, 'whitespace-nowrap')}
+            className={cn(
+              PAGE_TOOLBAR_META_TEXT_CLASS,
+              'whitespace-nowrap sm:hidden'
+            )}
+            data-testid='library-toolbar-count'
           >
             {visibleCount}
             {visibleCount === totalCount ? '' : ` of ${totalCount}`} visible
