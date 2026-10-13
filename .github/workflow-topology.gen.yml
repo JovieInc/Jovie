@@ -790,6 +790,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:verify
     jobCount: 1
+  - name: Mutation Diff
+    path: .github/workflows/mutation-diff.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:mutate
+    jobCount: 1
   - name: Neon Ephemeral Branch Cleanup
     path: .github/workflows/neon-ephemeral-branch-cleanup.yml
     active: true
