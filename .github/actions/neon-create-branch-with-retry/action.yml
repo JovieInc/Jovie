@@ -1,5 +1,5 @@
 name: 'Create Neon Branch with Retry'
-description: 'Create Neon branch with automatic cleanup and retry on limit errors'
+description: 'Create Neon branch with automatic cleanup, retry on endpoint-capacity errors, and bounded backoff on HTTP 5xx'
 
 inputs:
   project_id:
@@ -63,7 +63,7 @@ runs:
         echo "expires_at=$EXPIRES_AT" >> $GITHUB_OUTPUT
         echo "Branch will auto-expire at: $EXPIRES_AT (${HOURS}h from now)"
 
-    - name: Create Neon branch with bounded capacity retry
+    - name: Create Neon branch with bounded capacity and HTTP 5xx retry
       id: create-branch
       shell: bash
       env:
