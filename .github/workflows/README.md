@@ -230,7 +230,7 @@ Sensitive changes are classified deterministically on source PRs. Smoke and prev
 ## Internal PR Review (advisory)
 
 `internal-review.yml` (JOV-7400) is the internal, advisory-only replacement for
-CodeRabbit. On each non-draft PR open, reopen, ready-for-review and push it posts one upserted comment covering correctness risks, test gaps, migration
+CodeRabbit. On each non-draft PR open, reopen and push it posts one upserted comment covering correctness risks, test gaps, migration
 hazards and violations of the scoped `.claude/rules` conventions for the
 changed paths, via the Vercel AI Gateway (`zai/glm-5.3-flash`, existing
 `AI_GATEWAY_API_KEY` secret — no new vendors). Drafts, Dependabot, `bot/*`

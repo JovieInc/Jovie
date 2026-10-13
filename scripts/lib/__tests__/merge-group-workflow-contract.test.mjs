@@ -369,12 +369,11 @@ describe('merge_group workflow contract', () => {
     expect(FORK_GATE_WORKFLOW).not.toMatch(/^\s*merge_group:\s*$/m);
   });
 
-  it('reserves ready_for_review for green-enroll and the advisory reviewer', () => {
+  it('reserves ready_for_review for the green-enroll admission wake only', () => {
     const workflowDir = resolve(REPO_ROOT, '.github/workflows');
     const offenders = readdirSync(workflowDir)
       .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
       .filter(file => file !== 'merge-queue-green-enroll.yml')
-      .filter(file => file !== 'internal-review.yml')
       .filter(file => {
         const source = readFileSync(resolve(workflowDir, file), 'utf8');
         return workflowDeclaresReadyForReviewType(source);
@@ -395,18 +394,6 @@ describe('merge_group workflow contract', () => {
     );
     expect(getJobBlock(GREEN_ENROLL_WORKFLOW, 'enroll')).toContain(
       "(github.event_name != 'pull_request_target' || github.event.pull_request.draft == false)"
-    );
-    // The advisory reviewer posts one comment; it is never a CI flight or a
-    // required check, and it still skips drafts.
-    const reviewer = readFileSync(
-      resolve(workflowDir, 'internal-review.yml'),
-      'utf8'
-    );
-    expect(reviewer).toContain(
-      'types: [opened, reopened, ready_for_review, synchronize]'
-    );
-    expect(getJobBlock(reviewer, 'review')).toContain(
-      'github.event.pull_request.draft != true'
     );
   });
 
