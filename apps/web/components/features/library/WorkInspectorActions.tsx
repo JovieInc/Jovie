@@ -141,7 +141,7 @@ export function WorkInspectorActions({
   readonly launches?: readonly WorkLaunchSummary[];
   readonly canPublish: boolean;
   readonly disabled?: boolean;
-  /** Jumps to the private file-sharing surface (Files view). */
+  /** Opens private file sharing in place, on the link row it belongs to. */
   readonly onSharePrivately: () => void;
   readonly onRetryLaunchKit?: (launch: WorkLaunchSummary) => void;
 }) {
