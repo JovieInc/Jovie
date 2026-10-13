@@ -1024,7 +1024,7 @@ describe('limiters.ts', () => {
       const result = await checkAiChatRateLimitForPlan('user-1', null);
 
       expect(result.success).toBe(false);
-      expect(result.reason).toContain('Upgrade to Pro');
+      expect(result.reason).toContain('Upgrade to Artist Presence');
     });
 
     it('returns weekly quota failure without upgrade message for pro plan', async () => {
@@ -1359,7 +1359,7 @@ describe('limiters.ts', () => {
 
       expect(result.success).toBe(false);
       expect(result.reason).toContain('24 hours');
-      expect(result.reason).toContain('Upgrade to Pro');
+      expect(result.reason).toContain('Upgrade to Artist Presence');
     });
 
     it('returns failure without upgrade message for pro plan', async () => {
@@ -1471,7 +1471,7 @@ describe('limiters.ts', () => {
 
       expect(result.success).toBe(false);
       expect(result.reason).toContain('24 hours');
-      expect(result.reason).toContain('Upgrade to Pro');
+      expect(result.reason).toContain('Upgrade to Artist Presence');
     });
 
     it('returns failure without upgrade message for pro plan', async () => {

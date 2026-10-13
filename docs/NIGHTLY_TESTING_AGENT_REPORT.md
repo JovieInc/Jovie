@@ -3,12 +3,12 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38319365497)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38325221772)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-10-12T23:16:11.228Z
+Generated: 2026-10-13T00:22:57.048Z
 Workflow conclusion: failure
 
 ## Evidence warnings
@@ -19,10 +19,10 @@ Workflow conclusion: failure
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 8131 | 8089 | 0 | 0 | 42 |
+| unit | 8129 | 8087 | 0 | 0 | 42 |
 | unit | 10014 | 10004 | 0 | 0 | 10 |
 | unit | 8211 | 8194 | 0 | 0 | 17 |
-| unit | 8531 | 8495 | 0 | 0 | 36 |
+| unit | 8530 | 8493 | 1 | 0 | 36 |
 
 ## Selected Targets
 
@@ -46,4 +46,4 @@ Workflow conclusion: failure
 
 | Lane | Test | File | Message |
 |---|---|---|---|
-| none | none | none | none |
+| unit | tests/unit/ovie/mcp-handler.test.ts Ovie MCP handler > prepares the latest certified investor proof brief for the founder |  | expected false to be true // Object.is equality |

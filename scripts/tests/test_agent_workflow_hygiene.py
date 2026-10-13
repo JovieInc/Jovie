@@ -635,8 +635,6 @@ def test_conflict_handler_uses_shared_non_cancelling_canary_queue() -> None:
 def test_conflict_handler_reserves_app_token_for_bounded_mutations() -> None:
     """Fleet reads cannot consume the App installation's writer budget."""
     block = _job_block("pr-conflict-handler.yml", "plan")
-    ledger = _job_block("pr-conflict-handler.yml", "record_cohort")
-
     assert "GH_TOKEN: ${{ github.token }}" in block
     assert "GH_QUEUE_TOKEN: ${{ github.token }}" in block
     assert "GH_MUTATION_TOKEN: ${{ steps.app-token.outputs.token }}" in block
@@ -649,51 +647,7 @@ def test_conflict_handler_reserves_app_token_for_bounded_mutations() -> None:
     assert "hydrateOpenPrStatusContexts" in fleet
     assert "'pr',\n    'list'" not in fleet
     assert "statusCheckRollup'].join" not in fleet
-    assert "GH_TOKEN: ${{ github.token }}" in ledger
-    assert "GH_LEDGER_TOKEN: ${{ steps.app-token.outputs.token }}" in ledger
-    assert 'GH_TOKEN="$GH_LEDGER_TOKEN" gh api -X POST' in ledger
-    assert 'GH_TOKEN="$GH_LEDGER_TOKEN" gh api -X PATCH' in ledger
 
-
-def test_conflict_cohort_batches_poll_reads_and_fails_closed_on_ledger_lookup() -> None:
-    """A 40-PR cohort must stay under the workflow token's read budget."""
-    ledger = _job_block("pr-conflict-handler.yml", "record_cohort")
-    assignments = {}
-    for name in (
-        "poll_interval_seconds",
-        "poll_deadline_seconds",
-        "max_ci_run_pages",
-        "max_cohort_size",
-    ):
-        match = re.search(rf"^\s*{name}=(\d+)$", ledger, re.MULTILINE)
-        assert match, name
-        assignments[name] = int(match.group(1))
-
-    polls = (
-        assignments["poll_deadline_seconds"]
-        + assignments["poll_interval_seconds"]
-        - 1
-    ) // assignments["poll_interval_seconds"]
-    fixed_read_ceiling = 5 * assignments["max_cohort_size"] + 20
-    worst_case_reads = fixed_read_ceiling + polls * (
-        1 + assignments["max_ci_run_pages"]
-    )
-    assert worst_case_reads == 460
-    assert worst_case_reads < 1000
-
-    poll = ledger.split(
-        "deadline=$((SECONDS + poll_deadline_seconds))", 1
-    )[1].split("timed_out=", 1)[0]
-    assert 'repos/$REPOSITORY/pulls/$pr' not in poll
-    assert "actions/workflows/ci.yml/runs?head_sha" not in poll
-    assert "buildConflictCohortLiveHeadQuery" in poll
-    assert "indexLatestConflictCohortCiRuns" in poll
-    assert "gh api graphql" in poll
-    assert "page <= max_ci_run_pages" in poll
-
-    assert "--paginate --slurp" in ledger
-    assert "duplicate cohort receipts" in ledger
-    assert "| head -1 || true" not in ledger
 
 
 def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
@@ -1475,8 +1429,9 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
         encoding="utf-8"
     )
     assert "Graphite" not in dependabot
-    assert "scripts/native-merge-intent.mjs" in dependabot
-    assert "--match-head-commit" in (REPO_ROOT / "scripts" / "native-merge-intent.mjs").read_text(encoding="utf-8")
+    # Green enroll is the sole queue writer; Dependabot reconciliation never arms.
+    assert "native-merge-intent" not in dependabot
+    assert "--auto" not in dependabot
     adapter = (REPO_ROOT / "scripts" / "dependabot-workflow-run-adapter.mjs").read_text(
         encoding="utf-8"
     )
@@ -1497,10 +1452,7 @@ def test_dependabot_workflow_materializes_trusted_policy_runtime() -> None:
     assert "\n  workflow_run:" not in workflow
     assert "actions/download-artifact" not in workflow
     assert "      actions: read" in workflow
-    for entrypoint in (
-        "scripts/dependabot-workflow-run-adapter.mjs",
-        "scripts/native-merge-intent.mjs",
-    ):
+    for entrypoint in ("scripts/dependabot-workflow-run-adapter.mjs",):
         assert entrypoint in materialized
         _assert_local_runtime_closure(materialized, entrypoint)
 
@@ -1562,9 +1514,11 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "delivery-state-machine.mjs" in block
     assert "steps.refresh.outputs.receipt_path" in block
     assert "state/gem-priority-gate/latest.json" not in block
-    assert "steps.stack-actions.outcome == 'success'" in block
-    assert "LANES_STATE: /home/timwhite/.local/state/jovie-lanes" in block
-    assert "LANES_REPO: /home/timwhite/devin-sweep/Jovie" in block
+    # The lanes emitter owns the canonical receipt; refresh writes it only via
+    # the stale-receipt fallback, and the dead remediate hop stays deleted.
+    assert "python3 scripts/fleet-gate/receipt_writer.py" in block
+    assert "GEM_PRIORITY_GATE_STATE_DIR: ${{ steps.writer.outputs.state_dir }}" in block
+    assert "Remediate JOV backlog" not in block
     assert "push:" in trigger and "branches: [main]" in trigger
 
 
@@ -1635,7 +1589,7 @@ def test_triage_catch_up_uses_trusted_main_and_preserves_wake_receipts() -> None
     assert "persist-credentials: false" in checkout
     assert "if:" not in checkout
     catch_up = block.split("- name: Recover missed Linear Triage events", 1)[1].split(
-        "- name: Wake existing picker", 1
+        "- name: Preserve Triage catch-up receipt", 1
     )[0]
     assert "steps.debounce" not in catch_up
     assert (
@@ -1644,13 +1598,6 @@ def test_triage_catch_up_uses_trusted_main_and_preserves_wake_receipts() -> None
     )
     assert '--sweep > "$RECEIPT_FILE"' in catch_up
     assert "summer-bottleneck-signing.env" in catch_up
-    wake = block.split("- name: Wake existing picker", 1)[1].split(
-        "- name: Preserve Triage", 1
-    )[0]
-    assert "if: always()" in wake
-    assert '[[ -s "$RECEIPT_FILE" ]]' in wake
-    assert ".wakeSymphony == true" in wake
-    assert "--max-time 5" in wake
     receipt = block.split("- name: Preserve Triage catch-up receipt", 1)[1]
     assert "if: always()" in receipt
     assert (
@@ -1673,7 +1620,7 @@ def test_triage_catch_up_survives_failed_reconciliation_with_trusted_prerequisit
     assert "ref: main" in checkout
     assert "id: main-node" in node_setup
     catch_up = block.split("- name: Recover missed Linear Triage events", 1)[1].split(
-        "- name: Wake existing picker", 1
+        "- name: Preserve Triage catch-up receipt", 1
     )[0]
     condition = re.search(r"if: >-\n(.*?)\n        env:", catch_up, re.DOTALL)
     assert condition is not None, "Default success() skips recovery after upstream failure"
@@ -1685,16 +1632,16 @@ def test_triage_catch_up_survives_failed_reconciliation_with_trusted_prerequisit
     assert "continue-on-error:" not in block
 
 
-def test_symphony_wake_requires_verified_admitted_receipt() -> None:
-    """The assess job writes the exact-issue receipt before any Symphony wake,
-    and the wake is conditioned on the reconciler's mutated Todo transition."""
+def test_triage_receipts_never_wake_the_retired_symphony_endpoint() -> None:
+    """The Elixir Symphony at 127.0.0.1:4041 is retired (connection refused);
+    the Gem lanes dispatch tick picks Todo work from its Linear mirror. A wake
+    curl there only turned admitted Triage receipts into red runs."""
+    workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
+    assert "127.0.0.1:4041" not in workflow
+    assert ".wakeSymphony == true" not in workflow
     block = _job_block("fleet-gate-refresh.yml", "assess")
     assert "github.event_name == 'repository_dispatch'" in block
-    receipt_write = block.index('> "$RECEIPT_FILE"')
-    wake_gate = block.index(".wakeSymphony == true")
-    wake_call = block.index("http://127.0.0.1:4041/api/v1/refresh")
-    assert receipt_write < wake_gate < wake_call
-    assert "requiresImmediateInvestigation == true" in block
+    assert block.index('> "$RECEIPT_FILE"') < block.index("requiresImmediateInvestigation == true")
 
 
 def test_retired_admission_commands_stay_disabled() -> None:

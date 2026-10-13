@@ -12,12 +12,11 @@ import { useState } from 'react';
 import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { APP_ROUTES } from '@/constants/routes';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { useBillingStatusQuery, usePortalMutation } from '@/lib/queries';
 
 function resolvePlanLabel(plan: string | null | undefined): string {
-  if (plan === 'max' || plan === 'growth') return 'Max';
-  if (plan === 'pro') return 'Pro';
-  return 'Free';
+  return getPlanDisplayName(plan);
 }
 
 function resolveBadgeLabel(ctx: {
