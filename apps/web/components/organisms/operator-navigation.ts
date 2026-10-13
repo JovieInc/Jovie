@@ -79,6 +79,10 @@ export const OPERATOR_NAV_ITEMS: readonly OperatorNavItem[] =
     icon: OPERATOR_ICON_BY_ID[item.id],
   }));
 
+/** Group label type for every block in the OV sidebar (sections and lists). */
+export const OPERATOR_NAV_GROUP_LABEL =
+  'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90';
+
 export const OPERATOR_NAV_SECTIONS = [
   {
     label: 'Workspaces',

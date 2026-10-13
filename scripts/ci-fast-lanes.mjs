@@ -105,7 +105,22 @@ export const COPY_GATE_COMMAND =
  * Each runs here when the diff touches a file it reads. `prOnly` guards
  * already run in every web merge group and push, so they run on PRs only.
  */
+/** Repo-wide web unit guards; see runMergeGroupGuards. */
+export const MERGE_GROUP_GUARDS_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts';
+
 export const SOURCE_GUARDS = Object.freeze([
+  Object.freeze({
+    // The repo-wide design-system, metrics-layer and locked Pen chrome
+    // guards (~42s) ran only in ci-fast, i.e. merge groups: group pr-21458
+    // (2026-10-13) was ejected because a PR added text-destructive to
+    // OutboundRail.tsx and tripped destructive-red-drift-ratchet. They read
+    // web source from disk, so any web change can trip them.
+    id: 'merge-group-unit-guards',
+    command: MERGE_GROUP_GUARDS_COMMAND,
+    inputs: /^(?:apps\/web\/(?!tests\/e2e\/)|packages\/ui\/)/u,
+    prOnly: true,
+  }),
   Object.freeze({
     id: 'ci-schedule-inventory',
     command:
@@ -131,6 +146,21 @@ export const SOURCE_GUARDS = Object.freeze([
     // `@/` and relative imports reach any non-test apps/web source.
     inputs:
       /^apps\/web\/(?:tests\/unit\/marketing\/static-revalidate-policy\.test\.ts|(?!tests\/)(?!.*\.(?:test|spec)\.[cm]?[jt]sx?$).+)$/u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    // Every disk-reading web unit test whose path literals name a changed
+    // file (scripts/lib/web-source-read-tests.mjs). Such tests ejected ~45
+    // merge groups in the 7 days to 2026-10-12 because the import-graph
+    // selection never picked them. Any path can be read, so any change
+    // selects the guard; the script narrows to the tests (p50 2, p90 15).
+    id: 'web-source-read-tests',
+    // Resolved beside this module: Source Validation loads guards from the
+    // trusted base archive, so heads older than the script still get it.
+    command: `node ${JSON.stringify(
+      fileURLToPath(new URL('./lib/web-source-read-tests.mjs', import.meta.url))
+    )}`,
+    inputs: /./u,
     prOnly: true,
   }),
 ]);
@@ -409,11 +439,13 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.github/scripts/customer-notes-ready.test.js',
   '.github/scripts/auto-merge-stuck-triage.test.js',
   '.claude/hooks/post-task-validate.test.mjs',
   '.claude/hooks/prod-db-session-guard.test.mjs',
   'scripts/agent-context/check.test.mjs',
+  'scripts/agent/fix-claim.test.mjs',
   'scripts/agent/pen-native-semantic-manifest-contract.test.mjs',
   'scripts/agent/pen-registry-audit.test.mjs',
   'scripts/api-route-pruning.test.mjs',
@@ -453,6 +485,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
   'scripts/invariants/assurance-matrix.test.mjs',
+  'scripts/time-bomb/scan.test.mjs',
   'scripts/invariants/model-audit-contract.test.mjs',
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
   'scripts/invariants/quality-saturation.test.mjs',
@@ -720,8 +753,7 @@ const LANES = [
   {
     id: 'merge-group-guards',
     name: 'Merge-group unit guards',
-    nextLocalCommand:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
+    nextLocalCommand: MERGE_GROUP_GUARDS_COMMAND,
     run: runMergeGroupGuards,
   },
   {
