@@ -3,26 +3,25 @@
   Do not edit manually — changes are overwritten on the next scheduled run.
 -->
 
-> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38329171061)
+> Latest workflow run: [GitHub Actions](https://github.com/JovieInc/Jovie/actions/runs/38372905104)
 
 # Nightly Testing Agent — Daily Report
 
 Repo: jovie
-Generated: 2026-10-13T01:10:14.365Z
-Workflow conclusion: failure
+Generated: 2026-10-13T09:22:48.178Z
+Workflow conclusion: success
 
 ## Evidence warnings
 
-- Missing mutation report at /home/runner/work/Jovie/Jovie/apps/web/reports/mutation/mutation.json
 
 ## Suites
 
 | Lane | Total | Passed | Failed | Flaky | Skipped |
 |---|---:|---:|---:|---:|---:|
-| unit | 8129 | 8087 | 0 | 0 | 42 |
-| unit | 10014 | 10004 | 0 | 0 | 10 |
-| unit | 8211 | 8194 | 0 | 0 | 17 |
-| unit | 8530 | 8494 | 0 | 0 | 36 |
+| unit | 8515 | 8489 | 0 | 0 | 26 |
+| unit | 8396 | 8385 | 0 | 0 | 11 |
+| unit | 8002 | 7953 | 0 | 0 | 49 |
+| unit | 10235 | 10216 | 0 | 0 | 19 |
 
 ## Selected Targets
 
