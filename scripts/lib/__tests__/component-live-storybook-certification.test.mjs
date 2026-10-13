@@ -550,6 +550,52 @@ describe('live Storybook owned build resource bounds', () => {
     }
   });
 
+  it('waits for the exit event when a finished leader is already gone from the census', () => {
+    const instance = child();
+    const failure = vi.fn();
+    const sample = vi
+      .fn()
+      .mockReturnValueOnce(healthy)
+      .mockReturnValue({ ...healthy, leaderStartedAt: null, members: [] });
+    const watch = watchStorybookBuildResources(instance, failure, {
+      sample,
+      leaderAbsentGraceChecks: 2,
+    });
+    try {
+      watch.check();
+      watch.check();
+      watch.check();
+      instance.exitCode = 0;
+      instance.emit('exit', 0);
+      watch.check();
+      expect(failure).not.toHaveBeenCalled();
+      expect(sample).toHaveBeenCalledTimes(3);
+    } finally {
+      watch.stop();
+    }
+  });
+
+  it('fails closed when the leader stays absent past the exit grace', () => {
+    const instance = child();
+    const failure = vi.fn();
+    const watch = watchStorybookBuildResources(instance, failure, {
+      sample: () => ({ ...healthy, leaderStartedAt: null, members: [] }),
+      leaderAbsentGraceChecks: 2,
+    });
+    try {
+      watch.check();
+      watch.check();
+      expect(failure).not.toHaveBeenCalled();
+      watch.check();
+      expect(failure).toHaveBeenCalledOnce();
+      expect(failure.mock.calls[0][0].message).toBe(
+        'owned build identity unavailable'
+      );
+    } finally {
+      watch.stop();
+    }
+  });
+
   it('retains an unknown census as failure and stops sampling after normal exit', () => {
     const signal = vi.fn();
     const failure = vi.fn();

@@ -5,6 +5,7 @@ import { getAppUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
+import { DEFAULT_DM_TEMPLATE } from './constants';
 import { filterEmail } from './email-filter';
 import { detectRepresentation } from './management-filter';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
@@ -82,9 +83,7 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
       .from(leadPipelineSettings)
       .where(eq(leadPipelineSettings.id, 1));
 
-    const template =
-      settings?.dmTemplate ??
-      "Hey {displayName}! I found your Linktree and love your music on Spotify. I built Jovie to help artists like you create a better link-in-bio. Here's your free page: {claimLink}";
+    const template = settings?.dmTemplate ?? DEFAULT_DM_TEMPLATE;
 
     dmCopy = template
       .replaceAll('{displayName}', lead.displayName ?? lead.linktreeHandle)
