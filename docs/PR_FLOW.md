@@ -30,9 +30,10 @@ For an issue labeled `escaped-defect`, the closure receipt must also satisfy
 detector repair, including exact deployed-build retest and deliberate-red
 detector proof. The merge event deliberately leaves that issue open.
 
-Leaving draft (`ready_for_review`) is owned by `auto-merge-default.yml`, which
-enables native auto-merge and skips drafts. That event does not start another
-source CI flight.
+Leaving draft (`ready_for_review`) is owned by `merge-queue-green-enroll.yml`,
+the only workflow that puts PRs into the merge queue. It admits an
+already-green head and skips drafts. That event does not start another source
+CI flight.
 
 Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is

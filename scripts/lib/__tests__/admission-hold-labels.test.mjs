@@ -1,15 +1,6 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import {
-  chmodSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
 import { test } from 'node:test';
 import { CONTRACT_LABELS } from '../../hold-contract.mjs';
 import {
@@ -107,101 +98,38 @@ test('every enroll, dequeue, and auto-merge copy matches the canonical set', () 
     rearm.with['sparse-checkout'],
     /scripts\/lib\/admission-hold-labels\.json\n\s*scripts\/lib\/admission-hold-labels\.mjs/
   );
-
-  const enable = readWorkflow('auto-merge-default.yml').jobs.enable.steps.find(
-    s => s.name === 'Enable auto-merge'
-  ).run;
-  assert.deepEqual(
-    sorted([...enable.matchAll(/\. == "([^"]+)"/g)].map(m => m[1])),
-    sorted(ADMISSION_BLOCKING_LABELS)
-  );
-
-  const {
-    BLOCKING_LABELS,
-  } = require('../../../.github/scripts/customer-notes-ready.js');
-  assert.deepEqual(sorted(BLOCKING_LABELS), sorted(ADMISSION_BLOCKING_LABELS));
 });
 
-// Runs the real enable step against a fake gh: a held PR must never be armed,
-// because arming a CLEAN PR enqueues it and a held member fails every group.
-function runEnable(labels, { isDraft = false, env: extraEnv = {} } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'auto-merge-enable-'));
-  try {
-    const log = join(dir, 'calls.log');
-    const fake = join(dir, 'gh');
-    writeFileSync(
-      fake,
-      `#!/usr/bin/env bash
-printf '%s\\n' "$*" >> "${log}"
-jq_expr=""; json=""
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --jq) jq_expr="$2"; shift ;;
-    --json) json="$2"; shift ;;
-  esac
-  shift
-done
-case "$json" in
-  labels) printf '%s' '{"labels":${JSON.stringify(labels.map(name => ({ name })))}}' | jq -r "$jq_expr" ;;
-  state,isDraft) printf '%s' '{"state":"OPEN","isDraft":${isDraft}}' | jq -r "$jq_expr" ;;
-  headRefOid) echo ${'a'.repeat(40)} ;;
-  autoMergeRequest) echo "" ;;
-  "") echo '[[]]' ;;
-esac
-`
-    );
-    chmodSync(fake, 0o755);
-    const run = readWorkflow('auto-merge-default.yml').jobs.enable.steps.find(
-      s => s.name === 'Enable auto-merge'
-    ).run;
-    const result = spawnSync('bash', ['-c', run], {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        PATH: `${dir}${delimiter}${process.env.PATH}`,
-        GH_TOKEN: 'token',
-        PR_NUMBER: '7',
-        HEAD_REPO: 'JovieInc/Jovie',
-        BASE_REPO: 'JovieInc/Jovie',
-        ...extraEnv,
-      },
-    });
-    assert.equal(result.status, 0, result.stderr);
-    return {
-      stdout: result.stdout,
-      merged: readFileSync(log, 'utf8')
+// Auto-Merge Default was retired as a second queue writer; green enroll is the
+// only active workflow that arms or enqueues, so a held head has one admission
+// path to guard. agent-pipeline.yml is disabled_manually in GitHub and is
+// deleted with the other dormant agent landing controllers.
+test('merge-queue-green-enroll is the only workflow that arms or enqueues PRs', () => {
+  const writers = readdirSync('.github/workflows')
+    .filter(name => /\.ya?ml$/.test(name))
+    .filter(name => {
+      const source = readFileSync(`.github/workflows/${name}`, 'utf8')
         .split('\n')
-        .some(line => line.startsWith('pr merge 7')),
-    };
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
-
-test('the auto-merge enable step skips held PRs and arms unheld ones', () => {
-  for (const label of ['tim:hold', 'Gated', 'queue-poison']) {
-    const held = runEnable(['ui', label]);
-    assert.equal(held.merged, false, label);
-    assert.match(held.stdout, /admission-blocking label/);
-  }
-  assert.equal(runEnable(['ui']).merged, true);
+        .filter(line => !/^\s*#/.test(line))
+        .join('\n');
+      return /\benqueuePullRequest\b|\bgh pr merge [^\n]*--auto\b|\benablePullRequestAutoMerge\b/.test(
+        source
+      );
+    });
+  // agent-pipeline.yml is tolerated only while it exists; deleting it must
+  // not turn this red, and no other workflow may join it.
+  assert.deepEqual(
+    writers.filter(name => name !== 'agent-pipeline.yml'),
+    ['merge-queue-green-enroll.yml']
+  );
 });
 
-test('a Source Validation completion re-arms a missed same-repo enable but never a draft', () => {
-  const enable = readWorkflow('auto-merge-default.yml');
-  assert.deepEqual(enable.on.workflow_run, {
-    workflows: ['Source Validation'],
-    types: ['completed'],
-  });
-  assert.ok(enable.on.pull_request.types.includes('synchronize'));
+test('green enroll wakes on ready_for_review but never runs enroll for a draft event', () => {
+  const enroll = readWorkflow('merge-queue-green-enroll.yml');
+  assert.ok(enroll.on.pull_request_target.types.includes('ready_for_review'));
+  assert.ok(enroll.on.pull_request_target.types.includes('synchronize'));
   assert.match(
-    enable.jobs.enable.if,
-    /workflow_run\.pull_requests\[0\]\.number != null/
+    enroll.jobs.enroll.if,
+    /github\.event_name != 'pull_request_target' \|\| github\.event\.pull_request\.draft == false/
   );
-  assert.match(
-    enable.jobs.enable.if,
-    /head_repository\.full_name == github\.repository/
-  );
-  assert.equal(runEnable([], { isDraft: true }).merged, false);
-  assert.equal(runEnable([]).merged, true);
 });

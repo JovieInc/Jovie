@@ -686,10 +686,17 @@ test('wakes on completed Source Validation and on the push-to-main reconciliatio
     'labeled',
     'unlabeled',
     'reopened',
+    'ready_for_review',
     'synchronize',
   ]);
   // A label is never an enroll wake; only a blocking one dequeues its PR.
   assert.match(workflow.jobs.enroll.if, /github\.event\.action != 'labeled'/);
+  // Leaving draft is the only wake for an already-green head (JOV-INV-029);
+  // draft events never boot the enroll runner.
+  assert.match(
+    workflow.jobs.enroll.if,
+    /github\.event_name != 'pull_request_target' \|\| github\.event\.pull_request\.draft == false/
+  );
   // JOV-7589: a dequeue while checks are already green emits no completion
   // event, so every landing on main runs the full-roster sweep.
   assert.deepEqual(workflow.on.push, { branches: ['main'] });
