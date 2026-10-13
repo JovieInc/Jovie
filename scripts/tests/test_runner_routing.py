@@ -780,7 +780,7 @@ def test_merge_group_allocates_no_fixed_runner_probe() -> None:
 
 def test_observers_are_hosted_and_never_mutate_routing_or_fail_on_api_state() -> None:
     standalone = _job_block("runner-health-monitor.yml", "monitor")
-    for observer in (_job_block("agent-tick.yml", "runner-health"), standalone):
+    for observer in (standalone,):
         assert "runs-on: ubuntu-latest" in observer
         assert "actions: read" in observer
         assert "actions: write" not in observer

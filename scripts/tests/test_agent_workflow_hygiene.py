@@ -12,7 +12,6 @@ WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 
 HOT_PATH_WORKFLOWS = (
     "auto-ready-agent-drafts.yml",
-    "agent-tick.yml",
     "stuck-draft-autoclose.yml",
 )
 
@@ -23,7 +22,6 @@ FULL_CHECKOUT_JOBS = (
 FLEET_CONTROLLER_JOBS = (
     ("auto-ready-agent-drafts.yml", "auto-ready"),
     ("auto-ready-agent-drafts.yml", "green-source"),
-    ("agent-tick.yml", "auto-ready"),
 )
 
 MODEL_OR_ADVISORY_JOBS = (
@@ -122,11 +120,6 @@ HOSTED_API_ONLY_PR_CONTROLLERS = (
 HOSTED_BACKGROUND_CONTROLLER_JOBS = (
     ("agent-harness-health-report.yml", "report"),
     ("agent-landing-sweep.yml", "sweep"),
-    ("agent-tick.yml", "landing-sweep"),
-    ("agent-tick.yml", "cost-anomaly"),
-    ("agent-tick.yml", "dispatch"),
-    ("agent-tick.yml", "neon-cleanup"),
-    ("agent-tick.yml", "synthetic-monitoring"),
     ("doc-gardening-agent.yml", "garden"),
     ("github-ai-dispatcher.yml", "dispatch"),
     ("github-ai-orchestrator.yml", "guard"),
@@ -503,7 +496,6 @@ def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> N
     for workflow_name in (
         "agent-pipeline.yml",
         "agent-landing-sweep.yml",
-        "agent-tick.yml",
         "sentry-autofix.yml",
         "github-ai-orchestrator.yml",
     ):
@@ -896,19 +888,10 @@ def test_standalone_health_monitors_have_independent_bounded_schedules() -> None
         assert "runs-on: ubuntu-latest" in _job_block(workflow, job_name)
 
 
-def test_agent_tick_stays_manual_without_main_health() -> None:
-    """Agent Tick stays manual and carries no main-health job."""
-    agent_tick = (WORKFLOWS / "agent-tick.yml").read_text(encoding="utf-8")
-    assert "\n  main-ci-health:\n" not in agent_tick
-    agent_tick_trigger = agent_tick.split("\non:\n", 1)[1].split(
-        "\npermissions:", 1
-    )[0]
-    assert "workflow_dispatch:" in agent_tick_trigger
-    assert "schedule:" not in agent_tick_trigger
-
-    landing_sweep = _job_block("agent-tick.yml", "landing-sweep")
-    assert "statuses: read" in landing_sweep
-    assert "statuses: write" not in landing_sweep
+def test_agent_tick_stays_deleted() -> None:
+    """The disabled consolidated Agent Tick was deleted on 2026-10-12; its live
+    jobs run as standalone workflows."""
+    assert not (WORKFLOWS / "agent-tick.yml").exists()
 
 
 def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
