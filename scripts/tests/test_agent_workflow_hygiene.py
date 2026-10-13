@@ -1516,9 +1516,11 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "delivery-state-machine.mjs" in block
     assert "steps.refresh.outputs.receipt_path" in block
     assert "state/gem-priority-gate/latest.json" not in block
-    assert "steps.stack-actions.outcome == 'success'" in block
-    assert "LANES_STATE: /home/timwhite/.local/state/jovie-lanes" in block
-    assert "LANES_REPO: /home/timwhite/devin-sweep/Jovie" in block
+    # The lanes emitter owns the canonical receipt; refresh writes it only via
+    # the stale-receipt fallback, and the dead remediate hop stays deleted.
+    assert "python3 scripts/fleet-gate/receipt_writer.py" in block
+    assert "GEM_PRIORITY_GATE_STATE_DIR: ${{ steps.writer.outputs.state_dir }}" in block
+    assert "Remediate JOV backlog" not in block
     assert "push:" in trigger and "branches: [main]" in trigger
 
 
