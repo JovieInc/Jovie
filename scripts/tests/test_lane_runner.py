@@ -8808,9 +8808,9 @@ class OperatorInstallerGlueTest(unittest.TestCase):
             data = ("// inert fresh " + name + "\n").encode()
             path = target / name; path.write_bytes(data); path.chmod(0o600)
             outputs[name] = {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
-        manifest = {"schema": "jovie.mesh-managed-runtime/v1", "node": "24.21.0", "compiler": "0.28.2", "zod": "4.6.5",
+        manifest = {"schema": "jovie.mesh-managed-runtime/v1", "node": "24.21.0", "compiler": "0.28.2", "zod": "4.6.7",
                     "lockfileSha256": hashlib.sha256((root / "pnpm-lock.yaml").read_bytes()).hexdigest(),
-                    "dependencyPins": {name: ["d" * 64, "e" * 64] for name in ["esbuild@0.28.2", "zod@4.6.5", "@esbuild/darwin-arm64@0.28.2"]},
+                    "dependencyPins": {name: ["d" * 64, "e" * 64] for name in ["esbuild@0.28.2", "zod@4.6.7", "@esbuild/darwin-arm64@0.28.2"]},
                     "compilerBinary": {"package": "@esbuild/darwin-arm64", "version": "0.28.2", "sha256": "f" * 64},
                     "sourceFiles": {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in self.mesh_sources},
                     "outputs": outputs, "externalImports": ["node:fs"], "isolatedImportPassed": True, "recipientAdmission": False}

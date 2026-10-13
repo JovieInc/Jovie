@@ -1,12 +1,16 @@
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 const config = {
   packageManager: 'pnpm',
-  plugins: ['@stryker-mutator/vitest-runner'],
-  testRunner: 'vitest',
-  // Static registry derivations execute during module import. Running each
-  // mutant against the full suite avoids false survivors from per-test module
-  // caching and keeps this small contract package trustworthy.
+  // Command runner: @stryker-mutator/vitest-runner 10.0.0 drops results for
+  // tests inside `describe` blocks under vitest 5 and scored this package 0%.
+  // Each mutant runs the full contract suite in a fresh vitest process.
+  testRunner: 'command',
+  commandRunner: {
+    command:
+      'node ./node_modules/vitest/vitest.mjs run --config vitest.config.mts --bail 1 --reporter dot index.test.ts analysis.test.ts beat-grid.test.ts playback.test.ts',
+  },
   coverageAnalysis: 'off',
+  inPlace: true,
   disableTypeChecks: false,
   reporters: ['progress', 'clear-text', 'json'],
   mutate: [
@@ -17,15 +21,6 @@ const config = {
     'playback.ts',
     '!**/*.test.ts',
   ],
-  testFiles: [
-    'index.test.ts',
-    'analysis.test.ts',
-    'beat-grid.test.ts',
-    'playback.test.ts',
-  ],
-  vitest: {
-    configFile: 'vitest.config.mts',
-  },
   thresholds: {
     high: 95,
     low: 85,
