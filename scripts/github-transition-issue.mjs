@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { transitionIssue } from './lib/tracker.mjs';
 
-// Same normalization as github-claim-issue.mjs: accepts `123` or `#123`.
+// Accepts `123` or `#123`.
 const number = Number.parseInt(String(process.argv[2]).replace(/^#/, ''), 10);
 const target = (process.argv[3] ?? 'in-review').trim().toLowerCase();
 // transitionIssue accepts `note` (not `comment`); wrong key was silently dropped (TS2353 / #14553).

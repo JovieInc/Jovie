@@ -8,9 +8,12 @@ import {
 } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
+// JOV-5063: 32px visible surface-header actions. The canonical 44px pseudo hit
+// target from @jovie/ui stays intact; icon-only actions take the md (32px)
+// IconButton size instead of a height restyle.
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-7 gap-1.5 rounded-full border-transparent bg-transparent px-2 text-xs font-semibold text-secondary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-8 gap-1.5 rounded-full border-transparent bg-transparent px-2 text-xs font-semibold text-secondary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS =
@@ -83,6 +86,7 @@ export function DashboardHeaderActionButton({
       disabled={disabled}
       tooltipLabel={tooltipLabel}
       tooltipShortcut={tooltipShortcut}
+      size='md'
       data-testid={dataTestId}
       className={cn(
         DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS,

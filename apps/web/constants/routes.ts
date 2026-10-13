@@ -126,6 +126,8 @@ export const APP_ROUTES = {
   ADMIN_INVESTORS_LINKS: '/app/ov/investors/links',
   ADMIN_INVESTORS_SETTINGS: '/app/ov/investors/settings',
   ADMIN_LEADS: '/app/ov/leads',
+  /** Founder creator lists + smart views (Ovie only). */
+  ADMIN_LISTS: '/app/ov/lists',
   ADMIN_OUTREACH: '/app/ov/outreach',
   ADMIN_OUTREACH_EMAIL: '/app/ov/outreach/email',
   ADMIN_OUTREACH_DM: '/app/ov/outreach/dm',
@@ -204,6 +206,7 @@ export const APP_ROUTES = {
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */
   SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',
+  INTEGRATIONS: '/integrations',
   YOUTUBE_THUMBNAILS: '/youtube-thumbnails',
   VOICE: '/voice',
   /** Internal render-fixture index; the page itself 404s unless fixtures are enabled. */

@@ -280,3 +280,7 @@ test-report.*.flaky.json
 
 # Build-time copies of monorepo runtime files (apps/web/scripts/stage-runtime-data.mjs)
 apps/web/runtime-data/
+
+# Stryker mutation runs (scripts/mutation-diff.mjs)
+.stryker-tmp/
+/apps/web/reports/mutation/

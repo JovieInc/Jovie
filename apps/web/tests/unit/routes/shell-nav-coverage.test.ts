@@ -53,6 +53,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Internal admin wiki index reached from the /hud/wiki rewrite into the OV app shell',
   '/app/ov/wiki/[...slug]':
     'Internal admin wiki article reached from the /hud/wiki/:path* rewrite into the OV app shell',
+  '/app/ov/lists':
+    'Founder lists index reached from the Lists block in the OV sidebar, which links each list directly',
   '/app/ov/screenshots':
     'Internal screenshot QA utility retained for direct admin access outside founder navigation',
   '/app/ov/system':
@@ -70,6 +72,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/dashboard/tasks': 'Legacy tasks workspace retained for old bookmarks',
   '/app/settings/connectors':
     'Settings Connections page loads shared shell route context directly (data-backed since JOV-4799)',
+  '/app/ov/integrations':
+    'Account settings sub-tool reached from Platform Connections',
   '/app/settings/admin': 'Legacy admin settings route redirected to Ops',
   '/app/dashboard/release-plan':
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',

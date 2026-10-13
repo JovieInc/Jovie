@@ -5,7 +5,6 @@ This document explains the automation and labels used in this repo so agents can
 ## Source of truth
 
 - `.github/workflows/ci.yml`
-- `.github/workflows/claude.yml`
 - `.github/workflows/neon-ephemeral-branch-cleanup.yml`
 - `.coderabbit.yaml`
 

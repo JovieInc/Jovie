@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { aggregateMetrics } from '@/lib/services/insights/data-aggregator';
@@ -39,8 +40,7 @@ export async function POST() {
       if (!entitlements.isPro) {
         return NextResponse.json(
           {
-            error:
-              'AI-generated insights require a Pro plan. Upgrade to unlock this feature.',
+            error: `AI-generated insights require the ${getPlanDisplayName('pro')} plan. Upgrade to unlock this feature.`,
           },
           { status: 403, headers: NO_STORE_HEADERS }
         );

@@ -8,6 +8,7 @@ import {
 } from '@/components/atoms/table-action-menu';
 import { toast } from '@/components/feedback';
 import { convertContextMenuItems } from '@/components/organisms/table';
+import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import {
   getContactRoleLabel,
@@ -19,11 +20,17 @@ import { buildContactActions } from './contact-actions';
 
 const contactColumnHelper = createColumnHelper<EditableContact>();
 
-function buildNameCompany(contact: EditableContact): string {
-  const parts = [contact.personName, contact.companyName].filter(Boolean);
-  if (parts.length === 0) return '—';
-  if (parts.length === 1) return parts[0]!;
-  return `${parts[0]} @ ${parts[1]}`;
+function ContactIdentityCell({
+  contact,
+}: Readonly<{ contact: EditableContact }>) {
+  const name = contact.personName || contact.companyName;
+  if (!name) return <span className='text-tertiary-token'>—</span>;
+  return (
+    <PersonCell
+      name={name}
+      secondary={contact.personName ? contact.companyName : null}
+    />
+  );
 }
 
 function copyToClipboard(text: string, label: string) {
@@ -55,6 +62,14 @@ export function createContactColumns(
   callbacks: ContactColumnCallbacks
 ): ContactColumnDef[] {
   return [
+    // Identity column: the shared people row (face, name, company)
+    contactColumnHelper.display({
+      id: 'nameCompany',
+      header: 'Name',
+      cell: ({ row }) => <ContactIdentityCell contact={row.original} />,
+      size: 240,
+    }),
+
     // Role column
     contactColumnHelper.accessor('role', {
       id: 'role',
@@ -65,17 +80,6 @@ export function createContactColumns(
         return <span className='font-caption text-primary-token'>{label}</span>;
       },
       size: 180,
-    }),
-
-    // Name/Company column
-    contactColumnHelper.display({
-      id: 'nameCompany',
-      header: 'Name / Company',
-      cell: ({ row }) => {
-        const text = buildNameCompany(row.original);
-        return <span className='text-secondary-token truncate'>{text}</span>;
-      },
-      size: 200,
     }),
 
     // Territories column

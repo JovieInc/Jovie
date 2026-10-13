@@ -1,4 +1,8 @@
 name: Runner Health Monitor
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A hosted observer reads the self-hosted heartbeat so an offline pool cannot prevent its own detection; it never mutates routing or queued jobs.
+# revisit-trigger: Remove when the self-hosted runner host reports its own liveness to a hosted deadman.
 # clock-class: production-liveness
 
 # Hosted observer for the self-hosted OrbStack runner heartbeat. Queue unit
@@ -11,6 +15,11 @@ name: Runner Health Monitor
 # fallback before unit jobs queue.
 
 on:
+  # The Gem lanes tick fires this on the designed cadence
+  # (scripts/lanes/continuity_clock.py): GitHub delivered the cron below only
+  # about every 6 h, so the schedule is now the backstop.
+  repository_dispatch:
+    types: [clock_runner_health_monitor]
   schedule:
     # Observe the 10-minute heartbeat on a two-minute offset. The monitor is
     # hosted, so an offline self-hosted pool cannot prevent observation.
