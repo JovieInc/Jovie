@@ -242,25 +242,55 @@ describe('internal-pr-review run', () => {
     assert.match(post.body, /Skipped to bound cost/);
   });
 
-  it('annotates gateway rate limits instead of failing', async () => {
+  it('annotates gateway rate limits without a PR comment', async () => {
     const { calls, fetchImpl } = fakeFetch({
       gateway: { ok: false, status: 429 },
     });
-    const result = await run({ env: ENV, fetchImpl, log: () => {} });
+    const warnings = [];
+    const result = await run({
+      env: ENV,
+      fetchImpl,
+      log: m => warnings.push(m),
+    });
     assert.equal(result.outcome, 'unavailable');
-    const post = calls.find(
-      c => c.method === 'POST' && c.url.includes('/issues/')
+    assert.match(warnings.join('\n'), /::warning::.*429/);
+    assert.equal(
+      calls.some(c => c.method === 'POST' && c.url.includes('/issues/')),
+      false
     );
-    assert.match(post.body, /429/);
-    assert.match(post.body, /merge gates are unaffected/);
   });
 
-  it('annotates a missing gateway key without failing', async () => {
+  it('annotates a missing gateway key without a PR comment', async () => {
     const { calls, fetchImpl } = fakeFetch({});
     const env = { ...ENV, AI_GATEWAY_API_KEY: '' };
     const result = await run({ env, fetchImpl, log: () => {} });
     assert.equal(result.outcome, 'unavailable');
-    assert.ok(calls.some(c => c.method === 'POST'));
+    assert.equal(
+      calls.some(c => c.method === 'POST' && c.url.includes('/issues/')),
+      false
+    );
+  });
+
+  it('reports the finish reason of an empty model answer', async () => {
+    const result = await callGateway(
+      {
+        apiKey: 'k',
+        baseUrl: 'https://example.test/v1',
+        model: 'm',
+        prompt: 'p',
+      },
+      async () => ({
+        json: async () => ({
+          choices: [{ finish_reason: 'length', message: { content: '' } }],
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+    assert.deepEqual(result, {
+      ok: false,
+      reason: 'empty model response (finish length)',
+    });
   });
 
   it('never throws when GitHub itself errors', async () => {

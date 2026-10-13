@@ -28,7 +28,9 @@ export const DEFAULT_MODEL = 'zai/glm-5.3-flash';
 export const DEFAULT_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh/v1';
 export const MAX_DIFF_CHARS = 48_000;
 export const HARD_SKIP_DIFF_CHARS = 400_000;
-export const MAX_OUTPUT_TOKENS = 1_500;
+// glm-5.3-flash reasons before answering, and reasoning tokens count against
+// max_tokens: at 1,500 a ~3k-token prompt finished on `length` with no content.
+export const MAX_OUTPUT_TOKENS = 8_000;
 export const COMMENT_PAGE_LIMIT = 3;
 export const MAX_RULE_CONTEXT_CHARS = 12_000;
 export const MAX_RULE_CHARS = 6_000;
@@ -257,9 +259,13 @@ export async function callGateway(
     if (!response.ok)
       return { ok: false, reason: `gateway HTTP ${response.status}` };
     const body = await response.json();
-    const text = body?.choices?.[0]?.message?.content;
+    const choice = body?.choices?.[0];
+    const text = choice?.message?.content;
     if (typeof text !== 'string' || text.trim() === '')
-      return { ok: false, reason: 'empty model response' };
+      return {
+        ok: false,
+        reason: `empty model response (finish ${choice?.finish_reason ?? 'unknown'})`,
+      };
     return { ok: true, text };
   } catch (error) {
     return {
@@ -398,15 +404,14 @@ export async function run({ env, fetchImpl = fetch, log = console.log }) {
         },
         fetchImpl
       );
-      if (result.ok) {
-        outcome = 'reviewed';
-        text = result.text + (truncated ? '\n\n_(Diff was truncated.)_' : '');
-      } else {
-        outcome = 'unavailable';
-        text = `The internal reviewer could not run (${result.reason}). `;
-        text += 'This is advisory only — merge gates are unaffected. Retry by ';
-        text += 'pushing or reopening the PR.';
+      if (!result.ok) {
+        // An outage is not a review: annotate the run instead of adding a
+        // PR comment nobody can act on.
+        log(`::warning::internal review unavailable: ${result.reason}`);
+        return { outcome: 'unavailable', reason: result.reason };
       }
+      outcome = 'reviewed';
+      text = result.text + (truncated ? '\n\n_(Diff was truncated.)_' : '');
     }
     const action = await upsertReviewComment(
       {
