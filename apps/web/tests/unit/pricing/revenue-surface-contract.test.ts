@@ -111,11 +111,15 @@ describe('revenue-surface contract (JOV-7809)', () => {
   });
 
   it('certifies every outcome claimed by the paid offer', () => {
-    // The paid offer's outcome claims are the contract — revenue surfaces may
-    // lead with them, but must not invent capabilities beyond the registry.
+    // The paid offer's outcome claims are the contract — revenue surfaces
+    // must not invent capabilities beyond the registry. JOV-7794: the plan
+    // tagline names certified capabilities; monitoring is internal-only.
     expect(ARTIST_VISIBILITY_OFFER.pro.outcomes.length).toBeGreaterThan(0);
     expect(ENTITLEMENT_REGISTRY.pro.marketing.tagline).toContain(
-      'visibility monitoring'
+      'Take payments'
+    );
+    expect(ENTITLEMENT_REGISTRY.pro.marketing.tagline).not.toMatch(
+      /monitoring/i
     );
   });
 

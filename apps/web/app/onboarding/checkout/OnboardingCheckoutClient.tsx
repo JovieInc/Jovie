@@ -147,7 +147,7 @@ const PROOF_FACT_LIMIT = 4;
 
 /**
  * The visitor's own computed findings, shown before the price (JOV-7794).
- * Renders nothing without a real finding: never a sample or placeholder.
+ * Renders nothing without a real finding: never a sample or stand-in.
  */
 export function ClaimTimeProofCard({
   findings,
