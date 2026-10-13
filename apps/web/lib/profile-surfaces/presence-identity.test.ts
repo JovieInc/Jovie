@@ -6,6 +6,7 @@ import {
   getPresenceHandle,
   getPresenceObservation,
   getPresenceOutcomeGroup,
+  getPresenceRowTitle,
   identityPhotoAlt,
   isPresenceObservationStale,
   resolveIdentityPhoto,
@@ -150,6 +151,19 @@ describe('presence identity', () => {
     };
 
     expect(getPresenceEntityName(sevenDigital, 'Tim White')).toBe('Tim White');
+    // Inventory rows name the platform; generated titles collapse to it.
+    expect(
+      getPresenceRowTitle(
+        { platform: 'spotify', label: 'Tim White on spotify' },
+        'Tim White'
+      )
+    ).toBe('Spotify');
+    expect(
+      getPresenceRowTitle(
+        { platform: 'venmo', label: 'Tip on Venmo' },
+        'Tim White'
+      )
+    ).toBe('Tip on Venmo');
     // Generated "<artist> on <platform>" titles collapse to the entity name;
     // the row subtitle already carries the platform.
     expect(

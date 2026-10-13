@@ -83,6 +83,7 @@ import {
   getPresenceEntityName,
   getPresenceHandle,
   getPresencePlatformLabel,
+  getPresenceRowTitle,
 } from '@/lib/profile-surfaces/presence-identity';
 import { derivePresenceInspector } from '@/lib/profile-surfaces/presence-inspector';
 import {
@@ -1660,7 +1661,9 @@ function ProfilesWorkspaceContent({
               )}
               <div className='flex min-w-0 items-center gap-2'>
                 <div className='truncate text-sm font-medium text-primary-token'>
-                  {row.label}
+                  {row.rowType === 'connector'
+                    ? row.label
+                    : getPresenceRowTitle(row, data?.artist.name ?? '')}
                 </div>
                 <ConnectionSecondaryIdentity row={row} />
                 <div className={styles.mobileStatus}>
