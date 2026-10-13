@@ -340,7 +340,7 @@
     "@chromatic-com/storybook": "^5.4.0",
     "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^16.3.7",
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.64.0",
     "@sentry/node": "^11.4.0",
     "@shadcn/lint": "0.2.1",
     "@storybook/addon-a11y": "10.6.1",
