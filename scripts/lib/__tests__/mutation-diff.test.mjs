@@ -229,10 +229,12 @@ describe('mutation-diff.yml', () => {
   });
 
   /**
-   * Run the "Resolve files to mutate" step with a stub `gh` on PATH.
+   * Run the "Resolve files to mutate" step with a stub `gh` on PATH. The
+   * stub answers the runs query with `lastSuccess` and compare with files.
    * @param {Record<string, string>} env
+   * @param {string} [lastSuccess]
    */
-  function resolveFiles(env) {
+  function resolveFiles(env, lastSuccess = '') {
     const step = workflow.jobs.mutate.steps.find(
       candidate => candidate.id === 'files'
     );
@@ -243,7 +245,15 @@ describe('mutation-diff.yml', () => {
       const calls = join(root, 'calls');
       writeFileSync(
         join(bin, 'gh'),
-        `#!/usr/bin/env bash\necho "$*" >> "${calls}"\necho "apps/web/lib/auth/gate.ts apps/web/README.md"\n`
+        [
+          '#!/usr/bin/env bash',
+          `echo "$*" >> "${calls}"`,
+          'case "$*" in',
+          `  *actions/workflows/*) echo "${lastSuccess}" ;;`,
+          '  *) echo "apps/web/lib/auth/gate.ts apps/web/README.md" ;;',
+          'esac',
+          '',
+        ].join('\n')
       );
       chmodSync(join(bin, 'gh'), 0o755);
       const output = join(root, 'output');
@@ -275,23 +285,37 @@ describe('mutation-diff.yml', () => {
     }
   }
 
-  it('diffs the whole push through the compare API', () => {
-    const result = resolveFiles({ EVENT: 'push', BEFORE: 'before456' });
+  it('diffs from the last successful push run through the compare API', () => {
+    const result = resolveFiles(
+      { EVENT: 'push', BEFORE: 'before456' },
+      'ok789'
+    );
 
     expect(result.ghCalls).toContain(
-      'api repos/JovieInc/Jovie/compare/before456...head123'
+      'api repos/JovieInc/Jovie/actions/workflows/mutation-diff.yml/runs?branch=main&event=push&status=success&per_page=1'
+    );
+    expect(result.ghCalls).toContain(
+      'api repos/JovieInc/Jovie/compare/ok789...head123'
     );
     expect(result.output).toBe(
       'files=apps/web/lib/auth/gate.ts apps/web/README.md\n'
     );
   });
 
-  it('skips a push with no pre-push commit without calling the API', () => {
+  it('falls back to the push before-SHA without a successful run', () => {
+    const result = resolveFiles({ EVENT: 'push', BEFORE: 'before456' });
+
+    expect(result.ghCalls).toContain(
+      'api repos/JovieInc/Jovie/compare/before456...head123'
+    );
+  });
+
+  it('skips when there is no baseline commit at all', () => {
     const result = resolveFiles({ EVENT: 'push', BEFORE: '0000000000' });
 
-    expect(result.ghCalls).toBe('');
+    expect(result.ghCalls).not.toContain('compare/');
     expect(result.output).toBe('files=\n');
-    expect(result.stdout).toContain('No pre-push commit');
+    expect(result.stdout).toContain('No baseline commit');
   });
 
   it('uses the dispatch input verbatim', () => {
