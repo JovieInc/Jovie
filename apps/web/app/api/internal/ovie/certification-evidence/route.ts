@@ -130,11 +130,23 @@ export async function POST(request: Request): Promise<NextResponse> {
     invalidLabel: 'invalid_packet',
     handle: async data => {
       try {
-        const row = await ingestMarketingCertificationPacket(
+        const ingested = await ingestMarketingCertificationPacket(
           data.packet as CertificationReviewPacket,
           data.evaluatedAt
         );
-        return jsonResponse({ ok: true, row }, 200);
+        return jsonResponse(
+          {
+            entries: ingested.entries.map(entry => ({
+              evaluation: entry.evaluation,
+              identityId: entry.identityId,
+              message: entry.message,
+              state: entry.row.admission.state,
+            })),
+            ok: true,
+            row: ingested.row,
+          },
+          200
+        );
       } catch (error) {
         if (error instanceof MarketingCertificationRegistryDriftError) {
           return jsonResponse(
