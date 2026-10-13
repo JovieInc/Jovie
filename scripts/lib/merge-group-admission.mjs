@@ -671,6 +671,7 @@ export async function waitForMergeGroupAdmission({
   // Live membership and the exact queue ref are proved on the first poll and
   // re-proved before admitting; pending polls only read the two check pages.
   let provenQueue = null;
+  const settledChecks = REQUIRED_CHECKS.map(() => null);
   let pendingPolls = 0;
   const pendingDelayMs = () => {
     if (pendingPolls <= 1) return pollIntervalMs;
@@ -762,17 +763,23 @@ export async function waitForMergeGroupAdmission({
       provenQueue = proven;
     }
     const { liveReceipt, sourceHeadSha } = provenQueue;
-    const pages = await Promise.all(
-      REQUIRED_CHECKS.map(checkName =>
-        loadCheckRuns({ ...evidence, checkName, deadlineMs })
-      )
-    );
-    const states = pages.map((page, index) =>
-      classifyRequiredCheckPage(page, {
-        checkName: REQUIRED_CHECKS[index],
-        headSha: evidence.headSha,
+    // A required check that already succeeded on this exact synthetic head is
+    // not read again: each pending poll spent both check reads from the repo's
+    // shared GITHUB_TOKEN bucket (2026-10-13 storm). The live queue proof is
+    // still re-read before admitting.
+    const states = await Promise.all(
+      REQUIRED_CHECKS.map(async (checkName, index) => {
+        if (settledChecks[index]) return settledChecks[index];
+        return classifyRequiredCheckPage(
+          await loadCheckRuns({ ...evidence, checkName, deadlineMs }),
+          { checkName, headSha: evidence.headSha }
+        );
       })
     );
+    // Settle only after the whole read succeeded: an API failure repeats every proof.
+    states.forEach((state, index) => {
+      if (state.state === 'success') settledChecks[index] = state;
+    });
 
     const terminalFailure = states.findIndex(
       state => state.state === 'terminal-failure'
@@ -847,6 +854,7 @@ export async function waitForMergeGroupAdmission({
       if (!isTransientApiError(error)) throw error;
       // Every proof repeats after an API recovery.
       provenQueue = null;
+      settledChecks.fill(null);
       recoverySourceHeadSha ??= observedSourceHeadSha;
       if (error.retryAtMs !== undefined && error.retryAtMs !== null) {
         delayMs = Math.max(pollIntervalMs, error.retryAtMs - now());
