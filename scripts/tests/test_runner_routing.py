@@ -759,7 +759,9 @@ def test_merge_group_allocates_no_fixed_runner_probe() -> None:
     assert "workflow_dispatch:" in heartbeat
     assert "pull_request:" not in heartbeat
     assert "workflow_run:" not in heartbeat
-    assert "repository_dispatch:" not in heartbeat
+    # Only the Gem lanes clock event may wake it (scripts/lanes/continuity_clock.py).
+    assert "repository_dispatch:\n    types: [clock_runner_heartbeat]" in heartbeat
+    assert heartbeat.count("repository_dispatch:") == 1
     assert heartbeat.count("runs-on: jovie-runner") == 1
     assert "group: runner-heartbeat" in heartbeat
     assert "cancel-in-progress: true" in heartbeat

@@ -23,6 +23,8 @@ Before adding another Codex workspace automation, inspect existing Codex automat
 
 Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on GitHub-hosted runners.
 
+> **Delivery (measured 2026-10-10..12):** GitHub delivered every sub-daily cron in this repository only about every 6 h (median gap 311-452 min). Workflows whose purpose depends on cadence (Production Continuity 5 min, Runner Heartbeat and Runner Health Monitor 10 min, Cost Anomaly Gate 15 min, Sentry Autofix Recurrence 1 h) are fired by the Gem lanes tick via `repository_dispatch` (`scripts/lanes/continuity_clock.py`); their cron stays as the backstop when Gem is down.
+
 | Workflow | Schedule | Purpose | Source |
 |----------|----------|---------|--------|
 | `Fleet Gate Refresh` | `*/5 * * * *` UTC (production-liveness) + push to `main` + `workflow_dispatch` | Rewrites the canonical fleet receipt inside its 10-minute stale window. PR, check, and status events do not start this workflow. Runner Heartbeat's 10-minute dispatch remains the backup. | `.github/workflows/fleet-gate-refresh.yml` |
