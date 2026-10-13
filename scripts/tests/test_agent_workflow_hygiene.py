@@ -1405,8 +1405,13 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     trigger = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
     block = _job_block("fleet-gate-refresh.yml", "refresh")
 
-    assert "schedule:" in trigger
-    assert "cron: '*/5 * * * *'" in trigger
+    # JOV-INV-042: no clock. The Gem lanes emitter keeps the receipt fresh, so
+    # neither a cron nor a Runner Heartbeat dispatch rewrites it.
+    assert "schedule:" not in trigger
+    assert "cron:" not in workflow
+    assert "steps.debounce" not in block
+    heartbeat = (WORKFLOWS / "runner-heartbeat.yml").read_text(encoding="utf-8")
+    assert "fleet-gate-refresh.yml --ref main" not in heartbeat
     assert "workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]" in trigger
     assert trigger.count("workflow_run:") == 1
     assert "pull_request:" not in trigger
@@ -1422,7 +1427,6 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "group: fleet-gate-receipt" in workflow
     assert "cancel-in-progress: false" in workflow
     assert "github.event.label.name == 'needs-human'" not in block
-    assert "0 <= age < 120" in block
     assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
     assert "Persist stack policy repair actions" in block
     assert "--closure-health-file=" in block

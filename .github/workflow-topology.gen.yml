@@ -392,7 +392,6 @@ nodes:
     triggeringStateTransition:
       - push
       - repository_dispatch
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:assess
@@ -1063,8 +1062,8 @@ nodes:
       - repository_dispatch
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:remediation-clock
-    jobCount: 2
+    terminalReceipt: job:heartbeat
+    jobCount: 1
   - name: Safe PR Remediation
     path: .github/workflows/safe-pr-remediation.yml
     active: true

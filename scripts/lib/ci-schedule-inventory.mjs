@@ -119,8 +119,6 @@ export const CRON_KEEP_REASONS = Object.freeze({
     'AI credits: one subscription-bounded native security scan of main per day; per push would multiply native scanner spend',
   '.github/workflows/desktop-release.yml':
     'owner-tracked: daily signed staging desktop build until staging rides the Production Controller event without the 2026-09 supersession livelock; see ADMISSION_CRON_DEBT',
-  '.github/workflows/fleet-gate-refresh.yml':
-    'owner-tracked (Gem lanes): keeps the fleet receipt inside its wall-clock stale window until the lanes tick writes it; see ADMISSION_CRON_DEBT',
   '.github/workflows/golden-path-nightly.yml':
     'external: real auth plus Stripe test mode drift without a repository event, and acquisition eligibility needs Golden Path proof under 48 h old',
   '.github/workflows/m2-revenue-path-canary.yml':
@@ -166,7 +164,8 @@ export const CRON_ALLOWLIST = Object.freeze(Object.keys(CRON_KEEP_REASONS));
 // 25 = 27 minus auto-merge-default (retired: merge-queue-green-enroll admits,
 // the lanes stuck-PR ladder reports) and gem-producer-drift (its producer and
 // symphony-control's own drift check were removed in symphony-control#15).
-export const CRON_ALLOWLIST_CEILING = 25;
+// 24: fleet-gate-refresh, whose receipt the Gem lanes emitter now keeps fresh.
+export const CRON_ALLOWLIST_CEILING = 24;
 
 /**
  * Scheduled workflows that can change PR, merge-queue, issue, or label state.
@@ -181,14 +180,8 @@ export const ADMISSION_CRON_DEBT = Object.freeze({
     replacement:
       'staging builds from the existing Production Controller workflow_run trigger; drop the daily clock',
   }),
-  '.github/workflows/fleet-gate-refresh.yml': Object.freeze({
-    reason:
-      '*/5 rewrite keeps the Gem fleet-gate receipt (issue admission) inside its stale window',
-    replacement:
-      'Gem lanes tick emits the receipt natively (its removal-trigger); push and repository_dispatch stay',
-  }),
 });
-export const ADMISSION_CRON_DEBT_CEILING = 2;
+export const ADMISSION_CRON_DEBT_CEILING = 1;
 
 /**
  * Workflow steps that hold a runner polling GitHub, git, or queue state. Keyed

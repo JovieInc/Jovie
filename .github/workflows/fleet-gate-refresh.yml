@@ -3,7 +3,6 @@ name: Fleet Gate Refresh
 # accountable-writer: Gem
 # necessary-trust-boundary: Protected Gem reads live state and checks out exact main, excluding candidate code.
 # revisit-trigger: Remove when Symphony emits this atomic receipt natively.
-# clock-class: production-liveness
 
 # Fallback writer for the canonical Gem receipt. The lanes fleet-gate emitter
 # (scripts/lanes/fleet_gate_emitter.py) owns the canonical latest.json;
@@ -19,10 +18,13 @@ name: Fleet Gate Refresh
 # not consumed. PR activity was a dry run (it must not persist latest.json)
 # and a 2026-10-02 hour spawned 209 of those runs, cancelling every main
 # push before the receipt writer started. The gate rereads live main, so a
-# push to main persists immediately and the */5 clock rewrites observedAt
-# inside the 10-minute stale window. Path filters do not apply: any main
-# commit can change required checks. Runner Heartbeat remains the
-# workflow_dispatch backup.
+# push to main persists immediately. Path filters do not apply: any main
+# commit can change required checks.
+#
+# No clock (JOV-INV-042): the lanes emitter keeps the canonical receipt fresh
+# between main events. The former */5 cron (and Runner Heartbeat's dispatch)
+# only rewrote observedAt, GitHub delivered it about every 6 h, and this job
+# runs on the Gem host, so it could never cover a Gem outage anyway.
 #
 # Rollback: one revert restores linear-triage-assessment.yml and removes its
 # repository_dispatch event from this file. Never run both writers.
@@ -39,8 +41,6 @@ on:
     workflows: [CI]
     types: [completed]
     branches: [main]
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -61,47 +61,6 @@ jobs:
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 8
     steps:
-      - name: Skip a schedule tick that just refreshed
-        id: debounce
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          GEM_WORKSPACE: /home/timwhite/gem-workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          skip="$(python3 - << 'PY'
-          import json
-          import os
-          from datetime import datetime, timezone
-          from pathlib import Path
-
-          if os.environ.get("EVENT_NAME") != "schedule":
-              print("false")
-              raise SystemExit
-          workspace = os.environ.get("GEM_WORKSPACE", "/home/timwhite/gem-workspace")
-          receipt = Path(workspace, "state", "gem-priority-gate", "latest.json")
-          try:
-              data = json.loads(receipt.read_text(encoding="utf-8"))
-              observed = datetime.fromisoformat(
-                  str(data.get("observedAt", "")).replace("Z", "+00:00")
-              )
-              sha = data.get("signals", {}).get("main", {}).get("sha")
-              age = (datetime.now(timezone.utc) - observed).total_seconds()
-              fresh = (
-                  data.get("schema") == "jovie-fleet-gate/v1"
-                  and isinstance(sha, str)
-                  and len(sha) == 40
-                  and 0 <= age < 120
-              )
-          except (OSError, ValueError, TypeError):
-              fresh = False
-          print("true" if fresh else "false")
-          PY
-          )"
-          echo "skip=$skip" >> "$GITHUB_OUTPUT"
-          if [[ "$skip" == "true" ]]; then
-            echo "Canonical receipt is under 120s old; schedule tick is a no-op."
-          fi
       - name: Checkout exact main gate code
         id: main-checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -115,7 +74,6 @@ jobs:
           node-version: '24'
       - name: Choose receipt writer (emitter fresh, or fallback to canonical)
         id: writer
-        if: steps.debounce.outputs.skip != 'true'
         env:
           GEM_WORKSPACE: /home/timwhite/gem-workspace
         shell: bash
@@ -125,7 +83,7 @@ jobs:
       - name: Generate read-only Jovie Bot token
         id: app-token
         # Only the fallback runs the gate; a fresh emitter receipt mints nothing.
-        if: steps.debounce.outputs.skip != 'true' && steps.writer.outputs.mode == 'fallback'
+        if: steps.writer.outputs.mode == 'fallback'
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
@@ -136,14 +94,14 @@ jobs:
         id: refresh
         # A fresh emitter receipt skips the gate run entirely (~44 Jovie Bot
         # API calls whose output would only land in the runner's scratch dir).
-        if: steps.debounce.outputs.skip != 'true' && steps.writer.outputs.mode == 'fallback'
+        if: steps.writer.outputs.mode == 'fallback'
         uses: ./.github/actions/evaluate-fleet-gate
         env:
           GEM_PRIORITY_GATE_STATE_DIR: ${{ steps.writer.outputs.state_dir }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           # pull_request_target must not write live latest.json (clobbers Gem capacity
-          # when main gate is unfenced). Push, schedule, and dispatch persist.
+          # when main gate is unfenced). Push, CI completion, and dispatch persist.
           dry-run: ${{ github.event_name == 'pull_request_target' && 'true' || 'false' }}
 
       # Source PR/fork workflow definitions never execute their code here.
@@ -169,8 +127,8 @@ jobs:
             --closure-health-file="${{ steps.refresh.outputs.receipt_path || steps.writer.outputs.receipt_path }}"
 
       - name: Recover missed Linear Triage events
-        # Independent of the receipt debounce and new-work admission. A missed
-        # webhook must not wait for another issue edit or a main push.
+        # Independent of the receipt writer mode and new-work admission. A missed
+        # webhook is swept on the next main push or CI completion, not an issue edit.
         # Preserve upstream failures while recovering after their bounded timeout.
         # Candidate or incomplete checkout/setup must never execute this writer.
         if: >-
