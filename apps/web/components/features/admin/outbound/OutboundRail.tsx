@@ -339,7 +339,7 @@ export function OutboundRail({
             <p
               role='status'
               aria-live='polite'
-              className='min-h-4 text-2xs leading-4 text-destructive'
+              className='min-h-4 text-2xs leading-4 text-error'
             >
               {error}
             </p>
