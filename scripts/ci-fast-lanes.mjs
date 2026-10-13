@@ -140,10 +140,11 @@ export const SOURCE_GUARDS = Object.freeze([
     // selection never picked them. Any path can be read, so any change
     // selects the guard; the script narrows to the tests (p50 2, p90 15).
     id: 'web-source-read-tests',
-    // Source Validation runs guards from the trusted base archive; heads
-    // older than this script still get the trusted selector.
-    command:
-      'node "$(dirname "${SOURCE_GUARD_MODULE:-scripts/ci-fast-lanes.mjs}")/lib/web-source-read-tests.mjs"',
+    // Resolved beside this module: Source Validation loads guards from the
+    // trusted base archive, so heads older than the script still get it.
+    command: `node ${JSON.stringify(
+      fileURLToPath(new URL('./lib/web-source-read-tests.mjs', import.meta.url))
+    )}`,
     inputs: /./u,
     prOnly: true,
   }),

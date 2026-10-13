@@ -138,6 +138,7 @@ export function keyMatches(key, file) {
  * @param {string} [root]
  */
 export function sourceReadTests(root = REPO_ROOT) {
+  if (!existsSync(join(root, WEB))) return [];
   return walk(join(root, WEB), [])
     .map(path =>
       path
