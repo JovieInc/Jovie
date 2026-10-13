@@ -226,6 +226,24 @@ export async function runSecurityGate(options = {}) {
     return decision;
   }
 
+  // A report-only merge group repeats the PR-time report (source-validation.yml)
+  // and spent a compare plus a commit-pulls read from the repo's shared
+  // GITHUB_TOKEN bucket on every group rebuild (2026-10-13 rate-limit storms).
+  if (
+    !enabled &&
+    env.GITHUB_EVENT_NAME === 'merge_group' &&
+    options.changedFiles == null
+  ) {
+    const decision = {
+      status: 'report-only',
+      reason: 'merge_group_report_skipped',
+      blocking: [],
+      exitCode: 0,
+    };
+    write(formatGateReport(decision));
+    return decision;
+  }
+
   let changedFiles = options.changedFiles;
   let prBody = options.prBody;
   let labels = options.labels;
