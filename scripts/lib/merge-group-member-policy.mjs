@@ -391,6 +391,7 @@ export async function enforceCombinedTreePayload({
   repository,
   request = githubRequest,
   token,
+  treeSha: provenTreeSha = undefined,
 }) {
   requireSha(headSha, 'merge_group.head_sha');
   splitRepository(repository);
@@ -404,15 +405,17 @@ export async function enforceCombinedTreePayload({
     .split('/')
     .map(encodeURIComponent)
     .join('/');
-  const commit = await request(
-    `/repos/${encodedRepository}/git/commits/${headSha}`,
-    { deadlineMs, token }
-  );
-  const treeSha = commit.data?.tree?.sha;
-  if (
-    commit.data?.sha !== headSha ||
-    !SHA_PATTERN.test(String(treeSha ?? ''))
-  ) {
+  // The compare read already proved the head commit and names its tree.
+  let treeSha = provenTreeSha;
+  if (treeSha === undefined) {
+    const commit = await request(
+      `/repos/${encodedRepository}/git/commits/${headSha}`,
+      { deadlineMs, token }
+    );
+    treeSha = commit.data?.tree?.sha;
+    if (commit.data?.sha !== headSha) treeSha = undefined;
+  }
+  if (!SHA_PATTERN.test(String(treeSha ?? ''))) {
     fail('combined head commit evidence is missing or malformed');
   }
 
@@ -630,6 +633,7 @@ async function evaluateMembers({
   env,
   policy,
   pullRequests,
+  rangeFiles = null,
   repository,
   request,
   token,
@@ -660,13 +664,16 @@ async function evaluateMembers({
           pr.user?.login === 'dependabot[bot]' ||
           pr.head?.ref === 'screenshots/auto-update' ||
           labels.some(label => SIZE_BYPASS_LABELS.has(label));
-        return exempt
-          ? []
-          : githubPages(`/repos/${repository}/pulls/${pr.number}/files`, {
-              token,
-              deadlineMs,
-              request,
-            });
+        if (exempt) return [];
+        // A one-member group's compare diff is that PR's squash: its file
+        // list is already in hand, so the per-member files read is spent
+        // only for multi-member groups or a compare capped at 300 files.
+        if (rangeFiles) return rangeFiles;
+        return githubPages(`/repos/${repository}/pulls/${pr.number}/files`, {
+          token,
+          deadlineMs,
+          request,
+        });
       })
     );
     results = pullRequests.map((pr, index) =>
@@ -728,7 +735,29 @@ export async function runPolicy({
   pullRequests.forEach((pr, index) =>
     assertCurrentPullRequest(members[index], pr)
   );
-  const shared = { deadlineMs, env, pullRequests, repository, request, token };
+  // GitHub's compare returns at most 300 files; a full page may be truncated.
+  const COMPARE_FILE_CAP = 300;
+  const rangeFiles =
+    members.length === 1 &&
+    Array.isArray(comparison.files) &&
+    comparison.files.length < COMPARE_FILE_CAP
+      ? comparison.files
+      : null;
+  const headCommit = comparison.commits.at(-1);
+  const provenTreeSha =
+    headCommit?.sha === headSha &&
+    SHA_PATTERN.test(String(headCommit?.commit?.tree?.sha ?? ''))
+      ? headCommit.commit.tree.sha
+      : undefined;
+  const shared = {
+    deadlineMs,
+    env,
+    pullRequests,
+    rangeFiles,
+    repository,
+    request,
+    token,
+  };
 
   if (also) {
     // Publish the secondary verdict before any primary-only evidence (the
@@ -752,6 +781,7 @@ export async function runPolicy({
       repository,
       request,
       token,
+      treeSha: provenTreeSha,
     });
     const warning = trackedBytesBudgetWarning(payload.bytes);
     if (warning) log(`::warning::Combined tree: ${warning}`);
