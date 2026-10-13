@@ -20,8 +20,31 @@ import {
 
 const repo = resolve(import.meta.dirname, '../../..');
 const script = join(repo, 'scripts/dependabot-pin-sync.mjs');
-const workflow = load(
-  readFileSync(join(repo, '.github/workflows/dependabot-pin-sync.yml'), 'utf8')
+
+/**
+ * @typedef {{
+ *   id?: string,
+ *   uses?: string,
+ *   run?: string,
+ *   with?: Record<string, boolean | string>,
+ * }} PinSyncStep
+ * @typedef {{
+ *   if?: string,
+ *   permissions?: Record<string, string>,
+ *   steps: PinSyncStep[],
+ * }} PinSyncJob
+ */
+const workflow = /** @type {{
+ *   on: { workflow_run: { workflows: string[], types: string[] } },
+ *   permissions: Record<string, string>,
+ *   jobs: { prepare: PinSyncJob, commit: PinSyncJob },
+ * }} */ (
+  load(
+    readFileSync(
+      join(repo, '.github/workflows/dependabot-pin-sync.yml'),
+      'utf8'
+    )
+  )
 );
 const HEAD = 'a'.repeat(40);
 const REPO = 'JovieInc/Jovie';
