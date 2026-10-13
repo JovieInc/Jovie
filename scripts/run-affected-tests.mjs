@@ -901,7 +901,6 @@ const PERFORMANCE_PROFILER_REPAIR_MANIFEST = new Set([
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 const SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST = new Set([
-  '.github/workflows/agent-pipeline.yml',
   '.github/workflows/ci.yml',
   '.github/workflows/merge-queue-autoenroll.yml',
   'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',

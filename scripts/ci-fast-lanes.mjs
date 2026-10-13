@@ -246,7 +246,6 @@ export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   '.github/actions/setup-node-pnpm/**',
   '.github/actions/setup-playwright/**',
   '.github/runner-image/**',
-  '.github/workflows/agent-pipeline.yml',
   '.github/workflows/ci.yml',
   '.github/workflows/e2e-full-matrix.yml',
   '.github/workflows/fleet-gate-refresh.yml',
