@@ -2,12 +2,13 @@ name: Internal PR Review (advisory)
 
 # JOV-7400: internal, advisory-only AI reviewer — the CodeRabbit replacement.
 # Posts exactly one upserted comment per PR head covering correctness risks,
-# test gaps, and migration hazards on PR open, reopen and push. ready_for_review
-# is reserved for auto-merge-default.yml (merge-group workflow contract).
+# test gaps, and migration hazards on non-draft PR open, reopen and push.
+# ready_for_review has one subscriber (JOV-INV-029 PR lifecycle contract), so
+# an undrafted PR is reviewed on its next push.
 # The prompt carries the scoped .claude/rules conventions for changed paths,
 # read from the trusted base checkout.
 #
-# Cost bounds: Dependabot and bot/* report branches are skipped;
+# Cost bounds: drafts, Dependabot and bot/* report branches are skipped;
 # docs-only diffs never wake the job; a newer push cancels the stale run.
 #
 # Non-blocking by construction:
@@ -56,6 +57,7 @@ jobs:
     if: >-
       (github.event_name == 'pull_request_target' ||
        github.ref == 'refs/heads/main') &&
+      github.event.pull_request.draft != true &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
       !startsWith(github.event.pull_request.head.ref, 'bot/') &&
       !startsWith(github.event.pull_request.head.ref, 'dependabot/')

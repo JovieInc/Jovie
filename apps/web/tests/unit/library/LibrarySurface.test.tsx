@@ -1620,7 +1620,8 @@ describe('LibrarySurface', () => {
     fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
     const providerLink = drawer.getByRole('link', { name: /Spotify/u });
 
-    expect(overflowButton.className).toContain('focus-visible:ring-ring');
+    // Canonical IconButton focus ring (shared Button), not a local restyle.
+    expect(overflowButton.className).toContain('focus-visible:ring-focus');
     expect(previewButton.className).toContain(
       'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
     );
