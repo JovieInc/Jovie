@@ -26,7 +26,7 @@ Orchestrator, GitHub AI Dispatcher, Agent Tick, Agent Landing Sweep, and Stuck
 Draft Auto-Close were deleted on 2026-10-12; Taste Classifier and Taste Label
 Guard are deleted at source. Main Autofix and Auto-Fix Lint
 on Agent Drafts are retired at source — the lanes fix loop owns PR and red-main
-repair. Keep Agent Pipeline, PR
+repair (Agent Pipeline was deleted on 2026-10-12). Keep PR
 Conflict Handler, Auto-PR on Agent Push, and the legacy Release Loop disabled
 throughout the drain. The newly added Production
 Controller, Production Controller Health, and Production Release workflows
@@ -230,10 +230,11 @@ Sensitive changes are classified deterministically on source PRs. Smoke and prev
 ## Internal PR Review (advisory)
 
 `internal-review.yml` (JOV-7400) is the internal, advisory-only replacement for
-CodeRabbit. On each PR open, reopen and push it posts one upserted comment covering correctness risks, test gaps, migration
+CodeRabbit. On each non-draft PR open, reopen and push it posts one upserted comment covering correctness risks, test gaps, migration
 hazards and violations of the scoped `.claude/rules` conventions for the
-changed paths, via the Vercel AI Gateway (`zai/glm-5.3-flash`, existing
-`AI_GATEWAY_API_KEY` secret — no new vendors). Dependabot, `bot/*`
+changed paths (with capped base-branch call sites of changed exports, enclosing
+functions, scripts and flags), via the Vercel AI Gateway (`zai/glm-5.3-flash`, existing
+`AI_GATEWAY_API_KEY` secret — no new vendors). Drafts, Dependabot, `bot/*`
 report branches and docs-only diffs are skipped; `gh workflow run
 internal-review.yml -f pr_number=<n>` reviews one PR on demand.
 

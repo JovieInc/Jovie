@@ -43,6 +43,15 @@ function MobileProfilePanelTrigger() {
   );
 }
 
+/**
+ * Marker read by system-b-app.css: on lg the settings column reserves the
+ * companion profile rail's width from the first server paint, so the
+ * auto-opened rail never covers the form and opening it shifts nothing.
+ */
+function CompanionRailReservation() {
+  return <span hidden data-settings-companion-rail='true' />;
+}
+
 export function ArtistProfileContent({
   creatorProfileId = 'unavailable',
   initialArtistRules = [],
@@ -58,6 +67,7 @@ export function ArtistProfileContent({
   if (!artist) {
     return (
       <>
+        <CompanionRailReservation />
         <SettingsSection
           id='artist-profile'
           title='Profile'
@@ -102,6 +112,7 @@ export function ArtistProfileContent({
 
   return (
     <>
+      <CompanionRailReservation />
       <SettingsSection
         id='artist-profile'
         title='Profile'
