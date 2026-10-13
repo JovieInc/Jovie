@@ -3039,26 +3039,9 @@ def publish_verified(host: Host, pr: dict, *, claim: GateClaim | None = None, lo
             ready = sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG], log=log)
             if ready.returncode:
                 return "held:ready-failed"
-        live = require_gate_authority(host, pr, "before-verified-enqueue-policy", sensitive)
-        if blocked := source_publication_authority(live, before_ready=False, log=log):
-            return blocked
-        try:
-            history = sh(["node", str(HERE.parent / "merge-queue-backend.mjs"), "check-reenroll",
-                          str(pr["number"])], timeout=60, log=log, env={**os.environ, "REPO": REPO_SLUG})
-            receipt = json.loads(history.stdout)
-            if history.returncode or receipt != {"number": pr["number"], "reenrollable": True}:
-                return "held:queue-history"
-        except (OSError, ValueError, subprocess.SubprocessError):
-            return "held:queue-history-unavailable"
-        require_gate_authority(host, pr, "after-source-policy-before-enqueue", sensitive)
-        if successful_gate(host, pr, sensitive) is None:
-            return "held:gate-proof"
-        if any(claimed_elsewhere(pr["number"], pr["headRefOid"], kind) for kind in ("fix", "gate")):
-            return "held:publication-owner-active"
-        queued = sh(["gh", "pr", "merge", str(pr["number"]), "--repo", REPO_SLUG, "--auto",
-                     "--match-head-commit", pr["headRefOid"]], log=log)
-        if queued.returncode:
-            return "verified-not-queued"
+        # Merge Queue Green Enroll is the sole queue writer (2026-10-13): it admits this head
+        # on the ready_for_review wake or its push-to-main sweep, behind the same hold labels.
+        # Lanes never arm auto-merge or enqueue; an armed PR keeps enqueuing through a freeze.
         clear_requeue(host, pr["number"], pr["headRefOid"])
         return "landing"
     except (RepairStopped, PublicationRevoked) as error:
@@ -3706,23 +3689,6 @@ def _rerun_failed(pr: dict):
     results = [sh(["gh", "run", "rerun", run, "--failed", "--repo", REPO_SLUG]).returncode == 0
                for run in runs[:RERUN_RUNS_LIMIT]]
     return bool(results) and any(results)
-
-
-def arm_ready_prs(host: Host, prs: list[dict]) -> None:
-    """Select green rearming intent; the shared terminal consumer owns publication."""
-    if not prs or not remediation.escalation_enabled():
-        return
-    path = host.state / "fix-attempts.json"
-    attempts = json.loads(path.read_text()) if path.exists() else {}
-    held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
-    for pr in prs:
-        record = attempts.get(str(pr.get("number")), {})
-        classified = remediation.classify_blocker(pr, held.get(str(pr.get("number"))), record)
-        if classified.get("next_action") != "arm":
-            continue
-        # A cached ready classification cannot retire preservation signals or replace
-        # exact-head proof, owner, source-policy and native queue-history authority.
-        publish_verified(host, pr)
 
 
 def fetch_labeled_events(linear) -> list:
@@ -6409,12 +6375,6 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
     requeue_verified(host, lane_prs(name))
-    claim = Locked(host.state / "claim.lock", blocking=True)
-    try:
-        ready_candidates = fix_candidates(name) if remediation.escalation_enabled() else []
-    finally:
-        claim.release()
-    arm_ready_prs(host, ready_candidates)
     claim = Locked(host.state / "claim.lock", blocking=True)
     # The claim lock serializes the scan, so the shared cache fill happens once. A rate
     # limit skips the API for every worker until the cooldown file expires.
