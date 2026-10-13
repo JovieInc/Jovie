@@ -286,7 +286,9 @@ the queue keep landing, so dequeue any that must stop. The variable does not
 disarm native auto-merge: a PR armed before the flip (by an agent's
 `gh pr merge --auto` or any remaining writer) is still enqueued by GitHub
 when it turns green. Disarm those with `gh pr merge N --disable-auto -R
-JovieInc/Jovie`. `scripts/merge-queue-green-enroll.test.mjs` fails if a job
+JovieInc/Jovie`. After flipping the variable, also run
+`gh pr list -R JovieInc/Jovie --state open --limit 200 --json number,autoMergeRequest --jq '.[] | select(.autoMergeRequest) | .number'`
+and disarm every PR it prints. `scripts/merge-queue-green-enroll.test.mjs` fails if a job
 that can enqueue or arm lacks the guard.
 
 To admit one PR without a roster sweep, dispatch green enroll with
