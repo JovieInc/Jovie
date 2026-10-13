@@ -82,9 +82,10 @@ GitHub enablement state. During the PR-drain rollout, enable only **Merge Queue
 Auto-Enroll** and **Auto-Ready Agent Drafts** first. Enable **Main CI Health
 Monitor** and **Main Autofix** only after the staged queue and production path
 have produced bounded proof. **GitHub AI Orchestrator**, **GitHub AI
-Dispatcher** are retired at source under the Linear-only intake contract;
-**Agent Tick** was deleted on 2026-10-12. Keep **Agent Pipeline**,
-**PR Conflict Handler**, **Stuck Draft Auto-Close**, **Auto-Fix
+Dispatcher**, **Agent Tick**, **Agent Landing Sweep**, and **Stuck Draft
+Auto-Close** were deleted on 2026-10-12 under the Linear-only intake contract.
+**Taste Classifier** and **Taste Label Guard** are deleted at source. Keep **Agent Pipeline**,
+**PR Conflict Handler**, **Auto-Fix
 Lint on Agent Drafts**, **Auto-PR on
 Agent Push**, and the legacy **Release Loop** disabled throughout the drain. The new **Production
 Controller**, **Production Controller Health**, and **Production Release**
@@ -100,8 +101,6 @@ until the observer-only definition lands and is proven.
 
 | Workflow | File | Trigger | What It Does | Usage Pattern | Recommendation |
 |----------|------|---------|--------------|--------------|----------------|
-| **GitHub AI Orchestrator** | `github-ai-orchestrator.yml` | Audit-only `workflow_dispatch` | All jobs are hard-skipped; GitHub Issues cannot select, claim, or dispatch work | Verified `disabled_manually` (workflow ID `306926687`) | **Retired** — Linear-backed Symphony is the sole backlog selector |
-| **GitHub AI Dispatcher** | `github-ai-dispatcher.yml` | Audit-only `workflow_dispatch` | Its only job is hard-skipped; no GitHub Issue scan or dispatch can run | Verified `disabled_manually` (workflow ID `306926686`) | **Retired** — a workflow-state flip cannot restore intake |
 | **Linear AI Dispatcher** | retired (workflow removed) | none | Legacy scheduled Linear polling loop | none | **Retired** — no active `linear-ai-dispatcher.yml` exists |
 | **Hermes CLI Worker** | `hermes-cli-worker.yml` | `repository_dispatch` (`hermes_cli_worker`) + `workflow_dispatch` | Runs a self-hosted CLI worker (codex-cli, claude-code, or ruflo) on Hermes tasks; supports kinds: investigation, bug_patch, code_review, qa, triage, support_draft | Recently shipped (PR #8092); triggered on-demand | **Keep — enable if self-hosted runner is ready** — requires `[self-hosted, hermes]` runner. Verify runner is operational before routing work here. |
 | **Merge Queue Auto-Enroll** | `merge-queue-autoenroll.yml` | PR/CI/main events + manual; no schedule | Revalidates the exact current head and enrolls eligible PRs into GitHub's native merge queue | First controller enabled during drain | **Keep enabled first** — canonical queue enrollment owner |
@@ -120,9 +119,9 @@ until the observer-only definition lands and is proven.
 | **Auto-Resolve Conflicts** | retired (workflow disabled and removed) | none | Merged `main` into PR branches from label events | none | **Retired** — conflict remediation uses the exact-head GitHub Update Branch `REBASE` path; no automatic merge commit or force-push controller remains |
 | **Neon Scheduled Cleanup** | `neon-scheduled-cleanup.yml` | `workflow_dispatch` only | Cleans up orphaned Neon ephemeral branches from E2E / nightly runs | Manual | **Manual-only** — no active schedule |
 | **Neon Ephemeral Branch Cleanup** | `neon-ephemeral-branch-cleanup.yml` | Event-driven (PR close) | Deletes Neon branch created for a PR when PR closes | Per-PR close | **Keep** |
-| **Periodic Evals** | `evals-periodic.yml` | `workflow_dispatch` with typed `RUN_LIVE_EVALS` confirmation | Runs legacy live LLM eval tests; builds Docker image | Manual-only, concurrency 1 | **Keep manual-only** — no scheduled live-eval spend; verify coverage before any scheduled trigger returns |
+| **Periodic Evals** | retired (deleted 2026-10-12) | none | Legacy live LLM eval workflow | No runs in 30 days | **Deleted** |
 | **CI** | `ci.yml` | source PR, native `merge_group`, `main`, and explicit manual dispatch | Source fast gate; exact combined-head integration; queue-proof reuse or direct-main fallback; release-readiness handoff to the production controller | Stage-specific | **Keep** — production mutation is owned outside CI by the fixed controller lease |
-| **Sentry Error Gate** | `sentry-error-gate.yml` | Reusable `workflow_call` | 5-minute soak watching Sentry for error spikes post-deploy; triggers rollback if spike detected | Called by deploy flow | **Keep** |
+| **Sentry Error Gate** | `.github/actions/sentry-error-gate` | `production-release.yml` job | 5-minute soak watching Sentry for error spikes post-deploy; triggers rollback if spike detected | Composite action called by the production release (the reusable workflow wrapper had no callers and was deleted 2026-10-12) | **Keep** |
 | **Canary Health Gate** | `canary-health-gate.yml` | Reusable `workflow_call` | Verifies staging health before production promotion | Called by CI deploy flow | **Keep** |
 | **CodeQL** | `codeql.yml` | `push: main`, `36 5 * * *` UTC, manual | GitHub-native static analysis security scan | Post-merge + nightly | **Keep** |
 | **Security** | `security.yml` | `push: main`, `0 14 * * 1` UTC (upstream-advisory), manual | Additional security scanning | Post-merge + weekly baseline | **Keep** |
@@ -155,7 +154,6 @@ Founder priorities (current cycle): **product stability → design system transf
 
 | Automation | Current Status | Pause Risk |
 |------------|---------------|------------|
-| `Periodic Evals` (`evals-periodic.yml`) | Manual-only with `RUN_LIVE_EVALS` confirmation | Low — no scheduled spend. If this returns to a schedule, add measured per-run cost and current product-surface coverage before relying on results. |
 | `generate-playlist` cron route | Missing from `vercel.json` (runs never) | None — it's already not running. Decide if AI playlist feature is active before adding schedule. |
 | `monitor-metadata-submissions` cron route | Missing from `vercel.json` (runs never) | None — not running. Add schedule only if metadata-submission feature is user-facing. |
 

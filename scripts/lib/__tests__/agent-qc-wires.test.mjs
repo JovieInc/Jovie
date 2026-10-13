@@ -33,7 +33,6 @@ function extractLivePrPredicates(source) {
 
 describe('agent QC wire honesty (JOV-5235)', () => {
   const pipeline = readRepo('.github/workflows/agent-pipeline.yml');
-  const landing = readRepo('.github/workflows/agent-landing-sweep.yml');
   const architecture = readRepo('docs/AGENT_OS_ARCHITECTURE.md');
 
   it('retires the Scope Judge producer and stops advertising a passed gate', () => {
@@ -43,9 +42,6 @@ describe('agent QC wire honesty (JOV-5235)', () => {
     expect(pipeline).not.toContain('CI + Scope Judge both pass');
     expect(pipeline).not.toContain('context == "scope-judge"');
     expect(pipeline).not.toContain('[x] Scope judge');
-    expect(landing).not.toContain('scope-judge-passed');
-    expect(landing).not.toContain('Scope judge = success');
-    expect(landing).not.toContain('context == "scope-judge"');
     expect(architecture).toMatch(
       /github\.scope-judge.*retired|retired.*github\.scope-judge/i
     );

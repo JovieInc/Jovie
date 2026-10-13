@@ -133,6 +133,21 @@ export const SOURCE_GUARDS = Object.freeze([
       /^apps\/web\/(?:tests\/unit\/marketing\/static-revalidate-policy\.test\.ts|(?!tests\/)(?!.*\.(?:test|spec)\.[cm]?[jt]sx?$).+)$/u,
     prOnly: true,
   }),
+  Object.freeze({
+    // Every disk-reading web unit test whose path literals name a changed
+    // file (scripts/lib/web-source-read-tests.mjs). Such tests ejected ~45
+    // merge groups in the 7 days to 2026-10-12 because the import-graph
+    // selection never picked them. Any path can be read, so any change
+    // selects the guard; the script narrows to the tests (p50 2, p90 15).
+    id: 'web-source-read-tests',
+    // Resolved beside this module: Source Validation loads guards from the
+    // trusted base archive, so heads older than the script still get it.
+    command: `node ${JSON.stringify(
+      fileURLToPath(new URL('./lib/web-source-read-tests.mjs', import.meta.url))
+    )}`,
+    inputs: /./u,
+    prOnly: true,
+  }),
 ]);
 
 /**
@@ -409,11 +424,13 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.github/scripts/customer-notes-ready.test.js',
   '.github/scripts/auto-merge-stuck-triage.test.js',
   '.claude/hooks/post-task-validate.test.mjs',
   '.claude/hooks/prod-db-session-guard.test.mjs',
   'scripts/agent-context/check.test.mjs',
+  'scripts/agent/fix-claim.test.mjs',
   'scripts/agent/pen-native-semantic-manifest-contract.test.mjs',
   'scripts/agent/pen-registry-audit.test.mjs',
   'scripts/api-route-pruning.test.mjs',
