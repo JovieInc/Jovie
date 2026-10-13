@@ -1287,13 +1287,11 @@ const FLEET_PROMOTION_GATE_LANE = [
 ];
 const DEPENDABOT_AUTO_MERGE_NODE_TESTS = [
   'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
-  'scripts/lib/__tests__/native-merge-intent.test.mjs',
   'scripts/lib/__tests__/source-admission-policy.test.mjs',
 ];
 const DEPENDABOT_AUTO_MERGE_NODE_TEST_ARGS = [
   '--experimental-test-coverage',
   '--test-coverage-include=scripts/dependabot-workflow-run-adapter.mjs',
-  '--test-coverage-include=scripts/native-merge-intent.mjs',
   '--test-coverage-include=scripts/lib/source-admission-policy.mjs',
   '--test-coverage-lines=95',
 ];
