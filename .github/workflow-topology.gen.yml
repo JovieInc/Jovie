@@ -415,18 +415,6 @@ nodes:
       - pull_request_target
     terminalReceipt: job:fork-gate
     jobCount: 2
-  - name: Gem Producer Drift
-    path: .github/workflows/gem-producer-drift.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - schedule
-      - workflow_dispatch
-    terminalReceipt: job:drift
-    jobCount: 1
   - name: Golden Path Nightly
     path: .github/workflows/golden-path-nightly.yml
     active: true

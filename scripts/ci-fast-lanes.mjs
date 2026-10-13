@@ -481,7 +481,6 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/funnel-judge/coherence-screen.test.mjs',
   'scripts/lib/__tests__/test-file-dependencies.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
-  'scripts/gem-producer-drift/check-attestation.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
