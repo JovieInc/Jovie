@@ -20,6 +20,11 @@ import {
   selectMissedCohort,
   TIM_HOLD_LABELS,
 } from '../auto-ready-green-drafts.mjs';
+import {
+  filterList,
+  triggerNames,
+  workflowTriggers,
+} from '../workflow-triggers.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const fleetScript = readFileSync(
@@ -291,27 +296,25 @@ describe('green-source controller contract', () => {
   });
 
   it('keeps writer-proof recovery manual-only and wakes green-source from CI events', () => {
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).toContain('workflow_run:');
-    expect(workflow).not.toContain('check_suite:');
+    const on = workflowTriggers(workflow);
+    expect(triggerNames(on)).toEqual(['workflow_dispatch', 'workflow_run']);
+    expect(filterList(on.workflow_run.workflows)).toEqual([
+      'Fork PR Gate',
+      'PR Size Guard',
+      'Source Validation',
+    ]);
+    expect(filterList(on.workflow_run.types)).toEqual(['completed']);
     expect(workflow).not.toContain('github.event.check_suite');
     expect(workflow).not.toMatch(/^concurrency:/m);
     expect(workflow).toContain(
       'group: auto-ready-green-source-${{ github.event.inputs.pr_number'
     );
     expect(workflow).toContain('RUN_OFFSET: ${{ github.run_number }}');
-    expect(workflow).toContain(
-      "workflows: ['Source Validation', 'Fork PR Gate', 'PR Size Guard']"
-    );
     expect(workflow).toContain('scripts/auto-ready-green-drafts.sh');
     expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
     expect(workflow).toContain(
       "github.event.workflow_run.event == 'pull_request'"
     );
-    expect(workflow).not.toContain('schedule:');
-    expect(workflow).not.toContain('pull_request:');
-    expect(workflow).not.toContain('types: [opened, synchronize, reopened]');
-    expect(workflow).not.toContain('types: [ready_for_review');
     expect(workflow).not.toContain('ready_for_review/CI cascade');
     expect(workflow).not.toContain('secrets.GITHUB_TOKEN');
   });

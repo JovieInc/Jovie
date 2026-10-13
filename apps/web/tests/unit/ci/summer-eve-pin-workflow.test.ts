@@ -5,6 +5,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import {
+  cronGapMinutes,
+  triggerNames,
+  workflowTriggers,
+} from '../../../../../scripts/lib/workflow-triggers.mjs';
 
 const repoRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -21,10 +26,17 @@ const workflow = readFileSync(
 
 describe('summer eve identity workflow', () => {
   it('stays read-only, rejects deployment pins, and checks source-bound identity', () => {
-    expect(workflow).toContain("cron: '17 * * * *'");
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).toContain('pull_request:');
-    expect(workflow).not.toContain('paths:');
+    // PR-time identity check on every PR (no path filter), an hourly
+    // clock and manual dispatch.
+    const on = workflowTriggers(workflow);
+    expect(triggerNames(on)).toEqual([
+      'pull_request',
+      'schedule',
+      'workflow_dispatch',
+    ]);
+    expect(on.pull_request).not.toHaveProperty('paths');
+    expect(on.pull_request).not.toHaveProperty('paths-ignore');
+    expect(cronGapMinutes(on).max).toBeLessThanOrEqual(60);
     expect(workflow).toContain(
       'controller-hop-exception: jovie-controller-hop/v1'
     );
