@@ -195,10 +195,7 @@ export const ADMISSION_CRON_DEBT_CEILING = 2;
  * `<workflow path>#<job id>`. No entry may be added; the ceiling only goes down.
  */
 /** @type {Readonly<Record<string, string>>} */
-export const POLLING_DEBT = Object.freeze({
-  '.github/workflows/golden-path-nightly.yml#golden-path':
-    'dispatches ci.yml then waits up to 80 min for that run to complete',
-});
+export const POLLING_DEBT = Object.freeze({});
 export const POLLING_DEBT_CEILING = 2;
 
 /**
