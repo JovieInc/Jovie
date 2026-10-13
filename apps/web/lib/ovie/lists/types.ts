@@ -1,5 +1,5 @@
 import type { CreatorFeatures } from './learner';
-import type { OvList, suggestionPrecision } from './model';
+import type { ListMember, OvList, suggestionPrecision } from './model';
 import type { SidebarSmartView } from './smart-views';
 
 /** Client-safe API payload shapes for /api/admin/ov-lists. */
@@ -27,4 +27,16 @@ export interface ListDetail {
   readonly list: OvList;
   readonly creators: readonly ListCreator[];
   readonly precision: ReturnType<typeof suggestionPrecision>;
+}
+
+export interface SmartViewRow {
+  readonly listId: string;
+  readonly listName: string;
+  readonly member: ListMember;
+}
+
+export interface SmartViewDetail {
+  readonly view: { readonly id: string; readonly name: string };
+  readonly rows: readonly SmartViewRow[];
+  readonly creators: readonly ListCreator[];
 }

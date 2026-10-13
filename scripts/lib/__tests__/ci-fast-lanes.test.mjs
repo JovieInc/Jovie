@@ -1924,12 +1924,16 @@ describe('source-read guard selection', () => {
   const selected = (event, files) =>
     selectSourceGuards(event, files).map(guard => guard.id);
 
-  it.each([['pull_request'], ['merge_group'], ['push']])(
+  it.each([
+    ['pull_request', ['web-source-read-tests']],
+    ['merge_group', []],
+    ['push', []],
+  ])(
     'runs ci-schedule-inventory on %s when a workflow changes',
-    event => {
+    (event, pr) => {
       expect(
         selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual(['ci-schedule-inventory']);
+      ).toEqual(['ci-schedule-inventory', ...pr]);
     }
   );
 
@@ -1966,7 +1970,11 @@ describe('source-read guard selection', () => {
     ['apps/web/tests/e2e/public-profile-smoke.spec.ts', []],
     ['apps/ios/Jovie/App.swift', []],
   ])('selects the guards that read %s on a PR', (path, guards) => {
-    expect(selected('pull_request', [path])).toEqual(guards);
+    // Any path can be read by a web test; the script narrows the tests.
+    expect(selected('pull_request', [path])).toEqual([
+      ...guards,
+      'web-source-read-tests',
+    ]);
   });
 
   it('keeps web-only guards to PRs; web merge groups already run them', () => {
@@ -1994,6 +2002,16 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'web-source-read-tests') {
+        expect(guard.command).toContain('/lib/web-source-read-tests.mjs');
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/lib/web-source-read-tests.mjs'),
+            'utf8'
+          )
+        ).toContain('export function selectSourceReadTests');
+        continue;
+      }
       const dir = guard.command.includes('@jovie/web') ? 'apps/web' : 'scripts';
       const file = guard.command.split(' ').at(-1);
       expect(

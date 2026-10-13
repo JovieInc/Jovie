@@ -4,11 +4,10 @@
  *
  * Runs the `@jovie/ui-feel` ESLint rule (eslint-rules/ui-feel.js, JOV-8196)
  * over every web JSX source file and ratchets the per-check counts against
- * ui-feel-ratchet.baseline.json. The rule runs at error severity but CI only
- * lints *changed* files (scripts/lint-eslint-changed.mjs); this guard is the
- * repo-wide twin that fails when any check's count grows past its recorded
- * baseline, so pre-existing violations are captured exactly once and new
- * ones block the PR.
+ * ui-feel-ratchet.baseline.json. The rule is off in the shared eslint config
+ * (legacy debt would fail every touched file); this guard is the repo-wide
+ * gate that fails when any check's count grows past its recorded baseline,
+ * so pre-existing violations are captured exactly once and new ones block.
  *
  * Checks ratcheted (see eslint-rules/ui-feel.js for heuristics):
  *   headingNeedsBalance — <h1>-<h6> without text-wrap balance
@@ -26,14 +25,22 @@
  *     ui-feel-ratchet.baseline.json.
  *   - If a count drops below baseline, update it with `--update` and commit.
  *
+ * PR time: the CI workflow (and this ratchet) only runs in the merge group,
+ * so Source Validation's lint:eslint:changed calls `--changed <baseRef>`,
+ * which fails on any ui-feel violation on a line the PR adds. Untouched
+ * legacy lines stay owned by the baseline, so editing a file never forces
+ * cleaning its debt.
+ *
  * Usage:
  *   node scripts/lint-ui-feel.mjs            # check only
+ *   node scripts/lint-ui-feel.mjs --changed origin/main  # added lines only
  *   node scripts/lint-ui-feel.mjs --list     # print file:line locations
  *   node scripts/lint-ui-feel.mjs --update   # lower the baseline
  *
  * Exit 0 = all counts <= baseline. Exit 1 = regression detected.
  */
 
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, relative } from 'node:path';
@@ -85,11 +92,11 @@ export function loadUiFeelRule() {
 
 // ── scanning ───────────────────────────────────────────────────────────────
 
-async function createEslint(rule) {
+async function createEslint(rule, cwd = projectRoot) {
   const { ESLint } = await import('eslint');
   const tsParser = (await import('@typescript-eslint/parser')).default;
   return new ESLint({
-    cwd: projectRoot,
+    cwd,
     // Only this rule runs: the ratchet measures ui-feel violations, not the
     // rest of the flat config (changed-file ESLint already enforces those).
     overrideConfigFile: true,
@@ -111,16 +118,20 @@ async function createEslint(rule) {
   });
 }
 
-export async function collectViolations({ rule = loadUiFeelRule() } = {}) {
-  if (!rule) return [];
-  const eslint = await createEslint(rule);
-  const results = await eslint.lintFiles(SCAN_GLOBS);
+export async function collectViolations({
+  rule = loadUiFeelRule(),
+  patterns = SCAN_GLOBS,
+  cwd = projectRoot,
+} = {}) {
+  if (!rule || patterns.length === 0) return [];
+  const eslint = await createEslint(rule, cwd);
+  const results = await eslint.lintFiles(patterns);
   const violations = [];
   for (const result of results) {
     for (const message of result.messages ?? []) {
       if (message.ruleId !== RULE_ID) continue;
       violations.push({
-        file: relative(projectRoot, result.filePath).replaceAll('\\', '/'),
+        file: relative(cwd, result.filePath).replaceAll('\\', '/'),
         line: message.line ?? 0,
         messageId: message.messageId ?? 'unknown',
       });
@@ -145,6 +156,95 @@ export function countByCheck(violations) {
     }
   }
   return counts;
+}
+
+// ── added lines (PR-time gate) ─────────────────────────────────────────────
+
+const SCANNED_FILE = /^(app|components|hooks|lib)\/.+\.tsx$/;
+
+/**
+ * Parse `git diff -U0` output into web-root-relative file -> added line
+ * numbers, keeping only files the ratchet scans.
+ */
+export function addedLines(diffStdout) {
+  const added = new Map();
+  let file = null;
+  for (const line of diffStdout.split('\n')) {
+    if (line.startsWith('+++ ')) {
+      const path = line.slice(4).replace(/^b\//, '');
+      const rel = path.startsWith('apps/web/') ? path.slice(9) : null;
+      file = rel && SCANNED_FILE.test(rel) ? rel : null;
+      continue;
+    }
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
+    if (!hunk || !file) continue;
+    const start = Number(hunk[1]);
+    const count = hunk[2] === undefined ? 1 : Number(hunk[2]);
+    if (count === 0) continue;
+    const lines = added.get(file) ?? new Set();
+    for (let n = start; n < start + count; n += 1) lines.add(n);
+    added.set(file, lines);
+  }
+  return added;
+}
+
+export function violationsOnAddedLines(violations, added) {
+  return violations.filter(violation =>
+    added.get(violation.file)?.has(violation.line)
+  );
+}
+
+export async function checkChanged({
+  baseRef,
+  rule,
+  collect = collectViolations,
+  spawn = spawnSync,
+  log = console.log,
+  error = console.error,
+  webRoot = projectRoot,
+}) {
+  const diff = spawn(
+    'git',
+    [
+      'diff',
+      '-U0',
+      '--diff-filter=ACMR',
+      `${baseRef}...HEAD`,
+      '--',
+      'apps/web',
+    ],
+    {
+      cwd: join(webRoot, '..', '..'),
+      encoding: 'utf8',
+      maxBuffer: 256 * 1024 * 1024,
+    }
+  );
+  if (diff.status !== 0) {
+    error(`[lint:ui-feel] could not diff against ${baseRef}`);
+    return 1;
+  }
+  const added = addedLines(diff.stdout);
+  const files = [...added.keys()].filter(file =>
+    existsSync(join(webRoot, file))
+  );
+  const fresh = violationsOnAddedLines(
+    await collect({ rule, patterns: files, cwd: webRoot }),
+    added
+  );
+  if (fresh.length === 0) {
+    log(
+      `[lint:ui-feel] ok — no violations on added lines (${files.length} changed file(s))`
+    );
+    return 0;
+  }
+  error('[lint:ui-feel] new violations on lines this change adds:');
+  for (const violation of fresh) {
+    error(`  ${violation.file}:${violation.line}  ${violation.messageId}`);
+  }
+  error(
+    '[lint:ui-feel] see eslint-rules/ui-feel.js for each check and its fix.'
+  );
+  return 1;
 }
 
 // ── baseline ───────────────────────────────────────────────────────────────
@@ -197,9 +297,11 @@ export async function main(
     loadRule = loadUiFeelRule,
     collect = collectViolations,
     baselinePath = BASELINE_PATH,
+    spawn = spawnSync,
   } = {}
 ) {
   const isUpdate = argv.includes('--update');
+  const changedIndex = argv.indexOf('--changed');
   const isList = argv.includes('--list');
 
   let rule;
@@ -215,6 +317,15 @@ export async function main(
         'and eslint-rules/ui-feel.js is absent — nothing to ratchet yet.'
     );
     return 0;
+  }
+
+  if (changedIndex !== -1) {
+    const baseRef = argv[changedIndex + 1];
+    if (!baseRef) {
+      console.error('[lint:ui-feel] --changed needs a base ref');
+      return 1;
+    }
+    return checkChanged({ baseRef, rule, collect, spawn, log });
   }
 
   const violations = await collect({ rule });

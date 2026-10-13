@@ -76,10 +76,12 @@ describe('run', () => {
     const spawn = vi
       .fn()
       .mockReturnValueOnce(okDiff('apps/web/app/page.tsx\n'))
+      .mockReturnValueOnce({ status: 0 })
       .mockReturnValueOnce({ status: 0 });
     const log = vi.fn();
     expect(run({ spawn, log, exists: () => true })).toBe(0);
-    expect(spawn).toHaveBeenLastCalledWith(
+    expect(spawn).toHaveBeenNthCalledWith(
+      2,
       'pnpm',
       [
         'exec',
@@ -96,7 +98,26 @@ describe('run', () => {
     const spawn = vi
       .fn()
       .mockReturnValueOnce(okDiff('apps/web/app/page.tsx\n'))
-      .mockReturnValueOnce({ status: 2 });
+      .mockReturnValueOnce({ status: 2 })
+      .mockReturnValueOnce({ status: 0 });
     expect(run({ spawn, exists: () => true, log: () => {} })).toBe(2);
+  });
+
+  // @jovie/ui-feel is off in the shared config (ratcheted legacy debt), so
+  // PR time gates it on added lines; the repo-wide ratchet is merge-group only.
+  it('gates ui-feel on added lines against the same base', () => {
+    const spawn = vi
+      .fn()
+      .mockReturnValueOnce(okDiff('apps/web/app/page.tsx\n'))
+      .mockReturnValueOnce({ status: 0 })
+      .mockReturnValueOnce({ status: 1 });
+    expect(
+      run({ baseRef: 'origin/main', spawn, exists: () => true, log: () => {} })
+    ).toBe(1);
+    expect(spawn).toHaveBeenLastCalledWith(
+      'node',
+      ['scripts/lint-ui-feel.mjs', '--changed', 'origin/main'],
+      expect.objectContaining({ stdio: 'inherit' })
+    );
   });
 });

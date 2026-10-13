@@ -1,20 +1,19 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { changelogAnchorId } from '@/lib/changelog-parser';
 import { getChangelogSnapshot } from '@/lib/changelog-source';
 import {
+  type CustomerChangelogEntry,
+  customerChangelogEntryPath,
   formatCustomerChangelogTertiary,
-  projectCustomerChangelog,
+  projectCustomerChangelogArchive,
 } from '@/lib/customer-changelog';
 
 // Fully static
 export const revalidate = false;
 
-export function atomEntryId(version: string): string {
-  return `${BASE_URL}/changelog#${changelogAnchorId(version)}`;
-}
-
-function versionPageUrl(version: string): string {
-  return `${BASE_URL}/changelog/${encodeURIComponent(version)}`;
+export function atomEntryId(
+  entry: Pick<CustomerChangelogEntry, 'slug'>
+): string {
+  return `${BASE_URL}${customerChangelogEntryPath(entry)}`;
 }
 
 function escapeXml(s: string): string {
@@ -28,7 +27,9 @@ function escapeXml(s: string): string {
 
 export async function GET() {
   const snapshot = await getChangelogSnapshot();
-  const entries = projectCustomerChangelog(snapshot.releases).slice(0, 20);
+  const entries = projectCustomerChangelogArchive(
+    snapshot.sourceReleases
+  ).entries.slice(0, 20);
 
   const atomEntries = entries
     .map(entry => {
@@ -40,12 +41,13 @@ export async function GET() {
         entry.technicalVersion
       );
       const contentHtml = `<p>${escapeXml(entry.summary)}</p>`;
+      const url = atomEntryId(entry);
 
       return `
     <entry>
       <title>${escapeXml(entry.title)}</title>
-      <id>${escapeXml(atomEntryId(entry.technicalVersion))}#${escapeXml(entry.slug)}</id>
-      <link href="${escapeXml(versionPageUrl(entry.technicalVersion))}" rel="alternate"/>
+      <id>${escapeXml(url)}</id>
+      <link href="${escapeXml(url)}" rel="alternate"/>
       <updated>${updated}</updated>
       <summary>${escapeXml(tertiary)}</summary>
       <content type="html">${contentHtml}</content>
