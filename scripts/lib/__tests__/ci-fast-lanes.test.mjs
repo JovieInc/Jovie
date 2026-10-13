@@ -1924,12 +1924,16 @@ describe('source-read guard selection', () => {
   const selected = (event, files) =>
     selectSourceGuards(event, files).map(guard => guard.id);
 
-  it.each([['pull_request'], ['merge_group'], ['push']])(
+  it.each([
+    ['pull_request', ['web-source-read-tests']],
+    ['merge_group', []],
+    ['push', []],
+  ])(
     'runs ci-schedule-inventory on %s when a workflow changes',
-    event => {
+    (event, pr) => {
       expect(
         selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual(['ci-schedule-inventory']);
+      ).toEqual(['ci-schedule-inventory', ...pr]);
     }
   );
 
@@ -1943,30 +1947,66 @@ describe('source-read guard selection', () => {
     ['.github/scripts/run-actionlint.sh', []],
     [
       'apps/web/tests/unit/lib/auth/redis-command-budget.test.ts',
-      ['node-environment-files'],
+      ['merge-group-unit-guards', 'node-environment-files'],
     ],
-    ['apps/web/app/api/cron/example/route.test.ts', ['node-environment-files']],
-    ['apps/web/eslint-rules/rule.test.js', ['node-environment-files']],
-    ['apps/web/scripts/tool.test.mjs', ['node-environment-files']],
-    ['apps/web/tests/node-environment-files.json', ['node-environment-files']],
-    ['apps/web/tests/setup-optimized.ts', ['node-environment-files']],
+    [
+      'apps/web/app/api/cron/example/route.test.ts',
+      ['merge-group-unit-guards', 'node-environment-files'],
+    ],
+    [
+      'apps/web/eslint-rules/rule.test.js',
+      ['merge-group-unit-guards', 'node-environment-files'],
+    ],
+    [
+      'apps/web/scripts/tool.test.mjs',
+      ['merge-group-unit-guards', 'node-environment-files'],
+    ],
+    [
+      'apps/web/tests/node-environment-files.json',
+      ['merge-group-unit-guards', 'node-environment-files'],
+    ],
+    [
+      'apps/web/tests/setup-optimized.ts',
+      ['merge-group-unit-guards', 'node-environment-files'],
+    ],
     [
       'apps/web/vitest.config.fast.mts',
-      ['node-environment-files', 'static-revalidate-policy'],
+      [
+        'merge-group-unit-guards',
+        'node-environment-files',
+        'static-revalidate-policy',
+      ],
     ],
-    ['apps/web/lib/queries/fetch.ts', ['static-revalidate-policy']],
+    [
+      'apps/web/lib/queries/fetch.ts',
+      ['merge-group-unit-guards', 'static-revalidate-policy'],
+    ],
     [
       'apps/web/app/(marketing)/download/page.tsx',
-      ['static-revalidate-policy'],
+      ['merge-group-unit-guards', 'static-revalidate-policy'],
     ],
     [
       'apps/web/tests/unit/marketing/static-revalidate-policy.test.ts',
-      ['node-environment-files', 'static-revalidate-policy'],
+      [
+        'merge-group-unit-guards',
+        'node-environment-files',
+        'static-revalidate-policy',
+      ],
     ],
     ['apps/web/tests/e2e/public-profile-smoke.spec.ts', []],
     ['apps/ios/Jovie/App.swift', []],
+    // OutboundRail.tsx text-destructive ejected group pr-21458 (10-13).
+    [
+      'apps/web/components/features/admin/outbound/OutboundRail.tsx',
+      ['merge-group-unit-guards', 'static-revalidate-policy'],
+    ],
+    ['packages/ui/src/button.tsx', ['merge-group-unit-guards']],
   ])('selects the guards that read %s on a PR', (path, guards) => {
-    expect(selected('pull_request', [path])).toEqual(guards);
+    // Any path can be read by a web test; the script narrows the tests.
+    expect(selected('pull_request', [path])).toEqual([
+      ...guards,
+      'web-source-read-tests',
+    ]);
   });
 
   it('keeps web-only guards to PRs; web merge groups already run them', () => {
@@ -1994,6 +2034,16 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'web-source-read-tests') {
+        expect(guard.command).toContain('/lib/web-source-read-tests.mjs');
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/lib/web-source-read-tests.mjs'),
+            'utf8'
+          )
+        ).toContain('export function selectSourceReadTests');
+        continue;
+      }
       const dir = guard.command.includes('@jovie/web') ? 'apps/web' : 'scripts';
       const file = guard.command.split(' ').at(-1);
       expect(

@@ -159,7 +159,11 @@ exit 0
     const rejected = invoke();
     assert.notEqual(rejected.status, 0, rejected.stdout + rejected.stderr);
     assert.match(rejected.stdout + rejected.stderr, /TS2353/);
-    assert.match(readFileSync(calls, 'utf8'), /typecheck:stories\n$/);
+    // Story types check alongside the workspace typecheck; a rejection still
+    // stops the contract before any later gate runs.
+    const rejectedCalls = readFileSync(calls, 'utf8');
+    assert.match(rejectedCalls, /typecheck:stories\n/);
+    assert.doesNotMatch(rejectedCalls, /biome:check/);
     writeStory(false);
     git('add', '.');
     git('commit', '--quiet', '-m', 'use supported story props');
@@ -406,6 +410,7 @@ test('source validation rejects type errors and locked UI contract failures befo
       'typecheck',
       'run typecheck:scripts',
       '--filter @jovie/web run typecheck:tests',
+      '--filter @jovie/web run typecheck:stories',
       'screen-registration-gate',
       '--filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts',
     ]) {

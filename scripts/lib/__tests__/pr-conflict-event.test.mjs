@@ -1565,10 +1565,7 @@ else process.exit(2);
       WORKFLOW.match(
         /event_args=\(--event-payload-file "\$EVENT_PAYLOAD_PATH"\)/gu
       )
-    ).toHaveLength(2);
-    expect(WORKFLOW).toContain(
-      'if node scripts/pr-conflict-handler.mjs --dry-run "${event_args[@]}"'
-    );
+    ).toHaveLength(1);
     expect(WORKFLOW.match(/IN\("hold", "gated", "incident"\)/gu)).toHaveLength(
       3
     );
