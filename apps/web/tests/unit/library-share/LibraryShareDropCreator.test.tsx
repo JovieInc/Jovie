@@ -198,3 +198,27 @@ describe('LibraryShareDropCreator controlled by the link row', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
+
+describe('LibraryShareDropCreator asset picker', () => {
+  it('leads with the work being shared and contains long titles', () => {
+    render(
+      <LibraryShareDropCreator
+        releaseIds={['release-3']}
+        candidateAssets={[
+          { id: 'release-1', title: 'Midnight Drive' },
+          { id: 'release-3', title: 'Afterhours' },
+        ]}
+        defaultTitle='Afterhours files'
+        open
+      />
+    );
+    const picker = screen.getByTestId('library-share-asset-picker');
+    expect(picker.className).toContain('min-w-0');
+    const boxes = picker.querySelectorAll('input[type=checkbox]');
+    expect(boxes[0]).toHaveAttribute(
+      'data-testid',
+      'library-share-asset-release-3'
+    );
+    expect(boxes[0]).toBeChecked();
+  });
+});
