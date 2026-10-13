@@ -116,10 +116,12 @@ test('merge-queue-green-enroll is the only workflow that arms or enqueues PRs', 
         source
       );
     });
-  assert.deepEqual(writers, [
-    'agent-pipeline.yml',
-    'merge-queue-green-enroll.yml',
-  ]);
+  // agent-pipeline.yml is tolerated only while it exists; deleting it must
+  // not turn this red, and no other workflow may join it.
+  assert.deepEqual(
+    writers.filter(name => name !== 'agent-pipeline.yml'),
+    ['merge-queue-green-enroll.yml']
+  );
 });
 
 test('green enroll wakes on ready_for_review but never runs enroll for a draft event', () => {
