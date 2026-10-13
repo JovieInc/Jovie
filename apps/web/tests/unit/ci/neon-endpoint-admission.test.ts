@@ -449,8 +449,13 @@ describe('Neon endpoint admission', () => {
     expect(createBranch).toContain('2>"$CREATE_STDERR"');
     expect(createBranch).not.toContain('"${args[@]}" 2>&1');
     expect(capacityRetry).toContain('NEON_CREATE_ATTEMPTS:-12');
+    expect(capacityRetry).toContain('NEON_CREATE_5XX_BACKOFF_SECONDS:-2');
+    expect(capacityRetry).toContain('NEON_CREATE_5XX_BACKOFF_CAP_SECONDS:-30');
     expect(capacityRetry).toContain(
       'exceeded (the )?limit of concurrently active endpoints'
+    );
+    expect(capacityRetry).toContain(
+      'HTTP([[:space:]-]+status)?[[:space:]:=-]*5[0-9]{2}([^0-9]|$)'
     );
     expect(capacityRetry).toContain(
       'failed with a non-capacity error; refusing to retry'
@@ -525,6 +530,110 @@ describe('Neon endpoint admission', () => {
       expect(nonCapacity.stdout).toContain(
         'non-capacity error; refusing to retry'
       );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('retries HTTP 5xx with bounded backoff and keeps other 4xx fatal', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'neon-5xx-retry-'));
+    const actionPath = resolve(root, 'action');
+    const workspace = resolve(root, 'workspace');
+    const bin = resolve(root, 'bin');
+    mkdirSync(actionPath, { recursive: true });
+    mkdirSync(resolve(workspace, 'scripts/ci'), { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(
+      resolve(workspace, 'scripts/ci/neon-orphan-reaper.mjs'),
+      "import { appendFileSync } from 'node:fs'; appendFileSync(process.env.REAPER_LOG, 'reap\\n');\n"
+    );
+    writeFileSync(
+      resolve(bin, 'sleep'),
+      '#!/usr/bin/env bash\nprintf "%s\\n" "$1" >> "$SLEEP_LOG"\n'
+    );
+    chmodSync(resolve(bin, 'sleep'), 0o755);
+    const createPath = resolve(actionPath, 'create-branch.sh');
+    const wrapper = resolve(
+      repoRoot,
+      '.github/actions/neon-create-branch-with-retry/create-branch-with-capacity-retry.sh'
+    );
+    const attemptsFile = resolve(root, 'attempts');
+    const reaperLog = resolve(root, 'reaper.log');
+    const sleepLog = resolve(root, 'sleep.log');
+    const env = {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      GITHUB_ACTION_PATH: actionPath,
+      GITHUB_WORKSPACE: workspace,
+      NEON_CREATE_ATTEMPTS: '3',
+      NEON_CREATE_RETRY_SECONDS: '15',
+      NEON_CREATE_5XX_BACKOFF_SECONDS: '8',
+      NEON_CREATE_5XX_BACKOFF_CAP_SECONDS: '10',
+      ATTEMPTS_FILE: attemptsFile,
+      REAPER_LOG: reaperLog,
+      SLEEP_LOG: sleepLog,
+    };
+    const live502 =
+      'ERROR: HTTP 502 Bad Gateway | /api/v2/projects/curly-dew-35158967/branches/br-hidden-pine-adz9relp/databases';
+
+    const run = (script: string) => {
+      writeFileSync(attemptsFile, '0');
+      writeFileSync(reaperLog, '');
+      writeFileSync(sleepLog, '');
+      writeFileSync(createPath, script);
+      chmodSync(createPath, 0o755);
+      return spawnSync('bash', [wrapper], { env, encoding: 'utf8' });
+    };
+
+    try {
+      const recovered = run(
+        `#!/usr/bin/env bash\ncount=$(($(cat "$ATTEMPTS_FILE" 2>/dev/null || echo 0) + 1))\necho "$count" > "$ATTEMPTS_FILE"\nif [ "$count" -eq 1 ]; then echo '${live502}' >&2; exit 1; fi\nexit 0\n`
+      );
+      expect(recovered.status).toBe(0);
+      expect(readFileSync(attemptsFile, 'utf8').trim()).toBe('2');
+      expect(readFileSync(reaperLog, 'utf8').trim().split('\n')).toEqual([
+        'reap',
+      ]);
+      expect(readFileSync(sleepLog, 'utf8').trim()).toBe('8');
+      expect(recovered.stdout).toContain(
+        'returned HTTP 5xx on attempt 1/3; bounded backoff 8s before retry.'
+      );
+
+      const capped = run(
+        `#!/usr/bin/env bash\ncount=$(($(cat "$ATTEMPTS_FILE" 2>/dev/null || echo 0) + 1))\necho "$count" > "$ATTEMPTS_FILE"\necho 'HTTP status 503' >&2\nexit 1\n`
+      );
+      expect(capped.status).toBe(1);
+      expect(readFileSync(attemptsFile, 'utf8').trim()).toBe('3');
+      expect(readFileSync(sleepLog, 'utf8').trim().split('\n')).toEqual([
+        '8',
+        '10',
+      ]);
+      expect(readFileSync(reaperLog, 'utf8').trim().split('\n')).toEqual([
+        'reap',
+      ]);
+      expect(capped.stdout).toContain(
+        'still returned HTTP 5xx after 3 attempts.'
+      );
+
+      for (const fatal of [
+        'ERROR: HTTP 400 Bad Request',
+        'ERROR: HTTP 404 Not Found',
+        'HTTP status 422',
+        'HTTP 429 Too Many Requests',
+        'HTTP 499',
+        'HTTP 5020 is not a three-digit status',
+        'authentication failed',
+      ]) {
+        const result = run(
+          `#!/usr/bin/env bash\ncount=$(($(cat "$ATTEMPTS_FILE" 2>/dev/null || echo 0) + 1))\necho "$count" > "$ATTEMPTS_FILE"\necho '${fatal}' >&2\nexit 7\n`
+        );
+        expect(result.status, fatal).toBe(7);
+        expect(readFileSync(attemptsFile, 'utf8').trim(), fatal).toBe('1');
+        expect(readFileSync(sleepLog, 'utf8'), fatal).toBe('');
+        expect(result.stdout, fatal).toContain(
+          'non-capacity error; refusing to retry'
+        );
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
