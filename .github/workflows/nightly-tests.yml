@@ -155,16 +155,8 @@ jobs:
           GIT_BRANCH: nightly
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Cache Playwright Browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium only)
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
 
       - name: Seed nightly QA data
         run: |

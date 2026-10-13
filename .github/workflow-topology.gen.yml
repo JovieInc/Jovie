@@ -119,17 +119,6 @@ nodes:
       - workflow_run
     terminalReceipt: job:exhaust
     jobCount: 5
-  - name: Agent Tick
-    path: .github/workflows/agent-tick.yml
-    active: false
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_dispatch
-    terminalReceipt: job:synthetic-monitoring
-    jobCount: 7
   - name: Auto-Merge Default
     path: .github/workflows/auto-merge-default.yml
     active: true
