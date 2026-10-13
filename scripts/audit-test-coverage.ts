@@ -759,7 +759,7 @@ ${mutationSection}
 - **Cov %** is statement coverage from v8 (\`apps/web/coverage/coverage-final.json\`).
 - **Branch %** is branch coverage from v8 — the metric that actually matters for critical paths.
 - **Mut** is mutation score from Stryker (\`apps/web/reports/stryker-incremental.json\`). \`—\` means Stryker hasn't run for this surface.
-- **Δ7d** is coverage delta vs the previous snapshot at \`.context/test-coverage-snapshot.json\`.
+- **Δ7d** is coverage delta vs the previous snapshot at \`apps/web/reports/test-coverage-snapshot.json\`.
 
 ## Update Cadence
 
